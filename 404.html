@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Mantenimiento Industrial</title>
+  <script>
+    // SPA redirect para GitHub Pages
+    var base = '/mantenimiento-planta';
+    var path = window.location.pathname;
+    if (path !== base && path !== base + '/') {
+      sessionStorage.setItem('spa-redirect', path);
+    }
+    window.location.replace(base + '/');
+  </script>
+</head>
+<body>
+  Redirigiendo...
+</body>
+</html>

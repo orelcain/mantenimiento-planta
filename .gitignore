@@ -1,0 +1,24 @@
+node_modules
+dist
+*.log
+.turbo
+*.tsbuildinfo
+
+# Build outputs
+apps/pwa/dist
+apps/pwa/vite.config.js
+apps/pwa/vite.config.d.ts
+
+# Map images (uploaded by users, stored in Firebase)
+*.png
+apps/pwa/public/maps/*.png
+
+# Local env files
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea
+*.swp
+*.swo

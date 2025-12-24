@@ -1,0 +1,3 @@
+# Maps Directory
+This directory contains map images uploaded by users.
+Images are stored in Firebase Storage and served from there.
