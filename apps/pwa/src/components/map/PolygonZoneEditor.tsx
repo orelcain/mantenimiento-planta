@@ -36,7 +36,7 @@ import {
 } from '@/components/ui'
 import { useAppStore, useAuthStore } from '@/store'
 import { getZones, createZone, deleteZone } from '@/services/zones'
-import { uploadMapImage, getMapImages } from '@/services/storage'
+import { uploadMapImage, getMapImages, deleteMapImage } from '@/services/storage'
 import type { Zone, ZoneType, MapPoint } from '@/types'
 import { cn } from '@/lib/utils'
 import { getAssetUrl, isFirebaseStorageUrl } from '@/lib/config'
@@ -899,25 +899,61 @@ export function PolygonZoneEditor() {
           <DialogHeader>
             <DialogTitle>Seleccionar Plano</DialogTitle>
           </DialogHeader>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-4 max-h-[60vh] overflow-y-auto">
             {availableMaps.map((url, i) => (
               <div
                 key={url}
                 className={cn(
-                  'relative aspect-video rounded-lg overflow-hidden cursor-pointer border-2 transition-all',
+                  'relative aspect-video rounded-lg overflow-hidden border-2 transition-all group',
                   mapImage === url ? 'border-primary ring-2 ring-primary' : 'border-muted hover:border-primary/50'
                 )}
-                onClick={() => { setMapImage(url); setShowMapSelector(false); }}
               >
-                <img src={url} alt={`Plano ${i + 1}`} className="w-full h-full object-cover" />
+                <img 
+                  src={url} 
+                  alt={`Plano ${i + 1}`} 
+                  className="w-full h-full object-cover cursor-pointer" 
+                  onClick={() => { setMapImage(url); setShowMapSelector(false); }}
+                />
                 {mapImage === url && (
-                  <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
+                  <div className="absolute inset-0 bg-primary/20 flex items-center justify-center pointer-events-none">
                     <Check className="h-8 w-8 text-primary" />
                   </div>
+                )}
+                {/* Botón eliminar - solo visible en hover */}
+                {isAdmin && availableMaps.length > 1 && (
+                  <Button
+                    variant="destructive"
+                    size="icon"
+                    className="absolute top-1 right-1 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={async (e) => {
+                      e.stopPropagation()
+                      if (confirm(`¿Eliminar este plano?`)) {
+                        try {
+                          await deleteMapImage(url)
+                          // Si era el mapa actual, cambiar a otro
+                          if (mapImage === url) {
+                            const otherMap = availableMaps.find(m => m !== url)
+                            setMapImage(otherMap || null)
+                          }
+                          await loadAvailableMaps()
+                        } catch (error) {
+                          console.error('Error eliminando mapa:', error)
+                          alert('Error al eliminar el mapa')
+                        }
+                      }
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 )}
               </div>
             ))}
           </div>
+          {availableMaps.length === 0 && (
+            <p className="text-center text-muted-foreground py-8">
+              No hay planos subidos. Usa el botón "Subir plano" para agregar uno.
+            </p>
+          )}
         </DialogContent>
       </Dialog>
     </div>
