@@ -64,11 +64,8 @@ export function App() {
     return () => unsubscribe()
   }, [setUser, setLoading])
 
-  // Get base path from Vite config
-  const basename = import.meta.env.BASE_URL
-
   return (
-    <BrowserRouter basename={basename}>
+    <BrowserRouter basename="/mantenimiento-planta">
       <Routes>
         {/* Public routes */}
         <Route

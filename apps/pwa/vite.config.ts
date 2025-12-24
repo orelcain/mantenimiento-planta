@@ -9,6 +9,8 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'robots.txt', 'icons/*.svg'],
+      scope: '/mantenimiento-planta/',
+      base: '/mantenimiento-planta/',
       manifest: {
         name: 'Sistema de Mantenimiento Industrial',
         short_name: 'Mantenimiento',
