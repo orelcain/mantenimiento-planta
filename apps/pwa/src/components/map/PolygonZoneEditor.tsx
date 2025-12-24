@@ -148,7 +148,8 @@ export function PolygonZoneEditor() {
       console.error('Error cargando imagen del mapa')
       setImageLoaded(false)
     }
-    img.src = mapImage
+    // Si es URL de Firebase Storage, usarla directamente; si es local, agregar basePath
+    img.src = isFirebaseStorageUrl(mapImage) ? mapImage : getAssetUrl(mapImage)
   }, [mapImage])
 
   // Calcular bounds de un polígono

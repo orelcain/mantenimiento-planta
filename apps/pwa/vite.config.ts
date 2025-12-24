@@ -10,11 +10,25 @@ export default defineConfig({
       registerType: 'autoUpdate',
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,webp}'],
-        // No cachear URLs de Firebase Storage
-        navigateFallbackDenylist: [/^\/api/, /firebasestorage\.googleapis\.com/],
+        // No cachear URLs de Firebase Storage - IMPORTANTE para evitar CORS
+        navigateFallback: 'index.html',
+        navigateFallbackDenylist: [/^\/api/, /firebasestorage\.googleapis\.com/, /\.firebasestorage\.app/],
+        // Excluir completamente Firebase Storage del SW
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/firebasestorage\.googleapis\.com\/.*/i,
+            handler: 'NetworkOnly',
+            options: {
+              backgroundSync: {
+                name: 'firebase-storage-queue',
+                options: {
+                  maxRetentionTime: 24 * 60 // 24 hours
+                }
+              }
+            }
+          },
+          {
+            urlPattern: /\.firebasestorage\.app\/.*/i,
             handler: 'NetworkOnly'
           }
         ]
@@ -31,6 +45,12 @@ export default defineConfig({
         lang: 'es',
         orientation: 'portrait',
         icons: [
+          {
+            src: 'icons/icon.svg',
+            sizes: 'any',
+            type: 'image/svg+xml',
+            purpose: 'any'
+          },
           {
             src: 'icons/icon-192.svg',
             sizes: '192x192',
