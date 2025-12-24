@@ -4,6 +4,7 @@ import { onAuthChange, getUserById } from '@/services/auth'
 import { useAuthStore } from '@/store'
 import { LoadingScreen } from '@/components/ui'
 import { MainLayout } from '@/components/layout'
+import { HelpProvider } from '@/components/help'
 import {
   LoginPage,
   DashboardPage,
@@ -65,38 +66,40 @@ export function App() {
   }, [setUser, setLoading])
 
   return (
-    <BrowserRouter basename="/mantenimiento-planta">
-      <Routes>
-        {/* Public routes */}
-        <Route
-          path="/login"
-          element={
-            <PublicRoute>
-              <LoginPage />
-            </PublicRoute>
-          }
-        />
+    <HelpProvider>
+      <BrowserRouter basename="/mantenimiento-planta">
+        <Routes>
+          {/* Public routes */}
+          <Route
+            path="/login"
+            element={
+              <PublicRoute>
+                <LoginPage />
+              </PublicRoute>
+            }
+          />
 
-        {/* Private routes */}
-        <Route
-          path="/"
-          element={
-            <PrivateRoute>
-              <MainLayout />
-            </PrivateRoute>
-          }
-        >
-          <Route index element={<DashboardPage />} />
-          <Route path="incidents" element={<IncidentsPage />} />
-          <Route path="map" element={<MapPage />} />
-          <Route path="equipment" element={<EquipmentPage />} />
-          <Route path="preventive" element={<PreventivePage />} />
-          <Route path="settings" element={<SettingsPage />} />
-        </Route>
+          {/* Private routes */}
+          <Route
+            path="/"
+            element={
+              <PrivateRoute>
+                <MainLayout />
+              </PrivateRoute>
+            }
+          >
+            <Route index element={<DashboardPage />} />
+            <Route path="incidents" element={<IncidentsPage />} />
+            <Route path="map" element={<MapPage />} />
+            <Route path="equipment" element={<EquipmentPage />} />
+            <Route path="preventive" element={<PreventivePage />} />
+            <Route path="settings" element={<SettingsPage />} />
+          </Route>
 
-        {/* Fallback */}
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </BrowserRouter>
+          {/* Fallback */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </HelpProvider>
   )
 }

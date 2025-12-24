@@ -16,6 +16,7 @@ import { Avatar, AvatarFallback } from '@/components/ui'
 import { useAuthStore, useIsAdmin } from '@/store'
 import { signOut } from '@/services/auth'
 import { cn } from '@/lib/utils'
+import { HelpButton, HelpModal, WelcomeModal } from '@/components/help'
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
@@ -166,7 +167,8 @@ export function MainLayout() {
           <div className="flex-1" />
 
           {/* Desktop user menu */}
-          <div className="hidden lg:flex items-center gap-2">
+          <div className="hidden lg:flex items-center gap-3">
+            <HelpButton />
             <span className="text-sm text-muted-foreground">
               {user?.nombre} {user?.apellido}
             </span>
@@ -183,6 +185,10 @@ export function MainLayout() {
           <Outlet />
         </main>
       </div>
+
+      {/* Help System Modals */}
+      <HelpModal />
+      <WelcomeModal />
     </div>
   )
 }
