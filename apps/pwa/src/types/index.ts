@@ -20,13 +20,35 @@ export interface User {
   photoURL?: string
 }
 
-// Zona del mapa (cuadrante jerárquico)
+// Tipo de zona
+export type ZoneType = 
+  | 'produccion' 
+  | 'almacen' 
+  | 'oficinas' 
+  | 'mantenimiento' 
+  | 'carga_descarga'
+  | 'servicios'
+  | 'seguridad'
+  | 'otro'
+
+// Punto en el mapa (coordenadas normalizadas 0-1)
+export interface MapPoint {
+  x: number // 0-1 relativo al ancho del mapa
+  y: number // 0-1 relativo al alto del mapa
+}
+
+// Zona del mapa (polígono dibujado punto a punto)
 export interface Zone {
-  id: string // "A", "A1", "A1-3"
+  id: string // ID único generado
   parentId: string | null
   nivel: 1 | 2 | 3
   nombre: string
+  codigo: string // Código corto: "A", "B", "PROD-1", etc.
+  tipo: ZoneType
   descripcion?: string
+  // Polígono: array de puntos que forman la zona
+  polygon: MapPoint[]
+  // Bounds calculados del polígono (para búsquedas rápidas)
   bounds?: {
     minX: number
     minY: number

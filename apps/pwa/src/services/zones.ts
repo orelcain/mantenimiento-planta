@@ -104,8 +104,17 @@ export async function deleteZone(id: string): Promise<void> {
 function parseZoneDoc(doc: any): Zone {
   const data = doc.data()
   return {
-    ...data,
     id: doc.id,
+    parentId: data.parentId || null,
+    nivel: data.nivel || 1,
+    nombre: data.nombre || '',
+    codigo: data.codigo || data.id || '', // Compatibilidad con zonas antiguas
+    tipo: data.tipo || 'otro',
+    descripcion: data.descripcion || '',
+    polygon: data.polygon || [],
+    bounds: data.bounds || undefined,
+    color: data.color || '#2196f3',
+    activa: data.activa !== false,
     createdAt: toDate(data.createdAt),
     updatedAt: toDate(data.updatedAt),
   } as Zone

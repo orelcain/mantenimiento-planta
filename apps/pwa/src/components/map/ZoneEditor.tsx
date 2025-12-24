@@ -288,11 +288,22 @@ export function ZoneEditor() {
     // Generar ID de zona (A, B, C... o A1, A2 si es subzona)
     const nextId = String.fromCharCode(65 + zones.length) // A, B, C...
 
-    const newZone: Omit<Zone, 'id'> & { id: string } = {
+    // Crear polígono rectangular desde bounds
+    const polygon = [
+      { x: bounds.minX, y: bounds.minY },
+      { x: bounds.maxX, y: bounds.minY },
+      { x: bounds.maxX, y: bounds.maxY },
+      { x: bounds.minX, y: bounds.maxY },
+    ]
+
+    const newZone = {
       id: nextId,
       nombre: zoneName || `Zona ${nextId}`,
+      codigo: nextId,
+      tipo: 'otro' as const,
       descripcion: zoneDescription,
-      nivel: 1,
+      nivel: 1 as const,
+      polygon,
       bounds,
       color: zoneColor,
       parentId: null,

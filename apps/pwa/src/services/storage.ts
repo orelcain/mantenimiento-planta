@@ -3,6 +3,7 @@ import {
   uploadBytes,
   getDownloadURL,
   deleteObject,
+  listAll,
 } from 'firebase/storage'
 import { storage } from './firebase'
 import { generateId } from '@/lib/utils'
@@ -138,4 +139,40 @@ export async function compressImage(
       reject(new Error('Error cargando imagen'))
     }
   })
+}
+// Subir imagen del mapa/plano
+export async function uploadMapImage(file: File): Promise<string> {
+  const fileExtension = file.name.split('.').pop() || 'png'
+  const fileName = `map_${Date.now()}.${fileExtension}`
+  const storageRef = ref(storage, `maps/${fileName}`)
+  
+  await uploadBytes(storageRef, file)
+  return getDownloadURL(storageRef)
+}
+
+// Obtener todas las imágenes de mapas disponibles
+export async function getMapImages(): Promise<string[]> {
+  try {
+    const mapsRef = ref(storage, 'maps')
+    const result = await listAll(mapsRef)
+    
+    const urls = await Promise.all(
+      result.items.map(item => getDownloadURL(item))
+    )
+    
+    return urls
+  } catch (error) {
+    console.error('Error obteniendo mapas:', error)
+    return []
+  }
+}
+
+// Eliminar mapa
+export async function deleteMapImage(url: string): Promise<void> {
+  try {
+    const storageRef = ref(storage, url)
+    await deleteObject(storageRef)
+  } catch (error) {
+    console.error('Error eliminando mapa:', error)
+  }
 }

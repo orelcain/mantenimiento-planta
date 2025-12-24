@@ -17,9 +17,9 @@ import {
   Badge,
 } from '@/components/ui'
 import { useAppStore, useAuthStore } from '@/store'
-import { getMainZones } from '@/services/zones'
+import { getZones } from '@/services/zones'
 import { subscribeToIncidents } from '@/services/incidents'
-import { ZoneEditor } from '@/components/map'
+import { PolygonZoneEditor } from '@/components/map'
 import type { Zone, Incident } from '@/types'
 import { cn } from '@/lib/utils'
 
@@ -27,9 +27,9 @@ type ViewMode = 'view' | 'edit'
 
 export function MapPage() {
   const { user } = useAuthStore()
-  const { zones, setZones, setSelectedZone, incidents, setIncidents } = useAppStore()
+  const { zones, setZones, setSelectedZone, incidents, setIncidents, mapImage } = useAppStore()
   const [viewMode, setViewMode] = useState<ViewMode>('view')
-  const [mapUrl] = useState('/maps/map_1760411932641.png')
+  const mapUrl = mapImage || '/maps/map_1760411932641.png'
   const [scale, setScale] = useState(1)
   const [position, setPosition] = useState({ x: 0, y: 0 })
   const [isDragging, setIsDragging] = useState(false)
@@ -40,7 +40,7 @@ export function MapPage() {
 
   // Cargar zonas
   useEffect(() => {
-    getMainZones().then(setZones)
+    getZones().then(setZones)
   }, [setZones])
 
   // Suscribirse a incidencias activas
@@ -121,7 +121,7 @@ export function MapPage() {
     setIsDragging(false)
   }
 
-  // Modo Editor
+  // Modo Editor - Usar el nuevo editor de polígonos
   if (viewMode === 'edit') {
     return (
       <div className="space-y-6">
@@ -130,7 +130,7 @@ export function MapPage() {
           <div>
             <h1 className="text-2xl font-bold">Editor de Zonas</h1>
             <p className="text-muted-foreground">
-              Dibuja y configura las zonas de la planta
+              Dibuja zonas poligonales punto a punto sobre el plano
             </p>
           </div>
           <Button variant="outline" onClick={() => setViewMode('view')}>
@@ -139,11 +139,10 @@ export function MapPage() {
           </Button>
         </div>
 
-        <ZoneEditor />
+        <PolygonZoneEditor />
       </div>
     )
   }
-
   // Modo Vista
   return (
     <div className="space-y-6">
