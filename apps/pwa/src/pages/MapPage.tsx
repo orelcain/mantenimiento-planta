@@ -22,6 +22,7 @@ import { subscribeToIncidents } from '@/services/incidents'
 import { PolygonZoneEditor } from '@/components/map'
 import type { Zone, Incident } from '@/types'
 import { cn } from '@/lib/utils'
+import { getAssetUrl, isFirebaseStorageUrl } from '@/lib/config'
 
 type ViewMode = 'view' | 'edit'
 
@@ -29,7 +30,10 @@ export function MapPage() {
   const { user } = useAuthStore()
   const { zones, setZones, setSelectedZone, incidents, setIncidents, mapImage } = useAppStore()
   const [viewMode, setViewMode] = useState<ViewMode>('view')
-  const mapUrl = mapImage || '/maps/map_1760411932641.png'
+  // Si es URL de Firebase Storage, usarla directamente; si es local, agregar basePath
+  const mapUrl = mapImage 
+    ? (isFirebaseStorageUrl(mapImage) ? mapImage : getAssetUrl(mapImage))
+    : getAssetUrl('/maps/plano-planta.png')
   const [scale, setScale] = useState(1)
   const [position, setPosition] = useState({ x: 0, y: 0 })
   const [isDragging, setIsDragging] = useState(false)

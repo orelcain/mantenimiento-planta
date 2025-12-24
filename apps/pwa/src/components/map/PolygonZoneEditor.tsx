@@ -39,6 +39,7 @@ import { getZones, createZone, deleteZone } from '@/services/zones'
 import { uploadMapImage, getMapImages } from '@/services/storage'
 import type { Zone, ZoneType, MapPoint } from '@/types'
 import { cn } from '@/lib/utils'
+import { getAssetUrl, isFirebaseStorageUrl } from '@/lib/config'
 
 // Tipos de zona con información visual
 const ZONE_TYPES: { value: ZoneType; label: string; color: string; icon: string }[] = [

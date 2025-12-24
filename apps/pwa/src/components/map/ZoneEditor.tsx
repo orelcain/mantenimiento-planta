@@ -29,6 +29,7 @@ import { useAppStore, useAuthStore } from '@/store'
 import { getMainZones, createZone, deleteZone } from '@/services/zones'
 import type { Zone } from '@/types'
 import { cn } from '@/lib/utils'
+import { getAssetUrl } from '@/lib/config'
 
 interface Point {
   x: number
@@ -79,7 +80,7 @@ export function ZoneEditor() {
   const [zoneDescription, setZoneDescription] = useState('')
   
   // Imagen del plano
-  const [mapImage, setMapImage] = useState<string>('/maps/map_1760411932641.png')
+  const [mapImage, setMapImage] = useState<string>(getAssetUrl('/maps/plano-planta.png'))
   const [imageLoaded, setImageLoaded] = useState(false)
   
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -102,14 +103,14 @@ export function ZoneEditor() {
       setImageLoaded(true)
     }
     img.onerror = () => {
-      // Si no carga la primera imagen, intentar con la segunda
+      // Si no carga la primera imagen, intentar con imagen por defecto
       const img2 = new Image()
       img2.onload = () => {
         imageRef.current = img2
-        setMapImage('/maps/map_1763209400991.png')
+        setMapImage(getAssetUrl('/maps/default-map.png'))
         setImageLoaded(true)
       }
-      img2.src = '/maps/map_1763209400991.png'
+      img2.src = getAssetUrl('/maps/default-map.png')
     }
     img.src = mapImage
   }, [mapImage])
