@@ -1,0 +1,117 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Funciones helper
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.rol == 'admin';
+    }
+    
+    function isSupervisor() {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.rol in ['admin', 'supervisor'];
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Usuarios
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isOwner(userId) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Códigos de invitación
+    match /inviteCodes/{codeId} {
+      allow read: if true; // Permitir verificar códigos sin auth
+      allow create: if isAdmin();
+      allow update: if isAuthenticated(); // Para incrementar usos
+      allow delete: if isAdmin();
+    }
+
+    // Incidencias
+    match /incidents/{incidentId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
+    // Zonas
+    match /zones/{zoneId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Equipos
+    match /equipment/{equipmentId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin() || isSupervisor();
+      allow update: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
+    // Tareas preventivas
+    match /preventiveTasks/{taskId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin() || isSupervisor();
+      allow update: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
+    // Ejecuciones preventivas
+    match /preventiveExecutions/{executionId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
+    // Predicciones de falla
+    match /failurePredictions/{predictionId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin();
+      allow update: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
+    // Análisis de causa raíz
+    match /rootCauseAnalysis/{analysisId} {
+      allow read: if isAuthenticated();
+      allow create: if isSupervisor();
+      allow update: if isSupervisor();
+      allow delete: if isAdmin();
+    }
+
+    // Repuestos
+    match /spareParts/{partId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin() || isSupervisor();
+      allow update: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
+    // Movimientos de inventario
+    match /inventoryMovements/{movementId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Configuración
+    match /settings/{settingId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+  }
+}

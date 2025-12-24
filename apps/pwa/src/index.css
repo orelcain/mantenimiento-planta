@@ -1,0 +1,118 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /* Scrollbar personalizada para modo oscuro */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-background;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-muted rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground;
+  }
+}
+
+@layer utilities {
+  /* Animaciones */
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-in-out;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.3s ease-out;
+  }
+
+  .animate-pulse-slow {
+    animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Utilidades para el visor de mapa */
+  .map-container {
+    @apply relative w-full h-full overflow-hidden touch-none;
+  }
+
+  .zone-marker {
+    @apply absolute cursor-pointer transition-all duration-200;
+  }
+
+  .zone-marker:hover {
+    @apply scale-110;
+  }
+
+  /* Estados de incidencia */
+  .status-pendiente {
+    @apply bg-warning/20 text-warning border-warning;
+  }
+
+  .status-confirmada {
+    @apply bg-primary/20 text-primary border-primary;
+  }
+
+  .status-en_proceso {
+    @apply bg-blue-500/20 text-blue-400 border-blue-500;
+  }
+
+  .status-cerrada {
+    @apply bg-success/20 text-success border-success;
+  }
+
+  .status-rechazada {
+    @apply bg-destructive/20 text-destructive border-destructive;
+  }
+
+  /* Prioridades */
+  .priority-critica {
+    @apply bg-destructive text-destructive-foreground;
+  }
+
+  .priority-alta {
+    @apply bg-warning text-warning-foreground;
+  }
+
+  .priority-media {
+    @apply bg-primary text-primary-foreground;
+  }
+
+  .priority-baja {
+    @apply bg-muted text-muted-foreground;
+  }
+}

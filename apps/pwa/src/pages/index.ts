@@ -1,0 +1,7 @@
+export { LoginPage } from './LoginPage'
+export { DashboardPage } from './DashboardPage'
+export { IncidentsPage } from './IncidentsPage'
+export { MapPage } from './MapPage'
+export { EquipmentPage } from './EquipmentPage'
+export { SettingsPage } from './SettingsPage'
+export { PreventivePage } from './PreventivePage'
