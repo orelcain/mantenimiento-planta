@@ -31,9 +31,10 @@ export function MapPage() {
   const { zones, setZones, setSelectedZone, incidents, setIncidents, mapImage } = useAppStore()
   const [viewMode, setViewMode] = useState<ViewMode>('view')
   // Si es URL de Firebase Storage, usarla directamente; si es local, agregar basePath
+  // Si no hay mapa, será null y se mostrará un placeholder
   const mapUrl = mapImage 
     ? (isFirebaseStorageUrl(mapImage) ? mapImage : getAssetUrl(mapImage))
-    : getAssetUrl('/maps/plano-planta.png')
+    : null
   const [scale, setScale] = useState(1)
   const [position, setPosition] = useState({ x: 0, y: 0 })
   const [isDragging, setIsDragging] = useState(false)

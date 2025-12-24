@@ -9,29 +9,12 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,webp}'],
-        // No cachear URLs de Firebase Storage - IMPORTANTE para evitar CORS
+        globPatterns: ['**/*.{js,css,html,ico,svg,webp}'],
+        // NO cachear imágenes PNG - Firebase Storage las sirve directamente
         navigateFallback: 'index.html',
-        navigateFallbackDenylist: [/^\/api/, /firebasestorage\.googleapis\.com/, /\.firebasestorage\.app/],
-        // Excluir completamente Firebase Storage del SW
-        runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/firebasestorage\.googleapis\.com\/.*/i,
-            handler: 'NetworkOnly',
-            options: {
-              backgroundSync: {
-                name: 'firebase-storage-queue',
-                options: {
-                  maxRetentionTime: 24 * 60 // 24 hours
-                }
-              }
-            }
-          },
-          {
-            urlPattern: /\.firebasestorage\.app\/.*/i,
-            handler: 'NetworkOnly'
-          }
-        ]
+        navigateFallbackDenylist: [/^\/api/, /firebasestorage/, /googleapis/],
+        // Sin runtimeCaching - las imágenes van directo a la red
+        runtimeCaching: []
       },
       manifest: {
         name: 'Sistema de Mantenimiento Industrial',
