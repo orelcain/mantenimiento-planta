@@ -17,7 +17,8 @@ export default defineConfig({
         background_color: '#121212',
         display: 'standalone',
         orientation: 'portrait',
-        start_url: './',
+        start_url: '/mantenimiento-planta/',
+        scope: '/mantenimiento-planta/',
         icons: [
           {
             src: 'icons/icon-192.svg',
@@ -84,7 +85,7 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src')
     }
   },
-  base: './',
+  base: '/mantenimiento-planta/',
   build: {
     outDir: 'dist',
     sourcemap: false,
