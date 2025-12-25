@@ -261,6 +261,17 @@ function getErrorMessage(code: string): string {
     'auth/email-already-in-use': 'Este correo ya está registrado',
     'auth/weak-password': 'La contraseña debe tener al menos 6 caracteres',
     'auth/too-many-requests': 'Demasiados intentos. Intenta más tarde.',
+    'unavailable': 'Servicio no disponible. Verifica tu conexión a internet.',
+    'Firebase no está configurado correctamente': 'Error de configuración. Contacta al administrador.',
   }
-  return messages[code] || code
+  
+  // Buscar por código exacto
+  if (messages[code]) return messages[code]
+  
+  // Buscar si el mensaje contiene alguna de las claves
+  const matchedKey = Object.keys(messages).find(key => code?.includes(key))
+  if (matchedKey) return messages[matchedKey]
+  
+  // Error genérico con código para debugging
+  return `Error de autenticación: ${code || 'Desconocido'}`
 }
