@@ -19,7 +19,7 @@ import {
   QueryConstraint,
   writeBatch,
 } from 'firebase/firestore'
-import { db } from '../lib/firebase'
+import { db } from '../services/firebase'
 import { useAuthStore } from '../store'
 import { logger } from '../lib/logger'
 import {

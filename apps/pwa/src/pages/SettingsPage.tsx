@@ -11,6 +11,8 @@ import {
   Trash2,
   CheckCircle,
   Key,
+  Database,
+  RefreshCw,
 } from 'lucide-react'
 import {
   Card,
@@ -32,6 +34,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Spinner,
 } from '@/components/ui'
 import { useAuthStore } from '@/store'
 import { 
@@ -42,12 +45,15 @@ import {
   deleteDoc,
   setDoc,
   serverTimestamp,
+  query,
+  where,
 } from 'firebase/firestore'
 import { db } from '@/services/firebase'
 import type { User, InviteCode } from '@/types'
 import { cn } from '@/lib/utils'
+import { initializeHierarchySystem, isHierarchyInitialized } from '../services/hierarchyInit'
 
-type TabType = 'general' | 'users' | 'invites' | 'notifications'
+type TabType = 'general' | 'users' | 'invites' | 'notifications' | 'system'
 
 export function SettingsPage() {
   const { user } = useAuthStore()
@@ -73,6 +79,7 @@ export function SettingsPage() {
     { id: 'users' as const, label: 'Usuarios', icon: Users },
     { id: 'invites' as const, label: 'Invitaciones', icon: Key },
     { id: 'notifications' as const, label: 'Notificaciones', icon: Bell },
+    { id: 'system' as const, label: 'Sistema', icon: Database },
   ]
 
   return (
@@ -105,6 +112,7 @@ export function SettingsPage() {
       {activeTab === 'users' && <UsersSettings />}
       {activeTab === 'invites' && <InvitesSettings />}
       {activeTab === 'notifications' && <NotificationsSettings />}
+      {activeTab === 'system' && <SystemSettings />}
     </div>
   )
 }
@@ -552,11 +560,10 @@ function NotificationsSettings() {
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
     } catch (error) {
-      logger.error('Error guardando notificaciones', error instanceof Error ? error : new Error(String(error)))
+      logger.error('Error guardando configuración de notificaciones', error instanceof Error ? error : new Error(String(error)))
     }
     setSaving(false)
   }
-
   return (
     <div className="space-y-6">
       <Card>
@@ -622,6 +629,209 @@ function NotificationsSettings() {
           )}
         </Button>
       </div>
+    </div>
+  )
+}
+
+// Configuración del Sistema
+function SystemSettings() {
+  const { user } = useAuthStore()
+  const [isInitialized, setIsInitialized] = useState(false)
+  const [isChecking, setIsChecking] = useState(true)
+  const [isInitializing, setIsInitializing] = useState(false)
+  const [initSuccess, setInitSuccess] = useState(false)
+  const [initError, setInitError] = useState<string | null>(null)
+  const [hierarchyCount, setHierarchyCount] = useState(0)
+
+  useEffect(() => {
+    checkInitialization()
+  }, [])
+
+  const checkInitialization = async () => {
+    setIsChecking(true)
+    try {
+      const initialized = await isHierarchyInitialized()
+      setIsInitialized(initialized)
+      
+      // Contar nodos de jerarquía
+      const q = query(collection(db, 'hierarchy'), where('activo', '==', true))
+      const snapshot = await getDocs(q)
+      setHierarchyCount(snapshot.size)
+      
+      logger.info('Hierarchy system check', { initialized, count: snapshot.size })
+    } catch (error) {
+      logger.error('Error checking hierarchy initialization', error instanceof Error ? error : new Error(String(error)))
+    }
+    setIsChecking(false)
+  }
+
+  const handleInitialize = async () => {
+    if (!user?.id) return
+    
+    setIsInitializing(true)
+    setInitError(null)
+    setInitSuccess(false)
+    
+    try {
+      logger.info('Initializing hierarchy system', { userId: user.id })
+      await initializeHierarchySystem(user.id)
+      
+      setInitSuccess(true)
+      setIsInitialized(true)
+      
+      // Recargar count
+      await checkInitialization()
+      
+      logger.info('Hierarchy system initialized successfully')
+      setTimeout(() => setInitSuccess(false), 3000)
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Error desconocido'
+      logger.error('Error initializing hierarchy system', error instanceof Error ? error : new Error(String(error)))
+      setInitError(errorMessage)
+    }
+    
+    setIsInitializing(false)
+  }
+
+  const handleReinitialize = async () => {
+    if (!confirm('¿Estás seguro de reinicializar el sistema de jerarquías? Esto NO eliminará los datos existentes, solo agregará nodos faltantes.')) {
+      return
+    }
+    await handleInitialize()
+  }
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Database className="h-5 w-5" />
+            Sistema de Jerarquías
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {isChecking ? (
+            <div className="flex items-center justify-center py-8">
+              <Spinner size="lg" />
+              <span className="ml-3 text-muted-foreground">Verificando sistema...</span>
+            </div>
+          ) : (
+            <>
+              {/* Estado del sistema */}
+              <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
+                <div className="space-y-1">
+                  <p className="font-medium">Estado del Sistema</p>
+                  <p className="text-sm text-muted-foreground">
+                    {isInitialized 
+                      ? `Sistema inicializado - ${hierarchyCount} nodos activos` 
+                      : 'Sistema no inicializado'}
+                  </p>
+                </div>
+                <Badge variant={isInitialized ? 'default' : 'destructive'}>
+                  {isInitialized ? (
+                    <>
+                      <CheckCircle className="h-3 w-3 mr-1" />
+                      Activo
+                    </>
+                  ) : (
+                    'Pendiente'
+                  )}
+                </Badge>
+              </div>
+
+              {/* Información del sistema */}
+              <div className="space-y-3 text-sm">
+                <p className="text-muted-foreground">
+                  El sistema de jerarquías organiza las ubicaciones en 8 niveles:
+                </p>
+                <ol className="list-decimal list-inside space-y-1 ml-2">
+                  <li>🏢 Empresa</li>
+                  <li>📍 Área</li>
+                  <li>🗂️ Sub-área</li>
+                  <li>⚙️ Sistema</li>
+                  <li>🔧 Sub-sistema</li>
+                  <li>📂 Sección</li>
+                  <li>📋 Sub-sección</li>
+                  <li>🔍 Elemento</li>
+                </ol>
+              </div>
+
+              {/* Mensajes de estado */}
+              {initSuccess && (
+                <div className="p-3 rounded-lg bg-green-500/10 text-green-700 dark:text-green-400 flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4" />
+                  <span className="text-sm">Sistema inicializado correctamente</span>
+                </div>
+              )}
+
+              {initError && (
+                <div className="p-3 rounded-lg bg-destructive/10 text-destructive flex items-center gap-2">
+                  <Shield className="h-4 w-4" />
+                  <span className="text-sm">{initError}</span>
+                </div>
+              )}
+
+              {/* Acciones */}
+              <div className="flex gap-3 pt-4 border-t">
+                {!isInitialized ? (
+                  <Button 
+                    onClick={handleInitialize} 
+                    disabled={isInitializing}
+                    className="flex-1"
+                  >
+                    {isInitializing ? (
+                      <>
+                        <Spinner size="sm" />
+                        <span className="ml-2">Inicializando...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Database className="h-4 w-4 mr-2" />
+                        Inicializar Sistema
+                      </>
+                    )}
+                  </Button>
+                ) : (
+                  <>
+                    <Button 
+                      onClick={handleReinitialize} 
+                      disabled={isInitializing}
+                      variant="outline"
+                    >
+                      {isInitializing ? (
+                        <>
+                          <Spinner size="sm" />
+                          <span className="ml-2">Procesando...</span>
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="h-4 w-4 mr-2" />
+                          Reinicializar
+                        </>
+                      )}
+                    </Button>
+                    <Button 
+                      onClick={checkInitialization} 
+                      variant="ghost"
+                    >
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Verificar
+                    </Button>
+                  </>
+                )}
+              </div>
+
+              {/* Advertencia */}
+              {!isInitialized && (
+                <div className="p-3 rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-400 text-sm">
+                  <strong>Nota:</strong> La inicialización creará la estructura base de Aquachile Antarfood Chonchi 
+                  con 4 áreas principales y ejemplos de sub-estructuras.
+                </div>
+              )}
+            </>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }

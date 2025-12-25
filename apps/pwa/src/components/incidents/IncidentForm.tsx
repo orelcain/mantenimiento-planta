@@ -15,9 +15,11 @@ import { useAuthStore, useAppStore } from '@/store'
 import { createIncident } from '@/services/incidents'
 import { uploadIncidentPhoto, compressImage } from '@/services/storage'
 import type { IncidentPriority, Incident } from '@/types'
+import { HierarchyLevel } from '@/types/hierarchy'
 import { cn } from '@/lib/utils'
 import { createIncidentSchema, validateFileList } from '@/lib/validation'
 import { logger } from '@/lib/logger'
+import { HierarchySelector } from '../hierarchy/HierarchySelector'
 
 interface IncidentFormProps {
   onClose: () => void
@@ -52,6 +54,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId }: Incident
     titulo: '',
     descripcion: '',
     zoneId: preselectedZoneId || '',
+    hierarchyNodeId: undefined as string | undefined,
     prioridad: 'media' as IncidentPriority,
   })
 
@@ -114,6 +117,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId }: Incident
         titulo: formData.titulo,
         descripcion: formData.descripcion,
         zoneId: formData.zoneId,
+        hierarchyNodeId: formData.hierarchyNodeId,
         prioridad: formData.prioridad,
         status: 'pendiente' as const,
         fotos: [],
@@ -144,6 +148,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId }: Incident
         titulo: formData.titulo,
         descripcion: formData.descripcion,
         zoneId: formData.zoneId,
+        hierarchyNodeId: formData.hierarchyNodeId || undefined,
         prioridad: formData.prioridad,
         status: 'pendiente',
         fotos: [],
@@ -188,38 +193,52 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId }: Incident
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Zona - Más prominente */}
+          {/* Ubicación jerárquica - Selector en cascada */}
           <div className="space-y-2">
             <Label className="text-sm font-medium">📍 Ubicación *</Label>
-            {zones.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No hay zonas configuradas</p>
-            ) : (
-              <div className="grid grid-cols-2 gap-2">
-                {zones.map((zone) => (
-                  <button
-                    key={zone.id}
-                    type="button"
-                    onClick={() => setFormData({ ...formData, zoneId: zone.id })}
-                    className={cn(
-                      'p-3 rounded-lg border-2 text-left transition-all',
-                      formData.zoneId === zone.id 
-                        ? 'border-primary bg-primary/10' 
-                        : 'border-muted hover:border-primary/50'
-                    )}
-                  >
-                    <div className="flex items-center gap-2">
-                      <div 
-                        className="w-4 h-4 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: zone.color || '#2196f3' }}
-                      />
-                      <span className="font-medium text-sm truncate">{zone.nombre}</span>
-                    </div>
-                  </button>
-                ))}
-              </div>
+            <div className="border rounded-lg p-3 bg-muted/30">
+              <HierarchySelector
+                value={formData.hierarchyNodeId}
+                onChange={(nodeId) => setFormData({ ...formData, hierarchyNodeId: nodeId || undefined })}
+                minLevel={HierarchyLevel.SUB_AREA}
+                maxLevel={HierarchyLevel.ELEMENTO}
+                error={validationErrors.hierarchyNodeId}
+              />
+            </div>
+            {validationErrors.hierarchyNodeId && (
+              <p className="text-sm text-destructive mt-1">{validationErrors.hierarchyNodeId}</p>
             )}
-            {validationErrors.zoneId && (
-              <p className="text-sm text-destructive mt-1">{validationErrors.zoneId}</p>
+            
+            {/* Zonas legacy (fallback) */}
+            {zones.length > 0 && !formData.hierarchyNodeId && (
+              <details className="mt-2">
+                <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
+                  O seleccionar zona legacy
+                </summary>
+                <div className="grid grid-cols-2 gap-2 mt-2">
+                  {zones.map((zone) => (
+                    <button
+                      key={zone.id}
+                      type="button"
+                      onClick={() => setFormData({ ...formData, zoneId: zone.id })}
+                      className={cn(
+                        'p-2 rounded-lg border text-left transition-all text-xs',
+                        formData.zoneId === zone.id 
+                          ? 'border-primary bg-primary/10' 
+                          : 'border-muted hover:border-primary/50'
+                      )}
+                    >
+                      <div className="flex items-center gap-2">
+                        <div 
+                          className="w-3 h-3 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: zone.color || '#2196f3' }}
+                        />
+                        <span className="truncate">{zone.nombre}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </details>
             )}
           </div>
 
@@ -373,7 +392,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId }: Incident
               </Button>
               <Button 
                 type="submit" 
-                disabled={isLoading || !formData.zoneId || !formData.titulo}
+                disabled={isLoading || (!formData.hierarchyNodeId && !formData.zoneId) || !formData.titulo}
                 className="w-full sm:w-auto sm:flex-1"
               >
                 {isLoading ? (

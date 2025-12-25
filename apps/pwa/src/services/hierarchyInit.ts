@@ -4,7 +4,7 @@
  */
 
 import { doc, setDoc, Timestamp } from 'firebase/firestore'
-import { db } from '../lib/firebase'
+import { db } from './firebase'
 import { HierarchyNode, HierarchyLevel, DEFAULT_COMPANY_NODE } from '../types/hierarchy'
 import { logger } from '../lib/logger'
 
