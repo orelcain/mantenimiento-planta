@@ -1,4 +1,5 @@
 name: Deploy PWA to GitHub Pages
+# Version: v1.0.2 - Updated: 2024-12-24
 
 on:
   push:

@@ -165,7 +165,7 @@ export function PreventivePage() {
       if (debouncedSearch) {
         const searchLower = debouncedSearch.toLowerCase()
         const matchesSearch =
-          t.titulo.toLowerCase().includes(searchLower) ||
+          t.nombre.toLowerCase().includes(searchLower) ||
           (t.descripcion?.toLowerCase().includes(searchLower) ?? false)
         if (!matchesSearch) return false
       }
