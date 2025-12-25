@@ -29,6 +29,13 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
   - Tipado TypeScript completo
   - Documentación JSDoc incluida
 
+#### Añadido
+- **Sistema de versionado visible**
+  - Label de versión en sidebar de la aplicación
+  - Archivo de constantes `@/constants/version.ts` para gestión centralizada
+  - Comentario de versión en firestore.rules
+  - Sincronización automática con package.json
+
 #### Técnico
 - Imports directos en lazy loading para evitar tree-shaking issues
 - Chunks separados por ruta para máxima eficiencia

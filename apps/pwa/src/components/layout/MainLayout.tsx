@@ -17,6 +17,7 @@ import { useAuthStore, useIsAdmin } from '@/store'
 import { signOut } from '@/services/auth'
 import { cn } from '@/lib/utils'
 import { HelpButton, HelpModal, WelcomeModal } from '@/components/help'
+import { APP_VERSION } from '@/constants/version'
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
@@ -107,6 +108,13 @@ export function MainLayout() {
               </NavLink>
             ))}
           </nav>
+
+          {/* Version label */}
+          <div className="px-4 pb-2">
+            <div className="text-xs text-muted-foreground text-center py-1.5 px-2 bg-muted/50 rounded">
+              v{APP_VERSION}
+            </div>
+          </div>
 
           {/* User section */}
           <div className="p-4 border-t">

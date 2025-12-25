@@ -1,4 +1,6 @@
 rules_version = '2';
+// Version: v1.0.2 - Updated: 2024-12-24
+// Optimizaciones de rendimiento y seguridad
 service cloud.firestore {
   match /databases/{database}/documents {
     // Funciones helper
