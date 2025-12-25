@@ -1,6 +1,6 @@
 rules_version = '2';
-// Version: v1.0.4 - Updated: 2025-12-24
-// Corrección completa de mapa: preventDefault fix, resolución y UI
+// Version: v1.0.5 - Updated: 2025-12-25
+// Sistema de jerarquías anidadas de 8 niveles
 service cloud.firestore {
   match /databases/{database}/documents {
     // Funciones helper
@@ -20,6 +20,32 @@ service cloud.firestore {
     
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Validar nivel jerárquico
+    function isValidHierarchyLevel(level) {
+      return level >= 1 && level <= 8;
+    }
+
+    // Validar código de jerarquía
+    function isValidHierarchyCode(code) {
+      return code is string && code.size() >= 5 && code.size() <= 20;
+    }
+
+    // Jerarquías organizacionales (8 niveles)
+    match /hierarchy/{nodeId} {
+      allow read: if isAuthenticated();
+      allow create: if isSupervisor()
+        && request.resource.data.nombre is string
+        && request.resource.data.nombre.size() >= 3
+        && request.resource.data.nombre.size() <= 100
+        && isValidHierarchyCode(request.resource.data.codigo)
+        && isValidHierarchyLevel(request.resource.data.nivel)
+        && request.resource.data.path is list
+        && request.resource.data.path.size() <= 8
+        && request.resource.data.activo is bool;
+      allow update: if isSupervisor();
+      allow delete: if isAdmin();
     }
 
     // Usuarios

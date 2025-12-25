@@ -91,7 +91,9 @@ export interface Incident {
   titulo: string
   descripcion: string
   equipmentId?: string
-  zoneId: string
+  // Ubicación jer Aquí ya actualizado el sistema con el endpoint de la jerarquía
+  hierarchyNodeId?: string // ID del nodo jerárquico seleccionado (reemplaza zoneId)
+  zoneId?: string // @deprecated Mantener para compatibilidad con datos antiguos
   position?: { x: number; y: number }
   prioridad: IncidentPriority
   status: IncidentStatus
