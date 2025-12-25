@@ -71,6 +71,34 @@
         { "fieldPath": "categoria", "order": "ASCENDING" },
         { "fieldPath": "nombre", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "hierarchy",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "parentId", "order": "ASCENDING" },
+        { "fieldPath": "activo", "order": "ASCENDING" },
+        { "fieldPath": "orden", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "hierarchy",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "nivel", "order": "ASCENDING" },
+        { "fieldPath": "parentId", "order": "ASCENDING" },
+        { "fieldPath": "activo", "order": "ASCENDING" },
+        { "fieldPath": "orden", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "hierarchy",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "activo", "order": "ASCENDING" },
+        { "fieldPath": "nivel", "order": "ASCENDING" },
+        { "fieldPath": "orden", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []
