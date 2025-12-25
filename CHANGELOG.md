@@ -7,6 +7,45 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [1.0.4] - 2025-12-24
+
+### 🔧 Corrección Completa de Mapa
+
+#### Eventos Wheel (Zoom con Mouse)
+- **Fix definitivo**: addEventListener con `passive: false` en lugar de onWheel
+- Eliminado 100% los errores "Unable to preventDefault inside passive event listener"
+- Zoom suave con rueda del mouse sin warnings en consola
+- useEffect para manejar eventos wheel con control total
+
+#### Resolución de Imágenes
+- Agregado `key={mapUrl}` para forzar re-render cuando cambia el mapa
+- `imageRendering: 'crisp-edges'` para máxima nitidez
+- `objectFit: 'contain'` con maxWidth/maxHeight none
+- `decoding: 'sync'` para carga síncrona
+- Logging de carga con dimensiones naturales de imagen
+
+#### Vista del Mapa
+- Reset automático de zoom/posición al cambiar entre modo vista/editor
+- Fix: Mapa visible inmediatamente después de "Volver a Vista"
+- Sin necesidad de hacer zoom para ver el mapa
+- useEffect que resetea escala a 1 y posición a (0,0)
+
+#### Interfaz de Zonas
+- Eliminados iconos de AlertTriangle en badges de zonas
+- Simplificado label de zonas: solo código/nombre
+- Tipografía mejorada: font-semibold en labels
+- Badge de conteo con fondo amarillo (#fbbf24) más visible
+- Bordes reducidos de border-3 a border-2
+- Divs en lugar de Badge components para mejor control
+
+#### 📊 Bundle
+- Bundle: 1067.26 KiB (MapPage: 34.61KB)
+- Build time: 9.35s
+- 0 errores TypeScript
+- 0 warnings
+
+---
+
 ## [1.0.3] - 2024-12-24
 
 ### 🗺️ Optimización de Mapas y PWA

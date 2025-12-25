@@ -1,29 +1,30 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v1.0.3**
+## Versión Actual: **v1.0.4**
 
-**Fecha de lanzamiento**: 24 de diciembre de 2024  
+**Fecha de lanzamiento**: 24 de diciembre de 2025  
 **Estado**: ✅ PRODUCCIÓN READY  
-**Build**: 1066.xx KiB | 0 errores TypeScript
+**Build**: 1067.26 KiB | 0 errores TypeScript
 
 ---
 
 ## 📋 Información de la Versión
 
-### v1.0.3 - Optimización de Mapas y PWA
+### v1.0.4 - Corrección Completa de Mapa
 
-Correcciones críticas para experiencia de mapas y calidad de imágenes.
+Correcciones definitivas para experiencia de mapas y calidad visual.
 
 #### 🔧 Correcciones
-- ❌ Fix errores preventDefault en eventos touch del mapa
-- 🖼️ Mantener resolución original de mapas sin compresión
-- 📱 Mejor experiencia en dispositivos móviles
+- ❌ Fix definitivo errores preventDefault (addEventListener passive:false)
+- 🖼️ Resolución original con key para re-render
+- 👁️ Mapa visible inmediatamente en modo vista
+- 🎯 Reset automático zoom/posición al cambiar modos
 
-#### ✨ Mejoras
-- 🎯 `touchAction: 'none'` para prevenir conflictos de eventos
-- 🔍 `imageRendering: 'high-quality'` para máxima calidad visual
-- 📦 Metadata customizada en uploads de mapas
-- 👁️ Versión visible en login y sidebar
+#### ✨ Mejoras UI
+- 📋 Labels de zonas simplificados (sin iconos)
+- 🔤 Tipografía mejorada en badges
+- 🟡 Contador de incidencias más visible
+- 🗄️ Bordes optimizados (border-2)
 
 #### 📊 Métricas
 ```

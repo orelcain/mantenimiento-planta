@@ -33,6 +33,7 @@ import type { Zone, Incident, IncidentPriority, IncidentStatus } from '@/types'
 import { cn } from '@/lib/utils'
 import { getAssetUrl, isFirebaseStorageUrl } from '@/lib/config'
 import { formatRelativeTime } from '@/lib/utils'
+import { logger } from '@/lib/logger'
 
 type ViewMode = 'view' | 'edit'
 
@@ -75,6 +76,33 @@ export function MapPage() {
     getZones().then(setZones)
   }, [setZones])
 
+  // Listener de wheel con passive: false para prevenir scroll
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+
+    const handleWheelPassive = (e: WheelEvent) => {
+      e.preventDefault()
+      
+      const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9
+      const newScale = Math.max(0.5, Math.min(10, scale * zoomFactor))
+      
+      const rect = container.getBoundingClientRect()
+      const mouseX = e.clientX - rect.left
+      const mouseY = e.clientY - rect.top
+      
+      const scaleRatio = newScale / scale
+      const newPosX = mouseX - (mouseX - position.x) * scaleRatio
+      const newPosY = mouseY - (mouseY - position.y) * scaleRatio
+      
+      setScale(newScale)
+      setPosition({ x: newPosX, y: newPosY })
+    }
+
+    container.addEventListener('wheel', handleWheelPassive, { passive: false })
+    return () => container.removeEventListener('wheel', handleWheelPassive)
+  }, [scale, position])
+
   // Suscribirse a incidencias activas
   useEffect(() => {
     const unsubscribe = subscribeToIncidents(setIncidents, {
@@ -106,29 +134,7 @@ export function MapPage() {
     setPosition({ x: 0, y: 0 })
   }
 
-  // Zoom con rueda del mouse - optimizado para precisión
-  const handleWheel = (e: React.WheelEvent) => {
-    e.preventDefault()
-    const container = containerRef.current
-    if (!container) return
-
-    // Zoom más suave y preciso
-    const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9
-    const newScale = Math.max(0.5, Math.min(10, scale * zoomFactor))
-    
-    // Obtener posición del cursor
-    const rect = container.getBoundingClientRect()
-    const mouseX = e.clientX - rect.left
-    const mouseY = e.clientY - rect.top
-    
-    // Calcular nueva posición para mantener el punto bajo el cursor
-    const scaleRatio = newScale / scale
-    const newPosX = mouseX - (mouseX - position.x) * scaleRatio
-    const newPosY = mouseY - (mouseY - position.y) * scaleRatio
-    
-    setScale(newScale)
-    setPosition({ x: newPosX, y: newPosY })
-  }
+  // handleWheel ahora se maneja con addEventListener en useEffect para passive: false
 
   // Drag handlers
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -176,6 +182,12 @@ export function MapPage() {
   const handleTouchEnd = () => {
     setIsDragging(false)
   }
+
+  // Efecto para resetear vista al cambiar de modo
+  useEffect(() => {
+    setScale(1)
+    setPosition({ x: 0, y: 0 })
+  }, [viewMode])
 
   // Modo Editor - Usar el nuevo editor de polígonos
   if (viewMode === 'edit') {
@@ -267,7 +279,6 @@ export function MapPage() {
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
-            onWheel={handleWheel}
           >
             <div
               className="absolute transition-transform duration-100"
@@ -283,15 +294,23 @@ export function MapPage() {
                 {/* Imagen del plano */}
                 {mapUrl && (
                   <img
+                    key={mapUrl}
                     src={mapUrl}
                     alt="Plano de planta"
-                    className="absolute inset-0 w-full h-full object-contain"
+                    className="absolute inset-0 w-full h-full"
                     style={{
-                      imageRendering: 'crisp-edges',
+                      imageRendering: 'crisp-edges' as const,
+                      objectFit: 'contain',
+                      maxWidth: 'none',
+                      maxHeight: 'none',
                     }}
                     loading="eager"
-                    decoding="async"
+                    decoding="sync"
+                    onLoad={(e) => {
+                      logger.info('Map image loaded', { url: mapUrl, width: e.currentTarget.naturalWidth, height: e.currentTarget.naturalHeight })
+                    }}
                     onError={(e) => {
+                      logger.error('Map image failed to load', new Error(`Failed to load map: ${mapUrl}`))
                       e.currentTarget.style.display = 'none'
                     }}
                   />
@@ -563,26 +582,25 @@ function ZoneOverlay({
     return (
       <div
         className={cn(
-          'rounded-lg border-3 cursor-pointer transition-all hover:shadow-lg',
+          'rounded-lg border-2 cursor-pointer transition-all hover:shadow-lg',
           statusColor
         )}
         style={style}
         onClick={onClick}
       >
         <div className="absolute top-1 left-1">
-          <Badge
+          <div
+            className="px-2 py-0.5 rounded text-white text-xs font-semibold shadow-sm"
             style={{ backgroundColor: zone.color }}
-            className="text-white text-xs shadow"
           >
             {zone.codigo || zone.nombre}
-          </Badge>
+          </div>
         </div>
         {incidents.length > 0 && (
           <div className="absolute bottom-1 right-1">
-            <Badge variant="secondary" className="text-xs gap-1">
-              <AlertTriangle className="h-3 w-3" />
+            <div className="bg-yellow-500 text-white px-1.5 py-0.5 rounded text-xs font-bold shadow-sm">
               {incidents.length}
-            </Badge>
+            </div>
           </div>
         )}
       </div>
