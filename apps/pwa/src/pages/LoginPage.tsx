@@ -16,6 +16,7 @@ import { signIn, signUpWithInviteCode } from '@/services/auth'
 import { useAuthStore } from '@/store'
 import { loginSchema, signUpSchema } from '@/lib/validation'
 import { logger } from '@/lib/logger'
+import { APP_VERSION } from '@/constants/version'
 
 type AuthMode = 'login' | 'register'
 
@@ -113,6 +114,9 @@ export function LoginPage() {
               ? 'Ingresa tus credenciales para continuar'
               : 'Registra tu cuenta con el código de invitación'}
           </CardDescription>
+          <div className="mt-2">
+            <span className="text-xs text-muted-foreground">v{APP_VERSION}</span>
+          </div>
         </CardHeader>
 
         <CardContent>
@@ -178,6 +182,7 @@ export function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 disabled={isLoading}
+                autoComplete="email"
               />
               {validationErrors.email && (
                 <p className="text-sm text-destructive">{validationErrors.email}</p>
@@ -195,6 +200,7 @@ export function LoginPage() {
                 required
                 disabled={isLoading}
                 minLength={6}
+                autoComplete="current-password"
               />
               {validationErrors.password && (
                 <p className="text-sm text-destructive">{validationErrors.password}</p>
