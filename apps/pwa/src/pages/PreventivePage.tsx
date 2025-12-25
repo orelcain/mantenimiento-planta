@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { logger } from '@/lib/logger'
+import { debounce } from '@/lib/utils'
 import {
   createPreventiveTaskSchema,
   updatePreventiveTaskSchema,
@@ -82,6 +83,17 @@ export function PreventivePage() {
   const [editingTask, setEditingTask] = useState<PreventiveTask | null>(null)
   const [executingTask, setExecutingTask] = useState<PreventiveTask | null>(null)
   const [filterEquipment, setFilterEquipment] = useState<string>('all')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+
+  const debouncedSetSearch = useMemo(
+    () => debounce((value: string) => setDebouncedSearch(value), 300),
+    []
+  )
+
+  useEffect(() => {
+    debouncedSetSearch(searchQuery)
+  }, [searchQuery, debouncedSetSearch])
 
   useEffect(() => {
     loadData()
@@ -149,9 +161,18 @@ export function PreventivePage() {
   const filteredTasks = useMemo(() => {
     return tasks.filter((t) => {
       if (filterEquipment !== 'all' && t.equipmentId !== filterEquipment) return false
+      
+      if (debouncedSearch) {
+        const searchLower = debouncedSearch.toLowerCase()
+        const matchesSearch =
+          t.titulo.toLowerCase().includes(searchLower) ||
+          (t.descripcion?.toLowerCase().includes(searchLower) ?? false)
+        if (!matchesSearch) return false
+      }
+      
       return true
     })
-  }, [tasks, filterEquipment])
+  }, [tasks, filterEquipment, debouncedSearch])
 
   const overdueTasks = filteredTasks.filter(
     (t) => t.activo && t.proximaEjecucion < new Date()
@@ -324,20 +345,28 @@ export function PreventivePage() {
                   <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>
-              <Select value={filterEquipment} onValueChange={setFilterEquipment}>
-                <SelectTrigger className="w-48">
-                  <Filter className="h-4 w-4 mr-2" />
-                  <SelectValue placeholder="Filtrar por equipo" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos los equipos</SelectItem>
-                  {equipment.map((eq) => (
-                    <SelectItem key={eq.id} value={eq.id}>
-                      {eq.nombre}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Buscar tareas..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="max-w-xs"
+                />
+                <Select value={filterEquipment} onValueChange={setFilterEquipment}>
+                  <SelectTrigger className="w-48">
+                    <Filter className="h-4 w-4 mr-2" />
+                    <SelectValue placeholder="Filtrar por equipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los equipos</SelectItem>
+                    {equipment.map((eq) => (
+                      <SelectItem key={eq.id} value={eq.id}>
+                        {eq.nombre}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </CardHeader>
             <CardContent>
               {/* Day names */}

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Plus, Search, AlertTriangle, Clock, CheckCircle, XCircle, Filter } from 'lucide-react'
 import {
   Card,
@@ -18,6 +18,7 @@ import type { Incident, IncidentStatus, IncidentPriority } from '@/types'
 import { formatRelativeTime } from '@/lib/utils'
 import { IncidentForm } from '@/components/incidents/IncidentForm'
 import { IncidentDetail } from '@/components/incidents/IncidentDetail'
+import { debounce } from '@/lib/utils'
 
 const STATUS_CONFIG: Record<IncidentStatus, { label: string; icon: any; variant: any }> = {
   pendiente: { label: 'Pendiente', icon: Clock, variant: 'warning' },
@@ -40,8 +41,19 @@ export function IncidentsPage() {
   
   const [showForm, setShowForm] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [filterPriority, setFilterPriority] = useState<string>('all')
+
+  // Debounce search con 300ms
+  const debouncedSetSearch = useMemo(
+    () => debounce((value: string) => setDebouncedSearch(value), 300),
+    []
+  )
+
+  useEffect(() => {
+    debouncedSetSearch(searchQuery)
+  }, [searchQuery, debouncedSetSearch])
 
   // Suscribirse a cambios en tiempo real
   useEffect(() => {
@@ -51,11 +63,11 @@ export function IncidentsPage() {
     return () => unsubscribe()
   }, [setIncidents])
 
-  // Filtrar incidencias
+  // Filtrar incidencias con búsqueda debounced
   const filteredIncidents = incidents.filter((incident) => {
     const matchesSearch =
-      incident.titulo.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      incident.descripcion.toLowerCase().includes(searchQuery.toLowerCase())
+      incident.titulo.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+      incident.descripcion.toLowerCase().includes(debouncedSearch.toLowerCase())
     
     const matchesStatus = filterStatus === 'all' || incident.status === filterStatus
     const matchesPriority = filterPriority === 'all' || incident.prioridad === filterPriority

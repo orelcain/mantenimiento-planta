@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { onAuthChange, getUserById } from '@/services/auth'
 import { useAuthStore } from '@/store'
@@ -10,11 +10,13 @@ import {
   LoginPage,
   DashboardPage,
   IncidentsPage,
-  MapPage,
   EquipmentPage,
-  SettingsPage,
-  PreventivePage,
 } from '@/pages'
+
+// Code Splitting: Lazy load para páginas pesadas o menos usadas
+const MapPage = lazy(() => import('@/pages/MapPage').then((mod) => ({ default: mod.MapPage })))
+const PreventivePage = lazy(() => import('@/pages/PreventivePage').then((mod) => ({ default: mod.PreventivePage })))
+const SettingsPage = lazy(() => import('@/pages/SettingsPage').then((mod) => ({ default: mod.SettingsPage })))
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuthStore()
@@ -92,10 +94,22 @@ export function App() {
           >
             <Route index element={<DashboardPage />} />
             <Route path="incidents" element={<IncidentsPage />} />
-            <Route path="map" element={<MapPage />} />
+            <Route path="map" element={
+              <Suspense fallback={<LoadingScreen />}>
+                <MapPage />
+              </Suspense>
+            } />
             <Route path="equipment" element={<EquipmentPage />} />
-            <Route path="preventive" element={<PreventivePage />} />
-            <Route path="settings" element={<SettingsPage />} />
+            <Route path="preventive" element={
+              <Suspense fallback={<LoadingScreen />}>
+                <PreventivePage />
+              </Suspense>
+            } />
+            <Route path="settings" element={
+              <Suspense fallback={<LoadingScreen />}>
+                <SettingsPage />
+              </Suspense>
+            } />
           </Route>
 
           {/* Fallback */}

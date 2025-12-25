@@ -42,3 +42,27 @@ export function generateInviteCode(): string {
 export function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`
 }
+
+/**
+ * Debounce function para optimizar búsquedas y re-renders
+ * @param func - Función a ejecutar después del delay
+ * @param delay - Tiempo de espera en milisegundos (default: 300ms)
+ * @returns Función debounced
+ */
+export function debounce<T extends (...args: any[]) => void>(
+  func: T,
+  delay: number = 300
+): (...args: Parameters<T>) => void {
+  let timeoutId: NodeJS.Timeout | null = null
+
+  return function (this: any, ...args: Parameters<T>) {
+    if (timeoutId) {
+      clearTimeout(timeoutId)
+    }
+
+    timeoutId = setTimeout(() => {
+      func.apply(this, args)
+    }, delay)
+  }
+}
+

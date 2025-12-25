@@ -7,6 +7,36 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [1.0.2] - 2024-12-24
+
+### ⚡ Optimizaciones de Rendimiento
+
+#### Mejorado
+- **Debounce en búsquedas (300ms)**
+  - IncidentsPage: Búsqueda optimizada con debounce para reducir re-renders
+  - PreventivePage: Agregado input de búsqueda con debounce por título/descripción
+  - Menor consumo de CPU y mejor experiencia de usuario en búsquedas
+
+- **Code Splitting con React.lazy()**
+  - MapPage: Carga diferida (~34 KB / 10 KB gzip)
+  - PreventivePage: Carga diferida (~26 KB / 7 KB gzip)
+  - SettingsPage: Carga diferida (~13 KB / 4 KB gzip)
+  - **Total optimizado**: ~73 KB que solo se cargan cuando el usuario visita estas páginas
+  - Suspense con LoadingScreen para mejor UX durante carga
+
+- **Utilidades mejoradas**
+  - Agregada función `debounce` genérica en `@/lib/utils`
+  - Tipado TypeScript completo
+  - Documentación JSDoc incluida
+
+#### Técnico
+- Imports directos en lazy loading para evitar tree-shaking issues
+- Chunks separados por ruta para máxima eficiencia
+- Build optimizado: 20 entries en precache
+- Reducción significativa en bundle inicial
+
+---
+
 ## [1.0.1] - 2024-12-24
 
 ### 🚀 Mejoras de Mapas y Visualización

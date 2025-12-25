@@ -1,14 +1,40 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v1.0.1**
+## Versión Actual: **v1.0.2**
 
 **Fecha de lanzamiento**: 24 de diciembre de 2024  
 **Estado**: ✅ PRODUCCIÓN READY  
-**Build**: 1055.70 KiB | 0 errores TypeScript
+**Build**: 1065.77 KiB | 0 errores TypeScript
 
 ---
 
 ## 📋 Información de la Versión
+
+### v1.0.2 - Optimizaciones de Rendimiento
+
+Optimizaciones críticas de rendimiento con debounce en búsquedas y code splitting para reducir el bundle inicial.
+
+#### ⚡ Optimizaciones Implementadas
+- 🔍 Debounce (300ms) en búsquedas de IncidentsPage y PreventivePage
+- 📦 Code Splitting con React.lazy() para MapPage, PreventivePage y SettingsPage
+- 🚀 Chunks separados (~73 KB) que se cargan bajo demanda
+- 🛠️ Función debounce genérica en utilidades
+- 💾 Menor uso de CPU y mejor experiencia en búsquedas
+
+#### 📊 Métricas
+```
+TypeScript Errors: 0
+Bundle Principal: ~1065.77 KiB
+Chunks Separados: 
+  - MapPage: 34.08 KB (10.24 KB gzip)
+  - PreventivePage: 26.02 KB (6.94 KB gzip)
+  - SettingsPage: 13.43 KB (3.87 KB gzip)
+Build Time: ~10.06s
+Modules: 1,817
+Precache Entries: 20 (antes 16)
+```
+
+---
 
 ### v1.0.1 - Mejoras de Mapas y Visualización
 
