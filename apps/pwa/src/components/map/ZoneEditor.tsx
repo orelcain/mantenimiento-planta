@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { logger } from '@/lib/logger'
 import {
   Trash2,
   Save,
@@ -27,7 +28,6 @@ import {
 } from '@/components/ui'
 import { useAppStore, useAuthStore } from '@/store'
 import { getMainZones, createZone, deleteZone } from '@/services/zones'
-import type { Zone } from '@/types'
 import { cn } from '@/lib/utils'
 import { getAssetUrl } from '@/lib/config'
 
@@ -324,7 +324,7 @@ export function ZoneEditor() {
       setShowZoneDialog(false)
       setTool('select')
     } catch (error) {
-      console.error('Error creando zona:', error)
+      logger.error('Error creando zona', error instanceof Error ? error : new Error(String(error)))
     }
   }
 
@@ -335,8 +335,9 @@ export function ZoneEditor() {
     try {
       await deleteZone(zoneId)
       await getMainZones().then(setZones)
+      logger.info('Zone deleted', { zoneId })
     } catch (error) {
-      console.error('Error eliminando zona:', error)
+      logger.error('Error eliminando zona', error instanceof Error ? error : new Error(String(error)), { zoneId })
     }
   }
 

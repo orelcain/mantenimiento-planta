@@ -1,9 +1,7 @@
-import { useState, useEffect, createContext, useContext, ReactNode } from 'react'
+import { useState, createContext, useContext, ReactNode } from 'react'
 import {
   HelpCircle,
-  X,
   ChevronRight,
-  ChevronLeft,
   LayoutDashboard,
   AlertTriangle,
   Map,
@@ -392,11 +390,9 @@ function TipCard({ emoji, title, description }: { emoji: string; title: string; 
 
 // Componente de tooltip contextual
 export function ContextualTip({ 
-  id, 
   children, 
   tip 
 }: { 
-  id: string
   children: ReactNode
   tip: string 
 }) {

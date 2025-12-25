@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { logger } from '@/lib/logger'
 import {
   Clock,
   CheckCircle,
@@ -66,9 +67,11 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
     setIsLoading(true)
     try {
       await confirmIncident(incident.id, user.id)
+      logger.info('Incident confirmed', { incidentId: incident.id })
       onClose()
-    } catch (error) {
-      console.error('Error confirming incident:', error)
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error('Error confirming incident')
+      logger.error('Error confirming incident', err)
     } finally {
       setIsLoading(false)
     }
@@ -80,9 +83,11 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
     setIsLoading(true)
     try {
       await rejectIncident(incident.id, user.id, rejectionReason)
+      logger.info('Incident rejected', { incidentId: incident.id, reason: rejectionReason })
       onClose()
-    } catch (error) {
-      console.error('Error rejecting incident:', error)
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error('Error rejecting incident')
+      logger.error('Error rejecting incident', err)
     } finally {
       setIsLoading(false)
     }
@@ -94,9 +99,11 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
     setIsLoading(true)
     try {
       await closeIncident(incident.id, resolution)
+      logger.info('Incident closed', { incidentId: incident.id })
       onClose()
-    } catch (error) {
-      console.error('Error closing incident:', error)
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error('Error closing incident')
+      logger.error('Error closing incident', err)
     } finally {
       setIsLoading(false)
     }

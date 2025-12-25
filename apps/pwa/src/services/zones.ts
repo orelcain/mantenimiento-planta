@@ -8,7 +8,6 @@ import {
   deleteDoc,
   query,
   where,
-  orderBy,
   serverTimestamp,
   Timestamp,
 } from 'firebase/firestore'
@@ -53,18 +52,20 @@ export async function getZones(filters?: {
   nivel?: 1 | 2 | 3
   parentId?: string
 }): Promise<Zone[]> {
-  let q = query(collection(db, COLLECTION), orderBy('id'))
+  // Obtener todas las zonas sin orden para evitar necesidad de índice compuesto
+  let q = query(collection(db, COLLECTION))
 
   if (filters?.nivel) {
-    q = query(collection(db, COLLECTION), where('nivel', '==', filters.nivel), orderBy('id'))
+    q = query(collection(db, COLLECTION), where('nivel', '==', filters.nivel))
   }
 
   if (filters?.parentId) {
-    q = query(collection(db, COLLECTION), where('parentId', '==', filters.parentId), orderBy('id'))
+    q = query(collection(db, COLLECTION), where('parentId', '==', filters.parentId))
   }
 
   const snapshot = await getDocs(q)
-  return snapshot.docs.map(parseZoneDoc)
+  // Ordenar en el cliente para evitar índices compuestos
+  return snapshot.docs.map(parseZoneDoc).sort((a, b) => a.id.localeCompare(b.id))
 }
 
 // Obtener zonas nivel 1 (principales)
@@ -101,8 +102,14 @@ export async function deleteZone(id: string): Promise<void> {
 }
 
 // Helper para parsear documentos
-function parseZoneDoc(doc: any): Zone {
+import type { DocumentSnapshot, QueryDocumentSnapshot } from 'firebase/firestore'
+
+function parseZoneDoc(doc: DocumentSnapshot | QueryDocumentSnapshot): Zone {
   const data = doc.data()
+  if (!data) {
+    throw new Error(`Zone document ${doc.id} has no data`)
+  }
+  
   return {
     id: doc.id,
     parentId: data.parentId || null,
@@ -120,9 +127,10 @@ function parseZoneDoc(doc: any): Zone {
   } as Zone
 }
 
-function toDate(value: any): Date {
+function toDate(value: unknown): Date {
   if (!value) return new Date()
   if (value instanceof Timestamp) return value.toDate()
   if (value instanceof Date) return value
-  return new Date(value)
+  if (typeof value === 'string' || typeof value === 'number') return new Date(value)
+  return new Date()
 }

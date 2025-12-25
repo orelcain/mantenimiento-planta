@@ -25,6 +25,9 @@ import { useAppStore } from '@/store'
 import { getEquipments, createEquipment, updateEquipment } from '@/services/equipment'
 import { getMainZones } from '@/services/zones'
 import type { Equipment, Zone } from '@/types'
+import { createEquipmentSchema, updateEquipmentSchema } from '@/lib/validation'
+import { logger } from '@/lib/logger'
+import { debounce } from '@/lib/rate-limit'
 
 const STATUS_CONFIG = {
   operativo: { label: 'Operativo', className: 'bg-success text-success-foreground' },
@@ -45,6 +48,12 @@ export function EquipmentPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [filterZone, setFilterZone] = useState<string>('all')
   const [filterStatus, setFilterStatus] = useState<string>('all')
+
+  // Debounced search
+  const debouncedSetSearch = debounce((value: string) => {
+    setSearchQuery(value)
+    logger.info('Equipment search', { query: value })
+  }, 300)
 
   // Cargar datos
   useEffect(() => {
@@ -138,8 +147,8 @@ export function EquipmentPage() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Buscar por nombre o código..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                defaultValue={searchQuery}
+                onChange={(e) => debouncedSetSearch(e.target.value)}
                 className="pl-9"
               />
             </div>
@@ -274,6 +283,7 @@ function EquipmentForm({
   onSuccess: () => void
 }) {
   const [isLoading, setIsLoading] = useState(false)
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
   const [formData, setFormData] = useState({
     codigo: equipment?.codigo || '',
     nombre: equipment?.nombre || '',
@@ -289,8 +299,40 @@ function EquipmentForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
+    setValidationErrors({})
 
     try {
+      const dataToValidate = {
+        codigo: formData.codigo,
+        nombre: formData.nombre,
+        descripcion: formData.descripcion || undefined,
+        marca: formData.marca || undefined,
+        modelo: formData.modelo || undefined,
+        numeroSerie: formData.numeroSerie || undefined,
+        zoneId: formData.zoneId,
+        zonePath: [formData.zoneId],
+        position: { x: 0, y: 0 },
+        criticidad: formData.criticidad,
+        estado: formData.estado,
+      }
+
+      // Validar con Zod
+      const schema = equipment ? updateEquipmentSchema : createEquipmentSchema
+      const validation = schema.safeParse(dataToValidate)
+      
+      if (!validation.success) {
+        const errors: Record<string, string> = {}
+        validation.error.issues.forEach((err) => {
+          const path = err.path.map((p) => String(p)).join('.')
+          errors[path] = err.message
+        })
+        setValidationErrors(errors)
+        logger.warn('Equipment validation failed', { errors })
+        return
+      }
+
+      logger.info(equipment ? 'Updating equipment' : 'Creating equipment', { codigo: formData.codigo })
+
       if (equipment) {
         await updateEquipment(equipment.id, formData)
       } else {
@@ -300,9 +342,13 @@ function EquipmentForm({
           position: { x: 0, y: 0 },
         })
       }
+      
+      logger.info('Equipment saved successfully', { codigo: formData.codigo })
       onSuccess()
-    } catch (error) {
-      console.error('Error saving equipment:', error)
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error('Error saving equipment')
+      logger.error('Error saving equipment', err)
+      setValidationErrors({ general: 'Error al guardar el equipo. Por favor intenta de nuevo.' })
     } finally {
       setIsLoading(false)
     }
@@ -318,6 +364,12 @@ function EquipmentForm({
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {validationErrors.general && (
+            <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
+              {validationErrors.general}
+            </div>
+          )}
+          
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="codigo">Código *</Label>
@@ -328,6 +380,9 @@ function EquipmentForm({
                 placeholder="EQ-001"
                 required
               />
+              {validationErrors.codigo && (
+                <p className="text-sm text-destructive">{validationErrors.codigo}</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="zoneId">Zona *</Label>
@@ -346,6 +401,9 @@ function EquipmentForm({
                   ))}
                 </SelectContent>
               </Select>
+              {validationErrors.zoneId && (
+                <p className="text-sm text-destructive">{validationErrors.zoneId}</p>
+              )}
             </div>
           </div>
 
@@ -358,6 +416,9 @@ function EquipmentForm({
               placeholder="Bomba centrífuga principal"
               required
             />
+            {validationErrors.nombre && (
+              <p className="text-sm text-destructive">{validationErrors.nombre}</p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -369,6 +430,9 @@ function EquipmentForm({
               placeholder="Descripción del equipo..."
               rows={2}
             />
+            {validationErrors.descripcion && (
+              <p className="text-sm text-destructive">{validationErrors.descripcion}</p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">

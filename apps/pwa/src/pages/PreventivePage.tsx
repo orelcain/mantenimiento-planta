@@ -1,4 +1,11 @@
 import { useState, useEffect, useMemo } from 'react'
+import { logger } from '@/lib/logger'
+import {
+  createPreventiveTaskSchema,
+  updatePreventiveTaskSchema,
+  executePreventiveTaskSchema,
+  formatZodErrors,
+} from '@/lib/validation'
 import {
   Calendar,
   Plus,
@@ -94,7 +101,7 @@ export function PreventivePage() {
       setStats(statsData)
       setExecutions(executionsData)
     } catch (error) {
-      console.error('Error loading data:', error)
+      logger.error('Error loading preventive maintenance data', error instanceof Error ? error : new Error(String(error)))
     } finally {
       setLoading(false)
     }
@@ -170,9 +177,10 @@ export function PreventivePage() {
     if (!confirm('¿Estás seguro de eliminar esta tarea?')) return
     try {
       await deletePreventiveTask(taskId)
+      logger.info('Preventive task deleted', { taskId })
       loadData()
     } catch (error) {
-      console.error('Error deleting task:', error)
+      logger.error('Error deleting preventive task', error instanceof Error ? error : new Error(String(error)), { taskId })
     }
   }
 
@@ -721,9 +729,11 @@ function TaskDialog({
     checklist: task?.checklist?.map(c => ({ id: c.id, tarea: c.tarea, completado: c.completado })) || [{ id: '1', tarea: '', completado: false }],
   })
   const [saving, setSaving] = useState(false)
+  const [errors, setErrors] = useState<Record<string, string>>({})
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setErrors({})
     setSaving(true)
 
     try {
@@ -734,16 +744,29 @@ function TaskDialog({
         activo: true,
       }
 
-      if (task) {
-        await updatePreventiveTask(task.id, data)
-      } else {
-        await createPreventiveTask(data)
+      // Validación con Zod
+      const schema = task ? updatePreventiveTaskSchema : createPreventiveTaskSchema
+      const validation = schema.safeParse(data)
+
+      if (!validation.success) {
+        const formattedErrors = formatZodErrors(validation.error)
+        setErrors(formattedErrors)
+        logger.warn('Preventive task validation failed', { errors: formattedErrors, taskId: task?.id })
+        return
       }
 
+      if (task) {
+        await updatePreventiveTask(task.id, validation.data)
+      } else {
+        // Para crear, validation.data tiene todos los campos requeridos
+        await createPreventiveTask(validation.data as Omit<PreventiveTask, 'id' | 'createdAt' | 'updatedAt'>)
+      }
+
+      logger.info('Preventive task saved', { taskId: task?.id, isNew: !task })
       onSave()
       onClose()
     } catch (error) {
-      console.error('Error saving task:', error)
+      logger.error('Error saving preventive task', error instanceof Error ? error : new Error(String(error)), { taskId: task?.id })
     } finally {
       setSaving(false)
     }
@@ -782,6 +805,17 @@ function TaskDialog({
       </DialogHeader>
 
       <form onSubmit={handleSubmit} className="space-y-4">
+        {Object.keys(errors).length > 0 && (
+          <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-md">
+            <p className="font-medium">Por favor corrige los siguientes errores:</p>
+            <ul className="mt-2 list-disc list-inside text-sm">
+              {Object.values(errors).map((error, index) => (
+                <li key={index}>{error}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         <div className="space-y-2">
           <Label>Equipo *</Label>
           <Select
@@ -800,6 +834,9 @@ function TaskDialog({
               ))}
             </SelectContent>
           </Select>
+          {errors.equipmentId && (
+            <p className="text-sm text-red-600">{errors.equipmentId}</p>
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-4">
@@ -821,6 +858,9 @@ function TaskDialog({
                 ))}
               </SelectContent>
             </Select>
+            {errors.tipo && (
+              <p className="text-sm text-red-600">{errors.tipo}</p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -842,6 +882,9 @@ function TaskDialog({
                 ))}
               </SelectContent>
             </Select>
+            {errors.frecuenciaDias && (
+              <p className="text-sm text-red-600">{errors.frecuenciaDias}</p>
+            )}
           </div>
         </div>
 
@@ -853,6 +896,9 @@ function TaskDialog({
             placeholder="Ej: Lubricación de rodamientos"
             required
           />
+          {errors.nombre && (
+            <p className="text-sm text-red-600">{errors.nombre}</p>
+          )}
         </div>
 
         <div className="space-y-2">
@@ -863,6 +909,9 @@ function TaskDialog({
             placeholder="Instrucciones adicionales..."
             rows={2}
           />
+          {errors.descripcion && (
+            <p className="text-sm text-red-600">{errors.descripcion}</p>
+          )}
         </div>
 
         <div className="space-y-2">
@@ -875,6 +924,9 @@ function TaskDialog({
             }
             required
           />
+          {errors.proximaEjecucion && (
+            <p className="text-sm text-red-600">{errors.proximaEjecucion}</p>
+          )}
         </div>
 
         <div className="space-y-2">
@@ -899,16 +951,33 @@ function TaskDialog({
                 )}
               </div>
             ))}
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={addChecklistItem}
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Agregar paso
-            </Button>
           </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={addChecklistItem}
+            className="w-full"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Agregar tarea
+          </Button>
+          {errors.checklist && (
+            <p className="text-sm text-red-600">{errors.checklist}</p>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <Label>Asignado a (Email)</Label>
+          <Input
+            type="email"
+            value={formData.asignadoA}
+            onChange={(e) => setFormData({ ...formData, asignadoA: e.target.value })}
+            placeholder="usuario@empresa.com"
+          />
+          {errors.asignadoA && (
+            <p className="text-sm text-red-600">{errors.asignadoA}</p>
+          )}
         </div>
 
         <div className="flex justify-end gap-2 pt-4">
@@ -945,35 +1014,47 @@ function ExecuteTaskDialog({
   const [observaciones, setObservaciones] = useState('')
   const [duracion, setDuracion] = useState(30)
   const [saving, setSaving] = useState(false)
+  const [errors, setErrors] = useState<Record<string, string>>({})
 
   const allCompleted = checklist.every((c) => c.completado)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-
-    if (!allCompleted) {
-      alert('Debes completar todas las tareas del checklist')
-      return
-    }
-
+    setErrors({})
     setSaving(true)
 
     try {
-      await createExecution({
+      const data = {
         taskId: task.id,
         equipmentId: task.equipmentId,
         ejecutadoPor: userId,
-        fechaEjecucion: new Date(),
         checklistCompletado: checklist,
         observaciones,
-        fotos: [],
         duracionMinutos: duracion,
+      }
+
+      // Validación con Zod
+      const validation = executePreventiveTaskSchema.safeParse(data)
+
+      if (!validation.success) {
+        const formattedErrors = formatZodErrors(validation.error)
+        setErrors(formattedErrors)
+        logger.warn('Execute task validation failed', { errors: formattedErrors, taskId: task.id })
+        setSaving(false)
+        return
+      }
+
+      await createExecution({
+        ...validation.data,
+        fechaEjecucion: new Date(),
+        fotos: [],
       })
 
+      logger.info('Preventive task executed', { taskId: task.id, equipmentId: task.equipmentId })
       onSave()
       onClose()
     } catch (error) {
-      console.error('Error executing task:', error)
+      logger.error('Error executing preventive task', error instanceof Error ? error : new Error(String(error)), { taskId: task.id })
     } finally {
       setSaving(false)
     }
@@ -990,6 +1071,17 @@ function ExecuteTaskDialog({
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
+        {Object.keys(errors).length > 0 && (
+          <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-md">
+            <p className="font-medium">Por favor corrige los siguientes errores:</p>
+            <ul className="mt-2 list-disc list-inside text-sm">
+              {Object.values(errors).map((error, index) => (
+                <li key={index}>{error}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         <div className="space-y-2">
           <Label>Checklist</Label>
           <div className="space-y-2 border rounded-lg p-3">
@@ -1030,6 +1122,9 @@ function ExecuteTaskDialog({
               </div>
             ))}
           </div>
+          {errors.checklistCompletado && (
+            <p className="text-sm text-red-600">{errors.checklistCompletado}</p>
+          )}
         </div>
 
         <div className="space-y-2">
@@ -1040,6 +1135,9 @@ function ExecuteTaskDialog({
             onChange={(e) => setDuracion(Number(e.target.value))}
             min={1}
           />
+          {errors.duracionMinutos && (
+            <p className="text-sm text-red-600">{errors.duracionMinutos}</p>
+          )}
         </div>
 
         <div className="space-y-2">
@@ -1050,6 +1148,9 @@ function ExecuteTaskDialog({
             placeholder="Notas adicionales..."
             rows={3}
           />
+          {errors.observaciones && (
+            <p className="text-sm text-red-600">{errors.observaciones}</p>
+          )}
         </div>
 
         <div className="flex justify-end gap-2 pt-4">

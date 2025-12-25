@@ -7,18 +7,45 @@ import {
 } from 'firebase/storage'
 import { storage } from './firebase'
 import { generateId } from '@/lib/utils'
+import { validateFile } from '@/lib/validation'
+import { logger } from '@/lib/logger'
 
 // Subir imagen de incidencia
 export async function uploadIncidentPhoto(
   incidentId: string,
   file: File
 ): Promise<string> {
-  const fileExtension = file.name.split('.').pop() || 'jpg'
-  const fileName = `${generateId()}.${fileExtension}`
-  const storageRef = ref(storage, `incidents/${incidentId}/${fileName}`)
-  
-  await uploadBytes(storageRef, file)
-  return getDownloadURL(storageRef)
+  // Validar archivo antes de subir
+  const validation = validateFile(file)
+  if (!validation.valid) {
+    throw new Error(validation.error)
+  }
+
+  logger.info('Uploading incident photo', { 
+    incidentId, 
+    fileSize: file.size, 
+    fileType: file.type 
+  })
+
+  try {
+    // Comprimir imagen automáticamente si es mayor a 1MB
+    const fileToUpload = file.size > 1024 * 1024 
+      ? await compressImage(file, 1920, 0.8)
+      : file
+
+    const fileExtension = file.name.split('.').pop() || 'jpg'
+    const fileName = `${generateId()}.${fileExtension}`
+    const storageRef = ref(storage, `incidents/${incidentId}/${fileName}`)
+    
+    await uploadBytes(storageRef, fileToUpload)
+    const url = await getDownloadURL(storageRef)
+    
+    logger.info('Incident photo uploaded successfully', { incidentId, fileName })
+    return url
+  } catch (error) {
+    logger.error('Error uploading incident photo', error as Error, { incidentId })
+    throw error
+  }
 }
 
 // Subir imagen de equipo
@@ -26,12 +53,36 @@ export async function uploadEquipmentPhoto(
   equipmentId: string,
   file: File
 ): Promise<string> {
-  const fileExtension = file.name.split('.').pop() || 'jpg'
-  const fileName = `${generateId()}.${fileExtension}`
-  const storageRef = ref(storage, `equipment/${equipmentId}/${fileName}`)
-  
-  await uploadBytes(storageRef, file)
-  return getDownloadURL(storageRef)
+  // Validar archivo
+  const validation = validateFile(file)
+  if (!validation.valid) {
+    throw new Error(validation.error)
+  }
+
+  logger.info('Uploading equipment photo', { 
+    equipmentId, 
+    fileSize: file.size 
+  })
+
+  try {
+    // Comprimir si es necesario
+    const fileToUpload = file.size > 1024 * 1024
+      ? await compressImage(file, 1920, 0.8)
+      : file
+
+    const fileExtension = file.name.split('.').pop() || 'jpg'
+    const fileName = `${generateId()}.${fileExtension}`
+    const storageRef = ref(storage, `equipment/${equipmentId}/${fileName}`)
+    
+    await uploadBytes(storageRef, fileToUpload)
+    const url = await getDownloadURL(storageRef)
+    
+    logger.info('Equipment photo uploaded successfully', { equipmentId, fileName })
+    return url
+  } catch (error) {
+    logger.error('Error uploading equipment photo', error as Error, { equipmentId })
+    throw error
+  }
 }
 
 // Subir foto de usuario
@@ -161,8 +212,9 @@ export async function getMapImages(): Promise<string[]> {
     )
     
     return urls
-  } catch (error) {
-    console.error('Error obteniendo mapas:', error)
+  } catch (error: unknown) {
+    const err = error instanceof Error ? error : new Error('Error obteniendo mapas')
+    logger.error('Error getting maps', err)
     return []
   }
 }

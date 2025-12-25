@@ -57,7 +57,7 @@ export async function getEquipmentByCode(codigo: string): Promise<Equipment | nu
   const q = query(collection(db, COLLECTION), where('codigo', '==', codigo))
   const snapshot = await getDocs(q)
   
-  if (snapshot.empty) {
+  if (snapshot.empty || !snapshot.docs[0]) {
     return null
   }
 
@@ -120,8 +120,14 @@ export async function setEquipmentStatus(
 }
 
 // Helper para parsear documentos
-function parseEquipmentDoc(doc: any): Equipment {
+import type { DocumentSnapshot, QueryDocumentSnapshot } from 'firebase/firestore'
+
+function parseEquipmentDoc(doc: DocumentSnapshot | QueryDocumentSnapshot): Equipment {
   const data = doc.data()
+  if (!data) {
+    throw new Error(`Equipment document ${doc.id} has no data`)
+  }
+  
   return {
     ...data,
     id: doc.id,
@@ -131,9 +137,10 @@ function parseEquipmentDoc(doc: any): Equipment {
   } as Equipment
 }
 
-function toDate(value: any): Date | undefined {
+function toDate(value: unknown): Date | undefined {
   if (!value) return undefined
   if (value instanceof Timestamp) return value.toDate()
   if (value instanceof Date) return value
-  return new Date(value)
+  if (typeof value === 'string' || typeof value === 'number') return new Date(value)
+  return undefined
 }

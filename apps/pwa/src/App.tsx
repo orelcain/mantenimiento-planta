@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { onAuthChange, getUserById } from '@/services/auth'
 import { useAuthStore } from '@/store'
+import { logger } from '@/lib/logger'
 import { LoadingScreen } from '@/components/ui'
 import { MainLayout } from '@/components/layout'
 import { HelpProvider } from '@/components/help'
@@ -53,8 +54,9 @@ export function App() {
         try {
           const user = await getUserById(firebaseUser.uid)
           setUser(user)
-        } catch (error) {
-          console.error('Error fetching user:', error)
+        } catch (error: unknown) {
+          const err = error instanceof Error ? error : new Error('Error fetching user')
+          logger.error('Error fetching user', err)
           setUser(null)
         }
       } else {

@@ -39,15 +39,61 @@ service cloud.firestore {
     // Incidencias
     match /incidents/{incidentId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update: if isAuthenticated();
+      allow create: if isAuthenticated()
+        && request.resource.data.titulo is string
+        && request.resource.data.titulo.size() >= 5
+        && request.resource.data.titulo.size() <= 100
+        && request.resource.data.descripcion is string
+        && request.resource.data.descripcion.size() >= 10
+        && request.resource.data.descripcion.size() <= 1000
+        && request.resource.data.prioridad in ['critica', 'alta', 'media', 'baja']
+        && request.resource.data.status in ['pendiente', 'confirmada', 'rechazada', 'en_proceso', 'cerrada']
+        && request.resource.data.tipo in ['correctivo', 'preventivo', 'predictivo', 'proactivo']
+        && request.resource.data.zoneId is string
+        && request.resource.data.reportadoPor == request.auth.uid
+        && (!('sintomas' in request.resource.data) || request.resource.data.sintomas.size() <= 20)
+        && (!('fotos' in request.resource.data) || request.resource.data.fotos.size() <= 10);
+      allow update: if isAuthenticated()
+        && (
+          // Owner can update if status is 'pendiente'
+          (resource.data.reportadoPor == request.auth.uid && resource.data.status == 'pendiente')
+          // Supervisor/Admin can always update
+          || isSupervisor()
+        )
+        && (!('titulo' in request.resource.data) || (
+          request.resource.data.titulo is string
+          && request.resource.data.titulo.size() >= 5
+          && request.resource.data.titulo.size() <= 100
+        ))
+        && (!('descripcion' in request.resource.data) || (
+          request.resource.data.descripcion is string
+          && request.resource.data.descripcion.size() >= 10
+          && request.resource.data.descripcion.size() <= 1000
+        ))
+        && (!('prioridad' in request.resource.data) || (
+          request.resource.data.prioridad in ['critica', 'alta', 'media', 'baja']
+        ))
+        && (!('sintomas' in request.resource.data) || request.resource.data.sintomas.size() <= 20)
+        && (!('resolucion' in request.resource.data) || (
+          request.resource.data.resolucion.size() >= 20
+          && request.resource.data.resolucion.size() <= 1000
+        ));
       allow delete: if isAdmin();
     }
 
     // Zonas
     match /zones/{zoneId} {
       allow read: if isAuthenticated();
-      allow create: if isAdmin();
+      allow create: if isAdmin()
+        && request.resource.data.nombre is string
+        && request.resource.data.nombre.size() >= 2
+        && request.resource.data.nombre.size() <= 100
+        && request.resource.data.codigo is string
+        && request.resource.data.codigo.size() >= 1
+        && request.resource.data.codigo.size() <= 20
+        && request.resource.data.nivel in [1, 2, 3]
+        && request.resource.data.tipo in ['produccion', 'almacen', 'oficinas', 'mantenimiento', 'carga_descarga', 'servicios', 'seguridad', 'maquina', 'otro']
+        && request.resource.data.polygon.size() >= 3;
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
@@ -55,8 +101,28 @@ service cloud.firestore {
     // Equipos
     match /equipment/{equipmentId} {
       allow read: if isAuthenticated();
-      allow create: if isAdmin() || isSupervisor();
-      allow update: if isAuthenticated();
+      allow create: if (isAdmin() || isSupervisor())
+        && request.resource.data.codigo is string
+        && request.resource.data.codigo.size() >= 1
+        && request.resource.data.codigo.size() <= 20
+        && request.resource.data.nombre is string
+        && request.resource.data.nombre.size() >= 2
+        && request.resource.data.nombre.size() <= 100
+        && request.resource.data.criticidad in ['alta', 'media', 'baja']
+        && request.resource.data.estado in ['operativo', 'en_mantenimiento', 'fuera_servicio']
+        && request.resource.data.zoneId is string;
+      allow update: if isAuthenticated()
+        && (!('nombre' in request.resource.data) || (
+          request.resource.data.nombre is string
+          && request.resource.data.nombre.size() >= 2
+          && request.resource.data.nombre.size() <= 100
+        ))
+        && (!('criticidad' in request.resource.data) || (
+          request.resource.data.criticidad in ['alta', 'media', 'baja']
+        ))
+        && (!('estado' in request.resource.data) || (
+          request.resource.data.estado in ['operativo', 'en_mantenimiento', 'fuera_servicio']
+        ));
       allow delete: if isAdmin();
     }
 

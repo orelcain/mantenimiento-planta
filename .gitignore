@@ -13,10 +13,12 @@ apps/pwa/vite.config.d.ts
 *.png
 apps/pwa/public/maps/*.png
 
-# Local env files
+# Local env files - IMPORTANTE: Nunca commitear credenciales
 .env
 .env.local
 .env.*.local
+apps/pwa/.env
+apps/pwa/.env.local
 
 # IDE
 .idea

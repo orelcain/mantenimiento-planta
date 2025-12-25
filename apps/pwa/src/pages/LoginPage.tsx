@@ -14,6 +14,8 @@ import {
 } from '@/components/ui'
 import { signIn, signUpWithInviteCode } from '@/services/auth'
 import { useAuthStore } from '@/store'
+import { loginSchema, signUpSchema } from '@/lib/validation'
+import { logger } from '@/lib/logger'
 
 type AuthMode = 'login' | 'register'
 
@@ -24,6 +26,7 @@ export function LoginPage() {
   const [mode, setMode] = useState<AuthMode>('login')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
 
   // Form fields
   const [email, setEmail] = useState('')
@@ -35,20 +38,59 @@ export function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
+    setValidationErrors({})
     setIsLoading(true)
 
     try {
+      // Validar con Zod
+      if (mode === 'login') {
+        const validation = loginSchema.safeParse({ email, password })
+        if (!validation.success) {
+          const errors: Record<string, string> = {}
+          validation.error.issues.forEach((err) => {
+            const path = err.path.map((p) => String(p)).join('.')
+            errors[path] = err.message
+          })
+          setValidationErrors(errors)
+          logger.warn('Login validation failed', { errors })
+          return
+        }
+      } else {
+        const validation = signUpSchema.safeParse({ 
+          email, 
+          password, 
+          nombre, 
+          apellido, 
+          inviteCode 
+        })
+        if (!validation.success) {
+          const errors: Record<string, string> = {}
+          validation.error.issues.forEach((err) => {
+            const path = err.path.map((p) => String(p)).join('.')
+            errors[path] = err.message
+          })
+          setValidationErrors(errors)
+          logger.warn('SignUp validation failed', { errors })
+          return
+        }
+      }
+
+      logger.info(`Attempting ${mode}`, { email })
+      
       let user
       if (mode === 'login') {
         user = await signIn(email, password)
       } else {
         user = await signUpWithInviteCode(email, password, nombre, apellido, inviteCode)
       }
+      
       setUser(user)
+      logger.info(`${mode} successful`, { userId: user.id, email: user.email })
       navigate('/')
-    } catch (err: any) {
-      console.error('Auth error:', err)
-      setError(getErrorMessage(err.code || err.message))
+    } catch (err: unknown) {
+      const errorObj = err instanceof Error ? err : new Error('Authentication error')
+      logger.error('Auth error', errorObj)
+      setError(getErrorMessage((err as any).code || (err as any).message))
     } finally {
       setIsLoading(false)
     }
@@ -88,6 +130,9 @@ export function LoginPage() {
                       required
                       disabled={isLoading}
                     />
+                    {validationErrors.nombre && (
+                      <p className="text-sm text-destructive">{validationErrors.nombre}</p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="apellido">Apellido</Label>
@@ -99,6 +144,9 @@ export function LoginPage() {
                       required
                       disabled={isLoading}
                     />
+                    {validationErrors.apellido && (
+                      <p className="text-sm text-destructive">{validationErrors.apellido}</p>
+                    )}
                   </div>
                 </div>
 
@@ -113,6 +161,9 @@ export function LoginPage() {
                     disabled={isLoading}
                     className="uppercase tracking-widest"
                   />
+                  {validationErrors.inviteCode && (
+                    <p className="text-sm text-destructive">{validationErrors.inviteCode}</p>
+                  )}
                 </div>
               </>
             )}
@@ -128,6 +179,9 @@ export function LoginPage() {
                 required
                 disabled={isLoading}
               />
+              {validationErrors.email && (
+                <p className="text-sm text-destructive">{validationErrors.email}</p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -142,6 +196,9 @@ export function LoginPage() {
                 disabled={isLoading}
                 minLength={6}
               />
+              {validationErrors.password && (
+                <p className="text-sm text-destructive">{validationErrors.password}</p>
+              )}
             </div>
 
             {error && (

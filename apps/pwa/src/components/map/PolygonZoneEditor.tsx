@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { logger } from '@/lib/logger'
 import {
   Trash2,
   Save,
@@ -50,6 +51,7 @@ const ZONE_TYPES: { value: ZoneType; label: string; color: string; icon: string 
   { value: 'carga_descarga', label: 'Carga/Descarga', color: '#795548', icon: '🚚' },
   { value: 'servicios', label: 'Servicios', color: '#00bcd4', icon: '🚿' },
   { value: 'seguridad', label: 'Seguridad', color: '#f44336', icon: '🛡️' },
+  { value: 'maquina', label: 'Máquina/Equipo', color: '#ff5722', icon: '⚙️' },
   { value: 'otro', label: 'Otro', color: '#607d8b', icon: '📍' },
 ]
 
@@ -68,7 +70,7 @@ interface DrawingState {
 
 export function PolygonZoneEditor() {
   const { user } = useAuthStore()
-  const { zones, setZones, mapImage, setMapImage } = useAppStore()
+  const { zones, setZones, mapImage, setMapImage, equipment } = useAppStore()
   
   // Estado del editor
   const [tool, setTool] = useState<Tool>('select')
@@ -76,6 +78,7 @@ export function PolygonZoneEditor() {
   const [position, setPosition] = useState({ x: 0, y: 0 })
   const [isDragging, setIsDragging] = useState(false)
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
+  const [isPanning, setIsPanning] = useState(false)
   
   // Estado de dibujo de polígono
   const [drawing, setDrawing] = useState<DrawingState | null>(null)
@@ -92,6 +95,7 @@ export function PolygonZoneEditor() {
     tipo: 'produccion' as ZoneType,
     descripcion: '',
     color: '#2196f3',
+    equipmentId: '' as string | undefined, // Para vincular con equipo
   })
   
   // Imagen del plano
@@ -107,9 +111,9 @@ export function PolygonZoneEditor() {
 
   const isAdmin = user?.rol === 'admin'
   
-  // Dimensiones del canvas
-  const CANVAS_WIDTH = 1400
-  const CANVAS_HEIGHT = 800
+  // Dimensiones del canvas - se ajustarán según la imagen
+  const [canvasSize, setCanvasSize] = useState({ width: 1400, height: 800 })
+  const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1
 
   // Cargar zonas y mapas
   useEffect(() => {
@@ -126,8 +130,9 @@ export function PolygonZoneEditor() {
       if (!mapImage && maps.length > 0) {
         setMapImage(maps[0]!)
       }
+      logger.info('Maps loaded', { count: maps.length })
     } catch (error) {
-      console.error('Error cargando mapas:', error)
+      logger.error('Error cargando mapas', error instanceof Error ? error : new Error(String(error)))
     }
   }
 
@@ -142,10 +147,27 @@ export function PolygonZoneEditor() {
     img.crossOrigin = 'anonymous'
     img.onload = () => {
       imageRef.current = img
+      // Ajustar canvas para mantener aspect ratio con límite máximo
+      const maxWidth = 1600
+      const maxHeight = 900
+      let width = img.naturalWidth
+      let height = img.naturalHeight
+      
+      // Escalar si es muy grande
+      if (width > maxWidth) {
+        height = (maxWidth / width) * height
+        width = maxWidth
+      }
+      if (height > maxHeight) {
+        width = (maxHeight / height) * width
+        height = maxHeight
+      }
+      
+      setCanvasSize({ width: Math.floor(width), height: Math.floor(height) })
       setImageLoaded(true)
     }
     img.onerror = () => {
-      console.error('Error cargando imagen del mapa')
+      logger.error('Error cargando imagen del mapa', new Error('Image load failed'), { mapImage })
       setImageLoaded(false)
     }
     // Si es URL de Firebase Storage, usarla directamente; si es local, agregar basePath
@@ -181,35 +203,44 @@ export function PolygonZoneEditor() {
     return inside
   }
 
-  // Dibujar canvas
+  // Dibujar canvas con alta resolución
   const drawCanvas = useCallback(() => {
     const canvas = canvasRef.current
     const ctx = canvas?.getContext('2d')
     if (!canvas || !ctx) return
 
-    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    // Escalar contexto para alta resolución (devicePixelRatio)
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    
+    const width = canvasSize.width
+    const height = canvasSize.height
+
+    ctx.clearRect(0, 0, width, height)
 
     // Fondo
     if (imageRef.current && imageLoaded) {
-      ctx.drawImage(imageRef.current, 0, 0, canvas.width, canvas.height)
+      // Dibujar imagen a resolución completa
+      ctx.imageSmoothingEnabled = true
+      ctx.imageSmoothingQuality = 'high'
+      ctx.drawImage(imageRef.current, 0, 0, width, height)
     } else {
       // Grid de fondo si no hay imagen
       ctx.fillStyle = '#1a1a2e'
-      ctx.fillRect(0, 0, canvas.width, canvas.height)
+      ctx.fillRect(0, 0, width, height)
       
       ctx.strokeStyle = '#2a2a4e'
       ctx.lineWidth = 1
       const gridSize = 50
-      for (let x = 0; x <= canvas.width; x += gridSize) {
+      for (let x = 0; x <= width; x += gridSize) {
         ctx.beginPath()
         ctx.moveTo(x, 0)
-        ctx.lineTo(x, canvas.height)
+        ctx.lineTo(x, height)
         ctx.stroke()
       }
-      for (let y = 0; y <= canvas.height; y += gridSize) {
+      for (let y = 0; y <= height; y += gridSize) {
         ctx.beginPath()
         ctx.moveTo(0, y)
-        ctx.lineTo(canvas.width, y)
+        ctx.lineTo(width, y)
         ctx.stroke()
       }
       
@@ -217,7 +248,7 @@ export function PolygonZoneEditor() {
       ctx.fillStyle = '#666'
       ctx.font = '18px Inter, sans-serif'
       ctx.textAlign = 'center'
-      ctx.fillText('Sube una imagen del plano para comenzar', canvas.width / 2, canvas.height / 2)
+      ctx.fillText('Sube una imagen del plano para comenzar', width / 2, height / 2)
     }
 
     // Dibujar zonas existentes
@@ -229,8 +260,8 @@ export function PolygonZoneEditor() {
       
       // Convertir puntos normalizados a píxeles
       const pixelPoints = zone.polygon.map(p => ({
-        x: p.x * canvas.width,
-        y: p.y * canvas.height
+        x: p.x * width,
+        y: p.y * height
       }))
 
       // Dibujar polígono relleno
@@ -280,8 +311,8 @@ export function PolygonZoneEditor() {
     // Dibujar polígono en construcción
     if (drawing && drawing.points.length > 0) {
       const pixelPoints = drawing.points.map(p => ({
-        x: p.x * canvas.width,
-        y: p.y * canvas.height
+        x: p.x * width,
+        y: p.y * height
       }))
 
       // Líneas conectando puntos
@@ -327,10 +358,10 @@ export function PolygonZoneEditor() {
         ctx.fillStyle = '#4caf50'
         ctx.font = '14px Inter, sans-serif'
         ctx.textAlign = 'left'
-        ctx.fillText('✓ Click en punto 1 para cerrar el polígono', 20, canvas.height - 20)
+        ctx.fillText('✓ Click en punto 1 para cerrar el polígono', 20, height - 20)
       }
     }
-  }, [zones, drawing, hoveringFirstPoint, imageLoaded, selectedZone, zoneForm.color])
+  }, [zones, drawing, hoveringFirstPoint, imageLoaded, selectedZone, zoneForm.color, canvasSize, dpr])
 
   useEffect(() => {
     drawCanvas()
@@ -342,19 +373,20 @@ export function PolygonZoneEditor() {
     if (!canvas) return { x: 0, y: 0 }
     
     const rect = canvas.getBoundingClientRect()
-    const scaleX = canvas.width / rect.width
-    const scaleY = canvas.height / rect.height
+    // Usar canvasSize para las coordenadas, no canvas.width que tiene dpr aplicado
+    const scaleX = canvasSize.width / rect.width
+    const scaleY = canvasSize.height / rect.height
     
     return {
-      x: ((e.clientX - rect.left) * scaleX) / canvas.width,
-      y: ((e.clientY - rect.top) * scaleY) / canvas.height,
+      x: ((e.clientX - rect.left) * scaleX) / canvasSize.width,
+      y: ((e.clientY - rect.top) * scaleY) / canvasSize.height,
     }
   }
 
   // Distancia entre dos puntos
-  const distance = (p1: MapPoint, p2: MapPoint, canvas: HTMLCanvasElement) => {
-    const dx = (p1.x - p2.x) * canvas.width
-    const dy = (p1.y - p2.y) * canvas.height
+  const distance = (p1: MapPoint, p2: MapPoint) => {
+    const dx = (p1.x - p2.x) * canvasSize.width
+    const dy = (p1.y - p2.y) * canvasSize.height
     return Math.sqrt(dx * dx + dy * dy)
   }
 
@@ -371,7 +403,7 @@ export function PolygonZoneEditor() {
         setDrawing({ points: [coords], isComplete: false })
       } else if (!drawing.isComplete) {
         const firstPoint = drawing.points[0]!
-        const dist = distance(coords, firstPoint, canvas)
+        const dist = distance(coords, firstPoint)
         
         // Si está cerca del primer punto y hay al menos 3 puntos, cerrar polígono
         if (drawing.points.length >= 3 && dist < 20) {
@@ -401,7 +433,7 @@ export function PolygonZoneEditor() {
     if (tool === 'draw' && drawing && !drawing.isComplete && drawing.points.length >= 3) {
       const coords = getCanvasCoords(e)
       const firstPoint = drawing.points[0]!
-      const dist = distance(coords, firstPoint, canvas)
+      const dist = distance(coords, firstPoint)
       setHoveringFirstPoint(dist < 20)
     }
     
@@ -452,6 +484,7 @@ export function PolygonZoneEditor() {
       tipo: 'produccion',
       descripcion: '',
       color: '#2196f3',
+      equipmentId: undefined,
     })
   }
 
@@ -476,6 +509,8 @@ export function PolygonZoneEditor() {
       parentId: null,
       nivel: 1 as const,
       activa: true,
+      // Incluir equipmentId si es zona tipo máquina
+      ...(zoneForm.tipo === 'maquina' && zoneForm.equipmentId ? { equipmentId: zoneForm.equipmentId } : {})
     }
 
     try {
@@ -485,7 +520,7 @@ export function PolygonZoneEditor() {
       handleCancelDraw()
       setTool('select')
     } catch (error) {
-      console.error('Error creando zona:', error)
+      logger.error('Error creando zona en polygon editor', error instanceof Error ? error : new Error(String(error)))
       alert('Error al guardar la zona')
     }
   }
@@ -497,9 +532,10 @@ export function PolygonZoneEditor() {
     try {
       await deleteZone(zoneId)
       await getZones().then(setZones)
+      logger.info('Zone deleted from polygon editor', { zoneId })
       setSelectedZone(null)
     } catch (error) {
-      console.error('Error eliminando zona:', error)
+      logger.error('Error eliminando zona', error instanceof Error ? error : new Error(String(error)), { zoneId })
     }
   }
 
@@ -524,9 +560,10 @@ export function PolygonZoneEditor() {
     try {
       const url = await uploadMapImage(file)
       setMapImage(url)
+      logger.info('Map image uploaded', { url })
       await loadAvailableMaps()
     } catch (error) {
-      console.error('Error subiendo mapa:', error)
+      logger.error('Error subiendo mapa', error instanceof Error ? error : new Error(String(error)))
       alert('Error al subir la imagen')
     } finally {
       setUploading(false)
@@ -538,12 +575,62 @@ export function PolygonZoneEditor() {
 
   // Zoom
   const handleZoom = (delta: number) => {
-    setScale((prev) => Math.max(0.3, Math.min(3, prev + delta)))
+    setScale((prev) => Math.max(0.3, Math.min(5, prev + delta)))
   }
 
   const handleReset = () => {
     setScale(1)
     setPosition({ x: 0, y: 0 })
+  }
+
+  // Zoom con rueda del mouse
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    e.preventDefault()
+    
+    const container = containerRef.current
+    if (!container) return
+
+    // Calcular el factor de zoom
+    const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9
+    const newScale = Math.max(0.3, Math.min(5, scale * zoomFactor))
+    
+    // Obtener posición del cursor relativa al contenedor
+    const rect = container.getBoundingClientRect()
+    const mouseX = e.clientX - rect.left
+    const mouseY = e.clientY - rect.top
+    
+    // Calcular nueva posición para mantener el punto bajo el cursor
+    const scaleRatio = newScale / scale
+    const newPosX = mouseX - (mouseX - position.x) * scaleRatio
+    const newPosY = mouseY - (mouseY - position.y) * scaleRatio
+    
+    setScale(newScale)
+    setPosition({ x: newPosX, y: newPosY })
+  }, [scale, position])
+
+  // Pan con tecla espacio + arrastrar, o click del medio
+  const handleContainerMouseDown = (e: React.MouseEvent) => {
+    // Middle button (button === 1) o Space presionado
+    if (e.button === 1) {
+      e.preventDefault()
+      setIsPanning(true)
+      setIsDragging(true)
+      setDragStart({ x: e.clientX - position.x, y: e.clientY - position.y })
+    }
+  }
+
+  const handleContainerMouseMove = (e: React.MouseEvent) => {
+    if (isPanning && isDragging) {
+      setPosition({
+        x: e.clientX - dragStart.x,
+        y: e.clientY - dragStart.y,
+      })
+    }
+  }
+
+  const handleContainerMouseUp = () => {
+    setIsPanning(false)
+    setIsDragging(false)
   }
 
   // Cambiar tipo de zona (actualiza color automáticamente)
@@ -667,9 +754,15 @@ export function PolygonZoneEditor() {
             ref={containerRef}
             className={cn(
               'relative w-full overflow-hidden bg-muted',
-              tool === 'select' ? 'cursor-grab active:cursor-grabbing' : 'cursor-crosshair'
+              tool === 'select' ? 'cursor-grab active:cursor-grabbing' : 'cursor-crosshair',
+              isPanning && 'cursor-grabbing'
             )}
             style={{ height: '70vh', minHeight: '500px' }}
+            onWheel={handleWheel}
+            onMouseDown={handleContainerMouseDown}
+            onMouseMove={handleContainerMouseMove}
+            onMouseUp={handleContainerMouseUp}
+            onMouseLeave={handleContainerMouseUp}
           >
             <div
               className="absolute transition-transform duration-75"
@@ -680,8 +773,9 @@ export function PolygonZoneEditor() {
             >
               <canvas
                 ref={canvasRef}
-                width={CANVAS_WIDTH}
-                height={CANVAS_HEIGHT}
+                width={canvasSize.width * dpr}
+                height={canvasSize.height * dpr}
+                style={{ width: canvasSize.width, height: canvasSize.height }}
                 onClick={handleCanvasClick}
                 onMouseMove={handleCanvasMouseMove}
                 onMouseDown={handleCanvasMouseDown}
@@ -836,6 +930,43 @@ export function PolygonZoneEditor() {
               </div>
             </div>
             
+            {/* Selector de equipo para zonas tipo máquina */}
+            {zoneForm.tipo === 'maquina' && (
+              <div>
+                <Label htmlFor="zoneEquipment">Equipo Vinculado</Label>
+                <Select 
+                  value={zoneForm.equipmentId || ''} 
+                  onValueChange={(v) => {
+                    const selectedEquip = equipment.find(e => e.id === v)
+                    setZoneForm({ 
+                      ...zoneForm, 
+                      equipmentId: v,
+                      nombre: selectedEquip ? `${selectedEquip.nombre}` : zoneForm.nombre,
+                      codigo: selectedEquip?.codigo || zoneForm.codigo
+                    })
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar equipo..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Sin vincular</SelectItem>
+                    {equipment.map((equip) => (
+                      <SelectItem key={equip.id} value={equip.id}>
+                        <span className="flex items-center gap-2">
+                          <span>⚙️</span>
+                          <span>{equip.codigo} - {equip.nombre}</span>
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Al vincular un equipo, se usará su nombre y código
+                </p>
+              </div>
+            )}
+            
             <div>
               <Label htmlFor="zoneName">Nombre de la Zona</Label>
               <Input
@@ -935,9 +1066,10 @@ export function PolygonZoneEditor() {
                             const otherMap = availableMaps.find(m => m !== url)
                             setMapImage(otherMap || null)
                           }
+                          logger.info('Map deleted', { url })
                           await loadAvailableMaps()
                         } catch (error) {
-                          console.error('Error eliminando mapa:', error)
+                          logger.error('Error eliminando mapa', error instanceof Error ? error : new Error(String(error)), { url })
                           alert('Error al eliminar el mapa')
                         }
                       }

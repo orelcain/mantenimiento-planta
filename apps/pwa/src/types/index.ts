@@ -29,6 +29,7 @@ export type ZoneType =
   | 'carga_descarga'
   | 'servicios'
   | 'seguridad'
+  | 'maquina' // Zona vinculada a un equipo/máquina
   | 'otro'
 
 // Punto en el mapa (coordenadas normalizadas 0-1)
@@ -46,6 +47,7 @@ export interface Zone {
   codigo: string // Código corto: "A", "B", "PROD-1", etc.
   tipo: ZoneType
   descripcion?: string
+  equipmentId?: string // ID del equipo vinculado (solo para tipo 'maquina')
   // Polígono: array de puntos que forman la zona
   polygon: MapPoint[]
   // Bounds calculados del polígono (para búsquedas rápidas)

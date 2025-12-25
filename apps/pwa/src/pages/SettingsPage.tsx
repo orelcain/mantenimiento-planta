@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { logger } from '@/lib/logger'
 import {
   Settings,
   Users,
@@ -123,10 +124,11 @@ function GeneralSettings() {
         autoAssign,
         updatedAt: serverTimestamp(),
       }, { merge: true })
+      logger.info('General settings saved', { requireValidation, autoAssign })
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
     } catch (error) {
-      console.error('Error guardando:', error)
+      logger.error('Error guardando configuración general', error instanceof Error ? error : new Error(String(error)))
     }
     setSaving(false)
   }
@@ -230,8 +232,9 @@ function UsersSettings() {
         ...doc.data(),
       })) as User[]
       setUsers(usersData)
+      logger.info('Users loaded', { count: usersData.length })
     } catch (error) {
-      console.error('Error cargando usuarios:', error)
+      logger.error('Error cargando usuarios', error instanceof Error ? error : new Error(String(error)))
     }
     setLoading(false)
   }
@@ -242,9 +245,10 @@ function UsersSettings() {
         activo: !currentStatus,
         updatedAt: serverTimestamp(),
       })
+      logger.info('User status updated', { userId, newStatus: !currentStatus })
       loadUsers()
     } catch (error) {
-      console.error('Error actualizando usuario:', error)
+      logger.error('Error actualizando estado de usuario', error instanceof Error ? error : new Error(String(error)), { userId })
     }
   }
 
@@ -254,9 +258,10 @@ function UsersSettings() {
         rol: newRole,
         updatedAt: serverTimestamp(),
       })
+      logger.info('User role updated', { userId, newRole })
       loadUsers()
     } catch (error) {
-      console.error('Error actualizando rol:', error)
+      logger.error('Error actualizando rol', error instanceof Error ? error : new Error(String(error)), { userId, newRole })
     }
   }
 
@@ -352,8 +357,9 @@ function InvitesSettings() {
         code: doc.id,
       })) as InviteCode[]
       setInvites(invitesData)
+      logger.info('Invite codes loaded', { count: invitesData.length })
     } catch (error) {
-      console.error('Error cargando invitaciones:', error)
+      logger.error('Error cargando invitaciones', error instanceof Error ? error : new Error(String(error)))
     }
     setLoading(false)
   }
@@ -381,10 +387,11 @@ function InvitesSettings() {
         usedAt: null,
       })
 
+      logger.info('Invite code created', { code, role: newInviteRole })
       setShowCreateDialog(false)
       loadInvites()
     } catch (error) {
-      console.error('Error creando invitación:', error)
+      logger.error('Error creando invitación', error instanceof Error ? error : new Error(String(error)), { role: newInviteRole })
     }
     setCreating(false)
   }
@@ -393,9 +400,10 @@ function InvitesSettings() {
     if (!confirm('¿Eliminar este código de invitación?')) return
     try {
       await deleteDoc(doc(db, 'inviteCodes', code))
+      logger.info('Invite code deleted', { code })
       loadInvites()
     } catch (error) {
-      console.error('Error eliminando invitación:', error)
+      logger.error('Error eliminando invitación', error instanceof Error ? error : new Error(String(error)), { code })
     }
   }
 
@@ -540,10 +548,11 @@ function NotificationsSettings() {
         criticalAlerts,
         updatedAt: serverTimestamp(),
       }, { merge: true })
+      logger.info('Notification settings saved', { emailNotifications, pushNotifications, criticalAlerts })
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
     } catch (error) {
-      console.error('Error guardando:', error)
+      logger.error('Error guardando notificaciones', error instanceof Error ? error : new Error(String(error)))
     }
     setSaving(false)
   }

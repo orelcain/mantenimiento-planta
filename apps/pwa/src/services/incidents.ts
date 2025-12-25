@@ -207,8 +207,14 @@ export function subscribeToIncidents(
 }
 
 // Helper para parsear documentos
-function parseIncidentDoc(doc: any): Incident {
+import type { DocumentSnapshot, QueryDocumentSnapshot } from 'firebase/firestore'
+
+function parseIncidentDoc(doc: DocumentSnapshot | QueryDocumentSnapshot): Incident {
   const data = doc.data()
+  if (!data) {
+    throw new Error(`Incident document ${doc.id} has no data`)
+  }
+  
   return {
     ...data,
     id: doc.id,
@@ -220,9 +226,10 @@ function parseIncidentDoc(doc: any): Incident {
   } as Incident
 }
 
-function toDate(value: any): Date | undefined {
+function toDate(value: unknown): Date | undefined {
   if (!value) return undefined
   if (value instanceof Timestamp) return value.toDate()
   if (value instanceof Date) return value
-  return new Date(value)
+  if (typeof value === 'string' || typeof value === 'number') return new Date(value)
+  return undefined
 }
