@@ -191,14 +191,37 @@ export async function compressImage(
     }
   })
 }
-// Subir imagen del mapa/plano
+// Subir imagen del mapa/plano (sin compresión, mantiene resolución original)
 export async function uploadMapImage(file: File): Promise<string> {
+  // Validar que sea imagen
+  if (!file.type.startsWith('image/')) {
+    throw new Error('El archivo debe ser una imagen')
+  }
+
+  logger.info('Uploading map image', {
+    fileName: file.name,
+    fileSize: file.size,
+    fileType: file.type,
+  })
+
   const fileExtension = file.name.split('.').pop() || 'png'
   const fileName = `map_${Date.now()}.${fileExtension}`
   const storageRef = ref(storage, `maps/${fileName}`)
   
-  await uploadBytes(storageRef, file)
-  return getDownloadURL(storageRef)
+  // Subir sin comprimir para mantener máxima calidad
+  const metadata = {
+    contentType: file.type,
+    customMetadata: {
+      originalName: file.name,
+      uploadedAt: new Date().toISOString(),
+    },
+  }
+
+  await uploadBytes(storageRef, file, metadata)
+  const url = await getDownloadURL(storageRef)
+  
+  logger.info('Map image uploaded successfully', { fileName, url })
+  return url
 }
 
 // Obtener todas las imágenes de mapas disponibles

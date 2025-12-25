@@ -270,7 +270,7 @@ function getErrorMessage(code: string): string {
   
   // Buscar si el mensaje contiene alguna de las claves
   const matchedKey = Object.keys(messages).find(key => code?.includes(key))
-  if (matchedKey) return messages[matchedKey]
+  if (matchedKey) return messages[matchedKey] ?? `Error de autenticación: ${code || 'Desconocido'}`
   
   // Error genérico con código para debugging
   return `Error de autenticación: ${code || 'Desconocido'}`

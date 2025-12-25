@@ -7,6 +7,36 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [1.0.3] - 2024-12-24
+
+### 🗺️ Optimización de Mapas y PWA
+
+#### Corregido
+- **Fix de preventDefault en eventos touch**
+  - Agregado `touchAction: 'none'` al contenedor del mapa
+  - Eliminados warnings de "Unable to preventDefault inside passive event listener"
+  - Mejor experiencia de zoom y pan en dispositivos móviles
+
+#### Mejorado
+- **Calidad de imágenes de mapas**
+  - Las imágenes de mapas mantienen resolución original
+  - Sin compresión automática para planos de planta
+  - Agregado `imageRendering: 'high-quality'` y `crisp-edges`
+  - Metadata mejorada en uploads (nombre original, fecha)
+  - Loading eager para carga prioritaria
+
+- **Sistema de versionado**
+  - Versión visible en login y sidebar
+  - Actualizado a v1.0.3
+  - Sistema centralizado en constantes
+
+#### Técnico
+- Metadata customizada en uploads de mapas
+- Mejoras en renderizado de imágenes con CSS
+- Loading y decoding optimizados
+
+---
+
 ## [1.0.2] - 2024-12-24
 
 ### ⚡ Optimizaciones de Rendimiento

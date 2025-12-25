@@ -259,6 +259,7 @@ export function MapPage() {
           <div
             ref={containerRef}
             className="relative w-full h-[600px] md:h-[700px] overflow-hidden bg-muted cursor-grab active:cursor-grabbing"
+            style={{ touchAction: 'none' }}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
@@ -285,6 +286,11 @@ export function MapPage() {
                     src={mapUrl}
                     alt="Plano de planta"
                     className="absolute inset-0 w-full h-full object-contain"
+                    style={{
+                      imageRendering: 'crisp-edges',
+                    }}
+                    loading="eager"
+                    decoding="async"
                     onError={(e) => {
                       e.currentTarget.style.display = 'none'
                     }}
