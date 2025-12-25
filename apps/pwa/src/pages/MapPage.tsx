@@ -28,7 +28,7 @@ import {
 import { useAppStore, useAuthStore } from '@/store'
 import { getZones } from '@/services/zones'
 import { subscribeToIncidents } from '@/services/incidents'
-import { PolygonZoneEditor } from '@/components/map'
+import { PolygonZoneEditor, InteractiveSVGMap } from '@/components/map'
 import type { Zone, Incident, IncidentPriority, IncidentStatus } from '@/types'
 import { cn } from '@/lib/utils'
 import { getAssetUrl, isFirebaseStorageUrl } from '@/lib/config'
@@ -63,6 +63,10 @@ export function MapPage() {
   const mapUrl = mapImage 
     ? (isFirebaseStorageUrl(mapImage) ? mapImage : getAssetUrl(mapImage))
     : null
+  
+  // Detectar si el mapa es SVG
+  const isSVGMap = mapUrl?.toLowerCase().endsWith('.svg') || mapUrl?.toLowerCase().includes('.svg')
+  
   const [scale, setScale] = useState(1)
   const [position, setPosition] = useState({ x: 0, y: 0 })
   const [isDragging, setIsDragging] = useState(false)
@@ -291,8 +295,21 @@ export function MapPage() {
             >
               {/* Plano de fondo */}
               <div className="relative w-full h-full">
-                {/* Imagen del plano */}
-                {mapUrl && (
+                {/* Renderizado condicional: SVG interactivo o imagen estática */}
+                {mapUrl && isSVGMap ? (
+                  <InteractiveSVGMap
+                    svgUrl={mapUrl}
+                    zones={zones}
+                    incidents={incidents}
+                    scale={scale}
+                    position={position}
+                    onZoneClick={(zoneId: string) => {
+                      const zone = zones.find(z => z.id === zoneId)
+                      if (zone) setSelectedZone(zone)
+                    }}
+                    onIncidentClick={setSelectedIncident}
+                  />
+                ) : mapUrl ? (
                   <img
                     key={mapUrl}
                     src={mapUrl}
@@ -314,7 +331,7 @@ export function MapPage() {
                       e.currentTarget.style.display = 'none'
                     }}
                   />
-                )}
+                ) : null}
 
                 {/* Zonas sobre el plano */}
                 {zones.length > 0 ? (
