@@ -11,6 +11,7 @@ import {
   LogOut,
   ChevronDown,
   CalendarClock,
+  FolderTree,
 } from 'lucide-react'
 import { Avatar, AvatarFallback } from '@/components/ui'
 import { useAuthStore, useIsAdmin } from '@/store'
@@ -28,6 +29,7 @@ const navigation = [
 ]
 
 const adminNavigation = [
+  { name: 'Jerarquías', href: '/hierarchy', icon: FolderTree },
   { name: 'Configuración', href: '/settings', icon: Settings },
 ]
 

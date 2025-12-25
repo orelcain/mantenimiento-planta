@@ -17,6 +17,7 @@ import {
 const MapPage = lazy(() => import('@/pages/MapPage').then((mod) => ({ default: mod.MapPage })))
 const PreventivePage = lazy(() => import('@/pages/PreventivePage').then((mod) => ({ default: mod.PreventivePage })))
 const SettingsPage = lazy(() => import('@/pages/SettingsPage').then((mod) => ({ default: mod.SettingsPage })))
+const HierarchyPage = lazy(() => import('@/pages/HierarchyPage').then((mod) => ({ default: mod.HierarchyPage })))
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuthStore()
@@ -108,6 +109,11 @@ export function App() {
             <Route path="settings" element={
               <Suspense fallback={<LoadingScreen />}>
                 <SettingsPage />
+              </Suspense>
+            } />
+            <Route path="hierarchy" element={
+              <Suspense fallback={<LoadingScreen />}>
+                <HierarchyPage />
               </Suspense>
             } />
           </Route>
