@@ -176,6 +176,10 @@ export function MainLayout() {
 
           {/* Desktop user menu */}
           <div className="hidden lg:flex items-center gap-3">
+            {/* Version badge */}
+            <div className="text-xs text-muted-foreground px-2 py-1 bg-muted/50 rounded">
+              v{APP_VERSION}
+            </div>
             <HelpButton />
             <span className="text-sm text-muted-foreground">
               {user?.nombre} {user?.apellido}

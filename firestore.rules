@@ -1,6 +1,6 @@
 rules_version = '2';
-// Version: v1.0.5 - Updated: 2025-12-25
-// Sistema de jerarquías anidadas de 8 niveles
+// Version: v1.0.6 - Updated: 2025-12-25
+// Sistema de jerarquías anidadas de 8 niveles con integración UI
 service cloud.firestore {
   match /databases/{database}/documents {
     // Funciones helper
@@ -35,7 +35,7 @@ service cloud.firestore {
     // Jerarquías organizacionales (8 niveles)
     match /hierarchy/{nodeId} {
       allow read: if isAuthenticated();
-      allow create: if isSupervisor()
+      allow create: if isAdmin()
         && request.resource.data.nombre is string
         && request.resource.data.nombre.size() >= 3
         && request.resource.data.nombre.size() <= 100
@@ -44,7 +44,7 @@ service cloud.firestore {
         && request.resource.data.path is list
         && request.resource.data.path.size() <= 8
         && request.resource.data.activo is bool;
-      allow update: if isSupervisor();
+      allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 
