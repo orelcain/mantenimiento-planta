@@ -36,14 +36,20 @@ service cloud.firestore {
     match /hierarchy/{nodeId} {
       allow read: if isAuthenticated();
       allow create: if isAdmin()
+        && request.resource.data.keys().hasAll(['nombre', 'codigo', 'nivel', 'parentId', 'path', 'orden', 'activo', 'creadoPor', 'creadoEn', 'actualizadoEn'])
         && request.resource.data.nombre is string
-        && request.resource.data.nombre.size() >= 3
-        && request.resource.data.nombre.size() <= 100
-        && isValidHierarchyCode(request.resource.data.codigo)
-        && isValidHierarchyLevel(request.resource.data.nivel)
+        && request.resource.data.nombre.size() >= 2
+        && request.resource.data.codigo is string
+        && request.resource.data.codigo.size() >= 2
+        && request.resource.data.nivel is int
+        && request.resource.data.nivel >= 1
+        && request.resource.data.nivel <= 8
         && request.resource.data.path is list
-        && request.resource.data.path.size() <= 8
-        && request.resource.data.activo is bool;
+        && request.resource.data.orden is int
+        && request.resource.data.activo is bool
+        && request.resource.data.creadoPor is string
+        && request.resource.data.creadoEn is timestamp
+        && request.resource.data.actualizadoEn is timestamp;
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
