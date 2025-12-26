@@ -6,14 +6,13 @@
  */
 
 import React, { useState, useEffect } from 'react'
-import { ChevronRight, MapPin, CheckCircle, AlertTriangle, AlertCircle } from 'lucide-react'
+import { ChevronRight, MapPin, CheckCircle, AlertTriangle } from 'lucide-react'
 import { 
   HierarchyLevel, 
   HIERARCHY_LEVEL_NAMES,
   HIERARCHY_CONSTRAINTS 
 } from '@/types/hierarchy'
 import { useHierarchyCascadeOptions, useHierarchyPath } from '@/hooks/useHierarchy'
-import { Button } from '@/components/ui/button'
 import { initializeHierarchySystem } from '@/services/hierarchyInit'
 import { useAuthStore } from '@/store/authStore'
 
@@ -42,8 +41,8 @@ export function HierarchySelector({
   console.log('[HierarchySelector] Montado con:', { value, minLevel, maxLevel, disabled })
   
   const user = useAuthStore(state => state.user)
-  const [initializing, setInitializing] = useState(false)
-  const [initError, setInitError] = useState<string | null>(null)
+  const [autoInitializing, setAutoInitializing] = useState(false)
+  const [initAttempted, setInitAttempted] = useState(false)
   
   // Estado de selecciones por nivel
   const [selections, setSelections] = useState<(SelectedNode | null)[]>(
@@ -52,6 +51,84 @@ export function HierarchySelector({
 
   // Cargar path inicial si hay un valor
   const { path: initialPath, loading: loadingPath } = useHierarchyPath(value ?? null)
+  
+  // Verificar opciones del primer nivel
+  const { options: rootOptions, loading: rootLoading } = useHierarchyCascadeOptions(null, 1)
+  
+  // Auto-inicialización silenciosa si no hay opciones
+  useEffect(() => {
+    const autoInit = async () => {
+      // Solo intentar una vez y si hay usuario admin
+      if (initAttempted || !user?.id || user.rol !== 'admin' || autoInitializing) {
+        return
+      }
+      
+      // Si está cargando, esperar
+      if (rootLoading) {
+        return
+      }
+      
+      // Si ya hay opciones, no hacer nada
+      if (rootOptions.length > 0) {
+        return
+      }
+      
+      // Marcar como intentado para no repetir
+      setInitAttempted(true)
+      setAutoInitializing(true)
+      
+      console.log('[HierarchySelector] Auto-inicializando sistema...')
+      
+      try {
+        await initializeHierarchySystem(user.id)
+        console.log('[HierarchySelector] Sistema inicializado, recargando...')
+        // Forzar recarga para ver los nuevos datos
+        setTimeout(() => window.location.reload(), 500)
+      } catch (err) {
+        console.error('[HierarchySelector] Error en auto-inicialización:', err)
+        setAutoInitializing(false)
+      }
+    }
+    
+    autoInit()
+  }, [rootOptions, rootLoading, user, initAttempted, autoInitializing])
+
+  useEffect(() => {
+    const autoInit = async () => {
+      // Solo intentar una vez y si hay usuario admin
+      if (initAttempted || !user?.id || user.rol !== 'admin' || autoInitializing) {
+        return
+      }
+      
+      // Si está cargando, esperar
+      if (rootLoading) {
+        return
+      }
+      
+      // Si ya hay opciones, no hacer nada
+      if (rootOptions.length > 0) {
+        return
+      }
+      
+      // Marcar como intentado para no repetir
+      setInitAttempted(true)
+      setAutoInitializing(true)
+      
+      console.log('[HierarchySelector] Auto-inicializando sistema...')
+      
+      try {
+        await initializeHierarchySystem(user.id)
+        console.log('[HierarchySelector] Sistema inicializado, recargando...')
+        // Forzar recarga para ver los nuevos datos
+        setTimeout(() => window.location.reload(), 500)
+      } catch (err) {
+        console.error('[HierarchySelector] Error en auto-inicialización:', err)
+        setAutoInitializing(false)
+      }
+    }
+    
+    autoInit()
+  }, [rootOptions, rootLoading, user, initAttempted, autoInitializing])
 
   useEffect(() => {
     console.log('[HierarchySelector] Path inicial:', { initialPath, loadingPath })
@@ -70,31 +147,25 @@ export function HierarchySelector({
   }, [initialPath, loadingPath, maxLevel])
 
   const handleLevelSelect = (nivel: HierarchyLevel, nodeId: string | null) => {
-    const index = nivel - 1
+    console.log('[HierarchySelector] Selección en nivel', nivel, ':', nodeId)
+    
     const newSelections = [...selections]
-
-    if (nodeId) {
-      // Seleccionar nodo
-      newSelections[index] = { id: nodeId, nivel }
-      
-      // Limpiar niveles posteriores
-      for (let i = index + 1; i < maxLevel; i++) {
-        newSelections[i] = null
-      }
-
-      // Si alcanzamos nivel máximo o mínimo, notificar cambio
-      if (nivel >= minLevel) {
-        onChange(nodeId)
-      }
-    } else {
-      // Limpiar este nivel y posteriores
-      for (let i = index; i < maxLevel; i++) {
-        newSelections[i] = null
-      }
-      onChange(null)
+    const index = nivel - 1
+    
+    newSelections[index] = nodeId
+      ? { id: nodeId, nivel }
+      : null
+    
+    // Limpiar niveles posteriores
+    for (let i = index + 1; i < maxLevel; i++) {
+      newSelections[i] = null
     }
-
+    
     setSelections(newSelections)
+    
+    // Emitir último nivel seleccionado
+    const lastSelection = newSelections.findLast(s => s !== null)
+    onChange(lastSelection?.id ?? null)
   }
 
   // Verificar si se alcanzó el nivel mínimo
@@ -104,62 +175,14 @@ export function HierarchySelector({
 
   const currentLevel = selections.findIndex(s => s === null) + 1
   const showValidation = currentLevel > 0 && currentLevel < minLevel
-  
-  // Verificar si hay opciones en el primer nivel
-  const { options: rootOptions, loading: rootLoading } = useHierarchyCascadeOptions(null, 1)
-  const needsInitialization = !rootLoading && rootOptions.length === 0 && !initializing
-  
-  // Función para inicializar el sistema
-  const handleInitialize = async () => {
-    if (!user?.id) {
-      setInitError('No hay usuario autenticado')
-      return
-    }
-    
-    setInitializing(true)
-    setInitError(null)
-    console.log('[HierarchySelector] Inicializando sistema de jerarquía...')
-    
-    try {
-      await initializeHierarchySystem(user.id)
-      console.log('[HierarchySelector] Sistema inicializado correctamente')
-      // Trigger refresh by forcing component remount
-      window.location.reload()
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Error desconocido'
-      console.error('[HierarchySelector] Error inicializando:', err)
-      setInitError(message)
-    } finally {
-      setInitializing(false)
-    }
-  }
 
   return (
     <div className="space-y-4">
-      {/* Mensaje de inicialización */}
-      {needsInitialization && (
-        <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-          <AlertCircle className="w-6 h-6 text-amber-600 mt-0.5 flex-shrink-0" />
-          <div className="flex-1 space-y-2">
-            <div className="text-sm text-amber-800">
-              <strong>Sistema sin inicializar:</strong> No hay estructura de jerarquía creada. 
-              Necesitas inicializar el sistema con las áreas base para poder seleccionar ubicaciones.
-            </div>
-            <Button
-              onClick={handleInitialize}
-              disabled={initializing}
-              size="sm"
-              className="bg-amber-600 hover:bg-amber-700"
-            >
-              {initializing ? 'Inicializando...' : 'Inicializar Sistema'}
-            </Button>
-            {initError && (
-              <div className="text-xs text-red-600 flex items-center gap-1">
-                <AlertTriangle className="w-3 h-3" />
-                {initError}
-              </div>
-            )}
-          </div>
+      {/* Mensaje de inicialización en progreso */}
+      {autoInitializing && (
+        <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+          <span className="text-sm text-blue-700">Inicializando sistema...</span>
         </div>
       )}
       
