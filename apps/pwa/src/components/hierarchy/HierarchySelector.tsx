@@ -47,43 +47,6 @@ export function HierarchySelector({
   const { path: initialPath, loading: loadingPath } = useHierarchyPath(value ?? null)
 
   useEffect(() => {
-    const autoInit = async () => {
-      // Solo intentar una vez y si hay usuario admin
-      if (initAttempted || !user?.id || user.rol !== 'admin' || autoInitializing) {
-        return
-      }
-      
-      // Si está cargando, esperar
-      if (rootLoading) {
-        return
-      }
-      
-      // Si ya hay opciones, no hacer nada
-      if (rootOptions.length > 0) {
-        return
-      }
-      
-      // Marcar como intentado para no repetir
-      setInitAttempted(true)
-      setAutoInitializing(true)
-      
-      console.log('[HierarchySelector] Auto-inicializando sistema...')
-      
-      try {
-        await initializeHierarchySystem(user.id)
-        console.log('[HierarchySelector] Sistema inicializado, recargando...')
-        // Forzar recarga para ver los nuevos datos
-        setTimeout(() => window.location.reload(), 500)
-      } catch (err) {
-        console.error('[HierarchySelector] Error en auto-inicialización:', err)
-        setAutoInitializing(false)
-      }
-    }
-    
-    autoInit()
-  }, [rootOptions, rootLoading, user, initAttempted, autoInitializing])
-
-  useEffect(() => {
     console.log('[HierarchySelector] Path inicial:', { initialPath, loadingPath })
     if (initialPath.length > 0 && !loadingPath) {
       const newSelections: (SelectedNode | null)[] = Array(maxLevel).fill(null)
