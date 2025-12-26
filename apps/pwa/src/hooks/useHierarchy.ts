@@ -550,13 +550,21 @@ export function useHierarchyCascadeOptions(parentId: string | null, nivel: Hiera
   const { children, loading } = useHierarchyChildren(parentId, nivel)
   
   const options = useMemo(() => {
-    return children.map(node => ({
+    const opts = children.map(node => ({
       value: node.id,
       label: `${node.codigo} - ${node.nombre}`,
       nivel: node.nivel,
       hasChildren: node.nivel < 8,
     }))
-  }, [children])
+    console.log('[useHierarchyCascadeOptions] Opciones generadas:', {
+      parentId,
+      nivel,
+      childrenCount: children.length,
+      optionsCount: opts.length,
+      options: opts
+    })
+    return opts
+  }, [children, parentId, nivel])
 
   return { options, loading }
 }

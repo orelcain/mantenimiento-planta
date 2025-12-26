@@ -36,6 +36,8 @@ export function HierarchySelector({
   disabled = false,
   error,
 }: HierarchySelectorProps) {
+  console.log('[HierarchySelector] Montado con:', { value, minLevel, maxLevel, disabled })
+  
   // Estado de selecciones por nivel
   const [selections, setSelections] = useState<(SelectedNode | null)[]>(
     Array(maxLevel).fill(null)
@@ -45,6 +47,7 @@ export function HierarchySelector({
   const { path: initialPath, loading: loadingPath } = useHierarchyPath(value ?? null)
 
   useEffect(() => {
+    console.log('[HierarchySelector] Path inicial:', { initialPath, loadingPath })
     if (initialPath.length > 0 && !loadingPath) {
       const newSelections: (SelectedNode | null)[] = Array(maxLevel).fill(null)
       initialPath.forEach((pathNode) => {
@@ -191,6 +194,14 @@ function LevelSelector({
 }: LevelSelectorProps) {
   const { options, loading } = useHierarchyCascadeOptions(parentId, nivel)
 
+  console.log('[LevelSelector] Renderizando nivel:', {
+    nivel,
+    parentId,
+    optionsCount: options.length,
+    loading,
+    value
+  })
+
   return (
     <div>
       <label className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -199,7 +210,10 @@ function LevelSelector({
       </label>
       <select
         value={value ?? ''}
-        onChange={e => onChange(e.target.value || null)}
+        onChange={e => {
+          console.log('[LevelSelector] Cambio en nivel', nivel, ':', e.target.value)
+          onChange(e.target.value || null)
+        }}
         disabled={disabled || loading}
         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
       >
