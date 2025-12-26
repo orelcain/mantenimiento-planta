@@ -46,7 +46,12 @@ service cloud.firestore {
         && request.resource.data.activo is bool
         && request.resource.data.creadoPor is string
         && request.resource.data.creadoEn is timestamp
-        && request.resource.data.actualizadoEn is timestamp;
+        && request.resource.data.actualizadoEn is timestamp
+        && (!('parentId' in request.resource.data) || request.resource.data.parentId is string || request.resource.data.parentId == null)
+        && (!('path' in request.resource.data) || request.resource.data.path is list)
+        && (!('orden' in request.resource.data) || request.resource.data.orden is int)
+        && (!('descripcion' in request.resource.data) || request.resource.data.descripcion is string)
+        && (!('metadata' in request.resource.data) || request.resource.data.metadata is map);
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
