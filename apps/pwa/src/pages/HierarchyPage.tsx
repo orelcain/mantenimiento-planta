@@ -163,16 +163,22 @@ export function HierarchyPage() {
     setSaveError(null)
 
     try {
-      await createNode({
+      const nodeData: any = {
         nombre: formData.nombre,
         codigo: formData.codigo,
         nivel: formData.nivel,
         parentId: formData.parentId,
-        descripcion: formData.descripcion || undefined,
         orden: formData.orden,
         activo: true,
         creadoPor: user.id,
-      })
+      }
+      
+      // Solo agregar descripcion si tiene valor
+      if (formData.descripcion?.trim()) {
+        nodeData.descripcion = formData.descripcion.trim()
+      }
+      
+      await createNode(nodeData)
 
       logger.info('Node created', { nombre: formData.nombre, nivel: formData.nivel })
       setShowCreateDialog(false)
@@ -193,13 +199,19 @@ export function HierarchyPage() {
     setSaveError(null)
 
     try {
-      await updateNode(selectedNode.id, {
+      const updateData: any = {
         nombre: formData.nombre,
         codigo: formData.codigo,
-        descripcion: formData.descripcion || undefined,
         orden: formData.orden,
         activo: true,
-      })
+      }
+      
+      // Solo agregar descripcion si tiene valor
+      if (formData.descripcion?.trim()) {
+        updateData.descripcion = formData.descripcion.trim()
+      }
+      
+      await updateNode(selectedNode.id, updateData)
 
       logger.info('Node updated', { nodeId: selectedNode.id })
       setShowEditDialog(false)

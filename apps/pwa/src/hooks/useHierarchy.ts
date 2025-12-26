@@ -322,14 +322,25 @@ export function useHierarchyMutations() {
         ? 0
         : (siblingsSnapshot.docs[0].data().orden ?? 0)
 
-      const newNode: Omit<HierarchyNode, 'id'> = {
-        ...input,
+      const newNode: any = {
+        nombre: input.nombre,
+        codigo: input.codigo,
+        nivel: input.nivel,
+        parentId: input.parentId,
         path,
         orden: lastOrder + 1,
         activo: true,
         creadoPor: user.uid,
         creadoEn: Timestamp.now(),
         actualizadoEn: Timestamp.now(),
+      }
+      
+      // Solo agregar campos opcionales si tienen valor
+      if (input.descripcion?.trim()) {
+        newNode.descripcion = input.descripcion.trim()
+      }
+      if (input.metadata) {
+        newNode.metadata = input.metadata
       }
 
       const docRef = await addDoc(collection(db, 'hierarchy'), newNode)
@@ -347,10 +358,25 @@ export function useHierarchyMutations() {
 
   const updateNode = async (id: string, input: UpdateHierarchyNodeInput): Promise<void> => {
     try {
-      await updateDoc(doc(db, 'hierarchy', id), {
-        ...input,
+      const updateData: any = {
         actualizadoEn: Timestamp.now(),
-      })
+      }
+      
+      // Solo agregar campos que tienen valor
+      if (input.nombre !== undefined) updateData.nombre = input.nombre
+      if (input.codigo !== undefined) updateData.codigo = input.codigo
+      if (input.orden !== undefined) updateData.orden = input.orden
+      if (input.activo !== undefined) updateData.activo = input.activo
+      
+      // Campos opcionales - solo si tienen valor
+      if (input.descripcion?.trim()) {
+        updateData.descripcion = input.descripcion.trim()
+      }
+      if (input.metadata) {
+        updateData.metadata = input.metadata
+      }
+      
+      await updateDoc(doc(db, 'hierarchy', id), updateData)
 
       // Invalidar caché
       treeCache = null
