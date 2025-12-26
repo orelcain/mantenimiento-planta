@@ -118,8 +118,11 @@ export function useHierarchyChildren(parentId: string | null, nivel?: HierarchyL
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
+    console.log('[useHierarchyChildren] Cargando hijos:', { parentId, nivel })
+    
     if (nivel !== undefined && nivel >= 8) {
       // Nivel 8 no tiene hijos
+      console.log('[useHierarchyChildren] Nivel 8 alcanzado, sin hijos')
       setChildren([])
       return
     }
@@ -139,16 +142,22 @@ export function useHierarchyChildren(parentId: string | null, nivel?: HierarchyL
           constraints.unshift(where('nivel', '==', nivel + 1))
         }
 
+        console.log('[useHierarchyChildren] Query constraints:', constraints.map(c => c.type))
+        
         const q = query(hierarchyRef, ...constraints)
         const snapshot = await getDocs(q)
+        
+        console.log('[useHierarchyChildren] Documentos encontrados:', snapshot.size)
         
         const nodes: HierarchyNode[] = snapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data(),
         } as HierarchyNode))
 
+        console.log('[useHierarchyChildren] Nodos procesados:', nodes.length)
         setChildren(nodes)
       } catch (error) {
+        console.error('[useHierarchyChildren] Error:', error)
         logger.error('Failed to load hierarchy children', error)
         setChildren([])
       } finally {
@@ -297,20 +306,32 @@ export function useHierarchyMutations() {
   const user = useAuthStore((state: any) => state.user)
 
   const createNode = async (input: CreateHierarchyNodeInput): Promise<string> => {
-    if (!user) throw new Error('Usuario no autenticado')
+    console.log('[useHierarchy] createNode iniciado:', input)
+    console.log('[useHierarchy] Usuario actual:', { uid: user?.uid, id: user?.id })
+    
+    if (!user?.uid) {
+      const errorMsg = 'Usuario no autenticado o sin UID'
+      console.error('[useHierarchy] Error:', errorMsg, user)
+      throw new Error(errorMsg)
+    }
 
     try {
       // Calcular path
       const path: string[] = []
       if (input.parentId) {
+        console.log('[useHierarchy] Obteniendo padre:', input.parentId)
         const parentDoc = await getDoc(doc(db, 'hierarchy', input.parentId))
         if (parentDoc.exists()) {
           const parentData = parentDoc.data() as HierarchyNode
           path.push(...parentData.path, input.parentId)
+          console.log('[useHierarchy] Path calculado:', path)
+        } else {
+          console.error('[useHierarchy] Padre no encontrado:', input.parentId)
         }
       }
 
       // Obtener orden (siguiente disponible)
+      console.log('[useHierarchy] Consultando hermanos para calcular orden...')
       const hierarchyRef = collection(db, 'hierarchy')
       const siblingsQuery = query(
         hierarchyRef,
@@ -321,6 +342,8 @@ export function useHierarchyMutations() {
       const lastOrder = siblingsSnapshot.empty
         ? 0
         : (siblingsSnapshot.docs[0].data().orden ?? 0)
+      
+      console.log('[useHierarchy] Hermanos encontrados:', siblingsSnapshot.size, 'Orden siguiente:', lastOrder + 1)
 
       const newNode: any = {
         nombre: input.nombre,
@@ -343,14 +366,24 @@ export function useHierarchyMutations() {
         newNode.metadata = input.metadata
       }
 
+      console.log('[useHierarchy] Guardando nodo en Firestore:', newNode)
       const docRef = await addDoc(collection(db, 'hierarchy'), newNode)
+      console.log('[useHierarchy] Nodo guardado con ID:', docRef.id)
       
       // Invalidar caché
       treeCache = null
 
       logger.info('Hierarchy node created', { id: docRef.id, nivel: input.nivel })
+      console.log('[useHierarchy] Nodo creado exitosamente')
       return docRef.id
     } catch (error) {
+      console.error('[useHierarchy] Error al crear nodo:', error)
+      console.error('[useHierarchy] Detalles del error:', {
+        name: (error as any).name,
+        code: (error as any).code,
+        message: (error as any).message,
+        stack: (error as any).stack
+      })
       logger.error('Failed to create hierarchy node', error)
       throw error
     }

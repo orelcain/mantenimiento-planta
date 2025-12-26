@@ -163,6 +163,14 @@ export function HierarchyPage() {
     setSaveError(null)
 
     try {
+      console.log('[HierarchyPage] Creando nodo:', {
+        nombre: formData.nombre,
+        codigo: formData.codigo,
+        nivel: formData.nivel,
+        parentId: formData.parentId,
+        userId: user.id
+      })
+      
       const nodeData: any = {
         nombre: formData.nombre,
         codigo: formData.codigo,
@@ -170,7 +178,6 @@ export function HierarchyPage() {
         parentId: formData.parentId,
         orden: formData.orden,
         activo: true,
-        creadoPor: user.id,
       }
       
       // Solo agregar descripcion si tiene valor
@@ -178,7 +185,8 @@ export function HierarchyPage() {
         nodeData.descripcion = formData.descripcion.trim()
       }
       
-      await createNode(nodeData)
+      const newId = await createNode(nodeData)
+      console.log('[HierarchyPage] Nodo creado exitosamente:', newId)
 
       logger.info('Node created', { nombre: formData.nombre, nivel: formData.nivel })
       setShowCreateDialog(false)
