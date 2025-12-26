@@ -139,7 +139,10 @@ export function useHierarchyChildren(parentId: string | null, nivel?: HierarchyL
         ]
 
         if (nivel !== undefined) {
-          constraints.unshift(where('nivel', '==', nivel + 1))
+          // Si parentId es null (raíz), buscar el nivel especificado directamente
+          // Si hay parentId, buscar el nivel hijo (nivel + 1)
+          const targetLevel = parentId === null ? nivel : nivel + 1
+          constraints.unshift(where('nivel', '==', targetLevel))
         }
 
         console.log('[useHierarchyChildren] Query constraints:', constraints.map(c => c.type))
