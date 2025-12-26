@@ -85,6 +85,14 @@
       "collectionGroup": "hierarchy",
       "queryScope": "COLLECTION",
       "fields": [
+        { "fieldPath": "parentId", "order": "ASCENDING" },
+        { "fieldPath": "orden", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "hierarchy",
+      "queryScope": "COLLECTION",
+      "fields": [
         { "fieldPath": "nivel", "order": "ASCENDING" },
         { "fieldPath": "parentId", "order": "ASCENDING" },
         { "fieldPath": "activo", "order": "ASCENDING" },
