@@ -10,7 +10,7 @@ import { logger } from '../lib/logger'
 
 export async function initializeHierarchySystem(userId: string): Promise<void> {
   try {
-    logger.info('Initializing hierarchy system...')
+    console.log('[hierarchyInit] 🚀 Iniciando sistema jerárquico para usuario:', userId)
 
     // 1. Crear empresa (Nivel 1)
     const empresaId = 'aquachile-chonchi'
@@ -29,8 +29,9 @@ export async function initializeHierarchySystem(userId: string): Promise<void> {
       actualizadoEn: Timestamp.now(),
     }
 
+    console.log('[hierarchyInit] 📝 Creando empresa root:', empresaId)
     await setDoc(doc(db, 'hierarchy', empresaId), empresa)
-    logger.info('Empresa root created', { empresaId })
+    console.log('[hierarchyInit] ✅ Empresa creada:', empresaId)
 
     // 2. Crear áreas principales (Nivel 2)
     const areas = [
@@ -76,8 +77,9 @@ export async function initializeHierarchySystem(userId: string): Promise<void> {
         actualizadoEn: Timestamp.now(),
       }
 
+      console.log(`[hierarchyInit] 📝 Creando área ${i + 1}/${areas.length}:`, area.id)
       await setDoc(doc(db, 'hierarchy', area.id), areaNode)
-      logger.info('Area created', { areaId: area.id })
+      console.log(`[hierarchyInit] ✅ Área creada:`, area.id)
     }
 
     // 3. Crear sub-áreas de ejemplo en Producción (Nivel 3)
@@ -121,11 +123,13 @@ export async function initializeHierarchySystem(userId: string): Promise<void> {
         actualizadoEn: Timestamp.now(),
       }
 
+      console.log(`[hierarchyInit] 📝 Creando sub-área ${i + 1}/${subAreas.length}:`, subArea.id)
       await setDoc(doc(db, 'hierarchy', subArea.id), subAreaNode)
-      logger.info('Sub-area created', { subAreaId: subArea.id })
+      console.log(`[hierarchyInit] ✅ Sub-área creada:`, subArea.id)
     }
 
-    // 4. Crear sistemas de ejemplo (Nivel 4)
+    console.log('[hierarchyInit] 🎉 Sistema inicializado completamente con', 1 + areas.length + subAreas.length, 'nodos')
+    logger.info('Hierarchy system initialized successfully')
     const sistemas = [
       {
         id: 'sistema-refrigeracion',
@@ -165,6 +169,7 @@ export async function initializeHierarchySystem(userId: string): Promise<void> {
 
     logger.info('Hierarchy system initialization completed successfully')
   } catch (error) {
+    console.error('[hierarchyInit] ❌ Error fatal durante inicialización:', error)
     logger.error('Failed to initialize hierarchy system', error)
     throw error
   }

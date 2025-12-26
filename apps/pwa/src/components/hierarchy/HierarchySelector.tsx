@@ -58,6 +58,13 @@ export function HierarchySelector({
   // Auto-inicialización silenciosa si no hay opciones
   useEffect(() => {
     const autoInit = async () => {
+      // Verificar si ya se intentó en esta sesión
+      const sessionKey = 'hierarchy_init_attempted'
+      if (sessionStorage.getItem(sessionKey)) {
+        console.log('[HierarchySelector] Ya se intentó inicializar en esta sesión')
+        return
+      }
+      
       // Solo intentar una vez y si hay usuario admin
       if (initAttempted || !user?.id || user.rol !== 'admin' || autoInitializing) {
         return
@@ -76,17 +83,22 @@ export function HierarchySelector({
       // Marcar como intentado para no repetir
       setInitAttempted(true)
       setAutoInitializing(true)
+      sessionStorage.setItem(sessionKey, 'true')
       
       console.log('[HierarchySelector] Auto-inicializando sistema...')
       
       try {
         await initializeHierarchySystem(user.id)
-        console.log('[HierarchySelector] Sistema inicializado, recargando...')
-        // Forzar recarga para ver los nuevos datos
-        setTimeout(() => window.location.reload(), 500)
+        console.log('[HierarchySelector] ✅ Sistema inicializado exitosamente')
+        // Esperar un poco más para asegurar que Firestore termine
+        await new Promise(resolve => setTimeout(resolve, 2000))
+        // Recargar para ver los nuevos datos
+        window.location.reload()
       } catch (err) {
-        console.error('[HierarchySelector] Error en auto-inicialización:', err)
+        console.error('[HierarchySelector] ❌ Error en auto-inicialización:', err)
         setAutoInitializing(false)
+        // No remover sessionKey para no intentar de nuevo
+        alert('Error al inicializar el sistema. Por favor contacta al administrador.')
       }
     }
     
