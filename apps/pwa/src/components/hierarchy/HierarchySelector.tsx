@@ -93,11 +93,11 @@ export function HierarchySelector({
   const showValidation = currentLevel > 0 && currentLevel < minLevel
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {/* Breadcrumb de selección actual */}
       {selections.some(s => s !== null) && (
-        <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
-          <MapPin className="w-5 h-5 text-blue-600" />
+        <div className="flex items-center gap-2 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+          <MapPin className="w-5 h-5 text-blue-600 flex-shrink-0" />
           <div className="flex-1 flex items-center gap-2 flex-wrap">
             {selections.map((sel, index) => {
               if (!sel) return null
@@ -115,9 +115,15 @@ export function HierarchySelector({
 
           {/* Indicador de validación */}
           {isMinLevelReached ? (
-            <CheckCircle className="w-5 h-5 text-green-600" />
+            <div className="flex items-center gap-1 text-green-600">
+              <CheckCircle className="w-5 h-5" />
+              <span className="text-xs font-medium">Completo</span>
+            </div>
           ) : showValidation ? (
-            <AlertTriangle className="w-5 h-5 text-amber-600" />
+            <div className="flex items-center gap-1 text-amber-600">
+              <AlertTriangle className="w-5 h-5" />
+              <span className="text-xs font-medium">Incompleto</span>
+            </div>
           ) : null}
         </div>
       )}
@@ -148,9 +154,9 @@ export function HierarchySelector({
       {/* Mensaje de validación */}
       {showValidation && !isMinLevelReached && (
         <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-          <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5" />
+          <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
           <div className="text-sm text-amber-800">
-            Debes seleccionar hasta el nivel <strong>{HIERARCHY_LEVEL_NAMES[minLevel]}</strong> como mínimo.
+            Debes seleccionar hasta el nivel <strong>{HIERARCHY_LEVEL_NAMES[minLevel]}</strong> como mínimo para crear la incidencia.
           </div>
         </div>
       )}
@@ -208,12 +214,11 @@ function LevelSelector({
   if (!loading && options.length === 1 && value) {
     return (
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+        <label className="block text-sm font-medium text-gray-500 mb-1">
           {HIERARCHY_LEVEL_NAMES[nivel]}
-          {isRequired && <span className="text-red-500 ml-1">*</span>}
         </label>
-        <div className="px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-700">
-          {options[0].label}
+        <div className="px-4 py-2.5 bg-blue-50 border border-blue-200 rounded-lg text-blue-900 font-medium">
+          ✓ {options[0].label}
         </div>
       </div>
     )
@@ -232,7 +237,7 @@ function LevelSelector({
           onChange(e.target.value || null)
         }}
         disabled={disabled || loading}
-        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed text-gray-900"
       >
         <option value="">
           {loading ? 'Cargando...' : `Seleccionar ${HIERARCHY_LEVEL_NAMES[nivel].toLowerCase()}`}

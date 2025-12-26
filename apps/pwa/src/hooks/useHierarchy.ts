@@ -572,7 +572,7 @@ export function useHierarchyCascadeOptions(parentId: string | null, nivel: Hiera
   const options = useMemo(() => {
     const opts = children.map(node => ({
       value: node.id,
-      label: `${node.codigo} - ${node.nombre}`,
+      label: node.nombre, // Solo el nombre, sin código
       nivel: node.nivel,
       hasChildren: node.nivel < 8,
     }))
