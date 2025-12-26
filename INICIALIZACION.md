@@ -1,42 +1,24 @@
-# Guía de Inicialización del Sistema de Jerarquía
+# Sistema de Jerarquía - Inicialización Automática
 
-## v1.1.4 - Nueva funcionalidad de auto-inicialización
+## v1.1.5 - Inicialización automática simplificada ✨
 
 ### ¿Qué cambió?
 
-Ahora, cuando vayas a crear una incidencia y el selector de ubicación esté vacío, verás un **botón de inicialización automática**.
+El sistema ahora se **inicializa automáticamente** cuando detecta que no hay estructura creada. **No necesitas hacer nada**, solo espera unos segundos la primera vez que intentes crear una incidencia.
 
-### ¿Por qué necesito inicializar?
+### ¿Cómo funciona?
 
-El sistema de jerarquía de 8 niveles requiere al menos un nodo **EMPRESA** (nivel 1) como raíz. Si creaste áreas manualmente sin crear primero la empresa, el selector no podrá mostrar opciones.
-
-### Cómo usar la inicialización
-
-#### Opción 1: Desde el formulario de incidencia (NUEVO ✨)
-
-1. Ve a **Crear Incidencia**
-2. Si el selector de ubicación muestra el mensaje:
+1. Abre el formulario de **Crear Incidencia**
+2. Si no hay jerarquía creada, verás brevemente:
    ```
-   ⚠️ Sistema sin inicializar: No hay estructura de jerarquía creada...
+   🔄 Inicializando sistema...
    ```
-3. Haz clic en el botón **"Inicializar Sistema"**
-4. Espera unos segundos mientras se crean las áreas base
-5. La página se recargará automáticamente y verás las opciones
+3. La página se recargará automáticamente
+4. ¡Listo! Ahora verás las opciones de ubicación disponibles
 
-#### Opción 2: Manualmente desde Jerarquías
+### ¿Qué se crea automáticamente?
 
-1. Ve a **Jerarquías** en el menú
-2. Crea primero un nodo de tipo **EMPRESA** (nivel 1)
-   - Nombre: Por ejemplo "Aquachile Chonchi"
-   - Código: Por ejemplo "aquachile-chonchi"
-   - Nivel: **1 - EMPRESA**
-   - Parent: **Ninguno** (es la raíz)
-3. Luego crea **AREAS** (nivel 2) bajo esa empresa
-4. Finalmente crea **SUB-AREAS** (nivel 3) bajo las áreas
-
-### ¿Qué crea la inicialización automática?
-
-El botón crea la siguiente estructura base:
+El sistema crea esta estructura base:
 
 ```
 📍 Aquachile Antarfood Chonchi (EMPRESA - Nivel 1)
@@ -46,13 +28,28 @@ El botón crea la siguiente estructura base:
     │   ├── Línea de Empaque (SUB-AREA - Nivel 3)
     │   └── Zona de Recepción (SUB-AREA - Nivel 3)
     │
-    ├── 📦 Almacenamiento (AREA - Nivel 2)
+    ├── 📦 Almacenamiento y Logística (AREA - Nivel 2)
     │   └── Cámara Frigorífica Principal (SUB-AREA - Nivel 3)
     │
     ├── 🔧 Mantenimiento (AREA - Nivel 2)
     │
-    └── ✅ Calidad (AREA - Nivel 2)
+    └── ✅ Control de Calidad (AREA - Nivel 2)
 ```
+
+### Requisitos
+
+- ✅ Debes estar logueado como **administrador**
+- ✅ Primera vez que abres el selector de ubicación
+- ✅ No debe haber nodos de jerarquía existentes
+
+### Personalización posterior
+
+Después de la inicialización automática, puedes:
+
+1. Ve a **Jerarquías** en el menú
+2. Edita los nombres de las áreas según tu planta
+3. Agrega más áreas, sub-áreas, sistemas, etc.
+4. Desactiva las que no necesites
 
 ### Niveles del sistema
 
@@ -67,37 +64,43 @@ El botón crea la siguiente estructura base:
 
 ### Solución de problemas
 
-#### ❌ El botón no aparece
-- **Causa**: Ya hay nodos de nivel 1 creados
-- **Solución**: Verifica en Jerarquías si existe un nodo EMPRESA
+#### ❌ Sigue sin aparecer después de esperar
 
-#### ❌ Error al inicializar
-- **Causa**: Problema de permisos o conexión
-- **Solución**: 
-  1. Verifica que estés logueado como **admin**
-  2. Revisa la consola del navegador (F12)
-  3. Contacta soporte si persiste
+**Solución**:
+1. Recarga la página manualmente (F5)
+2. Verifica que estés logueado como **admin**
+3. Abre la consola del navegador (F12) y busca errores
+4. Si ves error de permisos, contacta soporte
 
-#### ❌ Después de inicializar sigue vacío
-- **Causa**: La página no se recargó
-- **Solución**: Recarga manualmente (F5)
+#### ❌ La inicialización falla
 
-### Logs de debug
+**Posibles causas**:
+- No tienes rol de administrador
+- Problema de conexión a Firebase
+- Reglas de Firestore mal configuradas
 
-En la consola del navegador (F12) verás:
+**Ver logs**:
+Abre consola del navegador (F12) y busca:
 ```
-[HierarchySelector] Inicializando sistema de jerarquía...
-[HierarchySelector] Sistema inicializado correctamente
+[HierarchySelector] Auto-inicializando sistema...
+[HierarchySelector] Sistema inicializado, recargando...
 ```
 
-### Próximos pasos después de inicializar
+### Gestión manual (opcional)
 
-1. ✅ Verifica que el selector ahora muestre opciones
-2. ✅ Personaliza las áreas según tu planta
-3. ✅ Agrega más niveles según necesites (hasta nivel 8)
-4. ✅ Crea incidencias con ubicaciones específicas
+Si prefieres crear la estructura manualmente:
+
+1. Ve a **Jerarquías**
+2. Crea primero un nodo **EMPRESA** (nivel 1):
+   - Nombre: Tu empresa
+   - Código: codigo-unico
+   - Nivel: **1 - EMPRESA**
+   - Parent: **Ninguno**
+3. Luego crea **AREAS** (nivel 2) bajo la empresa
+4. Finalmente **SUB-AREAS** (nivel 3)
 
 ---
 
-**Versión**: 1.1.4  
-**Fecha**: ${new Date().toLocaleDateString('es-CL')}
+**Versión**: 1.1.5  
+**Cambio importante**: Ya no hay botón manual - todo es automático  
+**Fecha**: 25 de diciembre de 2025
