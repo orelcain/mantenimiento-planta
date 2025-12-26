@@ -196,6 +196,29 @@ function LevelSelector({
     value
   })
 
+  // Auto-seleccionar si solo hay 1 opción
+  useEffect(() => {
+    if (!loading && options.length === 1 && !value) {
+      console.log('[LevelSelector] Auto-seleccionando única opción en nivel', nivel, ':', options[0].value)
+      onChange(options[0].value)
+    }
+  }, [options, loading, value, onChange, nivel])
+
+  // Si solo hay 1 opción, no mostrar selector (auto-seleccionado)
+  if (!loading && options.length === 1 && value) {
+    return (
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1.5">
+          {HIERARCHY_LEVEL_NAMES[nivel]}
+          {isRequired && <span className="text-red-500 ml-1">*</span>}
+        </label>
+        <div className="px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-700">
+          {options[0].label}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div>
       <label className="block text-sm font-medium text-gray-700 mb-1.5">
