@@ -309,8 +309,8 @@ export function useHierarchyMutations() {
     console.log('[useHierarchy] createNode iniciado:', input)
     console.log('[useHierarchy] Usuario actual:', { uid: user?.uid, id: user?.id })
     
-    if (!user?.uid) {
-      const errorMsg = 'Usuario no autenticado o sin UID'
+    if (!user?.id) {
+      const errorMsg = 'Usuario no autenticado o sin ID'
       console.error('[useHierarchy] Error:', errorMsg, user)
       throw new Error(errorMsg)
     }
@@ -353,7 +353,7 @@ export function useHierarchyMutations() {
         path,
         orden: lastOrder + 1,
         activo: true,
-        creadoPor: user.uid,
+        creadoPor: user.id,
         creadoEn: Timestamp.now(),
         actualizadoEn: Timestamp.now(),
       }
