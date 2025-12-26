@@ -149,6 +149,24 @@ export function useHierarchyChildren(parentId: string | null, nivel?: HierarchyL
         
         console.log('[useHierarchyChildren] Documentos encontrados:', snapshot.size)
         
+        // Si no hay resultados en nivel 1, mostrar TODOS los nodos para debug
+        if (snapshot.size === 0 && parentId === null && nivel === 1) {
+          console.warn('[useHierarchyChildren] ⚠️ No hay nodos nivel 1 con parentId null. Verificando qué hay en Firestore...')
+          const allNodesQuery = query(hierarchyRef, where('nivel', '==', 1))
+          const allSnapshot = await getDocs(allNodesQuery)
+          console.log('[useHierarchyChildren] Total nodos nivel 1 en Firestore:', allSnapshot.size)
+          allSnapshot.docs.forEach(doc => {
+            const data = doc.data()
+            console.log('[useHierarchyChildren] Nodo nivel 1:', {
+              id: doc.id,
+              nombre: data.nombre,
+              parentId: data.parentId,
+              nivel: data.nivel,
+              activo: data.activo
+            })
+          })
+        }
+        
         const nodes: HierarchyNode[] = snapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data(),

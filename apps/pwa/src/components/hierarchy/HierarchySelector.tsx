@@ -13,8 +13,6 @@ import {
   HIERARCHY_CONSTRAINTS 
 } from '@/types/hierarchy'
 import { useHierarchyCascadeOptions, useHierarchyPath } from '@/hooks/useHierarchy'
-import { initializeHierarchySystem } from '@/services/hierarchyInit'
-import { useAuthStore } from '@/store/authStore'
 
 interface HierarchySelectorProps {
   value?: string // ID del nodo seleccionado
@@ -40,10 +38,6 @@ export function HierarchySelector({
 }: HierarchySelectorProps) {
   console.log('[HierarchySelector] Montado con:', { value, minLevel, maxLevel, disabled })
   
-  const user = useAuthStore(state => state.user)
-  const [autoInitializing, setAutoInitializing] = useState(false)
-  const [initAttempted, setInitAttempted] = useState(false)
-  
   // Estado de selecciones por nivel
   const [selections, setSelections] = useState<(SelectedNode | null)[]>(
     Array(maxLevel).fill(null)
@@ -51,59 +45,6 @@ export function HierarchySelector({
 
   // Cargar path inicial si hay un valor
   const { path: initialPath, loading: loadingPath } = useHierarchyPath(value ?? null)
-  
-  // Verificar opciones del primer nivel
-  const { options: rootOptions, loading: rootLoading } = useHierarchyCascadeOptions(null, 1)
-  
-  // Auto-inicialización silenciosa si no hay opciones
-  useEffect(() => {
-    const autoInit = async () => {
-      // Verificar si ya se intentó en esta sesión
-      const sessionKey = 'hierarchy_init_attempted'
-      if (sessionStorage.getItem(sessionKey)) {
-        console.log('[HierarchySelector] Ya se intentó inicializar en esta sesión')
-        return
-      }
-      
-      // Solo intentar una vez y si hay usuario admin
-      if (initAttempted || !user?.id || user.rol !== 'admin' || autoInitializing) {
-        return
-      }
-      
-      // Si está cargando, esperar
-      if (rootLoading) {
-        return
-      }
-      
-      // Si ya hay opciones, no hacer nada
-      if (rootOptions.length > 0) {
-        return
-      }
-      
-      // Marcar como intentado para no repetir
-      setInitAttempted(true)
-      setAutoInitializing(true)
-      sessionStorage.setItem(sessionKey, 'true')
-      
-      console.log('[HierarchySelector] Auto-inicializando sistema...')
-      
-      try {
-        await initializeHierarchySystem(user.id)
-        console.log('[HierarchySelector] ✅ Sistema inicializado exitosamente')
-        // Esperar un poco más para asegurar que Firestore termine
-        await new Promise(resolve => setTimeout(resolve, 2000))
-        // Recargar para ver los nuevos datos
-        window.location.reload()
-      } catch (err) {
-        console.error('[HierarchySelector] ❌ Error en auto-inicialización:', err)
-        setAutoInitializing(false)
-        // No remover sessionKey para no intentar de nuevo
-        alert('Error al inicializar el sistema. Por favor contacta al administrador.')
-      }
-    }
-    
-    autoInit()
-  }, [rootOptions, rootLoading, user, initAttempted, autoInitializing])
 
   useEffect(() => {
     const autoInit = async () => {
@@ -190,14 +131,6 @@ export function HierarchySelector({
 
   return (
     <div className="space-y-4">
-      {/* Mensaje de inicialización en progreso */}
-      {autoInitializing && (
-        <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-          <span className="text-sm text-blue-700">Inicializando sistema...</span>
-        </div>
-      )}
-      
       {/* Breadcrumb de selección actual */}
       {selections.some(s => s !== null) && (
         <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
