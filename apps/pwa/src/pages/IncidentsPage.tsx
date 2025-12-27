@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Plus, Search, AlertTriangle, Clock, CheckCircle, XCircle, Filter } from 'lucide-react'
+import { Plus, Search, AlertTriangle, Clock, CheckCircle, XCircle, Filter, User } from 'lucide-react'
 import {
   Card,
   CardContent,
@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from '@/components/ui'
 import { useAppStore, useCanValidateIncidents } from '@/store'
+import { useAuthStore } from '@/store'
 import { subscribeToIncidents } from '@/services/incidents'
 import type { Incident, IncidentStatus, IncidentPriority } from '@/types'
 import { formatRelativeTime } from '@/lib/utils'
@@ -37,6 +38,7 @@ const PRIORITY_CONFIG: Record<IncidentPriority, { label: string; className: stri
 
 export function IncidentsPage() {
   const canValidate = useCanValidateIncidents()
+  const user = useAuthStore((state) => state.user)
   const { incidents, setIncidents, selectedIncident, setSelectedIncident } = useAppStore()
   
   const [showForm, setShowForm] = useState(false)
@@ -44,6 +46,7 @@ export function IncidentsPage() {
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [filterPriority, setFilterPriority] = useState<string>('all')
+  const [filterAssigned, setFilterAssigned] = useState<boolean>(false)
 
   // Debounce search con 300ms
   const debouncedSetSearch = useMemo(
@@ -71,8 +74,9 @@ export function IncidentsPage() {
     
     const matchesStatus = filterStatus === 'all' || incident.status === filterStatus
     const matchesPriority = filterPriority === 'all' || incident.prioridad === filterPriority
+    const matchesAssigned = !filterAssigned || incident.asignadoA === user?.id
     
-    return matchesSearch && matchesStatus && matchesPriority
+    return matchesSearch && matchesStatus && matchesPriority && matchesAssigned
   })
 
   // Estadísticas
@@ -80,6 +84,7 @@ export function IncidentsPage() {
     total: incidents.length,
     pendientes: incidents.filter((i) => i.status === 'pendiente').length,
     enProceso: incidents.filter((i) => i.status === 'en_proceso').length,
+    misIncidencias: incidents.filter((i) => i.asignadoA === user?.id).length,
     criticas: incidents.filter((i) => i.prioridad === 'critica' && i.status !== 'cerrada').length,
   }
 
@@ -98,7 +103,7 @@ export function IncidentsPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="text-2xl font-bold">{stats.total}</div>
@@ -123,6 +128,12 @@ export function IncidentsPage() {
             <div className="text-sm text-muted-foreground">Críticas</div>
           </CardContent>
         </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold text-blue-600">{stats.misIncidencias}</div>
+            <div className="text-sm text-muted-foreground">Mis Incidencias</div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Filters */}
@@ -138,6 +149,15 @@ export function IncidentsPage() {
                 className="pl-9"
               />
             </div>
+            <Button
+              variant={filterAssigned ? 'default' : 'outline'}
+              onClick={() => setFilterAssigned(!filterAssigned)}
+              className="w-full sm:w-auto"
+            >
+              <User className="h-4 w-4 mr-2" />
+              Mis Incidencias
+              {filterAssigned && <Badge className="ml-2">{stats.misIncidencias}</Badge>}
+            </Button>
             <Select value={filterStatus} onValueChange={setFilterStatus}>
               <SelectTrigger className="w-full sm:w-[180px]">
                 <Filter className="h-4 w-4 mr-2" />

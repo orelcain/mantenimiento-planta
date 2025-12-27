@@ -143,6 +143,30 @@ export async function getUserById(userId: string): Promise<User | null> {
   } as User
 }
 
+// Obtener todos los usuarios activos
+export async function getAllUsers(): Promise<User[]> {
+  const snapshot = await getDocs(collection(db, 'users'))
+  return snapshot.docs
+    .map((doc) => {
+      const data = doc.data()
+      return {
+        id: doc.id,
+        ...data,
+        createdAt: data.createdAt?.toDate() || new Date(),
+        updatedAt: data.updatedAt?.toDate() || new Date(),
+      } as User
+    })
+    .filter((user) => user.activo) // Solo usuarios activos
+}
+
+// Obtener usuarios técnicos activos (para asignación)
+export async function getTechnicians(): Promise<User[]> {
+  const users = await getAllUsers()
+  return users.filter(
+    (user) => user.rol === 'tecnico' || user.rol === 'supervisor' || user.rol === 'admin'
+  )
+}
+
 // Validar código de invitación
 export async function validateInviteCode(code: string): Promise<InviteCode | null> {
   const q = query(

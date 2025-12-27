@@ -116,6 +116,22 @@ export async function updateIncident(
   })
 }
 
+// Asignar incidencia a técnico
+export async function assignIncident(
+  id: string,
+  technicianId: string,
+  assignedBy: string
+): Promise<void> {
+  const docRef = doc(db, COLLECTION, id)
+  await updateDoc(docRef, {
+    asignadoA: technicianId,
+    assignedBy,
+    assignedAt: serverTimestamp(),
+    status: 'en_proceso',
+    updatedAt: serverTimestamp(),
+  })
+}
+
 // Confirmar incidencia (supervisor)
 export async function confirmIncident(
   id: string,

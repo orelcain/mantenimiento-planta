@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { logger } from '@/lib/logger'
 import {
   Clock,
@@ -6,6 +6,7 @@ import {
   XCircle,
   AlertTriangle,
   User,
+  UserPlus,
   MapPin,
   Camera,
   X,
@@ -21,10 +22,17 @@ import {
   Textarea,
   Label,
   Spinner,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@/components/ui'
 import { useAuthStore } from '@/store'
-import { confirmIncident, rejectIncident, closeIncident } from '@/services/incidents'
-import type { Incident, IncidentStatus, IncidentPriority } from '@/types'
+import { usePermissions } from '@/hooks/usePermissions'
+import { confirmIncident, rejectIncident, closeIncident, assignIncident } from '@/services/incidents'
+import { getTechnicians, getUserById } from '@/services/auth'
+import type { Incident, IncidentStatus, IncidentPriority, User as UserType } from '@/types'
 import { formatDate } from '@/lib/utils'
 
 const STATUS_CONFIG: Record<IncidentStatus, { label: string; icon: any; color: string }> = {
@@ -50,12 +58,35 @@ interface IncidentDetailProps {
 
 export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetailProps) {
   const user = useAuthStore((state) => state.user)
+  const permissions = usePermissions()
   const [isLoading, setIsLoading] = useState(false)
   const [showRejectForm, setShowRejectForm] = useState(false)
   const [showCloseForm, setShowCloseForm] = useState(false)
+  const [showAssignForm, setShowAssignForm] = useState(false)
   const [rejectionReason, setRejectionReason] = useState('')
   const [resolution, setResolution] = useState('')
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null)
+  const [technicians, setTechnicians] = useState<UserType[]>([])
+  const [selectedTechnician, setSelectedTechnician] = useState<string>('')
+  const [assignedUser, setAssignedUser] = useState<UserType | null>(null)
+
+  // Cargar lista de técnicos
+  useEffect(() => {
+    if (permissions.canAssignIncident) {
+      getTechnicians()
+        .then(setTechnicians)
+        .catch((error) => logger.error('Error loading technicians', error instanceof Error ? error : new Error(String(error))))
+    }
+  }, [permissions.canAssignIncident])
+
+  // Cargar información del usuario asignado
+  useEffect(() => {
+    if (incident.asignadoA) {
+      getUserById(incident.asignadoA)
+        .then(setAssignedUser)
+        .catch((error) => logger.error('Error loading assigned user', error instanceof Error ? error : new Error(String(error))))
+    }
+  }, [incident.asignadoA])
 
   const statusConfig = STATUS_CONFIG[incident.status]
   const priorityConfig = PRIORITY_CONFIG[incident.prioridad]
@@ -88,6 +119,23 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
     } catch (error: unknown) {
       const err = error instanceof Error ? error : new Error('Error rejecting incident')
       logger.error('Error rejecting incident', err)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Asignar incidencia
+  const handleAssign = async () => {
+    if (!user || !selectedTechnician) return
+    setIsLoading(true)
+    try {
+      await assignIncident(incident.id, selectedTechnician, user.id)
+      logger.info('Incident assigned', { incidentId: incident.id, technicianId: selectedTechnician })
+      setShowAssignForm(false)
+      onClose()
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error('Error assigning incident')
+      logger.error('Error assigning incident', err)
     } finally {
       setIsLoading(false)
     }
@@ -177,25 +225,43 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
             )}
 
             {/* Info adicional */}
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <MapPin className="h-4 w-4" />
-                  <span>Zona: {incident.zoneId}</span>
-                </div>
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <User className="h-4 w-4" />
-                  <span>Reportado por: {incident.reportadoPor}</span>
-                </div>
-              </div>
-              {incident.asignadoA && (
+            <div className="space-y-4 text-sm">
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 text-muted-foreground">
+                    <MapPin className="h-4 w-4" />
+                    <span>Zona: {incident.zoneId}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-muted-foreground">
                     <User className="h-4 w-4" />
-                    <span>Asignado a: {incident.asignadoA}</span>
+                    <span>Reportado por: {incident.reportadoPor}</span>
                   </div>
                 </div>
-              )}
+
+                {/* Usuario asignado */}
+                {assignedUser ? (
+                  <div className="p-3 bg-primary/10 rounded-lg border border-primary/20">
+                    <div className="flex items-center gap-2 mb-1">
+                      <User className="h-4 w-4 text-primary" />
+                      <span className="font-medium text-primary">Asignado a:</span>
+                    </div>
+                    <p className="text-sm">
+                      {assignedUser.nombre} {assignedUser.apellido}
+                    </p>
+                    <Badge variant="outline" className="mt-1">
+                      {assignedUser.rol === 'admin' ? 'Admin' :
+                       assignedUser.rol === 'supervisor' ? 'Supervisor' : 'Técnico'}
+                    </Badge>
+                  </div>
+                ) : incident.status === 'confirmada' && permissions.canAssignIncident && (
+                  <div className="p-3 bg-warning/10 rounded-lg border border-warning/20">
+                    <div className="flex items-center gap-2 text-warning">
+                      <AlertTriangle className="h-4 w-4" />
+                      <span className="text-sm font-medium">Sin asignar</span>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Motivo de rechazo */}
@@ -284,6 +350,43 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
                 </div>
               </div>
             )}
+
+            {/* Formulario de asignación */}
+            {showAssignForm && (
+              <div className="p-4 bg-muted rounded-lg space-y-4">
+                <h4 className="font-medium">Asignar técnico</h4>
+                <div className="space-y-2">
+                  <Label htmlFor="technician">Técnico responsable *</Label>
+                  <Select value={selectedTechnician} onValueChange={setSelectedTechnician}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccionar técnico..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {technicians.map((tech) => (
+                        <SelectItem key={tech.id} value={tech.id}>
+                          {tech.nombre} {tech.apellido} ({tech.rol === 'admin' ? 'Admin' :
+                           tech.rol === 'supervisor' ? 'Supervisor' : 'Técnico'})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowAssignForm(false)}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    onClick={handleAssign}
+                    disabled={isLoading || !selectedTechnician}
+                  >
+                    {isLoading ? <Spinner size="sm" /> : 'Asignar Técnico'}
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
 
           <DialogFooter className="flex-wrap gap-2">
@@ -308,8 +411,24 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
               </>
             )}
 
+            {/* Botón de asignar técnico */}
+            {incident.status === 'confirmada' && 
+              !incident.asignadoA && 
+              permissions.canAssignIncident && 
+              !showAssignForm && (
+              <Button
+                variant="default"
+                onClick={() => setShowAssignForm(true)}
+              >
+                <UserPlus className="h-4 w-4 mr-2" />
+                Asignar Técnico
+              </Button>
+            )}
+
+            {/* Botón de cerrar incidencia */}
             {(incident.status === 'confirmada' || incident.status === 'en_proceso') && 
-              !showCloseForm && (
+              permissions.canWorkOnIncident(incident.asignadoA) &&
+              !showCloseForm && !showAssignForm && (
               <Button
                 variant="success"
                 onClick={() => setShowCloseForm(true)}
