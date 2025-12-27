@@ -143,11 +143,19 @@ export const createIncidentSchema = z.object({
   tipo: maintenanceTypeSchema,
   titulo: tituloSchema,
   descripcion: descripcionSchema,
-  zoneId: z.string().min(1, 'Zona requerida'),
+  zoneId: z.string().optional(), // Opcional cuando se usa hierarchyNodeId
+  hierarchyNodeId: z.string().optional(), // Opcional cuando se usa zoneId
   prioridad: incidentPrioritySchema,
+  status: z.string().optional(),
+  fotos: z.array(z.string()).optional(),
+  reportadoPor: z.string(),
+  requiresValidation: z.boolean().optional(),
   sintomas: z.array(z.string()).max(20, 'Máximo 20 síntomas').optional(),
   equipmentId: z.string().optional(),
-})
+}).refine(
+  (data) => data.zoneId || data.hierarchyNodeId,
+  { message: 'Debe especificar una zona o un nodo de jerarquía', path: ['zoneId'] }
+)
 
 export const updateIncidentSchema = z.object({
   titulo: tituloSchema.optional(),
