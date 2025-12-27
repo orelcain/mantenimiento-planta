@@ -105,6 +105,16 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId }: Incident
   // Enviar formulario
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    console.log('🔍 handleSubmit llamado')
+    console.log('📝 formData:', formData)
+    console.log('👤 user:', user)
+    console.log('✅ disabled condition:', {
+      isLoading,
+      noLocation: !formData.hierarchyNodeId && !formData.zoneId,
+      noTitle: !formData.titulo,
+      shouldBeDisabled: isLoading || (!formData.hierarchyNodeId && !formData.zoneId) || !formData.titulo
+    })
+    
     if (!user) return
 
     setIsLoading(true)
@@ -199,7 +209,10 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId }: Incident
             <div className="border rounded-lg p-3 bg-muted/30">
               <HierarchySelector
                 value={formData.hierarchyNodeId}
-                onChange={(nodeId) => setFormData({ ...formData, hierarchyNodeId: nodeId || undefined })}
+                onChange={(nodeId) => {
+                  console.log('🔄 HierarchySelector onChange:', nodeId)
+                  setFormData({ ...formData, hierarchyNodeId: nodeId || undefined })
+                }}
                 minLevel={HierarchyLevel.SUB_AREA}
                 maxLevel={HierarchyLevel.ELEMENTO}
                 error={validationErrors.hierarchyNodeId}
@@ -259,7 +272,6 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId }: Incident
                   )}
                 >
                   <div className="flex items-center gap-2">
-                    <div className={cn('w-3 h-3 rounded-full', opt.color)} />
                     <div>
                       <p className="font-medium text-sm">{opt.label}</p>
                       <p className="text-xs text-muted-foreground">{opt.desc}</p>
