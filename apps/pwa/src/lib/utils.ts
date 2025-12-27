@@ -5,19 +5,36 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function formatDate(date: Date | string | number): string {
+export function formatDate(date: Date | string | number | undefined): string {
+  if (!date) return 'Fecha no disponible'
+  
+  const dateObj = new Date(date)
+  // Validar que la fecha sea válida
+  if (isNaN(dateObj.getTime())) {
+    console.warn('⚠️ formatDate: Fecha inválida recibida:', date)
+    return 'Fecha inválida'
+  }
+  
   return new Intl.DateTimeFormat('es-ES', {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
-  }).format(new Date(date))
+  }).format(dateObj)
 }
 
-export function formatRelativeTime(date: Date | string | number): string {
-  const now = new Date()
+export function formatRelativeTime(date: Date | string | number | undefined): string {
+  if (!date) return 'Fecha no disponible'
+  
   const target = new Date(date)
+  // Validar que la fecha sea válida
+  if (isNaN(target.getTime())) {
+    console.warn('⚠️ formatRelativeTime: Fecha inválida recibida:', date)
+    return 'Fecha inválida'
+  }
+  
+  const now = new Date()
   const diffMs = now.getTime() - target.getTime()
   const diffMins = Math.floor(diffMs / 60000)
   const diffHours = Math.floor(diffMs / 3600000)
