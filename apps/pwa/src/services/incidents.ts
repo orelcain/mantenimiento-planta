@@ -26,12 +26,13 @@ export async function createIncident(
   data: Omit<Incident, 'id' | 'createdAt' | 'updatedAt'>
 ): Promise<Incident> {
   const id = generateId()
+  const now = new Date()
   
   const incident: Incident = {
     ...data,
     id,
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    createdAt: now,
+    updatedAt: now,
   }
 
   await setDoc(doc(db, COLLECTION, id), {
@@ -40,6 +41,7 @@ export async function createIncident(
     updatedAt: serverTimestamp(),
   })
 
+  // Devolver el documento creado con fechas correctas
   return incident
 }
 
@@ -229,7 +231,16 @@ function parseIncidentDoc(doc: DocumentSnapshot | QueryDocumentSnapshot): Incide
 function toDate(value: unknown): Date | undefined {
   if (!value) return undefined
   if (value instanceof Timestamp) return value.toDate()
-  if (value instanceof Date) return value
-  if (typeof value === 'string' || typeof value === 'number') return new Date(value)
+  if (value instanceof Date) {
+    // Validar que la fecha sea válida
+    if (isNaN(value.getTime())) return undefined
+    return value
+  }
+  if (typeof value === 'string' || typeof value === 'number') {
+    const date = new Date(value)
+    // Validar que la conversión sea válida
+    if (isNaN(date.getTime())) return undefined
+    return date
+  }
   return undefined
 }
