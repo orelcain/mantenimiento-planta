@@ -137,11 +137,12 @@ export async function deleteFile(url: string): Promise<void> {
   }
 }
 
-// Comprimir imagen antes de subir
+// Comprimir imagen antes de subir (mejorado con soporte WebP)
 export async function compressImage(
   file: File,
   maxWidth: number = 1920,
-  quality: number = 0.8
+  quality: number = 0.8,
+  useWebP: boolean = true
 ): Promise<File> {
   return new Promise((resolve, reject) => {
     const img = new Image()
@@ -167,19 +168,27 @@ export async function compressImage(
       
       ctx.drawImage(img, 0, 0, width, height)
       
+      // Intentar usar WebP primero, fallback a JPEG
+      const mimeType = useWebP ? 'image/webp' : 'image/jpeg'
+      const extension = useWebP ? 'webp' : 'jpg'
+      
       canvas.toBlob(
         (blob) => {
           if (blob) {
-            const compressedFile = new File([blob], file.name, {
-              type: 'image/jpeg',
+            // Calcular nombre sin extensión
+            const nameWithoutExt = file.name.replace(/\.[^/.]+$/, '')
+            const compressedFile = new File([blob], `${nameWithoutExt}.${extension}`, {
+              type: mimeType,
               lastModified: Date.now(),
             })
+            
+            console.log(`📸 Imagen comprimida: ${file.size} → ${blob.size} bytes (${Math.round((1 - blob.size / file.size) * 100)}% reducción)`)
             resolve(compressedFile)
           } else {
             reject(new Error('No se pudo comprimir la imagen'))
           }
         },
-        'image/jpeg',
+        mimeType,
         quality
       )
       

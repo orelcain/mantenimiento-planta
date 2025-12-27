@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Camera, X, Upload, AlertTriangle } from 'lucide-react'
+import { Camera, X, Upload, AlertTriangle, Image as ImageIcon } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -42,7 +42,8 @@ const COMMON_SYMPTOMS = [
 export function IncidentForm({ onClose, onSuccess, preselectedZoneId }: IncidentFormProps) {
   const user = useAuthStore((state) => state.user)
   const { zones } = useAppStore()
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
+  const galleryInputRef = useRef<HTMLInputElement>(null)
 
   const [isLoading, setIsLoading] = useState(false)
   const [photos, setPhotos] = useState<File[]>([])
@@ -379,24 +380,47 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId }: Incident
               ))}
               
               {photos.length < 5 && (
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="aspect-square border-2 border-dashed border-muted rounded-lg flex flex-col items-center justify-center text-muted-foreground hover:border-primary hover:text-primary transition-colors bg-muted/30"
-                >
-                  <Camera className="h-8 w-8" />
-                  <span className="text-xs mt-1">Tomar foto</span>
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => cameraInputRef.current?.click()}
+                    className="aspect-square border-2 border-dashed border-muted rounded-lg flex flex-col items-center justify-center text-muted-foreground hover:border-primary hover:text-primary transition-colors bg-muted/30"
+                  >
+                    <Camera className="h-8 w-8" />
+                    <span className="text-xs mt-1">Cámara</span>
+                  </button>
+                  
+                  <button
+                    type="button"
+                    onClick={() => galleryInputRef.current?.click()}
+                    className="aspect-square border-2 border-dashed border-muted rounded-lg flex flex-col items-center justify-center text-muted-foreground hover:border-primary hover:text-primary transition-colors bg-muted/30"
+                  >
+                    <ImageIcon className="h-8 w-8" />
+                    <span className="text-xs mt-1">Galería</span>
+                  </button>
+                </>
               )}
             </div>
+            
+            {/* Input para cámara */}
             <input
-              ref={fileInputRef}
+              ref={cameraInputRef}
               type="file"
               accept="image/*"
               multiple
               onChange={handlePhotoSelect}
               className="hidden"
               capture="environment"
+            />
+            
+            {/* Input para galería */}
+            <input
+              ref={galleryInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={handlePhotoSelect}
+              className="hidden"
             />
           </div>
 
