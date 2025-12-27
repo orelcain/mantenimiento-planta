@@ -115,12 +115,17 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId }: Incident
       shouldBeDisabled: isLoading || (!formData.hierarchyNodeId && !formData.zoneId) || !formData.titulo
     })
     
-    if (!user) return
+    if (!user) {
+      console.log('❌ No user, aborting')
+      return
+    }
 
+    console.log('⏳ Setting loading state...')
     setIsLoading(true)
     setValidationErrors({})
 
     try {
+      console.log('📋 Preparando datos para validación...')
       // Validar datos con Zod antes de enviar
       const dataToValidate = {
         tipo: 'correctivo' as const,
@@ -136,10 +141,12 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId }: Incident
         ...(selectedSymptoms.length > 0 && { sintomas: selectedSymptoms }),
       }
 
+      console.log('🔒 Validando con Zod...', dataToValidate)
       // Validar con el schema de Zod
       const validation = createIncidentSchema.safeParse(dataToValidate)
       
       if (!validation.success) {
+        console.log('❌ Validación Zod falló:', validation.error.issues)
         const errors: Record<string, string> = {}
         validation.error.issues.forEach((err) => {
           const path = err.path.join('.')
@@ -150,6 +157,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId }: Incident
         return
       }
 
+      console.log('✅ Validación Zod exitosa')
       logger.info('Creating incident', { titulo: formData.titulo, prioridad: formData.prioridad })
       
       // Construir objeto de incidencia sin campos undefined
@@ -171,19 +179,25 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId }: Incident
         incidentData.sintomas = selectedSymptoms
       }
 
+      console.log('💾 Creando incidencia en Firestore...', incidentData)
       const incident = await createIncident(incidentData)
+      console.log('✅ Incidencia creada:', incident.id)
       logger.info('Incident created successfully', { incidentId: incident.id })
 
       // Subir fotos
       if (photos.length > 0) {
+        console.log('📸 Subiendo fotos:', photos.length)
         logger.info('Uploading photos', { count: photos.length })
         await Promise.all(
           photos.map((photo) => uploadIncidentPhoto(incident.id, photo))
         )
+        console.log('✅ Fotos subidas')
       }
 
+      console.log('🎉 Todo completo, llamando onSuccess()')
       onSuccess()
     } catch (error: unknown) {
+      console.log('❌ ERROR CAPTURADO:', error)
       const errorMessage = error instanceof Error ? error : new Error('Error al crear la incidencia')
       logger.error('Error creating incident', errorMessage)
       setValidationErrors({ general: 'Error al crear la incidencia. Por favor intenta de nuevo.' })

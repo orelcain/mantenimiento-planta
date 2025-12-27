@@ -2,17 +2,17 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '1.3.0' as const
+export const APP_VERSION = '1.3.1' as const
 
 /**
  * Fecha de la versión actual
  */
-export const VERSION_DATE = '2025-12-25' as const
+export const VERSION_DATE = '2025-12-26' as const
 
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Optimización de Mapas y PWA' as const
+export const VERSION_NAME = 'Bug Fixes & Debug Instrumentation' as const
 
 /**
  * Información completa de la versión
