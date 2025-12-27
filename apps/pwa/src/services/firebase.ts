@@ -2,6 +2,7 @@ import { initializeApp } from 'firebase/app'
 import { getAuth } from 'firebase/auth'
 import { getFirestore } from 'firebase/firestore'
 import { getStorage } from 'firebase/storage'
+import { getMessaging, isSupported } from 'firebase/messaging'
 
 // Configuración de Firebase hardcodeada (segura para cliente)
 // Estos valores son públicos y se incluyen en el bundle del cliente
@@ -21,6 +22,21 @@ const app = initializeApp(firebaseConfig)
 export const auth = getAuth(app)
 export const db = getFirestore(app)
 export const storage = getStorage(app)
+
+// Messaging (con verificación de soporte)
+let messaging: ReturnType<typeof getMessaging> | null = null
+isSupported().then((supported) => {
+  if (supported) {
+    messaging = getMessaging(app)
+    console.log('✅ Firebase Messaging supported')
+  } else {
+    console.warn('⚠️ Firebase Messaging not supported in this browser')
+  }
+}).catch((error) => {
+  console.error('❌ Error checking messaging support:', error)
+})
+
+export { messaging }
 
 console.log('✅ Firebase initialized successfully for project:', firebaseConfig.projectId)
 

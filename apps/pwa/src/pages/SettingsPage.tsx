@@ -52,6 +52,7 @@ import { db } from '@/services/firebase'
 import type { User, InviteCode } from '@/types'
 import { cn } from '@/lib/utils'
 import { initializeHierarchySystem, isHierarchyInitialized } from '../services/hierarchyInit'
+import { NotificationsSettings as NotificationsPushSettings } from '@/components/settings/NotificationsSettings'
 
 type TabType = 'general' | 'users' | 'invites' | 'notifications' | 'system'
 
@@ -111,7 +112,7 @@ export function SettingsPage() {
       {activeTab === 'general' && <GeneralSettings />}
       {activeTab === 'users' && <UsersSettings />}
       {activeTab === 'invites' && <InvitesSettings />}
-      {activeTab === 'notifications' && <NotificationsSettings />}
+      {activeTab === 'notifications' && <NotificationsPushSettings />}
       {activeTab === 'system' && <SystemSettings />}
     </div>
   )
@@ -535,100 +536,6 @@ function InvitesSettings() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
-  )
-}
-
-// Configuración de Notificaciones
-function NotificationsSettings() {
-  const [emailNotifications, setEmailNotifications] = useState(true)
-  const [pushNotifications, setPushNotifications] = useState(false)
-  const [criticalAlerts, setCriticalAlerts] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
-
-  const handleSave = async () => {
-    setSaving(true)
-    try {
-      await setDoc(doc(db, 'settings', 'notifications'), {
-        emailNotifications,
-        pushNotifications,
-        criticalAlerts,
-        updatedAt: serverTimestamp(),
-      }, { merge: true })
-      logger.info('Notification settings saved', { emailNotifications, pushNotifications, criticalAlerts })
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2000)
-    } catch (error) {
-      logger.error('Error guardando configuración de notificaciones', error instanceof Error ? error : new Error(String(error)))
-    }
-    setSaving(false)
-  }
-  return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Notificaciones</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label>Notificaciones por Email</Label>
-              <p className="text-sm text-muted-foreground">
-                Recibir resumen diario de incidencias
-              </p>
-            </div>
-            <Switch
-              checked={emailNotifications}
-              onCheckedChange={setEmailNotifications}
-            />
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label>Notificaciones Push</Label>
-              <p className="text-sm text-muted-foreground">
-                Recibir alertas en tiempo real (requiere PWA instalada)
-              </p>
-            </div>
-            <Switch
-              checked={pushNotifications}
-              onCheckedChange={setPushNotifications}
-            />
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label>Alertas Críticas</Label>
-              <p className="text-sm text-muted-foreground">
-                Notificar inmediatamente incidencias críticas
-              </p>
-            </div>
-            <Switch
-              checked={criticalAlerts}
-              onCheckedChange={setCriticalAlerts}
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="flex justify-end">
-        <Button onClick={handleSave} disabled={saving}>
-          {saving ? (
-            'Guardando...'
-          ) : saved ? (
-            <>
-              <CheckCircle className="h-4 w-4 mr-2" />
-              Guardado
-            </>
-          ) : (
-            <>
-              <Save className="h-4 w-4 mr-2" />
-              Guardar Cambios
-            </>
-          )}
-        </Button>
-      </div>
     </div>
   )
 }
