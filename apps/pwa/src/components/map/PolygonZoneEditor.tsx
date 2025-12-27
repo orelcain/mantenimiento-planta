@@ -41,6 +41,7 @@ import { uploadMapImage, getMapImages, deleteMapImage } from '@/services/storage
 import type { Zone, ZoneType, MapPoint } from '@/types'
 import { cn } from '@/lib/utils'
 import { getAssetUrl, isFirebaseStorageUrl } from '@/lib/config'
+import { createZoneSchema } from '@/lib/validation'
 
 // Tipos de zona con información visual
 const ZONE_TYPES: { value: ZoneType; label: string; color: string; icon: string }[] = [
@@ -496,15 +497,15 @@ export function PolygonZoneEditor() {
     
     // Generar código si no se proporcionó
     const codigo = zoneForm.codigo || `Z${zones.length + 1}`
+    const nombre = zoneForm.nombre || `Zona ${codigo}`
 
     const newZone = {
       id: `zone_${Date.now()}`,
-      nombre: zoneForm.nombre || `Zona ${codigo}`,
+      nombre,
       codigo,
       tipo: zoneForm.tipo,
-      descripcion: zoneForm.descripcion,
+      descripcion: zoneForm.descripcion || undefined,
       polygon: drawing.points,
-      bounds,
       color: zoneForm.color,
       parentId: null,
       nivel: 1 as const,
@@ -513,15 +514,30 @@ export function PolygonZoneEditor() {
       ...(zoneForm.tipo === 'maquina' && zoneForm.equipmentId ? { equipmentId: zoneForm.equipmentId } : {})
     }
 
+    // Validar con Zod
+    const validation = createZoneSchema.safeParse(newZone)
+    if (!validation.success) {
+      const errors: Record<string, string> = {}
+      validation.error.issues.forEach((err) => {
+        const path = err.path.map((p) => String(p)).join('.')
+        errors[path] = err.message
+      })
+      setValidationErrors(errors)
+      logger.warn('Zone validation failed', { errors })
+      return
+    }
+
     try {
       await createZone(newZone)
       await getZones().then(setZones)
+      logger.info('Zone created successfully', { id: newZone.id, codigo: newZone.codigo })
       
+      setValidationErrors({})
       handleCancelDraw()
       setTool('select')
     } catch (error) {
       logger.error('Error creando zona en polygon editor', error instanceof Error ? error : new Error(String(error)))
-      alert('Error al guardar la zona')
+      setValidationErrors({ general: 'Error al guardar la zona. Por favor intenta de nuevo.' })
     }
   }
 
@@ -975,6 +991,9 @@ export function PolygonZoneEditor() {
                 onChange={(e) => setZoneForm({ ...zoneForm, nombre: e.target.value })}
                 placeholder="Ej: Línea de producción 1"
               />
+              {validationErrors.nombre && (
+                <p className="text-sm text-destructive mt-1">{validationErrors.nombre}</p>
+              )}
             </div>
             
             <div>
@@ -986,6 +1005,9 @@ export function PolygonZoneEditor() {
                 placeholder="Descripción detallada de la zona..."
                 rows={2}
               />
+              {validationErrors.descripcion && (
+                <p className="text-sm text-destructive mt-1">{validationErrors.descripcion}</p>
+              )}
             </div>
             
             <div>

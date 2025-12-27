@@ -1,0 +1,373 @@
+rules_version = '2';
+// Version: v1.1.0 - Updated: 2025-12-26
+// Sistema de jerarquías anidadas de 8 niveles con validación mejorada
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ============================================
+    // FUNCIONES HELPER
+    // ============================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.rol == 'admin';
+    }
+    
+    function isSupervisor() {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.rol in ['admin', 'supervisor'];
+    }
+    
+    function isTechnician() {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.rol in ['admin', 'supervisor', 'tecnico'];
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isActiveUser() {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.activo == true;
+    }
+    
+    // ============================================
+    // FUNCIONES DE VALIDACIÓN
+    // ============================================
+    
+    // Validar tamaño de documento (máx 1MB)
+    function isValidDocSize() {
+      return request.resource.size() < 1048576; // 1MB
+    }
+    
+    // Validar email
+    function isValidEmail(email) {
+      return email.matches('^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$');
+    }
+    
+    // Validar string no vacío
+    function isNonEmptyString(value, minLen, maxLen) {
+      return value is string 
+        && value.size() >= minLen 
+        && value.size() <= maxLen
+        && value.trim().size() > 0; // No solo espacios
+    }
+    
+    // Validar timestamp futuro
+    function isFutureTimestamp(timestamp) {
+      return timestamp > request.time;
+    }
+    
+    // Validar timestamp pasado o presente
+    function isPastOrPresentTimestamp(timestamp) {
+      return timestamp <= request.time;
+    }
+
+    // Validar nivel jerárquico
+    function isValidHierarchyLevel(level) {
+      return level >= 1 && level <= 8;
+    }
+
+    // Validar código de jerarquía
+    function isValidHierarchyCode(code) {
+      return code is string && code.size() >= 5 && code.size() <= 20;
+    }
+
+    // Jerarquías organizacionales (8 niveles)
+    match /hierarchy/{nodeId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin()
+        && request.resource.data.nombre is string
+        && request.resource.data.nombre.size() >= 2
+        && request.resource.data.codigo is string
+        && request.resource.data.codigo.size() >= 2
+        && request.resource.data.nivel is int
+        && request.resource.data.nivel >= 1
+        && request.resource.data.nivel <= 8
+        && request.resource.data.activo is bool
+        && request.resource.data.creadoPor is string
+        && request.resource.data.creadoEn is timestamp
+        && request.resource.data.actualizadoEn is timestamp
+        && (!('parentId' in request.resource.data) || request.resource.data.parentId is string || request.resource.data.parentId == null)
+        && (!('path' in request.resource.data) || request.resource.data.path is list)
+        && (!('orden' in request.resource.data) || request.resource.data.orden is int)
+        && (!('descripcion' in request.resource.data) || request.resource.data.descripcion is string)
+        && (!('metadata' in request.resource.data) || request.resource.data.metadata is map);
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ============================================
+    // USUARIOS - Validación de perfil
+    // ============================================
+    match /users/{userId} {
+      allow read: if isActiveUser();
+      
+      allow create: if isAuthenticated()
+        && isValidDocSize()
+        && request.resource.data.id == userId
+        && isNonEmptyString(request.resource.data.nombre, 2, 50)
+        && isNonEmptyString(request.resource.data.apellido, 2, 50)
+        && isValidEmail(request.resource.data.email)
+        && request.resource.data.rol in ['admin', 'supervisor', 'tecnico', 'usuario']
+        && request.resource.data.activo is bool
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.updatedAt is timestamp
+        && (!('empresaId' in request.resource.data) || request.resource.data.empresaId is string)
+        && (!('areaId' in request.resource.data) || request.resource.data.areaId is string)
+        && (!('telefono' in request.resource.data) || isNonEmptyString(request.resource.data.telefono, 7, 15))
+        && (!('photoURL' in request.resource.data) || request.resource.data.photoURL is string);
+        
+      allow update: if isActiveUser()
+        && isValidDocSize()
+        && (isOwner(userId) || isAdmin())
+        // Solo admin puede cambiar rol
+        && (!('rol' in request.resource.data) || isAdmin())
+        // Solo admin puede cambiar activo
+        && (!('activo' in request.resource.data) || isAdmin())
+        && (!('nombre' in request.resource.data) || isNonEmptyString(request.resource.data.nombre, 2, 50))
+        && (!('apellido' in request.resource.data) || isNonEmptyString(request.resource.data.apellido, 2, 50))
+        && (!('email' in request.resource.data) || isValidEmail(request.resource.data.email))
+        && request.resource.data.updatedAt is timestamp;
+        
+      allow delete: if isAdmin();
+    }
+
+    // Códigos de invitación
+    match /inviteCodes/{codeId} {
+      allow read: if true; // Permitir verificar códigos sin auth
+      allow create: if isAdmin();
+      allow update: if isAuthenticated(); // Para incrementar usos
+      allow delete: if isAdmin();
+    }
+
+    // ============================================
+    // INCIDENCIAS - Validación exhaustiva
+    // ============================================
+    match /incidents/{incidentId} {
+      allow read: if isActiveUser();
+      
+      allow create: if isActiveUser()
+        && isValidDocSize()
+        // Campos requeridos
+        && isNonEmptyString(request.resource.data.titulo, 5, 100)
+        && isNonEmptyString(request.resource.data.descripcion, 10, 1000)
+        && request.resource.data.prioridad in ['critica', 'alta', 'media', 'baja']
+        && request.resource.data.status in ['pendiente', 'confirmada', 'rechazada', 'en_proceso', 'cerrada']
+        && request.resource.data.tipo in ['correctivo', 'preventivo', 'predictivo', 'proactivo']
+        && request.resource.data.reportadoPor == request.auth.uid
+        && request.resource.data.requiresValidation is bool
+        && request.resource.data.fotos is list
+        && request.resourcctiveUser()
+        && isValidDocSize()
+        && (
+          // Owner puede editar si está pendiente
+          (resource.data.reportadoPor == request.auth.uid && resource.data.status == 'pendiente')
+          // Técnico puede actualizar si está asignado
+          || (isTechnician() && resource.data.asignadoA == request.auth.uid)
+          // Supervisor/Admin pueden siempre
+          || isSupervisor()
+        )
+        // Validaciones de campos si existen
+        && (!('titulo' in request.resource.data) || isNonEmptyString(request.resource.data.titulo, 5, 100))
+        && (!('descripcion' in request.resource.data) || isNonEmptyString(request.resource.data.descripcion, 10, 1000))
+        && (!('prioridad' in request.resource.data) || request.resource.data.prioridad in ['critica', 'alta', 'media', 'baja'])
+        && (!('status' in request.resource.data) || request.resource.data.status in ['pendiente', 'confirmada', 'rechazada', 'en_proceso', 'cerrada'])
+        && (!('sintomas' in request.resource.data) || (
+          request.resource.data.sintomas is list
+          && request.resource.data.sintomas.size() <= 20
+        ))
+        && (!('fotos' in request.resource.data) || (
+          request.resource.data.fotos is list
+          && request.resource.data.fotos.size() <= 10
+        ))
+        && (!('resolucion' in request.resource.data) || isNonEmptyString(request.resource.data.resolucion, 20, 1000))
+        && (!('rejectionReason' in request.resource.data) || isNonEmptyString(request.resource.data.rejectionReason, 10, 500))
+        && (!('validatedBy' in request.resource.data) || (
+          isSupervisor() // Solo supervisores pueden validar
+          && request.resource.data.validatedBy == request.auth.uid
+        ))
+        && (!('asignadoA' in request.resource.data) || isSupervisor()) // Solo supervisores asignan
+        && request.resource.data.updatedAt is timestamp
+        && isPastOrPresentTimestamp(request.resource.data.updatedAt);
+        resource.data.reportadoPor == request.auth.uid && resource.data.status == 'pendiente')
+          // Supervisor/Admin can always update
+          || isSupervisor()
+        )
+        && (!('titulo' in request.resource.data) || (
+          request.resource.data.titulo is string
+          && request.resource.data.titulo.size() >= 5
+          && request.resource.data.titulo.size() <= 100
+        ))
+        && (!('descripcion' in request.resource.data) || (
+          request.resource.data.descripcion is string
+          && request.resource.data.descripcion.size() >= 10
+          && request.resource.data.descripcion.size() <= 1000
+        ))
+        && (!('prioridad' in request.resource.data) || (
+          request.resource.data.prioridad in ['critica', 'alta', 'media', 'baja']
+        ))
+        && (!('sintomas' in request.resource.data) || request.resource.data.sintomas.size() <= 20)
+        && (!('resolucion' in request.resource.data) || (
+          request.resource.data.resolucion.size() >= 20
+          && request.resource.data.resolucion.size() <= 1000
+        ));
+      allow delete: if isAdmin();
+    }
+
+    // Zonas
+    match /zones/{zoneId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin()
+        && request.resource.data.nombre is string
+        && request.resource.data.nombre.size() >= 2
+        && request.resource.data.nombre.size() <= 100
+        && request.resource.data.codigo is string
+        && request.resource.data.codigo.size() >= 1
+        && request.resource.data.codigo.size() <= 20
+        && request.resource.data.nivel in [1, 2, 3]
+        && request.resource.data.tipo in ['produccion', 'almacen', 'oficinas', 'mantenimiento', 'carga_descarga', 'servicios', 'seguridad', 'maquina', 'otro']
+        && request.resource.data.polygon.size() >= 3;
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ============================================
+    // EQUIPOS - Validación de activos
+    // ============================================
+    match /equipment/{equipmentId} {
+      allow read: if isActiveUser();
+      
+      allow create: if (isAdmin() || isSupervisor())
+        && isValidDocSize()
+        && isNonEmptyString(request.resource.data.codigo, 1, 20)
+        && isNonEmptyString(request.resource.data.nombre, 2, 100)
+        && request.resource.data.criticidad in ['alta', 'media', 'baja']
+        && request.resource.data.estado in ['operativo', 'en_mantenimiento', 'fuera_servicio']
+        && (
+          (request.resource.data.zoneId is string && request.resource.data.zoneId.size() > 0)
+          || (request.resource.data.hierarchyNodeId is string && request.resource.data.hierarchyNodeId.size() > 0)
+        )
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.updatedAt is timestamp
+        && (!('marca' in request.resource.data) || isNonEmptyString(request.resource.data.marca, 2, 50))
+        && (!('modelo' in request.resource.data) || isNonEmptyString(request.resource.data.modelo, 2, 50))
+        && (!('numeroSerie' in request.resource.data) || isNonEmptyString(request.resource.data.numeroSerie, 2, 50))
+        && (!('anoFabricacion' in request.resource.data) || (
+          request.resource.data.anoFabricacion is int
+          && request.resource.data.anoFabricacion >= 1900
+          && request.resource.data.anoFabricacion <= 2100
+        ))
+        && (!('horasOperacion' in request.resource.data) || request.resource.data.horasOperacion is number)
+        && (!('ultimoMantenimiento' in request.resource.data) || request.resource.data.ultimoMantenimiento is timestamp)
+        && (!('especificaciones' in request.resource.data) || request.resource.data.especificaciones is map);
+        
+      allow update: if (isAdmin() || isSupervisor() || isTechnician())
+        && isValidDocSize();
+        
+      allow delete: if isAdmin();
+    }
+
+    // ============================================
+    // TAREAS PREVENTIVAS - Validación de mantenimiento
+    // ============================================
+    match /preventiveTasks/{taskId} {
+      allow read: if isActiveUser();
+      
+      allow create: if (isAdmin() || isSupervisor())
+        && isValidDocSize()
+        && isNonEmptyString(request.resource.data.nombre, 5, 100)
+        && isNonEmptyString(request.resource.data.descripcion, 10, 500)
+        && request.resource.data.equipmentId is string
+        && request.resource.data.frecuenciaDias is int
+        && request.resource.data.frecuenciaDias > 0
+        && request.resource.data.frecuenciaDias <= 365
+        && request.resource.data.activa is bool
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.proximaEjecucion is timestamp
+        && isFutureTimestamp(request.resource.data.proximaEjecucion)
+        && (!('duracionEstimadaMinutos' in request.resource.data) || (
+          request.resource.data.duracionEstimadaMinutos is int
+          && request.resource.data.duracionEstimadaMinutos > 0
+        ))
+        && (!('instrucciones' in request.resource.data) || request.resource.data.instrucciones is list);
+        
+      allow update: if (isAdmin() || isSupervisor())
+        && isValidDocSize();
+        
+      allow delete: if isAdmin();
+    }
+
+    // ============================================
+    // EJECUCIONES PREVENTIVAS - Registro de trabajos
+    // ============================================
+    match /preventiveExecutions/{executionId} {
+      allow read: if isActiveUser();
+      
+      allow create: if isTechnician()
+        && isValidDocSize()
+        && request.resource.data.taskId is string
+        && request.resource.data.equipmentId is string
+        && request.resource.data.ejecutadoPor == request.auth.uid
+        && request.resource.data.fechaEjecucion is timestamp
+        && isPastOrPresentTimestamp(request.resource.data.fechaEjecucion)
+        && request.resource.data.completada is bool
+        && (!('observaciones' in request.resource.data) || isNonEmptyString(request.resource.data.observaciones, 10, 500))
+        && (!('fotos' in request.resource.data) || (
+          request.resource.data.fotos is list
+          && request.resource.data.fotos.size() <= 10
+        ));
+        
+      allow update: if isTechnician()
+        && isValidDocSize();
+        
+      allow delete: if isAdmin();
+    }
+
+    // ============================================
+    // PREDICCIONES Y ANÁLISIS
+    // ============================================
+    
+    // Predicciones de falla
+    match /failurePredictions/{predictionId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin();
+      allow update: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
+    // Análisis de causa raíz
+    match /rootCauseAnalysis/{analysisId} {
+      allow read: if isAuthenticated();
+      allow create: if isSupervisor();
+      allow update: if isSupervisor();
+      allow delete: if isAdmin();
+    }
+
+    // Repuestos
+    match /spareParts/{partId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin() || isSupervisor();
+      allow update: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
+    // Movimientos de inventario
+    match /inventoryMovements/{movementId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Configuración
+    match /settings/{settingId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+  }
+}
