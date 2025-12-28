@@ -214,6 +214,21 @@ const JERARQUIA_CHONCHI: HierarchyItem[] = [
   { codigo: '720004584', nombre: 'CAUDALIMETRO SALIDA RIL AL MAR', nivel: HierarchyLevel.SUB_SISTEMA, padre: '720004582' },
   { codigo: '720004585', nombre: 'BOMBA PERISTALTICA INYEC ANTIESPUMANTE', nivel: HierarchyLevel.SISTEMA, padre: 'AQ-IN-CHO-EXTE-PRIL' },
 
+  // ESTANQUE LODOS - Sub-equipos de 720004563
+  { codigo: '720004564', nombre: 'ESTANQUE POLIMERO N1', nivel: HierarchyLevel.SUB_SISTEMA, padre: '720004563' },
+  { codigo: '720004565', nombre: 'AGITADOR POLIMERO N1', nivel: HierarchyLevel.SECCION, padre: '720004564' },
+  { codigo: '720004566', nombre: 'MOTOREDUCTOR AGITADOR N1', nivel: HierarchyLevel.LINEA, padre: '720004565' },
+  { codigo: '720004567', nombre: 'TABLERO CONTROL AGITADOR N1', nivel: HierarchyLevel.LINEA, padre: '720004565' },
+  { codigo: '720004568', nombre: 'ESTANQUE POLIMERO N2', nivel: HierarchyLevel.SUB_SISTEMA, padre: '720004563' },
+  { codigo: '720004569', nombre: 'AGITADOR POLIMERO N2', nivel: HierarchyLevel.SECCION, padre: '720004568' },
+  { codigo: '720004570', nombre: 'MOTOREDUCTOR AGITADOR N2', nivel: HierarchyLevel.LINEA, padre: '720004569' },
+  { codigo: '720004571', nombre: 'TABLERO CONTROL AGITADOR N2', nivel: HierarchyLevel.LINEA, padre: '720004569' },
+
+  // BOMBAS VACIO ADICIONALES PLANTA RILES
+  { codigo: '720012955', nombre: 'BOMBA VACIO ANILLO LIQ TOLVA VISCERA N1', nivel: HierarchyLevel.SISTEMA, padre: 'AQ-IN-CHO-EXTE-PRIL' },
+  { codigo: '720012956', nombre: 'BOMBA VACIO ANILLO LIQ TOLVA VISCERA N2', nivel: HierarchyLevel.SISTEMA, padre: 'AQ-IN-CHO-EXTE-PRIL' },
+  { codigo: '720012957', nombre: 'BOMBA VACIO ANILLO LIQ TOLVA VISCERA N3', nivel: HierarchyLevel.SISTEMA, padre: 'AQ-IN-CHO-EXTE-PRIL' },
+
   // ==========================================
   // PLANTA CHONCHI - SUB-ÁREAS
   // ==========================================

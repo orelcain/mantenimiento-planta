@@ -76,6 +76,10 @@ export function HierarchyPage() {
   const [selectedNode, setSelectedNode] = useState<HierarchyNode | null>(null)
   const [parentForNew, setParentForNew] = useState<HierarchyNodeWithChildren | null>(null)
   
+  // Ref para scroll automático al primer resultado
+  const firstMatchRef = useRef<HTMLDivElement | null>(null)
+  const [isFirstMatch, setIsFirstMatch] = useState(true)
+  
   const [formData, setFormData] = useState<NodeFormData>({
     nombre: '',
     codigo: '',
@@ -360,11 +364,24 @@ export function HierarchyPage() {
   useMemo(() => {
     if (debouncedSearch && toExpand.size > 0) {
       setExpandedNodes(toExpand)
+      setIsFirstMatch(true) // Reset para próxima búsqueda
     } else if (!debouncedSearch) {
       // Restaurar al estado normal cuando se borra la búsqueda
       setExpandedNodes(new Set())
+      setIsFirstMatch(true)
     }
   }, [debouncedSearch, toExpand])
+
+  // Scroll automático al primer resultado
+  useEffect(() => {
+    if (debouncedSearch && firstMatchRef.current && isFirstMatch) {
+      firstMatchRef.current.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'center' 
+      })
+      setIsFirstMatch(false)
+    }
+  }, [debouncedSearch, isFirstMatch])
 
   // Función para resaltar texto coincidente
   const highlightText = (text: string, query: string) => {
@@ -392,13 +409,27 @@ export function HierarchyPage() {
   }
 
   const renderTree = (nodes: HierarchyNodeWithChildren[], depth = 0) => {
+    let isFirstRendered = isFirstMatch // Track si es el primer match renderizado
+    
     return nodes.map(node => {
       const isExpanded = expandedNodes.has(node.id)
       const hasChildren = node.children && node.children.length > 0
       const indent = depth * 24
+      
+      // Detectar si este nodo es un match
+      const isMatch = debouncedSearch && (
+        node.nombre.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+        node.codigo.toLowerCase().includes(debouncedSearch.toLowerCase())
+      )
+      
+      // Asignar ref al primer match
+      const assignRef = isMatch && isFirstRendered
+      if (assignRef) {
+        isFirstRendered = false
+      }
 
       return (
-        <div key={node.id} className="mb-1">
+        <div key={node.id} className="mb-1" ref={assignRef ? firstMatchRef : null}>
           <div
             className={cn(
               'flex items-center gap-2 p-2 rounded-lg hover:bg-muted transition-colors group',
