@@ -68,6 +68,8 @@ export function HierarchyPage() {
   const { tree, loading, refresh } = useHierarchyTree()
   const { createNode, updateNode, deleteNode, reorderNode } = useHierarchyMutations()
 
+  // Vista local del árbol para reordenamiento optimista
+  const [viewTree, setViewTree] = useState<HierarchyNodeWithChildren[]>([])
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set())
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -75,14 +77,14 @@ export function HierarchyPage() {
   const [showEditDialog, setShowEditDialog] = useState(false)
   const [selectedNode, setSelectedNode] = useState<HierarchyNode | null>(null)
   const [parentForNew, setParentForNew] = useState<HierarchyNodeWithChildren | null>(null)
+  const [activeNodeId, setActiveNodeId] = useState<string | null>(null)
   
-  // Estado para preservar expansión durante reordenamiento
-  const [isReordering, setIsReordering] = useState(false)
-  const savedExpandedState = useRef<Set<string>>(new Set())
-  const waitingForRefresh = useRef(false)
-  const prevLoadingRef = useRef(false)
+  // Estado para preservar expansión en búsqueda
   const prevSearchRef = useRef('')
   const preSearchExpandedRef = useRef<Set<string>>(new Set())
+  
+  // Refs para scroll y foco visual
+  const nodeRefs = useRef<Map<string, HTMLDivElement>>(new Map())
   
   // Ref para scroll automático al primer resultado
   const firstMatchRef = useRef<HTMLDivElement | null>(null)
@@ -113,6 +115,11 @@ export function HierarchyPage() {
     setSearchQuery(value)
     debouncedSetSearch(value)
   }
+
+  // Sincronizar la vista local con el árbol cargado desde servidor
+  useEffect(() => {
+    setViewTree(tree)
+  }, [tree])
 
   // Verificar permisos de admin
   if (user?.rol !== 'admin') {
@@ -150,7 +157,7 @@ export function HierarchyPage() {
         }
       })
     }
-    collectIds(tree)
+    collectIds(viewTree)
     setExpandedNodes(allIds)
   }
 
@@ -294,20 +301,62 @@ export function HierarchyPage() {
     }
   }
 
+  const reorderInTree = (
+    nodes: HierarchyNodeWithChildren[],
+    targetId: string,
+    direction: 'up' | 'down'
+  ): { updated: boolean; next: HierarchyNodeWithChildren[] } => {
+    const arr = [...nodes]
+    for (let i = 0; i < arr.length; i++) {
+      const node = arr[i]
+      // Encontrado en este nivel
+      if (node.id === targetId) {
+        if (direction === 'up' && i > 0) {
+          ;[arr[i - 1], arr[i]] = [arr[i], arr[i - 1]]
+          return { updated: true, next: arr }
+        }
+        if (direction === 'down' && i < arr.length - 1) {
+          ;[arr[i + 1], arr[i]] = [arr[i], arr[i + 1]]
+          return { updated: true, next: arr }
+        }
+        return { updated: false, next: nodes }
+      }
+      // Buscar en hijos
+      if (node.children?.length) {
+        const childResult = reorderInTree(node.children, targetId, direction)
+        if (childResult.updated) {
+          arr[i] = { ...node, children: childResult.next }
+          return { updated: true, next: arr }
+        }
+      }
+    }
+    return { updated: false, next: nodes }
+  }
+
+  const scrollToNode = (nodeId: string) => {
+    const el = nodeRefs.current.get(nodeId)
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }
+
   const handleReorder = async (nodeId: string, direction: 'up' | 'down') => {
+    const prevTree = viewTree
+    const { updated, next } = reorderInTree(viewTree, nodeId, direction)
+    if (!updated) return
+
+    // Optimista: actualizar vista y foco
+    setViewTree(next)
+    setActiveNodeId(nodeId)
+    scrollToNode(nodeId)
+
     try {
-      // Marcar que estamos reordenando y guardar estado
-      setIsReordering(true)
-      waitingForRefresh.current = true
-      savedExpandedState.current = new Set(expandedNodes)
-      
       await reorderNode(nodeId, direction)
-      refresh()
+      refresh() // Mantener coherencia con servidor
     } catch (error) {
       logger.error('Error reordering node', error instanceof Error ? error : new Error(String(error)))
       alert('Error al reordenar el nodo')
-      setIsReordering(false)
-      waitingForRefresh.current = false
+      setViewTree(prevTree) // Revertir si falla
     }
   }
 
@@ -369,11 +418,11 @@ export function HierarchyPage() {
   // Aplicar filtro y auto-expandir
   const { filtered: filteredTree, toExpand, matchCount } = useMemo(() => {
     if (!debouncedSearch.trim()) {
-      return { filtered: tree, toExpand: new Set<string>(), matchCount: 0 }
+      return { filtered: viewTree, toExpand: new Set<string>(), matchCount: 0 }
     }
-    const result = filterAndExpandTree(tree, debouncedSearch)
+    const result = filterAndExpandTree(viewTree, debouncedSearch)
     return { ...result, matchCount: countMatches(result.filtered) }
-  }, [tree, debouncedSearch])
+  }, [viewTree, debouncedSearch])
 
   // Manejo robusto de expansión en búsquedas sin colapsar el árbol
   useEffect(() => {
@@ -414,26 +463,6 @@ export function HierarchyPage() {
       setIsFirstMatch(false)
     }
   }, [debouncedSearch, isFirstMatch])
-
-  // Restaurar estado de expansión después de reordenar
-  useEffect(() => {
-    // Detectar transición: loading cambió de true a false
-    const loadingJustFinished = prevLoadingRef.current === true && loading === false
-    
-    // Solo restaurar si:
-    // 1. Estamos esperando que el refresh complete
-    // 2. El loading acaba de cambiar de true a false (refresh completó)
-    if (waitingForRefresh.current && loadingJustFinished) {
-      setExpandedNodes(savedExpandedState.current)
-      
-      // Resetear flags DESPUÉS de restaurar
-      setIsReordering(false)
-      waitingForRefresh.current = false
-    }
-    
-    // Actualizar ref de loading previo
-    prevLoadingRef.current = loading
-  }, [loading])
 
   // Función para resaltar texto coincidente
   const highlightText = (text: string, query: string) => {
@@ -480,14 +509,35 @@ export function HierarchyPage() {
         isFirstRendered = false
       }
 
+      const isActive = activeNodeId === node.id
+
       return (
-        <div key={node.id} className="mb-1" ref={assignRef ? firstMatchRef : null}>
+        <div
+          key={node.id}
+          className="mb-1"
+          ref={el => {
+            if (assignRef && firstMatchRef) {
+              // Mantener scroll al primer match
+              // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+              assignRef && (firstMatchRef.current = el)
+            }
+            if (el) {
+              nodeRefs.current.set(node.id, el)
+            } else {
+              nodeRefs.current.delete(node.id)
+            }
+          }}
+        >
           <div
             className={cn(
-              'flex items-center gap-2 p-2 rounded-lg hover:bg-muted transition-colors group',
-              'border border-transparent hover:border-border'
+              'flex items-center gap-2 p-2 rounded-lg transition-colors group',
+              'border',
+              isActive
+                ? 'border-emerald-400/70 bg-emerald-50 ring-2 ring-emerald-400/50'
+                : 'border-transparent hover:border-border hover:bg-muted'
             )}
             style={{ paddingLeft: `${indent + 8}px` }}
+            onClick={() => setActiveNodeId(node.id)}
           >
             {/* Toggle expand */}
             {hasChildren ? (
