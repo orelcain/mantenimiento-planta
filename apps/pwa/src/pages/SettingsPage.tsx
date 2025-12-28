@@ -37,6 +37,7 @@ import {
   Spinner,
 } from '@/components/ui'
 import { useAuthStore } from '@/store'
+import { createInviteCode } from '@/services/auth'
 import { 
   collection, 
   getDocs, 
@@ -373,30 +374,19 @@ function InvitesSettings() {
     setLoading(false)
   }
 
-  const generateCode = () => {
-    return Math.random().toString(36).substring(2, 8).toUpperCase()
-  }
-
   const handleCreateInvite = async () => {
     if (!user) return
     setCreating(true)
 
     try {
-      const code = generateCode()
-      const expiresAt = new Date()
-      expiresAt.setDate(expiresAt.getDate() + 7) // Expira en 7 días
+      await createInviteCode(
+        newInviteRole as 'admin' | 'supervisor' | 'tecnico',
+        1, // Un uso por código
+        user.id,
+        7 // Expira en 7 días
+      )
 
-      await setDoc(doc(db, 'inviteCodes', code), {
-        rol: newInviteRole,
-        createdBy: user.id,
-        createdAt: serverTimestamp(),
-        expiresAt,
-        used: false,
-        usedBy: null,
-        usedAt: null,
-      })
-
-      logger.info('Invite code created', { code, role: newInviteRole })
+      logger.info('Invite code created', { role: newInviteRole })
       setShowCreateDialog(false)
       loadInvites()
     } catch (error) {

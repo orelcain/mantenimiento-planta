@@ -417,7 +417,6 @@ export function useHierarchyMutations() {
       // Solo agregar campos que tienen valor
       if (input.nombre !== undefined) updateData.nombre = input.nombre
       if (input.codigo !== undefined) updateData.codigo = input.codigo
-      if (input.orden !== undefined) updateData.orden = input.orden
       if (input.activo !== undefined) updateData.activo = input.activo
       
       // Campos opcionales - solo si tienen valor
@@ -506,7 +505,7 @@ export function useHierarchyStats() {
           if (!levelGroups[node.nivel]) {
             levelGroups[node.nivel] = []
           }
-          levelGroups[node.nivel].push(node)
+          levelGroups[node.nivel]?.push(node)
         })
 
         // Calcular estadísticas
