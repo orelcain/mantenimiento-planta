@@ -257,6 +257,104 @@ export interface InviteCode {
   expiresAt?: Date
 }
 
+// ===== TIPOS IOT Y SENSORES =====
+
+export type SensorType = 
+  | 'vibration'      // Vibración (mm/s)
+  | 'temperature'    // Temperatura (°C)
+  | 'current'        // Corriente eléctrica (A)
+  | 'pressure'       // Presión (bar/psi)
+  | 'flow'           // Flujo (L/min)
+  | 'humidity'       // Humedad (%)
+  | 'rpm'            // Revoluciones por minuto
+  | 'power'          // Potencia (kW)
+  | 'sound'          // Sonido (dB)
+
+export type DeviceType = 'esp32' | 'logo8' | 'plc' | 'sensor_module'
+
+export interface SensorReading {
+  timestamp: Date
+  value: number
+  unit: string
+}
+
+export interface IoTDevice {
+  id: string
+  equipmentId: string
+  deviceType: DeviceType
+  name: string
+  ipAddress?: string
+  macAddress?: string
+  sensors: {
+    type: SensorType
+    name: string
+    unit: string
+    minValue: number
+    maxValue: number
+    warningThreshold: number
+    criticalThreshold: number
+  }[]
+  status: 'online' | 'offline' | 'error'
+  lastReading: Date
+  createdAt: Date
+}
+
+export interface SensorData {
+  id: string
+  deviceId: string
+  equipmentId: string
+  sensorType: SensorType
+  readings: SensorReading[]
+  currentValue: number
+  isAnomaly: boolean
+  alertLevel?: 'warning' | 'critical'
+  createdAt: Date
+}
+
+export interface IoTAlert {
+  id: string
+  deviceId: string
+  equipmentId: string
+  sensorType: SensorType
+  alertLevel: 'warning' | 'critical'
+  message: string
+  currentValue: number
+  threshold: number
+  autoIncidentCreated: boolean
+  incidentId?: string
+  acknowledgedBy?: string
+  acknowledgedAt?: Date
+  createdAt: Date
+}
+
+// ===== TIPOS IA Y ANÁLISIS =====
+
+export interface AIAnalysis {
+  incidentId?: string
+  equipmentId?: string
+  analysisType: 'symptom_suggestion' | 'pattern_detection' | 'root_cause' | 'prediction'
+  input: any
+  output: any
+  confidence: number
+  model: string
+  tokens: number
+  createdAt: Date
+}
+
+export interface PatternDetection {
+  id: string
+  equipmentIds: string[]
+  patternType: 'recurring_failure' | 'degradation' | 'correlation'
+  description: string
+  frequency: number
+  lastOccurrence: Date
+  recommendation: string
+  estimatedCost: number
+  estimatedSavings: number
+  createdBy: 'ai' | 'manual'
+  createdAt: Date
+}
+
 // Configuración de la aplicación
 export interface AppSettings {
   incidents: {
@@ -277,5 +375,15 @@ export interface AppSettings {
     companyName: string
     logoURL?: string
     timezone: string
+  }
+  iot: {
+    enabled: boolean
+    autoCreateIncidents: boolean
+    dataRetentionDays: number
+  }
+  ai: {
+    enabled: boolean
+    provider: 'groq' | 'gemini'
+    model: string
   }
 }

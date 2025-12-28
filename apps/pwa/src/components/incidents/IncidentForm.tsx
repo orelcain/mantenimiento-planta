@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Camera, X, Upload, AlertTriangle, Image as ImageIcon } from 'lucide-react'
+import { Camera, X, Upload, AlertTriangle, Image as ImageIcon, Sparkles } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -14,7 +14,8 @@ import {
 import { useAuthStore, useAppStore } from '@/store'
 import { createIncident } from '@/services/incidents'
 import { uploadIncidentPhoto, compressImage } from '@/services/storage'
-import type { IncidentPriority, Incident } from '@/types'
+import { generateSymptoms } from '@/services/ai'
+import type { IncidentPriority, Incident, Equipment } from '@/types'
 import { HierarchyLevel } from '@/types/hierarchy'
 import { cn } from '@/lib/utils'
 import { createIncidentSchema, validateFileList } from '@/lib/validation'
@@ -36,7 +37,7 @@ const PRIORITY_OPTIONS = [
 
 const COMMON_SYMPTOMS = [
   'Vibración', 'Ruido anormal', 'Calentamiento', 'Fuga de aceite', 
-  'Fuga de agua', 'Humo', 'Olor extraño', 'No enciende', 'Se detiene solo'
+  'Fuga de agua', 'Humo', 'Olor extraño', 'No enciende', 'Se detiene solo', 'Otro'
 ]
 
 export function IncidentForm({ onClose, onSuccess, preselectedZoneId }: IncidentFormProps) {
@@ -50,6 +51,9 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId }: Incident
   const [photoPreview, setPhotoPreview] = useState<string[]>([])
   const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([])
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
+  const [aiSymptoms, setAiSymptoms] = useState<string[]>(COMMON_SYMPTOMS)
+  const [isGeneratingSymptoms, setIsGeneratingSymptoms] = useState(false)
+  const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null)
 
   const [formData, setFormData] = useState({
     titulo: '',
@@ -65,6 +69,28 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId }: Incident
       setFormData(prev => ({ ...prev, zoneId: preselectedZoneId }))
     }
   }, [preselectedZoneId])
+
+  // Generar síntomas con IA cuando se selecciona nodo de jerarquía
+  const handleHierarchyChange = async (nodeId: string | undefined, equipment?: Equipment) => {
+    setFormData(prev => ({ ...prev, hierarchyNodeId: nodeId }))
+    
+    if (equipment) {
+      setSelectedEquipment(equipment)
+      setIsGeneratingSymptoms(true)
+      try {
+        const symptoms = await generateSymptoms(equipment)
+        setAiSymptoms(symptoms)
+        logger.info('Síntomas generados con IA', { equipmentId: equipment.id, count: symptoms.length })
+      } catch (error) {
+        logger.error('Error generando síntomas con IA', error instanceof Error ? error : new Error(String(error)))
+        setAiSymptoms(COMMON_SYMPTOMS) // Fallback a síntomas estáticos
+      } finally {
+        setIsGeneratingSymptoms(false)
+      }
+    } else {
+      setAiSymptoms(COMMON_SYMPTOMS)
+    }
+  }
 
   // Manejar selección de fotos
   const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -224,9 +250,9 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId }: Incident
             <div className="border rounded-lg p-3 bg-muted/30">
               <HierarchySelector
                 value={formData.hierarchyNodeId}
-                onChange={(nodeId) => {
-                  console.log('🔄 HierarchySelector onChange:', nodeId)
-                  setFormData({ ...formData, hierarchyNodeId: nodeId || undefined })
+                onChange={(nodeId, equipment) => {
+                  console.log('🔄 HierarchySelector onChange:', nodeId, equipment)
+                  handleHierarchyChange(nodeId || undefined, equipment)
                 }}
                 minLevel={HierarchyLevel.SUB_AREA}
                 maxLevel={HierarchyLevel.ELEMENTO}
@@ -330,11 +356,28 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId }: Incident
             )}
           </div>
 
-          {/* Síntomas - Chips seleccionables */}
+          {/* Síntomas - Chips seleccionables con IA */}
           <div className="space-y-2">
-            <Label className="text-sm font-medium">🔍 Síntomas (opcional)</Label>
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-medium">🔍 Síntomas (opcional)</Label>
+              {selectedEquipment && (
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  {isGeneratingSymptoms ? (
+                    <>
+                      <Spinner size="sm" />
+                      <span>Generando con IA...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-3 w-3 text-primary" />
+                      <span>Sugerencias IA</span>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
             <div className="flex flex-wrap gap-2">
-              {COMMON_SYMPTOMS.map((symptom) => (
+              {aiSymptoms.map((symptom) => (
                 <button
                   key={symptom}
                   type="button"
@@ -345,11 +388,13 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId }: Incident
                         : [...prev, symptom]
                     )
                   }}
+                  disabled={isGeneratingSymptoms}
                   className={cn(
                     'px-3 py-1.5 rounded-full text-sm border transition-colors',
                     selectedSymptoms.includes(symptom)
                       ? 'bg-primary text-primary-foreground border-primary'
-                      : 'bg-muted/50 border-muted hover:border-primary/50'
+                      : 'bg-muted/50 border-muted hover:border-primary/50',
+                    isGeneratingSymptoms && 'opacity-50 cursor-not-allowed'
                   )}
                 >
                   {symptom}

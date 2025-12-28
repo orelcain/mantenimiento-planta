@@ -19,7 +19,7 @@ export default defineConfig({
       manifest: {
         name: 'Sistema de Mantenimiento Industrial',
         short_name: 'Mantenimiento',
-        description: 'PWA para gestión de mantenimiento industrial y levantamiento de incidencias - v1.4.0',
+        description: 'PWA para gestión de mantenimiento industrial con IA, IoT y 4 tipos de mantenimiento - v1.5.0',
         version: '1.4.0',
         start_url: '/mantenimiento-planta/',
         scope: '/mantenimiento-planta/',

@@ -10,6 +10,7 @@ import {
   MapPin,
   Camera,
   X,
+  Trash2,
 } from 'lucide-react'
 import {
   Dialog,
@@ -30,7 +31,7 @@ import {
 } from '@/components/ui'
 import { useAuthStore } from '@/store'
 import { usePermissions } from '@/hooks/usePermissions'
-import { confirmIncident, rejectIncident, closeIncident, assignIncident } from '@/services/incidents'
+import { confirmIncident, rejectIncident, closeIncident, assignIncident, deleteIncident } from '@/services/incidents'
 import { getTechnicians, getUserById } from '@/services/auth'
 import type { Incident, IncidentStatus, IncidentPriority, User as UserType } from '@/types'
 import { formatDate } from '@/lib/utils'
@@ -152,6 +153,25 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
     } catch (error: unknown) {
       const err = error instanceof Error ? error : new Error('Error closing incident')
       logger.error('Error closing incident', err)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Eliminar incidencia (solo Admin)
+  const handleDelete = async () => {
+    if (!confirm('¿Estás seguro de eliminar esta incidencia? Esta acción no se puede deshacer.')) {
+      return
+    }
+    setIsLoading(true)
+    try {
+      await deleteIncident(incident.id)
+      logger.info('Incident deleted', { incidentId: incident.id })
+      onClose()
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error('Error deleting incident')
+      logger.error('Error deleting incident', err)
+      alert('Error al eliminar la incidencia')
     } finally {
       setIsLoading(false)
     }
@@ -435,6 +455,22 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
               >
                 <CheckCircle className="h-4 w-4 mr-2" />
                 Cerrar Incidencia
+              </Button>
+            )}
+
+            {/* Botón de eliminar (solo Admin) */}
+            {permissions.canDeleteIncident && (
+              <Button
+                variant="destructive"
+                onClick={handleDelete}
+                disabled={isLoading}
+              >
+                {isLoading ? <Spinner size="sm" /> : (
+                  <>
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Eliminar
+                  </>
+                )}
               </Button>
             )}
 
