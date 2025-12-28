@@ -63,6 +63,7 @@ export async function initializeHierarchySystem(userId: string): Promise<void> {
 
     for (let i = 0; i < areas.length; i++) {
       const area = areas[i]
+      if (!area) continue
       const areaNode: Omit<HierarchyNode, 'id'> = {
         nombre: area.nombre,
         codigo: area.codigo,
@@ -109,6 +110,7 @@ export async function initializeHierarchySystem(userId: string): Promise<void> {
 
     for (let i = 0; i < subAreas.length; i++) {
       const subArea = subAreas[i]
+      if (!subArea) continue
       const subAreaNode: Omit<HierarchyNode, 'id'> = {
         nombre: subArea.nombre,
         codigo: subArea.codigo,
@@ -149,6 +151,7 @@ export async function initializeHierarchySystem(userId: string): Promise<void> {
 
     for (let i = 0; i < sistemas.length; i++) {
       const sistema = sistemas[i]
+      if (!sistema) continue
       const sistemaNode: Omit<HierarchyNode, 'id'> = {
         nombre: sistema.nombre,
         codigo: sistema.codigo,
@@ -170,7 +173,7 @@ export async function initializeHierarchySystem(userId: string): Promise<void> {
     logger.info('Hierarchy system initialization completed successfully')
   } catch (error) {
     console.error('[hierarchyInit] ❌ Error fatal durante inicialización:', error)
-    logger.error('Failed to initialize hierarchy system', error)
+    logger.error('Failed to initialize hierarchy system', error instanceof Error ? error : new Error(String(error)))
     throw error
   }
 }

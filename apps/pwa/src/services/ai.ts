@@ -69,7 +69,7 @@ Ejemplo: ["Vibración excesiva", "Ruido anormal", ...]`
 
     return symptoms
   } catch (error) {
-    logger.error('Error generando síntomas con IA:', error)
+    logger.error('Error generando síntomas con IA:', error instanceof Error ? error : new Error(String(error)))
     return [
       'Vibración anormal',
       'Ruido inusual',
@@ -98,10 +98,10 @@ export async function analyzeRecurrentIssues(incidents: Incident[]): Promise<{
 
   try {
     const summary = incidents.map(inc => ({
-      equipment: inc.equipmentName,
-      symptom: inc.sintoma,
+      equipment: inc.equipmentId || 'N/A',
+      symptoms: inc.sintomas?.join(', ') || 'N/A',
       description: inc.descripcion,
-      maintenance: inc.maintenanceType,
+      type: inc.tipo,
       date: inc.createdAt,
     }))
 
@@ -158,7 +158,7 @@ Responde SOLO con JSON:
 
     return result
   } catch (error) {
-    logger.error('Error analizando patrones:', error)
+    logger.error('Error analizando patrones:', error instanceof Error ? error : new Error(String(error)))
     return { patterns: [], confidence: 0 }
   }
 }
@@ -221,7 +221,7 @@ Responde SOLO con JSON:
 
     return result
   } catch (error) {
-    logger.error('Error prediciendo fallas:', error)
+    logger.error('Error prediciendo fallas:', error instanceof Error ? error : new Error(String(error)))
     return null
   }
 }
@@ -247,11 +247,10 @@ export async function analyzeRootCause(incidents: Incident[]): Promise<{
 
   try {
     const summary = incidents.map(inc => ({
-      equipment: inc.equipmentName,
-      symptom: inc.sintoma,
+      equipment: inc.equipmentId || 'N/A',
+      symptoms: inc.sintomas?.join(', ') || 'N/A',
       description: inc.descripcion,
       resolution: inc.resolucion,
-      cost: inc.costoEstimado || 0,
       date: inc.createdAt,
     }))
 
@@ -305,7 +304,7 @@ Responde SOLO con JSON:
 
     return result
   } catch (error) {
-    logger.error('Error analizando causa raíz:', error)
+    logger.error('Error analizando causa raíz:', error instanceof Error ? error : new Error(String(error)))
     return {
       rootCause: 'Error en análisis',
       solution: 'Revisar manualmente',
@@ -323,6 +322,6 @@ async function saveAIAnalysis(analysis: Omit<AIAnalysis, 'id'>): Promise<void> {
     // Implementar cuando tengas Firebase configurado
     logger.info('Análisis IA generado:', analysis)
   } catch (error) {
-    logger.error('Error guardando análisis:', error)
+    logger.error('Error guardando análisis:', error instanceof Error ? error : new Error(String(error)))
   }
 }
