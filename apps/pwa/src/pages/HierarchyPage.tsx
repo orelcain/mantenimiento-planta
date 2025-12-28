@@ -81,6 +81,8 @@ export function HierarchyPage() {
   const savedExpandedState = useRef<Set<string>>(new Set())
   const waitingForRefresh = useRef(false)
   const prevLoadingRef = useRef(false)
+  const prevSearchRef = useRef('')
+  const preSearchExpandedRef = useRef<Set<string>>(new Set())
   
   // Ref para scroll automático al primer resultado
   const firstMatchRef = useRef<HTMLDivElement | null>(null)
@@ -111,15 +113,6 @@ export function HierarchyPage() {
     setSearchQuery(value)
     debouncedSetSearch(value)
   }
-
-  // Debug: Log cuando cambia tree o expandedNodes
-  useEffect(() => {
-    console.log('🌳 [TREE CHANGED]', { nodeCount: tree.length, loading, expandedSize: expandedNodes.size })
-  }, [tree, loading])
-
-  useEffect(() => {
-    console.log('📂 [EXPANDED CHANGED]', { size: expandedNodes.size, ids: Array.from(expandedNodes).slice(0, 5) })
-  }, [expandedNodes])
 
   // Verificar permisos de admin
   if (user?.rol !== 'admin') {
@@ -303,23 +296,18 @@ export function HierarchyPage() {
 
   const handleReorder = async (nodeId: string, direction: 'up' | 'down') => {
     try {
-      console.log('🔄 [REORDER START]', { nodeId, direction, currentExpanded: expandedNodes.size })
       // Marcar que estamos reordenando y guardar estado
       setIsReordering(true)
       waitingForRefresh.current = true
       savedExpandedState.current = new Set(expandedNodes)
-      console.log('💾 [STATE SAVED]', { savedSize: savedExpandedState.current.size, savedIds: Array.from(savedExpandedState.current) })
       
       await reorderNode(nodeId, direction)
-      console.log('✅ [REORDER API DONE]')
       refresh()
-      console.log('🔃 [REFRESH CALLED] - waitingForRefresh=true')
     } catch (error) {
       logger.error('Error reordering node', error instanceof Error ? error : new Error(String(error)))
       alert('Error al reordenar el nodo')
       setIsReordering(false)
       waitingForRefresh.current = false
-      console.log('❌ [REORDER ERROR - flags reset]')
     }
   }
 
@@ -387,28 +375,34 @@ export function HierarchyPage() {
     return { ...result, matchCount: countMatches(result.filtered) }
   }, [tree, debouncedSearch])
 
-  // Auto-expandir nodos cuando hay búsqueda
-  useMemo(() => {
-    console.log('🔍 [USEMEMO TRIGGERED]', { 
-      hasSearch: !!debouncedSearch, 
-      toExpandSize: toExpand.size, 
-      isReordering,
-      currentExpandedSize: expandedNodes.size 
-    })
-    
-    if (debouncedSearch && toExpand.size > 0) {
-      console.log('📖 [SEARCH MODE] - Expandiendo nodos de búsqueda:', toExpand.size)
-      setExpandedNodes(toExpand)
-      setIsFirstMatch(true) // Reset para próxima búsqueda
-    } else if (!debouncedSearch && !isReordering) {
-      // Solo restaurar al estado normal si NO estamos reordenando
-      console.log('🔒 [NO SEARCH MODE] - Colapsando todo (isReordering=false)')
-      setExpandedNodes(new Set())
-      setIsFirstMatch(true)
-    } else {
-      console.log('⏸️ [USEMEMO SKIP] - No action (isReordering=true or has search)')
+  // Manejo robusto de expansión en búsquedas sin colapsar el árbol
+  useEffect(() => {
+    const prevSearch = prevSearchRef.current
+    const hasSearch = !!debouncedSearch.trim()
+
+    // Entrada a modo búsqueda: guardar expansión actual y expandir coincidencias
+    if (!prevSearch && hasSearch) {
+      preSearchExpandedRef.current = new Set(expandedNodes)
+      if (toExpand.size > 0) {
+        setExpandedNodes(toExpand)
+        setIsFirstMatch(true)
+      }
     }
-  }, [debouncedSearch, toExpand, isReordering])
+
+    // Cambio dentro de búsqueda: actualizar expansión con coincidencias
+    if (hasSearch && toExpand.size > 0) {
+      setExpandedNodes(toExpand)
+      setIsFirstMatch(true)
+    }
+
+    // Salida de búsqueda: restaurar expansión previa (sin colapsar)
+    if (prevSearch && !hasSearch) {
+      setExpandedNodes(preSearchExpandedRef.current)
+      setIsFirstMatch(true)
+    }
+
+    prevSearchRef.current = debouncedSearch
+  }, [debouncedSearch, toExpand])
 
   // Scroll automático al primer resultado
   useEffect(() => {
@@ -423,14 +417,6 @@ export function HierarchyPage() {
 
   // Restaurar estado de expansión después de reordenar
   useEffect(() => {
-    console.log('🎯 [RESTORE EFFECT]', { 
-      isReordering, 
-      loading, 
-      prevLoading: prevLoadingRef.current,
-      waitingForRefresh: waitingForRefresh.current,
-      savedSize: savedExpandedState.current.size 
-    })
-    
     // Detectar transición: loading cambió de true a false
     const loadingJustFinished = prevLoadingRef.current === true && loading === false
     
@@ -438,16 +424,11 @@ export function HierarchyPage() {
     // 1. Estamos esperando que el refresh complete
     // 2. El loading acaba de cambiar de true a false (refresh completó)
     if (waitingForRefresh.current && loadingJustFinished) {
-      console.log('♻️ [RESTORING STATE - Loading transition detected]', { 
-        restoringSize: savedExpandedState.current.size,
-        restoringIds: Array.from(savedExpandedState.current)
-      })
       setExpandedNodes(savedExpandedState.current)
       
       // Resetear flags DESPUÉS de restaurar
       setIsReordering(false)
       waitingForRefresh.current = false
-      console.log('✅ [RESTORE COMPLETE] - All flags reset after transition')
     }
     
     // Actualizar ref de loading previo
