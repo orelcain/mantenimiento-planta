@@ -2,12 +2,12 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.0.0' as const
+export const APP_VERSION = '2.0.1' as const
 
 /**
  * Fecha de la versión actual
  */
-export const VERSION_DATE = '2024-12-27' as const
+export const VERSION_DATE = '2024-12-28' as const
 
 /**
  * Nombre de la versión (opcional)

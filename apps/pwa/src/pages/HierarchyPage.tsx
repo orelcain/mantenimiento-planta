@@ -5,7 +5,7 @@
  * de la estructura jerárquica de 8 niveles.
  */
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import {
   Plus,
   Edit2,
@@ -18,6 +18,9 @@ import {
   Settings as SettingsIcon,
   CheckCircle,
   XCircle,
+  ArrowUp,
+  ArrowDown,
+  Search,
 } from 'lucide-react'
 import {
   Card,
@@ -62,9 +65,10 @@ interface NodeFormData {
 export function HierarchyPage() {
   const user = useAuthStore(state => state.user)
   const { tree, loading, refresh } = useHierarchyTree()
-  const { createNode, updateNode, deleteNode } = useHierarchyMutations()
+  const { createNode, updateNode, deleteNode, reorderNode } = useHierarchyMutations()
 
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set())
+  const [searchQuery, setSearchQuery] = useState('')
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [showEditDialog, setShowEditDialog] = useState(false)
   const [selectedNode, setSelectedNode] = useState<HierarchyNode | null>(null)
@@ -137,13 +141,27 @@ export function HierarchyPage() {
   }
 
   const handleDelete = async (node: HierarchyNode) => {
-    if (!confirm(`¿Eliminar "${node.nombre}"? Esta acción no se puede deshacer.`)) {
+    // Confirmación especial para empresas (nivel 1)
+    const isEmpresa = node.nivel === HierarchyLevel.EMPRESA
+    const confirmMessage = isEmpresa
+      ? `⚠️ ADVERTENCIA: Vas a eliminar la empresa "${node.nombre}" y TODA su jerarquía (áreas, sistemas, equipos, etc.).\n\n¿Estás absolutamente seguro? Esta acción NO se puede deshacer.`
+      : `¿Eliminar "${node.nombre}"? Esta acción no se puede deshacer.`
+    
+    if (!confirm(confirmMessage)) {
       return
+    }
+
+    // Doble confirmación para empresas
+    if (isEmpresa) {
+      const finalConfirm = confirm(`Última confirmación: ¿Realmente deseas eliminar la empresa "${node.nombre}" y toda su estructura?`)
+      if (!finalConfirm) {
+        return
+      }
     }
 
     try {
       await deleteNode(node.id)
-      logger.info('Node deleted', { nodeId: node.id })
+      logger.info('Node deleted', { nodeId: node.id, nivel: node.nivel, isEmpresa })
       refresh()
     } catch (error) {
       logger.error('Error deleting node', error instanceof Error ? error : new Error(String(error)))
@@ -228,6 +246,71 @@ export function HierarchyPage() {
     }
   }
 
+  const handleReorder = async (nodeId: string, direction: 'up' | 'down') => {
+    try {
+      await reorderNode(nodeId, direction)
+      refresh()
+    } catch (error) {
+      logger.error('Error reordering node', error instanceof Error ? error : new Error(String(error)))
+      alert('Error al reordenar el nodo')
+    }
+  }
+
+  // Filtrar y expandir automáticamente los nodos que coinciden con la búsqueda
+  const filterAndExpandTree = (
+    nodes: HierarchyNodeWithChildren[], 
+    query: string
+  ): { filtered: HierarchyNodeWithChildren[], toExpand: Set<string> } => {
+    const toExpand = new Set<string>()
+    const lowerQuery = query.toLowerCase()
+
+    const filterRecursive = (nodes: HierarchyNodeWithChildren[]): HierarchyNodeWithChildren[] => {
+      return nodes.filter(node => {
+        const matchesName = node.nombre.toLowerCase().includes(lowerQuery)
+        const matchesCode = node.codigo.toLowerCase().includes(lowerQuery)
+        const matches = matchesName || matchesCode
+
+        let filteredChildren: HierarchyNodeWithChildren[] = []
+        if (node.children && node.children.length > 0) {
+          filteredChildren = filterRecursive(node.children)
+        }
+
+        const hasMatchingChildren = filteredChildren.length > 0
+
+        // Si este nodo o algún hijo coincide, expandir y mantener
+        if (matches || hasMatchingChildren) {
+          if (hasMatchingChildren) {
+            toExpand.add(node.id) // Expandir nodo padre de coincidencias
+          }
+          return {
+            ...node,
+            children: filteredChildren
+          }
+        }
+
+        return null
+      }).filter(Boolean) as HierarchyNodeWithChildren[]
+    }
+
+    const filtered = query ? filterRecursive(nodes) : nodes
+    return { filtered, toExpand }
+  }
+
+  // Aplicar filtro y auto-expandir
+  const { filtered: filteredTree, toExpand } = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return { filtered: tree, toExpand: new Set<string>() }
+    }
+    return filterAndExpandTree(tree, searchQuery)
+  }, [tree, searchQuery])
+
+  // Auto-expandir nodos cuando hay búsqueda
+  useMemo(() => {
+    if (searchQuery.trim() && toExpand.size > 0) {
+      setExpandedNodes(toExpand)
+    }
+  }, [searchQuery, toExpand])
+
   const renderTree = (nodes: HierarchyNodeWithChildren[], depth = 0) => {
     return nodes.map(node => {
       const isExpanded = expandedNodes.has(node.id)
@@ -283,12 +366,32 @@ export function HierarchyPage() {
 
             {/* Actions */}
             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              {/* Botones de ordenamiento */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleReorder(node.id, 'up')}
+                className="h-8 w-8 p-0"
+                title="Mover arriba"
+              >
+                <ArrowUp className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleReorder(node.id, 'down')}
+                className="h-8 w-8 p-0"
+                title="Mover abajo"
+              >
+                <ArrowDown className="h-4 w-4" />
+              </Button>
               {node.nivel < 8 && (
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => handleCreate(node)}
                   className="h-8 w-8 p-0"
+                  title="Agregar hijo"
                 >
                   <Plus className="h-4 w-4" />
                 </Button>
@@ -298,19 +401,20 @@ export function HierarchyPage() {
                 size="sm"
                 onClick={() => handleEdit(node)}
                 className="h-8 w-8 p-0"
+                title="Editar"
               >
                 <Edit2 className="h-4 w-4" />
               </Button>
-              {node.nivel > 1 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleDelete(node)}
-                  className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              )}
+              {/* Permitir eliminar cualquier nivel, incluyendo empresas (nivel 1) */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleDelete(node)}
+                className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                title="Eliminar"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
             </div>
           </div>
 
@@ -341,6 +445,21 @@ export function HierarchyPage() {
         </Button>
       </div>
 
+      {/* Buscador */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por nombre o código..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Tree */}
       <Card>
         <CardHeader>
@@ -355,19 +474,16 @@ export function HierarchyPage() {
               <Spinner size="lg" />
               <span className="ml-3 text-muted-foreground">Cargando estructura...</span>
             </div>
-          ) : tree.length === 0 ? (
+          ) : filteredTree.length === 0 ? (
             <div className="text-center py-12">
               <Folder className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
               <p className="text-muted-foreground">
-                No hay jerarquías configuradas
+                {searchQuery ? 'No se encontraron resultados' : 'No hay nodos creados. Comienza creando una empresa.'}
               </p>
-              <Button onClick={() => handleCreate(null)} className="mt-4">
-                Crear primera empresa
-              </Button>
             </div>
           ) : (
             <div className="space-y-1">
-              {renderTree(tree)}
+              {renderTree(filteredTree)}
             </div>
           )}
         </CardContent>

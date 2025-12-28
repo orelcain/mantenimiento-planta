@@ -478,7 +478,71 @@ export function useHierarchyMutations() {
     }
   }
 
-  return { createNode, updateNode, deleteNode }
+  /**
+   * Reordenar un nodo moviéndolo hacia arriba o abajo entre sus hermanos
+   */
+  const reorderNode = async (nodeId: string, direction: 'up' | 'down'): Promise<void> => {
+    try {
+      // Obtener el nodo actual
+      const nodeRef = doc(db, 'hierarchy', nodeId)
+      const nodeSnap = await getDoc(nodeRef)
+      
+      if (!nodeSnap.exists()) {
+        throw new Error('Nodo no encontrado')
+      }
+
+      const currentNode = { id: nodeSnap.id, ...nodeSnap.data() } as HierarchyNode
+
+      // Obtener hermanos (mismo parentId y nivel)
+      const hierarchyRef = collection(db, 'hierarchy')
+      const siblingsQuery = query(
+        hierarchyRef,
+        where('parentId', '==', currentNode.parentId),
+        where('nivel', '==', currentNode.nivel),
+        where('activo', '==', true),
+        orderBy('orden', 'asc')
+      )
+      
+      const siblingsSnapshot = await getDocs(siblingsQuery)
+      const siblings = siblingsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      } as HierarchyNode))
+
+      // Encontrar índice del nodo actual
+      const currentIndex = siblings.findIndex(s => s.id === nodeId)
+      
+      if (currentIndex === -1) {
+        throw new Error('Nodo no encontrado entre hermanos')
+      }
+
+      // Validar movimiento
+      const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1
+      if (targetIndex < 0 || targetIndex >= siblings.length) {
+        logger.info('Cannot move node: already at boundary', { nodeId, direction })
+        return // No hacer nada si ya está en el límite
+      }
+
+      // Intercambiar orden con el hermano
+      const batch = writeBatch(db)
+      const targetNode = siblings[targetIndex]
+
+      batch.update(doc(db, 'hierarchy', currentNode.id), { orden: targetNode.orden })
+      batch.update(doc(db, 'hierarchy', targetNode.id), { orden: currentNode.orden })
+
+      await batch.commit()
+
+      // Invalidar caché
+      treeCache = null
+
+      logger.info('Node reordered', { nodeId, direction, newOrder: targetNode.orden })
+    } catch (error) {
+      logger.error('Failed to reorder node', error instanceof Error ? error : new Error(String(error)))
+      throw error
+    }
+  }
+
+  return { createNode, updateNode, deleteNode, reorderNode }
 }
 
 /**
