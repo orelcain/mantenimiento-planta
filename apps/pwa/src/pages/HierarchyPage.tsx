@@ -79,6 +79,7 @@ export function HierarchyPage() {
   // Estado para preservar expansión durante reordenamiento
   const [isReordering, setIsReordering] = useState(false)
   const savedExpandedState = useRef<Set<string>>(new Set())
+  const waitingForRefresh = useRef(false)
   
   // Ref para scroll automático al primer resultado
   const firstMatchRef = useRef<HTMLDivElement | null>(null)
@@ -304,18 +305,20 @@ export function HierarchyPage() {
       console.log('🔄 [REORDER START]', { nodeId, direction, currentExpanded: expandedNodes.size })
       // Marcar que estamos reordenando y guardar estado
       setIsReordering(true)
+      waitingForRefresh.current = true
       savedExpandedState.current = new Set(expandedNodes)
       console.log('💾 [STATE SAVED]', { savedSize: savedExpandedState.current.size, savedIds: Array.from(savedExpandedState.current) })
       
       await reorderNode(nodeId, direction)
       console.log('✅ [REORDER API DONE]')
       refresh()
-      console.log('🔃 [REFRESH CALLED]')
+      console.log('🔃 [REFRESH CALLED] - waitingForRefresh=true')
     } catch (error) {
       logger.error('Error reordering node', error instanceof Error ? error : new Error(String(error)))
       alert('Error al reordenar el nodo')
       setIsReordering(false)
-      console.log('❌ [REORDER ERROR - isReordering reset]')
+      waitingForRefresh.current = false
+      console.log('❌ [REORDER ERROR - flags reset]')
     }
   }
 
@@ -419,17 +422,28 @@ export function HierarchyPage() {
 
   // Restaurar estado de expansión después de reordenar
   useEffect(() => {
-    console.log('🎯 [RESTORE EFFECT]', { isReordering, loading, savedSize: savedExpandedState.current.size })
+    console.log('🎯 [RESTORE EFFECT]', { 
+      isReordering, 
+      loading, 
+      waitingForRefresh: waitingForRefresh.current,
+      savedSize: savedExpandedState.current.size 
+    })
     
-    if (isReordering && !loading) {
-      // El árbol ya se recargó, restaurar expansión
+    // Solo restaurar si:
+    // 1. Estamos en modo reordering
+    // 2. Estamos esperando que el refresh complete
+    // 3. El loading ya terminó (refresh completó)
+    if (isReordering && waitingForRefresh.current && !loading) {
       console.log('♻️ [RESTORING STATE]', { 
         restoringSize: savedExpandedState.current.size,
         restoringIds: Array.from(savedExpandedState.current)
       })
       setExpandedNodes(savedExpandedState.current)
+      
+      // Resetear flags DESPUÉS de restaurar
       setIsReordering(false)
-      console.log('✅ [RESTORE COMPLETE] - isReordering reset to false')
+      waitingForRefresh.current = false
+      console.log('✅ [RESTORE COMPLETE] - All flags reset')
     }
   }, [isReordering, loading])
 
