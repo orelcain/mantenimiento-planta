@@ -526,6 +526,11 @@ export function useHierarchyMutations() {
       // Intercambiar orden con el hermano
       const batch = writeBatch(db)
       const targetNode = siblings[targetIndex]
+      
+      if (!targetNode) {
+        logger.error('Target node not found', { nodeId, direction, targetIndex })
+        return
+      }
 
       batch.update(doc(db, 'hierarchy', currentNode.id), { orden: targetNode.orden })
       batch.update(doc(db, 'hierarchy', targetNode.id), { orden: currentNode.orden })

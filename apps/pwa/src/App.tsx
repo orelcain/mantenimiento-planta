@@ -60,7 +60,7 @@ export function App() {
           setUser(user)
           
           // Inicializar jerarquía automáticamente si es admin y no está inicializada
-          if (user.role === 'admin') {
+          if (user && user.rol === 'admin') {
             const initialized = await isHierarchyInitialized()
             if (!initialized) {
               logger.info('Auto-inicializando jerarquía para admin', { userId: user.id })

@@ -51,7 +51,7 @@ export async function fixPCBOtoPCHO(): Promise<{ success: boolean; updated: numb
     }
     
   } catch (error) {
-    logger.error('❌ Error al corregir PCBO → PCHO:', error)
+    logger.error('❌ Error al corregir PCBO → PCHO:', error instanceof Error ? error : new Error(String(error)))
     return { 
       success: false, 
       updated: 0, 
