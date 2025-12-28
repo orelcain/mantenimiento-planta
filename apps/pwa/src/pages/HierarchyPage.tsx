@@ -540,7 +540,7 @@ export function HierarchyPage() {
               'flex items-center gap-2 p-2 rounded-lg transition-colors group',
               'border',
               isActive
-                ? 'border-emerald-200 bg-emerald-50/60 shadow-[0_0_0_1px_rgba(16,185,129,0.25)]'
+                ? 'border-emerald-500/30 bg-emerald-500/10 dark:border-emerald-400/20 dark:bg-emerald-400/5'
                 : 'border-transparent hover:border-border hover:bg-muted'
             )}
             style={{ paddingLeft: `${indent + 8}px` }}
