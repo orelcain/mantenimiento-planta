@@ -118,10 +118,11 @@ export function MapPage() {
   // Incidencias por zona
   const incidentsByZone = incidents.reduce(
     (acc, incident) => {
-      if (!acc[incident.zoneId]) {
-        acc[incident.zoneId] = []
+      const zoneId = incident.zoneId || 'unknown'
+      if (!acc[zoneId]) {
+        acc[zoneId] = []
       }
-      acc[incident.zoneId]!.push(incident)
+      acc[zoneId].push(incident)
       return acc
     },
     {} as Record<string, Incident[]>

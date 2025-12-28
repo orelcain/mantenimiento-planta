@@ -250,9 +250,9 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId }: Incident
             <div className="border rounded-lg p-3 bg-muted/30">
               <HierarchySelector
                 value={formData.hierarchyNodeId}
-                onChange={(nodeId, equipment) => {
-                  console.log('🔄 HierarchySelector onChange:', nodeId, equipment)
-                  handleHierarchyChange(nodeId || undefined, equipment)
+                onChange={(nodeId: string | null) => {
+                  console.log('🔄 HierarchySelector onChange:', nodeId)
+                  handleHierarchyChange(nodeId || undefined, undefined)
                 }}
                 minLevel={HierarchyLevel.SUB_AREA}
                 maxLevel={HierarchyLevel.ELEMENTO}

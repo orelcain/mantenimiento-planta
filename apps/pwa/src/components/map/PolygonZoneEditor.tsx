@@ -90,6 +90,7 @@ export function PolygonZoneEditor() {
   
   // Estado del formulario
   const [showZoneDialog, setShowZoneDialog] = useState(false)
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
   const [zoneForm, setZoneForm] = useState({
     nombre: '',
     codigo: '',
@@ -174,20 +175,6 @@ export function PolygonZoneEditor() {
     // Si es URL de Firebase Storage, usarla directamente; si es local, agregar basePath
     img.src = isFirebaseStorageUrl(mapImage) ? mapImage : getAssetUrl(mapImage)
   }, [mapImage])
-
-  // Calcular bounds de un polígono
-  const calculateBounds = (points: MapPoint[]) => {
-    if (points.length === 0) return undefined
-    
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-    points.forEach(p => {
-      minX = Math.min(minX, p.x)
-      minY = Math.min(minY, p.y)
-      maxX = Math.max(maxX, p.x)
-      maxY = Math.max(maxY, p.y)
-    })
-    return { minX, minY, maxX, maxY }
-  }
 
   // Verificar si un punto está dentro de un polígono (ray casting)
   const isPointInPolygon = (point: MapPoint, polygon: MapPoint[]): boolean => {
@@ -493,8 +480,6 @@ export function PolygonZoneEditor() {
   const handleSaveZone = async () => {
     if (!drawing || !drawing.isComplete || drawing.points.length < 3) return
 
-    const bounds = calculateBounds(drawing.points)
-    
     // Generar código si no se proporcionó
     const codigo = zoneForm.codigo || `Z${zones.length + 1}`
     const nombre = zoneForm.nombre || `Zona ${codigo}`

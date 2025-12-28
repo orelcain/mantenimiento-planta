@@ -5,7 +5,7 @@
  * de la estructura jerárquica de 8 niveles.
  */
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import {
   Plus,
   Edit2,

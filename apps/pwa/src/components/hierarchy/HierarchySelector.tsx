@@ -79,8 +79,8 @@ export function HierarchySelector({
     
     setSelections(newSelections)
     
-    // Emitir último nivel seleccionado
-    const lastSelection = newSelections.findLast(s => s !== null)
+    // Emitir último nivel seleccionado (buscar desde el final)
+    const lastSelection = newSelections.reverse().find((s): s is SelectedNode => s !== null)
     onChange(lastSelection?.id ?? null)
   }
 
@@ -204,14 +204,14 @@ function LevelSelector({
 
   // Auto-seleccionar si solo hay 1 opción
   useEffect(() => {
-    if (!loading && options.length === 1 && !value) {
+    if (!loading && options.length === 1 && !value && options[0]) {
       console.log('[LevelSelector] Auto-seleccionando única opción en nivel', nivel, ':', options[0].value)
       onChange(options[0].value)
     }
   }, [options, loading, value, onChange, nivel])
 
   // Si solo hay 1 opción, no mostrar selector (auto-seleccionado)
-  if (!loading && options.length === 1 && value) {
+  if (!loading && options.length === 1 && value && options[0]) {
     return (
       <div>
         <label className="block text-sm font-medium text-gray-500 mb-1">
@@ -269,12 +269,12 @@ export function HierarchyBreadcrumb({ nodeId, maxItems = 4 }: HierarchyBreadcrum
   }
 
   const displayPath = maxItems && path.length > maxItems
-    ? [...path.slice(0, maxItems - 1), { nombre: '...', id: 'more' }, path[path.length - 1]]
+    ? [...path.slice(0, maxItems - 1), { nombre: '...', id: 'more' }, path[path.length - 1]].filter(Boolean)
     : path
 
   return (
     <div className="flex items-center gap-1.5 flex-wrap text-sm text-gray-600">
-      {displayPath.map((item, index) => (
+      {displayPath.map((item, index) => item && (
         <React.Fragment key={item.id}>
           {index > 0 && <ChevronRight className="w-3.5 h-3.5 text-gray-400" />}
           <span className="font-medium">{item.nombre}</span>

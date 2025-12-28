@@ -31,7 +31,6 @@ import {
   CreateHierarchyNodeInput,
   UpdateHierarchyNodeInput,
   HierarchyStats,
-  HIERARCHY_LEVEL_NAMES,
 } from '@/types/hierarchy'
 
 // Cache global para árbol completo (5 minutos TTL)
@@ -178,7 +177,7 @@ export function useHierarchyChildren(parentId: string | null, nivel?: HierarchyL
         setChildren(nodes)
       } catch (error) {
         console.error('[useHierarchyChildren] Error:', error)
-        logger.error('Failed to load hierarchy children', error)
+        logger.error('Failed to load hierarchy children', error instanceof Error ? error : new Error(String(error)))
         setChildren([])
       } finally {
         setLoading(false)
@@ -244,7 +243,7 @@ export function useHierarchyPath(nodeId: string | null) {
 
         setPath(fullPath)
       } catch (error) {
-        logger.error('Failed to load hierarchy path', error)
+        logger.error('Failed to load hierarchy path', error instanceof Error ? error : new Error(String(error)))
         setPath([])
       } finally {
         setLoading(false)
@@ -306,7 +305,7 @@ export function useHierarchySearch(filters: HierarchyFilters) {
 
         setNodes(results)
       } catch (error) {
-        logger.error('Failed to search hierarchy', error)
+        logger.error('Failed to search hierarchy', error instanceof Error ? error : new Error(String(error)))
         setNodes([])
       } finally {
         setLoading(false)
@@ -361,7 +360,7 @@ export function useHierarchyMutations() {
       const siblingsSnapshot = await getDocs(siblingsQuery)
       const lastOrder = siblingsSnapshot.empty
         ? 0
-        : (siblingsSnapshot.docs[0].data().orden ?? 0)
+        : (siblingsSnapshot.docs[0]?.data().orden ?? 0)
       
       console.log('[useHierarchy] Hermanos encontrados:', siblingsSnapshot.size, 'Orden siguiente:', lastOrder + 1)
 
@@ -404,7 +403,7 @@ export function useHierarchyMutations() {
         message: (error as any).message,
         stack: (error as any).stack
       })
-      logger.error('Failed to create hierarchy node', error)
+      logger.error('Failed to create hierarchy node', error instanceof Error ? error : new Error(String(error)))
       throw error
     }
   }
@@ -436,7 +435,7 @@ export function useHierarchyMutations() {
 
       logger.info('Hierarchy node updated', { id })
     } catch (error) {
-      logger.error('Failed to update hierarchy node', error)
+      logger.error('Failed to create hierarchy node', error instanceof Error ? error : new Error(String(error)))
       throw error
     }
   }
@@ -475,7 +474,7 @@ export function useHierarchyMutations() {
       // Invalidar caché
       treeCache = null
     } catch (error) {
-      logger.error('Failed to delete hierarchy node', error)
+      logger.error('Failed to delete hierarchy node', error instanceof Error ? error : new Error(String(error)))
       throw error
     }
   }
@@ -522,7 +521,7 @@ export function useHierarchyStats() {
 
         setStats(levelStats.sort((a, b) => a.nivel - b.nivel))
       } catch (error) {
-        logger.error('Failed to load hierarchy stats', error)
+        logger.error('Failed to load hierarchy stats', error instanceof Error ? error : new Error(String(error)))
       } finally {
         setLoading(false)
       }
