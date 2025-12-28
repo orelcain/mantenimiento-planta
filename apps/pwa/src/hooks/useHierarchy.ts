@@ -528,7 +528,7 @@ export function useHierarchyMutations() {
       const targetNode = siblings[targetIndex]
       
       if (!targetNode) {
-        logger.error('Target node not found', { nodeId, direction, targetIndex })
+        logger.error('Target node not found', new Error(`Target node not found: ${nodeId} ${direction} ${targetIndex}`))
         return
       }
 
