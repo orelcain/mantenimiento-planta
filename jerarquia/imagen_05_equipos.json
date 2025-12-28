@@ -2,20 +2,20 @@
   "imagen": 5,
   "areas_y_equipos": [
     {
-      "area": "AQ-IN-CHO-PCBO-EXTE-SMAQ (continuación)",
+      "area": "AQ-IN-CHO-PCHO-EXTE-SMAQ (continuación)",
       "equipos": [
         {"codigo": "720004284", "denominacion": "SEPERTIN ENFRIAMIENTO CHILLER", "nivel": 5, "padre": "720004277"},
-        {"codigo": "720004528", "denominacion": "EXTRATOR SALA MAQUINAS 1", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-EXTE-SMAQ"},
-        {"codigo": "720004529", "denominacion": "EXTRATOR SALA MAQUINAS 2", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-EXTE-SMAQ"},
-        {"codigo": "720004534", "denominacion": "SOPLADORES VIGUETAS CAMARAS 1", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-EXTE-SMAQ"},
-        {"codigo": "720004535", "denominacion": "SOPLADORES VIGUETAS CAMARAS 2", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-EXTE-SMAQ"}
+        {"codigo": "720004528", "denominacion": "EXTRATOR SALA MAQUINAS 1", "nivel": 4, "padre": "AQ-IN-CHO-PCHO-EXTE-SMAQ"},
+        {"codigo": "720004529", "denominacion": "EXTRATOR SALA MAQUINAS 2", "nivel": 4, "padre": "AQ-IN-CHO-PCHO-EXTE-SMAQ"},
+        {"codigo": "720004534", "denominacion": "SOPLADORES VIGUETAS CAMARAS 1", "nivel": 4, "padre": "AQ-IN-CHO-PCHO-EXTE-SMAQ"},
+        {"codigo": "720004535", "denominacion": "SOPLADORES VIGUETAS CAMARAS 2", "nivel": 4, "padre": "AQ-IN-CHO-PCHO-EXTE-SMAQ"}
       ]
     },
     {
-      "area": "AQ-IN-CHO-PCBO-EXTE-SFRE",
+      "area": "AQ-IN-CHO-PCHO-EXTE-SFRE",
       "denominacion": "SALA DE FREON",
       "equipos": [
-        {"codigo": "720004675", "denominacion": "COMPRESOR TORNILLO CAMARA N1", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-EXTE-SFRE"},
+        {"codigo": "720004675", "denominacion": "COMPRESOR TORNILLO CAMARA N1", "nivel": 4, "padre": "AQ-IN-CHO-PCHO-EXTE-SFRE"},
         {"codigo": "720004676", "denominacion": "MOTOR COMPRESOR CAMARA N1", "nivel": 5, "padre": "720004675"},
         {"codigo": "720004677", "denominacion": "ENFRIADOR ACEITE COMPRESOR CAMARA N1", "nivel": 5, "padre": "720004675"},
         {"codigo": "720004678", "denominacion": "MOTOR VENT ENFR ACEITE N1 COMPR CAM N1", "nivel": 6, "padre": "720004677"},
@@ -46,21 +46,21 @@
         {"codigo": "720004703", "denominacion": "MOTOR VENT CONDENSADOR N22 COMP CAM N1", "nivel": 6, "padre": "720004681"},
         {"codigo": "720004704", "denominacion": "MOTOR VENT CONDENSADOR N23 COMP CAM N1", "nivel": 6, "padre": "720004681"},
         {"codigo": "720004705", "denominacion": "MOTOR VENT CONDENSADOR N24 COMP CAM N1", "nivel": 6, "padre": "720004681"},
-        {"codigo": "720012707", "denominacion": "COMPRESOR CAMARA N2", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-EXTE-SFRE"}
+        {"codigo": "720012707", "denominacion": "COMPRESOR CAMARA N2", "nivel": 4, "padre": "AQ-IN-CHO-PCHO-EXTE-SFRE"}
       ]
     },
     {
-      "area": "AQ-IN-CHO-PCBO-EXTE-TMAN",
+      "area": "AQ-IN-CHO-PCHO-EXTE-TMAN",
       "denominacion": "TALLER DE MANTENIMIENTO",
       "equipos": [
-        {"codigo": "720004476", "denominacion": "COMPRESOR AIRE PLANTA", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-EXTE-TMAN"},
-        {"codigo": "720004477", "denominacion": "COMPRESOR AIRE PLANTA", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-EXTE-TMAN"},
-        {"codigo": "720004547", "denominacion": "CALDERA PLANTA", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-EXTE-TMAN"},
-        {"codigo": "720004548", "denominacion": "AIRE ACONDICIONADO TECNICOS MANTENCION", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-EXTE-TMAN"}
+        {"codigo": "720004476", "denominacion": "COMPRESOR AIRE PLANTA", "nivel": 4, "padre": "AQ-IN-CHO-PCHO-EXTE-TMAN"},
+        {"codigo": "720004477", "denominacion": "COMPRESOR AIRE PLANTA", "nivel": 4, "padre": "AQ-IN-CHO-PCHO-EXTE-TMAN"},
+        {"codigo": "720004547", "denominacion": "CALDERA PLANTA", "nivel": 4, "padre": "AQ-IN-CHO-PCHO-EXTE-TMAN"},
+        {"codigo": "720004548", "denominacion": "AIRE ACONDICIONADO TECNICOS MANTENCION", "nivel": 4, "padre": "AQ-IN-CHO-PCHO-EXTE-TMAN"}
       ]
     },
     {
-      "area": "AQ-IN-CHO-PCBO-FRIG",
+      "area": "AQ-IN-CHO-PCHO-FRIG",
       "denominacion": "FRIGORIFICO",
       "sub_areas": ["ANCA", "ANCC", "CAMA", "OFIC"]
     }

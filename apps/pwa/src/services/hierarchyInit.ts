@@ -34,7 +34,7 @@ const JERARQUIA_CHONCHI: HierarchyItem[] = [
   // NIVEL 2 - ÁREAS PRINCIPALES
   { codigo: 'AQ-IN-CHO-ACOP', nombre: 'ACOPIO', nivel: HierarchyLevel.AREA, padre: 'AQ-IN-CHO' },
   { codigo: 'AQ-IN-CHO-EXTE', nombre: 'PATIO Y SERVICIOS EXTERIORES', nivel: HierarchyLevel.AREA, padre: 'AQ-IN-CHO' },
-  { codigo: 'AQ-IN-CHO-PCBO', nombre: 'PLANTA CHONCHI', nivel: HierarchyLevel.AREA, padre: 'AQ-IN-CHO' },
+  { codigo: 'AQ-IN-CHO-PCHO', nombre: 'PLANTA CHONCHI', nivel: HierarchyLevel.AREA, padre: 'AQ-IN-CHO' },
   { codigo: 'AQ-IN-CHO-PYAL', nombre: 'PLANTA YAL', nivel: HierarchyLevel.AREA, padre: 'AQ-IN-CHO' },
 
   // ==========================================
@@ -217,37 +217,37 @@ const JERARQUIA_CHONCHI: HierarchyItem[] = [
   // ==========================================
   // PLANTA CHONCHI - SUB-ÁREAS
   // ==========================================
-  { codigo: 'AQ-IN-CHO-PCBO-EXTE', nombre: 'EXTERIORES PLANTA PRINCIPAL', nivel: HierarchyLevel.SUB_AREA, padre: 'AQ-IN-CHO-PCBO' },
-  { codigo: 'AQ-IN-CHO-PCBO-FRIG', nombre: 'FRIGORIFICO', nivel: HierarchyLevel.SUB_AREA, padre: 'AQ-IN-CHO-PCBO' },
-  { codigo: 'AQ-IN-CHO-PCBO-PROC', nombre: 'PROCESO', nivel: HierarchyLevel.SUB_AREA, padre: 'AQ-IN-CHO-PCBO' },
+  { codigo: 'AQ-IN-CHO-PCHO-EXTE', nombre: 'EXTERIORES PLANTA PRINCIPAL', nivel: HierarchyLevel.SUB_AREA, padre: 'AQ-IN-CHO-PCHO' },
+  { codigo: 'AQ-IN-CHO-PCHO-FRIG', nombre: 'FRIGORIFICO', nivel: HierarchyLevel.SUB_AREA, padre: 'AQ-IN-CHO-PCHO' },
+  { codigo: 'AQ-IN-CHO-PCHO-PROC', nombre: 'PROCESO', nivel: HierarchyLevel.SUB_AREA, padre: 'AQ-IN-CHO-PCHO' },
 
   // EXTERIORES PLANTA PRINCIPAL - Sistemas
-  { codigo: 'AQ-IN-CHO-PCBO-EXTE-BMAT', nombre: 'BODEGA MATERIALES', nivel: HierarchyLevel.SISTEMA, padre: 'AQ-IN-CHO-PCBO-EXTE' },
-  { codigo: 'AQ-IN-CHO-PCBO-EXTE-CCAM', nombre: 'CARGA DE CAMIONES', nivel: HierarchyLevel.SISTEMA, padre: 'AQ-IN-CHO-PCBO-EXTE' },
-  { codigo: 'AQ-IN-CHO-PCBO-EXTE-SCAL', nombre: 'SALA CALDERA', nivel: HierarchyLevel.SISTEMA, padre: 'AQ-IN-CHO-PCBO-EXTE' },
-  { codigo: 'AQ-IN-CHO-PCBO-EXTE-SCBO', nombre: 'SUBESTACION PLANTA PRINCIPAL', nivel: HierarchyLevel.SISTEMA, padre: 'AQ-IN-CHO-PCBO-EXTE' },
-  { codigo: 'AQ-IN-CHO-PCBO-EXTE-SMAQ', nombre: 'SALA DE MAQUINAS', nivel: HierarchyLevel.SISTEMA, padre: 'AQ-IN-CHO-PCBO-EXTE' },
-  { codigo: 'AQ-IN-CHO-PCBO-EXTE-SFRE', nombre: 'SALA DE FREON', nivel: HierarchyLevel.SISTEMA, padre: 'AQ-IN-CHO-PCBO-EXTE' },
-  { codigo: 'AQ-IN-CHO-PCBO-EXTE-TMAN', nombre: 'TALLER MANTENIMIENTO', nivel: HierarchyLevel.SISTEMA, padre: 'AQ-IN-CHO-PCBO-EXTE' },
+  { codigo: 'AQ-IN-CHO-PCHO-EXTE-BMAT', nombre: 'BODEGA MATERIALES', nivel: HierarchyLevel.SISTEMA, padre: 'AQ-IN-CHO-PCHO-EXTE' },
+  { codigo: 'AQ-IN-CHO-PCHO-EXTE-CCAM', nombre: 'CARGA DE CAMIONES', nivel: HierarchyLevel.SISTEMA, padre: 'AQ-IN-CHO-PCHO-EXTE' },
+  { codigo: 'AQ-IN-CHO-PCHO-EXTE-SCAL', nombre: 'SALA CALDERA', nivel: HierarchyLevel.SISTEMA, padre: 'AQ-IN-CHO-PCHO-EXTE' },
+  { codigo: 'AQ-IN-CHO-PCHO-EXTE-SCBO', nombre: 'SUBESTACION PLANTA PRINCIPAL', nivel: HierarchyLevel.SISTEMA, padre: 'AQ-IN-CHO-PCHO-EXTE' },
+  { codigo: 'AQ-IN-CHO-PCHO-EXTE-SMAQ', nombre: 'SALA DE MAQUINAS', nivel: HierarchyLevel.SISTEMA, padre: 'AQ-IN-CHO-PCHO-EXTE' },
+  { codigo: 'AQ-IN-CHO-PCHO-EXTE-SFRE', nombre: 'SALA DE FREON', nivel: HierarchyLevel.SISTEMA, padre: 'AQ-IN-CHO-PCHO-EXTE' },
+  { codigo: 'AQ-IN-CHO-PCHO-EXTE-TMAN', nombre: 'TALLER MANTENIMIENTO', nivel: HierarchyLevel.SISTEMA, padre: 'AQ-IN-CHO-PCHO-EXTE' },
 
   // FRIGORIFICO - Sistemas
-  { codigo: 'AQ-IN-CHO-PCBO-FRIG-ANCA', nombre: 'ANTECAMARA', nivel: HierarchyLevel.SISTEMA, padre: 'AQ-IN-CHO-PCBO-FRIG' },
-  { codigo: 'AQ-IN-CHO-PCBO-FRIG-ANCC', nombre: 'ANDEN CARGA CAMIONES', nivel: HierarchyLevel.SISTEMA, padre: 'AQ-IN-CHO-PCBO-FRIG' },
-  { codigo: 'AQ-IN-CHO-PCBO-FRIG-CAMA', nombre: 'CAMARAS', nivel: HierarchyLevel.SISTEMA, padre: 'AQ-IN-CHO-PCBO-FRIG' },
-  { codigo: 'AQ-IN-CHO-PCBO-FRIG-OFIC', nombre: 'OFICINAS FRIGORIFICO', nivel: HierarchyLevel.SISTEMA, padre: 'AQ-IN-CHO-PCBO-FRIG' },
+  { codigo: 'AQ-IN-CHO-PCHO-FRIG-ANCA', nombre: 'ANTECAMARA', nivel: HierarchyLevel.SISTEMA, padre: 'AQ-IN-CHO-PCHO-FRIG' },
+  { codigo: 'AQ-IN-CHO-PCHO-FRIG-ANCC', nombre: 'ANDEN CARGA CAMIONES', nivel: HierarchyLevel.SISTEMA, padre: 'AQ-IN-CHO-PCHO-FRIG' },
+  { codigo: 'AQ-IN-CHO-PCHO-FRIG-CAMA', nombre: 'CAMARAS', nivel: HierarchyLevel.SISTEMA, padre: 'AQ-IN-CHO-PCHO-FRIG' },
+  { codigo: 'AQ-IN-CHO-PCHO-FRIG-OFIC', nombre: 'OFICINAS FRIGORIFICO', nivel: HierarchyLevel.SISTEMA, padre: 'AQ-IN-CHO-PCHO-FRIG' },
 
   // PROCESO - Sistemas
-  { codigo: 'AQ-IN-CHO-PCBO-PROC-ARMA', nombre: 'ARMADO DE CAJAS', nivel: HierarchyLevel.SISTEMA, padre: 'AQ-IN-CHO-PCBO-PROC' },
-  { codigo: 'AQ-IN-CHO-PCBO-PROC-EMPA', nombre: 'EMPARRILLADO', nivel: HierarchyLevel.SISTEMA, padre: 'AQ-IN-CHO-PCBO-PROC' },
-  { codigo: 'AQ-IN-CHO-PCBO-PROC-EMPQ', nombre: 'EMPAQUE', nivel: HierarchyLevel.SISTEMA, padre: 'AQ-IN-CHO-PCBO-PROC' },
-  { codigo: 'AQ-IN-CHO-PCBO-PROC-EVIS', nombre: 'EVISCERADO', nivel: HierarchyLevel.SISTEMA, padre: 'AQ-IN-CHO-PCBO-PROC' },
-  { codigo: 'AQ-IN-CHO-PCBO-PROC-FILE', nombre: 'FILETE', nivel: HierarchyLevel.SISTEMA, padre: 'AQ-IN-CHO-PCBO-PROC' },
-  { codigo: 'AQ-IN-CHO-PCBO-PROC-INMP', nombre: 'INGRESO MATERIA PRIMA', nivel: HierarchyLevel.SISTEMA, padre: 'AQ-IN-CHO-PCBO-PROC' },
-  { codigo: 'AQ-IN-CHO-PCBO-PROC-LAVA', nombre: 'LAVADO', nivel: HierarchyLevel.SISTEMA, padre: 'AQ-IN-CHO-PCBO-PROC' },
-  { codigo: 'AQ-IN-CHO-PCBO-PROC-OFIC', nombre: 'OFICINAS PROCESO', nivel: HierarchyLevel.SISTEMA, padre: 'AQ-IN-CHO-PCBO-PROC' },
-  { codigo: 'AQ-IN-CHO-PCBO-PROC-SACR', nombre: 'SACRIFICIO', nivel: HierarchyLevel.SISTEMA, padre: 'AQ-IN-CHO-PCBO-PROC' },
-  { codigo: 'AQ-IN-CHO-PCBO-PROC-SELL', nombre: 'SELLADO', nivel: HierarchyLevel.SISTEMA, padre: 'AQ-IN-CHO-PCBO-PROC' },
-  { codigo: 'AQ-IN-CHO-PCBO-PROC-TUNE', nombre: 'TUNELES', nivel: HierarchyLevel.SISTEMA, padre: 'AQ-IN-CHO-PCBO-PROC' },
+  { codigo: 'AQ-IN-CHO-PCHO-PROC-ARMA', nombre: 'ARMADO DE CAJAS', nivel: HierarchyLevel.SISTEMA, padre: 'AQ-IN-CHO-PCHO-PROC' },
+  { codigo: 'AQ-IN-CHO-PCHO-PROC-EMPA', nombre: 'EMPARRILLADO', nivel: HierarchyLevel.SISTEMA, padre: 'AQ-IN-CHO-PCHO-PROC' },
+  { codigo: 'AQ-IN-CHO-PCHO-PROC-EMPQ', nombre: 'EMPAQUE', nivel: HierarchyLevel.SISTEMA, padre: 'AQ-IN-CHO-PCHO-PROC' },
+  { codigo: 'AQ-IN-CHO-PCHO-PROC-EVIS', nombre: 'EVISCERADO', nivel: HierarchyLevel.SISTEMA, padre: 'AQ-IN-CHO-PCHO-PROC' },
+  { codigo: 'AQ-IN-CHO-PCHO-PROC-FILE', nombre: 'FILETE', nivel: HierarchyLevel.SISTEMA, padre: 'AQ-IN-CHO-PCHO-PROC' },
+  { codigo: 'AQ-IN-CHO-PCHO-PROC-INMP', nombre: 'INGRESO MATERIA PRIMA', nivel: HierarchyLevel.SISTEMA, padre: 'AQ-IN-CHO-PCHO-PROC' },
+  { codigo: 'AQ-IN-CHO-PCHO-PROC-LAVA', nombre: 'LAVADO', nivel: HierarchyLevel.SISTEMA, padre: 'AQ-IN-CHO-PCHO-PROC' },
+  { codigo: 'AQ-IN-CHO-PCHO-PROC-OFIC', nombre: 'OFICINAS PROCESO', nivel: HierarchyLevel.SISTEMA, padre: 'AQ-IN-CHO-PCHO-PROC' },
+  { codigo: 'AQ-IN-CHO-PCHO-PROC-SACR', nombre: 'SACRIFICIO', nivel: HierarchyLevel.SISTEMA, padre: 'AQ-IN-CHO-PCHO-PROC' },
+  { codigo: 'AQ-IN-CHO-PCHO-PROC-SELL', nombre: 'SELLADO', nivel: HierarchyLevel.SISTEMA, padre: 'AQ-IN-CHO-PCHO-PROC' },
+  { codigo: 'AQ-IN-CHO-PCHO-PROC-TUNE', nombre: 'TUNELES', nivel: HierarchyLevel.SISTEMA, padre: 'AQ-IN-CHO-PCHO-PROC' },
 
   // ==========================================
   // PLANTA YAL - SUB-ÁREAS

@@ -11,7 +11,7 @@
     "areas_nivel_2": [
       {"codigo": "AQ-IN-CHO-ACOP", "denominacion": "ACOPIO", "padre": "AQ-IN-CHO"},
       {"codigo": "AQ-IN-CHO-EXTE", "denominacion": "PATIO Y SERVICIOS EXTERIORES", "padre": "AQ-IN-CHO"},
-      {"codigo": "AQ-IN-CHO-PCBO", "denominacion": "PLANTA CHONCHI", "padre": "AQ-IN-CHO"},
+      {"codigo": "AQ-IN-CHO-PCHO", "denominacion": "PLANTA CHONCHI", "padre": "AQ-IN-CHO"},
       {"codigo": "AQ-IN-CHO-PYAL", "denominacion": "PLANTA YAL", "padre": "AQ-IN-CHO"}
     ]
   },

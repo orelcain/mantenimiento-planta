@@ -90,132 +90,132 @@
       "imagen": 4
     },
     {
-      "codigo": "AQ-IN-CHO-PCBO",
+      "codigo": "AQ-IN-CHO-PCHO",
       "denominacion": "PLANTA CHONCHI",
       "imagen": 4
     },
     {
-      "codigo": "AQ-IN-CHO-PCBO-EXTE",
+      "codigo": "AQ-IN-CHO-PCHO-EXTE",
       "denominacion": "EXTERIORES PLANTA PRINCIPAL",
       "imagen": 4
     },
     {
-      "codigo": "AQ-IN-CHO-PCBO-EXTE-BMAT",
+      "codigo": "AQ-IN-CHO-PCHO-EXTE-BMAT",
       "denominacion": "BODEGA DE MATERIALES",
       "imagen": 4
     },
     {
-      "codigo": "AQ-IN-CHO-PCBO-EXTE-CCAM",
+      "codigo": "AQ-IN-CHO-PCHO-EXTE-CCAM",
       "denominacion": "CARGA DE CAMIONES",
       "imagen": 4
     },
     {
-      "codigo": "AQ-IN-CHO-PCBO-EXTE-SCAL",
+      "codigo": "AQ-IN-CHO-PCHO-EXTE-SCAL",
       "denominacion": "SALA DE CALDERA",
       "imagen": 4
     },
     {
-      "codigo": "AQ-IN-CHO-PCBO-EXTE-SCBO",
+      "codigo": "AQ-IN-CHO-PCHO-EXTE-SCBO",
       "denominacion": "SUBESTACION PLANTA PRINCIPAL",
       "imagen": 4
     },
     {
-      "codigo": "AQ-IN-CHO-PCBO-EXTE-SMAQ",
+      "codigo": "AQ-IN-CHO-PCHO-EXTE-SMAQ",
       "denominacion": "SALA DE MAQUINAS",
       "imagen": 4
     },
     {
-      "codigo": "AQ-IN-CHO-PCBO-EXTE-SFRE",
+      "codigo": "AQ-IN-CHO-PCHO-EXTE-SFRE",
       "denominacion": "SALA DE FREON",
       "imagen": 5
     },
     {
-      "codigo": "AQ-IN-CHO-PCBO-EXTE-TMAN",
+      "codigo": "AQ-IN-CHO-PCHO-EXTE-TMAN",
       "denominacion": "TALLER DE MANTENIMIENTO",
       "imagen": 5
     },
     {
-      "codigo": "AQ-IN-CHO-PCBO-FRIG",
+      "codigo": "AQ-IN-CHO-PCHO-FRIG",
       "denominacion": "FRIGORIFICO",
       "imagen": 5
     },
     {
-      "codigo": "AQ-IN-CHO-PCBO-FRIG-ANCA",
+      "codigo": "AQ-IN-CHO-PCHO-FRIG-ANCA",
       "denominacion": "ANTECAMARA",
       "imagen": 6
     },
     {
-      "codigo": "AQ-IN-CHO-PCBO-FRIG-ANCC",
+      "codigo": "AQ-IN-CHO-PCHO-FRIG-ANCC",
       "denominacion": "ANDEN CARGA CAMIONES- SALA EMBARQUE",
       "imagen": 6
     },
     {
-      "codigo": "AQ-IN-CHO-PCBO-FRIG-CAMA",
+      "codigo": "AQ-IN-CHO-PCHO-FRIG-CAMA",
       "denominacion": "CAMARAS",
       "imagen": 6
     },
     {
-      "codigo": "AQ-IN-CHO-PCBO-FRIG-OFIC",
+      "codigo": "AQ-IN-CHO-PCHO-FRIG-OFIC",
       "denominacion": "OFICINAS",
       "imagen": 7
     },
     {
-      "codigo": "AQ-IN-CHO-PCBO-PROC",
+      "codigo": "AQ-IN-CHO-PCHO-PROC",
       "denominacion": "PROCESO",
       "imagen": 7
     },
     {
-      "codigo": "AQ-IN-CHO-PCBO-PROC-ARMA",
+      "codigo": "AQ-IN-CHO-PCHO-PROC-ARMA",
       "denominacion": "ARMADO DE CAJAS",
       "imagen": 7
     },
     {
-      "codigo": "AQ-IN-CHO-PCBO-PROC-EMPA",
+      "codigo": "AQ-IN-CHO-PCHO-PROC-EMPA",
       "denominacion": "EMPARRILLADO",
       "imagen": 7
     },
     {
-      "codigo": "AQ-IN-CHO-PCBO-PROC-EMPQ",
+      "codigo": "AQ-IN-CHO-PCHO-PROC-EMPQ",
       "denominacion": "EMPAQUE",
       "imagen": 7
     },
     {
-      "codigo": "AQ-IN-CHO-PCBO-PROC-EVIS",
+      "codigo": "AQ-IN-CHO-PCHO-PROC-EVIS",
       "denominacion": "EVISCERADO",
       "imagen": 8
     },
     {
-      "codigo": "AQ-IN-CHO-PCBO-PROC-FILE",
+      "codigo": "AQ-IN-CHO-PCHO-PROC-FILE",
       "denominacion": "FILETE",
       "imagen": 9
     },
     {
-      "codigo": "AQ-IN-CHO-PCBO-PROC-INMP",
+      "codigo": "AQ-IN-CHO-PCHO-PROC-INMP",
       "denominacion": "INGRESO MATERIA PRIMA",
       "imagen": 9
     },
     {
-      "codigo": "AQ-IN-CHO-PCBO-PROC-LAVA",
+      "codigo": "AQ-IN-CHO-PCHO-PROC-LAVA",
       "denominacion": "LAVADO BANDEJAS Y CARROS",
       "imagen": 9
     },
     {
-      "codigo": "AQ-IN-CHO-PCBO-PROC-OFIC",
+      "codigo": "AQ-IN-CHO-PCHO-PROC-OFIC",
       "denominacion": "OFICINAS",
       "imagen": 9
     },
     {
-      "codigo": "AQ-IN-CHO-PCBO-PROC-SACR",
+      "codigo": "AQ-IN-CHO-PCHO-PROC-SACR",
       "denominacion": "SACRIFICIO",
       "imagen": 9
     },
     {
-      "codigo": "AQ-IN-CHO-PCBO-PROC-SELL",
+      "codigo": "AQ-IN-CHO-PCHO-PROC-SELL",
       "denominacion": "SELLADO",
       "imagen": 10
     },
     {
-      "codigo": "AQ-IN-CHO-PCBO-PROC-TUNE",
+      "codigo": "AQ-IN-CHO-PCHO-PROC-TUNE",
       "denominacion": "TUNELES",
       "imagen": 10
     },

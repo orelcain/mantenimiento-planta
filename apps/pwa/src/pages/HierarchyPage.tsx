@@ -5,7 +5,7 @@
  * de la estructura jerárquica de 8 niveles.
  */
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import {
   Plus,
   Edit2,
@@ -22,6 +22,7 @@ import {
   ArrowDown,
   Search,
 } from 'lucide-react'
+import { debounce } from 'lodash'
 import {
   Card,
   CardContent,
@@ -69,6 +70,7 @@ export function HierarchyPage() {
 
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set())
   const [searchQuery, setSearchQuery] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [showCreateDialog, setShowCreateDialog] = useState(false)
   const [showEditDialog, setShowEditDialog] = useState(false)
   const [selectedNode, setSelectedNode] = useState<HierarchyNode | null>(null)
@@ -85,6 +87,20 @@ export function HierarchyPage() {
 
   const [isSaving, setIsSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+
+  // Debounced search (300ms delay)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const debouncedSetSearch = useCallback(
+    debounce((value: string) => {
+      setDebouncedSearch(value)
+    }, 300),
+    []
+  )
+
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value)
+    debouncedSetSearch(value)
+  }
 
   // Verificar permisos de admin
   if (user?.rol !== 'admin') {
@@ -297,19 +313,63 @@ export function HierarchyPage() {
   }
 
   // Aplicar filtro y auto-expandir
-  const { filtered: filteredTree, toExpand } = useMemo(() => {
-    if (!searchQuery.trim()) {
-      return { filtered: tree, toExpand: new Set<string>() }
+  const { filtered: filteredTree, toExpand, matchCount } = useMemo(() => {
+    if (!debouncedSearch.trim()) {
+      return { filtered: tree, toExpand: new Set<string>(), matchCount: 0 }
     }
-    return filterAndExpandTree(tree, searchQuery)
-  }, [tree, searchQuery])
+    const result = filterAndExpandTree(tree, debouncedSearch)
+    return { ...result, matchCount: countMatches(result.filtered) }
+  }, [tree, debouncedSearch])
+
+  // Contar nodos que coinciden
+  const countMatches = (nodes: HierarchyNodeWithChildren[]): number => {
+    let count = 0
+    const traverse = (nodes: HierarchyNodeWithChildren[]) => {
+      nodes.forEach(node => {
+        count++
+        if (node.children && node.children.length > 0) {
+          traverse(node.children)
+        }
+      })
+    }
+    traverse(nodes)
+    return count
+  }
 
   // Auto-expandir nodos cuando hay búsqueda
   useMemo(() => {
-    if (searchQuery.trim() && toExpand.size > 0) {
+    if (debouncedSearch && toExpand.size > 0) {
       setExpandedNodes(toExpand)
+    } else if (!debouncedSearch) {
+      // Restaurar al estado normal cuando se borra la búsqueda
+      setExpandedNodes(new Set())
     }
-  }, [searchQuery, toExpand])
+  }, [debouncedSearch, toExpand])
+
+  // Función para resaltar texto coincidente
+  const highlightText = (text: string, query: string) => {
+    if (!query.trim()) return text
+    
+    const lowerText = text.toLowerCase()
+    const lowerQuery = query.toLowerCase()
+    const index = lowerText.indexOf(lowerQuery)
+    
+    if (index === -1) return text
+    
+    const before = text.substring(0, index)
+    const match = text.substring(index, index + query.length)
+    const after = text.substring(index + query.length)
+    
+    return (
+      <>
+        {before}
+        <span className="bg-yellow-200 text-yellow-900 font-semibold px-0.5 rounded">
+          {match}
+        </span>
+        {after}
+      </>
+    )
+  }
 
   const renderTree = (nodes: HierarchyNodeWithChildren[], depth = 0) => {
     return nodes.map(node => {
@@ -354,13 +414,15 @@ export function HierarchyPage() {
             {/* Info */}
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <span className="font-medium truncate">{node.nombre}</span>
+                <span className="font-medium truncate">
+                  {highlightText(node.nombre, debouncedSearch)}
+                </span>
                 <Badge variant="outline" className="text-xs">
                   {HIERARCHY_LEVEL_NAMES[node.nivel]}
                 </Badge>
               </div>
               <div className="text-xs text-muted-foreground">
-                {node.codigo}
+                {highlightText(node.codigo, debouncedSearch)}
               </div>
             </div>
 
@@ -448,14 +510,38 @@ export function HierarchyPage() {
       {/* Buscador */}
       <Card>
         <CardContent className="pt-6">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar por nombre o código..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
+          <div className="space-y-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por nombre o código..."
+                value={searchQuery}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                className="pl-10 pr-10"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => {
+                    setSearchQuery('')
+                    setDebouncedSearch('')
+                  }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  title="Limpiar búsqueda"
+                >
+                  <XCircle className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+            {debouncedSearch && matchCount > 0 && (
+              <p className="text-xs text-muted-foreground">
+                {matchCount} {matchCount === 1 ? 'resultado encontrado' : 'resultados encontrados'}
+              </p>
+            )}
+            {debouncedSearch && matchCount === 0 && (
+              <p className="text-xs text-orange-600">
+                No se encontraron resultados para "{debouncedSearch}"
+              </p>
+            )}
           </div>
         </CardContent>
       </Card>

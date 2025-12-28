@@ -29,27 +29,27 @@
       ]
     },
     {
-      "area": "AQ-IN-CHO-PCBO",
+      "area": "AQ-IN-CHO-PCHO",
       "denominacion": "PLANTA CHONCHI",
       "sub_areas": ["EXTE", "FRIG", "PROC"]
     },
     {
-      "area": "AQ-IN-CHO-PCBO-EXTE",
+      "area": "AQ-IN-CHO-PCHO-EXTE",
       "denominacion": "EXTERIORES PLANTA PRINCIPAL",
       "sub_areas": ["BMAT", "CCAM", "SCAL", "SCBO", "SMAQ", "SFRE", "TMAN"]
     },
     {
-      "area": "AQ-IN-CHO-PCBO-EXTE-BMAT",
+      "area": "AQ-IN-CHO-PCHO-EXTE-BMAT",
       "denominacion": "BODEGA DE MATERIALES",
       "equipos": [
-        {"codigo": "720004537", "denominacion": "AIRE ACONDICIONADO BODEGA", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-EXTE-BMAT"}
+        {"codigo": "720004537", "denominacion": "AIRE ACONDICIONADO BODEGA", "nivel": 4, "padre": "AQ-IN-CHO-PCHO-EXTE-BMAT"}
       ]
     },
     {
-      "area": "AQ-IN-CHO-PCBO-EXTE-CCAM",
+      "area": "AQ-IN-CHO-PCHO-EXTE-CCAM",
       "denominacion": "CARGA DE CAMIONES",
       "equipos": [
-        {"codigo": "720004393", "denominacion": "CONJUNTO BOMBA/MOTOR DESCARGA CAMIONES", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-EXTE-CCAM"},
+        {"codigo": "720004393", "denominacion": "CONJUNTO BOMBA/MOTOR DESCARGA CAMIONES", "nivel": 4, "padre": "AQ-IN-CHO-PCHO-EXTE-CCAM"},
         {"codigo": "720004394", "denominacion": "BOMBA VACIO DESCARGA CAMIONES", "nivel": 5, "padre": "720004393"},
         {"codigo": "720004395", "denominacion": "MOTOR BOMBA VACIO DESCARGA CAMIONES", "nivel": 6, "padre": "720004394"},
         {"codigo": "720004396", "denominacion": "BOMBA AUTOCEBANTE DESCARGA CAMIONES", "nivel": 5, "padre": "720004393"},
@@ -61,24 +61,24 @@
       ]
     },
     {
-      "area": "AQ-IN-CHO-PCBO-EXTE-SCAL",
+      "area": "AQ-IN-CHO-PCHO-EXTE-SCAL",
       "denominacion": "SALA DE CALDERA",
       "equipos": []
     },
     {
-      "area": "AQ-IN-CHO-PCBO-EXTE-SCBO",
+      "area": "AQ-IN-CHO-PCHO-EXTE-SCBO",
       "denominacion": "SUBESTACION PLANTA PRINCIPAL",
       "equipos": [
-        {"codigo": "720004586", "denominacion": "TRANSFORMADOR 1 SUB ESTACION PRINCIPAL", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-EXTE-SCBO"},
-        {"codigo": "720004587", "denominacion": "TRANSFORMADOR 2 SUB ESTACION PRINCIPAL", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-EXTE-SCBO"},
-        {"codigo": "720011853", "denominacion": "SALA SERVIDORES PLANTA PRINCIPAL", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-EXTE-SCBO"}
+        {"codigo": "720004586", "denominacion": "TRANSFORMADOR 1 SUB ESTACION PRINCIPAL", "nivel": 4, "padre": "AQ-IN-CHO-PCHO-EXTE-SCBO"},
+        {"codigo": "720004587", "denominacion": "TRANSFORMADOR 2 SUB ESTACION PRINCIPAL", "nivel": 4, "padre": "AQ-IN-CHO-PCHO-EXTE-SCBO"},
+        {"codigo": "720011853", "denominacion": "SALA SERVIDORES PLANTA PRINCIPAL", "nivel": 4, "padre": "AQ-IN-CHO-PCHO-EXTE-SCBO"}
       ]
     },
     {
-      "area": "AQ-IN-CHO-PCBO-EXTE-SMAQ",
+      "area": "AQ-IN-CHO-PCHO-EXTE-SMAQ",
       "denominacion": "SALA DE MAQUINAS",
       "equipos": [
-        {"codigo": "720004277", "denominacion": "EQUIPO ENFRIAMIENTO RSW", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-EXTE-SMAQ"},
+        {"codigo": "720004277", "denominacion": "EQUIPO ENFRIAMIENTO RSW", "nivel": 4, "padre": "AQ-IN-CHO-PCHO-EXTE-SMAQ"},
         {"codigo": "720004278", "denominacion": "COMPRESOR TORNILLO NH3", "nivel": 5, "padre": "720004277"},
         {"codigo": "720004279", "denominacion": "TABLERO CONTROL Y FUERZA RSW", "nivel": 5, "padre": "720004277"},
         {"codigo": "720004280", "denominacion": "MOTOR ELECTRICO COMPRESOR RSW", "nivel": 5, "padre": "720004277"},

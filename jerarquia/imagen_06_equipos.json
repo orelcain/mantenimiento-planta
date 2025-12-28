@@ -2,20 +2,20 @@
   "imagen": 6,
   "areas_y_equipos": [
     {
-      "area": "AQ-IN-CHO-PCBO-FRIG-ANCA",
+      "area": "AQ-IN-CHO-PCHO-FRIG-ANCA",
       "denominacion": "ANTECAMARA",
       "equipos": [
-        {"codigo": "720004526", "denominacion": "EXTRACTOR LAVADO CARROS 1", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-FRIG-ANCA"},
-        {"codigo": "720004527", "denominacion": "EXTRACTOR LAVADO CARROS 2", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-FRIG-ANCA"},
-        {"codigo": "720004534", "denominacion": "SOPLADORES VIGUETAS CAMARAS 1", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-FRIG-ANCA"},
-        {"codigo": "720004535", "denominacion": "SOPLADORES VIGUETAS CAMARAS 2", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-FRIG-ANCA"}
+        {"codigo": "720004526", "denominacion": "EXTRACTOR LAVADO CARROS 1", "nivel": 4, "padre": "AQ-IN-CHO-PCHO-FRIG-ANCA"},
+        {"codigo": "720004527", "denominacion": "EXTRACTOR LAVADO CARROS 2", "nivel": 4, "padre": "AQ-IN-CHO-PCHO-FRIG-ANCA"},
+        {"codigo": "720004534", "denominacion": "SOPLADORES VIGUETAS CAMARAS 1", "nivel": 4, "padre": "AQ-IN-CHO-PCHO-FRIG-ANCA"},
+        {"codigo": "720004535", "denominacion": "SOPLADORES VIGUETAS CAMARAS 2", "nivel": 4, "padre": "AQ-IN-CHO-PCHO-FRIG-ANCA"}
       ]
     },
     {
-      "area": "AQ-IN-CHO-PCBO-FRIG-ANCC",
+      "area": "AQ-IN-CHO-PCHO-FRIG-ANCC",
       "denominacion": "ANDEN CARGA CAMIONES- SALA EMBARQUE",
       "equipos": [
-        {"codigo": "720004820", "denominacion": "CLIMATIZACION EMBARQUE", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-FRIG-ANCC"},
+        {"codigo": "720004820", "denominacion": "CLIMATIZACION EMBARQUE", "nivel": 4, "padre": "AQ-IN-CHO-PCHO-FRIG-ANCC"},
         {"codigo": "720004821", "denominacion": "COMPRESOR EMBARQUE", "nivel": 5, "padre": "720004820"},
         {"codigo": "720004822", "denominacion": "MOTOR COMPRESOR EMBARQUE", "nivel": 6, "padre": "720004821"},
         {"codigo": "720004823", "denominacion": "CONDENSADOR COMPRESOR EMBARQUE", "nivel": 5, "padre": "720004820"},
@@ -32,15 +32,15 @@
       ]
     },
     {
-      "area": "AQ-IN-CHO-PCBO-FRIG-CAMA",
+      "area": "AQ-IN-CHO-PCHO-FRIG-CAMA",
       "denominacion": "CAMARAS",
       "equipos": [
-        {"codigo": "720004514", "denominacion": "CORTINA AIRE ENTRADA PALETIZADO VERTICAL", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-FRIG-CAMA"},
-        {"codigo": "720004515", "denominacion": "CORTINA AIRE ENTRADA PALETIZADO", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-FRIG-CAMA"},
-        {"codigo": "720004516", "denominacion": "CORTINA AIRE CAMARA 1", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-FRIG-CAMA"},
-        {"codigo": "720004517", "denominacion": "CORTINA AIRE CAMARA 2", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-FRIG-CAMA"},
-        {"codigo": "720004518", "denominacion": "CORTINA AIRE SALA MUESTREO", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-FRIG-CAMA"},
-        {"codigo": "720004674", "denominacion": "CAMARA NUMERO 1", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-FRIG-CAMA"},
+        {"codigo": "720004514", "denominacion": "CORTINA AIRE ENTRADA PALETIZADO VERTICAL", "nivel": 4, "padre": "AQ-IN-CHO-PCHO-FRIG-CAMA"},
+        {"codigo": "720004515", "denominacion": "CORTINA AIRE ENTRADA PALETIZADO", "nivel": 4, "padre": "AQ-IN-CHO-PCHO-FRIG-CAMA"},
+        {"codigo": "720004516", "denominacion": "CORTINA AIRE CAMARA 1", "nivel": 4, "padre": "AQ-IN-CHO-PCHO-FRIG-CAMA"},
+        {"codigo": "720004517", "denominacion": "CORTINA AIRE CAMARA 2", "nivel": 4, "padre": "AQ-IN-CHO-PCHO-FRIG-CAMA"},
+        {"codigo": "720004518", "denominacion": "CORTINA AIRE SALA MUESTREO", "nivel": 4, "padre": "AQ-IN-CHO-PCHO-FRIG-CAMA"},
+        {"codigo": "720004674", "denominacion": "CAMARA NUMERO 1", "nivel": 4, "padre": "AQ-IN-CHO-PCHO-FRIG-CAMA"},
         {"codigo": "720004706", "denominacion": "EVAPORADOR CAMARA 1 N1", "nivel": 5, "padre": "720004674"},
         {"codigo": "720004707", "denominacion": "MOTOR VENTILADOR EVAPORADOR CAMARA 1 N1", "nivel": 6, "padre": "720004706"},
         {"codigo": "720004708", "denominacion": "MOTOR VENTILADOR EVAPORADOR CAMARA 1 N2", "nivel": 6, "padre": "720004706"},
@@ -56,7 +56,7 @@
         {"codigo": "720004718", "denominacion": "MOTOR VENTILADOR EVAPORADOR CAMARA 1 N10", "nivel": 6, "padre": "720004716"},
         {"codigo": "720004719", "denominacion": "MOTOR VENTILADOR EVAPORADOR CAMARA 1 N11", "nivel": 6, "padre": "720004716"},
         {"codigo": "720004720", "denominacion": "MOTOR VENTILADOR EVAPORADOR CAMARA 1 N12", "nivel": 6, "padre": "720004716"},
-        {"codigo": "720004721", "denominacion": "CAMARA NUMERO 2", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-FRIG-CAMA"},
+        {"codigo": "720004721", "denominacion": "CAMARA NUMERO 2", "nivel": 4, "padre": "AQ-IN-CHO-PCHO-FRIG-CAMA"},
         {"codigo": "720004731", "denominacion": "EVAPORADOR CAMARA N2 N1", "nivel": 5, "padre": "720004721"}
       ]
     }
