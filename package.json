@@ -16,5 +16,8 @@
   "packageManager": "pnpm@9.15.1",
   "engines": {
     "node": ">=20"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.6.0"
   }
 }
