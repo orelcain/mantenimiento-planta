@@ -312,16 +312,7 @@ export function HierarchyPage() {
     return { filtered, toExpand }
   }
 
-  // Aplicar filtro y auto-expandir
-  const { filtered: filteredTree, toExpand, matchCount } = useMemo(() => {
-    if (!debouncedSearch.trim()) {
-      return { filtered: tree, toExpand: new Set<string>(), matchCount: 0 }
-    }
-    const result = filterAndExpandTree(tree, debouncedSearch)
-    return { ...result, matchCount: countMatches(result.filtered) }
-  }, [tree, debouncedSearch])
-
-  // Contar nodos que coinciden
+  // Contar nodos que coinciden (definido ANTES de useMemo)
   const countMatches = (nodes: HierarchyNodeWithChildren[]): number => {
     let count = 0
     const traverse = (nodes: HierarchyNodeWithChildren[]) => {
@@ -335,6 +326,15 @@ export function HierarchyPage() {
     traverse(nodes)
     return count
   }
+
+  // Aplicar filtro y auto-expandir
+  const { filtered: filteredTree, toExpand, matchCount } = useMemo(() => {
+    if (!debouncedSearch.trim()) {
+      return { filtered: tree, toExpand: new Set<string>(), matchCount: 0 }
+    }
+    const result = filterAndExpandTree(tree, debouncedSearch)
+    return { ...result, matchCount: countMatches(result.filtered) }
+  }, [tree, debouncedSearch])
 
   // Auto-expandir nodos cuando hay búsqueda
   useMemo(() => {
@@ -549,10 +549,34 @@ export function HierarchyPage() {
       {/* Tree */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <SettingsIcon className="h-5 w-5" />
-            Estructura Jerárquica
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <SettingsIcon className="h-5 w-5" />
+              Estructura Jerárquica
+            </CardTitle>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={expandAll}
+                className="gap-2"
+                title="Expandir todos los nodos"
+              >
+                <ChevronDown className="h-4 w-4" />
+                Expandir Todo
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={collapseAll}
+                className="gap-2"
+                title="Contraer todos los nodos"
+              >
+                <ChevronRight className="h-4 w-4" />
+                Contraer Todo
+              </Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {loading ? (

@@ -13,6 +13,7 @@ import {
   Key,
   Database,
   RefreshCw,
+  Wrench,
 } from 'lucide-react'
 import {
   Card,
@@ -38,6 +39,7 @@ import {
 } from '@/components/ui'
 import { useAuthStore } from '@/store'
 import { createInviteCode } from '@/services/auth'
+import { fixPCBOtoPCHO } from '@/scripts/fixPCBOtoPCHO'
 import { 
   collection, 
   getDocs, 
@@ -739,6 +741,101 @@ function SystemSettings() {
           )}
         </CardContent>
       </Card>
+
+      {/* Card de corrección PCBO → PCHO */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Wrench className="h-5 w-5" />
+            Corrección de Datos: PCBO → PCHO
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Si la jerarquía contiene códigos con "PCBO" (error de tipeo), usa este botón para corregirlos automáticamente a "PCHO" (Planta Chonchi).
+          </p>
+          
+          <FixPCBOButton />
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+// Componente para el botón de corrección PCBO
+function FixPCBOButton() {
+  const [isFixing, setIsFixing] = useState(false)
+  const [result, setResult] = useState<{ success: boolean; updated: number; error?: string } | null>(null)
+
+  const handleFix = async () => {
+    if (!confirm('¿Deseas corregir todos los códigos PCBO a PCHO en Firestore?\n\nEsto actualizará los códigos y padres de todos los nodos afectados.')) {
+      return
+    }
+
+    setIsFixing(true)
+    setResult(null)
+
+    try {
+      const fixResult = await fixPCBOtoPCHO()
+      setResult(fixResult)
+      
+      if (fixResult.success && fixResult.updated > 0) {
+        // Recargar página después de 2 segundos
+        setTimeout(() => {
+          window.location.reload()
+        }, 2000)
+      }
+    } catch (error) {
+      setResult({
+        success: false,
+        updated: 0,
+        error: error instanceof Error ? error.message : 'Error desconocido'
+      })
+    } finally {
+      setIsFixing(false)
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <Button 
+        onClick={handleFix} 
+        disabled={isFixing}
+        variant="default"
+        className="gap-2"
+      >
+        {isFixing ? (
+          <>
+            <Spinner size="sm" />
+            <span>Corrigiendo...</span>
+          </>
+        ) : (
+          <>
+            <Wrench className="h-4 w-4" />
+            Corregir PCBO → PCHO
+          </>
+        )}
+      </Button>
+
+      {result && (
+        <div className={`p-3 rounded-lg ${
+          result.success 
+            ? 'bg-green-500/10 text-green-700 dark:text-green-400' 
+            : 'bg-red-500/10 text-red-700 dark:text-red-400'
+        }`}>
+          {result.success ? (
+            <div>
+              <CheckCircle className="h-4 w-4 inline mr-2" />
+              <strong>Éxito:</strong> {result.updated} {result.updated === 1 ? 'nodo actualizado' : 'nodos actualizados'}
+              {result.updated > 0 && ' (recargando página...)'}
+            </div>
+          ) : (
+            <div>
+              <strong>Error:</strong> {result.error}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
