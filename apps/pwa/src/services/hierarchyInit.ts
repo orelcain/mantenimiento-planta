@@ -1,6 +1,6 @@
 /**
  * Script de inicialización del sistema jerárquico
- * Crea la estructura base de Aquachile Antarfood Chonchi
+ * SOLO crea la empresa raíz - El usuario debe crear su propia estructura
  */
 
 import { doc, setDoc, Timestamp } from 'firebase/firestore'
@@ -12,7 +12,7 @@ export async function initializeHierarchySystem(userId: string): Promise<void> {
   try {
     console.log('[hierarchyInit] 🚀 Iniciando sistema jerárquico para usuario:', userId)
 
-    // 1. Crear empresa (Nivel 1)
+    // SOLO crear empresa (Nivel 1) - El usuario debe crear el resto manualmente
     const empresaId = 'aquachile-chonchi'
     const empresa: Omit<HierarchyNode, 'id'> = {
       nombre: DEFAULT_COMPANY_NODE.nombre,
@@ -32,145 +32,9 @@ export async function initializeHierarchySystem(userId: string): Promise<void> {
     console.log('[hierarchyInit] 📝 Creando empresa root:', empresaId)
     await setDoc(doc(db, 'hierarchy', empresaId), empresa)
     console.log('[hierarchyInit] ✅ Empresa creada:', empresaId)
+    console.log('[hierarchyInit] ℹ️ El usuario debe crear Áreas, Sub-áreas y Sistemas manualmente')
 
-    // 2. Crear áreas principales (Nivel 2)
-    const areas = [
-      {
-        id: 'area-produccion',
-        nombre: 'Producción',
-        codigo: 'PROD-001',
-        descripcion: 'Área de procesamiento y producción principal',
-      },
-      {
-        id: 'area-almacenamiento',
-        nombre: 'Almacenamiento y Logística',
-        codigo: 'ALM-001',
-        descripcion: 'Gestión de inventario y despacho',
-      },
-      {
-        id: 'area-mantenimiento',
-        nombre: 'Mantenimiento',
-        codigo: 'MAN-001',
-        descripcion: 'Talleres y gestión de equipos',
-      },
-      {
-        id: 'area-calidad',
-        nombre: 'Control de Calidad',
-        codigo: 'CAL-001',
-        descripcion: 'Laboratorios y aseguramiento de calidad',
-      },
-    ]
-
-    for (let i = 0; i < areas.length; i++) {
-      const area = areas[i]
-      if (!area) continue
-      const areaNode: Omit<HierarchyNode, 'id'> = {
-        nombre: area.nombre,
-        codigo: area.codigo,
-        nivel: HierarchyLevel.AREA,
-        parentId: empresaId,
-        path: [empresaId],
-        orden: i + 1,
-        activo: true,
-        descripcion: area.descripcion,
-        creadoPor: userId,
-        creadoEn: Timestamp.now(),
-        actualizadoEn: Timestamp.now(),
-      }
-
-      console.log(`[hierarchyInit] 📝 Creando área ${i + 1}/${areas.length}:`, area.id)
-      await setDoc(doc(db, 'hierarchy', area.id), areaNode)
-      console.log(`[hierarchyInit] ✅ Área creada:`, area.id)
-    }
-
-    // 3. Crear sub-áreas de ejemplo en Producción (Nivel 3)
-    const subAreas = [
-      {
-        id: 'subarea-prod-proceso',
-        nombre: 'Proceso',
-        codigo: 'PROD-001-PRO',
-        parentId: 'area-produccion',
-        descripcion: 'Línea de procesamiento principal',
-      },
-      {
-        id: 'subarea-prod-empaque',
-        nombre: 'Empaque',
-        codigo: 'PROD-001-EMP',
-        parentId: 'area-produccion',
-        descripcion: 'Zona de embalaje y etiquetado',
-      },
-      {
-        id: 'subarea-prod-congelacion',
-        nombre: 'Congelación',
-        codigo: 'PROD-001-CON',
-        parentId: 'area-produccion',
-        descripcion: 'Cámaras de congelación rápida',
-      },
-    ]
-
-    for (let i = 0; i < subAreas.length; i++) {
-      const subArea = subAreas[i]
-      if (!subArea) continue
-      const subAreaNode: Omit<HierarchyNode, 'id'> = {
-        nombre: subArea.nombre,
-        codigo: subArea.codigo,
-        nivel: HierarchyLevel.SUB_AREA,
-        parentId: subArea.parentId,
-        path: [empresaId, subArea.parentId],
-        orden: i + 1,
-        activo: true,
-        descripcion: subArea.descripcion,
-        creadoPor: userId,
-        creadoEn: Timestamp.now(),
-        actualizadoEn: Timestamp.now(),
-      }
-
-      console.log(`[hierarchyInit] 📝 Creando sub-área ${i + 1}/${subAreas.length}:`, subArea.id)
-      await setDoc(doc(db, 'hierarchy', subArea.id), subAreaNode)
-      console.log(`[hierarchyInit] ✅ Sub-área creada:`, subArea.id)
-    }
-
-    console.log('[hierarchyInit] 🎉 Sistema inicializado completamente con', 1 + areas.length + subAreas.length, 'nodos')
-    logger.info('Hierarchy system initialized successfully')
-    const sistemas = [
-      {
-        id: 'sistema-refrigeracion',
-        nombre: 'Sistema de Refrigeración',
-        codigo: 'PROD-001-CON-SRF',
-        parentId: 'subarea-prod-congelacion',
-        descripcion: 'Compresores y circuito de frío',
-      },
-      {
-        id: 'sistema-electrico',
-        nombre: 'Sistema Eléctrico',
-        codigo: 'PROD-001-CON-ELE',
-        parentId: 'subarea-prod-congelacion',
-        descripcion: 'Panel eléctrico y distribución',
-      },
-    ]
-
-    for (let i = 0; i < sistemas.length; i++) {
-      const sistema = sistemas[i]
-      if (!sistema) continue
-      const sistemaNode: Omit<HierarchyNode, 'id'> = {
-        nombre: sistema.nombre,
-        codigo: sistema.codigo,
-        nivel: HierarchyLevel.SISTEMA,
-        parentId: sistema.parentId,
-        path: [empresaId, 'area-produccion', sistema.parentId],
-        orden: i + 1,
-        activo: true,
-        descripcion: sistema.descripcion,
-        creadoPor: userId,
-        creadoEn: Timestamp.now(),
-        actualizadoEn: Timestamp.now(),
-      }
-
-      await setDoc(doc(db, 'hierarchy', sistema.id), sistemaNode)
-      logger.info('Sistema created', { sistemaId: sistema.id })
-    }
-
-    logger.info('Hierarchy system initialization completed successfully')
+    logger.info('Hierarchy system initialized with root company only')
   } catch (error) {
     console.error('[hierarchyInit] ❌ Error fatal durante inicialización:', error)
     logger.error('Failed to initialize hierarchy system', error instanceof Error ? error : new Error(String(error)))
