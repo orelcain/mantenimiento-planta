@@ -288,8 +288,17 @@ export function HierarchyPage() {
 
   const handleReorder = async (nodeId: string, direction: 'up' | 'down') => {
     try {
+      // Guardar el estado de expansión actual
+      const currentExpandedState = new Set(expandedNodes)
+      
       await reorderNode(nodeId, direction)
       refresh()
+      
+      // Restaurar el estado de expansión después del refresh
+      // Usar setTimeout para asegurar que el árbol se haya renderizado
+      setTimeout(() => {
+        setExpandedNodes(currentExpandedState)
+      }, 0)
     } catch (error) {
       logger.error('Error reordering node', error instanceof Error ? error : new Error(String(error)))
       alert('Error al reordenar el nodo')
