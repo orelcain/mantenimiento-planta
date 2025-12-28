@@ -1,0 +1,273 @@
+{
+  "metadata": {
+    "fecha_extraccion": "2025-12-27",
+    "fuente": "JERARQUIA UBICACION TECNICA PLANTA CHONCHI.docx",
+    "verificacion": "IMAGEN POR IMAGEN - CARACTER POR CARACTER"
+  },
+  "empresa": {
+    "codigo": "AQ-IN-CHO",
+    "denominacion": "CHONCHI"
+  },
+  "areas": [
+    {
+      "codigo": "AQ-IN-CHO-ACOP",
+      "denominacion": "ACOPIO",
+      "imagen": 1
+    },
+    {
+      "codigo": "AQ-IN-CHO-ACOP-CAAM",
+      "denominacion": "CASETA AGUA MAR",
+      "imagen": 2
+    },
+    {
+      "codigo": "AQ-IN-CHO-ACOP-JAUL",
+      "denominacion": "JAULAS",
+      "imagen": 2
+    },
+    {
+      "codigo": "AQ-IN-CHO-ACOP-OFIC",
+      "denominacion": "OFICINAS",
+      "imagen": 2
+    },
+    {
+      "codigo": "AQ-IN-CHO-ACOP-PONT",
+      "denominacion": "PONTON",
+      "imagen": 2
+    },
+    {
+      "codigo": "AQ-IN-CHO-EXTE",
+      "denominacion": "PATIO Y SERVICIOS EXTERIORES",
+      "imagen": 2
+    },
+    {
+      "codigo": "AQ-IN-CHO-EXTE-ALAG",
+      "denominacion": "ALMACENAMIENTO AGUAS",
+      "imagen": 2
+    },
+    {
+      "codigo": "AQ-IN-CHO-EXTE-CASI",
+      "denominacion": "CASINO",
+      "imagen": 2
+    },
+    {
+      "codigo": "AQ-IN-CHO-EXTE-EADM",
+      "denominacion": "EDIFICIO ADMINISTRATIVO",
+      "imagen": 2
+    },
+    {
+      "codigo": "AQ-IN-CHO-EXTE-ESTA",
+      "denominacion": "ESTACIONAMIENTO",
+      "imagen": 3
+    },
+    {
+      "codigo": "AQ-IN-CHO-EXTE-ESTR",
+      "denominacion": "ESTANQUE DE TRANSFERENCIA AM",
+      "imagen": 3
+    },
+    {
+      "codigo": "AQ-IN-CHO-EXTE-PATI",
+      "denominacion": "PATIO",
+      "imagen": 3
+    },
+    {
+      "codigo": "AQ-IN-CHO-EXTE-PORT",
+      "denominacion": "PORTERIA INGRESO PLANTA",
+      "imagen": 3
+    },
+    {
+      "codigo": "AQ-IN-CHO-EXTE-POZO",
+      "denominacion": "POZOS PROFUNDOS",
+      "imagen": 3
+    },
+    {
+      "codigo": "AQ-IN-CHO-EXTE-PRIL",
+      "denominacion": "PLANTA RILES",
+      "imagen": 3
+    },
+    {
+      "codigo": "AQ-IN-CHO-EXTE-RINC",
+      "denominacion": "RED DE INCENDIO",
+      "imagen": 4
+    },
+    {
+      "codigo": "AQ-IN-CHO-PCBO",
+      "denominacion": "PLANTA CHONCHI",
+      "imagen": 4
+    },
+    {
+      "codigo": "AQ-IN-CHO-PCBO-EXTE",
+      "denominacion": "EXTERIORES PLANTA PRINCIPAL",
+      "imagen": 4
+    },
+    {
+      "codigo": "AQ-IN-CHO-PCBO-EXTE-BMAT",
+      "denominacion": "BODEGA DE MATERIALES",
+      "imagen": 4
+    },
+    {
+      "codigo": "AQ-IN-CHO-PCBO-EXTE-CCAM",
+      "denominacion": "CARGA DE CAMIONES",
+      "imagen": 4
+    },
+    {
+      "codigo": "AQ-IN-CHO-PCBO-EXTE-SCAL",
+      "denominacion": "SALA DE CALDERA",
+      "imagen": 4
+    },
+    {
+      "codigo": "AQ-IN-CHO-PCBO-EXTE-SCBO",
+      "denominacion": "SUBESTACION PLANTA PRINCIPAL",
+      "imagen": 4
+    },
+    {
+      "codigo": "AQ-IN-CHO-PCBO-EXTE-SMAQ",
+      "denominacion": "SALA DE MAQUINAS",
+      "imagen": 4
+    },
+    {
+      "codigo": "AQ-IN-CHO-PCBO-EXTE-SFRE",
+      "denominacion": "SALA DE FREON",
+      "imagen": 5
+    },
+    {
+      "codigo": "AQ-IN-CHO-PCBO-EXTE-TMAN",
+      "denominacion": "TALLER DE MANTENIMIENTO",
+      "imagen": 5
+    },
+    {
+      "codigo": "AQ-IN-CHO-PCBO-FRIG",
+      "denominacion": "FRIGORIFICO",
+      "imagen": 5
+    },
+    {
+      "codigo": "AQ-IN-CHO-PCBO-FRIG-ANCA",
+      "denominacion": "ANTECAMARA",
+      "imagen": 6
+    },
+    {
+      "codigo": "AQ-IN-CHO-PCBO-FRIG-ANCC",
+      "denominacion": "ANDEN CARGA CAMIONES- SALA EMBARQUE",
+      "imagen": 6
+    },
+    {
+      "codigo": "AQ-IN-CHO-PCBO-FRIG-CAMA",
+      "denominacion": "CAMARAS",
+      "imagen": 6
+    },
+    {
+      "codigo": "AQ-IN-CHO-PCBO-FRIG-OFIC",
+      "denominacion": "OFICINAS",
+      "imagen": 7
+    },
+    {
+      "codigo": "AQ-IN-CHO-PCBO-PROC",
+      "denominacion": "PROCESO",
+      "imagen": 7
+    },
+    {
+      "codigo": "AQ-IN-CHO-PCBO-PROC-ARMA",
+      "denominacion": "ARMADO DE CAJAS",
+      "imagen": 7
+    },
+    {
+      "codigo": "AQ-IN-CHO-PCBO-PROC-EMPA",
+      "denominacion": "EMPARRILLADO",
+      "imagen": 7
+    },
+    {
+      "codigo": "AQ-IN-CHO-PCBO-PROC-EMPQ",
+      "denominacion": "EMPAQUE",
+      "imagen": 7
+    },
+    {
+      "codigo": "AQ-IN-CHO-PCBO-PROC-EVIS",
+      "denominacion": "EVISCERADO",
+      "imagen": 8
+    },
+    {
+      "codigo": "AQ-IN-CHO-PCBO-PROC-FILE",
+      "denominacion": "FILETE",
+      "imagen": 9
+    },
+    {
+      "codigo": "AQ-IN-CHO-PCBO-PROC-INMP",
+      "denominacion": "INGRESO MATERIA PRIMA",
+      "imagen": 9
+    },
+    {
+      "codigo": "AQ-IN-CHO-PCBO-PROC-LAVA",
+      "denominacion": "LAVADO BANDEJAS Y CARROS",
+      "imagen": 9
+    },
+    {
+      "codigo": "AQ-IN-CHO-PCBO-PROC-OFIC",
+      "denominacion": "OFICINAS",
+      "imagen": 9
+    },
+    {
+      "codigo": "AQ-IN-CHO-PCBO-PROC-SACR",
+      "denominacion": "SACRIFICIO",
+      "imagen": 9
+    },
+    {
+      "codigo": "AQ-IN-CHO-PCBO-PROC-SELL",
+      "denominacion": "SELLADO",
+      "imagen": 10
+    },
+    {
+      "codigo": "AQ-IN-CHO-PCBO-PROC-TUNE",
+      "denominacion": "TUNELES",
+      "imagen": 10
+    },
+    {
+      "codigo": "AQ-IN-CHO-PYAL",
+      "denominacion": "PLANTA YAL",
+      "imagen": 15
+    },
+    {
+      "codigo": "AQ-IN-CHO-PYAL-EXTE",
+      "denominacion": "EXTERIORES PLANTA YAL",
+      "imagen": 15
+    },
+    {
+      "codigo": "AQ-IN-CHO-PYAL-EXTE-SAMA",
+      "denominacion": "SALA DE MAQUINAS",
+      "imagen": 15
+    },
+    {
+      "codigo": "AQ-IN-CHO-PYAL-EXTE-SYAL",
+      "denominacion": "SUB ESTACION YAL",
+      "imagen": 15
+    },
+    {
+      "codigo": "AQ-IN-CHO-PYAL-PROC",
+      "denominacion": "PROCESO",
+      "imagen": 15
+    },
+    {
+      "codigo": "AQ-IN-CHO-PYAL-PROC-CCAM",
+      "denominacion": "CARGA DE CAMIONES",
+      "imagen": 15
+    },
+    {
+      "codigo": "AQ-IN-CHO-PYAL-PROC-EVIS",
+      "denominacion": "EVISCERADO",
+      "imagen": 15
+    },
+    {
+      "codigo": "AQ-IN-CHO-PYAL-PROC-INGR",
+      "denominacion": "INGRESO PLANTA YAL",
+      "imagen": 16
+    },
+    {
+      "codigo": "AQ-IN-CHO-PYAL-PROC-OFIC",
+      "denominacion": "OFICINAS",
+      "imagen": 16
+    },
+    {
+      "codigo": "AQ-IN-CHO-PYAL-PROC-SACR",
+      "denominacion": "SACRIFICIO",
+      "imagen": 17
+    }
+  ]
+}

@@ -1,0 +1,92 @@
+{
+  "imagen": 4,
+  "areas_y_equipos": [
+    {
+      "area": "AQ-IN-CHO-EXTE-PRIL (continuación)",
+      "equipos": [
+        {"codigo": "720004575", "denominacion": "BOMBA HELICOIDAL EXTRAC LODOS N1", "nivel": 5, "padre": "720004572"},
+        {"codigo": "720004576", "denominacion": "BOMBA HELICOIDAL EXTRAC LODOS N2", "nivel": 5, "padre": "720004572"},
+        {"codigo": "720004577", "denominacion": "BOMBA MEMBRANA INYECCION ANTIESPUMANTE", "nivel": 5, "padre": "720004572"},
+        {"codigo": "720004578", "denominacion": "ESTANQUE CLORACION", "nivel": 4, "padre": "AQ-IN-CHO-EXTE-PRIL"},
+        {"codigo": "720004579", "denominacion": "ESTANQUE METABISULFITO", "nivel": 4, "padre": "AQ-IN-CHO-EXTE-PRIL"},
+        {"codigo": "720004580", "denominacion": "AGITADOR ESTANQUE", "nivel": 4, "padre": "AQ-IN-CHO-EXTE-PRIL"},
+        {"codigo": "720004581", "denominacion": "MOTOREDUCTOR AGITADOR", "nivel": 5, "padre": "720004580"},
+        {"codigo": "720004582", "denominacion": "ESTANQUE DECLORACION", "nivel": 4, "padre": "AQ-IN-CHO-EXTE-PRIL"},
+        {"codigo": "720004583", "denominacion": "BOMBA AUTOCEBANTE RECIRCULACION", "nivel": 5, "padre": "720004582"},
+        {"codigo": "720004584", "denominacion": "CAUDALIMETRO SALIDA RIL AL MAR", "nivel": 5, "padre": "720004582"},
+        {"codigo": "720004585", "denominacion": "BOMBA PERISTALTICA INYEC ANTIESPUMANTE", "nivel": 4, "padre": "AQ-IN-CHO-EXTE-PRIL"},
+        {"codigo": "720012955", "denominacion": "BOMBA VACIO ANILLO LIQ TOLVA VISCERA N1", "nivel": 4, "padre": "AQ-IN-CHO-EXTE-PRIL"},
+        {"codigo": "720012956", "denominacion": "BOMBA VACIO ANILLO LIQ TOLVA VISCERA N2", "nivel": 4, "padre": "AQ-IN-CHO-EXTE-PRIL"},
+        {"codigo": "720012957", "denominacion": "BOMBA VACIO ANILLO LIQ TOLVA VISCERA N3", "nivel": 4, "padre": "AQ-IN-CHO-EXTE-PRIL"}
+      ]
+    },
+    {
+      "area": "AQ-IN-CHO-EXTE-RINC",
+      "denominacion": "RED DE INCENDIO",
+      "equipos": [
+        {"codigo": "720004483", "denominacion": "RED DE INCENDIO", "nivel": 4, "padre": "AQ-IN-CHO-EXTE-RINC"},
+        {"codigo": "720004484", "denominacion": "MOTOR ELECTRICO BOMBA RED INCENDIO", "nivel": 5, "padre": "720004483"}
+      ]
+    },
+    {
+      "area": "AQ-IN-CHO-PCBO",
+      "denominacion": "PLANTA CHONCHI",
+      "sub_areas": ["EXTE", "FRIG", "PROC"]
+    },
+    {
+      "area": "AQ-IN-CHO-PCBO-EXTE",
+      "denominacion": "EXTERIORES PLANTA PRINCIPAL",
+      "sub_areas": ["BMAT", "CCAM", "SCAL", "SCBO", "SMAQ", "SFRE", "TMAN"]
+    },
+    {
+      "area": "AQ-IN-CHO-PCBO-EXTE-BMAT",
+      "denominacion": "BODEGA DE MATERIALES",
+      "equipos": [
+        {"codigo": "720004537", "denominacion": "AIRE ACONDICIONADO BODEGA", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-EXTE-BMAT"}
+      ]
+    },
+    {
+      "area": "AQ-IN-CHO-PCBO-EXTE-CCAM",
+      "denominacion": "CARGA DE CAMIONES",
+      "equipos": [
+        {"codigo": "720004393", "denominacion": "CONJUNTO BOMBA/MOTOR DESCARGA CAMIONES", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-EXTE-CCAM"},
+        {"codigo": "720004394", "denominacion": "BOMBA VACIO DESCARGA CAMIONES", "nivel": 5, "padre": "720004393"},
+        {"codigo": "720004395", "denominacion": "MOTOR BOMBA VACIO DESCARGA CAMIONES", "nivel": 6, "padre": "720004394"},
+        {"codigo": "720004396", "denominacion": "BOMBA AUTOCEBANTE DESCARGA CAMIONES", "nivel": 5, "padre": "720004393"},
+        {"codigo": "720004397", "denominacion": "MOTOR BOMBA AUTOCEBANTE DESC CAMIONES", "nivel": 6, "padre": "720004396"},
+        {"codigo": "720004398", "denominacion": "ESTANQUE BOMBEO SISTEMA COSECHA", "nivel": 5, "padre": "720004393"},
+        {"codigo": "720004399", "denominacion": "DUCTO TRANSPORTE PECES", "nivel": 5, "padre": "720004393"},
+        {"codigo": "720004400", "denominacion": "CONJUNTO VALVULAS", "nivel": 5, "padre": "720004393"},
+        {"codigo": "720004401", "denominacion": "TABLERO CONTROL SIST DESCARGA CAMIONES", "nivel": 5, "padre": "720004393"}
+      ]
+    },
+    {
+      "area": "AQ-IN-CHO-PCBO-EXTE-SCAL",
+      "denominacion": "SALA DE CALDERA",
+      "equipos": []
+    },
+    {
+      "area": "AQ-IN-CHO-PCBO-EXTE-SCBO",
+      "denominacion": "SUBESTACION PLANTA PRINCIPAL",
+      "equipos": [
+        {"codigo": "720004586", "denominacion": "TRANSFORMADOR 1 SUB ESTACION PRINCIPAL", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-EXTE-SCBO"},
+        {"codigo": "720004587", "denominacion": "TRANSFORMADOR 2 SUB ESTACION PRINCIPAL", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-EXTE-SCBO"},
+        {"codigo": "720011853", "denominacion": "SALA SERVIDORES PLANTA PRINCIPAL", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-EXTE-SCBO"}
+      ]
+    },
+    {
+      "area": "AQ-IN-CHO-PCBO-EXTE-SMAQ",
+      "denominacion": "SALA DE MAQUINAS",
+      "equipos": [
+        {"codigo": "720004277", "denominacion": "EQUIPO ENFRIAMIENTO RSW", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-EXTE-SMAQ"},
+        {"codigo": "720004278", "denominacion": "COMPRESOR TORNILLO NH3", "nivel": 5, "padre": "720004277"},
+        {"codigo": "720004279", "denominacion": "TABLERO CONTROL Y FUERZA RSW", "nivel": 5, "padre": "720004277"},
+        {"codigo": "720004280", "denominacion": "MOTOR ELECTRICO COMPRESOR RSW", "nivel": 5, "padre": "720004277"},
+        {"codigo": "720004281", "denominacion": "BOMBA IMPULSORA NH3", "nivel": 5, "padre": "720004277"},
+        {"codigo": "720004282", "denominacion": "BOMBA CONDENSACION NH3", "nivel": 5, "padre": "720004277"},
+        {"codigo": "720004283", "denominacion": "BOMBA RECIRCULACION CHILLER", "nivel": 5, "padre": "720004277"}
+      ]
+    }
+  ],
+  "total_equipos_imagen_4": 42
+}

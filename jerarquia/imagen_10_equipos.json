@@ -1,0 +1,65 @@
+{
+  "imagen": 10,
+  "areas_y_equipos": [
+    {
+      "area": "AQ-IN-CHO-PCBO-PROC-SACR (continuación)",
+      "equipos": [
+        {"codigo": "720004507", "denominacion": "CORTINA AIRE ENTRADA SACRIFICIO", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-PROC-SACR"}
+      ]
+    },
+    {
+      "area": "AQ-IN-CHO-PCBO-PROC-SELL",
+      "denominacion": "SELLADO",
+      "equipos": [
+        {"codigo": "720012996", "denominacion": "SELLADORA CAMPANA", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-PROC-SELL"},
+        {"codigo": "720012997", "denominacion": "TERMOFORMADORA GEA", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-PROC-SELL"},
+        {"codigo": "720012998", "denominacion": "BALANZA DINAMICA MAREL", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-PROC-SELL"},
+        {"codigo": "720012999", "denominacion": "CINTA CURVA", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-PROC-SELL"}
+      ]
+    },
+    {
+      "area": "AQ-IN-CHO-PCBO-PROC-TUNE",
+      "denominacion": "TUNELES",
+      "equipos": [
+        {"codigo": "720004509", "denominacion": "CORTINA AIRE ENTRADA PRETUNEL N1", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-PROC-TUNE"},
+        {"codigo": "720004510", "denominacion": "CORTINA AIRE ENTRADA PRETUNEL N2", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-PROC-TUNE"},
+        {"codigo": "720004511", "denominacion": "CORTINA AIRE POSTUNEL N1", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-PROC-TUNE"},
+        {"codigo": "720004512", "denominacion": "CORTINA AIRE POSTUNEL N2", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-PROC-TUNE"},
+        {"codigo": "720004523", "denominacion": "EXTRACTOR PRETUNEL 1", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-PROC-TUNE"},
+        {"codigo": "720004524", "denominacion": "EXTRACTOR PRETUNEL 2", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-PROC-TUNE"},
+        {"codigo": "720004525", "denominacion": "EXTRACTOR PRETUNEL 3", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-PROC-TUNE"},
+        {"codigo": "720004532", "denominacion": "SOPLADORES VIGUETAS TUNELES 1", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-PROC-TUNE"},
+        {"codigo": "720004533", "denominacion": "SOPLADORES VIGUETAS TUNELES 2", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-PROC-TUNE"},
+        {"codigo": "720004596", "denominacion": "COMPRESOR NH3 N1", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-PROC-TUNE"},
+        {"codigo": "3300103462", "denominacion": "SENSOR TEMPERATURA, VILTER VSS1051 P/N 2", "nivel": 5, "padre": "720004596"},
+        {"codigo": "720004597", "denominacion": "MOTOR COMPRESOR NH3 N1", "nivel": 5, "padre": "720004596"},
+        {"codigo": "720004598", "denominacion": "TABLERO CONTROL COMPRESOR N1", "nivel": 5, "padre": "720004596"},
+        {"codigo": "720004599", "denominacion": "COMPRESOR NH3 N2", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-PROC-TUNE"},
+        {"codigo": "720004600", "denominacion": "MOTOR COMPRESOR NH3 N2", "nivel": 5, "padre": "720004599"},
+        {"codigo": "720004601", "denominacion": "TABLERO CONTROL COMPRESOR N2", "nivel": 5, "padre": "720004599"},
+        {"codigo": "720004602", "denominacion": "COMPRESOR NH3 N3", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-PROC-TUNE"},
+        {"codigo": "720004603", "denominacion": "MOTOR COMPRESOR NH3 N3", "nivel": 5, "padre": "720004602"},
+        {"codigo": "720004604", "denominacion": "TABLERO CONTROL COMPRESOR N3", "nivel": 5, "padre": "720004602"},
+        {"codigo": "720004605", "denominacion": "BOMBA FLUJO NH3 N1", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-PROC-TUNE"},
+        {"codigo": "720004606", "denominacion": "MOTOR ELECTRICO BOMBA FLUJO NH3 N1", "nivel": 5, "padre": "720004605"},
+        {"codigo": "720004607", "denominacion": "BOMBA FLUJO NH3 N2", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-PROC-TUNE"},
+        {"codigo": "720004608", "denominacion": "MOTOR ELECTRICO BOMBA FLUJO NH3 N2", "nivel": 5, "padre": "720004607"},
+        {"codigo": "720004609", "denominacion": "BOMBA FLUJO NH3 N3", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-PROC-TUNE"},
+        {"codigo": "720004610", "denominacion": "MOTOR ELECTRICO BOMBA FLUJO NH3 N3", "nivel": 5, "padre": "720004609"},
+        {"codigo": "720004611", "denominacion": "ESTANQUE BOMBEO N1 -40C", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-PROC-TUNE"},
+        {"codigo": "720004612", "denominacion": "ESTANQUE RECIBIDOR LIQUIDO NH3", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-PROC-TUNE"},
+        {"codigo": "720004613", "denominacion": "ESTANQUE PRIORITARIO NH3", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-PROC-TUNE"},
+        {"codigo": "720004617", "denominacion": "BOMBA FLUJO ALIMENTACION CONDESADORES N1", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-PROC-TUNE"},
+        {"codigo": "720004618", "denominacion": "MOTOR ELEC BOMBA ALIMENTACION N1", "nivel": 5, "padre": "720004617"},
+        {"codigo": "720004619", "denominacion": "BOMBA FLUJO ALIMENTACION CONDESADORES N2", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-PROC-TUNE"},
+        {"codigo": "720004620", "denominacion": "MOTOR ELEC BOMBA ALIMENTACION N2", "nivel": 5, "padre": "720004619"},
+        {"codigo": "720004621", "denominacion": "BOMBA FLUJO ALIMENTACION CONDESADORES N3", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-PROC-TUNE"},
+        {"codigo": "720004622", "denominacion": "MOTOR ELEC BOMBA ALIMENTACION N3", "nivel": 5, "padre": "720004621"},
+        {"codigo": "720004623", "denominacion": "TUNEL ESTATICO NH3 N1", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-PROC-TUNE"},
+        {"codigo": "720004624", "denominacion": "EVAPORADOR NH3 N1", "nivel": 5, "padre": "720004623"},
+        {"codigo": "720004625", "denominacion": "MOTOR VENTILADOR TUNELES NH3 N1", "nivel": 6, "padre": "720004624"}
+      ]
+    }
+  ],
+  "total_equipos_imagen_10": 44
+}

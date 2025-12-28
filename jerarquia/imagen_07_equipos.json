@@ -1,0 +1,78 @@
+{
+  "imagen": 7,
+  "areas_y_equipos": [
+    {
+      "area": "AQ-IN-CHO-PCBO-FRIG-CAMA (continuación)",
+      "equipos": [
+        {"codigo": "720004735", "denominacion": "EVAPORADOR CAMARA N2 N2", "nivel": 5, "padre": "720004721"},
+        {"codigo": "720004740", "denominacion": "EVAPORADOR CAMARA N2 N3", "nivel": 5, "padre": "720004721"}
+      ]
+    },
+    {
+      "area": "AQ-IN-CHO-PCBO-FRIG-OFIC",
+      "denominacion": "OFICINAS",
+      "equipos": []
+    },
+    {
+      "area": "AQ-IN-CHO-PCBO-PROC",
+      "denominacion": "PROCESO",
+      "sub_areas": ["ARMA", "EMPA", "EMPQ", "EVIS", "FILE", "INMP", "LAVA", "OFIC", "SACR", "SELL", "TUNE"]
+    },
+    {
+      "area": "AQ-IN-CHO-PCBO-PROC-ARMA",
+      "denominacion": "ARMADO DE CAJAS",
+      "equipos": [
+        {"codigo": "720011995", "denominacion": "FILTRO INGRESO PLANTA PRINCIPAL", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-PROC-ARMA"}
+      ]
+    },
+    {
+      "area": "AQ-IN-CHO-PCBO-PROC-EMPA",
+      "denominacion": "EMPARRILLADO",
+      "equipos": [
+        {"codigo": "720004462", "denominacion": "CONJ BALANZA ESTATICA \"STATIC GRADER\"", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-PROC-EMPA"},
+        {"codigo": "3300100752", "denominacion": "CELDA CARGA AK300 MARELEC STATIC GRADER", "nivel": 5, "padre": "720004462"},
+        {"codigo": "720004463", "denominacion": "MOTOREDUCTOR CINTA PALETAS GRADER", "nivel": 5, "padre": "720004462"},
+        {"codigo": "720004464", "denominacion": "INDICADOR CONTROL STATIC GRADER", "nivel": 5, "padre": "720004462"},
+        {"codigo": "720004465", "denominacion": "CINTA ZETA GRADER", "nivel": 5, "padre": "720004462"},
+        {"codigo": "720004466", "denominacion": "MOTOREDUCTOR CINTA 2 BALANZA ESTATICA", "nivel": 5, "padre": "720004462"},
+        {"codigo": "720004467", "denominacion": "CINTA ACELERACION 1 BALANZA ESTATICA", "nivel": 5, "padre": "720004462"},
+        {"codigo": "720004468", "denominacion": "MOTOREDUCTOR CINTA ACELERACION 1", "nivel": 6, "padre": "720004467"},
+        {"codigo": "720004469", "denominacion": "CINTA ACELERACION 2 BALANZA ESTATICA", "nivel": 5, "padre": "720004462"},
+        {"codigo": "720004470", "denominacion": "MOTOTAMBOR CINTA ACELERACION 2", "nivel": 6, "padre": "720004469"},
+        {"codigo": "720004471", "denominacion": "TABLERO CONTROL CONJ BALANZA ESTATICA", "nivel": 5, "padre": "720004462"},
+        {"codigo": "720004472", "denominacion": "CINTA FLIPPERS CLASIFICADO GRADER", "nivel": 5, "padre": "720004462"},
+        {"codigo": "720004473", "denominacion": "BLOQUE CONTROL CILINDROS NEUMATICOS", "nivel": 5, "padre": "720004462"},
+        {"codigo": "720004474", "denominacion": "TABLERO CONTROL CONJ BALANZA ESTATICA", "nivel": 5, "padre": "720004462"},
+        {"codigo": "720004475", "denominacion": "MOTOREDUCTOR CINTA CLASIFICADO", "nivel": 5, "padre": "720004462"}
+      ]
+    },
+    {
+      "area": "AQ-IN-CHO-PCBO-PROC-EMPQ",
+      "denominacion": "EMPAQUE",
+      "equipos": [
+        {"codigo": "720003516", "denominacion": "ENZUNCHADORA N3", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-PROC-EMPQ"},
+        {"codigo": "720004540", "denominacion": "AIRE ACONDICIONADO ARMADO CAJAS N1", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-PROC-EMPQ"},
+        {"codigo": "720004541", "denominacion": "AIRE ACONDICIONADO ARMADO CAJAS N2", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-PROC-EMPQ"},
+        {"codigo": "720004590", "denominacion": "EMPACADORA E-PACK", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-PROC-EMPQ"},
+        {"codigo": "720004591", "denominacion": "GLASEADOR AUTOMATICO", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-PROC-EMPQ"},
+        {"codigo": "720004592", "denominacion": "ENZUNCHADORA N1", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-PROC-EMPQ"},
+        {"codigo": "720004593", "denominacion": "ENZUNCHADORA N2", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-PROC-EMPQ"},
+        {"codigo": "720004834", "denominacion": "CLIMATIZACION EMPAQUE", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-PROC-EMPQ"},
+        {"codigo": "720011740", "denominacion": "EVAPORADOR M4 CLIMATIZACION EMPAQUE", "nivel": 5, "padre": "720004834"},
+        {"codigo": "720011741", "denominacion": "MOTO VENTILADOR N1 CLIMATIZACION EMPAQUE", "nivel": 6, "padre": "720011740"},
+        {"codigo": "720011742", "denominacion": "MOTO VENTILADOR N2 CLIMATIZACION EMPAQUE", "nivel": 6, "padre": "720011740"},
+        {"codigo": "720004835", "denominacion": "COMPRESOR PISTON CLIMATIZACION EMPAQUE", "nivel": 5, "padre": "720004834"},
+        {"codigo": "720004836", "denominacion": "MOTOR COMPRESOR CLIMATIZACION EMPAQUE", "nivel": 6, "padre": "720004835"},
+        {"codigo": "720004837", "denominacion": "CONDENSADOR CLIMATIZACION EMPAQUE", "nivel": 5, "padre": "720004834"},
+        {"codigo": "720004838", "denominacion": "MOTO VENTILADOR N1 CLIMATIZACION EMPAQUE", "nivel": 6, "padre": "720004837"},
+        {"codigo": "720004839", "denominacion": "MOTO VENTILADOR N2 CLIMATIZACION EMPAQUE", "nivel": 6, "padre": "720004837"},
+        {"codigo": "720004840", "denominacion": "MOTO VENTILADOR N3 CLIMATIZACION EMPAQUE", "nivel": 6, "padre": "720004837"},
+        {"codigo": "720004841", "denominacion": "MOTO VENTILADOR N4 CLIMATIZACION EMPAQUE", "nivel": 6, "padre": "720004837"},
+        {"codigo": "720004842", "denominacion": "EVAPORADOR N1 CLIMATIZACION EMPAQUE", "nivel": 5, "padre": "720004834"},
+        {"codigo": "720004843", "denominacion": "MOTO VENTILADOR N1 CLIMATIZACION EMPAQUE", "nivel": 6, "padre": "720004842"},
+        {"codigo": "720004844", "denominacion": "MOTO VENTILADOR N2 CLIMATIZACION EMPAQUE", "nivel": 6, "padre": "720004842"}
+      ]
+    }
+  ],
+  "total_equipos_imagen_7": 40
+}

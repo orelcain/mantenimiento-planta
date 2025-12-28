@@ -1,0 +1,76 @@
+{
+  "imagen": 9,
+  "areas_y_equipos": [
+    {
+      "area": "AQ-IN-CHO-PCBO-PROC-EVIS (continuación)",
+      "equipos": [
+        {"codigo": "720004458", "denominacion": "MOTOR ELECTRICO BOMBA VACIO N2", "nivel": 6, "padre": "720004457"},
+        {"codigo": "720011723", "denominacion": "CINTA TRANSVERSAL SALIDA BAADER", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-PROC-EVIS"},
+        {"codigo": "720004438", "denominacion": "CINTA ACELERACION LARGA ENTRADA BAADER", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-PROC-EVIS"},
+        {"codigo": "720004439", "denominacion": "MOTOREDUCTOR CINTA LARGA CLASIFICADO AC", "nivel": 5, "padre": "720004438"},
+        {"codigo": "720004440", "denominacion": "TABLERO CONTROL CINTA LARGA CLASIFICADO", "nivel": 5, "padre": "720004438"}
+      ]
+    },
+    {
+      "area": "AQ-IN-CHO-PCBO-PROC-FILE",
+      "denominacion": "FILETE",
+      "equipos": [
+        {"codigo": "720004411", "denominacion": "VOLCADOR BINS COSECHA", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-PROC-FILE"},
+        {"codigo": "720004412", "denominacion": "CENTRAL HIDRAULICA VOLCADOR COSECHA", "nivel": 5, "padre": "720004411"},
+        {"codigo": "720004413", "denominacion": "TABL ELEC CONT CENT HIDRAULIC VOLC COS", "nivel": 6, "padre": "720004412"},
+        {"codigo": "720004414", "denominacion": "MOTOR ELEC CENT HIDRAULICA VOLC COS", "nivel": 6, "padre": "720004412"},
+        {"codigo": "720004415", "denominacion": "BOMBA HIDRAULICA CENT HIDRAULIC VOLC COS", "nivel": 6, "padre": "720004412"},
+        {"codigo": "720004416", "denominacion": "MANDO HIDRAULICO VOLCADOR BINS", "nivel": 6, "padre": "720004412"},
+        {"codigo": "720004417", "denominacion": "BAADER 200", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-PROC-FILE"},
+        {"codigo": "720004422", "denominacion": "TABLERO BAADER 200", "nivel": 5, "padre": "720004417"},
+        {"codigo": "720004418", "denominacion": "CINTA ESQUELONE", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-PROC-FILE"},
+        {"codigo": "720004419", "denominacion": "MOTOREDUCTOR CINTA ESQUELONES", "nivel": 5, "padre": "720004418"},
+        {"codigo": "720004420", "denominacion": "CINTA SALIDA FILETE", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-PROC-FILE"},
+        {"codigo": "720004421", "denominacion": "MOTOREDUCTOR CINTA SALIDA FILETE", "nivel": 5, "padre": "720004420"},
+        {"codigo": "720012995", "denominacion": "CINTA PIMPONES", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-PROC-FILE"}
+      ]
+    },
+    {
+      "area": "AQ-IN-CHO-PCBO-PROC-INMP",
+      "denominacion": "INGRESO MATERIA PRIMA",
+      "equipos": [
+        {"codigo": "720004402", "denominacion": "CHILLER", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-PROC-INMP"},
+        {"codigo": "720011735", "denominacion": "DESAGUADOR SISTEMA 1", "nivel": 5, "padre": "720004402"},
+        {"codigo": "720004403", "denominacion": "REDUCTOR MECANICO", "nivel": 5, "padre": "720004402"},
+        {"codigo": "720004404", "denominacion": "MOTOR ELECTRICO REDUCTOR", "nivel": 6, "padre": "720004403"},
+        {"codigo": "720004405", "denominacion": "SEPERTIN ENFRIAMIENTO NH3", "nivel": 5, "padre": "720004402"},
+        {"codigo": "720004406", "denominacion": "BOMBA RECIRCULACION", "nivel": 5, "padre": "720004402"},
+        {"codigo": "720004407", "denominacion": "TABLERO CONTROL CHILLER", "nivel": 5, "padre": "720004402"},
+        {"codigo": "720004519", "denominacion": "EXTRACTOR COSECHA 1", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-PROC-INMP"},
+        {"codigo": "720004520", "denominacion": "EXTRACTOR COSECHA 2", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-PROC-INMP"},
+        {"codigo": "720004521", "denominacion": "EXTRACTOR COSECHA 3", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-PROC-INMP"},
+        {"codigo": "720004522", "denominacion": "EXTRACTOR COSECHA 4", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-PROC-INMP"}
+      ]
+    },
+    {
+      "area": "AQ-IN-CHO-PCBO-PROC-LAVA",
+      "denominacion": "LAVADO BANDEJAS Y CARROS",
+      "equipos": [
+        {"codigo": "720004513", "denominacion": "CORTINA AIRE ENTRADA LAVADO CARROS", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-PROC-LAVA"}
+      ]
+    },
+    {
+      "area": "AQ-IN-CHO-PCBO-PROC-OFIC",
+      "denominacion": "OFICINAS",
+      "equipos": []
+    },
+    {
+      "area": "AQ-IN-CHO-PCBO-PROC-SACR",
+      "denominacion": "SACRIFICIO",
+      "equipos": [
+        {"codigo": "720004408", "denominacion": "DESANGRADOR", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-PROC-SACR"},
+        {"codigo": "720004409", "denominacion": "MOTOREDUCTOR", "nivel": 5, "padre": "720004408"},
+        {"codigo": "720004410", "denominacion": "TABLERO CONTROL", "nivel": 5, "padre": "720004408"},
+        {"codigo": "720004443", "denominacion": "BOMBA HELICOIDAL DESALOJO VISCERAS N1", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-PROC-SACR"},
+        {"codigo": "720004505", "denominacion": "CORTINA AIRE ENTRADA PLANTA N1", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-PROC-SACR"},
+        {"codigo": "720004506", "denominacion": "CORTINA AIRE ENTRADA PLANTA N2", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-PROC-SACR"}
+      ]
+    }
+  ],
+  "total_equipos_imagen_9": 41
+}

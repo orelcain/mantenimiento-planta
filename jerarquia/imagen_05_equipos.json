@@ -1,0 +1,69 @@
+{
+  "imagen": 5,
+  "areas_y_equipos": [
+    {
+      "area": "AQ-IN-CHO-PCBO-EXTE-SMAQ (continuación)",
+      "equipos": [
+        {"codigo": "720004284", "denominacion": "SEPERTIN ENFRIAMIENTO CHILLER", "nivel": 5, "padre": "720004277"},
+        {"codigo": "720004528", "denominacion": "EXTRATOR SALA MAQUINAS 1", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-EXTE-SMAQ"},
+        {"codigo": "720004529", "denominacion": "EXTRATOR SALA MAQUINAS 2", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-EXTE-SMAQ"},
+        {"codigo": "720004534", "denominacion": "SOPLADORES VIGUETAS CAMARAS 1", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-EXTE-SMAQ"},
+        {"codigo": "720004535", "denominacion": "SOPLADORES VIGUETAS CAMARAS 2", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-EXTE-SMAQ"}
+      ]
+    },
+    {
+      "area": "AQ-IN-CHO-PCBO-EXTE-SFRE",
+      "denominacion": "SALA DE FREON",
+      "equipos": [
+        {"codigo": "720004675", "denominacion": "COMPRESOR TORNILLO CAMARA N1", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-EXTE-SFRE"},
+        {"codigo": "720004676", "denominacion": "MOTOR COMPRESOR CAMARA N1", "nivel": 5, "padre": "720004675"},
+        {"codigo": "720004677", "denominacion": "ENFRIADOR ACEITE COMPRESOR CAMARA N1", "nivel": 5, "padre": "720004675"},
+        {"codigo": "720004678", "denominacion": "MOTOR VENT ENFR ACEITE N1 COMPR CAM N1", "nivel": 6, "padre": "720004677"},
+        {"codigo": "720004679", "denominacion": "MOTOR VENT ENFR ACEITE N2 COMPR CAM N1", "nivel": 6, "padre": "720004677"},
+        {"codigo": "720004680", "denominacion": "MOTOR VENT ENFR ACEITE N3 COMPR CAM N1", "nivel": 6, "padre": "720004677"},
+        {"codigo": "720004681", "denominacion": "CONDENSADOR COMPRESOR CAMARA N1", "nivel": 5, "padre": "720004675"},
+        {"codigo": "720004682", "denominacion": "MOTOR VENT CONDENSADOR N1 COMP CAM N1", "nivel": 6, "padre": "720004681"},
+        {"codigo": "720004683", "denominacion": "MOTOR VENT CONDENSADOR N2 COMP CAM N1", "nivel": 6, "padre": "720004681"},
+        {"codigo": "720004684", "denominacion": "MOTOR VENT CONDENSADOR N3 COMP CAM N1", "nivel": 6, "padre": "720004681"},
+        {"codigo": "720004685", "denominacion": "MOTOR VENT CONDENSADOR N4 COMP CAM N1", "nivel": 6, "padre": "720004681"},
+        {"codigo": "720004686", "denominacion": "MOTOR VENT CONDENSADOR N5 COMP CAM N1", "nivel": 6, "padre": "720004681"},
+        {"codigo": "720004687", "denominacion": "MOTOR VENT CONDENSADOR N6 COMP CAM N1", "nivel": 6, "padre": "720004681"},
+        {"codigo": "720004688", "denominacion": "MOTOR VENT CONDENSADOR N7 COMP CAM N1", "nivel": 6, "padre": "720004681"},
+        {"codigo": "720004689", "denominacion": "MOTOR VENT CONDENSADOR N8 COMP CAM N1", "nivel": 6, "padre": "720004681"},
+        {"codigo": "720004690", "denominacion": "MOTOR VENT CONDENSADOR N9 COMP CAM N1", "nivel": 6, "padre": "720004681"},
+        {"codigo": "720004691", "denominacion": "MOTOR VENT CONDENSADOR N10 COMP CAM N1", "nivel": 6, "padre": "720004681"},
+        {"codigo": "720004692", "denominacion": "MOTOR VENT CONDENSADOR N11 COMP CAM N1", "nivel": 6, "padre": "720004681"},
+        {"codigo": "720004693", "denominacion": "MOTOR VENT CONDENSADOR N12 COMP CAM N1", "nivel": 6, "padre": "720004681"},
+        {"codigo": "720004694", "denominacion": "MOTOR VENT CONDENSADOR N13 COMP CAM N1", "nivel": 6, "padre": "720004681"},
+        {"codigo": "720004695", "denominacion": "MOTOR VENT CONDENSADOR N14 COMP CAM N1", "nivel": 6, "padre": "720004681"},
+        {"codigo": "720004696", "denominacion": "MOTOR VENT CONDENSADOR N15 COMP CAM N1", "nivel": 6, "padre": "720004681"},
+        {"codigo": "720004697", "denominacion": "MOTOR VENT CONDENSADOR N16 COMP CAM N1", "nivel": 6, "padre": "720004681"},
+        {"codigo": "720004698", "denominacion": "MOTOR VENT CONDENSADOR N17 COMP CAM N1", "nivel": 6, "padre": "720004681"},
+        {"codigo": "720004699", "denominacion": "MOTOR VENT CONDENSADOR N18 COMP CAM N1", "nivel": 6, "padre": "720004681"},
+        {"codigo": "720004700", "denominacion": "MOTOR VENT CONDENSADOR N19 COMP CAM N1", "nivel": 6, "padre": "720004681"},
+        {"codigo": "720004701", "denominacion": "MOTOR VENT CONDENSADOR N20 COMP CAM N1", "nivel": 6, "padre": "720004681"},
+        {"codigo": "720004702", "denominacion": "MOTOR VENT CONDENSADOR N21 COMP CAM N1", "nivel": 6, "padre": "720004681"},
+        {"codigo": "720004703", "denominacion": "MOTOR VENT CONDENSADOR N22 COMP CAM N1", "nivel": 6, "padre": "720004681"},
+        {"codigo": "720004704", "denominacion": "MOTOR VENT CONDENSADOR N23 COMP CAM N1", "nivel": 6, "padre": "720004681"},
+        {"codigo": "720004705", "denominacion": "MOTOR VENT CONDENSADOR N24 COMP CAM N1", "nivel": 6, "padre": "720004681"},
+        {"codigo": "720012707", "denominacion": "COMPRESOR CAMARA N2", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-EXTE-SFRE"}
+      ]
+    },
+    {
+      "area": "AQ-IN-CHO-PCBO-EXTE-TMAN",
+      "denominacion": "TALLER DE MANTENIMIENTO",
+      "equipos": [
+        {"codigo": "720004476", "denominacion": "COMPRESOR AIRE PLANTA", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-EXTE-TMAN"},
+        {"codigo": "720004477", "denominacion": "COMPRESOR AIRE PLANTA", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-EXTE-TMAN"},
+        {"codigo": "720004547", "denominacion": "CALDERA PLANTA", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-EXTE-TMAN"},
+        {"codigo": "720004548", "denominacion": "AIRE ACONDICIONADO TECNICOS MANTENCION", "nivel": 4, "padre": "AQ-IN-CHO-PCBO-EXTE-TMAN"}
+      ]
+    },
+    {
+      "area": "AQ-IN-CHO-PCBO-FRIG",
+      "denominacion": "FRIGORIFICO",
+      "sub_areas": ["ANCA", "ANCC", "CAMA", "OFIC"]
+    }
+  ],
+  "total_equipos_imagen_5": 41
+}

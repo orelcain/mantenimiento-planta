@@ -1,0 +1,91 @@
+{
+  "imagen": 2,
+  "areas_y_equipos": [
+    {
+      "area": "AQ-IN-CHO-ACOP (continuación)",
+      "equipos": [
+        {"codigo": "720004383", "denominacion": "HUINCHE LEVANTE MALLAS", "nivel": 4, "padre": "AQ-IN-CHO-ACOP"},
+        {"codigo": "720004384", "denominacion": "TABLERO CONTROL WINCHE", "nivel": 5, "padre": "720004383"},
+        {"codigo": "720004385", "denominacion": "REDUCTOR MECANICO FUERZA", "nivel": 5, "padre": "720004383"},
+        {"codigo": "720004386", "denominacion": "MOTOR ELECTRICO WINCHE", "nivel": 5, "padre": "720004383"},
+        {"codigo": "720004387", "denominacion": "ALARMA HUNDIMIENTO", "nivel": 4, "padre": "AQ-IN-CHO-ACOP"},
+        {"codigo": "720004388", "denominacion": "THERMO ELECTRICO AGUA CALIENTE", "nivel": 4, "padre": "AQ-IN-CHO-ACOP"},
+        {"codigo": "720004389", "denominacion": "MOTOBOMBA AGUA", "nivel": 4, "padre": "AQ-IN-CHO-ACOP"},
+        {"codigo": "720004390", "denominacion": "AIRE ACONDICIONADO COMEDOR 12000 BTU", "nivel": 4, "padre": "AQ-IN-CHO-ACOP"},
+        {"codigo": "720004391", "denominacion": "BOTE TRASLADOS", "nivel": 4, "padre": "AQ-IN-CHO-ACOP"},
+        {"codigo": "720004392", "denominacion": "MOTOR FUERA BORDA", "nivel": 5, "padre": "720004391"}
+      ]
+    },
+    {
+      "area": "AQ-IN-CHO-ACOP-CAAM",
+      "denominacion": "CASETA AGUA MAR",
+      "equipos": [
+        {"codigo": "720011724", "denominacion": "BOMBA AGUA MAR 1", "nivel": 4, "padre": "AQ-IN-CHO-ACOP-CAAM"},
+        {"codigo": "720011725", "denominacion": "BOMBA AGUA MAR 2", "nivel": 4, "padre": "AQ-IN-CHO-ACOP-CAAM"}
+      ]
+    },
+    {
+      "area": "AQ-IN-CHO-ACOP-JAUL",
+      "denominacion": "JAULAS",
+      "equipos": []
+    },
+    {
+      "area": "AQ-IN-CHO-ACOP-OFIC",
+      "denominacion": "OFICINAS",
+      "equipos": []
+    },
+    {
+      "area": "AQ-IN-CHO-ACOP-PONT",
+      "denominacion": "PONTON",
+      "equipos": []
+    },
+    {
+      "area": "AQ-IN-CHO-EXTE",
+      "denominacion": "PATIO Y SERVICIOS EXTERIORES",
+      "sub_areas": ["ALAG", "CASI", "EADM"]
+    },
+    {
+      "area": "AQ-IN-CHO-EXTE-ALAG",
+      "denominacion": "ALMACENAMIENTO AGUAS",
+      "equipos": [
+        {"codigo": "720004485", "denominacion": "CLORADOR AUTOMATICO AGUA DULCE", "nivel": 4, "padre": "AQ-IN-CHO-EXTE-ALAG"},
+        {"codigo": "720004486", "denominacion": "BOMBA DOSIFICACION PRECLORACION N1", "nivel": 5, "padre": "720004485"},
+        {"codigo": "720004487", "denominacion": "BOMBA DOSIFICACION PRECLORACION N2", "nivel": 5, "padre": "720004485"},
+        {"codigo": "720004488", "denominacion": "BOMBA DOSIFICACION AJUSTE FINO", "nivel": 5, "padre": "720004485"},
+        {"codigo": "720004489", "denominacion": "CAUDALIMETRO ENTRADA AGUA AGUA DULCE", "nivel": 5, "padre": "720004485"},
+        {"codigo": "720004490", "denominacion": "BOMBA RECIRCULACION AGUA DULCE", "nivel": 5, "padre": "720004485"},
+        {"codigo": "720004491", "denominacion": "BOMBA TRASPASO AGUA DULCE", "nivel": 5, "padre": "720004485"},
+        {"codigo": "720004492", "denominacion": "CLORADOR AUTOMATICO AGUA SALADA", "nivel": 4, "padre": "AQ-IN-CHO-EXTE-ALAG"},
+        {"codigo": "720004493", "denominacion": "BOMBA DOSIFICACION PRECLORACION N1", "nivel": 5, "padre": "720004492"},
+        {"codigo": "720004494", "denominacion": "BOMBA DOSIFICACION PRECLORACION N2", "nivel": 5, "padre": "720004492"},
+        {"codigo": "720004495", "denominacion": "BOMBA DOSIFICACION AJUSTE FINO", "nivel": 5, "padre": "720004492"},
+        {"codigo": "720004496", "denominacion": "CAUDALIMETRO ENTRADA AGUA AGUA SALADA", "nivel": 5, "padre": "720004492"},
+        {"codigo": "720004497", "denominacion": "BOMBA RECIRCULACION AGUA SALADA", "nivel": 5, "padre": "720004492"},
+        {"codigo": "720004498", "denominacion": "FILTRO UV AGUA DULCE", "nivel": 4, "padre": "AQ-IN-CHO-EXTE-ALAG"},
+        {"codigo": "720004499", "denominacion": "FILTRO UV AGUA SALADA", "nivel": 4, "padre": "AQ-IN-CHO-EXTE-ALAG"},
+        {"codigo": "720011857", "denominacion": "ESTANQUE AGUA DULCE 1", "nivel": 4, "padre": "AQ-IN-CHO-EXTE-ALAG"},
+        {"codigo": "720011858", "denominacion": "ESTANQUE AGUA DULCE 2", "nivel": 4, "padre": "AQ-IN-CHO-EXTE-ALAG"},
+        {"codigo": "720011859", "denominacion": "ESTANQUE AGUA MAR", "nivel": 4, "padre": "AQ-IN-CHO-EXTE-ALAG"}
+      ]
+    },
+    {
+      "area": "AQ-IN-CHO-EXTE-CASI",
+      "denominacion": "CASINO",
+      "equipos": [
+        {"codigo": "720004530", "denominacion": "EXTRACTOR CASINO N1", "nivel": 4, "padre": "AQ-IN-CHO-EXTE-CASI"},
+        {"codigo": "720004531", "denominacion": "EXTRACTOR CASINO N2", "nivel": 4, "padre": "AQ-IN-CHO-EXTE-CASI"}
+      ]
+    },
+    {
+      "area": "AQ-IN-CHO-EXTE-EADM",
+      "denominacion": "EDIFICIO ADMINISTRATIVO",
+      "equipos": [
+        {"codigo": "720004542", "denominacion": "AIRE ACONDICIONADO PERSONAS N1", "nivel": 4, "padre": "AQ-IN-CHO-EXTE-EADM"},
+        {"codigo": "720004543", "denominacion": "AIRE ACONDICIONADO PERSONAS N2", "nivel": 4, "padre": "AQ-IN-CHO-EXTE-EADM"},
+        {"codigo": "720004544", "denominacion": "AIRE ACONDICIONADO CONTROL PRODUCCION", "nivel": 4, "padre": "AQ-IN-CHO-EXTE-EADM"},
+        {"codigo": "720004545", "denominacion": "AIRE ACONDICIONADO PREVENCION", "nivel": 4, "padre": "AQ-IN-CHO-EXTE-EADM"}
+      ]
+    }
+  ],
+  "total_equipos_imagen_2": 36
+}

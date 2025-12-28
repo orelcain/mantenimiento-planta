@@ -6,6 +6,7 @@ import { logger } from '@/lib/logger'
 import { LoadingScreen } from '@/components/ui'
 import { MainLayout } from '@/components/layout'
 import { HelpProvider } from '@/components/help'
+import { initializeHierarchySystem, isHierarchyInitialized } from '@/services/hierarchyInit'
 import {
   LoginPage,
   DashboardPage,
@@ -57,6 +58,16 @@ export function App() {
         try {
           const user = await getUserById(firebaseUser.uid)
           setUser(user)
+          
+          // Inicializar jerarquía automáticamente si es admin y no está inicializada
+          if (user.role === 'admin') {
+            const initialized = await isHierarchyInitialized()
+            if (!initialized) {
+              logger.info('Auto-inicializando jerarquía para admin', { userId: user.id })
+              await initializeHierarchySystem(user.id)
+              logger.info('Jerarquía inicializada exitosamente')
+            }
+          }
         } catch (error: unknown) {
           const err = error instanceof Error ? error : new Error('Error fetching user')
           logger.error('Error fetching user', err)

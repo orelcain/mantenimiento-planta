@@ -1,0 +1,83 @@
+{
+  "imagen": 3,
+  "areas_y_equipos": [
+    {
+      "area": "AQ-IN-CHO-EXTE-EADM (continuación)",
+      "equipos": [
+        {"codigo": "720004546", "denominacion": "AIRE ACONDICIONADO CAPACITACION", "nivel": 4, "padre": "AQ-IN-CHO-EXTE-EADM"}
+      ]
+    },
+    {
+      "area": "AQ-IN-CHO-EXTE-ESTA",
+      "denominacion": "ESTACIONAMIENTO",
+      "equipos": []
+    },
+    {
+      "area": "AQ-IN-CHO-EXTE-ESTR",
+      "denominacion": "ESTANQUE DE TRANSFERENCIA AM",
+      "equipos": [
+        {"codigo": "720004478", "denominacion": "BOMBAS AGUA MAR N1", "nivel": 4, "padre": "AQ-IN-CHO-EXTE-ESTR"},
+        {"codigo": "720004479", "denominacion": "MOTOR ELECTRICO BOMBA AGUAMAR N1", "nivel": 5, "padre": "720004478"},
+        {"codigo": "720004480", "denominacion": "BOMBAS AGUA MAR N2", "nivel": 4, "padre": "AQ-IN-CHO-EXTE-ESTR"},
+        {"codigo": "720004481", "denominacion": "MOTOR ELECTRICO BOMBA AGUAMAR N1", "nivel": 5, "padre": "720004480"},
+        {"codigo": "720004482", "denominacion": "TABLERO ELECTRICO BOMBAS AGUA MAR", "nivel": 4, "padre": "AQ-IN-CHO-EXTE-ESTR"},
+        {"codigo": "720004500", "denominacion": "BOMBA ADUCCION AGUA N1", "nivel": 4, "padre": "AQ-IN-CHO-EXTE-ESTR"},
+        {"codigo": "720004501", "denominacion": "MOTOR ELECTRICO BOMBA ADUCCION N1", "nivel": 5, "padre": "720004500"},
+        {"codigo": "720004502", "denominacion": "BOMBA ADUCCION AGUA N2", "nivel": 4, "padre": "AQ-IN-CHO-EXTE-ESTR"},
+        {"codigo": "720004503", "denominacion": "MOTOR ELECTRICO BOMBA ADUCCION N2", "nivel": 5, "padre": "720004502"},
+        {"codigo": "720004504", "denominacion": "BOMBA TRANSFERENCIA AGUA MAR", "nivel": 4, "padre": "AQ-IN-CHO-EXTE-ESTR"}
+      ]
+    },
+    {
+      "area": "AQ-IN-CHO-EXTE-PATI",
+      "denominacion": "PATIO",
+      "equipos": []
+    },
+    {
+      "area": "AQ-IN-CHO-EXTE-PORT",
+      "denominacion": "PORTERIA INGRESO PLANTA",
+      "equipos": [
+        {"codigo": "720004538", "denominacion": "AIRE ACONDICIONADO GERENCIA", "nivel": 4, "padre": "AQ-IN-CHO-EXTE-PORT"},
+        {"codigo": "720004539", "denominacion": "AIRE ACONDICIONADO PRODUCCION", "nivel": 4, "padre": "AQ-IN-CHO-EXTE-PORT"}
+      ]
+    },
+    {
+      "area": "AQ-IN-CHO-EXTE-POZO",
+      "denominacion": "POZOS PROFUNDOS",
+      "equipos": []
+    },
+    {
+      "area": "AQ-IN-CHO-EXTE-PRIL",
+      "denominacion": "PLANTA RILES",
+      "equipos": [
+        {"codigo": "720004549", "denominacion": "BOMBA DESALOJO QUIMICOS", "nivel": 4, "padre": "AQ-IN-CHO-EXTE-PRIL"},
+        {"codigo": "720004550", "denominacion": "ESTANQUE EQUALIZACION", "nivel": 4, "padre": "AQ-IN-CHO-EXTE-PRIL"},
+        {"codigo": "720004551", "denominacion": "BOMBA AUTOCEBANTE PASILLO N1", "nivel": 5, "padre": "720004550"},
+        {"codigo": "720004552", "denominacion": "BOMBA AUTOCEBANTE PASILLO N2", "nivel": 5, "padre": "720004550"},
+        {"codigo": "720004553", "denominacion": "CAUDALIMETRO INGRESO AL DAF", "nivel": 5, "padre": "720004550"},
+        {"codigo": "720004554", "denominacion": "BOMBA HELICOIDAL DOSIFICACION POLIMERO", "nivel": 5, "padre": "720004550"},
+        {"codigo": "720004555", "denominacion": "ESTANQUE ALMACENAMIENTO CLORO", "nivel": 4, "padre": "AQ-IN-CHO-EXTE-PRIL"},
+        {"codigo": "720004556", "denominacion": "BOMBA MEMBRANA DOSIFICACION CLORO", "nivel": 5, "padre": "720004555"},
+        {"codigo": "720004557", "denominacion": "BOMBA MEMBRANA DOSIFICACION COAGULANTE", "nivel": 5, "padre": "720004555"},
+        {"codigo": "720004558", "denominacion": "FILTRO TORNILLO", "nivel": 4, "padre": "AQ-IN-CHO-EXTE-PRIL"},
+        {"codigo": "720004559", "denominacion": "MOTOREDUCTOR FILTRO", "nivel": 5, "padre": "720004558"},
+        {"codigo": "720004560", "denominacion": "TABLERO CONTROL FILTRO", "nivel": 5, "padre": "720004558"},
+        {"codigo": "720004561", "denominacion": "BOMBA LIMPIEZA FILTRO", "nivel": 5, "padre": "720004558"},
+        {"codigo": "720004562", "denominacion": "TORNILLO SIN FIN FILTRO", "nivel": 5, "padre": "720004558"},
+        {"codigo": "720004563", "denominacion": "ESTANQUE LODOS", "nivel": 4, "padre": "AQ-IN-CHO-EXTE-PRIL"},
+        {"codigo": "720004564", "denominacion": "ESTANQUE POLIMERO N1", "nivel": 5, "padre": "720004563"},
+        {"codigo": "720004565", "denominacion": "AGITADOR POLIMERO N1", "nivel": 5, "padre": "720004564"},
+        {"codigo": "720004566", "denominacion": "MOTOREDUCTOR AGITADOR N1", "nivel": 6, "padre": "720004565"},
+        {"codigo": "720004567", "denominacion": "TABLERO CONTROL AGITADOR N1", "nivel": 6, "padre": "720004565"},
+        {"codigo": "720004568", "denominacion": "ESTANQUE POLIMERO N2", "nivel": 5, "padre": "720004563"},
+        {"codigo": "720004569", "denominacion": "AGITADOR POLIMERO N2", "nivel": 5, "padre": "720004568"},
+        {"codigo": "720004570", "denominacion": "MOTOREDUCTOR AGITADOR N2", "nivel": 6, "padre": "720004569"},
+        {"codigo": "720004571", "denominacion": "TABLERO CONTROL AGITADOR N2", "nivel": 6, "padre": "720004569"},
+        {"codigo": "720004572", "denominacion": "SIST SEPARACION POR AIRE DISUELTO (DAF)", "nivel": 4, "padre": "AQ-IN-CHO-EXTE-PRIL"},
+        {"codigo": "720004573", "denominacion": "BOMBA SATURACION AIRE", "nivel": 5, "padre": "720004572"},
+        {"codigo": "720004574", "denominacion": "MOTOREDUCTOR PALETAS DESALOJO LODOS", "nivel": 5, "padre": "720004572"}
+      ]
+    }
+  ],
+  "total_equipos_imagen_3": 38
+}
