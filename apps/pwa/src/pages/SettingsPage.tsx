@@ -362,10 +362,20 @@ function InvitesSettings() {
   const loadInvites = async () => {
     try {
       const snapshot = await getDocs(collection(db, 'inviteCodes'))
-      const invitesData = snapshot.docs.map((doc) => ({
-        ...doc.data(),
-        code: doc.id,
-      })) as InviteCode[]
+      const invitesData = snapshot.docs.map((doc) => {
+        const data = doc.data()
+        return {
+          id: doc.id,
+          code: data.code,
+          rol: data.rol,
+          usosMaximos: data.usosMaximos || 1,
+          usosActuales: data.usosActuales || 0,
+          activo: data.activo ?? true,
+          createdBy: data.createdBy,
+          createdAt: data.createdAt?.toDate() || new Date(),
+          expiresAt: data.expiresAt?.toDate(),
+        } as InviteCode
+      })
       setInvites(invitesData)
       logger.info('Invite codes loaded', { count: invitesData.length })
     } catch (error) {
@@ -395,14 +405,14 @@ function InvitesSettings() {
     setCreating(false)
   }
 
-  const handleDeleteInvite = async (code: string) => {
+  const handleDeleteInvite = async (inviteId: string) => {
     if (!confirm('¿Eliminar este código de invitación?')) return
     try {
-      await deleteDoc(doc(db, 'inviteCodes', code))
-      logger.info('Invite code deleted', { code })
+      await deleteDoc(doc(db, 'inviteCodes', inviteId))
+      logger.info('Invite code deleted', { inviteId })
       loadInvites()
     } catch (error) {
-      logger.error('Error eliminando invitación', error instanceof Error ? error : new Error(String(error)), { code })
+      logger.error('Error eliminando invitación', error instanceof Error ? error : new Error(String(error)), { inviteId })
     }
   }
 
@@ -476,7 +486,7 @@ function InvitesSettings() {
                         variant="ghost"
                         size="icon"
                         className="text-destructive"
-                        onClick={() => handleDeleteInvite(invite.code)}
+                        onClick={() => handleDeleteInvite(invite.id)}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
