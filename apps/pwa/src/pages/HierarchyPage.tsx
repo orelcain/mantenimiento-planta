@@ -76,6 +76,10 @@ export function HierarchyPage() {
   const [selectedNode, setSelectedNode] = useState<HierarchyNode | null>(null)
   const [parentForNew, setParentForNew] = useState<HierarchyNodeWithChildren | null>(null)
   
+  // Estado para preservar expansión durante reordenamiento
+  const [isReordering, setIsReordering] = useState(false)
+  const savedExpandedState = useRef<Set<string>>(new Set())
+  
   // Ref para scroll automático al primer resultado
   const firstMatchRef = useRef<HTMLDivElement | null>(null)
   const [isFirstMatch, setIsFirstMatch] = useState(true)
@@ -288,20 +292,16 @@ export function HierarchyPage() {
 
   const handleReorder = async (nodeId: string, direction: 'up' | 'down') => {
     try {
-      // Guardar el estado de expansión actual
-      const currentExpandedState = new Set(expandedNodes)
+      // Marcar que estamos reordenando y guardar estado
+      setIsReordering(true)
+      savedExpandedState.current = new Set(expandedNodes)
       
       await reorderNode(nodeId, direction)
       refresh()
-      
-      // Restaurar el estado de expansión después del refresh
-      // Usar setTimeout para asegurar que el árbol se haya renderizado
-      setTimeout(() => {
-        setExpandedNodes(currentExpandedState)
-      }, 0)
     } catch (error) {
       logger.error('Error reordering node', error instanceof Error ? error : new Error(String(error)))
       alert('Error al reordenar el nodo')
+      setIsReordering(false)
     }
   }
 
@@ -374,12 +374,12 @@ export function HierarchyPage() {
     if (debouncedSearch && toExpand.size > 0) {
       setExpandedNodes(toExpand)
       setIsFirstMatch(true) // Reset para próxima búsqueda
-    } else if (!debouncedSearch) {
-      // Restaurar al estado normal cuando se borra la búsqueda
+    } else if (!debouncedSearch && !isReordering) {
+      // Solo restaurar al estado normal si NO estamos reordenando
       setExpandedNodes(new Set())
       setIsFirstMatch(true)
     }
-  }, [debouncedSearch, toExpand])
+  }, [debouncedSearch, toExpand, isReordering])
 
   // Scroll automático al primer resultado
   useEffect(() => {
@@ -391,6 +391,15 @@ export function HierarchyPage() {
       setIsFirstMatch(false)
     }
   }, [debouncedSearch, isFirstMatch])
+
+  // Restaurar estado de expansión después de reordenar
+  useEffect(() => {
+    if (isReordering && !loading) {
+      // El árbol ya se recargó, restaurar expansión
+      setExpandedNodes(savedExpandedState.current)
+      setIsReordering(false)
+    }
+  }, [isReordering, loading])
 
   // Función para resaltar texto coincidente
   const highlightText = (text: string, query: string) => {
