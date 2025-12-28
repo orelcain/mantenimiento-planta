@@ -2,11 +2,32 @@
 
 ## 🎯 Paso 1: Obtener API Key
 
+### **Si GitHub NO funciona, prueba esto:**
+
+#### **Opción A: Modo Incógnito** 🔒
+1. Abre tu navegador en **modo incógnito/privado**
+2. Ve a https://console.groq.com/keys
+3. Click en **"Continue with GitHub"**
+4. **IGNORA** los mensajes rojos en consola (son normales)
+5. Autoriza cuando GitHub lo pida
+
+#### **Opción B: Email** ⚡ (Más rápido - 2 minutos)
+1. Ve a https://console.groq.com/keys
+2. Click en **"Continue with Email"**
+3. Ingresa tu email
+4. Verifica desde tu correo
+5. ¡Listo!
+
+#### **Opción C: Deshabilitar extensiones**
+- Deshabilita bloqueadores (uBlock, Privacy Badger)
+- Habilita cookies de terceros temporalmente
+- Intenta con GitHub de nuevo
+
+---
+
+### **Proceso normal (después de login):**
 1. **Abrir** https://console.groq.com/keys
-2. **Registrarse** con:
-   - Email
-   - Cuenta de Google
-   - Cuenta de GitHub
+2. **Registrarse/Login** con Email, Google o GitHub
 3. **Crear API Key**:
    - Click en "Create API Key"
    - Nombre: "Mantenimiento Planta"
