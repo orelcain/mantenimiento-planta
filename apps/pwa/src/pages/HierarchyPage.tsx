@@ -80,6 +80,7 @@ export function HierarchyPage() {
   const [isReordering, setIsReordering] = useState(false)
   const savedExpandedState = useRef<Set<string>>(new Set())
   const waitingForRefresh = useRef(false)
+  const prevLoadingRef = useRef(false)
   
   // Ref para scroll automático al primer resultado
   const firstMatchRef = useRef<HTMLDivElement | null>(null)
@@ -425,16 +426,19 @@ export function HierarchyPage() {
     console.log('🎯 [RESTORE EFFECT]', { 
       isReordering, 
       loading, 
+      prevLoading: prevLoadingRef.current,
       waitingForRefresh: waitingForRefresh.current,
       savedSize: savedExpandedState.current.size 
     })
     
+    // Detectar transición: loading cambió de true a false
+    const loadingJustFinished = prevLoadingRef.current === true && loading === false
+    
     // Solo restaurar si:
-    // 1. Estamos en modo reordering
-    // 2. Estamos esperando que el refresh complete
-    // 3. El loading ya terminó (refresh completó)
-    if (isReordering && waitingForRefresh.current && !loading) {
-      console.log('♻️ [RESTORING STATE]', { 
+    // 1. Estamos esperando que el refresh complete
+    // 2. El loading acaba de cambiar de true a false (refresh completó)
+    if (waitingForRefresh.current && loadingJustFinished) {
+      console.log('♻️ [RESTORING STATE - Loading transition detected]', { 
         restoringSize: savedExpandedState.current.size,
         restoringIds: Array.from(savedExpandedState.current)
       })
@@ -443,9 +447,12 @@ export function HierarchyPage() {
       // Resetear flags DESPUÉS de restaurar
       setIsReordering(false)
       waitingForRefresh.current = false
-      console.log('✅ [RESTORE COMPLETE] - All flags reset')
+      console.log('✅ [RESTORE COMPLETE] - All flags reset after transition')
     }
-  }, [isReordering, loading])
+    
+    // Actualizar ref de loading previo
+    prevLoadingRef.current = loading
+  }, [loading])
 
   // Función para resaltar texto coincidente
   const highlightText = (text: string, query: string) => {
