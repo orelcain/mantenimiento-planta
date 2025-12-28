@@ -4,7 +4,7 @@
  * Versión 2.0.0 - Diciembre 2025
  */
 
-import { doc, Timestamp, writeBatch } from 'firebase/firestore'
+import { doc, Timestamp, writeBatch, getDoc } from 'firebase/firestore'
 import { db } from './firebase'
 import { HierarchyNode, HierarchyLevel } from '../types/hierarchy'
 import { logger } from '../lib/logger'
@@ -303,6 +303,16 @@ export async function initializeHierarchySystem(userId: string): Promise<void> {
           currentParent = parentItem?.padre || null
         }
 
+        // CRÍTICO: Verificar si el nodo YA existe antes de crear
+        // Esto evita sobrescribir ediciones del usuario
+        const nodeRef = doc(db, 'hierarchy', nodeId)
+        const existingDoc = await getDoc(nodeRef)
+        
+        if (existingDoc.exists()) {
+          console.log(`[hierarchyInit] ⚠️ Nodo ${item.codigo} ya existe, se omite (preservando ediciones)`)
+          continue // NO sobrescribir nodos existentes
+        }
+
         const node: Omit<HierarchyNode, 'id'> = {
           nombre: item.nombre,
           codigo: item.codigo,
@@ -318,7 +328,7 @@ export async function initializeHierarchySystem(userId: string): Promise<void> {
           actualizadoEn: Timestamp.now(),
         }
 
-        batch.set(doc(db, 'hierarchy', nodeId), node)
+        batch.set(nodeRef, node)
         processedCount++
       }
       

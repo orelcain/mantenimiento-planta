@@ -127,6 +127,26 @@ export function HierarchyPage() {
     setExpandedNodes(newExpanded)
   }
 
+  // Expandir todos los nodos
+  const expandAll = () => {
+    const allIds = new Set<string>()
+    const collectIds = (nodes: HierarchyNodeWithChildren[]) => {
+      nodes.forEach(node => {
+        allIds.add(node.id)
+        if (node.children?.length > 0) {
+          collectIds(node.children)
+        }
+      })
+    }
+    collectIds(tree)
+    setExpandedNodes(allIds)
+  }
+
+  // Contraer todos los nodos
+  const collapseAll = () => {
+    setExpandedNodes(new Set())
+  }
+
   const handleCreate = (parent: HierarchyNodeWithChildren | null) => {
     setParentForNew(parent)
     const nextLevel = parent ? (parent.nivel + 1) as HierarchyLevel : HierarchyLevel.EMPRESA
