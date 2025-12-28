@@ -309,14 +309,21 @@ export function HierarchyPage() {
     const arr = [...nodes]
     for (let i = 0; i < arr.length; i++) {
       const node = arr[i]
+      if (!node) continue
       // Encontrado en este nivel
       if (node.id === targetId) {
         if (direction === 'up' && i > 0) {
-          ;[arr[i - 1], arr[i]] = [arr[i], arr[i - 1]]
+          const prev = arr[i - 1]
+          if (!prev) return { updated: false, next: nodes }
+          arr[i - 1] = node
+          arr[i] = prev
           return { updated: true, next: arr }
         }
         if (direction === 'down' && i < arr.length - 1) {
-          ;[arr[i + 1], arr[i]] = [arr[i], arr[i + 1]]
+          const nextNode = arr[i + 1]
+          if (!nextNode) return { updated: false, next: nodes }
+          arr[i + 1] = node
+          arr[i] = nextNode
           return { updated: true, next: arr }
         }
         return { updated: false, next: nodes }
@@ -533,7 +540,7 @@ export function HierarchyPage() {
               'flex items-center gap-2 p-2 rounded-lg transition-colors group',
               'border',
               isActive
-                ? 'border-emerald-400/70 bg-emerald-50 ring-2 ring-emerald-400/50'
+                ? 'border-emerald-200 bg-emerald-50/60 shadow-[0_0_0_1px_rgba(16,185,129,0.25)]'
                 : 'border-transparent hover:border-border hover:bg-muted'
             )}
             style={{ paddingLeft: `${indent + 8}px` }}
