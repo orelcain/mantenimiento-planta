@@ -110,6 +110,15 @@ export function HierarchyPage() {
     debouncedSetSearch(value)
   }
 
+  // Debug: Log cuando cambia tree o expandedNodes
+  useEffect(() => {
+    console.log('🌳 [TREE CHANGED]', { nodeCount: tree.length, loading, expandedSize: expandedNodes.size })
+  }, [tree, loading])
+
+  useEffect(() => {
+    console.log('📂 [EXPANDED CHANGED]', { size: expandedNodes.size, ids: Array.from(expandedNodes).slice(0, 5) })
+  }, [expandedNodes])
+
   // Verificar permisos de admin
   if (user?.rol !== 'admin') {
     return (
@@ -292,16 +301,21 @@ export function HierarchyPage() {
 
   const handleReorder = async (nodeId: string, direction: 'up' | 'down') => {
     try {
+      console.log('🔄 [REORDER START]', { nodeId, direction, currentExpanded: expandedNodes.size })
       // Marcar que estamos reordenando y guardar estado
       setIsReordering(true)
       savedExpandedState.current = new Set(expandedNodes)
+      console.log('💾 [STATE SAVED]', { savedSize: savedExpandedState.current.size, savedIds: Array.from(savedExpandedState.current) })
       
       await reorderNode(nodeId, direction)
+      console.log('✅ [REORDER API DONE]')
       refresh()
+      console.log('🔃 [REFRESH CALLED]')
     } catch (error) {
       logger.error('Error reordering node', error instanceof Error ? error : new Error(String(error)))
       alert('Error al reordenar el nodo')
       setIsReordering(false)
+      console.log('❌ [REORDER ERROR - isReordering reset]')
     }
   }
 
@@ -371,13 +385,24 @@ export function HierarchyPage() {
 
   // Auto-expandir nodos cuando hay búsqueda
   useMemo(() => {
+    console.log('🔍 [USEMEMO TRIGGERED]', { 
+      hasSearch: !!debouncedSearch, 
+      toExpandSize: toExpand.size, 
+      isReordering,
+      currentExpandedSize: expandedNodes.size 
+    })
+    
     if (debouncedSearch && toExpand.size > 0) {
+      console.log('📖 [SEARCH MODE] - Expandiendo nodos de búsqueda:', toExpand.size)
       setExpandedNodes(toExpand)
       setIsFirstMatch(true) // Reset para próxima búsqueda
     } else if (!debouncedSearch && !isReordering) {
       // Solo restaurar al estado normal si NO estamos reordenando
+      console.log('🔒 [NO SEARCH MODE] - Colapsando todo (isReordering=false)')
       setExpandedNodes(new Set())
       setIsFirstMatch(true)
+    } else {
+      console.log('⏸️ [USEMEMO SKIP] - No action (isReordering=true or has search)')
     }
   }, [debouncedSearch, toExpand, isReordering])
 
@@ -394,10 +419,17 @@ export function HierarchyPage() {
 
   // Restaurar estado de expansión después de reordenar
   useEffect(() => {
+    console.log('🎯 [RESTORE EFFECT]', { isReordering, loading, savedSize: savedExpandedState.current.size })
+    
     if (isReordering && !loading) {
       // El árbol ya se recargó, restaurar expansión
+      console.log('♻️ [RESTORING STATE]', { 
+        restoringSize: savedExpandedState.current.size,
+        restoringIds: Array.from(savedExpandedState.current)
+      })
       setExpandedNodes(savedExpandedState.current)
       setIsReordering(false)
+      console.log('✅ [RESTORE COMPLETE] - isReordering reset to false')
     }
   }, [isReordering, loading])
 
