@@ -65,7 +65,7 @@ interface NodeFormData {
 
 export function HierarchyPage() {
   const user = useAuthStore(state => state.user)
-  const { tree, loading, refresh } = useHierarchyTree()
+  const { tree, loading, refresh, hasUpdates } = useHierarchyTree()
   const { createNode, updateNode, deleteNode, reorderNode } = useHierarchyMutations()
 
   // Vista local del árbol para reordenamiento optimista
@@ -653,6 +653,22 @@ export function HierarchyPage() {
 
   return (
     <div className="space-y-6">
+      {/* Banner de actualizaciones disponibles */}
+      {hasUpdates && (
+        <div className="bg-blue-500/10 border border-blue-500/30 text-blue-700 dark:text-blue-300 px-4 py-3 rounded-lg flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <CheckCircle className="h-5 w-5" />
+            <span className="font-medium">
+              Hay actualizaciones disponibles en la jerarquía
+            </span>
+          </div>
+          <Button onClick={() => refresh()} variant="default" size="sm" className="gap-2">
+            <CheckCircle className="h-4 w-4" />
+            Actualizar ahora
+          </Button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -661,10 +677,16 @@ export function HierarchyPage() {
             Administra la estructura organizacional de 8 niveles
           </p>
         </div>
-        <Button onClick={() => handleCreate(null)} className="gap-2">
-          <Plus className="h-4 w-4" />
-          Nueva Empresa
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={() => refresh()} variant="outline" className="gap-2">
+            <CheckCircle className="h-4 w-4" />
+            Sincronizar
+          </Button>
+          <Button onClick={() => handleCreate(null)} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Nueva Empresa
+          </Button>
+        </div>
       </div>
 
       {/* Buscador */}

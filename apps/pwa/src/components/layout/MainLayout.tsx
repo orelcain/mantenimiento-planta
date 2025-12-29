@@ -12,13 +12,15 @@ import {
   ChevronDown,
   CalendarClock,
   FolderTree,
+  RefreshCw,
 } from 'lucide-react'
-import { Avatar, AvatarFallback } from '@/components/ui'
+import { Avatar, AvatarFallback, Button } from '@/components/ui'
 import { useAuthStore, useIsAdmin } from '@/store'
 import { signOut } from '@/services/auth'
 import { cn } from '@/lib/utils'
 import { HelpButton, HelpModal, WelcomeModal } from '@/components/help'
 import { APP_VERSION } from '@/constants/version'
+import { useAppVersion } from '@/hooks/useAppVersion'
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
@@ -40,6 +42,7 @@ export function MainLayout() {
   const isAdmin = useIsAdmin()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const { hasUpdate, newVersion, reload } = useAppVersion()
 
   const handleSignOut = async () => {
     await signOut()
@@ -193,6 +196,27 @@ export function MainLayout() {
             </Avatar>
           </div>
         </header>
+
+        {/* Banner de actualización disponible */}
+        {hasUpdate && (
+          <div className="mx-4 mt-4 lg:mx-6 bg-blue-500/10 border border-blue-500/30 text-blue-700 dark:text-blue-300 px-4 py-3 rounded-lg flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <RefreshCw className="h-5 w-5" />
+              <div>
+                <span className="font-medium block">
+                  Nueva versión disponible: {newVersion}
+                </span>
+                <span className="text-sm opacity-80">
+                  Recarga la página para obtener la última versión
+                </span>
+              </div>
+            </div>
+            <Button onClick={reload} variant="default" size="sm" className="gap-2 ml-4">
+              <RefreshCw className="h-4 w-4" />
+              Recargar
+            </Button>
+          </div>
+        )}
 
         {/* Page content */}
         <main className="p-4 lg:p-6">

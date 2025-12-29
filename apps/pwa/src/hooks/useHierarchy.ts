@@ -33,34 +33,27 @@ import {
   HierarchyStats,
 } from '@/types/hierarchy'
 
-// Cache global para árbol completo (5 minutos TTL)
+// Cache global para árbol completo con timestamp de última actualización
 let treeCache: {
   data: HierarchyNodeWithChildren[]
   timestamp: number
+  lastUpdate: Timestamp | null
 } | null = null
-const CACHE_TTL = 5 * 60 * 1000 // 5 minutos
 
 /**
  * Hook principal: obtener árbol completo jerárquico
- * Optimizado con caché en memoria
+ * Con sincronización automática cada 30 segundos
  */
 export function useHierarchyTree() {
   const [tree, setTree] = useState<HierarchyNodeWithChildren[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
+  const [hasUpdates, setHasUpdates] = useState(false)
 
   const loadTree = async () => {
     try {
       setLoading(true)
       setError(null)
-
-      // Verificar caché
-      if (treeCache && Date.now() - treeCache.timestamp < CACHE_TTL) {
-        logger.info('Using cached hierarchy tree')
-        setTree(treeCache.data)
-        setLoading(false)
-        return
-      }
 
       // Obtener todos los nodos ordenados por nivel y orden
       const hierarchyRef = collection(db, 'hierarchy')
@@ -77,6 +70,16 @@ export function useHierarchyTree() {
         ...doc.data(),
       } as HierarchyNode))
 
+      // Encontrar última actualización
+      let lastUpdate: Timestamp | null = null
+      nodes.forEach(node => {
+        if (node.actualizadoEn) {
+          if (!lastUpdate || node.actualizadoEn.toMillis() > lastUpdate.toMillis()) {
+            lastUpdate = node.actualizadoEn
+          }
+        }
+      })
+
       // Construir árbol desde los nodos planos
       const treeData = buildTree(nodes)
 
@@ -84,9 +87,11 @@ export function useHierarchyTree() {
       treeCache = {
         data: treeData,
         timestamp: Date.now(),
+        lastUpdate,
       }
 
       setTree(treeData)
+      setHasUpdates(false)
       logger.info('Hierarchy tree loaded', { nodeCount: nodes.length })
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Error al cargar jerarquía')
@@ -97,8 +102,38 @@ export function useHierarchyTree() {
     }
   }
 
+  // Verificar si hay actualizaciones sin recargar todo el árbol
+  const checkForUpdates = async () => {
+    if (!treeCache?.lastUpdate) return
+    
+    try {
+      const hierarchyRef = collection(db, 'hierarchy')
+      const q = query(
+        hierarchyRef,
+        where('activo', '==', true),
+        where('actualizadoEn', '>', treeCache.lastUpdate),
+        orderBy('actualizadoEn', 'desc')
+      )
+      
+      const snapshot = await getDocs(q)
+      if (snapshot.size > 0) {
+        setHasUpdates(true)
+        logger.info('New hierarchy updates detected', { count: snapshot.size })
+      }
+    } catch (err) {
+      logger.error('Error checking for updates', err instanceof Error ? err : new Error(String(err)))
+    }
+  }
+
   useEffect(() => {
     loadTree()
+
+    // Polling cada 30 segundos para detectar cambios
+    const interval = setInterval(() => {
+      checkForUpdates()
+    }, 30000)
+
+    return () => clearInterval(interval)
   }, [])
 
   const refresh = () => {
@@ -106,7 +141,7 @@ export function useHierarchyTree() {
     loadTree()
   }
 
-  return { tree, loading, error, refresh }
+  return { tree, loading, error, refresh, hasUpdates }
 }
 
 /**
