@@ -6,6 +6,7 @@
 import { useState, useEffect } from 'react'
 import { APP_VERSION } from '@/constants/version'
 import { logger } from '@/lib/logger'
+import { getAssetUrl } from '@/lib/config'
 
 const VERSION_CHECK_INTERVAL = 60000 // 1 minuto
 const LAST_VERSION_KEY = 'app_last_version'
@@ -17,8 +18,9 @@ export function useAppVersion() {
   useEffect(() => {
     const checkVersion = async () => {
       try {
-        // Agregar timestamp para evitar cache
-        const response = await fetch(`/version.json?t=${Date.now()}`, {
+        // Usar getAssetUrl para obtener la ruta correcta con BASE_URL
+        const versionUrl = getAssetUrl(`/version.json?t=${Date.now()}`)
+        const response = await fetch(versionUrl, {
           cache: 'no-store',
           headers: {
             'Cache-Control': 'no-cache',
