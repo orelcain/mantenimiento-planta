@@ -359,6 +359,21 @@ export function useHierarchySearch(filters: HierarchyFilters) {
 export function useHierarchyMutations() {
   const user = useAuthStore((state: any) => state.user)
 
+  const assertUniqueCodigo = async (codigoRaw: string, excludeId?: string) => {
+    const codigo = codigoRaw.trim()
+    if (!codigo) throw new Error('El código es obligatorio')
+
+    const hierarchyRef = collection(db, 'hierarchy')
+    const q = query(hierarchyRef, where('codigo', '==', codigo), where('activo', '==', true))
+    const snap = await getDocs(q)
+
+    // Si existe algún doc activo con el mismo código (que no sea el mismo id), bloquear.
+    const collision = snap.docs.find(d => d.id !== excludeId)
+    if (collision) {
+      throw new Error(`Ya existe un nodo activo con el código ${codigo}`)
+    }
+  }
+
   const createNode = async (input: CreateHierarchyNodeInput): Promise<string> => {
     console.log('[useHierarchy] createNode iniciado:', input)
     console.log('[useHierarchy] Usuario actual:', { uid: user?.uid, id: user?.id })
@@ -370,6 +385,8 @@ export function useHierarchyMutations() {
     }
 
     try {
+      await assertUniqueCodigo(input.codigo)
+
       // Calcular path
       const path: string[] = []
       if (input.parentId) {
@@ -445,6 +462,10 @@ export function useHierarchyMutations() {
 
   const updateNode = async (id: string, input: UpdateHierarchyNodeInput): Promise<void> => {
     try {
+      if (input.codigo !== undefined) {
+        await assertUniqueCodigo(input.codigo, id)
+      }
+
       const updateData: any = {
         actualizadoEn: Timestamp.now(),
       }

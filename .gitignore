@@ -4,6 +4,9 @@ dist
 .turbo
 *.tsbuildinfo
 
+# Python venv
+.venv
+
 # Build outputs
 apps/pwa/dist
 apps/pwa/vite.config.js

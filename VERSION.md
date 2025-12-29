@@ -1,14 +1,29 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v1.0.4**
+## Versión Actual: **v2.1.7**
 
-**Fecha de lanzamiento**: 24 de diciembre de 2025  
+**Fecha de lanzamiento**: 29 de diciembre de 2025  
 **Estado**: ✅ PRODUCCIÓN READY  
-**Build**: 1067.26 KiB | 0 errores TypeScript
+**Build**: ✅ Último build local OK
 
 ---
 
 ## 📋 Información de la Versión
+
+### v2.1.7 - Reconciliación Mandante
+
+Refuerzo de gobernanza de datos y estabilidad del árbol jerárquico.
+
+#### 🗂️ Mandante y verificación
+- Dataset canónico derivado de los extractos verificados (438 códigos únicos)
+- Scripts para verificar y reconciliar Firestore contra el mandante
+
+#### 🛡️ Integridad de datos
+- Bloqueo de `codigo` duplicado (nodos activos) en creación/edición
+
+#### 🔄 Actualización y cache
+- Soporte de sincronización/refresco y detección de actualizaciones
+- Version-check para avisar “Nueva versión disponible”
 
 ### v1.0.4 - Corrección Completa de Mapa
 

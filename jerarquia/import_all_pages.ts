@@ -1,5 +1,10 @@
 /**
  * Script para importar TODOS los equipos de las páginas 1-10 a Firestore
+ *
+ * ⚠️ LEGADO (NO USAR): este script escribe el esquema antiguo (active/code/parentCode).
+ * Usar en su lugar:
+ * - jerarquia/import_hierarchy_admin.ts (esquema actual: activo/codigo/parentId/nivel/path/orden)
+ * - jerarquia/reconcile_firestore_to_expected.ts para dejar Firestore igual al mandante.
  * Ejecutar con:
  * $env:GOOGLE_APPLICATION_CREDENTIALS="d:\a\clave privada\mantenimiento-planta-771a3-firebase-adminsdk-fbsvc-c1bee027a1.json"; $env:TS_NODE_COMPILER_OPTIONS='{"module":"CommonJS","moduleResolution":"node"}'; node -r ts-node/register/transpile-only -e "require('./jerarquia/import_all_pages.ts')"
  */

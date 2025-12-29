@@ -7,6 +7,22 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.1.7] - 2025-12-29
+
+### 🧩 Reconciliación Mandante y Estabilidad de Jerarquía
+
+#### 🗂️ Datos (Mandante)
+- Dataset canónico `jerarquia/EXPECTED_CANONICAL.json` (438 códigos únicos) y reporte `jerarquia/EXPECTED_CONFLICTS.json`
+- Verificación y reconciliación Firestore ↔ mandante
+
+#### 🛡️ Integridad en la App
+- Bloqueo de creación/actualización de nodos activos con `codigo` duplicado
+- Soporte de refresco/detección de cambios para evitar jerarquía stale
+
+#### 🧰 Herramientas y repo
+- Scripts de apoyo en `jerarquia/` para verificación/reconciliación
+- `.venv` agregado a `.gitignore` y task de VS Code para build del PWA
+
 ## [1.0.4] - 2025-12-24
 
 ### 🔧 Corrección Completa de Mapa

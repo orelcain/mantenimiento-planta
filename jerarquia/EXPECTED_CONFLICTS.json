@@ -1,0 +1,139 @@
+{
+  "generatedAt": "2025-12-29T17:22:00.256Z",
+  "conflictos": 7,
+  "items": [
+    {
+      "codigo": "720004388",
+      "padres": [
+        {
+          "padre": "AQ-IN-CHO-ACOP",
+          "source": "D:\\a\\APP leventamiento de insidencias en planta\\jerarquia\\imagen_02_equipos.json"
+        }
+      ],
+      "denominaciones": [
+        {
+          "denominacion": "TERMO ELECTRICO AGUA CALIENTE",
+          "source": "D:\\a\\APP leventamiento de insidencias en planta\\jerarquia\\JERARQUIA_COMPLETA_VERIFICADA.json::PAGINA_1"
+        },
+        {
+          "denominacion": "THERMO ELECTRICO AGUA CALIENTE",
+          "source": "D:\\a\\APP leventamiento de insidencias en planta\\jerarquia\\imagen_02_equipos.json"
+        }
+      ]
+    },
+    {
+      "codigo": "720004479",
+      "padres": [
+        {
+          "padre": "720004478",
+          "source": "D:\\a\\APP leventamiento de insidencias en planta\\jerarquia\\imagen_03_equipos.json"
+        }
+      ],
+      "denominaciones": [
+        {
+          "denominacion": "MOTOR ELECTRICO BOMBA AGUA MAR N1",
+          "source": "D:\\a\\APP leventamiento de insidencias en planta\\jerarquia\\JERARQUIA_COMPLETA_VERIFICADA.json::PAGINA_2"
+        },
+        {
+          "denominacion": "MOTOR ELECTRICO BOMBA AGUAMAR N1",
+          "source": "D:\\a\\APP leventamiento de insidencias en planta\\jerarquia\\imagen_03_equipos.json"
+        }
+      ]
+    },
+    {
+      "codigo": "720004481",
+      "padres": [
+        {
+          "padre": "720004480",
+          "source": "D:\\a\\APP leventamiento de insidencias en planta\\jerarquia\\imagen_03_equipos.json"
+        }
+      ],
+      "denominaciones": [
+        {
+          "denominacion": "MOTOR ELECTRICO BOMBA AGUA MAR N2",
+          "source": "D:\\a\\APP leventamiento de insidencias en planta\\jerarquia\\JERARQUIA_COMPLETA_VERIFICADA.json::PAGINA_2"
+        },
+        {
+          "denominacion": "MOTOR ELECTRICO BOMBA AGUAMAR N1",
+          "source": "D:\\a\\APP leventamiento de insidencias en planta\\jerarquia\\imagen_03_equipos.json"
+        }
+      ]
+    },
+    {
+      "codigo": "720004489",
+      "padres": [
+        {
+          "padre": "720004485",
+          "source": "D:\\a\\APP leventamiento de insidencias en planta\\jerarquia\\imagen_02_equipos.json"
+        }
+      ],
+      "denominaciones": [
+        {
+          "denominacion": "CAUDALIMETRO ENTRADA AGUA DULCE",
+          "source": "D:\\a\\APP leventamiento de insidencias en planta\\jerarquia\\JERARQUIA_COMPLETA_VERIFICADA.json::PAGINA_2"
+        },
+        {
+          "denominacion": "CAUDALIMETRO ENTRADA AGUA AGUA DULCE",
+          "source": "D:\\a\\APP leventamiento de insidencias en planta\\jerarquia\\imagen_02_equipos.json"
+        }
+      ]
+    },
+    {
+      "codigo": "720004496",
+      "padres": [
+        {
+          "padre": "720004492",
+          "source": "D:\\a\\APP leventamiento de insidencias en planta\\jerarquia\\imagen_02_equipos.json"
+        }
+      ],
+      "denominaciones": [
+        {
+          "denominacion": "CAUDALIMETRO ENTRADA AGUA SALADA",
+          "source": "D:\\a\\APP leventamiento de insidencias en planta\\jerarquia\\JERARQUIA_COMPLETA_VERIFICADA.json::PAGINA_2"
+        },
+        {
+          "denominacion": "CAUDALIMETRO ENTRADA AGUA AGUA SALADA",
+          "source": "D:\\a\\APP leventamiento de insidencias en planta\\jerarquia\\imagen_02_equipos.json"
+        }
+      ]
+    },
+    {
+      "codigo": "720004534",
+      "padres": [
+        {
+          "padre": "AQ-IN-CHO-PCHO-EXTE-SMAQ",
+          "source": "D:\\a\\APP leventamiento de insidencias en planta\\jerarquia\\imagen_05_equipos.json"
+        },
+        {
+          "padre": "AQ-IN-CHO-PCHO-FRIG-ANCA",
+          "source": "D:\\a\\APP leventamiento de insidencias en planta\\jerarquia\\imagen_06_equipos.json"
+        }
+      ],
+      "denominaciones": [
+        {
+          "denominacion": "SOPLADORES VIGUETAS CAMARAS 1",
+          "source": "D:\\a\\APP leventamiento de insidencias en planta\\jerarquia\\imagen_06_equipos.json"
+        }
+      ]
+    },
+    {
+      "codigo": "720004535",
+      "padres": [
+        {
+          "padre": "AQ-IN-CHO-PCHO-EXTE-SMAQ",
+          "source": "D:\\a\\APP leventamiento de insidencias en planta\\jerarquia\\imagen_05_equipos.json"
+        },
+        {
+          "padre": "AQ-IN-CHO-PCHO-FRIG-ANCA",
+          "source": "D:\\a\\APP leventamiento de insidencias en planta\\jerarquia\\imagen_06_equipos.json"
+        }
+      ],
+      "denominaciones": [
+        {
+          "denominacion": "SOPLADORES VIGUETAS CAMARAS 2",
+          "source": "D:\\a\\APP leventamiento de insidencias en planta\\jerarquia\\imagen_06_equipos.json"
+        }
+      ]
+    }
+  ]
+}
