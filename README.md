@@ -106,20 +106,50 @@ pnpm build
 ## 📁 Estructura del Proyecto
 
 ```
-├── apps/pwa/                 # Aplicación PWA principal
-│   ├── src/
-│   │   ├── components/       # Componentes React
-│   │   ├── pages/            # Páginas de la app
-│   │   ├── services/         # Servicios Firebase
-│   │   ├── store/            # Estado global (Zustand)
-│   │   ├── types/            # Tipos TypeScript
-│   │   └── lib/              # Utilidades
-│   └── public/               # Assets estáticos
-├── packages/shared/          # Código compartido
-├── functions/                # Firebase Cloud Functions
-├── firestore.rules           # Reglas de seguridad
-└── .github/workflows/        # CI/CD
+mantenimiento-planta/
+├── apps/
+│   └── pwa/                  # 💻 Aplicación PWA principal
+│       ├── src/              # Código fuente React + TypeScript
+│       │   ├── components/   # Componentes reutilizables
+│       │   ├── pages/        # Páginas de la aplicación
+│       │   ├── services/     # Integración con Firebase
+│       │   ├── store/        # Estado global (Zustand)
+│       │   ├── types/        # Definiciones TypeScript
+│       │   └── lib/          # Utilidades y helpers
+│       └── public/           # Assets estáticos
+│
+├── data/                     # 📊 Datos del proyecto
+│   ├── jerarquia/            # Estructura organizacional
+│   │   ├── *.json            # Datos de jerarquía
+│   │   └── *.ts              # Scripts de procesamiento
+│   └── mapas/                # Planos y mapas
+│       ├── *.dwg             # Archivos AutoCAD
+│       ├── *.svg             # Mapas vectoriales
+│       └── *.png             # Imágenes de referencia
+│
+├── docs/                     # 📚 Documentación
+│   ├── development/          # Guías técnicas y roadmaps
+│   ├── history/              # Changelog de versiones anteriores
+│   └── setup/                # Configuraciones e inicialización
+│
+├── scripts/                  # 🔧 Scripts de utilidad
+│   └── *.ps1, *.ts          # Automatización y mantenimiento
+│
+├── .github/workflows/        # 🚀 CI/CD con GitHub Actions
+├── firebase.json             # ⚙️ Configuración Firebase
+├── firestore.rules           # 🔒 Reglas de seguridad
+├── turbo.json                # 📦 Configuración Turborepo
+├── README.md                 # 📖 Este archivo
+├── CHANGELOG.md              # 📝 Historial de cambios
+└── VERSION.md                # 🏷️ Información de versiones
 ```
+
+### Carpetas Principales
+
+- **`/apps`**: Código de la aplicación PWA
+- **`/data`**: Datos estructurales (jerarquía y mapas) - no versionados en build
+- **`/docs`**: Documentación técnica organizada por categorías
+- **`/scripts`**: Herramientas de automatización y mantenimiento
 
 ## 🎨 Tecnologías
 
