@@ -7,6 +7,21 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.2.24] - 2026-01-09
+
+### 📷 Evidencias Fotográficas (multi-foto por par)
+
+#### Añadido
+- Soporte de múltiples fotos ANTES y DESPUÉS por cada par (manteniendo compatibilidad con el modelo legado)
+- Selección de foto dentro del par para comparar y anotar
+
+#### Mejorado
+- Exportación PDF en formato “Informe Técnico”: 1 par por página y páginas adicionales cuando hay múltiples fotos por par
+- Listados: conteos y miniaturas calculadas desde `pairPhotos` cuando existe
+
+#### Corregido
+- Validaciones de exportación actualizadas para no bloquear evidencias multi-foto
+
 ## [2.1.7] - 2025-12-29
 
 ### 🧩 Reconciliación Mandante y Estabilidad de Jerarquía

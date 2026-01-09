@@ -22,7 +22,7 @@ import {
   deleteObject,
 } from 'firebase/storage'
 import { db, storage } from './firebase'
-import type { PhotoEvidence, PhotoItem, PhotoEvidenceStatus, PhotoComparison, PhotoPairMeta } from '@/types'
+import type { PhotoEvidence, PhotoItem, PhotoEvidenceStatus, PhotoComparison, PhotoPairMeta, PhotoPairPhotos } from '@/types'
 import { generateId } from '@/lib/utils'
 import { compressImage } from './storage'
 import { logger } from '@/lib/logger'
@@ -160,6 +160,56 @@ function parseEvidenceDoc(doc: any): PhotoEvidence {
   const data = doc.data()
   const createdAt = toDateSafe(data.createdAt) ?? new Date()
   const updatedAt = toDateSafe(data.updatedAt) ?? createdAt
+
+  const pairPhotos: PhotoPairPhotos[] | undefined = Array.isArray(data.pairPhotos)
+    ? data.pairPhotos.map((pp: any) => ({
+        before: Array.isArray(pp?.before)
+          ? pp.before.map((f: any) => ({
+              ...f,
+              timestamp: toDateSafe(f.timestamp) ?? createdAt,
+            }))
+          : [],
+        after: Array.isArray(pp?.after)
+          ? pp.after.map((f: any) => ({
+              ...f,
+              timestamp: toDateSafe(f.timestamp) ?? createdAt,
+            }))
+          : [],
+      }))
+    : undefined
+
+  // Legacy arrays (1 foto por par). If pairPhotos exists, keep them in sync for UI thumbnails.
+  const legacyBefore: PhotoItem[] = (data.fotosBefore || []).map((f: any) => ({
+    ...f,
+    timestamp: toDateSafe(f.timestamp) ?? createdAt,
+  }))
+  const legacyAfter: PhotoItem[] = (data.fotosAfter || []).map((f: any) => ({
+    ...f,
+    timestamp: toDateSafe(f.timestamp) ?? createdAt,
+  }))
+
+  const syncedLegacy = (() => {
+    if (!pairPhotos) return { fotosBefore: legacyBefore, fotosAfter: legacyAfter }
+    const maxPairs = Math.max(pairPhotos.length, legacyBefore.length, legacyAfter.length)
+    const fotosBefore: PhotoItem[] = []
+    const fotosAfter: PhotoItem[] = []
+    for (let i = 0; i < maxPairs; i++) {
+      const pp = pairPhotos[i]
+      const first = pp?.before?.[0] ?? legacyBefore[i]
+      if (first) fotosBefore.push(first)
+    }
+    for (let i = 0; i < maxPairs; i++) {
+      const pp = pairPhotos[i]
+      const first = pp?.after?.[0] ?? legacyAfter[i]
+      if (first) fotosAfter.push(first)
+    }
+    // Filter out undefined (TS) at runtime
+    return {
+      fotosBefore: fotosBefore.filter(Boolean) as PhotoItem[],
+      fotosAfter: fotosAfter.filter(Boolean) as PhotoItem[],
+    }
+  })()
+
   return {
     ...data,
     id: doc.id,
@@ -168,14 +218,47 @@ function parseEvidenceDoc(doc: any): PhotoEvidence {
     corregidaAt: toDateSafe(data.corregidaAt),
     verificadaAt: toDateSafe(data.verificadaAt),
     pairMeta: Array.isArray(data.pairMeta) ? data.pairMeta : [],
-    fotosBefore: (data.fotosBefore || []).map((f: any) => ({
-      ...f,
-      timestamp: toDateSafe(f.timestamp) ?? createdAt,
-    })),
-    fotosAfter: (data.fotosAfter || []).map((f: any) => ({
-      ...f,
-      timestamp: toDateSafe(f.timestamp) ?? createdAt,
-    })),
+    pairPhotos,
+    fotosBefore: syncedLegacy.fotosBefore,
+    fotosAfter: syncedLegacy.fotosAfter,
+  }
+}
+
+function buildPairPhotosFromLegacy(evidence: PhotoEvidence): PhotoPairPhotos[] {
+  const maxPairs = Math.max(evidence.fotosBefore.length, evidence.fotosAfter.length, evidence.pairMeta?.length ?? 0)
+  const pairs: PhotoPairPhotos[] = []
+  for (let i = 0; i < maxPairs; i++) {
+    const before = evidence.fotosBefore[i] ? [evidence.fotosBefore[i]!] : []
+    const after = evidence.fotosAfter[i] ? [evidence.fotosAfter[i]!] : []
+    pairs.push({ before, after })
+  }
+  return pairs
+}
+
+function getNormalizedPairPhotos(evidence: PhotoEvidence): PhotoPairPhotos[] {
+  const pairs = Array.isArray(evidence.pairPhotos) ? evidence.pairPhotos : buildPairPhotosFromLegacy(evidence)
+  const maxPairs = Math.max(pairs.length, evidence.fotosBefore.length, evidence.fotosAfter.length, evidence.pairMeta?.length ?? 0)
+  const out: PhotoPairPhotos[] = []
+  for (let i = 0; i < maxPairs; i++) {
+    const pp = pairs[i]
+    const before = Array.isArray(pp?.before) ? pp.before : []
+    const after = Array.isArray(pp?.after) ? pp.after : []
+    out.push({ before, after })
+  }
+  return out
+}
+
+function syncLegacyFromPairPhotos(pairPhotos: PhotoPairPhotos[]) {
+  const fotosBefore: PhotoItem[] = []
+  const fotosAfter: PhotoItem[] = []
+  for (let i = 0; i < pairPhotos.length; i++) {
+    const pp = pairPhotos[i]
+    if (pp?.before?.[0]) fotosBefore[i] = pp.before[0]
+    if (pp?.after?.[0]) fotosAfter[i] = pp.after[0]
+  }
+  return {
+    fotosBefore: fotosBefore.filter(Boolean) as PhotoItem[],
+    fotosAfter: fotosAfter.filter(Boolean) as PhotoItem[],
   }
 }
 
@@ -190,6 +273,7 @@ export async function createPhotoEvidence(
     ...data,
     id,
     fotosAfter: [],
+    pairPhotos: [],
     pairMeta: [],
     status: 'pendiente',
     createdAt: now,
@@ -398,6 +482,96 @@ export async function upsertEvidencePhotoAtIndex(
   }
 }
 
+export async function updateEvidencePairPhotos(
+  evidenceId: string,
+  pairIndex: number,
+  type: 'before' | 'after',
+  desired: { id: string; url: string; file?: File }[],
+  userId?: string
+): Promise<void> {
+  const evidence = await getPhotoEvidenceById(evidenceId)
+  if (!evidence) throw new Error('Evidencia no encontrada')
+
+  const pairPhotos = getNormalizedPairPhotos(evidence)
+
+  // Evitar huecos de pares
+  if (pairIndex > pairPhotos.length) {
+    throw new Error('No se puede guardar este par sin completar los anteriores')
+  }
+
+  // Asegurar que exista el par
+  if (pairIndex === pairPhotos.length) {
+    pairPhotos.push({ before: [], after: [] })
+  }
+
+  const currentList = type === 'before' ? pairPhotos[pairIndex]!.before : pairPhotos[pairIndex]!.after
+  const desiredIds = new Set(desired.map((d) => d.id))
+
+  // Borrar del storage lo que se quitó
+  for (const p of currentList) {
+    if (!desiredIds.has(p.id)) {
+      try {
+        await deleteEvidencePhoto(evidenceId, p.id, type, p.url)
+      } catch (e) {
+        logger.warn('Error deleting removed pair photo', { evidenceId, type, photoId: p.id })
+      }
+    }
+  }
+
+  const nextList: PhotoItem[] = []
+
+  for (const item of desired) {
+    if (item.file) {
+      const toReplace = currentList.find((p) => p.id === item.id)
+      if (toReplace) {
+        try {
+          await deleteEvidencePhoto(evidenceId, toReplace.id, type, toReplace.url)
+        } catch (e) {
+          logger.warn('Error deleting replaced pair photo', { evidenceId, type, photoId: toReplace.id })
+        }
+      }
+      const uploaded = await uploadMultipleEvidencePhotos(evidenceId, [item.file], type)
+      const first = uploaded[0]
+      if (!first) continue
+      nextList.push({ id: first.id, url: first.url, timestamp: new Date() })
+      continue
+    }
+
+    const existing = currentList.find((p) => p.id === item.id)
+    if (existing) {
+      nextList.push(existing)
+    } else {
+      // Fallback: keep provided id/url
+      nextList.push({ id: item.id, url: item.url, timestamp: new Date() })
+    }
+  }
+
+  if (type === 'before') {
+    pairPhotos[pairIndex] = { ...pairPhotos[pairIndex]!, before: nextList }
+  } else {
+    pairPhotos[pairIndex] = { ...pairPhotos[pairIndex]!, after: nextList }
+  }
+
+  const legacy = syncLegacyFromPairPhotos(pairPhotos)
+
+  if (type === 'after' && nextList.length > 0) {
+    await updatePhotoEvidence(evidenceId, {
+      pairPhotos,
+      fotosBefore: legacy.fotosBefore,
+      fotosAfter: legacy.fotosAfter,
+      status: 'corregida',
+      corregidoPor: userId,
+      corregidaAt: new Date(),
+    })
+  } else {
+    await updatePhotoEvidence(evidenceId, {
+      pairPhotos,
+      fotosBefore: legacy.fotosBefore,
+      fotosAfter: legacy.fotosAfter,
+    })
+  }
+}
+
 export async function deleteEvidencePair(
   evidenceId: string,
   pairIndex: number
@@ -405,31 +579,33 @@ export async function deleteEvidencePair(
   const evidence = await getPhotoEvidenceById(evidenceId)
   if (!evidence) throw new Error('Evidencia no encontrada')
 
-  const before = evidence.fotosBefore[pairIndex]
-  const after = evidence.fotosAfter[pairIndex]
-
-  if (before) {
-    try {
-      await deleteEvidencePhoto(evidenceId, before.id, 'before', before.url)
-    } catch (e) {
-      logger.warn('Error deleting before photo for pair deletion', { evidenceId, photoId: before.id })
+  const pairPhotos = getNormalizedPairPhotos(evidence)
+  const toDelete = pairPhotos[pairIndex]
+  if (toDelete) {
+    for (const p of toDelete.before) {
+      try {
+        await deleteEvidencePhoto(evidenceId, p.id, 'before', p.url)
+      } catch (e) {
+        logger.warn('Error deleting before photo for pair deletion', { evidenceId, photoId: p.id })
+      }
+    }
+    for (const p of toDelete.after) {
+      try {
+        await deleteEvidencePhoto(evidenceId, p.id, 'after', p.url)
+      } catch (e) {
+        logger.warn('Error deleting after photo for pair deletion', { evidenceId, photoId: p.id })
+      }
     }
   }
-  if (after) {
-    try {
-      await deleteEvidencePhoto(evidenceId, after.id, 'after', after.url)
-    } catch (e) {
-      logger.warn('Error deleting after photo for pair deletion', { evidenceId, photoId: after.id })
-    }
-  }
 
-  const fotosBefore = evidence.fotosBefore.filter((_, i) => i !== pairIndex)
-  const fotosAfter = evidence.fotosAfter.filter((_, i) => i !== pairIndex)
+  const nextPairPhotos = pairPhotos.filter((_, i) => i !== pairIndex)
+  const legacy = syncLegacyFromPairPhotos(nextPairPhotos)
   const pairMeta = (evidence.pairMeta || []).filter((_, i) => i !== pairIndex)
 
   await updatePhotoEvidence(evidenceId, {
-    fotosBefore,
-    fotosAfter,
+    pairPhotos: nextPairPhotos,
+    fotosBefore: legacy.fotosBefore,
+    fotosAfter: legacy.fotosAfter,
     pairMeta,
   })
 }
@@ -484,19 +660,27 @@ export async function deletePhotoEvidence(id: string): Promise<void> {
   const evidence = await getPhotoEvidenceById(id)
   if (!evidence) return
 
-  // Eliminar todas las fotos de storage
-  for (const photo of evidence.fotosBefore) {
-    try {
-      await deleteEvidencePhoto(id, photo.id, 'before', photo.url)
-    } catch (e) {
-      logger.warn('Error deleting before photo', { photoId: photo.id })
+  const pairPhotos = getNormalizedPairPhotos(evidence)
+  const seen = new Set<string>()
+
+  for (const pp of pairPhotos) {
+    for (const photo of pp.before) {
+      if (seen.has(photo.id)) continue
+      seen.add(photo.id)
+      try {
+        await deleteEvidencePhoto(id, photo.id, 'before', photo.url)
+      } catch (e) {
+        logger.warn('Error deleting before photo', { photoId: photo.id })
+      }
     }
-  }
-  for (const photo of evidence.fotosAfter) {
-    try {
-      await deleteEvidencePhoto(id, photo.id, 'after', photo.url)
-    } catch (e) {
-      logger.warn('Error deleting after photo', { photoId: photo.id })
+    for (const photo of pp.after) {
+      if (seen.has(photo.id)) continue
+      seen.add(photo.id)
+      try {
+        await deleteEvidencePhoto(id, photo.id, 'after', photo.url)
+      } catch (e) {
+        logger.warn('Error deleting after photo', { photoId: photo.id })
+      }
     }
   }
 
@@ -508,24 +692,26 @@ export async function deletePhotoEvidence(id: string): Promise<void> {
 // Preparar datos para exportación PDF
 export function prepareComparisonForExport(evidence: PhotoEvidence): PhotoComparison[] {
   const comparisons: PhotoComparison[] = []
-  
-  // Emparejar fotos before con after por índice
-  const maxLen = Math.max(evidence.fotosBefore.length, evidence.fotosAfter.length)
-  
-  for (let i = 0; i < maxLen; i++) {
-    const before = evidence.fotosBefore[i]
-    const after = evidence.fotosAfter[i]
+
+  const pairPhotos = getNormalizedPairPhotos(evidence)
+  for (let i = 0; i < pairPhotos.length; i++) {
+    const pp = pairPhotos[i]
+    if (!pp) continue
     const meta = evidence.pairMeta?.[i]
-    
-    if (before && after) {
-      comparisons.push({
-        evidenceId: evidence.id,
-        titulo: evidence.titulo,
-        ubicacion: meta?.ubicacion || evidence.hierarchyPath,
-        before,
-        after,
-        descripcion: meta?.descripcion || evidence.descripcion,
-      })
+    const maxInner = Math.max(pp.before.length, pp.after.length)
+    for (let k = 0; k < maxInner; k++) {
+      const before = pp.before[k]
+      const after = pp.after[k]
+      if (before && after) {
+        comparisons.push({
+          evidenceId: evidence.id,
+          titulo: evidence.titulo,
+          ubicacion: meta?.ubicacion || evidence.hierarchyPath,
+          before,
+          after,
+          descripcion: meta?.descripcion || evidence.descripcion,
+        })
+      }
     }
   }
   

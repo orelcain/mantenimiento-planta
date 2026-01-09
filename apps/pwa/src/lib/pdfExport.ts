@@ -211,15 +211,29 @@ export async function exportPhotoEvidenceTechnicalReportToPDF(
     return options?.userDisplayNameById?.[raw] ?? raw
   }
 
-  const evidencePages: Array<{ evidence: PhotoEvidence; pairIndex: number }> = []
+  const evidencePages: Array<{ evidence: PhotoEvidence; pairIndex: number; mediaIndex: number }> = []
   for (const evidence of evidences) {
-    const maxPairs = Math.max(evidence.fotosBefore.length, evidence.fotosAfter.length)
+    const maxPairs = Math.max(evidence.pairPhotos?.length ?? 0, evidence.fotosBefore.length, evidence.fotosAfter.length)
     for (let i = 0; i < maxPairs; i++) {
-      const before = evidence.fotosBefore[i]
-      const after = evidence.fotosAfter[i]
-      // Solo exportar si hay al menos una imagen en el par (y en práctica se usa cuando hay pares completos)
-      if (before || after) {
-        evidencePages.push({ evidence, pairIndex: i })
+      const pair = evidence.pairPhotos?.[i]
+      const beforeList = pair?.before?.length
+        ? pair.before
+        : evidence.fotosBefore[i]
+          ? [evidence.fotosBefore[i]!]
+          : []
+      const afterList = pair?.after?.length
+        ? pair.after
+        : evidence.fotosAfter[i]
+          ? [evidence.fotosAfter[i]!]
+          : []
+
+      const maxInner = Math.max(beforeList.length, afterList.length)
+      for (let k = 0; k < maxInner; k++) {
+        const before = beforeList[k]
+        const after = afterList[k]
+        if (before || after) {
+          evidencePages.push({ evidence, pairIndex: i, mediaIndex: k })
+        }
       }
     }
   }
@@ -234,7 +248,7 @@ export async function exportPhotoEvidenceTechnicalReportToPDF(
   for (let pageIndex = 0; pageIndex < evidencePages.length; pageIndex++) {
     const pageItem = evidencePages[pageIndex]
     if (!pageItem) continue
-    const { evidence, pairIndex } = pageItem
+    const { evidence, pairIndex, mediaIndex } = pageItem
     const canvas = document.createElement('canvas')
     canvas.width = pageWidth * 2
     canvas.height = pageHeight * 2
@@ -269,6 +283,19 @@ export async function exportPhotoEvidenceTechnicalReportToPDF(
 
     const pairMeta = evidence.pairMeta?.[pairIndex]
 
+    const totalBefore = (() => {
+      if (evidence.pairPhotos?.length) {
+        return evidence.pairPhotos.reduce((acc, p) => acc + (p?.before?.length ?? 0), 0)
+      }
+      return evidence.fotosBefore.length
+    })()
+    const totalAfter = (() => {
+      if (evidence.pairPhotos?.length) {
+        return evidence.pairPhotos.reduce((acc, p) => acc + (p?.after?.length ?? 0), 0)
+      }
+      return evidence.fotosAfter.length
+    })()
+
     const statusKey = evidence.status as PhotoEvidenceStatus
     const statusLabel = STATUS_LABEL[statusKey] ?? safeText(evidence.status)
     const reportRows = [
@@ -289,9 +316,9 @@ export async function exportPhotoEvidenceTechnicalReportToPDF(
         { label: 'Tipo falla (par)', value: safeText(pairMeta?.tipoFalla || '-') },
       ],
       [
-        { label: 'Fotos antes', value: String(evidence.fotosBefore.length) },
-        { label: 'Fotos después', value: String(evidence.fotosAfter.length) },
-        { label: 'Par', value: `${pairIndex + 1}` },
+        { label: 'Fotos antes', value: String(totalBefore) },
+        { label: 'Fotos después', value: String(totalAfter) },
+        { label: 'Par', value: `${pairIndex + 1}${totalBefore > 1 || totalAfter > 1 ? ` (img ${mediaIndex + 1})` : ''}` },
         { label: 'Título', value: safeText(evidence.titulo) },
       ],
     ]
@@ -328,8 +355,20 @@ export async function exportPhotoEvidenceTechnicalReportToPDF(
 
     // Evidencia fotográfica
     currentY = drawSectionHeader(ctx, '2. EVIDENCIA FOTOGRÁFICA (ANTES / DESPUÉS)', margin, currentY, contentWidth)
-    const before = evidence.fotosBefore[pairIndex] ?? null
-    const after = evidence.fotosAfter[pairIndex] ?? null
+    const pair = evidence.pairPhotos?.[pairIndex]
+    const beforeList = pair?.before?.length
+      ? pair.before
+      : evidence.fotosBefore[pairIndex]
+        ? [evidence.fotosBefore[pairIndex]!]
+        : []
+    const afterList = pair?.after?.length
+      ? pair.after
+      : evidence.fotosAfter[pairIndex]
+        ? [evidence.fotosAfter[pairIndex]!]
+        : []
+
+    const before = beforeList[mediaIndex] ?? null
+    const after = afterList[mediaIndex] ?? null
     currentY = await drawBeforeAfterPair(ctx, before, after, margin, currentY, contentWidth, {
       beforeAnnotated: Boolean(pairMeta?.anotadaAntes),
       afterAnnotated: Boolean(pairMeta?.anotadaDespues),

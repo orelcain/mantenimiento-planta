@@ -378,6 +378,11 @@ export interface PhotoPairMeta {
   anotadaDespues?: boolean
 }
 
+export interface PhotoPairPhotos {
+  before: PhotoItem[]
+  after: PhotoItem[]
+}
+
 // Grupo de fotos antes/después
 export interface PhotoEvidence {
   id: string
@@ -387,8 +392,11 @@ export interface PhotoEvidence {
   hierarchyNodeId?: string
   hierarchyPath?: string // "Planta > Área > Línea > Equipo"
   // Fotos
+  // Legacy: 1 foto por par (primer elemento). Se mantiene por compatibilidad.
   fotosBefore: PhotoItem[]
   fotosAfter: PhotoItem[]
+  // Nuevo: múltiples fotos por par (alineado por índice de par)
+  pairPhotos?: PhotoPairPhotos[]
   // Metadatos por par (se alinea por índice con fotosBefore/fotosAfter)
   pairMeta?: PhotoPairMeta[]
   // Estado

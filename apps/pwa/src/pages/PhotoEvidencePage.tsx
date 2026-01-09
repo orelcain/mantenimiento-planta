@@ -118,6 +118,21 @@ export function PhotoEvidencePage() {
     }
   }
 
+  const hasExportablePairs = (evidence: PhotoEvidence): boolean => {
+    if (evidence.pairPhotos?.length) {
+      for (const pp of evidence.pairPhotos) {
+        if ((pp?.before?.length ?? 0) > 0 && (pp?.after?.length ?? 0) > 0) return true
+      }
+      return false
+    }
+
+    const max = Math.max(evidence.fotosBefore.length, evidence.fotosAfter.length)
+    for (let i = 0; i < max; i++) {
+      if (evidence.fotosBefore[i] && evidence.fotosAfter[i]) return true
+    }
+    return false
+  }
+
   const handleExportSelected = async () => {
     if (selectedForExport.size === 0) return
 
@@ -131,13 +146,7 @@ export function PhotoEvidencePage() {
         .filter((v): v is string => typeof v === 'string' && v.trim().length > 0)
       const nameMap = ids.length ? await getUserDisplayNameMap(ids) : {}
 
-      const hasPairs = selectedEvidences.some((e) => {
-        const max = Math.max(e.fotosBefore.length, e.fotosAfter.length)
-        for (let i = 0; i < max; i++) {
-          if (e.fotosBefore[i] && e.fotosAfter[i]) return true
-        }
-        return false
-      })
+      const hasPairs = selectedEvidences.some(hasExportablePairs)
       if (!hasPairs) {
         alert('Las evidencias seleccionadas no tienen pares ANTES/DESPUÉS para exportar.')
         return
@@ -160,15 +169,7 @@ export function PhotoEvidencePage() {
   const handleExportSingle = async (evidence: PhotoEvidence) => {
     setIsExporting(true)
     try {
-      const max = Math.max(evidence.fotosBefore.length, evidence.fotosAfter.length)
-      let hasPair = false
-      for (let i = 0; i < max; i++) {
-        if (evidence.fotosBefore[i] && evidence.fotosAfter[i]) {
-          hasPair = true
-          break
-        }
-      }
-      if (!hasPair) {
+      if (!hasExportablePairs(evidence)) {
         alert('Esta evidencia no tiene pares ANTES/DESPUÉS para exportar.')
         return
       }

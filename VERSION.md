@@ -1,14 +1,33 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.1.7**
+## Versión Actual: **v2.2.24**
 
-**Fecha de lanzamiento**: 29 de diciembre de 2025  
+**Fecha de lanzamiento**: 9 de enero de 2026  
 **Estado**: ✅ PRODUCCIÓN READY  
 **Build**: ✅ Último build local OK
 
 ---
 
 ## 📋 Información de la Versión
+
+### v2.2.24 - Evidencias Fotográficas (Multi-foto) + Informe Técnico
+
+Evolución del módulo de evidencias con soporte multi-foto por par ANTES/DESPUÉS, anotación avanzada y exportación en formato informe técnico.
+
+#### 📷 Evidencias Fotográficas
+- Pares ANTES/DESPUÉS con múltiples fotos por par (compatible con el modelo legado)
+- Selección de foto a comparar/anotar dentro del par
+- Eliminación de par completa (fotos + datos) con reindexación
+
+#### 🖊️ Anotación
+- Anotador con zoom/pan (rueda + gesto) y edición post-creación
+
+#### 🧾 PDF (Informe Técnico)
+- Exportación tipo informe técnico, 1 par por página
+- Soporte de páginas adicionales cuando hay múltiples fotos por par
+
+#### 🔁 Flujo de verificación
+- Opción “Quitar verificación” para permitir re-editar evidencias ya verificadas
 
 ### v2.1.7 - Reconciliación Mandante
 

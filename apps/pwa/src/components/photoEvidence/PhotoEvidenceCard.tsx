@@ -62,8 +62,36 @@ export function PhotoEvidenceCard({
   }
   const statusConfig = STATUS_CONFIG[evidence.status]
   const StatusIcon = statusConfig.icon
-  const hasBeforePhotos = evidence.fotosBefore.length > 0
-  const hasAfterPhotos = evidence.fotosAfter.length > 0
+
+  const totalBefore = evidence.pairPhotos?.length
+    ? evidence.pairPhotos.reduce((acc, pp) => acc + (pp?.before?.length ?? 0), 0)
+    : evidence.fotosBefore.length
+  const totalAfter = evidence.pairPhotos?.length
+    ? evidence.pairPhotos.reduce((acc, pp) => acc + (pp?.after?.length ?? 0), 0)
+    : evidence.fotosAfter.length
+
+  const hasBeforePhotos = totalBefore > 0
+  const hasAfterPhotos = totalAfter > 0
+
+  const thumbBefore = (() => {
+    if (evidence.pairPhotos?.length) {
+      for (const pp of evidence.pairPhotos) {
+        const first = pp?.before?.[0]
+        if (first) return first
+      }
+    }
+    return evidence.fotosBefore[0]
+  })()
+
+  const thumbAfter = (() => {
+    if (evidence.pairPhotos?.length) {
+      for (const pp of evidence.pairPhotos) {
+        const first = pp?.after?.[0]
+        if (first) return first
+      }
+    }
+    return evidence.fotosAfter[0]
+  })()
 
   const reporta = evidence.reportadoPor
     ? (userDisplayNameById?.[evidence.reportadoPor] ?? evidence.reportadoPor)
@@ -77,9 +105,9 @@ export function PhotoEvidenceCard({
       >
         {/* Thumbnail */}
         <div className="relative w-16 h-16 rounded-lg overflow-hidden bg-muted flex-shrink-0">
-          {hasBeforePhotos && evidence.fotosBefore[0] ? (
+          {hasBeforePhotos && thumbBefore ? (
             <img
-              src={evidence.fotosBefore[0].url}
+              src={thumbBefore.url}
               alt=""
               className="w-full h-full object-cover"
             />
@@ -90,7 +118,7 @@ export function PhotoEvidenceCard({
           )}
           {/* Badge de cantidad de fotos */}
           <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px] text-center py-0.5">
-            {evidence.fotosBefore.length} / {evidence.fotosAfter.length}
+            {totalBefore} / {totalAfter}
           </div>
         </div>
 
@@ -123,9 +151,9 @@ export function PhotoEvidenceCard({
         <div className="grid grid-cols-2 h-32">
           {/* Antes */}
           <div className="relative border-r border-border">
-            {hasBeforePhotos && evidence.fotosBefore[0] ? (
+            {hasBeforePhotos && thumbBefore ? (
               <img
-                src={evidence.fotosBefore[0].url}
+                src={thumbBefore.url}
                 alt="Antes"
                 className="w-full h-full object-cover"
               />
@@ -135,15 +163,15 @@ export function PhotoEvidenceCard({
               </div>
             )}
             <div className="absolute top-2 left-2 px-2 py-0.5 bg-red-500 text-white text-[10px] font-medium rounded">
-              ANTES ({evidence.fotosBefore.length})
+              ANTES ({totalBefore})
             </div>
           </div>
 
           {/* Después */}
           <div className="relative">
-            {hasAfterPhotos && evidence.fotosAfter[0] ? (
+            {hasAfterPhotos && thumbAfter ? (
               <img
-                src={evidence.fotosAfter[0].url}
+                src={thumbAfter.url}
                 alt="Después"
                 className="w-full h-full object-cover"
               />
@@ -166,7 +194,7 @@ export function PhotoEvidenceCard({
               </div>
             )}
             <div className="absolute top-2 right-2 px-2 py-0.5 bg-green-500 text-white text-[10px] font-medium rounded">
-              DESPUÉS ({evidence.fotosAfter.length})
+              DESPUÉS ({totalAfter})
             </div>
           </div>
         </div>

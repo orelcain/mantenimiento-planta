@@ -10,6 +10,8 @@ interface PhotoUploaderProps {
   disabled?: boolean
   label?: string
   description?: string
+  selectedPhotoId?: string
+  onSelectPhotoId?: (photoId: string) => void
 }
 
 export function PhotoUploader({
@@ -19,6 +21,8 @@ export function PhotoUploader({
   disabled = false,
   label = 'Fotos',
   description,
+  selectedPhotoId,
+  onSelectPhotoId,
 }: PhotoUploaderProps) {
   const [isLoading, setIsLoading] = useState(false)
   const cameraInputRef = useRef<HTMLInputElement>(null)
@@ -92,12 +96,17 @@ export function PhotoUploader({
         {photos.map((photo) => (
           <div
             key={photo.id}
-            className="relative aspect-square rounded-lg overflow-hidden bg-muted group"
+            className={
+              `relative aspect-square rounded-lg overflow-hidden bg-muted group ` +
+              (selectedPhotoId && selectedPhotoId === photo.id ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : '')
+            }
           >
             <img
               src={photo.preview || photo.url}
               alt="Foto"
               className="w-full h-full object-cover"
+              onClick={() => onSelectPhotoId?.(photo.id)}
+              style={{ cursor: onSelectPhotoId ? 'pointer' : 'default' }}
             />
             {!disabled && (
               <button

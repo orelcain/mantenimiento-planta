@@ -1,5 +1,5 @@
 {
-  "version": "2.2.23",
+  "version": "2.2.24",
   "buildDate": "2026-01-09",
   "buildTimestamp": 1768012800000,
   "features": [
@@ -14,6 +14,8 @@
     "Anotaciones: seleccionar forma/texto con click y ver cambios en vivo",
     "Anotaciones: mover texto y puntos de forma (o toda la forma)",
     "Anotaciones: zoom (rueda/pinch) y mover vista (pan)",
+    "Evidencias: múltiples fotos por par (antes/después)",
+    "PDF: exporta todas las fotos del par (páginas adicionales)",
     "Fix: evita blob ERR_FILE_NOT_FOUND en previsualizaciones",
     "PDF: etiqueta (ANOTADA) por imagen"
   ]

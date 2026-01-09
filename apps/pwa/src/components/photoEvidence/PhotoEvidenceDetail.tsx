@@ -35,12 +35,11 @@ import { useAuthStore } from '@/store'
 import {
   getPhotoEvidenceById,
   deletePhotoEvidence,
-  removePhoto,
   markAsVerified,
   unmarkAsVerified,
   updatePhotoEvidencePairMeta,
-  upsertEvidencePhotoAtIndex,
   deleteEvidencePair,
+  updateEvidencePairPhotos,
 } from '@/services/photoEvidence'
 import type { PhotoEvidence, PhotoEvidenceStatus } from '@/types'
 import { logger } from '@/lib/logger'
@@ -112,6 +111,8 @@ export function PhotoEvidenceDetail({
   const [pairTipoFalla, setPairTipoFalla] = useState('')
   const [pairBeforePhoto, setPairBeforePhoto] = useState<{ id: string; url: string; preview?: string; file?: File }[]>([])
   const [pairAfterPhoto, setPairAfterPhoto] = useState<{ id: string; url: string; preview?: string; file?: File }[]>([])
+  const [selectedBeforePhotoId, setSelectedBeforePhotoId] = useState<string | null>(null)
+  const [selectedAfterPhotoId, setSelectedAfterPhotoId] = useState<string | null>(null)
 
   const [pairAntesAnotada, setPairAntesAnotada] = useState(false)
   const [pairDespuesAnotada, setPairDespuesAnotada] = useState(false)
@@ -143,10 +144,22 @@ export function PhotoEvidenceDetail({
     setPairAntesAnotada(Boolean(meta?.anotadaAntes))
     setPairDespuesAnotada(Boolean(meta?.anotadaDespues))
 
-    const before = evidence.fotosBefore[selectedPairIndex]
-    const after = evidence.fotosAfter[selectedPairIndex]
-    setPairBeforePhoto(before ? [{ id: before.id, url: before.url }] : [])
-    setPairAfterPhoto(after ? [{ id: after.id, url: after.url }] : [])
+    const pair = evidence.pairPhotos?.[selectedPairIndex]
+    const beforeList = pair?.before?.length
+      ? pair.before.map((p) => ({ id: p.id, url: p.url }))
+      : evidence.fotosBefore[selectedPairIndex]
+        ? [{ id: evidence.fotosBefore[selectedPairIndex]!.id, url: evidence.fotosBefore[selectedPairIndex]!.url }]
+        : []
+    const afterList = pair?.after?.length
+      ? pair.after.map((p) => ({ id: p.id, url: p.url }))
+      : evidence.fotosAfter[selectedPairIndex]
+        ? [{ id: evidence.fotosAfter[selectedPairIndex]!.id, url: evidence.fotosAfter[selectedPairIndex]!.url }]
+        : []
+
+    setPairBeforePhoto(beforeList)
+    setPairAfterPhoto(afterList)
+    setSelectedBeforePhotoId(beforeList[0]?.id ?? null)
+    setSelectedAfterPhotoId(afterList[0]?.id ?? null)
   }, [evidence, selectedPairIndex])
 
   useEffect(() => {
@@ -158,7 +171,10 @@ export function PhotoEvidenceDetail({
   }, [annotatePreviewUrl])
 
   const openAnnotator = (target: 'before' | 'after') => {
-    const current = target === 'before' ? pairBeforePhoto[0] : pairAfterPhoto[0]
+    const current =
+      target === 'before'
+        ? (pairBeforePhoto.find((p) => p.id === selectedBeforePhotoId) ?? pairBeforePhoto[0])
+        : (pairAfterPhoto.find((p) => p.id === selectedAfterPhotoId) ?? pairAfterPhoto[0])
     const src = current?.preview || current?.url
     if (!src) return
     setAnnotateTarget(target)
@@ -171,26 +187,24 @@ export function PhotoEvidenceDetail({
     setAnnotatePreviewUrl(nextPreview)
 
     if (annotateTarget === 'before') {
-      const current = pairBeforePhoto[0]
-      setPairBeforePhoto([
-        {
-          id: current?.id || 'before',
-          url: current?.url || '',
-          preview: nextPreview,
-          file,
-        },
-      ])
+      const currentId = selectedBeforePhotoId ?? pairBeforePhoto[0]?.id ?? 'before'
+      setPairBeforePhoto((prev) =>
+        prev.map((p) =>
+          p.id === currentId
+            ? { ...p, preview: nextPreview, file, url: p.url || nextPreview }
+            : p
+        )
+      )
       setPairAntesAnotada(true)
     } else if (annotateTarget === 'after') {
-      const current = pairAfterPhoto[0]
-      setPairAfterPhoto([
-        {
-          id: current?.id || 'after',
-          url: current?.url || '',
-          preview: nextPreview,
-          file,
-        },
-      ])
+      const currentId = selectedAfterPhotoId ?? pairAfterPhoto[0]?.id ?? 'after'
+      setPairAfterPhoto((prev) =>
+        prev.map((p) =>
+          p.id === currentId
+            ? { ...p, preview: nextPreview, file, url: p.url || nextPreview }
+            : p
+        )
+      )
       setPairDespuesAnotada(true)
     }
 
@@ -272,8 +286,28 @@ export function PhotoEvidenceDetail({
   const StatusIcon = statusConfig?.icon || Clock
   const canVerify = evidence && evidence.status === 'corregida' && user?.rol !== 'tecnico'
   const canUnverify = evidence && evidence.status === 'verificada' && user?.rol !== 'tecnico'
-  const canExport = evidence && evidence.fotosBefore.length > 0 && evidence.fotosAfter.length > 0
+  const canExport =
+    evidence &&
+    (() => {
+      if (evidence.pairPhotos?.length) {
+        return evidence.pairPhotos.some(
+          (pp) => (pp?.before?.length ?? 0) > 0 && (pp?.after?.length ?? 0) > 0
+        )
+      }
+      return evidence.fotosBefore.length > 0 && evidence.fotosAfter.length > 0
+    })()
   const canEditPairMeta = evidence && (evidence.status === 'pendiente' || evidence.status === 'en_proceso' || evidence.status === 'corregida')
+
+  const beforeForViewer = (() => {
+    const p = pairBeforePhoto.find((x) => x.id === selectedBeforePhotoId) ?? pairBeforePhoto[0]
+    if (!p) return null
+    return { id: p.id, url: p.preview || p.url, timestamp: new Date() }
+  })()
+  const afterForViewer = (() => {
+    const p = pairAfterPhoto.find((x) => x.id === selectedAfterPhotoId) ?? pairAfterPhoto[0]
+    if (!p) return null
+    return { id: p.id, url: p.preview || p.url, timestamp: new Date() }
+  })()
 
   const handleSavePair = async () => {
     if (!evidence || !user) return
@@ -314,25 +348,13 @@ export function PhotoEvidenceDetail({
         })
       }
 
-      // 2) Foto ANTES (reemplazar / agregar / eliminar)
-      const currentBefore = evidence.fotosBefore[selectedPairIndex]
-      const desiredBefore = pairBeforePhoto[0]
-      if (!desiredBefore && currentBefore) {
-        await removePhoto(evidence.id, currentBefore.id, 'before')
-        setPairAntesAnotada(false)
-      } else if (desiredBefore?.file) {
-        await upsertEvidencePhotoAtIndex(evidence.id, selectedPairIndex, 'before', desiredBefore.file, user.id)
-      }
+      // 2) Fotos ANTES (múltiples)
+      await updateEvidencePairPhotos(evidence.id, selectedPairIndex, 'before', pairBeforePhoto, user.id)
+      if (pairBeforePhoto.length === 0) setPairAntesAnotada(false)
 
-      // 3) Foto DESPUÉS (reemplazar / agregar / eliminar)
-      const currentAfter = evidence.fotosAfter[selectedPairIndex]
-      const desiredAfter = pairAfterPhoto[0]
-      if (!desiredAfter && currentAfter) {
-        await removePhoto(evidence.id, currentAfter.id, 'after')
-        setPairDespuesAnotada(false)
-      } else if (desiredAfter?.file) {
-        await upsertEvidencePhotoAtIndex(evidence.id, selectedPairIndex, 'after', desiredAfter.file, user.id)
-      }
+      // 3) Fotos DESPUÉS (múltiples)
+      await updateEvidencePairPhotos(evidence.id, selectedPairIndex, 'after', pairAfterPhoto, user.id)
+      if (pairAfterPhoto.length === 0) setPairDespuesAnotada(false)
 
       await loadEvidence()
       onUpdate()
@@ -348,7 +370,7 @@ export function PhotoEvidenceDetail({
   const handleDeletePair = async () => {
     if (!evidence) return
 
-    const maxPairs = Math.max(evidence.fotosBefore.length, evidence.fotosAfter.length, evidence.pairMeta?.length ?? 0)
+    const maxPairs = Math.max(evidence.pairPhotos?.length ?? 0, evidence.fotosBefore.length, evidence.fotosAfter.length, evidence.pairMeta?.length ?? 0)
     if (maxPairs === 0) return
 
     if (!confirm(`¿Eliminar el Par ${selectedPairIndex + 1} completo (fotos y datos)?`)) {
@@ -418,7 +440,7 @@ export function PhotoEvidenceDetail({
 
                 {/* Navegación de pares */}
                 {(() => {
-                  const maxPairs = Math.max(evidence.fotosBefore.length, evidence.fotosAfter.length, evidence.pairMeta?.length ?? 0)
+                  const maxPairs = Math.max(evidence.pairPhotos?.length ?? 0, evidence.fotosBefore.length, evidence.fotosAfter.length, evidence.pairMeta?.length ?? 0)
                   if (maxPairs <= 1 && !canEditPairMeta) return null
 
                   return (
@@ -456,8 +478,8 @@ export function PhotoEvidenceDetail({
                 })()}
 
                 <BeforeAfterViewer
-                  before={evidence.fotosBefore[selectedPairIndex] || null}
-                  after={evidence.fotosAfter[selectedPairIndex] || null}
+                  before={beforeForViewer}
+                  after={afterForViewer}
                 />
 
                 {canEditPairMeta && (
@@ -468,13 +490,16 @@ export function PhotoEvidenceDetail({
                           <PhotoUploader
                             photos={pairBeforePhoto}
                             onPhotosChange={(p) => {
-                              setPairBeforePhoto(p.slice(0, 1))
+                              setPairBeforePhoto(p)
+                              if (!selectedBeforePhotoId) setSelectedBeforePhotoId(p[0]?.id ?? null)
                               setPairAntesAnotada(false)
                             }}
-                            maxPhotos={1}
+                            maxPhotos={10}
                             disabled={isSaving}
                             label="📷 Foto ANTES (este par)"
-                            description="Para reemplazar: elimina y vuelve a agregar"
+                            description="Puedes agregar varias fotos. Click para seleccionar"
+                            selectedPhotoId={selectedBeforePhotoId ?? undefined}
+                            onSelectPhotoId={(id) => setSelectedBeforePhotoId(id)}
                           />
                           <div className="mt-2 flex justify-end">
                             <Button
@@ -491,13 +516,16 @@ export function PhotoEvidenceDetail({
                           <PhotoUploader
                             photos={pairAfterPhoto}
                             onPhotosChange={(p) => {
-                              setPairAfterPhoto(p.slice(0, 1))
+                              setPairAfterPhoto(p)
+                              if (!selectedAfterPhotoId) setSelectedAfterPhotoId(p[0]?.id ?? null)
                               setPairDespuesAnotada(false)
                             }}
-                            maxPhotos={1}
+                            maxPhotos={10}
                             disabled={isSaving}
                             label="📷 Foto DESPUÉS (este par)"
-                            description="Para reemplazar: elimina y vuelve a agregar"
+                            description="Puedes agregar varias fotos. Click para seleccionar"
+                            selectedPhotoId={selectedAfterPhotoId ?? undefined}
+                            onSelectPhotoId={(id) => setSelectedAfterPhotoId(id)}
                           />
                           <div className="mt-2 flex justify-end">
                             <Button
