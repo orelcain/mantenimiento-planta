@@ -22,7 +22,7 @@ import {
   deleteObject,
 } from 'firebase/storage'
 import { db, storage } from './firebase'
-import type { PhotoEvidence, PhotoItem, PhotoEvidenceStatus, PhotoComparison } from '@/types'
+import type { PhotoEvidence, PhotoItem, PhotoEvidenceStatus, PhotoComparison, PhotoPairMeta } from '@/types'
 import { generateId } from '@/lib/utils'
 import { compressImage } from './storage'
 import { logger } from '@/lib/logger'
@@ -163,6 +163,7 @@ function parseEvidenceDoc(doc: any): PhotoEvidence {
     updatedAt,
     corregidaAt: toDateSafe(data.corregidaAt),
     verificadaAt: toDateSafe(data.verificadaAt),
+    pairMeta: Array.isArray(data.pairMeta) ? data.pairMeta : [],
     fotosBefore: (data.fotosBefore || []).map((f: any) => ({
       ...f,
       timestamp: toDateSafe(f.timestamp) ?? createdAt,
@@ -185,6 +186,7 @@ export async function createPhotoEvidence(
     ...data,
     id,
     fotosAfter: [],
+    pairMeta: [],
     status: 'pendiente',
     createdAt: now,
     updatedAt: now,
@@ -418,20 +420,38 @@ export function prepareComparisonForExport(evidence: PhotoEvidence): PhotoCompar
   for (let i = 0; i < maxLen; i++) {
     const before = evidence.fotosBefore[i]
     const after = evidence.fotosAfter[i]
+    const meta = evidence.pairMeta?.[i]
     
     if (before && after) {
       comparisons.push({
         evidenceId: evidence.id,
         titulo: evidence.titulo,
-        ubicacion: evidence.hierarchyPath,
+        ubicacion: meta?.ubicacion || evidence.hierarchyPath,
         before,
         after,
-        descripcion: evidence.descripcion,
+        descripcion: meta?.descripcion || evidence.descripcion,
       })
     }
   }
   
   return comparisons
+}
+
+export async function updatePhotoEvidencePairMeta(
+  evidenceId: string,
+  pairIndex: number,
+  meta: PhotoPairMeta
+): Promise<void> {
+  const evidence = await getPhotoEvidenceById(evidenceId)
+  if (!evidence) throw new Error('Evidencia no encontrada')
+
+  const current = Array.isArray(evidence.pairMeta) ? [...evidence.pairMeta] : []
+  current[pairIndex] = {
+    ...(current[pairIndex] || {}),
+    ...meta,
+  }
+
+  await updatePhotoEvidence(evidenceId, { pairMeta: current })
 }
 
 // Obtener estadísticas

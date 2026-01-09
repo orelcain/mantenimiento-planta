@@ -367,6 +367,11 @@ export interface PhotoItem {
   timestamp: Date
 }
 
+export interface PhotoPairMeta {
+  ubicacion?: string
+  descripcion?: string
+}
+
 // Grupo de fotos antes/después
 export interface PhotoEvidence {
   id: string
@@ -378,6 +383,8 @@ export interface PhotoEvidence {
   // Fotos
   fotosBefore: PhotoItem[]
   fotosAfter: PhotoItem[]
+  // Metadatos por par (se alinea por índice con fotosBefore/fotosAfter)
+  pairMeta?: PhotoPairMeta[]
   // Estado
   status: PhotoEvidenceStatus
   // Metadatos

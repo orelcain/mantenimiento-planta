@@ -18,7 +18,10 @@ import {
   DialogTitle,
   Button,
   Badge,
+  Input,
+  Label,
   Spinner,
+  Textarea,
 } from '@/components/ui'
 import { BeforeAfterViewer } from './BeforeAfterViewer'
 import { PhotoUploader } from './PhotoUploader'
@@ -30,6 +33,7 @@ import {
   deletePhotoEvidence,
   markAsVerified,
   unmarkAsVerified,
+  updatePhotoEvidencePairMeta,
 } from '@/services/photoEvidence'
 import type { PhotoEvidence, PhotoItem, PhotoEvidenceStatus } from '@/types'
 import { logger } from '@/lib/logger'
@@ -88,6 +92,8 @@ export function PhotoEvidenceDetail({
   const [showAfterUploader, setShowAfterUploader] = useState(false)
   const [afterPhotos, setAfterPhotos] = useState<{ id: string; url: string; preview?: string; file?: File }[]>([])
   const [selectedPairIndex, setSelectedPairIndex] = useState(0)
+  const [pairUbicacion, setPairUbicacion] = useState('')
+  const [pairDescripcion, setPairDescripcion] = useState('')
 
   // Cargar evidencia
   useEffect(() => {
@@ -98,6 +104,13 @@ export function PhotoEvidenceDetail({
       setIsLoading(true)
     }
   }, [evidenceId, open])
+
+  useEffect(() => {
+    if (!evidence) return
+    const meta = evidence.pairMeta?.[selectedPairIndex]
+    setPairUbicacion(meta?.ubicacion ?? '')
+    setPairDescripcion(meta?.descripcion ?? '')
+  }, [evidence, selectedPairIndex])
 
   const loadEvidence = async () => {
     if (!evidenceId) return
@@ -214,6 +227,25 @@ export function PhotoEvidenceDetail({
   const canVerify = evidence && evidence.status === 'corregida' && user?.rol !== 'tecnico'
   const canUnverify = evidence && evidence.status === 'verificada' && user?.rol !== 'tecnico'
   const canExport = evidence && evidence.fotosBefore.length > 0 && evidence.fotosAfter.length > 0
+  const canEditPairMeta = evidence && (evidence.status === 'pendiente' || evidence.status === 'en_proceso' || evidence.status === 'corregida')
+
+  const handleSavePairMeta = async () => {
+    if (!evidence) return
+
+    setIsSaving(true)
+    try {
+      await updatePhotoEvidencePairMeta(evidence.id, selectedPairIndex, {
+        ubicacion: pairUbicacion.trim() || undefined,
+        descripcion: pairDescripcion.trim() || undefined,
+      })
+      await loadEvidence()
+      onUpdate()
+    } catch (error) {
+      logger.error('Error saving pair meta', error as Error)
+    } finally {
+      setIsSaving(false)
+    }
+  }
 
   return (
     <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
@@ -284,6 +316,49 @@ export function PhotoEvidenceDetail({
                   before={evidence.fotosBefore[selectedPairIndex] || null}
                   after={evidence.fotosAfter[selectedPairIndex] || null}
                 />
+
+                {canEditPairMeta && (evidence.fotosBefore[selectedPairIndex] || evidence.fotosAfter[selectedPairIndex]) && (
+                  <div className="mt-3 p-3 rounded-lg border border-border bg-muted/30 space-y-3">
+                    <div className="grid grid-cols-1 gap-3">
+                      <div className="space-y-1">
+                        <Label>Ubicación (solo para este par)</Label>
+                        <Input
+                          value={pairUbicacion}
+                          onChange={(e) => setPairUbicacion(e.target.value)}
+                          placeholder="Ej: Línea 2 > Bomba 3 (lado motor)"
+                          disabled={isSaving}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label>Descripción / observación (solo para este par)</Label>
+                        <Textarea
+                          value={pairDescripcion}
+                          onChange={(e) => setPairDescripcion(e.target.value)}
+                          placeholder="Qué se observó y qué se corrigió en este par"
+                          disabled={isSaving}
+                          rows={3}
+                        />
+                      </div>
+                    </div>
+                    <div className="flex justify-end">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleSavePairMeta}
+                        disabled={isSaving}
+                      >
+                        {isSaving ? (
+                          <>
+                            <Spinner className="w-4 h-4 mr-2" />
+                            Guardando...
+                          </>
+                        ) : (
+                          'Guardar datos del par'
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Agregar fotos DESPUÉS */}

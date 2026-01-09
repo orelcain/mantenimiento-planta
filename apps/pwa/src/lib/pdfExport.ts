@@ -254,6 +254,8 @@ export async function exportPhotoEvidenceTechnicalReportToPDF(
     // 1. Identificación
     currentY = drawSectionHeader(ctx, '1. IDENTIFICACIÓN', margin, currentY, contentWidth)
 
+    const pairMeta = evidence.pairMeta?.[pairIndex]
+
     const statusKey = evidence.status as PhotoEvidenceStatus
     const statusLabel = STATUS_LABEL[statusKey] ?? safeText(evidence.status)
     const reportRows = [
@@ -264,7 +266,8 @@ export async function exportPhotoEvidenceTechnicalReportToPDF(
         { label: 'Reporta', value: safeText(evidence.reportadoPor) },
       ],
       [
-        { label: 'Ubicación', value: safeText(evidence.hierarchyPath || '-') },
+        { label: 'Ubicación (general)', value: safeText(evidence.hierarchyPath || '-') },
+        { label: 'Ubicación (par)', value: safeText(pairMeta?.ubicacion || '-') },
       ],
       [
         { label: 'Fotos antes', value: String(evidence.fotosBefore.length) },
@@ -289,6 +292,20 @@ export async function exportPhotoEvidenceTechnicalReportToPDF(
     const bodyText = desc ? desc : '—'
     drawWrappedText(ctx, bodyText, margin + 10, currentY + 12, contentWidth - 20, 14)
     currentY += 66
+
+    // Observación del par (si aplica)
+    if ((pairMeta?.descripcion || '').trim()) {
+      currentY = drawSectionHeader(ctx, 'Observación del par', margin, currentY, contentWidth)
+      const pairText = pairMeta?.descripcion?.trim() || '—'
+      ctx.fillStyle = '#f9fafb'
+      ctx.fillRect(margin, currentY - 2, contentWidth, 44)
+      ctx.strokeStyle = '#e5e7eb'
+      ctx.strokeRect(margin, currentY - 2, contentWidth, 44)
+      ctx.fillStyle = '#111827'
+      ctx.font = `10px system-ui, sans-serif`
+      drawWrappedText(ctx, pairText, margin + 10, currentY + 12, contentWidth - 20, 14)
+      currentY += 54
+    }
 
     // Evidencia fotográfica
     currentY = drawSectionHeader(ctx, '2. EVIDENCIA FOTOGRÁFICA (ANTES / DESPUÉS)', margin, currentY, contentWidth)
