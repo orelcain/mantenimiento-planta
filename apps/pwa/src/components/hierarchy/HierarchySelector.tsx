@@ -5,7 +5,7 @@
  * con carga dinámica por nivel y validación mínima nivel 3.
  */
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { ChevronRight, MapPin, CheckCircle, AlertTriangle } from 'lucide-react'
 import { 
   HierarchyLevel, 
@@ -42,13 +42,18 @@ export function HierarchySelector({
   const [selections, setSelections] = useState<(SelectedNode | null)[]>(
     Array(maxLevel).fill(null)
   )
+  
+  // Ref para evitar re-llamar onChange innecesariamente
+  const initializedRef = useRef(false)
+  const lastEmittedValueRef = useRef<string | null>(null)
 
   // Cargar path inicial si hay un valor
   const { path: initialPath, loading: loadingPath } = useHierarchyPath(value ?? null)
 
   useEffect(() => {
     console.log('[HierarchySelector] Path inicial:', { initialPath, loadingPath })
-    if (initialPath.length > 0 && !loadingPath) {
+    if (initialPath.length > 0 && !loadingPath && !initializedRef.current) {
+      initializedRef.current = true
       const newSelections: (SelectedNode | null)[] = Array(maxLevel).fill(null)
       initialPath.forEach((pathNode) => {
         if (pathNode.nivel <= maxLevel) {
@@ -62,27 +67,37 @@ export function HierarchySelector({
     }
   }, [initialPath, loadingPath, maxLevel])
 
-  const handleLevelSelect = (nivel: HierarchyLevel, nodeId: string | null) => {
+  const handleLevelSelect = useCallback((nivel: HierarchyLevel, nodeId: string | null) => {
     console.log('[HierarchySelector] Selección en nivel', nivel, ':', nodeId)
     
-    const newSelections = [...selections]
-    const index = nivel - 1
-    
-    newSelections[index] = nodeId
-      ? { id: nodeId, nivel }
-      : null
-    
-    // Limpiar niveles posteriores
-    for (let i = index + 1; i < maxLevel; i++) {
-      newSelections[i] = null
-    }
-    
-    setSelections(newSelections)
-    
-    // Emitir último nivel seleccionado (buscar desde el final)
-    const lastSelection = newSelections.reverse().find((s): s is SelectedNode => s !== null)
-    onChange(lastSelection?.id ?? null)
-  }
+    setSelections(prevSelections => {
+      const newSelections = [...prevSelections]
+      const index = nivel - 1
+      
+      newSelections[index] = nodeId
+        ? { id: nodeId, nivel }
+        : null
+      
+      // Limpiar niveles posteriores
+      for (let i = index + 1; i < maxLevel; i++) {
+        newSelections[i] = null
+      }
+      
+      // Emitir último nivel seleccionado (buscar desde el final)
+      const selectionsToCheck = [...newSelections]
+      const lastSelection = selectionsToCheck.reverse().find((s): s is SelectedNode => s !== null)
+      const newValue = lastSelection?.id ?? null
+      
+      // Solo emitir si el valor cambió
+      if (lastEmittedValueRef.current !== newValue) {
+        lastEmittedValueRef.current = newValue
+        // Usar setTimeout para evitar actualizar estado durante render
+        setTimeout(() => onChange(newValue), 0)
+      }
+      
+      return newSelections
+    })
+  }, [maxLevel, onChange])
 
   // Verificar si se alcanzó el nivel mínimo
   const isMinLevelReached = selections.some(
@@ -193,6 +208,14 @@ function LevelSelector({
   isRequired,
 }: LevelSelectorProps) {
   const { options, loading } = useHierarchyCascadeOptions(parentId, nivel)
+  
+  // Ref para evitar auto-selección múltiple
+  const autoSelectedRef = useRef(false)
+  
+  // Reset auto-select flag cuando cambia parentId
+  useEffect(() => {
+    autoSelectedRef.current = false
+  }, [parentId])
 
   console.log('[LevelSelector] Renderizando nivel:', {
     nivel,
@@ -202,13 +225,14 @@ function LevelSelector({
     value
   })
 
-  // Auto-seleccionar si solo hay 1 opción
+  // Auto-seleccionar si solo hay 1 opción (solo una vez)
   useEffect(() => {
-    if (!loading && options.length === 1 && !value && options[0]) {
+    if (!loading && options.length === 1 && !value && options[0] && !autoSelectedRef.current) {
+      autoSelectedRef.current = true
       console.log('[LevelSelector] Auto-seleccionando única opción en nivel', nivel, ':', options[0].value)
       onChange(options[0].value)
     }
-  }, [options, loading, value, onChange, nivel])
+  }, [options, loading, value, nivel]) // Quitamos onChange de las dependencias para evitar bucle
 
   // Si solo hay 1 opción, no mostrar selector (auto-seleccionado)
   if (!loading && options.length === 1 && value && options[0]) {
