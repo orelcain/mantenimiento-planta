@@ -370,6 +370,10 @@ export interface PhotoItem {
 export interface PhotoPairMeta {
   ubicacion?: string
   descripcion?: string
+  equipo?: string
+  ot?: string
+  criticidad?: 'baja' | 'media' | 'alta' | 'critica'
+  tipoFalla?: string
 }
 
 // Grupo de fotos antes/después

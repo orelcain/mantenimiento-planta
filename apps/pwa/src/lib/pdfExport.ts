@@ -279,6 +279,12 @@ export async function exportPhotoEvidenceTechnicalReportToPDF(
         { label: 'Ubicación (par)', value: safeText(pairMeta?.ubicacion || '-') },
       ],
       [
+        { label: 'Equipo (par)', value: safeText(pairMeta?.equipo || '-') },
+        { label: 'OT (par)', value: safeText(pairMeta?.ot || '-') },
+        { label: 'Criticidad (par)', value: safeText(pairMeta?.criticidad || '-') },
+        { label: 'Tipo falla (par)', value: safeText(pairMeta?.tipoFalla || '-') },
+      ],
+      [
         { label: 'Fotos antes', value: String(evidence.fotosBefore.length) },
         { label: 'Fotos después', value: String(evidence.fotosAfter.length) },
         { label: 'Par', value: `${pairIndex + 1}` },

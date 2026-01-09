@@ -1,5 +1,5 @@
 {
-  "version": "2.2.13",
+  "version": "2.2.14",
   "buildDate": "2026-01-09",
   "buildTimestamp": 1768012800000,
   "features": [
@@ -8,6 +8,7 @@
     "Exportación a PDF de comparaciones",
     "Selector de ubicación en jerarquía opcional",
     "Nombres legibles (UI/PDF) para usuarios",
-    "Uploads con WebP y contentType coherente"
+    "Uploads con WebP y contentType coherente",
+    "Campos extra por par (equipo/OT/criticidad/tipo de falla) en UI/PDF"
   ]
 }

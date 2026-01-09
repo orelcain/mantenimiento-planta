@@ -20,6 +20,11 @@ import {
   Badge,
   Input,
   Label,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Spinner,
   Textarea,
 } from '@/components/ui'
@@ -100,6 +105,10 @@ export function PhotoEvidenceDetail({
   const [selectedPairIndex, setSelectedPairIndex] = useState(0)
   const [pairUbicacion, setPairUbicacion] = useState('')
   const [pairDescripcion, setPairDescripcion] = useState('')
+  const [pairEquipo, setPairEquipo] = useState('')
+  const [pairOT, setPairOT] = useState('')
+  const [pairCriticidad, setPairCriticidad] = useState<'baja' | 'media' | 'alta' | 'critica' | ''>('')
+  const [pairTipoFalla, setPairTipoFalla] = useState('')
   const [pairBeforePhoto, setPairBeforePhoto] = useState<{ id: string; url: string; preview?: string; file?: File }[]>([])
   const [pairAfterPhoto, setPairAfterPhoto] = useState<{ id: string; url: string; preview?: string; file?: File }[]>([])
 
@@ -118,6 +127,10 @@ export function PhotoEvidenceDetail({
     const meta = evidence.pairMeta?.[selectedPairIndex]
     setPairUbicacion(meta?.ubicacion ?? '')
     setPairDescripcion(meta?.descripcion ?? '')
+    setPairEquipo(meta?.equipo ?? '')
+    setPairOT(meta?.ot ?? '')
+    setPairCriticidad(meta?.criticidad ?? '')
+    setPairTipoFalla(meta?.tipoFalla ?? '')
 
     const before = evidence.fotosBefore[selectedPairIndex]
     const after = evidence.fotosAfter[selectedPairIndex]
@@ -209,12 +222,28 @@ export function PhotoEvidenceDetail({
       // 1) Metadatos del par
       const metaUbicacion = pairUbicacion.trim() || undefined
       const metaDescripcion = pairDescripcion.trim() || undefined
+      const metaEquipo = pairEquipo.trim() || undefined
+      const metaOT = pairOT.trim() || undefined
+      const metaCriticidad = pairCriticidad || undefined
+      const metaTipoFalla = pairTipoFalla.trim() || undefined
       const existingMeta = evidence.pairMeta?.[selectedPairIndex]
-      const shouldPersistMeta = Boolean(metaUbicacion || metaDescripcion || existingMeta)
+      const shouldPersistMeta = Boolean(
+        metaUbicacion ||
+          metaDescripcion ||
+          metaEquipo ||
+          metaOT ||
+          metaCriticidad ||
+          metaTipoFalla ||
+          existingMeta
+      )
       if (shouldPersistMeta) {
         await updatePhotoEvidencePairMeta(evidence.id, selectedPairIndex, {
           ubicacion: metaUbicacion,
           descripcion: metaDescripcion,
+          equipo: metaEquipo,
+          ot: metaOT,
+          criticidad: metaCriticidad,
+          tipoFalla: metaTipoFalla,
         })
       }
 
@@ -397,6 +426,58 @@ export function PhotoEvidenceDetail({
                           disabled={isSaving}
                         />
                       </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <Label>Equipo (solo para este par)</Label>
+                          <Input
+                            value={pairEquipo}
+                            onChange={(e) => setPairEquipo(e.target.value)}
+                            placeholder="Ej: Bomba 3"
+                            disabled={isSaving}
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <Label>OT (solo para este par)</Label>
+                          <Input
+                            value={pairOT}
+                            onChange={(e) => setPairOT(e.target.value)}
+                            placeholder="Ej: OT-12345"
+                            disabled={isSaving}
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <Label>Criticidad (solo para este par)</Label>
+                          <Select
+                            value={pairCriticidad || '__none__'}
+                            onValueChange={(v) => setPairCriticidad((v === '__none__' ? '' : v) as typeof pairCriticidad)}
+                          >
+                            <SelectTrigger disabled={isSaving}>
+                              <SelectValue placeholder="Seleccionar criticidad" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__none__">Sin definir</SelectItem>
+                              <SelectItem value="baja">Baja</SelectItem>
+                              <SelectItem value="media">Media</SelectItem>
+                              <SelectItem value="alta">Alta</SelectItem>
+                              <SelectItem value="critica">Crítica</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-1">
+                          <Label>Tipo de falla (solo para este par)</Label>
+                          <Input
+                            value={pairTipoFalla}
+                            onChange={(e) => setPairTipoFalla(e.target.value)}
+                            placeholder="Ej: Fuga, desgaste, vibración"
+                            disabled={isSaving}
+                          />
+                        </div>
+                      </div>
+
                       <div className="space-y-1">
                         <Label>Descripción / observación (solo para este par)</Label>
                         <Textarea
