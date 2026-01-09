@@ -703,10 +703,12 @@ export function prepareComparisonForExport(evidence: PhotoEvidence): PhotoCompar
       const before = pp.before[k]
       const after = pp.after[k]
       if (before && after) {
+        const pairTitle = meta?.titulo?.trim() || evidence.titulo
+        const pairLocation = meta?.ubicacionPath || meta?.ubicacion || evidence.hierarchyPath
         comparisons.push({
           evidenceId: evidence.id,
-          titulo: evidence.titulo,
-          ubicacion: meta?.ubicacion || evidence.hierarchyPath,
+          titulo: pairTitle,
+          ubicacion: pairLocation,
           before,
           after,
           descripcion: meta?.descripcion || evidence.descripcion,

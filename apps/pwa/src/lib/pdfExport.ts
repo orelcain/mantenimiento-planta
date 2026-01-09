@@ -242,6 +242,30 @@ export async function exportPhotoEvidenceTechnicalReportToPDF(
     throw new Error('No hay evidencias con fotos para exportar')
   }
 
+  // Agrupar visualmente (ordenar) por título y ubicación del par.
+  // No crea páginas adicionales; solo ordena para que queden juntas.
+  evidencePages.sort((a, b) => {
+    const aMeta = a.evidence.pairMeta?.[a.pairIndex]
+    const bMeta = b.evidence.pairMeta?.[b.pairIndex]
+    const aTitle = (aMeta?.titulo?.trim() || a.evidence.titulo).toLowerCase()
+    const bTitle = (bMeta?.titulo?.trim() || b.evidence.titulo).toLowerCase()
+    if (aTitle < bTitle) return -1
+    if (aTitle > bTitle) return 1
+
+    const aLoc = (aMeta?.ubicacionPath || aMeta?.ubicacion || a.evidence.hierarchyPath || '').toLowerCase()
+    const bLoc = (bMeta?.ubicacionPath || bMeta?.ubicacion || b.evidence.hierarchyPath || '').toLowerCase()
+    if (aLoc < bLoc) return -1
+    if (aLoc > bLoc) return 1
+
+    const aTime = a.evidence.createdAt instanceof Date ? a.evidence.createdAt.getTime() : 0
+    const bTime = b.evidence.createdAt instanceof Date ? b.evidence.createdAt.getTime() : 0
+    if (aTime !== bTime) return aTime - bTime
+
+    if (a.evidence.id !== b.evidence.id) return a.evidence.id < b.evidence.id ? -1 : 1
+    if (a.pairIndex !== b.pairIndex) return a.pairIndex - b.pairIndex
+    return a.mediaIndex - b.mediaIndex
+  })
+
   const totalPages = evidencePages.length
   const canvases: HTMLCanvasElement[] = []
 
@@ -282,6 +306,8 @@ export async function exportPhotoEvidenceTechnicalReportToPDF(
     currentY = drawSectionHeader(ctx, '1. IDENTIFICACIÓN', margin, currentY, contentWidth)
 
     const pairMeta = evidence.pairMeta?.[pairIndex]
+    const pairTitle = (pairMeta?.titulo?.trim() || evidence.titulo).trim()
+    const pairLocation = (pairMeta?.ubicacionPath || pairMeta?.ubicacion || '').trim()
 
     const totalBefore = (() => {
       if (evidence.pairPhotos?.length) {
@@ -307,7 +333,7 @@ export async function exportPhotoEvidenceTechnicalReportToPDF(
       ],
       [
         { label: 'Ubicación (general)', value: safeText(evidence.hierarchyPath || '-') },
-        { label: 'Ubicación (par)', value: safeText(pairMeta?.ubicacion || '-') },
+        { label: 'Ubicación (par)', value: safeText(pairLocation || '-') },
       ],
       [
         { label: 'Equipo (par)', value: safeText(pairMeta?.equipo || '-') },
@@ -319,7 +345,7 @@ export async function exportPhotoEvidenceTechnicalReportToPDF(
         { label: 'Fotos antes', value: String(totalBefore) },
         { label: 'Fotos después', value: String(totalAfter) },
         { label: 'Par', value: `${pairIndex + 1}${totalBefore > 1 || totalAfter > 1 ? ` (img ${mediaIndex + 1})` : ''}` },
-        { label: 'Título', value: safeText(evidence.titulo) },
+        { label: 'Título', value: safeText(pairTitle || evidence.titulo) },
       ],
     ]
 

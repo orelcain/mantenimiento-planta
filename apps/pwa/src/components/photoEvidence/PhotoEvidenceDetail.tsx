@@ -41,7 +41,10 @@ import {
   deleteEvidencePair,
   updateEvidencePairPhotos,
 } from '@/services/photoEvidence'
+import { HierarchySelector } from '@/components/hierarchy/HierarchySelector'
+import { useHierarchyPath } from '@/hooks/useHierarchy'
 import type { PhotoEvidence, PhotoEvidenceStatus } from '@/types'
+import type { HierarchyPath } from '@/types/hierarchy'
 import { logger } from '@/lib/logger'
 import { cn } from '@/lib/utils'
 
@@ -103,6 +106,9 @@ export function PhotoEvidenceDetail({
   const [isSaving, setIsSaving] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [selectedPairIndex, setSelectedPairIndex] = useState(0)
+  const [pairTitulo, setPairTitulo] = useState('')
+  const [pairUbicacionSource, setPairUbicacionSource] = useState<'general' | 'jerarquia' | 'manual'>('general')
+  const [pairUbicacionNodeId, setPairUbicacionNodeId] = useState<string | null>(null)
   const [pairUbicacion, setPairUbicacion] = useState('')
   const [pairDescripcion, setPairDescripcion] = useState('')
   const [pairEquipo, setPairEquipo] = useState('')
@@ -122,6 +128,9 @@ export function PhotoEvidenceDetail({
   const [annotateSourceUrl, setAnnotateSourceUrl] = useState<string | null>(null)
   const [annotatePreviewUrl, setAnnotatePreviewUrl] = useState<string | null>(null)
 
+  const { path: pairUbicacionPathData } = useHierarchyPath(pairUbicacionNodeId)
+  const pairUbicacionPath = pairUbicacionPathData.map((p: HierarchyPath) => p.nombre).join(' > ')
+
   // Cargar evidencia
   useEffect(() => {
     if (evidenceId && open) {
@@ -135,6 +144,16 @@ export function PhotoEvidenceDetail({
   useEffect(() => {
     if (!evidence) return
     const meta = evidence.pairMeta?.[selectedPairIndex]
+    setPairTitulo(meta?.titulo ?? '')
+
+    const ubicSource: 'general' | 'jerarquia' | 'manual' =
+      meta?.ubicacionNodeId || meta?.ubicacionPath
+        ? 'jerarquia'
+        : meta?.ubicacion
+          ? 'manual'
+          : 'general'
+    setPairUbicacionSource(ubicSource)
+    setPairUbicacionNodeId(meta?.ubicacionNodeId ?? null)
     setPairUbicacion(meta?.ubicacion ?? '')
     setPairDescripcion(meta?.descripcion ?? '')
     setPairEquipo(meta?.equipo ?? '')
@@ -315,7 +334,17 @@ export function PhotoEvidenceDetail({
     setIsSaving(true)
     try {
       // 1) Metadatos del par
-      const metaUbicacion = pairUbicacion.trim() || undefined
+      const metaTitulo = pairTitulo.trim() || undefined
+
+      const metaUbicacionNodeId = pairUbicacionSource === 'jerarquia' ? (pairUbicacionNodeId ?? undefined) : undefined
+      const resolvedHierarchyPath = pairUbicacionSource === 'jerarquia' ? (pairUbicacionPath.trim() || pairUbicacion.trim() || undefined) : undefined
+      const metaUbicacionPath = pairUbicacionSource === 'jerarquia' ? resolvedHierarchyPath : undefined
+      const metaUbicacion =
+        pairUbicacionSource === 'manual'
+          ? (pairUbicacion.trim() || undefined)
+          : pairUbicacionSource === 'jerarquia'
+            ? resolvedHierarchyPath
+            : undefined
       const metaDescripcion = pairDescripcion.trim() || undefined
       const metaEquipo = pairEquipo.trim() || undefined
       const metaOT = pairOT.trim() || undefined
@@ -325,7 +354,10 @@ export function PhotoEvidenceDetail({
       const metaAnotadaDespues = pairDespuesAnotada || undefined
       const existingMeta = evidence.pairMeta?.[selectedPairIndex]
       const shouldPersistMeta = Boolean(
+        metaTitulo ||
         metaUbicacion ||
+          metaUbicacionNodeId ||
+          metaUbicacionPath ||
           metaDescripcion ||
           metaEquipo ||
           metaOT ||
@@ -337,7 +369,10 @@ export function PhotoEvidenceDetail({
       )
       if (shouldPersistMeta) {
         await updatePhotoEvidencePairMeta(evidence.id, selectedPairIndex, {
+          titulo: metaTitulo,
           ubicacion: metaUbicacion,
+          ubicacionNodeId: metaUbicacionNodeId,
+          ubicacionPath: metaUbicacionPath,
           descripcion: metaDescripcion,
           equipo: metaEquipo,
           ot: metaOT,
@@ -541,14 +576,93 @@ export function PhotoEvidenceDetail({
                       </div>
 
                       <div className="space-y-1">
-                        <Label>Ubicación (solo para este par)</Label>
+                        <Label>Título (solo para este par)</Label>
                         <Input
-                          value={pairUbicacion}
-                          onChange={(e) => setPairUbicacion(e.target.value)}
-                          placeholder="Ej: Línea 2 > Bomba 3 (lado motor)"
+                          value={pairTitulo}
+                          onChange={(e) => setPairTitulo(e.target.value)}
+                          placeholder="Ej: Cambio de sello mecánico"
                           disabled={isSaving}
+                          list="pair-title-suggestions"
                         />
                       </div>
+
+                      <div className="space-y-1">
+                        <Label>Ubicación (solo para este par)</Label>
+                        <Select
+                          value={pairUbicacionSource}
+                          onValueChange={(v) => setPairUbicacionSource(v as typeof pairUbicacionSource)}
+                        >
+                          <SelectTrigger disabled={isSaving}>
+                            <SelectValue placeholder="Seleccionar origen" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="general">Usar ubicación general</SelectItem>
+                            <SelectItem value="jerarquia">Seleccionar desde jerarquía</SelectItem>
+                            <SelectItem value="manual">Escribir manual</SelectItem>
+                          </SelectContent>
+                        </Select>
+
+                        {pairUbicacionSource === 'general' && (
+                          <p className="text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded">
+                            {evidence.hierarchyPath ? `📍 ${evidence.hierarchyPath}` : 'Sin ubicación general'}
+                          </p>
+                        )}
+
+                        {pairUbicacionSource === 'jerarquia' && (
+                          <>
+                            <HierarchySelector
+                              value={pairUbicacionNodeId ?? undefined}
+                              onChange={(nodeId) => setPairUbicacionNodeId(nodeId)}
+                              minLevel={1}
+                              disabled={isSaving}
+                            />
+                            {(pairUbicacionPath || pairUbicacion.trim()) && (
+                              <p className="text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded">
+                                📍 {pairUbicacionPath || pairUbicacion.trim()}
+                              </p>
+                            )}
+                          </>
+                        )}
+
+                        {pairUbicacionSource === 'manual' && (
+                          <Input
+                            value={pairUbicacion}
+                            onChange={(e) => setPairUbicacion(e.target.value)}
+                            placeholder="Ej: Línea 2 > Bomba 3 (lado motor)"
+                            disabled={isSaving}
+                            list="pair-location-suggestions"
+                          />
+                        )}
+                      </div>
+
+                      {/* Sugerencias */}
+                      <datalist id="pair-title-suggestions">
+                        {Array.from(
+                          new Set(
+                            (evidence.pairMeta || [])
+                              .map((m) => m?.titulo?.trim())
+                              .filter((v): v is string => Boolean(v))
+                          )
+                        )
+                          .slice(0, 50)
+                          .map((t) => (
+                            <option key={t} value={t} />
+                          ))}
+                      </datalist>
+                      <datalist id="pair-location-suggestions">
+                        {Array.from(
+                          new Set(
+                            (evidence.pairMeta || [])
+                              .flatMap((m) => [m?.ubicacionPath, m?.ubicacion])
+                              .map((v) => (typeof v === 'string' ? v.trim() : ''))
+                              .filter((v) => v)
+                          )
+                        )
+                          .slice(0, 50)
+                          .map((t) => (
+                            <option key={t} value={t} />
+                          ))}
+                      </datalist>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div className="space-y-1">

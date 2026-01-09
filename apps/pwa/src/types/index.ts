@@ -368,7 +368,13 @@ export interface PhotoItem {
 }
 
 export interface PhotoPairMeta {
+  // Opcional: título específico del par (si no se define, se usa el título de la evidencia)
+  titulo?: string
+  // Ubicación específica del par (texto libre / manual)
   ubicacion?: string
+  // Opcional: ubicación seleccionada desde jerarquía (se guarda también como string resuelto)
+  ubicacionNodeId?: string
+  ubicacionPath?: string
   descripcion?: string
   equipo?: string
   ot?: string
