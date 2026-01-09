@@ -1,5 +1,5 @@
 {
-  "version": "2.2.21",
+  "version": "2.2.22",
   "buildDate": "2026-01-09",
   "buildTimestamp": 1768012800000,
   "features": [
@@ -12,6 +12,7 @@
     "Campos extra por par (equipo/OT/criticidad/tipo de falla) en UI/PDF",
     "Anotaciones: editar formas/textos (nombre, color, transparencia, curvatura, fondo de texto)",
     "Anotaciones: seleccionar forma/texto con click y ver cambios en vivo",
+    "Anotaciones: mover texto y puntos de forma (o toda la forma)",
     "Fix: evita blob ERR_FILE_NOT_FOUND en previsualizaciones",
     "PDF: etiqueta (ANOTADA) por imagen"
   ]

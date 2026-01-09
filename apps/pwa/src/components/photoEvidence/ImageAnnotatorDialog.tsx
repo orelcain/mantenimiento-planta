@@ -51,6 +51,12 @@ function clampNumber(v: number, min: number, max: number) {
   return Math.max(min, Math.min(max, v))
 }
 
+function distance(a: Point, b: Point) {
+  const dx = a.x - b.x
+  const dy = a.y - b.y
+  return Math.hypot(dx, dy)
+}
+
 interface ImageAnnotatorDialogProps {
   open: boolean
   title?: string
@@ -114,6 +120,15 @@ export function ImageAnnotatorDialog({
   const [textBackgroundOpacity, setTextBackgroundOpacity] = useState(0.75)
   const [texts, setTexts] = useState<TextItem[]>([])
   const [selectedTextId, setSelectedTextId] = useState<string | null>(null)
+
+  type DragState =
+    | { type: 'shape-point'; shapeId: string; pointIndex: number }
+    | { type: 'shape-move'; shapeId: string; startPoints: Point[]; startAt: Point }
+    | { type: 'text-move'; textId: string; startX: number; startY: number; startAt: Point }
+    | null
+
+  const dragRef = useRef<DragState>(null)
+  const didDragRef = useRef(false)
 
   const selectShapeById = (id: string | null, shapeList?: Shape[]) => {
     if (!id) {
@@ -393,6 +408,31 @@ export function ImageAnnotatorDialog({
       drawPolygon(shape.points, shape)
     }
 
+    // Selected shape handles (move points / move whole shape)
+    if (selectedShapeId) {
+      const s = shapes.find((x) => x.id === selectedShapeId)
+      if (s) {
+        for (let i = 0; i < s.points.length; i++) {
+          const pt = s.points[i]
+          if (!pt) continue
+          ctx2.save()
+          ctx2.fillStyle = '#ffffff'
+          ctx2.strokeStyle = '#111827'
+          ctx2.lineWidth = 2
+          ctx2.beginPath()
+          ctx2.arc(pt.x, pt.y, 8, 0, Math.PI * 2)
+          ctx2.fill()
+          ctx2.stroke()
+          ctx2.fillStyle = '#111827'
+          ctx2.font = 'bold 11px system-ui, sans-serif'
+          ctx2.textAlign = 'center'
+          ctx2.textBaseline = 'middle'
+          ctx2.fillText(String(i + 1), pt.x, pt.y)
+          ctx2.restore()
+        }
+      }
+    }
+
     // Current shape (preview as polyline + points numbering)
     if (currentShapePoints.length > 0) {
       const firstPoint = currentShapePoints[0]
@@ -508,12 +548,36 @@ export function ImageAnnotatorDialog({
     return { x, y }
   }
 
+  const getCanvasPointFromPointer = (evt: React.PointerEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current
+    if (!canvas) return null
+    const rect = canvas.getBoundingClientRect()
+    const x = ((evt.clientX - rect.left) / rect.width) * canvas.width
+    const y = ((evt.clientY - rect.top) / rect.height) * canvas.height
+    return { x, y }
+  }
+
   const hitTestShape = (p: Point) => {
     // Top-most wins: iterate from end to start
     for (let i = shapes.length - 1; i >= 0; i--) {
       const s = shapes[i]
       if (!s) continue
       if (isPointInPolygon(p, s.points)) return s
+    }
+    return null
+  }
+
+  const hitTestSelectedShapePoint = (p: Point) => {
+    if (!selectedShapeId) return null
+    const s = shapes.find((x) => x.id === selectedShapeId)
+    if (!s) return null
+    const threshold = 14
+    for (let i = 0; i < s.points.length; i++) {
+      const pt = s.points[i]
+      if (!pt) continue
+      if (distance(p, pt) <= threshold) {
+        return { shape: s, pointIndex: i }
+      }
     }
     return null
   }
@@ -554,7 +618,113 @@ export function ImageAnnotatorDialog({
     return null
   }
 
+  const handleCanvasPointerDown = (evt: React.PointerEvent<HTMLCanvasElement>) => {
+    if (evt.button !== 0) return
+    const p = getCanvasPointFromPointer(evt)
+    if (!p) return
+
+    didDragRef.current = false
+
+    // Shape drag/edit
+    if (mode === 'shape') {
+      // 1) If clicking a point handle of selected shape -> drag point
+      const hitPoint = hitTestSelectedShapePoint(p)
+      if (hitPoint) {
+        evt.currentTarget.setPointerCapture(evt.pointerId)
+        dragRef.current = { type: 'shape-point', shapeId: hitPoint.shape.id, pointIndex: hitPoint.pointIndex }
+        return
+      }
+
+      // 2) If clicking inside ANY shape -> select it and drag whole shape
+      const hit = hitTestShape(p)
+      if (hit) {
+        // ensure selected + controls loaded
+        selectShapeById(hit.id)
+        setSelectedTextId(null)
+
+        evt.currentTarget.setPointerCapture(evt.pointerId)
+        dragRef.current = { type: 'shape-move', shapeId: hit.id, startPoints: hit.points.map((pt) => ({ ...pt })), startAt: p }
+        return
+      }
+    }
+
+    // Text drag/edit
+    if (mode === 'text') {
+      const hit = hitTestText(p)
+      if (hit) {
+        selectTextById(hit.id)
+        setSelectedShapeId(null)
+
+        evt.currentTarget.setPointerCapture(evt.pointerId)
+        dragRef.current = { type: 'text-move', textId: hit.id, startX: hit.x, startY: hit.y, startAt: p }
+        return
+      }
+    }
+  }
+
+  const handleCanvasPointerMove = (evt: React.PointerEvent<HTMLCanvasElement>) => {
+    const drag = dragRef.current
+    if (!drag) return
+    const p = getCanvasPointFromPointer(evt)
+    if (!p) return
+
+    const moved = Math.abs(p.x - (drag.type === 'shape-move' || drag.type === 'text-move' ? drag.startAt.x : p.x)) +
+      Math.abs(p.y - (drag.type === 'shape-move' || drag.type === 'text-move' ? drag.startAt.y : p.y))
+    if (moved > 1) didDragRef.current = true
+
+    if (drag.type === 'shape-point') {
+      setShapes((prev) =>
+        prev.map((s) => {
+          if (s.id !== drag.shapeId) return s
+          const nextPoints = s.points.map((pt, idx) => (idx === drag.pointIndex ? { x: p.x, y: p.y } : pt))
+          return { ...s, points: nextPoints }
+        })
+      )
+      return
+    }
+
+    if (drag.type === 'shape-move') {
+      const dx = p.x - drag.startAt.x
+      const dy = p.y - drag.startAt.y
+      setShapes((prev) =>
+        prev.map((s) => {
+          if (s.id !== drag.shapeId) return s
+          const nextPoints = drag.startPoints.map((pt) => ({ x: pt.x + dx, y: pt.y + dy }))
+          return { ...s, points: nextPoints }
+        })
+      )
+      return
+    }
+
+    if (drag.type === 'text-move') {
+      const dx = p.x - drag.startAt.x
+      const dy = p.y - drag.startAt.y
+      setTexts((prev) =>
+        prev.map((t) => {
+          if (t.id !== drag.textId) return t
+          return { ...t, x: drag.startX + dx, y: drag.startY + dy }
+        })
+      )
+      return
+    }
+  }
+
+  const handleCanvasPointerUp = (evt: React.PointerEvent<HTMLCanvasElement>) => {
+    if (dragRef.current) {
+      try {
+        evt.currentTarget.releasePointerCapture(evt.pointerId)
+      } catch {
+        // ignore
+      }
+    }
+    dragRef.current = null
+  }
+
   const handleCanvasClick = (evt: React.MouseEvent<HTMLCanvasElement>) => {
+    if (didDragRef.current) {
+      didDragRef.current = false
+      return
+    }
     const p = getCanvasPoint(evt)
     if (!p) return
 
@@ -563,11 +733,9 @@ export function ImageAnnotatorDialog({
       const hit = hitTestShape(p)
       if (hit) {
         selectShapeById(hit.id)
-        // Keep text selection independent
         setSelectedTextId(null)
         return
       }
-      // If user is editing a shape and clicked outside, keep it simple: don't add points.
       if (selectedShapeId) return
     }
 
@@ -843,9 +1011,13 @@ export function ImageAnnotatorDialog({
             <div className={cn('w-full rounded-md border border-border bg-muted/20 overflow-auto', isLoading && 'opacity-60')}>
               <canvas
                 ref={canvasRef}
+                onPointerDown={handleCanvasPointerDown}
+                onPointerMove={handleCanvasPointerMove}
+                onPointerUp={handleCanvasPointerUp}
+                onPointerCancel={handleCanvasPointerUp}
                 onClick={handleCanvasClick}
                 className="block max-w-full"
-                style={{ cursor: mode === 'shape' ? 'crosshair' : 'text' }}
+                style={{ cursor: mode === 'shape' ? 'crosshair' : 'text', touchAction: 'none' }}
               />
             </div>
 
