@@ -1,5 +1,11 @@
 {
-  "version": "2.1.7",
-  "buildDate": "2025-12-29",
-  "buildTimestamp": 1767030429981
+  "version": "2.2.0",
+  "buildDate": "2026-01-09",
+  "buildTimestamp": 1768012800000,
+  "features": [
+    "Nuevo módulo de Evidencias Fotográficas (antes/después)",
+    "Comparador visual de fotos con slider",
+    "Exportación a PDF de comparaciones",
+    "Selector de ubicación en jerarquía opcional"
+  ]
 }

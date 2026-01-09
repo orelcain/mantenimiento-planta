@@ -355,6 +355,54 @@ export interface PatternDetection {
   createdAt: Date
 }
 
+// ===== EVIDENCIAS FOTOGRÁFICAS (ANTES/DESPUÉS) =====
+
+export type PhotoEvidenceStatus = 'pendiente' | 'en_proceso' | 'corregida' | 'verificada'
+
+// Foto individual (antes o después)
+export interface PhotoItem {
+  id: string
+  url: string
+  descripcion?: string
+  timestamp: Date
+}
+
+// Grupo de fotos antes/después
+export interface PhotoEvidence {
+  id: string
+  titulo: string
+  descripcion?: string
+  // Ubicación en jerarquía (opcional)
+  hierarchyNodeId?: string
+  hierarchyPath?: string // "Planta > Área > Línea > Equipo"
+  // Fotos
+  fotosBefore: PhotoItem[]
+  fotosAfter: PhotoItem[]
+  // Estado
+  status: PhotoEvidenceStatus
+  // Metadatos
+  reportadoPor: string
+  corregidoPor?: string
+  verificadoPor?: string
+  // Fechas
+  createdAt: Date
+  updatedAt: Date
+  corregidaAt?: Date
+  verificadaAt?: Date
+  // Tags/categorías para búsqueda
+  tags?: string[]
+}
+
+// Para exportación a PDF
+export interface PhotoComparison {
+  evidenceId: string
+  titulo: string
+  ubicacion?: string
+  before: PhotoItem
+  after: PhotoItem
+  descripcion?: string
+}
+
 // Configuración de la aplicación
 export interface AppSettings {
   incidents: {

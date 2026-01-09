@@ -2,17 +2,17 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.1.7' as const
+export const APP_VERSION = '2.2.0' as const
 
 /**
  * Fecha de la versión actual
  */
-export const VERSION_DATE = '2025-12-29' as const
+export const VERSION_DATE = '2026-01-09' as const
 
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Reconciliación Mandante' as const
+export const VERSION_NAME = 'Evidencias Fotográficas' as const
 
 /**
  * Información completa de la versión

@@ -13,6 +13,7 @@ import {
   CalendarClock,
   FolderTree,
   RefreshCw,
+  Camera,
 } from 'lucide-react'
 import { Avatar, AvatarFallback, Button } from '@/components/ui'
 import { useAuthStore, useIsAdmin } from '@/store'
@@ -25,6 +26,7 @@ import { useAppVersion } from '@/hooks/useAppVersion'
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Incidencias', href: '/incidents', icon: AlertTriangle },
+  { name: 'Evidencias', href: '/photo-evidence', icon: Camera },
   { name: 'Preventivo', href: '/preventive', icon: CalendarClock },
   { name: 'Mapa', href: '/map', icon: Map },
   { name: 'Equipos', href: '/equipment', icon: Wrench },
