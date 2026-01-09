@@ -339,6 +339,61 @@ export async function removePhoto(
   }
 }
 
+export async function upsertEvidencePhotoAtIndex(
+  evidenceId: string,
+  pairIndex: number,
+  type: 'before' | 'after',
+  file: File,
+  userId?: string
+): Promise<void> {
+  const evidence = await getPhotoEvidenceById(evidenceId)
+  if (!evidence) throw new Error('Evidencia no encontrada')
+
+  const fotos = type === 'before' ? evidence.fotosBefore : evidence.fotosAfter
+
+  // Evitar "huecos" en arrays (Firestore no permite undefined)
+  if (pairIndex > fotos.length) {
+    throw new Error('No se puede guardar este par sin completar los anteriores')
+  }
+
+  const current = fotos[pairIndex]
+  if (current) {
+    try {
+      await deleteEvidencePhoto(evidenceId, current.id, type, current.url)
+    } catch (e) {
+      logger.warn('Error deleting previous photo on upsert', { evidenceId, type, photoId: current.id })
+    }
+  }
+
+  const uploaded = await uploadMultipleEvidencePhotos(evidenceId, [file], type)
+  const first = uploaded[0]
+  if (!first) throw new Error('No se pudo subir la foto')
+
+  const newItem: PhotoItem = {
+    id: first.id,
+    url: first.url,
+    timestamp: new Date(),
+  }
+
+  const updatedFotos = [...fotos]
+  if (pairIndex === fotos.length) {
+    updatedFotos.push(newItem)
+  } else {
+    updatedFotos[pairIndex] = newItem
+  }
+
+  if (type === 'before') {
+    await updatePhotoEvidence(evidenceId, { fotosBefore: updatedFotos })
+  } else {
+    await updatePhotoEvidence(evidenceId, {
+      fotosAfter: updatedFotos,
+      status: 'corregida',
+      corregidoPor: userId,
+      corregidaAt: new Date(),
+    })
+  }
+}
+
 // Marcar como corregida
 export async function markAsCorrected(
   evidenceId: string,

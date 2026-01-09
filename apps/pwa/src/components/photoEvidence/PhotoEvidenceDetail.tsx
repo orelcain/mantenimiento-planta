@@ -9,7 +9,6 @@ import {
   AlertCircle,
   Trash2,
   Download,
-  Plus,
 } from 'lucide-react'
 import {
   Dialog,
@@ -28,14 +27,14 @@ import { PhotoUploader } from './PhotoUploader'
 import { useAuthStore } from '@/store'
 import {
   getPhotoEvidenceById,
-  updatePhotoEvidence,
-  uploadMultipleEvidencePhotos,
   deletePhotoEvidence,
+  removePhoto,
   markAsVerified,
   unmarkAsVerified,
   updatePhotoEvidencePairMeta,
+  upsertEvidencePhotoAtIndex,
 } from '@/services/photoEvidence'
-import type { PhotoEvidence, PhotoItem, PhotoEvidenceStatus } from '@/types'
+import type { PhotoEvidence, PhotoEvidenceStatus } from '@/types'
 import { logger } from '@/lib/logger'
 import { cn } from '@/lib/utils'
 
@@ -89,11 +88,11 @@ export function PhotoEvidenceDetail({
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
-  const [showAfterUploader, setShowAfterUploader] = useState(false)
-  const [afterPhotos, setAfterPhotos] = useState<{ id: string; url: string; preview?: string; file?: File }[]>([])
   const [selectedPairIndex, setSelectedPairIndex] = useState(0)
   const [pairUbicacion, setPairUbicacion] = useState('')
   const [pairDescripcion, setPairDescripcion] = useState('')
+  const [pairBeforePhoto, setPairBeforePhoto] = useState<{ id: string; url: string; preview?: string; file?: File }[]>([])
+  const [pairAfterPhoto, setPairAfterPhoto] = useState<{ id: string; url: string; preview?: string; file?: File }[]>([])
 
   // Cargar evidencia
   useEffect(() => {
@@ -110,6 +109,11 @@ export function PhotoEvidenceDetail({
     const meta = evidence.pairMeta?.[selectedPairIndex]
     setPairUbicacion(meta?.ubicacion ?? '')
     setPairDescripcion(meta?.descripcion ?? '')
+
+    const before = evidence.fotosBefore[selectedPairIndex]
+    const after = evidence.fotosAfter[selectedPairIndex]
+    setPairBeforePhoto(before ? [{ id: before.id, url: before.url }] : [])
+    setPairAfterPhoto(after ? [{ id: after.id, url: after.url }] : [])
   }, [evidence, selectedPairIndex])
 
   const loadEvidence = async () => {
@@ -123,46 +127,6 @@ export function PhotoEvidenceDetail({
       logger.error('Error loading evidence', error as Error)
     } finally {
       setIsLoading(false)
-    }
-  }
-
-  const handleAddAfterPhotos = async () => {
-    if (!evidence || !user || afterPhotos.length === 0) return
-
-    setIsSaving(true)
-    try {
-      // Subir fotos
-      const photosToUpload = afterPhotos.filter(p => p.file)
-      if (photosToUpload.length > 0) {
-        const uploadedPhotos = await uploadMultipleEvidencePhotos(
-          evidence.id,
-          photosToUpload.map(p => p.file!),
-          'after'
-        )
-
-        // Actualizar evidencia
-        const newAfterPhotos: PhotoItem[] = uploadedPhotos.map(uploaded => ({
-          id: uploaded.id,
-          url: uploaded.url,
-          timestamp: new Date(),
-        }))
-
-        await updatePhotoEvidence(evidence.id, {
-          fotosAfter: [...evidence.fotosAfter, ...newAfterPhotos],
-          status: 'corregida',
-          corregidoPor: user.id,
-          corregidaAt: new Date(),
-        })
-
-        setAfterPhotos([])
-        setShowAfterUploader(false)
-        loadEvidence()
-        onUpdate()
-      }
-    } catch (error) {
-      logger.error('Error adding after photos', error as Error)
-    } finally {
-      setIsSaving(false)
     }
   }
 
@@ -223,25 +187,46 @@ export function PhotoEvidenceDetail({
 
   const statusConfig = evidence ? STATUS_CONFIG[evidence.status] : null
   const StatusIcon = statusConfig?.icon || Clock
-  const canAddAfterPhotos = evidence && (evidence.status === 'pendiente' || evidence.status === 'en_proceso' || evidence.status === 'corregida')
   const canVerify = evidence && evidence.status === 'corregida' && user?.rol !== 'tecnico'
   const canUnverify = evidence && evidence.status === 'verificada' && user?.rol !== 'tecnico'
   const canExport = evidence && evidence.fotosBefore.length > 0 && evidence.fotosAfter.length > 0
   const canEditPairMeta = evidence && (evidence.status === 'pendiente' || evidence.status === 'en_proceso' || evidence.status === 'corregida')
 
-  const handleSavePairMeta = async () => {
-    if (!evidence) return
+  const handleSavePair = async () => {
+    if (!evidence || !user) return
 
     setIsSaving(true)
     try {
+      // 1) Metadatos del par
       await updatePhotoEvidencePairMeta(evidence.id, selectedPairIndex, {
         ubicacion: pairUbicacion.trim() || undefined,
         descripcion: pairDescripcion.trim() || undefined,
       })
+
+      // 2) Foto ANTES (reemplazar / agregar / eliminar)
+      const currentBefore = evidence.fotosBefore[selectedPairIndex]
+      const desiredBefore = pairBeforePhoto[0]
+      if (!desiredBefore && currentBefore) {
+        await removePhoto(evidence.id, currentBefore.id, 'before')
+      } else if (desiredBefore?.file) {
+        await upsertEvidencePhotoAtIndex(evidence.id, selectedPairIndex, 'before', desiredBefore.file, user.id)
+      }
+
+      // 3) Foto DESPUÉS (reemplazar / agregar / eliminar)
+      const currentAfter = evidence.fotosAfter[selectedPairIndex]
+      const desiredAfter = pairAfterPhoto[0]
+      if (!desiredAfter && currentAfter) {
+        await removePhoto(evidence.id, currentAfter.id, 'after')
+      } else if (desiredAfter?.file) {
+        await upsertEvidencePhotoAtIndex(evidence.id, selectedPairIndex, 'after', desiredAfter.file, user.id)
+      }
+
       await loadEvidence()
       onUpdate()
     } catch (error) {
-      logger.error('Error saving pair meta', error as Error)
+      const message = (error as Error)?.message || 'Error guardando el par'
+      logger.error('Error saving pair', error as Error)
+      alert(message)
     } finally {
       setIsSaving(false)
     }
@@ -293,9 +278,9 @@ export function PhotoEvidenceDetail({
                 </h3>
 
                 {/* Navegación de pares */}
-                {evidence.fotosBefore.length > 1 && (
+                {Math.max(evidence.fotosBefore.length, evidence.fotosAfter.length, evidence.pairMeta?.length ?? 0) > 1 && (
                   <div className="flex items-center gap-2 overflow-x-auto pb-2">
-                    {evidence.fotosBefore.map((_, index) => (
+                    {Array.from({ length: Math.max(evidence.fotosBefore.length, evidence.fotosAfter.length, evidence.pairMeta?.length ?? 0) }).map((_, index) => (
                       <button
                         key={index}
                         onClick={() => setSelectedPairIndex(index)}
@@ -317,9 +302,32 @@ export function PhotoEvidenceDetail({
                   after={evidence.fotosAfter[selectedPairIndex] || null}
                 />
 
-                {canEditPairMeta && (evidence.fotosBefore[selectedPairIndex] || evidence.fotosAfter[selectedPairIndex]) && (
+                {canEditPairMeta && (
                   <div className="mt-3 p-3 rounded-lg border border-border bg-muted/30 space-y-3">
                     <div className="grid grid-cols-1 gap-3">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="p-3 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/20">
+                          <PhotoUploader
+                            photos={pairBeforePhoto}
+                            onPhotosChange={(p) => setPairBeforePhoto(p.slice(0, 1))}
+                            maxPhotos={1}
+                            disabled={isSaving}
+                            label="📷 Foto ANTES (este par)"
+                            description="Para reemplazar: elimina y vuelve a agregar"
+                          />
+                        </div>
+                        <div className="p-3 rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/20">
+                          <PhotoUploader
+                            photos={pairAfterPhoto}
+                            onPhotosChange={(p) => setPairAfterPhoto(p.slice(0, 1))}
+                            maxPhotos={1}
+                            disabled={isSaving}
+                            label="📷 Foto DESPUÉS (este par)"
+                            description="Para reemplazar: elimina y vuelve a agregar"
+                          />
+                        </div>
+                      </div>
+
                       <div className="space-y-1">
                         <Label>Ubicación (solo para este par)</Label>
                         <Input
@@ -340,11 +348,12 @@ export function PhotoEvidenceDetail({
                         />
                       </div>
                     </div>
+
                     <div className="flex justify-end">
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={handleSavePairMeta}
+                        onClick={handleSavePair}
                         disabled={isSaving}
                       >
                         {isSaving ? (
@@ -353,7 +362,7 @@ export function PhotoEvidenceDetail({
                             Guardando...
                           </>
                         ) : (
-                          'Guardar datos del par'
+                          'Guardar cambios del par'
                         )}
                       </Button>
                     </div>
@@ -361,61 +370,7 @@ export function PhotoEvidenceDetail({
                 )}
               </div>
 
-              {/* Agregar fotos DESPUÉS */}
-              {canAddAfterPhotos && (
-                <div className="space-y-3">
-                  {!showAfterUploader ? (
-                    <Button
-                      variant="outline"
-                      className="w-full border-green-500 text-green-600 hover:bg-green-50"
-                      onClick={() => setShowAfterUploader(true)}
-                    >
-                      <Plus className="w-4 h-4 mr-2" />
-                      Agregar Fotos DESPUÉS (corrección)
-                    </Button>
-                  ) : (
-                    <div className="p-4 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-800 space-y-4">
-                      <PhotoUploader
-                        photos={afterPhotos}
-                        onPhotosChange={setAfterPhotos}
-                        maxPhotos={10}
-                        disabled={isSaving}
-                        label="📷 Fotos DESPUÉS (corrección)"
-                        description="Sube las fotos mostrando la corrección realizada"
-                      />
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex-1"
-                          onClick={() => {
-                            setShowAfterUploader(false)
-                            setAfterPhotos([])
-                          }}
-                          disabled={isSaving}
-                        >
-                          Cancelar
-                        </Button>
-                        <Button
-                          size="sm"
-                          className="flex-1 bg-green-600 hover:bg-green-700"
-                          onClick={handleAddAfterPhotos}
-                          disabled={afterPhotos.length === 0 || isSaving}
-                        >
-                          {isSaving ? (
-                            <>
-                              <Spinner className="w-4 h-4 mr-2" />
-                              Guardando...
-                            </>
-                          ) : (
-                            'Guardar Fotos'
-                          )}
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
+              {/* Nota: las fotos DESPUÉS ahora se editan por par (arriba) */}
 
               {/* Descripción */}
               {evidence.descripcion && (
