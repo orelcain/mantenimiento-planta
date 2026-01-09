@@ -57,6 +57,16 @@ function distance(a: Point, b: Point) {
   return Math.hypot(dx, dy)
 }
 
+const VIEW_MIN_SCALE = 1
+const VIEW_MAX_SCALE = 6
+
+function screenToWorld(p: Point, scale: number, offset: Point): Point {
+  return {
+    x: (p.x - offset.x) / scale,
+    y: (p.y - offset.y) / scale,
+  }
+}
+
 interface ImageAnnotatorDialogProps {
   open: boolean
   title?: string
@@ -120,6 +130,17 @@ export function ImageAnnotatorDialog({
   const [textBackgroundOpacity, setTextBackgroundOpacity] = useState(0.75)
   const [texts, setTexts] = useState<TextItem[]>([])
   const [selectedTextId, setSelectedTextId] = useState<string | null>(null)
+
+  const [viewScale, setViewScale] = useState(1)
+  const [viewOffset, setViewOffset] = useState<Point>({ x: 0, y: 0 })
+
+  const activePointersRef = useRef<Map<number, Point>>(new Map())
+  const pinchRef = useRef<{
+    startDist: number
+    startScale: number
+    startOffset: Point
+    worldMid: Point
+  } | null>(null)
 
   type DragState =
     | { type: 'shape-point'; shapeId: string; pointIndex: number }
@@ -220,6 +241,9 @@ export function ImageAnnotatorDialog({
     setTextBackgroundOpacity(0.75)
     setTexts([])
     setImageSize(null)
+    setViewScale(1)
+    setViewOffset({ x: 0, y: 0 })
+    activePointersRef.current.clear()
   }, [open])
 
   useEffect(() => {
@@ -319,6 +343,10 @@ export function ImageAnnotatorDialog({
     ctx2.clearRect(0, 0, canvas.width, canvas.height)
     ctx2.fillStyle = '#ffffff'
     ctx2.fillRect(0, 0, canvas.width, canvas.height)
+
+    // Apply view transform (zoom/pan) to image + annotations
+    ctx2.save()
+    ctx2.setTransform(viewScale, 0, 0, viewScale, viewOffset.x, viewOffset.y)
 
     ctx2.drawImage(img, 0, 0, canvas.width, canvas.height)
 
@@ -517,6 +545,8 @@ export function ImageAnnotatorDialog({
       ctx2.fillText(safeText, t.x, t.y)
       ctx2.restore()
     }
+
+    ctx2.restore()
   }
 
   useEffect(() => {
@@ -537,7 +567,7 @@ export function ImageAnnotatorDialog({
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, localImageUrl, shapes, currentShapePoints, texts, shapeBorderColor])
+  }, [open, localImageUrl, shapes, currentShapePoints, texts, shapeBorderColor, viewScale, viewOffset])
 
   const getCanvasPoint = (evt: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current
@@ -557,6 +587,18 @@ export function ImageAnnotatorDialog({
     return { x, y }
   }
 
+  const getCanvasWorldPointFromPointer = (evt: React.PointerEvent<HTMLCanvasElement>) => {
+    const p = getCanvasPointFromPointer(evt)
+    if (!p) return null
+    return screenToWorld(p, viewScale, viewOffset)
+  }
+
+  const getCanvasWorldPointFromMouse = (evt: React.MouseEvent<HTMLCanvasElement>) => {
+    const p = getCanvasPoint(evt)
+    if (!p) return null
+    return screenToWorld(p, viewScale, viewOffset)
+  }
+
   const hitTestShape = (p: Point) => {
     // Top-most wins: iterate from end to start
     for (let i = shapes.length - 1; i >= 0; i--) {
@@ -571,7 +613,7 @@ export function ImageAnnotatorDialog({
     if (!selectedShapeId) return null
     const s = shapes.find((x) => x.id === selectedShapeId)
     if (!s) return null
-    const threshold = 14
+    const threshold = 14 / Math.max(VIEW_MIN_SCALE, viewScale)
     for (let i = 0; i < s.points.length; i++) {
       const pt = s.points[i]
       if (!pt) continue
@@ -620,10 +662,33 @@ export function ImageAnnotatorDialog({
 
   const handleCanvasPointerDown = (evt: React.PointerEvent<HTMLCanvasElement>) => {
     if (evt.button !== 0) return
-    const p = getCanvasPointFromPointer(evt)
+    const screenP = getCanvasPointFromPointer(evt)
+    const p = getCanvasWorldPointFromPointer(evt)
     if (!p) return
+    if (!screenP) return
 
     didDragRef.current = false
+
+    // Track pointers for pinch
+    activePointersRef.current.set(evt.pointerId, screenP)
+
+    if (activePointersRef.current.size === 2) {
+      // Start pinch, cancel any element drag
+      dragRef.current = null
+      didDragRef.current = true
+      const vals = Array.from(activePointersRef.current.values())
+      if (vals.length < 2) return
+      const a = vals[0]!
+      const b = vals[1]!
+      const midScreen: Point = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
+      pinchRef.current = {
+        startDist: distance(a, b) || 1,
+        startScale: viewScale,
+        startOffset: { ...viewOffset },
+        worldMid: screenToWorld(midScreen, viewScale, viewOffset),
+      }
+      return
+    }
 
     // Shape drag/edit
     if (mode === 'shape') {
@@ -660,15 +725,72 @@ export function ImageAnnotatorDialog({
         return
       }
     }
+
+    // If nothing hit and zoomed, allow pan
+    if (viewScale > 1.0001) {
+      evt.currentTarget.setPointerCapture(evt.pointerId)
+      dragRef.current = {
+        // reuse shape-move structure would be wrong; use dedicated type
+        // (kept simple: store in refs via closure)
+        type: 'shape-move',
+        shapeId: '__PAN__',
+        startPoints: [],
+        startAt: p,
+      }
+      ;(dragRef.current as any)._pan = { startOffset: { ...viewOffset }, startAtScreen: screenP }
+      return
+    }
   }
 
   const handleCanvasPointerMove = (evt: React.PointerEvent<HTMLCanvasElement>) => {
+    const screenP = getCanvasPointFromPointer(evt)
+    const p = getCanvasWorldPointFromPointer(evt)
+    if (!screenP || !p) return
+
+    // Update pointer tracking for pinch
+    if (activePointersRef.current.has(evt.pointerId)) {
+      activePointersRef.current.set(evt.pointerId, screenP)
+    }
+
+    // Pinch zoom when two pointers active
+    const pointers = Array.from(activePointersRef.current.values())
+    if (pointers.length === 2) {
+      const a = pointers[0]!
+      const b = pointers[1]!
+      const midScreen: Point = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
+      const dist = distance(a, b)
+
+      const pinch = pinchRef.current
+      if (!pinch) return
+
+      const nextScale = clampNumber(pinch.startScale * (dist / pinch.startDist), VIEW_MIN_SCALE, VIEW_MAX_SCALE)
+      const nextOffset = {
+        x: midScreen.x - pinch.worldMid.x * nextScale,
+        y: midScreen.y - pinch.worldMid.y * nextScale,
+      }
+      setViewScale(nextScale)
+      setViewOffset(nextOffset)
+      didDragRef.current = true
+      return
+    }
+
     const drag = dragRef.current
     if (!drag) return
-    const p = getCanvasPointFromPointer(evt)
-    if (!p) return
 
-    const moved = Math.abs(p.x - (drag.type === 'shape-move' || drag.type === 'text-move' ? drag.startAt.x : p.x)) +
+    if (!drag) return
+
+    // Pan special-case
+    const pan = (drag as any)?._pan as { startOffset: Point; startAtScreen: Point } | undefined
+    if (pan && (drag as any).shapeId === '__PAN__') {
+      const dx = screenP.x - pan.startAtScreen.x
+      const dy = screenP.y - pan.startAtScreen.y
+      if (Math.abs(dx) + Math.abs(dy) > 1) didDragRef.current = true
+      setViewOffset({ x: pan.startOffset.x + dx, y: pan.startOffset.y + dy })
+      return
+    }
+
+    const moved =
+      Math.abs(p.x - (drag.type === 'shape-move' || drag.type === 'text-move' ? drag.startAt.x : p.x)) +
       Math.abs(p.y - (drag.type === 'shape-move' || drag.type === 'text-move' ? drag.startAt.y : p.y))
     if (moved > 1) didDragRef.current = true
 
@@ -710,6 +832,12 @@ export function ImageAnnotatorDialog({
   }
 
   const handleCanvasPointerUp = (evt: React.PointerEvent<HTMLCanvasElement>) => {
+    // Update pointer tracking
+    activePointersRef.current.delete(evt.pointerId)
+    if (activePointersRef.current.size < 2) {
+      pinchRef.current = null
+    }
+
     if (dragRef.current) {
       try {
         evt.currentTarget.releasePointerCapture(evt.pointerId)
@@ -725,7 +853,7 @@ export function ImageAnnotatorDialog({
       didDragRef.current = false
       return
     }
-    const p = getCanvasPoint(evt)
+    const p = getCanvasWorldPointFromMouse(evt)
     if (!p) return
 
     // Prefer selecting existing items when clicking on them
@@ -807,6 +935,33 @@ export function ImageAnnotatorDialog({
     setSelectedShapeId(null)
     setTexts([])
     setSelectedTextId(null)
+  }
+
+  const handleCanvasWheel = (evt: React.WheelEvent<HTMLCanvasElement>) => {
+    // zoom at cursor
+    evt.preventDefault()
+    const canvas = canvasRef.current
+    if (!canvas) return
+
+    const rect = canvas.getBoundingClientRect()
+    const screenP: Point = {
+      x: ((evt.clientX - rect.left) / rect.width) * canvas.width,
+      y: ((evt.clientY - rect.top) / rect.height) * canvas.height,
+    }
+
+    const worldP = screenToWorld(screenP, viewScale, viewOffset)
+
+    const delta = evt.deltaY
+    const zoomFactor = Math.exp(-delta * 0.001)
+    const nextScale = clampNumber(viewScale * zoomFactor, VIEW_MIN_SCALE, VIEW_MAX_SCALE)
+
+    const nextOffset: Point = {
+      x: screenP.x - worldP.x * nextScale,
+      y: screenP.y - worldP.y * nextScale,
+    }
+
+    setViewScale(nextScale)
+    setViewOffset(nextOffset)
   }
 
   const handleSave = async () => {
@@ -1015,6 +1170,7 @@ export function ImageAnnotatorDialog({
                 onPointerMove={handleCanvasPointerMove}
                 onPointerUp={handleCanvasPointerUp}
                 onPointerCancel={handleCanvasPointerUp}
+                onWheel={handleCanvasWheel}
                 onClick={handleCanvasClick}
                 className="block max-w-full"
                 style={{ cursor: mode === 'shape' ? 'crosshair' : 'text', touchAction: 'none' }}
