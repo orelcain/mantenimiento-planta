@@ -330,37 +330,19 @@ service cloud.firestore {
     // ============================================
     // EVIDENCIAS FOTOGRÁFICAS
     // ============================================
-    match /photo_evidences/{evidenceId} {
-      allow read: if isActiveUser();
+    match /photoEvidence/{evidenceId} {
+      allow read: if isAuthenticated();
       
-      allow create: if isActiveUser()
-        && isValidDocSize()
-        && isNonEmptyString(request.resource.data.titulo, 3, 200)
+      allow create: if isAuthenticated()
+        && request.resource.data.titulo is string
+        && request.resource.data.titulo.size() >= 1
         && request.resource.data.status in ['pendiente', 'en_proceso', 'verificada']
         && request.resource.data.reportadoPor == request.auth.uid
-        && request.resource.data.fotosBefore is list
-        && request.resource.data.createdAt is timestamp
-        && (!('fotosAfter' in request.resource.data) || request.resource.data.fotosAfter is list)
-        && (!('descripcion' in request.resource.data) || request.resource.data.descripcion is string)
-        && (!('hierarchyNodeId' in request.resource.data) || request.resource.data.hierarchyNodeId is string)
-        && (!('hierarchyPath' in request.resource.data) || request.resource.data.hierarchyPath is string)
-        && (!('tags' in request.resource.data) || request.resource.data.tags is list);
+        && request.resource.data.fotosBefore is list;
       
-      allow update: if isActiveUser()
-        && isValidDocSize()
-        && (
-          resource.data.reportadoPor == request.auth.uid
-          || isSupervisor()
-        )
-        && (!('titulo' in request.resource.data) || isNonEmptyString(request.resource.data.titulo, 3, 200))
-        && (!('status' in request.resource.data) || request.resource.data.status in ['pendiente', 'en_proceso', 'verificada'])
-        && (!('fotosBefore' in request.resource.data) || request.resource.data.fotosBefore is list)
-        && (!('fotosAfter' in request.resource.data) || request.resource.data.fotosAfter is list)
-        && (!('descripcion' in request.resource.data) || request.resource.data.descripcion is string)
-        && (!('tags' in request.resource.data) || request.resource.data.tags is list)
-        && request.resource.data.updatedAt is timestamp;
+      allow update: if isAuthenticated();
         
-      allow delete: if isAdmin() || (isActiveUser() && resource.data.reportadoPor == request.auth.uid);
+      allow delete: if isAdmin() || (isAuthenticated() && resource.data.reportadoPor == request.auth.uid);
     }
 
     // ============================================
