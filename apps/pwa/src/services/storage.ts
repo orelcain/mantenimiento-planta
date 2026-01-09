@@ -33,11 +33,15 @@ export async function uploadIncidentPhoto(
       ? await compressImage(file, 1920, 0.8)
       : file
 
-    const fileExtension = file.name.split('.').pop() || 'jpg'
+    const fileExtension =
+      fileToUpload.name.split('.').pop() ||
+      (fileToUpload.type === 'image/webp' ? 'webp' : 'jpg')
     const fileName = `${generateId()}.${fileExtension}`
     const storageRef = ref(storage, `incidents/${incidentId}/${fileName}`)
     
-    await uploadBytes(storageRef, fileToUpload)
+    await uploadBytes(storageRef, fileToUpload, {
+      contentType: fileToUpload.type || 'image/jpeg',
+    })
     const url = await getDownloadURL(storageRef)
     
     logger.info('Incident photo uploaded successfully', { incidentId, fileName })
@@ -70,11 +74,15 @@ export async function uploadEquipmentPhoto(
       ? await compressImage(file, 1920, 0.8)
       : file
 
-    const fileExtension = file.name.split('.').pop() || 'jpg'
+    const fileExtension =
+      fileToUpload.name.split('.').pop() ||
+      (fileToUpload.type === 'image/webp' ? 'webp' : 'jpg')
     const fileName = `${generateId()}.${fileExtension}`
     const storageRef = ref(storage, `equipment/${equipmentId}/${fileName}`)
     
-    await uploadBytes(storageRef, fileToUpload)
+    await uploadBytes(storageRef, fileToUpload, {
+      contentType: fileToUpload.type || 'image/jpeg',
+    })
     const url = await getDownloadURL(storageRef)
     
     logger.info('Equipment photo uploaded successfully', { equipmentId, fileName })
@@ -146,7 +154,8 @@ export async function compressImage(
 ): Promise<File> {
   return new Promise((resolve, reject) => {
     const img = new Image()
-    img.src = URL.createObjectURL(file)
+    const objectUrl = URL.createObjectURL(file)
+    img.src = objectUrl
     
     img.onload = () => {
       const canvas = document.createElement('canvas')
@@ -168,34 +177,54 @@ export async function compressImage(
       
       ctx.drawImage(img, 0, 0, width, height)
       
-      // Intentar usar WebP primero, fallback a JPEG
-      const mimeType = useWebP ? 'image/webp' : 'image/jpeg'
-      const extension = useWebP ? 'webp' : 'jpg'
-      
-      canvas.toBlob(
-        (blob) => {
-          if (blob) {
-            // Calcular nombre sin extensión
-            const nameWithoutExt = file.name.replace(/\.[^/.]+$/, '')
-            const compressedFile = new File([blob], `${nameWithoutExt}.${extension}`, {
-              type: mimeType,
-              lastModified: Date.now(),
-            })
-            
-            console.log(`📸 Imagen comprimida: ${file.size} → ${blob.size} bytes (${Math.round((1 - blob.size / file.size) * 100)}% reducción)`)
-            resolve(compressedFile)
-          } else {
-            reject(new Error('No se pudo comprimir la imagen'))
-          }
-        },
-        mimeType,
-        quality
-      )
-      
-      URL.revokeObjectURL(img.src)
+      const nameWithoutExt = file.name.replace(/\.[^/.]+$/, '')
+
+      const finalize = (blob: Blob, mimeType: string, extension: string) => {
+        const compressedFile = new File([blob], `${nameWithoutExt}.${extension}`, {
+          type: mimeType,
+          lastModified: Date.now(),
+        })
+        console.log(
+          `📸 Imagen comprimida: ${file.size} → ${blob.size} bytes (${Math.round((1 - blob.size / file.size) * 100)}% reducción)`
+        )
+        resolve(compressedFile)
+      }
+
+      const tryJpeg = () => {
+        canvas.toBlob(
+          (jpegBlob) => {
+            if (!jpegBlob) {
+              reject(new Error('No se pudo comprimir la imagen'))
+              return
+            }
+            finalize(jpegBlob, 'image/jpeg', 'jpg')
+          },
+          'image/jpeg',
+          quality
+        )
+      }
+
+      if (useWebP) {
+        canvas.toBlob(
+          (webpBlob) => {
+            if (!webpBlob) {
+              tryJpeg()
+              return
+            }
+            finalize(webpBlob, 'image/webp', 'webp')
+          },
+          'image/webp',
+          quality
+        )
+      } else {
+        tryJpeg()
+      }
+
+      URL.revokeObjectURL(objectUrl)
     }
     
     img.onerror = () => {
+      URL.revokeObjectURL(objectUrl)
       reject(new Error('Error cargando imagen'))
     }
   })

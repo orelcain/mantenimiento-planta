@@ -97,15 +97,19 @@ export async function uploadEvidencePhoto(
   try {
     // Comprimir imagen si es mayor a 1MB
     const fileToUpload = file.size > 1024 * 1024
-      ? await compressImage(file, 1920, 0.8)
+      ? await compressImage(file, 1920, 0.8, true)
       : file
 
     const photoId = generateId()
-    const fileExtension = file.name.split('.').pop() || 'jpg'
+    const fileExtension =
+      fileToUpload.name.split('.').pop() ||
+      (fileToUpload.type === 'image/webp' ? 'webp' : 'jpg')
     const fileName = `${photoId}.${fileExtension}`
     const storageRef = ref(storage, `evidence/${evidenceId}/${type}/${fileName}`)
     
-    await uploadBytes(storageRef, fileToUpload)
+    await uploadBytes(storageRef, fileToUpload, {
+      contentType: fileToUpload.type || 'image/jpeg',
+    })
     const url = await getDownloadURL(storageRef)
     
     logger.info('Evidence photo uploaded successfully', { evidenceId, photoId, type })

@@ -193,10 +193,19 @@ async function drawBeforeAfterPair(
  */
 export async function exportPhotoEvidenceTechnicalReportToPDF(
   evidences: PhotoEvidence[],
-  title: string = 'Informe Técnico - Evidencias Fotográficas'
+  title: string = 'Informe Técnico - Evidencias Fotográficas',
+  options?: {
+    userDisplayNameById?: Record<string, string>
+  }
 ): Promise<void> {
   const { pageWidth, pageHeight, margin, fontSize, footerHeight } = PDF_CONFIG
   const contentWidth = pageWidth - margin * 2
+
+  const resolveUser = (value: unknown): string => {
+    const raw = safeText(value)
+    if (!raw) return ''
+    return options?.userDisplayNameById?.[raw] ?? raw
+  }
 
   const evidencePages: Array<{ evidence: PhotoEvidence; pairIndex: number }> = []
   for (const evidence of evidences) {
@@ -263,7 +272,7 @@ export async function exportPhotoEvidenceTechnicalReportToPDF(
         { label: 'ID', value: safeText(evidence.id) },
         { label: 'Estado', value: safeText(statusLabel) },
         { label: 'Fecha evento', value: formatDateTime(evidence.createdAt) },
-        { label: 'Reporta', value: safeText(evidence.reportadoPor) },
+        { label: 'Reporta', value: resolveUser(evidence.reportadoPor) },
       ],
       [
         { label: 'Ubicación (general)', value: safeText(evidence.hierarchyPath || '-') },
@@ -318,11 +327,11 @@ export async function exportPhotoEvidenceTechnicalReportToPDF(
     currentY = drawSectionHeader(ctx, '3. CIERRE', margin, currentY, contentWidth)
     const cierreRows = [
       [
-        { label: 'Corregido por', value: safeText(evidence.corregidoPor || '-') },
+        { label: 'Corregido por', value: resolveUser(evidence.corregidoPor || '-') },
         { label: 'Fecha corrección', value: formatDateTime(evidence.corregidaAt) || '-' },
       ],
       [
-        { label: 'Verificado por', value: safeText(evidence.verificadoPor || '-') },
+        { label: 'Verificado por', value: resolveUser(evidence.verificadoPor || '-') },
         { label: 'Fecha verificación', value: formatDateTime(evidence.verificadaAt) || '-' },
       ],
     ]

@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils'
 
 interface PhotoEvidenceCardProps {
   evidence: PhotoEvidence
+  userDisplayNameById?: Record<string, string>
   onClick?: () => void
   onAddAfterPhotos?: () => void
   compact?: boolean
@@ -47,6 +48,7 @@ const STATUS_CONFIG: Record<PhotoEvidenceStatus, { label: string; color: string;
 
 export function PhotoEvidenceCard({
   evidence,
+  userDisplayNameById,
   onClick,
   onAddAfterPhotos,
   compact = false,
@@ -62,6 +64,10 @@ export function PhotoEvidenceCard({
   const StatusIcon = statusConfig.icon
   const hasBeforePhotos = evidence.fotosBefore.length > 0
   const hasAfterPhotos = evidence.fotosAfter.length > 0
+
+  const reporta = evidence.reportadoPor
+    ? (userDisplayNameById?.[evidence.reportadoPor] ?? evidence.reportadoPor)
+    : ''
 
   if (compact) {
     return (
@@ -197,6 +203,11 @@ export function PhotoEvidenceCard({
             <Calendar className="w-3 h-3" />
             {safeFormat(evidence.createdAt, "d MMM ''yy")}
           </span>
+          {reporta && (
+            <span className="flex items-center gap-1" title={reporta}>
+              <span className="truncate max-w-[140px]">Reporta: {reporta}</span>
+            </span>
+          )}
         </div>
 
         {/* Tags */}

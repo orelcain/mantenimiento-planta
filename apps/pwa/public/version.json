@@ -1,11 +1,13 @@
 {
-  "version": "2.2.12",
+  "version": "2.2.13",
   "buildDate": "2026-01-09",
   "buildTimestamp": 1768012800000,
   "features": [
     "Nuevo módulo de Evidencias Fotográficas (antes/después)",
     "Comparador visual de fotos con slider",
     "Exportación a PDF de comparaciones",
-    "Selector de ubicación en jerarquía opcional"
+    "Selector de ubicación en jerarquía opcional",
+    "Nombres legibles (UI/PDF) para usuarios",
+    "Uploads con WebP y contentType coherente"
   ]
 }

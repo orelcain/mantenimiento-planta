@@ -46,6 +46,7 @@ interface PhotoEvidenceDetailProps {
   onClose: () => void
   onUpdate: () => void
   onExportPDF?: (evidence: PhotoEvidence) => void
+  userDisplayNameById?: Record<string, string>
 }
 
 const STATUS_CONFIG: Record<PhotoEvidenceStatus, { label: string; color: string; icon: React.ElementType }> = {
@@ -77,7 +78,13 @@ export function PhotoEvidenceDetail({
   onClose,
   onUpdate,
   onExportPDF,
+  userDisplayNameById,
 }: PhotoEvidenceDetailProps) {
+    const resolveUser = (value: unknown): string => {
+      const raw = typeof value === 'string' ? value : ''
+      if (!raw) return ''
+      return userDisplayNameById?.[raw] ?? raw
+    }
   const safeFormat = (date: Date, fmt: string) => {
     try {
       return format(date, fmt, { locale: es })
@@ -455,6 +462,11 @@ export function PhotoEvidenceDetail({
                     <Calendar className="w-4 h-4" />
                     {safeFormat(evidence.createdAt, "d MMM yyyy, HH:mm")}
                   </p>
+                  {evidence.reportadoPor && (
+                    <p className="text-xs text-muted-foreground">
+                      Por: {resolveUser(evidence.reportadoPor)}
+                    </p>
+                  )}
                 </div>
                 {evidence.corregidaAt && (
                   <div className="space-y-1">
@@ -463,6 +475,11 @@ export function PhotoEvidenceDetail({
                       <CheckCircle className="w-4 h-4 text-green-500" />
                       {safeFormat(evidence.corregidaAt, "d MMM yyyy, HH:mm")}
                     </p>
+                    {evidence.corregidoPor && (
+                      <p className="text-xs text-muted-foreground">
+                        Por: {resolveUser(evidence.corregidoPor)}
+                      </p>
+                    )}
                   </div>
                 )}
                 {evidence.verificadaAt && (
@@ -472,6 +489,11 @@ export function PhotoEvidenceDetail({
                       <CheckCircle className="w-4 h-4 text-purple-500" />
                       {safeFormat(evidence.verificadaAt, "d MMM yyyy, HH:mm")}
                     </p>
+                    {evidence.verificadoPor && (
+                      <p className="text-xs text-muted-foreground">
+                        Por: {resolveUser(evidence.verificadoPor)}
+                      </p>
+                    )}
                   </div>
                 )}
               </div>

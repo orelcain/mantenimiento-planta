@@ -19,6 +19,7 @@ import {
   subscribeToPhotoEvidences,
   getPhotoEvidenceStats,
 } from '@/services/photoEvidence'
+import { getUserDisplayNameMap } from '@/services/userDisplay'
 import { exportPhotoEvidenceTechnicalReportToPDF } from '@/lib/pdfExport'
 import type { PhotoEvidence, PhotoEvidenceStatus } from '@/types'
 import { cn } from '@/lib/utils'
@@ -38,6 +39,7 @@ export function PhotoEvidencePage() {
   const [filteredEvidences, setFilteredEvidences] = useState<PhotoEvidence[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [stats, setStats] = useState({ total: 0, pendientes: 0, enProceso: 0, corregidas: 0, verificadas: 0 })
+  const [userDisplayNameById, setUserDisplayNameById] = useState<Record<string, string>>({})
   
   // UI State
   const [showForm, setShowForm] = useState(false)
@@ -84,6 +86,29 @@ export function PhotoEvidencePage() {
     setFilteredEvidences(filtered)
   }, [evidences, filterStatus, searchQuery])
 
+  // Resolver nombres legibles (userId -> "Nombre Apellido")
+  useEffect(() => {
+    const ids = evidences
+      .flatMap((e) => [e.reportadoPor, e.corregidoPor, e.verificadoPor])
+      .filter((v): v is string => typeof v === 'string' && v.trim().length > 0)
+
+    if (ids.length === 0) return
+
+    let cancelled = false
+    getUserDisplayNameMap(ids)
+      .then((map) => {
+        if (cancelled) return
+        setUserDisplayNameById((prev) => ({ ...prev, ...map }))
+      })
+      .catch((error) => {
+        console.error('Error resolving user display names:', error)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [evidences])
+
   const loadStats = async () => {
     try {
       const data = await getPhotoEvidenceStats()
@@ -101,6 +126,11 @@ export function PhotoEvidencePage() {
       // Obtener evidencias seleccionadas
       const selectedEvidences = evidences.filter(e => selectedForExport.has(e.id))
 
+      const ids = selectedEvidences
+        .flatMap((e) => [e.reportadoPor, e.corregidoPor, e.verificadoPor])
+        .filter((v): v is string => typeof v === 'string' && v.trim().length > 0)
+      const nameMap = ids.length ? await getUserDisplayNameMap(ids) : {}
+
       const hasPairs = selectedEvidences.some((e) => {
         const max = Math.max(e.fotosBefore.length, e.fotosAfter.length)
         for (let i = 0; i < max; i++) {
@@ -113,7 +143,9 @@ export function PhotoEvidencePage() {
         return
       }
 
-      await exportPhotoEvidenceTechnicalReportToPDF(selectedEvidences, 'Correcciones - Reporte Individual')
+      await exportPhotoEvidenceTechnicalReportToPDF(selectedEvidences, 'Correcciones - Reporte Individual', {
+        userDisplayNameById: nameMap,
+      })
       
       // Limpiar selección
       setSelectedForExport(new Set())
@@ -141,7 +173,13 @@ export function PhotoEvidencePage() {
         return
       }
 
-      await exportPhotoEvidenceTechnicalReportToPDF([evidence], `Correcciones - ${evidence.titulo}`)
+      const ids = [evidence.reportadoPor, evidence.corregidoPor, evidence.verificadoPor]
+        .filter((v): v is string => typeof v === 'string' && v.trim().length > 0)
+      const nameMap = ids.length ? await getUserDisplayNameMap(ids) : {}
+
+      await exportPhotoEvidenceTechnicalReportToPDF([evidence], `Correcciones - ${evidence.titulo}`, {
+        userDisplayNameById: nameMap,
+      })
     } catch (error) {
       console.error('Error exporting PDF:', error)
       alert('Error al exportar PDF. Por favor intenta de nuevo.')
@@ -311,6 +349,7 @@ export function PhotoEvidencePage() {
                 
                 <PhotoEvidenceCard
                   evidence={evidence}
+                  userDisplayNameById={userDisplayNameById}
                   onClick={() => setSelectedEvidenceId(evidence.id)}
                   onAddAfterPhotos={() => setSelectedEvidenceId(evidence.id)}
                 />
@@ -335,6 +374,7 @@ export function PhotoEvidencePage() {
         onClose={() => setSelectedEvidenceId(null)}
         onUpdate={() => loadStats()}
         onExportPDF={handleExportSingle}
+        userDisplayNameById={userDisplayNameById}
       />
     </div>
   )
