@@ -122,7 +122,11 @@ async function drawBeforeAfterPair(
   after: PhotoItem | null,
   x: number,
   y: number,
-  contentWidth: number
+  contentWidth: number,
+  options?: {
+    beforeAnnotated?: boolean
+    afterAnnotated?: boolean
+  }
 ): Promise<number> {
   const spacing = 12
   const imageWidth = (contentWidth - spacing) / 2
@@ -131,9 +135,9 @@ async function drawBeforeAfterPair(
   // Labels
   ctx.font = `bold 10px system-ui, sans-serif`
   ctx.fillStyle = '#dc2626'
-  ctx.fillText('ANTES', x, y + 12)
+  ctx.fillText(options?.beforeAnnotated ? 'ANTES (ANOTADA)' : 'ANTES', x, y + 12)
   ctx.fillStyle = '#16a34a'
-  ctx.fillText('DESPUÉS', x + imageWidth + spacing, y + 12)
+  ctx.fillText(options?.afterAnnotated ? 'DESPUÉS (ANOTADA)' : 'DESPUÉS', x + imageWidth + spacing, y + 12)
 
   const imgTop = y + 20
 
@@ -326,7 +330,10 @@ export async function exportPhotoEvidenceTechnicalReportToPDF(
     currentY = drawSectionHeader(ctx, '2. EVIDENCIA FOTOGRÁFICA (ANTES / DESPUÉS)', margin, currentY, contentWidth)
     const before = evidence.fotosBefore[pairIndex] ?? null
     const after = evidence.fotosAfter[pairIndex] ?? null
-    currentY = await drawBeforeAfterPair(ctx, before, after, margin, currentY, contentWidth)
+    currentY = await drawBeforeAfterPair(ctx, before, after, margin, currentY, contentWidth, {
+      beforeAnnotated: Boolean(pairMeta?.anotadaAntes),
+      afterAnnotated: Boolean(pairMeta?.anotadaDespues),
+    })
 
     // Corrección / cierre
     currentY += 6

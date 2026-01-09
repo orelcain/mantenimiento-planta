@@ -374,6 +374,8 @@ export interface PhotoPairMeta {
   ot?: string
   criticidad?: 'baja' | 'media' | 'alta' | 'critica'
   tipoFalla?: string
+  anotadaAntes?: boolean
+  anotadaDespues?: boolean
 }
 
 // Grupo de fotos antes/después

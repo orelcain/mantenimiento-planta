@@ -1,5 +1,5 @@
 {
-  "version": "2.2.15",
+  "version": "2.2.16",
   "buildDate": "2026-01-09",
   "buildTimestamp": 1768012800000,
   "features": [
@@ -10,6 +10,7 @@
     "Nombres legibles (UI/PDF) para usuarios",
     "Uploads con WebP y contentType coherente",
     "Campos extra por par (equipo/OT/criticidad/tipo de falla) en UI/PDF",
-    "Anotaciones sobre fotos (líneas + texto)"
+    "Anotaciones sobre fotos (líneas + texto)",
+    "PDF: etiqueta (ANOTADA) por imagen"
   ]
 }

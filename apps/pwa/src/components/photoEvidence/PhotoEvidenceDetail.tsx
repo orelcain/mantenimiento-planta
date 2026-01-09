@@ -113,6 +113,9 @@ export function PhotoEvidenceDetail({
   const [pairBeforePhoto, setPairBeforePhoto] = useState<{ id: string; url: string; preview?: string; file?: File }[]>([])
   const [pairAfterPhoto, setPairAfterPhoto] = useState<{ id: string; url: string; preview?: string; file?: File }[]>([])
 
+  const [pairAntesAnotada, setPairAntesAnotada] = useState(false)
+  const [pairDespuesAnotada, setPairDespuesAnotada] = useState(false)
+
   const [annotateOpen, setAnnotateOpen] = useState(false)
   const [annotateTarget, setAnnotateTarget] = useState<'before' | 'after' | null>(null)
   const [annotateSourceUrl, setAnnotateSourceUrl] = useState<string | null>(null)
@@ -137,6 +140,8 @@ export function PhotoEvidenceDetail({
     setPairOT(meta?.ot ?? '')
     setPairCriticidad(meta?.criticidad ?? '')
     setPairTipoFalla(meta?.tipoFalla ?? '')
+    setPairAntesAnotada(Boolean(meta?.anotadaAntes))
+    setPairDespuesAnotada(Boolean(meta?.anotadaDespues))
 
     const before = evidence.fotosBefore[selectedPairIndex]
     const after = evidence.fotosAfter[selectedPairIndex]
@@ -176,6 +181,7 @@ export function PhotoEvidenceDetail({
           file,
         },
       ])
+      setPairAntesAnotada(true)
     } else if (annotateTarget === 'after') {
       const current = pairAfterPhoto[0]
       setPairAfterPhoto([
@@ -186,6 +192,7 @@ export function PhotoEvidenceDetail({
           file,
         },
       ])
+      setPairDespuesAnotada(true)
     }
 
     setAnnotateOpen(false)
@@ -281,6 +288,8 @@ export function PhotoEvidenceDetail({
       const metaOT = pairOT.trim() || undefined
       const metaCriticidad = pairCriticidad || undefined
       const metaTipoFalla = pairTipoFalla.trim() || undefined
+      const metaAnotadaAntes = pairAntesAnotada || undefined
+      const metaAnotadaDespues = pairDespuesAnotada || undefined
       const existingMeta = evidence.pairMeta?.[selectedPairIndex]
       const shouldPersistMeta = Boolean(
         metaUbicacion ||
@@ -289,6 +298,8 @@ export function PhotoEvidenceDetail({
           metaOT ||
           metaCriticidad ||
           metaTipoFalla ||
+          metaAnotadaAntes ||
+          metaAnotadaDespues ||
           existingMeta
       )
       if (shouldPersistMeta) {
@@ -299,6 +310,8 @@ export function PhotoEvidenceDetail({
           ot: metaOT,
           criticidad: metaCriticidad,
           tipoFalla: metaTipoFalla,
+          anotadaAntes: metaAnotadaAntes,
+          anotadaDespues: metaAnotadaDespues,
         })
       }
 
@@ -307,6 +320,7 @@ export function PhotoEvidenceDetail({
       const desiredBefore = pairBeforePhoto[0]
       if (!desiredBefore && currentBefore) {
         await removePhoto(evidence.id, currentBefore.id, 'before')
+        setPairAntesAnotada(false)
       } else if (desiredBefore?.file) {
         await upsertEvidencePhotoAtIndex(evidence.id, selectedPairIndex, 'before', desiredBefore.file, user.id)
       }
@@ -316,6 +330,7 @@ export function PhotoEvidenceDetail({
       const desiredAfter = pairAfterPhoto[0]
       if (!desiredAfter && currentAfter) {
         await removePhoto(evidence.id, currentAfter.id, 'after')
+        setPairDespuesAnotada(false)
       } else if (desiredAfter?.file) {
         await upsertEvidencePhotoAtIndex(evidence.id, selectedPairIndex, 'after', desiredAfter.file, user.id)
       }
@@ -453,7 +468,10 @@ export function PhotoEvidenceDetail({
                         <div className="p-3 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/20">
                           <PhotoUploader
                             photos={pairBeforePhoto}
-                            onPhotosChange={(p) => setPairBeforePhoto(p.slice(0, 1))}
+                            onPhotosChange={(p) => {
+                              setPairBeforePhoto(p.slice(0, 1))
+                              setPairAntesAnotada(false)
+                            }}
                             maxPhotos={1}
                             disabled={isSaving}
                             label="📷 Foto ANTES (este par)"
@@ -473,7 +491,10 @@ export function PhotoEvidenceDetail({
                         <div className="p-3 rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/20">
                           <PhotoUploader
                             photos={pairAfterPhoto}
-                            onPhotosChange={(p) => setPairAfterPhoto(p.slice(0, 1))}
+                            onPhotosChange={(p) => {
+                              setPairAfterPhoto(p.slice(0, 1))
+                              setPairDespuesAnotada(false)
+                            }}
                             maxPhotos={1}
                             disabled={isSaving}
                             label="📷 Foto DESPUÉS (este par)"
