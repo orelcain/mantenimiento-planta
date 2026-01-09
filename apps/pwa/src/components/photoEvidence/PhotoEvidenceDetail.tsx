@@ -29,6 +29,7 @@ import {
   uploadMultipleEvidencePhotos,
   deletePhotoEvidence,
   markAsVerified,
+  unmarkAsVerified,
 } from '@/services/photoEvidence'
 import type { PhotoEvidence, PhotoItem, PhotoEvidenceStatus } from '@/types'
 import { logger } from '@/lib/logger'
@@ -167,6 +168,25 @@ export function PhotoEvidenceDetail({
     }
   }
 
+  const handleUnverify = async () => {
+    if (!evidence || !user) return
+
+    if (!confirm('¿Quitar la verificación para poder editar/ajustar la evidencia?')) {
+      return
+    }
+
+    setIsSaving(true)
+    try {
+      await unmarkAsVerified(evidence.id)
+      loadEvidence()
+      onUpdate()
+    } catch (error) {
+      logger.error('Error removing verification', error as Error)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   const handleDelete = async () => {
     if (!evidence) return
     
@@ -190,8 +210,9 @@ export function PhotoEvidenceDetail({
 
   const statusConfig = evidence ? STATUS_CONFIG[evidence.status] : null
   const StatusIcon = statusConfig?.icon || Clock
-  const canAddAfterPhotos = evidence && (evidence.status === 'pendiente' || evidence.status === 'en_proceso')
+  const canAddAfterPhotos = evidence && (evidence.status === 'pendiente' || evidence.status === 'en_proceso' || evidence.status === 'corregida')
   const canVerify = evidence && evidence.status === 'corregida' && user?.rol !== 'tecnico'
+  const canUnverify = evidence && evidence.status === 'verificada' && user?.rol !== 'tecnico'
   const canExport = evidence && evidence.fotosBefore.length > 0 && evidence.fotosAfter.length > 0
 
   return (
@@ -385,6 +406,17 @@ export function PhotoEvidenceDetail({
                   >
                     <CheckCircle className="w-4 h-4 mr-2" />
                     Verificar Corrección
+                  </Button>
+                )}
+
+                {canUnverify && (
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={handleUnverify}
+                    disabled={isSaving}
+                  >
+                    Quitar verificación
                   </Button>
                 )}
                 

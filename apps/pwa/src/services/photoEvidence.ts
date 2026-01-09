@@ -6,6 +6,7 @@ import {
   setDoc,
   updateDoc,
   deleteDoc,
+  deleteField,
   query,
   where,
   orderBy,
@@ -357,6 +358,18 @@ export async function markAsVerified(
     status: 'verificada',
     verificadoPor: userId,
     verificadaAt: new Date(),
+  })
+}
+
+// Quitar verificación (volver a corregida para permitir ajustes)
+export async function unmarkAsVerified(
+  evidenceId: string
+): Promise<void> {
+  await updateDoc(doc(db, COLLECTION, evidenceId), {
+    status: 'corregida',
+    verificadoPor: deleteField(),
+    verificadaAt: deleteField(),
+    updatedAt: serverTimestamp(),
   })
 }
 
