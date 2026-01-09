@@ -1,19 +1,27 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input, Label } from '@/components/ui'
+import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input, Label, Switch } from '@/components/ui'
 import { cn } from '@/lib/utils'
 
-type AnnotatorMode = 'line' | 'text'
+type AnnotatorMode = 'shape' | 'text'
 
 type Point = { x: number; y: number }
 
-type Stroke = {
+type Shape = {
+  id: string
   points: Point[]
+  fillColor: string
+  opacity: number // 0..1
+  showBorder: boolean
+  borderColor: string
 }
 
 type TextItem = {
+  id: string
   x: number
   y: number
   text: string
+  color: string
+  fontSize: number
 }
 
 interface ImageAnnotatorDialogProps {
@@ -57,25 +65,38 @@ export function ImageAnnotatorDialog({
   const [localImageUrl, setLocalImageUrl] = useState<string | null>(null)
   const [imageMime, setImageMime] = useState<string>('image/jpeg')
 
-  const [mode, setMode] = useState<AnnotatorMode>('line')
-  const [strokes, setStrokes] = useState<Stroke[]>([])
-  const [currentStroke, setCurrentStroke] = useState<Point[]>([])
+  const [mode, setMode] = useState<AnnotatorMode>('shape')
+
+  const [shapes, setShapes] = useState<Shape[]>([])
+  const [currentShapePoints, setCurrentShapePoints] = useState<Point[]>([])
+  const [selectedShapeId, setSelectedShapeId] = useState<string | null>(null)
+
+  const [shapeFillColor, setShapeFillColor] = useState('#dc2626')
+  const [shapeOpacity, setShapeOpacity] = useState(0.25)
+  const [shapeShowBorder, setShapeShowBorder] = useState(true)
+  const [shapeBorderColor, setShapeBorderColor] = useState('#dc2626')
+
   const [textValue, setTextValue] = useState('')
+  const [textColor, setTextColor] = useState('#111827')
+  const [textFontSize, setTextFontSize] = useState(18)
   const [texts, setTexts] = useState<TextItem[]>([])
+  const [selectedTextId, setSelectedTextId] = useState<string | null>(null)
 
   const [imageSize, setImageSize] = useState<{ width: number; height: number } | null>(null)
 
   const canSave = useMemo(() => {
-    return Boolean(localImageUrl && (strokes.length > 0 || currentStroke.length > 0 || texts.length > 0))
-  }, [localImageUrl, strokes.length, currentStroke.length, texts.length])
+    return Boolean(localImageUrl && (shapes.length > 0 || texts.length > 0))
+  }, [localImageUrl, shapes.length, texts.length])
 
   useEffect(() => {
     if (!open) return
     setLoadError(null)
     setIsLoading(false)
-    setMode('line')
-    setStrokes([])
-    setCurrentStroke([])
+    setMode('shape')
+    setShapes([])
+    setCurrentShapePoints([])
+    setSelectedShapeId(null)
+    setSelectedTextId(null)
     setTextValue('')
     setTexts([])
     setImageSize(null)
@@ -149,16 +170,12 @@ export function ImageAnnotatorDialog({
 
     ctx2.drawImage(img, 0, 0, canvas.width, canvas.height)
 
-    // Strokes
-    const drawStroke = (points: Point[]) => {
-      if (points.length < 2) return
+    // Shapes
+    const drawPolygon = (points: Point[], style: Pick<Shape, 'fillColor' | 'opacity' | 'showBorder' | 'borderColor'>) => {
+      if (points.length < 3) return
       const firstPoint = points[0]
       if (!firstPoint) return
       ctx2.save()
-      ctx2.strokeStyle = '#dc2626'
-      ctx2.lineWidth = 3
-      ctx2.lineJoin = 'round'
-      ctx2.lineCap = 'round'
       ctx2.beginPath()
       ctx2.moveTo(firstPoint.x, firstPoint.y)
       for (let i = 1; i < points.length; i++) {
@@ -166,18 +183,69 @@ export function ImageAnnotatorDialog({
         if (!pt) continue
         ctx2.lineTo(pt.x, pt.y)
       }
-      ctx2.stroke()
+      ctx2.closePath()
+      ctx2.globalAlpha = Math.max(0, Math.min(1, style.opacity))
+      ctx2.fillStyle = style.fillColor
+      ctx2.fill()
+      ctx2.globalAlpha = 1
+
+      if (style.showBorder) {
+        ctx2.strokeStyle = style.borderColor
+        ctx2.lineWidth = 2
+        ctx2.stroke()
+      }
       ctx2.restore()
     }
 
-    for (const stroke of strokes) drawStroke(stroke.points)
-    drawStroke(currentStroke)
+    for (const shape of shapes) {
+      drawPolygon(shape.points, shape)
+    }
+
+    // Current shape (preview as polyline + points numbering)
+    if (currentShapePoints.length > 0) {
+      const firstPoint = currentShapePoints[0]
+      if (firstPoint) {
+        ctx2.save()
+        ctx2.strokeStyle = shapeBorderColor
+        ctx2.lineWidth = 2
+        ctx2.setLineDash([6, 4])
+        ctx2.beginPath()
+        ctx2.moveTo(firstPoint.x, firstPoint.y)
+        for (let i = 1; i < currentShapePoints.length; i++) {
+          const pt = currentShapePoints[i]
+          if (!pt) continue
+          ctx2.lineTo(pt.x, pt.y)
+        }
+        ctx2.stroke()
+        ctx2.restore()
+      }
+
+      for (let i = 0; i < currentShapePoints.length; i++) {
+        const pt = currentShapePoints[i]
+        if (!pt) continue
+        const number = i + 1
+        ctx2.save()
+        ctx2.fillStyle = '#ffffff'
+        ctx2.strokeStyle = shapeBorderColor
+        ctx2.lineWidth = 2
+        ctx2.beginPath()
+        ctx2.arc(pt.x, pt.y, 10, 0, Math.PI * 2)
+        ctx2.fill()
+        ctx2.stroke()
+        ctx2.fillStyle = '#111827'
+        ctx2.font = 'bold 12px system-ui, sans-serif'
+        ctx2.textAlign = 'center'
+        ctx2.textBaseline = 'middle'
+        ctx2.fillText(String(number), pt.x, pt.y)
+        ctx2.restore()
+      }
+    }
 
     // Text
     for (const t of texts) {
       ctx2.save()
-      ctx2.font = 'bold 18px system-ui, sans-serif'
-      ctx2.fillStyle = '#111827'
+      ctx2.font = `bold ${Math.max(8, Math.min(80, t.fontSize))}px system-ui, sans-serif`
+      ctx2.fillStyle = t.color
       ctx2.strokeStyle = 'rgba(255,255,255,0.85)'
       ctx2.lineWidth = 4
       ctx2.strokeText(t.text, t.x, t.y)
@@ -204,7 +272,7 @@ export function ImageAnnotatorDialog({
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, localImageUrl, strokes, currentStroke, texts])
+  }, [open, localImageUrl, shapes, currentShapePoints, texts, shapeBorderColor])
 
   const getCanvasPoint = (evt: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current
@@ -219,40 +287,66 @@ export function ImageAnnotatorDialog({
     const p = getCanvasPoint(evt)
     if (!p) return
 
-    if (mode === 'line') {
-      setCurrentStroke((prev) => [...prev, p])
+    if (mode === 'shape') {
+      if (selectedShapeId) return
+
+      setCurrentShapePoints((prev) => {
+        const firstPoint = prev[0]
+        const next = [...prev]
+
+        // Cerrar forma si vuelve al punto 1
+        if (firstPoint && prev.length >= 3) {
+          const dx = p.x - firstPoint.x
+          const dy = p.y - firstPoint.y
+          const dist = Math.sqrt(dx * dx + dy * dy)
+          if (dist <= 14) {
+            const id = crypto.randomUUID()
+            const newShape: Shape = {
+              id,
+              points: prev,
+              fillColor: shapeFillColor,
+              opacity: shapeOpacity,
+              showBorder: shapeShowBorder,
+              borderColor: shapeBorderColor,
+            }
+            setShapes((existing) => [...existing, newShape])
+            return []
+          }
+        }
+
+        next.push(p)
+        return next
+      })
       return
     }
 
     const t = textValue.trim()
     if (!t) return
-    setTexts((prev) => [...prev, { x: p.x, y: p.y, text: t }])
-  }
-
-  const handleNewStroke = () => {
-    if (currentStroke.length < 2) {
-      setCurrentStroke([])
-      return
-    }
-    setStrokes((prev) => [...prev, { points: currentStroke }])
-    setCurrentStroke([])
+    const id = crypto.randomUUID()
+    setTexts((prev) => [
+      ...prev,
+      {
+        id,
+        x: p.x,
+        y: p.y,
+        text: t,
+        color: textColor,
+        fontSize: textFontSize,
+      },
+    ])
   }
 
   const handleClear = () => {
-    setStrokes([])
-    setCurrentStroke([])
+    setShapes([])
+    setCurrentShapePoints([])
+    setSelectedShapeId(null)
     setTexts([])
+    setSelectedTextId(null)
   }
 
   const handleSave = async () => {
     const canvas = canvasRef.current
     if (!canvas) return
-
-    // Si hay un trazo en curso, lo cerramos al guardar.
-    if (currentStroke.length >= 2) {
-      setStrokes((prev) => [...prev, { points: currentStroke }])
-      setCurrentStroke([])
-    }
 
     const blob: Blob | null = await new Promise((resolve) => {
       try {
@@ -304,8 +398,8 @@ export function ImageAnnotatorDialog({
               <div className="space-y-1">
                 <Label>Modo</Label>
                 <div className="flex gap-2">
-                  <Button type="button" variant={mode === 'line' ? 'default' : 'outline'} size="sm" onClick={() => setMode('line')}>
-                    Línea
+                  <Button type="button" variant={mode === 'shape' ? 'default' : 'outline'} size="sm" onClick={() => setMode('shape')}>
+                    Forma (puntos)
                   </Button>
                   <Button type="button" variant={mode === 'text' ? 'default' : 'outline'} size="sm" onClick={() => setMode('text')}>
                     Texto
@@ -313,21 +407,87 @@ export function ImageAnnotatorDialog({
                 </div>
               </div>
 
-              {mode === 'text' && (
-                <div className="space-y-1 min-w-[260px]">
-                  <Label>Texto</Label>
-                  <Input value={textValue} onChange={(e) => setTextValue(e.target.value)} placeholder="Escribe y luego haz click en la imagen" />
-                </div>
+              {mode === 'shape' && (
+                <>
+                  <div className="space-y-1">
+                    <Label>Color forma</Label>
+                    <Input type="color" value={shapeFillColor} onChange={(e) => setShapeFillColor(e.target.value)} className="h-9 w-[64px] p-1" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Transparencia</Label>
+                    <Input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.05}
+                      value={shapeOpacity}
+                      onChange={(e) => setShapeOpacity(Number(e.target.value))}
+                      className="w-[180px]"
+                    />
+                    <div className="text-xs text-muted-foreground">{Math.round(shapeOpacity * 100)}%</div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Marco</Label>
+                    <div className="flex items-center gap-2 h-9">
+                      <Switch checked={shapeShowBorder} onCheckedChange={setShapeShowBorder} />
+                      <span className="text-sm text-muted-foreground">{shapeShowBorder ? 'Sí' : 'No'}</span>
+                    </div>
+                  </div>
+                  {shapeShowBorder && (
+                    <div className="space-y-1">
+                      <Label>Color marco</Label>
+                      <Input type="color" value={shapeBorderColor} onChange={(e) => setShapeBorderColor(e.target.value)} className="h-9 w-[64px] p-1" />
+                    </div>
+                  )}
+
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedShapeId(null)
+                        setCurrentShapePoints([])
+                      }}
+                      disabled={!selectedShapeId && currentShapePoints.length === 0}
+                    >
+                      Nueva forma
+                    </Button>
+                    <Button type="button" variant="outline" size="sm" onClick={handleClear}>
+                      Limpiar
+                    </Button>
+                  </div>
+                </>
               )}
 
-              <div className="flex gap-2">
-                <Button type="button" variant="outline" size="sm" onClick={handleNewStroke} disabled={mode !== 'line'}>
-                  Nuevo trazo
-                </Button>
-                <Button type="button" variant="outline" size="sm" onClick={handleClear}>
-                  Limpiar
-                </Button>
-              </div>
+              {mode === 'text' && (
+                <>
+                  <div className="space-y-1 min-w-[260px]">
+                    <Label>Texto</Label>
+                    <Input value={textValue} onChange={(e) => setTextValue(e.target.value)} placeholder="Escribe y luego haz click para colocarlo" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Color</Label>
+                    <Input type="color" value={textColor} onChange={(e) => setTextColor(e.target.value)} className="h-9 w-[64px] p-1" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Tamaño</Label>
+                    <Input
+                      type="number"
+                      min={8}
+                      max={80}
+                      value={textFontSize}
+                      onChange={(e) => setTextFontSize(Number(e.target.value) || 18)}
+                      className="w-[90px]"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button type="button" variant="outline" size="sm" onClick={handleClear}>
+                      Limpiar
+                    </Button>
+                  </div>
+                </>
+              )}
             </div>
 
             {isLoading && <div className="text-sm text-muted-foreground">Cargando imagen…</div>}
@@ -338,9 +498,168 @@ export function ImageAnnotatorDialog({
                 ref={canvasRef}
                 onClick={handleCanvasClick}
                 className="block max-w-full"
-                style={{ cursor: mode === 'line' ? 'crosshair' : 'text' }}
+                style={{ cursor: mode === 'shape' ? 'crosshair' : 'text' }}
               />
             </div>
+
+            {mode === 'shape' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="rounded-md border border-border p-3">
+                  <div className="text-sm font-medium">Formas</div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    Click agrega puntos 1..N. Para cerrar, vuelve al punto 1.
+                  </div>
+                  <div className="mt-2 space-y-1">
+                    {shapes.length === 0 ? (
+                      <div className="text-sm text-muted-foreground">Sin formas.</div>
+                    ) : (
+                      shapes.map((s, idx) => (
+                        <div key={s.id} className="flex items-center justify-between gap-2">
+                          <div className="text-sm">Forma {idx + 1} ({s.points.length} pts)</div>
+                          <div className="flex gap-2">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant={selectedShapeId === s.id ? 'default' : 'outline'}
+                              onClick={() => {
+                                setSelectedShapeId(s.id)
+                                setCurrentShapePoints([])
+                                setShapeFillColor(s.fillColor)
+                                setShapeOpacity(s.opacity)
+                                setShapeShowBorder(s.showBorder)
+                                setShapeBorderColor(s.borderColor)
+                              }}
+                            >
+                              Editar
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setShapes((prev) => prev.filter((x) => x.id !== s.id))
+                                if (selectedShapeId === s.id) setSelectedShapeId(null)
+                              }}
+                            >
+                              Eliminar
+                            </Button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  {selectedShapeId && (
+                    <div className="mt-3 pt-3 border-t border-border">
+                      <div className="text-sm font-medium">Editar forma seleccionada</div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        Cambia color/transparencia/marco y se aplica a esa forma.
+                      </div>
+                      <div className="mt-2 flex gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={() => {
+                            setShapes((prev) =>
+                              prev.map((s) =>
+                                s.id === selectedShapeId
+                                  ? {
+                                      ...s,
+                                      fillColor: shapeFillColor,
+                                      opacity: shapeOpacity,
+                                      showBorder: shapeShowBorder,
+                                      borderColor: shapeBorderColor,
+                                    }
+                                  : s
+                              )
+                            )
+                          }}
+                        >
+                          Aplicar
+                        </Button>
+                        <Button type="button" size="sm" variant="outline" onClick={() => setSelectedShapeId(null)}>
+                          Listo
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-md border border-border p-3">
+                  <div className="text-sm font-medium">Texto</div>
+                  <div className="text-xs text-muted-foreground mt-1">Usa “Texto” para agregar y editar.</div>
+                </div>
+              </div>
+            )}
+
+            {mode === 'text' && (
+              <div className="rounded-md border border-border p-3">
+                <div className="text-sm font-medium">Textos</div>
+                <div className="text-xs text-muted-foreground mt-1">Selecciona un texto para editar contenido/color/tamaño.</div>
+                <div className="mt-2 space-y-1">
+                  {texts.length === 0 ? (
+                    <div className="text-sm text-muted-foreground">Sin textos.</div>
+                  ) : (
+                    texts.map((t, idx) => (
+                      <div key={t.id} className="flex items-center justify-between gap-2">
+                        <div className="text-sm truncate">{idx + 1}. {t.text}</div>
+                        <div className="flex gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={selectedTextId === t.id ? 'default' : 'outline'}
+                            onClick={() => {
+                              setSelectedTextId(t.id)
+                              setTextValue(t.text)
+                              setTextColor(t.color)
+                              setTextFontSize(t.fontSize)
+                            }}
+                          >
+                            Editar
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setTexts((prev) => prev.filter((x) => x.id !== t.id))
+                              if (selectedTextId === t.id) setSelectedTextId(null)
+                            }}
+                          >
+                            Eliminar
+                          </Button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {selectedTextId && (
+                  <div className="mt-3 pt-3 border-t border-border flex gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => {
+                        const nextText = textValue.trim()
+                        if (!nextText) return
+                        setTexts((prev) =>
+                          prev.map((t) =>
+                            t.id === selectedTextId
+                              ? { ...t, text: nextText, color: textColor, fontSize: textFontSize }
+                              : t
+                          )
+                        )
+                      }}
+                    >
+                      Aplicar
+                    </Button>
+                    <Button type="button" size="sm" variant="outline" onClick={() => setSelectedTextId(null)}>
+                      Listo
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={onClose}>
@@ -352,7 +671,7 @@ export function ImageAnnotatorDialog({
             </div>
 
             <div className="text-xs text-muted-foreground">
-              Tip: en “Línea”, cada click agrega un punto. En “Texto”, escribe y luego haz click para posicionarlo.
+              Tip: en “Forma”, click agrega puntos 1..N y al volver al punto 1 se cierra. En “Texto”, escribe y haz click para colocarlo.
             </div>
           </div>
         )}
