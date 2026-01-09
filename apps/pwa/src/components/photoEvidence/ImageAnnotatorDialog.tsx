@@ -30,6 +30,27 @@ type TextItem = {
   backgroundOpacity: number // 0..1
 }
 
+function isPointInPolygon(p: Point, polygon: Point[]) {
+  if (polygon.length < 3) return false
+
+  let inside = false
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const pi = polygon[i]
+    const pj = polygon[j]
+    if (!pi || !pj) continue
+
+    const intersect =
+      pi.y > p.y !== pj.y > p.y &&
+      p.x < ((pj.x - pi.x) * (p.y - pi.y)) / (pj.y - pi.y + 0.0000001) + pi.x
+    if (intersect) inside = !inside
+  }
+  return inside
+}
+
+function clampNumber(v: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, v))
+}
+
 interface ImageAnnotatorDialogProps {
   open: boolean
   title?: string
@@ -93,6 +114,44 @@ export function ImageAnnotatorDialog({
   const [textBackgroundOpacity, setTextBackgroundOpacity] = useState(0.75)
   const [texts, setTexts] = useState<TextItem[]>([])
   const [selectedTextId, setSelectedTextId] = useState<string | null>(null)
+
+  const selectShapeById = (id: string | null, shapeList?: Shape[]) => {
+    if (!id) {
+      setSelectedShapeId(null)
+      return
+    }
+    const list = shapeList ?? shapes
+    const s = list.find((x) => x.id === id)
+    if (!s) return
+
+    setSelectedShapeId(id)
+    setCurrentShapePoints([])
+    setShapeName(s.name ?? '')
+    setShapeFillColor(s.fillColor)
+    setShapeOpacity(clampNumber(s.opacity, 0, 1))
+    setShapeShowBorder(Boolean(s.showBorder))
+    setShapeBorderColor(s.borderColor)
+    setShapeCornerRadius(clampNumber(s.cornerRadius ?? 0, 0, 1))
+  }
+
+  const selectTextById = (id: string | null, textList?: TextItem[]) => {
+    if (!id) {
+      setSelectedTextId(null)
+      return
+    }
+    const list = textList ?? texts
+    const t = list.find((x) => x.id === id)
+    if (!t) return
+
+    setSelectedTextId(id)
+    setTextName(t.name ?? '')
+    setTextValue(t.text)
+    setTextColor(t.color)
+    setTextFontSize(t.fontSize)
+    setTextBackgroundEnabled(Boolean(t.backgroundEnabled))
+    setTextBackgroundColor(t.backgroundColor ?? '#ffffff')
+    setTextBackgroundOpacity(clampNumber(t.backgroundOpacity ?? 0.75, 0, 1))
+  }
 
   useEffect(() => {
     if (!selectedShapeId) return
@@ -449,13 +508,79 @@ export function ImageAnnotatorDialog({
     return { x, y }
   }
 
+  const hitTestShape = (p: Point) => {
+    // Top-most wins: iterate from end to start
+    for (let i = shapes.length - 1; i >= 0; i--) {
+      const s = shapes[i]
+      if (!s) continue
+      if (isPointInPolygon(p, s.points)) return s
+    }
+    return null
+  }
+
+  const hitTestText = (p: Point) => {
+    const canvas = canvasRef.current
+    const ctx = canvas?.getContext('2d')
+    // Even if ctx is missing, we can do a rough hit using fontSize
+    for (let i = texts.length - 1; i >= 0; i--) {
+      const t = texts[i]
+      if (!t) continue
+      const text = t.text ?? ''
+      const fontSize = clampNumber(t.fontSize ?? 18, 8, 80)
+
+      let textWidth = 0
+      if (ctx) {
+        ctx.save()
+        ctx.font = `bold ${fontSize}px system-ui, sans-serif`
+        textWidth = ctx.measureText(text).width
+        ctx.restore()
+      } else {
+        // Fallback: approx width
+        textWidth = text.length * (fontSize * 0.6)
+      }
+
+      const textHeight = Math.max(12, Math.min(90, fontSize))
+
+      // Match drawing: background box is above baseline; we allow selection around glyphs too
+      const paddingX = 10
+      const paddingY = 6
+      const left = t.x - paddingX
+      const top = t.y - textHeight - paddingY
+      const right = t.x + textWidth + paddingX
+      const bottom = t.y + paddingY
+
+      if (p.x >= left && p.x <= right && p.y >= top && p.y <= bottom) return t
+    }
+    return null
+  }
+
   const handleCanvasClick = (evt: React.MouseEvent<HTMLCanvasElement>) => {
     const p = getCanvasPoint(evt)
     if (!p) return
 
+    // Prefer selecting existing items when clicking on them
     if (mode === 'shape') {
+      const hit = hitTestShape(p)
+      if (hit) {
+        selectShapeById(hit.id)
+        // Keep text selection independent
+        setSelectedTextId(null)
+        return
+      }
+      // If user is editing a shape and clicked outside, keep it simple: don't add points.
       if (selectedShapeId) return
+    }
 
+    if (mode === 'text') {
+      const hit = hitTestText(p)
+      if (hit) {
+        selectTextById(hit.id)
+        setSelectedShapeId(null)
+        return
+      }
+    }
+
+    if (mode === 'shape') {
       setCurrentShapePoints((prev) => {
         const firstPoint = prev[0]
         const next = [...prev]
@@ -744,14 +869,7 @@ export function ImageAnnotatorDialog({
                               size="sm"
                               variant={selectedShapeId === s.id ? 'default' : 'outline'}
                               onClick={() => {
-                                setSelectedShapeId(s.id)
-                                setCurrentShapePoints([])
-                                  setShapeName(s.name ?? '')
-                                setShapeFillColor(s.fillColor)
-                                setShapeOpacity(s.opacity)
-                                setShapeShowBorder(s.showBorder)
-                                setShapeBorderColor(s.borderColor)
-                                setShapeCornerRadius(s.cornerRadius ?? 0)
+                                selectShapeById(s.id)
                               }}
                             >
                               Editar
@@ -812,14 +930,7 @@ export function ImageAnnotatorDialog({
                             size="sm"
                             variant={selectedTextId === t.id ? 'default' : 'outline'}
                             onClick={() => {
-                              setSelectedTextId(t.id)
-                              setTextName(t.name ?? '')
-                              setTextValue(t.text)
-                              setTextColor(t.color)
-                              setTextFontSize(t.fontSize)
-                              setTextBackgroundEnabled(Boolean(t.backgroundEnabled))
-                              setTextBackgroundColor(t.backgroundColor ?? '#ffffff')
-                              setTextBackgroundOpacity(t.backgroundOpacity ?? 0.75)
+                              selectTextById(t.id)
                             }}
                           >
                             Editar

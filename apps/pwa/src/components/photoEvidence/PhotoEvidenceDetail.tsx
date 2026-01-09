@@ -168,7 +168,6 @@ export function PhotoEvidenceDetail({
 
   const applyAnnotatedFile = (file: File) => {
     const nextPreview = URL.createObjectURL(file)
-    if (annotatePreviewUrl) URL.revokeObjectURL(annotatePreviewUrl)
     setAnnotatePreviewUrl(nextPreview)
 
     if (annotateTarget === 'before') {
