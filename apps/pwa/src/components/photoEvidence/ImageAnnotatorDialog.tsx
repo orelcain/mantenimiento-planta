@@ -8,6 +8,7 @@ type Point = { x: number; y: number }
 
 type Shape = {
   id: string
+  name?: string
   points: Point[]
   fillColor: string
   opacity: number // 0..1
@@ -18,11 +19,15 @@ type Shape = {
 
 type TextItem = {
   id: string
+  name?: string
   x: number
   y: number
   text: string
   color: string
   fontSize: number
+  backgroundEnabled: boolean
+  backgroundColor: string
+  backgroundOpacity: number // 0..1
 }
 
 interface ImageAnnotatorDialogProps {
@@ -77,10 +82,15 @@ export function ImageAnnotatorDialog({
   const [shapeShowBorder, setShapeShowBorder] = useState(true)
   const [shapeBorderColor, setShapeBorderColor] = useState('#dc2626')
   const [shapeCornerRadius, setShapeCornerRadius] = useState(0)
+  const [shapeName, setShapeName] = useState('')
 
   const [textValue, setTextValue] = useState('')
   const [textColor, setTextColor] = useState('#111827')
   const [textFontSize, setTextFontSize] = useState(18)
+  const [textName, setTextName] = useState('')
+  const [textBackgroundEnabled, setTextBackgroundEnabled] = useState(false)
+  const [textBackgroundColor, setTextBackgroundColor] = useState('#ffffff')
+  const [textBackgroundOpacity, setTextBackgroundOpacity] = useState(0.75)
   const [texts, setTexts] = useState<TextItem[]>([])
   const [selectedTextId, setSelectedTextId] = useState<string | null>(null)
 
@@ -92,6 +102,7 @@ export function ImageAnnotatorDialog({
         if (s.id !== selectedShapeId) return s
         const nextShape: Shape = {
           ...s,
+          name: shapeName.trim() || undefined,
           fillColor: shapeFillColor,
           opacity: shapeOpacity,
           showBorder: shapeShowBorder,
@@ -99,6 +110,7 @@ export function ImageAnnotatorDialog({
           cornerRadius: shapeCornerRadius,
         }
         const same =
+          nextShape.name === s.name &&
           nextShape.fillColor === s.fillColor &&
           nextShape.opacity === s.opacity &&
           nextShape.showBorder === s.showBorder &&
@@ -110,7 +122,7 @@ export function ImageAnnotatorDialog({
       })
       return changed ? next : prev
     })
-  }, [selectedShapeId, shapeFillColor, shapeOpacity, shapeShowBorder, shapeBorderColor, shapeCornerRadius])
+  }, [selectedShapeId, shapeName, shapeFillColor, shapeOpacity, shapeShowBorder, shapeBorderColor, shapeCornerRadius])
 
   const [imageSize, setImageSize] = useState<{ width: number; height: number } | null>(null)
 
@@ -128,9 +140,45 @@ export function ImageAnnotatorDialog({
     setSelectedShapeId(null)
     setSelectedTextId(null)
     setTextValue('')
+    setTextName('')
+    setTextBackgroundEnabled(false)
+    setTextBackgroundColor('#ffffff')
+    setTextBackgroundOpacity(0.75)
     setTexts([])
     setImageSize(null)
   }, [open])
+
+  useEffect(() => {
+    if (!selectedTextId) return
+    setTexts((prev) => {
+      let changed = false
+      const next = prev.map((t) => {
+        if (t.id !== selectedTextId) return t
+        const nextText: TextItem = {
+          ...t,
+          name: textName.trim() || undefined,
+          text: textValue,
+          color: textColor,
+          fontSize: textFontSize,
+          backgroundEnabled: textBackgroundEnabled,
+          backgroundColor: textBackgroundColor,
+          backgroundOpacity: textBackgroundOpacity,
+        }
+        const same =
+          nextText.name === t.name &&
+          nextText.text === t.text &&
+          nextText.color === t.color &&
+          nextText.fontSize === t.fontSize &&
+          nextText.backgroundEnabled === t.backgroundEnabled &&
+          nextText.backgroundColor === t.backgroundColor &&
+          nextText.backgroundOpacity === t.backgroundOpacity
+        if (same) return t
+        changed = true
+        return nextText
+      })
+      return changed ? next : prev
+    })
+  }, [selectedTextId, textName, textValue, textColor, textFontSize, textBackgroundEnabled, textBackgroundColor, textBackgroundOpacity])
 
   useEffect(() => {
     if (!open) return
@@ -330,11 +378,44 @@ export function ImageAnnotatorDialog({
     for (const t of texts) {
       ctx2.save()
       ctx2.font = `bold ${Math.max(8, Math.min(80, t.fontSize))}px system-ui, sans-serif`
+      const safeText = t.text ?? ''
+
+      if (t.backgroundEnabled) {
+        const opacity = Math.max(0, Math.min(1, t.backgroundOpacity ?? 0.75))
+        const paddingX = 10
+        const paddingY = 6
+        const metrics = ctx2.measureText(safeText)
+        const textWidth = metrics.width
+        const textHeight = Math.max(12, Math.min(90, t.fontSize))
+        const bgX = t.x - paddingX
+        const bgY = t.y - textHeight - paddingY
+        const bgW = textWidth + paddingX * 2
+        const bgH = textHeight + paddingY * 2
+        const r = 10
+
+        ctx2.save()
+        ctx2.globalAlpha = opacity
+        ctx2.fillStyle = t.backgroundColor
+        ctx2.beginPath()
+        ctx2.moveTo(bgX + r, bgY)
+        ctx2.lineTo(bgX + bgW - r, bgY)
+        ctx2.quadraticCurveTo(bgX + bgW, bgY, bgX + bgW, bgY + r)
+        ctx2.lineTo(bgX + bgW, bgY + bgH - r)
+        ctx2.quadraticCurveTo(bgX + bgW, bgY + bgH, bgX + bgW - r, bgY + bgH)
+        ctx2.lineTo(bgX + r, bgY + bgH)
+        ctx2.quadraticCurveTo(bgX, bgY + bgH, bgX, bgY + bgH - r)
+        ctx2.lineTo(bgX, bgY + r)
+        ctx2.quadraticCurveTo(bgX, bgY, bgX + r, bgY)
+        ctx2.closePath()
+        ctx2.fill()
+        ctx2.restore()
+      }
+
       ctx2.fillStyle = t.color
       ctx2.strokeStyle = 'rgba(255,255,255,0.85)'
       ctx2.lineWidth = 4
-      ctx2.strokeText(t.text, t.x, t.y)
-      ctx2.fillText(t.text, t.x, t.y)
+      ctx2.strokeText(safeText, t.x, t.y)
+      ctx2.fillText(safeText, t.x, t.y)
       ctx2.restore()
     }
   }
@@ -388,6 +469,7 @@ export function ImageAnnotatorDialog({
             const id = crypto.randomUUID()
             const newShape: Shape = {
               id,
+              name: shapeName.trim() || undefined,
               points: prev,
               fillColor: shapeFillColor,
               opacity: shapeOpacity,
@@ -413,11 +495,15 @@ export function ImageAnnotatorDialog({
       ...prev,
       {
         id,
+        name: textName.trim() || undefined,
         x: p.x,
         y: p.y,
         text: t,
         color: textColor,
         fontSize: textFontSize,
+        backgroundEnabled: textBackgroundEnabled,
+        backgroundColor: textBackgroundColor,
+        backgroundOpacity: textBackgroundOpacity,
       },
     ])
   }
@@ -495,6 +581,10 @@ export function ImageAnnotatorDialog({
 
               {mode === 'shape' && (
                 <>
+                  <div className="space-y-1 min-w-[220px]">
+                    <Label>Nombre de la forma</Label>
+                    <Input value={shapeName} onChange={(e) => setShapeName(e.target.value)} placeholder="Ej: Área afectada" />
+                  </div>
                   <div className="space-y-1">
                     <Label>Color forma</Label>
                     <Input type="color" value={shapeFillColor} onChange={(e) => setShapeFillColor(e.target.value)} className="h-9 w-[64px] p-1" />
@@ -547,6 +637,7 @@ export function ImageAnnotatorDialog({
                       onClick={() => {
                         setSelectedShapeId(null)
                         setCurrentShapePoints([])
+                        setShapeName('')
                       }}
                       disabled={!selectedShapeId && currentShapePoints.length === 0}
                     >
@@ -561,6 +652,10 @@ export function ImageAnnotatorDialog({
 
               {mode === 'text' && (
                 <>
+                  <div className="space-y-1 min-w-[220px]">
+                    <Label>Nombre del texto</Label>
+                    <Input value={textName} onChange={(e) => setTextName(e.target.value)} placeholder="Ej: Nota 1" />
+                  </div>
                   <div className="space-y-1 min-w-[260px]">
                     <Label>Texto</Label>
                     <Input value={textValue} onChange={(e) => setTextValue(e.target.value)} placeholder="Escribe y luego haz click para colocarlo" />
@@ -580,6 +675,34 @@ export function ImageAnnotatorDialog({
                       className="w-[90px]"
                     />
                   </div>
+                  <div className="space-y-1">
+                    <Label>Fondo</Label>
+                    <div className="flex items-center gap-2 h-9">
+                      <Switch checked={textBackgroundEnabled} onCheckedChange={setTextBackgroundEnabled} />
+                      <span className="text-sm text-muted-foreground">{textBackgroundEnabled ? 'Sí' : 'No'}</span>
+                    </div>
+                  </div>
+                  {textBackgroundEnabled && (
+                    <>
+                      <div className="space-y-1">
+                        <Label>Color fondo</Label>
+                        <Input type="color" value={textBackgroundColor} onChange={(e) => setTextBackgroundColor(e.target.value)} className="h-9 w-[64px] p-1" />
+                      </div>
+                      <div className="space-y-1">
+                        <Label>Transp. fondo</Label>
+                        <Input
+                          type="range"
+                          min={0}
+                          max={1}
+                          step={0.05}
+                          value={textBackgroundOpacity}
+                          onChange={(e) => setTextBackgroundOpacity(Number(e.target.value))}
+                          className="w-[180px]"
+                        />
+                        <div className="text-xs text-muted-foreground">{Math.round(textBackgroundOpacity * 100)}%</div>
+                      </div>
+                    </>
+                  )}
                   <div className="flex gap-2">
                     <Button type="button" variant="outline" size="sm" onClick={handleClear}>
                       Limpiar
@@ -614,7 +737,7 @@ export function ImageAnnotatorDialog({
                     ) : (
                       shapes.map((s, idx) => (
                         <div key={s.id} className="flex items-center justify-between gap-2">
-                          <div className="text-sm">Forma {idx + 1} ({s.points.length} pts)</div>
+                            <div className="text-sm">{s.name?.trim() ? s.name : `Forma ${idx + 1}`} ({s.points.length} pts)</div>
                           <div className="flex gap-2">
                             <Button
                               type="button"
@@ -623,6 +746,7 @@ export function ImageAnnotatorDialog({
                               onClick={() => {
                                 setSelectedShapeId(s.id)
                                 setCurrentShapePoints([])
+                                  setShapeName(s.name ?? '')
                                 setShapeFillColor(s.fillColor)
                                 setShapeOpacity(s.opacity)
                                 setShapeShowBorder(s.showBorder)
@@ -681,7 +805,7 @@ export function ImageAnnotatorDialog({
                   ) : (
                     texts.map((t, idx) => (
                       <div key={t.id} className="flex items-center justify-between gap-2">
-                        <div className="text-sm truncate">{idx + 1}. {t.text}</div>
+                        <div className="text-sm truncate">{t.name?.trim() ? t.name : `${idx + 1}.`} {t.text}</div>
                         <div className="flex gap-2">
                           <Button
                             type="button"
@@ -689,9 +813,13 @@ export function ImageAnnotatorDialog({
                             variant={selectedTextId === t.id ? 'default' : 'outline'}
                             onClick={() => {
                               setSelectedTextId(t.id)
+                              setTextName(t.name ?? '')
                               setTextValue(t.text)
                               setTextColor(t.color)
                               setTextFontSize(t.fontSize)
+                              setTextBackgroundEnabled(Boolean(t.backgroundEnabled))
+                              setTextBackgroundColor(t.backgroundColor ?? '#ffffff')
+                              setTextBackgroundOpacity(t.backgroundOpacity ?? 0.75)
                             }}
                           >
                             Editar
@@ -715,23 +843,6 @@ export function ImageAnnotatorDialog({
 
                 {selectedTextId && (
                   <div className="mt-3 pt-3 border-t border-border flex gap-2">
-                    <Button
-                      type="button"
-                      size="sm"
-                      onClick={() => {
-                        const nextText = textValue.trim()
-                        if (!nextText) return
-                        setTexts((prev) =>
-                          prev.map((t) =>
-                            t.id === selectedTextId
-                              ? { ...t, text: nextText, color: textColor, fontSize: textFontSize }
-                              : t
-                          )
-                        )
-                      }}
-                    >
-                      Aplicar
-                    </Button>
                     <Button type="button" size="sm" variant="outline" onClick={() => setSelectedTextId(null)}>
                       Listo
                     </Button>

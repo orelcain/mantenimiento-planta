@@ -1,5 +1,5 @@
 {
-  "version": "2.2.19",
+  "version": "2.2.20",
   "buildDate": "2026-01-09",
   "buildTimestamp": 1768012800000,
   "features": [
@@ -10,7 +10,7 @@
     "Nombres legibles (UI/PDF) para usuarios",
     "Uploads con WebP y contentType coherente",
     "Campos extra por par (equipo/OT/criticidad/tipo de falla) en UI/PDF",
-    "Anotaciones sobre fotos: formas por puntos traslúcidas + texto editable (edición en vivo + curvatura)",
+    "Anotaciones: editar formas/textos (nombre, color, transparencia, curvatura, fondo de texto)",
     "PDF: etiqueta (ANOTADA) por imagen"
   ]
 }
