@@ -9,6 +9,7 @@ import {
   AlertCircle,
   Trash2,
   Download,
+  Plus,
 } from 'lucide-react'
 import {
   Dialog,
@@ -199,10 +200,16 @@ export function PhotoEvidenceDetail({
     setIsSaving(true)
     try {
       // 1) Metadatos del par
-      await updatePhotoEvidencePairMeta(evidence.id, selectedPairIndex, {
-        ubicacion: pairUbicacion.trim() || undefined,
-        descripcion: pairDescripcion.trim() || undefined,
-      })
+      const metaUbicacion = pairUbicacion.trim() || undefined
+      const metaDescripcion = pairDescripcion.trim() || undefined
+      const existingMeta = evidence.pairMeta?.[selectedPairIndex]
+      const shouldPersistMeta = Boolean(metaUbicacion || metaDescripcion || existingMeta)
+      if (shouldPersistMeta) {
+        await updatePhotoEvidencePairMeta(evidence.id, selectedPairIndex, {
+          ubicacion: metaUbicacion,
+          descripcion: metaDescripcion,
+        })
+      }
 
       // 2) Foto ANTES (reemplazar / agregar / eliminar)
       const currentBefore = evidence.fotosBefore[selectedPairIndex]
@@ -305,24 +312,43 @@ export function PhotoEvidenceDetail({
                 </h3>
 
                 {/* Navegación de pares */}
-                {Math.max(evidence.fotosBefore.length, evidence.fotosAfter.length, evidence.pairMeta?.length ?? 0) > 1 && (
-                  <div className="flex items-center gap-2 overflow-x-auto pb-2">
-                    {Array.from({ length: Math.max(evidence.fotosBefore.length, evidence.fotosAfter.length, evidence.pairMeta?.length ?? 0) }).map((_, index) => (
-                      <button
-                        key={index}
-                        onClick={() => setSelectedPairIndex(index)}
-                        className={cn(
-                          'px-3 py-1 rounded-full text-xs font-medium transition-colors',
-                          selectedPairIndex === index
-                            ? 'bg-primary text-primary-foreground'
-                            : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                        )}
-                      >
-                        Par {index + 1}
-                      </button>
-                    ))}
-                  </div>
-                )}
+                {(() => {
+                  const maxPairs = Math.max(evidence.fotosBefore.length, evidence.fotosAfter.length, evidence.pairMeta?.length ?? 0)
+                  if (maxPairs <= 1 && !canEditPairMeta) return null
+
+                  return (
+                    <div className="flex items-center gap-2 overflow-x-auto pb-2">
+                      {Array.from({ length: Math.max(maxPairs, 1) }).map((_, index) => (
+                        <button
+                          key={index}
+                          onClick={() => setSelectedPairIndex(index)}
+                          className={cn(
+                            'px-3 py-1 rounded-full text-xs font-medium transition-colors',
+                            selectedPairIndex === index
+                              ? 'bg-primary text-primary-foreground'
+                              : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                          )}
+                        >
+                          Par {index + 1}
+                        </button>
+                      ))}
+
+                      {canEditPairMeta && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-7 px-2"
+                          onClick={() => setSelectedPairIndex(maxPairs)}
+                          disabled={isSaving}
+                        >
+                          <Plus className="w-4 h-4 mr-1" />
+                          Nuevo par
+                        </Button>
+                      )}
+                    </div>
+                  )
+                })()}
 
                 <BeforeAfterViewer
                   before={evidence.fotosBefore[selectedPairIndex] || null}
