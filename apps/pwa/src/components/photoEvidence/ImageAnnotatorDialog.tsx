@@ -1,0 +1,365 @@
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input, Label } from '@/components/ui'
+import { cn } from '@/lib/utils'
+
+type AnnotatorMode = 'line' | 'text'
+
+type Point = { x: number; y: number }
+
+type Stroke = {
+  points: Point[]
+}
+
+type TextItem = {
+  x: number
+  y: number
+  text: string
+}
+
+interface ImageAnnotatorDialogProps {
+  open: boolean
+  title?: string
+  sourceUrl: string | null
+  onClose: () => void
+  onSave: (file: File) => void
+}
+
+function clampCanvasSize(width: number, height: number, maxDim: number) {
+  const maxSide = Math.max(width, height)
+  if (maxSide <= maxDim) return { width, height, scale: 1 }
+  const scale = maxDim / maxSide
+  return { width: Math.round(width * scale), height: Math.round(height * scale), scale }
+}
+
+async function fetchAsObjectUrl(url: string): Promise<{ objectUrl: string; mime: string }>
+{
+  const res = await fetch(url)
+  if (!res.ok) {
+    throw new Error('No se pudo cargar la imagen')
+  }
+  const blob = await res.blob()
+  const objectUrl = URL.createObjectURL(blob)
+  return { objectUrl, mime: blob.type || 'image/jpeg' }
+}
+
+export function ImageAnnotatorDialog({
+  open,
+  title = 'Anotar imagen',
+  sourceUrl,
+  onClose,
+  onSave,
+}: ImageAnnotatorDialogProps) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null)
+
+  const [isLoading, setIsLoading] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
+
+  const [localImageUrl, setLocalImageUrl] = useState<string | null>(null)
+  const [imageMime, setImageMime] = useState<string>('image/jpeg')
+
+  const [mode, setMode] = useState<AnnotatorMode>('line')
+  const [strokes, setStrokes] = useState<Stroke[]>([])
+  const [currentStroke, setCurrentStroke] = useState<Point[]>([])
+  const [textValue, setTextValue] = useState('')
+  const [texts, setTexts] = useState<TextItem[]>([])
+
+  const [imageSize, setImageSize] = useState<{ width: number; height: number } | null>(null)
+
+  const canSave = useMemo(() => {
+    return Boolean(localImageUrl && (strokes.length > 0 || currentStroke.length > 0 || texts.length > 0))
+  }, [localImageUrl, strokes.length, currentStroke.length, texts.length])
+
+  useEffect(() => {
+    if (!open) return
+    setLoadError(null)
+    setIsLoading(false)
+    setMode('line')
+    setStrokes([])
+    setCurrentStroke([])
+    setTextValue('')
+    setTexts([])
+    setImageSize(null)
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    if (!sourceUrl) return
+
+    let isCancelled = false
+    let tempObjectUrl: string | null = null
+
+    const run = async () => {
+      setIsLoading(true)
+      setLoadError(null)
+      try {
+        const { objectUrl, mime } = await fetchAsObjectUrl(sourceUrl)
+        if (isCancelled) {
+          URL.revokeObjectURL(objectUrl)
+          return
+        }
+        tempObjectUrl = objectUrl
+        setLocalImageUrl(objectUrl)
+        setImageMime(mime)
+      } catch (e) {
+        setLoadError((e as Error)?.message || 'Error cargando la imagen')
+        setLocalImageUrl(null)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    run()
+
+    return () => {
+      isCancelled = true
+      if (tempObjectUrl) URL.revokeObjectURL(tempObjectUrl)
+    }
+  }, [open, sourceUrl])
+
+  const redraw = async () => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    if (!localImageUrl) return
+
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    const ctx2 = ctx
+
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve()
+      img.onerror = () => reject(new Error('Error cargando imagen'))
+      img.src = localImageUrl
+    })
+
+    const fitted = clampCanvasSize(img.width, img.height, 1600)
+    if (!imageSize || imageSize.width !== fitted.width || imageSize.height !== fitted.height) {
+      setImageSize({ width: fitted.width, height: fitted.height })
+    }
+
+    canvas.width = fitted.width
+    canvas.height = fitted.height
+
+    // Background
+    ctx2.clearRect(0, 0, canvas.width, canvas.height)
+    ctx2.fillStyle = '#ffffff'
+    ctx2.fillRect(0, 0, canvas.width, canvas.height)
+
+    ctx2.drawImage(img, 0, 0, canvas.width, canvas.height)
+
+    // Strokes
+    const drawStroke = (points: Point[]) => {
+      if (points.length < 2) return
+      const firstPoint = points[0]
+      if (!firstPoint) return
+      ctx2.save()
+      ctx2.strokeStyle = '#dc2626'
+      ctx2.lineWidth = 3
+      ctx2.lineJoin = 'round'
+      ctx2.lineCap = 'round'
+      ctx2.beginPath()
+      ctx2.moveTo(firstPoint.x, firstPoint.y)
+      for (let i = 1; i < points.length; i++) {
+        const pt = points[i]
+        if (!pt) continue
+        ctx2.lineTo(pt.x, pt.y)
+      }
+      ctx2.stroke()
+      ctx2.restore()
+    }
+
+    for (const stroke of strokes) drawStroke(stroke.points)
+    drawStroke(currentStroke)
+
+    // Text
+    for (const t of texts) {
+      ctx2.save()
+      ctx2.font = 'bold 18px system-ui, sans-serif'
+      ctx2.fillStyle = '#111827'
+      ctx2.strokeStyle = 'rgba(255,255,255,0.85)'
+      ctx2.lineWidth = 4
+      ctx2.strokeText(t.text, t.x, t.y)
+      ctx2.fillText(t.text, t.x, t.y)
+      ctx2.restore()
+    }
+  }
+
+  useEffect(() => {
+    if (!open) return
+    if (!localImageUrl) return
+
+    let cancelled = false
+    const run = async () => {
+      try {
+        await redraw()
+      } catch (e) {
+        if (!cancelled) setLoadError((e as Error)?.message || 'Error redibujando')
+      }
+    }
+
+    run()
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, localImageUrl, strokes, currentStroke, texts])
+
+  const getCanvasPoint = (evt: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current
+    if (!canvas) return null
+    const rect = canvas.getBoundingClientRect()
+    const x = ((evt.clientX - rect.left) / rect.width) * canvas.width
+    const y = ((evt.clientY - rect.top) / rect.height) * canvas.height
+    return { x, y }
+  }
+
+  const handleCanvasClick = (evt: React.MouseEvent<HTMLCanvasElement>) => {
+    const p = getCanvasPoint(evt)
+    if (!p) return
+
+    if (mode === 'line') {
+      setCurrentStroke((prev) => [...prev, p])
+      return
+    }
+
+    const t = textValue.trim()
+    if (!t) return
+    setTexts((prev) => [...prev, { x: p.x, y: p.y, text: t }])
+  }
+
+  const handleNewStroke = () => {
+    if (currentStroke.length < 2) {
+      setCurrentStroke([])
+      return
+    }
+    setStrokes((prev) => [...prev, { points: currentStroke }])
+    setCurrentStroke([])
+  }
+
+  const handleClear = () => {
+    setStrokes([])
+    setCurrentStroke([])
+    setTexts([])
+  }
+
+  const handleSave = async () => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+
+    // Si hay un trazo en curso, lo cerramos al guardar.
+    if (currentStroke.length >= 2) {
+      setStrokes((prev) => [...prev, { points: currentStroke }])
+      setCurrentStroke([])
+    }
+
+    const blob: Blob | null = await new Promise((resolve) => {
+      try {
+        canvas.toBlob(
+          (b) => resolve(b),
+          'image/webp',
+          0.92
+        )
+      } catch {
+        resolve(null)
+      }
+    })
+
+    if (blob) {
+      const file = new File([blob], 'anotada.webp', { type: 'image/webp' })
+      onSave(file)
+      return
+    }
+
+    // Fallback PNG
+    const pngBlob: Blob | null = await new Promise((resolve) => {
+      try {
+        canvas.toBlob((b) => resolve(b), 'image/png')
+      } catch {
+        resolve(null)
+      }
+    })
+
+    if (!pngBlob) {
+      throw new Error('No se pudo generar la imagen anotada')
+    }
+
+    const file = new File([pngBlob], 'anotada.png', { type: 'image/png' })
+    onSave(file)
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-4xl max-h-[95vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+        </DialogHeader>
+
+        {!sourceUrl ? (
+          <div className="text-sm text-muted-foreground">No hay imagen para anotar.</div>
+        ) : (
+          <div className="space-y-3">
+            <div className="flex flex-wrap gap-2 items-end">
+              <div className="space-y-1">
+                <Label>Modo</Label>
+                <div className="flex gap-2">
+                  <Button type="button" variant={mode === 'line' ? 'default' : 'outline'} size="sm" onClick={() => setMode('line')}>
+                    Línea
+                  </Button>
+                  <Button type="button" variant={mode === 'text' ? 'default' : 'outline'} size="sm" onClick={() => setMode('text')}>
+                    Texto
+                  </Button>
+                </div>
+              </div>
+
+              {mode === 'text' && (
+                <div className="space-y-1 min-w-[260px]">
+                  <Label>Texto</Label>
+                  <Input value={textValue} onChange={(e) => setTextValue(e.target.value)} placeholder="Escribe y luego haz click en la imagen" />
+                </div>
+              )}
+
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={handleNewStroke} disabled={mode !== 'line'}>
+                  Nuevo trazo
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={handleClear}>
+                  Limpiar
+                </Button>
+              </div>
+            </div>
+
+            {isLoading && <div className="text-sm text-muted-foreground">Cargando imagen…</div>}
+            {loadError && <div className="text-sm text-red-600">{loadError}</div>}
+
+            <div className={cn('w-full rounded-md border border-border bg-muted/20 overflow-auto', isLoading && 'opacity-60')}>
+              <canvas
+                ref={canvasRef}
+                onClick={handleCanvasClick}
+                className="block max-w-full"
+                style={{ cursor: mode === 'line' ? 'crosshair' : 'text' }}
+              />
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={onClose}>
+                Cancelar
+              </Button>
+              <Button type="button" onClick={handleSave} disabled={!canSave || isLoading}>
+                Guardar imagen anotada
+              </Button>
+            </div>
+
+            <div className="text-xs text-muted-foreground">
+              Tip: en “Línea”, cada click agrega un punto. En “Texto”, escribe y luego haz click para posicionarlo.
+            </div>
+          </div>
+        )}
+
+        {/* Nota: imageMime se conserva por si en el futuro se quiere condicionar formato */}
+        <input type="hidden" value={imageMime} readOnly />
+      </DialogContent>
+    </Dialog>
+  )
+}

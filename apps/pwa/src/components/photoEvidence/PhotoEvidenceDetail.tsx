@@ -30,6 +30,7 @@ import {
 } from '@/components/ui'
 import { BeforeAfterViewer } from './BeforeAfterViewer'
 import { PhotoUploader } from './PhotoUploader'
+import { ImageAnnotatorDialog } from './ImageAnnotatorDialog'
 import { useAuthStore } from '@/store'
 import {
   getPhotoEvidenceById,
@@ -112,6 +113,11 @@ export function PhotoEvidenceDetail({
   const [pairBeforePhoto, setPairBeforePhoto] = useState<{ id: string; url: string; preview?: string; file?: File }[]>([])
   const [pairAfterPhoto, setPairAfterPhoto] = useState<{ id: string; url: string; preview?: string; file?: File }[]>([])
 
+  const [annotateOpen, setAnnotateOpen] = useState(false)
+  const [annotateTarget, setAnnotateTarget] = useState<'before' | 'after' | null>(null)
+  const [annotateSourceUrl, setAnnotateSourceUrl] = useState<string | null>(null)
+  const [annotatePreviewUrl, setAnnotatePreviewUrl] = useState<string | null>(null)
+
   // Cargar evidencia
   useEffect(() => {
     if (evidenceId && open) {
@@ -137,6 +143,55 @@ export function PhotoEvidenceDetail({
     setPairBeforePhoto(before ? [{ id: before.id, url: before.url }] : [])
     setPairAfterPhoto(after ? [{ id: after.id, url: after.url }] : [])
   }, [evidence, selectedPairIndex])
+
+  useEffect(() => {
+    return () => {
+      if (annotatePreviewUrl) {
+        URL.revokeObjectURL(annotatePreviewUrl)
+      }
+    }
+  }, [annotatePreviewUrl])
+
+  const openAnnotator = (target: 'before' | 'after') => {
+    const current = target === 'before' ? pairBeforePhoto[0] : pairAfterPhoto[0]
+    const src = current?.preview || current?.url
+    if (!src) return
+    setAnnotateTarget(target)
+    setAnnotateSourceUrl(src)
+    setAnnotateOpen(true)
+  }
+
+  const applyAnnotatedFile = (file: File) => {
+    const nextPreview = URL.createObjectURL(file)
+    if (annotatePreviewUrl) URL.revokeObjectURL(annotatePreviewUrl)
+    setAnnotatePreviewUrl(nextPreview)
+
+    if (annotateTarget === 'before') {
+      const current = pairBeforePhoto[0]
+      setPairBeforePhoto([
+        {
+          id: current?.id || 'before',
+          url: current?.url || '',
+          preview: nextPreview,
+          file,
+        },
+      ])
+    } else if (annotateTarget === 'after') {
+      const current = pairAfterPhoto[0]
+      setPairAfterPhoto([
+        {
+          id: current?.id || 'after',
+          url: current?.url || '',
+          preview: nextPreview,
+          file,
+        },
+      ])
+    }
+
+    setAnnotateOpen(false)
+    setAnnotateTarget(null)
+    setAnnotateSourceUrl(null)
+  }
 
   const loadEvidence = async () => {
     if (!evidenceId) return
@@ -404,6 +459,16 @@ export function PhotoEvidenceDetail({
                             label="📷 Foto ANTES (este par)"
                             description="Para reemplazar: elimina y vuelve a agregar"
                           />
+                          <div className="mt-2 flex justify-end">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => openAnnotator('before')}
+                              disabled={isSaving || pairBeforePhoto.length === 0}
+                            >
+                              Anotar
+                            </Button>
+                          </div>
                         </div>
                         <div className="p-3 rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/20">
                           <PhotoUploader
@@ -414,6 +479,16 @@ export function PhotoEvidenceDetail({
                             label="📷 Foto DESPUÉS (este par)"
                             description="Para reemplazar: elimina y vuelve a agregar"
                           />
+                          <div className="mt-2 flex justify-end">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => openAnnotator('after')}
+                              disabled={isSaving || pairAfterPhoto.length === 0}
+                            >
+                              Anotar
+                            </Button>
+                          </div>
                         </div>
                       </div>
 
@@ -522,6 +597,18 @@ export function PhotoEvidenceDetail({
                   </div>
                 )}
               </div>
+
+              <ImageAnnotatorDialog
+                open={annotateOpen}
+                title={annotateTarget === 'after' ? 'Anotar foto DESPUÉS' : 'Anotar foto ANTES'}
+                sourceUrl={annotateSourceUrl}
+                onClose={() => {
+                  setAnnotateOpen(false)
+                  setAnnotateTarget(null)
+                  setAnnotateSourceUrl(null)
+                }}
+                onSave={applyAnnotatedFile}
+              />
 
               {/* Nota: las fotos DESPUÉS ahora se editan por par (arriba) */}
 
