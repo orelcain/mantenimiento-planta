@@ -82,6 +82,32 @@ export function ImageAnnotatorDialog({
   const [texts, setTexts] = useState<TextItem[]>([])
   const [selectedTextId, setSelectedTextId] = useState<string | null>(null)
 
+  useEffect(() => {
+    if (!selectedShapeId) return
+    setShapes((prev) => {
+      let changed = false
+      const next = prev.map((s) => {
+        if (s.id !== selectedShapeId) return s
+        const nextShape: Shape = {
+          ...s,
+          fillColor: shapeFillColor,
+          opacity: shapeOpacity,
+          showBorder: shapeShowBorder,
+          borderColor: shapeBorderColor,
+        }
+        const same =
+          nextShape.fillColor === s.fillColor &&
+          nextShape.opacity === s.opacity &&
+          nextShape.showBorder === s.showBorder &&
+          nextShape.borderColor === s.borderColor
+        if (same) return s
+        changed = true
+        return nextShape
+      })
+      return changed ? next : prev
+    })
+  }, [selectedShapeId, shapeFillColor, shapeOpacity, shapeShowBorder, shapeBorderColor])
+
   const [imageSize, setImageSize] = useState<{ width: number; height: number } | null>(null)
 
   const canSave = useMemo(() => {
@@ -553,30 +579,9 @@ export function ImageAnnotatorDialog({
                     <div className="mt-3 pt-3 border-t border-border">
                       <div className="text-sm font-medium">Editar forma seleccionada</div>
                       <div className="text-xs text-muted-foreground mt-1">
-                        Cambia color/transparencia/marco y se aplica a esa forma.
+                        Cambia color/transparencia/marco y se aplica en vivo.
                       </div>
                       <div className="mt-2 flex gap-2">
-                        <Button
-                          type="button"
-                          size="sm"
-                          onClick={() => {
-                            setShapes((prev) =>
-                              prev.map((s) =>
-                                s.id === selectedShapeId
-                                  ? {
-                                      ...s,
-                                      fillColor: shapeFillColor,
-                                      opacity: shapeOpacity,
-                                      showBorder: shapeShowBorder,
-                                      borderColor: shapeBorderColor,
-                                    }
-                                  : s
-                              )
-                            )
-                          }}
-                        >
-                          Aplicar
-                        </Button>
                         <Button type="button" size="sm" variant="outline" onClick={() => setSelectedShapeId(null)}>
                           Listo
                         </Button>
