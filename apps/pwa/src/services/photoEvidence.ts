@@ -394,6 +394,42 @@ export async function upsertEvidencePhotoAtIndex(
   }
 }
 
+export async function deleteEvidencePair(
+  evidenceId: string,
+  pairIndex: number
+): Promise<void> {
+  const evidence = await getPhotoEvidenceById(evidenceId)
+  if (!evidence) throw new Error('Evidencia no encontrada')
+
+  const before = evidence.fotosBefore[pairIndex]
+  const after = evidence.fotosAfter[pairIndex]
+
+  if (before) {
+    try {
+      await deleteEvidencePhoto(evidenceId, before.id, 'before', before.url)
+    } catch (e) {
+      logger.warn('Error deleting before photo for pair deletion', { evidenceId, photoId: before.id })
+    }
+  }
+  if (after) {
+    try {
+      await deleteEvidencePhoto(evidenceId, after.id, 'after', after.url)
+    } catch (e) {
+      logger.warn('Error deleting after photo for pair deletion', { evidenceId, photoId: after.id })
+    }
+  }
+
+  const fotosBefore = evidence.fotosBefore.filter((_, i) => i !== pairIndex)
+  const fotosAfter = evidence.fotosAfter.filter((_, i) => i !== pairIndex)
+  const pairMeta = (evidence.pairMeta || []).filter((_, i) => i !== pairIndex)
+
+  await updatePhotoEvidence(evidenceId, {
+    fotosBefore,
+    fotosAfter,
+    pairMeta,
+  })
+}
+
 // Marcar como corregida
 export async function markAsCorrected(
   evidenceId: string,

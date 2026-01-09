@@ -33,6 +33,7 @@ import {
   unmarkAsVerified,
   updatePhotoEvidencePairMeta,
   upsertEvidencePhotoAtIndex,
+  deleteEvidencePair,
 } from '@/services/photoEvidence'
 import type { PhotoEvidence, PhotoEvidenceStatus } from '@/types'
 import { logger } from '@/lib/logger'
@@ -232,6 +233,32 @@ export function PhotoEvidenceDetail({
     }
   }
 
+  const handleDeletePair = async () => {
+    if (!evidence) return
+
+    const maxPairs = Math.max(evidence.fotosBefore.length, evidence.fotosAfter.length, evidence.pairMeta?.length ?? 0)
+    if (maxPairs === 0) return
+
+    if (!confirm(`¿Eliminar el Par ${selectedPairIndex + 1} completo (fotos y datos)?`)) {
+      return
+    }
+
+    setIsSaving(true)
+    try {
+      await deleteEvidencePair(evidence.id, selectedPairIndex)
+      const nextMax = Math.max(maxPairs - 1, 0)
+      const nextIndex = nextMax === 0 ? 0 : Math.min(selectedPairIndex, nextMax - 1)
+      setSelectedPairIndex(nextIndex)
+      await loadEvidence()
+      onUpdate()
+    } catch (error) {
+      logger.error('Error deleting pair', error as Error)
+      alert((error as Error)?.message || 'Error eliminando el par')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-2xl max-h-[95vh] overflow-y-auto p-0">
@@ -364,6 +391,18 @@ export function PhotoEvidenceDetail({
                         ) : (
                           'Guardar cambios del par'
                         )}
+                      </Button>
+                    </div>
+
+                    <div className="flex justify-end">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-red-500 text-red-600 hover:bg-red-50"
+                        onClick={handleDeletePair}
+                        disabled={isSaving}
+                      >
+                        Eliminar par completo
                       </Button>
                     </div>
                   </div>
