@@ -14,6 +14,8 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogHeader,
+  DialogTitle,
   Button,
   Badge,
   Spinner,
@@ -188,6 +190,9 @@ export function PhotoEvidenceDetail({
   return (
     <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-2xl max-h-[95vh] overflow-y-auto p-0">
+        <DialogHeader className="sr-only">
+          <DialogTitle>{evidence?.titulo ?? 'Detalle de evidencia'}</DialogTitle>
+        </DialogHeader>
         {isLoading ? (
           <div className="flex items-center justify-center p-12">
             <Spinner className="w-8 h-8" />

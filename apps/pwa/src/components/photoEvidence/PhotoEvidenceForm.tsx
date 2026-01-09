@@ -74,6 +74,7 @@ export function PhotoEvidenceForm({ open, onClose, onSuccess }: PhotoEvidenceFor
     if (!user) return
     if (!formData.titulo.trim()) return
     if (photos.length === 0) return
+    if (!photos.some((p) => p.file)) return
 
     setIsLoading(true)
 
@@ -93,11 +94,11 @@ export function PhotoEvidenceForm({ open, onClose, onSuccess }: PhotoEvidenceFor
       })
 
       // Subir fotos
-      const photosToUpload = photos.filter(p => p.file)
+      const photosToUpload = photos.filter((p) => p.file)
       if (photosToUpload.length > 0) {
         const uploadedPhotos = await uploadMultipleEvidencePhotos(
           evidence.id,
-          photosToUpload.map(p => p.file!),
+          photosToUpload.map((p) => p.file!),
           'before'
         )
 
@@ -105,7 +106,6 @@ export function PhotoEvidenceForm({ open, onClose, onSuccess }: PhotoEvidenceFor
         const fotosBefore: PhotoItem[] = uploadedPhotos.map((uploaded) => ({
           id: uploaded.id,
           url: uploaded.url,
-          descripcion: undefined,
           timestamp: new Date(),
         }))
 

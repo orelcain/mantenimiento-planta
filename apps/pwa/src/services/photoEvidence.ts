@@ -28,6 +28,32 @@ import { logger } from '@/lib/logger'
 
 const COLLECTION = 'photoEvidence'
 
+function stripUndefined(value: unknown): unknown {
+  if (value === undefined) return undefined
+  if (value === null) return null
+
+  if (Array.isArray(value)) {
+    const mapped = value
+      .map((item) => stripUndefined(item))
+      .filter((item) => item !== undefined)
+    return mapped
+  }
+
+  if (value instanceof Date) return value
+
+  if (typeof value === 'object') {
+    const record = value as Record<string, unknown>
+    const result: Record<string, unknown> = {}
+    for (const [key, val] of Object.entries(record)) {
+      const cleaned = stripUndefined(val)
+      if (cleaned !== undefined) result[key] = cleaned
+    }
+    return result
+  }
+
+  return value
+}
+
 // ========== FUNCIONES DE STORAGE ==========
 
 // Subir foto de evidencia (before o after)
@@ -132,11 +158,14 @@ export async function createPhotoEvidence(
     updatedAt: now,
   }
 
-  await setDoc(doc(db, COLLECTION, id), {
-    ...evidence,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  })
+  await setDoc(
+    doc(db, COLLECTION, id),
+    stripUndefined({
+      ...evidence,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    }) as Record<string, unknown>
+  )
 
   logger.info('Photo evidence created', { id, titulo: data.titulo })
   return evidence
@@ -207,10 +236,13 @@ export async function updatePhotoEvidence(
   data: Partial<Omit<PhotoEvidence, 'id' | 'createdAt'>>
 ): Promise<void> {
   const docRef = doc(db, COLLECTION, id)
-  await updateDoc(docRef, {
-    ...data,
-    updatedAt: serverTimestamp(),
-  })
+  await updateDoc(
+    docRef,
+    stripUndefined({
+      ...data,
+      updatedAt: serverTimestamp(),
+    }) as Record<string, unknown>
+  )
   
   logger.info('Photo evidence updated', { id })
 }

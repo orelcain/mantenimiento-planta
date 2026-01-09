@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { ArrowLeftRight, ZoomIn } from 'lucide-react'
-import { Dialog, DialogContent, Button } from '@/components/ui'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, Button } from '@/components/ui'
 import type { PhotoItem } from '@/types'
 import { cn } from '@/lib/utils'
 
@@ -191,6 +191,11 @@ export function BeforeAfterViewer({ before, after, titulo }: BeforeAfterViewerPr
       {/* Modal fullscreen */}
       <Dialog open={isFullscreen} onOpenChange={setIsFullscreen}>
         <DialogContent className="max-w-[95vw] max-h-[95vh] p-0 overflow-hidden">
+          <DialogHeader className="sr-only">
+            <DialogTitle>
+              {fullscreenImage === 'before' ? 'Foto ANTES' : 'Foto DESPUÉS'}
+            </DialogTitle>
+          </DialogHeader>
           <div className="relative w-full h-full">
             <img
               src={fullscreenImage === 'before' ? before?.url : after?.url}
