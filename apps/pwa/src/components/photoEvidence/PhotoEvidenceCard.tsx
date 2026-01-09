@@ -51,6 +51,13 @@ export function PhotoEvidenceCard({
   onAddAfterPhotos,
   compact = false,
 }: PhotoEvidenceCardProps) {
+  const safeFormat = (date: Date, fmt: string) => {
+    try {
+      return format(date, fmt, { locale: es })
+    } catch {
+      return ''
+    }
+  }
   const statusConfig = STATUS_CONFIG[evidence.status]
   const StatusIcon = statusConfig.icon
   const hasBeforePhotos = evidence.fotosBefore.length > 0
@@ -188,7 +195,7 @@ export function PhotoEvidenceCard({
           )}
           <span className="flex items-center gap-1">
             <Calendar className="w-3 h-3" />
-            {format(evidence.createdAt, "d MMM ''yy", { locale: es })}
+            {safeFormat(evidence.createdAt, "d MMM ''yy")}
           </span>
         </div>
 

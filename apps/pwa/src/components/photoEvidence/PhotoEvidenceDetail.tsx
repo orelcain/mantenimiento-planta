@@ -72,6 +72,13 @@ export function PhotoEvidenceDetail({
   onUpdate,
   onExportPDF,
 }: PhotoEvidenceDetailProps) {
+  const safeFormat = (date: Date, fmt: string) => {
+    try {
+      return format(date, fmt, { locale: es })
+    } catch {
+      return ''
+    }
+  }
   const user = useAuthStore((state) => state.user)
   const [evidence, setEvidence] = useState<PhotoEvidence | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -330,7 +337,7 @@ export function PhotoEvidenceDetail({
                   <span className="text-muted-foreground">Reportado</span>
                   <p className="flex items-center gap-1">
                     <Calendar className="w-4 h-4" />
-                    {format(evidence.createdAt, "d MMM yyyy, HH:mm", { locale: es })}
+                    {safeFormat(evidence.createdAt, "d MMM yyyy, HH:mm")}
                   </p>
                 </div>
                 {evidence.corregidaAt && (
@@ -338,7 +345,7 @@ export function PhotoEvidenceDetail({
                     <span className="text-muted-foreground">Corregido</span>
                     <p className="flex items-center gap-1">
                       <CheckCircle className="w-4 h-4 text-green-500" />
-                      {format(evidence.corregidaAt, "d MMM yyyy, HH:mm", { locale: es })}
+                      {safeFormat(evidence.corregidaAt, "d MMM yyyy, HH:mm")}
                     </p>
                   </div>
                 )}
@@ -347,7 +354,7 @@ export function PhotoEvidenceDetail({
                     <span className="text-muted-foreground">Verificado</span>
                     <p className="flex items-center gap-1">
                       <CheckCircle className="w-4 h-4 text-purple-500" />
-                      {format(evidence.verificadaAt, "d MMM yyyy, HH:mm", { locale: es })}
+                      {safeFormat(evidence.verificadaAt, "d MMM yyyy, HH:mm")}
                     </p>
                   </div>
                 )}

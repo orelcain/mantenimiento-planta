@@ -54,6 +54,35 @@ function stripUndefined(value: unknown): unknown {
   return value
 }
 
+function toDateSafe(value: unknown): Date | undefined {
+  if (!value) return undefined
+
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? undefined : value
+  }
+
+  if (value instanceof Timestamp) return value.toDate()
+
+  if (typeof value === 'object') {
+    const maybe = value as { seconds?: unknown; nanoseconds?: unknown }
+    if (typeof maybe.seconds === 'number') {
+      const nanos = typeof maybe.nanoseconds === 'number' ? maybe.nanoseconds : 0
+      try {
+        return new Timestamp(maybe.seconds, nanos).toDate()
+      } catch {
+        return undefined
+      }
+    }
+  }
+
+  if (typeof value === 'number' || typeof value === 'string') {
+    const date = new Date(value)
+    return Number.isNaN(date.getTime()) ? undefined : date
+  }
+
+  return undefined
+}
+
 // ========== FUNCIONES DE STORAGE ==========
 
 // Subir foto de evidencia (before o after)
@@ -124,20 +153,22 @@ export async function deleteEvidencePhoto(
 // Helper para parsear documentos de Firestore
 function parseEvidenceDoc(doc: any): PhotoEvidence {
   const data = doc.data()
+  const createdAt = toDateSafe(data.createdAt) ?? new Date()
+  const updatedAt = toDateSafe(data.updatedAt) ?? createdAt
   return {
     ...data,
     id: doc.id,
-    createdAt: data.createdAt instanceof Timestamp ? data.createdAt.toDate() : new Date(data.createdAt),
-    updatedAt: data.updatedAt instanceof Timestamp ? data.updatedAt.toDate() : new Date(data.updatedAt),
-    corregidaAt: data.corregidaAt instanceof Timestamp ? data.corregidaAt.toDate() : data.corregidaAt ? new Date(data.corregidaAt) : undefined,
-    verificadaAt: data.verificadaAt instanceof Timestamp ? data.verificadaAt.toDate() : data.verificadaAt ? new Date(data.verificadaAt) : undefined,
+    createdAt,
+    updatedAt,
+    corregidaAt: toDateSafe(data.corregidaAt),
+    verificadaAt: toDateSafe(data.verificadaAt),
     fotosBefore: (data.fotosBefore || []).map((f: any) => ({
       ...f,
-      timestamp: f.timestamp instanceof Timestamp ? f.timestamp.toDate() : new Date(f.timestamp),
+      timestamp: toDateSafe(f.timestamp) ?? createdAt,
     })),
     fotosAfter: (data.fotosAfter || []).map((f: any) => ({
       ...f,
-      timestamp: f.timestamp instanceof Timestamp ? f.timestamp.toDate() : new Date(f.timestamp),
+      timestamp: toDateSafe(f.timestamp) ?? createdAt,
     })),
   }
 }
