@@ -7,6 +7,18 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.2.25] - 2026-01-09
+
+### 🧩 Metadatos por par + Exportación agrupada
+
+#### Añadido
+- Título por par (opcional)
+- Ubicación por par desde jerarquía o manual
+- Sugerencias de títulos/ubicaciones existentes para reutilizar
+
+#### Mejorado
+- PDF: páginas ordenadas/agrupadas por título + ubicación del par
+
 ## [2.2.24] - 2026-01-09
 
 ### 📷 Evidencias Fotográficas (multi-foto por par)

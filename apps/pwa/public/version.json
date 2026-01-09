@@ -1,7 +1,7 @@
 {
-  "version": "2.2.24",
+  "version": "2.2.25",
   "buildDate": "2026-01-09",
-  "buildTimestamp": 1768012800000,
+  "buildTimestamp": 1768002550743,
   "features": [
     "Nuevo módulo de Evidencias Fotográficas (antes/después)",
     "Comparador visual de fotos con slider",
@@ -16,6 +16,8 @@
     "Anotaciones: zoom (rueda/pinch) y mover vista (pan)",
     "Evidencias: múltiples fotos por par (antes/después)",
     "PDF: exporta todas las fotos del par (páginas adicionales)",
+    "Pares: título y ubicación por par (manual o jerarquía)",
+    "PDF: agrupación/orden por título + ubicación del par",
     "Fix: evita blob ERR_FILE_NOT_FOUND en previsualizaciones",
     "PDF: etiqueta (ANOTADA) por imagen"
   ]

@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.2.24**
+## Versión Actual: **v2.2.25**
 
 **Fecha de lanzamiento**: 9 de enero de 2026  
 **Estado**: ✅ PRODUCCIÓN READY  
@@ -9,6 +9,18 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.2.25 - Título/Ubicación por Par + Exportación Agrupada
+
+Mejora del flujo por par para permitir identificación fina y una exportación más ordenada.
+
+#### 🧾 Pares (metadatos)
+- Título opcional por par
+- Ubicación por par con 3 modos: usar general, seleccionar desde jerarquía, o escribir manual
+- Sugerencias de títulos/ubicaciones ya usados en la evidencia
+
+#### 🖨️ PDF
+- Ordena/agrupa las páginas por título y ubicación del par
 
 ### v2.2.24 - Evidencias Fotográficas (Multi-foto) + Informe Técnico
 
