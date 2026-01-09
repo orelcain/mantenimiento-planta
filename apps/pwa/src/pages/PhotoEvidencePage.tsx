@@ -18,9 +18,8 @@ import {
 import {
   subscribeToPhotoEvidences,
   getPhotoEvidenceStats,
-  prepareComparisonForExport,
 } from '@/services/photoEvidence'
-import { exportComparisonsToPDF } from '@/lib/pdfExport'
+import { exportPhotoEvidenceTechnicalReportToPDF } from '@/lib/pdfExport'
 import type { PhotoEvidence, PhotoEvidenceStatus } from '@/types'
 import { cn } from '@/lib/utils'
 
@@ -101,16 +100,20 @@ export function PhotoEvidencePage() {
     try {
       // Obtener evidencias seleccionadas
       const selectedEvidences = evidences.filter(e => selectedForExport.has(e.id))
-      
-      // Preparar comparaciones
-      const comparisons = selectedEvidences.flatMap(e => prepareComparisonForExport(e))
-      
-      if (comparisons.length === 0) {
-        alert('Las evidencias seleccionadas no tienen pares de fotos antes/después para exportar.')
+
+      const hasPairs = selectedEvidences.some((e) => {
+        const max = Math.max(e.fotosBefore.length, e.fotosAfter.length)
+        for (let i = 0; i < max; i++) {
+          if (e.fotosBefore[i] && e.fotosAfter[i]) return true
+        }
+        return false
+      })
+      if (!hasPairs) {
+        alert('Las evidencias seleccionadas no tienen pares ANTES/DESPUÉS para exportar.')
         return
       }
 
-      await exportComparisonsToPDF(comparisons, 'Comparación de Evidencias')
+      await exportPhotoEvidenceTechnicalReportToPDF(selectedEvidences, 'Correcciones - Reporte Individual')
       
       // Limpiar selección
       setSelectedForExport(new Set())
@@ -125,14 +128,20 @@ export function PhotoEvidencePage() {
   const handleExportSingle = async (evidence: PhotoEvidence) => {
     setIsExporting(true)
     try {
-      const comparisons = prepareComparisonForExport(evidence)
-      
-      if (comparisons.length === 0) {
-        alert('Esta evidencia no tiene pares de fotos antes/después para exportar.')
+      const max = Math.max(evidence.fotosBefore.length, evidence.fotosAfter.length)
+      let hasPair = false
+      for (let i = 0; i < max; i++) {
+        if (evidence.fotosBefore[i] && evidence.fotosAfter[i]) {
+          hasPair = true
+          break
+        }
+      }
+      if (!hasPair) {
+        alert('Esta evidencia no tiene pares ANTES/DESPUÉS para exportar.')
         return
       }
 
-      await exportComparisonsToPDF(comparisons, evidence.titulo)
+      await exportPhotoEvidenceTechnicalReportToPDF([evidence], `Correcciones - ${evidence.titulo}`)
     } catch (error) {
       console.error('Error exporting PDF:', error)
       alert('Error al exportar PDF. Por favor intenta de nuevo.')
