@@ -13,6 +13,7 @@ type Shape = {
   opacity: number // 0..1
   showBorder: boolean
   borderColor: string
+  cornerRadius: number // 0..1 (0%..100%)
 }
 
 type TextItem = {
@@ -75,6 +76,7 @@ export function ImageAnnotatorDialog({
   const [shapeOpacity, setShapeOpacity] = useState(0.25)
   const [shapeShowBorder, setShapeShowBorder] = useState(true)
   const [shapeBorderColor, setShapeBorderColor] = useState('#dc2626')
+  const [shapeCornerRadius, setShapeCornerRadius] = useState(0)
 
   const [textValue, setTextValue] = useState('')
   const [textColor, setTextColor] = useState('#111827')
@@ -94,19 +96,21 @@ export function ImageAnnotatorDialog({
           opacity: shapeOpacity,
           showBorder: shapeShowBorder,
           borderColor: shapeBorderColor,
+          cornerRadius: shapeCornerRadius,
         }
         const same =
           nextShape.fillColor === s.fillColor &&
           nextShape.opacity === s.opacity &&
           nextShape.showBorder === s.showBorder &&
-          nextShape.borderColor === s.borderColor
+          nextShape.borderColor === s.borderColor &&
+          nextShape.cornerRadius === s.cornerRadius
         if (same) return s
         changed = true
         return nextShape
       })
       return changed ? next : prev
     })
-  }, [selectedShapeId, shapeFillColor, shapeOpacity, shapeShowBorder, shapeBorderColor])
+  }, [selectedShapeId, shapeFillColor, shapeOpacity, shapeShowBorder, shapeBorderColor, shapeCornerRadius])
 
   const [imageSize, setImageSize] = useState<{ width: number; height: number } | null>(null)
 
@@ -197,19 +201,74 @@ export function ImageAnnotatorDialog({
     ctx2.drawImage(img, 0, 0, canvas.width, canvas.height)
 
     // Shapes
-    const drawPolygon = (points: Point[], style: Pick<Shape, 'fillColor' | 'opacity' | 'showBorder' | 'borderColor'>) => {
+    const drawPolygon = (
+      points: Point[],
+      style: Pick<Shape, 'fillColor' | 'opacity' | 'showBorder' | 'borderColor' | 'cornerRadius'>
+    ) => {
       if (points.length < 3) return
-      const firstPoint = points[0]
-      if (!firstPoint) return
-      ctx2.save()
-      ctx2.beginPath()
-      ctx2.moveTo(firstPoint.x, firstPoint.y)
-      for (let i = 1; i < points.length; i++) {
-        const pt = points[i]
-        if (!pt) continue
-        ctx2.lineTo(pt.x, pt.y)
+
+      const corner = Math.max(0, Math.min(1, style.cornerRadius || 0))
+
+      const drawStraight = () => {
+        const firstPoint = points[0]
+        if (!firstPoint) return
+        ctx2.beginPath()
+        ctx2.moveTo(firstPoint.x, firstPoint.y)
+        for (let i = 1; i < points.length; i++) {
+          const pt = points[i]
+          if (!pt) continue
+          ctx2.lineTo(pt.x, pt.y)
+        }
+        ctx2.closePath()
       }
-      ctx2.closePath()
+
+      const drawRounded = () => {
+        const n = points.length
+        const get = (idx: number) => points[(idx + n) % n]
+
+        const unit = (from: Point, to: Point) => {
+          const dx = to.x - from.x
+          const dy = to.y - from.y
+          const len = Math.hypot(dx, dy) || 1
+          return { x: dx / len, y: dy / len, len }
+        }
+
+        const cornerPoints = (i: number) => {
+          const prev = get(i - 1)
+          const curr = get(i)
+          const next = get(i + 1)
+          if (!prev || !curr || !next) return null
+
+          const uPrev = unit(curr, prev)
+          const uNext = unit(curr, next)
+          const minLen = Math.min(uPrev.len, uNext.len)
+          const r = Math.max(0, Math.min(minLen * 0.45, minLen * corner))
+
+          const start = { x: curr.x + uPrev.x * r, y: curr.y + uPrev.y * r }
+          const end = { x: curr.x + uNext.x * r, y: curr.y + uNext.y * r }
+          return { start, curr, end }
+        }
+
+        const first = cornerPoints(0)
+        if (!first) return
+        ctx2.beginPath()
+        ctx2.moveTo(first.start.x, first.start.y)
+        for (let i = 0; i < n; i++) {
+          const cp = cornerPoints(i)
+          if (!cp) continue
+          ctx2.lineTo(cp.start.x, cp.start.y)
+          ctx2.quadraticCurveTo(cp.curr.x, cp.curr.y, cp.end.x, cp.end.y)
+        }
+        ctx2.closePath()
+      }
+
+      ctx2.save()
+      if (corner <= 0.001) {
+        drawStraight()
+      } else {
+        drawRounded()
+      }
+
       ctx2.globalAlpha = Math.max(0, Math.min(1, style.opacity))
       ctx2.fillStyle = style.fillColor
       ctx2.fill()
@@ -334,6 +393,7 @@ export function ImageAnnotatorDialog({
               opacity: shapeOpacity,
               showBorder: shapeShowBorder,
               borderColor: shapeBorderColor,
+              cornerRadius: shapeCornerRadius,
             }
             setShapes((existing) => [...existing, newShape])
             return []
@@ -453,6 +513,19 @@ export function ImageAnnotatorDialog({
                     <div className="text-xs text-muted-foreground">{Math.round(shapeOpacity * 100)}%</div>
                   </div>
                   <div className="space-y-1">
+                    <Label>Curvatura</Label>
+                    <Input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.05}
+                      value={shapeCornerRadius}
+                      onChange={(e) => setShapeCornerRadius(Number(e.target.value))}
+                      className="w-[180px]"
+                    />
+                    <div className="text-xs text-muted-foreground">{Math.round(shapeCornerRadius * 100)}%</div>
+                  </div>
+                  <div className="space-y-1">
                     <Label>Marco</Label>
                     <div className="flex items-center gap-2 h-9">
                       <Switch checked={shapeShowBorder} onCheckedChange={setShapeShowBorder} />
@@ -554,6 +627,7 @@ export function ImageAnnotatorDialog({
                                 setShapeOpacity(s.opacity)
                                 setShapeShowBorder(s.showBorder)
                                 setShapeBorderColor(s.borderColor)
+                                setShapeCornerRadius(s.cornerRadius ?? 0)
                               }}
                             >
                               Editar
