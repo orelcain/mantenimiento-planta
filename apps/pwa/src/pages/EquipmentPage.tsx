@@ -1,89 +1,309 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, Wrench, MapPin } from 'lucide-react'
 import {
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  FileDown,
+  Grid3X3,
+  List,
+  MapPin,
+  Package,
+  Search,
+  Settings,
+  Star,
+  Text,
+  XCircle,
+} from 'lucide-react'
+import {
+  Badge,
+  Button,
   Card,
   CardContent,
   CardHeader,
   CardTitle,
-  Button,
+  Checkbox,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
   Input,
-  Badge,
+  Label,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  Label,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
   Textarea,
-  Checkbox,
 } from '@/components/ui'
-import { useAppStore } from '@/store'
+import { useAppStore, useAuthStore } from '@/store'
 import { getEquipments, updateEquipment } from '@/services/equipment'
-import type { Equipment } from '@/types'
+import { getIncidents } from '@/services/incidents'
 import { updateEquipmentSchema } from '@/lib/validation'
+import { debounce, formatRelativeTime, generateId } from '@/lib/utils'
 import { logger } from '@/lib/logger'
-import { debounce } from '@/lib/rate-limit'
 import { usePermissions } from '@/hooks/usePermissions'
+import type { Equipment, Incident } from '@/types'
 
-const STATUS_CONFIG = {
-  operativo: { label: 'Operativo', className: 'bg-success text-success-foreground' },
-  en_mantenimiento: { label: 'En Mantenimiento', className: 'bg-warning text-warning-foreground' },
-  fuera_servicio: { label: 'Fuera de Servicio', className: 'bg-destructive text-destructive-foreground' },
+const ITEMS_PER_PAGE = 12
+
+type ViewMode = 'grid' | 'list'
+
+type EquipmentNote = {
+  id: string
+  text: string
+  createdAt: string
 }
 
-const CRITICIDAD_CONFIG = {
-  alta: { label: 'Alta', className: 'bg-destructive text-destructive-foreground' },
-  media: { label: 'Media', className: 'bg-warning text-warning-foreground' },
-  baja: { label: 'Baja', className: 'bg-muted text-muted-foreground' },
+type EquipmentNotesById = Record<string, EquipmentNote[]>
+
+type StatusConfig = {
+  label: string
+  icon: any
+  badgeClassName: string
+  iconClassName: string
+}
+
+const STATUS_CONFIG: Record<Equipment['estado'], StatusConfig> = {
+  operativo: {
+    label: 'Operativo',
+    icon: CheckCircle2,
+    badgeClassName: 'bg-success text-success-foreground',
+    iconClassName: 'text-success',
+  },
+  en_mantenimiento: {
+    label: 'En Mantenimiento',
+    icon: Settings,
+    badgeClassName: 'bg-warning text-warning-foreground',
+    iconClassName: 'text-warning',
+  },
+  fuera_servicio: {
+    label: 'Fuera de Servicio',
+    icon: XCircle,
+    badgeClassName: 'bg-destructive text-destructive-foreground',
+    iconClassName: 'text-destructive',
+  },
+}
+
+const CRITICIDAD_CONFIG: Record<Equipment['criticidad'], { label: string; badgeClassName: string }> = {
+  alta: { label: 'Alta', badgeClassName: 'bg-destructive text-destructive-foreground' },
+  media: { label: 'Media', badgeClassName: 'bg-warning text-warning-foreground' },
+  baja: { label: 'Baja', badgeClassName: 'bg-muted text-muted-foreground' },
+}
+
+function safeParseJson<T>(raw: string | null): T | null {
+  if (!raw) return null
+  try {
+    return JSON.parse(raw) as T
+  } catch {
+    return null
+  }
+}
+
+function favoritesStorageKey(userId?: string) {
+  return `equipment_favorites_v1:${userId ?? 'anon'}`
+}
+
+function notesStorageKey(userId?: string) {
+  return `equipment_notes_v1:${userId ?? 'anon'}`
+}
+
+function downloadTextFile(filename: string, content: string, contentType = 'text/csv;charset=utf-8') {
+  const blob = new Blob([content], { type: contentType })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
+
+function toCsv(rows: Record<string, string>[]) {
+  const firstRow = rows[0]
+  if (!firstRow) return ''
+  const headers = Object.keys(firstRow)
+  const escape = (value: string) => {
+    const v = value ?? ''
+    const needs = /[",\n]/.test(v)
+    const escaped = v.replace(/"/g, '""')
+    return needs ? `"${escaped}"` : escaped
+  }
+  const lines = [headers.join(',')]
+  for (const row of rows) {
+    lines.push(headers.map((h) => escape(String(row[h] ?? ''))).join(','))
+  }
+  return lines.join('\n')
 }
 
 export function EquipmentPage() {
   const navigate = useNavigate()
-  const { equipment, setEquipment } = useAppStore()
-  const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null)
+  const { equipment, setEquipment, setSelectedIncident } = useAppStore()
+  const user = useAuthStore((s) => s.user)
+  const { canDeleteEquipment } = usePermissions()
+
   const [searchQuery, setSearchQuery] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<string>('all')
+  const [showFavsOnly, setShowFavsOnly] = useState(false)
 
-  // Debounced search
-  const debouncedSetSearch = debounce((value: string) => {
-    setSearchQuery(value)
-    logger.info('Equipment search', { query: value })
-  }, 300)
+  const [viewMode, setViewMode] = useState<ViewMode>('grid')
+  const [compact, setCompact] = useState(false)
 
-  // Cargar datos
+  const [favorites, setFavorites] = useState<Set<string>>(new Set())
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+
+  const [bulkLoading, setBulkLoading] = useState(false)
+  const [bulkError, setBulkError] = useState<string | null>(null)
+
+  const [currentPage, setCurrentPage] = useState(1)
+
+  const [detailEquipment, setDetailEquipment] = useState<Equipment | null>(null)
+  const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null)
+
+  const [detailIncidents, setDetailIncidents] = useState<Incident[]>([])
+  const [detailIncidentsLoading, setDetailIncidentsLoading] = useState(false)
+  const [detailIncidentsError, setDetailIncidentsError] = useState<string | null>(null)
+
+  const [notesById, setNotesById] = useState<EquipmentNotesById>({})
+  const [newNoteText, setNewNoteText] = useState('')
+
+  const debouncedSetSearch = useMemo(
+    () => debounce((value: string) => setDebouncedSearch(value), 300),
+    []
+  )
+
+  const favKey = useMemo(() => favoritesStorageKey(user?.id), [user?.id])
+  const notesKey = useMemo(() => notesStorageKey(user?.id), [user?.id])
+
   useEffect(() => {
     getEquipments().then(setEquipment)
   }, [setEquipment])
 
-  // Filtrar equipos
-  const filteredEquipment = equipment.filter((eq) => {
-    if (eq.deleted) return false
-    const matchesSearch =
-      eq.nombre.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      eq.codigo.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (eq.hierarchyPath?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false)
+  useEffect(() => {
+    debouncedSetSearch(searchQuery)
+  }, [searchQuery, debouncedSetSearch])
 
-    const matchesStatus = filterStatus === 'all' || eq.estado === filterStatus
-    
-    return matchesSearch && matchesStatus
-  })
+  useEffect(() => {
+    const favRaw = safeParseJson<string[]>(localStorage.getItem(favKey))
+    if (Array.isArray(favRaw)) setFavorites(new Set(favRaw))
 
-  // Stats
-  const stats = {
-    total: equipment.length,
-    operativos: equipment.filter((e) => e.estado === 'operativo').length,
-    enMantenimiento: equipment.filter((e) => e.estado === 'en_mantenimiento').length,
-    fueraServicio: equipment.filter((e) => e.estado === 'fuera_servicio').length,
+    const notesRaw = safeParseJson<EquipmentNotesById>(localStorage.getItem(notesKey))
+    if (notesRaw && typeof notesRaw === 'object') setNotesById(notesRaw)
+  }, [favKey, notesKey])
+
+  useEffect(() => {
+    localStorage.setItem(favKey, JSON.stringify([...favorites]))
+  }, [favorites, favKey])
+
+  useEffect(() => {
+    localStorage.setItem(notesKey, JSON.stringify(notesById))
+  }, [notesById, notesKey])
+
+  const filteredEquipment = useMemo(() => {
+    const q = debouncedSearch.trim().toLowerCase()
+
+    return equipment.filter((eq) => {
+      if (eq.deleted) return false
+
+      const matchesSearch =
+        q.length === 0 ||
+        eq.nombre.toLowerCase().includes(q) ||
+        eq.codigo.toLowerCase().includes(q) ||
+        (eq.hierarchyPath?.toLowerCase().includes(q) ?? false)
+
+      const matchesStatus = filterStatus === 'all' || eq.estado === filterStatus
+      const matchesFav = !showFavsOnly || favorites.has(eq.id)
+
+      return matchesSearch && matchesStatus && matchesFav
+    })
+  }, [debouncedSearch, equipment, favorites, filterStatus, showFavsOnly])
+
+  const totalPages = Math.max(1, Math.ceil(filteredEquipment.length / ITEMS_PER_PAGE))
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
+  const endIndex = startIndex + ITEMS_PER_PAGE
+  const paginatedEquipment = filteredEquipment.slice(startIndex, endIndex)
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages)
+  }, [currentPage, totalPages])
+
+  const stats = useMemo(
+    () => ({
+      total: equipment.filter((e) => !e.deleted).length,
+      operativos: equipment.filter((e) => !e.deleted && e.estado === 'operativo').length,
+      enMantenimiento: equipment.filter((e) => !e.deleted && e.estado === 'en_mantenimiento').length,
+      fueraServicio: equipment.filter((e) => !e.deleted && e.estado === 'fuera_servicio').length,
+    }),
+    [equipment]
+  )
+
+  const toggleFavorite = (equipmentId: string) => {
+    setFavorites((prev) => {
+      const next = new Set(prev)
+      if (next.has(equipmentId)) next.delete(equipmentId)
+      else next.add(equipmentId)
+      return next
+    })
   }
 
-  const handleEdit = (eq: Equipment) => {
-    setEditingEquipment(eq)
+  const toggleSelected = (equipmentId: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(equipmentId)) next.delete(equipmentId)
+      else next.add(equipmentId)
+      return next
+    })
+  }
+
+  const selectAllCurrentPage = () => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      for (const eq of paginatedEquipment) next.add(eq.id)
+      return next
+    })
+  }
+
+  const clearSelection = () => setSelectedIds(new Set())
+
+  const bulkSetSyncExcluded = async (value: boolean) => {
+    if (!canDeleteEquipment) {
+      setBulkError('No tienes permisos para excluir/reincluir equipos del sync.')
+      return
+    }
+
+    const ids = [...selectedIds]
+    if (ids.length === 0) return
+
+    const label = value ? 'excluir del sync' : 'reincluir al sync'
+    const ok = window.confirm(
+      `¿Confirmas ${label} ${ids.length} ${ids.length === 1 ? 'equipo' : 'equipos'}?`
+    )
+    if (!ok) return
+
+    setBulkLoading(true)
+    setBulkError(null)
+
+    try {
+      for (const id of ids) {
+        await updateEquipment(id, { syncExcluded: value })
+      }
+      const fresh = await getEquipments()
+      setEquipment(fresh)
+      clearSelection()
+    } catch (e: unknown) {
+      const err = e instanceof Error ? e : new Error('Error en acción masiva')
+      logger.error('Bulk syncExcluded update failed', err)
+      setBulkError('No se pudo completar la acción masiva. Intenta de nuevo.')
+    } finally {
+      setBulkLoading(false)
+    }
   }
 
   const handleViewHierarchy = (eq: Equipment) => {
@@ -93,115 +313,395 @@ export function EquipmentPage() {
     navigate(`/hierarchy?q=${q}&focus=${focus}`)
   }
 
-  const handleCloseForm = () => {
-    setEditingEquipment(null)
+  const exportCsv = () => {
+    const source = selectedIds.size > 0
+      ? filteredEquipment.filter((e) => selectedIds.has(e.id))
+      : filteredEquipment
+
+    const rows = source.map((e) => ({
+      Código: e.codigo,
+      Nombre: e.nombre,
+      Estado: STATUS_CONFIG[e.estado].label,
+      Criticidad: CRITICIDAD_CONFIG[e.criticidad].label,
+      Ubicación: e.hierarchyPath ?? e.zoneId ?? '',
+      Marca: e.marca ?? '',
+      Modelo: e.modelo ?? '',
+      'N° Serie': e.numeroSerie ?? '',
+    }))
+
+    const csv = toCsv(rows)
+    const fileName = selectedIds.size > 0 ? 'equipos_seleccionados.csv' : 'equipos.csv'
+    downloadTextFile(fileName, csv)
   }
 
-  const handleSuccess = async () => {
-    handleCloseForm()
-    const updated = await getEquipments()
-    setEquipment(updated)
+  useEffect(() => {
+    let cancelled = false
+
+    async function run() {
+      if (!detailEquipment) return
+
+      setDetailIncidents([])
+      setDetailIncidentsError(null)
+      setDetailIncidentsLoading(true)
+
+      try {
+        const incidents = await getIncidents({ equipmentId: detailEquipment.id, limit: 50 })
+        if (!cancelled) setDetailIncidents(incidents)
+      } catch (e: unknown) {
+        const err = e instanceof Error ? e : new Error('Error cargando incidencias')
+        logger.error('Error loading equipment incidents', err)
+        if (!cancelled) setDetailIncidentsError('No se pudo cargar el historial de incidencias.')
+      } finally {
+        if (!cancelled) setDetailIncidentsLoading(false)
+      }
+    }
+
+    run()
+
+    return () => {
+      cancelled = true
+    }
+  }, [detailEquipment])
+
+  const openDetail = (eq: Equipment) => {
+    setDetailEquipment(eq)
+    setNewNoteText('')
+  }
+
+  const closeDetail = () => setDetailEquipment(null)
+
+  const addNote = () => {
+    if (!detailEquipment) return
+    const text = newNoteText.trim()
+    if (!text) return
+
+    const note: EquipmentNote = {
+      id: generateId(),
+      text,
+      createdAt: new Date().toISOString(),
+    }
+
+    setNotesById((prev) => {
+      const next = { ...prev }
+      const list = next[detailEquipment.id] ?? []
+      next[detailEquipment.id] = [note, ...list]
+      return next
+    })
+
+    setNewNoteText('')
+  }
+
+  const openEditFromDetail = () => {
+    if (!detailEquipment) return
+    setEditingEquipment(detailEquipment)
+  }
+
+  const onSaveEquipment = async () => {
+    const fresh = await getEquipments()
+    setEquipment(fresh)
+
+    setEditingEquipment(null)
+
+    if (detailEquipment) {
+      const updated = fresh.find((e) => e.id === detailEquipment.id) ?? null
+      setDetailEquipment(updated)
+    }
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">Equipos</h1>
-          <p className="text-muted-foreground">Se sincroniza automáticamente desde la jerarquía</p>
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-primary/10 rounded-lg">
+            <Package className="h-6 w-6 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold">Equipos</h1>
+            <p className="text-sm text-muted-foreground">Se sincroniza automáticamente desde la jerarquía</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            variant={showFavsOnly ? 'default' : 'outline'}
+            onClick={() => {
+              setShowFavsOnly((v) => !v)
+              setCurrentPage(1)
+            }}
+          >
+            <Star className="h-4 w-4 mr-2" />
+            Favoritos
+          </Button>
+
+          <Button variant="outline" onClick={() => setViewMode((v) => (v === 'grid' ? 'list' : 'grid'))}>
+            {viewMode === 'grid' ? <List className="h-4 w-4 mr-2" /> : <Grid3X3 className="h-4 w-4 mr-2" />}
+            {viewMode === 'grid' ? 'Lista' : 'Grid'}
+          </Button>
+
+          <Button variant={compact ? 'default' : 'outline'} onClick={() => setCompact((v) => !v)}>
+            <Text className="h-4 w-4 mr-2" />
+            Compacto
+          </Button>
+
+          <Button variant="outline" onClick={exportCsv} disabled={filteredEquipment.length === 0}>
+            <FileDown className="h-4 w-4 mr-2" />
+            Exportar CSV
+          </Button>
         </div>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4">
-            <div className="text-2xl font-bold">{stats.total}</div>
-            <div className="text-sm text-muted-foreground">Total</div>
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-2xl font-bold">{stats.total}</div>
+                <div className="text-sm text-muted-foreground">Total Equipos</div>
+              </div>
+              <Package className="h-8 w-8 text-muted-foreground" />
+            </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-2xl font-bold text-success">{stats.operativos}</div>
-            <div className="text-sm text-muted-foreground">Operativos</div>
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-2xl font-bold text-success">{stats.operativos}</div>
+                <div className="text-sm text-muted-foreground">Operativos</div>
+              </div>
+              <CheckCircle2 className="h-8 w-8 text-success" />
+            </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-2xl font-bold text-warning">{stats.enMantenimiento}</div>
-            <div className="text-sm text-muted-foreground">En Mantenimiento</div>
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-2xl font-bold text-warning">{stats.enMantenimiento}</div>
+                <div className="text-sm text-muted-foreground">En Mantenimiento</div>
+              </div>
+              <Settings className="h-8 w-8 text-warning" />
+            </div>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-2xl font-bold text-destructive">{stats.fueraServicio}</div>
-            <div className="text-sm text-muted-foreground">Fuera de Servicio</div>
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-2xl font-bold text-destructive">{stats.fueraServicio}</div>
+                <div className="text-sm text-muted-foreground">Fuera de Servicio</div>
+              </div>
+              <XCircle className="h-8 w-8 text-destructive" />
+            </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Filters */}
       <Card>
         <CardContent className="p-4">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar por nombre o código..."
-                defaultValue={searchQuery}
-                onChange={(e) => debouncedSetSearch(e.target.value)}
-                className="pl-9"
-              />
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar por nombre, código o ubicación..."
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value)
+                    setCurrentPage(1)
+                  }}
+                  className="pl-9"
+                />
+              </div>
+              <Select
+                value={filterStatus}
+                onValueChange={(value) => {
+                  setFilterStatus(value)
+                  setCurrentPage(1)
+                }}
+              >
+                <SelectTrigger className="w-full sm:w-[220px]">
+                  <SelectValue placeholder="Estado" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los estados</SelectItem>
+                  <SelectItem value="operativo">✓ Operativo</SelectItem>
+                  <SelectItem value="en_mantenimiento">⚙ En Mantenimiento</SelectItem>
+                  <SelectItem value="fuera_servicio">✗ Fuera de Servicio</SelectItem>
+                </SelectContent>
+              </Select>
+              {filteredEquipment.length > 0 && (
+                <div className="text-sm text-muted-foreground whitespace-nowrap">
+                  {filteredEquipment.length} {filteredEquipment.length === 1 ? 'equipo' : 'equipos'}
+                </div>
+              )}
             </div>
-            <Select value={filterStatus} onValueChange={setFilterStatus}>
-              <SelectTrigger className="w-full sm:w-[180px]">
-                <SelectValue placeholder="Estado" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos los estados</SelectItem>
-                <SelectItem value="operativo">Operativo</SelectItem>
-                <SelectItem value="en_mantenimiento">En Mantenimiento</SelectItem>
-                <SelectItem value="fuera_servicio">Fuera de Servicio</SelectItem>
-              </SelectContent>
-            </Select>
+
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button variant="outline" size="sm" onClick={selectAllCurrentPage} disabled={paginatedEquipment.length === 0}>
+                Seleccionar página
+              </Button>
+              <Button variant="outline" size="sm" onClick={clearSelection} disabled={selectedIds.size === 0}>
+                Limpiar selección
+              </Button>
+              {selectedIds.size > 0 && <Badge variant="secondary">{selectedIds.size} seleccionados</Badge>}
+            </div>
+
+            {(bulkError || selectedIds.size > 0) && (
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                {bulkError ? (
+                  <div className="text-sm text-destructive">{bulkError}</div>
+                ) : (
+                  <div className="text-sm text-muted-foreground">
+                    Acciones masivas sobre la selección
+                  </div>
+                )}
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={selectedIds.size === 0 || bulkLoading || !canDeleteEquipment}
+                    onClick={() => bulkSetSyncExcluded(true)}
+                    title={!canDeleteEquipment ? 'Sin permisos' : undefined}
+                  >
+                    {bulkLoading ? 'Procesando…' : 'Excluir del sync'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={selectedIds.size === 0 || bulkLoading || !canDeleteEquipment}
+                    onClick={() => bulkSetSyncExcluded(false)}
+                    title={!canDeleteEquipment ? 'Sin permisos' : undefined}
+                  >
+                    {bulkLoading ? 'Procesando…' : 'Reincluir al sync'}
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
 
-      {/* Equipment List */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div
+        className={
+          viewMode === 'grid'
+            ? `grid gap-4 ${compact ? 'md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6' : 'md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'}`
+            : 'space-y-2'
+        }
+      >
         {filteredEquipment.length === 0 ? (
-          <Card className="md:col-span-2 lg:col-span-3">
-            <CardContent className="p-8 text-center">
-              <Wrench className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-lg font-medium">No hay equipos</h3>
-              <p className="text-muted-foreground">
-                {searchQuery || filterStatus !== 'all'
+          <Card>
+            <CardContent className="p-12 text-center">
+              <div className="mx-auto w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
+                <Package className="h-8 w-8 text-muted-foreground" />
+              </div>
+              <h3 className="text-lg font-semibold mb-2">No hay equipos</h3>
+              <p className="text-sm text-muted-foreground">
+                {searchQuery || filterStatus !== 'all' || showFavsOnly
                   ? 'No se encontraron equipos con los filtros aplicados'
                   : 'Aún no hay equipos sincronizados desde la jerarquía'}
               </p>
             </CardContent>
           </Card>
         ) : (
-          filteredEquipment.map((eq) => (
+          paginatedEquipment.map((eq) => (
             <EquipmentCard
               key={eq.id}
               equipment={eq}
-              onClick={() => handleEdit(eq)}
+              selected={selectedIds.has(eq.id)}
+              favorite={favorites.has(eq.id)}
+              viewMode={viewMode}
+              onToggleSelected={() => toggleSelected(eq.id)}
+              onToggleFavorite={() => toggleFavorite(eq.id)}
+              onOpenDetail={() => openDetail(eq)}
               onViewHierarchy={() => handleViewHierarchy(eq)}
             />
           ))
         )}
       </div>
 
-      {/* Form Modal */}
-      {editingEquipment && (
-        <EquipmentForm
-          equipment={editingEquipment}
-          onClose={handleCloseForm}
-          onSuccess={handleSuccess}
+      {filteredEquipment.length > 0 && totalPages > 1 && (
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between gap-4 flex-col sm:flex-row">
+              <div className="text-sm text-muted-foreground">
+                Mostrando {startIndex + 1}-{Math.min(endIndex, filteredEquipment.length)} de {filteredEquipment.length} equipos
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Anterior
+                </Button>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                    if (page === 1 || page === totalPages || (page >= currentPage - 1 && page <= currentPage + 1)) {
+                      return (
+                        <Button
+                          key={page}
+                          variant={currentPage === page ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setCurrentPage(page)}
+                          className="w-10"
+                        >
+                          {page}
+                        </Button>
+                      )
+                    }
+                    if (page === currentPage - 2 || page === currentPage + 2) {
+                      return (
+                        <span key={page} className="px-2 text-muted-foreground">
+                          ...
+                        </span>
+                      )
+                    }
+                    return null
+                  })}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Siguiente
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {detailEquipment && (
+        <EquipmentDetailDialog
+          equipment={detailEquipment}
+          favorite={favorites.has(detailEquipment.id)}
+          incidents={detailIncidents}
+          incidentsLoading={detailIncidentsLoading}
+          incidentsError={detailIncidentsError}
+          notes={notesById[detailEquipment.id] ?? []}
+          newNoteText={newNoteText}
+          onNewNoteTextChange={setNewNoteText}
+          onAddNote={addNote}
+          onToggleFavorite={() => toggleFavorite(detailEquipment.id)}
+          onViewHierarchy={() => handleViewHierarchy(detailEquipment)}
+          onEdit={openEditFromDetail}
+          onOpenIncident={(incident) => {
+            setSelectedIncident(incident)
+            navigate('/incidents')
+          }}
+          onClose={closeDetail}
         />
+      )}
+
+      {editingEquipment && (
+        <EquipmentForm equipment={editingEquipment} onClose={() => setEditingEquipment(null)} onSuccess={onSaveEquipment} />
       )}
     </div>
   )
@@ -209,72 +709,401 @@ export function EquipmentPage() {
 
 function EquipmentCard({
   equipment,
-  onClick,
+  selected,
+  favorite,
+  viewMode,
+  onToggleSelected,
+  onToggleFavorite,
+  onOpenDetail,
   onViewHierarchy,
 }: {
   equipment: Equipment
-  onClick: () => void
+  selected: boolean
+  favorite: boolean
+  viewMode: ViewMode
+  onToggleSelected: () => void
+  onToggleFavorite: () => void
+  onOpenDetail: () => void
   onViewHierarchy: () => void
+}) {
+  const statusConfig = STATUS_CONFIG[equipment.estado]
+  const criticidadConfig = CRITICIDAD_CONFIG[equipment.criticidad]
+  const StatusIcon = statusConfig.icon
+
+  if (viewMode === 'list') {
+    return (
+      <Card className="hover:border-primary/50 transition-colors">
+        <CardContent className="p-4">
+          <div className="flex items-start gap-3">
+            <Checkbox checked={selected} onCheckedChange={() => onToggleSelected()} />
+
+            <div className="flex-1 min-w-0 cursor-pointer" onClick={onOpenDetail}>
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="font-semibold truncate">{equipment.nombre}</div>
+                  <div className="text-sm text-muted-foreground font-mono truncate">{equipment.codigo}</div>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <StatusIcon className={`h-5 w-5 ${statusConfig.iconClassName}`} />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onToggleFavorite()
+                    }}
+                    title={favorite ? 'Quitar de favoritos' : 'Marcar como favorito'}
+                  >
+                    <Star className={`h-4 w-4 ${favorite ? 'fill-current text-yellow-500' : ''}`} />
+                  </Button>
+                </div>
+              </div>
+
+              {(equipment.hierarchyPath || equipment.zoneId) && (
+                <div className="flex items-start gap-2 text-xs text-muted-foreground mt-2">
+                  <MapPin className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
+                  <span className="line-clamp-2">{equipment.hierarchyPath || equipment.zoneId}</span>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between gap-2 mt-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {equipment.syncExcluded && (
+                    <Badge variant="outline" className="text-xs">
+                      Excluido
+                    </Badge>
+                  )}
+                  <Badge variant="outline" className={`${criticidadConfig.badgeClassName} text-xs`}>
+                    {criticidadConfig.label}
+                  </Badge>
+                  <Badge className={`${statusConfig.badgeClassName} text-xs`}>{statusConfig.label}</Badge>
+                </div>
+
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onViewHierarchy()
+                  }}
+                >
+                  Ver jerarquía
+                </Button>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <Card className="cursor-pointer hover:shadow-lg hover:border-primary/50 transition-all group" onClick={onOpenDetail}>
+      <CardHeader className="p-4 pb-3">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Checkbox
+              checked={selected}
+              onCheckedChange={() => onToggleSelected()}
+              onClick={(e) => e.stopPropagation()}
+              aria-label="Seleccionar equipo"
+            />
+            <div className="flex-1 min-w-0">
+              <CardTitle className="text-base mb-1 line-clamp-2 group-hover:text-primary transition-colors">
+                {equipment.nombre}
+              </CardTitle>
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary" className="font-mono text-xs">
+                  {equipment.codigo}
+                </Badge>
+                {equipment.syncExcluded && (
+                  <Badge variant="outline" className="text-xs">
+                    Excluido
+                  </Badge>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <StatusIcon className={`h-5 w-5 flex-shrink-0 ${statusConfig.iconClassName}`} />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={(e) => {
+                e.stopPropagation()
+                onToggleFavorite()
+              }}
+              title={favorite ? 'Quitar de favoritos' : 'Marcar como favorito'}
+            >
+              <Star className={`h-4 w-4 ${favorite ? 'fill-current text-yellow-500' : ''}`} />
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="p-4 pt-0 space-y-3">
+        {(equipment.hierarchyPath || equipment.zoneId) && (
+          <div className="flex items-start gap-2 text-xs text-muted-foreground">
+            <MapPin className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
+            <span className="line-clamp-2">{equipment.hierarchyPath || equipment.zoneId}</span>
+          </div>
+        )}
+
+        {equipment.marca && (
+          <div className="text-xs text-muted-foreground truncate">
+            <span className="font-medium">{equipment.marca}</span>
+            {equipment.modelo && <span> · {equipment.modelo}</span>}
+          </div>
+        )}
+
+        <div className="flex items-center justify-between pt-2 border-t">
+          <Badge variant="outline" className={`${criticidadConfig.badgeClassName} text-xs`}>
+            {criticidadConfig.label}
+          </Badge>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 text-xs"
+            onClick={(e) => {
+              e.stopPropagation()
+              onViewHierarchy()
+            }}
+            title="Ver en jerarquía"
+          >
+            Ver jerarquía
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+function EquipmentDetailDialog({
+  equipment,
+  favorite,
+  incidents,
+  incidentsLoading,
+  incidentsError,
+  notes,
+  newNoteText,
+  onNewNoteTextChange,
+  onAddNote,
+  onToggleFavorite,
+  onViewHierarchy,
+  onEdit,
+  onOpenIncident,
+  onClose,
+}: {
+  equipment: Equipment
+  favorite: boolean
+  incidents: Incident[]
+  incidentsLoading: boolean
+  incidentsError: string | null
+  notes: EquipmentNote[]
+  newNoteText: string
+  onNewNoteTextChange: (v: string) => void
+  onAddNote: () => void
+  onToggleFavorite: () => void
+  onViewHierarchy: () => void
+  onEdit: () => void
+  onOpenIncident: (incident: Incident) => void
+  onClose: () => void
 }) {
   const statusConfig = STATUS_CONFIG[equipment.estado]
   const criticidadConfig = CRITICIDAD_CONFIG[equipment.criticidad]
 
   return (
-    <Card
-      className="cursor-pointer hover:border-primary/50 transition-colors"
-      onClick={onClick}
-    >
-      <CardHeader className="p-4 pb-2">
-        <div className="flex items-start justify-between">
-          <div className="space-y-1">
-            <CardTitle className="text-base">{equipment.nombre}</CardTitle>
-            <p className="text-sm text-muted-foreground font-mono">{equipment.codigo}</p>
-          </div>
-          <div className="flex flex-col items-end gap-1">
-            <Badge className={statusConfig.className}>{statusConfig.label}</Badge>
-            {equipment.syncExcluded && (
-              <Badge variant="outline" className="text-muted-foreground">
-                Excluido
-              </Badge>
-            )}
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="p-4 pt-2">
-        <div className="space-y-2 text-sm">
-          {(equipment.hierarchyPath || equipment.zoneId) && (
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <MapPin className="h-4 w-4" />
-              {equipment.hierarchyPath || equipment.zoneId}
-            </div>
-          )}
-          <div className="flex justify-end">
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="max-w-4xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center justify-between gap-2">
+            <span className="truncate">{equipment.nombre}</span>
             <Button
               variant="ghost"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation()
-                onViewHierarchy()
-              }}
-              title="Ver este equipo en la jerarquía"
+              size="icon"
+              onClick={onToggleFavorite}
+              title={favorite ? 'Quitar de favoritos' : 'Marcar como favorito'}
             >
-              Ver jerarquía
+              <Star className={`h-5 w-5 ${favorite ? 'fill-current text-yellow-500' : ''}`} />
             </Button>
-          </div>
-          {equipment.marca && (
-            <div className="text-muted-foreground">
-              {equipment.marca} {equipment.modelo}
-            </div>
-          )}
-          <div className="flex items-center gap-2">
-            <span className="text-muted-foreground">Criticidad:</span>
-            <Badge variant="outline" className={criticidadConfig.className}>
-              {criticidadConfig.label}
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <Badge variant="secondary" className="font-mono text-xs">
+            {equipment.codigo}
+          </Badge>
+          <Badge className={`${statusConfig.badgeClassName} text-xs`}>{statusConfig.label}</Badge>
+          <Badge variant="outline" className={`${criticidadConfig.badgeClassName} text-xs`}>
+            {criticidadConfig.label}
+          </Badge>
+          {equipment.syncExcluded && (
+            <Badge variant="outline" className="text-xs">
+              Excluido
             </Badge>
-          </div>
+          )}
         </div>
-      </CardContent>
-    </Card>
+
+        {(equipment.hierarchyPath || equipment.zoneId) && (
+          <div className="flex items-start gap-2 text-sm text-muted-foreground">
+            <MapPin className="h-4 w-4 mt-0.5" />
+            <span className="line-clamp-2">{equipment.hierarchyPath || equipment.zoneId}</span>
+          </div>
+        )}
+
+        <Tabs defaultValue="info">
+          <TabsList>
+            <TabsTrigger value="info">Información</TabsTrigger>
+            <TabsTrigger value="history">Historial ({incidents.length})</TabsTrigger>
+            <TabsTrigger value="notes">Notas ({notes.length})</TabsTrigger>
+            <TabsTrigger value="qr">QR</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="info">
+            <Card>
+              <CardContent className="p-4 grid md:grid-cols-2 gap-4">
+                <div>
+                  <div className="text-sm text-muted-foreground">Marca</div>
+                  <div className="font-medium">{equipment.marca || '-'}</div>
+                </div>
+                <div>
+                  <div className="text-sm text-muted-foreground">Modelo</div>
+                  <div className="font-medium">{equipment.modelo || '-'}</div>
+                </div>
+                <div>
+                  <div className="text-sm text-muted-foreground">Número de serie</div>
+                  <div className="font-medium">{equipment.numeroSerie || '-'}</div>
+                </div>
+                <div>
+                  <div className="text-sm text-muted-foreground">Estado</div>
+                  <div className="font-medium">{statusConfig.label}</div>
+                </div>
+                <div className="md:col-span-2">
+                  <div className="text-sm text-muted-foreground">Descripción</div>
+                  <div className="font-medium whitespace-pre-wrap">{equipment.descripcion || '-'}</div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="history">
+            <div className="space-y-3">
+              {incidentsLoading && (
+                <Card>
+                  <CardContent className="p-4 text-sm text-muted-foreground">Cargando incidencias…</CardContent>
+                </Card>
+              )}
+              {incidentsError && (
+                <Card>
+                  <CardContent className="p-4 text-sm text-destructive">{incidentsError}</CardContent>
+                </Card>
+              )}
+              {!incidentsLoading && !incidentsError && incidents.length === 0 && (
+                <Card>
+                  <CardContent className="p-4 text-sm text-muted-foreground">Este equipo aún no tiene incidencias registradas.</CardContent>
+                </Card>
+              )}
+
+              {incidents.map((inc) => (
+                <Card key={inc.id} className="cursor-pointer hover:border-primary/50" onClick={() => onOpenIncident(inc)}>
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="font-medium truncate">{inc.titulo}</div>
+                        <div className="text-sm text-muted-foreground truncate">{formatRelativeTime(inc.createdAt)}</div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <Badge variant="outline" className="text-xs">
+                          {inc.tipo}
+                        </Badge>
+                        <Badge variant="secondary" className="text-xs">
+                          {inc.status}
+                        </Badge>
+                        <Badge variant="outline" className="text-xs">
+                          {inc.prioridad}
+                        </Badge>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="notes">
+            <div className="space-y-3">
+              <Card>
+                <CardContent className="p-4 space-y-2">
+                  <Label htmlFor="note">Nueva nota</Label>
+                  <Textarea
+                    id="note"
+                    value={newNoteText}
+                    onChange={(e) => onNewNoteTextChange(e.target.value)}
+                    placeholder="Escribe una nota rápida sobre este equipo…"
+                    rows={3}
+                  />
+                  <div className="flex justify-end">
+                    <Button onClick={onAddNote} disabled={!newNoteText.trim()}>
+                      Guardar nota
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {notes.length === 0 ? (
+                <Card>
+                  <CardContent className="p-4 text-sm text-muted-foreground">Sin notas aún.</CardContent>
+                </Card>
+              ) : (
+                notes.map((n) => (
+                  <Card key={n.id}>
+                    <CardContent className="p-4">
+                      <div className="text-sm text-muted-foreground">{formatRelativeTime(n.createdAt)}</div>
+                      <div className="mt-1 whitespace-pre-wrap">{n.text}</div>
+                    </CardContent>
+                  </Card>
+                ))
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="qr">
+            <Card>
+              <CardContent className="p-4 space-y-3">
+                <div className="text-sm text-muted-foreground">Código QR (texto)</div>
+                <div className="font-mono text-sm p-3 rounded-md bg-muted break-all">
+                  {equipment.qrCode || equipment.codigo}
+                </div>
+                <div className="flex justify-end">
+                  <Button
+                    variant="outline"
+                    onClick={async () => {
+                      const text = equipment.qrCode || equipment.codigo
+                      try {
+                        await navigator.clipboard.writeText(text)
+                      } catch {
+                        // ignore
+                      }
+                    }}
+                  >
+                    Copiar
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+
+        <DialogFooter className="gap-2">
+          <Button variant="outline" onClick={onViewHierarchy}>
+            Ver jerarquía
+          </Button>
+          <Button onClick={onEdit}>Editar</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -315,7 +1144,6 @@ function EquipmentForm({
 
     try {
       const dataToValidate = {
-        // En edición no permitimos cambiar código/nombre (vienen de la jerarquía)
         codigo: equipment.codigo,
         nombre: equipment.nombre,
         descripcion: formData.descripcion || undefined,
@@ -326,9 +1154,8 @@ function EquipmentForm({
         estado: formData.estado,
       }
 
-      // Validar con Zod
       const validation = updateEquipmentSchema.safeParse(dataToValidate)
-      
+
       if (!validation.success) {
         const errors: Record<string, string> = {}
         validation.error.issues.forEach((err) => {
@@ -351,8 +1178,7 @@ function EquipmentForm({
         criticidad: formData.criticidad,
         estado: formData.estado,
       })
-      
-      logger.info('Equipment saved successfully', { codigo: formData.codigo })
+
       onSuccess()
     } catch (error: unknown) {
       const err = error instanceof Error ? error : new Error('Error saving equipment')
@@ -378,14 +1204,12 @@ function EquipmentForm({
     setValidationErrors({})
 
     try {
-      // Eliminación lógica + exclusión: evita que el sync vuelva a crearlo
       logger.info('Soft deleting equipment (exclude from sync)', { equipmentId: equipment.id, codigo: equipment.codigo })
       await updateEquipment(equipment.id, {
         syncExcluded: true,
         deleted: true,
         deletedAt: new Date(),
       })
-      logger.info('Equipment soft-deleted successfully', { equipmentId: equipment.id })
       onSuccess()
     } catch (error: unknown) {
       const err = error instanceof Error ? error : new Error('Error deleting equipment')
@@ -400,38 +1224,23 @@ function EquipmentForm({
     <Dialog open onOpenChange={onClose}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>
-            Editar Equipo
-          </DialogTitle>
+          <DialogTitle>Editar Equipo</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {validationErrors.general && (
-            <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
-              {validationErrors.general}
-            </div>
+            <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">{validationErrors.general}</div>
           )}
-          
+
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="codigo">Código *</Label>
-              <Input
-                id="codigo"
-                value={formData.codigo}
-                disabled
-                required
-              />
-              {validationErrors.codigo && (
-                <p className="text-sm text-destructive">{validationErrors.codigo}</p>
-              )}
+              <Input id="codigo" value={formData.codigo} disabled required />
+              {validationErrors.codigo && <p className="text-sm text-destructive">{validationErrors.codigo}</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="nombre">Nombre *</Label>
-              <Input
-                id="nombre"
-                value={formData.nombre}
-                disabled
-              />
+              <Input id="nombre" value={formData.nombre} disabled />
             </div>
           </div>
 
@@ -444,9 +1253,7 @@ function EquipmentForm({
               placeholder="Descripción del equipo..."
               rows={2}
             />
-            {validationErrors.descripcion && (
-              <p className="text-sm text-destructive">{validationErrors.descripcion}</p>
-            )}
+            {validationErrors.descripcion && <p className="text-sm text-destructive">{validationErrors.descripcion}</p>}
           </div>
 
           {canDeleteEquipment && (
@@ -454,9 +1261,7 @@ function EquipmentForm({
               <Checkbox
                 id="syncExcluded"
                 checked={formData.syncExcluded}
-                onCheckedChange={(checked) =>
-                  setFormData({ ...formData, syncExcluded: checked === true })
-                }
+                onCheckedChange={(checked) => setFormData({ ...formData, syncExcluded: checked === true })}
                 disabled={isLoading}
               />
               <Label htmlFor="syncExcluded" className="text-sm">
@@ -491,9 +1296,7 @@ function EquipmentForm({
               <Label htmlFor="criticidad">Criticidad</Label>
               <Select
                 value={formData.criticidad}
-                onValueChange={(value: Equipment['criticidad']) =>
-                  setFormData({ ...formData, criticidad: value })
-                }
+                onValueChange={(value: Equipment['criticidad']) => setFormData({ ...formData, criticidad: value })}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -509,9 +1312,7 @@ function EquipmentForm({
               <Label htmlFor="estado">Estado</Label>
               <Select
                 value={formData.estado}
-                onValueChange={(value: Equipment['estado']) =>
-                  setFormData({ ...formData, estado: value })
-                }
+                onValueChange={(value: Equipment['estado']) => setFormData({ ...formData, estado: value })}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -527,12 +1328,7 @@ function EquipmentForm({
 
           <DialogFooter>
             {canDeleteEquipment && (
-              <Button
-                type="button"
-                variant="destructive"
-                onClick={handleDelete}
-                disabled={isLoading}
-              >
+              <Button type="button" variant="destructive" onClick={handleDelete} disabled={isLoading}>
                 Eliminar
               </Button>
             )}

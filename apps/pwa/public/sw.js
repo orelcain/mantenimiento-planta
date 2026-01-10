@@ -27,6 +27,8 @@ self.addEventListener('activate', (event) => {
 
 // NO interceptar peticiones de fetch - dejar que pasen directo
 // Esto evita problemas de CORS con Firebase Storage
-self.addEventListener('fetch', () => {
+self.addEventListener('fetch', (event) => {
   // No hacer nada - dejar que la petición pase normalmente
+  // (pero referenciar `event` evita que ESLint falle)
+  void event;
 });
