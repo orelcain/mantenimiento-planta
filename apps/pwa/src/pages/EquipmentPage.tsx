@@ -4,6 +4,7 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  Copy,
   FileDown,
   Grid3X3,
   List,
@@ -146,7 +147,7 @@ export function EquipmentPage() {
   const navigate = useNavigate()
   const { equipment, setEquipment, setSelectedIncident } = useAppStore()
   const user = useAuthStore((s) => s.user)
-  const { canDeleteEquipment } = usePermissions()
+  const { canDeleteEquipment, canEditEquipment } = usePermissions()
 
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -173,6 +174,12 @@ export function EquipmentPage() {
 
   const [notesById, setNotesById] = useState<EquipmentNotesById>({})
   const [newNoteText, setNewNoteText] = useState('')
+
+  const [maintenanceEquipment, setMaintenanceEquipment] = useState<Equipment | null>(null)
+  const [maintenanceType, setMaintenanceType] = useState<'local' | 'externo'>('local')
+  const [maintenanceResponsible, setMaintenanceResponsible] = useState('')
+  const [maintenanceNotes, setMaintenanceNotes] = useState('')
+  const [maintenanceLoading, setMaintenanceLoading] = useState(false)
 
   const debouncedSetSearch = useMemo(
     () => debounce((value: string) => setDebouncedSearch(value), 300),
@@ -303,6 +310,112 @@ export function EquipmentPage() {
       setBulkError('No se pudo completar la acción masiva. Intenta de nuevo.')
     } finally {
       setBulkLoading(false)
+    }
+  }
+
+  const bulkChangeStatus = async (newStatus: Equipment['estado']) => {
+    if (!canEditEquipment) {
+      setBulkError('No tienes permisos para editar el estado de los equipos.')
+      return
+    }
+
+    const ids = [...selectedIds]
+    if (ids.length === 0) return
+
+    const statusLabel = STATUS_CONFIG[newStatus].label
+    const ok = window.confirm(
+      `¿Confirmas cambiar el estado a "${statusLabel}" para ${ids.length} ${ids.length === 1 ? 'equipo' : 'equipos'}?`
+    )
+    if (!ok) return
+
+    setBulkLoading(true)
+    setBulkError(null)
+
+    try {
+      for (const id of ids) {
+        await updateEquipment(id, { estado: newStatus })
+      }
+      const fresh = await getEquipments()
+      setEquipment(fresh)
+      clearSelection()
+    } catch (e: unknown) {
+      const err = e instanceof Error ? e : new Error('Error en cambio masivo de estado')
+      logger.error('Bulk status change failed', err)
+      setBulkError('No se pudo cambiar el estado masivo. Intenta de nuevo.')
+    } finally {
+      setBulkLoading(false)
+    }
+  }
+
+  const copySelectedCodes = () => {
+    const ids = [...selectedIds]
+    if (ids.length === 0) return
+
+    const codes = equipment
+      .filter((e) => ids.includes(e.id))
+      .map((e) => e.codigo)
+      .join('\n')
+
+    navigator.clipboard
+      .writeText(codes)
+      .then(() => {
+        setBulkError(null)
+        alert(`${ids.length} códigos copiados al portapapeles`)
+      })
+      .catch(() => {
+        setBulkError('No se pudo copiar al portapapeles')
+      })
+  }
+
+  const openMaintenanceModal = (eq: Equipment) => {
+    setMaintenanceEquipment(eq)
+    setMaintenanceType('local')
+    setMaintenanceResponsible('')
+    setMaintenanceNotes('')
+  }
+
+  const closeMaintenanceModal = () => {
+    setMaintenanceEquipment(null)
+    setMaintenanceResponsible('')
+    setMaintenanceNotes('')
+  }
+
+  const submitMaintenance = async () => {
+    if (!maintenanceEquipment || !canEditEquipment) return
+
+    setMaintenanceLoading(true)
+
+    try {
+      await updateEquipment(maintenanceEquipment.id, {
+        estado: 'en_mantenimiento',
+      })
+
+      const noteText = `⚙️ Mantenimiento ${maintenanceType === 'local' ? 'Local' : 'Externo'}${
+        maintenanceResponsible ? ` - ${maintenanceResponsible}` : ''
+      }${maintenanceNotes ? `\n${maintenanceNotes}` : ''}`
+
+      const equipmentNotes = notesById[maintenanceEquipment.id] || []
+      const newNote: EquipmentNote = {
+        id: generateId(),
+        text: noteText,
+        createdAt: new Date().toISOString(),
+      }
+
+      setNotesById((prev) => ({
+        ...prev,
+        [maintenanceEquipment.id]: [...equipmentNotes, newNote],
+      }))
+
+      const fresh = await getEquipments()
+      setEquipment(fresh)
+
+      closeMaintenanceModal()
+    } catch (e: unknown) {
+      const err = e instanceof Error ? e : new Error('Error al asignar mantenimiento')
+      logger.error('Maintenance assignment failed', err)
+      alert('No se pudo asignar el mantenimiento. Intenta de nuevo.')
+    } finally {
+      setMaintenanceLoading(false)
     }
   }
 
@@ -558,6 +671,41 @@ export function EquipmentPage() {
                 )}
 
                 <div className="flex items-center gap-2 flex-wrap">
+                  <Select
+                    value=""
+                    onValueChange={(value) => bulkChangeStatus(value as Equipment['estado'])}
+                    disabled={selectedIds.size === 0 || bulkLoading || !canEditEquipment}
+                  >
+                    <SelectTrigger className="w-[180px] h-9 text-sm" title={!canEditEquipment ? 'Sin permisos' : undefined}>
+                      <SelectValue placeholder="Cambiar estado..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="operativo">✓ Operativo</SelectItem>
+                      <SelectItem value="en_mantenimiento">⚙ En Mantenimiento</SelectItem>
+                      <SelectItem value="fuera_servicio">✗ Fuera de Servicio</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={selectedIds.size === 0}
+                    onClick={copySelectedCodes}
+                  >
+                    <Copy className="h-4 w-4 mr-1" />
+                    Copiar códigos
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={selectedIds.size === 0}
+                    onClick={exportCsv}
+                  >
+                    <FileDown className="h-4 w-4 mr-1" />
+                    Exportar CSV
+                  </Button>
+
                   <Button
                     variant="outline"
                     size="sm"
@@ -617,6 +765,7 @@ export function EquipmentPage() {
               onToggleFavorite={() => toggleFavorite(eq.id)}
               onOpenDetail={() => openDetail(eq)}
               onViewHierarchy={() => handleViewHierarchy(eq)}
+              onQuickMaintenance={() => openMaintenanceModal(eq)}
             />
           ))
         )}
@@ -701,6 +850,68 @@ export function EquipmentPage() {
         />
       )}
 
+      {maintenanceEquipment && (
+        <Dialog open onOpenChange={(open) => !open && closeMaintenanceModal()}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Asignar mantenimiento</DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <div>
+                <div className="text-sm font-semibold mb-1">{maintenanceEquipment.nombre}</div>
+                <div className="text-xs text-muted-foreground font-mono">{maintenanceEquipment.codigo}</div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="maintenanceType">Tipo de mantenimiento</Label>
+                <Select value={maintenanceType} onValueChange={(v) => setMaintenanceType(v as 'local' | 'externo')}>
+                  <SelectTrigger id="maintenanceType">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="local">🔧 Local (Departamento de Mantenimiento)</SelectItem>
+                    <SelectItem value="externo">🏢 Externo (Servicio Tercerizado)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="maintenanceResponsible">
+                  {maintenanceType === 'local' ? 'Responsable/Técnico' : 'Proveedor/Empresa'}
+                </Label>
+                <Input
+                  id="maintenanceResponsible"
+                  value={maintenanceResponsible}
+                  onChange={(e) => setMaintenanceResponsible(e.target.value)}
+                  placeholder={maintenanceType === 'local' ? 'Nombre del técnico...' : 'Nombre de la empresa...'}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="maintenanceNotes">Notas adicionales (opcional)</Label>
+                <Textarea
+                  id="maintenanceNotes"
+                  value={maintenanceNotes}
+                  onChange={(e) => setMaintenanceNotes(e.target.value)}
+                  placeholder="Detalles del mantenimiento, piezas a revisar, etc..."
+                  rows={3}
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={closeMaintenanceModal} disabled={maintenanceLoading}>
+                Cancelar
+              </Button>
+              <Button onClick={submitMaintenance} disabled={maintenanceLoading || !canEditEquipment}>
+                {maintenanceLoading ? 'Guardando...' : 'Asignar mantenimiento'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
       {editingEquipment && (
         <EquipmentForm equipment={editingEquipment} onClose={() => setEditingEquipment(null)} onSuccess={onSaveEquipment} />
       )}
@@ -718,6 +929,7 @@ function EquipmentCard({
   onToggleFavorite,
   onOpenDetail,
   onViewHierarchy,
+  onQuickMaintenance,
 }: {
   equipment: Equipment
   selected: boolean
@@ -728,6 +940,7 @@ function EquipmentCard({
   onToggleFavorite: () => void
   onOpenDetail: () => void
   onViewHierarchy: () => void
+  onQuickMaintenance: () => void
 }) {
   const statusConfig = STATUS_CONFIG[equipment.estado]
   const criticidadConfig = CRITICIDAD_CONFIG[equipment.criticidad]
@@ -883,22 +1096,42 @@ function EquipmentCard({
           </div>
         )}
 
-        <div className="flex items-center justify-between pt-2 border-t">
-          <Badge variant="outline" className={`${criticidadConfig.badgeClassName} ${metaBadgeTextClassName}`}>
-            {criticidadConfig.label}
-          </Badge>
-          <Button
-            variant="ghost"
-            size="sm"
-            className={actionButtonClassName}
-            onClick={(e) => {
-              e.stopPropagation()
-              onViewHierarchy()
-            }}
-            title="Ver en jerarquía"
-          >
-            Ver jerarquía
-          </Button>
+        <div className="flex flex-col gap-2 pt-2 border-t">
+          <div className="flex items-center justify-between">
+            <Badge variant="outline" className={`${criticidadConfig.badgeClassName} ${metaBadgeTextClassName}`}>
+              {criticidadConfig.label}
+            </Badge>
+            <Badge className={`${statusConfig.badgeClassName} ${metaBadgeTextClassName}`}>
+              {statusConfig.label}
+            </Badge>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className={`flex-1 ${actionButtonClassName}`}
+              onClick={(e) => {
+                e.stopPropagation()
+                onQuickMaintenance()
+              }}
+              title="Asignar mantenimiento"
+            >
+              <Settings className={compact ? 'h-3 w-3 mr-1' : 'h-3.5 w-3.5 mr-1'} />
+              Mantenimiento
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className={actionButtonClassName}
+              onClick={(e) => {
+                e.stopPropagation()
+                onViewHierarchy()
+              }}
+              title="Ver en jerarquía"
+            >
+              Ver jerarquía
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>
