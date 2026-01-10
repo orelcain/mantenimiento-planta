@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Plus, Search, Wrench, MapPin } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Search, Wrench, MapPin } from 'lucide-react'
 import {
   Card,
   CardContent,
@@ -20,14 +21,15 @@ import {
   DialogFooter,
   Label,
   Textarea,
+  Checkbox,
 } from '@/components/ui'
 import { useAppStore } from '@/store'
-import { getEquipments, createEquipment, updateEquipment } from '@/services/equipment'
-import { getMainZones } from '@/services/zones'
-import type { Equipment, Zone } from '@/types'
-import { createEquipmentSchema, updateEquipmentSchema } from '@/lib/validation'
+import { getEquipments, updateEquipment } from '@/services/equipment'
+import type { Equipment } from '@/types'
+import { updateEquipmentSchema } from '@/lib/validation'
 import { logger } from '@/lib/logger'
 import { debounce } from '@/lib/rate-limit'
+import { usePermissions } from '@/hooks/usePermissions'
 
 const STATUS_CONFIG = {
   operativo: { label: 'Operativo', className: 'bg-success text-success-foreground' },
@@ -42,11 +44,10 @@ const CRITICIDAD_CONFIG = {
 }
 
 export function EquipmentPage() {
-  const { equipment, setEquipment, zones, setZones } = useAppStore()
-  const [showForm, setShowForm] = useState(false)
+  const navigate = useNavigate()
+  const { equipment, setEquipment } = useAppStore()
   const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
-  const [filterZone, setFilterZone] = useState<string>('all')
   const [filterStatus, setFilterStatus] = useState<string>('all')
 
   // Debounced search
@@ -58,19 +59,19 @@ export function EquipmentPage() {
   // Cargar datos
   useEffect(() => {
     getEquipments().then(setEquipment)
-    getMainZones().then(setZones)
-  }, [setEquipment, setZones])
+  }, [setEquipment])
 
   // Filtrar equipos
   const filteredEquipment = equipment.filter((eq) => {
+    if (eq.deleted) return false
     const matchesSearch =
       eq.nombre.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      eq.codigo.toLowerCase().includes(searchQuery.toLowerCase())
-    
-    const matchesZone = filterZone === 'all' || eq.zoneId === filterZone
+      eq.codigo.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (eq.hierarchyPath?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false)
+
     const matchesStatus = filterStatus === 'all' || eq.estado === filterStatus
     
-    return matchesSearch && matchesZone && matchesStatus
+    return matchesSearch && matchesStatus
   })
 
   // Stats
@@ -83,11 +84,16 @@ export function EquipmentPage() {
 
   const handleEdit = (eq: Equipment) => {
     setEditingEquipment(eq)
-    setShowForm(true)
+  }
+
+  const handleViewHierarchy = (eq: Equipment) => {
+    const focusId = eq.hierarchyNodeId || eq.id
+    const q = encodeURIComponent(eq.codigo)
+    const focus = encodeURIComponent(focusId)
+    navigate(`/hierarchy?q=${q}&focus=${focus}`)
   }
 
   const handleCloseForm = () => {
-    setShowForm(false)
     setEditingEquipment(null)
   }
 
@@ -103,12 +109,8 @@ export function EquipmentPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold">Equipos</h1>
-          <p className="text-muted-foreground">Gestión de activos y máquinas</p>
+          <p className="text-muted-foreground">Se sincroniza automáticamente desde la jerarquía</p>
         </div>
-        <Button onClick={() => setShowForm(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Nuevo Equipo
-        </Button>
       </div>
 
       {/* Stats */}
@@ -152,20 +154,6 @@ export function EquipmentPage() {
                 className="pl-9"
               />
             </div>
-            <Select value={filterZone} onValueChange={setFilterZone}>
-              <SelectTrigger className="w-full sm:w-[180px]">
-                <MapPin className="h-4 w-4 mr-2" />
-                <SelectValue placeholder="Zona" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas las zonas</SelectItem>
-                {zones.map((zone) => (
-                  <SelectItem key={zone.id} value={zone.id}>
-                    {zone.nombre}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
             <Select value={filterStatus} onValueChange={setFilterStatus}>
               <SelectTrigger className="w-full sm:w-[180px]">
                 <SelectValue placeholder="Estado" />
@@ -189,9 +177,9 @@ export function EquipmentPage() {
               <Wrench className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-medium">No hay equipos</h3>
               <p className="text-muted-foreground">
-                {searchQuery || filterZone !== 'all' || filterStatus !== 'all'
+                {searchQuery || filterStatus !== 'all'
                   ? 'No se encontraron equipos con los filtros aplicados'
-                  : 'Comienza agregando un nuevo equipo'}
+                  : 'Aún no hay equipos sincronizados desde la jerarquía'}
               </p>
             </CardContent>
           </Card>
@@ -200,18 +188,17 @@ export function EquipmentPage() {
             <EquipmentCard
               key={eq.id}
               equipment={eq}
-              zone={zones.find((z) => z.id === eq.zoneId)}
               onClick={() => handleEdit(eq)}
+              onViewHierarchy={() => handleViewHierarchy(eq)}
             />
           ))
         )}
       </div>
 
       {/* Form Modal */}
-      {showForm && (
+      {editingEquipment && (
         <EquipmentForm
           equipment={editingEquipment}
-          zones={zones}
           onClose={handleCloseForm}
           onSuccess={handleSuccess}
         />
@@ -222,12 +209,12 @@ export function EquipmentPage() {
 
 function EquipmentCard({
   equipment,
-  zone,
   onClick,
+  onViewHierarchy,
 }: {
   equipment: Equipment
-  zone?: Zone
   onClick: () => void
+  onViewHierarchy: () => void
 }) {
   const statusConfig = STATUS_CONFIG[equipment.estado]
   const criticidadConfig = CRITICIDAD_CONFIG[equipment.criticidad]
@@ -243,17 +230,37 @@ function EquipmentCard({
             <CardTitle className="text-base">{equipment.nombre}</CardTitle>
             <p className="text-sm text-muted-foreground font-mono">{equipment.codigo}</p>
           </div>
-          <Badge className={statusConfig.className}>{statusConfig.label}</Badge>
+          <div className="flex flex-col items-end gap-1">
+            <Badge className={statusConfig.className}>{statusConfig.label}</Badge>
+            {equipment.syncExcluded && (
+              <Badge variant="outline" className="text-muted-foreground">
+                Excluido
+              </Badge>
+            )}
+          </div>
         </div>
       </CardHeader>
       <CardContent className="p-4 pt-2">
         <div className="space-y-2 text-sm">
-          {zone && (
+          {(equipment.hierarchyPath || equipment.zoneId) && (
             <div className="flex items-center gap-2 text-muted-foreground">
               <MapPin className="h-4 w-4" />
-              {zone.nombre}
+              {equipment.hierarchyPath || equipment.zoneId}
             </div>
           )}
+          <div className="flex justify-end">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation()
+                onViewHierarchy()
+              }}
+              title="Ver este equipo en la jerarquía"
+            >
+              Ver jerarquía
+            </Button>
+          </div>
           {equipment.marca && (
             <div className="text-muted-foreground">
               {equipment.marca} {equipment.modelo}
@@ -273,52 +280,54 @@ function EquipmentCard({
 
 function EquipmentForm({
   equipment,
-  zones,
   onClose,
   onSuccess,
 }: {
-  equipment: Equipment | null
-  zones: Zone[]
+  equipment: Equipment
   onClose: () => void
   onSuccess: () => void
 }) {
+  const { canDeleteEquipment, canEditEquipment } = usePermissions()
   const [isLoading, setIsLoading] = useState(false)
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
   const [formData, setFormData] = useState({
-    codigo: equipment?.codigo || '',
-    nombre: equipment?.nombre || '',
-    descripcion: equipment?.descripcion || '',
-    marca: equipment?.marca || '',
-    modelo: equipment?.modelo || '',
-    numeroSerie: equipment?.numeroSerie || '',
-    zoneId: equipment?.zoneId || '',
-    criticidad: equipment?.criticidad || 'media' as Equipment['criticidad'],
-    estado: equipment?.estado || 'operativo' as Equipment['estado'],
+    codigo: equipment.codigo || '',
+    nombre: equipment.nombre || '',
+    descripcion: equipment.descripcion || '',
+    marca: equipment.marca || '',
+    modelo: equipment.modelo || '',
+    numeroSerie: equipment.numeroSerie || '',
+    syncExcluded: Boolean(equipment.syncExcluded),
+    criticidad: equipment.criticidad || ('media' as Equipment['criticidad']),
+    estado: equipment.estado || ('operativo' as Equipment['estado']),
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (!canEditEquipment) {
+      setValidationErrors({ general: 'No tienes permisos para editar equipos.' })
+      return
+    }
+
     setIsLoading(true)
     setValidationErrors({})
 
     try {
       const dataToValidate = {
-        codigo: formData.codigo,
-        nombre: formData.nombre,
+        // En edición no permitimos cambiar código/nombre (vienen de la jerarquía)
+        codigo: equipment.codigo,
+        nombre: equipment.nombre,
         descripcion: formData.descripcion || undefined,
         marca: formData.marca || undefined,
         modelo: formData.modelo || undefined,
         numeroSerie: formData.numeroSerie || undefined,
-        zoneId: formData.zoneId,
-        zonePath: [formData.zoneId],
-        position: { x: 0, y: 0 },
         criticidad: formData.criticidad,
         estado: formData.estado,
       }
 
       // Validar con Zod
-      const schema = equipment ? updateEquipmentSchema : createEquipmentSchema
-      const validation = schema.safeParse(dataToValidate)
+      const validation = updateEquipmentSchema.safeParse(dataToValidate)
       
       if (!validation.success) {
         const errors: Record<string, string> = {}
@@ -331,17 +340,17 @@ function EquipmentForm({
         return
       }
 
-      logger.info(equipment ? 'Updating equipment' : 'Creating equipment', { codigo: formData.codigo })
+      logger.info('Updating equipment', { equipmentId: equipment.id, codigo: equipment.codigo })
 
-      if (equipment) {
-        await updateEquipment(equipment.id, formData)
-      } else {
-        await createEquipment({
-          ...formData,
-          zonePath: [formData.zoneId],
-          position: { x: 0, y: 0 },
-        })
-      }
+      await updateEquipment(equipment.id, {
+        descripcion: formData.descripcion || undefined,
+        marca: formData.marca || undefined,
+        modelo: formData.modelo || undefined,
+        numeroSerie: formData.numeroSerie || undefined,
+        syncExcluded: formData.syncExcluded,
+        criticidad: formData.criticidad,
+        estado: formData.estado,
+      })
       
       logger.info('Equipment saved successfully', { codigo: formData.codigo })
       onSuccess()
@@ -354,12 +363,45 @@ function EquipmentForm({
     }
   }
 
+  const handleDelete = async () => {
+    if (!canDeleteEquipment) {
+      setValidationErrors({ general: 'No tienes permisos para eliminar equipos.' })
+      return
+    }
+
+    const ok = window.confirm(
+      `¿Eliminar el equipo "${equipment.nombre}" (${equipment.codigo})?\n\nEsto lo oculta del módulo y lo excluye del sync para evitar que se vuelva a crear automáticamente.`
+    )
+    if (!ok) return
+
+    setIsLoading(true)
+    setValidationErrors({})
+
+    try {
+      // Eliminación lógica + exclusión: evita que el sync vuelva a crearlo
+      logger.info('Soft deleting equipment (exclude from sync)', { equipmentId: equipment.id, codigo: equipment.codigo })
+      await updateEquipment(equipment.id, {
+        syncExcluded: true,
+        deleted: true,
+        deletedAt: new Date(),
+      })
+      logger.info('Equipment soft-deleted successfully', { equipmentId: equipment.id })
+      onSuccess()
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error('Error deleting equipment')
+      logger.error('Error deleting equipment', err)
+      setValidationErrors({ general: 'Error al eliminar el equipo. Por favor intenta de nuevo.' })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   return (
     <Dialog open onOpenChange={onClose}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>
-            {equipment ? 'Editar Equipo' : 'Nuevo Equipo'}
+            Editar Equipo
           </DialogTitle>
         </DialogHeader>
 
@@ -376,8 +418,7 @@ function EquipmentForm({
               <Input
                 id="codigo"
                 value={formData.codigo}
-                onChange={(e) => setFormData({ ...formData, codigo: e.target.value })}
-                placeholder="EQ-001"
+                disabled
                 required
               />
               {validationErrors.codigo && (
@@ -385,40 +426,13 @@ function EquipmentForm({
               )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="zoneId">Zona *</Label>
-              <Select
-                value={formData.zoneId}
-                onValueChange={(value) => setFormData({ ...formData, zoneId: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar zona" />
-                </SelectTrigger>
-                <SelectContent>
-                  {zones.map((zone) => (
-                    <SelectItem key={zone.id} value={zone.id}>
-                      {zone.nombre}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {validationErrors.zoneId && (
-                <p className="text-sm text-destructive">{validationErrors.zoneId}</p>
-              )}
+              <Label htmlFor="nombre">Nombre *</Label>
+              <Input
+                id="nombre"
+                value={formData.nombre}
+                disabled
+              />
             </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="nombre">Nombre *</Label>
-            <Input
-              id="nombre"
-              value={formData.nombre}
-              onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
-              placeholder="Bomba centrífuga principal"
-              required
-            />
-            {validationErrors.nombre && (
-              <p className="text-sm text-destructive">{validationErrors.nombre}</p>
-            )}
           </div>
 
           <div className="space-y-2">
@@ -434,6 +448,22 @@ function EquipmentForm({
               <p className="text-sm text-destructive">{validationErrors.descripcion}</p>
             )}
           </div>
+
+          {canDeleteEquipment && (
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="syncExcluded"
+                checked={formData.syncExcluded}
+                onCheckedChange={(checked) =>
+                  setFormData({ ...formData, syncExcluded: checked === true })
+                }
+                disabled={isLoading}
+              />
+              <Label htmlFor="syncExcluded" className="text-sm">
+                Excluir del sync (no se actualizará/creará desde jerarquía)
+              </Label>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -496,11 +526,21 @@ function EquipmentForm({
           </div>
 
           <DialogFooter>
+            {canDeleteEquipment && (
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={handleDelete}
+                disabled={isLoading}
+              >
+                Eliminar
+              </Button>
+            )}
             <Button type="button" variant="outline" onClick={onClose}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? 'Guardando...' : equipment ? 'Guardar Cambios' : 'Crear Equipo'}
+            <Button type="submit" disabled={isLoading || !canEditEquipment}>
+              {isLoading ? 'Guardando...' : 'Guardar Cambios'}
             </Button>
           </DialogFooter>
         </form>

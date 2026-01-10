@@ -66,7 +66,10 @@ const DEFAULT_PERMISSIONS: Record<UserRole, string[]> = {
     'createIncident', 'viewIncidents', 'closeIncident',
     'executePreventive', 'viewPredictive',
     'viewIoT', 'viewReports'
-  ]
+  ],
+  usuario: [
+    'createIncident',
+  ],
 }
 
 const CATEGORY_LABELS: Record<Permission['category'], { label: string; icon: string }> = {
@@ -179,7 +182,7 @@ export function PermissionsManager() {
 
       {/* Selector de rol */}
       <div className="flex gap-2">
-        {(['admin', 'supervisor', 'tecnico'] as UserRole[]).map(role => (
+        {(['admin', 'supervisor', 'tecnico', 'usuario'] as UserRole[]).map(role => (
           <button
             key={role}
             onClick={() => setSelectedRole(role)}
@@ -192,6 +195,7 @@ export function PermissionsManager() {
             {role === 'admin' && '👑 Admin'}
             {role === 'supervisor' && '👔 Supervisor'}
             {role === 'tecnico' && '🔧 Técnico'}
+            {role === 'usuario' && '👤 Usuario'}
             <Badge variant="secondary" className="ml-2">
               {rolePerms.length}/{ALL_PERMISSIONS.length}
             </Badge>

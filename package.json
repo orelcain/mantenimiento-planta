@@ -10,7 +10,9 @@
     "preview": "turbo run preview",
     "clean": "turbo run clean && rm -rf node_modules",
     "seed:user": "node scripts/seed_user_profile.js",
-    "seed:user:help": "node scripts/seed_user_profile.js --help"
+    "seed:user:help": "node scripts/seed_user_profile.js --help",
+    "sync:equipment": "node scripts/sync_equipment_from_hierarchy.js",
+    "sync:equipment:help": "node scripts/sync_equipment_from_hierarchy.js --help"
   },
   "devDependencies": {
     "ts-node": "^10.9.2",

@@ -238,24 +238,61 @@ export const equipmentStatusSchema = z.enum([
 
 export const equipmentCriticalitySchema = z.enum(['alta', 'media', 'baja'])
 
-export const createEquipmentSchema = z.object({
+const equipmentBaseSchema = z.object({
   codigo: codigoSchema,
   nombre: z.string().min(2).max(100),
   descripcion: z.string().max(500).optional(),
   marca: z.string().max(50).optional(),
   modelo: z.string().max(50).optional(),
   numeroSerie: z.string().max(50).optional(),
-  zoneId: z.string().min(1, 'Zona requerida'),
-  zonePath: z.array(z.string()),
-  position: z.object({
-    x: z.number().min(0).max(1),
-    y: z.number().min(0).max(1),
-  }),
+  // Ubicación (nuevo): jerarquía
+  hierarchyNodeId: z.string().optional(),
+  hierarchyPath: z.string().max(500).optional(),
+  // Ubicación (legacy): zonas/mapas
+  zoneId: z.string().optional(),
+  zonePath: z.array(z.string()).optional(),
+  position: z
+    .object({
+      x: z.number().min(0).max(1),
+      y: z.number().min(0).max(1),
+    })
+    .optional(),
   criticidad: equipmentCriticalitySchema,
   estado: equipmentStatusSchema,
 })
 
-export const updateEquipmentSchema = createEquipmentSchema.partial().omit({ codigo: true })
+export const createEquipmentSchema = equipmentBaseSchema.superRefine((data, ctx) => {
+  const hasHierarchy = typeof data.hierarchyNodeId === 'string' && data.hierarchyNodeId.trim().length > 0
+  const hasZone = typeof data.zoneId === 'string' && data.zoneId.trim().length > 0
+
+  if (!hasHierarchy && !hasZone) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Debe indicar una ubicación (jerarquía o zona)',
+      path: ['hierarchyNodeId'],
+    })
+  }
+
+  // Si se usa modelo legacy de zonas, exigir position/zonePath
+  if (hasZone) {
+    if (!data.position) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Posición requerida',
+        path: ['position'],
+      })
+    }
+    if (!data.zonePath || data.zonePath.length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Ruta de zona requerida',
+        path: ['zonePath'],
+      })
+    }
+  }
+})
+
+export const updateEquipmentSchema = equipmentBaseSchema.partial().omit({ codigo: true })
 
 // ============================================================================
 // TAREAS PREVENTIVAS

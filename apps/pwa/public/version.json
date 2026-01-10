@@ -1,5 +1,5 @@
 {
-  "version": "2.2.30",
+  "version": "2.2.31",
   "buildDate": "2026-01-09",
   "buildTimestamp": 1767916800000,
   "features": [
@@ -29,6 +29,9 @@
     "Jerarquía Admin: buscador mejorado (múltiples términos y conteo real de coincidencias)",
     "Usuarios: rol usuario (sin acceso a administración)",
     "Seguridad: reglas /users endurecidas contra escalamiento de rol",
-    "Deploy: GitHub Pages para pruebas"
+    "Deploy: GitHub Pages para pruebas",
+    "Equipos: sincronización automática desde jerarquía (nivel >= 5)",
+    "Equipos: ver jerarquía (deep-link con foco)",
+    "Equipos: excluir del sync y eliminación lógica (no se recrea)"
   ]
 }

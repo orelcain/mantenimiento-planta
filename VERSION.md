@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.2.30**
+## Versión Actual: **v2.2.31**
 
 **Fecha de lanzamiento**: 9 de enero de 2026  
 **Estado**: ✅ PRODUCCIÓN READY  
@@ -9,6 +9,12 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.2.31 - Equipos desde Jerarquía
+
+- Equipos: sincronización automática desde Jerarquía (nivel >= 5, con código)
+- Equipos: muestra `hierarchyPath` y botón “Ver jerarquía” (deep-link con foco)
+- Equipos: control de sync (`syncExcluded`) y eliminación lógica (`deleted`) para evitar recreación
 
 ### v2.2.30 - Roles + Buscador Jerarquía
 

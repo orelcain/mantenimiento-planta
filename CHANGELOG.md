@@ -7,6 +7,21 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.2.31] - 2026-01-09
+
+### 🧰 Equipos: sincronización desde Jerarquía
+
+#### Añadido
+- Sync: script admin para poblar/actualizar `/equipment` desde `/hierarchy` (nivel >= 5 con código)
+- Equipos: muestra `hierarchyPath` y permite buscar también por ruta
+- Navegación: botón “Ver jerarquía” (deep-link a Jerarquía con `q` + `focus`)
+
+#### Mejorado
+- Equipos: edición de campos operativos (estado/criticidad + metadata) sin depender de zonas
+
+#### Seguridad/Control
+- Equipos: `syncExcluded` + eliminación lógica (`deleted`) para evitar recreación automática
+
 ## [2.2.30] - 2026-01-09
 
 ### 👤 Usuarios: Rol `usuario` (no admin)

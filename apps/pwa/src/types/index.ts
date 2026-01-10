@@ -72,9 +72,18 @@ export interface Equipment {
   marca?: string
   modelo?: string
   numeroSerie?: string
-  zoneId: string
-  zonePath: string[] // ["A", "A1"] para "A1"
-  position: { x: number; y: number }
+  // Ubicación (nuevo): fuente de verdad es la jerarquía
+  hierarchyNodeId?: string // ID del nodo jerárquico asociado
+  hierarchyPath?: string // "Planta > Área > ... > Equipo" (snapshot opcional)
+  // Control de sincronización (jerarquía -> equipment)
+  syncExcluded?: boolean // Si true, el sync no debe crear/actualizar este equipo
+  // Eliminación lógica (para evitar recreación por sync)
+  deleted?: boolean
+  deletedAt?: Date
+  // Ubicación (legacy - zonas/mapas)
+  zoneId?: string
+  zonePath?: string[] // ["A", "A1"] para "A1"
+  position?: { x: number; y: number }
   qrCode?: string
   criticidad: 'alta' | 'media' | 'baja'
   estado: 'operativo' | 'en_mantenimiento' | 'fuera_servicio'

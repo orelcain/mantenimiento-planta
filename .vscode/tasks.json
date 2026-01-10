@@ -13,6 +13,18 @@
 			"isBackground": false,
 			"problemMatcher": [],
 			"group": "build"
+		},
+		{
+			"label": "Lint PWA (apps/pwa)",
+			"type": "shell",
+			"command": "pnpm",
+			"args": [
+				"-C",
+				"apps/pwa",
+				"lint"
+			],
+			"isBackground": false,
+			"group": "build"
 		}
 	]
 }

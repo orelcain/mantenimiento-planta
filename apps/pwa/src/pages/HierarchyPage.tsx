@@ -6,6 +6,7 @@
  */
 
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
+import { useLocation } from 'react-router-dom'
 import {
   Plus,
   Edit2,
@@ -66,6 +67,7 @@ interface NodeFormData {
 }
 
 export function HierarchyPage() {
+  const location = useLocation()
   const user = useAuthStore(state => state.user)
   const { tree, loading, refresh, hasUpdates } = useHierarchyTree({ includeInactive: true })
   const { createNode, updateNode, deleteNode, reorderNode } = useHierarchyMutations()
@@ -80,6 +82,14 @@ export function HierarchyPage() {
   const [selectedNode, setSelectedNode] = useState<HierarchyNode | null>(null)
   const [parentForNew, setParentForNew] = useState<HierarchyNodeWithChildren | null>(null)
   const [activeNodeId, setActiveNodeId] = useState<string | null>(null)
+
+  const { qParam, focusParam } = useMemo(() => {
+    const params = new URLSearchParams(location.search)
+    return {
+      qParam: params.get('q') || '',
+      focusParam: params.get('focus') || '',
+    }
+  }, [location.search])
   
   // Estado para preservar expansión en búsqueda
   const prevSearchRef = useRef('')
@@ -124,20 +134,48 @@ export function HierarchyPage() {
     setViewTree(tree)
   }, [tree])
 
-  // Verificar permisos de admin
-  if (user?.rol !== 'admin') {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <Card className="p-8 text-center">
-          <XCircle className="h-12 w-12 mx-auto mb-4 text-destructive" />
-          <h2 className="text-xl font-bold">Acceso Denegado</h2>
-          <p className="text-muted-foreground mt-2">
-            Solo los administradores pueden gestionar jerarquías.
-          </p>
-        </Card>
-      </div>
-    )
+  // Permitir deep-link: /hierarchy?q=...&focus=...
+  useEffect(() => {
+    if (qParam) {
+      setSearchQuery(qParam)
+      setDebouncedSearch(qParam)
+      setIsFirstMatch(true)
+    }
+  }, [qParam])
+
+  const findPathToNode = (nodes: HierarchyNodeWithChildren[], targetId: string): string[] | null => {
+    for (const node of nodes) {
+      if (node.id === targetId) return [node.id]
+      if (node.children?.length) {
+        const childPath = findPathToNode(node.children, targetId)
+        if (childPath) return [node.id, ...childPath]
+      }
+    }
+    return null
   }
+
+  useEffect(() => {
+    if (!focusParam || viewTree.length === 0) return
+
+    const path = findPathToNode(viewTree, focusParam)
+    if (!path) return
+
+    // Expandir ancestros del nodo para asegurar visibilidad
+    setExpandedNodes((prev) => {
+      const next = new Set(prev)
+      path.slice(0, -1).forEach((id) => next.add(id))
+      return next
+    })
+
+    setActiveNodeId(focusParam)
+
+    // Esperar render para tener refs
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        scrollToNode(focusParam)
+      })
+    })
+  }, [focusParam, viewTree])
 
   const toggleNode = (nodeId: string) => {
     const newExpanded = new Set(expandedNodes)
@@ -522,6 +560,21 @@ export function HierarchyPage() {
   const renderTree = (nodes: HierarchyNodeWithChildren[], depth = 0) => {
     let isFirstRendered = isFirstMatch // Track si es el primer match renderizado
 
+
+  // Verificar permisos de admin (debe estar después de todos los hooks)
+  if (user?.rol !== 'admin') {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <Card className="p-8 text-center">
+          <XCircle className="h-12 w-12 mx-auto mb-4 text-destructive" />
+          <h2 className="text-xl font-bold">Acceso Denegado</h2>
+          <p className="text-muted-foreground mt-2">
+            Solo los administradores pueden gestionar jerarquías.
+          </p>
+        </Card>
+      </div>
+    )
+  }
     const searchTokens = debouncedSearch
       .toLowerCase()
       .split(/\s+/)
