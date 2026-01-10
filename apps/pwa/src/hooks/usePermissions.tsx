@@ -66,7 +66,7 @@ export function usePermissions(): Permissions {
   const isAdmin = rol === 'admin'
   const isSupervisor = rol === 'supervisor'
   const isTechnician = rol === 'tecnico'
-  const isUser = !rol || rol === 'usuario' as any // Por si agregamos rol 'usuario' en futuro
+  const isUser = rol === 'usuario'
   
   const permissions: Permissions = {
     // Roles básicos

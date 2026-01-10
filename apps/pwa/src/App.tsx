@@ -1,6 +1,6 @@
 import { useEffect, lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { onAuthChange, getUserById } from '@/services/auth'
+import { onAuthChange, getUserById, signOut as signOutService } from '@/services/auth'
 import { useAuthStore } from '@/store'
 import { logger } from '@/lib/logger'
 import { LoadingScreen } from '@/components/ui'
@@ -49,6 +49,20 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  const { user, isLoading } = useAuthStore()
+
+  if (isLoading) {
+    return <LoadingScreen />
+  }
+
+  if (!user || user.rol !== 'admin') {
+    return <Navigate to="/" replace />
+  }
+
+  return <>{children}</>
+}
+
 export function App() {
   const { setUser, setLoading } = useAuthStore()
 
@@ -58,6 +72,20 @@ export function App() {
       if (firebaseUser) {
         try {
           const user = await getUserById(firebaseUser.uid)
+          if (!user) {
+            logger.warn('Usuario Auth sin perfil en Firestore; cerrando sesión', { uid: firebaseUser.uid })
+            await signOutService()
+            setUser(null)
+            return
+          }
+
+          if (!user.activo) {
+            logger.warn('Usuario desactivado; cerrando sesión', { uid: firebaseUser.uid })
+            await signOutService()
+            setUser(null)
+            return
+          }
+
           setUser(user)
           
           // Inicializar jerarquía automáticamente si es admin y no está inicializada
@@ -119,14 +147,18 @@ export function App() {
               </Suspense>
             } />
             <Route path="settings" element={
-              <Suspense fallback={<LoadingScreen />}>
-                <SettingsPage />
-              </Suspense>
+              <AdminRoute>
+                <Suspense fallback={<LoadingScreen />}>
+                  <SettingsPage />
+                </Suspense>
+              </AdminRoute>
             } />
             <Route path="hierarchy" element={
-              <Suspense fallback={<LoadingScreen />}>
-                <HierarchyPage />
-              </Suspense>
+              <AdminRoute>
+                <Suspense fallback={<LoadingScreen />}>
+                  <HierarchyPage />
+                </Suspense>
+              </AdminRoute>
             } />
             <Route path="photo-evidence" element={
               <Suspense fallback={<LoadingScreen />}>

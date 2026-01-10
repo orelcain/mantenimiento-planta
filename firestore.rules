@@ -10,20 +10,29 @@ service cloud.firestore {
     function isAuthenticated() {
       return request.auth != null;
     }
+
+    function userDocExists() {
+      return isAuthenticated() && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function currentUserRole() {
+      return userDocExists() ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.rol : null;
+    }
+
+    function currentUserIsActive() {
+      return userDocExists() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.activo == true;
+    }
     
     function isAdmin() {
-      return isAuthenticated() && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.rol == 'admin';
+      return currentUserRole() == 'admin';
     }
     
     function isSupervisor() {
-      return isAuthenticated() && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.rol in ['admin', 'supervisor'];
+      return currentUserRole() in ['admin', 'supervisor'];
     }
     
     function isTechnician() {
-      return isAuthenticated() && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.rol in ['admin', 'supervisor', 'tecnico'];
+      return currentUserRole() in ['admin', 'supervisor', 'tecnico'];
     }
     
     function isOwner(userId) {
@@ -31,8 +40,7 @@ service cloud.firestore {
     }
     
     function isActiveUser() {
-      return isAuthenticated() && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.activo == true;
+      return currentUserIsActive();
     }
     
     // ============================================
@@ -106,12 +114,34 @@ service cloud.firestore {
         && isValidEmail(request.resource.data.email)
         && request.resource.data.rol in ['admin', 'supervisor', 'tecnico', 'usuario']
         && request.resource.data.activo is bool
-        && (!('telefono' in request.resource.data) || isNonEmptyString(request.resource.data.telefono, 7, 15));
+        && (!('telefono' in request.resource.data) || isNonEmptyString(request.resource.data.telefono, 7, 15))
+        && (
+          // Admin puede crear/sembrar cualquier perfil
+          isAdmin()
+          ||
+          // Auto-creación: solo tu propio doc, sin poder auto-asignarse admin
+          (
+            isOwner(userId)
+            && request.resource.data.email == request.auth.token.email
+            && request.resource.data.rol in ['supervisor', 'tecnico', 'usuario']
+            && request.resource.data.activo == true
+          )
+        );
       
-      allow update: if isActiveUser()
-        && (isOwner(userId) || isAdmin())
-        && (!('rol' in request.resource.data) || isAdmin())
-        && (!('activo' in request.resource.data) || isAdmin());
+      allow update: if isValidDocSize()
+        && (
+          // Admin puede actualizar todo
+          isAdmin()
+          ||
+          // Usuario solo puede actualizar su perfil sin cambiar rol/activo/email
+          (
+            isActiveUser()
+            && isOwner(userId)
+            && request.resource.data.rol == resource.data.rol
+            && request.resource.data.activo == resource.data.activo
+            && request.resource.data.email == resource.data.email
+          )
+        );
       
       allow delete: if isAdmin();
     }

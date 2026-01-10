@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type ChangeEvent } from 'react'
 import { logger } from '@/lib/logger'
 import {
   Settings,
@@ -52,7 +52,7 @@ import {
   where,
 } from 'firebase/firestore'
 import { db } from '@/services/firebase'
-import type { User, InviteCode } from '@/types'
+import type { User, InviteCode, UserRole } from '@/types'
 import { cn } from '@/lib/utils'
 import { initializeHierarchySystem, isHierarchyInitialized } from '../services/hierarchyInit'
 import { NotificationsSettings as NotificationsPushSettings } from '@/components/settings/NotificationsSettings'
@@ -232,6 +232,13 @@ function UsersSettings() {
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
 
+  const [createUid, setCreateUid] = useState('')
+  const [createEmail, setCreateEmail] = useState('')
+  const [createNombre, setCreateNombre] = useState('')
+  const [createApellido, setCreateApellido] = useState('')
+  const [createRol, setCreateRol] = useState<UserRole>('usuario')
+  const [creatingUserDoc, setCreatingUserDoc] = useState(false)
+
   useEffect(() => {
     loadUsers()
   }, [])
@@ -282,9 +289,48 @@ function UsersSettings() {
       admin: { label: 'Admin', className: 'bg-destructive' },
       supervisor: { label: 'Supervisor', className: 'bg-warning' },
       tecnico: { label: 'Técnico', className: 'bg-primary' },
+      usuario: { label: 'Usuario', className: 'bg-muted' },
     }
-    const { label, className } = config[rol as keyof typeof config] || config.tecnico
+    const { label, className } = config[rol as keyof typeof config] || config.usuario
     return <Badge className={className}>{label}</Badge>
+  }
+
+  const handleCreateUserDoc = async () => {
+    const uid = createUid.trim()
+    const email = createEmail.trim()
+    const nombre = createNombre.trim()
+    const apellido = createApellido.trim()
+
+    if (!uid || !email || !nombre || !apellido) {
+      alert('Completa UID, email, nombre y apellido')
+      return
+    }
+
+    setCreatingUserDoc(true)
+    try {
+      await setDoc(doc(db, 'users', uid), {
+        email,
+        nombre,
+        apellido,
+        rol: createRol,
+        activo: true,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }, { merge: false })
+
+      logger.info('User doc created/seeded', { uid, rol: createRol })
+      setCreateUid('')
+      setCreateEmail('')
+      setCreateNombre('')
+      setCreateApellido('')
+      setCreateRol('usuario')
+      await loadUsers()
+    } catch (error) {
+      logger.error('Error creando perfil de usuario', error instanceof Error ? error : new Error(String(error)))
+      alert('Error creando perfil. Revisa permisos/reglas y vuelve a intentar.')
+    } finally {
+      setCreatingUserDoc(false)
+    }
   }
 
   if (loading) {
@@ -292,11 +338,67 @@ function UsersSettings() {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Usuarios del Sistema ({users.length})</CardTitle>
-      </CardHeader>
-      <CardContent>
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle>Crear perfil (UID existente)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label>UID *</Label>
+              <Input value={createUid} onChange={(e: ChangeEvent<HTMLInputElement>) => setCreateUid(e.target.value)} placeholder="UID de Firebase Auth" className="mt-1" />
+            </div>
+            <div>
+              <Label>Email *</Label>
+              <Input value={createEmail} onChange={(e: ChangeEvent<HTMLInputElement>) => setCreateEmail(e.target.value)} placeholder="correo@dominio.com" className="mt-1" />
+            </div>
+            <div>
+              <Label>Nombre *</Label>
+              <Input value={createNombre} onChange={(e: ChangeEvent<HTMLInputElement>) => setCreateNombre(e.target.value)} placeholder="Nombre" className="mt-1" />
+            </div>
+            <div>
+              <Label>Apellido *</Label>
+              <Input value={createApellido} onChange={(e: ChangeEvent<HTMLInputElement>) => setCreateApellido(e.target.value)} placeholder="Apellido" className="mt-1" />
+            </div>
+            <div>
+              <Label>Rol</Label>
+              <Select value={createRol} onValueChange={(v: string) => setCreateRol(v as UserRole)}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="usuario">Usuario</SelectItem>
+                  <SelectItem value="tecnico">Técnico</SelectItem>
+                  <SelectItem value="supervisor">Supervisor</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-end">
+              <Button onClick={handleCreateUserDoc} disabled={creatingUserDoc} className="w-full">
+                {creatingUserDoc ? (
+                  <>
+                    <Spinner size="sm" />
+                    <span className="ml-2">Creando...</span>
+                  </>
+                ) : (
+                  <>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Crear perfil
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Usuarios del Sistema ({users.length})</CardTitle>
+        </CardHeader>
+        <CardContent>
         <div className="divide-y divide-border">
           {users.map((u) => (
             <div
@@ -323,7 +425,7 @@ function UsersSettings() {
               <div className="flex items-center gap-2">
                 <Select
                   value={u.rol}
-                  onValueChange={(value) => handleChangeRole(u.id, value)}
+                  onValueChange={(value: string) => handleChangeRole(u.id, value)}
                 >
                   <SelectTrigger className="w-32">
                     <SelectValue />
@@ -332,6 +434,7 @@ function UsersSettings() {
                     <SelectItem value="admin">Admin</SelectItem>
                     <SelectItem value="supervisor">Supervisor</SelectItem>
                     <SelectItem value="tecnico">Técnico</SelectItem>
+                    <SelectItem value="usuario">Usuario</SelectItem>
                   </SelectContent>
                 </Select>
 
@@ -343,8 +446,9 @@ function UsersSettings() {
             </div>
           ))}
         </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </div>
   )
 }
 
@@ -354,7 +458,7 @@ function InvitesSettings() {
   const [invites, setInvites] = useState<InviteCode[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
-  const [newInviteRole, setNewInviteRole] = useState<string>('tecnico')
+  const [newInviteRole, setNewInviteRole] = useState<UserRole>('tecnico')
   const [creating, setCreating] = useState(false)
 
   useEffect(() => {
@@ -392,7 +496,7 @@ function InvitesSettings() {
 
     try {
       await createInviteCode(
-        newInviteRole as 'admin' | 'supervisor' | 'tecnico',
+          newInviteRole,
         1, // Un uso por código
         user.id,
         7 // Expira en 7 días
@@ -510,7 +614,7 @@ function InvitesSettings() {
           <div className="space-y-4">
             <div>
               <Label>Rol del nuevo usuario</Label>
-              <Select value={newInviteRole} onValueChange={setNewInviteRole}>
+              <Select value={newInviteRole} onValueChange={(value: string) => setNewInviteRole(value as UserRole)}>
                 <SelectTrigger className="mt-1">
                   <SelectValue />
                 </SelectTrigger>

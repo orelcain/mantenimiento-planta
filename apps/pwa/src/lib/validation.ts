@@ -86,7 +86,7 @@ export function validateFileList(files: File[]): { valid: boolean; error?: strin
 // USUARIOS
 // ============================================================================
 
-export const userRoleSchema = z.enum(['admin', 'supervisor', 'tecnico'])
+export const userRoleSchema = z.enum(['admin', 'supervisor', 'tecnico', 'usuario'])
 
 export const createUserSchema = z.object({
   email: emailSchema,

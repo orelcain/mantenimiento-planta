@@ -371,13 +371,23 @@ export function HierarchyPage() {
     query: string
   ): { filtered: HierarchyNodeWithChildren[], toExpand: Set<string> } => {
     const toExpand = new Set<string>()
-    const lowerQuery = query.toLowerCase()
+
+    const tokens = query
+      .toLowerCase()
+      .split(/\s+/)
+      .map((t) => t.trim())
+      .filter(Boolean)
+
+    const nodeMatchesQuery = (node: HierarchyNodeWithChildren): boolean => {
+      if (tokens.length === 0) return true
+      const name = node.nombre.toLowerCase()
+      const code = node.codigo.toLowerCase()
+      return tokens.every((t) => name.includes(t) || code.includes(t))
+    }
 
     const filterRecursive = (nodes: HierarchyNodeWithChildren[]): HierarchyNodeWithChildren[] => {
       return nodes.filter(node => {
-        const matchesName = node.nombre.toLowerCase().includes(lowerQuery)
-        const matchesCode = node.codigo.toLowerCase().includes(lowerQuery)
-        const matches = matchesName || matchesCode
+        const matches = nodeMatchesQuery(node)
 
         let filteredChildren: HierarchyNodeWithChildren[] = []
         if (node.children && node.children.length > 0) {
@@ -405,17 +415,32 @@ export function HierarchyPage() {
     return { filtered, toExpand }
   }
 
-  // Contar nodos que coinciden (definido ANTES de useMemo)
-  const countMatches = (nodes: HierarchyNodeWithChildren[]): number => {
+  // Contar coincidencias reales (sin contar padres agregados por contexto)
+  const countMatches = (nodes: HierarchyNodeWithChildren[], query: string): number => {
+    const tokens = query
+      .toLowerCase()
+      .split(/\s+/)
+      .map((t) => t.trim())
+      .filter(Boolean)
+
+    if (tokens.length === 0) return 0
+
+    const matches = (node: HierarchyNodeWithChildren): boolean => {
+      const name = node.nombre.toLowerCase()
+      const code = node.codigo.toLowerCase()
+      return tokens.every((t) => name.includes(t) || code.includes(t))
+    }
+
     let count = 0
-    const traverse = (nodes: HierarchyNodeWithChildren[]) => {
-      nodes.forEach(node => {
-        count++
+    const traverse = (arr: HierarchyNodeWithChildren[]) => {
+      arr.forEach((node) => {
+        if (matches(node)) count++
         if (node.children && node.children.length > 0) {
           traverse(node.children)
         }
       })
     }
+
     traverse(nodes)
     return count
   }
@@ -426,7 +451,7 @@ export function HierarchyPage() {
       return { filtered: viewTree, toExpand: new Set<string>(), matchCount: 0 }
     }
     const result = filterAndExpandTree(viewTree, debouncedSearch)
-    return { ...result, matchCount: countMatches(result.filtered) }
+    return { ...result, matchCount: countMatches(result.filtered, debouncedSearch) }
   }, [viewTree, debouncedSearch])
 
   // Manejo robusto de expansión en búsquedas sin colapsar el árbol
@@ -496,6 +521,14 @@ export function HierarchyPage() {
 
   const renderTree = (nodes: HierarchyNodeWithChildren[], depth = 0) => {
     let isFirstRendered = isFirstMatch // Track si es el primer match renderizado
+
+    const searchTokens = debouncedSearch
+      .toLowerCase()
+      .split(/\s+/)
+      .map((t) => t.trim())
+      .filter(Boolean)
+
+    const highlightQuery = searchTokens[0] || debouncedSearch
     
     return nodes.map(node => {
       const isExpanded = expandedNodes.has(node.id)
@@ -504,10 +537,11 @@ export function HierarchyPage() {
       const indent = depth * 24
       
       // Detectar si este nodo es un match
-      const isMatch = debouncedSearch && (
-        node.nombre.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-        node.codigo.toLowerCase().includes(debouncedSearch.toLowerCase())
-      )
+      const isMatch = searchTokens.length > 0 && searchTokens.every((t) => {
+        const name = node.nombre.toLowerCase()
+        const code = node.codigo.toLowerCase()
+        return name.includes(t) || code.includes(t)
+      })
       
       // Asignar ref al primer match
       const assignRef = isMatch && isFirstRendered
@@ -575,7 +609,7 @@ export function HierarchyPage() {
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <span className="font-medium truncate">
-                  {highlightText(node.nombre, debouncedSearch)}
+                  {highlightText(node.nombre, highlightQuery)}
                 </span>
                 <Badge variant="outline" className="text-xs">
                   {HIERARCHY_LEVEL_NAMES[node.nivel]}
@@ -592,7 +626,7 @@ export function HierarchyPage() {
                 )}
               </div>
               <div className="text-xs text-muted-foreground">
-                {highlightText(node.codigo, debouncedSearch)}
+                {highlightText(node.codigo, highlightQuery)}
               </div>
             </div>
 

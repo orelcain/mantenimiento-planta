@@ -7,6 +7,24 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.2.30] - 2026-01-10
+
+### 👤 Usuarios: Rol `usuario` (no admin)
+
+#### Añadido
+- Roles: soporte end-to-end de rol `usuario` (tipos/validación/UI)
+- Settings (admin): panel para crear perfil Firestore usando un UID ya existente
+
+#### Seguridad
+- Frontend: rutas admin protegidas (configuración/jerarquías)
+- Firestore Rules: endurecimiento de `/users` para evitar escalamiento (create/update)
+
+### 🌲 Jerarquía: Buscador mejorado
+
+#### Mejorado
+- Búsqueda: soporte de múltiples términos (AND)
+- Conteo: resultados cuentan solo coincidencias reales
+
 ## [2.2.29] - 2026-01-09
 
 ### 🌲 Jerarquía: Conteo de hijos (Admin)

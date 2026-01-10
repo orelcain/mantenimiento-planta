@@ -1,5 +1,5 @@
 // Tipos base del sistema
-export type UserRole = 'admin' | 'supervisor' | 'tecnico'
+export type UserRole = 'admin' | 'supervisor' | 'tecnico' | 'usuario'
 
 export type IncidentStatus = 'pendiente' | 'confirmada' | 'rechazada' | 'en_proceso' | 'cerrada'
 

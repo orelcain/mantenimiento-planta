@@ -1,14 +1,20 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.2.29**
+## Versión Actual: **v2.2.30**
 
-**Fecha de lanzamiento**: 9 de enero de 2026  
+**Fecha de lanzamiento**: 10 de enero de 2026  
 **Estado**: ✅ PRODUCCIÓN READY  
 **Build**: ✅ Último build local OK
 
 ---
 
 ## 📋 Información de la Versión
+
+### v2.2.30 - Roles + Buscador Jerarquía
+
+- Usuarios: habilita rol `usuario` (no admin) end-to-end
+- Seguridad: reglas `/users` reforzadas contra escalamiento y guards de rutas admin
+- Jerarquía Admin: buscador mejorado (múltiples términos + conteo real de matches)
 
 ### v2.2.29 - Jerarquía: Conteo de hijos + Pages
 
