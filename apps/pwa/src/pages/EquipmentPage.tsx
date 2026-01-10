@@ -466,8 +466,8 @@ export function EquipmentPage() {
         try {
           const incidents = await getIncidents({ equipmentId: eq.id, limit: 20 })
           equipmentData.historial = incidents.map((inc) => ({
-            titulo: inc.title,
-            prioridad: inc.priority,
+            titulo: inc.titulo,
+            prioridad: inc.prioridad,
             estado: inc.status,
             fecha: inc.createdAt,
           }))
@@ -1224,7 +1224,7 @@ export function EquipmentPage() {
                     Enviar por correo electrónico
                   </Button>
 
-                  {navigator.share && (
+                  {'share' in navigator && (
                     <Button
                       variant="outline"
                       onClick={handleShareViaMobile}
