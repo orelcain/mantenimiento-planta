@@ -1,7 +1,7 @@
 {
-  "version": "2.2.25",
+  "version": "2.2.28",
   "buildDate": "2026-01-09",
-  "buildTimestamp": 1768002550743,
+  "buildTimestamp": 1767916800000,
   "features": [
     "Nuevo módulo de Evidencias Fotográficas (antes/después)",
     "Comparador visual de fotos con slider",
@@ -19,6 +19,12 @@
     "Pares: título y ubicación por par (manual o jerarquía)",
     "PDF: agrupación/orden por título + ubicación del par",
     "Fix: evita blob ERR_FILE_NOT_FOUND en previsualizaciones",
-    "PDF: etiqueta (ANOTADA) por imagen"
+    "PDF: etiqueta (ANOTADA) por imagen",
+    "Jerarquía: breadcrumb del selector muestra nombres reales",
+    "Jerarquía: cache TTL 5 min (tree/children/path) reduce lecturas",
+    "Jerarquía Admin: activar/desactivar nodos + mostrar inactivos",
+    "Jerarquía Admin: delete en cascada seguro (sin huérfanos)",
+    "Jerarquía: dataset extendido (695 nodos activos, incluye Planta YAL)",
+    "Deploy: GitHub Pages para pruebas"
   ]
 }

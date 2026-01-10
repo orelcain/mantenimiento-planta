@@ -7,6 +7,41 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.2.28] - 2026-01-09
+
+### 🚀 Release para pruebas en Pages
+
+#### Añadido
+- Deploy: flujo GitHub Pages listo para validar en entorno Pages
+
+#### Corregido
+- Versionado: fecha/version sincronizadas para la release
+
+## [2.2.27] - 2026-01-09
+
+### 🌲 Jerarquía Extendida (695 nodos)
+
+#### Añadido
+- Datos: mandante extendido a 695 nodos (incluye subárbol Planta YAL)
+
+#### Mejorado
+- Herramientas: soporte para merge MD → dataset extendido e importación/reconciliación consistente
+
+## [2.2.26] - 2026-01-09
+
+### 🌲 Jerarquía Optimizada (Admin + Cache)
+
+#### Añadido
+- Admin: control de estado `activo` desde el diálogo de edición
+- Admin: visualización de nodos inactivos en el árbol
+
+#### Mejorado
+- Selector: breadcrumb muestra nombres reales del path
+- Performance: cache TTL (~5 min) para tree/children/path e invalidación en mutaciones
+
+#### Corregido
+- Admin: eliminación segura en cascada cuando hay descendientes (evita nodos huérfanos)
+
 ## [2.2.25] - 2026-01-09
 
 ### 🧩 Metadatos por par + Exportación agrupada

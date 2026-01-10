@@ -126,8 +126,8 @@ const { children } = useHierarchyChildren(parentId, nivel)
 ## 🔐 Reglas de Seguridad
 
 ```javascript
-// Solo supervisores pueden crear/editar jerarquías
-allow create, update: if isSupervisor()
+// Solo admins pueden crear/editar jerarquías
+allow create, update: if isAdmin()
   && isValidHierarchyLevel(request.resource.data.nivel)
   && isValidHierarchyCode(request.resource.data.codigo)
 

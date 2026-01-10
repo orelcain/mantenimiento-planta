@@ -34,6 +34,7 @@ type FsNode = {
 const COLLECTION = 'hierarchy'
 const JSON_MAIN = path.resolve(__dirname, 'JERARQUIA_COMPLETA_VERIFICADA.json')
 const CANON_PATH = path.resolve(__dirname, 'EXPECTED_CANONICAL.json')
+const CANON_EXT_PATH = path.resolve(__dirname, 'EXPECTED_CANONICAL_EXTENDED.json')
 
 function listImageJsonPaths(): string[] {
   const paths: string[] = []
@@ -46,8 +47,9 @@ function listImageJsonPaths(): string[] {
 
 function loadExpected(): { nodes: ExpectedNode[]; byCode: Map<string, ExpectedNode> } {
   // Preferir dataset canónico si existe.
-  if (fs.existsSync(CANON_PATH)) {
-    const raw = fs.readFileSync(CANON_PATH, 'utf8')
+  const preferred = fs.existsSync(CANON_EXT_PATH) ? CANON_EXT_PATH : CANON_PATH
+  if (fs.existsSync(preferred)) {
+    const raw = fs.readFileSync(preferred, 'utf8')
     const parsed = JSON.parse(raw) as any
     const nodes: ExpectedNode[] = Array.isArray(parsed?.nodes)
       ? parsed.nodes.map((n: any) => ({

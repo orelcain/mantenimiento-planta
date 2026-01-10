@@ -38,6 +38,7 @@ import {
   Label,
   Textarea,
   Badge,
+  Switch,
   Spinner,
 } from '@/components/ui'
 import { useAuthStore } from '@/store'
@@ -61,11 +62,12 @@ interface NodeFormData {
   parentId: string | null
   descripcion: string
   orden: number
+  activo: boolean
 }
 
 export function HierarchyPage() {
   const user = useAuthStore(state => state.user)
-  const { tree, loading, refresh, hasUpdates } = useHierarchyTree()
+  const { tree, loading, refresh, hasUpdates } = useHierarchyTree({ includeInactive: true })
   const { createNode, updateNode, deleteNode, reorderNode } = useHierarchyMutations()
 
   // Vista local del árbol para reordenamiento optimista
@@ -97,6 +99,7 @@ export function HierarchyPage() {
     parentId: null,
     descripcion: '',
     orden: 1,
+    activo: true,
   })
 
   const [isSaving, setIsSaving] = useState(false)
@@ -176,6 +179,7 @@ export function HierarchyPage() {
       parentId: parent?.id ?? null,
       descripcion: '',
       orden: 1,
+      activo: true,
     })
     setSaveError(null)
     setShowCreateDialog(true)
@@ -190,16 +194,19 @@ export function HierarchyPage() {
       parentId: node.parentId,
       descripcion: node.descripcion || '',
       orden: node.orden,
+      activo: node.activo ?? true,
     })
     setSaveError(null)
     setShowEditDialog(true)
   }
 
-  const handleDelete = async (node: HierarchyNode) => {
-    // Confirmación especial para empresas (nivel 1)
+  const handleDelete = async (node: HierarchyNodeWithChildren) => {
     const isEmpresa = node.nivel === HierarchyLevel.EMPRESA
-    const confirmMessage = isEmpresa
-      ? `⚠️ ADVERTENCIA: Vas a eliminar la empresa "${node.nombre}" y TODA su jerarquía (áreas, sistemas, equipos, etc.).\n\n¿Estás absolutamente seguro? Esta acción NO se puede deshacer.`
+    const hasChildren = Boolean(node.children && node.children.length > 0)
+    const willCascadeDelete = isEmpresa || hasChildren
+
+    const confirmMessage = willCascadeDelete
+      ? `⚠️ ADVERTENCIA: Vas a eliminar "${node.nombre}" y TODA su jerarquía descendiente.\n\n¿Estás seguro? Esta acción NO se puede deshacer.`
       : `¿Eliminar "${node.nombre}"? Esta acción no se puede deshacer.`
     
     if (!confirm(confirmMessage)) {
@@ -215,8 +222,8 @@ export function HierarchyPage() {
     }
 
     try {
-      await deleteNode(node.id)
-      logger.info('Node deleted', { nodeId: node.id, nivel: node.nivel, isEmpresa })
+      await deleteNode(node.id, willCascadeDelete)
+      logger.info('Node deleted', { nodeId: node.id, nivel: node.nivel, isEmpresa, hasChildren, willCascadeDelete })
       refresh()
     } catch (error) {
       logger.error('Error deleting node', error instanceof Error ? error : new Error(String(error)))
@@ -231,14 +238,6 @@ export function HierarchyPage() {
     setSaveError(null)
 
     try {
-      console.log('[HierarchyPage] Creando nodo:', {
-        nombre: formData.nombre,
-        codigo: formData.codigo,
-        nivel: formData.nivel,
-        parentId: formData.parentId,
-        userId: user.id
-      })
-      
       const nodeData: any = {
         nombre: formData.nombre,
         codigo: formData.codigo,
@@ -254,7 +253,6 @@ export function HierarchyPage() {
       }
       
       const newId = await createNode(nodeData)
-      console.log('[HierarchyPage] Nodo creado exitosamente:', newId)
 
       logger.info('Node created', { nombre: formData.nombre, nivel: formData.nivel })
       setShowCreateDialog(false)
@@ -279,7 +277,7 @@ export function HierarchyPage() {
         nombre: formData.nombre,
         codigo: formData.codigo,
         orden: formData.orden,
-        activo: true,
+        activo: formData.activo,
       }
       
       // Solo agregar descripcion si tiene valor
@@ -541,7 +539,8 @@ export function HierarchyPage() {
               'border',
               isActive
                 ? 'border-emerald-500/30 bg-emerald-500/10 dark:border-emerald-400/20 dark:bg-emerald-400/5'
-                : 'border-transparent hover:border-border hover:bg-muted'
+                : 'border-transparent hover:border-border hover:bg-muted',
+              !node.activo && 'opacity-60'
             )}
             style={{ paddingLeft: `${indent + 8}px` }}
             onClick={() => setActiveNodeId(node.id)}
@@ -580,6 +579,11 @@ export function HierarchyPage() {
                 <Badge variant="outline" className="text-xs">
                   {HIERARCHY_LEVEL_NAMES[node.nivel]}
                 </Badge>
+                {!node.activo && (
+                  <Badge variant="secondary" className="text-xs">
+                    Inactivo
+                  </Badge>
+                )}
               </div>
               <div className="text-xs text-muted-foreground">
                 {highlightText(node.codigo, debouncedSearch)}
@@ -897,6 +901,19 @@ export function HierarchyPage() {
                 value={formData.codigo}
                 onChange={e => setFormData({ ...formData, codigo: e.target.value.toUpperCase() })}
                 className="mt-1"
+              />
+            </div>
+
+            <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/30">
+              <div>
+                <p className="text-sm font-medium">Activo</p>
+                <p className="text-xs text-muted-foreground">
+                  Si lo desactivas, deja de aparecer en selectores.
+                </p>
+              </div>
+              <Switch
+                checked={formData.activo}
+                onCheckedChange={(checked) => setFormData({ ...formData, activo: checked })}
               />
             </div>
 

@@ -10,6 +10,7 @@ import {
   where,
   orderBy,
   getDocs,
+  limit,
   doc,
   getDoc,
   addDoc,
@@ -35,16 +36,52 @@ import {
 
 // Cache global para árbol completo con timestamp de última actualización
 let treeCache: {
+  key: 'active' | 'all'
   data: HierarchyNodeWithChildren[]
   timestamp: number
   lastUpdate: Timestamp | null
 } | null = null
 
+const CACHE_TTL_MS = 5 * 60 * 1000
+
+let nodeCache = new Map<string, { node: HierarchyNode; timestamp: number }>()
+let childrenCache = new Map<string, { children: HierarchyNode[]; timestamp: number }>()
+let pathCache = new Map<string, { path: HierarchyPath[]; timestamp: number }>()
+
+function isFresh(timestamp: number) {
+  return Date.now() - timestamp < CACHE_TTL_MS
+}
+
+function invalidateHierarchyCaches() {
+  treeCache = null
+  nodeCache.clear()
+  childrenCache.clear()
+  pathCache.clear()
+}
+
+async function getNodeCached(id: string): Promise<HierarchyNode | null> {
+  const cached = nodeCache.get(id)
+  if (cached && isFresh(cached.timestamp)) {
+    return cached.node
+  }
+
+  const snap = await getDoc(doc(db, 'hierarchy', id))
+  if (!snap.exists()) {
+    nodeCache.delete(id)
+    return null
+  }
+
+  const node = { id: snap.id, ...snap.data() } as HierarchyNode
+  nodeCache.set(id, { node, timestamp: Date.now() })
+  return node
+}
+
 /**
  * Hook principal: obtener árbol completo jerárquico
  * Con sincronización automática cada 30 segundos
  */
-export function useHierarchyTree() {
+export function useHierarchyTree(options?: { includeInactive?: boolean }) {
+  const includeInactive = options?.includeInactive ?? false
   const [tree, setTree] = useState<HierarchyNodeWithChildren[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
@@ -52,23 +89,48 @@ export function useHierarchyTree() {
 
   const loadTree = async () => {
     try {
-      setLoading(true)
       setError(null)
+
+      const cacheKey: 'active' | 'all' = includeInactive ? 'all' : 'active'
+      if (treeCache && treeCache.key === cacheKey && isFresh(treeCache.timestamp)) {
+        setTree(treeCache.data)
+        setHasUpdates(false)
+        setLoading(false)
+        return
+      }
+
+      setLoading(true)
 
       // Obtener todos los nodos ordenados por nivel y orden
       const hierarchyRef = collection(db, 'hierarchy')
-      const q = query(
-        hierarchyRef,
-        where('activo', '==', true),
-        orderBy('nivel', 'asc'),
-        orderBy('orden', 'asc')
-      )
+      // Nota: includeInactive usa ordenamiento en cliente para evitar requerir un índice compuesto extra.
+      const q = includeInactive
+        ? query(hierarchyRef, orderBy('nivel', 'asc'))
+        : query(
+            hierarchyRef,
+            where('activo', '==', true),
+            orderBy('nivel', 'asc'),
+            orderBy('orden', 'asc')
+          )
       
       const snapshot = await getDocs(q)
-      const nodes: HierarchyNode[] = snapshot.docs.map(doc => ({
+      const nodesUnsorted: HierarchyNode[] = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data(),
       } as HierarchyNode))
+
+      const nodes = includeInactive
+        ? [...nodesUnsorted].sort((a, b) => {
+            if (a.nivel !== b.nivel) return a.nivel - b.nivel
+            return (a.orden ?? 0) - (b.orden ?? 0)
+          })
+        : nodesUnsorted
+
+      // Pre-cargar cache de nodos por id para acelerar breadcrumbs/path
+      const now = Date.now()
+      nodes.forEach((n) => {
+        nodeCache.set(n.id, { node: n, timestamp: now })
+      })
 
       // Encontrar última actualización
       let lastUpdate: Timestamp | null = null
@@ -85,6 +147,7 @@ export function useHierarchyTree() {
 
       // Actualizar caché
       treeCache = {
+        key: includeInactive ? 'all' : 'active',
         data: treeData,
         timestamp: Date.now(),
         lastUpdate,
@@ -108,12 +171,18 @@ export function useHierarchyTree() {
     
     try {
       const hierarchyRef = collection(db, 'hierarchy')
-      const q = query(
-        hierarchyRef,
-        where('activo', '==', true),
-        where('actualizadoEn', '>', treeCache.lastUpdate),
-        orderBy('actualizadoEn', 'desc')
-      )
+      const q = includeInactive
+        ? query(
+            hierarchyRef,
+            where('actualizadoEn', '>', treeCache.lastUpdate),
+            orderBy('actualizadoEn', 'desc')
+          )
+        : query(
+            hierarchyRef,
+            where('activo', '==', true),
+            where('actualizadoEn', '>', treeCache.lastUpdate),
+            orderBy('actualizadoEn', 'desc')
+          )
       
       const snapshot = await getDocs(q)
       if (snapshot.size > 0) {
@@ -134,10 +203,10 @@ export function useHierarchyTree() {
     }, 30000)
 
     return () => clearInterval(interval)
-  }, [])
+  }, [includeInactive])
 
   const refresh = () => {
-    treeCache = null // Invalidar caché
+    invalidateHierarchyCaches()
     loadTree()
   }
 
@@ -152,12 +221,17 @@ export function useHierarchyChildren(parentId: string | null, nivel?: HierarchyL
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    console.log('[useHierarchyChildren] Cargando hijos:', { parentId, nivel })
-    
     if (nivel !== undefined && nivel >= 8) {
       // Nivel 8 no tiene hijos
-      console.log('[useHierarchyChildren] Nivel 8 alcanzado, sin hijos')
       setChildren([])
+      return
+    }
+
+    const cacheKey = `${parentId ?? 'root'}|${nivel ?? 'any'}`
+    const cached = childrenCache.get(cacheKey)
+    if (cached && isFresh(cached.timestamp)) {
+      setChildren(cached.children)
+      setLoading(false)
       return
     }
 
@@ -178,40 +252,17 @@ export function useHierarchyChildren(parentId: string | null, nivel?: HierarchyL
           constraints.unshift(where('nivel', '==', nivel))
         }
 
-        console.log('[useHierarchyChildren] Query constraints:', constraints.map(c => c.type))
-        
         const q = query(hierarchyRef, ...constraints)
         const snapshot = await getDocs(q)
-        
-        console.log('[useHierarchyChildren] Documentos encontrados:', snapshot.size)
-        
-        // Si no hay resultados en nivel 1, mostrar TODOS los nodos para debug
-        if (snapshot.size === 0 && parentId === null && nivel === 1) {
-          console.warn('[useHierarchyChildren] ⚠️ No hay nodos nivel 1 con parentId null. Verificando qué hay en Firestore...')
-          const allNodesQuery = query(hierarchyRef, where('nivel', '==', 1))
-          const allSnapshot = await getDocs(allNodesQuery)
-          console.log('[useHierarchyChildren] Total nodos nivel 1 en Firestore:', allSnapshot.size)
-          allSnapshot.docs.forEach(doc => {
-            const data = doc.data()
-            console.log('[useHierarchyChildren] Nodo nivel 1:', {
-              id: doc.id,
-              nombre: data.nombre,
-              parentId: data.parentId,
-              nivel: data.nivel,
-              activo: data.activo
-            })
-          })
-        }
         
         const nodes: HierarchyNode[] = snapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data(),
         } as HierarchyNode))
 
-        console.log('[useHierarchyChildren] Nodos procesados:', nodes.length)
+        childrenCache.set(cacheKey, { children: nodes, timestamp: Date.now() })
         setChildren(nodes)
       } catch (error) {
-        console.error('[useHierarchyChildren] Error:', error)
         logger.error('Failed to load hierarchy children', error instanceof Error ? error : new Error(String(error)))
         setChildren([])
       } finally {
@@ -238,44 +289,37 @@ export function useHierarchyPath(nodeId: string | null) {
       return
     }
 
+    const cached = pathCache.get(nodeId)
+    if (cached && isFresh(cached.timestamp)) {
+      setPath(cached.path)
+      setLoading(false)
+      return
+    }
+
     const loadPath = async () => {
       try {
         setLoading(true)
-        
-        // Obtener el nodo actual
-        const nodeDoc = await getDoc(doc(db, 'hierarchy', nodeId))
-        if (!nodeDoc.exists()) {
+
+        const node = await getNodeCached(nodeId)
+        if (!node) {
           setPath([])
+          pathCache.delete(nodeId)
           return
         }
 
-        const node = { id: nodeDoc.id, ...nodeDoc.data() } as HierarchyNode
+        const ancestors = await Promise.all((node.path || []).map((id) => getNodeCached(id)))
+        const fullPath: HierarchyPath[] = ancestors
+          .filter((n): n is HierarchyNode => Boolean(n))
+          .map((n) => ({
+            id: n.id,
+            nombre: n.nombre,
+            codigo: n.codigo,
+            nivel: n.nivel,
+          }))
 
-        // Construir path desde el array path del nodo
-        const pathDocs = await Promise.all(
-          node.path.map(id => getDoc(doc(db, 'hierarchy', id)))
-        )
+        fullPath.push({ id: node.id, nombre: node.nombre, codigo: node.codigo, nivel: node.nivel })
 
-        const fullPath: HierarchyPath[] = pathDocs
-          .filter(doc => doc.exists())
-          .map(doc => {
-            const data = doc.data() as HierarchyNode
-            return {
-              id: doc.id,
-              nombre: data.nombre,
-              codigo: data.codigo,
-              nivel: data.nivel,
-            }
-          })
-
-        // Agregar nodo actual al final
-        fullPath.push({
-          id: node.id,
-          nombre: node.nombre,
-          codigo: node.codigo,
-          nivel: node.nivel,
-        })
-
+        pathCache.set(nodeId, { path: fullPath, timestamp: Date.now() })
         setPath(fullPath)
       } catch (error) {
         logger.error('Failed to load hierarchy path', error instanceof Error ? error : new Error(String(error)))
@@ -375,12 +419,8 @@ export function useHierarchyMutations() {
   }
 
   const createNode = async (input: CreateHierarchyNodeInput): Promise<string> => {
-    console.log('[useHierarchy] createNode iniciado:', input)
-    console.log('[useHierarchy] Usuario actual:', { uid: user?.uid, id: user?.id })
-    
     if (!user?.id) {
       const errorMsg = 'Usuario no autenticado o sin ID'
-      console.error('[useHierarchy] Error:', errorMsg, user)
       throw new Error(errorMsg)
     }
 
@@ -390,19 +430,15 @@ export function useHierarchyMutations() {
       // Calcular path
       const path: string[] = []
       if (input.parentId) {
-        console.log('[useHierarchy] Obteniendo padre:', input.parentId)
         const parentDoc = await getDoc(doc(db, 'hierarchy', input.parentId))
         if (parentDoc.exists()) {
           const parentData = parentDoc.data() as HierarchyNode
           path.push(...parentData.path, input.parentId)
-          console.log('[useHierarchy] Path calculado:', path)
         } else {
-          console.error('[useHierarchy] Padre no encontrado:', input.parentId)
         }
       }
 
       // Obtener orden (siguiente disponible)
-      console.log('[useHierarchy] Consultando hermanos para calcular orden...')
       const hierarchyRef = collection(db, 'hierarchy')
       const siblingsQuery = query(
         hierarchyRef,
@@ -413,8 +449,6 @@ export function useHierarchyMutations() {
       const lastOrder = siblingsSnapshot.empty
         ? 0
         : (siblingsSnapshot.docs[0]?.data().orden ?? 0)
-      
-      console.log('[useHierarchy] Hermanos encontrados:', siblingsSnapshot.size, 'Orden siguiente:', lastOrder + 1)
 
       const newNode: any = {
         nombre: input.nombre,
@@ -437,24 +471,14 @@ export function useHierarchyMutations() {
         newNode.metadata = input.metadata
       }
 
-      console.log('[useHierarchy] Guardando nodo en Firestore:', newNode)
       const docRef = await addDoc(collection(db, 'hierarchy'), newNode)
-      console.log('[useHierarchy] Nodo guardado con ID:', docRef.id)
       
       // Invalidar caché
-      treeCache = null
+      invalidateHierarchyCaches()
 
       logger.info('Hierarchy node created', { id: docRef.id, nivel: input.nivel })
-      console.log('[useHierarchy] Nodo creado exitosamente')
       return docRef.id
     } catch (error) {
-      console.error('[useHierarchy] Error al crear nodo:', error)
-      console.error('[useHierarchy] Detalles del error:', {
-        name: (error as any).name,
-        code: (error as any).code,
-        message: (error as any).message,
-        stack: (error as any).stack
-      })
       logger.error('Failed to create hierarchy node', error instanceof Error ? error : new Error(String(error)))
       throw error
     }
@@ -486,7 +510,7 @@ export function useHierarchyMutations() {
       await updateDoc(doc(db, 'hierarchy', id), updateData)
 
       // Invalidar caché
-      treeCache = null
+      invalidateHierarchyCaches()
 
       logger.info('Hierarchy node updated', { id })
     } catch (error) {
@@ -498,36 +522,40 @@ export function useHierarchyMutations() {
   const deleteNode = async (id: string, deleteChildren = false): Promise<void> => {
     try {
       if (deleteChildren) {
-        // Eliminar nodo y todos sus descendientes
-        const batch = writeBatch(db)
-        
-        // Obtener todos los descendientes
+        // Eliminar nodo y todos sus descendientes (en lotes para evitar límite de 500 ops)
         const hierarchyRef = collection(db, 'hierarchy')
-        const descendantsQuery = query(
-          hierarchyRef,
-          where('path', 'array-contains', id)
-        )
+        const descendantsQuery = query(hierarchyRef, where('path', 'array-contains', id))
         const descendantsSnapshot = await getDocs(descendantsQuery)
 
-        // Agregar nodo actual y descendientes al batch
-        batch.delete(doc(db, 'hierarchy', id))
-        descendantsSnapshot.docs.forEach(doc => {
-          batch.delete(doc.ref)
-        })
+        const refs = [doc(db, 'hierarchy', id), ...descendantsSnapshot.docs.map((d) => d.ref)]
 
-        await batch.commit()
+        const chunkSize = 450
+        for (let i = 0; i < refs.length; i += chunkSize) {
+          const batch = writeBatch(db)
+          const chunk = refs.slice(i, i + chunkSize)
+          chunk.forEach((ref) => batch.delete(ref))
+          await batch.commit()
+        }
+
         logger.info('Hierarchy node and descendants deleted', {
           id,
           descendantsCount: descendantsSnapshot.size,
         })
       } else {
-        // Solo eliminar el nodo (hijos quedan huérfanos - se podrían reasignar)
+        // Solo eliminar el nodo (bloquear si tiene hijos para evitar huérfanos)
+        const hierarchyRef = collection(db, 'hierarchy')
+        const childrenQuery = query(hierarchyRef, where('parentId', '==', id), limit(1))
+        const childrenSnap = await getDocs(childrenQuery)
+        if (!childrenSnap.empty) {
+          throw new Error('No se puede eliminar un nodo con hijos. Usa eliminación en cascada o elimina/desactiva primero los descendientes.')
+        }
+
         await deleteDoc(doc(db, 'hierarchy', id))
         logger.info('Hierarchy node deleted', { id })
       }
 
       // Invalidar caché
-      treeCache = null
+      invalidateHierarchyCaches()
     } catch (error) {
       logger.error('Failed to delete hierarchy node', error instanceof Error ? error : new Error(String(error)))
       throw error
@@ -594,7 +622,7 @@ export function useHierarchyMutations() {
       await batch.commit()
 
       // Invalidar caché
-      treeCache = null
+      invalidateHierarchyCaches()
 
       logger.info('Node reordered', { nodeId, direction, newOrder: targetNode.orden })
     } catch (error) {
@@ -699,15 +727,8 @@ export function useHierarchyCascadeOptions(parentId: string | null, nivel: Hiera
       nivel: node.nivel,
       hasChildren: node.nivel < 8,
     }))
-    console.log('[useHierarchyCascadeOptions] Opciones generadas:', {
-      parentId,
-      nivel,
-      childrenCount: children.length,
-      optionsCount: opts.length,
-      options: opts
-    })
     return opts
-  }, [children, parentId, nivel])
+  }, [children])
 
   return { options, loading }
 }

@@ -19,24 +19,56 @@ type FlatNode = {
 const CREDENTIALS_ENV = 'GOOGLE_APPLICATION_CREDENTIALS'
 const COLLECTION = 'hierarchy'
 const JSON_PATH = path.resolve(__dirname, 'JERARQUIA_COMPLETA_VERIFICADA.json')
-
-function assertEnv() {
-  if (!process.env[CREDENTIALS_ENV]) {
-    throw new Error(`Debe definir ${CREDENTIALS_ENV} apuntando al JSON de servicio de Firebase Admin.`)
-  }
-}
+const CANON_PATH = path.resolve(__dirname, 'EXPECTED_CANONICAL.json')
+const CANON_EXT_PATH = path.resolve(__dirname, 'EXPECTED_CANONICAL_EXTENDED.json')
 
 function initFirebase() {
   if (admin.apps.length === 0) {
+    const credentialsPath = process.env[CREDENTIALS_ENV]
+    if (credentialsPath && fs.existsSync(credentialsPath)) {
+      const raw = fs.readFileSync(credentialsPath, 'utf8')
+      const serviceAccount = JSON.parse(raw)
+      admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount),
+      })
+      console.log(`[initFirebase] Usando Service Account: ${credentialsPath}`)
+      return
+    }
+
+    // Alternativa: Application Default Credentials (ADC)
+    // Ej:
+    //   gcloud auth application-default login
+    // Esto permite correr scripts sin bajar un JSON de servicio.
     admin.initializeApp({
       credential: admin.credential.applicationDefault(),
     })
+    console.log('[initFirebase] Usando Application Default Credentials (ADC)')
   }
 }
 
 function loadJson(): { estructura: any; [key: string]: any } {
   const raw = fs.readFileSync(JSON_PATH, 'utf8')
   return JSON.parse(raw)
+}
+
+function loadNodesPreferCanonical(): { nodes: FlatNode[]; source: string } {
+  const preferred = fs.existsSync(CANON_EXT_PATH) ? CANON_EXT_PATH : CANON_PATH
+
+  if (fs.existsSync(preferred)) {
+    const raw = fs.readFileSync(preferred, 'utf8')
+    const parsed = JSON.parse(raw) as any
+    const nodes: FlatNode[] = Array.isArray(parsed?.nodes)
+      ? parsed.nodes.map((n: any) => ({
+          codigo: String(n.codigo ?? '').trim(),
+          denominacion: String(n.denominacion ?? '').trim(),
+          padre: n.padre ? String(n.padre).trim() : null,
+        }))
+      : []
+    return { nodes: nodes.filter(n => n.codigo), source: preferred }
+  }
+
+  const data = loadJson()
+  return { nodes: collectNodes(data), source: JSON_PATH }
 }
 
 function collectNodes(data: any): FlatNode[] {
@@ -206,10 +238,9 @@ async function importNodes(nodes: FlatNode[]) {
 
 async function main() {
   try {
-    assertEnv()
     initFirebase()
-    const data = loadJson()
-    const nodes = collectNodes(data)
+    const { nodes, source } = loadNodesPreferCanonical()
+    console.log(`[main] Fuente: ${source}`)
     console.log(`[main] Nodos a procesar: ${nodes.length}`)
     await importNodes(nodes)
     console.log('[main] Importación finalizada')

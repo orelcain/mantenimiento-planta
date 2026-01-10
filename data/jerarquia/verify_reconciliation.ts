@@ -36,6 +36,7 @@ const COLLECTION = 'hierarchy'
 const JSON_PATH = path.resolve(__dirname, 'JERARQUIA_COMPLETA_VERIFICADA.json')
 const OCR_PATH = path.resolve(__dirname, 'ocr_resultado.txt')
 const CANON_PATH = path.resolve(__dirname, 'EXPECTED_CANONICAL.json')
+const CANON_EXT_PATH = path.resolve(__dirname, 'EXPECTED_CANONICAL_EXTENDED.json')
 
 function listImageJsonPaths(): string[] {
   const paths: string[] = []
@@ -61,8 +62,9 @@ function loadJson(): any {
 
 function loadExpectedFromAllSources(): { nodes: FlatNode[]; meta: { sources: string[] } } {
   // Si existe un dataset canónico, usarlo directamente.
-  if (fs.existsSync(CANON_PATH)) {
-    const raw = fs.readFileSync(CANON_PATH, 'utf8')
+  const preferred = fs.existsSync(CANON_EXT_PATH) ? CANON_EXT_PATH : CANON_PATH
+  if (fs.existsSync(preferred)) {
+    const raw = fs.readFileSync(preferred, 'utf8')
     const parsed = JSON.parse(raw) as any
     const nodes: FlatNode[] = Array.isArray(parsed?.nodes)
       ? parsed.nodes.map((n: any) => ({
@@ -72,7 +74,7 @@ function loadExpectedFromAllSources(): { nodes: FlatNode[]; meta: { sources: str
         }))
       : []
 
-    return { nodes, meta: { sources: [CANON_PATH] } }
+    return { nodes, meta: { sources: [preferred] } }
   }
 
   const sources: string[] = []

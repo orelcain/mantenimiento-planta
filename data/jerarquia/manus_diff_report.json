@@ -1,0 +1,1089 @@
+{
+  "md": {
+    "path": "D:\\a\\APP leventamiento de insidencias en planta\\data\\jerarquia\\jerarquia_datos.md",
+    "total": 354
+  },
+  "expected": {
+    "path": "D:\\a\\APP leventamiento de insidencias en planta\\data\\jerarquia\\EXPECTED_CANONICAL.json",
+    "total": 438
+  },
+  "onlyInMd": [
+    {
+      "codigo": "720004614",
+      "denominacion": "CONDENSADOR TUBULAR N1",
+      "padre": "AQ-IN-CHO-PCHO-EXTE-SDMA",
+      "line": 186
+    },
+    {
+      "codigo": "720004615",
+      "denominacion": "CONDENSADOR TUBULAR N2",
+      "padre": "AQ-IN-CHO-PCHO-EXTE-SDMA",
+      "line": 187
+    },
+    {
+      "codigo": "720004616",
+      "denominacion": "CONDENSADOR TUBULAR N3",
+      "padre": "AQ-IN-CHO-PCHO-EXTE-SDMA",
+      "line": 188
+    },
+    {
+      "codigo": "720011909",
+      "denominacion": "FILTRO INGRESO PLANTA PRINCIPAL",
+      "padre": "AQ-IN-CHO-PCHO-PROC",
+      "line": 275
+    },
+    {
+      "codigo": "AQ-IN-CHO-PCHO-EXTE-SCHO",
+      "denominacion": "SUBESTACION PLANTA PRINCIPAL",
+      "padre": "AQ-IN-CHO-PCHO-EXTE",
+      "line": 171
+    },
+    {
+      "codigo": "AQ-IN-CHO-PCHO-EXTE-SDMA",
+      "denominacion": "SALA DE MAQUINAS",
+      "padre": "AQ-IN-CHO-PCHO-EXTE",
+      "line": 175
+    },
+    {
+      "codigo": "AQ-IN-CHO-PCHO-EXTE-TMAT",
+      "denominacion": "TALLER DE MANTENIMIENTO",
+      "padre": "AQ-IN-CHO-PCHO-EXTE",
+      "line": 222
+    }
+  ],
+  "onlyInExpected": [
+    {
+      "codigo": "3300103462",
+      "denominacion": "SENSOR TEMPERATURA, VILTER VSS1051 P/N 2",
+      "padre": "720004596"
+    },
+    {
+      "codigo": "720004402",
+      "denominacion": "CHILLER",
+      "padre": "AQ-IN-CHO-PCHO-PROC-INMP"
+    },
+    {
+      "codigo": "720004403",
+      "denominacion": "REDUCTOR MECANICO",
+      "padre": "720004402"
+    },
+    {
+      "codigo": "720004404",
+      "denominacion": "MOTOR ELECTRICO REDUCTOR",
+      "padre": "720004403"
+    },
+    {
+      "codigo": "720004405",
+      "denominacion": "SEPERTIN ENFRIAMIENTO NH3",
+      "padre": "720004402"
+    },
+    {
+      "codigo": "720004406",
+      "denominacion": "BOMBA RECIRCULACION",
+      "padre": "720004402"
+    },
+    {
+      "codigo": "720004407",
+      "denominacion": "TABLERO CONTROL CHILLER",
+      "padre": "720004402"
+    },
+    {
+      "codigo": "720004408",
+      "denominacion": "DESANGRADOR",
+      "padre": "AQ-IN-CHO-PCHO-PROC-SACR"
+    },
+    {
+      "codigo": "720004409",
+      "denominacion": "MOTOREDUCTOR",
+      "padre": "720004408"
+    },
+    {
+      "codigo": "720004410",
+      "denominacion": "TABLERO CONTROL",
+      "padre": "720004408"
+    },
+    {
+      "codigo": "720004411",
+      "denominacion": "VOLCADOR BINS COSECHA",
+      "padre": "AQ-IN-CHO-PCHO-PROC-FILE"
+    },
+    {
+      "codigo": "720004412",
+      "denominacion": "CENTRAL HIDRAULICA VOLCADOR COSECHA",
+      "padre": "720004411"
+    },
+    {
+      "codigo": "720004413",
+      "denominacion": "TABL ELEC CONT CENT HIDRAULIC VOLC COS",
+      "padre": "720004412"
+    },
+    {
+      "codigo": "720004414",
+      "denominacion": "MOTOR ELEC CENT HIDRAULICA VOLC COS",
+      "padre": "720004412"
+    },
+    {
+      "codigo": "720004415",
+      "denominacion": "BOMBA HIDRAULICA CENT HIDRAULIC VOLC COS",
+      "padre": "720004412"
+    },
+    {
+      "codigo": "720004416",
+      "denominacion": "MANDO HIDRAULICO VOLCADOR BINS",
+      "padre": "720004412"
+    },
+    {
+      "codigo": "720004417",
+      "denominacion": "BAADER 200",
+      "padre": "AQ-IN-CHO-PCHO-PROC-FILE"
+    },
+    {
+      "codigo": "720004418",
+      "denominacion": "CINTA ESQUELONE",
+      "padre": "AQ-IN-CHO-PCHO-PROC-FILE"
+    },
+    {
+      "codigo": "720004419",
+      "denominacion": "MOTOREDUCTOR CINTA ESQUELONES",
+      "padre": "720004418"
+    },
+    {
+      "codigo": "720004420",
+      "denominacion": "CINTA SALIDA FILETE",
+      "padre": "AQ-IN-CHO-PCHO-PROC-FILE"
+    },
+    {
+      "codigo": "720004421",
+      "denominacion": "MOTOREDUCTOR CINTA SALIDA FILETE",
+      "padre": "720004420"
+    },
+    {
+      "codigo": "720004422",
+      "denominacion": "TABLERO BAADER 200",
+      "padre": "720004417"
+    },
+    {
+      "codigo": "720004438",
+      "denominacion": "CINTA ACELERACION LARGA ENTRADA BAADER",
+      "padre": "AQ-IN-CHO-PCHO-PROC-EVIS"
+    },
+    {
+      "codigo": "720004439",
+      "denominacion": "MOTOREDUCTOR CINTA LARGA CLASIFICADO AC",
+      "padre": "720004438"
+    },
+    {
+      "codigo": "720004440",
+      "denominacion": "TABLERO CONTROL CINTA LARGA CLASIFICADO",
+      "padre": "720004438"
+    },
+    {
+      "codigo": "720004443",
+      "denominacion": "BOMBA HELICOIDAL DESALOJO VISCERAS N1",
+      "padre": "AQ-IN-CHO-PCHO-PROC-SACR"
+    },
+    {
+      "codigo": "720004458",
+      "denominacion": "MOTOR ELECTRICO BOMBA VACIO N2",
+      "padre": "720004457"
+    },
+    {
+      "codigo": "720004505",
+      "denominacion": "CORTINA AIRE ENTRADA PLANTA N1",
+      "padre": "AQ-IN-CHO-PCHO-PROC-SACR"
+    },
+    {
+      "codigo": "720004506",
+      "denominacion": "CORTINA AIRE ENTRADA PLANTA N2",
+      "padre": "AQ-IN-CHO-PCHO-PROC-SACR"
+    },
+    {
+      "codigo": "720004507",
+      "denominacion": "CORTINA AIRE ENTRADA SACRIFICIO",
+      "padre": "AQ-IN-CHO-PCHO-PROC-SACR"
+    },
+    {
+      "codigo": "720004509",
+      "denominacion": "CORTINA AIRE ENTRADA PRETUNEL N1",
+      "padre": "AQ-IN-CHO-PCHO-PROC-TUNE"
+    },
+    {
+      "codigo": "720004510",
+      "denominacion": "CORTINA AIRE ENTRADA PRETUNEL N2",
+      "padre": "AQ-IN-CHO-PCHO-PROC-TUNE"
+    },
+    {
+      "codigo": "720004511",
+      "denominacion": "CORTINA AIRE POSTUNEL N1",
+      "padre": "AQ-IN-CHO-PCHO-PROC-TUNE"
+    },
+    {
+      "codigo": "720004512",
+      "denominacion": "CORTINA AIRE POSTUNEL N2",
+      "padre": "AQ-IN-CHO-PCHO-PROC-TUNE"
+    },
+    {
+      "codigo": "720004513",
+      "denominacion": "CORTINA AIRE ENTRADA LAVADO CARROS",
+      "padre": "AQ-IN-CHO-PCHO-PROC-LAVA"
+    },
+    {
+      "codigo": "720004519",
+      "denominacion": "EXTRACTOR COSECHA 1",
+      "padre": "AQ-IN-CHO-PCHO-PROC-INMP"
+    },
+    {
+      "codigo": "720004520",
+      "denominacion": "EXTRACTOR COSECHA 2",
+      "padre": "AQ-IN-CHO-PCHO-PROC-INMP"
+    },
+    {
+      "codigo": "720004521",
+      "denominacion": "EXTRACTOR COSECHA 3",
+      "padre": "AQ-IN-CHO-PCHO-PROC-INMP"
+    },
+    {
+      "codigo": "720004522",
+      "denominacion": "EXTRACTOR COSECHA 4",
+      "padre": "AQ-IN-CHO-PCHO-PROC-INMP"
+    },
+    {
+      "codigo": "720004523",
+      "denominacion": "EXTRACTOR PRETUNEL 1",
+      "padre": "AQ-IN-CHO-PCHO-PROC-TUNE"
+    },
+    {
+      "codigo": "720004524",
+      "denominacion": "EXTRACTOR PRETUNEL 2",
+      "padre": "AQ-IN-CHO-PCHO-PROC-TUNE"
+    },
+    {
+      "codigo": "720004525",
+      "denominacion": "EXTRACTOR PRETUNEL 3",
+      "padre": "AQ-IN-CHO-PCHO-PROC-TUNE"
+    },
+    {
+      "codigo": "720004532",
+      "denominacion": "SOPLADORES VIGUETAS TUNELES 1",
+      "padre": "AQ-IN-CHO-PCHO-PROC-TUNE"
+    },
+    {
+      "codigo": "720004533",
+      "denominacion": "SOPLADORES VIGUETAS TUNELES 2",
+      "padre": "AQ-IN-CHO-PCHO-PROC-TUNE"
+    },
+    {
+      "codigo": "720004547",
+      "denominacion": "CALDERA PLANTA",
+      "padre": "AQ-IN-CHO-PCHO-EXTE-TMAN"
+    },
+    {
+      "codigo": "720004596",
+      "denominacion": "COMPRESOR NH3 N1",
+      "padre": "AQ-IN-CHO-PCHO-PROC-TUNE"
+    },
+    {
+      "codigo": "720004597",
+      "denominacion": "MOTOR COMPRESOR NH3 N1",
+      "padre": "720004596"
+    },
+    {
+      "codigo": "720004598",
+      "denominacion": "TABLERO CONTROL COMPRESOR N1",
+      "padre": "720004596"
+    },
+    {
+      "codigo": "720004599",
+      "denominacion": "COMPRESOR NH3 N2",
+      "padre": "AQ-IN-CHO-PCHO-PROC-TUNE"
+    },
+    {
+      "codigo": "720004600",
+      "denominacion": "MOTOR COMPRESOR NH3 N2",
+      "padre": "720004599"
+    },
+    {
+      "codigo": "720004601",
+      "denominacion": "TABLERO CONTROL COMPRESOR N2",
+      "padre": "720004599"
+    },
+    {
+      "codigo": "720004602",
+      "denominacion": "COMPRESOR NH3 N3",
+      "padre": "AQ-IN-CHO-PCHO-PROC-TUNE"
+    },
+    {
+      "codigo": "720004603",
+      "denominacion": "MOTOR COMPRESOR NH3 N3",
+      "padre": "720004602"
+    },
+    {
+      "codigo": "720004604",
+      "denominacion": "TABLERO CONTROL COMPRESOR N3",
+      "padre": "720004602"
+    },
+    {
+      "codigo": "720004605",
+      "denominacion": "BOMBA FLUJO NH3 N1",
+      "padre": "AQ-IN-CHO-PCHO-PROC-TUNE"
+    },
+    {
+      "codigo": "720004606",
+      "denominacion": "MOTOR ELECTRICO BOMBA FLUJO NH3 N1",
+      "padre": "720004605"
+    },
+    {
+      "codigo": "720004607",
+      "denominacion": "BOMBA FLUJO NH3 N2",
+      "padre": "AQ-IN-CHO-PCHO-PROC-TUNE"
+    },
+    {
+      "codigo": "720004608",
+      "denominacion": "MOTOR ELECTRICO BOMBA FLUJO NH3 N2",
+      "padre": "720004607"
+    },
+    {
+      "codigo": "720004609",
+      "denominacion": "BOMBA FLUJO NH3 N3",
+      "padre": "AQ-IN-CHO-PCHO-PROC-TUNE"
+    },
+    {
+      "codigo": "720004610",
+      "denominacion": "MOTOR ELECTRICO BOMBA FLUJO NH3 N3",
+      "padre": "720004609"
+    },
+    {
+      "codigo": "720004611",
+      "denominacion": "ESTANQUE BOMBEO N1 -40C",
+      "padre": "AQ-IN-CHO-PCHO-PROC-TUNE"
+    },
+    {
+      "codigo": "720004612",
+      "denominacion": "ESTANQUE RECIBIDOR LIQUIDO NH3",
+      "padre": "AQ-IN-CHO-PCHO-PROC-TUNE"
+    },
+    {
+      "codigo": "720004613",
+      "denominacion": "ESTANQUE PRIORITARIO NH3",
+      "padre": "AQ-IN-CHO-PCHO-PROC-TUNE"
+    },
+    {
+      "codigo": "720004617",
+      "denominacion": "BOMBA FLUJO ALIMENTACION CONDESADORES N1",
+      "padre": "AQ-IN-CHO-PCHO-PROC-TUNE"
+    },
+    {
+      "codigo": "720004618",
+      "denominacion": "MOTOR ELEC BOMBA ALIMENTACION N1",
+      "padre": "720004617"
+    },
+    {
+      "codigo": "720004619",
+      "denominacion": "BOMBA FLUJO ALIMENTACION CONDESADORES N2",
+      "padre": "AQ-IN-CHO-PCHO-PROC-TUNE"
+    },
+    {
+      "codigo": "720004620",
+      "denominacion": "MOTOR ELEC BOMBA ALIMENTACION N2",
+      "padre": "720004619"
+    },
+    {
+      "codigo": "720004621",
+      "denominacion": "BOMBA FLUJO ALIMENTACION CONDESADORES N3",
+      "padre": "AQ-IN-CHO-PCHO-PROC-TUNE"
+    },
+    {
+      "codigo": "720004622",
+      "denominacion": "MOTOR ELEC BOMBA ALIMENTACION N3",
+      "padre": "720004621"
+    },
+    {
+      "codigo": "720004623",
+      "denominacion": "TUNEL ESTATICO NH3 N1",
+      "padre": "AQ-IN-CHO-PCHO-PROC-TUNE"
+    },
+    {
+      "codigo": "720004624",
+      "denominacion": "EVAPORADOR NH3 N1",
+      "padre": "720004623"
+    },
+    {
+      "codigo": "720004625",
+      "denominacion": "MOTOR VENTILADOR TUNELES NH3 N1",
+      "padre": "720004624"
+    },
+    {
+      "codigo": "720011723",
+      "denominacion": "CINTA TRANSVERSAL SALIDA BAADER",
+      "padre": "AQ-IN-CHO-PCHO-PROC-EVIS"
+    },
+    {
+      "codigo": "720011735",
+      "denominacion": "DESAGUADOR SISTEMA 1",
+      "padre": "720004402"
+    },
+    {
+      "codigo": "720011995",
+      "denominacion": "FILTRO INGRESO PLANTA PRINCIPAL",
+      "padre": "AQ-IN-CHO-PCHO-PROC-ARMA"
+    },
+    {
+      "codigo": "720012995",
+      "denominacion": "CINTA PIMPONES",
+      "padre": "AQ-IN-CHO-PCHO-PROC-FILE"
+    },
+    {
+      "codigo": "720012996",
+      "denominacion": "SELLADORA CAMPANA",
+      "padre": "AQ-IN-CHO-PCHO-PROC-SELL"
+    },
+    {
+      "codigo": "720012997",
+      "denominacion": "TERMOFORMADORA GEA",
+      "padre": "AQ-IN-CHO-PCHO-PROC-SELL"
+    },
+    {
+      "codigo": "720012998",
+      "denominacion": "BALANZA DINAMICA MAREL",
+      "padre": "AQ-IN-CHO-PCHO-PROC-SELL"
+    },
+    {
+      "codigo": "720012999",
+      "denominacion": "CINTA CURVA",
+      "padre": "AQ-IN-CHO-PCHO-PROC-SELL"
+    },
+    {
+      "codigo": "AQ-IN-CHO-PCHO-EXTE-SCBO",
+      "denominacion": "SUBESTACION PLANTA PRINCIPAL",
+      "padre": "AQ-IN-CHO-PCHO-EXTE"
+    },
+    {
+      "codigo": "AQ-IN-CHO-PCHO-EXTE-SMAQ",
+      "denominacion": "SALA DE MAQUINAS",
+      "padre": "AQ-IN-CHO-PCHO-EXTE"
+    },
+    {
+      "codigo": "AQ-IN-CHO-PCHO-EXTE-TMAN",
+      "denominacion": "TALLER DE MANTENIMIENTO",
+      "padre": "AQ-IN-CHO-PCHO-EXTE"
+    },
+    {
+      "codigo": "AQ-IN-CHO-PCHO-PROC-FILE",
+      "denominacion": "FILETE",
+      "padre": "AQ-IN-CHO-PCHO-PROC"
+    },
+    {
+      "codigo": "AQ-IN-CHO-PCHO-PROC-INMP",
+      "denominacion": "INGRESO MATERIA PRIMA",
+      "padre": "AQ-IN-CHO-PCHO-PROC"
+    },
+    {
+      "codigo": "AQ-IN-CHO-PCHO-PROC-LAVA",
+      "denominacion": "LAVADO BANDEJAS Y CARROS",
+      "padre": "AQ-IN-CHO-PCHO-PROC"
+    },
+    {
+      "codigo": "AQ-IN-CHO-PCHO-PROC-OFIC",
+      "denominacion": "OFICINAS",
+      "padre": "AQ-IN-CHO-PCHO-PROC"
+    },
+    {
+      "codigo": "AQ-IN-CHO-PCHO-PROC-SACR",
+      "denominacion": "SACRIFICIO",
+      "padre": "AQ-IN-CHO-PCHO-PROC"
+    },
+    {
+      "codigo": "AQ-IN-CHO-PCHO-PROC-SELL",
+      "denominacion": "SELLADO",
+      "padre": "AQ-IN-CHO-PCHO-PROC"
+    },
+    {
+      "codigo": "AQ-IN-CHO-PCHO-PROC-TUNE",
+      "denominacion": "TUNELES",
+      "padre": "AQ-IN-CHO-PCHO-PROC"
+    },
+    {
+      "codigo": "AQ-IN-CHO-PYAL",
+      "denominacion": "PLANTA YAL",
+      "padre": "AQ-IN-CHO"
+    }
+  ],
+  "mismatched": [
+    {
+      "codigo": "720004277",
+      "md": {
+        "denominacion": "EQUIPO ENFRIAMIENTO RSW",
+        "padre": "AQ-IN-CHO-PCHO-EXTE-SDMA",
+        "line": 176
+      },
+      "expected": {
+        "denominacion": "EQUIPO ENFRIAMIENTO RSW",
+        "padre": "AQ-IN-CHO-PCHO-EXTE-SMAQ"
+      }
+    },
+    {
+      "codigo": "720004284",
+      "md": {
+        "denominacion": "SERPENTIN ENFRIAMIENTO CHILLER",
+        "padre": "720004277",
+        "line": 183
+      },
+      "expected": {
+        "denominacion": "SEPERTIN ENFRIAMIENTO CHILLER",
+        "padre": "720004277"
+      }
+    },
+    {
+      "codigo": "720004373",
+      "md": {
+        "denominacion": "EXTRATOR AIRE CALIENTE N1",
+        "padre": "720004372",
+        "line": 40
+      },
+      "expected": {
+        "denominacion": "EXTRACTOR AIRE CALIENTE N1",
+        "padre": "720004372"
+      }
+    },
+    {
+      "codigo": "720004374",
+      "md": {
+        "denominacion": "EXTRATOR AIRE CALIENTE N2",
+        "padre": "720004372",
+        "line": 41
+      },
+      "expected": {
+        "denominacion": "EXTRACTOR AIRE CALIENTE N2",
+        "padre": "720004372"
+      }
+    },
+    {
+      "codigo": "720004375",
+      "md": {
+        "denominacion": "EXTRATOR AIRE CALIENTE N3",
+        "padre": "720004372",
+        "line": 42
+      },
+      "expected": {
+        "denominacion": "EXTRACTOR AIRE CALIENTE N3",
+        "padre": "720004372"
+      }
+    },
+    {
+      "codigo": "720004446",
+      "md": {
+        "denominacion": "MOTOR ELEC BOMBA VACIO ANILLO LIQ N1",
+        "padre": "720004444",
+        "line": 342
+      },
+      "expected": {
+        "denominacion": "MOTOR ELEC BOMBA VACIO ANILLO LIQ N1",
+        "padre": "720004441"
+      }
+    },
+    {
+      "codigo": "720004449",
+      "md": {
+        "denominacion": "BOMBA HELICOIDAL DESALOJO VISCERAS N2",
+        "padre": "720004448",
+        "line": 348
+      },
+      "expected": {
+        "denominacion": "BOMBA HELICOIDAL DESALOJO VISCERAS",
+        "padre": "720004447"
+      }
+    },
+    {
+      "codigo": "720004455",
+      "md": {
+        "denominacion": "BOMBA HELICOIDAL DESALOJO VISCERAS N3",
+        "padre": "720004454",
+        "line": 356
+      },
+      "expected": {
+        "denominacion": "BOMBA HELICOIDAL DESALOJO VISCERAS",
+        "padre": "720004453"
+      }
+    },
+    {
+      "codigo": "720004466",
+      "md": {
+        "denominacion": "MOTOREDUCTOR CINTA Z BALANZA ESTATICA",
+        "padre": "720004465",
+        "line": 283
+      },
+      "expected": {
+        "denominacion": "MOTOREDUCTOR CINTA 2 BALANZA ESTATICA",
+        "padre": "720004462"
+      }
+    },
+    {
+      "codigo": "720004472",
+      "md": {
+        "denominacion": "CINTA FLIPPERS CLASIFICADO GRADER",
+        "padre": "AQ-IN-CHO-PCHO-PROC-EMPA",
+        "line": 289
+      },
+      "expected": {
+        "denominacion": "CINTA FLIPPERS CLASIFICADO GRADER",
+        "padre": "720004462"
+      }
+    },
+    {
+      "codigo": "720004473",
+      "md": {
+        "denominacion": "BLOQUE CONTROL CILINDROS NEUMATICOS",
+        "padre": "720004472",
+        "line": 290
+      },
+      "expected": {
+        "denominacion": "BLOQUE CONTROL CILINDROS NEUMATICOS",
+        "padre": "720004462"
+      }
+    },
+    {
+      "codigo": "720004474",
+      "md": {
+        "denominacion": "TABLERO CONTROL CONJ BALANZA ESTATICA",
+        "padre": "720004472",
+        "line": 291
+      },
+      "expected": {
+        "denominacion": "TABLERO CONTROL CONJ BALANZA ESTATICA",
+        "padre": "720004462"
+      }
+    },
+    {
+      "codigo": "720004475",
+      "md": {
+        "denominacion": "MOTOREDUCTOR CINTA CLASIFICADO",
+        "padre": "720004472",
+        "line": 292
+      },
+      "expected": {
+        "denominacion": "MOTOREDUCTOR CINTA CLASIFICADO",
+        "padre": "720004462"
+      }
+    },
+    {
+      "codigo": "720004476",
+      "md": {
+        "denominacion": "COMPRESOR AIRE PLANTA",
+        "padre": "AQ-IN-CHO-PCHO-EXTE-TMAT",
+        "line": 223
+      },
+      "expected": {
+        "denominacion": "COMPRESOR AIRE PLANTA",
+        "padre": "AQ-IN-CHO-PCHO-EXTE-TMAN"
+      }
+    },
+    {
+      "codigo": "720004477",
+      "md": {
+        "denominacion": "CALDERA PLANTA",
+        "padre": "AQ-IN-CHO-PCHO-EXTE-TMAT",
+        "line": 224
+      },
+      "expected": {
+        "denominacion": "COMPRESOR AIRE PLANTA",
+        "padre": "AQ-IN-CHO-PCHO-EXTE-TMAN"
+      }
+    },
+    {
+      "codigo": "720004483",
+      "md": {
+        "denominacion": "BOMBA RED INCENDIO",
+        "padre": "AQ-IN-CHO-EXTE-RINC",
+        "line": 154
+      },
+      "expected": {
+        "denominacion": "RED DE INCENDIO",
+        "padre": "AQ-IN-CHO-EXTE-RINC"
+      }
+    },
+    {
+      "codigo": "720004526",
+      "md": {
+        "denominacion": "EXTRACTOR LAVADO CARROS 1",
+        "padre": "AQ-IN-CHO-PCHO-FRIG",
+        "line": 227
+      },
+      "expected": {
+        "denominacion": "EXTRACTOR LAVADO CARROS 1",
+        "padre": "AQ-IN-CHO-PCHO-FRIG-ANCA"
+      }
+    },
+    {
+      "codigo": "720004527",
+      "md": {
+        "denominacion": "EXTRACTOR LAVADO CARROS 2",
+        "padre": "AQ-IN-CHO-PCHO-FRIG",
+        "line": 228
+      },
+      "expected": {
+        "denominacion": "EXTRACTOR LAVADO CARROS 2",
+        "padre": "AQ-IN-CHO-PCHO-FRIG-ANCA"
+      }
+    },
+    {
+      "codigo": "720004528",
+      "md": {
+        "denominacion": "EXTRATOR SALA MAQUINAS 1",
+        "padre": "AQ-IN-CHO-PCHO-EXTE-SDMA",
+        "line": 184
+      },
+      "expected": {
+        "denominacion": "EXTRATOR SALA MAQUINAS 1",
+        "padre": "AQ-IN-CHO-PCHO-EXTE-SMAQ"
+      }
+    },
+    {
+      "codigo": "720004529",
+      "md": {
+        "denominacion": "EXTRATOR SALA MAQUINAS 2",
+        "padre": "AQ-IN-CHO-PCHO-EXTE-SDMA",
+        "line": 185
+      },
+      "expected": {
+        "denominacion": "EXTRATOR SALA MAQUINAS 2",
+        "padre": "AQ-IN-CHO-PCHO-EXTE-SMAQ"
+      }
+    },
+    {
+      "codigo": "720004530",
+      "md": {
+        "denominacion": "EXTRATOR CASINO N1",
+        "padre": "AQ-IN-CHO-EXTE-CASI",
+        "line": 87
+      },
+      "expected": {
+        "denominacion": "EXTRACTOR CASINO N1",
+        "padre": "AQ-IN-CHO-EXTE-CASI"
+      }
+    },
+    {
+      "codigo": "720004531",
+      "md": {
+        "denominacion": "EXTRATOR CASINO N2",
+        "padre": "AQ-IN-CHO-EXTE-CASI",
+        "line": 88
+      },
+      "expected": {
+        "denominacion": "EXTRACTOR CASINO N2",
+        "padre": "AQ-IN-CHO-EXTE-CASI"
+      }
+    },
+    {
+      "codigo": "720004534",
+      "md": {
+        "denominacion": "SOPLADORES VIGUETAS CAMARAS 1",
+        "padre": "AQ-IN-CHO-PCHO-FRIG",
+        "line": 229
+      },
+      "expected": {
+        "denominacion": "SOPLADORES VIGUETAS CAMARAS 1",
+        "padre": "AQ-IN-CHO-PCHO-FRIG-ANCA"
+      }
+    },
+    {
+      "codigo": "720004535",
+      "md": {
+        "denominacion": "SOPLADORES VIGUETAS CAMARAS 2",
+        "padre": "AQ-IN-CHO-PCHO-FRIG",
+        "line": 230
+      },
+      "expected": {
+        "denominacion": "SOPLADORES VIGUETAS CAMARAS 2",
+        "padre": "AQ-IN-CHO-PCHO-FRIG-ANCA"
+      }
+    },
+    {
+      "codigo": "720004548",
+      "md": {
+        "denominacion": "AIRE ACONDICIONADO TECNICOS MANTENCION",
+        "padre": "AQ-IN-CHO-PCHO-EXTE-TMAT",
+        "line": 225
+      },
+      "expected": {
+        "denominacion": "AIRE ACONDICIONADO TECNICOS MANTENCION",
+        "padre": "AQ-IN-CHO-PCHO-EXTE-TMAN"
+      }
+    },
+    {
+      "codigo": "720004551",
+      "md": {
+        "denominacion": "BOMBA AUTCEBANTE PASILLO N1",
+        "padre": "720004550",
+        "line": 115
+      },
+      "expected": {
+        "denominacion": "BOMBA AUTOCEBANTE PASILLO N1",
+        "padre": "720004550"
+      }
+    },
+    {
+      "codigo": "720004552",
+      "md": {
+        "denominacion": "BOMBA AUTCEBANTE PASILLO N2",
+        "padre": "720004550",
+        "line": 116
+      },
+      "expected": {
+        "denominacion": "BOMBA AUTOCEBANTE PASILLO N2",
+        "padre": "720004550"
+      }
+    },
+    {
+      "codigo": "720004554",
+      "md": {
+        "denominacion": "BOMBA HELICOIDAL DOSIFICACION PILOMERO",
+        "padre": "AQ-IN-CHO-EXTE-PRIL",
+        "line": 118
+      },
+      "expected": {
+        "denominacion": "BOMBA HELICOIDAL DOSIFICACION POLIMERO",
+        "padre": "720004550"
+      }
+    },
+    {
+      "codigo": "720004557",
+      "md": {
+        "denominacion": "BOMBA MEMBRANA DOSIFICACION COAGULANTE",
+        "padre": "AQ-IN-CHO-EXTE-PRIL",
+        "line": 121
+      },
+      "expected": {
+        "denominacion": "BOMBA MEMBRANA DOSIFICACION COAGULANTE",
+        "padre": "720004555"
+      }
+    },
+    {
+      "codigo": "720004564",
+      "md": {
+        "denominacion": "ESTANQUE POLIMERO N1",
+        "padre": "AQ-IN-CHO-EXTE-PRIL",
+        "line": 128
+      },
+      "expected": {
+        "denominacion": "ESTANQUE POLIMERO N1",
+        "padre": "720004563"
+      }
+    },
+    {
+      "codigo": "720004566",
+      "md": {
+        "denominacion": "MOTOREDUCTOR AGITADOR N1",
+        "padre": "720004564",
+        "line": 130
+      },
+      "expected": {
+        "denominacion": "MOTOREDUCTOR AGITADOR N1",
+        "padre": "720004565"
+      }
+    },
+    {
+      "codigo": "720004567",
+      "md": {
+        "denominacion": "TABLERO CONTROL AGITADOR N1",
+        "padre": "720004564",
+        "line": 131
+      },
+      "expected": {
+        "denominacion": "TABLERO CONTROL AGITADOR N1",
+        "padre": "720004565"
+      }
+    },
+    {
+      "codigo": "720004568",
+      "md": {
+        "denominacion": "ESTANQUE POLIMERO N2",
+        "padre": "AQ-IN-CHO-EXTE-PRIL",
+        "line": 132
+      },
+      "expected": {
+        "denominacion": "ESTANQUE POLIMERO N2",
+        "padre": "720004563"
+      }
+    },
+    {
+      "codigo": "720004580",
+      "md": {
+        "denominacion": "AGITADOR ESTANQUE",
+        "padre": "720004579",
+        "line": 144
+      },
+      "expected": {
+        "denominacion": "AGITADOR ESTANQUE",
+        "padre": "AQ-IN-CHO-EXTE-PRIL"
+      }
+    },
+    {
+      "codigo": "720004583",
+      "md": {
+        "denominacion": "BOMBA AUTCEBANTE RECIRCULACION",
+        "padre": "720004582",
+        "line": 147
+      },
+      "expected": {
+        "denominacion": "BOMBA AUTOCEBANTE RECIRCULACION",
+        "padre": "720004582"
+      }
+    },
+    {
+      "codigo": "720004585",
+      "md": {
+        "denominacion": "BOMBA PERISTALTICA INYEC ANTIESPUMANTE",
+        "padre": "720004582",
+        "line": 149
+      },
+      "expected": {
+        "denominacion": "BOMBA PERISTALTICA INYEC ANTIESPUMANTE",
+        "padre": "AQ-IN-CHO-EXTE-PRIL"
+      }
+    },
+    {
+      "codigo": "720004586",
+      "md": {
+        "denominacion": "TRANSFORMADOR 1 SUB ESTACION PRINCIPAL",
+        "padre": "AQ-IN-CHO-PCHO-EXTE-SCHO",
+        "line": 172
+      },
+      "expected": {
+        "denominacion": "TRANSFORMADOR 1 SUB ESTACION PRINCIPAL",
+        "padre": "AQ-IN-CHO-PCHO-EXTE-SCBO"
+      }
+    },
+    {
+      "codigo": "720004587",
+      "md": {
+        "denominacion": "TRANSFORMADOR 2 SUB ESTACION PRINCIPAL",
+        "padre": "AQ-IN-CHO-PCHO-EXTE-SCHO",
+        "line": 173
+      },
+      "expected": {
+        "denominacion": "TRANSFORMADOR 2 SUB ESTACION PRINCIPAL",
+        "padre": "AQ-IN-CHO-PCHO-EXTE-SCBO"
+      }
+    },
+    {
+      "codigo": "720004677",
+      "md": {
+        "denominacion": "ENFRIADOR ACEITE COMPRESOR CAMARA N1",
+        "padre": "AQ-IN-CHO-PCHO-EXTE-SFRE",
+        "line": 192
+      },
+      "expected": {
+        "denominacion": "ENFRIADOR ACEITE COMPRESOR CAMARA N1",
+        "padre": "720004675"
+      }
+    },
+    {
+      "codigo": "720004681",
+      "md": {
+        "denominacion": "CONDENSADOR COMPRESOR CAMARA N1",
+        "padre": "AQ-IN-CHO-PCHO-EXTE-SFRE",
+        "line": 196
+      },
+      "expected": {
+        "denominacion": "CONDENSADOR COMPRESOR CAMARA N1",
+        "padre": "720004675"
+      }
+    },
+    {
+      "codigo": "720004831",
+      "md": {
+        "denominacion": "EVAPORADOR N2 COMPRESOR EMBARQUE",
+        "padre": "720004820",
+        "line": 244
+      },
+      "expected": {
+        "denominacion": "EVAPORADOR N1 COMPRESOR EMBARQUE",
+        "padre": "720004820"
+      }
+    },
+    {
+      "codigo": "720004848",
+      "md": {
+        "denominacion": "MOTO VENTILADOR N2 CLIMATIZACION EMPAQUE",
+        "padre": "720004846",
+        "line": 318
+      },
+      "expected": {
+        "denominacion": "MOTO VENTILADOR N1 CLIMATIZACION EMPAQUE",
+        "padre": "720004846"
+      }
+    },
+    {
+      "codigo": "720004849",
+      "md": {
+        "denominacion": "MOTO VENTILADOR N3 CLIMATIZACION EMPAQUE",
+        "padre": "720004846",
+        "line": 319
+      },
+      "expected": {
+        "denominacion": "MOTO VENTILADOR N2 CLIMATIZACION EMPAQUE",
+        "padre": "720004846"
+      }
+    },
+    {
+      "codigo": "720004852",
+      "md": {
+        "denominacion": "MOTO VENTILADOR N2 CLIMATIZACION EMPAQUE",
+        "padre": "720004850",
+        "line": 322
+      },
+      "expected": {
+        "denominacion": "MOTO VENTILADOR N1 CLIMATIZACION EMPAQUE",
+        "padre": "720004850"
+      }
+    },
+    {
+      "codigo": "720011740",
+      "md": {
+        "denominacion": "EVAPORADOR N4 CLIMATIZACION EMPAQUE",
+        "padre": "720004834",
+        "line": 302
+      },
+      "expected": {
+        "denominacion": "EVAPORADOR M4 CLIMATIZACION EMPAQUE",
+        "padre": "720004834"
+      }
+    },
+    {
+      "codigo": "720011853",
+      "md": {
+        "denominacion": "SALA SERVIDORES PLANTA PRINCIPAL",
+        "padre": "AQ-IN-CHO-PCHO-EXTE-SCHO",
+        "line": 174
+      },
+      "expected": {
+        "denominacion": "SALA SERVIDORES PLANTA PRINCIPAL",
+        "padre": "AQ-IN-CHO-PCHO-EXTE-SCBO"
+      }
+    },
+    {
+      "codigo": "720012855",
+      "md": {
+        "denominacion": "DESPLACADOR AUTOMATICO 1",
+        "padre": "AQ-IN-CHO-PCHO-PROC-EMPQ",
+        "line": 324
+      },
+      "expected": {
+        "denominacion": "DESPLAZADOR AUTOMATICO 1",
+        "padre": "AQ-IN-CHO-PCHO-PROC-EMPQ"
+      }
+    },
+    {
+      "codigo": "720012856",
+      "md": {
+        "denominacion": "DESPLACADOR AUTOMATICO 2",
+        "padre": "AQ-IN-CHO-PCHO-PROC-EMPQ",
+        "line": 325
+      },
+      "expected": {
+        "denominacion": "DESPLAZADOR AUTOMATICO 2",
+        "padre": "AQ-IN-CHO-PCHO-PROC-EMPQ"
+      }
+    }
+  ]
+}

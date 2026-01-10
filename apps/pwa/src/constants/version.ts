@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.2.25' as const
+export const APP_VERSION = '2.2.28' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,13 @@ export const VERSION_DATE = '2026-01-09' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Evidencias Fotográficas' as const
+export const VERSION_NAME = 'Jerarquía Extendida (695 nodos)' as const
+
+/**
+ * Nota:
+ * Esta versión se sincroniza para pruebas vía GitHub Pages.
+ */
+
 
 /**
  * Información completa de la versión

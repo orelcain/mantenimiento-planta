@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.2.25**
+## Versión Actual: **v2.2.28**
 
 **Fecha de lanzamiento**: 9 de enero de 2026  
 **Estado**: ✅ PRODUCCIÓN READY  
@@ -9,6 +9,36 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.2.28 - Jerarquía Extendida + Pruebas en Pages
+
+- Sincronización para pruebas vía GitHub Pages (workflow de deploy activo en `main`)
+- Versionado/fecha alineados (source of truth)
+
+### v2.2.27 - Jerarquía Extendida (695 nodos)
+
+Ampliación del mandante de jerarquía para incluir subárboles adicionales (ej. Planta YAL), manteniendo consistencia 1:1 en Firestore.
+
+#### 🌲 Datos
+- Dataset extendido `EXPECTED_CANONICAL_EXTENDED.json` (695 nodos activos)
+- Reconciliación Firestore sin extras, duplicados ni huérfanos
+
+#### 🧰 Herramientas
+- Scripts para comparar/mergear MD → dataset extendido e importar/reconciliar en admin
+
+### v2.2.26 - Jerarquía Optimizada (Admin + Cache)
+
+Mejoras de administración, performance y seguridad operativa del sistema de jerarquías.
+
+#### 🧭 Selector
+- Breadcrumb del selector muestra nombres reales del path seleccionado
+
+#### ⚡ Performance
+- Cache TTL real (~5 min) para árbol, hijos y paths (menos lecturas/latencia)
+
+#### 🛡️ Admin seguro
+- Activar/desactivar nodos desde edición (los inactivos se muestran en el árbol admin)
+- Eliminación en cascada segura cuando hay descendientes (evita huérfanos)
 
 ### v2.2.25 - Título/Ubicación por Par + Exportación Agrupada
 

@@ -5,7 +5,7 @@
  * con carga dinámica por nivel y validación mínima nivel 3.
  */
 
-import React, { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { ChevronRight, MapPin, CheckCircle, AlertTriangle } from 'lucide-react'
 import { 
   HierarchyLevel, 
@@ -36,8 +36,6 @@ export function HierarchySelector({
   disabled = false,
   error,
 }: HierarchySelectorProps) {
-  console.log('[HierarchySelector] Montado con:', { value, minLevel, maxLevel, disabled })
-  
   // Estado de selecciones por nivel
   const [selections, setSelections] = useState<(SelectedNode | null)[]>(
     Array(maxLevel).fill(null)
@@ -50,8 +48,20 @@ export function HierarchySelector({
   // Cargar path inicial si hay un valor
   const { path: initialPath, loading: loadingPath } = useHierarchyPath(value ?? null)
 
+  const lastSelectedId = useMemo(() => {
+    for (let i = selections.length - 1; i >= 0; i--) {
+      const sel = selections[i]
+      if (sel) return sel.id
+    }
+    return null
+  }, [selections])
+
+  // Path del nodo actualmente seleccionado (para breadcrumb útil)
+  const { path: breadcrumbPath, loading: breadcrumbLoading } = useHierarchyPath(
+    lastSelectedId ?? (value ?? null)
+  )
+
   useEffect(() => {
-    console.log('[HierarchySelector] Path inicial:', { initialPath, loadingPath })
     if (initialPath.length > 0 && !loadingPath && !initializedRef.current) {
       initializedRef.current = true
       const newSelections: (SelectedNode | null)[] = Array(maxLevel).fill(null)
@@ -68,8 +78,6 @@ export function HierarchySelector({
   }, [initialPath, loadingPath, maxLevel])
 
   const handleLevelSelect = useCallback((nivel: HierarchyLevel, nodeId: string | null) => {
-    console.log('[HierarchySelector] Selección en nivel', nivel, ':', nodeId)
-    
     setSelections(prevSelections => {
       const newSelections = [...prevSelections]
       const index = nivel - 1
@@ -114,18 +122,20 @@ export function HierarchySelector({
         <div className="flex items-center gap-2 p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
           <MapPin className="w-5 h-5 text-blue-600 flex-shrink-0" />
           <div className="flex-1 flex items-center gap-2 flex-wrap">
-            {selections.map((sel, index) => {
-              if (!sel) return null
-              const nivel = (index + 1) as HierarchyLevel
-              return (
-                <React.Fragment key={sel.id}>
+            {breadcrumbLoading ? (
+              <span className="text-sm text-blue-700">Cargando ubicación...</span>
+            ) : breadcrumbPath.length ? (
+              breadcrumbPath.map((item, index) => (
+                <React.Fragment key={item.id}>
                   {index > 0 && <ChevronRight className="w-4 h-4 text-gray-400" />}
-                  <span className="text-sm font-medium text-blue-700">
-                    {HIERARCHY_LEVEL_NAMES[nivel]}
-                  </span>
+                  <span className="text-sm font-medium text-blue-700">{item.nombre}</span>
                 </React.Fragment>
-              )
-            })}
+              ))
+            ) : (
+              <span className="text-sm font-medium text-blue-700">
+                {HIERARCHY_LEVEL_NAMES[HierarchyLevel.EMPRESA]}
+              </span>
+            )}
           </div>
 
           {/* Indicador de validación */}
@@ -217,19 +227,10 @@ function LevelSelector({
     autoSelectedRef.current = false
   }, [parentId])
 
-  console.log('[LevelSelector] Renderizando nivel:', {
-    nivel,
-    parentId,
-    optionsCount: options.length,
-    loading,
-    value
-  })
-
   // Auto-seleccionar si solo hay 1 opción (solo una vez)
   useEffect(() => {
     if (!loading && options.length === 1 && !value && options[0] && !autoSelectedRef.current) {
       autoSelectedRef.current = true
-      console.log('[LevelSelector] Auto-seleccionando única opción en nivel', nivel, ':', options[0].value)
       onChange(options[0].value)
     }
   }, [options, loading, value, nivel]) // Quitamos onChange de las dependencias para evitar bucle
@@ -257,7 +258,6 @@ function LevelSelector({
       <select
         value={value ?? ''}
         onChange={e => {
-          console.log('[LevelSelector] Cambio en nivel', nivel, ':', e.target.value)
           onChange(e.target.value || null)
         }}
         disabled={disabled || loading}
