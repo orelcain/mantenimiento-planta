@@ -1,8 +1,12 @@
 {
-  "version": "2.4.0",
+  "version": "2.5.0",
   "buildDate": "2026-01-10",
   "buildTimestamp": 1736467200000,
   "features": [
+    "Equipos integrados en vista de jerarquía (badge + lista expandible)",
+    "Selección múltiple de equipos desde nodos de jerarquía",
+    "Barra flotante para compartir equipos seleccionados",
+    "Botón para navegar al módulo equipos desde jerarquía",
     "Sistema completo de fotos en equipos (múltiples fotos por equipo)",
     "Galería de fotos con upload múltiple y preview fullscreen",
     "Indicador de cantidad de fotos en tarjetas de equipos",
