@@ -1,7 +1,7 @@
 {
-  "version": "2.2.31",
-  "buildDate": "2026-01-09",
-  "buildTimestamp": 1767916800000,
+  "version": "2.3.0",
+  "buildDate": "2026-01-10",
+  "buildTimestamp": 1736467200000,
   "features": [
     "Nuevo módulo de Evidencias Fotográficas (antes/después)",
     "Comparador visual de fotos con slider",
@@ -32,6 +32,10 @@
     "Deploy: GitHub Pages para pruebas",
     "Equipos: sincronización automática desde jerarquía (nivel >= 5)",
     "Equipos: ver jerarquía (deep-link con foco)",
-    "Equipos: excluir del sync y eliminación lógica (no se recrea)"
+    "Equipos: excluir del sync y eliminación lógica (no se recrea)",
+    "Equipos: acciones masivas (cambiar estado, copiar códigos, exportar CSV selección)",
+    "Equipos: gestión rápida de mantenimiento (local/externo con responsable y notas)",
+    "Equipos: sistema de compartir/exportar avanzado (PDF/CSV/JSON, descarga/email/móvil)",
+    "Equipos: UI mejorada (tarjetas compactas, badges estado visible)"
   ]
 }

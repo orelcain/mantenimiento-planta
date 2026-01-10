@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.2.31' as const
+export const APP_VERSION = '2.3.0' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -11,12 +11,12 @@ export const APP_VERSION = '2.2.31' as const
 /**
  * Fecha de la versión actual
  */
-export const VERSION_DATE = '2026-01-09' as const
+export const VERSION_DATE = '2026-01-10' as const
 
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Equipos desde Jerarquía' as const
+export const VERSION_NAME = 'Gestión Avanzada de Equipos' as const
 
 /**
  * Nota:
