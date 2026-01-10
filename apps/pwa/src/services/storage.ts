@@ -289,3 +289,36 @@ export async function deleteMapImage(url: string): Promise<void> {
     console.error('Error eliminando mapa:', error)
   }
 }
+
+/**
+ * Eliminar foto de equipo
+ */
+export async function deleteEquipmentPhoto(url: string): Promise<void> {
+  try {
+    const storageRef = ref(storage, url)
+    await deleteObject(storageRef)
+    logger.info('Equipment photo deleted successfully', { url })
+  } catch (error) {
+    logger.error('Error deleting equipment photo', error as Error, { url })
+    throw error
+  }
+}
+
+/**
+ * Listar todas las fotos de un equipo
+ */
+export async function listEquipmentPhotos(equipmentId: string): Promise<string[]> {
+  try {
+    const folderRef = ref(storage, `equipment/${equipmentId}`)
+    const result = await listAll(folderRef)
+    
+    const urls = await Promise.all(
+      result.items.map((itemRef) => getDownloadURL(itemRef))
+    )
+    
+    return urls
+  } catch (error) {
+    logger.error('Error listing equipment photos', error as Error, { equipmentId })
+    return []
+  }
+}
