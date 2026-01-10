@@ -1,14 +1,23 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.2.31**
+## Versión Actual: **v2.3.0**
 
-**Fecha de lanzamiento**: 9 de enero de 2026  
+**Fecha de lanzamiento**: 10 de enero de 2026  
 **Estado**: ✅ PRODUCCIÓN READY  
 **Build**: ✅ Último build local OK
 
 ---
 
 ## 📋 Información de la Versión
+
+### v2.3.0 - Gestión Avanzada de Equipos
+
+- **Acciones masivas**: cambio de estado, copiar códigos, exportar CSV de selección
+- **Gestión de mantenimiento**: botón rápido en tarjetas con modal (tipo local/externo, responsable, notas)
+- **Sistema de compartir/exportar**: modal configurable con opciones de datos (básicos, historial, notas, URLs QR)
+- **Formatos múltiples**: exportación en PDF/texto, CSV, JSON
+- **Métodos de envío**: descarga, email, Web Share API (móvil)
+- **UI mejorada**: tarjetas más compactas, badges de estado visible en grid
 
 ### v2.2.31 - Equipos desde Jerarquía
 
