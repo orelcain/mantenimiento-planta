@@ -370,7 +370,7 @@ export async function isHierarchyInitialized(): Promise<boolean> {
       getDoc(doc(db, 'hierarchy', generateId('AQ-IN-CHO')))
     )
     return empresaDoc.exists()
-  } catch (error) {
+  } catch (_error) {
     return false
   }
 }

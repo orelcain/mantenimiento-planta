@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import {
@@ -131,6 +131,20 @@ export function PhotoEvidenceDetail({
   const { path: pairUbicacionPathData } = useHierarchyPath(pairUbicacionNodeId)
   const pairUbicacionPath = pairUbicacionPathData.map((p: HierarchyPath) => p.nombre).join(' > ')
 
+  const loadEvidence = useCallback(async () => {
+    if (!evidenceId) return
+
+    setIsLoading(true)
+    try {
+      const data = await getPhotoEvidenceById(evidenceId)
+      setEvidence(data)
+    } catch (error) {
+      logger.error('Error loading evidence', error as Error)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [evidenceId])
+
   // Cargar evidencia
   useEffect(() => {
     if (evidenceId && open) {
@@ -139,7 +153,7 @@ export function PhotoEvidenceDetail({
       setEvidence(null)
       setIsLoading(true)
     }
-  }, [evidenceId, open])
+  }, [evidenceId, open, loadEvidence])
 
   useEffect(() => {
     if (!evidence) return
@@ -230,20 +244,6 @@ export function PhotoEvidenceDetail({
     setAnnotateOpen(false)
     setAnnotateTarget(null)
     setAnnotateSourceUrl(null)
-  }
-
-  const loadEvidence = async () => {
-    if (!evidenceId) return
-    
-    setIsLoading(true)
-    try {
-      const data = await getPhotoEvidenceById(evidenceId)
-      setEvidence(data)
-    } catch (error) {
-      logger.error('Error loading evidence', error as Error)
-    } finally {
-      setIsLoading(false)
-    }
   }
 
   const handleMarkAsVerified = async () => {

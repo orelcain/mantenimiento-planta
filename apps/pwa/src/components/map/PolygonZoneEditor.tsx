@@ -117,14 +117,8 @@ export function PolygonZoneEditor() {
   const [canvasSize, setCanvasSize] = useState({ width: 1400, height: 800 })
   const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1
 
-  // Cargar zonas y mapas
-  useEffect(() => {
-    getZones().then(setZones)
-    loadAvailableMaps()
-  }, [setZones])
-
   // Cargar mapas disponibles
-  const loadAvailableMaps = async () => {
+  const loadAvailableMaps = useCallback(async () => {
     try {
       const maps = await getMapImages()
       setAvailableMaps(maps)
@@ -136,7 +130,14 @@ export function PolygonZoneEditor() {
     } catch (error) {
       logger.error('Error cargando mapas', error instanceof Error ? error : new Error(String(error)))
     }
-  }
+
+  }, [mapImage, setMapImage])
+
+  // Cargar zonas y mapas
+  useEffect(() => {
+    getZones().then(setZones)
+    loadAvailableMaps()
+  }, [setZones, loadAvailableMaps])
 
   // Cargar imagen del mapa
   useEffect(() => {

@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 /**
  * Hook de permisos - Sistema de control de acceso basado en roles
  * 

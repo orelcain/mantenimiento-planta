@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Módulo Equipos - Prueba UI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.263.1/lucide.min.css">
+    <style>
+        /* Iconos Lucide */
+        [data-lucide] {
+            width: 1em;
+            height: 1em;
+            display: inline-block;
+        }
+        /* Transiciones suaves para modo oscuro */
+        * {
+            transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+        }
+    </style>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        border: 'hsl(214.3 31.8% 91.4%)',
+                        input: 'hsl(214.3 31.8% 91.4%)',
+                        ring: 'hsl(222.2 84% 4.9%)',
+                        background: 'hsl(0 0% 100%)',
+                        foreground: 'hsl(222.2 84% 4.9%)',
+                        primary: {
+                            DEFAULT: 'hsl(222.2 47.4% 11.2%)',
+                            foreground: 'hsl(210 40% 98%)',
+                        },
+                        secondary: {
+                            DEFAULT: 'hsl(210 40% 96.1%)',
+                            foreground: 'hsl(222.2 47.4% 11.2%)',
+                        },
+                        destructive: {
+                            DEFAULT: 'hsl(0 84.2% 60.2%)',
+                            foreground: 'hsl(210 40% 98%)',
+                        },
+                        success: {
+                            DEFAULT: 'hsl(142 76% 36%)',
+                            foreground: 'hsl(210 40% 98%)',
+                        },
+                        warning: {
+                            DEFAULT: 'hsl(38 92% 50%)',
+                            foreground: 'hsl(222.2 47.4% 11.2%)',
+                        },
+                        muted: {
+                            DEFAULT: 'hsl(210 40% 96.1%)',
+                            foreground: 'hsl(215.4 16.3% 46.9%)',
+                        },
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 p-6">
+    <div class="max-w-7xl mx-auto space-y-6">
+        <!-- Header -->
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <div class="p-2 bg-primary/10 rounded-lg">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-primary"><path d="M16.5 9.4 7.55 4.24"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.29 7 12 12 20.71 7"/><line x1="12" x2="12" y1="22" y2="12"/></svg>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-bold">Equipos</h1>
+                    <p class="text-sm text-muted-foreground">Prueba de diseño con favoritos e historial</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <button id="toggleDark" class="p-2 bg-white dark:bg-gray-800 border dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                    <svg id="darkIcon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="hidden dark:block"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+                    <svg id="lightIcon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="dark:hidden"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+                </button>
+                <button id="toggleFavs" class="px-4 py-2 bg-white dark:bg-gray-800 border dark:border-gray-700 dark:text-white rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                    <span>Solo Favoritos</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="bg-white p-4 rounded-lg shadow hover:shadow-md transition-shadow">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <div class="text-2xl font-bold" id="totalCount">24</div>
+                        <div class="text-sm text-muted-foreground">Total Equipos</div>
+                    </div>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-muted-foreground"><path d="M16.5 9.4 7.55 4.24"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.29 7 12 12 20.71 7"/><line x1="12" x2="12" y1="22" y2="12"/></svg>
+                </div>
+            </div>
+            <div class="bg-white p-4 rounded-lg shadow hover:shadow-md transition-shadow">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <div class="text-2xl font-bold text-success">18</div>
+                        <div class="text-sm text-muted-foreground">Operativos</div>
+                    </div>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-success"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/></svg>
+                </div>
+            </div>
+            <div class="bg-white p-4 rounded-lg shadow hover:shadow-md transition-shadow">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <div class="text-2xl font-bold text-warning">4</div>
+                        <div class="text-sm text-muted-foreground">En Mantenimiento</div>
+                    </div>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-warning"><path d="M12 22a2 2 0 0 1-2-2V12a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2Z"/><path d="M14 7.5V2h-4v5.5"/><path d="M4 15h9"/><path d="M4 9h9"/></svg>
+                </div>
+            </div>
+            <div class="bg-white p-4 rounded-lg shadow hover:shadow-md transition-shadow">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <div class="text-2xl font-bold text-destructive">2</div>
+                        <div class="text-sm text-muted-foreground">Fuera de Servicio</div>
+                    </div>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-destructive"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="bg-white p-4 rounded-lg shadow">
+            <div class="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+                <div class="flex-1 relative w-full">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                    <input 
+                        type="text" 
+                        id="searchInput"
+                        placeholder="Buscar por nombre, código o ubicación..." 
+                        class="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    >
+                </div>
+                <select id="statusFilter" class="w-full sm:w-[200px] px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary">
+                    <option value="all">Todos los estados</option>
+                    <option value="operativo">✓ Operativo</option>
+                    <option value="en_mantenimiento">⚙ En Mantenimiento</option>
+                    <option value="fuera_servicio">✗ Fuera de Servicio</option>
+                </select>
+                <div class="text-sm text-muted-foreground whitespace-nowrap" id="resultCount">
+                    24 equipos
+                </div>
+            </div>
+        </div>
+
+        <!-- Equipment Grid -->
+        <div id="equipmentGrid" class="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <!-- Las tarjetas se generarán dinámicamente -->
+        </div>
+
+        <!-- Pagination -->
+        <div class="bg-white p-4 rounded-lg shadow">
+            <div class="flex items-center justify-between">
+                <div class="text-sm text-muted-foreground" id="pageInfo">
+                    Mostrando 1-12 de 24 equipos
+                </div>
+                <div class="flex items-center gap-2">
+                    <button id="prevPage" class="px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm flex items-center gap-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+                        Anterior
+                    </button>
+                    <div id="pageNumbers" class="flex items-center gap-1">
+                        <!-- Page numbers -->
+                    </div>
+                    <button id="nextPage" class="px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm flex items-center gap-1">
+                        Siguiente
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Detalle Equipo -->
+    <div id="detailModal" class="hidden fixed inset-0 bg-black/50 z-50 items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            <!-- Header -->
+            <div class="p-6 border-b flex items-start justify-between">
+                <div class="flex-1">
+                    <div class="flex items-center gap-3 mb-2">
+                        <h2 id="modalTitle" class="text-2xl font-bold">Bomba Centrífuga Principal</h2>
+                        <button id="favButton" class="p-1 hover:bg-gray-100 rounded transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-yellow-500"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                        </button>
+                    </div>
+                    <div class="flex items-center gap-2 text-sm text-muted-foreground">
+                        <span id="modalCode" class="font-mono bg-gray-100 px-2 py-1 rounded">BCP-001</span>
+                        <span id="modalStatus" class="px-2 py-1 rounded bg-success text-white">Operativo</span>
+                        <span id="modalCriticality" class="px-2 py-1 rounded bg-warning text-white">Media</span>
+                    </div>
+                    <div id="modalLocation" class="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+                        <span>Planta Principal > Área Producción > Línea 1 > Sistema Hidráulico</span>
+                    </div>
+                </div>
+                <button id="closeModal" class="p-2 hover:bg-gray-100 rounded transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                </button>
+            </div>
+
+            <!-- Content -->
+            <div class="flex-1 overflow-y-auto p-6">
+                <!-- Tabs -->
+                <div class="border-b mb-4">
+                    <div class="flex gap-4">
+                        <button class="tab-button active px-4 py-2 border-b-2 border-primary font-medium" data-tab="info">
+                            Información
+                        </button>
+                        <button class="tab-button px-4 py-2 border-b-2 border-transparent hover:border-gray-300 font-medium" data-tab="history">
+                            Historial <span class="ml-1 text-xs bg-gray-200 px-2 py-0.5 rounded-full" id="historyCount">5</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Tab Info -->
+                <div id="tabInfo" class="tab-content">
+                    <div class="space-y-4">
+                        <div class="grid md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="text-sm font-medium text-muted-foreground">Marca</label>
+                                <p id="modalBrand" class="text-base">Grundfos</p>
+                            </div>
+                            <div>
+                                <label class="text-sm font-medium text-muted-foreground">Modelo</label>
+                                <p id="modalModel" class="text-base">CR 64-2</p>
+                            </div>
+                            <div>
+                                <label class="text-sm font-medium text-muted-foreground">Número de Serie</label>
+                                <p id="modalSerial" class="text-base">GF-2024-001234</p>
+                            </div>
+                            <div>
+                                <label class="text-sm font-medium text-muted-foreground">Fecha Instalación</label>
+                                <p id="modalInstallDate" class="text-base">15/03/2023</p>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="text-sm font-medium text-muted-foreground">Descripción</label>
+                            <p id="modalDescription" class="text-base">Bomba centrífuga de múltiples etapas para sistema de agua de enfriamiento principal. Capacidad: 64 m³/h, Presión: 20 bar.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab History -->
+                <div id="tabHistory" class="tab-content hidden">
+                    <div id="historyList" class="space-y-3">
+                        <!-- Historial se generará dinámicamente -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="p-4 border-t bg-gray-50 flex justify-end gap-2">
+                <button class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-white transition-colors">
+                    Ver en Jerarquía
+                </button>
+                <button class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors">
+                    Editar Equipo
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Mock Data
+        const mockEquipment = [
+            { id: 1, codigo: 'BCP-001', nombre: 'Bomba Centrífuga Principal', ubicacion: 'Planta Principal > Área Producción > Línea 1', estado: 'operativo', criticidad: 'alta', marca: 'Grundfos', modelo: 'CR 64-2', favorite: false },
+            { id: 2, codigo: 'MOT-002', nombre: 'Motor Eléctrico Línea A', ubicacion: 'Planta Principal > Área Producción > Línea 1', estado: 'operativo', criticidad: 'media', marca: 'Siemens', modelo: 'M3BP', favorite: true },
+            { id: 3, codigo: 'CMP-003', nombre: 'Compresor de Aire Principal', ubicacion: 'Planta Principal > Área Utilidades > Cuarto Compresores', estado: 'en_mantenimiento', criticidad: 'alta', marca: 'Atlas Copco', modelo: 'GA 55', favorite: false },
+            { id: 4, codigo: 'VLV-004', nombre: 'Válvula Control Presión 1', ubicacion: 'Planta Principal > Área Producción > Sistema Hidráulico', estado: 'operativo', criticidad: 'baja', marca: 'Fisher', modelo: 'EZ', favorite: false },
+            { id: 5, codigo: 'SEN-005', nombre: 'Sensor Temperatura T-01', ubicacion: 'Planta Principal > Área Producción > Línea 2', estado: 'operativo', criticidad: 'media', marca: 'Endress+Hauser', modelo: 'TMT142', favorite: true },
+            { id: 6, codigo: 'TRN-006', nombre: 'Transformador Principal 1000kVA', ubicacion: 'Planta Principal > Subestación Eléctrica', estado: 'operativo', criticidad: 'alta', marca: 'ABB', modelo: 'DTTR', favorite: false },
+            { id: 7, codigo: 'BCN-007', nombre: 'Bomba Condensado Línea B', ubicacion: 'Planta Principal > Área Producción > Línea 2', estado: 'operativo', criticidad: 'media', marca: 'Grundfos', modelo: 'CR 32-4', favorite: false },
+            { id: 8, codigo: 'VEN-008', nombre: 'Ventilador Extracción Torre 1', ubicacion: 'Planta Principal > Área Cooling Tower', estado: 'operativo', criticidad: 'baja', marca: 'Sodeca', modelo: 'HIT-80', favorite: false },
+            { id: 9, codigo: 'INT-009', nombre: 'Intercambiador Calor IC-01', ubicacion: 'Planta Principal > Área Producción > Sistema Térmico', estado: 'fuera_servicio', criticidad: 'alta', marca: 'Alfa Laval', modelo: 'M15-BFG', favorite: false },
+            { id: 10, codigo: 'AGI-010', nombre: 'Agitador Tanque Mezcla TK-01', ubicacion: 'Planta Principal > Área Preparación', estado: 'operativo', criticidad: 'media', marca: 'Mixel', modelo: 'TTP 50', favorite: true },
+            { id: 11, codigo: 'FIL-011', nombre: 'Filtro Mangas FM-01', ubicacion: 'Planta Principal > Área Filtración', estado: 'en_mantenimiento', criticidad: 'media', marca: 'Donaldson', modelo: 'DFO', favorite: false },
+            { id: 12, codigo: 'CNT-012', nombre: 'Centrífuga Separación CS-01', ubicacion: 'Planta Principal > Área Separación', estado: 'operativo', criticidad: 'alta', marca: 'GEA', modelo: 'Westfalia', favorite: false },
+            { id: 13, codigo: 'SEC-013', nombre: 'Secador Aire Comprimido', ubicacion: 'Planta Principal > Área Utilidades', estado: 'operativo', criticidad: 'media', marca: 'Atlas Copco', modelo: 'FD 560', favorite: false },
+            { id: 14, codigo: 'BOM-014', nombre: 'Bomba Dosificadora Química', ubicacion: 'Planta Principal > Área Tratamiento', estado: 'operativo', criticidad: 'baja', marca: 'Prominent', modelo: 'GAMMA', favorite: false },
+            { id: 15, codigo: 'RED-015', nombre: 'Reductor Velocidad Motor L1', ubicacion: 'Planta Principal > Área Producción > Línea 1', estado: 'operativo', criticidad: 'media', marca: 'SEW', modelo: 'R97', favorite: false },
+            { id: 16, codigo: 'PAN-016', nombre: 'Panel Control PLC-01', ubicacion: 'Planta Principal > Sala Control', estado: 'operativo', criticidad: 'alta', marca: 'Siemens', modelo: 'S7-1500', favorite: true },
+            { id: 17, codigo: 'CHI-017', nombre: 'Chiller Agua Fría 200TR', ubicacion: 'Planta Principal > Área HVAC', estado: 'operativo', criticidad: 'media', marca: 'Carrier', modelo: '30XA', favorite: false },
+            { id: 18, codigo: 'CAL-018', nombre: 'Caldera Vapor 5 Ton/h', ubicacion: 'Planta Principal > Área Calderas', estado: 'en_mantenimiento', criticidad: 'alta', marca: 'Clayton', modelo: 'E-543', favorite: false },
+            { id: 19, codigo: 'UPS-019', nombre: 'UPS Sistema Crítico 100kVA', ubicacion: 'Planta Principal > Sala Eléctrica', estado: 'operativo', criticidad: 'alta', marca: 'Eaton', modelo: '9PX', favorite: false },
+            { id: 20, codigo: 'HID-020', nombre: 'Unidad Hidráulica UH-01', ubicacion: 'Planta Principal > Área Prensas', estado: 'fuera_servicio', criticidad: 'media', marca: 'Bosch Rexroth', modelo: 'A4VSO', favorite: false },
+            { id: 21, codigo: 'EXT-021', nombre: 'Extractor Polvo EP-01', ubicacion: 'Planta Principal > Área Molienda', estado: 'operativo', criticidad: 'baja', marca: 'Nederman', modelo: 'N29', favorite: false },
+            { id: 22, codigo: 'CIN-022', nombre: 'Cinta Transportadora CT-01', ubicacion: 'Planta Principal > Área Transporte', estado: 'operativo', criticidad: 'media', marca: 'Conveyor Systems', modelo: 'CS-800', favorite: false },
+            { id: 23, codigo: 'ROB-023', nombre: 'Robot Soldadura RS-01', ubicacion: 'Planta Principal > Área Ensamble', estado: 'en_mantenimiento', criticidad: 'alta', marca: 'FANUC', modelo: 'M-20iA', favorite: false },
+            { id: 24, codigo: 'TOR-024', nombre: 'Torre Enfriamiento TE-01', ubicacion: 'Planta Principal > Exterior', estado: 'operativo', criticidad: 'media', marca: 'Baltimore Aircoil', modelo: 'VTI', favorite: false },
+        ];
+
+        const mockIncidents = {
+            1: [
+                { fecha: '2026-01-05', tipo: 'Preventivo', titulo: 'Mantenimiento programado Q1', estado: 'cerrada', prioridad: 'media' },
+                { fecha: '2025-12-10', tipo: 'Correctivo', titulo: 'Fuga en sello mecánico', estado: 'cerrada', prioridad: 'alta' },
+                { fecha: '2025-11-15', tipo: 'Predictivo', titulo: 'Vibración fuera de rango', estado: 'cerrada', prioridad: 'media' },
+                { fecha: '2025-10-01', tipo: 'Preventivo', titulo: 'Cambio de rodamientos', estado: 'cerrada', prioridad: 'media' },
+                { fecha: '2025-09-20', tipo: 'Correctivo', titulo: 'Ruido anormal detectado', estado: 'cerrada', prioridad: 'baja' },
+            ],
+            2: [
+                { fecha: '2026-01-08', tipo: 'Preventivo', titulo: 'Revisión eléctrica trimestral', estado: 'cerrada', prioridad: 'media' },
+                { fecha: '2025-11-20', tipo: 'Correctivo', titulo: 'Sobrecalentamiento motor', estado: 'cerrada', prioridad: 'alta' },
+            ],
+            3: [
+                { fecha: '2026-01-09', tipo: 'Preventivo', titulo: 'Cambio de filtros de aire', estado: 'en_proceso', prioridad: 'alta' },
+                { fecha: '2025-12-15', tipo: 'Predictivo', titulo: 'Presión de descarga baja', estado: 'cerrada', prioridad: 'media' },
+                { fecha: '2025-10-10', tipo: 'Correctivo', titulo: 'Fuga de aire en válvula', estado: 'cerrada', prioridad: 'alta' },
+            ],
+        };
+
+        // Estado de la aplicación
+        let state = {
+            currentPage: 1,
+            itemsPerPage: 12,
+            searchQuery: '',
+            statusFilter: 'all',
+            showFavsOnly: false,
+            favorites: new Set([2, 5, 10, 16]), // IDs de favoritos
+            selectedEquipment: null
+        };
+
+        // Funciones de utilidad
+        function getStatusIcon(estado) {
+            const icons = {
+                operativo: '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-success"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/></svg>',
+                en_mantenimiento: '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-warning"><path d="M12 22a2 2 0 0 1-2-2V12a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2Z"/><path d="M14 7.5V2h-4v5.5"/><path d="M4 15h9"/><path d="M4 9h9"/></svg>',
+                fuera_servicio: '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-destructive"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>'
+            };
+            return icons[estado];
+        }
+
+        function getCriticalityClass(criticidad) {
+            return {
+                alta: 'bg-destructive text-white',
+                media: 'bg-warning text-white',
+                baja: 'bg-gray-200 text-gray-700'
+            }[criticidad];
+        }
+
+        function getStatusClass(estado) {
+            return {
+                operativo: 'bg-success text-white',
+                en_mantenimiento: 'bg-warning text-white',
+                fuera_servicio: 'bg-destructive text-white'
+            }[estado];
+        }
+
+        function toggleFavorite(id) {
+            if (state.favorites.has(id)) {
+                state.favorites.delete(id);
+            } else {
+                state.favorites.add(id);
+            }
+            render();
+        }
+
+        // Filtrado
+        function getFilteredEquipment() {
+            return mockEquipment.filter(eq => {
+                // Búsqueda
+                if (state.searchQuery) {
+                    const query = state.searchQuery.toLowerCase();
+                    const matches = 
+                        eq.nombre.toLowerCase().includes(query) ||
+                        eq.codigo.toLowerCase().includes(query) ||
+                        eq.ubicacion.toLowerCase().includes(query);
+                    if (!matches) return false;
+                }
+
+                // Filtro de estado
+                if (state.statusFilter !== 'all' && eq.estado !== state.statusFilter) {
+                    return false;
+                }
+
+                // Filtro de favoritos
+                if (state.showFavsOnly && !state.favorites.has(eq.id)) {
+                    return false;
+                }
+
+                return true;
+            });
+        }
+
+        // Renderizar tarjetas
+        function renderEquipment() {
+            const filtered = getFilteredEquipment();
+            const totalPages = Math.ceil(filtered.length / state.itemsPerPage);
+            const startIdx = (state.currentPage - 1) * state.itemsPerPage;
+            const endIdx = startIdx + state.itemsPerPage;
+            const paginated = filtered.slice(startIdx, endIdx);
+
+            const grid = document.getElementById('equipmentGrid');
+            
+            if (filtered.length === 0) {
+                grid.innerHTML = `
+                    <div class="md:col-span-2 lg:col-span-3 xl:col-span-4">
+                        <div class="bg-white p-12 rounded-lg shadow text-center">
+                            <div class="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-gray-400"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+                            </div>
+                            <h3 class="text-lg font-semibold mb-2">No hay equipos</h3>
+                            <p class="text-sm text-muted-foreground">
+                                ${state.searchQuery || state.statusFilter !== 'all' || state.showFavsOnly 
+                                    ? 'No se encontraron equipos con los filtros aplicados'
+                                    : 'Aún no hay equipos sincronizados'}
+                            </p>
+                        </div>
+                    </div>
+                `;
+            } else {
+                grid.innerHTML = paginated.map(eq => `
+                    <div class="bg-white rounded-lg shadow hover:shadow-lg hover:border-primary/50 transition-all cursor-pointer border-2 border-transparent" onclick="showDetail(${eq.id})">
+                        <div class="p-4 pb-3">
+                            <div class="flex items-start justify-between gap-2 mb-3">
+                                <div class="flex-1 min-w-0">
+                                    <h3 class="text-base font-semibold mb-1 line-clamp-2 hover:text-primary transition-colors">${eq.nombre}</h3>
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <span class="text-xs font-mono bg-gray-100 px-2 py-1 rounded">${eq.codigo}</span>
+                                    </div>
+                                </div>
+                                <button onclick="event.stopPropagation(); toggleFavorite(${eq.id})" class="flex-shrink-0 p-1 hover:bg-gray-100 rounded transition-colors">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" ${state.favorites.has(eq.id) ? 'fill="currentColor"' : 'fill="none"'} stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-yellow-500">
+                                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                                    </svg>
+                                </button>
+                            </div>
+                            <div class="space-y-3">
+                                <div class="flex items-start gap-2 text-xs text-muted-foreground">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="flex-shrink-0 mt-0.5"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+                                    <span class="line-clamp-2">${eq.ubicacion}</span>
+                                </div>
+                                ${eq.marca ? `
+                                    <div class="text-xs text-muted-foreground truncate">
+                                        <span class="font-medium">${eq.marca}</span>${eq.modelo ? ` · ${eq.modelo}` : ''}
+                                    </div>
+                                ` : ''}
+                                <div class="flex items-center justify-between pt-2 border-t">
+                                    <span class="text-xs px-2 py-1 rounded ${getCriticalityClass(eq.criticidad)}">
+                                        ${eq.criticidad.charAt(0).toUpperCase() + eq.criticidad.slice(1)}
+                                    </span>
+                                    <span class="text-xs px-2 py-1 rounded ${getStatusClass(eq.estado)}">
+                                        ${eq.estado === 'operativo' ? 'Operativo' : eq.estado === 'en_mantenimiento' ? 'Mantenimiento' : 'Fuera Servicio'}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            // Actualizar contador
+            document.getElementById('resultCount').textContent = `${filtered.length} ${filtered.length === 1 ? 'equipo' : 'equipos'}`;
+            
+            // Actualizar info de página
+            document.getElementById('pageInfo').textContent = 
+                filtered.length === 0 ? 'Sin resultados' :
+                `Mostrando ${startIdx + 1}-${Math.min(endIdx, filtered.length)} de ${filtered.length} equipos`;
+
+            // Renderizar paginación
+            renderPagination(totalPages, filtered.length);
+        }
+
+        function renderPagination(totalPages, totalItems) {
+            if (totalItems === 0 || totalPages <= 1) {
+                document.querySelector('.bg-white.p-4.rounded-lg.shadow:last-of-type').style.display = 'none';
+                return;
+            }
+            document.querySelector('.bg-white.p-4.rounded-lg.shadow:last-of-type').style.display = 'block';
+
+            const pageNumbers = document.getElementById('pageNumbers');
+            pageNumbers.innerHTML = '';
+
+            for (let i = 1; i <= totalPages; i++) {
+                if (
+                    i === 1 ||
+                    i === totalPages ||
+                    (i >= state.currentPage - 1 && i <= state.currentPage + 1)
+                ) {
+                    const btn = document.createElement('button');
+                    btn.className = `w-10 h-8 rounded-lg text-sm ${i === state.currentPage ? 'bg-primary text-white' : 'border border-gray-300 hover:bg-gray-50'}`;
+                    btn.textContent = i;
+                    btn.onclick = () => {
+                        state.currentPage = i;
+                        render();
+                    };
+                    pageNumbers.appendChild(btn);
+                } else if (i === state.currentPage - 2 || i === state.currentPage + 2) {
+                    const span = document.createElement('span');
+                    span.className = 'px-2 text-muted-foreground';
+                    span.textContent = '...';
+                    pageNumbers.appendChild(span);
+                }
+            }
+
+            document.getElementById('prevPage').disabled = state.currentPage === 1;
+            document.getElementById('nextPage').disabled = state.currentPage === totalPages;
+        }
+
+        // Modal de detalle
+        function showDetail(id) {
+            const equipment = mockEquipment.find(eq => eq.id === id);
+            if (!equipment) return;
+
+            state.selectedEquipment = equipment;
+
+            document.getElementById('modalTitle').textContent = equipment.nombre;
+            document.getElementById('modalCode').textContent = equipment.codigo;
+            document.getElementById('modalStatus').textContent = 
+                equipment.estado === 'operativo' ? 'Operativo' : 
+                equipment.estado === 'en_mantenimiento' ? 'En Mantenimiento' : 'Fuera de Servicio';
+            document.getElementById('modalStatus').className = `px-2 py-1 rounded ${getStatusClass(equipment.estado)}`;
+            document.getElementById('modalCriticality').textContent = equipment.criticidad.charAt(0).toUpperCase() + equipment.criticidad.slice(1);
+            document.getElementById('modalCriticality').className = `px-2 py-1 rounded ${getCriticalityClass(equipment.criticidad)}`;
+            document.getElementById('modalLocation').querySelector('span').textContent = equipment.ubicacion;
+            document.getElementById('modalBrand').textContent = equipment.marca || '-';
+            document.getElementById('modalModel').textContent = equipment.modelo || '-';
+            document.getElementById('modalSerial').textContent = 'N/A';
+            document.getElementById('modalInstallDate').textContent = 'N/A';
+            document.getElementById('modalDescription').textContent = 'Sin descripción disponible';
+
+            // Actualizar botón de favorito
+            const favBtn = document.getElementById('favButton');
+            favBtn.querySelector('svg').innerHTML = state.favorites.has(id) ?
+                '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" fill="currentColor"/>' :
+                '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>';
+            
+            favBtn.onclick = () => {
+                toggleFavorite(id);
+                showDetail(id); // Re-render para actualizar estrella
+            };
+
+            // Renderizar historial
+            const incidents = mockIncidents[id] || [];
+            document.getElementById('historyCount').textContent = incidents.length;
+            const historyList = document.getElementById('historyList');
+            
+            if (incidents.length === 0) {
+                historyList.innerHTML = `
+                    <div class="text-center py-8">
+                        <p class="text-muted-foreground">No hay historial de incidencias para este equipo</p>
+                    </div>
+                `;
+            } else {
+                historyList.innerHTML = incidents.map(inc => `
+                    <div class="p-4 border rounded-lg hover:bg-gray-50 transition-colors">
+                        <div class="flex items-start justify-between mb-2">
+                            <div class="flex-1">
+                                <h4 class="font-medium">${inc.titulo}</h4>
+                                <div class="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
+                                    <span>${inc.fecha}</span>
+                                    <span>·</span>
+                                    <span class="px-2 py-0.5 rounded text-xs ${inc.tipo === 'Correctivo' ? 'bg-destructive/10 text-destructive' : inc.tipo === 'Preventivo' ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'}">${inc.tipo}</span>
+                                    <span>·</span>
+                                    <span class="px-2 py-0.5 rounded text-xs ${inc.prioridad === 'alta' ? 'bg-destructive/10 text-destructive' : 'bg-warning/10 text-warning'}">${inc.prioridad}</span>
+                                </div>
+                            </div>
+                            <span class="px-2 py-1 rounded text-xs ${inc.estado === 'cerrada' ? 'bg-gray-200 text-gray-700' : 'bg-primary/10 text-primary'}">
+                                ${inc.estado === 'cerrada' ? 'Cerrada' : 'En Proceso'}
+                            </span>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            const modal = document.getElementById('detailModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeDetail() {
+            const modal = document.getElementById('detailModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            state.selectedEquipment = null;
+        }
+
+        // Event listeners
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            state.searchQuery = e.target.value;
+            state.currentPage = 1;
+            render();
+        });
+
+        document.getElementById('statusFilter').addEventListener('change', (e) => {
+            state.statusFilter = e.target.value;
+            state.currentPage = 1;
+            render();
+        });
+
+        document.getElementById('toggleFavs').addEventListener('click', () => {
+            state.showFavsOnly = !state.showFavsOnly;
+            state.currentPage = 1;
+            document.getElementById('toggleFavs').classList.toggle('bg-yellow-50');
+            document.getElementById('toggleFavs').classList.toggle('border-yellow-300');
+            render();
+        });
+
+        document.getElementById('prevPage').addEventListener('click', () => {
+            if (state.currentPage > 1) {
+                state.currentPage--;
+                render();
+            }
+        });
+
+        document.getElementById('nextPage').addEventListener('click', () => {
+            const filtered = getFilteredEquipment();
+            const totalPages = Math.ceil(filtered.length / state.itemsPerPage);
+            if (state.currentPage < totalPages) {
+                state.currentPage++;
+                render();
+            }
+        });
+
+        document.getElementById('closeModal').addEventListener('click', closeDetail);
+        document.getElementById('detailModal').addEventListener('click', (e) => {
+            if (e.target.id === 'detailModal') closeDetail();
+        });
+
+        // Tabs del modal
+        document.querySelectorAll('.tab-button').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tab = btn.dataset.tab;
+                document.querySelectorAll('.tab-button').forEach(b => {
+                    b.classList.remove('active', 'border-primary');
+                    b.classList.add('border-transparent');
+                });
+                btn.classList.add('active', 'border-primary');
+                btn.classList.remove('border-transparent');
+
+                document.querySelectorAll('.tab-content').forEach(content => {
+                    content.classList.add('hidden');
+                });
+                document.getElementById(`tab${tab.charAt(0).toUpperCase() + tab.slice(1)}`).classList.remove('hidden');
+            });
+        });
+
+        // Render inicial
+        function render() {
+            renderEquipment();
+        }
+
+        render();
+    </script>
+</body>
+</html>

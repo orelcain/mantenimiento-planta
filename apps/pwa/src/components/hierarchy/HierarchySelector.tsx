@@ -218,6 +218,11 @@ function LevelSelector({
   isRequired,
 }: LevelSelectorProps) {
   const { options, loading } = useHierarchyCascadeOptions(parentId, nivel)
+  const onChangeRef = useRef(onChange)
+
+  useEffect(() => {
+    onChangeRef.current = onChange
+  }, [onChange])
   
   // Ref para evitar auto-selección múltiple
   const autoSelectedRef = useRef(false)
@@ -231,9 +236,9 @@ function LevelSelector({
   useEffect(() => {
     if (!loading && options.length === 1 && !value && options[0] && !autoSelectedRef.current) {
       autoSelectedRef.current = true
-      onChange(options[0].value)
+      onChangeRef.current(options[0].value)
     }
-  }, [options, loading, value, nivel]) // Quitamos onChange de las dependencias para evitar bucle
+  }, [options, loading, value, nivel])
 
   // Si solo hay 1 opción, no mostrar selector (auto-seleccionado)
   if (!loading && options.length === 1 && value && options[0]) {

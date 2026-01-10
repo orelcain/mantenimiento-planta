@@ -621,7 +621,7 @@ export async function exportComparisonsToPDF(
         const afterX = margin + imageWidth + spacing + (imageWidth - afterDrawWidth) / 2
         const afterY = currentY + (imageHeight - afterDrawHeight) / 2
         ctx.drawImage(afterImg, afterX, afterY, afterDrawWidth, afterDrawHeight)
-      } catch (error) {
+      } catch (_error) {
         // Si falla la carga de imagen, mostrar placeholder
         ctx.fillStyle = '#f3f4f6'
         ctx.fillRect(margin, currentY, imageWidth, imageHeight)

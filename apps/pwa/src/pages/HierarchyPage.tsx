@@ -66,6 +66,20 @@ interface NodeFormData {
   activo: boolean
 }
 
+function findPathToNode(
+  nodes: HierarchyNodeWithChildren[],
+  targetId: string
+): string[] | null {
+  for (const node of nodes) {
+    if (node.id === targetId) return [node.id]
+    if (node.children?.length) {
+      const childPath = findPathToNode(node.children, targetId)
+      if (childPath) return [node.id, ...childPath]
+    }
+  }
+  return null
+}
+
 export function HierarchyPage() {
   const location = useLocation()
   const user = useAuthStore(state => state.user)
@@ -75,6 +89,7 @@ export function HierarchyPage() {
   // Vista local del árbol para reordenamiento optimista
   const [viewTree, setViewTree] = useState<HierarchyNodeWithChildren[]>([])
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set())
+  const expandedNodesRef = useRef(expandedNodes)
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [showCreateDialog, setShowCreateDialog] = useState(false)
@@ -82,6 +97,10 @@ export function HierarchyPage() {
   const [selectedNode, setSelectedNode] = useState<HierarchyNode | null>(null)
   const [parentForNew, setParentForNew] = useState<HierarchyNodeWithChildren | null>(null)
   const [activeNodeId, setActiveNodeId] = useState<string | null>(null)
+
+  useEffect(() => {
+    expandedNodesRef.current = expandedNodes
+  }, [expandedNodes])
 
   const { qParam, focusParam } = useMemo(() => {
     const params = new URLSearchParams(location.search)
@@ -97,6 +116,13 @@ export function HierarchyPage() {
   
   // Refs para scroll y foco visual
   const nodeRefs = useRef<Map<string, HTMLDivElement>>(new Map())
+
+  const scrollToNode = useCallback((nodeId: string) => {
+    const el = nodeRefs.current.get(nodeId)
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, [])
   
   // Ref para scroll automático al primer resultado
   const firstMatchRef = useRef<HTMLDivElement | null>(null)
@@ -143,17 +169,6 @@ export function HierarchyPage() {
     }
   }, [qParam])
 
-  const findPathToNode = (nodes: HierarchyNodeWithChildren[], targetId: string): string[] | null => {
-    for (const node of nodes) {
-      if (node.id === targetId) return [node.id]
-      if (node.children?.length) {
-        const childPath = findPathToNode(node.children, targetId)
-        if (childPath) return [node.id, ...childPath]
-      }
-    }
-    return null
-  }
-
   useEffect(() => {
     if (!focusParam || viewTree.length === 0) return
 
@@ -175,7 +190,7 @@ export function HierarchyPage() {
         scrollToNode(focusParam)
       })
     })
-  }, [focusParam, viewTree])
+  }, [focusParam, scrollToNode, viewTree])
 
   const toggleNode = (nodeId: string) => {
     const newExpanded = new Set(expandedNodes)
@@ -376,13 +391,6 @@ export function HierarchyPage() {
     return { updated: false, next: nodes }
   }
 
-  const scrollToNode = (nodeId: string) => {
-    const el = nodeRefs.current.get(nodeId)
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    }
-  }
-
   const handleReorder = async (nodeId: string, direction: 'up' | 'down') => {
     const prevTree = viewTree
     const { updated, next } = reorderInTree(viewTree, nodeId, direction)
@@ -499,7 +507,7 @@ export function HierarchyPage() {
 
     // Entrada a modo búsqueda: guardar expansión actual y expandir coincidencias
     if (!prevSearch && hasSearch) {
-      preSearchExpandedRef.current = new Set(expandedNodes)
+      preSearchExpandedRef.current = new Set(expandedNodesRef.current)
       if (toExpand.size > 0) {
         setExpandedNodes(toExpand)
         setIsFirstMatch(true)

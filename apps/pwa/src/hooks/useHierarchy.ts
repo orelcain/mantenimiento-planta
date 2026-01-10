@@ -3,7 +3,7 @@
  * Optimizados con caché y queries eficientes
  */
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import {
   collection,
   query,
@@ -194,12 +194,18 @@ export function useHierarchyTree(options?: { includeInactive?: boolean }) {
     }
   }
 
+  const loadTreeRef = useRef(loadTree)
+  const checkForUpdatesRef = useRef(checkForUpdates)
+
+  loadTreeRef.current = loadTree
+  checkForUpdatesRef.current = checkForUpdates
+
   useEffect(() => {
-    loadTree()
+    loadTreeRef.current()
 
     // Polling cada 30 segundos para detectar cambios
     const interval = setInterval(() => {
-      checkForUpdates()
+      checkForUpdatesRef.current()
     }, 30000)
 
     return () => clearInterval(interval)

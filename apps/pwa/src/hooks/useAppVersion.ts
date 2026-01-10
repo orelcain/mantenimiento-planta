@@ -40,7 +40,7 @@ export function useAppVersion() {
             setHasUpdate(true)
           }
         }
-      } catch (error) {
+      } catch (_error) {
         // Silently fail si no hay conexión o el archivo no existe aún
         // logger.debug('Error checking version')
       }

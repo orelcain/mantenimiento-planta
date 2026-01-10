@@ -448,7 +448,7 @@ export async function upsertEvidencePhotoAtIndex(
   if (current) {
     try {
       await deleteEvidencePhoto(evidenceId, current.id, type, current.url)
-    } catch (e) {
+    } catch (_e) {
       logger.warn('Error deleting previous photo on upsert', { evidenceId, type, photoId: current.id })
     }
   }
@@ -512,7 +512,7 @@ export async function updateEvidencePairPhotos(
     if (!desiredIds.has(p.id)) {
       try {
         await deleteEvidencePhoto(evidenceId, p.id, type, p.url)
-      } catch (e) {
+      } catch (_e) {
         logger.warn('Error deleting removed pair photo', { evidenceId, type, photoId: p.id })
       }
     }
@@ -526,7 +526,7 @@ export async function updateEvidencePairPhotos(
       if (toReplace) {
         try {
           await deleteEvidencePhoto(evidenceId, toReplace.id, type, toReplace.url)
-        } catch (e) {
+        } catch (_e) {
           logger.warn('Error deleting replaced pair photo', { evidenceId, type, photoId: toReplace.id })
         }
       }
@@ -585,14 +585,14 @@ export async function deleteEvidencePair(
     for (const p of toDelete.before) {
       try {
         await deleteEvidencePhoto(evidenceId, p.id, 'before', p.url)
-      } catch (e) {
+      } catch (_e) {
         logger.warn('Error deleting before photo for pair deletion', { evidenceId, photoId: p.id })
       }
     }
     for (const p of toDelete.after) {
       try {
         await deleteEvidencePhoto(evidenceId, p.id, 'after', p.url)
-      } catch (e) {
+      } catch (_e) {
         logger.warn('Error deleting after photo for pair deletion', { evidenceId, photoId: p.id })
       }
     }
@@ -669,7 +669,7 @@ export async function deletePhotoEvidence(id: string): Promise<void> {
       seen.add(photo.id)
       try {
         await deleteEvidencePhoto(id, photo.id, 'before', photo.url)
-      } catch (e) {
+      } catch (_e) {
         logger.warn('Error deleting before photo', { photoId: photo.id })
       }
     }
@@ -678,7 +678,7 @@ export async function deletePhotoEvidence(id: string): Promise<void> {
       seen.add(photo.id)
       try {
         await deleteEvidencePhoto(id, photo.id, 'after', photo.url)
-      } catch (e) {
+      } catch (_e) {
         logger.warn('Error deleting after photo', { photoId: photo.id })
       }
     }
