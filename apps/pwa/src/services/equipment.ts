@@ -11,10 +11,13 @@ import {
   orderBy,
   serverTimestamp,
   Timestamp,
+  arrayUnion,
+  arrayRemove,
 } from 'firebase/firestore'
 import { db } from './firebase'
 import type { Equipment } from '@/types'
 import { generateId } from '@/lib/utils'
+import { uploadEquipmentPhoto, deleteEquipmentPhoto } from './storage'
 
 const COLLECTION = 'equipment'
 
@@ -143,4 +146,44 @@ function toDate(value: unknown): Date | undefined {
   if (value instanceof Date) return value
   if (typeof value === 'string' || typeof value === 'number') return new Date(value)
   return undefined
+}
+
+// ========== FUNCIONES DE FOTOS ==========
+
+/**
+ * Agregar foto a un equipo
+ */
+export async function addEquipmentPhoto(
+  equipmentId: string,
+  file: File
+): Promise<string> {
+  // Subir la foto a Storage
+  const url = await uploadEquipmentPhoto(equipmentId, file)
+  
+  // Agregar la URL al array de fotos del equipo
+  const docRef = doc(db, COLLECTION, equipmentId)
+  await updateDoc(docRef, {
+    photos: arrayUnion(url),
+    updatedAt: serverTimestamp(),
+  })
+  
+  return url
+}
+
+/**
+ * Eliminar foto de un equipo
+ */
+export async function removeEquipmentPhoto(
+  equipmentId: string,
+  photoUrl: string
+): Promise<void> {
+  // Eliminar de Storage
+  await deleteEquipmentPhoto(photoUrl)
+  
+  // Quitar la URL del array de fotos del equipo
+  const docRef = doc(db, COLLECTION, equipmentId)
+  await updateDoc(docRef, {
+    photos: arrayRemove(photoUrl),
+    updatedAt: serverTimestamp(),
+  })
 }

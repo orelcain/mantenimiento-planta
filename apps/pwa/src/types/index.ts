@@ -88,7 +88,8 @@ export interface Equipment {
   criticidad: 'alta' | 'media' | 'baja'
   estado: 'operativo' | 'en_mantenimiento' | 'fuera_servicio'
   fechaInstalacion?: Date
-  photoURL?: string
+  photoURL?: string // @deprecated - usar photos[]
+  photos?: string[] // URLs de Firebase Storage para fotos de referencia del equipo
   createdAt: Date
   updatedAt: Date
 }
