@@ -612,6 +612,7 @@ export function EquipmentPage() {
               selected={selectedIds.has(eq.id)}
               favorite={favorites.has(eq.id)}
               viewMode={viewMode}
+              compact={compact}
               onToggleSelected={() => toggleSelected(eq.id)}
               onToggleFavorite={() => toggleFavorite(eq.id)}
               onOpenDetail={() => openDetail(eq)}
@@ -712,6 +713,7 @@ function EquipmentCard({
   selected,
   favorite,
   viewMode,
+  compact,
   onToggleSelected,
   onToggleFavorite,
   onOpenDetail,
@@ -721,6 +723,7 @@ function EquipmentCard({
   selected: boolean
   favorite: boolean
   viewMode: ViewMode
+  compact: boolean
   onToggleSelected: () => void
   onToggleFavorite: () => void
   onOpenDetail: () => void
@@ -730,21 +733,43 @@ function EquipmentCard({
   const criticidadConfig = CRITICIDAD_CONFIG[equipment.criticidad]
   const StatusIcon = statusConfig.icon
 
+  const titleClassName = compact
+    ? 'text-xs leading-snug line-clamp-3 group-hover:text-primary transition-colors'
+    : 'text-sm leading-snug line-clamp-3 group-hover:text-primary transition-colors'
+
+  const codeBadgeClassName = compact ? 'font-mono text-[10px]' : 'font-mono text-[11px]'
+  const metaBadgeTextClassName = compact ? 'text-[10px]' : 'text-[11px]'
+  const headerClassName = compact ? 'p-3 pb-2' : 'p-3.5 pb-2.5'
+  const contentClassName = compact ? 'p-3 pt-0 space-y-2' : 'p-3.5 pt-0 space-y-2.5'
+  const statusIconSizeClassName = compact ? 'h-4 w-4' : 'h-5 w-5'
+  const favButtonClassName = compact ? 'h-7 w-7' : 'h-8 w-8'
+  const favIconSizeClassName = compact ? 'h-3.5 w-3.5' : 'h-4 w-4'
+  const smallTextClassName = compact ? 'text-[11px]' : 'text-xs'
+  const actionButtonClassName = compact ? 'h-6 text-[11px]' : 'h-7 text-xs'
+
   if (viewMode === 'list') {
     return (
       <Card className="hover:border-primary/50 transition-colors">
-        <CardContent className="p-4">
+        <CardContent className={compact ? 'p-3' : 'p-4'}>
           <div className="flex items-start gap-3">
             <Checkbox checked={selected} onCheckedChange={() => onToggleSelected()} />
 
             <div className="flex-1 min-w-0 cursor-pointer" onClick={onOpenDetail}>
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <div className="font-semibold truncate">{equipment.nombre}</div>
-                  <div className="text-sm text-muted-foreground font-mono truncate">{equipment.codigo}</div>
+                  <div className={compact ? 'text-sm font-semibold truncate' : 'font-semibold truncate'}>{equipment.nombre}</div>
+                  <div
+                    className={
+                      compact
+                        ? 'text-[11px] text-muted-foreground font-mono truncate'
+                        : 'text-sm text-muted-foreground font-mono truncate'
+                    }
+                  >
+                    {equipment.codigo}
+                  </div>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  <StatusIcon className={`h-5 w-5 ${statusConfig.iconClassName}`} />
+                  <StatusIcon className={`${statusIconSizeClassName} ${statusConfig.iconClassName}`} />
                   <Button
                     variant="ghost"
                     size="sm"
@@ -754,35 +779,35 @@ function EquipmentCard({
                     }}
                     title={favorite ? 'Quitar de favoritos' : 'Marcar como favorito'}
                   >
-                    <Star className={`h-4 w-4 ${favorite ? 'fill-current text-yellow-500' : ''}`} />
+                    <Star className={`${favIconSizeClassName} ${favorite ? 'fill-current text-yellow-500' : ''}`} />
                   </Button>
                 </div>
               </div>
 
               {(equipment.hierarchyPath || equipment.zoneId) && (
-                <div className="flex items-start gap-2 text-xs text-muted-foreground mt-2">
-                  <MapPin className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
-                  <span className="line-clamp-2">{equipment.hierarchyPath || equipment.zoneId}</span>
+                <div className={`flex items-start gap-2 text-muted-foreground mt-2 ${smallTextClassName}`}>
+                  <MapPin className={compact ? 'h-3 w-3 flex-shrink-0 mt-0.5' : 'h-3.5 w-3.5 flex-shrink-0 mt-0.5'} />
+                  <span className={compact ? 'line-clamp-2' : 'line-clamp-2'}>{equipment.hierarchyPath || equipment.zoneId}</span>
                 </div>
               )}
 
               <div className="flex items-center justify-between gap-2 mt-2">
                 <div className="flex items-center gap-2 flex-wrap">
                   {equipment.syncExcluded && (
-                    <Badge variant="outline" className="text-xs">
+                    <Badge variant="outline" className={metaBadgeTextClassName}>
                       Excluido
                     </Badge>
                   )}
-                  <Badge variant="outline" className={`${criticidadConfig.badgeClassName} text-xs`}>
+                  <Badge variant="outline" className={`${criticidadConfig.badgeClassName} ${metaBadgeTextClassName}`}>
                     {criticidadConfig.label}
                   </Badge>
-                  <Badge className={`${statusConfig.badgeClassName} text-xs`}>{statusConfig.label}</Badge>
+                  <Badge className={`${statusConfig.badgeClassName} ${metaBadgeTextClassName}`}>{statusConfig.label}</Badge>
                 </div>
 
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-7 text-xs"
+                  className={actionButtonClassName}
                   onClick={(e) => {
                     e.stopPropagation()
                     onViewHierarchy()
@@ -800,7 +825,7 @@ function EquipmentCard({
 
   return (
     <Card className="cursor-pointer hover:shadow-lg hover:border-primary/50 transition-all group" onClick={onOpenDetail}>
-      <CardHeader className="p-4 pb-3">
+      <CardHeader className={headerClassName}>
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2">
             <Checkbox
@@ -810,15 +835,15 @@ function EquipmentCard({
               aria-label="Seleccionar equipo"
             />
             <div className="flex-1 min-w-0">
-              <CardTitle className="text-base mb-1 line-clamp-2 group-hover:text-primary transition-colors">
+              <CardTitle className={`${titleClassName} mb-1`}>
                 {equipment.nombre}
               </CardTitle>
               <div className="flex items-center gap-2">
-                <Badge variant="secondary" className="font-mono text-xs">
+                <Badge variant="secondary" className={codeBadgeClassName}>
                   {equipment.codigo}
                 </Badge>
                 {equipment.syncExcluded && (
-                  <Badge variant="outline" className="text-xs">
+                  <Badge variant="outline" className={metaBadgeTextClassName}>
                     Excluido
                   </Badge>
                 )}
@@ -827,45 +852,45 @@ function EquipmentCard({
           </div>
 
           <div className="flex items-center gap-2">
-            <StatusIcon className={`h-5 w-5 flex-shrink-0 ${statusConfig.iconClassName}`} />
+            <StatusIcon className={`${statusIconSizeClassName} flex-shrink-0 ${statusConfig.iconClassName}`} />
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8"
+              className={favButtonClassName}
               onClick={(e) => {
                 e.stopPropagation()
                 onToggleFavorite()
               }}
               title={favorite ? 'Quitar de favoritos' : 'Marcar como favorito'}
             >
-              <Star className={`h-4 w-4 ${favorite ? 'fill-current text-yellow-500' : ''}`} />
+              <Star className={`${favIconSizeClassName} ${favorite ? 'fill-current text-yellow-500' : ''}`} />
             </Button>
           </div>
         </div>
       </CardHeader>
-      <CardContent className="p-4 pt-0 space-y-3">
+      <CardContent className={contentClassName}>
         {(equipment.hierarchyPath || equipment.zoneId) && (
-          <div className="flex items-start gap-2 text-xs text-muted-foreground">
-            <MapPin className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
+          <div className={`flex items-start gap-2 text-muted-foreground ${smallTextClassName}`}>
+            <MapPin className={compact ? 'h-3 w-3 flex-shrink-0 mt-0.5' : 'h-3.5 w-3.5 flex-shrink-0 mt-0.5'} />
             <span className="line-clamp-2">{equipment.hierarchyPath || equipment.zoneId}</span>
           </div>
         )}
 
         {equipment.marca && (
-          <div className="text-xs text-muted-foreground truncate">
+          <div className={`text-muted-foreground truncate ${smallTextClassName}`}>
             <span className="font-medium">{equipment.marca}</span>
             {equipment.modelo && <span> · {equipment.modelo}</span>}
           </div>
         )}
 
         <div className="flex items-center justify-between pt-2 border-t">
-          <Badge variant="outline" className={`${criticidadConfig.badgeClassName} text-xs`}>
+          <Badge variant="outline" className={`${criticidadConfig.badgeClassName} ${metaBadgeTextClassName}`}>
             {criticidadConfig.label}
           </Badge>
           <Button
             variant="ghost"
             size="sm"
-            className="h-7 text-xs"
+            className={actionButtonClassName}
             onClick={(e) => {
               e.stopPropagation()
               onViewHierarchy()
