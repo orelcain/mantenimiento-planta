@@ -20,7 +20,7 @@ export default defineConfig({
         name: 'Sistema de Mantenimiento Industrial',
         short_name: 'Mantenimiento',
         description: 'PWA para gestión de mantenimiento industrial con IA, IoT y 4 tipos de mantenimiento',
-        version: '2.2.28',
+        version: '2.2.29',
         start_url: '/mantenimiento-planta/',
         scope: '/mantenimiento-planta/',
         display: 'standalone',

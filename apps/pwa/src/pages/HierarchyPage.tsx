@@ -254,7 +254,7 @@ export function HierarchyPage() {
       
       const newId = await createNode(nodeData)
 
-      logger.info('Node created', { nombre: formData.nombre, nivel: formData.nivel })
+      logger.info('Node created', { nodeId: newId, nombre: formData.nombre, nivel: formData.nivel })
       setShowCreateDialog(false)
       refresh()
     } catch (error) {
@@ -500,6 +500,7 @@ export function HierarchyPage() {
     return nodes.map(node => {
       const isExpanded = expandedNodes.has(node.id)
       const hasChildren = node.children && node.children.length > 0
+      const childCount = node.children?.length ?? 0
       const indent = depth * 24
       
       // Detectar si este nodo es un match
@@ -579,6 +580,11 @@ export function HierarchyPage() {
                 <Badge variant="outline" className="text-xs">
                   {HIERARCHY_LEVEL_NAMES[node.nivel]}
                 </Badge>
+                {childCount > 0 && (
+                  <Badge variant="secondary" className="text-xs">
+                    Hijos: {childCount}
+                  </Badge>
+                )}
                 {!node.activo && (
                   <Badge variant="secondary" className="text-xs">
                     Inactivo

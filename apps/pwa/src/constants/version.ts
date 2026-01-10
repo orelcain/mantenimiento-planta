@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-01-09' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Jerarquía Extendida (695 nodos)' as const
+export const VERSION_NAME = 'Jerarquía Extendida + Conteo de hijos' as const
 
 /**
  * Nota:

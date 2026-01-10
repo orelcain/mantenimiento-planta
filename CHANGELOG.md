@@ -7,6 +7,13 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.2.29] - 2026-01-09
+
+### 🌲 Jerarquía: Conteo de hijos (Admin)
+
+#### Mejorado
+- Árbol: muestra conteo de hijos por nodo en cada nivel
+
 ## [2.2.28] - 2026-01-09
 
 ### 🚀 Release para pruebas en Pages

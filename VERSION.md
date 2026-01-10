@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.2.28**
+## Versión Actual: **v2.2.29**
 
 **Fecha de lanzamiento**: 9 de enero de 2026  
 **Estado**: ✅ PRODUCCIÓN READY  
@@ -9,6 +9,10 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.2.29 - Jerarquía: Conteo de hijos + Pages
+
+- Jerarquía Admin: muestra cantidad de hijos por nodo en el árbol
 
 ### v2.2.28 - Jerarquía Extendida + Pruebas en Pages
 
