@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { QRCodeSVG } from 'qrcode.react'
 import {
   CheckCircle2,
   ChevronLeft,
@@ -8,16 +9,20 @@ import {
   Download,
   FileDown,
   Grid3X3,
+  Image as ImageIcon,
   List,
   Mail,
   MapPin,
   Package,
+  Plus,
   Search,
   Settings,
   Share2,
   Star,
   Text,
+  Trash2,
   XCircle,
+  ZoomIn,
 } from 'lucide-react'
 import {
   Badge,
@@ -46,7 +51,7 @@ import {
   Textarea,
 } from '@/components/ui'
 import { useAppStore, useAuthStore } from '@/store'
-import { getEquipments, updateEquipment } from '@/services/equipment'
+import { getEquipments, updateEquipment, addEquipmentPhoto, removeEquipmentPhoto } from '@/services/equipment'
 import { getIncidents } from '@/services/incidents'
 import { updateEquipmentSchema } from '@/lib/validation'
 import { debounce, formatRelativeTime, generateId } from '@/lib/utils'
@@ -188,9 +193,13 @@ export function EquipmentPage() {
   const [shareIncludeBasic, setShareIncludeBasic] = useState(true)
   const [shareIncludeHistory, setShareIncludeHistory] = useState(true)
   const [shareIncludeNotes, setShareIncludeNotes] = useState(true)
+  const [shareIncludePhotos, setShareIncludePhotos] = useState(true)
   const [shareIncludeQR, setShareIncludeQR] = useState(false)
   const [shareFormat, setShareFormat] = useState<'pdf' | 'csv' | 'json'>('pdf')
   const [shareLoading, setShareLoading] = useState(false)
+
+  const [photoUploading, setPhotoUploading] = useState(false)
+  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null)
 
   const debouncedSetSearch = useMemo(
     () => debounce((value: string) => setDebouncedSearch(value), 300),
@@ -484,6 +493,13 @@ export function EquipmentPage() {
         }))
       }
 
+      if (shareIncludePhotos && eq.photos && eq.photos.length > 0) {
+        equipmentData.fotos = eq.photos.map((url, idx) => ({
+          url,
+          numero: idx + 1,
+        }))
+      }
+
       if (shareIncludeQR) {
         equipmentData.qr_url = `${window.location.origin}/equipment/${eq.id}`
       }
@@ -614,6 +630,13 @@ export function EquipmentPage() {
         })
       }
 
+      if (shareIncludePhotos && eq.fotos && eq.fotos.length > 0) {
+        content += `\nFotos (${eq.fotos.length}):\n`
+        eq.fotos.forEach((foto: any) => {
+          content += `  ${foto.numero}. ${foto.url}\n`
+        })
+      }
+
       if (shareIncludeQR && eq.qr_url) {
         content += `\nURL QR: ${eq.qr_url}\n`
       }
@@ -723,6 +746,54 @@ export function EquipmentPage() {
     if (detailEquipment) {
       const updated = fresh.find((e) => e.id === detailEquipment.id) ?? null
       setDetailEquipment(updated)
+    }
+  }
+
+  const handlePhotoUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0 || !detailEquipment || !canEditEquipment) return
+
+    setPhotoUploading(true)
+
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i]
+        if (file) {
+          await addEquipmentPhoto(detailEquipment.id, file)
+        }
+      }
+
+      const fresh = await getEquipments()
+      setEquipment(fresh)
+
+      const updated = fresh.find((e) => e.id === detailEquipment.id) ?? null
+      if (updated) setDetailEquipment(updated)
+    } catch (e: unknown) {
+      const err = e instanceof Error ? e : new Error('Error al subir fotos')
+      logger.error('Photo upload failed', err)
+      alert('No se pudieron subir las fotos. Intenta de nuevo.')
+    } finally {
+      setPhotoUploading(false)
+    }
+  }
+
+  const handlePhotoDelete = async (photoUrl: string) => {
+    if (!detailEquipment || !canEditEquipment) return
+
+    const ok = window.confirm('¿Eliminar esta foto?')
+    if (!ok) return
+
+    try {
+      await removeEquipmentPhoto(detailEquipment.id, photoUrl)
+
+      const fresh = await getEquipments()
+      setEquipment(fresh)
+
+      const updated = fresh.find((e) => e.id === detailEquipment.id) ?? null
+      if (updated) setDetailEquipment(updated)
+    } catch (e: unknown) {
+      const err = e instanceof Error ? e : new Error('Error al eliminar foto')
+      logger.error('Photo delete failed', err)
+      alert('No se pudo eliminar la foto. Intenta de nuevo.')
     }
   }
 
@@ -1052,6 +1123,8 @@ export function EquipmentPage() {
           incidentsError={detailIncidentsError}
           notes={notesById[detailEquipment.id] ?? []}
           newNoteText={newNoteText}
+          photoUploading={photoUploading}
+          selectedPhotoIndex={selectedPhotoIndex}
           onNewNoteTextChange={setNewNoteText}
           onAddNote={addNote}
           onToggleFavorite={() => toggleFavorite(detailEquipment.id)}
@@ -1061,6 +1134,9 @@ export function EquipmentPage() {
             setSelectedIncident(incident)
             navigate('/incidents')
           }}
+          onPhotoUpload={handlePhotoUpload}
+          onPhotoDelete={handlePhotoDelete}
+          onPhotoSelect={setSelectedPhotoIndex}
           onClose={closeDetail}
         />
       )}
@@ -1172,6 +1248,17 @@ export function EquipmentPage() {
                   />
                   <Label htmlFor="shareNotes" className="text-sm font-normal cursor-pointer">
                     Notas internas del usuario
+                  </Label>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="sharePhotos"
+                    checked={shareIncludePhotos}
+                    onCheckedChange={(checked) => setShareIncludePhotos(checked as boolean)}
+                  />
+                  <Label htmlFor="sharePhotos" className="text-sm font-normal cursor-pointer">
+                    Fotos del equipo
                   </Label>
                 </div>
 
@@ -1433,10 +1520,18 @@ function EquipmentCard({
         )}
 
         <div className="flex flex-col gap-2 pt-2 border-t">
-          <div className="flex items-center justify-between">
-            <Badge variant="outline" className={`${criticidadConfig.badgeClassName} ${metaBadgeTextClassName}`}>
-              {criticidadConfig.label}
-            </Badge>
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className={`${criticidadConfig.badgeClassName} ${metaBadgeTextClassName}`}>
+                {criticidadConfig.label}
+              </Badge>
+              {equipment.photos && equipment.photos.length > 0 && (
+                <Badge variant="secondary" className={`${metaBadgeTextClassName} flex items-center gap-1`}>
+                  <ImageIcon className={compact ? 'h-2.5 w-2.5' : 'h-3 w-3'} />
+                  {equipment.photos.length}
+                </Badge>
+              )}
+            </div>
             <Badge className={`${statusConfig.badgeClassName} ${metaBadgeTextClassName}`}>
               {statusConfig.label}
             </Badge>
@@ -1482,12 +1577,17 @@ function EquipmentDetailDialog({
   incidentsError,
   notes,
   newNoteText,
+  photoUploading,
+  selectedPhotoIndex,
   onNewNoteTextChange,
   onAddNote,
   onToggleFavorite,
   onViewHierarchy,
   onEdit,
   onOpenIncident,
+  onPhotoUpload,
+  onPhotoDelete,
+  onPhotoSelect,
   onClose,
 }: {
   equipment: Equipment
@@ -1497,12 +1597,17 @@ function EquipmentDetailDialog({
   incidentsError: string | null
   notes: EquipmentNote[]
   newNoteText: string
+  photoUploading: boolean
+  selectedPhotoIndex: number | null
   onNewNoteTextChange: (v: string) => void
   onAddNote: () => void
   onToggleFavorite: () => void
   onViewHierarchy: () => void
   onEdit: () => void
   onOpenIncident: (incident: Incident) => void
+  onPhotoUpload: (files: FileList | null) => void
+  onPhotoDelete: (photoUrl: string) => void
+  onPhotoSelect: (index: number | null) => void
   onClose: () => void
 }) {
   const statusConfig = STATUS_CONFIG[equipment.estado]
@@ -1550,6 +1655,7 @@ function EquipmentDetailDialog({
         <Tabs defaultValue="info">
           <TabsList>
             <TabsTrigger value="info">Información</TabsTrigger>
+            <TabsTrigger value="photos">Fotos ({equipment.photos?.length || 0})</TabsTrigger>
             <TabsTrigger value="history">Historial ({incidents.length})</TabsTrigger>
             <TabsTrigger value="notes">Notas ({notes.length})</TabsTrigger>
             <TabsTrigger value="qr">QR</TabsTrigger>
@@ -1578,6 +1684,83 @@ function EquipmentDetailDialog({
                   <div className="text-sm text-muted-foreground">Descripción</div>
                   <div className="font-medium whitespace-pre-wrap">{equipment.descripcion || '-'}</div>
                 </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="photos">
+            <Card>
+              <CardContent className="p-4 space-y-4">
+                {/* Upload section */}
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-medium">Galería de fotos</h3>
+                  <div>
+                    <input
+                      type="file"
+                      id="photo-upload"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      onChange={(e) => onPhotoUpload(e.target.files)}
+                      disabled={photoUploading}
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => document.getElementById('photo-upload')?.click()}
+                      disabled={photoUploading}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      {photoUploading ? 'Subiendo...' : 'Agregar fotos'}
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Photos grid */}
+                {equipment.photos && equipment.photos.length > 0 ? (
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                    {equipment.photos.map((photoUrl, idx) => (
+                      <div key={photoUrl} className="relative group aspect-square rounded-lg overflow-hidden border">
+                        <img
+                          src={photoUrl}
+                          alt={`Foto ${idx + 1}`}
+                          className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                          onClick={() => onPhotoSelect(idx)}
+                        />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                          <Button
+                            variant="secondary"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              onPhotoSelect(idx)
+                            }}
+                          >
+                            <ZoomIn className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              onPhotoDelete(photoUrl)
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <ImageIcon className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                    <p>No hay fotos todavía</p>
+                    <p className="text-sm">Haz clic en "Agregar fotos" para subir imágenes</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -1665,16 +1848,47 @@ function EquipmentDetailDialog({
 
           <TabsContent value="qr">
             <Card>
-              <CardContent className="p-4 space-y-3">
-                <div className="text-sm text-muted-foreground">Código QR (texto)</div>
-                <div className="font-mono text-sm p-3 rounded-md bg-muted break-all">
-                  {equipment.qrCode || equipment.codigo}
+              <CardContent className="p-6 space-y-6">
+                {/* QR Code Visual */}
+                <div className="flex flex-col items-center gap-4">
+                  <div className="text-sm font-medium text-center">Código QR del Equipo</div>
+                  <div className="p-4 bg-white rounded-lg border-2 border-border">
+                    <QRCodeSVG
+                      value={`${window.location.origin}/equipment/${equipment.id}`}
+                      size={200}
+                      level="H"
+                      includeMargin
+                      data-qr={equipment.id}
+                    />
+                  </div>
+                  <div className="text-xs text-muted-foreground text-center max-w-xs">
+                    Escanea este código para acceder directamente al equipo
+                  </div>
                 </div>
-                <div className="flex justify-end">
+
+                {/* Texto del QR */}
+                <div className="space-y-2">
+                  <div className="text-sm text-muted-foreground">URL del equipo</div>
+                  <div className="font-mono text-xs p-3 rounded-md bg-muted break-all">
+                    {`${window.location.origin}/equipment/${equipment.id}`}
+                  </div>
+                </div>
+
+                {/* Código del equipo */}
+                <div className="space-y-2">
+                  <div className="text-sm text-muted-foreground">Código del equipo</div>
+                  <div className="font-mono text-sm p-3 rounded-md bg-muted break-all">
+                    {equipment.qrCode || equipment.codigo}
+                  </div>
+                </div>
+
+                {/* Acciones */}
+                <div className="flex gap-2 justify-end">
                   <Button
                     variant="outline"
+                    size="sm"
                     onClick={async () => {
-                      const text = equipment.qrCode || equipment.codigo
+                      const text = `${window.location.origin}/equipment/${equipment.id}`
                       try {
                         await navigator.clipboard.writeText(text)
                       } catch {
@@ -1682,7 +1896,27 @@ function EquipmentDetailDialog({
                       }
                     }}
                   >
-                    Copiar
+                    <Copy className="h-4 w-4 mr-2" />
+                    Copiar URL
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const svg = document.querySelector(`svg[data-qr="${equipment.id}"]`)
+                      if (!svg) return
+                      const svgData = new XMLSerializer().serializeToString(svg)
+                      const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' })
+                      const url = URL.createObjectURL(svgBlob)
+                      const link = document.createElement('a')
+                      link.href = url
+                      link.download = `qr-${equipment.codigo}.svg`
+                      link.click()
+                      URL.revokeObjectURL(url)
+                    }}
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Descargar QR
                   </Button>
                 </div>
               </CardContent>
@@ -1697,6 +1931,55 @@ function EquipmentDetailDialog({
           <Button onClick={onEdit}>Editar</Button>
         </DialogFooter>
       </DialogContent>
+
+      {/* Photo preview modal */}
+      {selectedPhotoIndex !== null && equipment.photos && equipment.photos[selectedPhotoIndex] && (
+        <Dialog open onOpenChange={() => onPhotoSelect(null)}>
+          <DialogContent className="max-w-5xl h-[90vh] flex flex-col">
+            <DialogHeader>
+              <DialogTitle>
+                Foto {selectedPhotoIndex + 1} de {equipment.photos.length}
+              </DialogTitle>
+            </DialogHeader>
+            <div className="flex-1 relative min-h-0">
+              <img
+                src={equipment.photos[selectedPhotoIndex]}
+                alt={`Foto ${selectedPhotoIndex + 1}`}
+                className="absolute inset-0 w-full h-full object-contain"
+              />
+            </div>
+            <div className="flex items-center justify-between gap-2 pt-4 border-t">
+              <Button
+                variant="outline"
+                onClick={() => onPhotoSelect(Math.max(0, selectedPhotoIndex - 1))}
+                disabled={selectedPhotoIndex === 0}
+              >
+                Anterior
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  const photoUrl = equipment.photos?.[selectedPhotoIndex]
+                  if (photoUrl) {
+                    onPhotoDelete(photoUrl)
+                    onPhotoSelect(null)
+                  }
+                }}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Eliminar foto
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => onPhotoSelect(Math.min(equipment.photos!.length - 1, selectedPhotoIndex + 1))}
+                disabled={selectedPhotoIndex === equipment.photos.length - 1}
+              >
+                Siguiente
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </Dialog>
   )
 }
