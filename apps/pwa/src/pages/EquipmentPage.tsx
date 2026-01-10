@@ -5,13 +5,16 @@ import {
   ChevronLeft,
   ChevronRight,
   Copy,
+  Download,
   FileDown,
   Grid3X3,
   List,
+  Mail,
   MapPin,
   Package,
   Search,
   Settings,
+  Share2,
   Star,
   Text,
   XCircle,
@@ -180,6 +183,14 @@ export function EquipmentPage() {
   const [maintenanceResponsible, setMaintenanceResponsible] = useState('')
   const [maintenanceNotes, setMaintenanceNotes] = useState('')
   const [maintenanceLoading, setMaintenanceLoading] = useState(false)
+
+  const [shareModalOpen, setShareModalOpen] = useState(false)
+  const [shareIncludeBasic, setShareIncludeBasic] = useState(true)
+  const [shareIncludeHistory, setShareIncludeHistory] = useState(true)
+  const [shareIncludeNotes, setShareIncludeNotes] = useState(true)
+  const [shareIncludeQR, setShareIncludeQR] = useState(false)
+  const [shareFormat, setShareFormat] = useState<'pdf' | 'csv' | 'json'>('pdf')
+  const [shareLoading, setShareLoading] = useState(false)
 
   const debouncedSetSearch = useMemo(
     () => debounce((value: string) => setDebouncedSearch(value), 300),
@@ -417,6 +428,200 @@ export function EquipmentPage() {
     } finally {
       setMaintenanceLoading(false)
     }
+  }
+
+  const openShareModal = () => {
+    if (selectedIds.size === 0) return
+    setShareModalOpen(true)
+  }
+
+  const closeShareModal = () => {
+    setShareModalOpen(false)
+  }
+
+  const generateShareData = async () => {
+    const selectedEquipments = equipment.filter((e) => selectedIds.has(e.id))
+
+    const data: any = {
+      fecha_exportacion: new Date().toISOString(),
+      total_equipos: selectedEquipments.length,
+      equipos: [],
+    }
+
+    for (const eq of selectedEquipments) {
+      const equipmentData: any = {}
+
+      if (shareIncludeBasic) {
+        equipmentData.codigo = eq.codigo
+        equipmentData.nombre = eq.nombre
+        equipmentData.estado = STATUS_CONFIG[eq.estado].label
+        equipmentData.criticidad = CRITICIDAD_CONFIG[eq.criticidad].label
+        equipmentData.ubicacion = eq.hierarchyPath || eq.zoneId || ''
+        equipmentData.marca = eq.marca || ''
+        equipmentData.modelo = eq.modelo || ''
+        equipmentData.numero_serie = eq.numeroSerie || ''
+      }
+
+      if (shareIncludeHistory) {
+        try {
+          const incidents = await getIncidents({ equipmentId: eq.id, limit: 20 })
+          equipmentData.historial = incidents.map((inc) => ({
+            titulo: inc.title,
+            prioridad: inc.priority,
+            estado: inc.status,
+            fecha: inc.createdAt,
+          }))
+        } catch (_e) {
+          equipmentData.historial = []
+        }
+      }
+
+      if (shareIncludeNotes) {
+        const notes = notesById[eq.id] || []
+        equipmentData.notas = notes.map((n) => ({
+          texto: n.text,
+          fecha: n.createdAt,
+        }))
+      }
+
+      if (shareIncludeQR) {
+        equipmentData.qr_url = `${window.location.origin}/equipment/${eq.id}`
+      }
+
+      data.equipos.push(equipmentData)
+    }
+
+    return data
+  }
+
+  const handleShareDownload = async () => {
+    setShareLoading(true)
+
+    try {
+      const data = await generateShareData()
+
+      if (shareFormat === 'json') {
+        const json = JSON.stringify(data, null, 2)
+        downloadTextFile('equipos_exportados.json', json)
+      } else if (shareFormat === 'csv') {
+        const rows = data.equipos.map((eq: any) => ({
+          Código: eq.codigo || '',
+          Nombre: eq.nombre || '',
+          Estado: eq.estado || '',
+          Criticidad: eq.criticidad || '',
+          Ubicación: eq.ubicacion || '',
+          Marca: eq.marca || '',
+          Modelo: eq.modelo || '',
+          'N° Serie': eq.numero_serie || '',
+          'Incidencias': eq.historial?.length || 0,
+          'Notas': eq.notas?.length || 0,
+        }))
+        const csv = toCsv(rows)
+        downloadTextFile('equipos_exportados.csv', csv)
+      } else if (shareFormat === 'pdf') {
+        const pdfContent = generateSharePdfContent(data)
+        downloadTextFile('equipos_exportados.txt', pdfContent)
+        alert('Para generar PDF: copia este contenido y pégalo en un generador de PDF o imprime la página.')
+      }
+
+      closeShareModal()
+    } catch (e) {
+      const err = e instanceof Error ? e : new Error('Error al generar exportación')
+      logger.error('Share export failed', err)
+      alert('No se pudo generar la exportación. Intenta de nuevo.')
+    } finally {
+      setShareLoading(false)
+    }
+  }
+
+  const handleShareViaEmail = async () => {
+    setShareLoading(true)
+
+    try {
+      const data = await generateShareData()
+      const body = generateSharePdfContent(data)
+      const subject = `Exportación de ${data.total_equipos} equipos - ${new Date().toLocaleDateString()}`
+      
+      window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+      
+      closeShareModal()
+    } catch (_e) {
+      alert('No se pudo preparar el email. Intenta con la opción de descarga.')
+    } finally {
+      setShareLoading(false)
+    }
+  }
+
+  const handleShareViaMobile = async () => {
+    if (!navigator.share) {
+      alert('Tu navegador no soporta la función de compartir. Usa la opción de descarga.')
+      return
+    }
+
+    setShareLoading(true)
+
+    try {
+      const data = await generateShareData()
+      const text = generateSharePdfContent(data)
+      
+      await navigator.share({
+        title: `Exportación de ${data.total_equipos} equipos`,
+        text: text.substring(0, 1000) + '...',
+      })
+      
+      closeShareModal()
+    } catch (_e) {
+      if ((_e as Error).name !== 'AbortError') {
+        alert('No se pudo compartir. Intenta con la opción de descarga.')
+      }
+    } finally {
+      setShareLoading(false)
+    }
+  }
+
+  const generateSharePdfContent = (data: any): string => {
+    let content = `REPORTE DE EQUIPOS\n`
+    content += `Fecha: ${new Date(data.fecha_exportacion).toLocaleString()}\n`
+    content += `Total equipos: ${data.total_equipos}\n`
+    content += `\n${'='.repeat(60)}\n\n`
+
+    for (const eq of data.equipos) {
+      content += `EQUIPO: ${eq.nombre}\n`
+      content += `Código: ${eq.codigo}\n`
+      
+      if (shareIncludeBasic) {
+        content += `Estado: ${eq.estado}\n`
+        content += `Criticidad: ${eq.criticidad}\n`
+        content += `Ubicación: ${eq.ubicacion}\n`
+        if (eq.marca) content += `Marca: ${eq.marca}\n`
+        if (eq.modelo) content += `Modelo: ${eq.modelo}\n`
+        if (eq.numero_serie) content += `N° Serie: ${eq.numero_serie}\n`
+      }
+
+      if (shareIncludeHistory && eq.historial && eq.historial.length > 0) {
+        content += `\nHistorial de Incidencias (${eq.historial.length}):\n`
+        eq.historial.forEach((inc: any, i: number) => {
+          content += `  ${i + 1}. ${inc.titulo} - ${inc.prioridad} - ${inc.estado}\n`
+          content += `     Fecha: ${new Date(inc.fecha).toLocaleString()}\n`
+        })
+      }
+
+      if (shareIncludeNotes && eq.notas && eq.notas.length > 0) {
+        content += `\nNotas (${eq.notas.length}):\n`
+        eq.notas.forEach((nota: any, i: number) => {
+          content += `  ${i + 1}. ${nota.texto}\n`
+          content += `     Fecha: ${new Date(nota.fecha).toLocaleString()}\n`
+        })
+      }
+
+      if (shareIncludeQR && eq.qr_url) {
+        content += `\nURL QR: ${eq.qr_url}\n`
+      }
+
+      content += `\n${'-'.repeat(60)}\n\n`
+    }
+
+    return content
   }
 
   const handleViewHierarchy = (eq: Equipment) => {
@@ -707,6 +912,16 @@ export function EquipmentPage() {
                   </Button>
 
                   <Button
+                    variant="default"
+                    size="sm"
+                    disabled={selectedIds.size === 0}
+                    onClick={openShareModal}
+                  >
+                    <Share2 className="h-4 w-4 mr-1" />
+                    Compartir
+                  </Button>
+
+                  <Button
                     variant="outline"
                     size="sm"
                     disabled={selectedIds.size === 0 || bulkLoading || !canDeleteEquipment}
@@ -906,6 +1121,127 @@ export function EquipmentPage() {
               </Button>
               <Button onClick={submitMaintenance} disabled={maintenanceLoading || !canEditEquipment}>
                 {maintenanceLoading ? 'Guardando...' : 'Asignar mantenimiento'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {shareModalOpen && (
+        <Dialog open onOpenChange={(open) => !open && closeShareModal()}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Compartir equipos seleccionados</DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <div className="text-sm text-muted-foreground">
+                {selectedIds.size} {selectedIds.size === 1 ? 'equipo seleccionado' : 'equipos seleccionados'}
+              </div>
+
+              <div className="space-y-3">
+                <Label className="text-base">¿Qué información incluir?</Label>
+                
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="shareBasic"
+                    checked={shareIncludeBasic}
+                    onCheckedChange={(checked) => setShareIncludeBasic(checked as boolean)}
+                  />
+                  <Label htmlFor="shareBasic" className="text-sm font-normal cursor-pointer">
+                    Datos básicos (código, nombre, estado, ubicación, marca, modelo)
+                  </Label>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="shareHistory"
+                    checked={shareIncludeHistory}
+                    onCheckedChange={(checked) => setShareIncludeHistory(checked as boolean)}
+                  />
+                  <Label htmlFor="shareHistory" className="text-sm font-normal cursor-pointer">
+                    Historial de incidencias (últimas 20 por equipo)
+                  </Label>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="shareNotes"
+                    checked={shareIncludeNotes}
+                    onCheckedChange={(checked) => setShareIncludeNotes(checked as boolean)}
+                  />
+                  <Label htmlFor="shareNotes" className="text-sm font-normal cursor-pointer">
+                    Notas internas del usuario
+                  </Label>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="shareQR"
+                    checked={shareIncludeQR}
+                    onCheckedChange={(checked) => setShareIncludeQR(checked as boolean)}
+                  />
+                  <Label htmlFor="shareQR" className="text-sm font-normal cursor-pointer">
+                    URLs para códigos QR
+                  </Label>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="shareFormat">Formato de exportación</Label>
+                <Select value={shareFormat} onValueChange={(v) => setShareFormat(v as 'pdf' | 'csv' | 'json')}>
+                  <SelectTrigger id="shareFormat">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pdf">📄 PDF/Texto (para imprimir o copiar)</SelectItem>
+                    <SelectItem value="csv">📊 CSV (para Excel)</SelectItem>
+                    <SelectItem value="json">💾 JSON (para sistemas)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="border-t pt-4 space-y-2">
+                <Label className="text-base">¿Cómo deseas compartir?</Label>
+                <div className="flex flex-col gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={handleShareDownload}
+                    disabled={shareLoading}
+                    className="justify-start"
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Descargar archivo
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    onClick={handleShareViaEmail}
+                    disabled={shareLoading}
+                    className="justify-start"
+                  >
+                    <Mail className="h-4 w-4 mr-2" />
+                    Enviar por correo electrónico
+                  </Button>
+
+                  {navigator.share && (
+                    <Button
+                      variant="outline"
+                      onClick={handleShareViaMobile}
+                      disabled={shareLoading}
+                      className="justify-start"
+                    >
+                      <Share2 className="h-4 w-4 mr-2" />
+                      Compartir vía móvil
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={closeShareModal} disabled={shareLoading}>
+                Cancelar
               </Button>
             </DialogFooter>
           </DialogContent>
