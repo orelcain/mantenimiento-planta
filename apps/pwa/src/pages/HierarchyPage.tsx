@@ -6,7 +6,7 @@
  */
 
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
   Plus,
   Edit2,
@@ -22,6 +22,10 @@ import {
   ArrowUp,
   ArrowDown,
   Search,
+  Package,
+  ExternalLink,
+  Share2,
+  Image as ImageIcon,
 } from 'lucide-react'
 import { debounce } from 'lodash'
 import {
@@ -41,6 +45,7 @@ import {
   Badge,
   Switch,
   Spinner,
+  Checkbox,
 } from '@/components/ui'
 import { useAuthStore } from '@/store'
 import { 
@@ -49,10 +54,12 @@ import {
   HIERARCHY_LEVEL_NAMES,
   HierarchyNode,
 } from '@/types/hierarchy'
+import { Equipment } from '@/types'
 import { 
   useHierarchyTree, 
   useHierarchyMutations 
 } from '@/hooks/useHierarchy'
+import { getEquipments } from '@/services/equipment'
 import { logger } from '@/lib/logger'
 import { cn } from '@/lib/utils'
 
@@ -82,6 +89,7 @@ function findPathToNode(
 
 export function HierarchyPage() {
   const location = useLocation()
+  const navigate = useNavigate()
   const user = useAuthStore(state => state.user)
   const { tree, loading, refresh, hasUpdates } = useHierarchyTree({ includeInactive: true })
   const { createNode, updateNode, deleteNode, reorderNode } = useHierarchyMutations()
@@ -98,9 +106,39 @@ export function HierarchyPage() {
   const [parentForNew, setParentForNew] = useState<HierarchyNodeWithChildren | null>(null)
   const [activeNodeId, setActiveNodeId] = useState<string | null>(null)
 
+  // Estados para equipos
+  const [equipmentByNode, setEquipmentByNode] = useState<Map<string, Equipment[]>>(new Map())
+  const [expandedEquipmentNodes, setExpandedEquipmentNodes] = useState<Set<string>>(new Set())
+  const [selectedEquipmentIds, setSelectedEquipmentIds] = useState<Set<string>>(new Set())
+  const [showShareModal, setShowShareModal] = useState(false)
+
   useEffect(() => {
     expandedNodesRef.current = expandedNodes
   }, [expandedNodes])
+
+  // Cargar equipos cuando se monta el componente
+  useEffect(() => {
+    const loadEquipment = async () => {
+      try {
+        const equipment = await getEquipments()
+
+        // Agrupar equipos por hierarchyNodeId
+        const byNode = new Map<string, Equipment[]>()
+        equipment.forEach(eq => {
+          const nodeId = eq.hierarchyNodeId
+          if (nodeId) {
+            const existing = byNode.get(nodeId) || []
+            byNode.set(nodeId, [...existing, eq])
+          }
+        })
+        setEquipmentByNode(byNode)
+      } catch (error) {
+        logger.error('Failed to load equipment', error as Error)
+      }
+    }
+
+    loadEquipment()
+  }, [])
 
   const { qParam, focusParam } = useMemo(() => {
     const params = new URLSearchParams(location.search)
@@ -220,6 +258,35 @@ export function HierarchyPage() {
   // Contraer todos los nodos
   const collapseAll = () => {
     setExpandedNodes(new Set())
+  }
+
+  // Funciones para equipos
+  const toggleEquipmentNode = (nodeId: string) => {
+    const newExpanded = new Set(expandedEquipmentNodes)
+    if (newExpanded.has(nodeId)) {
+      newExpanded.delete(nodeId)
+    } else {
+      newExpanded.add(nodeId)
+    }
+    setExpandedEquipmentNodes(newExpanded)
+  }
+
+  const toggleEquipmentSelection = (equipmentId: string) => {
+    const newSelected = new Set(selectedEquipmentIds)
+    if (newSelected.has(equipmentId)) {
+      newSelected.delete(equipmentId)
+    } else {
+      newSelected.add(equipmentId)
+    }
+    setSelectedEquipmentIds(newSelected)
+  }
+
+  const clearSelection = () => {
+    setSelectedEquipmentIds(new Set())
+  }
+
+  const navigateToEquipment = (equipmentId: string) => {
+    navigate(`/equipment?id=${equipmentId}`)
   }
 
   const handleCreate = (parent: HierarchyNodeWithChildren | null) => {
@@ -685,6 +752,13 @@ export function HierarchyPage() {
                     Inactivo
                   </Badge>
                 )}
+                {/* Badge de equipos */}
+                {equipmentByNode.get(node.id) && equipmentByNode.get(node.id)!.length > 0 && (
+                  <Badge variant="default" className="text-xs flex items-center gap-1">
+                    <Package className="h-3 w-3" />
+                    {equipmentByNode.get(node.id)!.length}
+                  </Badge>
+                )}
               </div>
               <div className="text-xs text-muted-foreground">
                 {highlightText(node.codigo, highlightQuery)}
@@ -744,6 +818,60 @@ export function HierarchyPage() {
               </Button>
             </div>
           </div>
+
+          {/* Equipment list */}
+          {equipmentByNode.get(node.id) && equipmentByNode.get(node.id)!.length > 0 && (
+            <div style={{ paddingLeft: `${indent + 32}px` }} className="mt-1">
+              <button
+                onClick={() => toggleEquipmentNode(node.id)}
+                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground p-1 rounded hover:bg-muted"
+              >
+                {expandedEquipmentNodes.has(node.id) ? (
+                  <ChevronDown className="h-3 w-3" />
+                ) : (
+                  <ChevronRight className="h-3 w-3" />
+                )}
+                <Package className="h-3 w-3" />
+                <span>{equipmentByNode.get(node.id)!.length} equipos</span>
+              </button>
+
+              {expandedEquipmentNodes.has(node.id) && (
+                <div className="mt-1 space-y-1">
+                  {equipmentByNode.get(node.id)!.map((eq) => (
+                    <div
+                      key={eq.id}
+                      className="flex items-center gap-2 p-2 rounded border border-border hover:border-primary/50 bg-background/50"
+                    >
+                      <Checkbox
+                        checked={selectedEquipmentIds.has(eq.id)}
+                        onCheckedChange={() => toggleEquipmentSelection(eq.id)}
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm truncate">{eq.nombre}</div>
+                        <div className="text-xs text-muted-foreground font-mono">{eq.codigo}</div>
+                      </div>
+                      {eq.photos && eq.photos.length > 0 && (
+                        <Badge variant="secondary" className="text-xs flex items-center gap-1">
+                          <ImageIcon className="h-2.5 w-2.5" />
+                          {eq.photos.length}
+                        </Badge>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => navigateToEquipment(eq.id)}
+                        className="h-7 px-2 text-xs"
+                        title="Ver en módulo equipos"
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Children */}
           {isExpanded && hasChildren && (
@@ -1063,6 +1191,70 @@ export function HierarchyPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Floating action bar for selected equipment */}
+      {selectedEquipmentIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
+          <Card className="shadow-lg border-2 border-primary">
+            <CardContent className="p-4 flex items-center gap-4">
+              <div className="text-sm font-medium">
+                {selectedEquipmentIds.size} {selectedEquipmentIds.size === 1 ? 'equipo seleccionado' : 'equipos seleccionados'}
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={clearSelection}
+                >
+                  Limpiar
+                </Button>
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => setShowShareModal(true)}
+                  className="gap-2"
+                >
+                  <Share2 className="h-4 w-4" />
+                  Compartir
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Share modal placeholder - will reuse EquipmentPage share logic */}
+      {showShareModal && (
+        <Dialog open onOpenChange={(open) => !open && setShowShareModal(false)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Compartir equipos desde jerarquía</DialogTitle>
+            </DialogHeader>
+            <div className="p-4">
+              <p className="text-sm text-muted-foreground mb-4">
+                Se compartirán {selectedEquipmentIds.size} equipos seleccionados
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Esta funcionalidad reutilizará la lógica de compartir del módulo de equipos.
+                Por ahora, puedes navegar al módulo de equipos para compartir.
+              </p>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowShareModal(false)}>
+                Cerrar
+              </Button>
+              <Button
+                onClick={() => {
+                  const ids = Array.from(selectedEquipmentIds).join(',')
+                  navigate(`/equipment?selected=${ids}`)
+                }}
+              >
+                Ir a Equipos
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   )
 }
