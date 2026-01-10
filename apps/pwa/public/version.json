@@ -1,8 +1,14 @@
 {
-  "version": "2.3.0",
+  "version": "2.4.0",
   "buildDate": "2026-01-10",
   "buildTimestamp": 1736467200000,
   "features": [
+    "Sistema completo de fotos en equipos (múltiples fotos por equipo)",
+    "Galería de fotos con upload múltiple y preview fullscreen",
+    "Indicador de cantidad de fotos en tarjetas de equipos",
+    "Códigos QR visuales con descarga SVG",
+    "Opción para incluir fotos en compartir equipos",
+    "Navegación entre fotos en vista ampliada",
     "Nuevo módulo de Evidencias Fotográficas (antes/después)",
     "Comparador visual de fotos con slider",
     "Exportación a PDF de comparaciones",
