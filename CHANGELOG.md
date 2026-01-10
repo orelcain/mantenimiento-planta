@@ -7,7 +7,7 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
-## [2.2.30] - 2026-01-10
+## [2.2.30] - 2026-01-09
 
 ### 👤 Usuarios: Rol `usuario` (no admin)
 

@@ -1,7 +1,7 @@
 {
   "version": "2.2.30",
-  "buildDate": "2026-01-10",
-  "buildTimestamp": 1768003200000,
+  "buildDate": "2026-01-09",
+  "buildTimestamp": 1767916800000,
   "features": [
     "Nuevo módulo de Evidencias Fotográficas (antes/después)",
     "Comparador visual de fotos con slider",
