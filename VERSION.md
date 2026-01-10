@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.3.0**
+## Versión Actual: **v2.5.0**
 
 **Fecha de lanzamiento**: 10 de enero de 2026  
 **Estado**: ✅ PRODUCCIÓN READY  
@@ -9,6 +9,23 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.5.0 - Jerarquía + Equipos Integrados
+
+- **Equipos en jerarquía**: visualización de equipos asociados a cada nodo con badge contador
+- **Lista expandible**: ver equipos por nodo con indicador de fotos
+- **Selección múltiple**: checkboxes para seleccionar equipos desde jerarquía
+- **Barra flotante**: contador y botón compartir para equipos seleccionados
+- **Navegación mejorada**: botón directo para ver equipo en módulo equipos
+- **Compartir integrado**: flujo completo de compartir desde jerarquía
+
+### v2.4.0 - Equipos con Fotos y QR
+
+- **Sistema de fotos**: múltiples fotos por equipo con upload y galería
+- **Preview fullscreen**: visualización de fotos con navegación anterior/siguiente
+- **QR codes visuales**: generación de códigos QR con descarga SVG
+- **Fotos en compartir**: opción para incluir fotos en exportación
+- **Indicadores**: badge con cantidad de fotos en tarjetas de equipos
 
 ### v2.3.0 - Gestión Avanzada de Equipos
 
