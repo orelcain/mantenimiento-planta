@@ -1,8 +1,9 @@
 {
-  "version": "2.13.1",
+  "version": "2.13.2",
   "buildDate": "2026-01-11",
   "buildTimestamp": 1768089600000,
   "features": [
+    "Lista scrollable visual en Sensores - toda info visible sin memorizar códigos",
     "Fix crítico: ESP32 ya NO crea usuarios anónimos (reglas RTDB permisivas para IoT)",
     "Emparejamiento de sensores (ESP32) desde la PWA (/sensors) sin recompilar por equipo",
     "Nuevo módulo Predictivo (IoT) con cálculo de riesgo por equipo",
