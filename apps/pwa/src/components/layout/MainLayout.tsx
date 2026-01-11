@@ -15,6 +15,7 @@ import {
   RefreshCw,
   Camera,
   Activity,
+  Cpu,
 } from 'lucide-react'
 import { Avatar, AvatarFallback, Button } from '@/components/ui'
 import { useAuthStore, useIsAdmin } from '@/store'
@@ -30,6 +31,7 @@ const navigation = [
   { name: 'Evidencias', href: '/photo-evidence', icon: Camera },
   { name: 'Preventivo', href: '/preventive', icon: CalendarClock },
   { name: 'Predictivo', href: '/predictive', icon: Activity },
+  { name: 'Sensores', href: '/sensors', icon: Cpu },
   { name: 'Mapa', href: '/map', icon: Map },
   { name: 'Equipos', href: '/equipment', icon: Wrench },
 ]

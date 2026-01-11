@@ -15,6 +15,7 @@
 #include <WiFi.h>
 #include <Firebase_ESP_Client.h>
 #include <DHTesp.h>
+#include <Preferences.h>
 #include <time.h>
 
 // Config local (no versionada) / config de ejemplo (versionada)
@@ -37,6 +38,13 @@ String getStatus(float value, float warning, float critical);
 unsigned long getTimestamp();
 void sendOnlineStatus(bool online);
 void sendSensorData();
+
+static String getDeviceId();
+static void loadEquipmentId();
+static void persistEquipmentId(const String& equipmentId);
+static bool hasAssignedEquipment();
+static void sendDeviceStatus(bool online);
+static void startDeviceAssignmentStream();
 
 static void printDhtPinState(const char* context);
 
@@ -62,14 +70,137 @@ static void getSimulatedDht(float& temperature, float& humidity);
 // ============ OBJETOS GLOBALES ============
 DHTesp dht;
 FirebaseData fbdo;
+FirebaseData stream;
 FirebaseAuth auth;
 FirebaseConfig config;
+
+Preferences prefs;
+
+static String deviceId;
+static String currentEquipmentId;
 
 // ============ VARIABLES DE ESTADO ============
 unsigned long lastSendTime = 0;
 unsigned long lastReconnectTime = 0;
 bool firebaseReady = false;
 int failedAttempts = 0;
+
+static unsigned long lastDeviceStatusMs = 0;
+static unsigned long lastStreamReadMs = 0;
+
+static String getDeviceId() {
+  // MAC sin ':' para usarla como key en RTDB
+  String mac = WiFi.macAddress();
+  mac.replace(":", "");
+  mac.toUpperCase();
+  return mac;
+}
+
+static bool looksLikePlaceholder(const String& s) {
+  if (s.length() == 0) return true;
+  // Si alguien dejó el ejemplo sin editar
+  if (s == "TU_EQUIPMENT_ID") return true;
+  return false;
+}
+
+static void loadEquipmentId() {
+  prefs.begin("iot", false);
+  String stored = prefs.getString("equipmentId", "");
+  prefs.end();
+
+  if (!looksLikePlaceholder(stored)) {
+    currentEquipmentId = stored;
+    return;
+  }
+
+  // Fallback: EQUIPMENT_ID desde config.h (si se usa)
+  String fallback = String(EQUIPMENT_ID);
+  if (!looksLikePlaceholder(fallback)) {
+    currentEquipmentId = fallback;
+  } else {
+    currentEquipmentId = "";
+  }
+}
+
+static void persistEquipmentId(const String& equipmentId) {
+  prefs.begin("iot", false);
+  prefs.putString("equipmentId", equipmentId);
+  prefs.end();
+}
+
+static bool hasAssignedEquipment() {
+  return currentEquipmentId.length() > 0;
+}
+
+static void sendDeviceStatus(bool online) {
+  if (!firebaseReady) return;
+  if (deviceId.length() == 0) return;
+
+  // Throttle (no más de 1 update por ~3s)
+  if (millis() - lastDeviceStatusMs < 3000) return;
+  lastDeviceStatusMs = millis();
+
+  FirebaseJson json;
+  json.set("online", online);
+  json.set("lastSeen", (unsigned long)getTimestamp());
+  json.set("ip", WiFi.localIP().toString());
+  json.set("rssi", WiFi.RSSI());
+  json.set("firmwareVersion", "2026-01-11");
+  json.set("sensorType", "dht11");
+  json.set("assignedEquipmentId", hasAssignedEquipment() ? currentEquipmentId : "");
+
+  String path;
+  path.reserve(64);
+  path = "devices/";
+  path += deviceId;
+
+  if (!Firebase.RTDB.setJSON(&fbdo, path.c_str(), &json)) {
+    Serial.printf("✗ Error actualizando device status: %s\n", fbdo.errorReason().c_str());
+  }
+}
+
+static void streamCallback(FirebaseStream data) {
+  if (data.dataTypeEnum() == fb_esp_rtdb_data_type_string) {
+    String newId = data.stringData();
+    newId.trim();
+
+    if (newId != currentEquipmentId) {
+      currentEquipmentId = newId;
+      persistEquipmentId(currentEquipmentId);
+      Serial.printf("🔗 Asignación actualizada desde RTDB: equipmentId=%s\n", currentEquipmentId.c_str());
+    }
+  } else if (data.dataTypeEnum() == fb_esp_rtdb_data_type_null) {
+    if (currentEquipmentId.length() > 0) {
+      currentEquipmentId = "";
+      persistEquipmentId(currentEquipmentId);
+      Serial.println("🔌 Asignación eliminada desde RTDB (sin equipo).");
+    }
+  }
+}
+
+static void streamTimeoutCallback(bool timeout) {
+  if (timeout) {
+    Serial.println("⚠ Stream timeout (reintentando)...");
+  }
+}
+
+static void startDeviceAssignmentStream() {
+  if (!firebaseReady) return;
+  if (deviceId.length() == 0) return;
+
+  String path;
+  path.reserve(80);
+  path = "devices/";
+  path += deviceId;
+  path += "/assignedEquipmentId";
+
+  if (!Firebase.RTDB.beginStream(&stream, path.c_str())) {
+    Serial.printf("✗ Error iniciando stream: %s\n", stream.errorReason().c_str());
+    return;
+  }
+  Firebase.RTDB.setStreamCallback(&stream, streamCallback, streamTimeoutCallback);
+  Serial.printf("👂 Escuchando asignación en: %s\n", path.c_str());
+}
 
 static void printDhtPinState(const char* context) {
   // El DHT normalmente deja la línea en HIGH (pull-up). Si queda siempre LOW,
@@ -180,6 +311,12 @@ void connectWiFi() {
     Serial.print("  Señal: ");
     Serial.print(WiFi.RSSI());
     Serial.println(" dBm");
+
+    if (deviceId.length() == 0) {
+      deviceId = getDeviceId();
+      Serial.print("  Device ID: ");
+      Serial.println(deviceId);
+    }
   } else {
     Serial.println();
     Serial.println("✗ Error: No se pudo conectar al WiFi");
@@ -234,6 +371,12 @@ void setupFirebase() {
     Serial.println("✓ Firebase conectado con autenticación anónima!");
     Serial.printf("  UID: %s\n", auth.token.uid.c_str());
     firebaseReady = true;
+
+    // Cargar equipo asignado (NVS/config) y registrar el device
+    loadEquipmentId();
+    Serial.printf("📌 Equipo asignado (local): %s\n", currentEquipmentId.c_str());
+    sendDeviceStatus(true);
+    startDeviceAssignmentStream();
     
     // Enviar estado inicial
     sendOnlineStatus(true);
@@ -261,23 +404,30 @@ unsigned long getTimestamp() {
 
 // ============ FUNCIÓN: ENVIAR ESTADO ONLINE ============
 void sendOnlineStatus(bool online) {
+  // Mantener device status siempre
+  sendDeviceStatus(online);
+
+  if (!hasAssignedEquipment()) {
+    return;
+  }
+
   String path;
-  path.reserve(64);
+  path.reserve(96);
   path = "sensors/";
-  path += EQUIPMENT_ID;
+  path += currentEquipmentId;
   path += "/online";
   Firebase.RTDB.setBool(&fbdo, path.c_str(), online);
-  
+
   path = "sensors/";
-  path += EQUIPMENT_ID;
+  path += currentEquipmentId;
   path += "/lastSeen";
   Firebase.RTDB.setInt(&fbdo, path.c_str(), getTimestamp());
-  
+
   if (online) {
     path = "sensors/";
-    path += EQUIPMENT_ID;
+    path += currentEquipmentId;
     path += "/equipmentId";
-    Firebase.RTDB.setString(&fbdo, path.c_str(), EQUIPMENT_ID);
+    Firebase.RTDB.setString(&fbdo, path.c_str(), currentEquipmentId);
   }
 }
 
@@ -319,10 +469,16 @@ void sendSensorData() {
   Serial.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
   
   // Enviar a Firebase
+  if (!hasAssignedEquipment()) {
+    Serial.println("ℹ️ Sin equipo asignado. Publicando solo estado del dispositivo (devices/...) y esperando pairing.");
+    sendOnlineStatus(true);
+    return;
+  }
+
   String basePath;
   basePath.reserve(48);
   basePath = "sensors/";
-  basePath += EQUIPMENT_ID;
+  basePath += currentEquipmentId;
   
   // Temperatura
   FirebaseJson tempJson;
@@ -404,6 +560,12 @@ void loop() {
       lastReconnectTime = millis();
     }
     return;
+  }
+
+  // Procesar stream de asignación (devices/{deviceId}/assignedEquipmentId)
+  if (millis() - lastStreamReadMs > 500) {
+    Firebase.RTDB.readStream(&stream);
+    lastStreamReadMs = millis();
   }
   
   // Enviar datos según intervalo

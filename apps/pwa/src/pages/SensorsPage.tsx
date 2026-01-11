@@ -1,0 +1,310 @@
+import { useEffect, useMemo, useState } from 'react'
+import { Cpu, Link2, Unlink2, AlertTriangle } from 'lucide-react'
+import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui'
+import { useAppStore, useAuthStore } from '@/store'
+import type { Equipment } from '@/types'
+import type { DeviceRow } from '@/services/devicesRtdb'
+import { assignDeviceToEquipment, subscribeDevices } from '@/services/devicesRtdb'
+
+function normalizeTs(ts: number | undefined): number | null {
+  if (typeof ts !== 'number' || !Number.isFinite(ts)) return null
+  if (ts > 0 && ts < 1e12) return ts * 1000
+  return ts
+}
+
+function toEquipmentSearchText(e: Equipment): string {
+  return `${e.nombre} ${e.codigo} ${e.hierarchyPath ?? ''} ${e.zonePath?.join(' ') ?? ''}`
+    .toLowerCase()
+    .trim()
+}
+
+function onlineBadge(online: boolean | undefined) {
+  if (online) return <Badge variant="default">Online</Badge>
+  return <Badge variant="secondary">Offline</Badge>
+}
+
+export function SensorsPage() {
+  const equipment = useAppStore((s) => s.equipment)
+  const user = useAuthStore((s) => s.user)
+
+  const [devices, setDevices] = useState<DeviceRow[]>([])
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string>('')
+  const [loadError, setLoadError] = useState<string | null>(null)
+
+  const [deviceSearch, setDeviceSearch] = useState('')
+
+  const [equipmentSearch, setEquipmentSearch] = useState('')
+  const [filterEstado, setFilterEstado] = useState<Equipment['estado'] | 'todas'>('todas')
+  const [filterCriticidad, setFilterCriticidad] = useState<Equipment['criticidad'] | 'todas'>('todas')
+  const [selectedEquipmentId, setSelectedEquipmentId] = useState<string>('')
+
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [saveOk, setSaveOk] = useState<string | null>(null)
+
+  useEffect(() => {
+    const unsub = subscribeDevices(
+      (rows) => {
+        setDevices(rows)
+        // Auto seleccionar el primer dispositivo si no hay selección.
+        if (!selectedDeviceId && rows[0]?.deviceId) {
+          setSelectedDeviceId(rows[0].deviceId)
+        }
+      },
+      (err) => {
+        setLoadError(err instanceof Error ? err.message : 'Error leyendo dispositivos (RTDB).')
+      }
+    )
+
+    return () => unsub()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const filteredDevices = useMemo(() => {
+    const q = deviceSearch.trim().toLowerCase()
+    if (!q) return devices
+    return devices.filter((d) => d.deviceId.toLowerCase().includes(q))
+  }, [deviceSearch, devices])
+
+  const selectedDevice = useMemo(
+    () => devices.find((d) => d.deviceId === selectedDeviceId) ?? null,
+    [devices, selectedDeviceId]
+  )
+
+  const assignedEquipment = useMemo(() => {
+    const id = selectedDevice?.assignedEquipmentId
+    if (!id) return null
+    return equipment.find((e) => e.id === id) ?? null
+  }, [equipment, selectedDevice?.assignedEquipmentId])
+
+  const filteredEquipment = useMemo(() => {
+    const q = equipmentSearch.trim().toLowerCase()
+    return equipment.filter((e) => {
+      if (filterEstado !== 'todas' && e.estado !== filterEstado) return false
+      if (filterCriticidad !== 'todas' && e.criticidad !== filterCriticidad) return false
+      if (!q) return true
+      return toEquipmentSearchText(e).includes(q)
+    })
+  }, [equipment, equipmentSearch, filterCriticidad, filterEstado])
+
+  async function saveAssignment(equipmentId: string | null) {
+    if (!user?.id) return
+    if (!selectedDevice) return
+
+    setSaveError(null)
+    setSaveOk(null)
+    setSaving(true)
+
+    try {
+      await assignDeviceToEquipment({ deviceId: selectedDevice.deviceId, equipmentId, userId: user.id })
+      setSaveOk(equipmentId ? 'Asignación guardada.' : 'Asignación eliminada.')
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Error guardando asignación (RTDB).')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold">Sensores</h1>
+        <p className="text-muted-foreground">
+          Empareja dispositivos (ESP32) con equipos sin editar firmware por equipo.
+        </p>
+      </div>
+
+      {loadError && (
+        <div className="text-sm text-destructive flex items-center gap-2">
+          <AlertTriangle className="h-4 w-4" />
+          {loadError}
+        </div>
+      )}
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2">
+              <Cpu className="h-5 w-5" />
+              Dispositivos detectados
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="max-w-xl">
+              <Label>Buscar dispositivo</Label>
+              <Input
+                value={deviceSearch}
+                onChange={(e) => setDeviceSearch(e.target.value)}
+                placeholder="Buscar por deviceId (MAC)…"
+              />
+              <div className="mt-1 text-xs text-muted-foreground">{filteredDevices.length} dispositivo(s)</div>
+            </div>
+
+            <div className="space-y-2 max-h-[420px] overflow-auto">
+              {filteredDevices.length === 0 ? (
+                <div className="text-sm text-muted-foreground">No hay dispositivos aún.</div>
+              ) : (
+                filteredDevices.map((d) => {
+                  const lastSeen = normalizeTs(d.lastSeen)
+                  const isSelected = d.deviceId === selectedDeviceId
+                  return (
+                    <button
+                      key={d.deviceId}
+                      type="button"
+                      onClick={() => setSelectedDeviceId(d.deviceId)}
+                      className={`w-full text-left rounded border p-3 transition-colors ${isSelected ? 'border-primary bg-primary/5' : 'hover:bg-muted/40'}`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="font-medium">{d.deviceId}</div>
+                        {onlineBadge(Boolean(d.online))}
+                      </div>
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        {lastSeen ? `Último reporte: ${new Date(lastSeen).toLocaleString()}` : 'Sin lastSeen'}
+                      </div>
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        Asignado a: {d.assignedEquipmentId ? d.assignedEquipmentId : '—'}
+                      </div>
+                    </button>
+                  )
+                })
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center justify-between">
+              <span>Emparejar</span>
+              {selectedDevice ? onlineBadge(Boolean(selectedDevice.online)) : <Badge variant="secondary">—</Badge>}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {!selectedDevice ? (
+              <div className="text-sm text-muted-foreground">Selecciona un dispositivo.</div>
+            ) : (
+              <>
+                <div className="space-y-1">
+                  <div className="text-sm text-muted-foreground">Dispositivo</div>
+                  <div className="font-medium">{selectedDevice.deviceId}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {selectedDevice.ip ? `IP: ${selectedDevice.ip}` : ''}
+                    {typeof selectedDevice.rssi === 'number' ? ` · RSSI: ${selectedDevice.rssi} dBm` : ''}
+                  </div>
+                </div>
+
+                <div className="rounded border p-3">
+                  <div className="text-sm font-medium">Asignación actual</div>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    {assignedEquipment
+                      ? `${assignedEquipment.nombre} (${assignedEquipment.codigo})`
+                      : selectedDevice.assignedEquipmentId
+                        ? `ID: ${selectedDevice.assignedEquipmentId}`
+                        : 'Sin asignar'}
+                  </div>
+                </div>
+
+                <div className="grid gap-3">
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    <div className="sm:col-span-2">
+                      <Label>Buscar equipo</Label>
+                      <Input
+                        value={equipmentSearch}
+                        onChange={(e) => setEquipmentSearch(e.target.value)}
+                        placeholder="Nombre, código o ubicación…"
+                      />
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <div>
+                        <Label>Estado</Label>
+                        <Select value={filterEstado} onValueChange={(v) => setFilterEstado(v as any)}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Estado" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="todas">Todas</SelectItem>
+                            <SelectItem value="operativo">Operativo</SelectItem>
+                            <SelectItem value="en_mantenimiento">En mantenimiento</SelectItem>
+                            <SelectItem value="fuera_servicio">Fuera de servicio</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label>Criticidad</Label>
+                        <Select value={filterCriticidad} onValueChange={(v) => setFilterCriticidad(v as any)}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Criticidad" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="todas">Todas</SelectItem>
+                            <SelectItem value="alta">Alta</SelectItem>
+                            <SelectItem value="media">Media</SelectItem>
+                            <SelectItem value="baja">Baja</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="max-w-xl">
+                    <Label>Equipo destino</Label>
+                    <Select value={selectedEquipmentId} onValueChange={setSelectedEquipmentId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona un equipo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {filteredEquipment.length === 0 ? (
+                          <div className="p-2 text-sm text-muted-foreground">Sin resultados</div>
+                        ) : (
+                          filteredEquipment.slice(0, 300).map((e) => (
+                            <SelectItem key={e.id} value={e.id}>
+                              {e.nombre} ({e.codigo})
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      {filteredEquipment.length} resultado(s){filteredEquipment.length > 300 ? ' (mostrando 300)' : ''}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      onClick={() => saveAssignment(selectedEquipmentId || null)}
+                      disabled={!selectedEquipmentId || saving}
+                      className="gap-2"
+                    >
+                      <Link2 className="h-4 w-4" />
+                      {saving ? 'Guardando…' : 'Asignar'}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => saveAssignment(null)}
+                      disabled={saving}
+                      className="gap-2"
+                    >
+                      <Unlink2 className="h-4 w-4" />
+                      Desasignar
+                    </Button>
+                  </div>
+
+                  {saveError && (
+                    <div className="text-sm text-destructive flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4" />
+                      {saveError}
+                    </div>
+                  )}
+
+                  {saveOk && <div className="text-sm text-muted-foreground">{saveOk}</div>}
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  )
+}

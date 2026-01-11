@@ -22,6 +22,7 @@ const SettingsPage = lazy(() => import('@/pages/SettingsPage').then((mod) => ({ 
 const HierarchyPage = lazy(() => import('@/pages/HierarchyPage').then((mod) => ({ default: mod.HierarchyPage })))
 const PhotoEvidencePage = lazy(() => import('@/pages/PhotoEvidencePage').then((mod) => ({ default: mod.PhotoEvidencePage })))
 const PublicEquipmentView = lazy(() => import('@/pages/PublicEquipmentView').then((mod) => ({ default: mod.PublicEquipmentView })))
+const SensorsPage = lazy(() => import('@/pages/SensorsPage').then((mod) => ({ default: mod.SensorsPage })))
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuthStore()
@@ -162,6 +163,11 @@ export function App() {
             } />
             <Route path="equipment" element={<EquipmentPage />} />
             <Route path="predictive" element={<PredictivePage />} />
+            <Route path="sensors" element={
+              <Suspense fallback={<LoadingScreen />}>
+                <SensorsPage />
+              </Suspense>
+            } />
             <Route path="preventive" element={
               <Suspense fallback={<LoadingScreen />}>
                 <PreventivePage />

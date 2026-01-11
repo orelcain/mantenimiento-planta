@@ -193,12 +193,21 @@ GND (-)   →   GND   (pin al lado del 3.3V)
 
 3. **Verificar en Firebase:**
    - Ve a Firebase Console → Realtime Database
-   - Deberías ver:
+   - Deberías ver (telemetría del equipo):
    ```
    sensors/
      └─ tu-equipo-id/
         ├─ temperatura: { value: 22.5, unit: "°C", ... }
         └─ humedad: { value: 45, unit: "%", ... }
+   ```
+
+   - Y también verás el dispositivo (para emparejamiento):
+   ```
+   devices/
+     └─ TU_DEVICE_ID_MAC_SIN_DOS_PUNTOS/
+        ├─ online: true
+        ├─ lastSeen: 173...
+        └─ assignedEquipmentId: "..." | ""
    ```
 
 ---
@@ -230,15 +239,19 @@ Verás una nueva pestaña "📡 IoT" con los datos en tiempo real!
 ### Firebase no conecta
 - Verifica API Key y Database URL
 - Ve a Firebase Console → Realtime Database → Reglas
-- Cambia temporalmente a:
+- Si vas a usar emparejamiento desde la PWA (/sensors), asegúrate de permitir `devices/*`.
+- Recomendado (requiere usuario autenticado, incluye anónimo):
   ```json
   {
     "rules": {
-      ".read": true,
-      ".write": true
+         ".read": "auth != null",
+         ".write": "auth != null"
     }
   }
   ```
+
+   En este repo ya existe un archivo de reglas listo para deploy:
+   - `database.rules.json`
 
 ---
 

@@ -20,7 +20,8 @@
 #define FIREBASE_DATABASE_URL "https://TU_PROYECTO-default-rtdb.firebaseio.com"
 
 // ============ CONFIGURACIÓN DE EQUIPO ============
-// ID del equipo (copiar desde la PWA)
-#define EQUIPMENT_ID "TU_EQUIPMENT_ID"
+// ID del equipo (opcional): se usa como fallback si aún no emparejas el ESP32.
+// Recomendado: emparejar desde la PWA (ruta /sensors) y dejar esto vacío.
+#define EQUIPMENT_ID ""
 
 #endif // CONFIG_H
