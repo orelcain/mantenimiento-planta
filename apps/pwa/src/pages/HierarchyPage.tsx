@@ -26,6 +26,8 @@ import {
   ExternalLink,
   Share2,
   Image as ImageIcon,
+  Sparkles,
+  Clock,
 } from 'lucide-react'
 import { debounce } from 'lodash'
 import {
@@ -108,12 +110,31 @@ export function HierarchyPage() {
 
   // Estados para equipos
   const [equipmentByNode, setEquipmentByNode] = useState<Map<string, Equipment[]>>(new Map())
-  const [expandedEquipmentNodes, setExpandedEquipmentNodes] = useState<Set<string>>(new Set())
+  const [expandedEquipmentNodes, setExpandedEquipmentNodes] = useState<Set<string>>(() => {
+    // Restaurar estado de expansión de equipos desde localStorage
+    const saved = localStorage.getItem('hierarchy_expanded_equipment_nodes')
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved)
+        return new Set(parsed)
+      } catch {
+        return new Set()
+      }
+    }
+    return new Set()
+  })
   const [selectedEquipmentIds, setSelectedEquipmentIds] = useState<Set<string>>(new Set())
   const [showShareModal, setShowShareModal] = useState(false)
 
+  // Persistir estado de expansión de equipos
+  useEffect(() => {
+    localStorage.setItem('hierarchy_expanded_equipment_nodes', JSON.stringify([...expandedEquipmentNodes]))
+  }, [expandedEquipmentNodes])
+
   useEffect(() => {
     expandedNodesRef.current = expandedNodes
+    // Persistir estado de expansión
+    localStorage.setItem('hierarchy_expanded_nodes', JSON.stringify([...expandedNodes]))
   }, [expandedNodes])
 
   // Cargar equipos cuando se monta el componente
@@ -757,6 +778,26 @@ export function HierarchyPage() {
                   <Badge variant="default" className="text-xs flex items-center gap-1">
                     <Package className="h-3 w-3" />
                     {equipmentByNode.get(node.id)!.length}
+                  </Badge>
+                )}
+                {/* Badge estructura base vs expansión */}
+                {node.isBaseStructure ? (
+                  <Badge 
+                    variant="outline" 
+                    className="text-xs flex items-center gap-1 border-blue-300 text-blue-700 bg-blue-50"
+                    title={`Estructura base - ${node.baseStructureDate ? new Date(node.baseStructureDate.toDate()).toLocaleDateString() : 'Fecha no disponible'}`}
+                  >
+                    <Clock className="h-2.5 w-2.5" />
+                    Base
+                  </Badge>
+                ) : node.creadoEn && (
+                  <Badge 
+                    variant="default" 
+                    className="text-xs flex items-center gap-1 bg-green-500 hover:bg-green-600"
+                    title={`Expansión agregada - ${new Date(node.creadoEn.toDate()).toLocaleDateString()}`}
+                  >
+                    <Sparkles className="h-2.5 w-2.5" />
+                    Nuevo
                   </Badge>
                 )}
               </div>

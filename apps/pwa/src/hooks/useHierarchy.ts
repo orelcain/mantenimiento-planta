@@ -464,6 +464,7 @@ export function useHierarchyMutations() {
         path,
         orden: lastOrder + 1,
         activo: true,
+        isBaseStructure: false, // Los nuevos nodos son expansiones
         creadoPor: user.id,
         creadoEn: Timestamp.now(),
         actualizadoEn: Timestamp.now(),

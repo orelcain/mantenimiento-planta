@@ -56,6 +56,10 @@ export interface HierarchyNode {
   creadoPor: string
   creadoEn: Timestamp
   actualizadoEn: Timestamp
+  
+  // Campos para diferenciar estructura base de expansiones
+  isBaseStructure?: boolean // true = nodo de estructura base inicial, false/undefined = expansión
+  baseStructureDate?: Timestamp // Fecha en que se estableció la base (misma para todos los nodos base)
 }
 
 // Nodo con hijos (para renderizar árbol)

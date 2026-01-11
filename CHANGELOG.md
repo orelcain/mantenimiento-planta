@@ -7,6 +7,52 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.6.1] - 2026-01-10
+
+### 🎯 UX Mejorada: Filtros y Persistencia
+
+#### Añadido
+- **Filtro automático**: Equipos seleccionados en jerarquía se filtran al navegar a módulo equipos
+- **Badge informativo**: Indicador visual con cantidad de equipos filtrados y botón "Ver todos"
+- **Persistencia de expansión**: Nodos expandidos en jerarquía persisten al salir y volver
+- **Persistencia de equipos**: Lista expandible de equipos por nodo también mantiene estado
+- **Query params**: Soporte para `?selected=id1,id2` y `?id=equipmentId` en URL
+
+#### Técnico
+- Estado de expansión guardado en `localStorage` con keys:
+  - `hierarchy_expanded_nodes`: nodos de jerarquía expandidos
+  - `hierarchy_expanded_equipment_nodes`: listas de equipos expandidas
+- Filtro `filterSelectedIds` en EquipmentPage con efecto desde query params
+- Restauración automática de estados al montar componentes
+
+#### Mejorado
+- UX de navegación entre módulos más fluida
+- No se pierde contexto visual al cambiar entre páginas
+- Botón "Colapsar todo" sigue funcionando para limpiar expansión manualmente
+
+## [2.6.0] - 2026-01-10
+
+### 🏢 Sistema de Estructura Base y Expansiones
+
+#### Añadido
+- **Distintivos visuales**: Badge azul "Base" con icono Clock para estructura original
+- **Badge expansiones**: Badge verde "Nuevo" con icono Sparkles para nodos agregados
+- **Tooltips informativos**: Fechas de creación visibles al pasar sobre badges
+- **Auditoría temporal**: Seguimiento visual del crecimiento organizacional
+- **Script de migración**: `mark_base_hierarchy.js` para marcar estructura base
+- **Auto-clasificación**: Nuevos nodos marcados automáticamente como expansiones
+
+#### Base de Datos
+- Campo `isBaseStructure?: boolean` en HierarchyNode (true=base, false=expansión)
+- Campo `baseStructureDate?: Timestamp` para fecha común de estructura base
+- Migración completada: 862 nodos marcados como estructura base
+
+#### Técnico
+- Actualizado `apps/pwa/src/types/hierarchy.ts` con nuevos campos
+- Modificado `HierarchyPage.tsx` para mostrar badges según clasificación
+- Actualizado `useHierarchy.ts` para marcar nuevos nodos como expansiones
+- Documentación completa en `docs/development/BASE_EXPANSION_SYSTEM.md`
+
 ## [2.2.31] - 2026-01-09
 
 ### 🧰 Equipos: sincronización desde Jerarquía

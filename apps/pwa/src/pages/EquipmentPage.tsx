@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import {
   CheckCircle2,
@@ -153,6 +153,7 @@ function toCsv(rows: Record<string, string>[]) {
 
 export function EquipmentPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { equipment, setEquipment, setSelectedIncident } = useAppStore()
   const user = useAuthStore((s) => s.user)
   const { canDeleteEquipment, canEditEquipment } = usePermissions()
@@ -161,6 +162,7 @@ export function EquipmentPage() {
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [showFavsOnly, setShowFavsOnly] = useState(false)
+  const [filterSelectedIds, setFilterSelectedIds] = useState<Set<string>>(new Set())
 
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
   const [compact, setCompact] = useState(false)
@@ -213,6 +215,22 @@ export function EquipmentPage() {
     getEquipments().then(setEquipment)
   }, [setEquipment])
 
+  // Procesar equipos seleccionados desde query params (desde jerarquía)
+  useEffect(() => {
+    const selectedParam = searchParams.get('selected')
+    const idParam = searchParams.get('id')
+    
+    if (selectedParam) {
+      const ids = selectedParam.split(',').filter(Boolean)
+      setFilterSelectedIds(new Set(ids))
+      setSelectedIds(new Set(ids))
+    } else if (idParam) {
+      setFilterSelectedIds(new Set([idParam]))
+    } else {
+      setFilterSelectedIds(new Set())
+    }
+  }, [searchParams])
+
   useEffect(() => {
     debouncedSetSearch(searchQuery)
   }, [searchQuery, debouncedSetSearch])
@@ -247,10 +265,11 @@ export function EquipmentPage() {
 
       const matchesStatus = filterStatus === 'all' || eq.estado === filterStatus
       const matchesFav = !showFavsOnly || favorites.has(eq.id)
+      const matchesSelected = filterSelectedIds.size === 0 || filterSelectedIds.has(eq.id)
 
-      return matchesSearch && matchesStatus && matchesFav
+      return matchesSearch && matchesStatus && matchesFav && matchesSelected
     })
-  }, [debouncedSearch, equipment, favorites, filterStatus, showFavsOnly])
+  }, [debouncedSearch, equipment, favorites, filterStatus, showFavsOnly, filterSelectedIds])
 
   const totalPages = Math.max(1, Math.ceil(filteredEquipment.length / ITEMS_PER_PAGE))
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
@@ -889,6 +908,25 @@ export function EquipmentPage() {
       <Card>
         <CardContent className="p-4">
           <div className="flex flex-col gap-3">
+            {/* Badge filtro activo desde jerarquía */}
+            {filterSelectedIds.size > 0 && (
+              <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                <div className="flex-1 text-sm text-blue-700">
+                  Mostrando {filterSelectedIds.size} {filterSelectedIds.size === 1 ? 'equipo seleccionado' : 'equipos seleccionados'} desde jerarquía
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setFilterSelectedIds(new Set())
+                    navigate('/equipment', { replace: true })
+                  }}
+                  className="text-blue-700 hover:text-blue-900 hover:bg-blue-100"
+                >
+                  Ver todos
+                </Button>
+              </div>
+            )}
             <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
               <div className="flex-1 relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -1032,7 +1070,7 @@ export function EquipmentPage() {
               </div>
               <h3 className="text-lg font-semibold mb-2">No hay equipos</h3>
               <p className="text-sm text-muted-foreground">
-                {searchQuery || filterStatus !== 'all' || showFavsOnly
+                {searchQuery || filterStatus !== 'all' || showFavsOnly || filterSelectedIds.size > 0
                   ? 'No se encontraron equipos con los filtros aplicados'
                   : 'Aún no hay equipos sincronizados desde la jerarquía'}
               </p>

@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.5.0**
+## Versión Actual: **v2.6.1**
 
 **Fecha de lanzamiento**: 10 de enero de 2026  
 **Estado**: ✅ PRODUCCIÓN READY  
@@ -9,6 +9,25 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.6.1 - UX Mejorada (Filtros y Persistencia)
+
+- **Filtro de selección**: Equipos seleccionados en jerarquía se filtran automáticamente en módulo equipos
+- **Badge informativo**: Indicador visual cuando se filtra por selección con botón "Ver todos"
+- **Persistencia de expansión**: Estado de nodos expandidos se mantiene al salir de jerarquía
+- **Persistencia de equipos**: Lista de equipos por nodo también persiste su estado expandido
+- **Navegación mejorada**: Query params `?selected=id1,id2,id3` para filtrar equipos
+- **Storage local**: Estados guardados en localStorage para mejor UX
+
+### v2.6.0 - Base + Expansiones
+
+- **Estructura base**: 862 nodos existentes marcados como estructura base con fecha común
+- **Badge "Base"**: distintivo azul con icono Clock para nodos de estructura original
+- **Badge "Nuevo"**: distintivo verde con icono Sparkles para expansiones futuras
+- **Tooltips informativos**: fechas de creación visibles al pasar sobre badges
+- **Script de migración**: herramienta para marcar estructura base (`mark_base_hierarchy.js`)
+- **Auto-clasificación**: nuevos nodos marcados automáticamente como expansiones
+- **Auditoría temporal**: seguimiento visual del crecimiento organizacional
 
 ### v2.5.0 - Jerarquía + Equipos Integrados
 

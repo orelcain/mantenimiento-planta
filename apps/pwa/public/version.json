@@ -1,8 +1,14 @@
 {
-  "version": "2.5.0",
+  "version": "2.6.0",
   "buildDate": "2026-01-10",
   "buildTimestamp": 1736467200000,
   "features": [
+    "Sistema de estructura base vs expansiones con distintivos visuales",
+    "Badge azul 'Base' con icono Clock para nodos de estructura original (862 nodos)",
+    "Badge verde 'Nuevo' con icono Sparkles para expansiones futuras",
+    "Tooltips con fechas de creación en badges de jerarquía",
+    "Script de migración para marcar estructura base existente",
+    "Nuevos nodos marcados automáticamente como expansiones",
     "Equipos integrados en vista de jerarquía (badge + lista expandible)",
     "Selección múltiple de equipos desde nodos de jerarquía",
     "Barra flotante para compartir equipos seleccionados",
