@@ -9,6 +9,8 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       workbox: {
+        clientsClaim: true,
+        skipWaiting: true,
         globPatterns: ['**/*.{js,css,html,ico,svg,webp}'],
         // NO cachear imágenes PNG - Firebase Storage las sirve directamente
         navigateFallback: 'index.html',

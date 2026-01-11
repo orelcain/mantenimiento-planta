@@ -80,12 +80,62 @@ export function useAppVersion() {
     return () => clearInterval(interval)
   }, [])
 
-  const reload = () => {
+  const reload = async () => {
     // Guardar la nueva versión antes de recargar
     if (newVersion) {
       localStorage.setItem(LAST_VERSION_KEY, newVersion)
     }
-    window.location.reload()
+
+    // 1) Intentar activar el Service Worker nuevo (si está esperando)
+    if ('serviceWorker' in navigator) {
+      try {
+        const registrations = await navigator.serviceWorker.getRegistrations()
+        const controllerChanged = new Promise<void>((resolve) => {
+          navigator.serviceWorker.addEventListener('controllerchange', () => resolve(), { once: true })
+        })
+
+        for (const reg of registrations) {
+          try {
+            await reg.update()
+            if (reg.waiting) {
+              reg.waiting.postMessage({ type: 'SKIP_WAITING' })
+            }
+          } catch {
+            // ignore
+          }
+        }
+
+        // Esperar un poco a que el SW tome control (si aplica)
+        await Promise.race([controllerChanged, new Promise((r) => setTimeout(r, 2000))])
+      } catch {
+        // ignore
+      }
+    }
+
+    // 2) Limpiar caches (Workbox/HTTP caches)
+    if ('caches' in window) {
+      try {
+        const names = await caches.keys()
+        await Promise.all(names.map((name) => caches.delete(name)))
+      } catch {
+        // ignore
+      }
+    }
+
+    // 3) Fallback fuerte: desregistrar SW para salir de un SW “pegado”
+    if ('serviceWorker' in navigator) {
+      try {
+        const registrations = await navigator.serviceWorker.getRegistrations()
+        await Promise.all(registrations.map((r) => r.unregister()))
+      } catch {
+        // ignore
+      }
+    }
+
+    // 4) Recargar con cache-buster (evita que el browser use una respuesta vieja)
+    const url = new URL(window.location.href)
+    url.searchParams.set('r', String(Date.now()))
+    window.location.replace(url.toString())
   }
 
   return {

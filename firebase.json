@@ -24,6 +24,24 @@
     ],
     "headers": [
       {
+        "source": "/version.json",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache"
+          }
+        ]
+      },
+      {
+        "source": "/manifest.webmanifest",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache"
+          }
+        ]
+      },
+      {
         "source": "**/*.@(js|css|svg|png|jpg|jpeg|gif|ico|woff|woff2)",
         "headers": [
           {
