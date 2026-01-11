@@ -1320,13 +1320,50 @@ export function EquipmentPage() {
       )}
 
       {/* Photo annotation editor */}
-      {editingPhoto && (
+      {editingPhoto && detailEquipment && (
         <PhotoAnnotationEditor
           photoUrl={editingPhoto}
           onSave={async (annotatedImageUrl) => {
-            // TODO: Subir imagen anotada y reemplazar la original
-            // Por ahora solo cerramos
-            setEditingPhoto(null)
+            try {
+              setPhotoUploading(true)
+              
+              // Convertir blob URL a File
+              const response = await fetch(annotatedImageUrl)
+              const blob = await response.blob()
+              const file = new File([blob], `annotated-${Date.now()}.webp`, {
+                type: 'image/webp',
+              })
+              
+              // Preguntar si reemplazar o agregar
+              const replaceOriginal = window.confirm(
+                '¿Deseas reemplazar la foto original con la versión anotada? ' +
+                'Si cancelas, se agregará como foto nueva.'
+              )
+              
+              if (replaceOriginal) {
+                // Eliminar foto original
+                await removeEquipmentPhoto(detailEquipment.id, editingPhoto)
+              }
+              
+              // Subir nueva foto anotada
+              await addEquipmentPhoto(detailEquipment.id, file)
+              
+              // Recargar equipos
+              const fresh = await getEquipments()
+              setEquipment(fresh)
+              
+              const updated = fresh.find((e) => e.id === detailEquipment.id) ?? null
+              if (updated) setDetailEquipment(updated)
+              
+              setEditingPhoto(null)
+              setSelectedPhotoIndex(null)
+            } catch (e) {
+              const err = e instanceof Error ? e : new Error('Error al guardar foto anotada')
+              logger.error('Annotated photo save failed', err)
+              alert('No se pudo guardar la foto anotada. Intenta de nuevo.')
+            } finally {
+              setPhotoUploading(false)
+            }
           }}
           onClose={() => setEditingPhoto(null)}
         />
