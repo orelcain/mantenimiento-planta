@@ -13,13 +13,50 @@ import {
   Share2, 
   ChevronLeft,
   ChevronRight,
-  Clock
+  Clock,
+  FileText
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, Badge, Button } from '@/components/ui'
 import { getEquipments } from '@/services/equipment'
 import { getIncidents } from '@/services/incidents'
 import type { Equipment, Incident } from '@/types'
 import { logger } from '@/lib/logger'
+
+type EquipmentNote = {
+  id: string
+  text: string
+  createdAt: string
+}
+
+type EquipmentNotesById = Record<string, EquipmentNote[]>
+
+const safeParseJson = <T,>(raw: string | null): T | null => {
+  if (!raw) return null
+  try {
+    return JSON.parse(raw) as T
+  } catch {
+    return null
+  }
+}
+
+type EquipmentNote = {
+  id: string
+  text: string
+  createdAt: string
+}
+
+type EquipmentNotesById = Record<string, EquipmentNote[]>
+
+const notesStorageKey = (userId: string | undefined) => `equipment_notes_${userId || 'public'}`
+
+const safeParseJson = <T,>(raw: string | null): T | null => {
+  if (!raw) return null
+  try {
+    return JSON.parse(raw) as T
+  } catch {
+    return null
+  }
+}
 
 /**
  * Vista pública de equipos (sin autenticación)
@@ -55,6 +92,7 @@ export function PublicEquipmentView() {
   const { id } = useParams<{ id: string }>()
   const [equipments, setEquipments] = useState<Equipment[]>([])
   const [incidents, setIncidents] = useState<Record<string, Incident[]>>({})
+  const [notesById, setNotesById] = useState<EquipmentNotesById>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [lightboxPhoto, setLightboxPhoto] = useState<{ url: string; index: number; total: number } | null>(null)
@@ -91,6 +129,22 @@ export function PublicEquipmentView() {
         }
 
         setEquipments(filtered)
+        
+        // Cargar notas desde localStorage
+        const allNotes: EquipmentNotesById = {}
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i)
+          if (key && key.startsWith('equipment_notes_')) {
+            const notesData = safeParseJson<EquipmentNotesById>(localStorage.getItem(key))
+            if (notesData) {
+              Object.keys(notesData).forEach(equipId => {
+                if (!allNotes[equipId]) allNotes[equipId] = []
+                allNotes[equipId].push(...notesData[equipId])
+              })
+            }
+          }
+        }
+        setNotesById(allNotes)
         
         // Cargar últimas incidencias para cada equipo
         const incidentsData: Record<string, Incident[]> = {}
@@ -214,6 +268,7 @@ export function PublicEquipmentView() {
           {equipments.map((equipment) => {
             const StatusIcon = STATUS_CONFIG[equipment.estado].icon
             const equipmentIncidents = incidents[equipment.id] || []
+            const equipmentNotes = notesById[equipment.id] || []
             
             return (
               <Card key={equipment.id} className="overflow-hidden">
@@ -303,6 +358,24 @@ export function PublicEquipmentView() {
                               </div>
                             </div>
                           </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Notas */}
+                  {equipmentNotes.length > 0 && (
+                    <div>
+                      <h3 className="font-semibold mb-3 text-sm text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+                        <FileText className="h-4 w-4" />
+                        Notas ({equipmentNotes.length})
+                      </h3>
+                      <div className="space-y-2">
+                        {equipmentNotes.map((note) => (
+                          <div key={note.id} className="p-3 bg-muted/20 rounded-lg border">
+                            <p className="text-sm">{note.text}</p>
+                            <p className="text-xs text-muted-foreground mt-1">{note.createdAt}</p>
+                          </div>
                         ))}
                       </div>
                     </div>
