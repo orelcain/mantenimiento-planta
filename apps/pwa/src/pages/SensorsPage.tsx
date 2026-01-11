@@ -388,34 +388,78 @@ export function SensorsPage() {
                   </div>
 
                   <div>
-                    <Label>Buscar equipo</Label>
+                    <Label>Buscar equipo (opcional)</Label>
                     <Input
                       value={equipmentSearch}
                       onChange={(e) => setEquipmentSearch(e.target.value)}
-                      placeholder="Nombre, código o ubicación…"
+                      placeholder="Escribe para filtrar por nombre o código..."
                     />
                   </div>
 
                   <div>
-                    <Label>Equipo destino</Label>
-                    <Select value={selectedEquipmentId} onValueChange={setSelectedEquipmentId}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecciona un equipo" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {filteredEquipment.length === 0 ? (
-                          <div className="p-2 text-sm text-muted-foreground">Sin resultados</div>
-                        ) : (
-                          filteredEquipment.slice(0, 300).map((e) => (
-                            <SelectItem key={e.id} value={e.id}>
-                              {e.nombre} ({e.codigo})
-                            </SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
-                    <div className="mt-1 text-xs text-muted-foreground">
-                      {filteredEquipment.length} resultado(s){filteredEquipment.length > 300 ? ' (mostrando 300)' : ''}
+                    <Label>Selecciona un equipo ({filteredEquipment.length} resultado{filteredEquipment.length !== 1 ? 's' : ''})</Label>
+                    <div className="mt-2 max-h-[300px] overflow-y-auto border rounded-md bg-muted/20">
+                      {filteredEquipment.length === 0 ? (
+                        <div className="p-4 text-sm text-muted-foreground text-center">
+                          No se encontraron equipos con esos filtros
+                        </div>
+                      ) : (
+                        <div className="divide-y">
+                          {filteredEquipment.slice(0, 100).map((e) => {
+                            const isSelected = e.id === selectedEquipmentId
+                            return (
+                              <button
+                                key={e.id}
+                                type="button"
+                                onClick={() => setSelectedEquipmentId(e.id)}
+                                className={`w-full text-left p-3 transition-colors hover:bg-muted/60 ${isSelected ? 'bg-primary/10 border-l-2 border-l-primary' : ''}`}
+                              >
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="flex-1 min-w-0">
+                                    <div className="font-medium truncate">{e.nombre}</div>
+                                    <div className="text-xs text-muted-foreground mt-0.5">
+                                      Código: {e.codigo}
+                                    </div>
+                                    {e.hierarchyPath && (
+                                      <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                                        <span className="opacity-60">📍</span>
+                                        <span className="truncate">{e.hierarchyPath}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="flex flex-col gap-1 items-end shrink-0">
+                                    <Badge
+                                      variant={
+                                        e.estado === 'operativo'
+                                          ? 'default'
+                                          : e.estado === 'en_mantenimiento'
+                                            ? 'secondary'
+                                            : 'destructive'
+                                      }
+                                      className="text-xs"
+                                    >
+                                      {e.estado === 'operativo' ? 'Operativo' : e.estado === 'en_mantenimiento' ? 'Mantención' : 'Fuera'}
+                                    </Badge>
+                                    <Badge
+                                      variant={
+                                        e.criticidad === 'alta' ? 'destructive' : e.criticidad === 'media' ? 'default' : 'secondary'
+                                      }
+                                      className="text-xs"
+                                    >
+                                      {e.criticidad === 'alta' ? '🔴 Alta' : e.criticidad === 'media' ? '🟡 Media' : '🟢 Baja'}
+                                    </Badge>
+                                  </div>
+                                </div>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      )}
+                      {filteredEquipment.length > 100 && (
+                        <div className="p-2 text-xs text-center text-muted-foreground bg-muted/40 border-t">
+                          Mostrando primeros 100 de {filteredEquipment.length}. Usa los filtros para refinar la búsqueda.
+                        </div>
+                      )}
                     </div>
                   </div>
 

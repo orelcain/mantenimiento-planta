@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.13.1**
+## Versión Actual: **v2.13.2**
 
 **Fecha de lanzamiento**: 11 de enero de 2026  
 **Estado**: ✅ PRODUCCIÓN READY  
@@ -9,6 +9,33 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.13.2 - UX Mejorada en Sensores (Lista Scrollable)
+
+**Mejoras de UX:**
+- **Lista scrollable visual**: Reemplazado dropdown oculto por lista completa con toda la información visible
+- **Contexto visual inmediato**: Cada equipo muestra nombre, código, ubicación jerárquica, estado y criticidad
+- **Sin memorización requerida**: No necesitas saber códigos de memoria, toda la info está a la vista
+- **Filtros intuitivos**: Badges de colores para estado y criticidad (🔴 Alta, 🟡 Media, 🟢 Baja)
+- **Navegación por ubicación**: Icono 📍 muestra ruta jerárquica completa (Planta > Sector > Área)
+- **Selección visual**: Border azul indica equipo seleccionado
+
+**Detalles técnicos:**
+- Límite de 100 equipos visibles por performance, con indicador si hay más
+- Búsqueda en tiempo real filtra mientras escribes (opcional)
+- Scroll interno con altura máxima de 300px
+
+### v2.13.1 - Migración a Database Secret (Legacy Auth)
+
+**Correcciones Críticas:**
+- **Usuarios anónimos eliminados**: Solución a creación masiva de cientos de usuarios Auth
+- **Database Secret implementado**: Método legacy pero funcional para IoT write-only
+- **Script de limpieza**: firebase-admin SDK para eliminación batch automatizada
+
+**Técnico:**
+- Firmware ESP32 eliminó `Firebase.signUp()` completamente
+- Config con `FIREBASE_DATABASE_SECRET` en lugar de API Key
+- Reglas RTDB permisivas validando estructura de datos
 
 ### v2.11.0 - Emparejamiento de Sensores (IoT)
 
