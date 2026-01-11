@@ -58,6 +58,7 @@ import { updateEquipmentSchema } from '@/lib/validation'
 import { debounce, formatRelativeTime, generateId } from '@/lib/utils'
 import { logger } from '@/lib/logger'
 import { usePermissions } from '@/hooks/usePermissions'
+import { PhotoAnnotationEditor } from '@/components/PhotoAnnotationEditor'
 import type { Equipment, Incident } from '@/types'
 
 const ITEMS_PER_PAGE = 12
@@ -204,6 +205,7 @@ export function EquipmentPage() {
 
   const [photoUploading, setPhotoUploading] = useState(false)
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null)
+  const [editingPhoto, setEditingPhoto] = useState<string | null>(null)
   
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
   const [editingNoteText, setEditingNoteText] = useState('')
@@ -1312,10 +1314,23 @@ export function EquipmentPage() {
           onPhotoUpload={handlePhotoUpload}
           onPhotoDelete={handlePhotoDelete}
           onPhotoSelect={setSelectedPhotoIndex}
+          onEditPhoto={(photoUrl) => setEditingPhoto(photoUrl)}
           onClose={closeDetail}
         />
       )}
 
+      {/* Photo annotation editor */}
+      {editingPhoto && (
+        <PhotoAnnotationEditor
+          photoUrl={editingPhoto}
+          onSave={async (annotatedImageUrl) => {
+            // TODO: Subir imagen anotada y reemplazar la original
+            // Por ahora solo cerramos
+            setEditingPhoto(null)
+          }}
+          onClose={() => setEditingPhoto(null)}
+        />
+      )}
       {maintenanceEquipment && (
         <Dialog open onOpenChange={(open) => !open && closeMaintenanceModal()}>
           <DialogContent className="max-w-md">
@@ -1846,6 +1861,7 @@ function EquipmentDetailDialog({
   onPhotoUpload,
   onPhotoDelete,
   onPhotoSelect,
+  onEditPhoto,
   onClose,
 }: {
   equipment: Equipment
@@ -1873,6 +1889,7 @@ function EquipmentDetailDialog({
   onPhotoUpload: (files: FileList | null) => void
   onPhotoDelete: (photoUrl: string) => void
   onPhotoSelect: (index: number | null) => void
+  onEditPhoto: (photoUrl: string) => void
   onClose: () => void
 }) {
   const statusConfig = STATUS_CONFIG[equipment.estado]
@@ -2278,19 +2295,33 @@ function EquipmentDetailDialog({
               >
                 Anterior
               </Button>
-              <Button
-                variant="destructive"
-                onClick={() => {
-                  const photoUrl = equipment.photos?.[selectedPhotoIndex]
-                  if (photoUrl) {
-                    onPhotoDelete(photoUrl)
-                    onPhotoSelect(null)
-                  }
-                }}
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Eliminar foto
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    const photoUrl = equipment.photos?.[selectedPhotoIndex]
+                    if (photoUrl) {
+                      onEditPhoto(photoUrl)
+                    }
+                  }}
+                >
+                  <Edit2 className="h-4 w-4 mr-2" />
+                  Editar anotaciones
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => {
+                    const photoUrl = equipment.photos?.[selectedPhotoIndex]
+                    if (photoUrl) {
+                      onPhotoDelete(photoUrl)
+                      onPhotoSelect(null)
+                    }
+                  }}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Eliminar
+                </Button>
+              </div>
               <Button
                 variant="outline"
                 onClick={() => onPhotoSelect(Math.min(equipment.photos!.length - 1, selectedPhotoIndex + 1))}
