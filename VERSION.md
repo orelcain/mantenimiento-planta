@@ -1,14 +1,25 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.9.0**
+## Versión Actual: **v2.10.0**
 
-**Fecha de lanzamiento**: 10 de enero de 2026  
+**Fecha de lanzamiento**: 11 de enero de 2026  
 **Estado**: ✅ PRODUCCIÓN READY  
 **Build**: ✅ Último build local OK
 
 ---
 
 ## 📋 Información de la Versión
+
+### v2.10.0 - IoT Predictivo (RTDB + Incidencias automáticas)
+
+**Nuevas Características:**
+- **Módulo Predictivo**: vista dedicada por equipo con riesgo, confianza y recomendación
+- **Integración RTDB**: lectura de `sensors/{equipmentId}` y histórico `readings` para tendencia
+- **Incidencias predictivas**: creación automática en Firestore cuando el riesgo es alto/crítico (anti-duplicados)
+
+**Técnico:**
+- Firmware ESP32 versionado sin secretos (config de ejemplo) para colaboración segura
+- Sincronización de versión en app (`APP_VERSION`) + `public/version.json` + manifest
 
 ### v2.9.0 - Vista Pública Mejorada y Email Optimizado
 
