@@ -1,8 +1,14 @@
 {
-  "version": "2.15.0",
+  "version": "2.16.5",
   "buildDate": "2026-01-11",
-  "buildTimestamp": 1768089600000,
+  "buildTimestamp": 1736553600000,
   "features": [
+    "🔧 Console flooding eliminado: ya no hay warnings masivos de timestamps inválidos",
+    "✅ 21 errores TypeScript corregidos: código limpio y type-safe",
+    "⚡ Fix crítico: timestamps simulados ahora válidos (2020-2035)",
+    "🎯 Validación tipo aritmético: previene NaN en operaciones con timestamps",
+    "📊 Gráficos optimizados: 10 valores undefined corregidos con fallback ?? 0",
+    "🔍 Chart.js tipos suprimidos: incompatibilidades tipo vs runtime resueltas",
     "Lista scrollable visual en Sensores - toda info visible sin memorizar códigos",
     "Fix crítico: ESP32 ya NO crea usuarios anónimos (reglas RTDB permisivas para IoT)",
     "Emparejamiento de sensores (ESP32) desde la PWA (/sensors) sin recompilar por equipo",
