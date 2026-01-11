@@ -43,10 +43,25 @@ interface TelemetryChartProps {
 
 export function TelemetryChart({ data, type, height = 300 }: TelemetryChartProps) {
   const chartData = useMemo(() => {
+    // Formatear labels según el rango de tiempo
     const labels = data.map(d => {
-      const hour = d.timestamp.getHours()
-      const minute = d.timestamp.getMinutes()
-      return `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`
+      const date = new Date(d.timestamp)
+      const now = new Date()
+      const hoursDiff = (now.getTime() - date.getTime()) / (1000 * 60 * 60)
+      
+      // Si es más de 24h atrás, mostrar día/mes también
+      if (hoursDiff > 24) {
+        const day = date.getDate().toString().padStart(2, '0')
+        const month = (date.getMonth() + 1).toString().padStart(2, '0')
+        const hour = date.getHours().toString().padStart(2, '0')
+        const minute = date.getMinutes().toString().padStart(2, '0')
+        return `${day}/${month} ${hour}:${minute}`
+      } else {
+        // Solo hora:minuto para últimas 24h
+        const hour = date.getHours().toString().padStart(2, '0')
+        const minute = date.getMinutes().toString().padStart(2, '0')
+        return `${hour}:${minute}`
+      }
     })
 
     const tempData = data.map(d => d.temperatura)

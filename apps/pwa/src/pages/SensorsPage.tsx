@@ -16,6 +16,38 @@ function normalizeTs(ts: number | undefined): number | null {
   return ts
 }
 
+function formatDateTime(timestamp: number | Date | undefined): string {
+  if (!timestamp) return '—'
+  
+  try {
+    const date = typeof timestamp === 'number' ? new Date(timestamp) : timestamp
+    
+    // Validar que la fecha sea válida
+    if (isNaN(date.getTime())) return 'Fecha inválida'
+    
+    // Verificar que la fecha esté en un rango razonable (2020-2030)
+    const year = date.getFullYear()
+    if (year < 2020 || year > 2030) {
+      console.warn('Fecha fuera de rango:', date, 'timestamp original:', timestamp)
+      return 'Fecha inválida'
+    }
+    
+    // Formatear con zona horaria local del usuario
+    return date.toLocaleString('es-ES', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    })
+  } catch (err) {
+    console.error('Error formateando fecha:', err, timestamp)
+    return 'Error'
+  }
+}
+
 function toEquipmentSearchText(e: Equipment): string {
   return `${e.nombre} ${e.codigo} ${e.hierarchyPath ?? ''} ${e.zonePath?.join(' ') ?? ''}`
     .toLowerCase()
@@ -311,7 +343,7 @@ export function SensorsPage() {
                         {onlineBadge(Boolean(d.online))}
                       </div>
                       <div className="mt-1 text-xs text-muted-foreground">
-                        {lastSeen ? `Último reporte: ${new Date(lastSeen).toLocaleString()}` : 'Sin lastSeen'}
+                        {lastSeen ? `Último reporte: ${formatDateTime(lastSeen)}` : 'Sin lastSeen'}
                       </div>
                       {d.assignedEquipmentId && (
                         <div className="mt-1 text-xs">
@@ -388,7 +420,7 @@ export function SensorsPage() {
                         )}
                         {displayTelemetry.temperatura.timestamp && (
                           <div className="text-xs text-muted-foreground mt-2">
-                            {new Date(displayTelemetry.temperatura.timestamp).toLocaleString()}
+                            {formatDateTime(displayTelemetry.temperatura.timestamp)}
                           </div>
                         )}
                       </div>
@@ -411,7 +443,7 @@ export function SensorsPage() {
                         )}
                         {displayTelemetry.humedad.timestamp && (
                           <div className="text-xs text-muted-foreground mt-2">
-                            {new Date(displayTelemetry.humedad.timestamp).toLocaleString()}
+                            {formatDateTime(displayTelemetry.humedad.timestamp)}
                           </div>
                         )}
                       </div>
@@ -427,7 +459,7 @@ export function SensorsPage() {
 
                     {displayTelemetry.lastSeen && (
                       <div className="text-xs text-muted-foreground">
-                        Última actualización: {new Date(displayTelemetry.lastSeen).toLocaleString()}
+                        Última actualización: {formatDateTime(displayTelemetry.lastSeen)}
                       </div>
                     )}
 
