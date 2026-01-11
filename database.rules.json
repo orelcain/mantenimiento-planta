@@ -5,20 +5,14 @@
 
     "devices": {
       "$deviceId": {
-        // Lectura: solo usuarios autenticados (PWA)
         ".read": "auth != null",
-        // Escritura: el propio device puede escribir su estado SIN auth
-        // pero usuarios autenticados (PWA) pueden asignar equipos
         ".write": "auth != null || newData.child('online').exists()"
       }
     },
 
     "sensors": {
       "$equipmentId": {
-        // Lectura: solo usuarios autenticados (PWA)
         ".read": "auth != null",
-        // Escritura: ESP32 puede escribir datos de sensores SIN auth
-        // (validamos que tenga estructura correcta)
         ".write": "auth != null || (newData.child('temperatura').exists() && newData.child('humedad').exists())"
       }
     }
