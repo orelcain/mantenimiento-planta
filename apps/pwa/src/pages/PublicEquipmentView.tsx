@@ -39,25 +39,6 @@ const safeParseJson = <T,>(raw: string | null): T | null => {
   }
 }
 
-type EquipmentNote = {
-  id: string
-  text: string
-  createdAt: string
-}
-
-type EquipmentNotesById = Record<string, EquipmentNote[]>
-
-const notesStorageKey = (userId: string | undefined) => `equipment_notes_${userId || 'public'}`
-
-const safeParseJson = <T,>(raw: string | null): T | null => {
-  if (!raw) return null
-  try {
-    return JSON.parse(raw) as T
-  } catch {
-    return null
-  }
-}
-
 /**
  * Vista pública de equipos (sin autenticación)
  * Accesible vía QR codes para mostrar info básica de equipos
@@ -139,7 +120,10 @@ export function PublicEquipmentView() {
             if (notesData) {
               Object.keys(notesData).forEach(equipId => {
                 if (!allNotes[equipId]) allNotes[equipId] = []
-                allNotes[equipId].push(...notesData[equipId])
+                const notes = notesData[equipId]
+                if (notes && Array.isArray(notes)) {
+                  allNotes[equipId].push(...notes)
+                }
               })
             }
           }
