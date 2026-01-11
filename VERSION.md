@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.10.0**
+## Versión Actual: **v2.11.0**
 
 **Fecha de lanzamiento**: 11 de enero de 2026  
 **Estado**: ✅ PRODUCCIÓN READY  
@@ -9,6 +9,16 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.11.0 - Emparejamiento de Sensores (IoT)
+
+**Nuevas Características:**
+- **Emparejamiento desde la PWA**: nueva ruta `/sensors` para asignar/desasignar ESP32↔equipo (sin editar firmware por equipo)
+- **Registro de dispositivos**: `devices/{deviceId}` en RTDB con `online/lastSeen` y `assignedEquipmentId`
+
+**Técnico:**
+- Firmware ESP32: `deviceId` por MAC, escucha `assignedEquipmentId` por stream y persiste en NVS
+- Reglas RTDB listas para deploy (`database.rules.json`) y registradas en `firebase.json`
 
 ### v2.10.0 - IoT Predictivo (RTDB + Incidencias automáticas)
 

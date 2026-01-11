@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-01-11' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'IoT Predictivo' as const
+export const VERSION_NAME = 'Emparejamiento de Sensores (IoT)' as const
 
 /**
  * Nota:

@@ -2,6 +2,61 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
+			"label": "PlatformIO: Build ESP32 (iot/esp32-sensor)",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-ExecutionPolicy",
+				"Bypass",
+				"-Command",
+				"& \"$env:USERPROFILE\\.platformio\\penv\\Scripts\\platformio.exe\" run"
+			],
+			"options": {
+				"cwd": "${workspaceFolder}/iot/esp32-sensor"
+			},
+			"problemMatcher": [
+				"$platformio"
+			],
+			"group": "build"
+		},
+		{
+			"label": "PlatformIO: Upload ESP32 (iot/esp32-sensor, COM3)",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-ExecutionPolicy",
+				"Bypass",
+				"-Command",
+				"& \"$env:USERPROFILE\\.platformio\\penv\\Scripts\\platformio.exe\" run --target upload --upload-port COM3"
+			],
+			"options": {
+				"cwd": "${workspaceFolder}/iot/esp32-sensor"
+			},
+			"problemMatcher": [
+				"$platformio"
+			],
+			"group": "build"
+		},
+		{
+			"label": "PlatformIO: Monitor ESP32 (iot/esp32-sensor, COM3 @115200)",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-ExecutionPolicy",
+				"Bypass",
+				"-Command",
+				"& \"$env:USERPROFILE\\.platformio\\penv\\Scripts\\platformio.exe\" device monitor --port COM3 --baud 115200"
+			],
+			"options": {
+				"cwd": "${workspaceFolder}/iot/esp32-sensor"
+			},
+			"isBackground": true,
+			"problemMatcher": []
+		},
+		{
 			"label": "Build PWA (apps/pwa)",
 			"type": "shell",
 			"command": "pnpm",
