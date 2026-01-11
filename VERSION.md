@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.16.5**
+## Versión Actual: **v2.16.6**
 
 **Fecha de lanzamiento**: 11 de enero de 2026  
 **Estado**: ✅ PRODUCCIÓN READY  
@@ -9,6 +9,26 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.16.6 - Fix Validación Gráfico Historial (11/01/2026)
+
+**Fixes Críticos:**
+- 🔧 **Validación de valores 0**: Hook useTelemetryHistory ahora acepta temperatura/humedad = 0 como valores válidos
+- 📊 **Gráfico historial**: Corregida condición que impedía generar historial cuando valores eran falsy pero válidos
+- ⚡ **Loading infinito resuelto**: Cambio de `!currentTemp` a `typeof currentTemp !== 'number'`
+- 📦 **version.json actualizado**: Servidor ahora sirve 2.16.6 correctamente
+
+**Mejoras Técnicas:**
+- Validación tipo estricta con `typeof` en lugar de truthy/falsy check
+- Permite temperatura/humedad = 0 como casos válidos (edge case importante)
+- Banner "Nueva versión" funciona correctamente (server version sincronizado)
+
+**Impacto:**
+- ✅ Gráficos de telemetría ahora se renderizan siempre que haya valores numéricos
+- ✅ Loading state correcto: termina cuando datos están listos
+- ✅ Banner versión desaparece tras actualizar
+
+---
 
 ### v2.16.5 - Fix Timestamps Simulados + TypeScript Warnings (11/01/2026)
 

@@ -1,8 +1,9 @@
 {
-  "version": "2.16.5",
+  "version": "2.16.6",
   "buildDate": "2026-01-11",
   "buildTimestamp": 1736553600000,
   "features": [
+    "🔧 Fix validación gráfico: acepta temperatura/humedad = 0 como valores válidos",
     "🔧 Console flooding eliminado: ya no hay warnings masivos de timestamps inválidos",
     "✅ 21 errores TypeScript corregidos: código limpio y type-safe",
     "⚡ Fix crítico: timestamps simulados ahora válidos (2020-2035)",

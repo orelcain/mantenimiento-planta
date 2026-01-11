@@ -43,7 +43,8 @@ export function useTelemetryHistory(
 
   // Inicialización: generar datos históricos simulados SOLO la primera vez
   useEffect(() => {
-    if (initializingRef.current || !currentTemp || !currentHumidity) {
+    // Validar que tengamos valores numéricos (permitir 0 como válido)
+    if (initializingRef.current || typeof currentTemp !== 'number' || typeof currentHumidity !== 'number') {
       return
     }
 
