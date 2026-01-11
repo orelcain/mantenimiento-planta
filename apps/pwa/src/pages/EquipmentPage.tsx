@@ -587,96 +587,92 @@ export function EquipmentPage() {
     setShareLoading(true)
 
     try {
-      const data = await generateShareData()
+      await generateShareData() // Generamos data aunque no la usemos directamente
       const selectedEquipments = equipment.filter((e) => selectedIds.has(e.id))
       
-      // Generar contenido HTML para email
-      let htmlBody = `<html><body style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px;">
-        <h1 style="color: #333;">Información de Equipos</h1>
-        <p style="color: #666;">Fecha: ${new Date().toLocaleDateString()} - ${selectedEquipments.length} equipo(s)</p>
-        <hr style="border: 1px solid #ddd; margin: 20px 0;">
-      `
+      // Generar contenido de email en texto plano mejorado
+      // NOTA: mailto: no soporta HTML, solo texto plano
+      let textBody = `═══════════════════════════════════════════════════
+INFORMACIÓN DE EQUIPOS
+${new Date().toLocaleDateString()} - ${selectedEquipments.length} equipo(s)
+═══════════════════════════════════════════════════
+
+`
 
       for (const eq of selectedEquipments) {
-        const StatusIcon = STATUS_CONFIG[eq.estado].label
-        
-        htmlBody += `
-          <div style="border: 1px solid #ddd; border-radius: 8px; padding: 15px; margin: 20px 0; background: #f9f9f9;">
-            <h2 style="color: #2563eb; margin-top: 0;">${eq.nombre}</h2>
-            <p style="color: #666; font-size: 14px;"><strong>Código:</strong> ${eq.codigo}</p>
-            <p style="margin: 5px 0;"><span style="background: #e5e7eb; padding: 4px 8px; border-radius: 4px; font-size: 12px;">${StatusIcon}</span> <span style="background: #fef3c7; padding: 4px 8px; border-radius: 4px; font-size: 12px;">${CRITICIDAD_CONFIG[eq.criticidad].label}</span></p>
-        `
+        textBody += `
+┌──────────────────────────────────────────────────┐
+│ ${eq.nombre.toUpperCase()}
+└──────────────────────────────────────────────────┘
+
+📋 INFORMACIÓN BÁSICA
+• Código: ${eq.codigo}
+• Estado: ${STATUS_CONFIG[eq.estado].label}
+• Criticidad: ${CRITICIDAD_CONFIG[eq.criticidad].label}
+`
 
         if (eq.hierarchyPath) {
-          htmlBody += `<p style="color: #666; font-size: 13px;">📍 ${eq.hierarchyPath}</p>`
+          textBody += `• Ubicación: ${eq.hierarchyPath}\n`
         }
 
         if (eq.marca || eq.modelo || eq.numeroSerie) {
-          htmlBody += `<div style="margin-top: 10px; font-size: 13px;">`
-          if (eq.marca) htmlBody += `<p style="margin: 3px 0;"><strong>Marca:</strong> ${eq.marca}</p>`
-          if (eq.modelo) htmlBody += `<p style="margin: 3px 0;"><strong>Modelo:</strong> ${eq.modelo}</p>`
-          if (eq.numeroSerie) htmlBody += `<p style="margin: 3px 0;"><strong>N° Serie:</strong> ${eq.numeroSerie}</p>`
-          htmlBody += `</div>`
+          textBody += `\n🔧 DATOS TÉCNICOS\n`
+          if (eq.marca) textBody += `• Marca: ${eq.marca}\n`
+          if (eq.modelo) textBody += `• Modelo: ${eq.modelo}\n`
+          if (eq.numeroSerie) textBody += `• N° Serie: ${eq.numeroSerie}\n`
         }
 
-        // Incluir primera foto si está habilitado
+        // Incluir fotos si está habilitado
         if (shareIncludePhotos && eq.photos && eq.photos.length > 0) {
-          htmlBody += `
-            <div style="margin-top: 15px;">
-              <p style="font-weight: bold; margin-bottom: 8px;">📷 Foto principal:</p>
-              <img src="${eq.photos[0]}" alt="Foto del equipo" style="max-width: 300px; border-radius: 4px; border: 1px solid #ddd;" />
-              ${eq.photos.length > 1 ? `<p style="color: #666; font-size: 12px; margin-top: 5px;">+ ${eq.photos.length - 1} foto(s) más</p>` : ''}
-            </div>
-          `
+          textBody += `\n📷 FOTOS (${eq.photos.length})\n`
+          eq.photos.forEach((photoUrl, idx) => {
+            textBody += `${idx + 1}. ${photoUrl}\n`
+          })
+          textBody += `\n💡 Tip: Copia las URLs en tu navegador para ver las fotos\n`
         }
 
         // Incluir notas si está habilitado
         const notes = notesById[eq.id] || []
         if (shareIncludeNotes && notes.length > 0) {
-          htmlBody += `
-            <div style="margin-top: 15px; padding: 10px; background: #fff; border-left: 3px solid #3b82f6;">
-              <p style="font-weight: bold; margin: 0 0 8px 0;">📝 Notas:</p>
-          `
-          notes.forEach(note => {
-            htmlBody += `<p style="margin: 5px 0; font-size: 13px; color: #444;">• ${note.text} <span style="color: #999; font-size: 11px;">(${note.createdAt})</span></p>`
+          textBody += `\n📝 NOTAS (${notes.length})\n`
+          notes.forEach((note, idx) => {
+            textBody += `${idx + 1}. ${note.text}\n   (${note.createdAt})\n`
           })
-          htmlBody += `</div>`
         }
 
         // Incluir QR si está habilitado
         if (shareIncludeQR) {
           const qrUrl = `${window.location.origin}/mantenimiento-planta/public/equipment/${eq.id}`
-          htmlBody += `
-            <div style="margin-top: 15px; padding: 10px; background: #fff; text-align: center; border: 1px solid #ddd; border-radius: 4px;">
-              <p style="font-weight: bold; margin: 0 0 8px 0;">📱 Código QR</p>
-              <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Escanea para ver este equipo en la app</p>
-              <div style="background: white; padding: 10px; display: inline-block;">
-                <svg width="120" height="120" viewBox="0 0 120 120">
-                  <text x="60" y="60" text-anchor="middle" style="font-size: 10px; fill: #666;">[QR Code]</text>
-                </svg>
-              </div>
-              <p style="font-size: 11px; color: #666; margin-top: 8px;">URL: <a href="${qrUrl}" style="color: #2563eb;">${qrUrl}</a></p>
-            </div>
-          `
+          textBody += `\n📱 VER EN LA APP\n${qrUrl}\n`
+          textBody += `\n💡 Abre este enlace para ver toda la información con fotos ampliadas,\n   historial de incidencias y más detalles.\n`
         }
 
-        htmlBody += `</div>`
+        textBody += `\n${'─'.repeat(50)}\n`
       }
 
-      htmlBody += `
-        <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; text-align: center; color: #999; font-size: 12px;">
-          <p>Este reporte fue generado desde el Sistema de Gestión de Mantenimiento</p>
-          <p>Para acceder a funciones completas, inicia sesión en la aplicación</p>
-        </div>
-      </body></html>`
+      textBody += `\n
+══════════════════════════════════════════════════════
+ℹ️  NOTA IMPORTANTE
 
-      // Crear el body en texto plano como fallback
-      const textBody = generateSharePdfContent(data)
-      const subject = `Información de ${selectedEquipments.length} equipo(s) - ${new Date().toLocaleDateString()}`
+Por limitaciones técnicas del correo electrónico, las 
+imágenes se muestran como enlaces (URLs). Para una 
+mejor experiencia visual:
+
+✅ Abre los enlaces del QR en tu navegador
+✅ Las fotos se pueden ampliar haciendo clic
+✅ Verás el historial completo de incidencias
+✅ Interfaz optimizada para móvil y desktop
+
+──────────────────────────────────────────────────────
+Sistema de Gestión de Mantenimiento
+Generado automáticamente
+══════════════════════════════════════════════════════
+`
+
+      const subject = `🔧 Información de ${selectedEquipments.length} equipo(s) - ${new Date().toLocaleDateString()}`
       
-      // Para email con HTML necesitamos un workaround porque mailto: no soporta HTML directamente
-      // Abrimos con body en texto y el usuario puede copiar el HTML si lo necesita
-      window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(textBody + '\\n\\nNota: Adjunta las fotos manualmente si es necesario.')}`
+      // mailto: solo soporta texto plano, no HTML
+      window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(textBody)}`
       
       closeShareModal()
     } catch (_e) {

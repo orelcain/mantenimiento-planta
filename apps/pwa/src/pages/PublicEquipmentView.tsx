@@ -1,10 +1,24 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
-import { Package, MapPin, AlertCircle, CheckCircle2, Settings, XCircle, Image as ImageIcon } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle, Badge } from '@/components/ui'
+import { 
+  Package, 
+  MapPin, 
+  AlertCircle, 
+  CheckCircle2, 
+  Settings, 
+  XCircle, 
+  Image as ImageIcon, 
+  X, 
+  Share2, 
+  ChevronLeft,
+  ChevronRight,
+  Clock
+} from 'lucide-react'
+import { Card, CardContent, CardHeader, CardTitle, Badge, Button } from '@/components/ui'
 import { getEquipments } from '@/services/equipment'
-import type { Equipment } from '@/types'
+import { getIncidents } from '@/services/incidents'
+import type { Equipment, Incident } from '@/types'
 import { logger } from '@/lib/logger'
 
 /**
@@ -40,8 +54,10 @@ const CRITICIDAD_CONFIG: Record<Equipment['criticidad'], { label: string; classN
 export function PublicEquipmentView() {
   const { id } = useParams<{ id: string }>()
   const [equipments, setEquipments] = useState<Equipment[]>([])
+  const [incidents, setIncidents] = useState<Record<string, Incident[]>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [lightboxPhoto, setLightboxPhoto] = useState<{ url: string; index: number; total: number } | null>(null)
 
   useEffect(() => {
     const loadEquipments = async () => {
@@ -75,6 +91,18 @@ export function PublicEquipmentView() {
         }
 
         setEquipments(filtered)
+        
+        // Cargar últimas incidencias para cada equipo
+        const incidentsData: Record<string, Incident[]> = {}
+        for (const eq of filtered) {
+          try {
+            const eqIncidents = await getIncidents({ equipmentId: eq.id, limit: 5 })
+            incidentsData[eq.id] = eqIncidents
+          } catch {
+            incidentsData[eq.id] = []
+          }
+        }
+        setIncidents(incidentsData)
       } catch (err) {
         logger.error('Error loading public equipment:', err instanceof Error ? err : new Error(String(err)))
         setError('Error al cargar la información de los equipos')
@@ -85,6 +113,48 @@ export function PublicEquipmentView() {
 
     loadEquipments()
   }, [id])
+
+  const handleShare = async () => {
+    const url = window.location.href
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: equipments.length === 1 ? (equipments[0]?.nombre || 'Equipo') : 'Equipos',
+          text: 'Información de equipos',
+          url,
+        })
+      } catch (err) {
+        // User cancelled or error
+      }
+    } else {
+      // Fallback: copiar al portapapeles
+      await navigator.clipboard.writeText(url)
+      alert('Enlace copiado al portapapeles')
+    }
+  }
+
+  const openLightbox = (photoUrl: string, index: number, total: number) => {
+    setLightboxPhoto({ url: photoUrl, index, total })
+  }
+
+  const closeLightbox = () => {
+    setLightboxPhoto(null)
+  }
+
+  const navigatePhoto = (direction: 'prev' | 'next', allPhotos: string[]) => {
+    if (!lightboxPhoto) return
+    const newIndex = direction === 'prev' 
+      ? Math.max(0, lightboxPhoto.index - 1)
+      : Math.min(allPhotos.length - 1, lightboxPhoto.index + 1)
+    const newUrl = allPhotos[newIndex]
+    if (newUrl) {
+      setLightboxPhoto({
+        url: newUrl,
+        index: newIndex,
+        total: allPhotos.length
+      })
+    }
+  }
 
   if (loading) {
     return (
@@ -116,112 +186,170 @@ export function PublicEquipmentView() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="border-b bg-card">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex items-center gap-3">
-            <Package className="h-8 w-8 text-primary" />
-            <div>
-              <h1 className="text-2xl font-bold">
-                {equipments.length === 1 ? 'Información de Equipo' : `${equipments.length} Equipos`}
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                Vista pública - Solo lectura
-              </p>
+      <div className="border-b bg-card sticky top-0 z-10 shadow-sm">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Package className="h-8 w-8 text-primary" />
+              <div>
+                <h1 className="text-xl md:text-2xl font-bold">
+                  {equipments.length === 1 ? (equipments[0]?.nombre || 'Equipo') : `${equipments.length} Equipos`}
+                </h1>
+                <p className="text-xs md:text-sm text-muted-foreground">
+                  Vista pública - Solo lectura
+                </p>
+              </div>
             </div>
+            <Button variant="outline" size="sm" onClick={handleShare} className="gap-2">
+              <Share2 className="h-4 w-4" />
+              <span className="hidden sm:inline">Compartir</span>
+            </Button>
           </div>
         </div>
       </div>
 
       {/* Content */}
-      <div className="container mx-auto px-4 py-8">
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div className="container mx-auto px-4 py-6 md:py-8">
+        <div className="space-y-6">
           {equipments.map((equipment) => {
             const StatusIcon = STATUS_CONFIG[equipment.estado].icon
+            const equipmentIncidents = incidents[equipment.id] || []
             
             return (
               <Card key={equipment.id} className="overflow-hidden">
-                <CardHeader className="pb-3">
+                <CardHeader className="pb-3 bg-muted/30">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
-                      <CardTitle className="text-lg truncate">{equipment.nombre}</CardTitle>
-                      <p className="text-sm text-muted-foreground mt-1">{equipment.codigo}</p>
+                      <CardTitle className="text-xl md:text-2xl">{equipment.nombre}</CardTitle>
+                      <p className="text-sm text-muted-foreground mt-1 font-mono">{equipment.codigo}</p>
                     </div>
-                    <StatusIcon className={`h-5 w-5 shrink-0 ${STATUS_CONFIG[equipment.estado].className}`} />
+                    <StatusIcon className={`h-6 w-6 shrink-0 ${STATUS_CONFIG[equipment.estado].className}`} />
                   </div>
-                </CardHeader>
-
-                <CardContent className="space-y-4">
+                  
                   {/* Estado y Criticidad */}
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 mt-3">
                     <Badge className={STATUS_CONFIG[equipment.estado].className}>
                       {STATUS_CONFIG[equipment.estado].label}
                     </Badge>
                     <Badge className={CRITICIDAD_CONFIG[equipment.criticidad].className}>
-                      {CRITICIDAD_CONFIG[equipment.criticidad].label}
+                      Criticidad: {CRITICIDAD_CONFIG[equipment.criticidad].label}
                     </Badge>
                   </div>
+                </CardHeader>
 
+                <CardContent className="space-y-6 pt-6">
                   {/* Ubicación */}
                   {equipment.hierarchyPath && (
-                    <div className="flex items-start gap-2 text-sm">
-                      <MapPin className="h-4 w-4 mt-0.5 shrink-0 text-muted-foreground" />
-                      <span className="text-muted-foreground">{equipment.hierarchyPath}</span>
+                    <div className="flex items-start gap-3 p-3 bg-muted/20 rounded-lg">
+                      <MapPin className="h-5 w-5 mt-0.5 shrink-0 text-primary" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-muted-foreground mb-1">Ubicación</p>
+                        <p className="text-sm">{equipment.hierarchyPath}</p>
+                      </div>
                     </div>
                   )}
 
                   {/* Datos técnicos */}
                   {(equipment.marca || equipment.modelo || equipment.numeroSerie) && (
-                    <div className="space-y-1 text-sm">
-                      {equipment.marca && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Marca:</span>
-                          <span className="font-medium">{equipment.marca}</span>
-                        </div>
-                      )}
-                      {equipment.modelo && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Modelo:</span>
-                          <span className="font-medium">{equipment.modelo}</span>
-                        </div>
-                      )}
-                      {equipment.numeroSerie && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Serie:</span>
-                          <span className="font-medium">{equipment.numeroSerie}</span>
-                        </div>
-                      )}
+                    <div>
+                      <h3 className="font-semibold mb-3 text-sm text-muted-foreground uppercase tracking-wide">
+                        Datos Técnicos
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        {equipment.marca && (
+                          <div className="p-3 bg-muted/20 rounded-lg">
+                            <p className="text-xs text-muted-foreground mb-1">Marca</p>
+                            <p className="font-medium">{equipment.marca}</p>
+                          </div>
+                        )}
+                        {equipment.modelo && (
+                          <div className="p-3 bg-muted/20 rounded-lg">
+                            <p className="text-xs text-muted-foreground mb-1">Modelo</p>
+                            <p className="font-medium">{equipment.modelo}</p>
+                          </div>
+                        )}
+                        {equipment.numeroSerie && (
+                          <div className="p-3 bg-muted/20 rounded-lg">
+                            <p className="text-xs text-muted-foreground mb-1">Número de Serie</p>
+                            <p className="font-medium font-mono text-sm">{equipment.numeroSerie}</p>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
 
-                  {/* Fotos */}
+                  {/* Fotos con Lightbox */}
                   {equipment.photos && equipment.photos.length > 0 && (
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <div>
+                      <h3 className="font-semibold mb-3 text-sm text-muted-foreground uppercase tracking-wide flex items-center gap-2">
                         <ImageIcon className="h-4 w-4" />
-                        <span>{equipment.photos.length} {equipment.photos.length === 1 ? 'foto' : 'fotos'}</span>
-                      </div>
-                      <div className="grid grid-cols-3 gap-2">
-                        {equipment.photos.slice(0, 3).map((photo, idx) => (
-                          <img
+                        Fotos ({equipment.photos.length})
+                      </h3>
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                        {equipment.photos.map((photo, idx) => (
+                          <button
                             key={idx}
-                            src={photo}
-                            alt={`Foto ${idx + 1}`}
-                            className="w-full h-20 object-cover rounded border"
-                          />
+                            onClick={() => openLightbox(photo, idx, equipment.photos?.length || 0)}
+                            className="relative group overflow-hidden rounded-lg border-2 border-transparent hover:border-primary transition-all aspect-square"
+                          >
+                            <img
+                              src={photo}
+                              alt={`Foto ${idx + 1}`}
+                              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-200"
+                            />
+                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-200 flex items-center justify-center">
+                              <div className="bg-white/90 px-2 py-1 rounded text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                                Ver ampliada
+                              </div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Últimas Incidencias */}
+                  {equipmentIncidents.length > 0 && (
+                    <div>
+                      <h3 className="font-semibold mb-3 text-sm text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+                        <Clock className="h-4 w-4" />
+                        Últimas Incidencias ({equipmentIncidents.length})
+                      </h3>
+                      <div className="space-y-2">
+                        {equipmentIncidents.slice(0, 3).map((incident) => (
+                          <div key={incident.id} className="p-3 bg-muted/20 rounded-lg border">
+                            <div className="flex items-start justify-between gap-2 mb-1">
+                              <p className="font-medium text-sm">{incident.titulo}</p>
+                              <Badge variant="outline" className="text-xs shrink-0">
+                                {incident.prioridad}
+                              </Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              {new Date(incident.createdAt).toLocaleDateString('es-ES', {
+                                day: '2-digit',
+                                month: 'short',
+                                year: 'numeric',
+                              })} • {incident.status}
+                            </p>
+                          </div>
                         ))}
                       </div>
                     </div>
                   )}
 
                   {/* QR Code */}
-                  <div className="flex justify-center pt-2">
-                    <div className="bg-white p-2 rounded border">
+                  <div className="flex flex-col items-center gap-3 p-4 bg-muted/20 rounded-lg">
+                    <div className="bg-white p-3 rounded-lg shadow-sm">
                       <QRCodeSVG
-                        value={`${window.location.origin}/public/equipment/${equipment.id}`}
-                        size={80}
-                        level="M"
+                        value={`${window.location.origin}/mantenimiento-planta/public/equipment/${equipment.id}`}
+                        size={120}
+                        level="H"
+                        includeMargin
                       />
                     </div>
+                    <p className="text-xs text-center text-muted-foreground max-w-xs">
+                      Escanea este código para acceder a la información del equipo desde tu móvil
+                    </p>
                   </div>
                 </CardContent>
               </Card>
@@ -230,11 +358,69 @@ export function PublicEquipmentView() {
         </div>
 
         {/* Footer info */}
-        <div className="mt-8 text-center text-sm text-muted-foreground">
-          <p>Esta es una vista pública de solo lectura.</p>
-          <p>Para acceder a funciones completas, inicia sesión en la aplicación.</p>
+        <div className="mt-8 p-6 text-center border-t bg-muted/20 rounded-lg">
+          <Package className="h-8 w-8 mx-auto mb-3 text-muted-foreground" />
+          <p className="text-sm font-medium mb-1">Vista pública de solo lectura</p>
+          <p className="text-xs text-muted-foreground">
+            Para acceder a funciones completas como edición, historial detallado y más,<br className="hidden md:inline" /> 
+            inicia sesión en la aplicación de mantenimiento.
+          </p>
         </div>
       </div>
+
+      {/* Lightbox para fotos */}
+      {lightboxPhoto && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4"
+          onClick={closeLightbox}
+        >
+          <button
+            onClick={closeLightbox}
+            className="absolute top-4 right-4 p-2 bg-white/10 hover:bg-white/20 rounded-full transition-colors"
+          >
+            <X className="h-6 w-6 text-white" />
+          </button>
+          
+          <div className="relative max-w-6xl max-h-full flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+            {/* Navegación */}
+            {lightboxPhoto.index > 0 && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  const currentEquipment = equipments.find(eq => eq.photos?.includes(lightboxPhoto.url))
+                  if (currentEquipment?.photos) navigatePhoto('prev', currentEquipment.photos)
+                }}
+                className="absolute left-4 p-3 bg-white/10 hover:bg-white/20 rounded-full transition-colors"
+              >
+                <ChevronLeft className="h-6 w-6 text-white" />
+              </button>
+            )}
+            
+            <img
+              src={lightboxPhoto.url}
+              alt={`Foto ${lightboxPhoto.index + 1} de ${lightboxPhoto.total}`}
+              className="max-w-full max-h-[85vh] object-contain rounded-lg"
+            />
+            
+            {lightboxPhoto.index < lightboxPhoto.total - 1 && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  const currentEquipment = equipments.find(eq => eq.photos?.includes(lightboxPhoto.url))
+                  if (currentEquipment?.photos) navigatePhoto('next', currentEquipment.photos)
+                }}
+                className="absolute right-4 p-3 bg-white/10 hover:bg-white/20 rounded-full transition-colors"
+              >
+                <ChevronRight className="h-6 w-6 text-white" />
+              </button>
+            )}
+            
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 bg-black/60 rounded-full text-white text-sm font-medium">
+              {lightboxPhoto.index + 1} / {lightboxPhoto.total}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
