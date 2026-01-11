@@ -2226,7 +2226,7 @@ function EquipmentDetailDialog({
                   <div className="text-sm font-medium text-center">Código QR del Equipo</div>
                   <div className="p-4 bg-white rounded-lg border-2 border-border">
                     <QRCodeSVG
-                      value={`${window.location.origin}/equipment/${equipment.id}`}
+                      value={`${window.location.origin}/mantenimiento-planta/public/equipment/${equipment.id}`}
                       size={200}
                       level="H"
                       includeMargin
@@ -2242,7 +2242,7 @@ function EquipmentDetailDialog({
                 <div className="space-y-2">
                   <div className="text-sm text-muted-foreground">URL del equipo</div>
                   <div className="font-mono text-xs p-3 rounded-md bg-muted break-all">
-                    {`${window.location.origin}/equipment/${equipment.id}`}
+                    {`${window.location.origin}/mantenimiento-planta/public/equipment/${equipment.id}`}
                   </div>
                 </div>
 
@@ -2260,7 +2260,7 @@ function EquipmentDetailDialog({
                     variant="outline"
                     size="sm"
                     onClick={async () => {
-                      const text = `${window.location.origin}/equipment/${equipment.id}`
+                      const text = `${window.location.origin}/mantenimiento-planta/public/equipment/${equipment.id}`
                       try {
                         await navigator.clipboard.writeText(text)
                       } catch {
