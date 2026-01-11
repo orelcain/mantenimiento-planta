@@ -397,11 +397,21 @@ export function SensorsPage() {
                   </div>
 
                   <div>
-                    <Label>Selecciona un equipo ({filteredEquipment.length} resultado{filteredEquipment.length !== 1 ? 's' : ''})</Label>
+                    <Label>Selecciona un equipo ({filteredEquipment.length} de {equipment.length} totales)</Label>
                     <div className="mt-2 max-h-[300px] overflow-y-auto border rounded-md bg-muted/20">
-                      {filteredEquipment.length === 0 ? (
-                        <div className="p-4 text-sm text-muted-foreground text-center">
-                          No se encontraron equipos con esos filtros
+                      {equipment.length === 0 ? (
+                        <div className="p-4 text-sm text-center space-y-2">
+                          <div className="text-muted-foreground">⏳ Cargando equipos...</div>
+                          <div className="text-xs text-muted-foreground/70">
+                            Si esto tarda mucho, recarga la página
+                          </div>
+                        </div>
+                      ) : filteredEquipment.length === 0 ? (
+                        <div className="p-4 text-sm text-center space-y-2">
+                          <div className="text-amber-600">No se encontraron equipos con esos filtros</div>
+                          <div className="text-xs text-muted-foreground">
+                            Prueba cambiar los filtros de Estado o Criticidad
+                          </div>
                         </div>
                       ) : (
                         <div className="divide-y">
