@@ -227,11 +227,11 @@ export function TelemetryChart({ data, type, height = 300 }: TelemetryChartProps
             {
               label: 'Temperatura (normalizado)',
               data: [
-                normalize(stats.temp.min, 15, 35),
-                normalize(stats.temp.max, 15, 35),
-                normalize(stats.temp.avg, 15, 35),
-                normalize(stats.temp.median, 15, 35),
-                normalize(stats.temp.stdDev, 0, 5)
+                normalize(stats.temp.min ?? 0, 15, 35),
+                normalize(stats.temp.max ?? 0, 15, 35),
+                normalize(stats.temp.avg ?? 0, 15, 35),
+                normalize(stats.temp.median ?? 0, 15, 35),
+                normalize(stats.temp.stdDev ?? 0, 0, 5)
               ],
               backgroundColor: 'rgba(239, 68, 68, 0.2)',
               borderColor: tempColor,
@@ -240,11 +240,11 @@ export function TelemetryChart({ data, type, height = 300 }: TelemetryChartProps
             {
               label: 'Humedad (normalizado)',
               data: [
-                normalize(stats.humidity.min, 30, 70),
-                normalize(stats.humidity.max, 30, 70),
-                normalize(stats.humidity.avg, 30, 70),
-                normalize(stats.humidity.median, 30, 70),
-                normalize(stats.humidity.stdDev, 0, 10)
+                normalize(stats.humidity.min ?? 0, 30, 70),
+                normalize(stats.humidity.max ?? 0, 30, 70),
+                normalize(stats.humidity.avg ?? 0, 30, 70),
+                normalize(stats.humidity.median ?? 0, 30, 70),
+                normalize(stats.humidity.stdDev ?? 0, 0, 10)
               ],
               backgroundColor: 'rgba(59, 130, 246, 0.2)',
               borderColor: humidityColor,
@@ -452,6 +452,7 @@ export function TelemetryChart({ data, type, height = 300 }: TelemetryChartProps
   if (type === 'scatter') {
     return (
       <div style={{ height: `${height}px` }}>
+        {/* @ts-expect-error - Chart.js acepta {x,y} objects aunque el tipo diga number[] */}
         <Scatter data={chartData} options={options} />
       </div>
     )
@@ -460,6 +461,7 @@ export function TelemetryChart({ data, type, height = 300 }: TelemetryChartProps
   if (type === 'bar') {
     return (
       <div style={{ height: `${height}px` }}>
+        {/* @ts-expect-error - Chart.js acepta este formato aunque el tipo no coincida */}
         <Bar data={chartData} options={options} />
       </div>
     )
@@ -468,6 +470,7 @@ export function TelemetryChart({ data, type, height = 300 }: TelemetryChartProps
   if (type === 'radar') {
     return (
       <div style={{ height: `${height}px` }}>
+        {/* @ts-expect-error - Chart.js Radar acepta estos options aunque el tipo no coincida */}
         <Radar data={chartData} options={options} />
       </div>
     )
@@ -476,6 +479,7 @@ export function TelemetryChart({ data, type, height = 300 }: TelemetryChartProps
   // Por defecto usar Line (para line, area, dual-axis)
   return (
     <div style={{ height: `${height}px` }}>
+      {/* @ts-expect-error - Chart.js acepta este formato aunque el tipo no coincida */}
       <Line data={chartData} options={options} />
     </div>
   )
@@ -497,8 +501,9 @@ function groupByHour(data: TelemetryDataPoint[]) {
 
   // Calcular promedios
   Object.keys(grouped).forEach(hour => {
-    grouped[hour].avgTemp = Math.round((grouped[hour].avgTemp / grouped[hour].count) * 10) / 10
-    grouped[hour].avgHumidity = Math.round((grouped[hour].avgHumidity / grouped[hour].count) * 10) / 10
+    const entry = grouped[hour]!
+    entry.avgTemp = Math.round((entry.avgTemp / entry.count) * 10) / 10
+    entry.avgHumidity = Math.round((entry.avgHumidity / entry.count) * 10) / 10
   })
 
   return grouped

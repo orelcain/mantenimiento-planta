@@ -14,7 +14,7 @@ export type TimeRange = '1h' | '6h' | '12h' | '24h' | '48h' | '7d'
  * TODO: Implementar query a Firestore collection 'telemetryHistory'
  */
 export function useTelemetryHistory(
-  equipmentId: string | null,
+  _equipmentId: string | null, // _ indica parámetro intencionalmente no usado
   currentTemp?: number,
   currentHumidity?: number,
   timeRange: TimeRange = '24h'
@@ -25,7 +25,7 @@ export function useTelemetryHistory(
 } {
   const [data, setData] = useState<TelemetryDataPoint[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<Error | null>(null)
+  const error = null // Error state mantenido para compatibilidad de interfaz
   
   // Referencias para mantener estado persistente sin causar re-renders
   const lastValueRef = useRef<{ temp: number; humidity: number } | null>(null)

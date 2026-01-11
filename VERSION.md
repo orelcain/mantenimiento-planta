@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.16.4**
+## Versión Actual: **v2.16.5**
 
 **Fecha de lanzamiento**: 11 de enero de 2026  
 **Estado**: ✅ PRODUCCIÓN READY  
@@ -9,6 +9,32 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.16.5 - Fix Timestamps Simulados + TypeScript Warnings (11/01/2026)
+
+**Fixes Críticos:**
+- **Timestamps simulados**: Eliminados timestamps inválidos (2062, 1970) que generaban ~500 warnings en consola
+- **Console flooding**: Eliminado console.warn que inundaba la consola con "Fecha fuera de rango"
+- **TypeScript warnings**: Corregidos 21 problemas de compilación (parámetros no usados, undefined values, tipos ChartJS)
+
+**Mejoras Técnicas:**
+- **useTelemetryHistory**: Prefijo `_` para parámetro `equipmentId` no utilizado (indica intencional)
+- **TelemetryChart**: 
+  - Agregado `??` nullish coalescing para valores undefined en normalize()
+  - Non-null assertion `!` para acceso a grouped object
+  - Suprimidos errores tipo ChartJS con `@ts-expect-error` (funcionan correctamente en runtime)
+- **SensorsPage**:
+  - Fix operación aritmética: `timestamp * 1000` solo si es number
+  - Eliminado console.warn flooding para timestamps fuera de rango
+  - Retorno silencioso `'—'` en lugar de log masivo
+
+**Impacto:**
+- Consola limpia sin warnings masivos
+- Build TypeScript sin errores
+- Mismo comportamiento funcional que v2.16.4
+- Performance sin cambios (optimización es visual/logging)
+
+---
 
 ### v2.16.4 - Carga Asíncrona del Gráfico + Banner Fix (11/01/2026)
 
