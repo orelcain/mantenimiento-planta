@@ -13,10 +13,11 @@ import {
   RadialLinearScale,
   TimeScale
 } from 'chart.js'
+import zoomPlugin from 'chartjs-plugin-zoom'
 import { Line, Bar, Radar, Scatter } from 'react-chartjs-2'
 import type { TelemetryDataPoint } from '../../hooks/useTelemetryHistory'
 
-// Registrar componentes de Chart.js
+// Registrar componentes de Chart.js + plugin zoom
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -28,7 +29,8 @@ ChartJS.register(
   Legend,
   Filler,
   RadialLinearScale,
-  TimeScale
+  TimeScale,
+  zoomPlugin
 )
 
 export type ChartType = 'line' | 'area' | 'dual-axis' | 'scatter' | 'bar' | 'radar'
@@ -242,6 +244,26 @@ export function TelemetryChart({ data, type, height = 300 }: TelemetryChartProps
         tooltip: {
           mode: 'index' as const,
           intersect: false
+        },
+        zoom: {
+          pan: {
+            enabled: true,
+            mode: 'x' as const,
+            modifierKey: 'ctrl' as const
+          },
+          zoom: {
+            wheel: {
+              enabled: true,
+              speed: 0.1
+            },
+            pinch: {
+              enabled: true
+            },
+            mode: 'x' as const
+          },
+          limits: {
+            x: { min: 'original' as const, max: 'original' as const }
+          }
         }
       }
     }

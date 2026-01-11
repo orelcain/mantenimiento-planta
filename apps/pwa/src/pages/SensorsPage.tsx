@@ -8,7 +8,7 @@ import type { SensorSummaryNode } from '@/services/sensorsRtdb'
 import { assignDeviceToEquipment, subscribeDevices } from '@/services/devicesRtdb'
 import { subscribeSensorSummary } from '@/services/sensorsRtdb'
 import { TelemetryChart, type ChartType } from '@/components/telemetry/TelemetryChart'
-import { useTelemetryHistory } from '@/hooks/useTelemetryHistory'
+import { useTelemetryHistory, type TimeRange } from '@/hooks/useTelemetryHistory'
 
 function normalizeTs(ts: number | undefined): number | null {
   if (typeof ts !== 'number' || !Number.isFinite(ts)) return null
@@ -54,6 +54,7 @@ export function SensorsPage() {
   // Estado para el gráfico de telemetría
   const [showChart, setShowChart] = useState(false)
   const [chartType, setChartType] = useState<ChartType>('dual-axis')
+  const [timeRange, setTimeRange] = useState<TimeRange>('24h')
 
   useEffect(() => {
     const unsub = subscribeDevices(
@@ -146,7 +147,8 @@ export function SensorsPage() {
   const { data: historyData, loading: historyLoading } = useTelemetryHistory(
     assignedEquipment?.id ?? null,
     displayTelemetry?.temperatura?.value,
-    displayTelemetry?.humedad?.value
+    displayTelemetry?.humedad?.value,
+    timeRange
   )
 
   const filteredEquipment = useMemo(() => {
@@ -269,7 +271,8 @@ export function SensorsPage() {
         </div>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      {/* Layout adaptativo: cuando el gráfico está visible, columna de telemetría ocupa más espacio */}
+      <div className={showChart ? "grid gap-4 lg:grid-cols-[300px_1fr_350px]" : "grid gap-4 lg:grid-cols-3"}>
         {/* Columna 1: Lista de dispositivos */}
         <Card>
           <CardHeader className="pb-3">
@@ -443,29 +446,48 @@ export function SensorsPage() {
                       {/* Gráfico histórico expandible */}
                       {showChart && (
                         <div className="mt-4 space-y-3">
-                          {/* Selector de tipo de gráfico */}
-                          <div className="space-y-2">
-                            <Label htmlFor="chart-type" className="text-sm">Tipo de gráfico</Label>
-                            <Select value={chartType} onValueChange={(v) => setChartType(v as ChartType)}>
-                              <SelectTrigger id="chart-type" className="w-full">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="line">📈 Línea de tiempo</SelectItem>
-                                <SelectItem value="area">🌊 Área suavizada</SelectItem>
-                                <SelectItem value="dual-axis">🎯 Doble eje (Recomendado)</SelectItem>
-                                <SelectItem value="scatter">🔵 Scatter (Correlación)</SelectItem>
-                                <SelectItem value="bar">📊 Barras por hora</SelectItem>
-                                <SelectItem value="radar">🕸️ Radar (Estadísticas)</SelectItem>
-                              </SelectContent>
-                            </Select>
+                          {/* Controles: Tipo de gráfico y Rango temporal */}
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-2">
+                              <Label htmlFor="chart-type" className="text-sm">Tipo de gráfico</Label>
+                              <Select value={chartType} onValueChange={(v) => setChartType(v as ChartType)}>
+                                <SelectTrigger id="chart-type" className="w-full">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="line">📈 Línea de tiempo</SelectItem>
+                                  <SelectItem value="area">🌊 Área suavizada</SelectItem>
+                                  <SelectItem value="dual-axis">🎯 Doble eje (Recomendado)</SelectItem>
+                                  <SelectItem value="scatter">🔵 Scatter (Correlación)</SelectItem>
+                                  <SelectItem value="bar">📊 Barras por hora</SelectItem>
+                                  <SelectItem value="radar">🕸️ Radar (Estadísticas)</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label htmlFor="time-range" className="text-sm">Rango temporal</Label>
+                              <Select value={timeRange} onValueChange={(v) => setTimeRange(v as TimeRange)}>
+                                <SelectTrigger id="time-range" className="w-full">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="1h">⏱️ Última hora</SelectItem>
+                                  <SelectItem value="6h">🕐 Últimas 6 horas</SelectItem>
+                                  <SelectItem value="12h">🕛 Últimas 12 horas</SelectItem>
+                                  <SelectItem value="24h">📅 Últimas 24 horas</SelectItem>
+                                  <SelectItem value="48h">📆 Últimos 2 días</SelectItem>
+                                  <SelectItem value="7d">📊 Última semana</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
                           </div>
 
                           {/* Gráfico */}
                           <div className="rounded border bg-card p-4">
                             {historyLoading ? (
                               <div className="text-sm text-muted-foreground text-center py-8">
-                                🔄 Cargando historial de 24 horas...
+                                🔄 Cargando historial...
                               </div>
                             ) : historyData.length === 0 ? (
                               <div className="text-sm text-muted-foreground text-center py-8">
@@ -473,10 +495,21 @@ export function SensorsPage() {
                               </div>
                             ) : (
                               <>
-                                <div className="text-xs text-muted-foreground mb-3">
-                                  Últimas 24 horas · {historyData.length} puntos de datos
+                                <div className="flex items-center justify-between mb-3">
+                                  <div className="text-xs text-muted-foreground">
+                                    {timeRange === '1h' && 'Última hora'}
+                                    {timeRange === '6h' && 'Últimas 6 horas'}
+                                    {timeRange === '12h' && 'Últimas 12 horas'}
+                                    {timeRange === '24h' && 'Últimas 24 horas'}
+                                    {timeRange === '48h' && 'Últimos 2 días'}
+                                    {timeRange === '7d' && 'Última semana'}
+                                    {' · '}{historyData.length} puntos de datos
+                                  </div>
+                                  <div className="text-xs text-muted-foreground">
+                                    💡 Zoom: scroll | Pan: Ctrl+arrastrar
+                                  </div>
                                 </div>
-                                <TelemetryChart data={historyData} type={chartType} height={350} />
+                                <TelemetryChart data={historyData} type={chartType} height={450} />
                               </>
                             )}
                           </div>

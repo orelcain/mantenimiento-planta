@@ -6,15 +6,18 @@ export interface TelemetryDataPoint {
   humedad: number
 }
 
+export type TimeRange = '1h' | '6h' | '12h' | '24h' | '48h' | '7d'
+
 /**
- * Hook para obtener historial de telemetría de las últimas 24 horas
+ * Hook para obtener historial de telemetría
  * Por ahora genera datos simulados basados en el valor actual
  * TODO: Implementar query a Firestore collection 'telemetryHistory'
  */
 export function useTelemetryHistory(
   equipmentId: string | null,
   currentTemp?: number,
-  currentHumidity?: number
+  currentHumidity?: number,
+  timeRange: TimeRange = '24h'
 ): {
   data: TelemetryDataPoint[]
   loading: boolean
@@ -38,16 +41,28 @@ export function useTelemetryHistory(
     // Simular delay de carga
     setTimeout(() => {
       try {
-        // Generar 24 horas de datos (1 punto cada 15 minutos = 96 puntos)
+        // Calcular parámetros según el rango de tiempo
+        const ranges = {
+          '1h': { hours: 1, intervalMinutes: 2 },   // 30 puntos
+          '6h': { hours: 6, intervalMinutes: 10 },  // 36 puntos
+          '12h': { hours: 12, intervalMinutes: 15 }, // 48 puntos
+          '24h': { hours: 24, intervalMinutes: 15 }, // 96 puntos
+          '48h': { hours: 48, intervalMinutes: 30 }, // 96 puntos
+          '7d': { hours: 168, intervalMinutes: 120 } // 84 puntos (2h cada punto)
+        }
+        
+        const { hours, intervalMinutes } = ranges[timeRange]
         const now = new Date()
         const history: TelemetryDataPoint[] = []
         
         // Base values: usar valores actuales o defaults
         const baseTemp = currentTemp || 25
         const baseHumidity = currentHumidity || 50
+        
+        const totalPoints = Math.floor((hours * 60) / intervalMinutes)
 
-        for (let i = 96; i >= 0; i--) {
-          const timestamp = new Date(now.getTime() - i * 15 * 60 * 1000)
+        for (let i = totalPoints; i >= 0; i--) {
+          const timestamp = new Date(now.getTime() - i * intervalMinutes * 60 * 1000)
           
           // Generar variación realista:
           // - Temperatura: ±3°C con patrón sinusoidal (más calor al mediodía)
@@ -76,7 +91,7 @@ export function useTelemetryHistory(
       }
     }, 500) // Simular 500ms de latency
 
-  }, [currentTemp, currentHumidity]) // Regenerar cuando cambien los valores actuales
+  }, [currentTemp, currentHumidity, timeRange]) // Regenerar cuando cambien los valores actuales o el rango
 
   return { data, loading, error }
 }
