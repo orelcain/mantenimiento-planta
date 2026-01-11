@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Cpu, Link2, Unlink2, AlertTriangle, Thermometer, Droplets, Activity } from 'lucide-react'
+import { Cpu, Link2, Unlink2, AlertTriangle, Thermometer, Droplets, Activity, X } from 'lucide-react'
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui'
 import { useAppStore, useAuthStore } from '@/store'
 import type { Equipment } from '@/types'
@@ -39,6 +39,10 @@ export function SensorsPage() {
   const [equipmentSearch, setEquipmentSearch] = useState('')
   const [filterEstado, setFilterEstado] = useState<Equipment['estado'] | 'todas'>('todas')
   const [filterCriticidad, setFilterCriticidad] = useState<Equipment['criticidad'] | 'todas'>('todas')
+  const [filterPlanta, setFilterPlanta] = useState<string>('todas')
+  const [filterSector, setFilterSector] = useState<string>('todas')
+  const [filterArea, setFilterArea] = useState<string>('todas')
+  const [filterSinSensor, setFilterSinSensor] = useState(false)
   const [selectedEquipmentId, setSelectedEquipmentId] = useState<string>('')
 
   const [saving, setSaving] = useState(false)
@@ -107,13 +111,89 @@ export function SensorsPage() {
 
   const filteredEquipment = useMemo(() => {
     const q = equipmentSearch.trim().toLowerCase()
+    
+    // Obtener equipos con sensores asignados
+    const equiposConSensor = new Set(devices.filter(d => d.assignedEquipmentId).map(d => d.assignedEquipmentId))
+    
     return equipment.filter((e) => {
+      // Filtro de estado
       if (filterEstado !== 'todas' && e.estado !== filterEstado) return false
+      
+      // Filtro de criticidad
       if (filterCriticidad !== 'todas' && e.criticidad !== filterCriticidad) return false
+      
+      // Filtro "solo sin sensor"
+      if (filterSinSensor && equiposConSensor.has(e.id)) return false
+      
+      // Filtros jerárquicos
+      if (e.hierarchyPath) {
+        const parts = e.hierarchyPath.split(' > ')
+        
+        if (filterPlanta !== 'todas') {
+          const planta = parts[0]
+          if (!planta || !planta.toLowerCase().includes(filterPlanta.toLowerCase())) return false
+        }
+        
+        if (filterSector !== 'todas' && parts.length > 1) {
+          const sector = parts[1]
+          if (!sector || !sector.toLowerCase().includes(filterSector.toLowerCase())) return false
+        }
+        
+        if (filterArea !== 'todas' && parts.length > 2) {
+          const area = parts[2]
+          if (!area || !area.toLowerCase().includes(filterArea.toLowerCase())) return false
+        }
+      } else if (filterPlanta !== 'todas' || filterSector !== 'todas' || filterArea !== 'todas') {
+        // Si no tiene hierarchyPath y hay filtros jerárquicos activos, excluir
+        return false
+      }
+      
+      // Búsqueda por texto
       if (!q) return true
       return toEquipmentSearchText(e).includes(q)
     })
-  }, [equipment, equipmentSearch, filterCriticidad, filterEstado])
+  }, [equipment, equipmentSearch, filterCriticidad, filterEstado, filterPlanta, filterSector, filterArea, filterSinSensor, devices])
+
+  // Extraer opciones únicas de jerarquía
+  const plantasDisponibles = useMemo(() => {
+    const plantas = new Set<string>()
+    equipment.forEach(e => {
+      if (e.hierarchyPath) {
+        const parts = e.hierarchyPath.split(' > ')
+        if (parts[0]) plantas.add(parts[0])
+      }
+    })
+    return Array.from(plantas).sort()
+  }, [equipment])
+
+  const sectoresDisponibles = useMemo(() => {
+    const sectores = new Set<string>()
+    equipment.forEach(e => {
+      if (e.hierarchyPath) {
+        const parts = e.hierarchyPath.split(' > ')
+        if (filterPlanta === 'todas' || (parts[0] && parts[0].toLowerCase().includes(filterPlanta.toLowerCase()))) {
+          if (parts[1]) sectores.add(parts[1])
+        }
+      }
+    })
+    return Array.from(sectores).sort()
+  }, [equipment, filterPlanta])
+
+  const areasDisponibles = useMemo(() => {
+    const areas = new Set<string>()
+    equipment.forEach(e => {
+      if (e.hierarchyPath) {
+        const parts = e.hierarchyPath.split(' > ')
+        const matchPlanta = filterPlanta === 'todas' || (parts[0] && parts[0].toLowerCase().includes(filterPlanta.toLowerCase()))
+        const matchSector = filterSector === 'todas' || (parts[1] && parts[1].toLowerCase().includes(filterSector.toLowerCase()))
+        
+        if (matchPlanta && matchSector && parts[2]) {
+          areas.add(parts[2])
+        }
+      }
+    })
+    return Array.from(areas).sort()
+  }, [equipment, filterPlanta, filterSector])
 
   async function saveAssignment(equipmentId: string | null) {
     if (!user?.id) return
@@ -356,7 +436,54 @@ export function SensorsPage() {
                 <div className="border-t pt-4 space-y-3">
                   <div className="text-sm font-medium">Cambiar asignación</div>
                   
-                  <div className="grid gap-2 sm:grid-cols-2">
+                  {/* Filtros jerárquicos en cascada */}
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    <div>
+                      <Label>Planta</Label>
+                      <Select value={filterPlanta} onValueChange={(v) => { setFilterPlanta(v); setFilterSector('todas'); setFilterArea('todas') }}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Todas" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="todas">Todas las plantas</SelectItem>
+                          {plantasDisponibles.map(p => (
+                            <SelectItem key={p} value={p}>{p}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Sector</Label>
+                      <Select value={filterSector} onValueChange={(v) => { setFilterSector(v); setFilterArea('todas') }} disabled={filterPlanta === 'todas'}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Todos" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="todas">Todos los sectores</SelectItem>
+                          {sectoresDisponibles.map(s => (
+                            <SelectItem key={s} value={s}>{s}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Área</Label>
+                      <Select value={filterArea} onValueChange={setFilterArea} disabled={filterSector === 'todas'}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Todas" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="todas">Todas las áreas</SelectItem>
+                          {areasDisponibles.map(a => (
+                            <SelectItem key={a} value={a}>{a}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {/* Filtros de estado y criticidad */}
+                  <div className="grid gap-2 sm:grid-cols-3">
                     <div>
                       <Label>Estado</Label>
                       <Select value={filterEstado} onValueChange={(v) => setFilterEstado(v as any)}>
@@ -364,7 +491,7 @@ export function SensorsPage() {
                           <SelectValue placeholder="Estado" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="todas">Todas</SelectItem>
+                          <SelectItem value="todas">Todos</SelectItem>
                           <SelectItem value="operativo">Operativo</SelectItem>
                           <SelectItem value="en_mantenimiento">En mantenimiento</SelectItem>
                           <SelectItem value="fuera_servicio">Fuera de servicio</SelectItem>
@@ -385,10 +512,43 @@ export function SensorsPage() {
                         </SelectContent>
                       </Select>
                     </div>
+                    <div className="flex items-end">
+                      <label className="flex items-center gap-2 cursor-pointer h-10 px-3 rounded-md border bg-background hover:bg-muted/50 transition-colors w-full">
+                        <input
+                          type="checkbox"
+                          checked={filterSinSensor}
+                          onChange={(e) => setFilterSinSensor(e.target.checked)}
+                          className="h-4 w-4"
+                        />
+                        <span className="text-sm">Sin sensor</span>
+                      </label>
+                    </div>
                   </div>
 
                   <div>
-                    <Label>Buscar equipo (opcional)</Label>
+                    <div className="flex items-center justify-between mb-2">
+                      <Label>Buscar equipo (opcional)</Label>
+                      {(equipmentSearch || filterPlanta !== 'todas' || filterSector !== 'todas' || filterArea !== 'todas' || filterEstado !== 'todas' || filterCriticidad !== 'todas' || filterSinSensor) && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setEquipmentSearch('')
+                            setFilterPlanta('todas')
+                            setFilterSector('todas')
+                            setFilterArea('todas')
+                            setFilterEstado('todas')
+                            setFilterCriticidad('todas')
+                            setFilterSinSensor(false)
+                          }}
+                          className="h-7 gap-1 text-xs"
+                        >
+                          <X className="h-3 w-3" />
+                          Limpiar filtros
+                        </Button>
+                      )}
+                    </div>
                     <Input
                       value={equipmentSearch}
                       onChange={(e) => setEquipmentSearch(e.target.value)}
