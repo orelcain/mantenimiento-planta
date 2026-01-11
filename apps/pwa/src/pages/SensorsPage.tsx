@@ -106,6 +106,7 @@ export function SensorsPage() {
   }, [assignedEquipment?.id])
 
   // Telemetría para mostrar: priorizar la del dispositivo (devices/{id}/telemetry) sobre sensors/{equipmentId}
+  // useMemo con comparación profunda para evitar re-renders innecesarios
   const displayTelemetry = useMemo(() => {
     // Si el dispositivo tiene telemetría directa, usarla
     if (selectedDevice?.telemetry) {
@@ -125,7 +126,15 @@ export function SensorsPage() {
       }
     }
     return null
-  }, [selectedDevice, sensorData])
+  }, [
+    // Solo depender de los valores que realmente importan
+    selectedDevice?.telemetry?.temperatura?.value,
+    selectedDevice?.telemetry?.temperatura?.timestamp,
+    selectedDevice?.telemetry?.humedad?.value,
+    selectedDevice?.telemetry?.humedad?.timestamp,
+    selectedDevice?.online,
+    sensorData
+  ])
 
   const filteredEquipment = useMemo(() => {
     const q = equipmentSearch.trim().toLowerCase()

@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>10 Opciones de Visualización - Telemetría IoT</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      padding: 20px;
+      color: #333;
+    }
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    h1 {
+      text-align: center;
+      color: white;
+      margin-bottom: 30px;
+      font-size: 2.5em;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(600px, 1fr));
+      gap: 25px;
+    }
+    .chart-card {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+      transition: transform 0.3s;
+    }
+    .chart-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+    }
+    .chart-title {
+      font-size: 1.3em;
+      font-weight: 600;
+      margin-bottom: 15px;
+      color: #667eea;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .badge {
+      background: #667eea;
+      color: white;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 0.7em;
+      font-weight: 500;
+    }
+    canvas {
+      max-height: 300px;
+    }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-top: 15px;
+    }
+    .stat {
+      text-align: center;
+      padding: 10px;
+      background: #f8f9fa;
+      border-radius: 8px;
+    }
+    .stat-value {
+      font-size: 1.5em;
+      font-weight: bold;
+      color: #667eea;
+    }
+    .stat-label {
+      font-size: 0.85em;
+      color: #666;
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>📊 10 Opciones de Visualización - Telemetría IoT</h1>
+    
+    <div class="grid">
+      <!-- Opción 1: Línea de Tiempo Clásica -->
+      <div class="chart-card">
+        <div class="chart-title">
+          1. Línea de Tiempo Clásica
+          <span class="badge">Básico</span>
+        </div>
+        <canvas id="chart1"></canvas>
+        <div class="stats">
+          <div class="stat">
+            <div class="stat-value">26.8°C</div>
+            <div class="stat-label">Actual</div>
+          </div>
+          <div class="stat">
+            <div class="stat-value">28.5°C</div>
+            <div class="stat-label">Máx</div>
+          </div>
+          <div class="stat">
+            <div class="stat-value">24.2°C</div>
+            <div class="stat-label">Mín</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Opción 2: Área Suavizada -->
+      <div class="chart-card">
+        <div class="chart-title">
+          2. Área Suavizada con Gradiente
+          <span class="badge">Premium</span>
+        </div>
+        <canvas id="chart2"></canvas>
+      </div>
+
+      <!-- Opción 3: Doble Eje (Temp + Humedad) -->
+      <div class="chart-card">
+        <div class="chart-title">
+          3. Doble Eje (Temperatura + Humedad)
+          <span class="badge">Recomendado</span>
+        </div>
+        <canvas id="chart3"></canvas>
+      </div>
+
+      <!-- Opción 4: Scatter con Tendencia -->
+      <div class="chart-card">
+        <div class="chart-title">
+          4. Dispersión con Línea de Tendencia
+          <span class="badge">Análisis</span>
+        </div>
+        <canvas id="chart4"></canvas>
+      </div>
+
+      <!-- Opción 5: Barras Apiladas por Hora -->
+      <div class="chart-card">
+        <div class="chart-title">
+          5. Barras Apiladas por Hora
+          <span class="badge">Resumen</span>
+        </div>
+        <canvas id="chart5"></canvas>
+      </div>
+
+      <!-- Opción 6: Radar Multivariable -->
+      <div class="chart-card">
+        <div class="chart-title">
+          6. Radar de Estado Actual
+          <span class="badge">Dashboard</span>
+        </div>
+        <canvas id="chart6"></canvas>
+      </div>
+
+      <!-- Opción 7: Gauge Circular -->
+      <div class="chart-card">
+        <div class="chart-title">
+          7. Medidor Circular (Gauge)
+          <span class="badge">Real-Time</span>
+        </div>
+        <canvas id="chart7"></canvas>
+      </div>
+
+      <!-- Opción 8: Heatmap Temporal -->
+      <div class="chart-card">
+        <div class="chart-title">
+          8. Mapa de Calor por Día/Hora
+          <span class="badge">Avanzado</span>
+        </div>
+        <canvas id="chart8"></canvas>
+      </div>
+
+      <!-- Opción 9: Candlestick (OHLC) -->
+      <div class="chart-card">
+        <div class="chart-title">
+          9. Candlestick (Max/Min/Promedio)
+          <span class="badge">Financiero</span>
+        </div>
+        <canvas id="chart9"></canvas>
+      </div>
+
+      <!-- Opción 10: Mixed Chart -->
+      <div class="chart-card">
+        <div class="chart-title">
+          10. Combinación Línea + Barra + Área
+          <span class="badge">Completo</span>
+        </div>
+        <canvas id="chart10"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Generar datos simulados de las últimas 24 horas
+    function generateData(hours = 24) {
+      const now = new Date();
+      const data = [];
+      for (let i = hours; i >= 0; i--) {
+        const time = new Date(now - i * 60 * 60 * 1000);
+        data.push({
+          time,
+          temp: 25 + Math.sin(i / 3) * 3 + Math.random() * 2,
+          humidity: 45 + Math.cos(i / 4) * 10 + Math.random() * 5
+        });
+      }
+      return data;
+    }
+
+    const sampleData = generateData(24);
+    
+    // Configuración común
+    const commonOptions = {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: {
+        legend: { position: 'top' }
+      }
+    };
+
+    // 1. Línea de Tiempo Clásica
+    new Chart(document.getElementById('chart1'), {
+      type: 'line',
+      data: {
+        labels: sampleData.map(d => d.time),
+        datasets: [{
+          label: 'Temperatura (°C)',
+          data: sampleData.map(d => d.temp),
+          borderColor: '#ff6b6b',
+          backgroundColor: 'rgba(255, 107, 107, 0.1)',
+          tension: 0.4,
+          fill: false
+        }]
+      },
+      options: {
+        ...commonOptions,
+        scales: {
+          x: { type: 'time', time: { unit: 'hour' } },
+          y: { beginAtZero: false, title: { display: true, text: 'Temperatura (°C)' } }
+        }
+      }
+    });
+
+    // 2. Área Suavizada con Gradiente
+    const ctx2 = document.getElementById('chart2').getContext('2d');
+    const gradient = ctx2.createLinearGradient(0, 0, 0, 300);
+    gradient.addColorStop(0, 'rgba(102, 126, 234, 0.8)');
+    gradient.addColorStop(1, 'rgba(118, 75, 162, 0.1)');
+    
+    new Chart(ctx2, {
+      type: 'line',
+      data: {
+        labels: sampleData.map(d => d.time),
+        datasets: [{
+          label: 'Temperatura (°C)',
+          data: sampleData.map(d => d.temp),
+          borderColor: '#667eea',
+          backgroundColor: gradient,
+          tension: 0.4,
+          fill: true,
+          borderWidth: 3
+        }]
+      },
+      options: {
+        ...commonOptions,
+        scales: {
+          x: { type: 'time', time: { unit: 'hour' } },
+          y: { beginAtZero: false }
+        }
+      }
+    });
+
+    // 3. Doble Eje (Temp + Humedad)
+    new Chart(document.getElementById('chart3'), {
+      type: 'line',
+      data: {
+        labels: sampleData.map(d => d.time),
+        datasets: [
+          {
+            label: 'Temperatura (°C)',
+            data: sampleData.map(d => d.temp),
+            borderColor: '#ff6b6b',
+            backgroundColor: 'rgba(255, 107, 107, 0.1)',
+            yAxisID: 'y',
+            tension: 0.4
+          },
+          {
+            label: 'Humedad (%)',
+            data: sampleData.map(d => d.humidity),
+            borderColor: '#4ecdc4',
+            backgroundColor: 'rgba(78, 205, 196, 0.1)',
+            yAxisID: 'y1',
+            tension: 0.4
+          }
+        ]
+      },
+      options: {
+        ...commonOptions,
+        scales: {
+          x: { type: 'time', time: { unit: 'hour' } },
+          y: { type: 'linear', position: 'left', title: { display: true, text: 'Temp (°C)' } },
+          y1: { type: 'linear', position: 'right', title: { display: true, text: 'Humedad (%)' }, grid: { drawOnChartArea: false } }
+        }
+      }
+    });
+
+    // 4. Scatter con Tendencia
+    new Chart(document.getElementById('chart4'), {
+      type: 'scatter',
+      data: {
+        datasets: [
+          {
+            label: 'Lecturas',
+            data: sampleData.map(d => ({ x: d.temp, y: d.humidity })),
+            backgroundColor: 'rgba(102, 126, 234, 0.6)',
+            pointRadius: 6
+          },
+          {
+            label: 'Tendencia',
+            type: 'line',
+            data: [{ x: 23, y: 40 }, { x: 29, y: 60 }],
+            borderColor: '#ff6b6b',
+            borderWidth: 2,
+            borderDash: [5, 5],
+            fill: false,
+            pointRadius: 0
+          }
+        ]
+      },
+      options: {
+        ...commonOptions,
+        scales: {
+          x: { title: { display: true, text: 'Temperatura (°C)' } },
+          y: { title: { display: true, text: 'Humedad (%)' } }
+        }
+      }
+    });
+
+    // 5. Barras Apiladas por Hora
+    const hourlyData = Array(24).fill(0).map((_, i) => ({
+      hour: i,
+      normal: Math.random() * 30 + 20,
+      warning: Math.random() * 10,
+      critical: Math.random() * 5
+    }));
+
+    new Chart(document.getElementById('chart5'), {
+      type: 'bar',
+      data: {
+        labels: hourlyData.map(d => `${d.hour}:00`),
+        datasets: [
+          {
+            label: 'Normal',
+            data: hourlyData.map(d => d.normal),
+            backgroundColor: '#51cf66'
+          },
+          {
+            label: 'Warning',
+            data: hourlyData.map(d => d.warning),
+            backgroundColor: '#ffd43b'
+          },
+          {
+            label: 'Critical',
+            data: hourlyData.map(d => d.critical),
+            backgroundColor: '#ff6b6b'
+          }
+        ]
+      },
+      options: {
+        ...commonOptions,
+        scales: {
+          x: { stacked: true },
+          y: { stacked: true, title: { display: true, text: 'Minutos' } }
+        }
+      }
+    });
+
+    // 6. Radar Multivariable
+    new Chart(document.getElementById('chart6'), {
+      type: 'radar',
+      data: {
+        labels: ['Temperatura', 'Humedad', 'Estabilidad', 'Precisión', 'Confiabilidad'],
+        datasets: [{
+          label: 'Estado Actual',
+          data: [85, 70, 90, 95, 88],
+          borderColor: '#667eea',
+          backgroundColor: 'rgba(102, 126, 234, 0.2)',
+          pointBackgroundColor: '#667eea',
+          pointBorderColor: '#fff',
+          pointRadius: 5
+        }]
+      },
+      options: {
+        ...commonOptions,
+        scales: {
+          r: { beginAtZero: true, max: 100 }
+        }
+      }
+    });
+
+    // 7. Gauge Circular (simulado con doughnut)
+    new Chart(document.getElementById('chart7'), {
+      type: 'doughnut',
+      data: {
+        labels: ['Temperatura Actual', 'Margen'],
+        datasets: [{
+          data: [26.8, 13.2], // 26.8°C de 40°C max
+          backgroundColor: ['#667eea', '#e9ecef'],
+          borderWidth: 0
+        }]
+      },
+      options: {
+        ...commonOptions,
+        circumference: 180,
+        rotation: -90,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => ctx.label === 'Temperatura Actual' ? `${ctx.parsed}°C` : ''
+            }
+          }
+        }
+      }
+    });
+
+    // 8. Heatmap Temporal (simulado con bubble)
+    const heatmapData = [];
+    for (let day = 0; day < 7; day++) {
+      for (let hour = 0; hour < 24; hour++) {
+        heatmapData.push({
+          x: hour,
+          y: day,
+          r: Math.random() * 15 + 5
+        });
+      }
+    }
+
+    new Chart(document.getElementById('chart8'), {
+      type: 'bubble',
+      data: {
+        datasets: [{
+          label: 'Intensidad',
+          data: heatmapData,
+          backgroundColor: ctx => {
+            const value = ctx.parsed.r;
+            return `rgba(255, ${255 - value * 10}, ${255 - value * 10}, 0.6)`;
+          }
+        }]
+      },
+      options: {
+        ...commonOptions,
+        scales: {
+          x: { type: 'linear', min: 0, max: 23, title: { display: true, text: 'Hora del día' } },
+          y: { type: 'linear', min: 0, max: 6, title: { display: true, text: 'Día de la semana' } }
+        }
+      }
+    });
+
+    // 9. Candlestick (OHLC)
+    const candleData = Array(12).fill(0).map((_, i) => {
+      const open = 25 + Math.random() * 3;
+      const close = open + (Math.random() - 0.5) * 2;
+      const high = Math.max(open, close) + Math.random();
+      const low = Math.min(open, close) - Math.random();
+      return { x: i * 2, o: open, h: high, l: low, c: close };
+    });
+
+    new Chart(document.getElementById('chart9'), {
+      type: 'bar',
+      data: {
+        datasets: [{
+          label: 'OHLC',
+          data: candleData.map(d => ({ x: d.x, y: [d.l, d.o, d.c, d.h] })),
+          backgroundColor: ctx => candleData[ctx.dataIndex].c > candleData[ctx.dataIndex].o ? '#51cf66' : '#ff6b6b',
+          borderColor: ctx => candleData[ctx.dataIndex].c > candleData[ctx.dataIndex].o ? '#51cf66' : '#ff6b6b',
+          borderWidth: 2
+        }]
+      },
+      options: {
+        ...commonOptions,
+        scales: {
+          x: { title: { display: true, text: 'Horas' } },
+          y: { title: { display: true, text: 'Temperatura (°C)' } }
+        }
+      }
+    });
+
+    // 10. Mixed Chart
+    new Chart(document.getElementById('chart10'), {
+      type: 'line',
+      data: {
+        labels: sampleData.slice(0, 12).map(d => d.time),
+        datasets: [
+          {
+            type: 'line',
+            label: 'Temperatura (°C)',
+            data: sampleData.slice(0, 12).map(d => d.temp),
+            borderColor: '#ff6b6b',
+            backgroundColor: 'rgba(255, 107, 107, 0.1)',
+            yAxisID: 'y',
+            tension: 0.4
+          },
+          {
+            type: 'bar',
+            label: 'Lecturas/Hora',
+            data: Array(12).fill(0).map(() => Math.floor(Math.random() * 5) + 3),
+            backgroundColor: 'rgba(102, 126, 234, 0.5)',
+            yAxisID: 'y1'
+          },
+          {
+            type: 'line',
+            label: 'Humedad (%)',
+            data: sampleData.slice(0, 12).map(d => d.humidity),
+            borderColor: '#4ecdc4',
+            backgroundColor: 'rgba(78, 205, 196, 0.2)',
+            yAxisID: 'y',
+            tension: 0.4,
+            fill: true
+          }
+        ]
+      },
+      options: {
+        ...commonOptions,
+        scales: {
+          x: { type: 'time', time: { unit: 'hour' } },
+          y: { type: 'linear', position: 'left', title: { display: true, text: 'Temp/Humedad' } },
+          y1: { type: 'linear', position: 'right', title: { display: true, text: 'Lecturas' }, grid: { drawOnChartArea: false } }
+        }
+      }
+    });
+  </script>
+</body>
+</html>
