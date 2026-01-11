@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.8.0**
+## Versión Actual: **v2.9.0**
 
 **Fecha de lanzamiento**: 10 de enero de 2026  
 **Estado**: ✅ PRODUCCIÓN READY  
@@ -9,6 +9,33 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.9.0 - Vista Pública Mejorada y Email Optimizado
+
+**Nuevas Características:**
+- **Lightbox fullscreen**: Ampliar fotos con navegación prev/next y contador
+- **Notas en vista pública**: Mostrar notas al escanear QR (carga desde localStorage)
+- **Historial visible**: Últimas 5 incidencias con fecha, prioridad y estado
+- **Botón compartir**: Web Share API con fallback a clipboard
+- **QR mejorado**: 120px, nivel H de corrección de errores con texto explicativo
+
+**Mejoras de UX:**
+- **Email mobile-friendly**: Formato limpio con caracteres Unicode seguros (•, →, ━, ✓)
+- **Líneas cortas**: 22 caracteres para evitar scroll horizontal en móviles
+- **Nota técnica discreta**: Estilo "letra chica" al final del email
+- **Layout responsive**: Mobile-first con header sticky en vista pública
+- **Secciones organizadas**: Ubicación, datos técnicos, galería, notas, historial
+
+**Correcciones:**
+- **Fix URL del QR**: Cambiar de `/equipment/` a `/mantenimiento-planta/public/equipment/`
+- **Fix TypeScript**: Eliminar código duplicado en PublicEquipmentView
+- **Fix spread operator**: Validación Array.isArray antes de usar spread
+- **Conditional rendering**: Notas e incidencias solo se muestran si existen
+
+**Técnico:**
+- Cargar notas desde localStorage en vista pública (compatible con múltiples usuarios)
+- Galería de fotos con grid adaptativo (2→3→4 cols)
+- Footer informativo con limitaciones de vista pública
 
 ### v2.8.0 - Editor de Anotaciones y Notas Mejoradas
 
