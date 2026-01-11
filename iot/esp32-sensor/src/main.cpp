@@ -45,6 +45,7 @@ static void persistEquipmentId(const String& equipmentId);
 static bool hasAssignedEquipment();
 static void sendDeviceStatus(bool online);
 static void startDeviceAssignmentStream();
+static void setEquipmentOnlineFor(const String& equipmentId, bool online);
 
 static void printDhtPinState(const char* context);
 
@@ -132,6 +133,30 @@ static bool hasAssignedEquipment() {
   return currentEquipmentId.length() > 0;
 }
 
+static void setEquipmentOnlineFor(const String& equipmentId, bool online) {
+  if (!firebaseReady) return;
+  if (equipmentId.length() == 0) return;
+
+  String path;
+  path.reserve(96);
+  path = "sensors/";
+  path += equipmentId;
+  path += "/online";
+  Firebase.RTDB.setBool(&fbdo, path.c_str(), online);
+
+  if (!online) return;
+
+  path = "sensors/";
+  path += equipmentId;
+  path += "/lastSeen";
+  Firebase.RTDB.setInt(&fbdo, path.c_str(), getTimestamp());
+
+  path = "sensors/";
+  path += equipmentId;
+  path += "/equipmentId";
+  Firebase.RTDB.setString(&fbdo, path.c_str(), equipmentId);
+}
+
 static void sendDeviceStatus(bool online) {
   if (!firebaseReady) return;
   if (deviceId.length() == 0) return;
@@ -161,6 +186,7 @@ static void sendDeviceStatus(bool online) {
 
 static void streamCallback(FirebaseStream data) {
   if (data.dataTypeEnum() == fb_esp_rtdb_data_type_string) {
+    const String oldId = currentEquipmentId;
     String newId = data.stringData();
     newId.trim();
 
@@ -168,12 +194,21 @@ static void streamCallback(FirebaseStream data) {
       currentEquipmentId = newId;
       persistEquipmentId(currentEquipmentId);
       Serial.printf("🔗 Asignación actualizada desde RTDB: equipmentId=%s\n", currentEquipmentId.c_str());
+
+      if (oldId.length() > 0 && oldId != currentEquipmentId) {
+        setEquipmentOnlineFor(oldId, false);
+      }
+      if (hasAssignedEquipment()) {
+        sendOnlineStatus(true);
+      }
     }
   } else if (data.dataTypeEnum() == fb_esp_rtdb_data_type_null) {
     if (currentEquipmentId.length() > 0) {
+      const String oldId = currentEquipmentId;
       currentEquipmentId = "";
       persistEquipmentId(currentEquipmentId);
       Serial.println("🔌 Asignación eliminada desde RTDB (sin equipo).");
+      setEquipmentOnlineFor(oldId, false);
     }
   }
 }
