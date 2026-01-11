@@ -161,8 +161,8 @@ static void sendDeviceStatus(bool online) {
   if (!firebaseReady) return;
   if (deviceId.length() == 0) return;
 
-  // Throttle (no más de 1 update por ~3s)
-  if (millis() - lastDeviceStatusMs < 3000) return;
+  // Throttle más permisivo (no más de 1 update por 500ms)
+  if (millis() - lastDeviceStatusMs < 500) return;
   lastDeviceStatusMs = millis();
 
   FirebaseJson json;
@@ -170,7 +170,7 @@ static void sendDeviceStatus(bool online) {
   json.set("lastSeen", (unsigned long)getTimestamp());
   json.set("ip", WiFi.localIP().toString());
   json.set("rssi", WiFi.RSSI());
-  json.set("firmwareVersion", "2026-01-11");
+  json.set("firmwareVersion", "2.12.1");
   json.set("sensorType", "dht11");
   json.set("assignedEquipmentId", hasAssignedEquipment() ? currentEquipmentId : "");
 
@@ -181,6 +181,11 @@ static void sendDeviceStatus(bool online) {
 
   if (!Firebase.RTDB.setJSON(&fbdo, path.c_str(), &json)) {
     Serial.printf("✗ Error actualizando device status: %s\n", fbdo.errorReason().c_str());
+  } else {
+    Serial.printf("✓ Device status publicado en devices/%s (online: %s, equipo: %s)\n", 
+                  deviceId.c_str(), 
+                  online ? "true" : "false",
+                  hasAssignedEquipment() ? currentEquipmentId.c_str() : "ninguno");
   }
 }
 
@@ -439,12 +444,15 @@ unsigned long getTimestamp() {
 
 // ============ FUNCIÓN: ENVIAR ESTADO ONLINE ============
 void sendOnlineStatus(bool online) {
-  // Mantener device status siempre
+  // Mantener device status siempre (esto publica en devices/)
   sendDeviceStatus(online);
 
+  // Si no hay equipo asignado, solo publicamos device status (arriba) y salimos
   if (!hasAssignedEquipment()) {
     return;
   }
+
+  // A partir de aquí, solo se ejecuta si HAY equipo asignado (publica en sensors/)
 
   String path;
   path.reserve(96);

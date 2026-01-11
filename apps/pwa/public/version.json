@@ -1,9 +1,9 @@
 {
-  "version": "2.12.0",
+  "version": "2.12.1",
   "buildDate": "2026-01-11",
   "buildTimestamp": 1768089600000,
   "features": [
-    "Actualización robusta en GitHub Pages sin quedar pegado en assets viejos",
+    "Fix: ESP32 publica correctamente en devices/ para detección en PWA",
     "Emparejamiento de sensores (ESP32) desde la PWA (/sensors) sin recompilar por equipo",
     "Nuevo módulo Predictivo (IoT) con cálculo de riesgo por equipo",
     "Integración con Firebase RTDB para estado del sensor e histórico (readings)",
