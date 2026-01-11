@@ -132,8 +132,10 @@ export function useAppVersion() {
       }
     }
 
-    // 4) Recargar con cache-buster (evita que el browser use una respuesta vieja)
-    const url = new URL(window.location.href)
+    // 4) Recargar con cache-buster hacia la ruta base.
+    // En GitHub Pages, recargar en rutas profundas puede servir 404.html y “pegar” la app.
+    const baseUrl = `${window.location.origin}${getAssetUrl('/')}`
+    const url = new URL(baseUrl)
     url.searchParams.set('r', String(Date.now()))
     window.location.replace(url.toString())
   }
