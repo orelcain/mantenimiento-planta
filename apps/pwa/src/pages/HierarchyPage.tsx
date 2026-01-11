@@ -98,7 +98,19 @@ export function HierarchyPage() {
 
   // Vista local del árbol para reordenamiento optimista
   const [viewTree, setViewTree] = useState<HierarchyNodeWithChildren[]>([])
-  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set())
+  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(() => {
+    // Restaurar estado de expansión desde localStorage
+    const saved = localStorage.getItem('hierarchy_expanded_nodes')
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved)
+        return new Set(parsed)
+      } catch {
+        return new Set()
+      }
+    }
+    return new Set()
+  })
   const expandedNodesRef = useRef(expandedNodes)
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -784,7 +796,7 @@ export function HierarchyPage() {
                 {node.isBaseStructure ? (
                   <Badge 
                     variant="outline" 
-                    className="text-xs flex items-center gap-1 border-blue-300 text-blue-700 bg-blue-50"
+                    className="text-xs flex items-center gap-1 border-blue-300 text-blue-700 bg-blue-50 opacity-0 group-hover:opacity-100 transition-opacity"
                     title={`Estructura base - ${node.baseStructureDate ? new Date(node.baseStructureDate.toDate()).toLocaleDateString() : 'Fecha no disponible'}`}
                   >
                     <Clock className="h-2.5 w-2.5" />
