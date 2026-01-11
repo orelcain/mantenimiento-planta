@@ -53,9 +53,12 @@ export function subscribeDevices(
   const unsubscribe = onValue(
     r,
     (snap) => {
-      onData(snapshotToDevices(snap))
+      const devices = snapshotToDevices(snap)
+      console.log('[devicesRtdb] Dispositivos detectados:', devices.length, devices)
+      onData(devices)
     },
     (err) => {
+      console.error('[devicesRtdb] Error:', err)
       onError?.(err)
     }
   )

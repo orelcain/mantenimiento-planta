@@ -43,8 +43,10 @@ export function SensorsPage() {
   const [saveOk, setSaveOk] = useState<string | null>(null)
 
   useEffect(() => {
+    console.log('[SensorsPage] Iniciando suscripción a devices...')
     const unsub = subscribeDevices(
       (rows) => {
+        console.log('[SensorsPage] Dispositivos recibidos:', rows)
         setDevices(rows)
         // Auto seleccionar el primer dispositivo si no hay selección.
         if (!selectedDeviceId && rows[0]?.deviceId) {
@@ -52,6 +54,7 @@ export function SensorsPage() {
         }
       },
       (err) => {
+        console.error('[SensorsPage] Error:', err)
         setLoadError(err instanceof Error ? err.message : 'Error leyendo dispositivos (RTDB).')
       }
     )
