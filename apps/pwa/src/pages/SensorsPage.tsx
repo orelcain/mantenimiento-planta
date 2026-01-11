@@ -509,7 +509,13 @@ export function SensorsPage() {
                                     💡 Zoom: scroll | Pan: Ctrl+arrastrar
                                   </div>
                                 </div>
-                                <TelemetryChart data={historyData} type={chartType} height={450} />
+                                {/* Key estable para evitar re-montaje del gráfico */}
+                                <TelemetryChart 
+                                  key={`${selectedDeviceId}-${chartType}-${timeRange}`}
+                                  data={historyData} 
+                                  type={chartType} 
+                                  height={450} 
+                                />
                               </>
                             )}
                           </div>

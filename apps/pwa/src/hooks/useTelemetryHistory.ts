@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 export interface TelemetryDataPoint {
   timestamp: Date
@@ -9,8 +9,8 @@ export interface TelemetryDataPoint {
 export type TimeRange = '1h' | '6h' | '12h' | '24h' | '48h' | '7d'
 
 /**
- * Hook para obtener historial de telemetría
- * Por ahora genera datos simulados basados en el valor actual
+ * Hook para obtener historial de telemetría con buffer circular (osciloscopio)
+ * Los datos se agregan sin recargar todo el gráfico
  * TODO: Implementar query a Firestore collection 'telemetryHistory'
  */
 export function useTelemetryHistory(
@@ -26,72 +26,121 @@ export function useTelemetryHistory(
   const [data, setData] = useState<TelemetryDataPoint[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
+  
+  // Referencias para mantener estado persistente sin causar re-renders
+  const lastValueRef = useRef<{ temp: number; humidity: number } | null>(null)
+  const initializingRef = useRef(false)
 
+  // Calcular límite de puntos según el rango
+  const maxPoints = {
+    '1h': 30,
+    '6h': 36,
+    '12h': 48,
+    '24h': 96,
+    '48h': 96,
+    '7d': 84
+  }[timeRange]
+
+  // Inicialización: generar datos históricos simulados SOLO la primera vez
   useEffect(() => {
-    // Si no hay valores actuales de temp/humedad, no hay nada que mostrar
-    if (currentTemp === undefined || currentHumidity === undefined) {
-      setData([])
-      setLoading(false)
+    if (initializingRef.current || !currentTemp || !currentHumidity) {
       return
     }
 
+    initializingRef.current = true
     setLoading(true)
-    setError(null)
 
-    // Simular delay de carga
     setTimeout(() => {
-      try {
-        // Calcular parámetros según el rango de tiempo
-        const ranges = {
-          '1h': { hours: 1, intervalMinutes: 2 },   // 30 puntos
-          '6h': { hours: 6, intervalMinutes: 10 },  // 36 puntos
-          '12h': { hours: 12, intervalMinutes: 15 }, // 48 puntos
-          '24h': { hours: 24, intervalMinutes: 15 }, // 96 puntos
-          '48h': { hours: 48, intervalMinutes: 30 }, // 96 puntos
-          '7d': { hours: 168, intervalMinutes: 120 } // 84 puntos (2h cada punto)
-        }
-        
-        const { hours, intervalMinutes } = ranges[timeRange]
-        const now = new Date()
-        const history: TelemetryDataPoint[] = []
-        
-        // Base values: usar valores actuales o defaults
-        const baseTemp = currentTemp || 25
-        const baseHumidity = currentHumidity || 50
-        
-        const totalPoints = Math.floor((hours * 60) / intervalMinutes)
-
-        for (let i = totalPoints; i >= 0; i--) {
-          const timestamp = new Date(now.getTime() - i * intervalMinutes * 60 * 1000)
-          
-          // Generar variación realista:
-          // - Temperatura: ±3°C con patrón sinusoidal (más calor al mediodía)
-          const hourOfDay = timestamp.getHours()
-          const tempVariation = Math.sin((hourOfDay - 6) * Math.PI / 12) * 2 // Pico a las 14h
-          const tempNoise = (Math.random() - 0.5) * 1.5
-          const temperatura = baseTemp + tempVariation + tempNoise
-          
-          // - Humedad: ±10% inversamente proporcional a temperatura
-          const humidityVariation = -tempVariation * 2 // Menos humedad cuando más calor
-          const humidityNoise = (Math.random() - 0.5) * 3
-          const humedad = baseHumidity + humidityVariation + humidityNoise
-
-          history.push({
-            timestamp,
-            temperatura: Math.round(temperatura * 10) / 10,
-            humedad: Math.round(humedad * 10) / 10
-          })
-        }
-
-        setData(history)
-        setLoading(false)
-      } catch (err) {
-        setError(err instanceof Error ? err : new Error('Error generating data'))
-        setLoading(false)
+      const ranges = {
+        '1h': { hours: 1, intervalMinutes: 2 },
+        '6h': { hours: 6, intervalMinutes: 10 },
+        '12h': { hours: 12, intervalMinutes: 15 },
+        '24h': { hours: 24, intervalMinutes: 15 },
+        '48h': { hours: 48, intervalMinutes: 30 },
+        '7d': { hours: 168, intervalMinutes: 120 }
       }
-    }, 500) // Simular 500ms de latency
+      
+      const { hours, intervalMinutes } = ranges[timeRange]
+      const now = new Date()
+      const history: TelemetryDataPoint[] = []
+      
+      const baseTemp = currentTemp
+      const baseHumidity = currentHumidity
+      
+      const totalPoints = Math.floor((hours * 60) / intervalMinutes)
 
-  }, [currentTemp, currentHumidity, timeRange]) // Regenerar cuando cambien los valores actuales o el rango
+      for (let i = totalPoints; i >= 1; i--) {
+        const timestamp = new Date(now.getTime() - i * intervalMinutes * 60 * 1000)
+        
+        const hourOfDay = timestamp.getHours()
+        const tempVariation = Math.sin((hourOfDay - 6) * Math.PI / 12) * 2
+        const tempNoise = (Math.random() - 0.5) * 1.5
+        const temperatura = baseTemp + tempVariation + tempNoise
+        
+        const humidityVariation = -tempVariation * 2
+        const humidityNoise = (Math.random() - 0.5) * 3
+        const humedad = baseHumidity + humidityVariation + humidityNoise
+
+        history.push({
+          timestamp,
+          temperatura: Math.round(temperatura * 10) / 10,
+          humedad: Math.round(humedad * 10) / 10
+        })
+      }
+
+      setData(history)
+      lastValueRef.current = { temp: currentTemp, humidity: currentHumidity }
+      setLoading(false)
+    }, 500)
+  }, [timeRange]) // Solo depender de timeRange para inicialización
+
+  // Agregar nuevos puntos cuando llegan datos nuevos (efecto osciloscopio)
+  useEffect(() => {
+    if (!initializingRef.current || !currentTemp || !currentHumidity) {
+      return
+    }
+
+    const lastValue = lastValueRef.current
+    
+    // Solo agregar si los valores cambiaron
+    if (lastValue && 
+        (Math.abs(lastValue.temp - currentTemp) > 0.05 || 
+         Math.abs(lastValue.humidity - currentHumidity) > 0.05)) {
+      
+      setData(prevData => {
+        const newPoint: TelemetryDataPoint = {
+          timestamp: new Date(),
+          temperatura: Math.round(currentTemp * 10) / 10,
+          humedad: Math.round(currentHumidity * 10) / 10
+        }
+
+        // Buffer circular: agregar al final, eliminar del principio si excede límite
+        const newData = [...prevData, newPoint]
+        if (newData.length > maxPoints) {
+          newData.shift() // Remover el punto más antiguo
+        }
+
+        return newData
+      })
+
+      lastValueRef.current = { temp: currentTemp, humidity: currentHumidity }
+    }
+  }, [currentTemp, currentHumidity, maxPoints])
+
+  // Reset cuando cambia el rango temporal
+  useEffect(() => {
+    if (initializingRef.current) {
+      initializingRef.current = false
+      setData([])
+    }
+  }, [timeRange])
+  // Reset cuando cambia el rango temporal
+  useEffect(() => {
+    if (initializingRef.current) {
+      initializingRef.current = false
+      setData([])
+    }
+  }, [timeRange])
 
   return { data, loading, error }
 }
