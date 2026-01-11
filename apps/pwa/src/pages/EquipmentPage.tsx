@@ -590,83 +590,81 @@ export function EquipmentPage() {
       await generateShareData() // Generamos data aunque no la usemos directamente
       const selectedEquipments = equipment.filter((e) => selectedIds.has(e.id))
       
-      // Generar contenido de email en texto plano mejorado
-      // NOTA: mailto: no soporta HTML, solo texto plano
-      let textBody = `═══════════════════════════════════════════════════
-INFORMACIÓN DE EQUIPOS
-${new Date().toLocaleDateString()} - ${selectedEquipments.length} equipo(s)
-═══════════════════════════════════════════════════
+      // Formato optimizado para móviles y desktop
+      // Usa caracteres Unicode seguros que se ven bien en todos los dispositivos
+      let textBody = `INFORMACION DE EQUIPOS
+${new Date().toLocaleDateString()} • ${selectedEquipments.length} equipo(s)
+
 
 `
 
       for (const eq of selectedEquipments) {
-        textBody += `
-┌──────────────────────────────────────────────────┐
-│ ${eq.nombre.toUpperCase()}
-└──────────────────────────────────────────────────┘
+        textBody += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${eq.nombre.toUpperCase()}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-📋 INFORMACIÓN BÁSICA
-• Código: ${eq.codigo}
-• Estado: ${STATUS_CONFIG[eq.estado].label}
-• Criticidad: ${CRITICIDAD_CONFIG[eq.criticidad].label}
+INFORMACION BASICA
+  • Codigo     : ${eq.codigo}
+  • Estado     : ${STATUS_CONFIG[eq.estado].label}
+  • Criticidad : ${CRITICIDAD_CONFIG[eq.criticidad].label}
 `
 
         if (eq.hierarchyPath) {
-          textBody += `• Ubicación: ${eq.hierarchyPath}\n`
+          textBody += `  • Ubicacion  : ${eq.hierarchyPath}\n`
         }
 
         if (eq.marca || eq.modelo || eq.numeroSerie) {
-          textBody += `\n🔧 DATOS TÉCNICOS\n`
-          if (eq.marca) textBody += `• Marca: ${eq.marca}\n`
-          if (eq.modelo) textBody += `• Modelo: ${eq.modelo}\n`
-          if (eq.numeroSerie) textBody += `• N° Serie: ${eq.numeroSerie}\n`
+          textBody += `\nDATOS TECNICOS\n`
+          if (eq.marca) textBody += `  • Marca      : ${eq.marca}\n`
+          if (eq.modelo) textBody += `  • Modelo     : ${eq.modelo}\n`
+          if (eq.numeroSerie) textBody += `  • N° Serie   : ${eq.numeroSerie}\n`
         }
 
         // Incluir fotos si está habilitado
         if (shareIncludePhotos && eq.photos && eq.photos.length > 0) {
-          textBody += `\n📷 FOTOS (${eq.photos.length})\n`
+          textBody += `\nFOTOS (${eq.photos.length})\n`
           eq.photos.forEach((photoUrl, idx) => {
-            textBody += `${idx + 1}. ${photoUrl}\n`
+            textBody += `  ${idx + 1}. ${photoUrl}\n`
           })
-          textBody += `\n💡 Tip: Copia las URLs en tu navegador para ver las fotos\n`
         }
 
         // Incluir notas si está habilitado
         const notes = notesById[eq.id] || []
         if (shareIncludeNotes && notes.length > 0) {
-          textBody += `\n📝 NOTAS (${notes.length})\n`
+          textBody += `\nNOTAS (${notes.length})\n`
           notes.forEach((note, idx) => {
-            textBody += `${idx + 1}. ${note.text}\n   (${note.createdAt})\n`
+            textBody += `  ${idx + 1}. ${note.text}\n       ${note.createdAt}\n`
           })
         }
 
         // Incluir QR si está habilitado
         if (shareIncludeQR) {
           const qrUrl = `${window.location.origin}/mantenimiento-planta/public/equipment/${eq.id}`
-          textBody += `\n📱 VER EN LA APP\n${qrUrl}\n`
-          textBody += `\n💡 Abre este enlace para ver toda la información con fotos ampliadas,\n   historial de incidencias y más detalles.\n`
+          textBody += `\nVER DETALLES COMPLETOS\n  → ${qrUrl}\n\n`
+          textBody += `  Ventajas del enlace web:\n`
+          textBody += `  ✓ Fotos en alta resolucion con zoom\n`
+          textBody += `  ✓ Historial completo de incidencias\n`
+          textBody += `  ✓ Optimizado para movil y desktop\n`
         }
 
-        textBody += `\n${'─'.repeat(50)}\n`
+        textBody += `\n\n`
       }
 
-      textBody += `\n
-══════════════════════════════════════════════════════
-ℹ️  NOTA IMPORTANTE
+      textBody += `
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+NOTA TECNICA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Por limitaciones técnicas del correo electrónico, las 
-imágenes se muestran como enlaces (URLs). Para una 
-mejor experiencia visual:
+Las imagenes se muestran como enlaces por limitaciones 
+del protocolo mailto (solo soporta texto plano).
 
-✅ Abre los enlaces del QR en tu navegador
-✅ Las fotos se pueden ampliar haciendo clic
-✅ Verás el historial completo de incidencias
-✅ Interfaz optimizada para móvil y desktop
+Para visualizar contenido multimedia y funciones 
+avanzadas, utiliza el enlace "Ver detalles completos".
 
-──────────────────────────────────────────────────────
-Sistema de Gestión de Mantenimiento
-Generado automáticamente
-══════════════════════════════════════════════════════
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Sistema de Gestion de Mantenimiento
+${new Date().toLocaleDateString()} • ${new Date().toLocaleTimeString()}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 `
 
       const subject = `🔧 Información de ${selectedEquipments.length} equipo(s) - ${new Date().toLocaleDateString()}`
