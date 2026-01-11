@@ -16,6 +16,21 @@ export type DeviceNode = {
   assignedEquipmentId?: string | null
   assignmentUpdatedAt?: number
   assignmentUpdatedBy?: string
+  telemetry?: {
+    temperatura?: {
+      value?: number
+      unit?: string
+      status?: string
+      timestamp?: number
+    }
+    humedad?: {
+      value?: number
+      unit?: string
+      status?: string
+      timestamp?: number
+    }
+    source?: string
+  }
 }
 
 export type DeviceRow = DeviceNode & {

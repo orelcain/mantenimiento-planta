@@ -170,7 +170,7 @@ static void sendDeviceStatus(bool online) {
   json.set("lastSeen", (unsigned long)getTimestamp());
   json.set("ip", WiFi.localIP().toString());
   json.set("rssi", WiFi.RSSI());
-  json.set("firmwareVersion", "2.13.5");
+  json.set("firmwareVersion", "2.14.0");
   json.set("sensorType", "dht11");
   json.set("assignedEquipmentId", hasAssignedEquipment() ? currentEquipmentId : "");
 
@@ -498,9 +498,33 @@ void sendSensorData() {
   Serial.printf("💧  Humedad: %.1f%% [%s]\n", humidity, humStatus.c_str());
   Serial.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
   
-  // Enviar a Firebase
+  // 1. Publicar telemetría en devices/{deviceId}/telemetry (SIEMPRE, asignado o no)
+  FirebaseJson deviceTelemetryJson;
+  deviceTelemetryJson.set("temperatura/value", temperature);
+  deviceTelemetryJson.set("temperatura/unit", "°C");
+  deviceTelemetryJson.set("temperatura/status", tempStatus);
+  deviceTelemetryJson.set("temperatura/timestamp", timestamp);
+  deviceTelemetryJson.set("humedad/value", humidity);
+  deviceTelemetryJson.set("humedad/unit", "%");
+  deviceTelemetryJson.set("humedad/status", humStatus);
+  deviceTelemetryJson.set("humedad/timestamp", timestamp);
+  deviceTelemetryJson.set("source", simulated ? "simulated" : "dht11");
+  
+  String deviceTelemetryPath;
+  deviceTelemetryPath.reserve(64);
+  deviceTelemetryPath = "devices/";
+  deviceTelemetryPath += getDeviceId();
+  deviceTelemetryPath += "/telemetry";
+  
+  if (Firebase.RTDB.setJSON(&fbdo, deviceTelemetryPath.c_str(), &deviceTelemetryJson)) {
+    Serial.println("✓ Telemetría publicada en devices/{deviceId}/telemetry");
+  } else {
+    Serial.printf("✗ Error telemetría device: %s\n", fbdo.errorReason().c_str());
+  }
+  
+  // 2. Si está asignado, TAMBIÉN publicar en sensors/{equipmentId} (para historial)
   if (!hasAssignedEquipment()) {
-    Serial.println("ℹ️ Sin equipo asignado. Publicando solo estado del dispositivo (devices/...) y esperando pairing.");
+    Serial.println("ℹ️ Sin equipo asignado. Telemetría disponible solo en devices/.");
     sendOnlineStatus(true);
     return;
   }

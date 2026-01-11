@@ -109,6 +109,28 @@ export function SensorsPage() {
     return () => unsub()
   }, [assignedEquipment?.id])
 
+  // Telemetría para mostrar: priorizar la del dispositivo (devices/{id}/telemetry) sobre sensors/{equipmentId}
+  const displayTelemetry = useMemo(() => {
+    // Si el dispositivo tiene telemetría directa, usarla
+    if (selectedDevice?.telemetry) {
+      return {
+        temperatura: selectedDevice.telemetry.temperatura,
+        humedad: selectedDevice.telemetry.humedad,
+        online: selectedDevice.online,
+        lastSeen: selectedDevice.lastSeen,
+        source: selectedDevice.telemetry.source || 'device'
+      }
+    }
+    // Si no, usar la del equipo asignado (sensors/{equipmentId})
+    if (sensorData) {
+      return {
+        ...sensorData,
+        source: 'equipment'
+      }
+    }
+    return null
+  }, [selectedDevice, sensorData])
+
   const filteredEquipment = useMemo(() => {
     const q = equipmentSearch.trim().toLowerCase()
     
@@ -300,85 +322,91 @@ export function SensorsPage() {
           <CardContent className="space-y-4">
             {!selectedDevice ? (
               <div className="text-sm text-muted-foreground">Selecciona un dispositivo para ver su telemetría.</div>
-            ) : !assignedEquipment ? (
-              <div className="space-y-2">
-                <div className="text-sm font-medium">Dispositivo sin asignar</div>
-                <div className="text-xs text-muted-foreground">
-                  Este sensor no está asignado a ningún equipo. Asígnalo para ver su telemetría.
-                </div>
-              </div>
             ) : (
               <>
-                <div className="space-y-2">
-                  <div className="text-sm font-medium">Equipo asociado</div>
-                  <div className="text-xs">
-                    <div className="font-medium">{assignedEquipment.nombre}</div>
-                    <div className="text-muted-foreground">{assignedEquipment.codigo}</div>
-                    {assignedEquipment.hierarchyPath && (
-                      <div className="text-muted-foreground mt-1">{assignedEquipment.hierarchyPath}</div>
-                    )}
+                {/* Info del equipo asignado (si existe) */}
+                {assignedEquipment && (
+                  <div className="space-y-2 pb-3 border-b">
+                    <div className="text-sm font-medium">Equipo asociado</div>
+                    <div className="text-xs">
+                      <div className="font-medium">{assignedEquipment.nombre}</div>
+                      <div className="text-muted-foreground">{assignedEquipment.codigo}</div>
+                      {assignedEquipment.hierarchyPath && (
+                        <div className="text-muted-foreground mt-1">{assignedEquipment.hierarchyPath}</div>
+                      )}
+                    </div>
                   </div>
-                </div>
+                )}
 
-                {sensorData ? (
+                {/* Dispositivo sin asignar */}
+                {!assignedEquipment && (
+                  <div className="pb-3 border-b">
+                    <div className="text-sm font-medium">Dispositivo sin asignar</div>
+                    <div className="text-xs text-muted-foreground">
+                      Este sensor no está asignado a ningún equipo. Puedes ver su telemetría en tiempo real para verificar que funciona.
+                    </div>
+                  </div>
+                )}
+
+                {displayTelemetry ? (
                   <div className="space-y-3">
                     {/* Temperatura */}
-                    {sensorData.temperatura && (
+                    {displayTelemetry.temperatura && (
                       <div className="rounded border p-3 bg-orange-50 dark:bg-orange-950/20">
                         <div className="flex items-center gap-2 mb-2">
                           <Thermometer className="h-4 w-4 text-orange-600" />
                           <span className="text-sm font-medium">Temperatura</span>
                         </div>
                         <div className="text-2xl font-bold">
-                          {sensorData.temperatura.value?.toFixed(1) ?? '—'} {sensorData.temperatura.unit ?? '°C'}
+                          {displayTelemetry.temperatura.value?.toFixed(1) ?? '—'} {displayTelemetry.temperatura.unit ?? '°C'}
                         </div>
-                        {sensorData.temperatura.status && (
-                          <Badge variant={sensorData.temperatura.status === 'normal' ? 'default' : 'destructive'} className="mt-2">
-                            {sensorData.temperatura.status}
+                        {displayTelemetry.temperatura.status && (
+                          <Badge variant={displayTelemetry.temperatura.status === 'normal' ? 'default' : 'destructive'} className="mt-2">
+                            {displayTelemetry.temperatura.status}
                           </Badge>
                         )}
-                        {sensorData.temperatura.timestamp && (
+                        {displayTelemetry.temperatura.timestamp && (
                           <div className="text-xs text-muted-foreground mt-2">
-                            {new Date(sensorData.temperatura.timestamp).toLocaleString()}
+                            {new Date(displayTelemetry.temperatura.timestamp).toLocaleString()}
                           </div>
                         )}
                       </div>
                     )}
 
                     {/* Humedad */}
-                    {sensorData.humedad && (
+                    {displayTelemetry.humedad && (
                       <div className="rounded border p-3 bg-blue-50 dark:bg-blue-950/20">
                         <div className="flex items-center gap-2 mb-2">
                           <Droplets className="h-4 w-4 text-blue-600" />
                           <span className="text-sm font-medium">Humedad</span>
                         </div>
                         <div className="text-2xl font-bold">
-                          {sensorData.humedad.value?.toFixed(1) ?? '—'} {sensorData.humedad.unit ?? '%'}
+                          {displayTelemetry.humedad.value?.toFixed(1) ?? '—'} {displayTelemetry.humedad.unit ?? '%'}
                         </div>
-                        {sensorData.humedad.status && (
-                          <Badge variant={sensorData.humedad.status === 'normal' ? 'default' : 'destructive'} className="mt-2">
-                            {sensorData.humedad.status}
+                        {displayTelemetry.humedad.status && (
+                          <Badge variant={displayTelemetry.humedad.status === 'normal' ? 'default' : 'destructive'} className="mt-2">
+                            {displayTelemetry.humedad.status}
                           </Badge>
                         )}
-                        {sensorData.humedad.timestamp && (
+                        {displayTelemetry.humedad.timestamp && (
                           <div className="text-xs text-muted-foreground mt-2">
-                            {new Date(sensorData.humedad.timestamp).toLocaleString()}
+                            {new Date(displayTelemetry.humedad.timestamp).toLocaleString()}
                           </div>
                         )}
                       </div>
                     )}
 
                     {/* Estado online */}
-                    {sensorData.online !== undefined && (
+                    {displayTelemetry.online !== undefined && (
                       <div className="flex items-center gap-2 text-sm">
                         <span className="text-muted-foreground">Estado del sensor:</span>
-                        {onlineBadge(sensorData.online)}
+                        {onlineBadge(displayTelemetry.online)}
                       </div>
                     )}
 
-                    {sensorData.lastSeen && (
+                    {displayTelemetry.lastSeen && (
                       <div className="text-xs text-muted-foreground">
-                        Última actualización: {new Date(sensorData.lastSeen).toLocaleString()}
+                        Última actualización: {new Date(displayTelemetry.lastSeen).toLocaleString()}
                       </div>
                     )}
                   </div>
