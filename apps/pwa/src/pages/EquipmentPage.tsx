@@ -199,6 +199,7 @@ export function EquipmentPage() {
   const [shareIncludeQR, setShareIncludeQR] = useState(false)
   const [shareFormat, setShareFormat] = useState<'pdf' | 'csv' | 'json'>('pdf')
   const [shareLoading, setShareLoading] = useState(false)
+  const [selectedNotesByEquipment, setSelectedNotesByEquipment] = useState<Map<string, Set<string>>>(new Map())
 
   const [photoUploading, setPhotoUploading] = useState(false)
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null)
@@ -506,7 +507,14 @@ export function EquipmentPage() {
 
       if (shareIncludeNotes) {
         const notes = notesById[eq.id] || []
-        equipmentData.notas = notes.map((n) => ({
+        const selectedNotesSet = selectedNotesByEquipment.get(eq.id)
+        
+        // Si hay notas seleccionadas, filtrar solo esas; si no, incluir todas
+        const notesToInclude = selectedNotesSet && selectedNotesSet.size > 0
+          ? notes.filter((_, idx) => selectedNotesSet.has(`${eq.id}-${idx}`))
+          : notes
+        
+        equipmentData.notas = notesToInclude.map((n) => ({
           texto: n.text,
           fecha: n.createdAt,
         }))
@@ -520,7 +528,7 @@ export function EquipmentPage() {
       }
 
       if (shareIncludeQR) {
-        equipmentData.qr_url = `${window.location.origin}/equipment/${eq.id}`
+        equipmentData.qr_url = `${window.location.origin}/mantenimiento-planta/public/equipment/${eq.id}`
       }
 
       data.equipos.push(equipmentData)
@@ -574,10 +582,95 @@ export function EquipmentPage() {
 
     try {
       const data = await generateShareData()
-      const body = generateSharePdfContent(data)
-      const subject = `Exportación de ${data.total_equipos} equipos - ${new Date().toLocaleDateString()}`
+      const selectedEquipments = equipment.filter((e) => selectedIds.has(e.id))
       
-      window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+      // Generar contenido HTML para email
+      let htmlBody = `<html><body style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px;">
+        <h1 style="color: #333;">Información de Equipos</h1>
+        <p style="color: #666;">Fecha: ${new Date().toLocaleDateString()} - ${selectedEquipments.length} equipo(s)</p>
+        <hr style="border: 1px solid #ddd; margin: 20px 0;">
+      `
+
+      for (const eq of selectedEquipments) {
+        const StatusIcon = STATUS_CONFIG[eq.estado].label
+        
+        htmlBody += `
+          <div style="border: 1px solid #ddd; border-radius: 8px; padding: 15px; margin: 20px 0; background: #f9f9f9;">
+            <h2 style="color: #2563eb; margin-top: 0;">${eq.nombre}</h2>
+            <p style="color: #666; font-size: 14px;"><strong>Código:</strong> ${eq.codigo}</p>
+            <p style="margin: 5px 0;"><span style="background: #e5e7eb; padding: 4px 8px; border-radius: 4px; font-size: 12px;">${StatusIcon}</span> <span style="background: #fef3c7; padding: 4px 8px; border-radius: 4px; font-size: 12px;">${CRITICIDAD_CONFIG[eq.criticidad].label}</span></p>
+        `
+
+        if (eq.hierarchyPath) {
+          htmlBody += `<p style="color: #666; font-size: 13px;">📍 ${eq.hierarchyPath}</p>`
+        }
+
+        if (eq.marca || eq.modelo || eq.numeroSerie) {
+          htmlBody += `<div style="margin-top: 10px; font-size: 13px;">`
+          if (eq.marca) htmlBody += `<p style="margin: 3px 0;"><strong>Marca:</strong> ${eq.marca}</p>`
+          if (eq.modelo) htmlBody += `<p style="margin: 3px 0;"><strong>Modelo:</strong> ${eq.modelo}</p>`
+          if (eq.numeroSerie) htmlBody += `<p style="margin: 3px 0;"><strong>N° Serie:</strong> ${eq.numeroSerie}</p>`
+          htmlBody += `</div>`
+        }
+
+        // Incluir primera foto si está habilitado
+        if (shareIncludePhotos && eq.photos && eq.photos.length > 0) {
+          htmlBody += `
+            <div style="margin-top: 15px;">
+              <p style="font-weight: bold; margin-bottom: 8px;">📷 Foto principal:</p>
+              <img src="${eq.photos[0]}" alt="Foto del equipo" style="max-width: 300px; border-radius: 4px; border: 1px solid #ddd;" />
+              ${eq.photos.length > 1 ? `<p style="color: #666; font-size: 12px; margin-top: 5px;">+ ${eq.photos.length - 1} foto(s) más</p>` : ''}
+            </div>
+          `
+        }
+
+        // Incluir notas si está habilitado
+        const notes = notesById[eq.id] || []
+        if (shareIncludeNotes && notes.length > 0) {
+          htmlBody += `
+            <div style="margin-top: 15px; padding: 10px; background: #fff; border-left: 3px solid #3b82f6;">
+              <p style="font-weight: bold; margin: 0 0 8px 0;">📝 Notas:</p>
+          `
+          notes.forEach(note => {
+            htmlBody += `<p style="margin: 5px 0; font-size: 13px; color: #444;">• ${note.text} <span style="color: #999; font-size: 11px;">(${note.createdAt})</span></p>`
+          })
+          htmlBody += `</div>`
+        }
+
+        // Incluir QR si está habilitado
+        if (shareIncludeQR) {
+          const qrUrl = `${window.location.origin}/mantenimiento-planta/public/equipment/${eq.id}`
+          htmlBody += `
+            <div style="margin-top: 15px; padding: 10px; background: #fff; text-align: center; border: 1px solid #ddd; border-radius: 4px;">
+              <p style="font-weight: bold; margin: 0 0 8px 0;">📱 Código QR</p>
+              <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Escanea para ver este equipo en la app</p>
+              <div style="background: white; padding: 10px; display: inline-block;">
+                <svg width="120" height="120" viewBox="0 0 120 120">
+                  <text x="60" y="60" text-anchor="middle" style="font-size: 10px; fill: #666;">[QR Code]</text>
+                </svg>
+              </div>
+              <p style="font-size: 11px; color: #666; margin-top: 8px;">URL: <a href="${qrUrl}" style="color: #2563eb;">${qrUrl}</a></p>
+            </div>
+          `
+        }
+
+        htmlBody += `</div>`
+      }
+
+      htmlBody += `
+        <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; text-align: center; color: #999; font-size: 12px;">
+          <p>Este reporte fue generado desde el Sistema de Gestión de Mantenimiento</p>
+          <p>Para acceder a funciones completas, inicia sesión en la aplicación</p>
+        </div>
+      </body></html>`
+
+      // Crear el body en texto plano como fallback
+      const textBody = generateSharePdfContent(data)
+      const subject = `Información de ${selectedEquipments.length} equipo(s) - ${new Date().toLocaleDateString()}`
+      
+      // Para email con HTML necesitamos un workaround porque mailto: no soporta HTML directamente
+      // Abrimos con body en texto y el usuario puede copiar el HTML si lo necesita
+      window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(textBody + '\\n\\nNota: Adjunta las fotos manualmente si es necesario.')}`
       
       closeShareModal()
     } catch (_e) {
@@ -1288,6 +1381,82 @@ export function EquipmentPage() {
                     Notas internas del usuario
                   </Label>
                 </div>
+
+                {/* Selector individual de notas cuando está habilitado */}
+                {shareIncludeNotes && (
+                  <div className="ml-6 mt-2 space-y-2 border-l-2 border-gray-200 pl-4">
+                    <p className="text-xs text-gray-600 mb-2">Selecciona las notas a incluir:</p>
+                    {equipment.filter((e) => selectedIds.has(e.id)).map((eq) => {
+                      const eqNotes = notesById[eq.id] || []
+                      if (eqNotes.length === 0) return null
+
+                      const selectedNotesSet = selectedNotesByEquipment.get(eq.id) || new Set()
+                      
+                      return (
+                        <div key={eq.id} className="bg-gray-50 p-2 rounded">
+                          <p className="text-xs font-semibold text-gray-700 mb-1">{eq.nombre}</p>
+                          <div className="space-y-1">
+                            {eqNotes.map((note, idx) => {
+                              const noteId = `${eq.id}-${idx}`
+                              const isChecked = selectedNotesSet.has(noteId)
+                              
+                              return (
+                                <div key={noteId} className="flex items-start space-x-2">
+                                  <Checkbox
+                                    id={noteId}
+                                    checked={isChecked}
+                                    onCheckedChange={(checked) => {
+                                      const newMap = new Map(selectedNotesByEquipment)
+                                      const noteSet = new Set(newMap.get(eq.id) || [])
+                                      if (checked) {
+                                        noteSet.add(noteId)
+                                      } else {
+                                        noteSet.delete(noteId)
+                                      }
+                                      newMap.set(eq.id, noteSet)
+                                      setSelectedNotesByEquipment(newMap)
+                                    }}
+                                  />
+                                  <Label htmlFor={noteId} className="text-xs font-normal cursor-pointer">
+                                    {note.text.substring(0, 50)}{note.text.length > 50 ? '...' : ''} 
+                                    <span className="text-gray-400 ml-1">({note.createdAt})</span>
+                                  </Label>
+                                </div>
+                              )
+                            })}
+                          </div>
+                          <div className="flex gap-2 mt-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 text-xs"
+                              onClick={() => {
+                                const newMap = new Map(selectedNotesByEquipment)
+                                const allNoteIds = eqNotes.map((_, idx) => `${eq.id}-${idx}`)
+                                newMap.set(eq.id, new Set(allNoteIds))
+                                setSelectedNotesByEquipment(newMap)
+                              }}
+                            >
+                              Todas
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 text-xs"
+                              onClick={() => {
+                                const newMap = new Map(selectedNotesByEquipment)
+                                newMap.set(eq.id, new Set())
+                                setSelectedNotesByEquipment(newMap)
+                              }}
+                            >
+                              Ninguna
+                            </Button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
 
                 <div className="flex items-center space-x-2">
                   <Checkbox
