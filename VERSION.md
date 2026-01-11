@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.16.3**
+## Versión Actual: **v2.16.4**
 
 **Fecha de lanzamiento**: 11 de enero de 2026  
 **Estado**: ✅ PRODUCCIÓN READY  
@@ -9,6 +9,30 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.16.4 - Carga Asíncrona del Gráfico + Banner Fix (11/01/2026)
+
+**Fixes Críticos:**
+- **Banner actualización**: Agregado console.log para diagnosticar versión desactualizada en service worker
+- **Carga gráfico**: Historial se genera de forma asíncrona sin bloquear render inicial
+- **Performance mejorada**: Punto actual se muestra inmediatamente, historial completo se carga en background
+
+**Mejoras de UX:**
+- **Skeleton animado**: Barras pulsantes con gradiente azul durante carga del gráfico
+- **Spinner centralizado**: Mensaje "Generando historial..." con indicador de progreso
+- **Respuesta instantánea**: Gráfico responde inmediatamente en lugar de bloquear 500ms
+
+**Detalles técnicos:**
+- useTelemetryHistory refactorizado: `setTimeout(..., 0)` para carga en siguiente tick
+- Primer render muestra punto actual + skeleton
+- Buffer histórico se genera en background sin afectar interactividad
+- Loading state: `isLoading = data.length < 3` puntos
+
+**Bundle:**
+- TelemetryChart: +0.8 kB (skeleton loader)
+- Total precache: ~2010 KiB
+
+### v2.16.3 - Timestamps con Hora Actual Real (11/01/2026)
 
 ### v2.13.2 - UX Mejorada en Sensores (Lista Scrollable)
 

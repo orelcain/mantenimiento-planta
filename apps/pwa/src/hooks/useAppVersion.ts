@@ -31,6 +31,12 @@ export function useAppVersion() {
           const data = await response.json()
           const serverVersion = data.version
           
+          console.log('🔍 Version check:', {
+            current: APP_VERSION,
+            server: serverVersion,
+            hasUpdate: serverVersion !== APP_VERSION
+          })
+          
           if (serverVersion && serverVersion !== APP_VERSION) {
             logger.info('New app version detected', {
               current: APP_VERSION,

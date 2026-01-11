@@ -42,6 +42,9 @@ interface TelemetryChartProps {
 }
 
 export function TelemetryChart({ data, type, height = 300 }: TelemetryChartProps) {
+  // Mostrar indicador de carga si hay muy pocos datos
+  const isLoading = data.length < 3
+
   const chartData = useMemo(() => {
     // Formatear labels según el rango de tiempo
     const labels = data.map(d => {
@@ -413,6 +416,37 @@ export function TelemetryChart({ data, type, height = 300 }: TelemetryChartProps
         return commonOptions
     }
   }, [type])
+
+  // Mostrar skeleton mientras carga
+  if (isLoading) {
+    return (
+      <div style={{ height: `${height}px` }} className="relative bg-gray-50 dark:bg-gray-900/30 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
+            <p className="text-sm text-gray-500 dark:text-gray-400 animate-pulse">
+              Generando historial...
+            </p>
+          </div>
+        </div>
+        {/* Skeleton del gráfico */}
+        <div className="absolute inset-4">
+          <div className="h-full flex items-end gap-1 opacity-20">
+            {Array.from({ length: 20 }).map((_, i) => (
+              <div 
+                key={i} 
+                className="flex-1 bg-gradient-to-t from-blue-300 to-blue-500 rounded-t animate-pulse"
+                style={{ 
+                  height: `${30 + Math.random() * 60}%`,
+                  animationDelay: `${i * 50}ms`
+                }}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   // Renderizar el tipo de gráfico correspondiente
   if (type === 'scatter') {

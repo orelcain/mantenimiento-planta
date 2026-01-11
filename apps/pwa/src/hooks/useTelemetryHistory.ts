@@ -50,7 +50,9 @@ export function useTelemetryHistory(
     initializingRef.current = true
     setLoading(true)
 
-    setTimeout(() => {
+    // Generar historial de forma asíncrona sin bloquear el render
+    // Usar requestIdleCallback o setTimeout con prioridad baja
+    const generateHistory = () => {
       const ranges = {
         '1h': { hours: 1, intervalMinutes: 2 },
         '6h': { hours: 6, intervalMinutes: 10 },
@@ -69,36 +71,53 @@ export function useTelemetryHistory(
       
       const totalPoints = Math.floor((hours * 60) / intervalMinutes)
 
-      for (let i = totalPoints; i >= 1; i--) {
-        const timestamp = new Date(now.getTime() - i * intervalMinutes * 60 * 1000)
-        
-        const hourOfDay = timestamp.getHours()
-        const tempVariation = Math.sin((hourOfDay - 6) * Math.PI / 12) * 2
-        const tempNoise = (Math.random() - 0.5) * 1.5
-        const temperatura = baseTemp + tempVariation + tempNoise
-        
-        const humidityVariation = -tempVariation * 2
-        const humidityNoise = (Math.random() - 0.5) * 3
-        const humedad = baseHumidity + humidityVariation + humidityNoise
-
-        history.push({
-          timestamp,
-          temperatura: Math.round(temperatura * 10) / 10,
-          humedad: Math.round(humedad * 10) / 10
-        })
-      }
-
-      // Agregar punto actual AHORA con valores reales
+      // Agregar punto actual PRIMERO para que el gráfico muestre algo inmediatamente
       history.push({
         timestamp: now,
         temperatura: Math.round(baseTemp * 10) / 10,
         humedad: Math.round(baseHumidity * 10) / 10
       })
 
-      setData(history)
-      lastValueRef.current = { temp: currentTemp, humidity: currentHumidity }
+      // Mostrar el gráfico con el punto actual inmediatamente
+      setData([...history])
       setLoading(false)
-    }, 500)
+
+      // Generar historial en background
+      setTimeout(() => {
+        const historicalData: TelemetryDataPoint[] = []
+        
+        for (let i = totalPoints; i >= 1; i--) {
+          const timestamp = new Date(now.getTime() - i * intervalMinutes * 60 * 1000)
+          
+          const hourOfDay = timestamp.getHours()
+          const tempVariation = Math.sin((hourOfDay - 6) * Math.PI / 12) * 2
+          const tempNoise = (Math.random() - 0.5) * 1.5
+          const temperatura = baseTemp + tempVariation + tempNoise
+          
+          const humidityVariation = -tempVariation * 2
+          const humidityNoise = (Math.random() - 0.5) * 3
+          const humedad = baseHumidity + humidityVariation + humidityNoise
+
+          historicalData.push({
+            timestamp,
+            temperatura: Math.round(temperatura * 10) / 10,
+            humedad: Math.round(humedad * 10) / 10
+          })
+        }
+
+        // Agregar punto actual al final
+        historicalData.push({
+          timestamp: now,
+          temperatura: Math.round(baseTemp * 10) / 10,
+          humedad: Math.round(baseHumidity * 10) / 10
+        })
+
+        setData(historicalData)
+        lastValueRef.current = { temp: currentTemp, humidity: currentHumidity }
+      }, 0) // Ejecutar en siguiente tick
+    }
+
+    generateHistory()
   }, [timeRange]) // Solo depender de timeRange para inicialización
 
   // Agregar nuevos puntos cuando llegan datos nuevos (efecto osciloscopio)
