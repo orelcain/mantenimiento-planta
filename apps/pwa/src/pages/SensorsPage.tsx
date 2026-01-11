@@ -25,11 +25,25 @@ function formatDateTime(timestamp: number | Date | undefined): string {
     // Validar que la fecha sea válida
     if (isNaN(date.getTime())) return 'Fecha inválida'
     
-    // Verificar que la fecha esté en un rango razonable (2020-2030)
+    // Verificar que la fecha esté en un rango razonable (2020-2035)
+    // Ampliado el rango para ser más permisivo
     const year = date.getFullYear()
-    if (year < 2020 || year > 2030) {
+    if (year < 2020 || year > 2035) {
+      // En lugar de mostrar "Fecha inválida", intentar normalizar si parece timestamp en segundos
+      const normalizedDate = new Date(timestamp * 1000)
+      if (!isNaN(normalizedDate.getTime()) && normalizedDate.getFullYear() >= 2020 && normalizedDate.getFullYear() <= 2035) {
+        return normalizedDate.toLocaleString('es-ES', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false
+        })
+      }
       console.warn('Fecha fuera de rango:', date, 'timestamp original:', timestamp)
-      return 'Fecha inválida'
+      return '—'
     }
     
     // Formatear con zona horaria local del usuario
@@ -44,7 +58,7 @@ function formatDateTime(timestamp: number | Date | undefined): string {
     })
   } catch (err) {
     console.error('Error formateando fecha:', err, timestamp)
-    return 'Error'
+    return '—'
   }
 }
 

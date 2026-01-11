@@ -88,6 +88,13 @@ export function useTelemetryHistory(
         })
       }
 
+      // Agregar punto actual AHORA con valores reales
+      history.push({
+        timestamp: now,
+        temperatura: Math.round(baseTemp * 10) / 10,
+        humedad: Math.round(baseHumidity * 10) / 10
+      })
+
       setData(history)
       lastValueRef.current = { temp: currentTemp, humidity: currentHumidity }
       setLoading(false)
