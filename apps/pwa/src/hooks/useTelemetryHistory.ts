@@ -25,7 +25,8 @@ export function useTelemetryHistory(
   const [error, setError] = useState<Error | null>(null)
 
   useEffect(() => {
-    if (!equipmentId) {
+    // Si no hay valores actuales de temp/humedad, no hay nada que mostrar
+    if (currentTemp === undefined || currentHumidity === undefined) {
       setData([])
       setLoading(false)
       return
@@ -75,7 +76,7 @@ export function useTelemetryHistory(
       }
     }, 500) // Simular 500ms de latency
 
-  }, [equipmentId, currentTemp, currentHumidity])
+  }, [currentTemp, currentHumidity]) // Regenerar cuando cambien los valores actuales
 
   return { data, loading, error }
 }
