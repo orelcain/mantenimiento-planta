@@ -115,7 +115,7 @@ export function App() {
 
   return (
     <HelpProvider>
-      <BrowserRouter basename="/mantenimiento-planta">
+      <BrowserRouter basename={import.meta.env.BASE_URL}>
         <Routes>
           {/* Public routes */}
           <Route

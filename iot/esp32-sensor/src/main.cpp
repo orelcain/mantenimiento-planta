@@ -170,7 +170,7 @@ static void sendDeviceStatus(bool online) {
   json.set("lastSeen", (unsigned long)getTimestamp());
   json.set("ip", WiFi.localIP().toString());
   json.set("rssi", WiFi.RSSI());
-  json.set("firmwareVersion", "2.13.4");
+  json.set("firmwareVersion", "2.13.5");
   json.set("sensorType", "dht11");
   json.set("assignedEquipmentId", hasAssignedEquipment() ? currentEquipmentId : "");
 
