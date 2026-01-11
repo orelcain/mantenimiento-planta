@@ -170,7 +170,7 @@ static void sendDeviceStatus(bool online) {
   json.set("lastSeen", (unsigned long)getTimestamp());
   json.set("ip", WiFi.localIP().toString());
   json.set("rssi", WiFi.RSSI());
-  json.set("firmwareVersion", "2.13.0");
+  json.set("firmwareVersion", "2.13.1");
   json.set("sensorType", "dht11");
   json.set("assignedEquipmentId", hasAssignedEquipment() ? currentEquipmentId : "");
 
@@ -368,12 +368,9 @@ void connectWiFi() {
 void setupFirebase() {
   Serial.println("⏳ Configurando Firebase...");
   
-  // Configurar credenciales
-  config.api_key = FIREBASE_API_KEY;
+  // Configurar credenciales - SOLO database_url (sin API_KEY = sin auth)
   config.database_url = FIREBASE_DATABASE_URL;
-  
-  // Callback de token (debe configurarse ANTES de Firebase.begin)
-  config.token_status_callback = tokenStatusCallback;
+  config.signer.tokens.legacy_token = FIREBASE_DATABASE_SECRET; // Token legacy (no crea usuarios)
   
   // Configurar reconexión automática
   Firebase.reconnectWiFi(true);
@@ -381,16 +378,9 @@ void setupFirebase() {
   // Configurar timeout
   config.timeout.serverResponse = 10 * 1000; // 10 segundos
 
-  // ⚠️ SOLUCIÓN: Usar auth anónima PERO con token persistente (un solo usuario por ESP32)
-  // Esto evita crear cientos de usuarios (uno por reset) y permite usar RTDB
-  Serial.println("  Intentando auth anónima (un solo usuario por device)...");
-  
-  // Hacer signup anónimo - la librería maneja la reutilización del token
-  if (Firebase.signUp(&config, &auth, "", "")) {
-    Serial.println("✓ Auth anónima lista (nuevo usuario o token existente reutilizado)");
-  } else {
-    Serial.printf("⚠ Warning signup: %s\n", config.signer.signupError.message.c_str());
-  }
+  // ⚠️ NO usar Firebase.signUp() - esto crea usuarios anónimos constantemente
+  // En su lugar, usar Database Secret (legacy) que NO requiere auth de usuario
+  Serial.println("  Conectando con Database Secret (sin crear usuarios)...");
   
   Firebase.begin(&config, &auth);
   
@@ -405,8 +395,8 @@ void setupFirebase() {
   
   if (Firebase.ready()) {
     Serial.println();
-    Serial.println("✓ Firebase conectado con auth anónima!");
-    Serial.printf("  UID: %s\n", auth.token.uid.c_str());
+    Serial.println("✓ Firebase conectado con Database Secret!");
+    Serial.println("  (Sin autenticación de usuario - no crea usuarios anónimos)");
     firebaseReady = true;
 
     // Cargar equipo asignado (NVS/config) y registrar el device
