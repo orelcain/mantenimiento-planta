@@ -1,0 +1,272 @@
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Activity, AlertTriangle, CheckCircle2 } from 'lucide-react'
+import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Switch } from '@/components/ui'
+import type { BadgeProps } from '@/components/ui/badge'
+import { useAppStore } from '@/store'
+import { useAuthStore } from '@/store'
+import { useIoTPrediction } from '@/hooks/useIoTPrediction'
+import { formatRelativeTime } from '@/lib/utils'
+import { ensurePredictiveIncident } from '@/services/predictiveIncidents'
+
+function riskBadgeVariant(risk: string): BadgeProps['variant'] {
+  switch (risk) {
+    case 'critico':
+      return 'destructive'
+    case 'alto':
+      return 'warning'
+    case 'medio':
+      return 'secondary'
+    default:
+      return 'default'
+  }
+}
+
+export function PredictivePage() {
+  const equipment = useAppStore((s) => s.equipment)
+  const user = useAuthStore((s) => s.user)
+
+  const [selectedId, setSelectedId] = useState<string>(() => equipment[0]?.id ?? '')
+  const [autoCreate, setAutoCreate] = useState(true)
+  const [creating, setCreating] = useState(false)
+  const [createdIncidentId, setCreatedIncidentId] = useState<string | null>(null)
+  const [createError, setCreateError] = useState<string | null>(null)
+  const lastHandledTimestampRef = useRef<number | null>(null)
+
+  const selectedEquipment = useMemo(
+    () => equipment.find((e) => e.id === selectedId) ?? null,
+    [equipment, selectedId]
+  )
+
+  const { summary, readings, prediction, error } = useIoTPrediction(selectedId || null)
+
+  const lastReading = readings[readings.length - 1]
+
+  const canCreateIncident = Boolean(user?.id && selectedEquipment && lastReading)
+
+  async function createPredictiveIncidentNow() {
+    if (!user?.id || !selectedEquipment) return
+
+    setCreateError(null)
+    setCreating(true)
+    try {
+      const created = await ensurePredictiveIncident({
+        equipment: {
+          id: selectedEquipment.id,
+          nombre: selectedEquipment.nombre,
+          codigo: selectedEquipment.codigo,
+          hierarchyNodeId: selectedEquipment.hierarchyNodeId,
+        },
+        prediction,
+        lastReading,
+        reportedByUserId: user.id,
+      })
+
+      if (created) {
+        setCreatedIncidentId(created.id)
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Error creando incidencia predictiva.'
+      setCreateError(msg)
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  // Auto-creación cuando llega una nueva lectura y el riesgo es alto/critico.
+  useEffect(() => {
+    if (!autoCreate) return
+    if (!user?.id) return
+    if (!selectedEquipment) return
+    if (!lastReading?.timestamp) return
+
+    // Solo intentar una vez por timestamp de lectura.
+    if (lastHandledTimestampRef.current === lastReading.timestamp) return
+
+    // Señal clara de riesgo
+    if (prediction.nivelRiesgo !== 'alto' && prediction.nivelRiesgo !== 'critico') {
+      lastHandledTimestampRef.current = lastReading.timestamp
+      return
+    }
+
+    // Lanzar creación (idempotente por el guard en Firestore)
+    void (async () => {
+      await createPredictiveIncidentNow()
+      lastHandledTimestampRef.current = lastReading.timestamp
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoCreate, user?.id, selectedEquipment?.id, lastReading?.timestamp, prediction.nivelRiesgo, prediction.confianza])
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">Módulo Predictivo</h1>
+          <p className="text-muted-foreground">
+            Sensores IoT por máquina + tendencia + alertas de riesgo
+          </p>
+        </div>
+      </div>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2">
+            <Activity className="h-5 w-5" />
+            Seleccionar equipo
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Select value={selectedId} onValueChange={setSelectedId}>
+            <SelectTrigger className="max-w-xl">
+              <SelectValue placeholder="Selecciona un equipo" />
+            </SelectTrigger>
+            <SelectContent>
+              {equipment.map((e) => (
+                <SelectItem key={e.id} value={e.id}>
+                  {e.nombre} ({e.codigo})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {error && (
+            <div className="mt-3 text-sm text-destructive flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4" />
+              {error}
+            </div>
+          )}
+
+          <div className="mt-4 flex flex-col gap-3">
+            <div className="flex items-center justify-between gap-4 max-w-xl">
+              <div className="space-y-0.5">
+                <Label>Auto-crear incidencia predictiva</Label>
+                <div className="text-xs text-muted-foreground">
+                  Crea una incidencia (tipo predictivo) cuando el riesgo sea alto/crítico.
+                </div>
+              </div>
+              <Switch checked={autoCreate} onCheckedChange={setAutoCreate} />
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                onClick={createPredictiveIncidentNow}
+                disabled={!canCreateIncident || creating}
+              >
+                {creating ? 'Creando…' : 'Crear incidencia ahora'}
+              </Button>
+              {createdIncidentId && (
+                <div className="text-xs text-muted-foreground">
+                  Incidencia creada: {createdIncidentId}
+                </div>
+              )}
+            </div>
+
+            {createError && (
+              <div className="text-sm text-destructive flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4" />
+                {createError}
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {selectedEquipment && (
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center justify-between">
+                <span>Estado actual</span>
+                <Badge variant={riskBadgeVariant(prediction.nivelRiesgo)}>
+                  Riesgo: {prediction.nivelRiesgo}
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="text-sm text-muted-foreground">
+                Equipo: <span className="text-foreground font-medium">{selectedEquipment.nombre}</span>
+              </div>
+
+              <div className="grid gap-2 sm:grid-cols-2">
+                <div className="p-3 rounded border">
+                  <div className="text-xs text-muted-foreground">Temperatura</div>
+                  <div className="text-xl font-semibold">
+                    {typeof lastReading?.temperature === 'number' && Number.isFinite(lastReading.temperature)
+                      ? `${lastReading.temperature.toFixed(1)} °C`
+                      : '—'}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    fuente: {lastReading?.source ?? summary?.temperatura?.source ?? '—'}
+                  </div>
+                </div>
+                <div className="p-3 rounded border">
+                  <div className="text-xs text-muted-foreground">Humedad</div>
+                  <div className="text-xl font-semibold">
+                    {typeof lastReading?.humidity === 'number' && Number.isFinite(lastReading.humidity)
+                      ? `${lastReading.humidity.toFixed(1)} %`
+                      : '—'}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    online: {summary?.online ? 'sí' : 'no'}
+                  </div>
+                </div>
+              </div>
+
+              <div className="text-sm">
+                <div className="font-medium mb-1">Indicadores</div>
+                <ul className="list-disc pl-5 space-y-1">
+                  {prediction.indicadores.map((i) => (
+                    <li key={i} className="text-muted-foreground">
+                      {i}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="text-sm">
+                <div className="font-medium mb-1">Recomendación</div>
+                <div className="text-muted-foreground">{prediction.recomendacion}</div>
+              </div>
+
+              <div className="text-xs text-muted-foreground flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4" />
+                Confianza estimada: {Math.round(prediction.confianza * 100)}%
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle>Últimas lecturas</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {readings.length === 0 ? (
+                <div className="text-sm text-muted-foreground">
+                  Aún no hay histórico. El ESP32 empezará a poblar la ruta "sensors/&lt;equipmentId&gt;/readings".
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-[360px] overflow-auto">
+                  {readings
+                    .slice(-12)
+                    .reverse()
+                    .map((r) => (
+                      <div key={r.timestamp} className="flex items-center justify-between p-2 rounded border">
+                        <div className="text-sm">
+                          <div className="font-medium">
+                            {r.temperature.toFixed(1)}°C · {r.humidity.toFixed(1)}%
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {formatRelativeTime(new Date(r.timestamp))} · {r.source ?? '—'}
+                          </div>
+                        </div>
+                        <div className="text-xs text-muted-foreground">{new Date(r.timestamp).toLocaleTimeString()}</div>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+    </div>
+  )
+}

@@ -27,3 +27,13 @@ apps/pwa/.env.local
 .idea
 *.swp
 *.swo
+
+# VS Code workspace file (local)
+*.code-workspace
+
+# PlatformIO / ESP32 (no commitear builds ni credenciales)
+**/.pio/
+iot/**/config.h
+iot/**/src/config.h
+esp32-sensor/**/config.h
+esp32-sensor/**/src/config.h

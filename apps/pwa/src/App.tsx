@@ -12,6 +12,7 @@ import {
   DashboardPage,
   IncidentsPage,
   EquipmentPage,
+  PredictivePage,
 } from '@/pages'
 
 // Code Splitting: Lazy load para páginas pesadas o menos usadas
@@ -160,6 +161,7 @@ export function App() {
               </Suspense>
             } />
             <Route path="equipment" element={<EquipmentPage />} />
+            <Route path="predictive" element={<PredictivePage />} />
             <Route path="preventive" element={
               <Suspense fallback={<LoadingScreen />}>
                 <PreventivePage />
