@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Cpu, Link2, Unlink2, AlertTriangle } from 'lucide-react'
+import { Cpu, Link2, Unlink2, AlertTriangle, Thermometer, Droplets, Activity } from 'lucide-react'
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui'
 import { useAppStore, useAuthStore } from '@/store'
 import type { Equipment } from '@/types'
 import type { DeviceRow } from '@/services/devicesRtdb'
+import type { SensorSummaryNode } from '@/services/sensorsRtdb'
 import { assignDeviceToEquipment, subscribeDevices } from '@/services/devicesRtdb'
+import { subscribeSensorSummary } from '@/services/sensorsRtdb'
 
 function normalizeTs(ts: number | undefined): number | null {
   if (typeof ts !== 'number' || !Number.isFinite(ts)) return null
@@ -30,6 +32,7 @@ export function SensorsPage() {
   const [devices, setDevices] = useState<DeviceRow[]>([])
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('')
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [sensorData, setSensorData] = useState<SensorSummaryNode | null>(null)
 
   const [deviceSearch, setDeviceSearch] = useState('')
 
@@ -80,6 +83,28 @@ export function SensorsPage() {
     return equipment.find((e) => e.id === id) ?? null
   }, [equipment, selectedDevice?.assignedEquipmentId])
 
+  // Suscribirse a telemetría del sensor cuando hay equipo asignado
+  useEffect(() => {
+    if (!assignedEquipment?.id) {
+      setSensorData(null)
+      return
+    }
+
+    console.log('[SensorsPage] Suscribiendo a telemetría de equipo:', assignedEquipment.id)
+    const unsub = subscribeSensorSummary(
+      assignedEquipment.id,
+      (data) => {
+        console.log('[SensorsPage] Telemetría recibida:', data)
+        setSensorData(data)
+      },
+      (err) => {
+        console.error('[SensorsPage] Error telemetría:', err)
+      }
+    )
+
+    return () => unsub()
+  }, [assignedEquipment?.id])
+
   const filteredEquipment = useMemo(() => {
     const q = equipmentSearch.trim().toLowerCase()
     return equipment.filter((e) => {
@@ -124,7 +149,8 @@ export function SensorsPage() {
         </div>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-3">
+        {/* Columna 1: Lista de dispositivos */}
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2">
@@ -164,9 +190,17 @@ export function SensorsPage() {
                       <div className="mt-1 text-xs text-muted-foreground">
                         {lastSeen ? `Último reporte: ${new Date(lastSeen).toLocaleString()}` : 'Sin lastSeen'}
                       </div>
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        Asignado a: {d.assignedEquipmentId ? d.assignedEquipmentId : '—'}
-                      </div>
+                      {d.assignedEquipmentId && (
+                        <div className="mt-1 text-xs">
+                          <span className="text-muted-foreground">Equipo: </span>
+                          <span className="font-medium">
+                            {equipment.find((e) => e.id === d.assignedEquipmentId)?.nombre || d.assignedEquipmentId}
+                          </span>
+                        </div>
+                      )}
+                      {!d.assignedEquipmentId && (
+                        <div className="mt-1 text-xs text-amber-600">Sin asignar</div>
+                      )}
                     </button>
                   )
                 })
@@ -175,6 +209,110 @@ export function SensorsPage() {
           </CardContent>
         </Card>
 
+        {/* Columna 2: Telemetría en tiempo real */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2">
+              <Activity className="h-5 w-5" />
+              Telemetría
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {!selectedDevice ? (
+              <div className="text-sm text-muted-foreground">Selecciona un dispositivo para ver su telemetría.</div>
+            ) : !assignedEquipment ? (
+              <div className="space-y-2">
+                <div className="text-sm font-medium">Dispositivo sin asignar</div>
+                <div className="text-xs text-muted-foreground">
+                  Este sensor no está asignado a ningún equipo. Asígnalo para ver su telemetría.
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <div className="text-sm font-medium">Equipo asociado</div>
+                  <div className="text-xs">
+                    <div className="font-medium">{assignedEquipment.nombre}</div>
+                    <div className="text-muted-foreground">{assignedEquipment.codigo}</div>
+                    {assignedEquipment.hierarchyPath && (
+                      <div className="text-muted-foreground mt-1">{assignedEquipment.hierarchyPath}</div>
+                    )}
+                  </div>
+                </div>
+
+                {sensorData ? (
+                  <div className="space-y-3">
+                    {/* Temperatura */}
+                    {sensorData.temperatura && (
+                      <div className="rounded border p-3 bg-orange-50 dark:bg-orange-950/20">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Thermometer className="h-4 w-4 text-orange-600" />
+                          <span className="text-sm font-medium">Temperatura</span>
+                        </div>
+                        <div className="text-2xl font-bold">
+                          {sensorData.temperatura.value?.toFixed(1) ?? '—'} {sensorData.temperatura.unit ?? '°C'}
+                        </div>
+                        {sensorData.temperatura.status && (
+                          <Badge variant={sensorData.temperatura.status === 'normal' ? 'default' : 'destructive'} className="mt-2">
+                            {sensorData.temperatura.status}
+                          </Badge>
+                        )}
+                        {sensorData.temperatura.timestamp && (
+                          <div className="text-xs text-muted-foreground mt-2">
+                            {new Date(sensorData.temperatura.timestamp).toLocaleString()}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Humedad */}
+                    {sensorData.humedad && (
+                      <div className="rounded border p-3 bg-blue-50 dark:bg-blue-950/20">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Droplets className="h-4 w-4 text-blue-600" />
+                          <span className="text-sm font-medium">Humedad</span>
+                        </div>
+                        <div className="text-2xl font-bold">
+                          {sensorData.humedad.value?.toFixed(1) ?? '—'} {sensorData.humedad.unit ?? '%'}
+                        </div>
+                        {sensorData.humedad.status && (
+                          <Badge variant={sensorData.humedad.status === 'normal' ? 'default' : 'destructive'} className="mt-2">
+                            {sensorData.humedad.status}
+                          </Badge>
+                        )}
+                        {sensorData.humedad.timestamp && (
+                          <div className="text-xs text-muted-foreground mt-2">
+                            {new Date(sensorData.humedad.timestamp).toLocaleString()}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Estado online */}
+                    {sensorData.online !== undefined && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <span className="text-muted-foreground">Estado del sensor:</span>
+                        {onlineBadge(sensorData.online)}
+                      </div>
+                    )}
+
+                    {sensorData.lastSeen && (
+                      <div className="text-xs text-muted-foreground">
+                        Última actualización: {new Date(sensorData.lastSeen).toLocaleString()}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-sm text-muted-foreground">
+                    Esperando datos del sensor...
+                  </div>
+                )}
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Columna 3: Emparejar */}
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center justify-between">
@@ -184,72 +322,81 @@ export function SensorsPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             {!selectedDevice ? (
-              <div className="text-sm text-muted-foreground">Selecciona un dispositivo.</div>
+              <div className="text-sm text-muted-foreground">Selecciona un dispositivo para emparejarlo.</div>
             ) : (
               <>
                 <div className="space-y-1">
                   <div className="text-sm text-muted-foreground">Dispositivo</div>
-                  <div className="font-medium">{selectedDevice.deviceId}</div>
+                  <div className="font-medium break-all">{selectedDevice.deviceId}</div>
                   <div className="text-xs text-muted-foreground">
                     {selectedDevice.ip ? `IP: ${selectedDevice.ip}` : ''}
                     {typeof selectedDevice.rssi === 'number' ? ` · RSSI: ${selectedDevice.rssi} dBm` : ''}
                   </div>
+                  {selectedDevice.firmwareVersion && (
+                    <div className="text-xs text-muted-foreground">Firmware: {selectedDevice.firmwareVersion}</div>
+                  )}
                 </div>
 
-                <div className="rounded border p-3">
-                  <div className="text-sm font-medium">Asignación actual</div>
-                  <div className="text-xs text-muted-foreground mt-1">
-                    {assignedEquipment
-                      ? `${assignedEquipment.nombre} (${assignedEquipment.codigo})`
-                      : selectedDevice.assignedEquipmentId
-                        ? `ID: ${selectedDevice.assignedEquipmentId}`
-                        : 'Sin asignar'}
+                <div className="rounded border p-3 bg-muted/30">
+                  <div className="text-sm font-medium mb-1">Asignación actual</div>
+                  <div className="text-xs">
+                    {assignedEquipment ? (
+                      <>
+                        <div className="font-medium">{assignedEquipment.nombre}</div>
+                        <div className="text-muted-foreground">{assignedEquipment.codigo}</div>
+                      </>
+                    ) : selectedDevice.assignedEquipmentId ? (
+                      <div className="text-muted-foreground">ID: {selectedDevice.assignedEquipmentId}</div>
+                    ) : (
+                      <div className="text-amber-600">Sin asignar</div>
+                    )}
                   </div>
                 </div>
 
-                <div className="grid gap-3">
-                  <div className="grid gap-2 sm:grid-cols-3">
-                    <div className="sm:col-span-2">
-                      <Label>Buscar equipo</Label>
-                      <Input
-                        value={equipmentSearch}
-                        onChange={(e) => setEquipmentSearch(e.target.value)}
-                        placeholder="Nombre, código o ubicación…"
-                      />
+                <div className="border-t pt-4 space-y-3">
+                  <div className="text-sm font-medium">Cambiar asignación</div>
+                  
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <div>
+                      <Label>Estado</Label>
+                      <Select value={filterEstado} onValueChange={(v) => setFilterEstado(v as any)}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Estado" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="todas">Todas</SelectItem>
+                          <SelectItem value="operativo">Operativo</SelectItem>
+                          <SelectItem value="en_mantenimiento">En mantenimiento</SelectItem>
+                          <SelectItem value="fuera_servicio">Fuera de servicio</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      <div>
-                        <Label>Estado</Label>
-                        <Select value={filterEstado} onValueChange={(v) => setFilterEstado(v as any)}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Estado" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="todas">Todas</SelectItem>
-                            <SelectItem value="operativo">Operativo</SelectItem>
-                            <SelectItem value="en_mantenimiento">En mantenimiento</SelectItem>
-                            <SelectItem value="fuera_servicio">Fuera de servicio</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <Label>Criticidad</Label>
-                        <Select value={filterCriticidad} onValueChange={(v) => setFilterCriticidad(v as any)}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Criticidad" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="todas">Todas</SelectItem>
-                            <SelectItem value="alta">Alta</SelectItem>
-                            <SelectItem value="media">Media</SelectItem>
-                            <SelectItem value="baja">Baja</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
+                    <div>
+                      <Label>Criticidad</Label>
+                      <Select value={filterCriticidad} onValueChange={(v) => setFilterCriticidad(v as any)}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Criticidad" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="todas">Todas</SelectItem>
+                          <SelectItem value="alta">Alta</SelectItem>
+                          <SelectItem value="media">Media</SelectItem>
+                          <SelectItem value="baja">Baja</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
 
-                  <div className="max-w-xl">
+                  <div>
+                    <Label>Buscar equipo</Label>
+                    <Input
+                      value={equipmentSearch}
+                      onChange={(e) => setEquipmentSearch(e.target.value)}
+                      placeholder="Nombre, código o ubicación…"
+                    />
+                  </div>
+
+                  <div>
                     <Label>Equipo destino</Label>
                     <Select value={selectedEquipmentId} onValueChange={setSelectedEquipmentId}>
                       <SelectTrigger>

@@ -1,96 +1,129 @@
 /**
- * Script para eliminar TODOS los usuarios anónimos de Firebase Auth
+ * Script para eliminar TODOS los usuarios anónimos de Firebase Auth EN BATCH
  * 
- * Uso:
- *   firebase login (si no estás logueado)
+ * PASO 1: Descargar Service Account Key:
+ *   1. Ve a: https://console.firebase.google.com/project/mantenimiento-planta-771a3/settings/serviceaccounts/adminsdk
+ *   2. Click "Generar nueva clave privada" 
+ *   3. Guarda el archivo JSON en la carpeta raíz del proyecto
+ *   4. Renómbralo a: serviceAccountKey.json
+ * 
+ * PASO 2: Instalar firebase-admin:
+ *   npm install firebase-admin
+ * 
+ * PASO 3: Ejecutar:
  *   node scripts/delete_anonymous_users.js
- * 
- * Usa las credenciales de Firebase CLI
  */
 
-const { spawn } = require('child_process');
+const admin = require('firebase-admin');
+const fs = require('fs');
+const path = require('path');
+
+// Buscar service account key
+const serviceAccountPath = path.join(__dirname, '../serviceAccountKey.json');
+
+if (!fs.existsSync(serviceAccountPath)) {
+  console.error('❌ ERROR: No se encontró serviceAccountKey.json');
+  console.log('');
+  console.log('📋 PASOS PARA OBTENERLO:');
+  console.log('1. Ve a: https://console.firebase.google.com/project/mantenimiento-planta-771a3/settings/serviceaccounts/adminsdk');
+  console.log('2. Click en "Generar nueva clave privada"');
+  console.log('3. Guarda el archivo en la raíz del proyecto');
+  console.log('4. Renómbralo a: serviceAccountKey.json');
+  console.log('5. Ejecuta este script nuevamente');
+  process.exit(1);
+}
+
+const serviceAccount = require(serviceAccountPath);
+
+// Inicializar Firebase Admin
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+  databaseURL: 'https://mantenimiento-planta-771a3-default-rtdb.firebaseio.com'
+});
 
 async function deleteAnonymousUsers() {
-  console.log('🔍 Usando Firebase CLI para eliminar usuarios anónimos...');
-  console.log('⚠️  Este proceso puede tardar varios minutos');
+  console.log('╔════════════════════════════════════════════════════╗');
+  console.log('║  Eliminador MASIVO de Usuarios Anónimos - Firebase ║');
+  console.log('╚════════════════════════════════════════════════════╝');
   console.log('');
+  console.log('🔍 Buscando usuarios anónimos...');
   
-  // Usar Firebase CLI para obtener lista de usuarios
-  const listProcess = spawn('firebase', [
-    'auth:export',
-    'users.json',
-    '--format=json'
-  ], {
-    cwd: process.cwd(),
-    shell: true
-  });
+  let totalDeleted = 0;
+  let totalErrors = 0;
+  let pageToken;
   
-  listProcess.stdout.on('data', (data) => {
-    console.log(data.toString());
-  });
-  
-  listProcess.stderr.on('data', (data) => {
-    console.error(data.toString());
-  });
-  
-  listProcess.on('close', async (code) => {
-    if (code !== 0) {
-      console.error('❌ Error exportando usuarios. ¿Estás logueado? Ejecuta: firebase login');
-      process.exit(1);
-    }
-    
-    // Leer archivo de usuarios
-    const fs = require('fs');
-    if (!fs.existsSync('users.json')) {
-      console.log('✅ No hay usuarios para eliminar');
-      process.exit(0);
-    }
-    
-    const usersData = JSON.parse(fs.readFileSync('users.json', 'utf8'));
-    const users = usersData.users || [];
-    
-    // Filtrar usuarios anónimos
-    const anonymousUsers = users.filter(user => {
-      return !user.email && !user.phoneNumber && user.providerUserInfo?.length === 0;
-    });
-    
-    console.log(`📋 Encontrados ${anonymousUsers.length} usuarios anónimos de ${users.length} totales`);
-    
-    if (anonymousUsers.length === 0) {
-      console.log('✅ No hay usuarios anónimos para eliminar');
-      fs.unlinkSync('users.json');
-      process.exit(0);
-    }
-    
-    // Eliminar en lotes
-    let deleted = 0;
-    for (const user of anonymousUsers) {
-      const deleteProcess = spawn('firebase', [
-        'auth:delete',
-        user.localId,
-        '--force'
-      ], {
-        cwd: process.cwd(),
-        shell: true
+  try {
+    do {
+      // Listar usuarios en lotes de 1000
+      const listResult = await admin.auth().listUsers(1000, pageToken);
+      
+      // Debug: mostrar info de los primeros usuarios
+      if (listResult.users.length > 0) {
+        console.log(`\n📋 Total usuarios en este lote: ${listResult.users.length}`);
+        console.log('📋 Muestra de primeros 3 usuarios:');
+        listResult.users.slice(0, 3).forEach(u => {
+          console.log(`  - UID: ${u.uid.substring(0, 25)}...`);
+          console.log(`    Email: ${u.email || 'N/A'}`);
+          console.log(`    Phone: ${u.phoneNumber || 'N/A'}`);
+          console.log(`    Providers: ${u.providerData.length}`);
+          console.log(`    Created: ${new Date(u.metadata.creationTime).toLocaleString()}`);
+        });
+      }
+      
+      // Filtrar usuarios anónimos (sin email, sin teléfono, sin proveedores)
+      const anonymousUsers = listResult.users.filter(user => {
+        return user.providerData.length === 0 && !user.email && !user.phoneNumber;
       });
       
-      await new Promise((resolve) => {
-        deleteProcess.on('close', (code) => {
-          if (code === 0) {
-            deleted++;
-            if (deleted % 5 === 0) {
-              console.log(`  ✓ Eliminados: ${deleted}/${anonymousUsers.length}`);
+      if (anonymousUsers.length > 0) {
+        console.log(`📋 Encontrados ${anonymousUsers.length} usuarios anónimos en este lote`);
+        
+        // Eliminar en paralelo (batches de 100 para evitar rate limits)
+        for (let i = 0; i < anonymousUsers.length; i += 100) {
+          const batch = anonymousUsers.slice(i, i + 100);
+          
+          await Promise.all(batch.map(async (user) => {
+            try {
+              await admin.auth().deleteUser(user.uid);
+              totalDeleted++;
+              if (totalDeleted % 50 === 0) {
+                console.log(`  ✓ Progreso: ${totalDeleted} eliminados...`);
+              }
+            } catch (error) {
+              totalErrors++;
+              console.error(`  ✗ Error eliminando ${user.uid}: ${error.message}`);
             }
-          }
-          resolve();
-        });
-      });
-    }
+          }));
+          
+          // Pequeña pausa entre batches
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      }
+      
+      pageToken = listResult.pageToken;
+    } while (pageToken);
     
-    console.log(`\n✅ Proceso completado: ${deleted} usuarios eliminados`);
-    fs.unlinkSync('users.json');
-    process.exit(0);
-  });
+    console.log('');
+    console.log('╔════════════════════════════════════════════════════╗');
+    console.log('║              PROCESO COMPLETADO                    ║');
+    console.log('╚════════════════════════════════════════════════════╝');
+    console.log('');
+    console.log(`✅ Usuarios eliminados: ${totalDeleted}`);
+    if (totalErrors > 0) {
+      console.log(`⚠️  Errores: ${totalErrors}`);
+    }
+    console.log('');
+    console.log('🎉 Todos los usuarios anónimos han sido eliminados!');
+    console.log('');
+    console.log('⚠️  RECUERDA: El firmware v2.13.1 con Database Secret');
+    console.log('   YA NO CREARÁ más usuarios anónimos.');
+    
+  } catch (error) {
+    console.error('❌ Error fatal:', error);
+    process.exit(1);
+  }
+  
+  process.exit(0);
 }
 
 // Ejecutar
