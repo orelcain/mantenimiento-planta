@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Cpu, Link2, Unlink2, AlertTriangle, Thermometer, Droplets, Activity, X } from 'lucide-react'
+import { Cpu, Link2, Unlink2, AlertTriangle, Thermometer, Droplets, Activity, X, BarChart3 } from 'lucide-react'
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui'
 import { useAppStore, useAuthStore } from '@/store'
 import type { Equipment } from '@/types'
@@ -7,6 +7,8 @@ import type { DeviceRow } from '@/services/devicesRtdb'
 import type { SensorSummaryNode } from '@/services/sensorsRtdb'
 import { assignDeviceToEquipment, subscribeDevices } from '@/services/devicesRtdb'
 import { subscribeSensorSummary } from '@/services/sensorsRtdb'
+import { TelemetryChart, type ChartType } from '@/components/telemetry/TelemetryChart'
+import { useTelemetryHistory } from '@/hooks/useTelemetryHistory'
 
 function normalizeTs(ts: number | undefined): number | null {
   if (typeof ts !== 'number' || !Number.isFinite(ts)) return null
@@ -48,6 +50,10 @@ export function SensorsPage() {
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saveOk, setSaveOk] = useState<string | null>(null)
+
+  // Estado para el gráfico de telemetría
+  const [showChart, setShowChart] = useState(false)
+  const [chartType, setChartType] = useState<ChartType>('dual-axis')
 
   useEffect(() => {
     const unsub = subscribeDevices(
@@ -135,6 +141,13 @@ export function SensorsPage() {
     selectedDevice?.online,
     sensorData
   ])
+
+  // Hook para obtener historial de telemetría (datos simulados por ahora)
+  const { data: historyData, loading: historyLoading } = useTelemetryHistory(
+    assignedEquipment?.id ?? null,
+    displayTelemetry?.temperatura?.value,
+    displayTelemetry?.humedad?.value
+  )
 
   const filteredEquipment = useMemo(() => {
     const q = equipmentSearch.trim().toLowerCase()
@@ -414,6 +427,62 @@ export function SensorsPage() {
                         Última actualización: {new Date(displayTelemetry.lastSeen).toLocaleString()}
                       </div>
                     )}
+
+                    {/* Botón para mostrar/ocultar gráfico histórico */}
+                    <div className="pt-4 border-t">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setShowChart(!showChart)}
+                        className="w-full gap-2"
+                      >
+                        <BarChart3 className="h-4 w-4" />
+                        {showChart ? 'Ocultar' : 'Ver'} Gráfico Histórico
+                      </Button>
+
+                      {/* Gráfico histórico expandible */}
+                      {showChart && (
+                        <div className="mt-4 space-y-3">
+                          {/* Selector de tipo de gráfico */}
+                          <div className="space-y-2">
+                            <Label htmlFor="chart-type" className="text-sm">Tipo de gráfico</Label>
+                            <Select value={chartType} onValueChange={(v) => setChartType(v as ChartType)}>
+                              <SelectTrigger id="chart-type" className="w-full">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="line">📈 Línea de tiempo</SelectItem>
+                                <SelectItem value="area">🌊 Área suavizada</SelectItem>
+                                <SelectItem value="dual-axis">🎯 Doble eje (Recomendado)</SelectItem>
+                                <SelectItem value="scatter">🔵 Scatter (Correlación)</SelectItem>
+                                <SelectItem value="bar">📊 Barras por hora</SelectItem>
+                                <SelectItem value="radar">🕸️ Radar (Estadísticas)</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          {/* Gráfico */}
+                          <div className="rounded border bg-card p-4">
+                            {historyLoading ? (
+                              <div className="text-sm text-muted-foreground text-center py-8">
+                                🔄 Cargando historial de 24 horas...
+                              </div>
+                            ) : historyData.length === 0 ? (
+                              <div className="text-sm text-muted-foreground text-center py-8">
+                                No hay datos históricos disponibles
+                              </div>
+                            ) : (
+                              <>
+                                <div className="text-xs text-muted-foreground mb-3">
+                                  Últimas 24 horas · {historyData.length} puntos de datos
+                                </div>
+                                <TelemetryChart data={historyData} type={chartType} height={350} />
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ) : (
                   <div className="text-sm text-muted-foreground">
