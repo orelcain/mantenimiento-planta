@@ -28,23 +28,23 @@ export async function uploadIncidentPhoto(
   })
 
   try {
-    // Comprimir imagen automáticamente si es mayor a 1MB
-    const fileToUpload = file.size > 1024 * 1024 
-      ? await compressImage(file, 1920, 0.8)
-      : file
+    // Siempre convertir a WebP con buena calidad
+    const fileToUpload = await compressImage(file, 1920, 0.88, true)
 
-    const fileExtension =
-      fileToUpload.name.split('.').pop() ||
-      (fileToUpload.type === 'image/webp' ? 'webp' : 'jpg')
-    const fileName = `${generateId()}.${fileExtension}`
+    const fileName = `${generateId()}.webp`
     const storageRef = ref(storage, `incidents/${incidentId}/${fileName}`)
     
     await uploadBytes(storageRef, fileToUpload, {
-      contentType: fileToUpload.type || 'image/jpeg',
+      contentType: 'image/webp',
     })
     const url = await getDownloadURL(storageRef)
     
-    logger.info('Incident photo uploaded successfully', { incidentId, fileName })
+    logger.info('Incident photo uploaded successfully', { 
+      incidentId, 
+      fileName,
+      originalSize: file.size,
+      webpSize: fileToUpload.size 
+    })
     return url
   } catch (error) {
     logger.error('Error uploading incident photo', error as Error, { incidentId })
@@ -69,23 +69,25 @@ export async function uploadEquipmentPhoto(
   })
 
   try {
-    // Comprimir si es necesario
-    const fileToUpload = file.size > 1024 * 1024
-      ? await compressImage(file, 1920, 0.8)
-      : file
+    // Siempre convertir a WebP y comprimir si es necesario
+    // Mantener calidad alta (0.88) para buena visualización
+    const fileToUpload = await compressImage(file, 1920, 0.88, true)
 
-    const fileExtension =
-      fileToUpload.name.split('.').pop() ||
-      (fileToUpload.type === 'image/webp' ? 'webp' : 'jpg')
-    const fileName = `${generateId()}.${fileExtension}`
+    const fileName = `${generateId()}.webp`
     const storageRef = ref(storage, `equipment/${equipmentId}/${fileName}`)
     
     await uploadBytes(storageRef, fileToUpload, {
-      contentType: fileToUpload.type || 'image/jpeg',
+      contentType: 'image/webp',
     })
     const url = await getDownloadURL(storageRef)
     
-    logger.info('Equipment photo uploaded successfully', { equipmentId, fileName })
+    logger.info('Equipment photo uploaded successfully', { 
+      equipmentId, 
+      fileName,
+      originalSize: file.size,
+      webpSize: fileToUpload.size,
+      reduction: Math.round((1 - fileToUpload.size / file.size) * 100)
+    })
     return url
   } catch (error) {
     logger.error('Error uploading equipment photo', error as Error, { equipmentId })

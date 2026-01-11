@@ -7,6 +7,7 @@ import {
   ChevronRight,
   Copy,
   Download,
+  Edit2,
   FileDown,
   Grid3X3,
   Image as ImageIcon,
@@ -203,6 +204,9 @@ export function EquipmentPage() {
 
   const [photoUploading, setPhotoUploading] = useState(false)
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null)
+  
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
+  const [editingNoteText, setEditingNoteText] = useState('')
 
   const debouncedSetSearch = useMemo(
     () => debounce((value: string) => setDebouncedSearch(value), 300),
@@ -844,6 +848,29 @@ export function EquipmentPage() {
     setNewNoteText('')
   }
 
+  const editNote = (equipmentId: string, noteId: string, newText: string) => {
+    const text = newText.trim()
+    if (!text) return
+
+    setNotesById((prev) => {
+      const next = { ...prev }
+      const list = next[equipmentId] ?? []
+      next[equipmentId] = list.map((note) =>
+        note.id === noteId ? { ...note, text } : note
+      )
+      return next
+    })
+  }
+
+  const deleteNote = (equipmentId: string, noteId: string) => {
+    setNotesById((prev) => {
+      const next = { ...prev }
+      const list = next[equipmentId] ?? []
+      next[equipmentId] = list.filter((note) => note.id !== noteId)
+      return next
+    })
+  }
+
   const openEditFromDetail = () => {
     if (!detailEquipment) return
     setEditingEquipment(detailEquipment)
@@ -1256,8 +1283,25 @@ export function EquipmentPage() {
           newNoteText={newNoteText}
           photoUploading={photoUploading}
           selectedPhotoIndex={selectedPhotoIndex}
+          editingNoteId={editingNoteId}
+          editingNoteText={editingNoteText}
           onNewNoteTextChange={setNewNoteText}
           onAddNote={addNote}
+          onEditNote={(noteId, newText) => {
+            editNote(detailEquipment.id, noteId, newText)
+            setEditingNoteId(null)
+            setEditingNoteText('')
+          }}
+          onDeleteNote={(noteId) => deleteNote(detailEquipment.id, noteId)}
+          onStartEditNote={(noteId, text) => {
+            setEditingNoteId(noteId)
+            setEditingNoteText(text)
+          }}
+          onCancelEditNote={() => {
+            setEditingNoteId(null)
+            setEditingNoteText('')
+          }}
+          onEditingNoteTextChange={setEditingNoteText}
           onToggleFavorite={() => toggleFavorite(detailEquipment.id)}
           onViewHierarchy={() => handleViewHierarchy(detailEquipment)}
           onEdit={openEditFromDetail}
@@ -1786,8 +1830,15 @@ function EquipmentDetailDialog({
   newNoteText,
   photoUploading,
   selectedPhotoIndex,
+  editingNoteId,
+  editingNoteText,
   onNewNoteTextChange,
   onAddNote,
+  onEditNote,
+  onDeleteNote,
+  onStartEditNote,
+  onCancelEditNote,
+  onEditingNoteTextChange,
   onToggleFavorite,
   onViewHierarchy,
   onEdit,
@@ -1806,8 +1857,15 @@ function EquipmentDetailDialog({
   newNoteText: string
   photoUploading: boolean
   selectedPhotoIndex: number | null
+  editingNoteId: string | null
+  editingNoteText: string
   onNewNoteTextChange: (v: string) => void
   onAddNote: () => void
+  onEditNote: (noteId: string, newText: string) => void
+  onDeleteNote: (noteId: string) => void
+  onStartEditNote: (noteId: string, text: string) => void
+  onCancelEditNote: () => void
+  onEditingNoteTextChange: (text: string) => void
   onToggleFavorite: () => void
   onViewHierarchy: () => void
   onEdit: () => void
@@ -2044,8 +2102,65 @@ function EquipmentDetailDialog({
                 notes.map((n) => (
                   <Card key={n.id}>
                     <CardContent className="p-4">
-                      <div className="text-sm text-muted-foreground">{formatRelativeTime(n.createdAt)}</div>
-                      <div className="mt-1 whitespace-pre-wrap">{n.text}</div>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1">
+                          <div className="text-sm text-muted-foreground mb-1">{formatRelativeTime(n.createdAt)}</div>
+                          {editingNoteId === n.id ? (
+                            <div className="space-y-2">
+                              <Textarea
+                                value={editingNoteText}
+                                onChange={(e) => onEditingNoteTextChange(e.target.value)}
+                                rows={3}
+                                autoFocus
+                              />
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  onClick={() => {
+                                    onEditNote(n.id, editingNoteText)
+                                  }}
+                                  disabled={!editingNoteText.trim()}
+                                >
+                                  Guardar
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={onCancelEditNote}
+                                >
+                                  Cancelar
+                                </Button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="whitespace-pre-wrap">{n.text}</div>
+                          )}
+                        </div>
+                        {editingNoteId !== n.id && (
+                          <div className="flex gap-1 flex-shrink-0">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => onStartEditNote(n.id, n.text)}
+                              className="h-8 w-8 p-0"
+                            >
+                              <Edit2 className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                if (confirm('¿Eliminar esta nota?')) {
+                                  onDeleteNote(n.id)
+                                }
+                              }}
+                              className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        )}
+                      </div>
                     </CardContent>
                   </Card>
                 ))
