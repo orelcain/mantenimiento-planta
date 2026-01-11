@@ -9,6 +9,7 @@
     "lint": "turbo run lint",
     "preview": "turbo run preview",
     "clean": "turbo run clean && rm -rf node_modules",
+    "sync:version:pwa": "node scripts/sync-pwa-version.mjs",
     "seed:user": "node scripts/seed_user_profile.js",
     "seed:user:help": "node scripts/seed_user_profile.js --help",
     "sync:equipment": "node scripts/sync_equipment_from_hierarchy.js",

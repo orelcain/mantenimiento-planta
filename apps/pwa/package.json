@@ -1,10 +1,12 @@
 {
   "name": "@mantenimiento/pwa",
-  "version": "2.16.9",
+  "version": "2.16.10",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "sync:version": "node ../../scripts/sync-pwa-version.mjs",
+    "prebuild": "pnpm run sync:version",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",

@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useRef } from 'react'
 import 'chartjs-adapter-date-fns'
 import {
   Chart as ChartJS,
@@ -70,6 +70,64 @@ interface TelemetryChartProps {
 export function TelemetryChart({ data, type, height = 300 }: TelemetryChartProps) {
   // Mostrar indicador de carga si hay muy pocos datos
   const isLoading = data.length < 3
+
+  const chartRef = useRef<ChartJS | null>(null)
+
+  const supportsRealtimeZoom =
+    type === 'line' ||
+    type === 'area' ||
+    type === 'dual-axis' ||
+    type === 'candlestick' ||
+    type === 'mixed'
+
+  const zoomToNow = () => {
+    const chart = chartRef.current as any
+    if (!chart) return
+
+    const now = Date.now()
+    const windowPastMs = 30 * 60 * 1000
+    const windowFutureMs = 2 * 60 * 1000
+    const min = now - windowPastMs
+    const max = now + windowFutureMs
+
+    // Preferir API del plugin si está disponible
+    if (typeof chart.zoomScale === 'function') {
+      try {
+        chart.zoomScale('x', { min, max }, 'none')
+        chart.update('none')
+        return
+      } catch {
+        // fallback abajo
+      }
+    }
+
+    const scales = chart.options?.scales
+    if (scales?.x) {
+      scales.x.min = min
+      scales.x.max = max
+    }
+    chart.update('none')
+  }
+
+  const resetZoom = () => {
+    const chart = chartRef.current as any
+    if (!chart) return
+
+    if (typeof chart.resetZoom === 'function') {
+      try {
+        chart.resetZoom()
+      } catch {
+        // ignore
+      }
+    }
+
+    const scales = chart.options?.scales
+    if (scales?.x) {
+      delete scales.x.min
+      delete scales.x.max
+    }
+    chart.update('none')
+  }
 
   const chartData = useMemo(() => {
     const tempSeries = data.map(d => ({ x: d.timestamp, y: d.temperatura }))
@@ -643,67 +701,62 @@ export function TelemetryChart({ data, type, height = 300 }: TelemetryChartProps
     )
   }
 
-  // Renderizar el tipo de gráfico correspondiente
-  if (type === 'scatter') {
-    return (
-      <div style={{ height: `${height}px` }}>
-        <Scatter data={chartData as any} options={options as any} />
-      </div>
-    )
-  }
+  const chartElement = (() => {
+    if (type === 'scatter') {
+      return <Scatter ref={chartRef as any} data={chartData as any} options={options as any} />
+    }
 
-  if (type === 'bar') {
-    return (
-      <div style={{ height: `${height}px` }}>
-        <Bar data={chartData as any} options={options as any} />
-      </div>
-    )
-  }
+    if (type === 'bar') {
+      return <Bar ref={chartRef as any} data={chartData as any} options={options as any} />
+    }
 
-  if (type === 'radar') {
-    return (
-      <div style={{ height: `${height}px` }}>
-        <Radar data={chartData as any} options={options as any} />
-      </div>
-    )
-  }
+    if (type === 'radar') {
+      return <Radar ref={chartRef as any} data={chartData as any} options={options as any} />
+    }
 
-  if (type === 'gauge') {
-    return (
-      <div style={{ height: `${height}px` }}>
-        <Doughnut data={chartData as any} options={options as any} />
-      </div>
-    )
-  }
+    if (type === 'gauge') {
+      return <Doughnut ref={chartRef as any} data={chartData as any} options={options as any} />
+    }
 
-  if (type === 'heatmap') {
-    return (
-      <div style={{ height: `${height}px` }}>
-        <Chart type="matrix" data={chartData as any} options={options as any} />
-      </div>
-    )
-  }
+    if (type === 'heatmap') {
+      return <Chart ref={chartRef as any} type="matrix" data={chartData as any} options={options as any} />
+    }
 
-  if (type === 'candlestick') {
-    return (
-      <div style={{ height: `${height}px` }}>
-        <Chart type="candlestick" data={chartData as any} options={options as any} />
-      </div>
-    )
-  }
+    if (type === 'candlestick') {
+      return <Chart ref={chartRef as any} type="candlestick" data={chartData as any} options={options as any} />
+    }
 
-  if (type === 'mixed') {
-    return (
-      <div style={{ height: `${height}px` }}>
-        <Chart type="line" data={chartData as any} options={options as any} />
-      </div>
-    )
-  }
+    if (type === 'mixed') {
+      return <Chart ref={chartRef as any} type="line" data={chartData as any} options={options as any} />
+    }
 
-  // Por defecto usar Line (para line, area, dual-axis)
+    // Por defecto usar Line (para line, area, dual-axis)
+    return <Line ref={chartRef as any} data={chartData as any} options={options as any} />
+  })()
+
   return (
-    <div style={{ height: `${height}px` }}>
-      <Line data={chartData as any} options={options as any} />
+    <div style={{ height: `${height}px` }} className="relative">
+      {supportsRealtimeZoom && (
+        <div className="absolute right-2 top-2 z-10 flex gap-2">
+          <button
+            type="button"
+            onClick={zoomToNow}
+            className="px-2 py-1 text-xs rounded-md border border-gray-200 bg-white/90 shadow-sm hover:bg-white dark:border-gray-700 dark:bg-gray-900/80 dark:hover:bg-gray-900"
+            title="Zoom al tiempo actual"
+          >
+            Ahora
+          </button>
+          <button
+            type="button"
+            onClick={resetZoom}
+            className="px-2 py-1 text-xs rounded-md border border-gray-200 bg-white/90 shadow-sm hover:bg-white dark:border-gray-700 dark:bg-gray-900/80 dark:hover:bg-gray-900"
+            title="Restablecer zoom"
+          >
+            Reset
+          </button>
+        </div>
+      )}
+      {chartElement}
     </div>
   )
 }

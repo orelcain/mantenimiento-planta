@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.16.9**
+## Versión Actual: **v2.16.10**
 
 **Fecha de lanzamiento**: 11 de enero de 2026  
 **Estado**: ✅ PRODUCCIÓN READY  
@@ -9,6 +9,15 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.16.10 - Zoom Tiempo Real (11/01/2026)
+
+**Mejoras Principales:**
+- ⏱️ **Botón "Ahora"** en gráficos de serie temporal: centra el eje X alrededor del tiempo actual.
+- 🔄 **Reset**: restablece el zoom al rango original.
+- 🧩 **Sync automático**: script para mantener versión consistente (package/manifest/version.json/constantes).
+
+---
 
 ### v2.16.9 - Sync Release (11/01/2026)
 
