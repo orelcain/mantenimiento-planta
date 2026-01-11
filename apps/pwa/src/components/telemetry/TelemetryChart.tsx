@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import 'chartjs-adapter-date-fns'
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -6,6 +7,7 @@ import {
   PointElement,
   LineElement,
   BarElement,
+  ArcElement,
   Title,
   Tooltip,
   Legend,
@@ -14,7 +16,14 @@ import {
   TimeScale
 } from 'chart.js'
 import zoomPlugin from 'chartjs-plugin-zoom'
-import { Line, Bar, Radar, Scatter } from 'react-chartjs-2'
+import { Bar, Chart, Doughnut, Line, Radar, Scatter } from 'react-chartjs-2'
+import { MatrixController, MatrixElement } from 'chartjs-chart-matrix'
+import {
+  CandlestickController,
+  CandlestickElement,
+  OhlcController,
+  OhlcElement
+} from 'chartjs-chart-financial'
 import type { TelemetryDataPoint } from '../../hooks/useTelemetryHistory'
 
 // Registrar componentes de Chart.js + plugin zoom
@@ -24,16 +33,33 @@ ChartJS.register(
   PointElement,
   LineElement,
   BarElement,
+  ArcElement,
   Title,
   Tooltip,
   Legend,
   Filler,
   RadialLinearScale,
   TimeScale,
+  MatrixController,
+  MatrixElement,
+  CandlestickController,
+  CandlestickElement,
+  OhlcController,
+  OhlcElement,
   zoomPlugin
 )
 
-export type ChartType = 'line' | 'area' | 'dual-axis' | 'scatter' | 'bar' | 'radar'
+export type ChartType =
+  | 'line'
+  | 'area'
+  | 'dual-axis'
+  | 'scatter'
+  | 'bar'
+  | 'radar'
+  | 'gauge'
+  | 'heatmap'
+  | 'candlestick'
+  | 'mixed'
 
 interface TelemetryChartProps {
   data: TelemetryDataPoint[]
@@ -46,40 +72,8 @@ export function TelemetryChart({ data, type, height = 300 }: TelemetryChartProps
   const isLoading = data.length < 3
 
   const chartData = useMemo(() => {
-    // Formatear labels según el rango de tiempo
-    const labels = data.map(d => {
-      try {
-        const date = new Date(d.timestamp)
-        
-        // Validar que la fecha sea válida
-        if (isNaN(date.getTime())) {
-          return '??:??'
-        }
-        
-        const now = new Date()
-        const hoursDiff = (now.getTime() - date.getTime()) / (1000 * 60 * 60)
-        
-        // Si es más de 24h atrás, mostrar día/mes también
-        if (Math.abs(hoursDiff) > 24) {
-          const day = date.getDate().toString().padStart(2, '0')
-          const month = (date.getMonth() + 1).toString().padStart(2, '0')
-          const hour = date.getHours().toString().padStart(2, '0')
-          const minute = date.getMinutes().toString().padStart(2, '0')
-          return `${day}/${month} ${hour}:${minute}`
-        } else {
-          // Solo hora:minuto para últimas 24h
-          const hour = date.getHours().toString().padStart(2, '0')
-          const minute = date.getMinutes().toString().padStart(2, '0')
-          return `${hour}:${minute}`
-        }
-      } catch (err) {
-        console.error('Error formateando timestamp:', d.timestamp, err)
-        return '??:??'
-      }
-    })
-
-    const tempData = data.map(d => d.temperatura)
-    const humidityData = data.map(d => d.humedad)
+    const tempSeries = data.map(d => ({ x: d.timestamp, y: d.temperatura }))
+    const humiditySeries = data.map(d => ({ x: d.timestamp, y: d.humedad }))
 
     // Configuración común de colores
     const tempColor = 'rgb(239, 68, 68)' // red-500
@@ -89,22 +83,21 @@ export function TelemetryChart({ data, type, height = 300 }: TelemetryChartProps
       case 'line':
         // 1. Línea de tiempo clásica
         return {
-          labels,
           datasets: [
             {
               label: 'Temperatura (°C)',
-              data: tempData,
+              data: tempSeries,
               borderColor: tempColor,
-              backgroundColor: tempColor,
+              backgroundColor: 'rgba(239, 68, 68, 0.08)',
               borderWidth: 2,
               pointRadius: 0,
               tension: 0.4
             },
             {
               label: 'Humedad (%)',
-              data: humidityData,
+              data: humiditySeries,
               borderColor: humidityColor,
-              backgroundColor: humidityColor,
+              backgroundColor: 'rgba(59, 130, 246, 0.08)',
               borderWidth: 2,
               pointRadius: 0,
               tension: 0.4
@@ -115,11 +108,10 @@ export function TelemetryChart({ data, type, height = 300 }: TelemetryChartProps
       case 'area':
         // 2. Área suavizada con gradiente
         return {
-          labels,
           datasets: [
             {
               label: 'Temperatura (°C)',
-              data: tempData,
+              data: tempSeries,
               borderColor: tempColor,
               backgroundColor: (context: any) => {
                 const ctx = context.chart.ctx
@@ -135,7 +127,7 @@ export function TelemetryChart({ data, type, height = 300 }: TelemetryChartProps
             },
             {
               label: 'Humedad (%)',
-              data: humidityData,
+              data: humiditySeries,
               borderColor: humidityColor,
               backgroundColor: (context: any) => {
                 const ctx = context.chart.ctx
@@ -155,11 +147,10 @@ export function TelemetryChart({ data, type, height = 300 }: TelemetryChartProps
       case 'dual-axis':
         // 3. Doble eje Y (temperatura + humedad) ⭐
         return {
-          labels,
           datasets: [
             {
               label: 'Temperatura (°C)',
-              data: tempData,
+              data: tempSeries,
               borderColor: tempColor,
               backgroundColor: tempColor,
               borderWidth: 2,
@@ -169,7 +160,7 @@ export function TelemetryChart({ data, type, height = 300 }: TelemetryChartProps
             },
             {
               label: 'Humedad (%)',
-              data: humidityData,
+              data: humiditySeries,
               borderColor: humidityColor,
               backgroundColor: humidityColor,
               borderWidth: 2,
@@ -197,59 +188,156 @@ export function TelemetryChart({ data, type, height = 300 }: TelemetryChartProps
 
       case 'bar':
         // 5. Barras agrupadas por hora
-        const hourlyData = groupByHour(data)
-        return {
-          labels: Object.keys(hourlyData).map(h => `${h}:00`),
-          datasets: [
-            {
-              label: 'Temp Promedio (°C)',
-              data: Object.values(hourlyData).map(h => h.avgTemp),
-              backgroundColor: 'rgba(239, 68, 68, 0.6)',
-              borderColor: tempColor,
-              borderWidth: 1
-            },
-            {
-              label: 'Humedad Promedio (%)',
-              data: Object.values(hourlyData).map(h => h.avgHumidity),
-              backgroundColor: 'rgba(59, 130, 246, 0.6)',
-              borderColor: humidityColor,
-              borderWidth: 1
-            }
-          ]
+        {
+          const hourlyData = groupByHour(data)
+          return {
+            labels: Object.keys(hourlyData).map(h => `${h}:00`),
+            datasets: [
+              {
+                label: 'Temp Promedio (°C)',
+                data: Object.values(hourlyData).map(h => h.avgTemp),
+                backgroundColor: 'rgba(239, 68, 68, 0.6)',
+                borderColor: tempColor,
+                borderWidth: 1
+              },
+              {
+                label: 'Humedad Promedio (%)',
+                data: Object.values(hourlyData).map(h => h.avgHumidity),
+                backgroundColor: 'rgba(59, 130, 246, 0.6)',
+                borderColor: humidityColor,
+                borderWidth: 1
+              }
+            ]
+          }
         }
 
       case 'radar':
-        // 6. Radar con estadísticas
-        const stats = calculateStats(data)
+        // 6. Radar de Estado Actual (como el demo)
+        {
+          const stats = calculateStats(data)
+          const latest = data[data.length - 1]
+          const stability = 100 - normalize(stats.temp.stdDev ?? 0, 0, 3) // menor desviación => mejor
+          const precision = Math.min(100, (data.length / 96) * 100)
+          const reliability = Math.max(0, Math.min(100, 100 - missingRatio(data) * 100))
+
+          return {
+            labels: ['Temperatura', 'Humedad', 'Estabilidad', 'Precisión', 'Confiabilidad'],
+            datasets: [
+              {
+                label: 'Estado Actual',
+                data: [
+                  clamp100(normalize(latest?.temperatura ?? stats.temp.avg ?? 0, 15, 35)),
+                  clamp100(normalize(latest?.humedad ?? stats.humidity.avg ?? 0, 30, 70)),
+                  clamp100(stability),
+                  clamp100(precision),
+                  clamp100(reliability)
+                ],
+                borderColor: '#667eea',
+                backgroundColor: 'rgba(102, 126, 234, 0.2)',
+                pointBackgroundColor: '#667eea',
+                pointBorderColor: '#fff',
+                pointRadius: 5
+              }
+            ]
+          }
+        }
+
+      case 'gauge': {
+        // 7. Gauge semicircular
+        const latest = data[data.length - 1]
+        const current = latest?.temperatura ?? 0
+        const maxTemp = 40
+        const clamped = Math.max(0, Math.min(maxTemp, current))
         return {
-          labels: ['Mín', 'Máx', 'Promedio', 'Mediana', 'Desv Est'],
+          labels: ['Temperatura Actual', 'Margen'],
           datasets: [
             {
-              label: 'Temperatura (normalizado)',
-              data: [
-                normalize(stats.temp.min ?? 0, 15, 35),
-                normalize(stats.temp.max ?? 0, 15, 35),
-                normalize(stats.temp.avg ?? 0, 15, 35),
-                normalize(stats.temp.median ?? 0, 15, 35),
-                normalize(stats.temp.stdDev ?? 0, 0, 5)
-              ],
-              backgroundColor: 'rgba(239, 68, 68, 0.2)',
-              borderColor: tempColor,
-              borderWidth: 2
-            },
-            {
-              label: 'Humedad (normalizado)',
-              data: [
-                normalize(stats.humidity.min ?? 0, 30, 70),
-                normalize(stats.humidity.max ?? 0, 30, 70),
-                normalize(stats.humidity.avg ?? 0, 30, 70),
-                normalize(stats.humidity.median ?? 0, 30, 70),
-                normalize(stats.humidity.stdDev ?? 0, 0, 10)
-              ],
-              backgroundColor: 'rgba(59, 130, 246, 0.2)',
-              borderColor: humidityColor,
-              borderWidth: 2
+              data: [clamped, Math.max(0, maxTemp - clamped)],
+              backgroundColor: ['#667eea', '#e9ecef'],
+              borderWidth: 0
             }
+          ]
+        }
+      }
+
+      case 'heatmap':
+        // 8. Heatmap Temporal (matrix) - Día vs Hora
+        return {
+          datasets: [
+            {
+              label: 'Temperatura (°C)',
+              data: buildHeatmapMatrix(data),
+              width: ({ chart }: any) => {
+                const area = chart.chartArea
+                return area ? (area.right - area.left) / 24 - 1 : 10
+              },
+              height: ({ chart }: any) => {
+                const area = chart.chartArea
+                return area ? (area.bottom - area.top) / 7 - 1 : 10
+              },
+              borderWidth: 1,
+              borderColor: 'rgba(0,0,0,0.08)',
+              backgroundColor: (ctx: any) => {
+                const v = ctx.raw?.v
+                if (typeof v !== 'number') return 'rgba(102,126,234,0.2)'
+                const t = Math.max(0, Math.min(1, (v - 20) / 15))
+                const r = Math.round(255 * t)
+                const g = Math.round(120 + (255 - 120) * (1 - t))
+                const b = Math.round(255 * (1 - t))
+                return `rgba(${r},${g},${b},0.75)`
+              }
+            } as any
+          ]
+        }
+
+      case 'candlestick':
+        // 9. Candlestick (OHLC) real
+        return {
+          datasets: [
+            {
+              label: 'OHLC Temp (°C)',
+              data: buildCandles(data),
+              color: {
+                up: '#51cf66',
+                down: '#ff6b6b',
+                unchanged: '#adb5bd'
+              }
+            } as any
+          ]
+        }
+
+      case 'mixed':
+        // 10. Mixed chart (línea temp + barra lecturas + área humedad)
+        return {
+          datasets: [
+            {
+              type: 'line',
+              label: 'Temperatura (°C)',
+              data: tempSeries,
+              borderColor: '#ff6b6b',
+              backgroundColor: 'rgba(255, 107, 107, 0.1)',
+              tension: 0.4,
+              pointRadius: 0,
+              yAxisID: 'y'
+            } as any,
+            {
+              type: 'bar',
+              label: 'Lecturas',
+              data: data.map(d => ({ x: d.timestamp, y: 1 })),
+              backgroundColor: 'rgba(102, 126, 234, 0.5)',
+              yAxisID: 'y1'
+            } as any,
+            {
+              type: 'line',
+              label: 'Humedad (%)',
+              data: humiditySeries,
+              borderColor: '#4ecdc4',
+              backgroundColor: 'rgba(78, 205, 196, 0.2)',
+              tension: 0.4,
+              pointRadius: 0,
+              fill: true,
+              yAxisID: 'y'
+            } as any
           ]
         }
 
@@ -259,6 +347,8 @@ export function TelemetryChart({ data, type, height = 300 }: TelemetryChartProps
   }, [data, type, height])
 
   const options = useMemo(() => {
+    const dayLabels = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
+
     const commonOptions = {
       responsive: true,
       maintainAspectRatio: false,
@@ -304,16 +394,13 @@ export function TelemetryChart({ data, type, height = 300 }: TelemetryChartProps
           ...commonOptions,
           scales: {
             x: {
-              ticks: {
-                maxTicksLimit: 12,
-                maxRotation: 0
+              type: 'time' as const,
+              time: {
+                unit: 'hour' as const
               }
             },
             y: {
-              beginAtZero: false,
-              ticks: {
-                callback: (value: any) => `${value}°C / %`
-              }
+              beginAtZero: false
             }
           },
           interaction: {
@@ -328,9 +415,9 @@ export function TelemetryChart({ data, type, height = 300 }: TelemetryChartProps
           ...commonOptions,
           scales: {
             x: {
-              ticks: {
-                maxTicksLimit: 12,
-                maxRotation: 0
+              type: 'time' as const,
+              time: {
+                unit: 'hour' as const
               }
             },
             'y-temp': {
@@ -412,6 +499,114 @@ export function TelemetryChart({ data, type, height = 300 }: TelemetryChartProps
           }
         }
 
+      case 'gauge':
+        return {
+          ...commonOptions,
+          circumference: 180,
+          rotation: -90,
+          plugins: {
+            ...commonOptions.plugins,
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (ctx: any) => (ctx.label === 'Temperatura Actual' ? `${ctx.parsed}°C` : '')
+              }
+            }
+          }
+        }
+
+      case 'heatmap':
+        return {
+          ...commonOptions,
+          plugins: {
+            ...commonOptions.plugins,
+            zoom: undefined,
+            tooltip: {
+              callbacks: {
+                title: (items: any[]) => {
+                  const raw = items?.[0]?.raw
+                  if (!raw) return ''
+                  return `${dayLabels[raw.y]} · ${String(raw.x).padStart(2, '0')}:00`
+                },
+                label: (item: any) => {
+                  const raw = item.raw
+                  return `Temp: ${Number(raw.v).toFixed(1)}°C`
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              type: 'linear' as const,
+              min: 0,
+              max: 23,
+              ticks: {
+                stepSize: 3,
+                callback: (v: any) => `${String(v).padStart(2, '0')}h`
+              },
+              title: { display: true, text: 'Hora del día' }
+            },
+            y: {
+              type: 'linear' as const,
+              min: 0,
+              max: 6,
+              ticks: {
+                stepSize: 1,
+                callback: (v: any) => dayLabels[v] ?? v
+              },
+              title: { display: true, text: 'Día' }
+            }
+          }
+        }
+
+      case 'candlestick':
+        return {
+          ...commonOptions,
+          scales: {
+            x: {
+              type: 'time' as const,
+              time: { unit: 'hour' as const },
+              title: { display: true, text: 'Tiempo' }
+            },
+            y: {
+              title: { display: true, text: 'Temperatura (°C)' }
+            }
+          },
+          plugins: {
+            ...commonOptions.plugins,
+            tooltip: {
+              callbacks: {
+                label: (ctx: any) => {
+                  const r = ctx.raw
+                  return `O:${r.o.toFixed(1)} H:${r.h.toFixed(1)} L:${r.l.toFixed(1)} C:${r.c.toFixed(1)} °C`
+                }
+              }
+            }
+          }
+        }
+
+      case 'mixed':
+        return {
+          ...commonOptions,
+          scales: {
+            x: {
+              type: 'time' as const,
+              time: { unit: 'hour' as const }
+            },
+            y: {
+              type: 'linear' as const,
+              position: 'left' as const,
+              beginAtZero: false
+            },
+            y1: {
+              type: 'linear' as const,
+              position: 'right' as const,
+              beginAtZero: true,
+              grid: { drawOnChartArea: false }
+            }
+          }
+        }
+
       default:
         return commonOptions
     }
@@ -452,8 +647,7 @@ export function TelemetryChart({ data, type, height = 300 }: TelemetryChartProps
   if (type === 'scatter') {
     return (
       <div style={{ height: `${height}px` }}>
-        {/* @ts-expect-error - Chart.js acepta {x,y} objects aunque el tipo diga number[] */}
-        <Scatter data={chartData} options={options} />
+        <Scatter data={chartData as any} options={options as any} />
       </div>
     )
   }
@@ -461,8 +655,7 @@ export function TelemetryChart({ data, type, height = 300 }: TelemetryChartProps
   if (type === 'bar') {
     return (
       <div style={{ height: `${height}px` }}>
-        {/* @ts-expect-error - Chart.js acepta este formato aunque el tipo no coincida */}
-        <Bar data={chartData} options={options} />
+        <Bar data={chartData as any} options={options as any} />
       </div>
     )
   }
@@ -470,8 +663,39 @@ export function TelemetryChart({ data, type, height = 300 }: TelemetryChartProps
   if (type === 'radar') {
     return (
       <div style={{ height: `${height}px` }}>
-        {/* @ts-expect-error - Chart.js Radar acepta estos options aunque el tipo no coincida */}
-        <Radar data={chartData} options={options} />
+        <Radar data={chartData as any} options={options as any} />
+      </div>
+    )
+  }
+
+  if (type === 'gauge') {
+    return (
+      <div style={{ height: `${height}px` }}>
+        <Doughnut data={chartData as any} options={options as any} />
+      </div>
+    )
+  }
+
+  if (type === 'heatmap') {
+    return (
+      <div style={{ height: `${height}px` }}>
+        <Chart type="matrix" data={chartData as any} options={options as any} />
+      </div>
+    )
+  }
+
+  if (type === 'candlestick') {
+    return (
+      <div style={{ height: `${height}px` }}>
+        <Chart type="candlestick" data={chartData as any} options={options as any} />
+      </div>
+    )
+  }
+
+  if (type === 'mixed') {
+    return (
+      <div style={{ height: `${height}px` }}>
+        <Chart type="line" data={chartData as any} options={options as any} />
       </div>
     )
   }
@@ -479,8 +703,7 @@ export function TelemetryChart({ data, type, height = 300 }: TelemetryChartProps
   // Por defecto usar Line (para line, area, dual-axis)
   return (
     <div style={{ height: `${height}px` }}>
-      {/* @ts-expect-error - Chart.js acepta este formato aunque el tipo no coincida */}
-      <Line data={chartData} options={options} />
+      <Line data={chartData as any} options={options as any} />
     </div>
   )
 }
@@ -531,4 +754,72 @@ function calculateStats(data: TelemetryDataPoint[]) {
 
 function normalize(value: number, min: number, max: number): number {
   return ((value - min) / (max - min)) * 100
+}
+
+function clamp100(value: number): number {
+  if (!Number.isFinite(value)) return 0
+  return Math.max(0, Math.min(100, value))
+}
+
+function missingRatio(data: TelemetryDataPoint[]): number {
+  if (data.length === 0) return 1
+  let missing = 0
+  for (const d of data) {
+    if (!Number.isFinite(d.temperatura) || !Number.isFinite(d.humedad)) missing++
+  }
+  return missing / data.length
+}
+
+function buildHeatmapMatrix(data: TelemetryDataPoint[]) {
+  // Matriz 7x24: promedio temperatura por día/hora
+  const buckets: Record<string, { sum: number; count: number }> = {}
+
+  for (const d of data) {
+    const day = d.timestamp.getDay() // 0-6
+    const hour = d.timestamp.getHours() // 0-23
+    const key = `${day}-${hour}`
+    if (!buckets[key]) buckets[key] = { sum: 0, count: 0 }
+    buckets[key].sum += d.temperatura
+    buckets[key].count++
+  }
+
+  const out: Array<{ x: number; y: number; v: number }> = []
+  for (let day = 0; day < 7; day++) {
+    for (let hour = 0; hour < 24; hour++) {
+      const key = `${day}-${hour}`
+      const b = buckets[key]
+      const v = b ? b.sum / b.count : NaN
+      out.push({ x: hour, y: day, v: Number.isFinite(v) ? v : 0 })
+    }
+  }
+
+  return out
+}
+
+function buildCandles(data: TelemetryDataPoint[]) {
+  // OHLC por 2 horas
+  const MS_2H = 2 * 60 * 60 * 1000
+  const sorted = [...data].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
+  if (sorted.length === 0) return []
+
+  const firstTs = sorted[0]!.timestamp.getTime()
+  const buckets: Record<number, TelemetryDataPoint[]> = {}
+
+  for (const d of sorted) {
+    const bucket = Math.floor((d.timestamp.getTime() - firstTs) / MS_2H)
+    if (!buckets[bucket]) buckets[bucket] = []
+    buckets[bucket].push(d)
+  }
+
+  return Object.keys(buckets)
+    .map(k => Number(k))
+    .sort((a, b) => a - b)
+    .map(bucket => {
+      const points = buckets[bucket]!
+      const open = points[0]!.temperatura
+      const close = points[points.length - 1]!.temperatura
+      const high = Math.max(...points.map(p => p.temperatura), open, close)
+      const low = Math.min(...points.map(p => p.temperatura), open, close)
+      return { x: points[0]!.timestamp, o: open, h: high, l: low, c: close }
+    })
 }

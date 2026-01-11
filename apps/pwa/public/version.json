@@ -1,7 +1,7 @@
 {
-  "version": "2.16.7",
+  "version": "2.16.9",
   "buildDate": "2026-01-11",
-  "buildTimestamp": 1736553600000,
+  "buildTimestamp": 1768166316282,
   "features": [
     "🔧 Fix validación gráfico: acepta temperatura/humedad = 0 como valores válidos",
     "🔧 Console flooding eliminado: ya no hay warnings masivos de timestamps inválidos",

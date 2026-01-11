@@ -183,11 +183,9 @@ export function SensorsPage() {
     return null
   }, [
     // Solo depender de los valores que realmente importan
-    selectedDevice?.telemetry?.temperatura?.value,
-    selectedDevice?.telemetry?.temperatura?.timestamp,
-    selectedDevice?.telemetry?.humedad?.value,
-    selectedDevice?.telemetry?.humedad?.timestamp,
+    selectedDevice?.telemetry,
     selectedDevice?.online,
+    selectedDevice?.lastSeen,
     sensorData
   ])
 
@@ -508,7 +506,11 @@ export function SensorsPage() {
                                   <SelectItem value="dual-axis">🎯 Doble eje (Recomendado)</SelectItem>
                                   <SelectItem value="scatter">🔵 Scatter (Correlación)</SelectItem>
                                   <SelectItem value="bar">📊 Barras por hora</SelectItem>
-                                  <SelectItem value="radar">🕸️ Radar (Estadísticas)</SelectItem>
+                                  <SelectItem value="radar">🕸️ Radar de estado</SelectItem>
+                                  <SelectItem value="gauge">🧭 Gauge (Temperatura)</SelectItem>
+                                  <SelectItem value="heatmap">🧩 Heatmap (Día vs Hora)</SelectItem>
+                                  <SelectItem value="candlestick">🕯️ Candlestick (OHLC)</SelectItem>
+                                  <SelectItem value="mixed">🧪 Mixed (Combinado)</SelectItem>
                                 </SelectContent>
                               </Select>
                             </div>

@@ -161,7 +161,7 @@ export function PublicEquipmentView() {
           text: 'Información de equipos',
           url,
         })
-      } catch (err) {
+      } catch (_err) {
         // User cancelled or error
       }
     } else {

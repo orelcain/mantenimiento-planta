@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.16.7**
+## Versión Actual: **v2.16.9**
 
 **Fecha de lanzamiento**: 11 de enero de 2026  
 **Estado**: ✅ PRODUCCIÓN READY  
@@ -9,6 +9,27 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.16.9 - Sync Release (11/01/2026)
+
+**Mejoras Principales:**
+- 🔄 **Sincronización**: dependencias/lockfile alineados y versionado consistente en PWA (package/manifest/version.json).
+- ♻️ **Service Worker**: bump de versión para forzar actualización en clientes.
+
+---
+
+### v2.16.8 - Gráficos Demo en PWA (11/01/2026)
+
+**Mejoras Principales:**
+- 📊 **Gráficos (10 opciones)**: `TelemetryChart` ahora soporta gauge, heatmap (matrix), candlestick (financial) y mixed, alineándose al demo.
+- 🕒 **Eje temporal real**: los gráficos de serie usan escala `time` con `chartjs-adapter-date-fns`.
+- 🎛️ **UI**: el selector en Sensores muestra las 10 opciones.
+
+**Impacto:**
+- ✅ La PWA puede renderizar los mismos tipos del demo (1–10)
+- ✅ Mejor consistencia visual/UX entre demo y app
+
+---
 
 ### v2.16.7 - Fix Gráfico Historial + Timestamps Telemetría (11/01/2026)
 

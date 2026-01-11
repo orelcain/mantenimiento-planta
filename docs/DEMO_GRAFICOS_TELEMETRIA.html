@@ -6,6 +6,9 @@
   <title>10 Opciones de Visualización - Telemetría IoT</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+  <!-- Plugins para Opciones 8 y 9 -->
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-matrix@2.0.1/dist/chartjs-chart-matrix.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial@3.3.0/dist/chartjs-chart-financial.min.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -429,67 +432,141 @@
       }
     });
 
-    // 8. Heatmap Temporal (simulado con bubble)
-    const heatmapData = [];
+    // 8. Heatmap Temporal (matrix) - Día vs Hora
+    const dayLabels = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
+    const heatmapData = []
     for (let day = 0; day < 7; day++) {
       for (let hour = 0; hour < 24; hour++) {
-        heatmapData.push({
-          x: hour,
-          y: day,
-          r: Math.random() * 15 + 5
-        });
+        // Simular “intensidad” (p.ej. variación térmica) con patrón día/noche
+        const base = 25 + Math.sin((hour - 6) * Math.PI / 12) * 3
+        const daily = (day === 0 || day === 6) ? -0.7 : 0.3
+        const value = base + daily + (Math.random() - 0.5) * 0.8
+        heatmapData.push({ x: hour, y: day, v: value })
       }
     }
 
     new Chart(document.getElementById('chart8'), {
-      type: 'bubble',
+      type: 'matrix',
       data: {
         datasets: [{
-          label: 'Intensidad',
+          label: 'Temperatura (°C)',
           data: heatmapData,
-          backgroundColor: ctx => {
-            const value = ctx.parsed.r;
-            return `rgba(255, ${255 - value * 10}, ${255 - value * 10}, 0.6)`;
+          // tamaño de celda
+          width: ({ chart }) => {
+            const area = chart.chartArea
+            return area ? (area.right - area.left) / 24 - 1 : 10
+          },
+          height: ({ chart }) => {
+            const area = chart.chartArea
+            return area ? (area.bottom - area.top) / 7 - 1 : 10
+          },
+          borderWidth: 1,
+          borderColor: 'rgba(0,0,0,0.08)',
+          backgroundColor: (ctx) => {
+            const v = ctx.raw?.v
+            if (typeof v !== 'number') return 'rgba(102,126,234,0.2)'
+            // Normalizar 20-35°C -> 0-1
+            const t = Math.max(0, Math.min(1, (v - 20) / 15))
+            const r = Math.round(255 * t)
+            const g = Math.round(120 + (255 - 120) * (1 - t))
+            const b = Math.round(255 * (1 - t))
+            return `rgba(${r},${g},${b},0.75)`
+          },
+        }]
+      },
+      options: {
+        ...commonOptions,
+        plugins: {
+          ...commonOptions.plugins,
+          tooltip: {
+            callbacks: {
+              title: (items) => {
+                const raw = items?.[0]?.raw
+                if (!raw) return ''
+                return `${dayLabels[raw.y]} · ${String(raw.x).padStart(2,'0')}:00`
+              },
+              label: (item) => {
+                const raw = item.raw
+                return `Temp: ${raw.v.toFixed(1)}°C`
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            type: 'linear',
+            min: 0,
+            max: 23,
+            ticks: {
+              stepSize: 3,
+              callback: (v) => `${String(v).padStart(2,'0')}h`
+            },
+            title: { display: true, text: 'Hora del día' }
+          },
+          y: {
+            type: 'linear',
+            min: 0,
+            max: 6,
+            ticks: {
+              stepSize: 1,
+              callback: (v) => dayLabels[v] ?? v
+            },
+            title: { display: true, text: 'Día' }
+          }
+        }
+      }
+    })
+
+    // 9. Candlestick (OHLC) real (chartjs-chart-financial)
+    const candleData = []
+    for (let i = 0; i < 12; i++) {
+      // cada 2 horas
+      const slice = sampleData.slice(i * 2, i * 2 + 2)
+      const open = slice[0]?.temp ?? (25 + Math.random() * 2)
+      const close = slice[slice.length - 1]?.temp ?? (open + (Math.random() - 0.5))
+      const high = Math.max(...slice.map(d => d.temp), open, close) + Math.random() * 0.4
+      const low = Math.min(...slice.map(d => d.temp), open, close) - Math.random() * 0.4
+      candleData.push({
+        x: slice[0]?.time ?? new Date(Date.now() - (12 - i) * 2 * 60 * 60 * 1000),
+        o: open,
+        h: high,
+        l: low,
+        c: close,
+      })
+    }
+
+    new Chart(document.getElementById('chart9'), {
+      type: 'candlestick',
+      data: {
+        datasets: [{
+          label: 'OHLC Temp (°C)',
+          data: candleData,
+          color: {
+            up: '#51cf66',
+            down: '#ff6b6b',
+            unchanged: '#adb5bd'
           }
         }]
       },
       options: {
         ...commonOptions,
+        plugins: {
+          ...commonOptions.plugins,
+          tooltip: {
+            callbacks: {
+              label: (ctx) => {
+                const r = ctx.raw
+                return `O:${r.o.toFixed(1)} H:${r.h.toFixed(1)} L:${r.l.toFixed(1)} C:${r.c.toFixed(1)} °C`
+              }
+            }
+          }
+        },
         scales: {
-          x: { type: 'linear', min: 0, max: 23, title: { display: true, text: 'Hora del día' } },
-          y: { type: 'linear', min: 0, max: 6, title: { display: true, text: 'Día de la semana' } }
-        }
-      }
-    });
-
-    // 9. Candlestick (OHLC)
-    const candleData = Array(12).fill(0).map((_, i) => {
-      const open = 25 + Math.random() * 3;
-      const close = open + (Math.random() - 0.5) * 2;
-      const high = Math.max(open, close) + Math.random();
-      const low = Math.min(open, close) - Math.random();
-      return { x: i * 2, o: open, h: high, l: low, c: close };
-    });
-
-    new Chart(document.getElementById('chart9'), {
-      type: 'bar',
-      data: {
-        datasets: [{
-          label: 'OHLC',
-          data: candleData.map(d => ({ x: d.x, y: [d.l, d.o, d.c, d.h] })),
-          backgroundColor: ctx => candleData[ctx.dataIndex].c > candleData[ctx.dataIndex].o ? '#51cf66' : '#ff6b6b',
-          borderColor: ctx => candleData[ctx.dataIndex].c > candleData[ctx.dataIndex].o ? '#51cf66' : '#ff6b6b',
-          borderWidth: 2
-        }]
-      },
-      options: {
-        ...commonOptions,
-        scales: {
-          x: { title: { display: true, text: 'Horas' } },
+          x: { type: 'time', time: { unit: 'hour' }, title: { display: true, text: 'Tiempo' } },
           y: { title: { display: true, text: 'Temperatura (°C)' } }
         }
       }
-    });
+    })
 
     // 10. Mixed Chart
     new Chart(document.getElementById('chart10'), {

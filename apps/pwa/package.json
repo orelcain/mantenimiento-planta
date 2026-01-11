@@ -1,6 +1,6 @@
 {
   "name": "@mantenimiento/pwa",
-  "version": "2.16.7",
+  "version": "2.16.9",
   "private": true,
   "type": "module",
   "scripts": {
@@ -24,6 +24,9 @@
     "@radix-ui/react-toast": "^1.2.2",
     "@types/lodash": "^4.17.21",
     "chart.js": "^4.5.1",
+    "chartjs-adapter-date-fns": "^3.0.0",
+    "chartjs-chart-financial": "^0.2.1",
+    "chartjs-chart-matrix": "^3.0.0",
     "chartjs-plugin-zoom": "^2.2.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
