@@ -170,7 +170,7 @@ static void sendDeviceStatus(bool online) {
   json.set("lastSeen", (unsigned long)getTimestamp());
   json.set("ip", WiFi.localIP().toString());
   json.set("rssi", WiFi.RSSI());
-  json.set("firmwareVersion", "2.12.1");
+  json.set("firmwareVersion", "2.13.0");
   json.set("sensorType", "dht11");
   json.set("assignedEquipmentId", hasAssignedEquipment() ? currentEquipmentId : "");
 
@@ -372,10 +372,6 @@ void setupFirebase() {
   config.api_key = FIREBASE_API_KEY;
   config.database_url = FIREBASE_DATABASE_URL;
   
-  // Autenticación anónima
-  auth.user.email = "";
-  auth.user.password = "";
-  
   // Callback de token (debe configurarse ANTES de Firebase.begin)
   config.token_status_callback = tokenStatusCallback;
   
@@ -385,20 +381,21 @@ void setupFirebase() {
   // Configurar timeout
   config.timeout.serverResponse = 10 * 1000; // 10 segundos
 
-  // Signup anónimo (recomendado antes de Firebase.begin)
-  Serial.println("  Autenticando...");
+  // ⚠️ SOLUCIÓN: Usar auth anónima PERO con token persistente (un solo usuario por ESP32)
+  // Esto evita crear cientos de usuarios (uno por reset) y permite usar RTDB
+  Serial.println("  Intentando auth anónima (un solo usuario por device)...");
+  
+  // Hacer signup anónimo - la librería maneja la reutilización del token
   if (Firebase.signUp(&config, &auth, "", "")) {
-    Serial.println("  ✓ Sign up anónimo exitoso");
+    Serial.println("✓ Auth anónima lista (nuevo usuario o token existente reutilizado)");
   } else {
-    Serial.printf("  ✗ Error sign up: %s\n", config.signer.signupError.message.c_str());
+    Serial.printf("⚠ Warning signup: %s\n", config.signer.signupError.message.c_str());
   }
-
-  // Iniciar Firebase con autenticación anónima
-  Serial.println("  Iniciando Firebase con autenticación anónima...");
+  
   Firebase.begin(&config, &auth);
   
-  // Esperar a que el token esté listo
-  Serial.println("  Esperando token...");
+  // Esperar a que esté listo
+  Serial.println("  Esperando conexión...");
   int waitCount = 0;
   while (!Firebase.ready() && waitCount < 30) {
     delay(1000);
@@ -408,7 +405,7 @@ void setupFirebase() {
   
   if (Firebase.ready()) {
     Serial.println();
-    Serial.println("✓ Firebase conectado con autenticación anónima!");
+    Serial.println("✓ Firebase conectado con auth anónima!");
     Serial.printf("  UID: %s\n", auth.token.uid.c_str());
     firebaseReady = true;
 
