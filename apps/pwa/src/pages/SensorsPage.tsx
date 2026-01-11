@@ -50,10 +50,8 @@ export function SensorsPage() {
   const [saveOk, setSaveOk] = useState<string | null>(null)
 
   useEffect(() => {
-    console.log('[SensorsPage] Iniciando suscripción a devices...')
     const unsub = subscribeDevices(
       (rows) => {
-        console.log('[SensorsPage] Dispositivos recibidos:', rows)
         setDevices(rows)
         // Auto seleccionar el primer dispositivo si no hay selección.
         if (!selectedDeviceId && rows[0]?.deviceId) {
@@ -61,7 +59,7 @@ export function SensorsPage() {
         }
       },
       (err) => {
-        console.error('[SensorsPage] Error:', err)
+        console.error('[SensorsPage] Error suscripción devices:', err)
         setLoadError(err instanceof Error ? err.message : 'Error leyendo dispositivos (RTDB).')
       }
     )
@@ -94,15 +92,13 @@ export function SensorsPage() {
       return
     }
 
-    console.log('[SensorsPage] Suscribiendo a telemetría de equipo:', assignedEquipment.id)
     const unsub = subscribeSensorSummary(
       assignedEquipment.id,
       (data) => {
-        console.log('[SensorsPage] Telemetría recibida:', data)
         setSensorData(data)
       },
       (err) => {
-        console.error('[SensorsPage] Error telemetría:', err)
+        console.error('[SensorsPage] Error telemetría equipo:', err)
       }
     )
 

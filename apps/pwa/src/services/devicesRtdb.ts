@@ -64,12 +64,22 @@ export function subscribeDevices(
   onError?: (error: unknown) => void
 ) {
   const r = ref(rtdb, 'devices')
+  
+  let lastEmit = 0
+  const THROTTLE_MS = 2000 // Solo actualizar cada 2 segundos
 
   const unsubscribe = onValue(
     r,
     (snap) => {
+      const now = Date.now()
       const devices = snapshotToDevices(snap)
-      console.log('[devicesRtdb] Dispositivos detectados:', devices.length, devices)
+      
+      // Throttle: solo emitir si han pasado más de 2 segundos
+      if (now - lastEmit < THROTTLE_MS) {
+        return
+      }
+      
+      lastEmit = now
       onData(devices)
     },
     (err) => {
