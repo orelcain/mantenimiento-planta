@@ -1,12 +1,68 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Activity, AlertTriangle, CheckCircle2 } from 'lucide-react'
-import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Switch } from '@/components/ui'
+import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Switch } from '@/components/ui'
 import type { BadgeProps } from '@/components/ui/badge'
 import { useAppStore } from '@/store'
 import { useAuthStore } from '@/store'
 import { useIoTPrediction } from '@/hooks/useIoTPrediction'
 import { formatRelativeTime } from '@/lib/utils'
 import { ensurePredictiveIncident } from '@/services/predictiveIncidents'
+import type { Equipment } from '@/types'
+
+function normalizeTs(ts: number | undefined): number | null {
+  if (typeof ts !== 'number' || !Number.isFinite(ts)) return null
+  if (ts > 0 && ts < 1e12) return ts * 1000
+  return ts
+}
+
+function toSearchText(e: Equipment): string {
+  return `${e.nombre} ${e.codigo} ${e.hierarchyPath ?? ''} ${e.zonePath?.join(' ') ?? ''}`
+    .toLowerCase()
+    .trim()
+}
+
+function Sparkline({
+  points,
+  height = 56,
+  colorClass = 'stroke-primary',
+}: {
+  points: Array<number>
+  height?: number
+  colorClass?: string
+}) {
+  const values = points.filter((p) => Number.isFinite(p))
+  if (values.length < 2) {
+    return <div className="h-14 rounded border bg-muted/20" />
+  }
+
+  const min = Math.min(...values)
+  const max = Math.max(...values)
+  const range = Math.max(1e-6, max - min)
+
+  const width = 320
+  const padding = 6
+  const innerW = width - padding * 2
+  const innerH = height - padding * 2
+
+  const d = values
+    .map((v, idx) => {
+      const x = padding + (idx / (values.length - 1)) * innerW
+      const y = padding + (1 - (v - min) / range) * innerH
+      return `${x.toFixed(2)},${y.toFixed(2)}`
+    })
+    .join(' ')
+
+  return (
+    <svg viewBox={`0 0 ${width} ${height}`} className="w-full">
+      <polyline
+        fill="none"
+        strokeWidth="2"
+        className={colorClass}
+        points={d}
+      />
+    </svg>
+  )
+}
 
 function riskBadgeVariant(risk: string): BadgeProps['variant'] {
   switch (risk) {
@@ -26,11 +82,25 @@ export function PredictivePage() {
   const user = useAuthStore((s) => s.user)
 
   const [selectedId, setSelectedId] = useState<string>(() => equipment[0]?.id ?? '')
+  const [search, setSearch] = useState('')
+  const [filterEstado, setFilterEstado] = useState<Equipment['estado'] | 'todas'>('todas')
+  const [filterCriticidad, setFilterCriticidad] = useState<Equipment['criticidad'] | 'todas'>('todas')
   const [autoCreate, setAutoCreate] = useState(true)
   const [creating, setCreating] = useState(false)
   const [createdIncidentId, setCreatedIncidentId] = useState<string | null>(null)
   const [createError, setCreateError] = useState<string | null>(null)
   const lastHandledTimestampRef = useRef<number | null>(null)
+
+  const filteredEquipment = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return equipment
+      .filter((e) => {
+        if (filterEstado !== 'todas' && e.estado !== filterEstado) return false
+        if (filterCriticidad !== 'todas' && e.criticidad !== filterCriticidad) return false
+        if (!q) return true
+        return toSearchText(e).includes(q)
+      })
+  }, [equipment, filterCriticidad, filterEstado, search])
 
   const selectedEquipment = useMemo(
     () => equipment.find((e) => e.id === selectedId) ?? null,
@@ -40,8 +110,33 @@ export function PredictivePage() {
   const { summary, readings, prediction, error } = useIoTPrediction(selectedId || null)
 
   const lastReading = readings[readings.length - 1]
+  const lastReadingTs = normalizeTs(lastReading?.timestamp)
 
   const canCreateIncident = Boolean(user?.id && selectedEquipment && lastReading)
+
+  async function copyToClipboard(text: string) {
+    try {
+      await navigator.clipboard.writeText(text)
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  async function copyEquipmentId() {
+    if (!selectedEquipment) return
+    await copyToClipboard(selectedEquipment.id)
+  }
+
+  async function copyConfigSnippet() {
+    if (!selectedEquipment) return
+    const snippet = [
+      `#define EQUIPMENT_ID "${selectedEquipment.id}"`,
+      '',
+      '// Firmware: iot/esp32-sensor/src/config.h',
+    ].join('\n')
+    await copyToClipboard(snippet)
+  }
 
   async function createPredictiveIncidentNow() {
     if (!user?.id || !selectedEquipment) return
@@ -115,18 +210,82 @@ export function PredictivePage() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <Select value={selectedId} onValueChange={setSelectedId}>
-            <SelectTrigger className="max-w-xl">
-              <SelectValue placeholder="Selecciona un equipo" />
-            </SelectTrigger>
-            <SelectContent>
-              {equipment.map((e) => (
-                <SelectItem key={e.id} value={e.id}>
-                  {e.nombre} ({e.codigo})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="grid gap-3 max-w-3xl">
+            <div className="grid gap-2 sm:grid-cols-3">
+              <div className="sm:col-span-2">
+                <Label>Buscar equipo</Label>
+                <Input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Buscar por nombre, código o ubicación…"
+                />
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <div>
+                  <Label>Estado</Label>
+                  <Select value={filterEstado} onValueChange={(v) => setFilterEstado(v as any)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Estado" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todas">Todas</SelectItem>
+                      <SelectItem value="operativo">Operativo</SelectItem>
+                      <SelectItem value="en_mantenimiento">En mantenimiento</SelectItem>
+                      <SelectItem value="fuera_servicio">Fuera de servicio</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Criticidad</Label>
+                  <Select value={filterCriticidad} onValueChange={(v) => setFilterCriticidad(v as any)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Criticidad" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todas">Todas</SelectItem>
+                      <SelectItem value="alta">Alta</SelectItem>
+                      <SelectItem value="media">Media</SelectItem>
+                      <SelectItem value="baja">Baja</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-end justify-between gap-3 flex-wrap">
+              <div className="min-w-[280px] flex-1">
+                <Label>Equipo</Label>
+                <Select value={selectedId} onValueChange={setSelectedId}>
+                  <SelectTrigger className="max-w-xl">
+                    <SelectValue placeholder="Selecciona un equipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {filteredEquipment.length === 0 ? (
+                      <div className="p-2 text-sm text-muted-foreground">Sin resultados</div>
+                    ) : (
+                      filteredEquipment.map((e) => (
+                        <SelectItem key={e.id} value={e.id}>
+                          {e.nombre} ({e.codigo})
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+                <div className="mt-1 text-xs text-muted-foreground">
+                  {filteredEquipment.length} resultado(s)
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Button type="button" variant="secondary" onClick={copyEquipmentId} disabled={!selectedEquipment}>
+                  Copiar ID
+                </Button>
+                <Button type="button" variant="secondary" onClick={copyConfigSnippet} disabled={!selectedEquipment}>
+                  Copiar config
+                </Button>
+              </div>
+            </div>
+          </div>
           {error && (
             <div className="mt-3 text-sm text-destructive flex items-center gap-2">
               <AlertTriangle className="h-4 w-4" />
@@ -184,6 +343,10 @@ export function PredictivePage() {
             <CardContent className="space-y-3">
               <div className="text-sm text-muted-foreground">
                 Equipo: <span className="text-foreground font-medium">{selectedEquipment.nombre}</span>
+              </div>
+
+              <div className="text-xs text-muted-foreground">
+                ID: <span className="text-foreground">{selectedEquipment.id}</span>
               </div>
 
               <div className="grid gap-2 sm:grid-cols-2">
@@ -244,7 +407,39 @@ export function PredictivePage() {
                   Aún no hay histórico. El ESP32 empezará a poblar la ruta "sensors/&lt;equipmentId&gt;/readings".
                 </div>
               ) : (
-                <div className="space-y-2 max-h-[360px] overflow-auto">
+                <div className="space-y-3">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="rounded border p-2">
+                      <div className="text-xs text-muted-foreground">Temperatura (últimas {Math.min(readings.length, 60)})</div>
+                      <Sparkline
+                        points={readings.slice(-60).map((r) => r.temperature)}
+                        colorClass="stroke-orange-500"
+                      />
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        Último: {typeof lastReading?.temperature === 'number' && Number.isFinite(lastReading.temperature)
+                          ? `${lastReading.temperature.toFixed(1)} °C`
+                          : '—'}
+                      </div>
+                    </div>
+                    <div className="rounded border p-2">
+                      <div className="text-xs text-muted-foreground">Humedad (últimas {Math.min(readings.length, 60)})</div>
+                      <Sparkline
+                        points={readings.slice(-60).map((r) => r.humidity)}
+                        colorClass="stroke-sky-500"
+                      />
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        Último: {typeof lastReading?.humidity === 'number' && Number.isFinite(lastReading.humidity)
+                          ? `${lastReading.humidity.toFixed(1)} %`
+                          : '—'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="text-xs text-muted-foreground">
+                    {lastReadingTs ? `Última lectura: ${new Date(lastReadingTs).toLocaleString()}` : 'Última lectura: —'}
+                  </div>
+
+                  <div className="space-y-2 max-h-[300px] overflow-auto">
                   {readings
                     .slice(-12)
                     .reverse()
@@ -255,12 +450,15 @@ export function PredictivePage() {
                             {r.temperature.toFixed(1)}°C · {r.humidity.toFixed(1)}%
                           </div>
                           <div className="text-xs text-muted-foreground">
-                            {formatRelativeTime(new Date(r.timestamp))} · {r.source ?? '—'}
+                            {formatRelativeTime(new Date(normalizeTs(r.timestamp) ?? r.timestamp))} · {r.source ?? '—'}
                           </div>
                         </div>
-                        <div className="text-xs text-muted-foreground">{new Date(r.timestamp).toLocaleTimeString()}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {new Date(normalizeTs(r.timestamp) ?? r.timestamp).toLocaleTimeString()}
+                        </div>
                       </div>
                     ))}
+                  </div>
                 </div>
               )}
             </CardContent>
