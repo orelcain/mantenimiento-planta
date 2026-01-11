@@ -45,6 +45,26 @@ function normalizeTimestamp(value: unknown): number | undefined {
   return n
 }
 
+function normalizeTelemetry(node: DeviceNode['telemetry'] | undefined): DeviceNode['telemetry'] | undefined {
+  if (!node) return undefined
+
+  const normalizeValueNode = (v?: { value?: number; unit?: string; status?: string; timestamp?: number }) => {
+    if (!v) return undefined
+    return {
+      ...v,
+      // Normalizar por si viene como string o en segundos
+      value: v.value != null ? Number(v.value) : v.value,
+      timestamp: v.timestamp != null ? normalizeTimestamp(v.timestamp) : v.timestamp,
+    }
+  }
+
+  return {
+    ...node,
+    temperatura: normalizeValueNode(node.temperatura),
+    humedad: normalizeValueNode(node.humedad),
+  }
+}
+
 function snapshotToDevices(snapshot: DataSnapshot): DeviceRow[] {
   const raw = snapshot.val() as Record<string, DeviceNode> | null
   if (!raw) return []
@@ -55,6 +75,7 @@ function snapshotToDevices(snapshot: DataSnapshot): DeviceRow[] {
       ...node,
       lastSeen: normalizeTimestamp(node?.lastSeen),
       assignmentUpdatedAt: normalizeTimestamp(node?.assignmentUpdatedAt),
+      telemetry: normalizeTelemetry(node?.telemetry),
     }))
     .sort((a, b) => (b.lastSeen ?? 0) - (a.lastSeen ?? 0))
 }

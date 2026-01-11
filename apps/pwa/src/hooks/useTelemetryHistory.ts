@@ -14,7 +14,7 @@ export type TimeRange = '1h' | '6h' | '12h' | '24h' | '48h' | '7d'
  * TODO: Implementar query a Firestore collection 'telemetryHistory'
  */
 export function useTelemetryHistory(
-  _equipmentId: string | null, // _ indica parámetro intencionalmente no usado
+  equipmentId: string | null,
   currentTemp?: number,
   currentHumidity?: number,
   timeRange: TimeRange = '24h'
@@ -119,11 +119,11 @@ export function useTelemetryHistory(
     }
 
     generateHistory()
-  }, [timeRange]) // Solo depender de timeRange para inicialización
+  }, [equipmentId, timeRange, currentTemp, currentHumidity])
 
   // Agregar nuevos puntos cuando llegan datos nuevos (efecto osciloscopio)
   useEffect(() => {
-    if (!initializingRef.current || !currentTemp || !currentHumidity) {
+    if (!initializingRef.current || typeof currentTemp !== 'number' || typeof currentHumidity !== 'number') {
       return
     }
 
@@ -154,20 +154,14 @@ export function useTelemetryHistory(
     }
   }, [currentTemp, currentHumidity, maxPoints])
 
-  // Reset cuando cambia el rango temporal
+  // Reset cuando cambia el rango temporal o el equipo
   useEffect(() => {
     if (initializingRef.current) {
       initializingRef.current = false
       setData([])
+      setLoading(true)
     }
-  }, [timeRange])
-  // Reset cuando cambia el rango temporal
-  useEffect(() => {
-    if (initializingRef.current) {
-      initializingRef.current = false
-      setData([])
-    }
-  }, [timeRange])
+  }, [equipmentId, timeRange])
 
   return { data, loading, error }
 }

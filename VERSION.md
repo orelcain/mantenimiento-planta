@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.16.6**
+## Versión Actual: **v2.16.7**
 
 **Fecha de lanzamiento**: 11 de enero de 2026  
 **Estado**: ✅ PRODUCCIÓN READY  
@@ -10,18 +10,17 @@
 
 ## 📋 Información de la Versión
 
-### v2.16.6 - Fix Validación Gráfico Historial (11/01/2026)
+### v2.16.7 - Fix Gráfico Historial + Timestamps Telemetría (11/01/2026)
 
 **Fixes Críticos:**
-- 🔧 **Validación de valores 0**: Hook useTelemetryHistory ahora acepta temperatura/humedad = 0 como valores válidos
-- 📊 **Gráfico historial**: Corregida condición que impedía generar historial cuando valores eran falsy pero válidos
-- ⚡ **Loading infinito resuelto**: Cambio de `!currentTemp` a `typeof currentTemp !== 'number'`
-- 📦 **version.json actualizado**: Servidor ahora sirve 2.16.6 correctamente
+- 📊 **Gráfico historial**: Inicialización ahora depende de temperatura/humedad (no solo de `timeRange`) y evita loading infinito
+- 🔧 **Validación numérica**: Se acepta `0` como valor válido y se evita bloquear si los datos llegan después del primer render
+- 🕒 **Fecha/hora telemetría**: Normalización de `devices/{id}/telemetry/*/timestamp` (segundos → ms)
+- 📦 **Versioning**: `version.json` actualizado a 2.16.7 para sincronizar banner/servidor
 
 **Mejoras Técnicas:**
-- Validación tipo estricta con `typeof` en lugar de truthy/falsy check
-- Permite temperatura/humedad = 0 como casos válidos (edge case importante)
-- Banner "Nueva versión" funciona correctamente (server version sincronizado)
+- Normalización de valores y timestamps en `devicesRtdb` para consistencia con `sensorsRtdb`
+- Reset del historial cuando cambia `timeRange` o el equipo
 
 **Impacto:**
 - ✅ Gráficos de telemetría ahora se renderizan siempre que haya valores numéricos
