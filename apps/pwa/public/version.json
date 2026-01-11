@@ -1,8 +1,16 @@
 {
-  "version": "2.6.0",
+  "version": "2.8.0",
   "buildDate": "2026-01-10",
   "buildTimestamp": 1736467200000,
   "features": [
+    "Editor de anotaciones en fotos con formas punto a punto y texto",
+    "Notas editables con botones editar/eliminar y confirmación",
+    "Conversión automática de todas las fotos a WebP (88% calidad)",
+    "Formas personalizables: transparencia 0-100%, curvatura esquinas 0-100%",
+    "Herramienta de texto con tamaño ajustable (12-72px) y colores",
+    "Guardado inteligente: reemplazar foto original o agregar como nueva",
+    "Sistema compartir mejorado: email HTML, selector notas, vista pública",
+    "Reducción significativa de peso en fotos para menor consumo",
     "Sistema de estructura base vs expansiones con distintivos visuales",
     "Badge azul 'Base' con icono Clock para nodos de estructura original (862 nodos)",
     "Badge verde 'Nuevo' con icono Sparkles para expansiones futuras",

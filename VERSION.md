@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.6.1**
+## Versión Actual: **v2.8.0**
 
 **Fecha de lanzamiento**: 10 de enero de 2026  
 **Estado**: ✅ PRODUCCIÓN READY  
@@ -9,6 +9,17 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.8.0 - Editor de Anotaciones y Notas Mejoradas
+
+- **Notas editables**: Botones editar/eliminar en cada nota con confirmación
+- **WebP automático**: Conversión automática de todas las fotos a WebP (calidad 88%)
+- **Editor de anotaciones**: Canvas para dibujar formas punto a punto en fotos
+- **Formas personalizables**: Transparencia 0-100%, curvatura esquinas 0-100%, colores
+- **Texto en fotos**: Herramienta para añadir texto con tamaño ajustable (12-72px)
+- **Guardado inteligente**: Opción de reemplazar foto original o agregar como nueva
+- **Sistema compartir mejorado**: Email HTML, selector notas, vista pública sin auth
+- **Reducción de peso**: Fotos optimizadas automáticamente para menor consumo
 
 ### v2.6.1 - UX Mejorada (Filtros y Persistencia)
 

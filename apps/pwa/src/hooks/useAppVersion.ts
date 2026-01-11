@@ -38,6 +38,10 @@ export function useAppVersion() {
             })
             setNewVersion(serverVersion)
             setHasUpdate(true)
+          } else {
+            // Si las versiones coinciden, ocultar el banner
+            setHasUpdate(false)
+            setNewVersion(null)
           }
         }
       } catch (_error) {
@@ -77,7 +81,10 @@ export function useAppVersion() {
   }, [])
 
   const reload = () => {
-    localStorage.setItem(LAST_VERSION_KEY, newVersion || APP_VERSION)
+    // Guardar la nueva versión antes de recargar
+    if (newVersion) {
+      localStorage.setItem(LAST_VERSION_KEY, newVersion)
+    }
     window.location.reload()
   }
 
