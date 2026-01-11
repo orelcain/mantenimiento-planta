@@ -599,9 +599,9 @@ ${new Date().toLocaleDateString()} • ${selectedEquipments.length} equipo(s)
 `
 
       for (const eq of selectedEquipments) {
-        textBody += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        textBody += `━━━━━━━━━━━━━━━━━━━━━━
 ${eq.nombre.toUpperCase()}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━
 
 INFORMACION BASICA
   • Codigo     : ${eq.codigo}
@@ -651,20 +651,14 @@ INFORMACION BASICA
       }
 
       textBody += `
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-NOTA TECNICA
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Las imagenes se muestran como enlaces por limitaciones 
-del protocolo mailto (solo soporta texto plano).
-
-Para visualizar contenido multimedia y funciones 
-avanzadas, utiliza el enlace "Ver detalles completos".
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━
 Sistema de Gestion de Mantenimiento
 ${new Date().toLocaleDateString()} • ${new Date().toLocaleTimeString()}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+      (*) Las imagenes se muestran como enlaces por limitaciones tecnicas 
+          del protocolo mailto. Para visualizar contenido multimedia, 
+          usa el enlace "Ver detalles completos" arriba.
 `
 
       const subject = `🔧 Información de ${selectedEquipments.length} equipo(s) - ${new Date().toLocaleDateString()}`
