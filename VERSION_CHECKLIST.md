@@ -27,11 +27,17 @@ Cuando hagas **cualquier cambio** en el código, actualiza la versión en **TODO
    ```
    (También actualizar `features` con el cambio actual)
 
-5. **`VERSION.md`**
+5. **`apps/pwa/src/constants/version.ts`** ⚠️ **CRÍTICO**
+   ```typescript
+   export const APP_VERSION = 'X.Y.Z' as const
+   ```
+   ⚠️ Este archivo es el que la app lee en runtime - si no se actualiza, el banner "nueva versión" nunca desaparece
+
+6. **`VERSION.md`**
    - Actualizar "Versión Actual: **vX.Y.Z**"
    - Agregar entrada de changelog con la nueva versión
 
-6. **`iot/esp32-sensor/src/main.cpp`** (si aplica)
+7. **`iot/esp32-sensor/src/main.cpp`** (si aplica)
    ```cpp
    json.set("firmwareVersion", "X.Y.Z");
    ```

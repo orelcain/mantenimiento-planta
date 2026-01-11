@@ -55,6 +55,7 @@ $files = @(
     @{Path="apps/pwa/package.json"; Pattern='"version":\s*"[^"]+"'; Replace="`"version`": `"$NewVersion`""},
     @{Path="apps/pwa/vite.config.ts"; Pattern="version:\s*'[^']+'"; Replace="version: '$NewVersion'"},
     @{Path="apps/pwa/public/version.json"; Pattern='"version":\s*"[^"]+"'; Replace="`"version`": `"$NewVersion`""},
+    @{Path="apps/pwa/src/constants/version.ts"; Pattern="APP_VERSION\s*=\s*'[^']+'"; Replace="APP_VERSION = '$NewVersion'"},
     @{Path="iot/esp32-sensor/src/main.cpp"; Pattern='firmwareVersion",\s*"[^"]+"'; Replace="firmwareVersion`", `"$NewVersion`""},
     @{Path="VERSION.md"; Pattern='Versión Actual:\s*\*\*v[^\*]+\*\*'; Replace="Versión Actual: **v$NewVersion**"}
 )
@@ -88,6 +89,7 @@ $versions += (Get-Content "package.json" | ConvertFrom-Json).version
 $versions += (Get-Content "apps/pwa/package.json" | ConvertFrom-Json).version
 $versions += ((Get-Content "apps/pwa/vite.config.ts" -Raw) -match "version:\s*'([^']+)'") ? $Matches[1] : "ERROR"
 $versions += (Get-Content "apps/pwa/public/version.json" | ConvertFrom-Json).version
+$versions += ((Get-Content "apps/pwa/src/constants/version.ts" -Raw) -match "APP_VERSION\s*=\s*'([^']+)'") ? $Matches[1] : "ERROR"
 $versions += ((Get-Content "iot/esp32-sensor/src/main.cpp" -Raw) -match 'firmwareVersion",\s*"([^"]+)"') ? $Matches[1] : "ERROR"
 
 $allSame = ($versions | Select-Object -Unique).Count -eq 1
@@ -100,7 +102,8 @@ if ($allSame -and $versions[0] -eq $NewVersion) {
     Write-Host "  apps/pwa/package.json: $($versions[1])"
     Write-Host "  apps/pwa/vite.config.ts: $($versions[2])"
     Write-Host "  apps/pwa/public/version.json: $($versions[3])"
-    Write-Host "  ESP32 firmware: $($versions[4])"
+    Write-Host "  apps/pwa/src/constants/version.ts: $($versions[4])" -ForegroundColor Yellow
+    Write-Host "  ESP32 firmware: $($versions[5])"
     exit 1
 }
 

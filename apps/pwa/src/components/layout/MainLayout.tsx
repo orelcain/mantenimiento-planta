@@ -217,8 +217,13 @@ export function MainLayout() {
                 </span>
               </div>
             </div>
-            <Button onClick={reload} variant="default" size="sm" className="gap-2 ml-4">
-              <RefreshCw className="h-4 w-4" />
+            <Button 
+              onClick={reload} 
+              variant="default" 
+              size="sm" 
+              className="gap-2 ml-4 transition-all hover:scale-105 active:scale-95 shadow-md hover:shadow-lg"
+            >
+              <RefreshCw className="h-4 w-4 animate-spin-slow" />
               Recargar
             </Button>
           </div>
