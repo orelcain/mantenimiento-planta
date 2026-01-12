@@ -8,6 +8,7 @@ import type { SensorSummaryNode } from '@/services/sensorsRtdb'
 import { assignDeviceToEquipment, subscribeDevices } from '@/services/devicesRtdb'
 import { subscribeSensorSummary } from '@/services/sensorsRtdb'
 import { TelemetryChart, type ChartType } from '@/components/telemetry/TelemetryChart'
+import { TelemetryExportDialog } from '@/components/telemetry/TelemetryExportDialog'
 import { useTelemetryHistory, type TimeRange } from '@/hooks/useTelemetryHistory'
 
 function normalizeTs(ts: number | undefined): number | null {
@@ -555,8 +556,16 @@ export function SensorsPage() {
                                     {timeRange === '7d' && 'Última semana'}
                                     {' · '}{historyData.length} puntos de datos
                                   </div>
-                                  <div className="text-xs text-muted-foreground">
-                                    💡 Zoom: scroll | Pan: Ctrl+arrastrar
+                                  <div className="flex items-center gap-2">
+                                    <TelemetryExportDialog
+                                      devices={devices}
+                                      equipment={equipment}
+                                      defaultDeviceId={selectedDeviceId}
+                                      defaultPreset={timeRange}
+                                    />
+                                    <div className="text-xs text-muted-foreground whitespace-nowrap">
+                                      💡 Zoom: scroll | Pan: Ctrl+arrastrar
+                                    </div>
                                   </div>
                                 </div>
                                 {/* Key estable para evitar re-montaje del gráfico */}

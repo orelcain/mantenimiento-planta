@@ -4,6 +4,10 @@ import {
   query,
   orderByChild,
   limitToLast,
+  limitToFirst,
+  startAt,
+  endAt,
+  get,
   type DataSnapshot,
 } from 'firebase/database'
 import { rtdb } from './firebase'
@@ -31,6 +35,10 @@ export type SensorReading = {
   tempStatus?: string
   humStatus?: string
   source?: string
+}
+
+export type SensorReadingRow = SensorReading & {
+  id: string
 }
 
 function normalizeTimestamp(value: unknown): number {
@@ -81,6 +89,24 @@ function snapshotToReadings(snapshot: DataSnapshot): SensorReading[] {
   return readings
 }
 
+function snapshotToReadingRows(snapshot: DataSnapshot): SensorReadingRow[] {
+  const raw = snapshot.val() as Record<string, Partial<SensorReading>> | null
+  if (!raw) return []
+
+  return Object.entries(raw)
+    .map(([id, r]) => ({
+      id,
+      timestamp: normalizeTimestamp(r.timestamp ?? 0),
+      temperature: Number(r.temperature ?? NaN),
+      humidity: Number(r.humidity ?? NaN),
+      tempStatus: r.tempStatus,
+      humStatus: r.humStatus,
+      source: r.source,
+    }))
+    .filter((r) => Number.isFinite(r.timestamp))
+    .sort((a, b) => a.timestamp - b.timestamp)
+}
+
 export function subscribeSensorSummary(
   equipmentId: string,
   onData: (data: SensorSummaryNode | null) => void,
@@ -127,4 +153,48 @@ export function subscribeSensorReadings(
   return () => {
     unsubscribe()
   }
+}
+
+export async function fetchSensorReadingsRange(params: {
+  equipmentId: string
+  fromMs: number
+  toMs: number
+  limit?: number
+}): Promise<SensorReadingRow[]> {
+  const limit = params.limit ?? 20_000
+  const path = `sensors/${params.equipmentId}/readings`
+  const r = ref(rtdb, path)
+
+  // La base puede tener timestamps en ms o en segundos.
+  // Ejecutamos ambas consultas (ms + segundos) y unificamos por id.
+  const ranges: Array<{ from: number; to: number }> = [{ from: params.fromMs, to: params.toMs }]
+
+  const fromSec = Math.floor(params.fromMs / 1000)
+  const toSec = Math.ceil(params.toMs / 1000)
+  if (Number.isFinite(fromSec) && Number.isFinite(toSec) && fromSec > 0 && toSec > 0) {
+    ranges.push({ from: fromSec, to: toSec })
+  }
+
+  const snaps = await Promise.all(
+    ranges.map((range) =>
+      get(
+        query(
+          r,
+          orderByChild('timestamp'),
+          startAt(range.from),
+          endAt(range.to),
+          limitToFirst(limit)
+        )
+      )
+    )
+  )
+
+  const byId = new Map<string, SensorReadingRow>()
+  for (const s of snaps) {
+    for (const row of snapshotToReadingRows(s)) {
+      byId.set(row.id, row)
+    }
+  }
+
+  return Array.from(byId.values()).sort((a, b) => a.timestamp - b.timestamp)
 }
