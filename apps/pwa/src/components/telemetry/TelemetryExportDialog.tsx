@@ -21,7 +21,7 @@ import {
 } from '@/components/ui'
 import type { DeviceRow } from '@/services/devicesRtdb'
 import type { Equipment } from '@/types'
-import { fetchSensorReadingsRange } from '@/services/sensorsRtdb'
+import { fetchSensorReadingsBounds, fetchSensorReadingsRange } from '@/services/sensorsRtdb'
 import {
   buildTelemetryAuditMeta,
   exportTelemetryAsCsv,
@@ -247,9 +247,58 @@ export function TelemetryExportDialog(props: {
           .map((r) => `sensors/${r.equipmentId}/readings`)
           .join(' · ')
 
+        const equipmentIds = Array.from(
+          new Set(results.map((r) => r.equipmentId).filter((v): v is string => Boolean(v)))
+        )
+
+        let boundsInfo: string | null = null
+        try {
+          const bounds = await Promise.all(
+            equipmentIds.map(async (equipmentId) => {
+              const b = await fetchSensorReadingsBounds({ equipmentId })
+              return { equipmentId, ...b }
+            })
+          )
+
+          const fmt = (ms: number) =>
+            new Date(ms).toLocaleString('es-ES', {
+              day: '2-digit',
+              month: '2-digit',
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit',
+              hour12: false,
+            })
+
+          const parts = bounds
+            .map((b) => {
+              if (!b.first || !b.last) return `sin histórico en sensors/${b.equipmentId}/readings`
+              const firstMs = b.first.timestamp
+              const lastMs = b.last.timestamp
+              const inRange = lastMs >= fromMs && firstMs <= toMs
+              const clockNote =
+                lastMs > Date.now() + 5 * 60 * 1000
+                  ? ' (ojo: timestamps en el futuro → reloj del ESP32 corrido)'
+                  : lastMs < Date.now() - 60 * 24 * 60 * 60 * 1000
+                    ? ' (ojo: último dato muy antiguo)'
+                    : ''
+
+              return inRange
+                ? `histórico existe pero no calzó con filtros (rango DB: ${fmt(firstMs)} → ${fmt(lastMs)})${clockNote}`
+                : `rango DB: ${fmt(firstMs)} → ${fmt(lastMs)}${clockNote}`
+            })
+            .join(' · ')
+
+          if (parts) boundsInfo = parts
+        } catch {
+          // Si falla el diagnóstico, no bloqueamos el export.
+          boundsInfo = null
+        }
+
         setLastInfo(
           expectedPaths
-            ? `Export listo (0 lecturas). No hay histórico en el rango. Ruta esperada: ${expectedPaths}. Si el sensor se asignó recién o acabas de actualizar reglas RTDB, espera 1–2 envíos (5–10s) y reintenta.`
+            ? `Export listo (0 lecturas). No hay histórico en el rango. Ruta esperada: ${expectedPaths}.${boundsInfo ? ` Diagnóstico: ${boundsInfo}.` : ''} Si el sensor se asignó recién o acabas de actualizar reglas RTDB, espera 1–2 envíos (5–10s) y reintenta.`
             : 'Export listo (0 lecturas). No hay histórico en el rango. Revisa que el sensor tenga equipo asignado.'
         )
       } else {

@@ -198,3 +198,19 @@ export async function fetchSensorReadingsRange(params: {
 
   return Array.from(byId.values()).sort((a, b) => a.timestamp - b.timestamp)
 }
+
+export async function fetchSensorReadingsBounds(params: {
+  equipmentId: string
+}): Promise<{ first: SensorReadingRow | null; last: SensorReadingRow | null }> {
+  const path = `sensors/${params.equipmentId}/readings`
+  const r = ref(rtdb, path)
+
+  const [firstSnap, lastSnap] = await Promise.all([
+    get(query(r, orderByChild('timestamp'), limitToFirst(1))),
+    get(query(r, orderByChild('timestamp'), limitToLast(1))),
+  ])
+
+  const first = snapshotToReadingRows(firstSnap)[0] ?? null
+  const last = snapshotToReadingRows(lastSnap)[0] ?? null
+  return { first, last }
+}
