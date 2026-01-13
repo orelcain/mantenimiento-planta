@@ -241,11 +241,24 @@ export function TelemetryExportDialog(props: {
         }
       }
 
-      setLastInfo(
-        truncated
-          ? `Export listo (${total} lecturas). OJO: se alcanzó el límite (${limit}) en al menos 1 sensor.`
-          : `Export listo (${total} lecturas).`
-      )
+      if (total === 0) {
+        const expectedPaths = results
+          .filter((r) => Boolean(r.equipmentId))
+          .map((r) => `sensors/${r.equipmentId}/readings`)
+          .join(' · ')
+
+        setLastInfo(
+          expectedPaths
+            ? `Export listo (0 lecturas). No hay histórico en el rango. Ruta esperada: ${expectedPaths}. Si el sensor se asignó recién o acabas de actualizar reglas RTDB, espera 1–2 envíos (5–10s) y reintenta.`
+            : 'Export listo (0 lecturas). No hay histórico en el rango. Revisa que el sensor tenga equipo asignado.'
+        )
+      } else {
+        setLastInfo(
+          truncated
+            ? `Export listo (${total} lecturas). OJO: se alcanzó el límite (${limit}) en al menos 1 sensor.`
+            : `Export listo (${total} lecturas).`
+        )
+      }
 
       return { meta, events }
     } catch (e) {
