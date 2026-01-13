@@ -67,6 +67,12 @@ static void getSimulatedDht(float& temperature, float& humidity);
 #define SEND_INTERVAL 5000      // Enviar datos cada 5 segundos
 #define RECONNECT_INTERVAL 30000 // Reintentar conexión cada 30 seg
 
+// ============ BUFFER OFFLINE (BACKFILL) ============
+// Guarda lecturas en RAM cuando no hay WiFi/Firebase y las envía al volver.
+// Nota: RAM buffer NO sobrevive reinicios/cortes de energía.
+#define READINGS_BUFFER_MAX 720 // ~1 hora a 5s
+#define READINGS_FLUSH_BATCH 25 // máx lecturas por ciclo
+
 // ============ UMBRALES DE ALERTA ============
 // Temperatura
 #define TEMP_WARNING 30.0   // Advertencia si temp > 30°C
@@ -98,6 +104,137 @@ static WebServer portalServer(80);
 static String savedWifiSsid[WIFI_MAX_NETWORKS];
 static String savedWifiPass[WIFI_MAX_NETWORKS];
 static uint8_t savedWifiCount = 0;
+
+// Declarado más abajo (variables de estado), pero usado por helpers de buffer.
+extern bool firebaseReady;
+
+// ============ BUFFER DE LECTURAS EN RAM ============
+enum StatusCode : uint8_t { STATUS_NORMAL = 0, STATUS_WARNING = 1, STATUS_CRITICAL = 2 };
+enum SourceCode : uint8_t { SRC_DHT11 = 0, SRC_SIMULATED = 1 };
+
+static StatusCode statusToCode(const String& s) {
+  if (s == "critical") return STATUS_CRITICAL;
+  if (s == "warning") return STATUS_WARNING;
+  return STATUS_NORMAL;
+}
+
+static const char* codeToStatus(StatusCode c) {
+  switch (c) {
+    case STATUS_CRITICAL: return "critical";
+    case STATUS_WARNING: return "warning";
+    default: return "normal";
+  }
+}
+
+static const char* codeToSource(SourceCode c) {
+  switch (c) {
+    case SRC_SIMULATED: return "simulated";
+    default: return "dht11";
+  }
+}
+
+struct BufferedReading {
+  uint64_t timestampMs;
+  float temperature;
+  float humidity;
+  StatusCode tempStatus;
+  StatusCode humStatus;
+  SourceCode source;
+  char equipmentId[24];
+};
+
+static BufferedReading readingBuf[READINGS_BUFFER_MAX];
+static uint16_t readingHead = 0;
+static uint16_t readingTail = 0;
+static uint16_t readingCount = 0;
+static uint32_t bufferedDrops = 0;
+
+static void bufferReading(
+  const String& equipmentId,
+  uint64_t timestampMs,
+  float temperature,
+  float humidity,
+  const String& tempStatus,
+  const String& humStatus,
+  bool simulated
+) {
+  if (equipmentId.length() == 0) {
+    // No hay destino para histórico.
+    return;
+  }
+
+  BufferedReading& slot = readingBuf[readingHead];
+  slot.timestampMs = timestampMs;
+  slot.temperature = temperature;
+  slot.humidity = humidity;
+  slot.tempStatus = statusToCode(tempStatus);
+  slot.humStatus = statusToCode(humStatus);
+  slot.source = simulated ? SRC_SIMULATED : SRC_DHT11;
+  memset(slot.equipmentId, 0, sizeof(slot.equipmentId));
+  strncpy(slot.equipmentId, equipmentId.c_str(), sizeof(slot.equipmentId) - 1);
+
+  readingHead = (uint16_t)((readingHead + 1) % READINGS_BUFFER_MAX);
+  if (readingCount < READINGS_BUFFER_MAX) {
+    readingCount++;
+  } else {
+    // Buffer lleno: sobrescribe el más antiguo.
+    readingTail = (uint16_t)((readingTail + 1) % READINGS_BUFFER_MAX);
+    bufferedDrops++;
+  }
+}
+
+static void flushBufferedReadings() {
+  if (!firebaseReady) return;
+  if (WiFi.status() != WL_CONNECTED) return;
+  if (readingCount == 0) return;
+
+  uint16_t flushed = 0;
+  while (readingCount > 0 && flushed < READINGS_FLUSH_BATCH) {
+    BufferedReading& r = readingBuf[readingTail];
+
+    if (strlen(r.equipmentId) == 0) {
+      // No se puede enviar: descartar.
+      readingTail = (uint16_t)((readingTail + 1) % READINGS_BUFFER_MAX);
+      readingCount--;
+      continue;
+    }
+
+    String basePath;
+    basePath.reserve(48);
+    basePath = "sensors/";
+    basePath += r.equipmentId;
+    String readingsPath = basePath + "/readings";
+
+    FirebaseJson readingJson;
+    readingJson.set("timestamp", (double)r.timestampMs);
+    readingJson.set("temperature", r.temperature);
+    readingJson.set("humidity", r.humidity);
+    readingJson.set("tempStatus", codeToStatus(r.tempStatus));
+    readingJson.set("humStatus", codeToStatus(r.humStatus));
+    readingJson.set("source", codeToSource(r.source));
+
+    if (!Firebase.RTDB.pushJSON(&fbdo, readingsPath.c_str(), &readingJson)) {
+      // Si falla, no consumimos la cola; se reintentará luego.
+      Serial.printf("⚠ Backfill falló (se reintentará): %s\n", fbdo.errorReason().c_str());
+      break;
+    }
+
+    readingTail = (uint16_t)((readingTail + 1) % READINGS_BUFFER_MAX);
+    readingCount--;
+    flushed++;
+
+    // Pequeño respiro para no bloquear
+    delay(10);
+  }
+
+  if (flushed > 0) {
+    Serial.printf("📤 Backfill: enviadas %u, pendientes %u", (unsigned)flushed, (unsigned)readingCount);
+    if (bufferedDrops > 0) {
+      Serial.printf(" (drops por buffer lleno: %lu)", (unsigned long)bufferedDrops);
+    }
+    Serial.println();
+  }
+}
 
 static void loadSavedWifiNetworks() {
   prefs.begin("iot", false);
@@ -802,6 +939,15 @@ void sendSensorData() {
   Serial.printf("💧  Humedad: %.1f%% [%s]\n", humidity, humStatus.c_str());
   Serial.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
   
+  // Si no hay conectividad/Firebase listo, guardamos en buffer y salimos.
+  if (WiFi.status() != WL_CONNECTED || !firebaseReady) {
+    if (hasAssignedEquipment()) {
+      bufferReading(currentEquipmentId, timestamp, temperature, humidity, tempStatus, humStatus, simulated);
+      Serial.printf("🧺 Buffer offline: %u pendientes\n", (unsigned)readingCount);
+    }
+    return;
+  }
+
   // 1. Publicar telemetría en devices/{deviceId}/telemetry (SIEMPRE, asignado o no)
   FirebaseJson deviceTelemetryJson;
   deviceTelemetryJson.set("temperatura/value", temperature);
@@ -813,13 +959,13 @@ void sendSensorData() {
   deviceTelemetryJson.set("humedad/status", humStatus);
   deviceTelemetryJson.set("humedad/timestamp", (double)timestamp);
   deviceTelemetryJson.set("source", simulated ? "simulated" : "dht11");
-  
+
   String deviceTelemetryPath;
   deviceTelemetryPath.reserve(64);
   deviceTelemetryPath = "devices/";
   deviceTelemetryPath += getDeviceId();
   deviceTelemetryPath += "/telemetry";
-  
+
   if (Firebase.RTDB.setJSON(&fbdo, deviceTelemetryPath.c_str(), &deviceTelemetryJson)) {
     Serial.println("✓ Telemetría publicada en devices/{deviceId}/telemetry");
   } else {
@@ -829,7 +975,6 @@ void sendSensorData() {
   // 2. Si está asignado, TAMBIÉN publicar en sensors/{equipmentId} (para historial)
   if (!hasAssignedEquipment()) {
     Serial.println("ℹ️ Sin equipo asignado. Telemetría disponible solo en devices/.");
-    sendOnlineStatus(true);
     return;
   }
 
@@ -883,6 +1028,8 @@ void sendSensorData() {
   readingsPath += "/readings";
   if (!Firebase.RTDB.pushJSON(&fbdo, readingsPath.c_str(), &readingJson)) {
     Serial.printf("✗ Error guardando histórico: %s\n", fbdo.errorReason().c_str());
+    // Guardar en buffer para reintento/backfill
+    bufferReading(currentEquipmentId, timestamp, temperature, humidity, tempStatus, humStatus, simulated);
   }
   
   // Actualizar estado online
@@ -901,26 +1048,30 @@ void loop() {
   handleConfigPortalLoop();
   initAfterWifiOnce();
 
-  // Verificar conexión WiFi
+  // Reintentar conexión WiFi sin bloquear el muestreo.
   if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("⚠ WiFi desconectado, reconectando...");
-    digitalWrite(LED_PIN, LOW);
-    connectWiFi();
-    return;
+    if (millis() - lastReconnectTime > RECONNECT_INTERVAL) {
+      Serial.println("⚠ WiFi desconectado, intentando reconectar...");
+      digitalWrite(LED_PIN, LOW);
+      connectWiFi();
+      lastReconnectTime = millis();
+    }
   }
-  
-  // Verificar Firebase
-  if (!firebaseReady) {
+
+  // Si ya hay WiFi y Firebase está listo, intentar enviar backlog.
+  flushBufferedReadings();
+
+  // Verificar Firebase (solo si hay WiFi)
+  if (WiFi.status() == WL_CONNECTED && !firebaseReady) {
     if (millis() - lastReconnectTime > RECONNECT_INTERVAL) {
       Serial.println("⚠ Intentando reconectar a Firebase...");
       setupFirebase();
       lastReconnectTime = millis();
     }
-    return;
   }
 
   // Procesar stream de asignación (devices/{deviceId}/assignedEquipmentId)
-  if (millis() - lastStreamReadMs > 500) {
+  if (firebaseReady && millis() - lastStreamReadMs > 500) {
     Firebase.RTDB.readStream(&stream);
     lastStreamReadMs = millis();
   }
