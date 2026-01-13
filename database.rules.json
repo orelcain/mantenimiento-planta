@@ -13,9 +13,30 @@
     "sensors": {
       "$equipmentId": {
         ".read": "auth != null",
-        ".write": "auth != null || (newData.child('temperatura').exists() && newData.child('humedad').exists())",
+        ".write": "auth != null",
+
+        "online": {
+          ".write": "auth != null || newData.isBoolean()"
+        },
+        "lastSeen": {
+          ".write": "auth != null || newData.isNumber()"
+        },
+        "equipmentId": {
+          ".write": "auth != null || newData.isString()"
+        },
+
+        "temperatura": {
+          ".write": "auth != null || (newData.child('value').isNumber() && newData.child('timestamp').isNumber())"
+        },
+        "humedad": {
+          ".write": "auth != null || (newData.child('value').isNumber() && newData.child('timestamp').isNumber())"
+        },
+
         "readings": {
-          ".indexOn": ["timestamp"]
+          ".indexOn": ["timestamp"],
+          "$readingId": {
+            ".write": "auth != null || (newData.child('timestamp').isNumber() && newData.child('temperature').isNumber() && newData.child('humidity').isNumber())"
+          }
         }
       }
     }
