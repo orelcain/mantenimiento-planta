@@ -35,7 +35,7 @@
 void connectWiFi();
 void setupFirebase();
 String getStatus(float value, float warning, float critical);
-unsigned long getTimestamp();
+uint64_t getTimestamp();
 void sendOnlineStatus(bool online);
 void sendSensorData();
 
@@ -149,7 +149,7 @@ static void setEquipmentOnlineFor(const String& equipmentId, bool online) {
   path = "sensors/";
   path += equipmentId;
   path += "/lastSeen";
-  Firebase.RTDB.setInt(&fbdo, path.c_str(), getTimestamp());
+  Firebase.RTDB.setDouble(&fbdo, path.c_str(), (double)getTimestamp());
 
   path = "sensors/";
   path += equipmentId;
@@ -167,7 +167,7 @@ static void sendDeviceStatus(bool online) {
 
   FirebaseJson json;
   json.set("online", online);
-  json.set("lastSeen", (unsigned long)getTimestamp());
+  json.set("lastSeen", (double)getTimestamp());
   json.set("ip", WiFi.localIP().toString());
   json.set("rssi", WiFi.RSSI());
   json.set("firmwareVersion", "2.14.0");
@@ -328,24 +328,101 @@ void setup() {
 
 // ============ FUNCIÓN: CONECTAR WiFi ============
 void connectWiFi() {
-  Serial.print("⏳ Conectando a WiFi: ");
-  Serial.println(WIFI_SSID);
-  
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-  
-  int attempts = 0;
-  while (WiFi.status() != WL_CONNECTED && attempts < 20) {
-    delay(500);
-    Serial.print(".");
-    digitalWrite(LED_PIN, !digitalRead(LED_PIN)); // Parpadear LED
-    attempts++;
-  }
-  
-  if (WiFi.status() == WL_CONNECTED) {
-    digitalWrite(LED_PIN, HIGH); // LED encendido = conectado
+  struct WifiNetwork {
+    const char* ssid;
+    const char* password;
+  };
+
+  static const WifiNetwork networks[] = {
+#if defined(WIFI_SSID_1)
+    { WIFI_SSID_1, WIFI_PASSWORD_1 },
+#endif
+#if defined(WIFI_SSID_2)
+    { WIFI_SSID_2, WIFI_PASSWORD_2 },
+#endif
+#if defined(WIFI_SSID_3)
+    { WIFI_SSID_3, WIFI_PASSWORD_3 },
+#endif
+#if defined(WIFI_SSID_4)
+    { WIFI_SSID_4, WIFI_PASSWORD_4 },
+#endif
+#if defined(WIFI_SSID_5)
+    { WIFI_SSID_5, WIFI_PASSWORD_5 },
+#endif
+  };
+
+  const size_t networkCount = sizeof(networks) / sizeof(networks[0]);
+
+  auto beginWifi = []() {
+    WiFi.mode(WIFI_STA);
+    WiFi.setAutoReconnect(true);
+    WiFi.persistent(false);
+    WiFi.disconnect(true, true);
+    delay(200);
+  };
+
+  auto tryConnect = [&](const char* ssid, const char* password, uint32_t timeoutMs) -> bool {
+    if (!ssid || String(ssid).length() == 0) return false;
+    Serial.print("⏳ Conectando a WiFi: ");
+    Serial.println(ssid);
+    WiFi.begin(ssid, password);
+
+    const uint32_t started = millis();
+    while (WiFi.status() != WL_CONNECTED && (millis() - started) < timeoutMs) {
+      delay(350);
+      Serial.print(".");
+      digitalWrite(LED_PIN, !digitalRead(LED_PIN));
+    }
     Serial.println();
+    return WiFi.status() == WL_CONNECTED;
+  };
+
+  beginWifi();
+
+  int bestNetworkIdx = -1;
+  int bestRssi = -999;
+
+  if (networkCount > 0) {
+    Serial.println("🔎 Escaneando redes WiFi cercanas...");
+    int found = WiFi.scanNetworks(/*async=*/false, /*hidden=*/true);
+    if (found > 0) {
+      for (int i = 0; i < found; i++) {
+        String ssid = WiFi.SSID(i);
+        int rssi = WiFi.RSSI(i);
+        for (size_t k = 0; k < networkCount; k++) {
+          if (ssid == networks[k].ssid) {
+            if (rssi > bestRssi) {
+              bestRssi = rssi;
+              bestNetworkIdx = (int)k;
+            }
+          }
+        }
+      }
+    }
+    WiFi.scanDelete();
+  }
+
+  bool connected = false;
+  if (networkCount == 0) {
+    // Compatibilidad con config antigua (WIFI_SSID/WIFI_PASSWORD)
+    connected = tryConnect(WIFI_SSID, WIFI_PASSWORD, 12 * 1000);
+  } else {
+    // 1) Intenta primero la mejor conocida (si existe)
+    if (bestNetworkIdx >= 0) {
+      connected = tryConnect(networks[bestNetworkIdx].ssid, networks[bestNetworkIdx].password, 12 * 1000);
+    }
+    // 2) Fallback: recorrer el resto
+    for (size_t i = 0; !connected && i < networkCount; i++) {
+      if ((int)i == bestNetworkIdx) continue;
+      connected = tryConnect(networks[i].ssid, networks[i].password, 12 * 1000);
+    }
+  }
+
+  if (connected) {
+    digitalWrite(LED_PIN, HIGH);
     Serial.println("✓ WiFi conectado!");
+    Serial.print("  SSID: ");
+    Serial.println(WiFi.SSID());
     Serial.print("  IP: ");
     Serial.println(WiFi.localIP());
     Serial.print("  Señal: ");
@@ -357,11 +434,11 @@ void connectWiFi() {
       Serial.print("  Device ID: ");
       Serial.println(deviceId);
     }
-  } else {
-    Serial.println();
-    Serial.println("✗ Error: No se pudo conectar al WiFi");
-    Serial.println("  Verifica SSID y contraseña en config.h");
+    return;
   }
+
+  Serial.println("✗ Error: No se pudo conectar a ningún WiFi configurado");
+  Serial.println("  Verifica credenciales en config.h (WIFI_SSID/WIFI_PASSWORD o WIFI_SSID_1..)");
 }
 
 // ============ FUNCIÓN: CONFIGURAR FIREBASE ============
@@ -423,10 +500,10 @@ String getStatus(float value, float warning, float critical) {
 }
 
 // ============ FUNCIÓN: OBTENER TIMESTAMP ============
-unsigned long getTimestamp() {
+uint64_t getTimestamp() {
   time_t now;
   time(&now);
-  return (unsigned long)now * 1000; // Convertir a milisegundos
+  return (uint64_t)now * 1000ULL; // ms epoch, requiere 64-bit
 }
 
 // ============ FUNCIÓN: ENVIAR ESTADO ONLINE ============
@@ -451,7 +528,7 @@ void sendOnlineStatus(bool online) {
   path = "sensors/";
   path += currentEquipmentId;
   path += "/lastSeen";
-  Firebase.RTDB.setInt(&fbdo, path.c_str(), getTimestamp());
+  Firebase.RTDB.setDouble(&fbdo, path.c_str(), (double)getTimestamp());
 
   if (online) {
     path = "sensors/";
@@ -485,7 +562,7 @@ void sendSensorData() {
   String tempStatus = getStatus(temperature, TEMP_WARNING, TEMP_CRITICAL);
   String humStatus = getStatus(humidity, HUM_WARNING, HUM_CRITICAL);
   
-  unsigned long timestamp = getTimestamp();
+  uint64_t timestamp = getTimestamp();
   
   // Mostrar en serial
   Serial.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
@@ -503,11 +580,11 @@ void sendSensorData() {
   deviceTelemetryJson.set("temperatura/value", temperature);
   deviceTelemetryJson.set("temperatura/unit", "°C");
   deviceTelemetryJson.set("temperatura/status", tempStatus);
-  deviceTelemetryJson.set("temperatura/timestamp", timestamp);
+  deviceTelemetryJson.set("temperatura/timestamp", (double)timestamp);
   deviceTelemetryJson.set("humedad/value", humidity);
   deviceTelemetryJson.set("humedad/unit", "%");
   deviceTelemetryJson.set("humedad/status", humStatus);
-  deviceTelemetryJson.set("humedad/timestamp", timestamp);
+  deviceTelemetryJson.set("humedad/timestamp", (double)timestamp);
   deviceTelemetryJson.set("source", simulated ? "simulated" : "dht11");
   
   String deviceTelemetryPath;
@@ -539,7 +616,7 @@ void sendSensorData() {
   tempJson.set("value", temperature);
   tempJson.set("unit", "°C");
   tempJson.set("status", tempStatus);
-  tempJson.set("timestamp", timestamp);
+  tempJson.set("timestamp", (double)timestamp);
   tempJson.set("source", simulated ? "simulated" : "dht11");
   
   String tempPath = basePath;
@@ -555,7 +632,7 @@ void sendSensorData() {
   humJson.set("value", humidity);
   humJson.set("unit", "%");
   humJson.set("status", humStatus);
-  humJson.set("timestamp", timestamp);
+  humJson.set("timestamp", (double)timestamp);
   humJson.set("source", simulated ? "simulated" : "dht11");
   
   String humPath = basePath;
@@ -568,7 +645,7 @@ void sendSensorData() {
 
   // Histórico de lecturas (para analítica/predicción)
   FirebaseJson readingJson;
-  readingJson.set("timestamp", timestamp);
+  readingJson.set("timestamp", (double)timestamp);
   readingJson.set("temperature", temperature);
   readingJson.set("humidity", humidity);
   readingJson.set("tempStatus", tempStatus);

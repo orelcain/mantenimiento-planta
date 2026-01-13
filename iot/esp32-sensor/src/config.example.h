@@ -9,8 +9,26 @@
 #define CONFIG_H
 
 // ============ CONFIGURACIÓN WiFi ============
-#define WIFI_SSID "TU_WIFI"
-#define WIFI_PASSWORD "TU_PASSWORD_WIFI"
+// Opción A (simple): 1 sola red
+// #define WIFI_SSID "TU_WIFI"
+// #define WIFI_PASSWORD "TU_PASSWORD_WIFI"
+
+// Opción B (recomendada): varias redes (fallback automático)
+// El ESP32 escanea y se conecta a la conocida con mejor señal.
+#define WIFI_SSID_1 "TU_WIFI_1"
+#define WIFI_PASSWORD_1 "TU_PASSWORD_WIFI_1"
+
+// #define WIFI_SSID_2 "TU_WIFI_2"
+// #define WIFI_PASSWORD_2 "TU_PASSWORD_WIFI_2"
+
+// #define WIFI_SSID_3 "TU_WIFI_3"
+// #define WIFI_PASSWORD_3 "TU_PASSWORD_WIFI_3"
+
+// #define WIFI_SSID_4 "TU_WIFI_4"
+// #define WIFI_PASSWORD_4 "TU_PASSWORD_WIFI_4"
+
+// #define WIFI_SSID_5 "TU_WIFI_5"
+// #define WIFI_PASSWORD_5 "TU_PASSWORD_WIFI_5"
 
 // ============ CONFIGURACIÓN FIREBASE ============
 // Firebase Console → ⚙️ Configuración del proyecto → Web API Key

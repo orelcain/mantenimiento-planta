@@ -41,14 +41,39 @@ export type SensorReadingRow = SensorReading & {
   id: string
 }
 
-function normalizeTimestamp(value: unknown): number {
+const TS_WRAP_MOD = 2 ** 32
+
+function unwrapWrappedMs(tsWrappedMs: number, nowMs: number): number {
+  // RTDB puede haber recibido timestamps ms truncados a 32-bit (wrap 2^32).
+  // Recuperamos el valor más cercano a `nowMs` sumando múltiplos de 2^32.
+  if (!Number.isFinite(tsWrappedMs)) return NaN
+  if (!Number.isFinite(nowMs)) return tsWrappedMs
+
+  const k = Math.round((nowMs - tsWrappedMs) / TS_WRAP_MOD)
+  const unwrapped = tsWrappedMs + k * TS_WRAP_MOD
+  return unwrapped
+}
+
+function normalizeTimestamp(value: unknown, nowMs: number = Date.now()): number {
   const n = Number(value)
   if (!Number.isFinite(n)) return NaN
 
-  // Si viene en segundos (10 dígitos aprox), convertir a ms.
   // Epoch ms suele ser >= 1e12.
-  if (n > 0 && n < 1e12) return n * 1000
-  return n
+  if (n >= 1e12) return n
+
+  if (n <= 0) return NaN
+
+  const nowSec = Math.floor(nowMs / 1000)
+  const maxReasonableSec = nowSec + 60 * 60 * 24 * 30 // +30 días
+
+  // Si el número parece "segundos" razonables (cerca de ahora), lo convertimos a ms.
+  if (n <= maxReasonableSec) return n * 1000
+
+  // Si cae en el rango 32-bit, puede ser ms truncado; lo "desenvolvemos".
+  if (n < TS_WRAP_MOD) return unwrapWrappedMs(n, nowMs)
+
+  // Fallback: tratarlo como segundos.
+  return n * 1000
 }
 
 function normalizeSummary(summary: SensorSummaryNode | null): SensorSummaryNode | null {
@@ -166,13 +191,29 @@ export async function fetchSensorReadingsRange(params: {
   const r = ref(rtdb, path)
 
   // La base puede tener timestamps en ms o en segundos.
-  // Ejecutamos ambas consultas (ms + segundos) y unificamos por id.
+  // Además, versiones antiguas del firmware podían truncar ms a 32-bit.
+  // Ejecutamos (ms + segundos + wrap32(ms)) y unificamos por id.
   const ranges: Array<{ from: number; to: number }> = [{ from: params.fromMs, to: params.toMs }]
 
   const fromSec = Math.floor(params.fromMs / 1000)
   const toSec = Math.ceil(params.toMs / 1000)
   if (Number.isFinite(fromSec) && Number.isFinite(toSec) && fromSec > 0 && toSec > 0) {
     ranges.push({ from: fromSec, to: toSec })
+  }
+
+  // Wrap 32-bit de ms: query por dominio mod 2^32.
+  const mod = TS_WRAP_MOD
+  const fromWrap = ((params.fromMs % mod) + mod) % mod
+  const toWrap = ((params.toMs % mod) + mod) % mod
+
+  if (Number.isFinite(fromWrap) && Number.isFinite(toWrap)) {
+    if (fromWrap <= toWrap) {
+      ranges.push({ from: fromWrap, to: toWrap })
+    } else {
+      // Cruza el borde del wrap
+      ranges.push({ from: fromWrap, to: mod - 1 })
+      ranges.push({ from: 0, to: toWrap })
+    }
   }
 
   const snaps = await Promise.all(
