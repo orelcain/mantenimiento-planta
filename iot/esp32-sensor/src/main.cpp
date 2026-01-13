@@ -17,6 +17,8 @@
 #include <DHTesp.h>
 #include <Preferences.h>
 #include <time.h>
+#include <WebServer.h>
+#include <DNSServer.h>
 
 // Config local (no versionada) / config de ejemplo (versionada)
 #if __has_include("config.h")
@@ -32,12 +34,17 @@
 #include "addons/RTDBHelper.h"
 
 // ============ DECLARACIONES DE FUNCIONES ============
-void connectWiFi();
+bool connectWiFi();
 void setupFirebase();
 String getStatus(float value, float warning, float critical);
 uint64_t getTimestamp();
 void sendOnlineStatus(bool online);
 void sendSensorData();
+
+static void startConfigPortal();
+static void stopConfigPortal();
+static void handleConfigPortalLoop();
+static void initAfterWifiOnce();
 
 static String getDeviceId();
 static void loadEquipmentId();
@@ -79,6 +86,69 @@ Preferences prefs;
 
 static String deviceId;
 static String currentEquipmentId;
+
+// ============ WIFI PORTAL / CREDENCIALES (PREFERENCES) ============
+#define WIFI_MAX_NETWORKS 5
+
+static bool postWifiInitialized = false;
+static bool portalActive = false;
+static DNSServer dnsServer;
+static WebServer portalServer(80);
+
+static String savedWifiSsid[WIFI_MAX_NETWORKS];
+static String savedWifiPass[WIFI_MAX_NETWORKS];
+static uint8_t savedWifiCount = 0;
+
+static void loadSavedWifiNetworks() {
+  prefs.begin("iot", false);
+  savedWifiCount = (uint8_t)prefs.getUChar("wifiCount", 0);
+  if (savedWifiCount > WIFI_MAX_NETWORKS) savedWifiCount = WIFI_MAX_NETWORKS;
+
+  for (uint8_t i = 0; i < WIFI_MAX_NETWORKS; i++) {
+    savedWifiSsid[i] = "";
+    savedWifiPass[i] = "";
+  }
+
+  for (uint8_t i = 0; i < savedWifiCount; i++) {
+    String kS = String("wS") + String(i);
+    String kP = String("wP") + String(i);
+    savedWifiSsid[i] = prefs.getString(kS.c_str(), "");
+    savedWifiPass[i] = prefs.getString(kP.c_str(), "");
+    savedWifiSsid[i].trim();
+  }
+  prefs.end();
+}
+
+static void saveWifiNetworksToPrefs(const String* ssids, const String* passes, uint8_t count) {
+  if (count > WIFI_MAX_NETWORKS) count = WIFI_MAX_NETWORKS;
+
+  prefs.begin("iot", false);
+  prefs.putUChar("wifiCount", count);
+  for (uint8_t i = 0; i < WIFI_MAX_NETWORKS; i++) {
+    String kS = String("wS") + String(i);
+    String kP = String("wP") + String(i);
+    if (i < count) {
+      prefs.putString(kS.c_str(), ssids[i]);
+      prefs.putString(kP.c_str(), passes[i]);
+    } else {
+      prefs.remove(kS.c_str());
+      prefs.remove(kP.c_str());
+    }
+  }
+  prefs.end();
+}
+
+static void clearWifiNetworksFromPrefs() {
+  prefs.begin("iot", false);
+  prefs.putUChar("wifiCount", 0);
+  for (uint8_t i = 0; i < WIFI_MAX_NETWORKS; i++) {
+    String kS = String("wS") + String(i);
+    String kP = String("wP") + String(i);
+    prefs.remove(kS.c_str());
+    prefs.remove(kP.c_str());
+  }
+  prefs.end();
+}
 
 // ============ VARIABLES DE ESTADO ============
 unsigned long lastSendTime = 0;
@@ -312,22 +382,20 @@ void setup() {
   randomSeed(micros());
   
   // Conectar a WiFi
-  connectWiFi();
-  
-  // Configurar Firebase
-  setupFirebase();
-  
-  // Configurar hora (NTP)
-  configTime(-3 * 3600, 0, "pool.ntp.org", "time.nist.gov");
-  
-  Serial.println();
-  Serial.println("✓ Sistema listo!");
-  Serial.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-  Serial.println();
+  loadSavedWifiNetworks();
+  const bool wifiOk = connectWiFi();
+
+  if (!wifiOk) {
+    Serial.println("⚠ No hay WiFi. Iniciando portal de configuración...");
+    startConfigPortal();
+  }
+
+  // Inicialización dependiente de WiFi (Firebase/NTP) se hace aquí o luego en loop
+  initAfterWifiOnce();
 }
 
 // ============ FUNCIÓN: CONECTAR WiFi ============
-void connectWiFi() {
+bool connectWiFi() {
   struct WifiNetwork {
     const char* ssid;
     const char* password;
@@ -379,18 +447,52 @@ void connectWiFi() {
 
   beginWifi();
 
+  // Construir lista final de redes: primero las guardadas en Preferences, luego las de compile-time.
+  String ssids[WIFI_MAX_NETWORKS];
+  String passes[WIFI_MAX_NETWORKS];
+  uint8_t count = 0;
+
+  auto addNetwork = [&](const String& ssid, const String& pass) {
+    if (ssid.length() == 0) return;
+    for (uint8_t i = 0; i < count; i++) {
+      if (ssids[i] == ssid) return;
+    }
+    if (count >= WIFI_MAX_NETWORKS) return;
+    ssids[count] = ssid;
+    passes[count] = pass;
+    count++;
+  };
+
+  for (uint8_t i = 0; i < savedWifiCount; i++) {
+    addNetwork(savedWifiSsid[i], savedWifiPass[i]);
+  }
+
+  if (networkCount == 0) {
+    // Compatibilidad con config antigua (WIFI_SSID/WIFI_PASSWORD)
+    addNetwork(String(WIFI_SSID), String(WIFI_PASSWORD));
+  } else {
+    for (size_t i = 0; i < networkCount; i++) {
+      addNetwork(String(networks[i].ssid), String(networks[i].password));
+    }
+  }
+
+  if (count == 0) {
+    Serial.println("⚠ No hay credenciales WiFi configuradas.");
+    return false;
+  }
+
   int bestNetworkIdx = -1;
   int bestRssi = -999;
 
-  if (networkCount > 0) {
+  if (count > 0) {
     Serial.println("🔎 Escaneando redes WiFi cercanas...");
     int found = WiFi.scanNetworks(/*async=*/false, /*hidden=*/true);
     if (found > 0) {
       for (int i = 0; i < found; i++) {
         String ssid = WiFi.SSID(i);
         int rssi = WiFi.RSSI(i);
-        for (size_t k = 0; k < networkCount; k++) {
-          if (ssid == networks[k].ssid) {
+        for (uint8_t k = 0; k < count; k++) {
+          if (ssid == ssids[k]) {
             if (rssi > bestRssi) {
               bestRssi = rssi;
               bestNetworkIdx = (int)k;
@@ -403,19 +505,14 @@ void connectWiFi() {
   }
 
   bool connected = false;
-  if (networkCount == 0) {
-    // Compatibilidad con config antigua (WIFI_SSID/WIFI_PASSWORD)
-    connected = tryConnect(WIFI_SSID, WIFI_PASSWORD, 12 * 1000);
-  } else {
-    // 1) Intenta primero la mejor conocida (si existe)
-    if (bestNetworkIdx >= 0) {
-      connected = tryConnect(networks[bestNetworkIdx].ssid, networks[bestNetworkIdx].password, 12 * 1000);
-    }
-    // 2) Fallback: recorrer el resto
-    for (size_t i = 0; !connected && i < networkCount; i++) {
-      if ((int)i == bestNetworkIdx) continue;
-      connected = tryConnect(networks[i].ssid, networks[i].password, 12 * 1000);
-    }
+  // 1) Intenta primero la mejor conocida (si existe)
+  if (bestNetworkIdx >= 0) {
+    connected = tryConnect(ssids[bestNetworkIdx].c_str(), passes[bestNetworkIdx].c_str(), 12 * 1000);
+  }
+  // 2) Fallback: recorrer el resto
+  for (uint8_t i = 0; !connected && i < count; i++) {
+    if ((int)i == bestNetworkIdx) continue;
+    connected = tryConnect(ssids[i].c_str(), passes[i].c_str(), 12 * 1000);
   }
 
   if (connected) {
@@ -434,11 +531,141 @@ void connectWiFi() {
       Serial.print("  Device ID: ");
       Serial.println(deviceId);
     }
-    return;
+    return true;
   }
 
   Serial.println("✗ Error: No se pudo conectar a ningún WiFi configurado");
   Serial.println("  Verifica credenciales en config.h (WIFI_SSID/WIFI_PASSWORD o WIFI_SSID_1..)");
+  return false;
+}
+
+static void startConfigPortal() {
+  if (portalActive) return;
+  portalActive = true;
+
+  const String apSsid = String("ESP32-") + (deviceId.length() ? deviceId : String("CONFIG"));
+  WiFi.mode(WIFI_AP);
+  WiFi.softAP(apSsid.c_str());
+  delay(200);
+
+  IPAddress ip = WiFi.softAPIP();
+  dnsServer.start(53, "*", ip);
+
+  portalServer.on("/", HTTP_GET, []() {
+    String html;
+    html.reserve(2400);
+    html += "<!doctype html><html><head><meta charset='utf-8'>";
+    html += "<meta name='viewport' content='width=device-width,initial-scale=1'>";
+    html += "<title>Config WiFi</title>";
+    html += "<style>body{font-family:system-ui,Segoe UI,Arial;margin:16px;max-width:720px}";
+    html += "input{width:100%;padding:10px;margin:6px 0}button{padding:10px 14px;margin-top:10px}";
+    html += ".row{margin:10px 0;padding:10px;border:1px solid #ddd;border-radius:10px}";
+    html += "small{color:#666}</style></head><body>";
+    html += "<h2>ESP32 - Configuración WiFi</h2>";
+    html += "<p><small>Red AP: <b>" + WiFi.softAPSSID() + "</b> · IP: <b>" + WiFi.softAPIP().toString() + "</b></small></p>";
+    html += "<form method='POST' action='/save'>";
+    html += "<p>Ingresa hasta " + String(WIFI_MAX_NETWORKS) + " redes (SSID + clave). Se guardan en el ESP32.</p>";
+
+    for (uint8_t i = 0; i < WIFI_MAX_NETWORKS; i++) {
+      html += "<div class='row'>";
+      html += "<label>SSID " + String(i + 1) + "</label>";
+      html += "<input name='ssid" + String(i + 1) + "' placeholder='Nombre WiFi' value='";
+      if (i < savedWifiCount) html += savedWifiSsid[i];
+      html += "'>";
+      html += "<label>Clave " + String(i + 1) + "</label>";
+      html += "<input name='pass" + String(i + 1) + "' type='password' placeholder='Contraseña' value='";
+      if (i < savedWifiCount) html += savedWifiPass[i];
+      html += "'>";
+      html += "</div>";
+    }
+
+    html += "<button type='submit'>Guardar y reiniciar</button>";
+    html += "</form>";
+    html += "<form method='POST' action='/clear' style='margin-top:14px'>";
+    html += "<button type='submit'>Borrar WiFi guardados</button>";
+    html += "</form>";
+    html += "</body></html>";
+    portalServer.send(200, "text/html", html);
+  });
+
+  portalServer.on("/save", HTTP_POST, []() {
+    String ssids[WIFI_MAX_NETWORKS];
+    String passes[WIFI_MAX_NETWORKS];
+    uint8_t count = 0;
+
+    for (uint8_t i = 0; i < WIFI_MAX_NETWORKS; i++) {
+      String s = portalServer.arg(String("ssid") + String(i + 1));
+      String p = portalServer.arg(String("pass") + String(i + 1));
+      s.trim();
+      if (s.length() == 0) continue;
+      if (count >= WIFI_MAX_NETWORKS) break;
+      ssids[count] = s;
+      passes[count] = p;
+      count++;
+    }
+
+    saveWifiNetworksToPrefs(ssids, passes, count);
+    loadSavedWifiNetworks();
+
+    portalServer.send(200, "text/html",
+      "<html><body><h3>Guardado.</h3><p>Reiniciando...</p></body></html>");
+    delay(800);
+    ESP.restart();
+  });
+
+  portalServer.on("/clear", HTTP_POST, []() {
+    clearWifiNetworksFromPrefs();
+    loadSavedWifiNetworks();
+    portalServer.send(200, "text/html",
+      "<html><body><h3>WiFi borrados.</h3><p>Vuelve atrás y configura nuevamente.</p></body></html>");
+  });
+
+  portalServer.onNotFound([]() {
+    portalServer.sendHeader("Location", String("http://") + WiFi.softAPIP().toString(), true);
+    portalServer.send(302, "text/plain", "");
+  });
+
+  portalServer.begin();
+  Serial.println("📶 Portal WiFi activo.");
+  Serial.print("   SSID: ");
+  Serial.println(WiFi.softAPSSID());
+  Serial.print("   IP: ");
+  Serial.println(WiFi.softAPIP());
+  Serial.println("   Abre http://192.168.4.1 en el celular/PC conectado a esa red.");
+}
+
+static void stopConfigPortal() {
+  if (!portalActive) return;
+  portalActive = false;
+  dnsServer.stop();
+  portalServer.stop();
+  WiFi.softAPdisconnect(true);
+  Serial.println("📶 Portal WiFi detenido.");
+}
+
+static void handleConfigPortalLoop() {
+  if (!portalActive) return;
+  dnsServer.processNextRequest();
+  portalServer.handleClient();
+}
+
+static void initAfterWifiOnce() {
+  if (postWifiInitialized) return;
+  if (WiFi.status() != WL_CONNECTED) return;
+
+  // Configurar hora (NTP)
+  configTime(-3 * 3600, 0, "pool.ntp.org", "time.nist.gov");
+
+  // Configurar Firebase
+  setupFirebase();
+
+  postWifiInitialized = true;
+  stopConfigPortal();
+
+  Serial.println();
+  Serial.println("✓ Sistema listo!");
+  Serial.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+  Serial.println();
 }
 
 // ============ FUNCIÓN: CONFIGURAR FIREBASE ============
@@ -671,15 +898,14 @@ void sendSensorData() {
 
 // ============ LOOP PRINCIPAL ============
 void loop() {
+  handleConfigPortalLoop();
+  initAfterWifiOnce();
+
   // Verificar conexión WiFi
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("⚠ WiFi desconectado, reconectando...");
     digitalWrite(LED_PIN, LOW);
     connectWiFi();
-    if (WiFi.status() == WL_CONNECTED) {
-      firebaseReady = true;
-      setupFirebase();
-    }
     return;
   }
   
