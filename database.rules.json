@@ -13,7 +13,10 @@
     "sensors": {
       "$equipmentId": {
         ".read": "auth != null",
-        ".write": "auth != null || (newData.child('temperatura').exists() && newData.child('humedad').exists())"
+        ".write": "auth != null || (newData.child('temperatura').exists() && newData.child('humedad').exists())",
+        "readings": {
+          ".indexOn": ["timestamp"]
+        }
       }
     }
   }
