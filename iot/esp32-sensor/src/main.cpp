@@ -19,6 +19,7 @@
 #include <time.h>
 #include <WebServer.h>
 #include <DNSServer.h>
+#include <LittleFS.h>
 
 // Config local (no versionada) / config de ejemplo (versionada)
 #if __has_include("config.h")
@@ -69,9 +70,14 @@ static void getSimulatedDht(float& temperature, float& humidity);
 
 // ============ BUFFER OFFLINE (BACKFILL) ============
 // Guarda lecturas en RAM cuando no hay WiFi/Firebase y las envía al volver.
-// Nota: RAM buffer NO sobrevive reinicios/cortes de energía.
+// RAM: útil para cortes breves (rápido). Flash (LittleFS): sobrevive reinicios.
 #define READINGS_BUFFER_MAX 720 // ~1 hora a 5s
 #define READINGS_FLUSH_BATCH 25 // máx lecturas por ciclo
+
+// Backlog persistente en flash
+#define BACKLOG_FILE_PATH "/backlog.csv"
+// Guardar offset cada N lecturas enviadas (reduce escrituras NVS)
+#define BACKLOG_OFFSET_SAVE_EVERY 10
 
 // ============ UMBRALES DE ALERTA ============
 // Temperatura
@@ -104,6 +110,10 @@ static WebServer portalServer(80);
 static String savedWifiSsid[WIFI_MAX_NETWORKS];
 static String savedWifiPass[WIFI_MAX_NETWORKS];
 static uint8_t savedWifiCount = 0;
+
+static bool fsReady = false;
+static uint32_t backlogOffset = 0;
+static uint32_t backlogSentSinceSave = 0;
 
 // Declarado más abajo (variables de estado), pero usado por helpers de buffer.
 extern bool firebaseReady;
@@ -163,6 +173,34 @@ static void bufferReading(
     return;
   }
 
+  // 1) Intentar persistir en flash (sobrevive reinicio)
+  if (fsReady) {
+    File f = LittleFS.open(BACKLOG_FILE_PATH, FILE_APPEND);
+    if (f) {
+      char line[160];
+      // ts,temp,hum,tempStatus,humStatus,source,equipmentId
+      // status: 0/1/2, source: 0/1
+      const int n = snprintf(
+        line,
+        sizeof(line),
+        "%llu,%.3f,%.3f,%u,%u,%u,%s\n",
+        (unsigned long long)timestampMs,
+        (double)temperature,
+        (double)humidity,
+        (unsigned)statusToCode(tempStatus),
+        (unsigned)statusToCode(humStatus),
+        (unsigned)(simulated ? SRC_SIMULATED : SRC_DHT11),
+        equipmentId.c_str()
+      );
+      if (n > 0) {
+        f.print(line);
+      }
+      f.close();
+      return; // Persistido: no duplicar en RAM
+    }
+  }
+
+  // 2) Fallback: guardar en RAM
   BufferedReading& slot = readingBuf[readingHead];
   slot.timestampMs = timestampMs;
   slot.temperature = temperature;
@@ -186,7 +224,6 @@ static void bufferReading(
 static void flushBufferedReadings() {
   if (!firebaseReady) return;
   if (WiFi.status() != WL_CONNECTED) return;
-  if (readingCount == 0) return;
 
   uint16_t flushed = 0;
   while (readingCount > 0 && flushed < READINGS_FLUSH_BATCH) {
@@ -233,6 +270,152 @@ static void flushBufferedReadings() {
       Serial.printf(" (drops por buffer lleno: %lu)", (unsigned long)bufferedDrops);
     }
     Serial.println();
+  }
+}
+
+static bool parseBacklogLine(const String& line, BufferedReading& out) {
+  // Formato: ts,temp,hum,tsCode,hsCode,srcCode,equipmentId
+  // Ej: 1705160000123,25.1,55.2,0,0,0,720004501
+  if (line.length() < 10) return false;
+
+  int idx1 = line.indexOf(',');
+  if (idx1 < 0) return false;
+  int idx2 = line.indexOf(',', idx1 + 1);
+  if (idx2 < 0) return false;
+  int idx3 = line.indexOf(',', idx2 + 1);
+  if (idx3 < 0) return false;
+  int idx4 = line.indexOf(',', idx3 + 1);
+  if (idx4 < 0) return false;
+  int idx5 = line.indexOf(',', idx4 + 1);
+  if (idx5 < 0) return false;
+  int idx6 = line.indexOf(',', idx5 + 1);
+  if (idx6 < 0) return false;
+
+  const String tsS = line.substring(0, idx1);
+  const String tS = line.substring(idx1 + 1, idx2);
+  const String hS = line.substring(idx2 + 1, idx3);
+  const String tsCodeS = line.substring(idx3 + 1, idx4);
+  const String hsCodeS = line.substring(idx4 + 1, idx5);
+  const String srcS = line.substring(idx5 + 1, idx6);
+  String eq = line.substring(idx6 + 1);
+  eq.trim();
+
+  const uint64_t ts = (uint64_t)strtoull(tsS.c_str(), nullptr, 10);
+  const float t = (float)atof(tS.c_str());
+  const float h = (float)atof(hS.c_str());
+  const uint8_t tsC = (uint8_t)atoi(tsCodeS.c_str());
+  const uint8_t hsC = (uint8_t)atoi(hsCodeS.c_str());
+  const uint8_t srcC = (uint8_t)atoi(srcS.c_str());
+
+  if (ts == 0 || eq.length() == 0) return false;
+
+  out.timestampMs = ts;
+  out.temperature = t;
+  out.humidity = h;
+  out.tempStatus = (StatusCode)tsC;
+  out.humStatus = (StatusCode)hsC;
+  out.source = (SourceCode)srcC;
+  memset(out.equipmentId, 0, sizeof(out.equipmentId));
+  strncpy(out.equipmentId, eq.c_str(), sizeof(out.equipmentId) - 1);
+  return true;
+}
+
+static void saveBacklogOffset() {
+  prefs.begin("iot", false);
+  prefs.putUInt("blOff", backlogOffset);
+  prefs.end();
+}
+
+static void loadBacklogOffset() {
+  prefs.begin("iot", false);
+  backlogOffset = prefs.getUInt("blOff", 0);
+  prefs.end();
+}
+
+static void flushBacklogFromFlash() {
+  if (!fsReady) return;
+  if (!firebaseReady) return;
+  if (WiFi.status() != WL_CONNECTED) return;
+
+  if (!LittleFS.exists(BACKLOG_FILE_PATH)) return;
+  File f = LittleFS.open(BACKLOG_FILE_PATH, FILE_READ);
+  if (!f) return;
+
+  const size_t size = f.size();
+  if (backlogOffset >= size) {
+    f.close();
+    LittleFS.remove(BACKLOG_FILE_PATH);
+    backlogOffset = 0;
+    saveBacklogOffset();
+    return;
+  }
+
+  f.seek(backlogOffset);
+
+  uint16_t flushed = 0;
+  while (f.available() && flushed < READINGS_FLUSH_BATCH) {
+    String line = f.readStringUntil('\n');
+    line.trim();
+    if (line.length() == 0) {
+      backlogOffset = (uint32_t)f.position();
+      continue;
+    }
+
+    BufferedReading r;
+    if (!parseBacklogLine(line, r)) {
+      // Línea corrupta: saltar
+      backlogOffset = (uint32_t)f.position();
+      continue;
+    }
+
+    String readingsPath;
+    readingsPath.reserve(64);
+    readingsPath = "sensors/";
+    readingsPath += r.equipmentId;
+    readingsPath += "/readings";
+
+    FirebaseJson readingJson;
+    readingJson.set("timestamp", (double)r.timestampMs);
+    readingJson.set("temperature", r.temperature);
+    readingJson.set("humidity", r.humidity);
+    readingJson.set("tempStatus", codeToStatus(r.tempStatus));
+    readingJson.set("humStatus", codeToStatus(r.humStatus));
+    readingJson.set("source", codeToSource(r.source));
+
+    if (!Firebase.RTDB.pushJSON(&fbdo, readingsPath.c_str(), &readingJson)) {
+      Serial.printf("⚠ Backlog flash falló (se reintentará): %s\n", fbdo.errorReason().c_str());
+      break;
+    }
+
+    backlogOffset = (uint32_t)f.position();
+    flushed++;
+    backlogSentSinceSave++;
+
+    if (backlogSentSinceSave >= BACKLOG_OFFSET_SAVE_EVERY) {
+      saveBacklogOffset();
+      backlogSentSinceSave = 0;
+    }
+
+    delay(10);
+  }
+
+  const bool reachedEnd = (backlogOffset >= f.size());
+  f.close();
+
+  if (flushed > 0) {
+    Serial.printf("📤 Backlog flash: enviadas %u", (unsigned)flushed);
+    Serial.println();
+  }
+
+  if (reachedEnd) {
+    LittleFS.remove(BACKLOG_FILE_PATH);
+    backlogOffset = 0;
+    saveBacklogOffset();
+    backlogSentSinceSave = 0;
+  } else {
+    // Persistir offset al menos una vez por flush
+    saveBacklogOffset();
+    backlogSentSinceSave = 0;
   }
 }
 
@@ -517,6 +700,20 @@ void setup() {
   Serial.println("✓ DHT listo (si falla, se simula)");
 
   randomSeed(micros());
+
+  // DeviceId disponible incluso antes de WiFi (para SSID del portal)
+  if (deviceId.length() == 0) {
+    deviceId = getDeviceId();
+  }
+
+  // LittleFS para backlog persistente
+  fsReady = LittleFS.begin(true);
+  if (fsReady) {
+    loadBacklogOffset();
+    Serial.println("💾 LittleFS listo (backlog persistente habilitado)");
+  } else {
+    Serial.println("⚠ No se pudo inicializar LittleFS (backlog persistente deshabilitado)");
+  }
   
   // Conectar a WiFi
   loadSavedWifiNetworks();
@@ -637,8 +834,17 @@ bool connectWiFi() {
           }
         }
       }
+    } else if (found == 0) {
+      Serial.println("⚠ No se detectaron redes en el escaneo.");
     }
     WiFi.scanDelete();
+
+    // Si el escaneo funcionó pero ninguna red conocida está presente,
+    // no tiene sentido esperar minutos intentando conectar: levantamos portal rápido.
+    if (found >= 0 && bestNetworkIdx < 0) {
+      Serial.println("⚠ Ninguna red conocida encontrada. Activar portal será más rápido.");
+      return false;
+    }
   }
 
   bool connected = false;
@@ -682,7 +888,8 @@ static void startConfigPortal() {
 
   const String apSsid = String("ESP32-") + (deviceId.length() ? deviceId : String("CONFIG"));
   WiFi.mode(WIFI_AP);
-  WiFi.softAP(apSsid.c_str());
+  // Canal fijo para mejorar visibilidad; red visible (hidden=false)
+  WiFi.softAP(apSsid.c_str(), nullptr, 1, 0);
   delay(200);
 
   IPAddress ip = WiFi.softAPIP();
@@ -787,8 +994,14 @@ static void handleConfigPortalLoop() {
 }
 
 static void initAfterWifiOnce() {
-  if (postWifiInitialized) return;
   if (WiFi.status() != WL_CONNECTED) return;
+
+  // Si el WiFi volvió, apagar portal aunque ya se haya inicializado antes.
+  if (portalActive) {
+    stopConfigPortal();
+  }
+
+  if (postWifiInitialized) return;
 
   // Configurar hora (NTP)
   configTime(-3 * 3600, 0, "pool.ntp.org", "time.nist.gov");
@@ -797,7 +1010,6 @@ static void initAfterWifiOnce() {
   setupFirebase();
 
   postWifiInitialized = true;
-  stopConfigPortal();
 
   Serial.println();
   Serial.println("✓ Sistema listo!");
@@ -1050,6 +1262,11 @@ void loop() {
 
   // Reintentar conexión WiFi sin bloquear el muestreo.
   if (WiFi.status() != WL_CONNECTED) {
+    // Si el portal está activo, mantenemos AP y no intentamos pasar a STA.
+    // (evita que el AP desaparezca y no se vea en el celular)
+    if (portalActive) {
+      // Igual seguimos midiendo y guardando backlog.
+    } else
     if (millis() - lastReconnectTime > RECONNECT_INTERVAL) {
       Serial.println("⚠ WiFi desconectado, intentando reconectar...");
       digitalWrite(LED_PIN, LOW);
@@ -1064,6 +1281,7 @@ void loop() {
 
   // Si ya hay WiFi y Firebase está listo, intentar enviar backlog.
   flushBufferedReadings();
+  flushBacklogFromFlash();
 
   // Verificar Firebase (solo si hay WiFi)
   if (WiFi.status() == WL_CONNECTED && !firebaseReady) {
