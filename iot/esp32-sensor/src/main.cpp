@@ -1053,7 +1053,11 @@ void loop() {
     if (millis() - lastReconnectTime > RECONNECT_INTERVAL) {
       Serial.println("⚠ WiFi desconectado, intentando reconectar...");
       digitalWrite(LED_PIN, LOW);
-      connectWiFi();
+      const bool ok = connectWiFi();
+      if (!ok && !portalActive) {
+        Serial.println("📶 No se pudo reconectar. Activando portal WiFi...");
+        startConfigPortal();
+      }
       lastReconnectTime = millis();
     }
   }
