@@ -759,9 +759,9 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
       const preferFlashFor1h = (currentRange === '1h' && flashHistoryCount > ramHistoryCount);
       const autoUseFlash = (currentRange !== '1h' || windowOverrideMs > 0 || preferFlashFor1h);
       const useFlash = sourceMode === 'flash' ? true : (sourceMode === 'ram' ? false : autoUseFlash);
-      const windowPoints = windowMs ? Math.ceil((windowMs / 1000) / Math.max(1, sendIntervalSeconds)) : 200;
-      const autoLimit = Math.min(200, Math.max(50, Math.ceil(windowPoints * 1.2)));  // Reducido de 2000 a 200
-      const limit = samplesLimitOverride > 0 ? Math.min(200, samplesLimitOverride) : autoLimit;  // Max 200
+      const windowPoints = windowMs ? Math.ceil((windowMs / 1000) / Math.max(1, sendIntervalSeconds)) : 2000;
+      const autoLimit = Math.min(2000, Math.max(100, Math.ceil(windowPoints * 1.2)));
+      const limit = samplesLimitOverride > 0 ? samplesLimitOverride : autoLimit;
       const offsetCount = useFlash ? Math.floor((xOffsetMs / 1000) / Math.max(1, sendIntervalSeconds)) : 0;
       const url = '/api/history?source=' + (useFlash ? 'flash' : 'ram') + '&limit=' + limit + '&offset=' + offsetCount;
       
@@ -943,8 +943,8 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
 
     updateData();
     loadConfig();
-    setInterval(updateData, 15000);  // Cada 15 seg en lugar de 5
-    setInterval(loadConfig, 60000);  // Cada 60 seg en lugar de 30
+    setInterval(updateData, 5000);
+    setInterval(loadConfig, 30000);
   </script>
 </body>
 </html>

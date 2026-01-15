@@ -115,9 +115,9 @@ void handleApiHistory() {
   String source = portalServer.arg("source");
   bool useFlash = (source == "flash");
   
-  // Leer parámetro de límite (para no saturar memoria con 20000 lecturas)
+  // Leer parámetro de límite (REDUCIDO para evitar sobrecarga)
   int limit = portalServer.arg("limit").toInt();
-  if (limit <= 0 || limit > 2000) limit = 500;  // Máximo 500 por request
+  if (limit <= 0 || limit > 200) limit = 100;  // Máximo 200 (antes 2000)
   
   // Leer parámetro de offset (para paginación)
   int offset = portalServer.arg("offset").toInt();
