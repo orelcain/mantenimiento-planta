@@ -265,7 +265,8 @@ static void ensureHttpServerStarted() {
   // Página principal: si está en AP, mostrar config WiFi/AP. En STA, mostrar dashboard.
   portalServer.on("/", HTTP_GET, []() {
     const bool isApMode = (WiFi.getMode() & WIFI_MODE_AP);
-    const bool showWifiConfig = portalActive || isApMode || portalServer.hasArg("cfg");
+    const bool forceDashboard = portalServer.hasArg("dash");
+    const bool showWifiConfig = !forceDashboard && (portalActive || isApMode || portalServer.hasArg("cfg"));
 
     String html;
     html.reserve(3200);
@@ -321,7 +322,10 @@ static void ensureHttpServerStarted() {
       html += "<button type='submit'>Borrar WiFi guardados</button>";
       html += "</form>";
 
-      html += "<p style='margin-top:16px'><a href='/status.json'>Ver status JSON</a></p>";
+      html += "<p style='margin-top:16px'>";
+      html += "<a href='/?dash=1'>Abrir dashboard</a> · ";
+      html += "<a href='/status.json'>Ver status JSON</a>";
+      html += "</p>";
     } else {
       html += "<h2>ESP32 - Dashboard local</h2>";
       html += "<p><small>Tip: abre <code>/status.json</code> para JSON.</small></p>";
