@@ -173,6 +173,17 @@ void handleApiConfig() {
     doc["flashHistoryMax"] = 20000;
     doc["ramHistoryCount"] = telemetryCount;
     doc["ramHistoryMax"] = TELEMETRY_HISTORY_SIZE;
+
+    // Umbrales de alerta
+    AlertThresholds t = getAlertThresholds();
+    doc["tempWarnLow"] = t.tempWarnLow;
+    doc["tempWarnHigh"] = t.tempWarnHigh;
+    doc["tempCritLow"] = t.tempCritLow;
+    doc["tempCritHigh"] = t.tempCritHigh;
+    doc["humWarnLow"] = t.humWarnLow;
+    doc["humWarnHigh"] = t.humWarnHigh;
+    doc["humCritLow"] = t.humCritLow;
+    doc["humCritHigh"] = t.humCritHigh;
     
     // Calcular días estimados de histórico
     uint32_t intervalSec = getSendIntervalSeconds();
@@ -194,6 +205,9 @@ void handleApiConfig() {
     }
     
     bool changed = false;
+    bool thresholdsChanged = false;
+
+    AlertThresholds t = getAlertThresholds();
     
     if (doc.containsKey("sendIntervalSeconds")) {
       int newInterval = doc["sendIntervalSeconds"].as<int>();
@@ -201,6 +215,29 @@ void handleApiConfig() {
         setSendIntervalSeconds(newInterval);
         changed = true;
       }
+    }
+
+    auto setFloat = [&](const char* key, float& target) {
+      if (!doc.containsKey(key)) return;
+      target = doc[key].as<float>();
+      thresholdsChanged = true;
+    };
+
+    setFloat("tempWarnLow", t.tempWarnLow);
+    setFloat("tempWarnHigh", t.tempWarnHigh);
+    setFloat("tempCritLow", t.tempCritLow);
+    setFloat("tempCritHigh", t.tempCritHigh);
+    setFloat("humWarnLow", t.humWarnLow);
+    setFloat("humWarnHigh", t.humWarnHigh);
+    setFloat("humCritLow", t.humCritLow);
+    setFloat("humCritHigh", t.humCritHigh);
+
+    if (thresholdsChanged) {
+      if (!setAlertThresholds(t)) {
+        portalServer.send(400, "application/json", "{\"error\":\"Umbrales inválidos\"}");
+        return;
+      }
+      changed = true;
     }
     
     if (changed) {

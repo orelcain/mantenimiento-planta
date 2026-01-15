@@ -39,7 +39,7 @@
 // ============ DECLARACIONES DE FUNCIONES ============
 bool connectWiFi();
 void setupFirebase();
-String getStatus(float value, float warning, float critical);
+String getStatus(float value, float warnLow, float warnHigh, float critLow, float critHigh);
 uint64_t getTimestamp();
 void sendOnlineStatus(bool online);
 void sendSensorData();
@@ -74,6 +74,12 @@ static void setEquipmentOnlineFor(const String& equipmentId, bool online);
 static void printDhtPinState(const char* context);
 
 static void getSimulatedDht(float& temperature, float& humidity);
+
+// Funciones para umbrales de alerta
+static void loadAlertThresholds();
+static void persistAlertThresholds();
+AlertThresholds getAlertThresholds();
+bool setAlertThresholds(const AlertThresholds& t);
 
 // Funciones para intervalo configurable
 static void loadSendInterval();
@@ -134,12 +140,16 @@ static uint32_t historySavedIndex = 0;  // Último índice guardado en prefs
 #define BACKLOG_OFFSET_SAVE_EVERY 10
 
 // ============ UMBRALES DE ALERTA ============
-// Temperatura
-#define TEMP_WARNING 30.0   // Advertencia si temp > 30°C
-#define TEMP_CRITICAL 40.0  // Crítico si temp > 40°C
-// Humedad
-#define HUM_WARNING 70.0    // Advertencia si humedad > 70%
-#define HUM_CRITICAL 85.0   // Crítico si humedad > 85%
+// Temperatura (°C)
+#define TEMP_WARN_LOW_DEFAULT 15.0
+#define TEMP_WARN_HIGH_DEFAULT 30.0
+#define TEMP_CRIT_LOW_DEFAULT 10.0
+#define TEMP_CRIT_HIGH_DEFAULT 40.0
+// Humedad (%)
+#define HUM_WARN_LOW_DEFAULT 30.0
+#define HUM_WARN_HIGH_DEFAULT 70.0
+#define HUM_CRIT_LOW_DEFAULT 20.0
+#define HUM_CRIT_HIGH_DEFAULT 85.0
 
 // ============ OBJETOS GLOBALES ============
 DHTesp dht;
@@ -188,6 +198,18 @@ static float lastHumidity = NAN;
 static bool lastSimulated = false;
 static String lastTempStatus;
 static String lastHumStatus;
+
+// Umbrales de alerta (configurables vía API)
+static AlertThresholds alertThresholds = {
+  TEMP_WARN_LOW_DEFAULT,
+  TEMP_WARN_HIGH_DEFAULT,
+  TEMP_CRIT_LOW_DEFAULT,
+  TEMP_CRIT_HIGH_DEFAULT,
+  HUM_WARN_LOW_DEFAULT,
+  HUM_WARN_HIGH_DEFAULT,
+  HUM_CRIT_LOW_DEFAULT,
+  HUM_CRIT_HIGH_DEFAULT
+};
 
 static String staHostname;
 static bool mdnsStarted = false;
@@ -915,6 +937,65 @@ static void loadSendInterval() {
   Serial.printf("⏱️  Intervalo de lectura: %d segundos\n", sendIntervalSeconds);
 }
 
+// ============ UMBRALES CONFIGURABLES ============
+static bool validateThresholds(const AlertThresholds& t) {
+  const bool tempOk = (t.tempCritLow <= t.tempWarnLow) && (t.tempWarnLow <= t.tempWarnHigh) && (t.tempWarnHigh <= t.tempCritHigh);
+  const bool humOk = (t.humCritLow <= t.humWarnLow) && (t.humWarnLow <= t.humWarnHigh) && (t.humWarnHigh <= t.humCritHigh);
+  return tempOk && humOk;
+}
+
+static void loadAlertThresholds() {
+  prefs.begin("iot", false);
+  alertThresholds.tempWarnLow = prefs.getFloat("tWL", TEMP_WARN_LOW_DEFAULT);
+  alertThresholds.tempWarnHigh = prefs.getFloat("tWH", TEMP_WARN_HIGH_DEFAULT);
+  alertThresholds.tempCritLow = prefs.getFloat("tCL", TEMP_CRIT_LOW_DEFAULT);
+  alertThresholds.tempCritHigh = prefs.getFloat("tCH", TEMP_CRIT_HIGH_DEFAULT);
+  alertThresholds.humWarnLow = prefs.getFloat("hWL", HUM_WARN_LOW_DEFAULT);
+  alertThresholds.humWarnHigh = prefs.getFloat("hWH", HUM_WARN_HIGH_DEFAULT);
+  alertThresholds.humCritLow = prefs.getFloat("hCL", HUM_CRIT_LOW_DEFAULT);
+  alertThresholds.humCritHigh = prefs.getFloat("hCH", HUM_CRIT_HIGH_DEFAULT);
+  prefs.end();
+
+  if (!validateThresholds(alertThresholds)) {
+    alertThresholds = {
+      TEMP_WARN_LOW_DEFAULT,
+      TEMP_WARN_HIGH_DEFAULT,
+      TEMP_CRIT_LOW_DEFAULT,
+      TEMP_CRIT_HIGH_DEFAULT,
+      HUM_WARN_LOW_DEFAULT,
+      HUM_WARN_HIGH_DEFAULT,
+      HUM_CRIT_LOW_DEFAULT,
+      HUM_CRIT_HIGH_DEFAULT
+    };
+  }
+}
+
+static void persistAlertThresholds() {
+  prefs.begin("iot", false);
+  prefs.putFloat("tWL", alertThresholds.tempWarnLow);
+  prefs.putFloat("tWH", alertThresholds.tempWarnHigh);
+  prefs.putFloat("tCL", alertThresholds.tempCritLow);
+  prefs.putFloat("tCH", alertThresholds.tempCritHigh);
+  prefs.putFloat("hWL", alertThresholds.humWarnLow);
+  prefs.putFloat("hWH", alertThresholds.humWarnHigh);
+  prefs.putFloat("hCL", alertThresholds.humCritLow);
+  prefs.putFloat("hCH", alertThresholds.humCritHigh);
+  prefs.end();
+}
+
+AlertThresholds getAlertThresholds() {
+  return alertThresholds;
+}
+
+bool setAlertThresholds(const AlertThresholds& t) {
+  if (!validateThresholds(t)) {
+    return false;
+  }
+  alertThresholds = t;
+  persistAlertThresholds();
+  return true;
+}
+
 static void persistSendInterval(uint16_t intervalSec) {
   if (intervalSec < MIN_SEND_INTERVAL) intervalSec = MIN_SEND_INTERVAL;
   if (intervalSec > MAX_SEND_INTERVAL) intervalSec = MAX_SEND_INTERVAL;
@@ -1388,6 +1469,9 @@ void setup() {
   // Cargar intervalo de lectura configurable
   loadSendInterval();
 
+  // Cargar umbrales de alerta configurables
+  loadAlertThresholds();
+
   // Servidor HTTP: registrar TODOS los endpoints ANTES de begin()
   // 1. Endpoints del portal de configuración
   ensureHttpServerStarted();
@@ -1587,7 +1671,7 @@ bool connectWiFi() {
 
     // Si el escaneo funcionó pero ninguna red conocida está presente,
     // no tiene sentido esperar minutos intentando conectar: levantamos portal rápido.
-    if (found >= 0 && bestNetworkIdx < 0) {
+    if (found > 0 && bestNetworkIdx < 0) {
       Serial.println("⚠ Ninguna red conocida encontrada. Activar portal será más rápido.");
       return false;
     }
@@ -1787,10 +1871,49 @@ void setupFirebase() {
 }
 
 // ============ FUNCIÓN: DETERMINAR ESTADO ============
-String getStatus(float value, float warning, float critical) {
-  if (value >= critical) return "critical";
-  if (value >= warning) return "warning";
+String getStatus(float value, float warnLow, float warnHigh, float critLow, float critHigh) {
+  if (value <= critLow || value >= critHigh) return "critical";
+  if (value <= warnLow || value >= warnHigh) return "warning";
   return "normal";
+}
+
+static bool isAlertStatus(const String& s) {
+  return (s == "warning" || s == "critical");
+}
+
+static void pushAlertEvent(const String& kind, const String& status, float value, uint64_t timestamp) {
+  if (!firebaseReady || WiFi.status() != WL_CONNECTED) return;
+
+  FirebaseJson alertJson;
+  alertJson.set("timestamp", (double)timestamp);
+  alertJson.set("type", kind);
+  alertJson.set("status", status);
+  alertJson.set("value", value);
+  alertJson.set("deviceId", getDeviceId());
+  if (hasAssignedEquipment()) {
+    alertJson.set("equipmentId", currentEquipmentId);
+  }
+
+  AlertThresholds t = getAlertThresholds();
+  if (kind == "temperature") {
+    alertJson.set("warnLow", t.tempWarnLow);
+    alertJson.set("warnHigh", t.tempWarnHigh);
+    alertJson.set("critLow", t.tempCritLow);
+    alertJson.set("critHigh", t.tempCritHigh);
+  } else {
+    alertJson.set("warnLow", t.humWarnLow);
+    alertJson.set("warnHigh", t.humWarnHigh);
+    alertJson.set("critLow", t.humCritLow);
+    alertJson.set("critHigh", t.humCritHigh);
+  }
+
+  String deviceAlertPath = String("devices/") + getDeviceId() + "/alerts";
+  Firebase.RTDB.pushJSON(&fbdo, deviceAlertPath.c_str(), &alertJson);
+
+  if (hasAssignedEquipment()) {
+    String equipAlertPath = String("sensors/") + currentEquipmentId + "/alerts";
+    Firebase.RTDB.pushJSON(&fbdo, equipAlertPath.c_str(), &alertJson);
+  }
 }
 
 // ============ FUNCIÓN: OBTENER TIMESTAMP ============
@@ -1852,19 +1975,30 @@ void sendSensorData() {
     printDhtPinState("durante lectura fallida");
   }
   
-  // Determinar estados
-  String tempStatus = getStatus(temperature, TEMP_WARNING, TEMP_CRITICAL);
-  String humStatus = getStatus(humidity, HUM_WARNING, HUM_CRITICAL);
+  // Determinar estados con umbrales configurables
+  const AlertThresholds t = getAlertThresholds();
+  String tempStatus = getStatus(temperature, t.tempWarnLow, t.tempWarnHigh, t.tempCritLow, t.tempCritHigh);
+  String humStatus = getStatus(humidity, t.humWarnLow, t.humWarnHigh, t.humCritLow, t.humCritHigh);
   
   uint64_t timestamp = getTimestamp();
 
   // Guardar última lectura para el dashboard local
+  const String prevTempStatus = lastTempStatus;
+  const String prevHumStatus = lastHumStatus;
   lastReadingTs = timestamp;
   lastTemperature = temperature;
   lastHumidity = humidity;
   lastSimulated = simulated;
   lastTempStatus = tempStatus;
   lastHumStatus = humStatus;
+
+  // Alertas: disparar solo si cambia a warning/critical
+  if (isAlertStatus(tempStatus) && tempStatus != prevTempStatus) {
+    pushAlertEvent("temperature", tempStatus, temperature, timestamp);
+  }
+  if (isAlertStatus(humStatus) && humStatus != prevHumStatus) {
+    pushAlertEvent("humidity", humStatus, humidity, timestamp);
+  }
   
   // Agregar al histórico del servidor web local (RAM)
   addTelemetryReading(timestamp, temperature, humidity, tempStatus, humStatus, simulated);

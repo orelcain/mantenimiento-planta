@@ -39,6 +39,21 @@ extern void setSendIntervalSeconds(uint16_t sec);
 extern uint32_t getFlashHistoryCount();
 extern bool getFlashReading(uint32_t index, uint64_t& ts, float& temp, float& hum, uint8_t& tempSt, uint8_t& humSt, bool& sim);
 
+// ============ UMBRALES DE ALERTA (TEMP/HUM) ============
+struct AlertThresholds {
+  float tempWarnLow;
+  float tempWarnHigh;
+  float tempCritLow;
+  float tempCritHigh;
+  float humWarnLow;
+  float humWarnHigh;
+  float humCritLow;
+  float humCritHigh;
+};
+
+AlertThresholds getAlertThresholds();
+bool setAlertThresholds(const AlertThresholds& t);
+
 // ============ FUNCIONES PÚBLICAS ============
 void setupLocalWebServer();
 void handleLocalWebServer();
@@ -107,6 +122,7 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
       border-color: #4f46e5;
     }
     .range-btn.reset { background: #fef3c7; border-color: #fcd34d; color: #92400e; }
+    .range-btn.nav { background: #ecfeff; border-color: #a5f3fc; color: #0e7490; }
     .legend {
       display: flex;
       gap: 10px;
@@ -133,6 +149,28 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
       white-space: nowrap;
     }
     .tooltip.visible { opacity: 1; }
+    .crosshair {
+      position: absolute;
+      width: 1px;
+      background: rgba(17, 24, 39, 0.5);
+      top: 0;
+      bottom: 0;
+      opacity: 0;
+      z-index: 6;
+    }
+    .dot {
+      position: absolute;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      opacity: 0;
+      z-index: 7;
+      border: 1px solid #fff;
+      box-shadow: 0 0 0 1px rgba(0,0,0,0.1);
+    }
+    .dot.temp { background: #ef4444; }
+    .dot.hum { background: #3b82f6; }
+    .crosshair.visible, .dot.visible { opacity: 1; }
     .stats {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
@@ -164,6 +202,32 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
       padding-top: 8px;
       border-top: 1px solid #e5e7eb;
     }
+    .time-controls {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-top: 8px;
+      font-size: 0.75em;
+      color: #475569;
+    }
+    .time-controls label { font-weight: 600; }
+    .time-controls input, .time-controls select {
+      padding: 4px 6px;
+      border: 1px solid #cbd5f5;
+      border-radius: 6px;
+      font-size: 1em;
+      background: #fff;
+    }
+    .time-controls button {
+      padding: 4px 10px;
+      border: none;
+      border-radius: 6px;
+      background: #6366f1;
+      color: #fff;
+      cursor: pointer;
+      font-size: 0.9em;
+    }
     .config-section {
       margin-top: 10px;
       padding: 10px;
@@ -185,6 +249,9 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
       border: 1px solid #7dd3fc;
       border-radius: 4px;
       font-size: 1em;
+    }
+    .config-row input.mini {
+      width: 52px;
     }
     .config-row button {
       padding: 4px 10px;
@@ -222,6 +289,11 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
           <button class="range-btn" data-range="all">Todo</button>
         </div>
         <div class="btn-group">
+          <button class="range-btn nav" id="xBack">◀︎</button>
+          <button class="range-btn nav" id="xForward">▶︎</button>
+          <button class="range-btn nav" id="xNow">Ahora</button>
+        </div>
+        <div class="btn-group">
           <button class="range-btn" id="zoomOut">Y−</button>
           <button class="range-btn" id="zoomIn">Y+</button>
           <button class="range-btn reset" id="zoomReset">100%</button>
@@ -234,6 +306,9 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
       <div class="chart-container">
         <canvas id="chart1"></canvas>
         <div class="tooltip" id="tooltip"></div>
+        <div class="crosshair" id="crosshair"></div>
+        <div class="dot temp" id="dotTemp"></div>
+        <div class="dot hum" id="dotHum"></div>
       </div>
       <div class="stats">
         <div class="stat">
@@ -263,7 +338,20 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
       </div>
       <div class="info-row">
         <span>Histórico: <span id="historyCount">--</span></span>
-        <span>Zoom: <span id="zoomLevel">100%</span></span>
+        <span>Ventana: <span id="timeWindow">--</span> · Offset: <span id="timeOffset">0</span></span>
+      </div>
+      <div class="time-controls">
+        <label>Ventana (min)</label>
+        <input type="number" id="windowInput" min="0" step="5" value="0">
+        <label>Muestras</label>
+        <input type="number" id="samplesInput" min="50" max="2000" step="50" value="0">
+        <label>Fuente</label>
+        <select id="sourceSelect">
+          <option value="auto">Auto</option>
+          <option value="ram">RAM</option>
+          <option value="flash">Flash</option>
+        </select>
+        <button onclick="applyTimeControls()">Aplicar</button>
       </div>
       
       <div class="config-section">
@@ -272,6 +360,21 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
           <input type="number" id="intervalInput" min="5" max="300" value="10">
           <span>seg</span>
           <button onclick="updateInterval()">OK</button>
+        </div>
+        <div class="config-row">
+          <label>Temp (°C)</label>
+          <span>Wmin</span><input type="number" step="0.1" id="tempWarnLow" class="mini">
+          <span>Wmax</span><input type="number" step="0.1" id="tempWarnHigh" class="mini">
+          <span>Cmin</span><input type="number" step="0.1" id="tempCritLow" class="mini">
+          <span>Cmax</span><input type="number" step="0.1" id="tempCritHigh" class="mini">
+        </div>
+        <div class="config-row">
+          <label>Hum (%)</label>
+          <span>Wmin</span><input type="number" step="0.1" id="humWarnLow" class="mini">
+          <span>Wmax</span><input type="number" step="0.1" id="humWarnHigh" class="mini">
+          <span>Cmin</span><input type="number" step="0.1" id="humCritLow" class="mini">
+          <span>Cmax</span><input type="number" step="0.1" id="humCritHigh" class="mini">
+          <button onclick="updateThresholds()">Alertas</button>
         </div>
         <div class="config-info">
           <span id="capacityInfo">--</span> · Flash: <span id="flashInfo">--</span>
@@ -285,11 +388,31 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
   <script>
     const chart1Canvas = document.getElementById('chart1');
     const tooltip = document.getElementById('tooltip');
+    const crosshair = document.getElementById('crosshair');
+    const dotTemp = document.getElementById('dotTemp');
+    const dotHum = document.getElementById('dotHum');
     let currentRange = '1h';
     let yZoom = 1.0;
-    let chartData = { temps: [], hums: [], filtered: [] };
+    let chartData = { temps: [], hums: [], filtered: [], tsMin: 0, tsMax: 0 };
     let chartLabels = {};
     let pad = { left: 38, right: 32, top: 10, bottom: 18 };
+    let xOffsetMs = 0;
+    let sendIntervalSeconds = 10;
+    let windowOverrideMs = 0;
+    let samplesLimitOverride = 0;
+    let sourceMode = 'auto';
+    let flashHistoryCount = 0;
+    let ramHistoryCount = 0;
+    let thresholds = {
+      tempWarnLow: null,
+      tempWarnHigh: null,
+      tempCritLow: null,
+      tempCritHigh: null,
+      humWarnLow: null,
+      humWarnHigh: null,
+      humCritLow: null,
+      humCritHigh: null
+    };
 
     function prepareCanvas(canvas) {
       const dpr = window.devicePixelRatio || 1;
@@ -315,15 +438,49 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
       ctx.setLineDash([]);
     }
 
-    function drawSeries(ctx, pad, plotW, plotH, data, color, min, max) {
-      if (!data.length) return;
+    function drawThresholdLine(ctx, pad, plotW, plotH, value, min, max, color, label, alignRight) {
+      if (value === null || value === undefined) return;
+      if (value < min || value > max) return;
       const span = max - min || 1;
-      const step = plotW / Math.max(1, data.length - 1);
+      const y = pad.top + (1 - (value - min) / span) * plotH;
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      ctx.moveTo(pad.left, y);
+      ctx.lineTo(pad.left + plotW, y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = color;
+      ctx.font = '9px system-ui, sans-serif';
+      ctx.textAlign = alignRight ? 'right' : 'left';
+      ctx.fillText(label, alignRight ? (pad.left + plotW - 2) : (pad.left + 2), y - 2);
+      ctx.restore();
+    }
+
+    function drawThresholds(ctx, pad, plotW, plotH, labels) {
+      drawThresholdLine(ctx, pad, plotW, plotH, thresholds.tempWarnLow, labels.tempMin, labels.tempMax, '#f59e0b', 'T W−', false);
+      drawThresholdLine(ctx, pad, plotW, plotH, thresholds.tempWarnHigh, labels.tempMin, labels.tempMax, '#f59e0b', 'T W+', false);
+      drawThresholdLine(ctx, pad, plotW, plotH, thresholds.tempCritLow, labels.tempMin, labels.tempMax, '#dc2626', 'T C−', false);
+      drawThresholdLine(ctx, pad, plotW, plotH, thresholds.tempCritHigh, labels.tempMin, labels.tempMax, '#dc2626', 'T C+', false);
+
+      drawThresholdLine(ctx, pad, plotW, plotH, thresholds.humWarnLow, labels.humMin, labels.humMax, '#60a5fa', 'H W−', true);
+      drawThresholdLine(ctx, pad, plotW, plotH, thresholds.humWarnHigh, labels.humMin, labels.humMax, '#60a5fa', 'H W+', true);
+      drawThresholdLine(ctx, pad, plotW, plotH, thresholds.humCritLow, labels.humMin, labels.humMax, '#2563eb', 'H C−', true);
+      drawThresholdLine(ctx, pad, plotW, plotH, thresholds.humCritHigh, labels.humMin, labels.humMax, '#2563eb', 'H C+', true);
+    }
+
+    function drawSeriesTime(ctx, pad, plotW, plotH, readings, getVal, color, min, max, tsMin, tsMax) {
+      if (!readings.length) return;
+      const span = max - min || 1;
+      const tsSpan = tsMax - tsMin || 1;
       ctx.strokeStyle = color;
       ctx.lineWidth = 1.5;
       ctx.beginPath();
-      data.forEach((v, i) => {
-        const x = pad.left + i * step;
+      readings.forEach((r, i) => {
+        const v = getVal(r);
+        const x = pad.left + ((r.timestamp - tsMin) / tsSpan) * plotW;
         let norm = (v - min) / span;
         norm = Math.max(0, Math.min(1, norm));
         const y = pad.top + (1 - norm) * plotH;
@@ -332,7 +489,7 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
       ctx.stroke();
     }
 
-    function drawAxesLabels(ctx, pad, plotW, plotH, tMin, tMax, hMin, hMax, startLabel, midLabel, endLabel) {
+    function drawAxesLabels(ctx, pad, plotW, plotH, tMin, tMax, hMin, hMax, startLabel, midLabel, endLabel, curTemp, curHum) {
       ctx.font = '10px system-ui, sans-serif';
       const tMid = (tMin + tMax) / 2;
       const hMid = (hMin + hMax) / 2;
@@ -349,6 +506,38 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
       ctx.fillText(hMid.toFixed(0), pad.left + plotW + 3, pad.top + plotH / 2 + 3);
       ctx.fillText(hMin.toFixed(0), pad.left + plotW + 3, pad.top + plotH - 2);
 
+      // Marcas dinámicas de valor actual
+      if (typeof curTemp === 'number') {
+        const tSpan = (tMax - tMin) || 1;
+        const tY = pad.top + (1 - (curTemp - tMin) / tSpan) * plotH;
+        if (tY >= pad.top && tY <= pad.top + plotH) {
+          ctx.strokeStyle = '#ef4444';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(pad.left - 4, tY);
+          ctx.lineTo(pad.left - 1, tY);
+          ctx.stroke();
+          ctx.fillStyle = '#ef4444';
+          ctx.textAlign = 'right';
+          ctx.fillText(curTemp.toFixed(1), pad.left - 6, tY + 3);
+        }
+      }
+      if (typeof curHum === 'number') {
+        const hSpan = (hMax - hMin) || 1;
+        const hY = pad.top + (1 - (curHum - hMin) / hSpan) * plotH;
+        if (hY >= pad.top && hY <= pad.top + plotH) {
+          ctx.strokeStyle = '#3b82f6';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(pad.left + plotW + 1, hY);
+          ctx.lineTo(pad.left + plotW + 4, hY);
+          ctx.stroke();
+          ctx.fillStyle = '#3b82f6';
+          ctx.textAlign = 'left';
+          ctx.fillText(curHum.toFixed(0), pad.left + plotW + 6, hY + 3);
+        }
+      }
+
       ctx.fillStyle = '#9ca3af';
       ctx.font = '9px system-ui, sans-serif';
       ctx.textAlign = 'left';
@@ -359,27 +548,70 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
       ctx.fillText(endLabel, pad.left + plotW, pad.top + plotH + 12);
     }
 
-    function renderDual(canvas, temp, hum, labels) {
+    function renderDual(canvas, readings, labels) {
       const { ctx, w, h } = prepareCanvas(canvas);
       const plotW = w - pad.left - pad.right;
       const plotH = h - pad.top - pad.bottom;
       ctx.clearRect(0, 0, w, h);
       drawGrid(ctx, pad, plotW, plotH);
-      drawSeries(ctx, pad, plotW, plotH, temp, '#ef4444', labels.tempMin, labels.tempMax);
-      drawSeries(ctx, pad, plotW, plotH, hum, '#3b82f6', labels.humMin, labels.humMax);
+      drawThresholds(ctx, pad, plotW, plotH, labels);
+      drawSeriesTime(ctx, pad, plotW, plotH, readings, r => r.temperature, '#ef4444', labels.tempMin, labels.tempMax, labels.tsMin, labels.tsMax);
+      drawSeriesTime(ctx, pad, plotW, plotH, readings, r => r.humidity, '#3b82f6', labels.humMin, labels.humMax, labels.tsMin, labels.tsMax);
+      const cur = readings.length ? readings[readings.length - 1] : null;
       drawAxesLabels(ctx, pad, plotW, plotH,
         labels.tempMin, labels.tempMax,
         labels.humMin, labels.humMax,
-        labels.startLabel, labels.midLabel, labels.endLabel
+        labels.startLabel, labels.midLabel, labels.endLabel,
+        cur ? cur.temperature : null,
+        cur ? cur.humidity : null
       );
     }
 
-    function filterByRange(data) {
-      if (currentRange === 'all') return data;
-      const now = Date.now();
+    function getWindowMs() {
+      if (windowOverrideMs > 0) return windowOverrideMs;
+      if (currentRange === 'all') return 0;
       const ranges = { '1h': 3600000, '6h': 21600000, '24h': 86400000 };
-      const windowMs = ranges[currentRange] || 3600000;
-      return data.filter(d => (now - d.timestamp) <= windowMs);
+      return ranges[currentRange] || 3600000;
+    }
+
+    function filterByRange(data, windowMs, offsetMs) {
+      if (!windowMs) return data;
+      const windowEnd = Date.now() - offsetMs;
+      const windowStart = windowEnd - windowMs;
+      return data.filter(d => d.timestamp >= windowStart && d.timestamp <= windowEnd);
+    }
+
+    function formatSpan(ms) {
+      if (!ms) return 'Todo';
+      const totalMin = Math.round(ms / 60000);
+      const h = Math.floor(totalMin / 60);
+      const m = totalMin % 60;
+      if (h > 0 && m > 0) return h + 'h ' + m + 'm';
+      if (h > 0) return h + 'h';
+      return m + 'm';
+    }
+
+    function formatOffset(ms) {
+      if (!ms) return '0';
+      return formatSpan(ms);
+    }
+
+    function applyTimeControls() {
+      const windowMin = parseInt(document.getElementById('windowInput').value || '0');
+      const samples = parseInt(document.getElementById('samplesInput').value || '0');
+      const sourceSel = document.getElementById('sourceSelect').value;
+
+      windowOverrideMs = windowMin > 0 ? windowMin * 60000 : 0;
+      samplesLimitOverride = samples > 0 ? Math.min(2000, Math.max(50, samples)) : 0;
+      sourceMode = sourceSel || 'auto';
+
+      if (windowOverrideMs > 0) {
+        currentRange = 'custom';
+        document.querySelectorAll('[data-range]').forEach(b => b.classList.remove('active'));
+      }
+      xOffsetMs = 0;
+      updateData();
+    }
     }
 
     // Touch/Mouse hover para mostrar tooltip
@@ -408,9 +640,18 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
       if (dataLen === 0) return;
       
       const relX = x - pad.left;
-      const idx = Math.round((relX / plotW) * (dataLen - 1));
-      const safeIdx = Math.max(0, Math.min(dataLen - 1, idx));
-      const reading = chartData.filtered[safeIdx];
+      const tsSpan = (chartData.tsMax - chartData.tsMin) || 1;
+      const targetTs = chartData.tsMin + (relX / plotW) * tsSpan;
+      let nearest = chartData.filtered[0];
+      let bestDelta = Math.abs(nearest.timestamp - targetTs);
+      for (let i = 1; i < chartData.filtered.length; i++) {
+        const d = Math.abs(chartData.filtered[i].timestamp - targetTs);
+        if (d < bestDelta) {
+          bestDelta = d;
+          nearest = chartData.filtered[i];
+        }
+      }
+      const reading = nearest;
       
       if (!reading) return;
       
@@ -426,10 +667,32 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
       tooltip.style.left = tx + 'px';
       tooltip.style.top = ty + 'px';
       tooltip.classList.add('visible');
+
+      const xPx = pad.left + ((reading.timestamp - chartData.tsMin) / ((chartData.tsMax - chartData.tsMin) || 1)) * plotW;
+      const tSpan = (chartLabels.tempMax - chartLabels.tempMin) || 1;
+      const hSpan = (chartLabels.humMax - chartLabels.humMin) || 1;
+      const yTemp = pad.top + (1 - (reading.temperature - chartLabels.tempMin) / tSpan) * plotH;
+      const yHum = pad.top + (1 - (reading.humidity - chartLabels.humMin) / hSpan) * plotH;
+
+      crosshair.style.left = xPx + 'px';
+      crosshair.style.top = pad.top + 'px';
+      crosshair.style.height = plotH + 'px';
+      crosshair.classList.add('visible');
+
+      dotTemp.style.left = (xPx - 3) + 'px';
+      dotTemp.style.top = (yTemp - 3) + 'px';
+      dotTemp.classList.add('visible');
+
+      dotHum.style.left = (xPx - 3) + 'px';
+      dotHum.style.top = (yHum - 3) + 'px';
+      dotHum.classList.add('visible');
     }
 
     function hideTooltip() {
       tooltip.classList.remove('visible');
+      crosshair.classList.remove('visible');
+      dotTemp.classList.remove('visible');
+      dotHum.classList.remove('visible');
     }
 
     chart1Canvas.addEventListener('mousemove', handlePointer);
@@ -444,8 +707,26 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
         document.querySelectorAll('[data-range]').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         currentRange = btn.dataset.range;
+        xOffsetMs = 0;
         updateData();
       });
+    });
+
+    document.getElementById('xBack').addEventListener('click', () => {
+      const windowMs = getWindowMs();
+      if (!windowMs) return;
+      xOffsetMs += windowMs;
+      updateData();
+    });
+    document.getElementById('xForward').addEventListener('click', () => {
+      const windowMs = getWindowMs();
+      if (!windowMs) return;
+      xOffsetMs = Math.max(0, xOffsetMs - windowMs);
+      updateData();
+    });
+    document.getElementById('xNow').addEventListener('click', () => {
+      xOffsetMs = 0;
+      updateData();
     });
 
     document.getElementById('zoomIn').addEventListener('click', () => {
@@ -475,27 +756,39 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
         })
         .catch(() => {});
 
-      const useFlash = (currentRange !== '1h');
-      const limit = currentRange === 'all' ? 2000 : (currentRange === '24h' ? 1000 : 500);
-      const url = '/api/history?source=' + (useFlash ? 'flash' : 'ram') + '&limit=' + limit;
+      const windowMs = getWindowMs();
+      const preferFlashFor1h = (currentRange === '1h' && flashHistoryCount > ramHistoryCount);
+      const autoUseFlash = (currentRange !== '1h' || windowOverrideMs > 0 || preferFlashFor1h);
+      const useFlash = sourceMode === 'flash' ? true : (sourceMode === 'ram' ? false : autoUseFlash);
+      const windowPoints = windowMs ? Math.ceil((windowMs / 1000) / Math.max(1, sendIntervalSeconds)) : 2000;
+      const autoLimit = Math.min(2000, Math.max(100, Math.ceil(windowPoints * 1.2)));
+      const limit = samplesLimitOverride > 0 ? samplesLimitOverride : autoLimit;
+      const offsetCount = useFlash ? Math.floor((xOffsetMs / 1000) / Math.max(1, sendIntervalSeconds)) : 0;
+      const url = '/api/history?source=' + (useFlash ? 'flash' : 'ram') + '&limit=' + limit + '&offset=' + offsetCount;
       
       fetch(url)
         .then(r => r.json())
         .then(response => {
-          const data = Array.isArray(response) ? response : 
+          let data = Array.isArray(response) ? response : 
                        (response._meta ? Object.values(response).filter(Array.isArray)[0] || [] : response);
           const meta = response._meta || { total: data.length, source: 'ram' };
+
+          if (samplesLimitOverride > 0 && data.length > samplesLimitOverride) {
+            data = data.slice(data.length - samplesLimitOverride);
+          }
           
-          const filtered = filterByRange(data);
+          const filtered = filterByRange(data, windowMs, xOffsetMs);
           chartData.filtered = filtered;
           const temps = filtered.map(d => d.temperature);
           const hums = filtered.map(d => d.humidity);
           chartData.temps = temps;
           chartData.hums = hums;
 
-          const startTs = filtered.length ? filtered[0].timestamp : 0;
-          const endTs = filtered.length ? filtered[filtered.length - 1].timestamp : 0;
-          const midTs = filtered.length ? filtered[Math.floor(filtered.length / 2)].timestamp : 0;
+          const fallbackEnd = Date.now() - xOffsetMs;
+          const fallbackStart = windowMs ? (fallbackEnd - windowMs) : fallbackEnd;
+          const startTs = filtered.length ? filtered[0].timestamp : fallbackStart;
+          const endTs = filtered.length ? filtered[filtered.length - 1].timestamp : fallbackEnd;
+          const midTs = filtered.length ? filtered[Math.floor(filtered.length / 2)].timestamp : (startTs + endTs) / 2;
           const fmt = (ts) => ts ? new Date(ts).toLocaleTimeString('es-ES', {hour:'2-digit',minute:'2-digit'}) : '--';
 
           // Rangos REALES de los datos (sin margen extra)
@@ -523,10 +816,13 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
 
           chartLabels = {
             tempMin, tempMax, humMin, humMax,
-            startLabel: fmt(startTs), midLabel: fmt(midTs), endLabel: fmt(endTs)
+            startLabel: fmt(startTs), midLabel: fmt(midTs), endLabel: fmt(endTs),
+            tsMin: startTs, tsMax: endTs
           };
+          chartData.tsMin = startTs;
+          chartData.tsMax = endTs;
 
-          renderDual(chart1Canvas, temps, hums, chartLabels);
+          renderDual(chart1Canvas, filtered, chartLabels);
 
           // Stats
           if (temps.length > 0) {
@@ -541,7 +837,10 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
           }
 
           const src = meta.source === 'flash' ? '💾' : '🧠';
-          document.getElementById('historyCount').textContent = filtered.length + '/' + meta.total + ' ' + src;
+          const limitText = samplesLimitOverride > 0 ? (' · max ' + samplesLimitOverride) : '';
+          document.getElementById('historyCount').textContent = filtered.length + '/' + meta.total + ' ' + src + limitText;
+          document.getElementById('timeWindow').textContent = formatSpan(windowMs);
+          document.getElementById('timeOffset').textContent = formatOffset(xOffsetMs);
         })
         .catch(() => {});
     }
@@ -552,8 +851,29 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
         .then(cfg => {
           document.getElementById('intervalInput').value = cfg.sendIntervalSeconds;
           document.getElementById('footerInterval').textContent = cfg.sendIntervalSeconds;
+          sendIntervalSeconds = cfg.sendIntervalSeconds;
           document.getElementById('capacityInfo').textContent = '~' + cfg.estimatedDaysCapacity.toFixed(1) + ' días';
           document.getElementById('flashInfo').textContent = cfg.flashHistoryCount + '/' + cfg.flashHistoryMax;
+          flashHistoryCount = cfg.flashHistoryCount || 0;
+          ramHistoryCount = cfg.ramHistoryCount || 0;
+
+          thresholds.tempWarnLow = cfg.tempWarnLow;
+          thresholds.tempWarnHigh = cfg.tempWarnHigh;
+          thresholds.tempCritLow = cfg.tempCritLow;
+          thresholds.tempCritHigh = cfg.tempCritHigh;
+          thresholds.humWarnLow = cfg.humWarnLow;
+          thresholds.humWarnHigh = cfg.humWarnHigh;
+          thresholds.humCritLow = cfg.humCritLow;
+          thresholds.humCritHigh = cfg.humCritHigh;
+
+          document.getElementById('tempWarnLow').value = cfg.tempWarnLow;
+          document.getElementById('tempWarnHigh').value = cfg.tempWarnHigh;
+          document.getElementById('tempCritLow').value = cfg.tempCritLow;
+          document.getElementById('tempCritHigh').value = cfg.tempCritHigh;
+          document.getElementById('humWarnLow').value = cfg.humWarnLow;
+          document.getElementById('humWarnHigh').value = cfg.humWarnHigh;
+          document.getElementById('humCritLow').value = cfg.humCritLow;
+          document.getElementById('humCritHigh').value = cfg.humCritHigh;
         })
         .catch(() => {});
     }
@@ -570,6 +890,52 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
       .then(res => {
         if (res.success) {
           document.getElementById('footerInterval').textContent = val;
+          loadConfig();
+        }
+      })
+      .catch(() => {});
+    }
+
+    function updateThresholds() {
+      const readVal = (id) => parseFloat(document.getElementById(id).value);
+      const tWL = readVal('tempWarnLow');
+      const tWH = readVal('tempWarnHigh');
+      const tCL = readVal('tempCritLow');
+      const tCH = readVal('tempCritHigh');
+      const hWL = readVal('humWarnLow');
+      const hWH = readVal('humWarnHigh');
+      const hCL = readVal('humCritLow');
+      const hCH = readVal('humCritHigh');
+
+      if ([tWL, tWH, tCL, tCH, hWL, hWH, hCL, hCH].some(v => Number.isNaN(v))) {
+        alert('Completa todos los umbrales');
+        return;
+      }
+
+      const tempOk = (tCL <= tWL) && (tWL <= tWH) && (tWH <= tCH);
+      const humOk = (hCL <= hWL) && (hWL <= hWH) && (hWH <= hCH);
+      if (!tempOk || !humOk) {
+        alert('Orden inválido. Debe cumplir: Cmin ≤ Wmin ≤ Wmax ≤ Cmax');
+        return;
+      }
+
+      fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tempWarnLow: tWL,
+          tempWarnHigh: tWH,
+          tempCritLow: tCL,
+          tempCritHigh: tCH,
+          humWarnLow: hWL,
+          humWarnHigh: hWH,
+          humCritLow: hCL,
+          humCritHigh: hCH
+        })
+      })
+      .then(r => r.json())
+      .then(res => {
+        if (res.success) {
           loadConfig();
         }
       })
