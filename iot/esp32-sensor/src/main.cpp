@@ -327,32 +327,8 @@ static void ensureHttpServerStarted() {
 
       html += "<p style='margin-top:16px'><a href='/status.json'>Ver status JSON</a></p>";
     } else {
-      html += "<h2>ESP32 - Dashboard local</h2>";
-      html += "<p><small>Tip: abre <code>/status.json</code> para JSON.</small></p>";
-      html += "<div class='row kv'>";
-      html += "<div><b>Device ID</b></div><div><code>" + deviceId + "</code></div>";
-      html += "<div><b>Nombre</b></div><div>" + (deviceName.length() ? deviceName : String("(sin alias)")) + "</div>";
-      html += "<div><b>Equipo asignado</b></div><div><code>" + (hasAssignedEquipment() ? currentEquipmentId : String("(ninguno)")) + "</code></div>";
-      html += "<div><b>WiFi</b></div><div>" + String(WiFi.status() == WL_CONNECTED ? "conectado" : "offline") + "</div>";
-      html += "<div><b>SSID</b></div><div><code>" + WiFi.SSID() + "</code></div>";
-      html += "<div><b>IP</b></div><div><code>" + WiFi.localIP().toString() + "</code></div>";
-      html += "<div><b>RSSI</b></div><div><code>" + String(WiFi.status() == WL_CONNECTED ? WiFi.RSSI() : 0) + " dBm</code></div>";
-      html += "<div><b>mDNS</b></div><div><code>" + staHostname + ".local</code></div>";
-      html += "<div><b>AP</b></div><div><code>" + WiFi.softAPSSID() + "</code> @ <code>" + WiFi.softAPIP().toString() + "</code></div>";
-      html += "</div>";
-
-      html += "<div class='row kv'>";
-      html += "<div><b>Temperatura</b></div><div><code>" + String(lastTemperature, 2) + "</code> (" + lastTempStatus + ")</div>";
-      html += "<div><b>Humedad</b></div><div><code>" + String(lastHumidity, 2) + "</code> (" + lastHumStatus + ")</div>";
-      html += "<div><b>Fuente</b></div><div>" + String(lastSimulated ? "simulada" : "DHT11") + "</div>";
-      html += "</div>";
-
-      html += "<div class='row kv'>";
-      html += "<div><b>Backlog RAM</b></div><div><code>" + String((unsigned)getRamBacklogCount()) + "</code></div>";
-      html += "<div><b>Backlog Flash</b></div><div><code>" + String(fsReady ? "OK" : "NO") + "</code> (offset <code>" + String((unsigned long)backlogOffset) + "</code>)</div>";
-      html += "</div>";
-
-      html += "<p><a href='/wifi'>Config WiFi/AP</a> · <a href='/status.json'>status.json</a></p>";
+      portalServer.send_P(200, "text/html", HTML_DASHBOARD);
+      return;
     }
 
     html += "</body></html>";
