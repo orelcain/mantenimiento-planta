@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Cpu, Link2, Unlink2, AlertTriangle, Thermometer, Droplets, Activity, X, BarChart3, Wifi, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
+import { Cpu, Link2, Unlink2, AlertTriangle, Thermometer, Droplets, Activity, X, BarChart3, Wifi, Trash2, ChevronDown, ChevronUp, Eye, EyeOff, Copy, RefreshCw, Check } from 'lucide-react'
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui'
 import { useAppStore, useAuthStore } from '@/store'
 import type { Equipment } from '@/types'
@@ -142,9 +142,11 @@ export function SensorsPage() {
   const [apEnabled, setApEnabled] = useState(true)
   const [apSsid, setApSsid] = useState('')
   const [apPassword, setApPassword] = useState('')
+  const [showApPassword, setShowApPassword] = useState(false)
   const [savingAp, setSavingAp] = useState(false)
   const [apSaveError, setApSaveError] = useState<string | null>(null)
   const [apSaveOk, setApSaveOk] = useState<string | null>(null)
+  const [copiedField, setCopiedField] = useState<'ssid' | 'password' | null>(null)
 
   // Estado para eliminar dispositivos
   const [deletingDevice, setDeletingDevice] = useState<string | null>(null)
@@ -196,6 +198,44 @@ export function SensorsPage() {
     () => devices.find((d) => d.deviceId === selectedDeviceId) ?? null,
     [devices, selectedDeviceId]
   )
+
+  // Cargar configuración AP actual del dispositivo seleccionado
+  useEffect(() => {
+    if (selectedDevice) {
+      setApEnabled(selectedDevice.apEnabled ?? true)
+      setApSsid(selectedDevice.apSsid || '')
+      setApPassword(selectedDevice.apPassword || '')
+    } else {
+      setApSsid('')
+      setApPassword('')
+      setApEnabled(true)
+    }
+  }, [selectedDevice])
+
+  // Función para generar contraseña segura
+  const generateSecurePassword = () => {
+    const length = 12
+    const charset = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%&'
+    let password = ''
+    const array = new Uint8Array(length)
+    crypto.getRandomValues(array)
+    for (let i = 0; i < length; i++) {
+      password += charset[array[i] % charset.length]
+    }
+    setApPassword(password)
+    setShowApPassword(true)
+  }
+
+  // Función para copiar al portapapeles
+  const copyToClipboard = async (text: string, field: 'ssid' | 'password') => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopiedField(field)
+      setTimeout(() => setCopiedField(null), 2000)
+    } catch (err) {
+      console.error('Error copiando:', err)
+    }
+  }
 
   const assignedEquipment = useMemo(() => {
     const id = selectedDevice?.assignedEquipmentId
@@ -1579,11 +1619,64 @@ export function SensorsPage() {
                 </div>
 
                 {selectedDevice.apSsid && (
-                  <div className="rounded border p-2 bg-muted/30">
-                    <div className="text-xs font-medium mb-1">AP Actual</div>
-                    <div className="text-xs">
-                      <div className="font-mono">{selectedDevice.apSsid}</div>
-                      <div className="text-muted-foreground">IP: {selectedDevice.apIp || '192.168.4.1'}</div>
+                  <div className="rounded border p-3 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border-blue-200 dark:border-blue-800">
+                    <div className="text-xs font-semibold text-blue-700 dark:text-blue-300 mb-2 flex items-center gap-1">
+                      <Wifi className="h-3 w-3" />
+                      Configuración Actual del AP
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="text-xs text-muted-foreground">SSID:</div>
+                        <div className="flex items-center gap-1">
+                          <span className="font-mono text-sm font-medium">{selectedDevice.apSsid}</span>
+                          <button
+                            onClick={() => copyToClipboard(selectedDevice.apSsid || '', 'ssid')}
+                            className="p-1 hover:bg-white/50 dark:hover:bg-black/20 rounded transition-colors"
+                            title="Copiar SSID"
+                          >
+                            {copiedField === 'ssid' ? (
+                              <Check className="h-3 w-3 text-green-600" />
+                            ) : (
+                              <Copy className="h-3 w-3 text-muted-foreground" />
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                      {selectedDevice.apPassword && (
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="text-xs text-muted-foreground">Contraseña:</div>
+                          <div className="flex items-center gap-1">
+                            <span className="font-mono text-sm font-medium">
+                              {showApPassword ? selectedDevice.apPassword : '••••••••'}
+                            </span>
+                            <button
+                              onClick={() => setShowApPassword(!showApPassword)}
+                              className="p-1 hover:bg-white/50 dark:hover:bg-black/20 rounded transition-colors"
+                              title={showApPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                            >
+                              {showApPassword ? (
+                                <EyeOff className="h-3 w-3 text-muted-foreground" />
+                              ) : (
+                                <Eye className="h-3 w-3 text-muted-foreground" />
+                              )}
+                            </button>
+                            <button
+                              onClick={() => copyToClipboard(selectedDevice.apPassword || '', 'password')}
+                              className="p-1 hover:bg-white/50 dark:hover:bg-black/20 rounded transition-colors"
+                              title="Copiar contraseña"
+                            >
+                              {copiedField === 'password' ? (
+                                <Check className="h-3 w-3 text-green-600" />
+                              ) : (
+                                <Copy className="h-3 w-3 text-muted-foreground" />
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                      <div className="text-xs text-muted-foreground">
+                        IP: {selectedDevice.apIp || '192.168.4.1'}
+                      </div>
                     </div>
                   </div>
                 )}
@@ -1617,17 +1710,73 @@ export function SensorsPage() {
                   </div>
 
                   <div>
-                    <Label htmlFor="ap-password">Contraseña WPA2</Label>
-                    <Input
-                      id="ap-password"
-                      type="password"
-                      placeholder="Mínimo 8 caracteres"
-                      value={apPassword}
-                      onChange={(e) => setApPassword(e.target.value)}
-                      className="mt-1"
-                    />
+                    <Label htmlFor="ap-password" className="flex items-center justify-between">
+                      <span>Contraseña WPA2</span>
+                      <button
+                        type="button"
+                        onClick={generateSecurePassword}
+                        className="text-xs text-primary hover:text-primary/80 flex items-center gap-1 transition-colors"
+                      >
+                        <RefreshCw className="h-3 w-3" />
+                        Generar
+                      </button>
+                    </Label>
+                    <div className="relative mt-1">
+                      <Input
+                        id="ap-password"
+                        type={showApPassword ? "text" : "password"}
+                        placeholder="Mínimo 8 caracteres o vacío para red abierta"
+                        value={apPassword}
+                        onChange={(e) => setApPassword(e.target.value)}
+                        className="pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowApPassword(!showApPassword)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-muted rounded transition-colors"
+                        title={showApPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                      >
+                        {showApPassword ? (
+                          <EyeOff className="h-4 w-4 text-muted-foreground" />
+                        ) : (
+                          <Eye className="h-4 w-4 text-muted-foreground" />
+                        )}
+                      </button>
+                    </div>
+                    {apPassword && apPassword.length > 0 && (
+                      <div className="mt-2 space-y-1">
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                            <div
+                              className={`h-full transition-all ${
+                                apPassword.length < 8
+                                  ? 'w-1/3 bg-red-500'
+                                  : apPassword.length < 12
+                                    ? 'w-2/3 bg-yellow-500'
+                                    : 'w-full bg-green-500'
+                              }`}
+                            />
+                          </div>
+                          <span className={`text-xs font-medium ${
+                            apPassword.length < 8
+                              ? 'text-red-600 dark:text-red-400'
+                              : apPassword.length < 12
+                                ? 'text-yellow-600 dark:text-yellow-400'
+                                : 'text-green-600 dark:text-green-400'
+                          }`}>
+                            {apPassword.length < 8 ? 'Débil' : apPassword.length < 12 ? 'Media' : 'Fuerte'}
+                          </span>
+                        </div>
+                        {apPassword.length < 8 && (
+                          <div className="text-xs text-red-600 dark:text-red-400 flex items-start gap-1">
+                            <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
+                            <span>WPA2 requiere mínimo 8 caracteres</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
                     <div className="text-xs text-muted-foreground mt-1">
-                      Vacío = red abierta (sin contraseña)
+                      {apPassword.length === 0 ? '⚠️ Vacío = red abierta (sin contraseña)' : `${apPassword.length} caracteres`}
                     </div>
                   </div>
 
