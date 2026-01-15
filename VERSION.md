@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.17.1**
+## Versión Actual: **v2.17.2**
 
 **Fecha de lanzamiento**: 14 de enero de 2026  
 **Estado**: ✅ PRODUCCIÓN READY  
@@ -9,6 +9,20 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.17.2 - Fix Autocomplete + UX Asignación (14/01/2026)
+
+**Fixes:**
+- 🔒 **Autocomplete Off**: inputs de búsqueda (dispositivos y equipos) no autocompletar con email del navegador.
+- 🎨 **UX Asignación Mejorada**: botones contextuales ("Asignar equipo" → "Cambiar equipo" según estado).
+- 💡 **Mensajes Ayuda**: tooltip "Selecciona un equipo de la lista arriba..." cuando no hay selección.
+- ✅ **Feedback Visual**: mensajes de éxito (verde) y error (rojo) con fondos coloreados y mejores contrastes.
+- 🔘 **Botón Condicional**: "Quitar asignación" solo visible si hay equipo asignado.
+
+**Archivos Modificados:**
+- `apps/pwa/src/pages/SensorsPage.tsx`: autocomplete="off" + type="search" + UX botones asignación
+
+---
 
 ### v2.17.1 - Fix Filtro Búsqueda (14/01/2026)
 
