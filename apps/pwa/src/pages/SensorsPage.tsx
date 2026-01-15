@@ -279,29 +279,22 @@ export function SensorsPage() {
     equipment.forEach(e => {
       if (e.hierarchyPath) {
         const parts = e.hierarchyPath.split(' > ')
-        if (filterPlanta === 'todas' || (parts[0] && parts[0].toLowerCase().includes(filterPlanta.toLowerCase()))) {
-          if (parts[1]) sectores.add(parts[1])
-        }
+        if (parts[1]) sectores.add(parts[1])
       }
     })
     return Array.from(sectores).sort()
-  }, [equipment, filterPlanta])
+  }, [equipment])
 
   const areasDisponibles = useMemo(() => {
     const areas = new Set<string>()
     equipment.forEach(e => {
       if (e.hierarchyPath) {
         const parts = e.hierarchyPath.split(' > ')
-        const matchPlanta = filterPlanta === 'todas' || (parts[0] && parts[0].toLowerCase().includes(filterPlanta.toLowerCase()))
-        const matchSector = filterSector === 'todas' || (parts[1] && parts[1].toLowerCase().includes(filterSector.toLowerCase()))
-        
-        if (matchPlanta && matchSector && parts[2]) {
-          areas.add(parts[2])
-        }
+        if (parts[2]) areas.add(parts[2])
       }
     })
     return Array.from(areas).sort()
-  }, [equipment, filterPlanta, filterSector])
+  }, [equipment])
 
   async function saveAssignment(equipmentId: string | null) {
     if (!user?.id) return
@@ -870,11 +863,11 @@ export function SensorsPage() {
                     )}
                   </div>
                   
-                  {/* Filtros jerárquicos en cascada */}
+                  {/* Filtros jerárquicos independientes */}
                   <div className="grid gap-2 sm:grid-cols-3">
                     <div>
                       <Label>Planta</Label>
-                      <Select value={filterPlanta} onValueChange={(v) => { setFilterPlanta(v); setFilterSector('todas'); setFilterArea('todas') }}>
+                      <Select value={filterPlanta} onValueChange={setFilterPlanta}>
                         <SelectTrigger>
                           <SelectValue placeholder="Todas" />
                         </SelectTrigger>
@@ -888,7 +881,7 @@ export function SensorsPage() {
                     </div>
                     <div>
                       <Label>Sector</Label>
-                      <Select value={filterSector} onValueChange={(v) => { setFilterSector(v); setFilterArea('todas') }} disabled={filterPlanta === 'todas'}>
+                      <Select value={filterSector} onValueChange={setFilterSector}>
                         <SelectTrigger>
                           <SelectValue placeholder="Todos" />
                         </SelectTrigger>
@@ -902,7 +895,7 @@ export function SensorsPage() {
                     </div>
                     <div>
                       <Label>Área</Label>
-                      <Select value={filterArea} onValueChange={setFilterArea} disabled={filterSector === 'todas'}>
+                      <Select value={filterArea} onValueChange={setFilterArea}>
                         <SelectTrigger>
                           <SelectValue placeholder="Todas" />
                         </SelectTrigger>
