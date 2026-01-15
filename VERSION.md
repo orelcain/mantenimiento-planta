@@ -1,14 +1,47 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.18.0**
+## Versión Actual: **v2.18.1**
 
-**Fecha de lanzamiento**: 14 de enero de 2026  
+**Fecha de lanzamiento**: 15 de enero de 2026  
 **Estado**: ✅ PRODUCCIÓN READY  
 **Build**: ✅ Último build local OK
 
 ---
 
 ## 📋 Información de la Versión
+
+### v2.18.1 - Selectores en Cascada (Padre → Hijo) (15/01/2026)
+
+**Mejora:**
+- 🔗 **Cascada Jerárquica**: selectores ahora funcionan en cascada (padre → hijo).
+- 🎯 **Filtrado Inteligente**: al seleccionar un nivel padre, los selectores hijos solo muestran opciones válidas de ese padre.
+- 🔄 **Reset Automático**: al cambiar un nivel padre, los niveles hijos se resetean a "Todos" automáticamente.
+- ✅ **UX Mejorada**: navegación más intuitiva por la jerarquía de equipos.
+
+**Comportamiento:**
+- Seleccionar **Planta** → filtra Sectores de esa planta (y resetea Sector/Área/Niveles 4-7)
+- Seleccionar **Sector** → filtra Áreas de ese sector (y resetea Área/Niveles 4-7)
+- Seleccionar **Área** → filtra Nivel 4 de esa área (y resetea Niveles 4-7)
+- Y así sucesivamente hasta el nivel 7
+
+**Ejemplo de Flujo:**
+1. Usuario elige "Planta Norte" → Selector de Sector solo muestra sectores de Planta Norte
+2. Usuario elige "Sector A" → Selector de Área solo muestra áreas de Planta Norte > Sector A
+3. Si usuario cambia de Planta, los sectores/áreas se resetean automáticamente
+
+**Archivos Modificados:**
+- `apps/pwa/src/pages/SensorsPage.tsx`: 
+  - Actualizados 6 useMemo (sectoresDisponibles hasta nivel7Disponibles) para filtrar por nivel padre
+  - Agregada lógica de reset en cascada en onValueChange de cada selector
+  - Cada nivel ahora considera las selecciones de todos los niveles superiores
+
+**Beneficios:**
+- ✅ Elimina confusión de opciones incompatibles
+- ✅ Reduce errores de selección incorrecta
+- ✅ Acelera navegación al limitar opciones relevantes
+- ✅ Comportamiento estándar esperado en selectores jerárquicos
+
+---
 
 ### v2.18.0 - Jerarquía Extendida a 7 Niveles (14/01/2026)
 

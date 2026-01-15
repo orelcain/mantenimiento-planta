@@ -319,7 +319,7 @@ export function SensorsPage() {
     })
   }, [equipment, equipmentSearch, filterCriticidad, filterEstado, filterPlanta, filterSector, filterArea, filterNivel4, filterNivel5, filterNivel6, filterNivel7, filterSinSensor, devices])
 
-  // Extraer opciones únicas de jerarquía
+  // Extraer opciones únicas de jerarquía (en cascada: padre → hijo)
   const plantasDisponibles = useMemo(() => {
     const plantas = new Set<string>()
     equipment.forEach(e => {
@@ -336,66 +336,203 @@ export function SensorsPage() {
     equipment.forEach(e => {
       if (e.hierarchyPath) {
         const parts = e.hierarchyPath.split(' > ')
-        if (parts[1]) sectores.add(parts[1])
+        // Solo incluir sectores de la planta seleccionada
+        if (filterPlanta !== 'todas') {
+          if (parts[0] === filterPlanta && parts[1]) {
+            sectores.add(parts[1])
+          }
+        } else {
+          if (parts[1]) sectores.add(parts[1])
+        }
       }
     })
     return Array.from(sectores).sort()
-  }, [equipment])
+  }, [equipment, filterPlanta])
 
   const areasDisponibles = useMemo(() => {
     const areas = new Set<string>()
     equipment.forEach(e => {
       if (e.hierarchyPath) {
         const parts = e.hierarchyPath.split(' > ')
-        if (parts[2]) areas.add(parts[2])
+        // Solo incluir áreas del sector seleccionado (y planta si aplica)
+        if (filterSector !== 'todas') {
+          const matchPlanta = filterPlanta === 'todas' || parts[0] === filterPlanta
+          if (matchPlanta && parts[1] === filterSector && parts[2]) {
+            areas.add(parts[2])
+          }
+        } else if (filterPlanta !== 'todas') {
+          if (parts[0] === filterPlanta && parts[2]) {
+            areas.add(parts[2])
+          }
+        } else {
+          if (parts[2]) areas.add(parts[2])
+        }
       }
     })
     return Array.from(areas).sort()
-  }, [equipment])
+  }, [equipment, filterPlanta, filterSector])
 
   const nivel4Disponibles = useMemo(() => {
     const nivel4 = new Set<string>()
     equipment.forEach(e => {
       if (e.hierarchyPath) {
         const parts = e.hierarchyPath.split(' > ')
-        if (parts[3]) nivel4.add(parts[3])
+        // Solo incluir nivel4 del área seleccionada (y niveles superiores si aplican)
+        if (filterArea !== 'todas') {
+          const matchPlanta = filterPlanta === 'todas' || parts[0] === filterPlanta
+          const matchSector = filterSector === 'todas' || parts[1] === filterSector
+          if (matchPlanta && matchSector && parts[2] === filterArea && parts[3]) {
+            nivel4.add(parts[3])
+          }
+        } else if (filterSector !== 'todas') {
+          const matchPlanta = filterPlanta === 'todas' || parts[0] === filterPlanta
+          if (matchPlanta && parts[1] === filterSector && parts[3]) {
+            nivel4.add(parts[3])
+          }
+        } else if (filterPlanta !== 'todas') {
+          if (parts[0] === filterPlanta && parts[3]) {
+            nivel4.add(parts[3])
+          }
+        } else {
+          if (parts[3]) nivel4.add(parts[3])
+        }
       }
     })
     return Array.from(nivel4).sort()
-  }, [equipment])
+  }, [equipment, filterPlanta, filterSector, filterArea])
 
   const nivel5Disponibles = useMemo(() => {
     const nivel5 = new Set<string>()
     equipment.forEach(e => {
       if (e.hierarchyPath) {
         const parts = e.hierarchyPath.split(' > ')
-        if (parts[4]) nivel5.add(parts[4])
+        // Solo incluir nivel5 del nivel4 seleccionado (y niveles superiores)
+        if (filterNivel4 !== 'todas') {
+          const matchPlanta = filterPlanta === 'todas' || parts[0] === filterPlanta
+          const matchSector = filterSector === 'todas' || parts[1] === filterSector
+          const matchArea = filterArea === 'todas' || parts[2] === filterArea
+          if (matchPlanta && matchSector && matchArea && parts[3] === filterNivel4 && parts[4]) {
+            nivel5.add(parts[4])
+          }
+        } else if (filterArea !== 'todas') {
+          const matchPlanta = filterPlanta === 'todas' || parts[0] === filterPlanta
+          const matchSector = filterSector === 'todas' || parts[1] === filterSector
+          if (matchPlanta && matchSector && parts[2] === filterArea && parts[4]) {
+            nivel5.add(parts[4])
+          }
+        } else if (filterSector !== 'todas') {
+          const matchPlanta = filterPlanta === 'todas' || parts[0] === filterPlanta
+          if (matchPlanta && parts[1] === filterSector && parts[4]) {
+            nivel5.add(parts[4])
+          }
+        } else if (filterPlanta !== 'todas') {
+          if (parts[0] === filterPlanta && parts[4]) {
+            nivel5.add(parts[4])
+          }
+        } else {
+          if (parts[4]) nivel5.add(parts[4])
+        }
       }
     })
     return Array.from(nivel5).sort()
-  }, [equipment])
+  }, [equipment, filterPlanta, filterSector, filterArea, filterNivel4])
 
   const nivel6Disponibles = useMemo(() => {
     const nivel6 = new Set<string>()
     equipment.forEach(e => {
       if (e.hierarchyPath) {
         const parts = e.hierarchyPath.split(' > ')
-        if (parts[5]) nivel6.add(parts[5])
+        // Solo incluir nivel6 del nivel5 seleccionado (y niveles superiores)
+        if (filterNivel5 !== 'todas') {
+          const matchPlanta = filterPlanta === 'todas' || parts[0] === filterPlanta
+          const matchSector = filterSector === 'todas' || parts[1] === filterSector
+          const matchArea = filterArea === 'todas' || parts[2] === filterArea
+          const matchNivel4 = filterNivel4 === 'todas' || parts[3] === filterNivel4
+          if (matchPlanta && matchSector && matchArea && matchNivel4 && parts[4] === filterNivel5 && parts[5]) {
+            nivel6.add(parts[5])
+          }
+        } else if (filterNivel4 !== 'todas') {
+          const matchPlanta = filterPlanta === 'todas' || parts[0] === filterPlanta
+          const matchSector = filterSector === 'todas' || parts[1] === filterSector
+          const matchArea = filterArea === 'todas' || parts[2] === filterArea
+          if (matchPlanta && matchSector && matchArea && parts[3] === filterNivel4 && parts[5]) {
+            nivel6.add(parts[5])
+          }
+        } else if (filterArea !== 'todas') {
+          const matchPlanta = filterPlanta === 'todas' || parts[0] === filterPlanta
+          const matchSector = filterSector === 'todas' || parts[1] === filterSector
+          if (matchPlanta && matchSector && parts[2] === filterArea && parts[5]) {
+            nivel6.add(parts[5])
+          }
+        } else if (filterSector !== 'todas') {
+          const matchPlanta = filterPlanta === 'todas' || parts[0] === filterPlanta
+          if (matchPlanta && parts[1] === filterSector && parts[5]) {
+            nivel6.add(parts[5])
+          }
+        } else if (filterPlanta !== 'todas') {
+          if (parts[0] === filterPlanta && parts[5]) {
+            nivel6.add(parts[5])
+          }
+        } else {
+          if (parts[5]) nivel6.add(parts[5])
+        }
       }
     })
     return Array.from(nivel6).sort()
-  }, [equipment])
+  }, [equipment, filterPlanta, filterSector, filterArea, filterNivel4, filterNivel5])
 
   const nivel7Disponibles = useMemo(() => {
     const nivel7 = new Set<string>()
     equipment.forEach(e => {
       if (e.hierarchyPath) {
         const parts = e.hierarchyPath.split(' > ')
-        if (parts[6]) nivel7.add(parts[6])
+        // Solo incluir nivel7 del nivel6 seleccionado (y niveles superiores)
+        if (filterNivel6 !== 'todas') {
+          const matchPlanta = filterPlanta === 'todas' || parts[0] === filterPlanta
+          const matchSector = filterSector === 'todas' || parts[1] === filterSector
+          const matchArea = filterArea === 'todas' || parts[2] === filterArea
+          const matchNivel4 = filterNivel4 === 'todas' || parts[3] === filterNivel4
+          const matchNivel5 = filterNivel5 === 'todas' || parts[4] === filterNivel5
+          if (matchPlanta && matchSector && matchArea && matchNivel4 && matchNivel5 && parts[5] === filterNivel6 && parts[6]) {
+            nivel7.add(parts[6])
+          }
+        } else if (filterNivel5 !== 'todas') {
+          const matchPlanta = filterPlanta === 'todas' || parts[0] === filterPlanta
+          const matchSector = filterSector === 'todas' || parts[1] === filterSector
+          const matchArea = filterArea === 'todas' || parts[2] === filterArea
+          const matchNivel4 = filterNivel4 === 'todas' || parts[3] === filterNivel4
+          if (matchPlanta && matchSector && matchArea && matchNivel4 && parts[4] === filterNivel5 && parts[6]) {
+            nivel7.add(parts[6])
+          }
+        } else if (filterNivel4 !== 'todas') {
+          const matchPlanta = filterPlanta === 'todas' || parts[0] === filterPlanta
+          const matchSector = filterSector === 'todas' || parts[1] === filterSector
+          const matchArea = filterArea === 'todas' || parts[2] === filterArea
+          if (matchPlanta && matchSector && matchArea && parts[3] === filterNivel4 && parts[6]) {
+            nivel7.add(parts[6])
+          }
+        } else if (filterArea !== 'todas') {
+          const matchPlanta = filterPlanta === 'todas' || parts[0] === filterPlanta
+          const matchSector = filterSector === 'todas' || parts[1] === filterSector
+          if (matchPlanta && matchSector && parts[2] === filterArea && parts[6]) {
+            nivel7.add(parts[6])
+          }
+        } else if (filterSector !== 'todas') {
+          const matchPlanta = filterPlanta === 'todas' || parts[0] === filterPlanta
+          if (matchPlanta && parts[1] === filterSector && parts[6]) {
+            nivel7.add(parts[6])
+          }
+        } else if (filterPlanta !== 'todas') {
+          if (parts[0] === filterPlanta && parts[6]) {
+            nivel7.add(parts[6])
+          }
+        } else {
+          if (parts[6]) nivel7.add(parts[6])
+        }
       }
     })
     return Array.from(nivel7).sort()
-  }, [equipment])
+  }, [equipment, filterPlanta, filterSector, filterArea, filterNivel4, filterNivel5, filterNivel6])
 
   async function saveAssignment(equipmentId: string | null) {
     if (!user?.id) return
@@ -964,7 +1101,7 @@ export function SensorsPage() {
                     )}
                   </div>
                   
-                  {/* Filtros jerárquicos independientes */}
+                  {/* Filtros jerárquicos en cascada (padre → hijo) */}
                   {loadingEquipment ? (
                     <div className="p-4 text-sm bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded">
                       <div className="font-medium text-blue-900 dark:text-blue-100 mb-1">
@@ -989,7 +1126,16 @@ export function SensorsPage() {
                     <div className="grid gap-2 sm:grid-cols-3">
                       <div>
                         <Label>Planta</Label>
-                        <Select value={filterPlanta} onValueChange={setFilterPlanta}>
+                        <Select value={filterPlanta} onValueChange={(v) => {
+                          setFilterPlanta(v)
+                          // Resetear niveles hijos al cambiar planta
+                          setFilterSector('todas')
+                          setFilterArea('todas')
+                          setFilterNivel4('todas')
+                          setFilterNivel5('todas')
+                          setFilterNivel6('todas')
+                          setFilterNivel7('todas')
+                        }}>
                           <SelectTrigger>
                             <SelectValue placeholder="Todas" />
                           </SelectTrigger>
@@ -1003,7 +1149,15 @@ export function SensorsPage() {
                       </div>
                       <div>
                         <Label>Sector</Label>
-                        <Select value={filterSector} onValueChange={setFilterSector}>
+                        <Select value={filterSector} onValueChange={(v) => {
+                          setFilterSector(v)
+                          // Resetear niveles hijos al cambiar sector
+                          setFilterArea('todas')
+                          setFilterNivel4('todas')
+                          setFilterNivel5('todas')
+                          setFilterNivel6('todas')
+                          setFilterNivel7('todas')
+                        }}>
                           <SelectTrigger>
                             <SelectValue placeholder="Todos" />
                           </SelectTrigger>
@@ -1017,7 +1171,14 @@ export function SensorsPage() {
                       </div>
                       <div>
                         <Label>Área</Label>
-                        <Select value={filterArea} onValueChange={setFilterArea}>
+                        <Select value={filterArea} onValueChange={(v) => {
+                          setFilterArea(v)
+                          // Resetear niveles hijos al cambiar área
+                          setFilterNivel4('todas')
+                          setFilterNivel5('todas')
+                          setFilterNivel6('todas')
+                          setFilterNivel7('todas')
+                        }}>
                           <SelectTrigger>
                             <SelectValue placeholder="Todas" />
                           </SelectTrigger>
@@ -1037,7 +1198,13 @@ export function SensorsPage() {
                         {nivel4Disponibles.length > 0 && (
                           <div>
                             <Label>Nivel 4</Label>
-                            <Select value={filterNivel4} onValueChange={setFilterNivel4}>
+                            <Select value={filterNivel4} onValueChange={(v) => {
+                              setFilterNivel4(v)
+                              // Resetear niveles hijos al cambiar nivel 4
+                              setFilterNivel5('todas')
+                              setFilterNivel6('todas')
+                              setFilterNivel7('todas')
+                            }}>
                               <SelectTrigger>
                                 <SelectValue placeholder="Todos" />
                               </SelectTrigger>
@@ -1053,7 +1220,12 @@ export function SensorsPage() {
                         {nivel5Disponibles.length > 0 && (
                           <div>
                             <Label>Nivel 5</Label>
-                            <Select value={filterNivel5} onValueChange={setFilterNivel5}>
+                            <Select value={filterNivel5} onValueChange={(v) => {
+                              setFilterNivel5(v)
+                              // Resetear niveles hijos al cambiar nivel 5
+                              setFilterNivel6('todas')
+                              setFilterNivel7('todas')
+                            }}>
                               <SelectTrigger>
                                 <SelectValue placeholder="Todos" />
                               </SelectTrigger>
@@ -1069,7 +1241,11 @@ export function SensorsPage() {
                         {nivel6Disponibles.length > 0 && (
                           <div>
                             <Label>Nivel 6</Label>
-                            <Select value={filterNivel6} onValueChange={setFilterNivel6}>
+                            <Select value={filterNivel6} onValueChange={(v) => {
+                              setFilterNivel6(v)
+                              // Resetear nivel hijo al cambiar nivel 6
+                              setFilterNivel7('todas')
+                            }}>
                               <SelectTrigger>
                                 <SelectValue placeholder="Todos" />
                               </SelectTrigger>
