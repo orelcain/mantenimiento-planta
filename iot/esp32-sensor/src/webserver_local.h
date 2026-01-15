@@ -363,17 +363,17 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
         </div>
         <div class="config-row">
           <label>Temp (°C)</label>
-          <span>Wmin</span><input type="number" step="0.1" id="tempWarnLow" class="mini">
-          <span>Wmax</span><input type="number" step="0.1" id="tempWarnHigh" class="mini">
-          <span>Cmin</span><input type="number" step="0.1" id="tempCritLow" class="mini">
-          <span>Cmax</span><input type="number" step="0.1" id="tempCritHigh" class="mini">
+          <span title="Advertencia mínima (baja temperatura)">Wmin</span><input type="number" step="0.1" id="tempWarnLow" class="mini" title="Advertencia mínima: si baja de aquí, warning">
+          <span title="Advertencia máxima (alta temperatura)">Wmax</span><input type="number" step="0.1" id="tempWarnHigh" class="mini" title="Advertencia máxima: si supera aquí, warning">
+          <span title="Crítico mínimo (baja temperatura)">Cmin</span><input type="number" step="0.1" id="tempCritLow" class="mini" title="Crítico mínimo: si baja de aquí, critical">
+          <span title="Crítico máximo (alta temperatura)">Cmax</span><input type="number" step="0.1" id="tempCritHigh" class="mini" title="Crítico máximo: si supera aquí, critical">
         </div>
         <div class="config-row">
           <label>Hum (%)</label>
-          <span>Wmin</span><input type="number" step="0.1" id="humWarnLow" class="mini">
-          <span>Wmax</span><input type="number" step="0.1" id="humWarnHigh" class="mini">
-          <span>Cmin</span><input type="number" step="0.1" id="humCritLow" class="mini">
-          <span>Cmax</span><input type="number" step="0.1" id="humCritHigh" class="mini">
+          <span title="Advertencia mínima (baja humedad)">Wmin</span><input type="number" step="0.1" id="humWarnLow" class="mini" title="Advertencia mínima: si baja de aquí, warning">
+          <span title="Advertencia máxima (alta humedad)">Wmax</span><input type="number" step="0.1" id="humWarnHigh" class="mini" title="Advertencia máxima: si supera aquí, warning">
+          <span title="Crítico mínimo (baja humedad)">Cmin</span><input type="number" step="0.1" id="humCritLow" class="mini" title="Crítico mínimo: si baja de aquí, critical">
+          <span title="Crítico máximo (alta humedad)">Cmax</span><input type="number" step="0.1" id="humCritHigh" class="mini" title="Crítico máximo: si supera aquí, critical">
           <button onclick="updateThresholds()">Alertas</button>
         </div>
         <div class="config-info">
