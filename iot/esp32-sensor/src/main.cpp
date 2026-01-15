@@ -184,11 +184,13 @@ static String getApSsid() {
 
 static void ensureAlwaysOnAp() {
   if (!apAlwaysOn) {
-    Serial.println("📡 AP desactivado (apAlwaysOn=false)");
     return;
   }
 
-  static bool apDnsStarted = false;
+  static bool apInitialized = false;
+  if (apInitialized) {
+    return; // AP ya está activo, no hacer nada
+  }
 
   Serial.println("📡 Activando AP siempre encendido (modo AP+STA)...");
 
@@ -211,12 +213,11 @@ static void ensureAlwaysOnAp() {
   Serial.printf("   IP del AP: %s\n", WiFi.softAPIP().toString().c_str());
 
   // Iniciar captive portal DNS (redirige todo al dashboard)
-  if (!apDnsStarted) {
-    IPAddress apIP = WiFi.softAPIP();
-    apDnsServer.start(53, "*", apIP);
-    apDnsStarted = true;
-    Serial.println("🌐 Captive Portal DNS activo - Dashboard se abre automáticamente");
-  }
+  IPAddress apIP = WiFi.softAPIP();
+  apDnsServer.start(53, "*", apIP);
+  Serial.println("🌐 Captive Portal DNS activo - Dashboard se abre automáticamente");
+  
+  apInitialized = true;
 }
 
 static void ensureHttpServerStarted() {
