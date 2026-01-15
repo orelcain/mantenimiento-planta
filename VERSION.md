@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.17.3**
+## Versión Actual: **v2.17.4**
 
 **Fecha de lanzamiento**: 14 de enero de 2026  
 **Estado**: ✅ PRODUCCIÓN READY  
@@ -9,6 +9,25 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.17.4 - Fix Carga Equipment Autónoma (14/01/2026)
+
+**Fixes:**
+- 🔄 **Carga Autónoma**: SensorsPage ahora carga equipment directamente desde Firestore si el store global está vacío.
+- 🎯 **Independencia**: no requiere navegar primero a otras páginas (Equipos, Dashboard) para tener datos.
+- 💾 **Fallback Inteligente**: usa store global si está cargado, sino carga desde Firestore en background.
+- 🔍 **Debug Mejorado**: logs de consola indican fuente de datos (store vs Firestore).
+- ✅ **Feedback Visual**: indicadores de "Cargando equipos..." y "No hay equipos disponibles".
+
+**Archivos Modificados:**
+- `apps/pwa/src/pages/SensorsPage.tsx`: carga local de equipment + estado loading + mensajes UX
+
+**Problema Resuelto:**
+- Selectores de jerarquía (Planta/Sector/Área) ahora se llenan automáticamente
+- Asignación de equipos funciona inmediatamente al entrar a página Sensores
+- No depende de estado compartido entre páginas
+
+---
 
 ### v2.17.3 - Selectores Jerarquía Independientes (14/01/2026)
 

@@ -8,6 +8,7 @@ import type { SensorSummaryNode } from '@/services/sensorsRtdb'
 import { assignDeviceToEquipment, subscribeDevices, deleteDevice } from '@/services/devicesRtdb'
 import { subscribeSensorSummary } from '@/services/sensorsRtdb'
 import { saveApConfig } from '@/services/apConfigRtdb'
+import { getEquipments } from '@/services/equipment'
 import { TelemetryChart, type ChartType } from '@/components/telemetry/TelemetryChart'
 import { TelemetryExportDialog } from '@/components/telemetry/TelemetryExportDialog'
 import { useTelemetryHistory, type TimeRange } from '@/hooks/useTelemetryHistory'
@@ -78,16 +79,34 @@ function onlineBadge(online: boolean | undefined) {
 }
 
 export function SensorsPage() {
-  const equipment = useAppStore((s) => s.equipment)
+  const equipmentStore = useAppStore((s) => s.equipment)
   const user = useAuthStore((s) => s.user)
 
-  // Debug: verificar equipment cargado
+  // Estado local para equipment (cargar si store vacío)
+  const [equipment, setEquipment] = useState<Equipment[]>(equipmentStore)
+  const [loadingEquipment, setLoadingEquipment] = useState(false)
+
+  // Cargar equipment si el store está vacío
   useEffect(() => {
-    console.log('[SensorsPage] Equipment store:', equipment.length, 'items')
-    if (equipment.length === 0) {
-      console.warn('[SensorsPage] Equipment store vacío - puede no estar cargado aún')
+    if (equipmentStore.length > 0) {
+      setEquipment(equipmentStore)
+      console.log('[SensorsPage] Equipment cargado desde store:', equipmentStore.length, 'items')
+    } else if (!loadingEquipment) {
+      console.log('[SensorsPage] Store vacío, cargando equipment desde Firestore...')
+      setLoadingEquipment(true)
+      getEquipments()
+        .then((data) => {
+          setEquipment(data)
+          console.log('[SensorsPage] Equipment cargado desde Firestore:', data.length, 'items')
+        })
+        .catch((err) => {
+          console.error('[SensorsPage] Error cargando equipment:', err)
+        })
+        .finally(() => {
+          setLoadingEquipment(false)
+        })
     }
-  }, [equipment])
+  }, [equipmentStore, loadingEquipment])
 
   const [devices, setDevices] = useState<DeviceRow[]>([])
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('')
@@ -872,13 +891,22 @@ export function SensorsPage() {
                   </div>
                   
                   {/* Filtros jerárquicos independientes */}
-                  {equipment.length === 0 ? (
+                  {loadingEquipment ? (
+                    <div className="p-4 text-sm bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded">
+                      <div className="font-medium text-blue-900 dark:text-blue-100 mb-1">
+                        🔄 Cargando equipos...
+                      </div>
+                      <div className="text-xs text-blue-700 dark:text-blue-300">
+                        Por favor espera un momento
+                      </div>
+                    </div>
+                  ) : equipment.length === 0 ? (
                     <div className="p-4 text-sm bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded">
                       <div className="font-medium text-amber-900 dark:text-amber-100 mb-1">
-                        ⚠️ No hay equipos cargados
+                        ⚠️ No hay equipos disponibles
                       </div>
                       <div className="text-xs text-amber-700 dark:text-amber-300">
-                        Recarga la página o ve a la página de Equipos para cargar la jerarquía.
+                        Ve a la página de Equipos para agregar equipos a la jerarquía.
                       </div>
                     </div>
                   ) : (
