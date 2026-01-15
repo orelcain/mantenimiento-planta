@@ -612,7 +612,6 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
       xOffsetMs = 0;
       updateData();
     }
-    }
 
     // Touch/Mouse hover para mostrar tooltip
     function handlePointer(e) {
