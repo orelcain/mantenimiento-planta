@@ -33,6 +33,12 @@ extern TelemetryReading telemetryHistory[TELEMETRY_HISTORY_SIZE];
 extern uint16_t telemetryIndex;
 extern uint16_t telemetryCount;
 
+// Funciones externas del main.cpp para intervalo e histórico flash
+extern uint16_t getSendIntervalSeconds();
+extern void setSendIntervalSeconds(uint16_t sec);
+extern uint32_t getFlashHistoryCount();
+extern bool getFlashReading(uint32_t index, uint64_t& ts, float& temp, float& hum, uint8_t& tempSt, uint8_t& humSt, bool& sim);
+
 // ============ FUNCIONES PÚBLICAS ============
 void setupLocalWebServer();
 void handleLocalWebServer();
@@ -154,9 +160,40 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
     .footer {
       text-align: center;
       margin-top: 16px;
-      color: rgba(255,255,255,0.85);
+      color: #6b7280;
       font-size: 0.9em;
     }
+    .config-section {
+      margin-top: 15px;
+      padding: 12px;
+      background: #f0f9ff;
+      border-radius: 8px;
+      border: 1px solid #bae6fd;
+    }
+    .config-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .config-row label { font-weight: 500; color: #0369a1; }
+    .config-row input[type="number"] {
+      width: 70px;
+      padding: 6px 8px;
+      border: 1px solid #7dd3fc;
+      border-radius: 6px;
+      font-size: 1em;
+    }
+    .config-row button {
+      padding: 6px 12px;
+      background: #0284c7;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .config-row button:hover { background: #0369a1; }
+    .config-info { font-size: 0.85em; color: #64748b; margin-top: 6px; }
   </style>
 </head>
 <body>
@@ -185,10 +222,6 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
           <div class="legend-item"><span class="legend-dot" style="background:#3b82f6"></span>Humedad (%)</div>
         </div>
         <canvas id="chart1"></canvas>
-        <div class="axis-range">
-          <span><span class="label">Y</span> <span id="rangeTemp">--</span> · <span id="rangeHum">--</span></span>
-          <span><span class="label">X</span> <span id="rangeX">--</span></span>
-        </div>
         <div class="stats">
           <div class="stat">
             <div class="stat-value" id="statCurrent">--</div>
@@ -217,18 +250,30 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
         </div>
         <div class="axis-range" style="margin-top:10px">
           <span><span class="label">Histórico</span> <span id="historyCount">--</span></span>
-          <span><span class="label">Ventana</span> Últimas 100 lecturas</span>
+          <span><span class="label">Zoom Y</span> <span id="zoomLevel">100%</span></span>
+        </div>
+        
+        <div class="config-section">
+          <div class="config-row">
+            <label>Intervalo de lectura:</label>
+            <input type="number" id="intervalInput" min="5" max="300" value="10">
+            <span>segundos</span>
+            <button onclick="updateInterval()">Aplicar</button>
+          </div>
+          <div class="config-info">
+            <span id="capacityInfo">--</span> · Flash: <span id="flashInfo">--</span>
+          </div>
         </div>
       </div>
     </div>
 
-    <div class="footer">Actualización automática cada 5 segundos</div>
+    <div class="footer">Actualización automática · Intervalo: <span id="footerInterval">--</span>s</div>
   </div>
 
   <script>
     const chart1Canvas = document.getElementById('chart1');
     let currentRange = '1h';
-    let yZoom = 1.0;
+    let yZoom = 1.0; // 1.0 = 100%, >1 = ampliar (reduce rango visible)
 
     function prepareCanvas(canvas) {
       const dpr = window.devicePixelRatio || 1;
@@ -265,7 +310,10 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
       ctx.beginPath();
       data.forEach((v, i) => {
         const x = pad.left + i * step;
-        const y = pad.top + (1 - (v - min) / span) * plotH;
+        // Clamp dentro del área de ploteo
+        let normalizedY = (v - min) / span;
+        normalizedY = Math.max(0, Math.min(1, normalizedY));
+        const y = pad.top + (1 - normalizedY) * plotH;
         if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
       });
       ctx.stroke();
@@ -273,21 +321,27 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
 
     function drawAxesLabels(ctx, pad, plotW, plotH, tMin, tMax, hMin, hMax, startLabel, midLabel, endLabel) {
       ctx.fillStyle = '#6b7280';
-      ctx.font = '12px system-ui, -apple-system, Segoe UI, Arial';
+      ctx.font = '11px system-ui, -apple-system, Segoe UI, Arial';
 
       const tMid = (tMin + tMax) / 2;
       const hMid = (hMin + hMax) / 2;
 
+      // Eje Y izquierdo - Temperatura (rojo)
       ctx.textAlign = 'right';
-      ctx.fillText(tMax.toFixed(1) + '°C', pad.left - 6, pad.top + 10);
-      ctx.fillText(tMid.toFixed(1) + '°C', pad.left - 6, pad.top + plotH / 2 + 4);
-      ctx.fillText(tMin.toFixed(1) + '°C', pad.left - 6, pad.top + plotH - 2);
+      ctx.fillStyle = '#ef4444';
+      ctx.fillText(tMax.toFixed(1) + '°C', pad.left - 4, pad.top + 10);
+      ctx.fillText(tMid.toFixed(1) + '°C', pad.left - 4, pad.top + plotH / 2 + 4);
+      ctx.fillText(tMin.toFixed(1) + '°C', pad.left - 4, pad.top + plotH - 2);
 
+      // Eje Y derecho - Humedad (azul)
       ctx.textAlign = 'left';
-      ctx.fillText(hMax.toFixed(0) + '%', pad.left + plotW + 6, pad.top + 10);
-      ctx.fillText(hMid.toFixed(0) + '%', pad.left + plotW + 6, pad.top + plotH / 2 + 4);
-      ctx.fillText(hMin.toFixed(0) + '%', pad.left + plotW + 6, pad.top + plotH - 2);
+      ctx.fillStyle = '#3b82f6';
+      ctx.fillText(hMax.toFixed(0) + '%', pad.left + plotW + 4, pad.top + 10);
+      ctx.fillText(hMid.toFixed(0) + '%', pad.left + plotW + 4, pad.top + plotH / 2 + 4);
+      ctx.fillText(hMin.toFixed(0) + '%', pad.left + plotW + 4, pad.top + plotH - 2);
 
+      // Eje X - Tiempo
+      ctx.fillStyle = '#6b7280';
       ctx.textAlign = 'left';
       ctx.fillText(startLabel, pad.left, pad.top + plotH + 14);
       ctx.textAlign = 'center';
@@ -298,15 +352,18 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
 
     function renderDual(canvas, temp, hum, labels) {
       const { ctx, w, h } = prepareCanvas(canvas);
-      const pad = { left: 36, right: 36, top: 12, bottom: 22 };
+      const pad = { left: 42, right: 36, top: 12, bottom: 22 };
       const plotW = w - pad.left - pad.right;
       const plotH = h - pad.top - pad.bottom;
 
       ctx.clearRect(0, 0, w, h);
       drawGrid(ctx, pad, plotW, plotH);
+      
+      // Dibujar series con los rangos AJUSTADOS (incluyendo zoom)
       drawSeries(ctx, pad, plotW, plotH, temp, '#ef4444', labels.tempMin, labels.tempMax);
       drawSeries(ctx, pad, plotW, plotH, hum, '#3b82f6', labels.humMin, labels.humMax);
 
+      // Dibujar etiquetas de ejes con los MISMOS rangos usados para dibujar
       drawAxesLabels(ctx, pad, plotW, plotH,
         labels.tempMin, labels.tempMax,
         labels.humMin, labels.humMax,
@@ -332,12 +389,16 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
       });
     });
 
+    // Y+ = ampliar = reducir rango visible = zoom > 1
+    // Y- = reducir = ampliar rango visible = zoom < 1
     document.getElementById('zoomIn').addEventListener('click', () => {
-      yZoom = Math.min(4, yZoom * 1.25);
+      yZoom = Math.min(8, yZoom * 1.5);
+      document.getElementById('zoomLevel').textContent = Math.round(yZoom * 100) + '%';
       updateData();
     });
     document.getElementById('zoomOut').addEventListener('click', () => {
-      yZoom = Math.max(0.5, yZoom / 1.25);
+      yZoom = Math.max(0.25, yZoom / 1.5);
+      document.getElementById('zoomLevel').textContent = Math.round(yZoom * 100) + '%';
       updateData();
     });
 
@@ -352,9 +413,19 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
         })
         .catch(() => {});
 
-      fetch('/api/history')
+      // Usar histórico flash para rangos largos, RAM para 1h
+      const useFlash = (currentRange !== '1h');
+      const limit = currentRange === 'all' ? 2000 : (currentRange === '24h' ? 1000 : 500);
+      const url = '/api/history?source=' + (useFlash ? 'flash' : 'ram') + '&limit=' + limit;
+      
+      fetch(url)
         .then(r => r.json())
-        .then(data => {
+        .then(response => {
+          // El histórico puede venir como array directo o con _meta
+          const data = Array.isArray(response) ? response : 
+                       (response._meta ? Object.values(response).filter(Array.isArray)[0] || [] : response);
+          const meta = response._meta || { total: data.length, source: 'ram' };
+          
           const filtered = filterByRange(data);
           const temps = filtered.map(d => d.temperature);
           const hums = filtered.map(d => d.humidity);
@@ -366,20 +437,24 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
           const midLabel = midTs ? new Date(midTs).toLocaleTimeString('es-ES') : '--';
           const endLabel = endTs ? new Date(endTs).toLocaleTimeString('es-ES') : '--';
 
-          const rawTempMin = temps.length ? Math.min(...temps) : 0;
-          const rawTempMax = temps.length ? Math.max(...temps) : 0;
-          const rawHumMin = hums.length ? Math.min(...hums) : 0;
-          const rawHumMax = hums.length ? Math.max(...hums) : 0;
+          // Calcular rangos reales de los datos
+          const rawTempMin = temps.length ? Math.min(...temps) : 20;
+          const rawTempMax = temps.length ? Math.max(...temps) : 30;
+          const rawHumMin = hums.length ? Math.min(...hums) : 40;
+          const rawHumMax = hums.length ? Math.max(...hums) : 80;
 
+          // Aplicar zoom: zoom>1 = rango más pequeño = más amplificado
           const tempCenter = (rawTempMin + rawTempMax) / 2;
-          const tempSpan = (rawTempMax - rawTempMin) || 1;
-          const tempSpanZoom = tempSpan / yZoom;
+          const humCenter = (rawHumMin + rawHumMax) / 2;
+          
+          const tempSpanOrig = (rawTempMax - rawTempMin) * 1.1 || 2;
+          const humSpanOrig = (rawHumMax - rawHumMin) * 1.1 || 10;
+          
+          const tempSpanZoom = tempSpanOrig / yZoom;
+          const humSpanZoom = humSpanOrig / yZoom;
+          
           const tempMin = tempCenter - tempSpanZoom / 2;
           const tempMax = tempCenter + tempSpanZoom / 2;
-
-          const humCenter = (rawHumMin + rawHumMax) / 2;
-          const humSpan = (rawHumMax - rawHumMin) || 1;
-          const humSpanZoom = humSpan / yZoom;
           const humMin = humCenter - humSpanZoom / 2;
           const humMax = humCenter + humSpanZoom / 2;
 
@@ -389,44 +464,71 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
             startLabel, midLabel, endLabel
           });
 
+          // Stats con valores REALES
           if (temps.length > 0) {
             const current = temps[temps.length - 1];
-            const max = Math.max(...temps);
-            const min = Math.min(...temps);
             document.getElementById('statCurrent').textContent = current.toFixed(1) + '°C';
-            document.getElementById('statMax').textContent = max.toFixed(1) + '°C';
-            document.getElementById('statMin').textContent = min.toFixed(1) + '°C';
-
-            document.getElementById('rangeTemp').textContent = 'Temp ' + min.toFixed(1) + '–' + max.toFixed(1) + ' °C';
+            document.getElementById('statMax').textContent = rawTempMax.toFixed(1) + '°C';
+            document.getElementById('statMin').textContent = rawTempMin.toFixed(1) + '°C';
           }
 
           if (hums.length > 0) {
-            const maxH = Math.max(...hums);
-            const minH = Math.min(...hums);
-            document.getElementById('rangeHum').textContent = 'Hum ' + minH.toFixed(0) + '–' + maxH.toFixed(0) + ' %';
             const currentH = hums[hums.length - 1];
             document.getElementById('humCurrent').textContent = currentH.toFixed(0) + '%';
-            document.getElementById('humMax').textContent = maxH.toFixed(0) + '%';
-            document.getElementById('humMin').textContent = minH.toFixed(0) + '%';
+            document.getElementById('humMax').textContent = rawHumMax.toFixed(0) + '%';
+            document.getElementById('humMin').textContent = rawHumMin.toFixed(0) + '%';
           }
 
-          if (filtered.length > 0) {
-            const startTs = filtered[0].timestamp;
-            const endTs = filtered[filtered.length - 1].timestamp;
-            const start = new Date(startTs).toLocaleTimeString('es-ES');
-            const end = new Date(endTs).toLocaleTimeString('es-ES');
-            document.getElementById('rangeX').textContent = start + ' – ' + end;
-          } else {
-            document.getElementById('rangeX').textContent = 'Sin datos';
-          }
-
-          document.getElementById('historyCount').textContent = filtered.length + ' lecturas';
+          const src = meta.source === 'flash' ? '💾' : '🧠';
+          document.getElementById('historyCount').textContent = 
+            filtered.length + ' de ' + meta.total + ' ' + src;
         })
         .catch(() => {});
     }
 
+    // Cargar configuración
+    function loadConfig() {
+      fetch('/api/config')
+        .then(r => r.json())
+        .then(cfg => {
+          document.getElementById('intervalInput').value = cfg.sendIntervalSeconds;
+          document.getElementById('footerInterval').textContent = cfg.sendIntervalSeconds;
+          document.getElementById('capacityInfo').textContent = 
+            'Capacidad: ~' + cfg.estimatedDaysCapacity.toFixed(1) + ' días';
+          document.getElementById('flashInfo').textContent = 
+            cfg.flashHistoryCount + '/' + cfg.flashHistoryMax + ' lecturas';
+        })
+        .catch(() => {});
+    }
+
+    // Actualizar intervalo
+    function updateInterval() {
+      const val = parseInt(document.getElementById('intervalInput').value);
+      if (val < 5 || val > 300) {
+        alert('El intervalo debe estar entre 5 y 300 segundos');
+        return;
+      }
+      fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sendIntervalSeconds: val })
+      })
+      .then(r => r.json())
+      .then(res => {
+        if (res.success) {
+          document.getElementById('footerInterval').textContent = val;
+          loadConfig();
+        } else {
+          alert('Error: ' + (res.error || 'desconocido'));
+        }
+      })
+      .catch(() => alert('Error de conexión'));
+    }
+
     updateData();
+    loadConfig();
     setInterval(updateData, 5000);
+    setInterval(loadConfig, 30000);
   </script>
 </body>
 </html>

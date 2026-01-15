@@ -75,14 +75,52 @@ static void printDhtPinState(const char* context);
 
 static void getSimulatedDht(float& temperature, float& humidity);
 
+// Funciones para intervalo configurable
+static void loadSendInterval();
+static void persistSendInterval(uint16_t intervalSec);
+static void startSendIntervalStream();
+uint16_t getSendIntervalSeconds();  // Público para webserver
+void setSendIntervalSeconds(uint16_t sec);  // Público para webserver
+
+// Funciones para histórico persistente en flash
+static void initFlashHistory();
+static void saveReadingToFlash(uint64_t ts, float temp, float hum, uint8_t tempSt, uint8_t humSt, bool sim);
+uint32_t getFlashHistoryCount();  // Público
+bool getFlashReading(uint32_t index, uint64_t& ts, float& temp, float& hum, uint8_t& tempSt, uint8_t& humSt, bool& sim);
+
 // ============ CONFIGURACIÓN DE HARDWARE ============
 #define DHT_PIN 4        // GPIO4 (D4) - Pin de datos del DHT11
 #define DHT_TYPE DHT11   // Tipo de sensor (DHT11)
 #define LED_PIN 2        // LED integrado del ESP32
 
 // ============ INTERVALOS DE TIEMPO ============
-#define SEND_INTERVAL 5000      // Enviar datos cada 5 segundos
-#define RECONNECT_INTERVAL 30000 // Reintentar conexión cada 30 seg
+#define DEFAULT_SEND_INTERVAL 10   // Intervalo por defecto en SEGUNDOS
+#define MIN_SEND_INTERVAL 5        // Mínimo 5 segundos
+#define MAX_SEND_INTERVAL 300      // Máximo 5 minutos
+#define RECONNECT_INTERVAL 30000   // Reintentar conexión cada 30 seg
+
+// Intervalo configurable (en segundos)
+static uint16_t sendIntervalSeconds = DEFAULT_SEND_INTERVAL;
+
+// ============ HISTÓRICO PERSISTENTE EN FLASH ============
+#define HISTORY_FILE_PATH "/history.bin"
+#define HISTORY_MAX_READINGS 20000  // ~600KB, suficiente para 6+ días
+#define HISTORY_SAVE_EVERY 10       // Guardar índice cada N lecturas
+
+// Estructura compacta para flash (20 bytes por lectura)
+struct __attribute__((packed)) FlashReading {
+  uint64_t timestamp;   // 8 bytes
+  float temperature;    // 4 bytes
+  float humidity;       // 4 bytes
+  uint8_t tempStatus;   // 1 byte (0=normal, 1=warning, 2=critical)
+  uint8_t humStatus;    // 1 byte
+  uint8_t simulated;    // 1 byte
+  uint8_t reserved;     // 1 byte (padding)
+};
+
+static uint32_t historyWriteIndex = 0;  // Siguiente posición a escribir
+static uint32_t historyTotalCount = 0;  // Total de lecturas escritas
+static uint32_t historySavedIndex = 0;  // Último índice guardado en prefs
 
 // ============ BUFFER OFFLINE (BACKFILL) ============
 // Guarda lecturas en RAM cuando no hay WiFi/Firebase y las envía al volver.
@@ -863,6 +901,157 @@ static void persistEquipmentPath(const String& equipmentPath) {
   prefs.end();
 }
 
+// ============ INTERVALO DE LECTURA CONFIGURABLE ============
+
+static void loadSendInterval() {
+  prefs.begin("iot", false);
+  sendIntervalSeconds = prefs.getUShort("sendInterval", DEFAULT_SEND_INTERVAL);
+  prefs.end();
+  
+  // Validar rango
+  if (sendIntervalSeconds < MIN_SEND_INTERVAL) sendIntervalSeconds = MIN_SEND_INTERVAL;
+  if (sendIntervalSeconds > MAX_SEND_INTERVAL) sendIntervalSeconds = MAX_SEND_INTERVAL;
+  
+  Serial.printf("⏱️  Intervalo de lectura: %d segundos\n", sendIntervalSeconds);
+}
+
+static void persistSendInterval(uint16_t intervalSec) {
+  if (intervalSec < MIN_SEND_INTERVAL) intervalSec = MIN_SEND_INTERVAL;
+  if (intervalSec > MAX_SEND_INTERVAL) intervalSec = MAX_SEND_INTERVAL;
+  
+  prefs.begin("iot", false);
+  prefs.putUShort("sendInterval", intervalSec);
+  prefs.end();
+}
+
+uint16_t getSendIntervalSeconds() {
+  return sendIntervalSeconds;
+}
+
+void setSendIntervalSeconds(uint16_t sec) {
+  if (sec < MIN_SEND_INTERVAL) sec = MIN_SEND_INTERVAL;
+  if (sec > MAX_SEND_INTERVAL) sec = MAX_SEND_INTERVAL;
+  
+  sendIntervalSeconds = sec;
+  persistSendInterval(sec);
+  Serial.printf("⏱️  Intervalo actualizado a %d segundos\n", sec);
+}
+
+// ============ HISTÓRICO PERSISTENTE EN FLASH ============
+
+static void initFlashHistory() {
+  if (!fsReady) {
+    Serial.println("⚠️  LittleFS no disponible, histórico flash desactivado");
+    return;
+  }
+  
+  // Cargar índice guardado
+  prefs.begin("iot", false);
+  historyWriteIndex = prefs.getULong("histIdx", 0);
+  historyTotalCount = prefs.getULong("histTotal", 0);
+  prefs.end();
+  
+  // Verificar si el archivo existe
+  if (!LittleFS.exists(HISTORY_FILE_PATH)) {
+    // Crear archivo vacío
+    File f = LittleFS.open(HISTORY_FILE_PATH, "w");
+    if (f) {
+      f.close();
+      Serial.println("📁 Archivo de histórico creado");
+    }
+    historyWriteIndex = 0;
+    historyTotalCount = 0;
+  }
+  
+  Serial.printf("📊 Histórico flash: %lu lecturas, índice=%lu (máx %d)\n", 
+                historyTotalCount, historyWriteIndex, HISTORY_MAX_READINGS);
+}
+
+static void saveReadingToFlash(uint64_t ts, float temp, float hum, uint8_t tempSt, uint8_t humSt, bool sim) {
+  if (!fsReady) return;
+  
+  FlashReading reading;
+  reading.timestamp = ts;
+  reading.temperature = temp;
+  reading.humidity = hum;
+  reading.tempStatus = tempSt;
+  reading.humStatus = humSt;
+  reading.simulated = sim ? 1 : 0;
+  reading.reserved = 0;
+  
+  // Calcular posición en el archivo (circular)
+  uint32_t pos = (historyWriteIndex % HISTORY_MAX_READINGS) * sizeof(FlashReading);
+  
+  File f = LittleFS.open(HISTORY_FILE_PATH, "r+");
+  if (!f) {
+    // Intentar crear si no existe
+    f = LittleFS.open(HISTORY_FILE_PATH, "w+");
+  }
+  
+  if (f) {
+    f.seek(pos);
+    f.write((uint8_t*)&reading, sizeof(FlashReading));
+    f.close();
+    
+    historyWriteIndex++;
+    historyTotalCount++;
+    
+    // Guardar índice periódicamente (reduce desgaste flash)
+    if (historyWriteIndex - historySavedIndex >= HISTORY_SAVE_EVERY) {
+      prefs.begin("iot", false);
+      prefs.putULong("histIdx", historyWriteIndex);
+      prefs.putULong("histTotal", historyTotalCount);
+      prefs.end();
+      historySavedIndex = historyWriteIndex;
+    }
+  }
+}
+
+uint32_t getFlashHistoryCount() {
+  if (historyTotalCount >= HISTORY_MAX_READINGS) {
+    return HISTORY_MAX_READINGS;
+  }
+  return historyTotalCount;
+}
+
+bool getFlashReading(uint32_t index, uint64_t& ts, float& temp, float& hum, uint8_t& tempSt, uint8_t& humSt, bool& sim) {
+  if (!fsReady) return false;
+  
+  uint32_t count = getFlashHistoryCount();
+  if (index >= count) return false;
+  
+  // Calcular posición real en el buffer circular
+  uint32_t realIndex;
+  if (historyTotalCount >= HISTORY_MAX_READINGS) {
+    // Buffer lleno, el más antiguo está en historyWriteIndex
+    realIndex = (historyWriteIndex + index) % HISTORY_MAX_READINGS;
+  } else {
+    // Buffer no lleno, empezar desde 0
+    realIndex = index;
+  }
+  
+  uint32_t pos = realIndex * sizeof(FlashReading);
+  
+  File f = LittleFS.open(HISTORY_FILE_PATH, "r");
+  if (!f) return false;
+  
+  f.seek(pos);
+  FlashReading reading;
+  size_t bytesRead = f.read((uint8_t*)&reading, sizeof(FlashReading));
+  f.close();
+  
+  if (bytesRead != sizeof(FlashReading)) return false;
+  
+  ts = reading.timestamp;
+  temp = reading.temperature;
+  hum = reading.humidity;
+  tempSt = reading.tempStatus;
+  humSt = reading.humStatus;
+  sim = reading.simulated != 0;
+  
+  return true;
+}
+
 static bool hasAssignedEquipment() {
   return currentEquipmentId.length() > 0;
 }
@@ -1195,6 +1384,9 @@ void setup() {
 
   // Settings locales (AP/alias)
   loadLocalSettings();
+  
+  // Cargar intervalo de lectura configurable
+  loadSendInterval();
 
   // Servidor HTTP: registrar TODOS los endpoints ANTES de begin()
   // 1. Endpoints del portal de configuración
@@ -1254,6 +1446,9 @@ void setup() {
         }
       }
       Serial.println("💾 LittleFS listo (backlog persistente habilitado)");
+      
+      // Inicializar histórico persistente
+      initFlashHistory();
     } else {
       Serial.println("⚠ LittleFS no es escribible (backlog persistente deshabilitado; usando RAM)");
     }
@@ -1671,8 +1866,13 @@ void sendSensorData() {
   lastTempStatus = tempStatus;
   lastHumStatus = humStatus;
   
-  // Agregar al histórico del servidor web local
+  // Agregar al histórico del servidor web local (RAM)
   addTelemetryReading(timestamp, temperature, humidity, tempStatus, humStatus, simulated);
+  
+  // Guardar también en flash (persistente)
+  uint8_t tempStatusCode = (tempStatus == "critical") ? 2 : (tempStatus == "warning") ? 1 : 0;
+  uint8_t humStatusCode = (humStatus == "critical") ? 2 : (humStatus == "warning") ? 1 : 0;
+  saveReadingToFlash(timestamp, temperature, humidity, tempStatusCode, humStatusCode, simulated);
   
   // Mostrar en serial
   Serial.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
@@ -1833,8 +2033,9 @@ void loop() {
     lastStreamReadMs = millis();
   }
   
-  // Enviar datos según intervalo
-  if (millis() - lastSendTime > SEND_INTERVAL) {
+  // Enviar datos según intervalo configurable
+  unsigned long intervalMs = (unsigned long)sendIntervalSeconds * 1000UL;
+  if (millis() - lastSendTime > intervalMs) {
     sendSensorData();
     lastSendTime = millis();
   }

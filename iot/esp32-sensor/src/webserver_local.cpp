@@ -84,31 +84,133 @@ void handleApiCurrent() {
 }
 
 void handleApiHistory() {
+  // Leer parámetro de fuente: ram (default para compatibilidad) o flash
+  String source = portalServer.arg("source");
+  bool useFlash = (source == "flash");
+  
+  // Leer parámetro de límite (para no saturar memoria con 20000 lecturas)
+  int limit = portalServer.arg("limit").toInt();
+  if (limit <= 0 || limit > 2000) limit = 500;  // Máximo 500 por request
+  
+  // Leer parámetro de offset (para paginación)
+  int offset = portalServer.arg("offset").toInt();
+  if (offset < 0) offset = 0;
+  
   JsonDocument doc;
   JsonArray array = doc.to<JsonArray>();
+  
+  if (useFlash) {
+    // Leer desde flash persistente
+    uint32_t total = getFlashHistoryCount();
+    
+    // Calcular inicio (las más recientes primero si se pide desde el final)
+    int startIdx = (int)total - limit - offset;
+    if (startIdx < 0) startIdx = 0;
+    int endIdx = (int)total - offset;
+    if (endIdx > (int)total) endIdx = total;
+    
+    const char* statusNames[] = {"normal", "warning", "critical"};
+    
+    for (int i = startIdx; i < endIdx; i++) {
+      uint64_t ts;
+      float temp, hum;
+      uint8_t tempSt, humSt;
+      bool sim;
+      
+      if (getFlashReading(i, ts, temp, hum, tempSt, humSt, sim)) {
+        JsonObject obj = array.add<JsonObject>();
+        obj["timestamp"] = ts;
+        obj["temperature"] = temp;
+        obj["humidity"] = hum;
+        obj["tempStatus"] = statusNames[tempSt < 3 ? tempSt : 0];
+        obj["humStatus"] = statusNames[humSt < 3 ? humSt : 0];
+        obj["simulated"] = sim;
+      }
+    }
+    
+    // Agregar metadata
+    doc["_meta"]["total"] = total;
+    doc["_meta"]["offset"] = offset;
+    doc["_meta"]["limit"] = limit;
+    doc["_meta"]["source"] = "flash";
+  } else {
+    // Leer desde RAM (comportamiento original, máximo 100)
+    uint16_t count = min(telemetryCount, (uint16_t)TELEMETRY_HISTORY_SIZE);
+    uint16_t startIdx = (telemetryCount >= TELEMETRY_HISTORY_SIZE) 
+                        ? telemetryIndex 
+                        : 0;
 
-  // Iterar sobre el buffer circular
-  uint16_t count = min(telemetryCount, (uint16_t)TELEMETRY_HISTORY_SIZE);
-  uint16_t startIdx = (telemetryCount >= TELEMETRY_HISTORY_SIZE) 
-                      ? telemetryIndex 
-                      : 0;
+    for (uint16_t i = 0; i < count; i++) {
+      uint16_t idx = (startIdx + i) % TELEMETRY_HISTORY_SIZE;
+      TelemetryReading& r = telemetryHistory[idx];
 
-  for (uint16_t i = 0; i < count; i++) {
-    uint16_t idx = (startIdx + i) % TELEMETRY_HISTORY_SIZE;
-    TelemetryReading& r = telemetryHistory[idx];
-
-    JsonObject obj = array.add<JsonObject>();
-    obj["timestamp"] = r.timestamp;
-    obj["temperature"] = r.temperature;
-    obj["humidity"] = r.humidity;
-    obj["tempStatus"] = r.tempStatus;
-    obj["humStatus"] = r.humStatus;
-    obj["simulated"] = r.simulated;
+      JsonObject obj = array.add<JsonObject>();
+      obj["timestamp"] = r.timestamp;
+      obj["temperature"] = r.temperature;
+      obj["humidity"] = r.humidity;
+      obj["tempStatus"] = r.tempStatus;
+      obj["humStatus"] = r.humStatus;
+      obj["simulated"] = r.simulated;
+    }
+    
+    // Agregar metadata
+    doc["_meta"]["total"] = count;
+    doc["_meta"]["source"] = "ram";
   }
 
   String json;
   serializeJson(doc, json);
   portalServer.send(200, "application/json", json);
+}
+
+// Handler para obtener/cambiar configuración
+void handleApiConfig() {
+  if (portalServer.method() == HTTP_GET) {
+    // GET: devolver configuración actual
+    JsonDocument doc;
+    doc["sendIntervalSeconds"] = getSendIntervalSeconds();
+    doc["flashHistoryCount"] = getFlashHistoryCount();
+    doc["flashHistoryMax"] = 20000;
+    doc["ramHistoryCount"] = telemetryCount;
+    doc["ramHistoryMax"] = TELEMETRY_HISTORY_SIZE;
+    
+    // Calcular días estimados de histórico
+    uint32_t intervalSec = getSendIntervalSeconds();
+    float daysCapacity = (20000.0f * intervalSec) / 86400.0f;
+    doc["estimatedDaysCapacity"] = daysCapacity;
+    
+    String json;
+    serializeJson(doc, json);
+    portalServer.send(200, "application/json", json);
+  } else if (portalServer.method() == HTTP_POST) {
+    // POST: actualizar configuración
+    String body = portalServer.arg("plain");
+    JsonDocument doc;
+    DeserializationError err = deserializeJson(doc, body);
+    
+    if (err) {
+      portalServer.send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
+      return;
+    }
+    
+    bool changed = false;
+    
+    if (doc.containsKey("sendIntervalSeconds")) {
+      int newInterval = doc["sendIntervalSeconds"].as<int>();
+      if (newInterval >= 5 && newInterval <= 300) {
+        setSendIntervalSeconds(newInterval);
+        changed = true;
+      }
+    }
+    
+    if (changed) {
+      portalServer.send(200, "application/json", "{\"success\":true}");
+    } else {
+      portalServer.send(400, "application/json", "{\"error\":\"No valid changes\"}");
+    }
+  } else {
+    portalServer.send(405, "application/json", "{\"error\":\"Method not allowed\"}");
+  }
 }
 
 void handleNotFound() {
@@ -129,6 +231,8 @@ void setupLocalWebServer() {
   portalServer.on("/", handleDashboard);
   portalServer.on("/api/current", handleApiCurrent);
   portalServer.on("/api/history", handleApiHistory);
+  portalServer.on("/api/config", HTTP_GET, handleApiConfig);
+  portalServer.on("/api/config", HTTP_POST, handleApiConfig);
   
   // Captive Portal: capturar todas las peticiones comunes de detección
   portalServer.on("/generate_204", handleCaptivePortal);          // Android

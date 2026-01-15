@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.20.0**
+## Versión Actual: **v2.21.0**
 
 **Fecha de lanzamiento**: 15 de enero de 2026  
 **Estado**: ✅ PRODUCCIÓN READY  
@@ -9,6 +9,31 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.21.0 - Gestión de Dispositivos + UI Sensores Mejorada (15/01/2026)
+
+**Nuevas Funcionalidades:**
+- 🧹 **Eliminar dispositivos duplicados (Firebase RTDB)**:
+  - Nueva función para limpiar dispositivos duplicados/huérfanos en RTDB
+  - Acción integrada en la UI de Sensores
+
+- 🧭 **UI Sensores reorganizada**:
+  - Layout en 2 columnas con dashboard de estadísticas
+  - Cards separadas para Telemetría, Emparejar y WiFi AP
+  - Device list mejorada con deviceName, apSsid e IP
+
+- 📈 **ESP32 histórico persistente + intervalo configurable**:
+  - Lecturas guardadas en LittleFS (hasta 20,000)
+  - Intervalo de lectura configurable desde panel local
+
+**Fixes Técnicos:**
+- ✅ Fix detección real-time sin throttling
+- ✅ Fix propagación de eventos en botón eliminar
+
+**Build PWA:**
+- ✅ Build local OK (apps/pwa)
+
+---
 
 ### v2.20.0 - ESP32 Dashboard Local + USB Detection + Mejoras UI (15/01/2026)
 
