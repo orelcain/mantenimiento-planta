@@ -281,6 +281,9 @@ static void ensureHttpServerStarted() {
     html += "</style></head><body>";
 
     if (showWifiConfig) {
+      html += "<div style='margin-bottom:12px'>";
+      html += "<a href='/?dash=1' style='display:inline-block;padding:10px 14px;background:#2563eb;color:#fff;border-radius:8px;text-decoration:none;font-weight:600'>Abrir dashboard</a>";
+      html += "</div>";
       html += "<h2>ESP32 - Configuración WiFi</h2>";
       html += "<p><small>Red AP: <b>" + WiFi.softAPSSID() + "</b> · IP: <b>" + WiFi.softAPIP().toString() + "</b></small></p>";
       html += "<form method='POST' action='/save'>";
@@ -322,10 +325,7 @@ static void ensureHttpServerStarted() {
       html += "<button type='submit'>Borrar WiFi guardados</button>";
       html += "</form>";
 
-      html += "<p style='margin-top:16px'>";
-      html += "<a href='/?dash=1'>Abrir dashboard</a> · ";
-      html += "<a href='/status.json'>Ver status JSON</a>";
-      html += "</p>";
+      html += "<p style='margin-top:16px'><a href='/status.json'>Ver status JSON</a></p>";
     } else {
       html += "<h2>ESP32 - Dashboard local</h2>";
       html += "<p><small>Tip: abre <code>/status.json</code> para JSON.</small></p>";
