@@ -19,6 +19,31 @@ extern String currentEquipmentId;
 
 // ============ HANDLERS HTTP ============
 
+// Página simple de captive portal (iOS/Android/Windows)
+static const char CAPTIVE_PORTAL_HTML[] PROGMEM = R"rawliteral(
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ESP32 - Portal</title>
+  <meta http-equiv="refresh" content="0; url=/" />
+  <style>
+    body{font-family:system-ui,Segoe UI,Arial;margin:20px}
+    a{color:#2563eb}
+  </style>
+</head>
+<body>
+  <p>Redirigiendo al panel local...</p>
+  <p><a href="/">Abrir panel</a></p>
+</body>
+</html>
+)rawliteral";
+
+static void handleCaptivePortal() {
+  portalServer.send_P(200, "text/html", CAPTIVE_PORTAL_HTML);
+}
+
 void handleDashboard() {
   portalServer.send_P(200, "text/html", HTML_DASHBOARD);
 }
@@ -84,8 +109,8 @@ void handleNotFound() {
   // Captive Portal: redirigir todo al dashboard
   // Esto hace que al conectarse al WiFi AP se abra automáticamente el navegador
   if (WiFi.getMode() & WIFI_MODE_AP) {
-    portalServer.sendHeader("Location", "http://192.168.4.1", true);
-    portalServer.send(302, "text/plain", "");
+    // Responder 200 para forzar detección de portal cautivo
+    handleCaptivePortal();
   } else {
     portalServer.send(404, "text/plain", "404 Not Found");
   }
@@ -100,14 +125,14 @@ void setupLocalWebServer() {
   portalServer.on("/api/history", handleApiHistory);
   
   // Captive Portal: capturar todas las peticiones comunes de detección
-  portalServer.on("/generate_204", handleDashboard);          // Android
-  portalServer.on("/gen_204", handleDashboard);               // Android
-  portalServer.on("/ncsi.txt", handleDashboard);              // Windows
-  portalServer.on("/hotspot-detect.html", handleDashboard);   // iOS/macOS
-  portalServer.on("/library/test/success.html", handleDashboard); // iOS (captive.apple.com)
-  portalServer.on("/canonical.html", handleDashboard);        // Firefox
-  portalServer.on("/success.txt", handleDashboard);           // Firefox
-  portalServer.on("/connecttest.txt", handleDashboard);       // Windows
+  portalServer.on("/generate_204", handleCaptivePortal);          // Android
+  portalServer.on("/gen_204", handleCaptivePortal);               // Android
+  portalServer.on("/ncsi.txt", handleCaptivePortal);              // Windows
+  portalServer.on("/hotspot-detect.html", handleCaptivePortal);   // iOS/macOS
+  portalServer.on("/library/test/success.html", handleCaptivePortal); // iOS (captive.apple.com)
+  portalServer.on("/canonical.html", handleCaptivePortal);        // Firefox
+  portalServer.on("/success.txt", handleCaptivePortal);           // Firefox
+  portalServer.on("/connecttest.txt", handleCaptivePortal);       // Windows
   
   portalServer.onNotFound(handleNotFound);
 
