@@ -262,9 +262,10 @@ static void ensureHttpServerStarted() {
     portalServer.send(200, "application/json", json);
   });
 
-  // Página principal: dashboard en STA; si portalActive o ?cfg=1, mostrar config WiFi.
+  // Página principal: si está en AP, mostrar config WiFi/AP. En STA, mostrar dashboard.
   portalServer.on("/", HTTP_GET, []() {
-    const bool showWifiConfig = portalActive || portalServer.hasArg("cfg");
+    const bool isApMode = (WiFi.getMode() & WIFI_MODE_AP);
+    const bool showWifiConfig = portalActive || isApMode || portalServer.hasArg("cfg");
 
     String html;
     html.reserve(3200);
