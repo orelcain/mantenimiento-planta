@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Cpu, Link2, Unlink2, AlertTriangle, Thermometer, Droplets, Activity, X, BarChart3, Wifi } from 'lucide-react'
+import { Cpu, Link2, Unlink2, AlertTriangle, Thermometer, Droplets, Activity, X, BarChart3, Wifi, Trash2 } from 'lucide-react'
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui'
 import { useAppStore, useAuthStore } from '@/store'
 import type { Equipment } from '@/types'
 import type { DeviceRow } from '@/services/devicesRtdb'
 import type { SensorSummaryNode } from '@/services/sensorsRtdb'
-import { assignDeviceToEquipment, subscribeDevices } from '@/services/devicesRtdb'
+import { assignDeviceToEquipment, subscribeDevices, deleteDevice } from '@/services/devicesRtdb'
 import { subscribeSensorSummary } from '@/services/sensorsRtdb'
 import { saveApConfig } from '@/services/apConfigRtdb'
 import { TelemetryChart, type ChartType } from '@/components/telemetry/TelemetryChart'
@@ -108,6 +108,9 @@ export function SensorsPage() {
   const [savingAp, setSavingAp] = useState(false)
   const [apSaveError, setApSaveError] = useState<string | null>(null)
   const [apSaveOk, setApSaveOk] = useState<string | null>(null)
+
+  // Estado para eliminar dispositivos
+  const [deletingDevice, setDeletingDevice] = useState<string | null>(null)
 
   // Estado para el gráfico de telemetría
   const [showChart, setShowChart] = useState(false)
@@ -341,6 +344,26 @@ export function SensorsPage() {
     }
   }
 
+  async function handleDeleteDevice(deviceId: string) {
+    if (!confirm(`¿Seguro que quieres eliminar el dispositivo ${deviceId}?\n\nEsta acción no se puede deshacer.`)) {
+      return
+    }
+
+    setDeletingDevice(deviceId)
+    try {
+      await deleteDevice(deviceId)
+      // Si era el dispositivo seleccionado, limpiar selección
+      if (deviceId === selectedDeviceId) {
+        setSelectedDeviceId('')
+      }
+    } catch (err) {
+      console.error('[SensorsPage] Error eliminando dispositivo:', err)
+      alert(err instanceof Error ? err.message : 'Error eliminando dispositivo')
+    } finally {
+      setDeletingDevice(null)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -453,50 +476,92 @@ export function SensorsPage() {
                       const assignedEquip = d.assignedEquipmentId 
                         ? equipment.find((e) => e.id === d.assignedEquipmentId)
                         : null
+                      const isDeleting = deletingDevice === d.deviceId
                       
                       return (
-                        <button
+                        <div
                           key={d.deviceId}
-                          type="button"
-                          onClick={() => setSelectedDeviceId(d.deviceId)}
-                          className={`w-full text-left rounded-lg border p-3 transition-all ${
+                          className={`rounded-lg border transition-all ${
                             isSelected 
                               ? 'border-primary bg-primary/5 shadow-sm' 
-                              : 'hover:bg-muted/40 hover:border-muted-foreground/20'
+                              : 'hover:border-muted-foreground/20'
                           }`}
                         >
-                          <div className="flex items-start justify-between gap-2 mb-2">
-                            <div className="flex-1 min-w-0">
-                              <div className="font-mono text-sm font-medium truncate">
-                                {d.deviceId}
+                          <button
+                            type="button"
+                            onClick={() => setSelectedDeviceId(d.deviceId)}
+                            disabled={isDeleting}
+                            className="w-full text-left p-3"
+                          >
+                            <div className="flex items-start justify-between gap-2 mb-2">
+                              <div className="flex-1 min-w-0">
+                                <div className="font-mono text-xs font-medium truncate text-muted-foreground mb-1">
+                                  {d.deviceId}
+                                </div>
+                                {d.deviceName && (
+                                  <div className="text-sm font-medium">{d.deviceName}</div>
+                                )}
+                                {d.apSsid && (
+                                  <div className="text-xs text-muted-foreground mt-1">
+                                    📶 {d.apSsid}
+                                  </div>
+                                )}
                               </div>
+                              {onlineBadge(Boolean(d.online))}
                             </div>
-                            {onlineBadge(Boolean(d.online))}
+
+                            {assignedEquip && (
+                              <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-950/20 rounded text-xs">
+                                <div className="font-medium text-blue-900 dark:text-blue-100">
+                                  {assignedEquip.nombre}
+                                </div>
+                                <div className="text-blue-600 dark:text-blue-400 mt-0.5">
+                                  {assignedEquip.codigo}
+                                </div>
+                              </div>
+                            )}
+
+                            {!assignedEquip && (
+                              <div className="mt-2 text-xs">
+                                <Badge variant="secondary" className="text-amber-600">
+                                  Sin asignar
+                                </Badge>
+                              </div>
+                            )}
+
+                            <div className="mt-2 flex items-center justify-between gap-2">
+                              <div className="text-xs text-muted-foreground">
+                                {lastSeen ? formatDateTime(lastSeen) : 'Sin reporte'}
+                              </div>
+                              {d.ip && (
+                                <div className="text-xs text-muted-foreground">
+                                  {d.ip}
+                                </div>
+                              )}
+                            </div>
+                          </button>
+                          
+                          {/* Botón de eliminar */}
+                          <div className="px-3 pb-3 pt-0">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteDevice(d.deviceId)}
+                              disabled={isDeleting}
+                              className="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
+                            >
+                              {isDeleting ? (
+                                <>Eliminando...</>
+                              ) : (
+                                <>
+                                  <Trash2 className="h-3 w-3 mr-2" />
+                                  Eliminar dispositivo
+                                </>
+                              )}
+                            </Button>
                           </div>
-
-                          {assignedEquip && (
-                            <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-950/20 rounded text-xs">
-                              <div className="font-medium text-blue-900 dark:text-blue-100">
-                                {assignedEquip.nombre}
-                              </div>
-                              <div className="text-blue-600 dark:text-blue-400 mt-0.5">
-                                {assignedEquip.codigo}
-                              </div>
-                            </div>
-                          )}
-
-                          {!assignedEquip && (
-                            <div className="mt-2 text-xs">
-                              <Badge variant="secondary" className="text-amber-600">
-                                Sin asignar
-                              </Badge>
-                            </div>
-                          )}
-
-                          <div className="mt-2 text-xs text-muted-foreground">
-                            {lastSeen ? formatDateTime(lastSeen) : 'Sin reporte'}
-                          </div>
-                        </button>
+                        </div>
                       )
                     })}
                   </div>

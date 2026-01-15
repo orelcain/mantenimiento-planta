@@ -2,6 +2,7 @@ import {
   onValue,
   ref,
   update,
+  remove,
   type DataSnapshot,
 } from 'firebase/database'
 import { rtdb } from './firebase'
@@ -16,6 +17,10 @@ export type DeviceNode = {
   assignedEquipmentId?: string | null
   assignmentUpdatedAt?: number
   assignmentUpdatedBy?: string
+  apSsid?: string
+  apIp?: string
+  deviceName?: string
+  mdns?: string
   telemetry?: {
     temperatura?: {
       value?: number
@@ -120,4 +125,15 @@ export async function assignDeviceToEquipment(params: {
     assignmentUpdatedAt: Date.now(),
     assignmentUpdatedBy: params.userId,
   })
+}
+
+/**
+ * Elimina un dispositivo de Firebase RTDB.
+ * Útil para limpiar dispositivos obsoletos o duplicados.
+ */
+export async function deleteDevice(deviceId: string): Promise<void> {
+  const path = `devices/${deviceId}`
+  const r = ref(rtdb, path)
+  await remove(r)
+  console.log(`[devicesRtdb] Dispositivo eliminado: ${deviceId}`)
 }
