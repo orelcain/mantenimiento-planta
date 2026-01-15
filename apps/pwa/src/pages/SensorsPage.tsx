@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Cpu, Link2, Unlink2, AlertTriangle, Thermometer, Droplets, Activity, X, BarChart3, Wifi, Trash2 } from 'lucide-react'
-import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui'
+import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui'
 import { useAppStore, useAuthStore } from '@/store'
 import type { Equipment } from '@/types'
 import type { DeviceRow } from '@/services/devicesRtdb'

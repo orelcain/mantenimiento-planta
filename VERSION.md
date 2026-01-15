@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.16.12**
+## Versión Actual: **v2.17.0**
 
 **Fecha de lanzamiento**: 14 de enero de 2026  
 **Estado**: ✅ PRODUCCIÓN READY  
@@ -9,6 +9,33 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.17.0 - UI Sensores Mejorada + Delete Devices (14/01/2026)
+
+**Mejoras Principales:**
+- 🗑️ **Eliminar Dispositivos**: nueva función para eliminar dispositivos duplicados desde la PWA con confirmación.
+- 📊 **Dashboard Estadísticas**: cards con totales (dispositivos, online, asignados) en vista principal.
+- 🎨 **UI Reorganizada**: layout de 2 columnas (lista de dispositivos 380px + detalles flex).
+- 🃏 **Cards Separadas**: UI modular con cards para Telemetría, Emparejar y WiFi AP.
+- ⚡ **Fix Detección**: eliminado throttling de 2 segundos que bloqueaba actualizaciones real-time.
+- 🔍 **Device Info**: lista mejorada mostrando deviceName, apSsid, IP, lastSeen para identificación visual.
+- 🐛 **Fix Propagación**: botón eliminar con stopPropagation para evitar selección accidental.
+
+**Mejoras Técnicas:**
+- Logs de debug extensivos en `subscribeDevices()` para diagnóstico
+- Error messages con troubleshooting steps (autenticación, reglas RTDB, ESP32)
+- Función `deleteDevice(deviceId)` usando Firebase `remove()`
+- Estado `deletingDevice` para feedback visual durante eliminación
+- Interfaz `DeviceNode` extendida: +apSsid, +apIp, +deviceName, +mdns
+
+**Archivos Modificados:**
+- `apps/pwa/src/services/devicesRtdb.ts`: +deleteDevice(), sin throttling, +logs
+- `apps/pwa/src/pages/SensorsPage.tsx`: UI completa rediseñada + función eliminar
+
+**Flujo Eliminar:**
+PWA (botón) → confirmación → deleteDevice(id) → Firebase remove() → actualización real-time
+
+---
 
 ### v2.16.12 - Config AP Remota ESP32 (14/01/2026)
 
