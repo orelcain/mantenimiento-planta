@@ -20,6 +20,7 @@
 #include <WebServer.h>
 #include <DNSServer.h>
 #include <LittleFS.h>
+#include <ESPmDNS.h>
 
 // Config local (no versionada) / config de ejemplo (versionada)
 #if __has_include("config.h")
@@ -47,12 +48,23 @@ static void stopConfigPortal();
 static void handleConfigPortalLoop();
 static void initAfterWifiOnce();
 
+static void ensureHttpServerStarted();
+static void ensureHttpServerListening();
+static void ensureAlwaysOnAp();
+static void loadLocalSettings();
+static String getApSsid();
+static uint16_t getRamBacklogCount();
+
+static void saveWifiNetworksToPrefs(const String* ssids, const String* passes, uint8_t count);
+static void clearWifiNetworksFromPrefs();
+
 static String getDeviceId();
 static void loadEquipmentId();
 static void persistEquipmentId(const String& equipmentId);
 static bool hasAssignedEquipment();
 static void sendDeviceStatus(bool online);
 static void startDeviceAssignmentStream();
+static void startApConfigStream();
 static void setEquipmentOnlineFor(const String& equipmentId, bool online);
 
 static void printDhtPinState(const char* context);
@@ -111,9 +123,290 @@ static String savedWifiSsid[WIFI_MAX_NETWORKS];
 static String savedWifiPass[WIFI_MAX_NETWORKS];
 static uint8_t savedWifiCount = 0;
 
+static bool httpServerStarted = false;
+static bool httpServerListening = false;
+
+// Dashboard / AP settings (Preferences)
+static bool apAlwaysOn = false;
+static String apSsidCustom;
+static String apPassword;
+static String deviceName;
+
 static bool fsReady = false;
 static uint32_t backlogOffset = 0;
 static uint32_t backlogSentSinceSave = 0;
+static bool flashBacklogHasFile = false;
+
+// Última lectura (para dashboard local)
+static uint64_t lastReadingTs = 0;
+static float lastTemperature = NAN;
+static float lastHumidity = NAN;
+static bool lastSimulated = false;
+static String lastTempStatus;
+static String lastHumStatus;
+
+static String staHostname;
+static bool mdnsStarted = false;
+
+static void loadLocalSettings() {
+  prefs.begin("iot", false);
+  apAlwaysOn = prefs.getBool("apAlways", true);  // TRUE por defecto: AP siempre activo
+  apSsidCustom = prefs.getString("apName", "");
+  apPassword = prefs.getString("apPass", "");
+  deviceName = prefs.getString("devName", "");
+  
+  // LIMPIEZA: Si apName contiene SSID de WiFi conocida, borrarlo
+  if (apSsidCustom.indexOf("vivo") >= 0 || apSsidCustom.indexOf("iPhone") >= 0 || apSsidCustom.indexOf("Movistar") >= 0) {
+    Serial.printf("⚠️  apName contiene SSID WiFi erróneo: '%s'. Limpiando...\n", apSsidCustom.c_str());
+    apSsidCustom = "";
+    prefs.putString("apName", "");
+  }
+  prefs.end();
+
+  apSsidCustom.trim();
+  apPassword.trim();
+  deviceName.trim();
+
+  Serial.printf("⚙️  Config AP: apAlwaysOn=%s, SSID='%s', pass=%s, alias='%s'\n",
+    apAlwaysOn ? "true" : "false",
+    apSsidCustom.length() ? apSsidCustom.c_str() : "(auto)",
+    apPassword.length() >= 8 ? "protegido" : "abierto",
+    deviceName.length() ? deviceName.c_str() : "(sin alias)"
+  );
+}
+
+static String getApSsid() {
+  if (apSsidCustom.length() > 0) return apSsidCustom;
+  return String("ESP32-") + (deviceId.length() ? deviceId : String("CONFIG"));
+}
+
+static void ensureAlwaysOnAp() {
+  if (!apAlwaysOn) {
+    Serial.println("📡 AP desactivado (apAlwaysOn=false)");
+    return;
+  }
+
+  Serial.println("📡 Activando AP siempre encendido (modo AP+STA)...");
+
+  // En modo dual, el canal del AP lo determina la red STA conectada.
+  wifi_mode_t mode = WiFi.getMode();
+  if (mode != WIFI_AP_STA) {
+    WiFi.mode(WIFI_AP_STA);
+    delay(50);
+  }
+
+  const String ssid = getApSsid();
+  const bool passOk = (apPassword.length() >= 8);
+  if (passOk) {
+    WiFi.softAP(ssid.c_str(), apPassword.c_str());
+    Serial.printf("✓ AP activo: %s (WPA2 protegido)\n", ssid.c_str());
+  } else {
+    WiFi.softAP(ssid.c_str());
+    Serial.printf("✓ AP activo: %s (abierto - sin contraseña)\n", ssid.c_str());
+  }
+  Serial.printf("   IP del AP: %s\n", WiFi.softAPIP().toString().c_str());
+}
+
+static void ensureHttpServerStarted() {
+  if (httpServerStarted) return;
+  httpServerStarted = true;
+
+  // Endpoint: estado en JSON
+  portalServer.on("/status.json", HTTP_GET, []() {
+    String json;
+    json.reserve(900);
+    json += "{";
+    json += "\"deviceId\":\"" + deviceId + "\",";
+    json += "\"deviceName\":\"" + deviceName + "\",";
+    json += "\"assignedEquipmentId\":\"" + (hasAssignedEquipment() ? currentEquipmentId : String("")) + "\",";
+    json += "\"wifiConnected\":" + String(WiFi.status() == WL_CONNECTED ? "true" : "false") + ",";
+    json += "\"ssid\":\"" + WiFi.SSID() + "\",";
+    json += "\"ip\":\"" + WiFi.localIP().toString() + "\",";
+    json += "\"rssi\":" + String(WiFi.status() == WL_CONNECTED ? WiFi.RSSI() : 0) + ",";
+    json += "\"portalActive\":" + String(portalActive ? "true" : "false") + ",";
+    json += "\"apAlwaysOn\":" + String(apAlwaysOn ? "true" : "false") + ",";
+    json += "\"apSsid\":\"" + WiFi.softAPSSID() + "\",";
+    json += "\"apIp\":\"" + WiFi.softAPIP().toString() + "\",";
+    json += "\"lastReadingTs\":" + String((double)lastReadingTs, 0) + ",";
+    json += "\"temperature\":" + String(isnan(lastTemperature) ? 0.0 : lastTemperature, 2) + ",";
+    json += "\"humidity\":" + String(isnan(lastHumidity) ? 0.0 : lastHumidity, 2) + ",";
+    json += "\"tempStatus\":\"" + lastTempStatus + "\",";
+    json += "\"humStatus\":\"" + lastHumStatus + "\",";
+    json += "\"source\":\"" + String(lastSimulated ? "simulated" : "dht11") + "\",";
+    json += "\"ramBacklogCount\":" + String((unsigned)getRamBacklogCount()) + ",";
+    json += "\"flashBacklogOffset\":" + String((unsigned long)backlogOffset) + ",";
+    json += "\"flashBacklogReady\":" + String(fsReady ? "true" : "false");
+    json += "}";
+
+    portalServer.send(200, "application/json", json);
+  });
+
+  // Página principal: dashboard en STA; si portalActive o ?cfg=1, mostrar config WiFi.
+  portalServer.on("/", HTTP_GET, []() {
+    const bool showWifiConfig = portalActive || portalServer.hasArg("cfg");
+
+    String html;
+    html.reserve(3200);
+    html += "<!doctype html><html><head><meta charset='utf-8'>";
+    html += "<meta name='viewport' content='width=device-width,initial-scale=1'>";
+    html += "<title>ESP32</title>";
+    html += "<style>body{font-family:system-ui,Segoe UI,Arial;margin:16px;max-width:820px}";
+    html += "input{width:100%;padding:10px;margin:6px 0}button{padding:10px 14px;margin-top:10px}";
+    html += ".row{margin:10px 0;padding:10px;border:1px solid #ddd;border-radius:10px}";
+    html += ".kv{display:grid;grid-template-columns:180px 1fr;gap:8px;align-items:center}";
+    html += "small{color:#666}code{background:#f3f3f3;padding:2px 6px;border-radius:6px}";
+    html += "</style></head><body>";
+
+    if (showWifiConfig) {
+      html += "<h2>ESP32 - Configuración WiFi</h2>";
+      html += "<p><small>Red AP: <b>" + WiFi.softAPSSID() + "</b> · IP: <b>" + WiFi.softAPIP().toString() + "</b></small></p>";
+      html += "<form method='POST' action='/save'>";
+      html += "<p>Ingresa hasta " + String(WIFI_MAX_NETWORKS) + " redes (SSID + clave). Se guardan en el ESP32.</p>";
+
+      for (uint8_t i = 0; i < WIFI_MAX_NETWORKS; i++) {
+        html += "<div class='row'>";
+        html += "<label>SSID " + String(i + 1) + "</label>";
+        html += "<input name='ssid" + String(i + 1) + "' placeholder='Nombre WiFi' value='";
+        if (i < savedWifiCount) html += savedWifiSsid[i];
+        html += "'>";
+        html += "<label>Clave " + String(i + 1) + "</label>";
+        html += "<input name='pass" + String(i + 1) + "' type='password' placeholder='Contraseña' value='";
+        if (i < savedWifiCount) html += savedWifiPass[i];
+        html += "'>";
+        html += "</div>";
+      }
+
+      html += "<div class='row'>";
+      html += "<h3>Acceso local (AP)</h3>";
+      html += "<label>SSID del AP (opcional)</label>";
+      html += "<input name='apName' placeholder='Ej: Mantenimiento-ESP32' value='" + apSsidCustom + "'>";
+      html += "<label>Clave del AP (opcional, >= 8 chars para WPA2)</label>";
+      html += "<input name='apPass' type='password' placeholder='(vacío = abierta)' value='" + apPassword + "'>";
+      html += "<label><input type='checkbox' name='apAlways' value='1'";
+      if (apAlwaysOn) html += " checked";
+      html += "> Mantener AP encendido siempre (AP+STA)</label>";
+      html += "</div>";
+
+      html += "<div class='row'>";
+      html += "<h3>Nombre del dispositivo</h3>";
+      html += "<label>Alias (opcional)</label>";
+      html += "<input name='devName' placeholder='Ej: Sensor horno 1' value='" + deviceName + "'>";
+      html += "</div>";
+
+      html += "<button type='submit'>Guardar y reiniciar</button>";
+      html += "</form>";
+      html += "<form method='POST' action='/clear' style='margin-top:14px'>";
+      html += "<button type='submit'>Borrar WiFi guardados</button>";
+      html += "</form>";
+
+      html += "<p style='margin-top:16px'><a href='/status.json'>Ver status JSON</a></p>";
+    } else {
+      html += "<h2>ESP32 - Dashboard local</h2>";
+      html += "<p><small>Tip: abre <code>/status.json</code> para JSON.</small></p>";
+      html += "<div class='row kv'>";
+      html += "<div><b>Device ID</b></div><div><code>" + deviceId + "</code></div>";
+      html += "<div><b>Nombre</b></div><div>" + (deviceName.length() ? deviceName : String("(sin alias)")) + "</div>";
+      html += "<div><b>Equipo asignado</b></div><div><code>" + (hasAssignedEquipment() ? currentEquipmentId : String("(ninguno)")) + "</code></div>";
+      html += "<div><b>WiFi</b></div><div>" + String(WiFi.status() == WL_CONNECTED ? "conectado" : "offline") + "</div>";
+      html += "<div><b>SSID</b></div><div><code>" + WiFi.SSID() + "</code></div>";
+      html += "<div><b>IP</b></div><div><code>" + WiFi.localIP().toString() + "</code></div>";
+      html += "<div><b>RSSI</b></div><div><code>" + String(WiFi.status() == WL_CONNECTED ? WiFi.RSSI() : 0) + " dBm</code></div>";
+      html += "<div><b>mDNS</b></div><div><code>" + staHostname + ".local</code></div>";
+      html += "<div><b>AP</b></div><div><code>" + WiFi.softAPSSID() + "</code> @ <code>" + WiFi.softAPIP().toString() + "</code></div>";
+      html += "</div>";
+
+      html += "<div class='row kv'>";
+      html += "<div><b>Temperatura</b></div><div><code>" + String(lastTemperature, 2) + "</code> (" + lastTempStatus + ")</div>";
+      html += "<div><b>Humedad</b></div><div><code>" + String(lastHumidity, 2) + "</code> (" + lastHumStatus + ")</div>";
+      html += "<div><b>Fuente</b></div><div>" + String(lastSimulated ? "simulada" : "DHT11") + "</div>";
+      html += "</div>";
+
+      html += "<div class='row kv'>";
+      html += "<div><b>Backlog RAM</b></div><div><code>" + String((unsigned)getRamBacklogCount()) + "</code></div>";
+      html += "<div><b>Backlog Flash</b></div><div><code>" + String(fsReady ? "OK" : "NO") + "</code> (offset <code>" + String((unsigned long)backlogOffset) + "</code>)</div>";
+      html += "</div>";
+
+      html += "<p><a href='/wifi'>Config WiFi/AP</a> · <a href='/status.json'>status.json</a></p>";
+    }
+
+    html += "</body></html>";
+    portalServer.send(200, "text/html", html);
+  });
+
+  // Configuración (disponible también en STA)
+  portalServer.on("/wifi", HTTP_GET, []() {
+    portalServer.sendHeader("Location", String("/") + "?cfg=1", true);
+    portalServer.send(302, "text/plain", "");
+  });
+
+  portalServer.on("/save", HTTP_POST, []() {
+    String ssids[WIFI_MAX_NETWORKS];
+    String passes[WIFI_MAX_NETWORKS];
+    uint8_t count = 0;
+
+    for (uint8_t i = 0; i < WIFI_MAX_NETWORKS; i++) {
+      String s = portalServer.arg(String("ssid") + String(i + 1));
+      String p = portalServer.arg(String("pass") + String(i + 1));
+      s.trim();
+      if (s.length() == 0) continue;
+      if (count >= WIFI_MAX_NETWORKS) break;
+      ssids[count] = s;
+      passes[count] = p;
+      count++;
+    }
+
+    String apName = portalServer.arg("apName");
+    String apPass = portalServer.arg("apPass");
+    String devName = portalServer.arg("devName");
+    const bool apAlways = portalServer.hasArg("apAlways");
+
+    apName.trim();
+    apPass.trim();
+    devName.trim();
+
+    saveWifiNetworksToPrefs(ssids, passes, count);
+
+    prefs.begin("iot", false);
+    prefs.putBool("apAlways", apAlways);
+    prefs.putString("apName", apName);
+    prefs.putString("apPass", apPass);
+    prefs.putString("devName", devName);
+    prefs.end();
+
+    portalServer.send(200, "text/html",
+      "<html><body><h3>Guardado.</h3><p>Reiniciando...</p></body></html>");
+    delay(800);
+    ESP.restart();
+  });
+
+  portalServer.on("/clear", HTTP_POST, []() {
+    clearWifiNetworksFromPrefs();
+    portalServer.send(200, "text/html",
+      "<html><body><h3>WiFi borrados.</h3><p>Reiniciando...</p></body></html>");
+    delay(800);
+    ESP.restart();
+  });
+
+  // En portalActive, redirigir todo a '/'
+  portalServer.onNotFound([]() {
+    if (portalActive) {
+      portalServer.sendHeader("Location", String("http://") + WiFi.softAPIP().toString(), true);
+      portalServer.send(302, "text/plain", "");
+      return;
+    }
+    portalServer.send(404, "text/plain", "Not found");
+  });
+
+}
+
+static void ensureHttpServerListening() {
+  // Importante: llamar esto solo DESPUÉS de que WiFi/AP haya inicializado la pila TCP/IP.
+  // Si se llama demasiado temprano, lwIP puede assertar (Invalid mbox).
+  if (!httpServerStarted) ensureHttpServerStarted();
+  if (httpServerListening) return;
+  httpServerListening = true;
+  portalServer.begin();
+}
 
 // Declarado más abajo (variables de estado), pero usado por helpers de buffer.
 extern bool firebaseReady;
@@ -159,6 +452,10 @@ static uint16_t readingTail = 0;
 static uint16_t readingCount = 0;
 static uint32_t bufferedDrops = 0;
 
+static uint16_t getRamBacklogCount() {
+  return readingCount;
+}
+
 static void bufferReading(
   const String& equipmentId,
   uint64_t timestampMs,
@@ -175,8 +472,10 @@ static void bufferReading(
 
   // 1) Intentar persistir en flash (sobrevive reinicio)
   if (fsReady) {
-    File f = LittleFS.open(BACKLOG_FILE_PATH, FILE_APPEND);
+    // Usar modo explícito "a" para asegurar creación si no existe.
+    File f = LittleFS.open(BACKLOG_FILE_PATH, "a");
     if (f) {
+      flashBacklogHasFile = true;
       char line[160];
       // ts,temp,hum,tempStatus,humStatus,source,equipmentId
       // status: 0/1/2, source: 0/1
@@ -198,6 +497,10 @@ static void bufferReading(
       f.close();
       return; // Persistido: no duplicar en RAM
     }
+
+    // Si falló, no insistir en cada lectura (evita spam del VFS). Caemos a RAM.
+    fsReady = false;
+    flashBacklogHasFile = false;
   }
 
   // 2) Fallback: guardar en RAM
@@ -337,9 +640,18 @@ static void flushBacklogFromFlash() {
   if (!firebaseReady) return;
   if (WiFi.status() != WL_CONNECTED) return;
 
-  if (!LittleFS.exists(BACKLOG_FILE_PATH)) return;
+  // Importante: NO usar LittleFS.exists() en cada loop cuando el archivo no existe,
+  // porque el VFS spamea logs de error. Sólo intentamos abrir si sabemos que hay backlog.
+  if (!flashBacklogHasFile && backlogOffset == 0) return;
   File f = LittleFS.open(BACKLOG_FILE_PATH, FILE_READ);
-  if (!f) return;
+  if (!f) {
+    // Si el FS montó pero no permite abrir, evitamos insistir en cada loop.
+    fsReady = false;
+    flashBacklogHasFile = false;
+    backlogOffset = 0;
+    saveBacklogOffset();
+    return;
+  }
 
   const size_t size = f.size();
   if (backlogOffset >= size) {
@@ -347,6 +659,7 @@ static void flushBacklogFromFlash() {
     LittleFS.remove(BACKLOG_FILE_PATH);
     backlogOffset = 0;
     saveBacklogOffset();
+    flashBacklogHasFile = false;
     return;
   }
 
@@ -412,10 +725,12 @@ static void flushBacklogFromFlash() {
     backlogOffset = 0;
     saveBacklogOffset();
     backlogSentSinceSave = 0;
+    flashBacklogHasFile = false;
   } else {
     // Persistir offset al menos una vez por flush
     saveBacklogOffset();
     backlogSentSinceSave = 0;
+    flashBacklogHasFile = true;
   }
 }
 
@@ -480,11 +795,15 @@ static unsigned long lastDeviceStatusMs = 0;
 static unsigned long lastStreamReadMs = 0;
 
 static String getDeviceId() {
-  // MAC sin ':' para usarla como key en RTDB
-  String mac = WiFi.macAddress();
-  mac.replace(":", "");
-  mac.toUpperCase();
-  return mac;
+  // MAC sin ':' para usarla como key en RTDB.
+  // Ojo: WiFi.macAddress() puede tocar la pila TCP/IP y crashear si WiFi aún no está inicializado.
+  const uint64_t efuseMac = ESP.getEfuseMac();
+  const uint16_t macHigh = (uint16_t)(efuseMac >> 32);
+  const uint32_t macLow = (uint32_t)(efuseMac & 0xFFFFFFFFULL);
+
+  char out[13];
+  snprintf(out, sizeof(out), "%04X%08X", macHigh, macLow);
+  return String(out);
 }
 
 static bool looksLikePlaceholder(const String& s) {
@@ -560,9 +879,14 @@ static void sendDeviceStatus(bool online) {
   json.set("lastSeen", (double)getTimestamp());
   json.set("ip", WiFi.localIP().toString());
   json.set("rssi", WiFi.RSSI());
+  json.set("mdns", staHostname.length() ? (staHostname + ".local") : "");
+  json.set("deviceName", deviceName);
   json.set("firmwareVersion", "2.14.0");
   json.set("sensorType", "dht11");
   json.set("assignedEquipmentId", hasAssignedEquipment() ? currentEquipmentId : "");
+  json.set("apAlwaysOn", apAlwaysOn);
+  json.set("apSsid", WiFi.softAPSSID());
+  json.set("apIp", WiFi.softAPIP().toString());
 
   String path;
   path.reserve(64);
@@ -632,6 +956,82 @@ static void startDeviceAssignmentStream() {
   Serial.printf("👂 Escuchando asignación en: %s\n", path.c_str());
 }
 
+static FirebaseData apConfigStream;
+
+static void apConfigStreamCallback(FirebaseStream data) {
+  if (data.dataTypeEnum() == fb_esp_rtdb_data_type_json) {
+    FirebaseJson json;
+    json.setJsonData(data.stringData());
+
+    FirebaseJsonData enabled, ssid, password;
+    json.get(enabled, "enabled");
+    json.get(ssid, "ssid");
+    json.get(password, "password");
+
+    bool newApEnabled = enabled.success ? enabled.to<bool>() : true;
+    String newSsid = ssid.success ? ssid.to<String>() : "";
+    String newPass = password.success ? password.to<String>() : "";
+    newSsid.trim();
+    newPass.trim();
+
+    Serial.printf("📡 Config AP recibida desde Firebase: enabled=%s, ssid='%s', pass=%s\n",
+      newApEnabled ? "true" : "false",
+      newSsid.length() ? newSsid.c_str() : "(auto)",
+      newPass.length() >= 8 ? "protegido" : "abierto"
+    );
+
+    // Guardar en Preferences
+    prefs.begin("iot", false);
+    prefs.putBool("apAlways", newApEnabled);
+    if (newSsid.length() > 0) {
+      prefs.putString("apName", newSsid);
+    } else {
+      prefs.remove("apName");
+    }
+    if (newPass.length() >= 8) {
+      prefs.putString("apPass", newPass);
+    } else {
+      prefs.remove("apPass");
+    }
+    prefs.end();
+
+    // Aplicar cambios
+    apAlwaysOn = newApEnabled;
+    apSsidCustom = newSsid;
+    apPassword = newPass;
+
+    Serial.println("✓ Config AP actualizada. Reiniciando AP...");
+    WiFi.softAPdisconnect(true);
+    delay(500);
+    ensureAlwaysOnAp();
+  }
+}
+
+static void apConfigStreamTimeoutCallback(bool timeout) {
+  if (timeout) {
+    Serial.println("⚠ Stream apConfig timeout (se reconecta automáticamente).");
+  }
+}
+
+static void startApConfigStream() {
+  if (!firebaseReady) return;
+  if (deviceId.length() == 0) return;
+
+  String path;
+  path.reserve(80);
+  path = "devices/";
+  path += deviceId;
+  path += "/apConfig";
+
+  if (!Firebase.RTDB.beginStream(&apConfigStream, path.c_str())) {
+    Serial.printf("⚠ No se pudo iniciar stream apConfig: %s\n", apConfigStream.errorReason().c_str());
+    return;
+  }
+
+  Firebase.RTDB.setStreamCallback(&apConfigStream, apConfigStreamCallback, apConfigStreamTimeoutCallback);
+  Serial.printf("👂 Escuchando config AP en: %s\n", path.c_str());
+}
+
 static void printDhtPinState(const char* context) {
   // El DHT normalmente deja la línea en HIGH (pull-up). Si queda siempre LOW,
   // suele ser corto a GND / pinout incorrecto / sensor trabado.
@@ -673,6 +1073,21 @@ void setup() {
   Serial.println("║  Temperatura y Humedad en Tiempo Real ║");
   Serial.println("╚════════════════════════════════════════╝");
   Serial.println();
+
+  Serial.printf("🧱 Build: %s %s\n", __DATE__, __TIME__);
+  Serial.println();
+
+  // ⚠️ SOLO ESTA VEZ: Borrar Preferences para forzar nuevo default apAlwaysOn=true
+  // Borra esta sección después de flashear una vez
+  #define FORCE_RESET_AP_ALWAYS_ON_DEFAULT true
+  #if FORCE_RESET_AP_ALWAYS_ON_DEFAULT
+  {
+    Serial.println("🔄 RESET: Borrando Preferences para forzar apAlwaysOn=true por defecto");
+    prefs.begin("iot", false);
+    prefs.remove("apAlways");  // Solo borra este flag, mantiene WiFi/nombres
+    prefs.end();
+  }
+  #endif
   
   // Configurar LED
   pinMode(LED_PIN, OUTPUT);
@@ -706,11 +1121,64 @@ void setup() {
     deviceId = getDeviceId();
   }
 
+  // Settings locales (AP/alias)
+  loadLocalSettings();
+
+  // Servidor HTTP siempre listo (dashboard + config)
+  ensureHttpServerStarted();
+
   // LittleFS para backlog persistente
-  fsReady = LittleFS.begin(true);
+  // Montar sobre la partición típica "spiffs" (esquema por defecto en ESP32)
+  // para evitar problemas cuando no existe una partición etiquetada como "littlefs".
+  fsReady = LittleFS.begin(true, "/littlefs", 10, "spiffs");
   if (fsReady) {
-    loadBacklogOffset();
-    Serial.println("💾 LittleFS listo (backlog persistente habilitado)");
+    // Validar que sea escribible (en algunos setups puede montar pero no permitir creación).
+    bool canCreate = true;
+
+    // Crear un archivo temporal para probar escritura sin tocar backlog.csv
+    {
+      File createTest = LittleFS.open("/.writetest", "w");
+      if (createTest) {
+        createTest.close();
+        LittleFS.remove("/.writetest");
+      } else {
+        canCreate = false;
+      }
+    }
+
+    if (!canCreate) {
+      Serial.println("⚠ LittleFS montó pero no permite crear archivos. Intentando formatear...");
+      LittleFS.end();
+      LittleFS.format();
+      fsReady = LittleFS.begin(true, "/littlefs", 10, "spiffs");
+
+      if (fsReady) {
+        File createTest = LittleFS.open("/.writetest", "w");
+        if (createTest) {
+          createTest.close();
+          LittleFS.remove("/.writetest");
+        } else {
+          fsReady = false;
+        }
+      }
+    }
+
+    if (fsReady) {
+      loadBacklogOffset();
+      // Detectar backlog existente una sola vez (evita spameo; no usar exists() en loop).
+      flashBacklogHasFile = false;
+      {
+        File backlogProbe = LittleFS.open(BACKLOG_FILE_PATH, FILE_READ);
+        if (backlogProbe) {
+          const size_t sz = backlogProbe.size();
+          flashBacklogHasFile = (sz > 0 && backlogOffset < sz);
+          backlogProbe.close();
+        }
+      }
+      Serial.println("💾 LittleFS listo (backlog persistente habilitado)");
+    } else {
+      Serial.println("⚠ LittleFS no es escribible (backlog persistente deshabilitado; usando RAM)");
+    }
   } else {
     Serial.println("⚠ No se pudo inicializar LittleFS (backlog persistente deshabilitado)");
   }
@@ -722,6 +1190,8 @@ void setup() {
   if (!wifiOk) {
     Serial.println("⚠ No hay WiFi. Iniciando portal de configuración...");
     startConfigPortal();
+  } else {
+    ensureAlwaysOnAp();
   }
 
   // Inicialización dependiente de WiFi (Firebase/NTP) se hace aquí o luego en loop
@@ -756,7 +1226,7 @@ bool connectWiFi() {
   const size_t networkCount = sizeof(networks) / sizeof(networks[0]);
 
   auto beginWifi = []() {
-    WiFi.mode(WIFI_STA);
+    WiFi.mode(apAlwaysOn ? WIFI_AP_STA : WIFI_STA);
     WiFi.setAutoReconnect(true);
     WiFi.persistent(false);
     WiFi.disconnect(true, true);
@@ -780,6 +1250,9 @@ bool connectWiFi() {
   };
 
   beginWifi();
+
+  // Si el usuario quiere AP siempre activo, levantarlo ya.
+  ensureAlwaysOnAp();
 
   // Construir lista final de redes: primero las guardadas en Preferences, luego las de compile-time.
   String ssids[WIFI_MAX_NETWORKS];
@@ -874,6 +1347,8 @@ bool connectWiFi() {
       Serial.print("  Device ID: ");
       Serial.println(deviceId);
     }
+
+    ensureAlwaysOnAp();
     return true;
   }
 
@@ -886,90 +1361,24 @@ static void startConfigPortal() {
   if (portalActive) return;
   portalActive = true;
 
-  const String apSsid = String("ESP32-") + (deviceId.length() ? deviceId : String("CONFIG"));
+  ensureHttpServerStarted();
+
+  const String apSsid = getApSsid();
   WiFi.mode(WIFI_AP);
   // Canal fijo para mejorar visibilidad; red visible (hidden=false)
-  WiFi.softAP(apSsid.c_str(), nullptr, 1, 0);
+  const bool passOk = (apPassword.length() >= 8);
+  if (passOk) {
+    WiFi.softAP(apSsid.c_str(), apPassword.c_str(), 1, 0);
+  } else {
+    WiFi.softAP(apSsid.c_str(), nullptr, 1, 0);
+  }
   delay(200);
+
+  ensureHttpServerListening();
 
   IPAddress ip = WiFi.softAPIP();
   dnsServer.start(53, "*", ip);
 
-  portalServer.on("/", HTTP_GET, []() {
-    String html;
-    html.reserve(2400);
-    html += "<!doctype html><html><head><meta charset='utf-8'>";
-    html += "<meta name='viewport' content='width=device-width,initial-scale=1'>";
-    html += "<title>Config WiFi</title>";
-    html += "<style>body{font-family:system-ui,Segoe UI,Arial;margin:16px;max-width:720px}";
-    html += "input{width:100%;padding:10px;margin:6px 0}button{padding:10px 14px;margin-top:10px}";
-    html += ".row{margin:10px 0;padding:10px;border:1px solid #ddd;border-radius:10px}";
-    html += "small{color:#666}</style></head><body>";
-    html += "<h2>ESP32 - Configuración WiFi</h2>";
-    html += "<p><small>Red AP: <b>" + WiFi.softAPSSID() + "</b> · IP: <b>" + WiFi.softAPIP().toString() + "</b></small></p>";
-    html += "<form method='POST' action='/save'>";
-    html += "<p>Ingresa hasta " + String(WIFI_MAX_NETWORKS) + " redes (SSID + clave). Se guardan en el ESP32.</p>";
-
-    for (uint8_t i = 0; i < WIFI_MAX_NETWORKS; i++) {
-      html += "<div class='row'>";
-      html += "<label>SSID " + String(i + 1) + "</label>";
-      html += "<input name='ssid" + String(i + 1) + "' placeholder='Nombre WiFi' value='";
-      if (i < savedWifiCount) html += savedWifiSsid[i];
-      html += "'>";
-      html += "<label>Clave " + String(i + 1) + "</label>";
-      html += "<input name='pass" + String(i + 1) + "' type='password' placeholder='Contraseña' value='";
-      if (i < savedWifiCount) html += savedWifiPass[i];
-      html += "'>";
-      html += "</div>";
-    }
-
-    html += "<button type='submit'>Guardar y reiniciar</button>";
-    html += "</form>";
-    html += "<form method='POST' action='/clear' style='margin-top:14px'>";
-    html += "<button type='submit'>Borrar WiFi guardados</button>";
-    html += "</form>";
-    html += "</body></html>";
-    portalServer.send(200, "text/html", html);
-  });
-
-  portalServer.on("/save", HTTP_POST, []() {
-    String ssids[WIFI_MAX_NETWORKS];
-    String passes[WIFI_MAX_NETWORKS];
-    uint8_t count = 0;
-
-    for (uint8_t i = 0; i < WIFI_MAX_NETWORKS; i++) {
-      String s = portalServer.arg(String("ssid") + String(i + 1));
-      String p = portalServer.arg(String("pass") + String(i + 1));
-      s.trim();
-      if (s.length() == 0) continue;
-      if (count >= WIFI_MAX_NETWORKS) break;
-      ssids[count] = s;
-      passes[count] = p;
-      count++;
-    }
-
-    saveWifiNetworksToPrefs(ssids, passes, count);
-    loadSavedWifiNetworks();
-
-    portalServer.send(200, "text/html",
-      "<html><body><h3>Guardado.</h3><p>Reiniciando...</p></body></html>");
-    delay(800);
-    ESP.restart();
-  });
-
-  portalServer.on("/clear", HTTP_POST, []() {
-    clearWifiNetworksFromPrefs();
-    loadSavedWifiNetworks();
-    portalServer.send(200, "text/html",
-      "<html><body><h3>WiFi borrados.</h3><p>Vuelve atrás y configura nuevamente.</p></body></html>");
-  });
-
-  portalServer.onNotFound([]() {
-    portalServer.sendHeader("Location", String("http://") + WiFi.softAPIP().toString(), true);
-    portalServer.send(302, "text/plain", "");
-  });
-
-  portalServer.begin();
   Serial.println("📶 Portal WiFi activo.");
   Serial.print("   SSID: ");
   Serial.println(WiFi.softAPSSID());
@@ -982,19 +1391,42 @@ static void stopConfigPortal() {
   if (!portalActive) return;
   portalActive = false;
   dnsServer.stop();
-  portalServer.stop();
-  WiFi.softAPdisconnect(true);
+  if (!apAlwaysOn) {
+    WiFi.softAPdisconnect(true);
+  }
   Serial.println("📶 Portal WiFi detenido.");
 }
 
 static void handleConfigPortalLoop() {
-  if (!portalActive) return;
-  dnsServer.processNextRequest();
+  if (portalActive) {
+    dnsServer.processNextRequest();
+  }
   portalServer.handleClient();
 }
 
 static void initAfterWifiOnce() {
   if (WiFi.status() != WL_CONNECTED) return;
+
+  ensureHttpServerListening();
+
+  // mDNS para acceder como http://<hostname>.local
+  if (staHostname.length() == 0) {
+    String suffix = deviceId;
+    if (suffix.length() > 6) suffix = suffix.substring(suffix.length() - 6);
+    staHostname = String("esp32-") + suffix;
+  }
+  if (!mdnsStarted) {
+    if (MDNS.begin(staHostname.c_str())) {
+      MDNS.addService("http", "tcp", 80);
+      mdnsStarted = true;
+      Serial.printf("🌐 mDNS listo: http://%s.local\n", staHostname.c_str());
+    } else {
+      Serial.println("⚠ No se pudo iniciar mDNS");
+    }
+  }
+
+  // Si está configurado, mantener AP activo aunque haya WiFi
+  ensureAlwaysOnAp();
 
   // Si el WiFi volvió, apagar portal aunque ya se haya inicializado antes.
   if (portalActive) {
@@ -1057,6 +1489,7 @@ void setupFirebase() {
     Serial.printf("📌 Equipo asignado (local): %s\n", currentEquipmentId.c_str());
     sendDeviceStatus(true);
     startDeviceAssignmentStream();
+    startApConfigStream();
     
     // Enviar estado inicial
     sendOnlineStatus(true);
@@ -1139,6 +1572,14 @@ void sendSensorData() {
   String humStatus = getStatus(humidity, HUM_WARNING, HUM_CRITICAL);
   
   uint64_t timestamp = getTimestamp();
+
+  // Guardar última lectura para el dashboard local
+  lastReadingTs = timestamp;
+  lastTemperature = temperature;
+  lastHumidity = humidity;
+  lastSimulated = simulated;
+  lastTempStatus = tempStatus;
+  lastHumStatus = humStatus;
   
   // Mostrar en serial
   Serial.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
