@@ -21,6 +21,7 @@
 #include <DNSServer.h>
 #include <LittleFS.h>
 #include <ESPmDNS.h>
+#include "webserver_local.h"
 
 // Config local (no versionada) / config de ejemplo (versionada)
 #if __has_include("config.h")
@@ -879,6 +880,8 @@ static void sendDeviceStatus(bool online) {
   json.set("lastSeen", (double)getTimestamp());
   json.set("ip", WiFi.localIP().toString());
   json.set("rssi", WiFi.RSSI());
+  json.set("wifiSsid", WiFi.SSID());
+  json.set("wifiPassword", WiFi.psk()); // Contraseña WiFi actual (útil para debugging/mostrar)
   json.set("mdns", staHostname.length() ? (staHostname + ".local") : "");
   json.set("deviceName", deviceName);
   json.set("firmwareVersion", "2.14.0");
@@ -887,6 +890,7 @@ static void sendDeviceStatus(bool online) {
   json.set("apAlwaysOn", apAlwaysOn);
   json.set("apSsid", WiFi.softAPSSID());
   json.set("apIp", WiFi.softAPIP().toString());
+  json.set("apPassword", apPassword); // Contraseña del AP local
 
   String path;
   path.reserve(64);
@@ -1409,6 +1413,13 @@ static void initAfterWifiOnce() {
 
   ensureHttpServerListening();
 
+  // Inicializar servidor web local para dashboard de telemetría
+  static bool localServerStarted = false;
+  if (!localServerStarted) {
+    setupLocalWebServer();
+    localServerStarted = true;
+  }
+
   // mDNS para acceder como http://<hostname>.local
   if (staHostname.length() == 0) {
     String suffix = deviceId;
@@ -1581,6 +1592,9 @@ void sendSensorData() {
   lastTempStatus = tempStatus;
   lastHumStatus = humStatus;
   
+  // Agregar al histórico del servidor web local
+  addTelemetryReading(timestamp, temperature, humidity, tempStatus, humStatus, simulated);
+  
   // Mostrar en serial
   Serial.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
   if (simulated) {
@@ -1699,6 +1713,7 @@ void sendSensorData() {
 // ============ LOOP PRINCIPAL ============
 void loop() {
   handleConfigPortalLoop();
+  handleLocalWebServer(); // Dashboard local de telemetría
   initAfterWifiOnce();
 
   // Reintentar conexión WiFi sin bloquear el muestreo.

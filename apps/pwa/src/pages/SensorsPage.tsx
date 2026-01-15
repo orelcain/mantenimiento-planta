@@ -1097,6 +1097,168 @@ export function SensorsPage() {
                 </CardContent>
               </Card>
 
+              {/* Card de Conexiones WiFi */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2">
+                    <Wifi className="h-5 w-5" />
+                    <span>Conexiones WiFi</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {/* WiFi Principal (Station Mode) */}
+                  {selectedDevice.wifiSsid && (
+                    <div className="rounded border p-3 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 border-green-200 dark:border-green-800">
+                      <div className="text-xs font-semibold text-green-700 dark:text-green-300 mb-2 flex items-center gap-1">
+                        <Wifi className="h-3 w-3" />
+                        WiFi Principal (Conectado)
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="text-xs text-muted-foreground">SSID:</div>
+                          <div className="flex items-center gap-1">
+                            <span className="font-mono text-sm font-medium">{selectedDevice.wifiSsid}</span>
+                            <button
+                              onClick={() => copyToClipboard(selectedDevice.wifiSsid || '', 'ssid')}
+                              className="p-1 hover:bg-white/50 dark:hover:bg-black/20 rounded transition-colors"
+                              title="Copiar SSID"
+                            >
+                              {copiedField === 'ssid' ? (
+                                <Check className="h-3 w-3 text-green-600" />
+                              ) : (
+                                <Copy className="h-3 w-3 text-muted-foreground" />
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                        {selectedDevice.wifiPassword && (
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="text-xs text-muted-foreground">Contraseña:</div>
+                            <div className="flex items-center gap-1">
+                              <span className="font-mono text-sm font-medium">
+                                {showApPassword ? selectedDevice.wifiPassword : '••••••••'}
+                              </span>
+                              <button
+                                onClick={() => setShowApPassword(!showApPassword)}
+                                className="p-1 hover:bg-white/50 dark:hover:bg-black/20 rounded transition-colors"
+                                title={showApPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                              >
+                                {showApPassword ? (
+                                  <EyeOff className="h-3 w-3 text-muted-foreground" />
+                                ) : (
+                                  <Eye className="h-3 w-3 text-muted-foreground" />
+                                )}
+                              </button>
+                              <button
+                                onClick={() => copyToClipboard(selectedDevice.wifiPassword || '', 'password')}
+                                className="p-1 hover:bg-white/50 dark:hover:bg-black/20 rounded transition-colors"
+                                title="Copiar contraseña"
+                              >
+                                {copiedField === 'password' ? (
+                                  <Check className="h-3 w-3 text-green-600" />
+                                ) : (
+                                  <Copy className="h-3 w-3 text-muted-foreground" />
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                        {selectedDevice.ip && (
+                          <div className="text-xs text-muted-foreground">
+                            IP: {selectedDevice.ip}
+                          </div>
+                        )}
+                        {selectedDevice.rssi && (
+                          <div className="text-xs text-muted-foreground">
+                            Señal: {selectedDevice.rssi} dBm
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* WiFi AP Local */}
+                  {selectedDevice.apSsid && (
+                    <div className="rounded border p-3 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border-blue-200 dark:border-blue-800">
+                      <div className="text-xs font-semibold text-blue-700 dark:text-blue-300 mb-2 flex items-center gap-1">
+                        <Wifi className="h-3 w-3" />
+                        WiFi Local (Access Point)
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="text-xs text-muted-foreground">SSID:</div>
+                          <div className="flex items-center gap-1">
+                            <span className="font-mono text-sm font-medium">{selectedDevice.apSsid}</span>
+                            <button
+                              onClick={() => copyToClipboard(selectedDevice.apSsid || '', 'ssid')}
+                              className="p-1 hover:bg-white/50 dark:hover:bg-black/20 rounded transition-colors"
+                              title="Copiar SSID"
+                            >
+                              {copiedField === 'ssid' ? (
+                                <Check className="h-3 w-3 text-green-600" />
+                              ) : (
+                                <Copy className="h-3 w-3 text-muted-foreground" />
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                        {selectedDevice.apPassword && (
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="text-xs text-muted-foreground">Contraseña:</div>
+                            <div className="flex items-center gap-1">
+                              <span className="font-mono text-sm font-medium">
+                                {showApPassword ? selectedDevice.apPassword : '••••••••'}
+                              </span>
+                              <button
+                                onClick={() => setShowApPassword(!showApPassword)}
+                                className="p-1 hover:bg-white/50 dark:hover:bg-black/20 rounded transition-colors"
+                                title={showApPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                              >
+                                {showApPassword ? (
+                                  <EyeOff className="h-3 w-3 text-muted-foreground" />
+                                ) : (
+                                  <Eye className="h-3 w-3 text-muted-foreground" />
+                                )}
+                              </button>
+                              <button
+                                onClick={() => copyToClipboard(selectedDevice.apPassword || '', 'password')}
+                                className="p-1 hover:bg-white/50 dark:hover:bg-black/20 rounded transition-colors"
+                                title="Copiar contraseña"
+                              >
+                                {copiedField === 'password' ? (
+                                  <Check className="h-3 w-3 text-green-600" />
+                                ) : (
+                                  <Copy className="h-3 w-3 text-muted-foreground" />
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                        <div className="text-xs text-muted-foreground">
+                          IP Local: {selectedDevice.apIp || '192.168.4.1'}
+                        </div>
+                        {selectedDevice.apIp && (
+                          <a
+                            href={`http://${selectedDevice.apIp}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-primary hover:underline flex items-center gap-1"
+                          >
+                            🌐 Abrir panel local
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {!selectedDevice.wifiSsid && !selectedDevice.apSsid && (
+                    <div className="text-xs text-muted-foreground bg-amber-50 dark:bg-amber-950/20 p-2 rounded border border-amber-200 dark:border-amber-800">
+                      ⚠️ Este dispositivo no ha reportado información de WiFi aún
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
               {/* Card de Emparejar - Colapsable */}
               <Card>
                 <CardHeader className="pb-3">

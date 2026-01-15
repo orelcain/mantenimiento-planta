@@ -17,6 +17,8 @@ export type DeviceNode = {
   assignedEquipmentId?: string | null
   assignmentUpdatedAt?: number
   assignmentUpdatedBy?: string
+  wifiSsid?: string
+  wifiPassword?: string
   apSsid?: string
   apIp?: string
   apPassword?: string
