@@ -80,7 +80,14 @@ void handleApiHistory() {
 }
 
 void handleNotFound() {
-  localServer.send(404, "text/plain", "404 Not Found");
+  // Captive Portal: redirigir todo al dashboard
+  // Esto hace que al conectarse al WiFi AP se abra automáticamente el navegador
+  if (WiFi.getMode() & WIFI_MODE_AP) {
+    localServer.sendHeader("Location", "http://192.168.4.1", true);
+    localServer.send(302, "text/plain", "");
+  } else {
+    localServer.send(404, "text/plain", "404 Not Found");
+  }
 }
 
 // ============ SETUP ============
@@ -89,6 +96,16 @@ void setupLocalWebServer() {
   localServer.on("/", handleDashboard);
   localServer.on("/api/current", handleApiCurrent);
   localServer.on("/api/history", handleApiHistory);
+  
+  // Captive Portal: capturar todas las peticiones comunes de detección
+  localServer.on("/generate_204", handleDashboard);          // Android
+  localServer.on("/gen_204", handleDashboard);               // Android
+  localServer.on("/ncsi.txt", handleDashboard);              // Windows
+  localServer.on("/hotspot-detect.html", handleDashboard);   // iOS/macOS
+  localServer.on("/canonical.html", handleDashboard);        // Firefox
+  localServer.on("/success.txt", handleDashboard);           // Firefox
+  localServer.on("/connecttest.txt", handleDashboard);       // Windows
+  
   localServer.onNotFound(handleNotFound);
 
   localServer.begin();

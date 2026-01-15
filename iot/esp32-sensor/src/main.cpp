@@ -118,6 +118,7 @@ String currentEquipmentId;
 static bool postWifiInitialized = false;
 static bool portalActive = false;
 static DNSServer dnsServer;
+static DNSServer apDnsServer;  // DNS para captive portal AP
 static WebServer portalServer(80);
 
 static String savedWifiSsid[WIFI_MAX_NETWORKS];
@@ -187,6 +188,8 @@ static void ensureAlwaysOnAp() {
     return;
   }
 
+  static bool apDnsStarted = false;
+
   Serial.println("📡 Activando AP siempre encendido (modo AP+STA)...");
 
   // En modo dual, el canal del AP lo determina la red STA conectada.
@@ -206,6 +209,14 @@ static void ensureAlwaysOnAp() {
     Serial.printf("✓ AP activo: %s (abierto - sin contraseña)\n", ssid.c_str());
   }
   Serial.printf("   IP del AP: %s\n", WiFi.softAPIP().toString().c_str());
+
+  // Iniciar captive portal DNS (redirige todo al dashboard)
+  if (!apDnsStarted) {
+    IPAddress apIP = WiFi.softAPIP();
+    apDnsServer.start(53, "*", apIP);
+    apDnsStarted = true;
+    Serial.println("🌐 Captive Portal DNS activo - Dashboard se abre automáticamente");
+  }
 }
 
 static void ensureHttpServerStarted() {
@@ -1406,6 +1417,11 @@ static void handleConfigPortalLoop() {
     dnsServer.processNextRequest();
   }
   portalServer.handleClient();
+  
+  // Procesar DNS captive portal del AP
+  if (apAlwaysOn) {
+    apDnsServer.processNextRequest();
+  }
 }
 
 static void initAfterWifiOnce() {
