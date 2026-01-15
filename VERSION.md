@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.17.4**
+## Versión Actual: **v2.17.5**
 
 **Fecha de lanzamiento**: 14 de enero de 2026  
 **Estado**: ✅ PRODUCCIÓN READY  
@@ -9,6 +9,34 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.17.5 - Fix Bucle Infinito Equipment Loading (14/01/2026)
+
+**Fixes:**
+- 🐛 **Bucle Infinito**: corregido bucle infinito en carga de equipment usando useRef para trackear estado de carga.
+- ⚡ **Performance**: equipment solo se carga una vez al montar componente.
+- 🔍 **useEffect Fix**: eliminada dependencia circular que causaba re-ejecuciones infinitas.
+- ✅ **Logs Limpios**: consola ahora muestra solo 1 intento de carga en lugar de cientos.
+
+**Archivos Modificados:**
+- `apps/pwa/src/pages/SensorsPage.tsx`: agregado useRef flag para evitar cargas repetidas
+
+**Problema Resuelto:**
+- Console logs no se repiten infinitamente
+- CPU no se sobrecarga con llamadas a Firestore repetidas
+- Página responde correctamente sin lag
+
+**Cambio Técnico:**
+```typescript
+const loadedRef = useRef(false) // Flag para evitar cargas repetidas
+useEffect(() => {
+  if (loadedRef.current || loadingEquipment) return
+  loadedRef.current = true
+  // ... lógica de carga
+}, [equipmentStore, loadingEquipment])
+```
+
+---
 
 ### v2.17.4 - Fix Carga Equipment Autónoma (14/01/2026)
 

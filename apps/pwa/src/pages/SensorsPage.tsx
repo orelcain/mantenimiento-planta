@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Cpu, Link2, Unlink2, AlertTriangle, Thermometer, Droplets, Activity, X, BarChart3, Wifi, Trash2 } from 'lucide-react'
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui'
 import { useAppStore, useAuthStore } from '@/store'
@@ -85,15 +85,21 @@ export function SensorsPage() {
   // Estado local para equipment (cargar si store vacío)
   const [equipment, setEquipment] = useState<Equipment[]>(equipmentStore)
   const [loadingEquipment, setLoadingEquipment] = useState(false)
+  const loadedRef = useRef(false) // Flag para evitar cargas repetidas
 
-  // Cargar equipment si el store está vacío
+  // Cargar equipment si el store está vacío (solo una vez)
   useEffect(() => {
+    // Si ya se cargó o está cargando, no hacer nada
+    if (loadedRef.current || loadingEquipment) return
+
     if (equipmentStore.length > 0) {
       setEquipment(equipmentStore)
+      loadedRef.current = true
       console.log('[SensorsPage] Equipment cargado desde store:', equipmentStore.length, 'items')
-    } else if (!loadingEquipment) {
+    } else {
       console.log('[SensorsPage] Store vacío, cargando equipment desde Firestore...')
       setLoadingEquipment(true)
+      loadedRef.current = true
       getEquipments()
         .then((data) => {
           setEquipment(data)
