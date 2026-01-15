@@ -1142,6 +1142,11 @@ void setup() {
 
   // Servidor HTTP siempre listo (dashboard + config)
   ensureHttpServerStarted();
+  
+  // Registrar endpoints del dashboard (captive portal)
+  // IMPORTANTE: Debe estar ANTES de iniciar el AP para que funcione el captive portal
+  setupLocalWebServer();
+  Serial.println("✅ Endpoints del dashboard registrados (captive portal listo)");
 
   // LittleFS para backlog persistente
   // Montar sobre la partición típica "spiffs" (esquema por defecto en ESP32)
@@ -1429,13 +1434,6 @@ static void initAfterWifiOnce() {
   if (WiFi.status() != WL_CONNECTED) return;
 
   ensureHttpServerListening();
-
-  // Inicializar servidor web local para dashboard de telemetría
-  static bool localServerStarted = false;
-  if (!localServerStarted) {
-    setupLocalWebServer();
-    localServerStarted = true;
-  }
 
   // mDNS para acceder como http://<hostname>.local
   if (staHostname.length() == 0) {
