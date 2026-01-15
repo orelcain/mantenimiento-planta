@@ -46,7 +46,6 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ESP32 - Dashboard Local</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -105,7 +104,7 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
       font-size: 0.7em;
       font-weight: 500;
     }
-    canvas { max-height: 300px; }
+    canvas { width: 100%; height: 260px; display: block; }
     .stats {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
@@ -187,50 +186,74 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
   </div>
 
   <script>
-    const chart1 = new Chart(document.getElementById('chart1').getContext('2d'), {
-      type: 'line',
-      data: { labels: [], datasets: [{
-        label: 'Temperatura (°C)',
-        data: [],
-        borderColor: '#ef4444',
-        backgroundColor: 'rgba(239, 68, 68, 0.12)',
-        tension: 0.25,
-        fill: true
-      }]} ,
-      options: { responsive: true, maintainAspectRatio: false }
-    });
+    const chart1Canvas = document.getElementById('chart1');
+    const chart2Canvas = document.getElementById('chart2');
+    const chart3Canvas = document.getElementById('chart3');
 
-    const chart2 = new Chart(document.getElementById('chart2').getContext('2d'), {
-      type: 'line',
-      data: { labels: [], datasets: [{
-        label: 'Temperatura (°C)',
-        data: [],
-        borderColor: '#667eea',
-        backgroundColor: 'rgba(102, 126, 234, 0.25)',
-        tension: 0.4,
-        fill: true
-      }]} ,
-      options: { responsive: true, maintainAspectRatio: false }
-    });
+    function prepareCanvas(canvas) {
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      const ctx = canvas.getContext('2d');
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      return { ctx, w: rect.width, h: rect.height };
+    }
 
-    const chart3 = new Chart(document.getElementById('chart3').getContext('2d'), {
-      type: 'line',
-      data: {
-        labels: [],
-        datasets: [
-          { label: 'Temperatura (°C)', data: [], borderColor: '#ef4444', yAxisID: 'y', tension: 0.35 },
-          { label: 'Humedad (%)', data: [], borderColor: '#3b82f6', yAxisID: 'y1', tension: 0.35 }
-        ]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: {
-          y: { type: 'linear', position: 'left' },
-          y1: { type: 'linear', position: 'right', grid: { drawOnChartArea: false } }
-        }
+    function drawGrid(ctx, w, h) {
+      ctx.strokeStyle = '#eef0f5';
+      ctx.lineWidth = 1;
+      const rows = 4;
+      for (let i = 1; i <= rows; i++) {
+        const y = (h / (rows + 1)) * i;
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(w, y);
+        ctx.stroke();
       }
-    });
+    }
+
+    function drawSeries(ctx, w, h, data, color, fillColor) {
+      if (!data.length) return;
+      const min = Math.min(...data);
+      const max = Math.max(...data);
+      const span = max - min || 1;
+      const pad = 10;
+      const step = w / Math.max(1, data.length - 1);
+
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      data.forEach((v, i) => {
+        const x = i * step;
+        const y = h - pad - ((v - min) / span) * (h - pad * 2);
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+
+      if (fillColor) {
+        ctx.lineTo(w, h);
+        ctx.lineTo(0, h);
+        ctx.closePath();
+        ctx.fillStyle = fillColor;
+        ctx.fill();
+      }
+    }
+
+    function renderSingle(canvas, data, color, fillColor) {
+      const { ctx, w, h } = prepareCanvas(canvas);
+      ctx.clearRect(0, 0, w, h);
+      drawGrid(ctx, w, h);
+      drawSeries(ctx, w, h, data, color, fillColor);
+    }
+
+    function renderDual(canvas, temp, hum) {
+      const { ctx, w, h } = prepareCanvas(canvas);
+      ctx.clearRect(0, 0, w, h);
+      drawGrid(ctx, w, h);
+      drawSeries(ctx, w, h, temp, '#ef4444', null);
+      drawSeries(ctx, w, h, hum, '#3b82f6', null);
+    }
 
     function updateData() {
       fetch('/api/current')
@@ -249,18 +272,9 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
           const temps = data.map(d => d.temperature);
           const hums = data.map(d => d.humidity);
 
-          chart1.data.labels = labels;
-          chart1.data.datasets[0].data = temps;
-          chart1.update('none');
-
-          chart2.data.labels = labels;
-          chart2.data.datasets[0].data = temps;
-          chart2.update('none');
-
-          chart3.data.labels = labels;
-          chart3.data.datasets[0].data = temps;
-          chart3.data.datasets[1].data = hums;
-          chart3.update('none');
+          renderSingle(chart1Canvas, temps, '#ef4444', 'rgba(239, 68, 68, 0.12)');
+          renderSingle(chart2Canvas, temps, '#667eea', 'rgba(102, 126, 234, 0.25)');
+          renderDual(chart3Canvas, temps, hums);
 
           if (temps.length > 0) {
             const current = temps[temps.length - 1];
