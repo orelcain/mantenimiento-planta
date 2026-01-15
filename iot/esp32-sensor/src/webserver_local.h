@@ -89,10 +89,13 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
     }
     .range-bar {
       display: flex;
-      justify-content: flex-end;
+      justify-content: space-between;
       gap: 8px;
       margin-bottom: 10px;
+      align-items: center;
+      flex-wrap: wrap;
     }
+    .zoom-controls { display: flex; gap: 8px; }
     .range-btn {
       border: 1px solid #c7d2fe;
       background: #eef2ff;
@@ -166,10 +169,16 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
     <div class="grid">
       <div class="chart-card">
         <div class="range-bar">
-          <button class="range-btn active" data-range="1h">1 h</button>
-          <button class="range-btn" data-range="6h">6 h</button>
-          <button class="range-btn" data-range="24h">24 h</button>
-          <button class="range-btn" data-range="all">Todo</button>
+          <div>
+            <button class="range-btn active" data-range="1h">1 h</button>
+            <button class="range-btn" data-range="6h">6 h</button>
+            <button class="range-btn" data-range="24h">24 h</button>
+            <button class="range-btn" data-range="all">Todo</button>
+          </div>
+          <div class="zoom-controls">
+            <button class="range-btn" id="zoomOut">Y−</button>
+            <button class="range-btn" id="zoomIn">Y+</button>
+          </div>
         </div>
         <div class="legend">
           <div class="legend-item"><span class="legend-dot" style="background:#ef4444"></span>Temperatura (°C)</div>
@@ -219,6 +228,7 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
   <script>
     const chart1Canvas = document.getElementById('chart1');
     let currentRange = '1h';
+    let yZoom = 1.0;
 
     function prepareCanvas(canvas) {
       const dpr = window.devicePixelRatio || 1;
@@ -245,10 +255,8 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
       ctx.setLineDash([]);
     }
 
-    function drawSeries(ctx, pad, plotW, plotH, data, color) {
+    function drawSeries(ctx, pad, plotW, plotH, data, color, min, max) {
       if (!data.length) return;
-      const min = Math.min(...data);
-      const max = Math.max(...data);
       const span = max - min || 1;
       const step = plotW / Math.max(1, data.length - 1);
 
@@ -296,8 +304,8 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
 
       ctx.clearRect(0, 0, w, h);
       drawGrid(ctx, pad, plotW, plotH);
-      drawSeries(ctx, pad, plotW, plotH, temp, '#ef4444');
-      drawSeries(ctx, pad, plotW, plotH, hum, '#3b82f6');
+      drawSeries(ctx, pad, plotW, plotH, temp, '#ef4444', labels.tempMin, labels.tempMax);
+      drawSeries(ctx, pad, plotW, plotH, hum, '#3b82f6', labels.humMin, labels.humMax);
 
       drawAxesLabels(ctx, pad, plotW, plotH,
         labels.tempMin, labels.tempMax,
@@ -316,11 +324,21 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
 
     document.querySelectorAll('.range-btn').forEach(btn => {
       btn.addEventListener('click', () => {
+        if (!btn.dataset.range) return;
         document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         currentRange = btn.dataset.range;
         updateData();
       });
+    });
+
+    document.getElementById('zoomIn').addEventListener('click', () => {
+      yZoom = Math.min(4, yZoom * 1.25);
+      updateData();
+    });
+    document.getElementById('zoomOut').addEventListener('click', () => {
+      yZoom = Math.max(0.5, yZoom / 1.25);
+      updateData();
     });
 
     function updateData() {
@@ -348,10 +366,22 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
           const midLabel = midTs ? new Date(midTs).toLocaleTimeString('es-ES') : '--';
           const endLabel = endTs ? new Date(endTs).toLocaleTimeString('es-ES') : '--';
 
-          const tempMin = temps.length ? Math.min(...temps) : 0;
-          const tempMax = temps.length ? Math.max(...temps) : 0;
-          const humMin = hums.length ? Math.min(...hums) : 0;
-          const humMax = hums.length ? Math.max(...hums) : 0;
+          const rawTempMin = temps.length ? Math.min(...temps) : 0;
+          const rawTempMax = temps.length ? Math.max(...temps) : 0;
+          const rawHumMin = hums.length ? Math.min(...hums) : 0;
+          const rawHumMax = hums.length ? Math.max(...hums) : 0;
+
+          const tempCenter = (rawTempMin + rawTempMax) / 2;
+          const tempSpan = (rawTempMax - rawTempMin) || 1;
+          const tempSpanZoom = tempSpan / yZoom;
+          const tempMin = tempCenter - tempSpanZoom / 2;
+          const tempMax = tempCenter + tempSpanZoom / 2;
+
+          const humCenter = (rawHumMin + rawHumMax) / 2;
+          const humSpan = (rawHumMax - rawHumMin) || 1;
+          const humSpanZoom = humSpan / yZoom;
+          const humMin = humCenter - humSpanZoom / 2;
+          const humMax = humCenter + humSpanZoom / 2;
 
           renderDual(chart1Canvas, temps, hums, {
             tempMin, tempMax,

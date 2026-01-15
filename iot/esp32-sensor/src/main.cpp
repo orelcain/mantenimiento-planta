@@ -244,6 +244,7 @@ static void ensureHttpServerStarted() {
     json += "\"deviceId\":\"" + deviceId + "\",";
     json += "\"deviceName\":\"" + deviceName + "\",";
     json += "\"assignedEquipmentId\":\"" + (hasAssignedEquipment() ? currentEquipmentId : String("")) + "\",";
+    json += "\"assignedEquipmentPath\":\"" + currentEquipmentPath + "\",";
     json += "\"wifiConnected\":" + String(WiFi.status() == WL_CONNECTED ? "true" : "false") + ",";
     json += "\"ssid\":\"" + WiFi.SSID() + "\",";
     json += "\"ip\":\"" + WiFi.localIP().toString() + "\",";
