@@ -104,6 +104,7 @@ void setupLocalWebServer() {
   portalServer.on("/gen_204", handleDashboard);               // Android
   portalServer.on("/ncsi.txt", handleDashboard);              // Windows
   portalServer.on("/hotspot-detect.html", handleDashboard);   // iOS/macOS
+  portalServer.on("/library/test/success.html", handleDashboard); // iOS (captive.apple.com)
   portalServer.on("/canonical.html", handleDashboard);        // Firefox
   portalServer.on("/success.txt", handleDashboard);           // Firefox
   portalServer.on("/connecttest.txt", handleDashboard);       // Windows

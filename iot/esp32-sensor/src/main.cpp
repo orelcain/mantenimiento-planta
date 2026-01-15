@@ -203,6 +203,11 @@ static void ensureAlwaysOnAp() {
 
   const String ssid = getApSsid();
   const bool passOk = (apPassword.length() >= 8);
+  // Fijar IP del AP para acceso manual confiable
+  IPAddress apIPCfg(192, 168, 4, 1);
+  IPAddress apGW(192, 168, 4, 1);
+  IPAddress apMask(255, 255, 255, 0);
+  WiFi.softAPConfig(apIPCfg, apGW, apMask);
   if (passOk) {
     WiFi.softAP(ssid.c_str(), apPassword.c_str());
     Serial.printf("✓ AP activo: %s (WPA2 protegido)\n", ssid.c_str());
@@ -1392,6 +1397,11 @@ static void startConfigPortal() {
   WiFi.mode(WIFI_AP);
   // Canal fijo para mejorar visibilidad; red visible (hidden=false)
   const bool passOk = (apPassword.length() >= 8);
+  // Fijar IP del AP para acceso manual confiable
+  IPAddress apIP(192, 168, 4, 1);
+  IPAddress apGW(192, 168, 4, 1);
+  IPAddress apMask(255, 255, 255, 0);
+  WiFi.softAPConfig(apIP, apGW, apMask);
   if (passOk) {
     WiFi.softAP(apSsid.c_str(), apPassword.c_str(), 1, 0);
   } else {
