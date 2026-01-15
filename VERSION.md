@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.17.2**
+## Versión Actual: **v2.17.3**
 
 **Fecha de lanzamiento**: 14 de enero de 2026  
 **Estado**: ✅ PRODUCCIÓN READY  
@@ -9,6 +9,25 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.17.3 - Selectores Jerarquía Independientes (14/01/2026)
+
+**Fixes:**
+- 🔓 **Selectores Independientes**: Planta, Sector y Área funcionan sin dependencia en cascada.
+- ✅ **Sin Restricciones**: ningún selector se deshabilita, selección libre en cualquier nivel.
+- 📋 **Opciones Completas**: cada selector muestra TODAS las opciones disponibles (no filtradas por otros niveles).
+- 🎯 **Filtrado Flexible**: lógica AND que permite combinar filtros de cualquier nivel jerárquico.
+- 🚫 **No Cascada Forzada**: eliminada lógica que obligaba a seleccionar Planta → Sector → Área en orden.
+
+**Archivos Modificados:**
+- `apps/pwa/src/pages/SensorsPage.tsx`: selectores independientes + opciones completas en cada nivel
+
+**Beneficios:**
+- Búsqueda más rápida de equipos
+- No necesitas navegar toda la jerarquía si sabes el sector/área
+- Filtros más intuitivos y flexibles
+
+---
 
 ### v2.17.2 - Fix Autocomplete + UX Asignación (14/01/2026)
 
