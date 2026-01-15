@@ -181,6 +181,10 @@ static uint8_t savedWifiCount = 0;
 static bool httpServerStarted = false;
 static bool httpServerListening = false;
 
+// Configuración del servidor HTTP para evitar crashes
+static unsigned long lastServerCleanup = 0;
+#define SERVER_CLEANUP_INTERVAL 30000  // Limpiar cada 30 segundos
+
 // Dashboard / AP settings (Preferences)
 static bool apAlwaysOn = false;
 static String apSsidCustom;
@@ -1769,6 +1773,12 @@ static void handleConfigPortalLoop() {
   // Procesar DNS captive portal del AP
   if (apAlwaysOn) {
     apDnsServer.processNextRequest();
+  }
+  
+  // Cleanup periódico del servidor para liberar sockets
+  if (millis() - lastServerCleanup > SERVER_CLEANUP_INTERVAL) {
+    portalServer.close();  // Cierra conexiones inactivas
+    lastServerCleanup = millis();
   }
 }
 

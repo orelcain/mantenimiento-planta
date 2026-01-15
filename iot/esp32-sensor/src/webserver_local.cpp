@@ -46,6 +46,7 @@ static void handleCaptivePortal() {
 }
 
 void handleDashboard() {
+  portalServer.sendHeader("Connection", "close");  // Cerrar conexión después de enviar
   portalServer.send_P(200, "text/html", HTML_DASHBOARD);
 }
 
@@ -105,6 +106,7 @@ void handleApiCurrent() {
 
   String json;
   serializeJson(doc, json);
+  portalServer.sendHeader("Connection", "close");
   portalServer.send(200, "application/json", json);
 }
 
@@ -185,6 +187,7 @@ void handleApiHistory() {
 
   String json;
   serializeJson(doc, json);
+  portalServer.sendHeader("Connection", "close");
   portalServer.send(200, "application/json", json);
 }
 
@@ -217,6 +220,7 @@ void handleApiConfig() {
     
     String json;
     serializeJson(doc, json);
+    portalServer.sendHeader("Connection", "close");
     portalServer.send(200, "application/json", json);
   } else if (portalServer.method() == HTTP_POST) {
     // POST: actualizar configuración
