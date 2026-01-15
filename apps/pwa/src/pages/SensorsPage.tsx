@@ -81,6 +81,14 @@ export function SensorsPage() {
   const equipment = useAppStore((s) => s.equipment)
   const user = useAuthStore((s) => s.user)
 
+  // Debug: verificar equipment cargado
+  useEffect(() => {
+    console.log('[SensorsPage] Equipment store:', equipment.length, 'items')
+    if (equipment.length === 0) {
+      console.warn('[SensorsPage] Equipment store vacío - puede no estar cargado aún')
+    }
+  }, [equipment])
+
   const [devices, setDevices] = useState<DeviceRow[]>([])
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('')
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -864,6 +872,16 @@ export function SensorsPage() {
                   </div>
                   
                   {/* Filtros jerárquicos independientes */}
+                  {equipment.length === 0 ? (
+                    <div className="p-4 text-sm bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded">
+                      <div className="font-medium text-amber-900 dark:text-amber-100 mb-1">
+                        ⚠️ No hay equipos cargados
+                      </div>
+                      <div className="text-xs text-amber-700 dark:text-amber-300">
+                        Recarga la página o ve a la página de Equipos para cargar la jerarquía.
+                      </div>
+                    </div>
+                  ) : (
                   <div className="grid gap-2 sm:grid-cols-3">
                     <div>
                       <Label>Planta</Label>
@@ -908,6 +926,7 @@ export function SensorsPage() {
                       </Select>
                     </div>
                   </div>
+                  )}
 
                   {/* Filtros de estado y criticidad */}
                   <div className="grid gap-2 sm:grid-cols-3">
