@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Cpu, Link2, Unlink2, AlertTriangle, Thermometer, Droplets, Activity, X, BarChart3, Wifi, Trash2 } from 'lucide-react'
+import { Cpu, Link2, Unlink2, AlertTriangle, Thermometer, Droplets, Activity, X, BarChart3, Wifi, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui'
 import { useAppStore, useAuthStore } from '@/store'
 import type { Equipment } from '@/types'
@@ -148,6 +148,12 @@ export function SensorsPage() {
 
   // Estado para eliminar dispositivos
   const [deletingDevice, setDeletingDevice] = useState<string | null>(null)
+
+  // Estado para colapsar/expandir sección de Emparejar
+  const [isPairingExpanded, setIsPairingExpanded] = useState(true)
+  
+  // Estado para colapsar/expandir sección de WiFi AP
+  const [isWifiApExpanded, setIsWifiApExpanded] = useState(false)
 
   // Estado para el gráfico de telemetría
   const [showChart, setShowChart] = useState(false)
@@ -696,7 +702,11 @@ export function SensorsPage() {
                         placeholder="Buscar por ID (MAC)…"
                         className="flex-1"
                         autoComplete="off"
+                        autoCorrect="off"
+                        autoCapitalize="off"
+                        spellCheck="false"
                         type="search"
+                        name="device-search-field"
                       />
                       {deviceSearch && (
                         <Button
@@ -1045,18 +1055,32 @@ export function SensorsPage() {
                 </CardContent>
               </Card>
 
-              {/* Card de Emparejar */}
+              {/* Card de Emparejar - Colapsable */}
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center justify-between">
-                    <span className="flex items-center gap-2">
-                      <Link2 className="h-5 w-5" />
-                      Emparejar
-                    </span>
-                    {onlineBadge(Boolean(selectedDevice.online))}
-                  </CardTitle>
+                  <button
+                    type="button"
+                    onClick={() => setIsPairingExpanded(!isPairingExpanded)}
+                    className="w-full"
+                  >
+                    <CardTitle className="flex items-center justify-between">
+                      <span className="flex items-center gap-2">
+                        <Link2 className="h-5 w-5" />
+                        Emparejar
+                      </span>
+                      <div className="flex items-center gap-2">
+                        {onlineBadge(Boolean(selectedDevice.online))}
+                        {isPairingExpanded ? (
+                          <ChevronUp className="h-5 w-5 text-muted-foreground" />
+                        ) : (
+                          <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                        )}
+                      </div>
+                    </CardTitle>
+                  </button>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                {isPairingExpanded && (
+                  <CardContent className="space-y-4">
                   <div className="space-y-1">
                     <div className="text-sm text-muted-foreground">Dispositivo</div>
                     <div className="font-mono text-sm">{selectedDevice.deviceId}</div>
@@ -1521,18 +1545,33 @@ export function SensorsPage() {
                     </div>
                   )}
                 </div>
-                </CardContent>
+                  </CardContent>
+                )}
               </Card>
 
-              {/* Card de Configuración AP */}
+              {/* Card de Configuración AP - Colapsable */}
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2">
-                    <Wifi className="h-5 w-5" />
-                    <span>WiFi Local (AP)</span>
-                  </CardTitle>
+                  <button
+                    type="button"
+                    onClick={() => setIsWifiApExpanded(!isWifiApExpanded)}
+                    className="w-full"
+                  >
+                    <CardTitle className="flex items-center justify-between">
+                      <span className="flex items-center gap-2">
+                        <Wifi className="h-5 w-5" />
+                        <span>WiFi Local (AP)</span>
+                      </span>
+                      {isWifiApExpanded ? (
+                        <ChevronUp className="h-5 w-5 text-muted-foreground" />
+                      ) : (
+                        <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                      )}
+                    </CardTitle>
+                  </button>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                {isWifiApExpanded && (
+                  <CardContent className="space-y-4">
                 <div className="text-xs text-muted-foreground">
                   Configura el Access Point local del ESP32 para acceder a sus datos sin internet.
                 </div>
@@ -1612,7 +1651,8 @@ export function SensorsPage() {
                     </div>
                   )}
                   </div>
-                </CardContent>
+                  </CardContent>
+                )}
               </Card>
             </>
           )}
