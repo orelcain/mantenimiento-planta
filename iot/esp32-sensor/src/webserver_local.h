@@ -178,7 +178,7 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
         <canvas id="chart1"></canvas>
         <div class="axis-range">
           <span><span class="label">Y</span> <span id="rangeTemp">--</span> · <span id="rangeHum">--</span></span>
-          <span><span class="label">X</span> Tiempo (rango seleccionado)</span>
+          <span><span class="label">X</span> <span id="rangeX">--</span></span>
         </div>
         <div class="stats">
           <div class="stat">
@@ -193,6 +193,10 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
             <div class="stat-value" id="statMin">--</div>
             <div class="stat-label">Temp mín</div>
           </div>
+        </div>
+        <div class="axis-range" style="margin-top:10px">
+          <span><span class="label">Histórico</span> <span id="historyCount">--</span></span>
+          <span><span class="label">Ventana</span> Últimas 100 lecturas</span>
         </div>
       </div>
     </div>
@@ -316,6 +320,18 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
             const minH = Math.min(...hums);
             document.getElementById('rangeHum').textContent = 'Hum ' + minH.toFixed(0) + '–' + maxH.toFixed(0) + ' %';
           }
+
+          if (filtered.length > 0) {
+            const startTs = filtered[0].timestamp;
+            const endTs = filtered[filtered.length - 1].timestamp;
+            const start = new Date(startTs).toLocaleTimeString('es-ES');
+            const end = new Date(endTs).toLocaleTimeString('es-ES');
+            document.getElementById('rangeX').textContent = start + ' – ' + end;
+          } else {
+            document.getElementById('rangeX').textContent = 'Sin datos';
+          }
+
+          document.getElementById('historyCount').textContent = filtered.length + ' lecturas';
         })
         .catch(() => {});
     }
