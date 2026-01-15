@@ -1140,13 +1140,14 @@ void setup() {
   // Settings locales (AP/alias)
   loadLocalSettings();
 
-  // Servidor HTTP siempre listo (dashboard + config)
+  // Servidor HTTP: registrar TODOS los endpoints ANTES de begin()
+  // 1. Endpoints del portal de configuración
   ensureHttpServerStarted();
   
-  // Registrar endpoints del dashboard (captive portal)
-  // IMPORTANTE: Debe estar ANTES de iniciar el AP para que funcione el captive portal
+  // 2. Endpoints del dashboard (captive portal)
+  // IMPORTANTE: Debe estar ANTES de .begin() para que funcione el captive portal
   setupLocalWebServer();
-  Serial.println("✅ Endpoints del dashboard registrados (captive portal listo)");
+  Serial.println("✅ Todos los endpoints registrados (servidor listo para .begin())");
 
   // LittleFS para backlog persistente
   // Montar sobre la partición típica "spiffs" (esquema por defecto en ESP32)
