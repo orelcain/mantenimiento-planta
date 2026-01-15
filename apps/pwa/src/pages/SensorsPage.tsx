@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Cpu, Link2, Unlink2, AlertTriangle, Thermometer, Droplets, Activity, X, BarChart3, Wifi, Trash2, ChevronDown, ChevronUp, Eye, EyeOff, Copy, RefreshCw, Check } from 'lucide-react'
+import { Cpu, Link2, Unlink2, AlertTriangle, Thermometer, Droplets, Activity, X, BarChart3, Wifi, Trash2, ChevronDown, ChevronUp, Eye, EyeOff, Copy, RefreshCw, Check, Usb } from 'lucide-react'
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui'
 import { useAppStore, useAuthStore } from '@/store'
 import type { Equipment } from '@/types'
@@ -8,6 +8,7 @@ import type { SensorSummaryNode } from '@/services/sensorsRtdb'
 import { assignDeviceToEquipment, subscribeDevices, deleteDevice } from '@/services/devicesRtdb'
 import { subscribeSensorSummary } from '@/services/sensorsRtdb'
 import { saveApConfig } from '@/services/apConfigRtdb'
+import { useUsbDetection } from '@/hooks/useUsbDetection'
 import { getEquipments } from '@/services/equipment'
 import { TelemetryChart, type ChartType } from '@/components/telemetry/TelemetryChart'
 import { TelemetryExportDialog } from '@/components/telemetry/TelemetryExportDialog'
@@ -162,6 +163,9 @@ export function SensorsPage() {
   const [chartType, setChartType] = useState<ChartType>('dual-axis')
   const [timeRange, setTimeRange] = useState<TimeRange>('24h')
 
+  // Hook de detección USB
+  const { connectedDevices: usbDevices, isSupported: usbSupported, error: usbError, requestDevice } = useUsbDetection()
+
   useEffect(() => {
     console.log('[SensorsPage] Montando componente, iniciando suscripción devices')
     const unsub = subscribeDevices(
@@ -236,6 +240,19 @@ export function SensorsPage() {
       console.error('Error copiando:', err)
     }
   }
+
+  // Auto-seleccionar dispositivo cuando se detecta por USB
+  useEffect(() => {
+    if (usbDevices.length > 0 && usbDevices[0]) {
+      const detectedMac = usbDevices[0].deviceId
+      const matchingDevice = devices.find(d => d.deviceId.toUpperCase() === detectedMac.toUpperCase())
+      
+      if (matchingDevice) {
+        setSelectedDeviceId(matchingDevice.deviceId)
+        console.log('✓ Dispositivo USB auto-seleccionado:', matchingDevice.deviceId)
+      }
+    }
+  }, [usbDevices, devices])
 
   const assignedEquipment = useMemo(() => {
     const id = selectedDevice?.assignedEquipmentId
@@ -750,6 +767,19 @@ export function SensorsPage() {
                         data-lpignore="true"
                         data-form-type="other"
                       />
+                      {usbSupported && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={requestDevice}
+                          className="gap-2 shrink-0"
+                          title="Detectar dispositivo conectado por USB"
+                        >
+                          <Usb className="h-4 w-4" />
+                          USB
+                        </Button>
+                      )}
                       {deviceSearch && (
                         <Button
                           type="button"
@@ -767,6 +797,16 @@ export function SensorsPage() {
                       {deviceSearch && filteredDevices.length === 0 && (
                         <span className="text-amber-600 ml-2">
                           • No hay resultados, limpia el filtro
+                        </span>
+                      )}
+                      {usbDevices.length > 0 && (
+                        <span className="text-green-600 ml-2">
+                          • {usbDevices.length} USB detectado(s) 🔌
+                        </span>
+                      )}
+                      {usbError && (
+                        <span className="text-red-600 ml-2">
+                          • {usbError}
                         </span>
                       )}
                     </div>

@@ -109,8 +109,8 @@ FirebaseConfig config;
 
 Preferences prefs;
 
-static String deviceId;
-static String currentEquipmentId;
+String deviceId;
+String currentEquipmentId;
 
 // ============ WIFI PORTAL / CREDENCIALES (PREFERENCES) ============
 #define WIFI_MAX_NETWORKS 5

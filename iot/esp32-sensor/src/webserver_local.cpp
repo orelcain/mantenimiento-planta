@@ -32,9 +32,13 @@ void handleApiCurrent() {
   uint16_t lastIdx = (telemetryIndex == 0) ? telemetryCount - 1 : telemetryIndex - 1;
   TelemetryReading& reading = telemetryHistory[lastIdx];
 
-  StaticJsonDocument<512> doc;
+  JsonDocument doc;
   doc["deviceId"] = deviceId;
-  doc["equipmentId"] = currentEquipmentId.isEmpty() ? nullptr : currentEquipmentId;
+  if (currentEquipmentId.isEmpty()) {
+    doc["equipmentId"] = nullptr;
+  } else {
+    doc["equipmentId"] = currentEquipmentId;
+  }
   doc["timestamp"] = reading.timestamp;
   doc["temperature"] = reading.temperature;
   doc["humidity"] = reading.humidity;
@@ -48,7 +52,7 @@ void handleApiCurrent() {
 }
 
 void handleApiHistory() {
-  DynamicJsonDocument doc(8192); // ~100 lecturas
+  JsonDocument doc;
   JsonArray array = doc.to<JsonArray>();
 
   // Iterar sobre el buffer circular
@@ -61,7 +65,7 @@ void handleApiHistory() {
     uint16_t idx = (startIdx + i) % TELEMETRY_HISTORY_SIZE;
     TelemetryReading& r = telemetryHistory[idx];
 
-    JsonObject obj = array.createNestedObject();
+    JsonObject obj = array.add<JsonObject>();
     obj["timestamp"] = r.timestamp;
     obj["temperature"] = r.temperature;
     obj["humidity"] = r.humidity;

@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.19.0**
+## Versión Actual: **v2.20.0**
 
 **Fecha de lanzamiento**: 15 de enero de 2026  
 **Estado**: ✅ PRODUCCIÓN READY  
@@ -9,6 +9,84 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.20.0 - ESP32 Dashboard Local + USB Detection + Mejoras UI (15/01/2026)
+
+**Nuevas Funcionalidades:**
+- 🌐 **Servidor Web Local ESP32**:
+  - Dashboard embebido en ESP32 con Chart.js
+  - 3 endpoints REST: `/`, `/api/current`, `/api/history`
+  - Buffer circular 100 lecturas en RAM
+  - Visualización temp/humedad en tiempo real con gráficos
+  - Acceso vía `http://192.168.4.1` (AP) o IP local (STA)
+  - HTML glassmorphism con gradientes responsivos
+  - Actualización automática cada 5 segundos
+
+- 🔌 **Detección USB Automática**:
+  - Hook `useUsbDetection` con Web Serial API
+  - Auto-detección ESP32 por VID (0x10C4, 0x1A86, 0x0403)
+  - Lectura MAC via serial (115200 baud)
+  - Botón USB en SensorsPage con auto-selección
+  - Soporte Chrome/Edge (Web Serial API)
+  - Timeout 5s con manejo de errores robusto
+
+- 🗑️ **Eliminar Dispositivos Duplicados**:
+  - Nueva función para limpiar dispositivos huérfanos/duplicados
+  - Integrada en UI de sensores
+  - Fix propagación eventos en botón eliminar
+
+- 📊 **UI Sensores Reorganizada**:
+  - Layout 2 columnas con dashboard estadísticas
+  - Cards separadas: Telemetría, Emparejar, WiFi AP
+  - Device list mejorada: deviceName, apSsid, IP
+  - Fix detección real-time sin throttling
+
+**Archivos Nuevos:**
+- `iot/esp32-sensor/src/webserver_local.h`: Header servidor web local
+- `iot/esp32-sensor/src/webserver_local.cpp`: Implementación REST API
+- `apps/pwa/src/hooks/useUsbDetection.ts`: Hook detección USB
+- `apps/pwa/src/types/webserial.d.ts`: Tipos Web Serial API
+
+**Archivos Modificados:**
+- `iot/esp32-sensor/src/main.cpp`:
+  - Include webserver_local.h
+  - Setup servidor en `initAfterWifiOnce()`
+  - `handleLocalWebServer()` en loop
+  - `addTelemetryReading()` en `sendSensorData()`
+  - Publicación wifiSsid/wifiPassword en Firebase
+  - Variables deviceId/currentEquipmentId sin static (extern)
+- `iot/esp32-sensor/platformio.ini`:
+  - Agregada dependencia ArduinoJson @ ^7.2.1
+- `apps/pwa/src/pages/SensorsPage.tsx`:
+  - Import Usb icon + useUsbDetection hook
+  - Botón USB junto a búsqueda
+  - Auto-selección dispositivo USB detectado
+  - Mensajes feedback USB
+  - Card "Conexiones WiFi" con cuadros WiFi + AP
+  - Botones copiar + toggle password + link panel local
+- `apps/pwa/src/services/devicesRtdb.ts`:
+  - Campos wifiSsid, wifiPassword en DeviceNode
+
+**Fixes Técnicos:**
+- ✅ Correcciones ArduinoJson v7 (breaking changes):
+  - `StaticJsonDocument/DynamicJsonDocument` → `JsonDocument`
+  - `array.createNestedObject()` → `array.add<JsonObject>()`
+  - Operador ternario nullptr → if/else explícito
+- ✅ Tipos Web Serial API completos (webserial.d.ts)
+- ✅ Null checks en usbDevices[0] (TypeScript strict)
+- ✅ Navigator.serial optional chaining
+
+**Dependencias:**
+- ArduinoJson 7.4.2 (ESP32)
+- PlatformIO 6.1.18
+- intelhex 2.3.0 (esptool dependency)
+
+**Compilación ESP32:**
+- ✅ Build exitoso: firmware.bin 1.21 MB
+- RAM: 28.8% (94.2 KB / 320 KB)
+- Flash: 92.5% (1.21 MB / 1.28 MB)
+
+---
 
 ### v2.19.0 - Mejoras UX Sensores y Config WiFi AP (15/01/2026)
 
