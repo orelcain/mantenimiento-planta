@@ -50,15 +50,6 @@ void handleDashboard() {
 }
 
 void handleApiCurrent() {
-  if (telemetryCount == 0) {
-    portalServer.send(503, "application/json", "{\"error\":\"No data available\"}");
-    return;
-  }
-
-  // Obtener última lectura
-  uint16_t lastIdx = (telemetryIndex == 0) ? telemetryCount - 1 : telemetryIndex - 1;
-  TelemetryReading& reading = telemetryHistory[lastIdx];
-
   JsonDocument doc;
   doc["deviceId"] = deviceId;
   if (currentEquipmentId.isEmpty()) {
@@ -71,12 +62,46 @@ void handleApiCurrent() {
   } else {
     doc["equipmentPath"] = currentEquipmentPath;
   }
-  doc["timestamp"] = reading.timestamp;
-  doc["temperature"] = reading.temperature;
-  doc["humidity"] = reading.humidity;
-  doc["tempStatus"] = reading.tempStatus;
-  doc["humStatus"] = reading.humStatus;
-  doc["simulated"] = reading.simulated;
+
+  // Primero intentar RAM
+  if (telemetryCount > 0) {
+    uint16_t lastIdx = (telemetryIndex == 0) ? telemetryCount - 1 : telemetryIndex - 1;
+    TelemetryReading& reading = telemetryHistory[lastIdx];
+    doc["timestamp"] = reading.timestamp;
+    doc["temperature"] = reading.temperature;
+    doc["humidity"] = reading.humidity;
+    doc["tempStatus"] = reading.tempStatus;
+    doc["humStatus"] = reading.humStatus;
+    doc["simulated"] = reading.simulated;
+    doc["source"] = "ram";
+  } 
+  // Fallback a flash si RAM vacío
+  else {
+    uint32_t flashCount = getFlashHistoryCount();
+    if (flashCount > 0) {
+      uint64_t ts;
+      float temp, hum;
+      uint8_t tempSt, humSt;
+      bool sim;
+      const char* statusNames[] = {"normal", "warning", "critical"};
+      
+      if (getFlashReading(flashCount - 1, ts, temp, hum, tempSt, humSt, sim)) {
+        doc["timestamp"] = ts;
+        doc["temperature"] = temp;
+        doc["humidity"] = hum;
+        doc["tempStatus"] = statusNames[tempSt < 3 ? tempSt : 0];
+        doc["humStatus"] = statusNames[humSt < 3 ? humSt : 0];
+        doc["simulated"] = sim;
+        doc["source"] = "flash";
+      } else {
+        portalServer.send(503, "application/json", "{\"error\":\"No data available\"}");
+        return;
+      }
+    } else {
+      portalServer.send(503, "application/json", "{\"error\":\"No data available\"}");
+      return;
+    }
+  }
 
   String json;
   serializeJson(doc, json);
