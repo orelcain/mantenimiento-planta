@@ -50,9 +50,9 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background: #f5f7fb;
       padding: 20px;
-      color: #333;
+      color: #1f2937;
     }
     .container {
       max-width: 1400px;
@@ -60,16 +60,16 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
     }
     h1 {
       text-align: center;
-      color: white;
-      margin-bottom: 10px;
-      font-size: 2.4em;
-      text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+      color: #111827;
+      margin-bottom: 6px;
+      font-size: 1.6em;
+      font-weight: 700;
     }
     .meta {
       text-align: center;
-      color: rgba(255,255,255,0.9);
-      margin-bottom: 20px;
-      font-size: 0.95em;
+      color: #6b7280;
+      margin-bottom: 16px;
+      font-size: 0.9em;
     }
     .grid {
       display: grid;
@@ -158,9 +158,9 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
 </head>
 <body>
   <div class="container">
-    <h1>📊 ESP32 Sensor Dashboard</h1>
+    <h1>ESP32 Sensor Dashboard</h1>
     <div class="meta">
-      Device: <b id="deviceId">--</b> · Equipo: <b id="equipment">--</b> · Última: <b id="lastUpdate">--</b>
+      Device: <b id="deviceId">--</b> · Equipo: <b id="equipment">--</b> · Ruta: <b id="equipmentPath">--</b> · Última: <b id="lastUpdate">--</b>
     </div>
 
     <div class="grid">
@@ -193,6 +193,18 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
             <div class="stat-value" id="statMin">--</div>
             <div class="stat-label">Temp mín</div>
           </div>
+          <div class="stat">
+            <div class="stat-value" id="humCurrent">--</div>
+            <div class="stat-label">Hum actual</div>
+          </div>
+          <div class="stat">
+            <div class="stat-value" id="humMax">--</div>
+            <div class="stat-label">Hum máx</div>
+          </div>
+          <div class="stat">
+            <div class="stat-value" id="humMin">--</div>
+            <div class="stat-label">Hum mín</div>
+          </div>
         </div>
         <div class="axis-range" style="margin-top:10px">
           <span><span class="label">Histórico</span> <span id="historyCount">--</span></span>
@@ -218,54 +230,80 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
       return { ctx, w: rect.width, h: rect.height };
     }
 
-    function drawGrid(ctx, w, h) {
+    function drawGrid(ctx, pad, plotW, plotH) {
       ctx.strokeStyle = '#e5e7eb';
       ctx.lineWidth = 1;
       ctx.setLineDash([6, 6]);
       const rows = 4;
-      for (let i = 1; i <= rows; i++) {
-        const y = (h / (rows + 1)) * i;
+      for (let i = 0; i <= rows; i++) {
+        const y = pad.top + (plotH / rows) * i;
         ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(w, y);
+        ctx.moveTo(pad.left, y);
+        ctx.lineTo(pad.left + plotW, y);
         ctx.stroke();
       }
       ctx.setLineDash([]);
     }
 
-    function drawSeries(ctx, w, h, data, color, fillColor) {
+    function drawSeries(ctx, pad, plotW, plotH, data, color) {
       if (!data.length) return;
       const min = Math.min(...data);
       const max = Math.max(...data);
       const span = max - min || 1;
-      const pad = 10;
-      const step = w / Math.max(1, data.length - 1);
+      const step = plotW / Math.max(1, data.length - 1);
 
       ctx.strokeStyle = color;
       ctx.lineWidth = 2;
       ctx.beginPath();
       data.forEach((v, i) => {
-        const x = i * step;
-        const y = h - pad - ((v - min) / span) * (h - pad * 2);
+        const x = pad.left + i * step;
+        const y = pad.top + (1 - (v - min) / span) * plotH;
         if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
       });
       ctx.stroke();
-
-      if (fillColor) {
-        ctx.lineTo(w, h);
-        ctx.lineTo(0, h);
-        ctx.closePath();
-        ctx.fillStyle = fillColor;
-        ctx.fill();
-      }
     }
 
-    function renderDual(canvas, temp, hum) {
+    function drawAxesLabels(ctx, pad, plotW, plotH, tMin, tMax, hMin, hMax, startLabel, midLabel, endLabel) {
+      ctx.fillStyle = '#6b7280';
+      ctx.font = '12px system-ui, -apple-system, Segoe UI, Arial';
+
+      const tMid = (tMin + tMax) / 2;
+      const hMid = (hMin + hMax) / 2;
+
+      ctx.textAlign = 'right';
+      ctx.fillText(tMax.toFixed(1) + '°C', pad.left - 6, pad.top + 10);
+      ctx.fillText(tMid.toFixed(1) + '°C', pad.left - 6, pad.top + plotH / 2 + 4);
+      ctx.fillText(tMin.toFixed(1) + '°C', pad.left - 6, pad.top + plotH - 2);
+
+      ctx.textAlign = 'left';
+      ctx.fillText(hMax.toFixed(0) + '%', pad.left + plotW + 6, pad.top + 10);
+      ctx.fillText(hMid.toFixed(0) + '%', pad.left + plotW + 6, pad.top + plotH / 2 + 4);
+      ctx.fillText(hMin.toFixed(0) + '%', pad.left + plotW + 6, pad.top + plotH - 2);
+
+      ctx.textAlign = 'left';
+      ctx.fillText(startLabel, pad.left, pad.top + plotH + 14);
+      ctx.textAlign = 'center';
+      ctx.fillText(midLabel, pad.left + plotW / 2, pad.top + plotH + 14);
+      ctx.textAlign = 'right';
+      ctx.fillText(endLabel, pad.left + plotW, pad.top + plotH + 14);
+    }
+
+    function renderDual(canvas, temp, hum, labels) {
       const { ctx, w, h } = prepareCanvas(canvas);
+      const pad = { left: 36, right: 36, top: 12, bottom: 22 };
+      const plotW = w - pad.left - pad.right;
+      const plotH = h - pad.top - pad.bottom;
+
       ctx.clearRect(0, 0, w, h);
-      drawGrid(ctx, w, h);
-      drawSeries(ctx, w, h, temp, '#ef4444', null);
-      drawSeries(ctx, w, h, hum, '#3b82f6', null);
+      drawGrid(ctx, pad, plotW, plotH);
+      drawSeries(ctx, pad, plotW, plotH, temp, '#ef4444');
+      drawSeries(ctx, pad, plotW, plotH, hum, '#3b82f6');
+
+      drawAxesLabels(ctx, pad, plotW, plotH,
+        labels.tempMin, labels.tempMax,
+        labels.humMin, labels.humMax,
+        labels.startLabel, labels.midLabel, labels.endLabel
+      );
     }
 
     function filterByRange(data) {
@@ -291,6 +329,7 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
         .then(data => {
           document.getElementById('deviceId').textContent = data.deviceId;
           document.getElementById('equipment').textContent = data.equipmentId || 'Sin asignar';
+          document.getElementById('equipmentPath').textContent = data.equipmentPath || 'Sin ruta';
           document.getElementById('lastUpdate').textContent = new Date(data.timestamp).toLocaleString('es-ES');
         })
         .catch(() => {});
@@ -302,7 +341,23 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
           const temps = filtered.map(d => d.temperature);
           const hums = filtered.map(d => d.humidity);
 
-          renderDual(chart1Canvas, temps, hums);
+          const startTs = filtered.length ? filtered[0].timestamp : 0;
+          const endTs = filtered.length ? filtered[filtered.length - 1].timestamp : 0;
+          const midTs = filtered.length ? filtered[Math.floor(filtered.length / 2)].timestamp : 0;
+          const startLabel = startTs ? new Date(startTs).toLocaleTimeString('es-ES') : '--';
+          const midLabel = midTs ? new Date(midTs).toLocaleTimeString('es-ES') : '--';
+          const endLabel = endTs ? new Date(endTs).toLocaleTimeString('es-ES') : '--';
+
+          const tempMin = temps.length ? Math.min(...temps) : 0;
+          const tempMax = temps.length ? Math.max(...temps) : 0;
+          const humMin = hums.length ? Math.min(...hums) : 0;
+          const humMax = hums.length ? Math.max(...hums) : 0;
+
+          renderDual(chart1Canvas, temps, hums, {
+            tempMin, tempMax,
+            humMin, humMax,
+            startLabel, midLabel, endLabel
+          });
 
           if (temps.length > 0) {
             const current = temps[temps.length - 1];
@@ -319,6 +374,10 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
             const maxH = Math.max(...hums);
             const minH = Math.min(...hums);
             document.getElementById('rangeHum').textContent = 'Hum ' + minH.toFixed(0) + '–' + maxH.toFixed(0) + ' %';
+            const currentH = hums[hums.length - 1];
+            document.getElementById('humCurrent').textContent = currentH.toFixed(0) + '%';
+            document.getElementById('humMax').textContent = maxH.toFixed(0) + '%';
+            document.getElementById('humMin').textContent = minH.toFixed(0) + '%';
           }
 
           if (filtered.length > 0) {

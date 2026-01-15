@@ -62,9 +62,12 @@ static void clearWifiNetworksFromPrefs();
 static String getDeviceId();
 static void loadEquipmentId();
 static void persistEquipmentId(const String& equipmentId);
+static void loadEquipmentPath();
+static void persistEquipmentPath(const String& equipmentPath);
 static bool hasAssignedEquipment();
 static void sendDeviceStatus(bool online);
 static void startDeviceAssignmentStream();
+static void startEquipmentPathStream();
 static void startApConfigStream();
 static void setEquipmentOnlineFor(const String& equipmentId, bool online);
 
@@ -111,6 +114,7 @@ Preferences prefs;
 
 String deviceId;
 String currentEquipmentId;
+String currentEquipmentPath;
 
 // ============ WIFI PORTAL / CREDENCIALES (PREFERENCES) ============
 #define WIFI_MAX_NETWORKS 5
@@ -840,6 +844,24 @@ static void persistEquipmentId(const String& equipmentId) {
   prefs.end();
 }
 
+static void loadEquipmentPath() {
+  prefs.begin("iot", false);
+  String stored = prefs.getString("equipmentPath", "");
+  stored.trim();
+  currentEquipmentPath = stored;
+  prefs.end();
+}
+
+static void persistEquipmentPath(const String& equipmentPath) {
+  prefs.begin("iot", false);
+  if (equipmentPath.length() > 0) {
+    prefs.putString("equipmentPath", equipmentPath);
+  } else {
+    prefs.remove("equipmentPath");
+  }
+  prefs.end();
+}
+
 static bool hasAssignedEquipment() {
   return currentEquipmentId.length() > 0;
 }
@@ -937,6 +959,32 @@ static void streamCallback(FirebaseStream data) {
   }
 }
 
+static FirebaseData equipmentPathStream;
+
+static void equipmentPathStreamCallback(FirebaseStream data) {
+  if (data.dataTypeEnum() == fb_esp_rtdb_data_type_string) {
+    String newPath = data.stringData();
+    newPath.trim();
+    if (newPath != currentEquipmentPath) {
+      currentEquipmentPath = newPath;
+      persistEquipmentPath(currentEquipmentPath);
+      Serial.printf("🧭 Ruta jerárquica actualizada: %s\n", currentEquipmentPath.c_str());
+    }
+  } else if (data.dataTypeEnum() == fb_esp_rtdb_data_type_null) {
+    if (currentEquipmentPath.length() > 0) {
+      currentEquipmentPath = "";
+      persistEquipmentPath(currentEquipmentPath);
+      Serial.println("🧭 Ruta jerárquica eliminada (sin ruta).\n");
+    }
+  }
+}
+
+static void equipmentPathStreamTimeoutCallback(bool timeout) {
+  if (timeout) {
+    Serial.println("⚠ Stream ruta jerárquica timeout (reintentando)...");
+  }
+}
+
 static void streamTimeoutCallback(bool timeout) {
   if (timeout) {
     Serial.println("⚠ Stream timeout (reintentando)...");
@@ -959,6 +1007,24 @@ static void startDeviceAssignmentStream() {
   }
   Firebase.RTDB.setStreamCallback(&stream, streamCallback, streamTimeoutCallback);
   Serial.printf("👂 Escuchando asignación en: %s\n", path.c_str());
+}
+
+static void startEquipmentPathStream() {
+  if (!firebaseReady) return;
+  if (deviceId.length() == 0) return;
+
+  String path;
+  path.reserve(90);
+  path += "devices/";
+  path += deviceId;
+  path += "/assignedEquipmentPath";
+
+  if (!Firebase.RTDB.beginStream(&equipmentPathStream, path.c_str())) {
+    Serial.printf("✗ Error iniciando stream ruta jerárquica: %s\n", equipmentPathStream.errorReason().c_str());
+    return;
+  }
+  Firebase.RTDB.setStreamCallback(&equipmentPathStream, equipmentPathStreamCallback, equipmentPathStreamTimeoutCallback);
+  Serial.printf("👂 Escuchando ruta jerárquica en: %s\n", path.c_str());
 }
 
 static FirebaseData apConfigStream;
@@ -1507,9 +1573,11 @@ void setupFirebase() {
 
     // Cargar equipo asignado (NVS/config) y registrar el device
     loadEquipmentId();
+    loadEquipmentPath();
     Serial.printf("📌 Equipo asignado (local): %s\n", currentEquipmentId.c_str());
     sendDeviceStatus(true);
     startDeviceAssignmentStream();
+    startEquipmentPathStream();
     startApConfigStream();
     
     // Enviar estado inicial

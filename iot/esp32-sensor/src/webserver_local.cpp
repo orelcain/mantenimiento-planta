@@ -16,6 +16,7 @@ uint16_t telemetryCount = 0;
 // Variables externas del main.cpp
 extern String deviceId;
 extern String currentEquipmentId;
+extern String currentEquipmentPath;
 
 // ============ HANDLERS HTTP ============
 
@@ -64,6 +65,11 @@ void handleApiCurrent() {
     doc["equipmentId"] = nullptr;
   } else {
     doc["equipmentId"] = currentEquipmentId;
+  }
+  if (currentEquipmentPath.isEmpty()) {
+    doc["equipmentPath"] = "";
+  } else {
+    doc["equipmentPath"] = currentEquipmentPath;
   }
   doc["timestamp"] = reading.timestamp;
   doc["temperature"] = reading.temperature;
