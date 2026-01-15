@@ -6,7 +6,8 @@
 #include <ArduinoJson.h>
 
 // ============ VARIABLES GLOBALES ============
-WebServer localServer(LOCAL_WEB_SERVER_PORT);
+// NOTA: portalServer definido en main.cpp
+extern WebServer portalServer;
 
 TelemetryReading telemetryHistory[TELEMETRY_HISTORY_SIZE];
 uint16_t telemetryIndex = 0;
@@ -19,12 +20,12 @@ extern String currentEquipmentId;
 // ============ HANDLERS HTTP ============
 
 void handleDashboard() {
-  localServer.send_P(200, "text/html", HTML_DASHBOARD);
+  portalServer.send_P(200, "text/html", HTML_DASHBOARD);
 }
 
 void handleApiCurrent() {
   if (telemetryCount == 0) {
-    localServer.send(503, "application/json", "{\"error\":\"No data available\"}");
+    portalServer.send(503, "application/json", "{\"error\":\"No data available\"}");
     return;
   }
 
@@ -48,7 +49,7 @@ void handleApiCurrent() {
 
   String json;
   serializeJson(doc, json);
-  localServer.send(200, "application/json", json);
+  portalServer.send(200, "application/json", json);
 }
 
 void handleApiHistory() {
@@ -76,40 +77,40 @@ void handleApiHistory() {
 
   String json;
   serializeJson(doc, json);
-  localServer.send(200, "application/json", json);
+  portalServer.send(200, "application/json", json);
 }
 
 void handleNotFound() {
   // Captive Portal: redirigir todo al dashboard
   // Esto hace que al conectarse al WiFi AP se abra automáticamente el navegador
   if (WiFi.getMode() & WIFI_MODE_AP) {
-    localServer.sendHeader("Location", "http://192.168.4.1", true);
-    localServer.send(302, "text/plain", "");
+    portalServer.sendHeader("Location", "http://192.168.4.1", true);
+    portalServer.send(302, "text/plain", "");
   } else {
-    localServer.send(404, "text/plain", "404 Not Found");
+    portalServer.send(404, "text/plain", "404 Not Found");
   }
 }
 
 // ============ SETUP ============
 
 void setupLocalWebServer() {
-  localServer.on("/", handleDashboard);
-  localServer.on("/api/current", handleApiCurrent);
-  localServer.on("/api/history", handleApiHistory);
+  // Registrar endpoints del dashboard en portalServer
+  portalServer.on("/", handleDashboard);
+  portalServer.on("/api/current", handleApiCurrent);
+  portalServer.on("/api/history", handleApiHistory);
   
   // Captive Portal: capturar todas las peticiones comunes de detección
-  localServer.on("/generate_204", handleDashboard);          // Android
-  localServer.on("/gen_204", handleDashboard);               // Android
-  localServer.on("/ncsi.txt", handleDashboard);              // Windows
-  localServer.on("/hotspot-detect.html", handleDashboard);   // iOS/macOS
-  localServer.on("/canonical.html", handleDashboard);        // Firefox
-  localServer.on("/success.txt", handleDashboard);           // Firefox
-  localServer.on("/connecttest.txt", handleDashboard);       // Windows
+  portalServer.on("/generate_204", handleDashboard);          // Android
+  portalServer.on("/gen_204", handleDashboard);               // Android
+  portalServer.on("/ncsi.txt", handleDashboard);              // Windows
+  portalServer.on("/hotspot-detect.html", handleDashboard);   // iOS/macOS
+  portalServer.on("/canonical.html", handleDashboard);        // Firefox
+  portalServer.on("/success.txt", handleDashboard);           // Firefox
+  portalServer.on("/connecttest.txt", handleDashboard);       // Windows
   
-  localServer.onNotFound(handleNotFound);
+  portalServer.onNotFound(handleNotFound);
 
-  localServer.begin();
-  Serial.println("✅ Servidor web local iniciado en puerto " + String(LOCAL_WEB_SERVER_PORT));
+  Serial.println("✅ Endpoints del dashboard registrados en puerto " + String(LOCAL_WEB_SERVER_PORT));
   Serial.println("🌐 Accede via:");
   
   if (WiFi.getMode() & WIFI_MODE_AP) {
@@ -124,7 +125,8 @@ void setupLocalWebServer() {
 // ============ LOOP ============
 
 void handleLocalWebServer() {
-  localServer.handleClient();
+  // portalServer.handleClient() se llama desde main.cpp en handleConfigPortalLoop()
+  // No hacer nada aquí para evitar llamadas duplicadas
 }
 
 // ============ AGREGAR LECTURA AL HISTÓRICO ============

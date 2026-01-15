@@ -15,7 +15,8 @@
 #define TELEMETRY_HISTORY_SIZE 100 // Últimas 100 lecturas en RAM
 
 // ============ SERVIDOR Y DATOS ============
-extern WebServer localServer;
+// NOTA: Usamos portalServer de main.cpp (puerto 80 compartido)
+extern WebServer portalServer;
 
 // Estructura para histórico de lecturas
 struct TelemetryReading {

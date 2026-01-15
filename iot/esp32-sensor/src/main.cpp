@@ -119,7 +119,7 @@ static bool postWifiInitialized = false;
 static bool portalActive = false;
 static DNSServer dnsServer;
 static DNSServer apDnsServer;  // DNS para captive portal AP
-static WebServer portalServer(80);
+WebServer portalServer(80);  // No static, compartido con webserver_local.cpp
 
 static String savedWifiSsid[WIFI_MAX_NETWORKS];
 static String savedWifiPass[WIFI_MAX_NETWORKS];
