@@ -464,6 +464,8 @@ export function SensorsPage() {
                         onChange={(e) => setDeviceSearch(e.target.value)}
                         placeholder="Buscar por ID (MAC)…"
                         className="flex-1"
+                        autoComplete="off"
+                        type="search"
                       />
                       {deviceSearch && (
                         <Button
@@ -853,7 +855,20 @@ export function SensorsPage() {
                 </div>
 
                 <div className="border-t pt-4 space-y-3">
-                  <div className="text-sm font-medium">Cambiar asignación</div>
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm font-medium">Asignar a equipo</div>
+                    {selectedDevice?.assignedEquipmentId && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setSelectedEquipmentId('')}
+                        className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                      >
+                        Cambiar equipo
+                      </Button>
+                    )}
+                  </div>
                   
                   {/* Filtros jerárquicos en cascada */}
                   <div className="grid gap-2 sm:grid-cols-3">
@@ -972,6 +987,8 @@ export function SensorsPage() {
                       value={equipmentSearch}
                       onChange={(e) => setEquipmentSearch(e.target.value)}
                       placeholder="Escribe para filtrar por nombre o código..."
+                      autoComplete="off"
+                      type="search"
                     />
                   </div>
 
@@ -1052,36 +1069,50 @@ export function SensorsPage() {
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Button
-                      type="button"
-                      onClick={() => saveAssignment(selectedEquipmentId || null)}
-                      disabled={!selectedEquipmentId || saving}
-                      className="gap-2"
-                    >
-                      <Link2 className="h-4 w-4" />
-                      {saving ? 'Guardando…' : 'Asignar'}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={() => saveAssignment(null)}
-                      disabled={saving}
-                      className="gap-2"
-                    >
-                      <Unlink2 className="h-4 w-4" />
-                      Desasignar
-                    </Button>
+                  <div className="flex flex-col gap-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button
+                        type="button"
+                        onClick={() => saveAssignment(selectedEquipmentId || null)}
+                        disabled={!selectedEquipmentId || saving}
+                        className="gap-2 flex-1 min-w-[140px]"
+                      >
+                        <Link2 className="h-4 w-4" />
+                        {saving ? 'Guardando…' : selectedDevice?.assignedEquipmentId ? 'Cambiar equipo' : 'Asignar equipo'}
+                      </Button>
+                      {selectedDevice?.assignedEquipmentId && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => saveAssignment(null)}
+                          disabled={saving}
+                          className="gap-2"
+                        >
+                          <Unlink2 className="h-4 w-4" />
+                          Quitar asignación
+                        </Button>
+                      )}
+                    </div>
+
+                    {!selectedEquipmentId && !selectedDevice?.assignedEquipmentId && (
+                      <div className="text-xs text-muted-foreground bg-blue-50 dark:bg-blue-950/20 p-2 rounded border border-blue-200 dark:border-blue-800">
+                        💡 Selecciona un equipo de la lista arriba para asignarlo a este sensor
+                      </div>
+                    )}
                   </div>
 
                   {saveError && (
-                    <div className="text-sm text-destructive flex items-center gap-2">
+                    <div className="text-sm text-destructive flex items-center gap-2 bg-destructive/10 p-2 rounded">
                       <AlertTriangle className="h-4 w-4" />
                       {saveError}
                     </div>
                   )}
 
-                  {saveOk && <div className="text-sm text-muted-foreground">{saveOk}</div>}
+                  {saveOk && (
+                    <div className="text-sm text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-950/20 p-2 rounded border border-green-200 dark:border-green-800">
+                      ✓ {saveOk}
+                    </div>
+                  )}
                 </div>
                 </CardContent>
               </Card>
