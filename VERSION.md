@@ -26,12 +26,22 @@
   - Lecturas guardadas en LittleFS (hasta 20,000)
   - Intervalo de lectura configurable desde panel local
 
+- 📊 **Dashboard ESP32 mejorado**:
+  - Tooltip touch/hover para ver lecturas al tocar el gráfico
+  - Muestra tiempo y valores (temp/hum) del punto tocado
+  - Botón reset zoom "100%" para volver a vista normal
+  - Rangos del eje Y ajustados fielmente a las lecturas
+  - UI compacta (~30% más pequeña) para mejor visual en móvil
+  - Meta info en múltiples líneas (device, equipo, ruta)
+
 **Fixes Técnicos:**
 - ✅ Fix detección real-time sin throttling
 - ✅ Fix propagación de eventos en botón eliminar
+- ✅ Zoom Y ahora ajusta rangos correctamente
 
 **Build PWA:**
 - ✅ Build local OK (apps/pwa)
+- ✅ Firmware ESP32 flasheado (95.6% flash)
 
 ---
 
