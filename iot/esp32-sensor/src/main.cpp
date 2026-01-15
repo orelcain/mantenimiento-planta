@@ -217,6 +217,9 @@ static void ensureAlwaysOnAp() {
   apDnsServer.start(53, "*", apIP);
   Serial.println("🌐 Captive Portal DNS activo - Dashboard se abre automáticamente");
   
+  // Asegurar que el servidor HTTP esté escuchando en el AP
+  ensureHttpServerListening();
+  
   apInitialized = true;
 }
 
