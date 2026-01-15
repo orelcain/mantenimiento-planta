@@ -96,15 +96,25 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
       align-items: center;
       gap: 10px;
     }
-    .badge {
-      background: #667eea;
-      color: white;
-      padding: 4px 12px;
-      border-radius: 20px;
-      font-size: 0.7em;
-      font-weight: 500;
+    .legend {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 6px 0 10px;
+      font-size: 0.9em;
+      color: #555;
     }
+    .legend-item { display: flex; align-items: center; gap: 6px; }
+    .legend-dot { width: 12px; height: 4px; border-radius: 4px; display: inline-block; }
     canvas { width: 100%; height: 260px; display: block; }
+    .axis-range {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.85em;
+      color: #666;
+      margin-top: 6px;
+    }
+    .axis-range .label { font-weight: 600; color: #444; }
     .stats {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
@@ -144,11 +154,15 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
 
     <div class="grid">
       <div class="chart-card">
-        <div class="chart-title">
-          1. Línea de Tiempo Clásica
-          <span class="badge">Básico</span>
+        <div class="chart-title">1. Línea de Tiempo Clásica</div>
+        <div class="legend">
+          <div class="legend-item"><span class="legend-dot" style="background:#ef4444"></span>Temperatura (°C)</div>
         </div>
         <canvas id="chart1"></canvas>
+        <div class="axis-range">
+          <span><span class="label">Y</span> <span id="rangeTemp1">--</span></span>
+          <span><span class="label">X</span> Tiempo (últimas lecturas)</span>
+        </div>
         <div class="stats">
           <div class="stat">
             <div class="stat-value" id="statCurrent">--</div>
@@ -166,19 +180,28 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
       </div>
 
       <div class="chart-card">
-        <div class="chart-title">
-          2. Área Suavizada con Gradiente
-          <span class="badge">Premium</span>
+        <div class="chart-title">2. Área Suavizada con Gradiente</div>
+        <div class="legend">
+          <div class="legend-item"><span class="legend-dot" style="background:#667eea"></span>Temperatura (°C)</div>
         </div>
         <canvas id="chart2"></canvas>
+        <div class="axis-range">
+          <span><span class="label">Y</span> <span id="rangeTemp2">--</span></span>
+          <span><span class="label">X</span> Tiempo (últimas lecturas)</span>
+        </div>
       </div>
 
       <div class="chart-card">
-        <div class="chart-title">
-          3. Doble Eje (Temperatura + Humedad)
-          <span class="badge">Recomendado</span>
+        <div class="chart-title">3. Doble Eje (Temperatura + Humedad)</div>
+        <div class="legend">
+          <div class="legend-item"><span class="legend-dot" style="background:#ef4444"></span>Temperatura (°C)</div>
+          <div class="legend-item"><span class="legend-dot" style="background:#3b82f6"></span>Humedad (%)</div>
         </div>
         <canvas id="chart3"></canvas>
+        <div class="axis-range">
+          <span><span class="label">Y</span> <span id="rangeTemp3">--</span> · <span id="rangeHum3">--</span></span>
+          <span><span class="label">X</span> Tiempo (últimas lecturas)</span>
+        </div>
       </div>
     </div>
 
@@ -283,6 +306,16 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
             document.getElementById('statCurrent').textContent = current.toFixed(1) + '°C';
             document.getElementById('statMax').textContent = max.toFixed(1) + '°C';
             document.getElementById('statMin').textContent = min.toFixed(1) + '°C';
+
+            document.getElementById('rangeTemp1').textContent = min.toFixed(1) + '–' + max.toFixed(1) + ' °C';
+            document.getElementById('rangeTemp2').textContent = min.toFixed(1) + '–' + max.toFixed(1) + ' °C';
+            document.getElementById('rangeTemp3').textContent = 'Temp ' + min.toFixed(1) + '–' + max.toFixed(1) + ' °C';
+          }
+
+          if (hums.length > 0) {
+            const maxH = Math.max(...hums);
+            const minH = Math.min(...hums);
+            document.getElementById('rangeHum3').textContent = 'Hum ' + minH.toFixed(0) + '–' + maxH.toFixed(0) + ' %';
           }
         })
         .catch(() => {});
