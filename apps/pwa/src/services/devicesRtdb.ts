@@ -86,30 +86,23 @@ export function subscribeDevices(
 ) {
   const r = ref(rtdb, 'devices')
   
-  let lastEmit = 0
-  const THROTTLE_MS = 2000 // Solo actualizar cada 2 segundos
+  console.log('[devicesRtdb] Iniciando suscripción a devices/')
 
   const unsubscribe = onValue(
     r,
     (snap) => {
-      const now = Date.now()
       const devices = snapshotToDevices(snap)
-      
-      // Throttle: solo emitir si han pasado más de 2 segundos
-      if (now - lastEmit < THROTTLE_MS) {
-        return
-      }
-      
-      lastEmit = now
+      console.log('[devicesRtdb] Datos recibidos:', devices.length, 'dispositivos')
       onData(devices)
     },
     (err) => {
-      console.error('[devicesRtdb] Error:', err)
+      console.error('[devicesRtdb] Error suscripción:', err)
       onError?.(err)
     }
   )
 
   return () => {
+    console.log('[devicesRtdb] Desuscribiendo de devices/')
     unsubscribe()
   }
 }

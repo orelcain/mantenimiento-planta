@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Cpu, Link2, Unlink2, AlertTriangle, Thermometer, Droplets, Activity, X, BarChart3, Wifi } from 'lucide-react'
-import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui'
+import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui'
 import { useAppStore, useAuthStore } from '@/store'
 import type { Equipment } from '@/types'
 import type { DeviceRow } from '@/services/devicesRtdb'
@@ -115,9 +115,12 @@ export function SensorsPage() {
   const [timeRange, setTimeRange] = useState<TimeRange>('24h')
 
   useEffect(() => {
+    console.log('[SensorsPage] Montando componente, iniciando suscripción devices')
     const unsub = subscribeDevices(
       (rows) => {
+        console.log('[SensorsPage] Dispositivos recibidos:', rows.length)
         setDevices(rows)
+        setLoadError(null) // Limpiar error si la suscripción funciona
         // Auto seleccionar el primer dispositivo si no hay selección.
         if (!selectedDeviceId && rows[0]?.deviceId) {
           setSelectedDeviceId(rows[0].deviceId)
@@ -125,11 +128,15 @@ export function SensorsPage() {
       },
       (err) => {
         console.error('[SensorsPage] Error suscripción devices:', err)
-        setLoadError(err instanceof Error ? err.message : 'Error leyendo dispositivos (RTDB).')
+        const errorMsg = err instanceof Error ? err.message : 'Error leyendo dispositivos de Firebase RTDB'
+        setLoadError(`${errorMsg}. Verifica que estés autenticado y que las reglas RTDB permitan lectura.`)
       }
     )
 
-    return () => unsub()
+    return () => {
+      console.log('[SensorsPage] Desmontando componente')
+      unsub()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -337,119 +344,216 @@ export function SensorsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Sensores</h1>
+        <h1 className="text-2xl font-bold">Sensores IoT</h1>
         <p className="text-muted-foreground">
-          Empareja dispositivos (ESP32) con equipos sin editar firmware por equipo.
+          Gestiona dispositivos ESP32, visualiza telemetría en tiempo real y configura WiFi local (AP).
         </p>
       </div>
 
       {loadError && (
-        <div className="text-sm text-destructive flex items-center gap-2">
-          <AlertTriangle className="h-4 w-4" />
-          {loadError}
+        <div className="rounded border border-destructive/50 bg-destructive/10 p-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 text-destructive mt-0.5" />
+            <div className="flex-1">
+              <div className="font-medium text-destructive">Error de conexión</div>
+              <div className="text-sm text-destructive/90 mt-1">{loadError}</div>
+              <div className="text-xs text-muted-foreground mt-2">
+                • Verifica que estés autenticado en Firebase
+                <br />
+                • Revisa que el ESP32 esté encendido y conectado
+                <br />• Comprueba las reglas de seguridad de Firebase RTDB
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Layout adaptativo: cuando el gráfico está visible, columna de telemetría ocupa más espacio */}
-      <div className={showChart ? "grid gap-4 lg:grid-cols-[300px_1fr_350px]" : "grid gap-4 lg:grid-cols-3"}>
-        {/* Columna 1: Lista de dispositivos */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2">
-              <Cpu className="h-5 w-5" />
-              Dispositivos detectados
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="max-w-xl">
-              <Label>Buscar dispositivo</Label>
-              <Input
-                value={deviceSearch}
-                onChange={(e) => setDeviceSearch(e.target.value)}
-                placeholder="Buscar por deviceId (MAC)…"
-              />
-              <div className="mt-1 text-xs text-muted-foreground">{filteredDevices.length} dispositivo(s)</div>
-            </div>
+      {/* Info rápida de estado */}
+      {!loadError && (
+        <div className="grid gap-4 md:grid-cols-3">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm text-muted-foreground">Dispositivos</div>
+                  <div className="text-2xl font-bold">{devices.length}</div>
+                </div>
+                <Cpu className="h-8 w-8 text-muted-foreground" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm text-muted-foreground">Online</div>
+                  <div className="text-2xl font-bold text-green-600">
+                    {devices.filter(d => d.online).length}
+                  </div>
+                </div>
+                <Activity className="h-8 w-8 text-green-600" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm text-muted-foreground">Asignados</div>
+                  <div className="text-2xl font-bold text-blue-600">
+                    {devices.filter(d => d.assignedEquipmentId).length}
+                  </div>
+                </div>
+                <Link2 className="h-8 w-8 text-blue-600" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
-            <div className="space-y-2 max-h-[420px] overflow-auto">
-              {filteredDevices.length === 0 ? (
-                <div className="text-sm text-muted-foreground">No hay dispositivos aún.</div>
+      {/* Layout principal */}
+      <div className="grid gap-6 lg:grid-cols-[380px_1fr]">
+        {/* Columna izquierda: Lista de dispositivos */}
+        <div className="space-y-4">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2">
+                <Cpu className="h-5 w-5" />
+                Dispositivos ESP32
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {devices.length === 0 ? (
+                <div className="text-center py-8">
+                  <Cpu className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
+                  <div className="text-sm font-medium">No hay dispositivos detectados</div>
+                  <div className="text-xs text-muted-foreground mt-2 max-w-xs mx-auto">
+                    Verifica que tu ESP32 esté encendido, conectado a WiFi y publicando en Firebase RTDB.
+                  </div>
+                </div>
               ) : (
-                filteredDevices.map((d) => {
-                  const lastSeen = normalizeTs(d.lastSeen)
-                  const isSelected = d.deviceId === selectedDeviceId
-                  return (
-                    <button
-                      key={d.deviceId}
-                      type="button"
-                      onClick={() => setSelectedDeviceId(d.deviceId)}
-                      className={`w-full text-left rounded border p-3 transition-colors ${isSelected ? 'border-primary bg-primary/5' : 'hover:bg-muted/40'}`}
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="font-medium">{d.deviceId}</div>
-                        {onlineBadge(Boolean(d.online))}
-                      </div>
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        {lastSeen ? `Último reporte: ${formatDateTime(lastSeen)}` : 'Sin lastSeen'}
-                      </div>
-                      {d.assignedEquipmentId && (
-                        <div className="mt-1 text-xs">
-                          <span className="text-muted-foreground">Equipo: </span>
-                          <span className="font-medium">
-                            {equipment.find((e) => e.id === d.assignedEquipmentId)?.nombre || d.assignedEquipmentId}
-                          </span>
-                        </div>
-                      )}
-                      {!d.assignedEquipmentId && (
-                        <div className="mt-1 text-xs text-amber-600">Sin asignar</div>
-                      )}
-                    </button>
-                  )
-                })
+                <>
+                  <div>
+                    <Label>Buscar dispositivo</Label>
+                    <Input
+                      value={deviceSearch}
+                      onChange={(e) => setDeviceSearch(e.target.value)}
+                      placeholder="Buscar por ID (MAC)…"
+                      className="mt-1"
+                    />
+                    <div className="mt-1.5 text-xs text-muted-foreground">
+                      {filteredDevices.length} de {devices.length} dispositivo(s)
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 max-h-[500px] overflow-auto">
+                    {filteredDevices.map((d) => {
+                      const lastSeen = normalizeTs(d.lastSeen)
+                      const isSelected = d.deviceId === selectedDeviceId
+                      const assignedEquip = d.assignedEquipmentId 
+                        ? equipment.find((e) => e.id === d.assignedEquipmentId)
+                        : null
+                      
+                      return (
+                        <button
+                          key={d.deviceId}
+                          type="button"
+                          onClick={() => setSelectedDeviceId(d.deviceId)}
+                          className={`w-full text-left rounded-lg border p-3 transition-all ${
+                            isSelected 
+                              ? 'border-primary bg-primary/5 shadow-sm' 
+                              : 'hover:bg-muted/40 hover:border-muted-foreground/20'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-2 mb-2">
+                            <div className="flex-1 min-w-0">
+                              <div className="font-mono text-sm font-medium truncate">
+                                {d.deviceId}
+                              </div>
+                            </div>
+                            {onlineBadge(Boolean(d.online))}
+                          </div>
+
+                          {assignedEquip && (
+                            <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-950/20 rounded text-xs">
+                              <div className="font-medium text-blue-900 dark:text-blue-100">
+                                {assignedEquip.nombre}
+                              </div>
+                              <div className="text-blue-600 dark:text-blue-400 mt-0.5">
+                                {assignedEquip.codigo}
+                              </div>
+                            </div>
+                          )}
+
+                          {!assignedEquip && (
+                            <div className="mt-2 text-xs">
+                              <Badge variant="secondary" className="text-amber-600">
+                                Sin asignar
+                              </Badge>
+                            </div>
+                          )}
+
+                          <div className="mt-2 text-xs text-muted-foreground">
+                            {lastSeen ? formatDateTime(lastSeen) : 'Sin reporte'}
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </>
               )}
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
 
-        {/* Columna 2: Telemetría en tiempo real */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2">
-              <Activity className="h-5 w-5" />
-              Telemetría
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {!selectedDevice ? (
-              <div className="text-sm text-muted-foreground">Selecciona un dispositivo para ver su telemetría.</div>
-            ) : (
-              <>
-                {/* Info del equipo asignado (si existe) */}
-                {assignedEquipment && (
-                  <div className="space-y-2 pb-3 border-b">
-                    <div className="text-sm font-medium">Equipo asociado</div>
-                    <div className="text-xs">
-                      <div className="font-medium">{assignedEquipment.nombre}</div>
-                      <div className="text-muted-foreground">{assignedEquipment.codigo}</div>
-                      {assignedEquipment.hierarchyPath && (
-                        <div className="text-muted-foreground mt-1">{assignedEquipment.hierarchyPath}</div>
-                      )}
+        {/* Columna derecha: Detalles del dispositivo seleccionado */}
+        <div className="space-y-4">
+          {!selectedDevice ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <Cpu className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+                <div className="text-lg font-medium mb-2">Selecciona un dispositivo</div>
+                <div className="text-sm text-muted-foreground max-w-md mx-auto">
+                  Elige un ESP32 de la lista para ver su telemetría en tiempo real, asignarlo a un equipo y configurar su WiFi local.
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <>
+              {/* Card de Telemetría */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2">
+                    <Activity className="h-5 w-5" />
+                    Telemetría en tiempo real
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {assignedEquipment && (
+                    <div className="space-y-2 pb-3 border-b">
+                      <div className="text-sm font-medium">Equipo asociado</div>
+                      <div className="text-xs">
+                        <div className="font-medium">{assignedEquipment.nombre}</div>
+                        <div className="text-muted-foreground">{assignedEquipment.codigo}</div>
+                        {assignedEquipment.hierarchyPath && (
+                          <div className="text-muted-foreground mt-1">{assignedEquipment.hierarchyPath}</div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {/* Dispositivo sin asignar */}
-                {!assignedEquipment && (
-                  <div className="pb-3 border-b">
-                    <div className="text-sm font-medium">Dispositivo sin asignar</div>
-                    <div className="text-xs text-muted-foreground">
-                      Este sensor no está asignado a ningún equipo. Puedes ver su telemetría en tiempo real para verificar que funciona.
+                  {/* Dispositivo sin asignar */}
+                  {!assignedEquipment && (
+                    <div className="pb-3 border-b">
+                      <div className="text-sm font-medium">Dispositivo sin asignar</div>
+                      <div className="text-xs text-muted-foreground">
+                        Este sensor no está asignado a ningún equipo. Puedes ver su telemetría en tiempo real para verificar que funciona.
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {displayTelemetry ? (
-                  <div className="space-y-3">
+                  {displayTelemetry ? (
+                    <div className="space-y-3">
                     {/* Temperatura */}
                     {displayTelemetry.temperatura && (
                       <div className="rounded border p-3 bg-orange-50 dark:bg-orange-950/20">
@@ -613,41 +717,38 @@ export function SensorsPage() {
                         </div>
                       )}
                     </div>
-                  </div>
-                ) : (
-                  <div className="text-sm text-muted-foreground">
-                    Esperando datos del sensor...
-                  </div>
-                )}
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Columna 3: Emparejar */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center justify-between">
-              <span>Emparejar</span>
-              {selectedDevice ? onlineBadge(Boolean(selectedDevice.online)) : <Badge variant="secondary">—</Badge>}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {!selectedDevice ? (
-              <div className="text-sm text-muted-foreground">Selecciona un dispositivo para emparejarlo.</div>
-            ) : (
-              <>
-                <div className="space-y-1">
-                  <div className="text-sm text-muted-foreground">Dispositivo</div>
-                  <div className="font-medium break-all">{selectedDevice.deviceId}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {selectedDevice.ip ? `IP: ${selectedDevice.ip}` : ''}
-                    {typeof selectedDevice.rssi === 'number' ? ` · RSSI: ${selectedDevice.rssi} dBm` : ''}
-                  </div>
-                  {selectedDevice.firmwareVersion && (
-                    <div className="text-xs text-muted-foreground">Firmware: {selectedDevice.firmwareVersion}</div>
+                    </div>
+                  ) : (
+                    <div className="text-sm text-muted-foreground">
+                      Esperando datos del sensor...
+                    </div>
                   )}
-                </div>
+                </CardContent>
+              </Card>
+
+              {/* Card de Emparejar */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center justify-between">
+                    <span className="flex items-center gap-2">
+                      <Link2 className="h-5 w-5" />
+                      Emparejar
+                    </span>
+                    {onlineBadge(Boolean(selectedDevice.online))}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-1">
+                    <div className="text-sm text-muted-foreground">Dispositivo</div>
+                    <div className="font-mono text-sm">{selectedDevice.deviceId}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {selectedDevice.ip ? `IP: ${selectedDevice.ip}` : ''}
+                      {typeof selectedDevice.rssi === 'number' ? ` · RSSI: ${selectedDevice.rssi} dBm` : ''}
+                    </div>
+                    {selectedDevice.firmwareVersion && (
+                      <div className="text-xs text-muted-foreground">Firmware: {selectedDevice.firmwareVersion}</div>
+                    )}
+                  </div>
 
                 <div className="rounded border p-3 bg-muted/30">
                   <div className="text-sm font-medium mb-1">Asignación actual</div>
@@ -896,24 +997,18 @@ export function SensorsPage() {
 
                   {saveOk && <div className="text-sm text-muted-foreground">{saveOk}</div>}
                 </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
+                </CardContent>
+              </Card>
 
-        {/* Columna 4: Configuración AP */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2">
-              <Wifi className="h-5 w-5" />
-              <span>WiFi Local (AP)</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {!selectedDevice ? (
-              <div className="text-sm text-muted-foreground">Selecciona un dispositivo para configurar su AP.</div>
-            ) : (
-              <>
+              {/* Card de Configuración AP */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2">
+                    <Wifi className="h-5 w-5" />
+                    <span>WiFi Local (AP)</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
                 <div className="text-xs text-muted-foreground">
                   Configura el Access Point local del ESP32 para acceder a sus datos sin internet.
                 </div>
@@ -992,11 +1087,12 @@ export function SensorsPage() {
                       {apSaveOk}
                     </div>
                   )}
-                </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          )}
+        </div>
       </div>
     </div>
   )
