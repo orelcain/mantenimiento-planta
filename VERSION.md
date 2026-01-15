@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.18.1**
+## Versión Actual: **v2.19.0**
 
 **Fecha de lanzamiento**: 15 de enero de 2026  
 **Estado**: ✅ PRODUCCIÓN READY  
@@ -9,6 +9,54 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.19.0 - Mejoras UX Sensores y Config WiFi AP (15/01/2026)
+
+**Nuevas Funcionalidades:**
+- 🔐 **Config WiFi AP Ultra Mejorada**:
+  - Toggle 👁️ para mostrar/ocultar contraseña actual y nueva
+  - Generador de contraseñas seguras aleatorias (12 caracteres)
+  - Indicador visual de fortaleza (débil/media/fuerte)
+  - Validación visual con alertas si < 8 caracteres
+  - Botones copiar 📋 para SSID y contraseña con feedback ✓
+  - Carga automática de valores actuales del dispositivo
+  - Contador de caracteres dinámico
+  
+- 🗑️ **Eliminar Dispositivos**: nueva función para eliminar dispositivos duplicados/huérfanos
+- 📊 **UI Reorganizada**: dashboard de estadísticas y cards separadas
+- 🔄 **Fix Real-time**: detección sin throttling
+- ✅ **Fixes TypeScript**: agregadas propiedades apPassword/apEnabled en DeviceNode
+
+**Mejoras UX:**
+- Cuadro visual gradiente azul para configuración actual del AP
+- Muestra SSID y contraseña guardada con opciones de copiar
+- Generador criptográficamente seguro usando crypto.getRandomValues
+- Excluye caracteres confusos (0/O, 1/l/I) en contraseñas generadas
+- Barra de progreso visual para fortaleza de contraseña
+- Feedback inmediato al copiar (icono check verde por 2s)
+
+**Archivos Modificados:**
+- `apps/pwa/src/pages/SensorsPage.tsx`: 
+  - Agregados iconos Eye, EyeOff, Copy, RefreshCw, Check
+  - Nuevo estado showApPassword y copiedField
+  - useEffect para cargar config AP del dispositivo seleccionado
+  - Función generateSecurePassword() con crypto.getRandomValues
+  - Función copyToClipboard() con feedback visual
+  - Mejoras visuales en cuadro "Configuración Actual del AP"
+  - Campo contraseña con toggle, generador y validación
+- `apps/pwa/src/services/devicesRtdb.ts`:
+  - Agregadas propiedades apPassword y apEnabled en tipo DeviceNode
+- `apps/pwa/src/services/apConfigRtdb.ts`: 
+  - Fix autocomplete ultra-agresivo (one-time-code, name dinámico)
+
+**Beneficios:**
+- ✅ Usuario puede ver y copiar fácilmente credenciales WiFi
+- ✅ Generación de contraseñas seguras en 1 click
+- ✅ Validación visual previene contraseñas débiles
+- ✅ UX más profesional y pulida
+- ✅ Menos errores al transcribir manualmente
+
+---
 
 ### v2.18.1 - Selectores en Cascada (Padre → Hijo) (15/01/2026)
 

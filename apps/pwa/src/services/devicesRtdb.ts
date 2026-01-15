@@ -19,6 +19,8 @@ export type DeviceNode = {
   assignmentUpdatedBy?: string
   apSsid?: string
   apIp?: string
+  apPassword?: string
+  apEnabled?: boolean
   deviceName?: string
   mdns?: string
   telemetry?: {

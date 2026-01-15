@@ -220,7 +220,7 @@ export function SensorsPage() {
     const array = new Uint8Array(length)
     crypto.getRandomValues(array)
     for (let i = 0; i < length; i++) {
-      password += charset[array[i] % charset.length]
+      password += charset[array[i]! % charset.length]
     }
     setApPassword(password)
     setShowApPassword(true)
