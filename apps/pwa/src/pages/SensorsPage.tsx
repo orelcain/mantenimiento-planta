@@ -127,6 +127,10 @@ export function SensorsPage() {
   const [filterPlanta, setFilterPlanta] = useState<string>('todas')
   const [filterSector, setFilterSector] = useState<string>('todas')
   const [filterArea, setFilterArea] = useState<string>('todas')
+  const [filterNivel4, setFilterNivel4] = useState<string>('todas')
+  const [filterNivel5, setFilterNivel5] = useState<string>('todas')
+  const [filterNivel6, setFilterNivel6] = useState<string>('todas')
+  const [filterNivel7, setFilterNivel7] = useState<string>('todas')
   const [filterSinSensor, setFilterSinSensor] = useState(false)
   const [selectedEquipmentId, setSelectedEquipmentId] = useState<string>('')
 
@@ -284,7 +288,27 @@ export function SensorsPage() {
           const area = parts[2]
           if (!area || !area.toLowerCase().includes(filterArea.toLowerCase())) return false
         }
-      } else if (filterPlanta !== 'todas' || filterSector !== 'todas' || filterArea !== 'todas') {
+        
+        if (filterNivel4 !== 'todas' && parts.length > 3) {
+          const nivel4 = parts[3]
+          if (!nivel4 || !nivel4.toLowerCase().includes(filterNivel4.toLowerCase())) return false
+        }
+        
+        if (filterNivel5 !== 'todas' && parts.length > 4) {
+          const nivel5 = parts[4]
+          if (!nivel5 || !nivel5.toLowerCase().includes(filterNivel5.toLowerCase())) return false
+        }
+        
+        if (filterNivel6 !== 'todas' && parts.length > 5) {
+          const nivel6 = parts[5]
+          if (!nivel6 || !nivel6.toLowerCase().includes(filterNivel6.toLowerCase())) return false
+        }
+        
+        if (filterNivel7 !== 'todas' && parts.length > 6) {
+          const nivel7 = parts[6]
+          if (!nivel7 || !nivel7.toLowerCase().includes(filterNivel7.toLowerCase())) return false
+        }
+      } else if (filterPlanta !== 'todas' || filterSector !== 'todas' || filterArea !== 'todas' || filterNivel4 !== 'todas' || filterNivel5 !== 'todas' || filterNivel6 !== 'todas' || filterNivel7 !== 'todas') {
         // Si no tiene hierarchyPath y hay filtros jerárquicos activos, excluir
         return false
       }
@@ -293,7 +317,7 @@ export function SensorsPage() {
       if (!q) return true
       return toEquipmentSearchText(e).includes(q)
     })
-  }, [equipment, equipmentSearch, filterCriticidad, filterEstado, filterPlanta, filterSector, filterArea, filterSinSensor, devices])
+  }, [equipment, equipmentSearch, filterCriticidad, filterEstado, filterPlanta, filterSector, filterArea, filterNivel4, filterNivel5, filterNivel6, filterNivel7, filterSinSensor, devices])
 
   // Extraer opciones únicas de jerarquía
   const plantasDisponibles = useMemo(() => {
@@ -327,6 +351,50 @@ export function SensorsPage() {
       }
     })
     return Array.from(areas).sort()
+  }, [equipment])
+
+  const nivel4Disponibles = useMemo(() => {
+    const nivel4 = new Set<string>()
+    equipment.forEach(e => {
+      if (e.hierarchyPath) {
+        const parts = e.hierarchyPath.split(' > ')
+        if (parts[3]) nivel4.add(parts[3])
+      }
+    })
+    return Array.from(nivel4).sort()
+  }, [equipment])
+
+  const nivel5Disponibles = useMemo(() => {
+    const nivel5 = new Set<string>()
+    equipment.forEach(e => {
+      if (e.hierarchyPath) {
+        const parts = e.hierarchyPath.split(' > ')
+        if (parts[4]) nivel5.add(parts[4])
+      }
+    })
+    return Array.from(nivel5).sort()
+  }, [equipment])
+
+  const nivel6Disponibles = useMemo(() => {
+    const nivel6 = new Set<string>()
+    equipment.forEach(e => {
+      if (e.hierarchyPath) {
+        const parts = e.hierarchyPath.split(' > ')
+        if (parts[5]) nivel6.add(parts[5])
+      }
+    })
+    return Array.from(nivel6).sort()
+  }, [equipment])
+
+  const nivel7Disponibles = useMemo(() => {
+    const nivel7 = new Set<string>()
+    equipment.forEach(e => {
+      if (e.hierarchyPath) {
+        const parts = e.hierarchyPath.split(' > ')
+        if (parts[6]) nivel7.add(parts[6])
+      }
+    })
+    return Array.from(nivel7).sort()
   }, [equipment])
 
   async function saveAssignment(equipmentId: string | null) {
@@ -916,49 +984,122 @@ export function SensorsPage() {
                       </div>
                     </div>
                   ) : (
-                  <div className="grid gap-2 sm:grid-cols-3">
-                    <div>
-                      <Label>Planta</Label>
-                      <Select value={filterPlanta} onValueChange={setFilterPlanta}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Todas" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="todas">Todas las plantas</SelectItem>
-                          {plantasDisponibles.map(p => (
-                            <SelectItem key={p} value={p}>{p}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                  <div className="space-y-2">
+                    {/* Primera fila: Planta, Sector, Área */}
+                    <div className="grid gap-2 sm:grid-cols-3">
+                      <div>
+                        <Label>Planta</Label>
+                        <Select value={filterPlanta} onValueChange={setFilterPlanta}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Todas" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="todas">Todas las plantas</SelectItem>
+                            {plantasDisponibles.map(p => (
+                              <SelectItem key={p} value={p}>{p}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label>Sector</Label>
+                        <Select value={filterSector} onValueChange={setFilterSector}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Todos" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="todas">Todos los sectores</SelectItem>
+                            {sectoresDisponibles.map(s => (
+                              <SelectItem key={s} value={s}>{s}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label>Área</Label>
+                        <Select value={filterArea} onValueChange={setFilterArea}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Todas" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="todas">Todas las áreas</SelectItem>
+                            {areasDisponibles.map(a => (
+                              <SelectItem key={a} value={a}>{a}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
-                    <div>
-                      <Label>Sector</Label>
-                      <Select value={filterSector} onValueChange={setFilterSector}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Todos" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="todas">Todos los sectores</SelectItem>
-                          {sectoresDisponibles.map(s => (
-                            <SelectItem key={s} value={s}>{s}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label>Área</Label>
-                      <Select value={filterArea} onValueChange={setFilterArea}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Todas" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="todas">Todas las áreas</SelectItem>
-                          {areasDisponibles.map(a => (
-                            <SelectItem key={a} value={a}>{a}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    
+                    {/* Segunda fila: Niveles 4, 5, 6, 7 */}
+                    {(nivel4Disponibles.length > 0 || nivel5Disponibles.length > 0 || nivel6Disponibles.length > 0 || nivel7Disponibles.length > 0) && (
+                      <div className="grid gap-2 sm:grid-cols-4">
+                        {nivel4Disponibles.length > 0 && (
+                          <div>
+                            <Label>Nivel 4</Label>
+                            <Select value={filterNivel4} onValueChange={setFilterNivel4}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Todos" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="todas">Todos</SelectItem>
+                                {nivel4Disponibles.map(n => (
+                                  <SelectItem key={n} value={n}>{n}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
+                        {nivel5Disponibles.length > 0 && (
+                          <div>
+                            <Label>Nivel 5</Label>
+                            <Select value={filterNivel5} onValueChange={setFilterNivel5}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Todos" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="todas">Todos</SelectItem>
+                                {nivel5Disponibles.map(n => (
+                                  <SelectItem key={n} value={n}>{n}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
+                        {nivel6Disponibles.length > 0 && (
+                          <div>
+                            <Label>Nivel 6</Label>
+                            <Select value={filterNivel6} onValueChange={setFilterNivel6}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Todos" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="todas">Todos</SelectItem>
+                                {nivel6Disponibles.map(n => (
+                                  <SelectItem key={n} value={n}>{n}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
+                        {nivel7Disponibles.length > 0 && (
+                          <div>
+                            <Label>Nivel 7</Label>
+                            <Select value={filterNivel7} onValueChange={setFilterNivel7}>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Todos" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="todas">Todos</SelectItem>
+                                {nivel7Disponibles.map(n => (
+                                  <SelectItem key={n} value={n}>{n}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                   )}
 
@@ -1008,7 +1149,7 @@ export function SensorsPage() {
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <Label>Buscar equipo (opcional)</Label>
-                      {(equipmentSearch || filterPlanta !== 'todas' || filterSector !== 'todas' || filterArea !== 'todas' || filterEstado !== 'todas' || filterCriticidad !== 'todas' || filterSinSensor) && (
+                      {(equipmentSearch || filterPlanta !== 'todas' || filterSector !== 'todas' || filterArea !== 'todas' || filterNivel4 !== 'todas' || filterNivel5 !== 'todas' || filterNivel6 !== 'todas' || filterNivel7 !== 'todas' || filterEstado !== 'todas' || filterCriticidad !== 'todas' || filterSinSensor) && (
                         <Button
                           type="button"
                           variant="ghost"
@@ -1018,6 +1159,10 @@ export function SensorsPage() {
                             setFilterPlanta('todas')
                             setFilterSector('todas')
                             setFilterArea('todas')
+                            setFilterNivel4('todas')
+                            setFilterNivel5('todas')
+                            setFilterNivel6('todas')
+                            setFilterNivel7('todas')
                             setFilterEstado('todas')
                             setFilterCriticidad('todas')
                             setFilterSinSensor(false)

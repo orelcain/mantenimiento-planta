@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.17.5**
+## Versión Actual: **v2.18.0**
 
 **Fecha de lanzamiento**: 14 de enero de 2026  
 **Estado**: ✅ PRODUCCIÓN READY  
@@ -9,6 +9,43 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.18.0 - Jerarquía Extendida a 7 Niveles (14/01/2026)
+
+**Nueva Funcionalidad:**
+- 🎯 **7 Niveles de Jerarquía**: extendida la jerarquía de equipos de 3 a 7 niveles máximos.
+- 📊 **Selectores Dinámicos**: niveles adicionales (4-7) solo se muestran si existen datos para ellos.
+- 🔍 **Filtrado Completo**: todos los niveles son filtables de forma independiente.
+- ✨ **Layout Responsivo**: primera fila con 3 niveles (Planta/Sector/Área), segunda fila con hasta 4 niveles adicionales.
+
+**Estructura de Jerarquía:**
+1. **Nivel 1**: Planta (existente)
+2. **Nivel 2**: Sector (existente)
+3. **Nivel 3**: Área (existente)
+4. **Nivel 4**: Línea, Sección, etc. (nuevo)
+5. **Nivel 5**: Zona, Célula, etc. (nuevo)
+6. **Nivel 6**: Módulo, Estación, etc. (nuevo)
+7. **Nivel 7**: Subequipo, Componente, etc. (nuevo)
+
+**Archivos Modificados:**
+- `apps/pwa/src/pages/SensorsPage.tsx`: 
+  - Agregados 4 estados de filtro (filterNivel4-7)
+  - Agregados 4 useMemo para extraer niveles disponibles
+  - Actualizado filtrado para incluir niveles 4-7
+  - UI reorganizada en 2 filas de selectores
+  - Actualizada función "Limpiar filtros"
+
+**Beneficios:**
+- ✅ Soporte completo para jerarquías complejas de equipos industriales
+- ✅ Mayor granularidad en asignación de sensores IoT
+- ✅ Filtrado preciso hasta el nivel más bajo de la estructura
+- ✅ Escalabilidad para organizaciones con múltiples niveles organizacionales
+
+**Compatibilidad:**
+- ✅ Totalmente retrocompatible con jerarquías de 3 niveles existentes
+- ✅ Los niveles adicionales son opcionales y solo se muestran si existen
+
+---
 
 ### v2.17.5 - Fix Bucle Infinito Equipment Loading (14/01/2026)
 
