@@ -1,14 +1,32 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.16.11**
+## Versión Actual: **v2.16.12**
 
-**Fecha de lanzamiento**: 11 de enero de 2026  
+**Fecha de lanzamiento**: 14 de enero de 2026  
 **Estado**: ✅ PRODUCCIÓN READY  
 **Build**: ✅ Último build local OK
 
 ---
 
 ## 📋 Información de la Versión
+
+### v2.16.12 - Config AP Remota ESP32 (14/01/2026)
+
+**Mejoras Principales:**
+- 📡 **Configuración AP Remota**: nueva UI en página Sensores para configurar WiFi local (AP) de cada ESP32 desde la PWA.
+- 🔐 **Seguridad WiFi**: soporte para SSID personalizado y contraseña WPA2 (mínimo 8 caracteres).
+- 🔄 **Sincronización Real-Time**: ESP32 escucha cambios en Firebase RTDB y aplica configuración AP dinámicamente.
+- 🛡️ **Modo Dual**: AP local siempre activo (AP+STA) mientras está conectado a WiFi de internet.
+- 🧹 **Auto-limpieza**: firmware detecta y limpia SSID erróneos guardados en memoria.
+
+**Archivos Nuevos:**
+- `apps/pwa/src/services/apConfigRtdb.ts`: servicio Firebase para configuración AP
+- Stream `apConfig` en ESP32 firmware para sincronización real-time
+
+**Flujo:**
+PWA (UI) → Firebase RTDB (`devices/{id}/apConfig`) → ESP32 (stream listener) → Aplica config AP
+
+---
 
 ### v2.16.10 - Zoom Tiempo Real (11/01/2026)
 

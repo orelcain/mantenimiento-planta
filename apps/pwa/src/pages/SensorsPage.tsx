@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Cpu, Link2, Unlink2, AlertTriangle, Thermometer, Droplets, Activity, X, BarChart3 } from 'lucide-react'
+import { Cpu, Link2, Unlink2, AlertTriangle, Thermometer, Droplets, Activity, X, BarChart3, Wifi } from 'lucide-react'
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui'
 import { useAppStore, useAuthStore } from '@/store'
 import type { Equipment } from '@/types'
@@ -7,6 +7,7 @@ import type { DeviceRow } from '@/services/devicesRtdb'
 import type { SensorSummaryNode } from '@/services/sensorsRtdb'
 import { assignDeviceToEquipment, subscribeDevices } from '@/services/devicesRtdb'
 import { subscribeSensorSummary } from '@/services/sensorsRtdb'
+import { saveApConfig } from '@/services/apConfigRtdb'
 import { TelemetryChart, type ChartType } from '@/components/telemetry/TelemetryChart'
 import { TelemetryExportDialog } from '@/components/telemetry/TelemetryExportDialog'
 import { useTelemetryHistory, type TimeRange } from '@/hooks/useTelemetryHistory'
@@ -99,6 +100,14 @@ export function SensorsPage() {
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saveOk, setSaveOk] = useState<string | null>(null)
+
+  // Estado para configuración AP
+  const [apEnabled, setApEnabled] = useState(true)
+  const [apSsid, setApSsid] = useState('')
+  const [apPassword, setApPassword] = useState('')
+  const [savingAp, setSavingAp] = useState(false)
+  const [apSaveError, setApSaveError] = useState<string | null>(null)
+  const [apSaveOk, setApSaveOk] = useState<string | null>(null)
 
   // Estado para el gráfico de telemetría
   const [showChart, setShowChart] = useState(false)
@@ -299,6 +308,29 @@ export function SensorsPage() {
       setSaveError(err instanceof Error ? err.message : 'Error guardando asignación (RTDB).')
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function saveApConfiguration() {
+    if (!selectedDevice) return
+
+    setApSaveError(null)
+    setApSaveOk(null)
+    setSavingAp(true)
+
+    try {
+      await saveApConfig(selectedDevice.deviceId, {
+        enabled: apEnabled,
+        ssid: apSsid.trim() || undefined,
+        password: apPassword.trim() || undefined
+      })
+      setApSaveOk('✓ Configuración AP enviada al dispositivo')
+      // Limpiar mensaje después de 3 segundos
+      setTimeout(() => setApSaveOk(null), 3000)
+    } catch (err) {
+      setApSaveError(err instanceof Error ? err.message : 'Error guardando configuración AP')
+    } finally {
+      setSavingAp(false)
     }
   }
 
@@ -863,6 +895,103 @@ export function SensorsPage() {
                   )}
 
                   {saveOk && <div className="text-sm text-muted-foreground">{saveOk}</div>}
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Columna 4: Configuración AP */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2">
+              <Wifi className="h-5 w-5" />
+              <span>WiFi Local (AP)</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {!selectedDevice ? (
+              <div className="text-sm text-muted-foreground">Selecciona un dispositivo para configurar su AP.</div>
+            ) : (
+              <>
+                <div className="text-xs text-muted-foreground">
+                  Configura el Access Point local del ESP32 para acceder a sus datos sin internet.
+                </div>
+
+                {selectedDevice.apSsid && (
+                  <div className="rounded border p-2 bg-muted/30">
+                    <div className="text-xs font-medium mb-1">AP Actual</div>
+                    <div className="text-xs">
+                      <div className="font-mono">{selectedDevice.apSsid}</div>
+                      <div className="text-muted-foreground">IP: {selectedDevice.apIp || '192.168.4.1'}</div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="ap-enabled"
+                      checked={apEnabled}
+                      onChange={(e) => setApEnabled(e.target.checked)}
+                      className="rounded border-gray-300"
+                    />
+                    <Label htmlFor="ap-enabled" className="text-sm cursor-pointer">
+                      AP siempre activo (AP+STA)
+                    </Label>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="ap-ssid">SSID del AP</Label>
+                    <Input
+                      id="ap-ssid"
+                      placeholder="Ej: Sensor-Horno-1"
+                      value={apSsid}
+                      onChange={(e) => setApSsid(e.target.value)}
+                      className="mt-1"
+                    />
+                    <div className="text-xs text-muted-foreground mt-1">
+                      Vacío = ESP32-{selectedDevice.deviceId.slice(-6)}
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="ap-password">Contraseña WPA2</Label>
+                    <Input
+                      id="ap-password"
+                      type="password"
+                      placeholder="Mínimo 8 caracteres"
+                      value={apPassword}
+                      onChange={(e) => setApPassword(e.target.value)}
+                      className="mt-1"
+                    />
+                    <div className="text-xs text-muted-foreground mt-1">
+                      Vacío = red abierta (sin contraseña)
+                    </div>
+                  </div>
+
+                  <Button
+                    onClick={saveApConfiguration}
+                    disabled={savingAp}
+                    className="w-full gap-2"
+                  >
+                    <Wifi className="h-4 w-4" />
+                    {savingAp ? 'Enviando…' : 'Guardar Config AP'}
+                  </Button>
+
+                  {apSaveError && (
+                    <div className="text-sm text-destructive flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4" />
+                      {apSaveError}
+                    </div>
+                  )}
+
+                  {apSaveOk && (
+                    <div className="text-sm text-green-600 font-medium">
+                      {apSaveOk}
+                    </div>
+                  )}
                 </div>
               </>
             )}
