@@ -1360,7 +1360,25 @@ export function SensorsPage() {
                   </div>
 
                   <div>
-                    <Label>Selecciona un equipo ({filteredEquipment.length} de {equipment.length} totales)</Label>
+                    <div className="flex items-center justify-between mb-2">
+                      <Label className="text-sm font-medium">
+                        Selecciona un equipo
+                        <span className="ml-2 text-xs font-normal text-muted-foreground">
+                          ({filteredEquipment.length} {filteredEquipment.length === 1 ? 'equipo' : 'equipos'} {filteredEquipment.length !== equipment.length && `de ${equipment.length} totales`})
+                        </span>
+                      </Label>
+                      {selectedEquipmentId && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setSelectedEquipmentId('')}
+                          className="h-7 text-xs"
+                        >
+                          Limpiar selección
+                        </Button>
+                      )}
+                    </div>
                     <div className="mt-2 max-h-[300px] overflow-y-auto border rounded-md bg-muted/20">
                       {equipment.length === 0 ? (
                         <div className="p-4 text-sm text-center space-y-2">
@@ -1371,13 +1389,21 @@ export function SensorsPage() {
                         </div>
                       ) : filteredEquipment.length === 0 ? (
                         <div className="p-4 text-sm text-center space-y-2">
-                          <div className="text-amber-600">No se encontraron equipos con esos filtros</div>
-                          <div className="text-xs text-muted-foreground">
-                            Prueba cambiar los filtros de Estado o Criticidad
+                          <div className="text-amber-600 font-medium">❌ No se encontraron equipos con esos filtros</div>
+                          <div className="text-xs text-muted-foreground space-y-1">
+                            <div>• Verifica que la combinación de Planta/Sector/Área sea correcta</div>
+                            <div>• Prueba cambiar los filtros de Estado o Criticidad</div>
+                            <div>• O usa el botón "Limpiar filtros" arriba</div>
                           </div>
                         </div>
                       ) : (
-                        <div className="divide-y">
+                        <>
+                          {filteredEquipment.length > 5 && (
+                            <div className="sticky top-0 z-10 p-2 text-xs text-center bg-blue-50 dark:bg-blue-950/30 border-b text-blue-700 dark:text-blue-300">
+                              💡 Desliza hacia abajo para ver todos los equipos ({filteredEquipment.length})
+                            </div>
+                          )}
+                          <div className="divide-y">
                           {filteredEquipment.slice(0, 100).map((e) => {
                             const isSelected = e.id === selectedEquipmentId
                             return (
@@ -1426,7 +1452,8 @@ export function SensorsPage() {
                               </button>
                             )
                           })}
-                        </div>
+                          </div>
+                        </>
                       )}
                       {filteredEquipment.length > 100 && (
                         <div className="p-2 text-xs text-center text-muted-foreground bg-muted/40 border-t">
@@ -1436,7 +1463,20 @@ export function SensorsPage() {
                     </div>
                   </div>
 
+                  {/* Resumen de selección y botones de acción */}
                   <div className="flex flex-col gap-3">
+                    {selectedEquipmentId && equipment.find(e => e.id === selectedEquipmentId) && (
+                      <div className="p-3 rounded-md bg-primary/10 border border-primary/30">
+                        <div className="text-xs font-medium text-primary mb-1">✓ Equipo seleccionado:</div>
+                        <div className="text-sm font-medium">
+                          {equipment.find(e => e.id === selectedEquipmentId)?.nombre}
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-0.5">
+                          {equipment.find(e => e.id === selectedEquipmentId)?.codigo}
+                        </div>
+                      </div>
+                    )}
+                    
                     <div className="flex flex-wrap items-center gap-2">
                       <Button
                         type="button"
