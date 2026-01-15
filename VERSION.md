@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.17.0**
+## Versión Actual: **v2.17.1**
 
 **Fecha de lanzamiento**: 14 de enero de 2026  
 **Estado**: ✅ PRODUCCIÓN READY  
@@ -9,6 +9,18 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.17.1 - Fix Filtro Búsqueda (14/01/2026)
+
+**Fixes:**
+- 🔍 **Botón Limpiar Filtro**: agregado botón X para limpiar búsqueda de dispositivos cuando hay texto.
+- ⚠️ **Mensaje Alerta**: indicador visual si el filtro oculta todos los dispositivos ("No hay resultados, limpia el filtro").
+- 🐛 **UX Mejorada**: evita confusión cuando los dispositivos desaparecen por filtro activo.
+
+**Archivos Modificados:**
+- `apps/pwa/src/pages/SensorsPage.tsx`: botón X + mensaje alerta en filtro búsqueda
+
+---
 
 ### v2.17.0 - UI Sensores Mejorada + Delete Devices (14/01/2026)
 

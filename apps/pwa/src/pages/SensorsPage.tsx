@@ -458,14 +458,32 @@ export function SensorsPage() {
                 <>
                   <div>
                     <Label>Buscar dispositivo</Label>
-                    <Input
-                      value={deviceSearch}
-                      onChange={(e) => setDeviceSearch(e.target.value)}
-                      placeholder="Buscar por ID (MAC)…"
-                      className="mt-1"
-                    />
+                    <div className="flex gap-2 mt-1">
+                      <Input
+                        value={deviceSearch}
+                        onChange={(e) => setDeviceSearch(e.target.value)}
+                        placeholder="Buscar por ID (MAC)…"
+                        className="flex-1"
+                      />
+                      {deviceSearch && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setDeviceSearch('')}
+                          className="px-3"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                     <div className="mt-1.5 text-xs text-muted-foreground">
                       {filteredDevices.length} de {devices.length} dispositivo(s)
+                      {deviceSearch && filteredDevices.length === 0 && (
+                        <span className="text-amber-600 ml-2">
+                          • No hay resultados, limpia el filtro
+                        </span>
+                      )}
                     </div>
                   </div>
 
