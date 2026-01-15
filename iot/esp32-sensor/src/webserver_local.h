@@ -73,7 +73,7 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
     }
     .grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(600px, 1fr));
+      grid-template-columns: 1fr;
       gap: 25px;
     }
     .chart-card {
@@ -87,14 +87,25 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
       transform: translateY(-3px);
       box-shadow: 0 12px 36px rgba(0,0,0,0.3);
     }
-    .chart-title {
-      font-size: 1.3em;
-      font-weight: 600;
-      margin-bottom: 15px;
-      color: #667eea;
+    .range-bar {
       display: flex;
-      align-items: center;
-      gap: 10px;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .range-btn {
+      border: 1px solid #c7d2fe;
+      background: #eef2ff;
+      color: #3730a3;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 0.85em;
+      cursor: pointer;
+    }
+    .range-btn.active {
+      background: #4f46e5;
+      color: #fff;
+      border-color: #4f46e5;
     }
     .legend {
       display: flex;
@@ -154,53 +165,34 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
 
     <div class="grid">
       <div class="chart-card">
-        <div class="chart-title">1. Línea de Tiempo Clásica</div>
-        <div class="legend">
-          <div class="legend-item"><span class="legend-dot" style="background:#ef4444"></span>Temperatura (°C)</div>
+        <div class="range-bar">
+          <button class="range-btn active" data-range="1h">1 h</button>
+          <button class="range-btn" data-range="6h">6 h</button>
+          <button class="range-btn" data-range="24h">24 h</button>
+          <button class="range-btn" data-range="all">Todo</button>
         </div>
-        <canvas id="chart1"></canvas>
-        <div class="axis-range">
-          <span><span class="label">Y</span> <span id="rangeTemp1">--</span></span>
-          <span><span class="label">X</span> Tiempo (últimas lecturas)</span>
-        </div>
-        <div class="stats">
-          <div class="stat">
-            <div class="stat-value" id="statCurrent">--</div>
-            <div class="stat-label">Actual</div>
-          </div>
-          <div class="stat">
-            <div class="stat-value" id="statMax">--</div>
-            <div class="stat-label">Máx</div>
-          </div>
-          <div class="stat">
-            <div class="stat-value" id="statMin">--</div>
-            <div class="stat-label">Mín</div>
-          </div>
-        </div>
-      </div>
-
-      <div class="chart-card">
-        <div class="chart-title">2. Área Suavizada con Gradiente</div>
-        <div class="legend">
-          <div class="legend-item"><span class="legend-dot" style="background:#667eea"></span>Temperatura (°C)</div>
-        </div>
-        <canvas id="chart2"></canvas>
-        <div class="axis-range">
-          <span><span class="label">Y</span> <span id="rangeTemp2">--</span></span>
-          <span><span class="label">X</span> Tiempo (últimas lecturas)</span>
-        </div>
-      </div>
-
-      <div class="chart-card">
-        <div class="chart-title">3. Doble Eje (Temperatura + Humedad)</div>
         <div class="legend">
           <div class="legend-item"><span class="legend-dot" style="background:#ef4444"></span>Temperatura (°C)</div>
           <div class="legend-item"><span class="legend-dot" style="background:#3b82f6"></span>Humedad (%)</div>
         </div>
-        <canvas id="chart3"></canvas>
+        <canvas id="chart1"></canvas>
         <div class="axis-range">
-          <span><span class="label">Y</span> <span id="rangeTemp3">--</span> · <span id="rangeHum3">--</span></span>
-          <span><span class="label">X</span> Tiempo (últimas lecturas)</span>
+          <span><span class="label">Y</span> <span id="rangeTemp">--</span> · <span id="rangeHum">--</span></span>
+          <span><span class="label">X</span> Tiempo (rango seleccionado)</span>
+        </div>
+        <div class="stats">
+          <div class="stat">
+            <div class="stat-value" id="statCurrent">--</div>
+            <div class="stat-label">Temp actual</div>
+          </div>
+          <div class="stat">
+            <div class="stat-value" id="statMax">--</div>
+            <div class="stat-label">Temp máx</div>
+          </div>
+          <div class="stat">
+            <div class="stat-value" id="statMin">--</div>
+            <div class="stat-label">Temp mín</div>
+          </div>
         </div>
       </div>
     </div>
@@ -210,8 +202,7 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
 
   <script>
     const chart1Canvas = document.getElementById('chart1');
-    const chart2Canvas = document.getElementById('chart2');
-    const chart3Canvas = document.getElementById('chart3');
+    let currentRange = '1h';
 
     function prepareCanvas(canvas) {
       const dpr = window.devicePixelRatio || 1;
@@ -224,8 +215,9 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
     }
 
     function drawGrid(ctx, w, h) {
-      ctx.strokeStyle = '#eef0f5';
+      ctx.strokeStyle = '#e5e7eb';
       ctx.lineWidth = 1;
+      ctx.setLineDash([6, 6]);
       const rows = 4;
       for (let i = 1; i <= rows; i++) {
         const y = (h / (rows + 1)) * i;
@@ -234,6 +226,7 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
         ctx.lineTo(w, y);
         ctx.stroke();
       }
+      ctx.setLineDash([]);
     }
 
     function drawSeries(ctx, w, h, data, color, fillColor) {
@@ -263,13 +256,6 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
       }
     }
 
-    function renderSingle(canvas, data, color, fillColor) {
-      const { ctx, w, h } = prepareCanvas(canvas);
-      ctx.clearRect(0, 0, w, h);
-      drawGrid(ctx, w, h);
-      drawSeries(ctx, w, h, data, color, fillColor);
-    }
-
     function renderDual(canvas, temp, hum) {
       const { ctx, w, h } = prepareCanvas(canvas);
       ctx.clearRect(0, 0, w, h);
@@ -277,6 +263,23 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
       drawSeries(ctx, w, h, temp, '#ef4444', null);
       drawSeries(ctx, w, h, hum, '#3b82f6', null);
     }
+
+    function filterByRange(data) {
+      if (currentRange === 'all') return data;
+      const now = Date.now();
+      const ranges = { '1h': 60 * 60 * 1000, '6h': 6 * 60 * 60 * 1000, '24h': 24 * 60 * 60 * 1000 };
+      const windowMs = ranges[currentRange] || ranges['1h'];
+      return data.filter(d => (now - d.timestamp) <= windowMs);
+    }
+
+    document.querySelectorAll('.range-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentRange = btn.dataset.range;
+        updateData();
+      });
+    });
 
     function updateData() {
       fetch('/api/current')
@@ -291,13 +294,11 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
       fetch('/api/history')
         .then(r => r.json())
         .then(data => {
-          const labels = data.map(d => new Date(d.timestamp).toLocaleTimeString('es-ES'));
-          const temps = data.map(d => d.temperature);
-          const hums = data.map(d => d.humidity);
+          const filtered = filterByRange(data);
+          const temps = filtered.map(d => d.temperature);
+          const hums = filtered.map(d => d.humidity);
 
-          renderSingle(chart1Canvas, temps, '#ef4444', 'rgba(239, 68, 68, 0.12)');
-          renderSingle(chart2Canvas, temps, '#667eea', 'rgba(102, 126, 234, 0.25)');
-          renderDual(chart3Canvas, temps, hums);
+          renderDual(chart1Canvas, temps, hums);
 
           if (temps.length > 0) {
             const current = temps[temps.length - 1];
@@ -307,15 +308,13 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
             document.getElementById('statMax').textContent = max.toFixed(1) + '°C';
             document.getElementById('statMin').textContent = min.toFixed(1) + '°C';
 
-            document.getElementById('rangeTemp1').textContent = min.toFixed(1) + '–' + max.toFixed(1) + ' °C';
-            document.getElementById('rangeTemp2').textContent = min.toFixed(1) + '–' + max.toFixed(1) + ' °C';
-            document.getElementById('rangeTemp3').textContent = 'Temp ' + min.toFixed(1) + '–' + max.toFixed(1) + ' °C';
+            document.getElementById('rangeTemp').textContent = 'Temp ' + min.toFixed(1) + '–' + max.toFixed(1) + ' °C';
           }
 
           if (hums.length > 0) {
             const maxH = Math.max(...hums);
             const minH = Math.min(...hums);
-            document.getElementById('rangeHum3').textContent = 'Hum ' + minH.toFixed(0) + '–' + maxH.toFixed(0) + ' %';
+            document.getElementById('rangeHum').textContent = 'Hum ' + minH.toFixed(0) + '–' + maxH.toFixed(0) + ' %';
           }
         })
         .catch(() => {});
