@@ -701,12 +701,14 @@ export function SensorsPage() {
                         onChange={(e) => setDeviceSearch(e.target.value)}
                         placeholder="Buscar por ID (MAC)…"
                         className="flex-1"
-                        autoComplete="off"
+                        autoComplete="one-time-code"
                         autoCorrect="off"
                         autoCapitalize="off"
                         spellCheck="false"
-                        type="search"
-                        name="device-search-field"
+                        type="text"
+                        name={`device-search-${Date.now()}`}
+                        data-lpignore="true"
+                        data-form-type="other"
                       />
                       {deviceSearch && (
                         <Button
