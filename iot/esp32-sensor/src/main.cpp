@@ -21,6 +21,7 @@
 #include <DNSServer.h>
 #include <LittleFS.h>
 #include <ESPmDNS.h>
+#include <esp_task_wdt.h>
 #include "webserver_local.h"
 
 // Config local (no versionada) / config de ejemplo (versionada)
@@ -2125,6 +2126,9 @@ void sendSensorData() {
 
 // ============ LOOP PRINCIPAL ============
 void loop() {
+  // Alimentar watchdog para evitar reinicios
+  esp_task_wdt_reset();
+  
   handleConfigPortalLoop();
   handleLocalWebServer(); // Dashboard local de telemetría
   initAfterWifiOnce();
