@@ -547,7 +547,10 @@ export function SensorsPage() {
                               type="button"
                               variant="ghost"
                               size="sm"
-                              onClick={() => handleDeleteDevice(d.deviceId)}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleDeleteDevice(d.deviceId)
+                              }}
                               disabled={isDeleting}
                               className="w-full text-destructive hover:text-destructive hover:bg-destructive/10"
                             >
