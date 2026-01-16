@@ -147,7 +147,7 @@ export function SensorsPage() {
   const [savingAp, setSavingAp] = useState(false)
   const [apSaveError, setApSaveError] = useState<string | null>(null)
   const [apSaveOk, setApSaveOk] = useState<string | null>(null)
-  const [copiedField, setCopiedField] = useState<'ssid' | 'password' | null>(null)
+  const [copiedField, setCopiedField] = useState<'ssid' | 'password' | 'otaHost' | 'otaPassword' | null>(null)
 
   // Estado para eliminar dispositivos
   const [deletingDevice, setDeletingDevice] = useState<string | null>(null)
@@ -203,6 +203,10 @@ export function SensorsPage() {
     [devices, selectedDeviceId]
   )
 
+  const otaHostname = selectedDevice?.deviceId ? `esp32-${selectedDevice.deviceId.slice(-6)}` : ''
+  const otaHostLabel = otaHostname ? `${otaHostname}.local` : ''
+  const otaPassword = '12345678'
+
   // Cargar configuración AP actual del dispositivo seleccionado
   useEffect(() => {
     if (selectedDevice) {
@@ -231,7 +235,7 @@ export function SensorsPage() {
   }
 
   // Función para copiar al portapapeles
-  const copyToClipboard = async (text: string, field: 'ssid' | 'password') => {
+  const copyToClipboard = async (text: string, field: 'ssid' | 'password' | 'otaHost' | 'otaPassword') => {
     try {
       await navigator.clipboard.writeText(text)
       setCopiedField(field)
@@ -1878,6 +1882,54 @@ export function SensorsPage() {
                       )}
                       <div className="text-xs text-muted-foreground">
                         IP: {selectedDevice.apIp || '192.168.4.1'}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {selectedDevice && (
+                  <div className="rounded border p-3 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 border-emerald-200 dark:border-emerald-800">
+                    <div className="text-xs font-semibold text-emerald-700 dark:text-emerald-300 mb-2 flex items-center gap-1">
+                      <Wifi className="h-3 w-3" />
+                      Información OTA (WiFi)
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="text-xs text-muted-foreground">Hostname:</div>
+                        <div className="flex items-center gap-1">
+                          <span className="font-mono text-sm font-medium">{otaHostLabel || '--'}</span>
+                          <button
+                            onClick={() => copyToClipboard(otaHostLabel || '', 'otaHost')}
+                            className="p-1 hover:bg-white/50 dark:hover:bg-black/20 rounded transition-colors"
+                            title="Copiar hostname"
+                          >
+                            {copiedField === 'otaHost' ? (
+                              <Check className="h-3 w-3 text-green-600" />
+                            ) : (
+                              <Copy className="h-3 w-3 text-muted-foreground" />
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="text-xs text-muted-foreground">Contraseña OTA:</div>
+                        <div className="flex items-center gap-1">
+                          <span className="font-mono text-sm font-medium">{otaPassword}</span>
+                          <button
+                            onClick={() => copyToClipboard(otaPassword, 'otaPassword')}
+                            className="p-1 hover:bg-white/50 dark:hover:bg-black/20 rounded transition-colors"
+                            title="Copiar contraseña OTA"
+                          >
+                            {copiedField === 'otaPassword' ? (
+                              <Check className="h-3 w-3 text-green-600" />
+                            ) : (
+                              <Copy className="h-3 w-3 text-muted-foreground" />
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        Usa mDNS: {otaHostLabel || 'esp32-XXXXXX.local'}
                       </div>
                     </div>
                   </div>
