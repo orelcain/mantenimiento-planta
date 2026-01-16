@@ -461,62 +461,103 @@ static void ensureHttpServerStarted() {
 
   // ============ CAPTIVE PORTAL DETECTION ============
   // Android detecta captive portal esperando código 204 (No Content)
-  // Si recibe 204, asume que no hay captive portal
-  // Si recibe 200 o 302-307, abre el portal
+  // Si NO recibe 204, asume que hay captive portal y lo abre
   portalServer.on("/generate_204", HTTP_GET, []() {
     Serial.println("📱 Android captive detection: /generate_204");
-    // Responder 200 en lugar de 204 para forzar apertura del portal
+    // Responder con HTML que redirige automáticamente
+    String html = "<html><head><meta http-equiv='refresh' content='0;url=http://";
+    html += WiFi.softAPIP().toString();
+    html += "' /></head><body>Redirigiendo al portal...</body></html>";
     portalServer.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     portalServer.sendHeader("Pragma", "no-cache");
     portalServer.sendHeader("Expires", "0");
-    portalServer.sendHeader("Location", "http://" + WiFi.softAPIP().toString(), true);
-    portalServer.send(302, "text/plain", "Redirigiendo al portal...");
+    portalServer.send(200, "text/html", html);
   });
   
   portalServer.on("/gen_204", HTTP_GET, []() {
     Serial.println("📱 Android captive detection: /gen_204");
+    String html = "<html><head><meta http-equiv='refresh' content='0;url=http://";
+    html += WiFi.softAPIP().toString();
+    html += "' /></head><body>Redirigiendo al portal...</body></html>";
     portalServer.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     portalServer.sendHeader("Pragma", "no-cache");
     portalServer.sendHeader("Expires", "0");
-    portalServer.sendHeader("Location", "http://" + WiFi.softAPIP().toString(), true);
-    portalServer.send(302, "text/plain", "Redirigiendo al portal...");
+    portalServer.send(200, "text/html", html);
   });
 
   // iOS/macOS detecta captive portal con estas URLs
   portalServer.on("/hotspot-detect.html", HTTP_GET, []() {
     Serial.println("📱 iOS captive detection: /hotspot-detect.html");
+    // iOS espera HTML con contenido específico para abrir el portal
+    String html = "<!DOCTYPE html><html><head>";
+    html += "<meta http-equiv='refresh' content='0;url=http://";
+    html += WiFi.softAPIP().toString();
+    html += "' /></head><body><h1>Conectando...</h1></body></html>";
     portalServer.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     portalServer.sendHeader("Pragma", "no-cache");
-    portalServer.sendHeader("Expires", "0");
-    portalServer.sendHeader("Location", "http://" + WiFi.softAPIP().toString(), true);
-    portalServer.send(302, "text/html", "<html><body>Redirigiendo...</body></html>");
+    portalServer.send(200, "text/html", html);
   });
 
   portalServer.on("/library/test/success.html", HTTP_GET, []() {
     Serial.println("📱 iOS captive detection: /library/test/success.html");
+    String html = "<!DOCTYPE html><html><head>";
+    html += "<meta http-equiv='refresh' content='0;url=http://";
+    html += WiFi.softAPIP().toString();
+    html += "' /></head><body><h1>Conectando...</h1></body></html>";
     portalServer.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     portalServer.sendHeader("Pragma", "no-cache");
-    portalServer.sendHeader("Expires", "0");
-    portalServer.sendHeader("Location", "http://" + WiFi.softAPIP().toString(), true);
-    portalServer.send(302, "text/html", "<html><body>Redirigiendo...</body></html>");
+    portalServer.send(200, "text/html", html);
   });
 
   // Windows detecta con estas URLs
   portalServer.on("/ncsi.txt", HTTP_GET, []() {
+    Serial.println("📱 Windows captive detection: /ncsi.txt");
+    String html = "<html><head><meta http-equiv='refresh' content='0;url=http://";
+    html += WiFi.softAPIP().toString();
+    html += "' /></head><body>Microsoft NCSI</body></html>";
     portalServer.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     portalServer.sendHeader("Pragma", "no-cache");
-    portalServer.sendHeader("Expires", "0");
-    // Windows espera "Microsoft NCSI" pero redireccionar funciona mejor
-    portalServer.sendHeader("Location", "http://" + WiFi.softAPIP().toString(), true);
-    portalServer.send(302, "text/plain", "Microsoft NCSI");
+    portalServer.send(200, "text/html", html);
   });
 
   portalServer.on("/connecttest.txt", HTTP_GET, []() {
+    Serial.println("📱 Windows captive detection: /connecttest.txt");
+    String html = "<html><head><meta http-equiv='refresh' content='0;url=http://";
+    html += WiFi.softAPIP().toString();
+    html += "' /></head><body>Microsoft Connect Test</body></html>";
     portalServer.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     portalServer.sendHeader("Pragma", "no-cache");
-    portalServer.sendHeader("Expires", "0");
-    portalServer.sendHeader("Location", "http://" + WiFi.softAPIP().toString(), true);
-    portalServer.send(302, "text/plain", "Microsoft Connect Test");
+    portalServer.send(200, "text/html", html);
+  });
+
+  // URLs adicionales de Android (versiones más recientes)
+  portalServer.on("/mobile/status.php", HTTP_GET, []() {
+    Serial.println("📱 Android captive detection: /mobile/status.php");
+    String html = "<html><head><meta http-equiv='refresh' content='0;url=http://";
+    html += WiFi.softAPIP().toString();
+    html += "' /></head><body>Redirigiendo...</body></html>";
+    portalServer.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    portalServer.send(200, "text/html", html);
+  });
+
+  portalServer.on("/generate204", HTTP_GET, []() {
+    Serial.println("📱 Android captive detection: /generate204");
+    String html = "<html><head><meta http-equiv='refresh' content='0;url=http://";
+    html += WiFi.softAPIP().toString();
+    html += "' /></head><body>Redirigiendo...</body></html>";
+    portalServer.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    portalServer.send(200, "text/html", html);
+  });
+
+  // iOS versiones más recientes
+  portalServer.on("/success.txt", HTTP_GET, []() {
+    Serial.println("📱 iOS captive detection: /success.txt");
+    String html = "<!DOCTYPE html><html><head>";
+    html += "<meta http-equiv='refresh' content='0;url=http://";
+    html += WiFi.softAPIP().toString();
+    html += "' /></head><body>Success</body></html>";
+    portalServer.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    portalServer.send(200, "text/html", html);
   });
 
   // Redirigir todo lo demás a '/'
