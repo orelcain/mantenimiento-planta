@@ -299,18 +299,6 @@ void setupLocalWebServer() {
   portalServer.on("/api/history", handleApiHistory);
   portalServer.on("/api/config", HTTP_GET, handleApiConfig);
   portalServer.on("/api/config", HTTP_POST, handleApiConfig);
-  
-  // Captive Portal: capturar todas las peticiones comunes de detección
-  portalServer.on("/generate_204", handleCaptivePortal);          // Android
-  portalServer.on("/gen_204", handleCaptivePortal);               // Android
-  portalServer.on("/ncsi.txt", handleCaptivePortal);              // Windows
-  portalServer.on("/hotspot-detect.html", handleCaptivePortal);   // iOS/macOS
-  portalServer.on("/library/test/success.html", handleCaptivePortal); // iOS (captive.apple.com)
-  portalServer.on("/canonical.html", handleCaptivePortal);        // Firefox
-  portalServer.on("/success.txt", handleCaptivePortal);           // Firefox
-  portalServer.on("/connecttest.txt", handleCaptivePortal);       // Windows
-  
-  portalServer.onNotFound(handleNotFound);
 
   Serial.println("✅ Endpoints del dashboard registrados en puerto " + String(LOCAL_WEB_SERVER_PORT));
   Serial.println("🌐 Accede via:");
