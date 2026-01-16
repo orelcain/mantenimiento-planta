@@ -459,10 +459,77 @@ static void ensureHttpServerStarted() {
     ESP.restart();
   });
 
-  // En portalActive, redirigir todo a '/'
+  // ============ CAPTIVE PORTAL DETECTION ============
+  // Android detecta captive portal esperando código 204 (No Content)
+  // Si recibe 204, asume que no hay captive portal
+  // Si recibe 200 o 302-307, abre el portal
+  portalServer.on("/generate_204", HTTP_GET, []() {
+    Serial.println("📱 Android captive detection: /generate_204");
+    // Responder 200 en lugar de 204 para forzar apertura del portal
+    portalServer.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    portalServer.sendHeader("Pragma", "no-cache");
+    portalServer.sendHeader("Expires", "0");
+    portalServer.sendHeader("Location", "http://" + WiFi.softAPIP().toString(), true);
+    portalServer.send(302, "text/plain", "Redirigiendo al portal...");
+  });
+  
+  portalServer.on("/gen_204", HTTP_GET, []() {
+    Serial.println("📱 Android captive detection: /gen_204");
+    portalServer.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    portalServer.sendHeader("Pragma", "no-cache");
+    portalServer.sendHeader("Expires", "0");
+    portalServer.sendHeader("Location", "http://" + WiFi.softAPIP().toString(), true);
+    portalServer.send(302, "text/plain", "Redirigiendo al portal...");
+  });
+
+  // iOS/macOS detecta captive portal con estas URLs
+  portalServer.on("/hotspot-detect.html", HTTP_GET, []() {
+    Serial.println("📱 iOS captive detection: /hotspot-detect.html");
+    portalServer.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    portalServer.sendHeader("Pragma", "no-cache");
+    portalServer.sendHeader("Expires", "0");
+    portalServer.sendHeader("Location", "http://" + WiFi.softAPIP().toString(), true);
+    portalServer.send(302, "text/html", "<html><body>Redirigiendo...</body></html>");
+  });
+
+  portalServer.on("/library/test/success.html", HTTP_GET, []() {
+    Serial.println("📱 iOS captive detection: /library/test/success.html");
+    portalServer.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    portalServer.sendHeader("Pragma", "no-cache");
+    portalServer.sendHeader("Expires", "0");
+    portalServer.sendHeader("Location", "http://" + WiFi.softAPIP().toString(), true);
+    portalServer.send(302, "text/html", "<html><body>Redirigiendo...</body></html>");
+  });
+
+  // Windows detecta con estas URLs
+  portalServer.on("/ncsi.txt", HTTP_GET, []() {
+    portalServer.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    portalServer.sendHeader("Pragma", "no-cache");
+    portalServer.sendHeader("Expires", "0");
+    // Windows espera "Microsoft NCSI" pero redireccionar funciona mejor
+    portalServer.sendHeader("Location", "http://" + WiFi.softAPIP().toString(), true);
+    portalServer.send(302, "text/plain", "Microsoft NCSI");
+  });
+
+  portalServer.on("/connecttest.txt", HTTP_GET, []() {
+    portalServer.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    portalServer.sendHeader("Pragma", "no-cache");
+    portalServer.sendHeader("Expires", "0");
+    portalServer.sendHeader("Location", "http://" + WiFi.softAPIP().toString(), true);
+    portalServer.send(302, "text/plain", "Microsoft Connect Test");
+  });
+
+  // Redirigir todo lo demás a '/'
   portalServer.onNotFound([]() {
-    if (portalActive) {
-      portalServer.sendHeader("Location", String("http://") + WiFi.softAPIP().toString(), true);
+    // Log para diagnosticar captive portal
+    String uri = portalServer.uri();
+    String host = portalServer.hostHeader();
+    Serial.printf("🌐 Petición captive: Host=%s, URI=%s\n", host.c_str(), uri.c_str());
+    
+    // Siempre redirigir al dashboard cuando AP está activo
+    if (apAlwaysOn || portalActive) {
+      portalServer.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      portalServer.sendHeader("Location", "http://" + WiFi.softAPIP().toString(), true);
       portalServer.send(302, "text/plain", "");
       return;
     }
