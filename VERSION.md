@@ -1,14 +1,34 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.21.0**
+## Versión Actual: **v2.22.1**
 
-**Fecha de lanzamiento**: 15 de enero de 2026  
-**Estado**: ✅ PRODUCCIÓN READY  
+**Fecha de lanzamiento**: 16 de enero de 2026  \
+**Estado**: ✅ PRODUCCIÓN READY  \
 **Build**: ✅ Último build local OK
 
 ---
 
 ## 📋 Información de la Versión
+
+### v2.22.1 - OTA por WiFi + estado de red local (16/01/2026)
+
+**Nuevas Funcionalidades:**
+- ✅ **OTA por WiFi** (actualización sin USB)
+- ✅ **Panel local muestra SSID/IP/RSSI**
+
+**Mejoras Técnicas:**
+- ✅ Configuración OTA documentada en PlatformIO
+
+### v2.22.0 - Red local simplificada + AP con contraseña desde PWA (15/01/2026)
+
+**Nuevas Funcionalidades:**
+- ✅ **Red local simplificada en ESP32** (AP + captive portal básico)
+- ✅ **Panel local ligero** con lecturas actuales y estado
+- ✅ **AP protegido** con contraseña configurada desde PWA
+
+**Mejoras Técnicas:**
+- ✅ Menos endpoints locales y menor carga en memoria
+- ✅ Manejo centralizado de red local
 
 ### v2.21.0 - Gestión de Dispositivos + UI Sensores Mejorada (15/01/2026)
 

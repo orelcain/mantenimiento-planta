@@ -42,4 +42,9 @@
 // Recomendado: emparejar desde la PWA (ruta /sensors) y dejar esto vacío.
 #define EQUIPMENT_ID ""
 
+// ============ OTA (Actualización por WiFi) ============
+// Habilita OTA en producción. Requiere al menos 8 caracteres si defines password.
+// #define OTA_ENABLED 1
+// #define OTA_PASSWORD "TU_CLAVE_OTA"
+
 #endif // CONFIG_H

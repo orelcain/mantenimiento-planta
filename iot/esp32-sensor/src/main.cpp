@@ -18,11 +18,12 @@
 #include <Preferences.h>
 #include <time.h>
 #include <WebServer.h>
-#include <DNSServer.h>
 #include <LittleFS.h>
 #include <ESPmDNS.h>
 #include <esp_task_wdt.h>
+#include <ArduinoOTA.h>
 #include "webserver_local.h"
+#include "network_local.h"
 
 // Config local (no versionada) / config de ejemplo (versionada)
 #if __has_include("config.h")
@@ -45,8 +46,6 @@ uint64_t getTimestamp();
 void sendOnlineStatus(bool online);
 void sendSensorData();
 
-static void startConfigPortal();
-static void stopConfigPortal();
 static void handleConfigPortalLoop();
 static void initAfterWifiOnce();
 
@@ -169,10 +168,7 @@ String currentEquipmentPath;
 #define WIFI_MAX_NETWORKS 5
 
 static bool postWifiInitialized = false;
-static bool portalActive = false;
-static DNSServer dnsServer;
-static DNSServer apDnsServer;  // DNS para captive portal AP
-WebServer portalServer(80);  // No static, compartido con webserver_local.cpp
+// Nota: portalServer ahora definido en network_local.cpp
 
 static String savedWifiSsid[WIFI_MAX_NETWORKS];
 static String savedWifiPass[WIFI_MAX_NETWORKS];
@@ -180,10 +176,6 @@ static uint8_t savedWifiCount = 0;
 
 static bool httpServerStarted = false;
 static bool httpServerListening = false;
-
-// Configuración del servidor HTTP para evitar crashes
-static unsigned long lastServerCleanup = 0;
-#define SERVER_CLEANUP_INTERVAL 30000  // Limpiar cada 30 segundos
 
 // Dashboard / AP settings (Preferences)
 static bool apAlwaysOn = false;
@@ -218,6 +210,9 @@ static AlertThresholds alertThresholds = {
 
 static String staHostname;
 static bool mdnsStarted = false;
+#if defined(OTA_ENABLED) || defined(OTA_PASSWORD)
+static bool otaStarted = false;
+#endif
 
 static void loadLocalSettings() {
   prefs.begin("iot", false);
@@ -263,33 +258,13 @@ static void ensureAlwaysOnAp() {
 
   Serial.println("📡 Activando AP siempre encendido (modo AP+STA)...");
 
-  // En modo dual, el canal del AP lo determina la red STA conectada.
-  wifi_mode_t mode = WiFi.getMode();
-  if (mode != WIFI_AP_STA) {
-    WiFi.mode(WIFI_AP_STA);
-    delay(50);
-  }
-
+  // Configurar SSID personalizado si existe
   const String ssid = getApSsid();
-  const bool passOk = (apPassword.length() >= 8);
-  // Fijar IP del AP para acceso manual confiable
-  IPAddress apIPCfg(192, 168, 4, 1);
-  IPAddress apGW(192, 168, 4, 1);
-  IPAddress apMask(255, 255, 255, 0);
-  WiFi.softAPConfig(apIPCfg, apGW, apMask);
-  if (passOk) {
-    WiFi.softAP(ssid.c_str(), apPassword.c_str());
-    Serial.printf("✓ AP activo: %s (WPA2 protegido)\n", ssid.c_str());
-  } else {
-    WiFi.softAP(ssid.c_str());
-    Serial.printf("✓ AP activo: %s (abierto - sin contraseña)\n", ssid.c_str());
-  }
-  Serial.printf("   IP del AP: %s\n", WiFi.softAPIP().toString().c_str());
-
-  // Iniciar captive portal DNS (redirige todo al dashboard)
-  IPAddress apIP = WiFi.softAPIP();
-  apDnsServer.start(53, "*", apIP);
-  Serial.println("🌐 Captive Portal DNS activo - Dashboard se abre automáticamente");
+  networkLocalSetApSsid(ssid);
+  networkLocalSetApPassword(apPassword);
+  
+  // Inicializar red local (AP + DNS + endpoints captive)
+  networkLocalInit();
   
   // Asegurar que el servidor HTTP esté escuchando en el AP
   ensureHttpServerListening();
@@ -314,7 +289,6 @@ static void ensureHttpServerStarted() {
     json += "\"ssid\":\"" + WiFi.SSID() + "\",";
     json += "\"ip\":\"" + WiFi.localIP().toString() + "\",";
     json += "\"rssi\":" + String(WiFi.status() == WL_CONNECTED ? WiFi.RSSI() : 0) + ",";
-    json += "\"portalActive\":" + String(portalActive ? "true" : "false") + ",";
     json += "\"apAlwaysOn\":" + String(apAlwaysOn ? "true" : "false") + ",";
     json += "\"apSsid\":\"" + WiFi.softAPSSID() + "\",";
     json += "\"apIp\":\"" + WiFi.softAPIP().toString() + "\",";
@@ -332,251 +306,7 @@ static void ensureHttpServerStarted() {
     portalServer.send(200, "application/json", json);
   });
 
-  // Página principal: si está en AP, mostrar config WiFi/AP. En STA, mostrar dashboard.
-  portalServer.on("/", HTTP_GET, []() {
-    const bool isApMode = (WiFi.getMode() & WIFI_MODE_AP);
-    const bool forceDashboard = portalServer.hasArg("dash");
-    const bool showWifiConfig = !forceDashboard && (portalActive || isApMode || portalServer.hasArg("cfg"));
-
-    String html;
-    html.reserve(3200);
-    html += "<!doctype html><html><head><meta charset='utf-8'>";
-    html += "<meta name='viewport' content='width=device-width,initial-scale=1'>";
-    html += "<title>ESP32</title>";
-    html += "<style>body{font-family:system-ui,Segoe UI,Arial;margin:16px;max-width:820px}";
-    html += "input{width:100%;padding:10px;margin:6px 0}button{padding:10px 14px;margin-top:10px}";
-    html += ".row{margin:10px 0;padding:10px;border:1px solid #ddd;border-radius:10px}";
-    html += ".kv{display:grid;grid-template-columns:180px 1fr;gap:8px;align-items:center}";
-    html += "small{color:#666}code{background:#f3f3f3;padding:2px 6px;border-radius:6px}";
-    html += "</style></head><body>";
-
-    if (showWifiConfig) {
-      html += "<div style='margin-bottom:12px'>";
-      html += "<a href='/?dash=1' style='display:inline-block;padding:10px 14px;background:#2563eb;color:#fff;border-radius:8px;text-decoration:none;font-weight:600'>Abrir dashboard</a>";
-      html += "</div>";
-      html += "<h2>ESP32 - Configuración WiFi</h2>";
-      html += "<p><small>Red AP: <b>" + WiFi.softAPSSID() + "</b> · IP: <b>" + WiFi.softAPIP().toString() + "</b></small></p>";
-      html += "<form method='POST' action='/save'>";
-      html += "<p>Ingresa hasta " + String(WIFI_MAX_NETWORKS) + " redes (SSID + clave). Se guardan en el ESP32.</p>";
-
-      for (uint8_t i = 0; i < WIFI_MAX_NETWORKS; i++) {
-        html += "<div class='row'>";
-        html += "<label>SSID " + String(i + 1) + "</label>";
-        html += "<input name='ssid" + String(i + 1) + "' placeholder='Nombre WiFi' value='";
-        if (i < savedWifiCount) html += savedWifiSsid[i];
-        html += "'>";
-        html += "<label>Clave " + String(i + 1) + "</label>";
-        html += "<input name='pass" + String(i + 1) + "' type='password' placeholder='Contraseña' value='";
-        if (i < savedWifiCount) html += savedWifiPass[i];
-        html += "'>";
-        html += "</div>";
-      }
-
-      html += "<div class='row'>";
-      html += "<h3>Acceso local (AP)</h3>";
-      html += "<label>SSID del AP (opcional)</label>";
-      html += "<input name='apName' placeholder='Ej: Mantenimiento-ESP32' value='" + apSsidCustom + "'>";
-      html += "<label>Clave del AP (opcional, >= 8 chars para WPA2)</label>";
-      html += "<input name='apPass' type='password' placeholder='(vacío = abierta)' value='" + apPassword + "'>";
-      html += "<label><input type='checkbox' name='apAlways' value='1'";
-      if (apAlwaysOn) html += " checked";
-      html += "> Mantener AP encendido siempre (AP+STA)</label>";
-      html += "</div>";
-
-      html += "<div class='row'>";
-      html += "<h3>Nombre del dispositivo</h3>";
-      html += "<label>Alias (opcional)</label>";
-      html += "<input name='devName' placeholder='Ej: Sensor horno 1' value='" + deviceName + "'>";
-      html += "</div>";
-
-      html += "<button type='submit'>Guardar y reiniciar</button>";
-      html += "</form>";
-      html += "<form method='POST' action='/clear' style='margin-top:14px'>";
-      html += "<button type='submit'>Borrar WiFi guardados</button>";
-      html += "</form>";
-
-      html += "<p style='margin-top:16px'><a href='/status.json'>Ver status JSON</a></p>";
-    } else {
-      portalServer.send_P(200, "text/html", HTML_DASHBOARD);
-      return;
-    }
-
-    html += "</body></html>";
-    portalServer.send(200, "text/html", html);
-  });
-
-  // Configuración (disponible también en STA)
-  portalServer.on("/wifi", HTTP_GET, []() {
-    portalServer.sendHeader("Location", String("/") + "?cfg=1", true);
-    portalServer.send(302, "text/plain", "");
-  });
-
-  portalServer.on("/save", HTTP_POST, []() {
-    String ssids[WIFI_MAX_NETWORKS];
-    String passes[WIFI_MAX_NETWORKS];
-    uint8_t count = 0;
-
-    for (uint8_t i = 0; i < WIFI_MAX_NETWORKS; i++) {
-      String s = portalServer.arg(String("ssid") + String(i + 1));
-      String p = portalServer.arg(String("pass") + String(i + 1));
-      s.trim();
-      if (s.length() == 0) continue;
-      if (count >= WIFI_MAX_NETWORKS) break;
-      ssids[count] = s;
-      passes[count] = p;
-      count++;
-    }
-
-    String apName = portalServer.arg("apName");
-    String apPass = portalServer.arg("apPass");
-    String devName = portalServer.arg("devName");
-    const bool apAlways = portalServer.hasArg("apAlways");
-
-    apName.trim();
-    apPass.trim();
-    devName.trim();
-
-    saveWifiNetworksToPrefs(ssids, passes, count);
-
-    prefs.begin("iot", false);
-    prefs.putBool("apAlways", apAlways);
-    prefs.putString("apName", apName);
-    prefs.putString("apPass", apPass);
-    prefs.putString("devName", devName);
-    prefs.end();
-
-    portalServer.send(200, "text/html",
-      "<html><body><h3>Guardado.</h3><p>Reiniciando...</p></body></html>");
-    delay(800);
-    ESP.restart();
-  });
-
-  portalServer.on("/clear", HTTP_POST, []() {
-    clearWifiNetworksFromPrefs();
-    portalServer.send(200, "text/html",
-      "<html><body><h3>WiFi borrados.</h3><p>Reiniciando...</p></body></html>");
-    delay(800);
-    ESP.restart();
-  });
-
-  // ============ CAPTIVE PORTAL DETECTION ============
-  // Android detecta captive portal esperando código 204 (No Content)
-  // Si NO recibe 204, asume que hay captive portal y lo abre
-  portalServer.on("/generate_204", HTTP_GET, []() {
-    Serial.println("📱 Android captive detection: /generate_204");
-    // Responder con HTML que redirige automáticamente
-    String html = "<html><head><meta http-equiv='refresh' content='0;url=http://";
-    html += WiFi.softAPIP().toString();
-    html += "' /></head><body>Redirigiendo al portal...</body></html>";
-    portalServer.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-    portalServer.sendHeader("Pragma", "no-cache");
-    portalServer.sendHeader("Expires", "0");
-    portalServer.send(200, "text/html", html);
-  });
-  
-  portalServer.on("/gen_204", HTTP_GET, []() {
-    Serial.println("📱 Android captive detection: /gen_204");
-    String html = "<html><head><meta http-equiv='refresh' content='0;url=http://";
-    html += WiFi.softAPIP().toString();
-    html += "' /></head><body>Redirigiendo al portal...</body></html>";
-    portalServer.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-    portalServer.sendHeader("Pragma", "no-cache");
-    portalServer.sendHeader("Expires", "0");
-    portalServer.send(200, "text/html", html);
-  });
-
-  // iOS/macOS detecta captive portal con estas URLs
-  portalServer.on("/hotspot-detect.html", HTTP_GET, []() {
-    Serial.println("📱 iOS captive detection: /hotspot-detect.html");
-    // iOS espera HTML con contenido específico para abrir el portal
-    String html = "<!DOCTYPE html><html><head>";
-    html += "<meta http-equiv='refresh' content='0;url=http://";
-    html += WiFi.softAPIP().toString();
-    html += "' /></head><body><h1>Conectando...</h1></body></html>";
-    portalServer.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-    portalServer.sendHeader("Pragma", "no-cache");
-    portalServer.send(200, "text/html", html);
-  });
-
-  portalServer.on("/library/test/success.html", HTTP_GET, []() {
-    Serial.println("📱 iOS captive detection: /library/test/success.html");
-    String html = "<!DOCTYPE html><html><head>";
-    html += "<meta http-equiv='refresh' content='0;url=http://";
-    html += WiFi.softAPIP().toString();
-    html += "' /></head><body><h1>Conectando...</h1></body></html>";
-    portalServer.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-    portalServer.sendHeader("Pragma", "no-cache");
-    portalServer.send(200, "text/html", html);
-  });
-
-  // Windows detecta con estas URLs
-  portalServer.on("/ncsi.txt", HTTP_GET, []() {
-    Serial.println("📱 Windows captive detection: /ncsi.txt");
-    String html = "<html><head><meta http-equiv='refresh' content='0;url=http://";
-    html += WiFi.softAPIP().toString();
-    html += "' /></head><body>Microsoft NCSI</body></html>";
-    portalServer.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-    portalServer.sendHeader("Pragma", "no-cache");
-    portalServer.send(200, "text/html", html);
-  });
-
-  portalServer.on("/connecttest.txt", HTTP_GET, []() {
-    Serial.println("📱 Windows captive detection: /connecttest.txt");
-    String html = "<html><head><meta http-equiv='refresh' content='0;url=http://";
-    html += WiFi.softAPIP().toString();
-    html += "' /></head><body>Microsoft Connect Test</body></html>";
-    portalServer.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-    portalServer.sendHeader("Pragma", "no-cache");
-    portalServer.send(200, "text/html", html);
-  });
-
-  // URLs adicionales de Android (versiones más recientes)
-  portalServer.on("/mobile/status.php", HTTP_GET, []() {
-    Serial.println("📱 Android captive detection: /mobile/status.php");
-    String html = "<html><head><meta http-equiv='refresh' content='0;url=http://";
-    html += WiFi.softAPIP().toString();
-    html += "' /></head><body>Redirigiendo...</body></html>";
-    portalServer.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-    portalServer.send(200, "text/html", html);
-  });
-
-  portalServer.on("/generate204", HTTP_GET, []() {
-    Serial.println("📱 Android captive detection: /generate204");
-    String html = "<html><head><meta http-equiv='refresh' content='0;url=http://";
-    html += WiFi.softAPIP().toString();
-    html += "' /></head><body>Redirigiendo...</body></html>";
-    portalServer.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-    portalServer.send(200, "text/html", html);
-  });
-
-  // iOS versiones más recientes
-  portalServer.on("/success.txt", HTTP_GET, []() {
-    Serial.println("📱 iOS captive detection: /success.txt");
-    String html = "<!DOCTYPE html><html><head>";
-    html += "<meta http-equiv='refresh' content='0;url=http://";
-    html += WiFi.softAPIP().toString();
-    html += "' /></head><body>Success</body></html>";
-    portalServer.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-    portalServer.send(200, "text/html", html);
-  });
-
-  // Redirigir todo lo demás a '/'
-  portalServer.onNotFound([]() {
-    // Log para diagnosticar captive portal
-    String uri = portalServer.uri();
-    String host = portalServer.hostHeader();
-    Serial.printf("🌐 Petición captive: Host=%s, URI=%s\n", host.c_str(), uri.c_str());
-    
-    // Siempre redirigir al dashboard cuando AP está activo
-    if (apAlwaysOn || portalActive) {
-      portalServer.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-      portalServer.sendHeader("Location", "http://" + WiFi.softAPIP().toString(), true);
-      portalServer.send(302, "text/plain", "");
-      return;
-    }
-    portalServer.send(404, "text/plain", "Not found");
-  });
-
+  // Nota: el portal cautivo básico se maneja desde network_local.cpp
 }
 
 static void ensureHttpServerListening() {
@@ -585,7 +315,9 @@ static void ensureHttpServerListening() {
   if (!httpServerStarted) ensureHttpServerStarted();
   if (httpServerListening) return;
   httpServerListening = true;
-  portalServer.begin();
+  
+  // Usar el nuevo módulo de red para iniciar el servidor
+  networkLocalStartServer();
 }
 
 // Declarado más abajo (variables de estado), pero usado por helpers de buffer.
@@ -1658,8 +1390,11 @@ void setup() {
   const bool wifiOk = connectWiFi();
 
   if (!wifiOk) {
-    Serial.println("⚠ No hay WiFi. Iniciando portal de configuración...");
-    startConfigPortal();
+    Serial.println("⚠ No hay WiFi. AP local activo para lecturas.");
+    networkLocalSetApSsid(getApSsid());
+    networkLocalSetApPassword(apPassword);
+    networkLocalInit();
+    ensureHttpServerListening();
   } else {
     ensureAlwaysOnAp();
   }
@@ -1827,67 +1562,8 @@ bool connectWiFi() {
   return false;
 }
 
-static void startConfigPortal() {
-  if (portalActive) return;
-  portalActive = true;
-
-  ensureHttpServerStarted();
-
-  const String apSsid = getApSsid();
-  WiFi.mode(WIFI_AP);
-  // Canal fijo para mejorar visibilidad; red visible (hidden=false)
-  const bool passOk = (apPassword.length() >= 8);
-  // Fijar IP del AP para acceso manual confiable
-  IPAddress apIP(192, 168, 4, 1);
-  IPAddress apGW(192, 168, 4, 1);
-  IPAddress apMask(255, 255, 255, 0);
-  WiFi.softAPConfig(apIP, apGW, apMask);
-  if (passOk) {
-    WiFi.softAP(apSsid.c_str(), apPassword.c_str(), 1, 0);
-  } else {
-    WiFi.softAP(apSsid.c_str(), nullptr, 1, 0);
-  }
-  delay(200);
-
-  ensureHttpServerListening();
-
-  IPAddress ip = WiFi.softAPIP();
-  dnsServer.start(53, "*", ip);
-
-  Serial.println("📶 Portal WiFi activo.");
-  Serial.print("   SSID: ");
-  Serial.println(WiFi.softAPSSID());
-  Serial.print("   IP: ");
-  Serial.println(WiFi.softAPIP());
-  Serial.println("   Abre http://192.168.4.1 en el celular/PC conectado a esa red.");
-}
-
-static void stopConfigPortal() {
-  if (!portalActive) return;
-  portalActive = false;
-  dnsServer.stop();
-  if (!apAlwaysOn) {
-    WiFi.softAPdisconnect(true);
-  }
-  Serial.println("📶 Portal WiFi detenido.");
-}
-
 static void handleConfigPortalLoop() {
-  if (portalActive) {
-    dnsServer.processNextRequest();
-  }
-  portalServer.handleClient();
-  
-  // Procesar DNS captive portal del AP
-  if (apAlwaysOn) {
-    apDnsServer.processNextRequest();
-  }
-  
-  // Cleanup periódico del servidor para liberar sockets
-  if (millis() - lastServerCleanup > SERVER_CLEANUP_INTERVAL) {
-    portalServer.close();  // Cierra conexiones inactivas
-    lastServerCleanup = millis();
-  }
+  networkLocalLoop();
 }
 
 static void initAfterWifiOnce() {
@@ -1911,13 +1587,20 @@ static void initAfterWifiOnce() {
     }
   }
 
+#if defined(OTA_ENABLED) || defined(OTA_PASSWORD)
+  if (!otaStarted) {
+    ArduinoOTA.setHostname(staHostname.c_str());
+#ifdef OTA_PASSWORD
+    ArduinoOTA.setPassword(OTA_PASSWORD);
+#endif
+    ArduinoOTA.begin();
+    otaStarted = true;
+    Serial.println("✅ OTA listo para actualización WiFi");
+  }
+#endif
+
   // Si está configurado, mantener AP activo aunque haya WiFi
   ensureAlwaysOnAp();
-
-  // Si el WiFi volvió, apagar portal aunque ya se haya inicializado antes.
-  if (portalActive) {
-    stopConfigPortal();
-  }
 
   if (postWifiInitialized) return;
 
@@ -2250,21 +1933,20 @@ void loop() {
   handleConfigPortalLoop();
   handleLocalWebServer(); // Dashboard local de telemetría
   initAfterWifiOnce();
+#if defined(OTA_ENABLED) || defined(OTA_PASSWORD)
+  if (otaStarted) {
+    ArduinoOTA.handle();
+  }
+#endif
 
   // Reintentar conexión WiFi sin bloquear el muestreo.
   if (WiFi.status() != WL_CONNECTED) {
-    // Si el portal está activo, mantenemos AP y no intentamos pasar a STA.
-    // (evita que el AP desaparezca y no se vea en el celular)
-    if (portalActive) {
-      // Igual seguimos midiendo y guardando backlog.
-    } else
     if (millis() - lastReconnectTime > RECONNECT_INTERVAL) {
       Serial.println("⚠ WiFi desconectado, intentando reconectar...");
       digitalWrite(LED_PIN, LOW);
       const bool ok = connectWiFi();
-      if (!ok && !portalActive) {
-        Serial.println("📶 No se pudo reconectar. Activando portal WiFi...");
-        startConfigPortal();
+      if (!ok) {
+        Serial.println("📶 No se pudo reconectar. AP local sigue activo.");
       }
       lastReconnectTime = millis();
     }
