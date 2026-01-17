@@ -19,11 +19,6 @@ function normalizeTs(ts: number | undefined): number | null {
   return ts
 }
 
-function toSearchText(e: Equipment): string {
-  return `${e.nombre} ${e.codigo} ${e.hierarchyPath ?? ''} ${e.zonePath?.join(' ') ?? ''}`
-    .toLowerCase()
-    .trim()
-}
 
 function Sparkline({
   points,
@@ -87,7 +82,6 @@ export function PredictivePage() {
   const user = useAuthStore((s) => s.user)
 
   const [selectedId, setSelectedId] = useState<string>(() => equipment[0]?.id ?? '')
-  const [search, setSearch] = useState('')
   const [filterEstado, setFilterEstado] = useState<Equipment['estado'] | 'todas'>('todas')
   const [filterCriticidad, setFilterCriticidad] = useState<Equipment['criticidad'] | 'todas'>('todas')
   const [autoCreate, setAutoCreate] = useState(true)
@@ -111,15 +105,12 @@ export function PredictivePage() {
   const hasGroqKey = Boolean(import.meta.env.VITE_GROQ_API_KEY)
 
   const filteredEquipment = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    return equipment
-      .filter((e) => {
-        if (filterEstado !== 'todas' && e.estado !== filterEstado) return false
-        if (filterCriticidad !== 'todas' && e.criticidad !== filterCriticidad) return false
-        if (!q) return true
-        return toSearchText(e).includes(q)
-      })
-  }, [equipment, filterCriticidad, filterEstado, search])
+    return equipment.filter((e) => {
+      if (filterEstado !== 'todas' && e.estado !== filterEstado) return false
+      if (filterCriticidad !== 'todas' && e.criticidad !== filterCriticidad) return false
+      return true
+    })
+  }, [equipment, filterCriticidad, filterEstado])
 
   const selectedEquipment = useMemo(
     () => equipment.find((e) => e.id === selectedId) ?? null,
@@ -269,16 +260,7 @@ export function PredictivePage() {
         </CardHeader>
         <CardContent>
           <div className="grid gap-3 max-w-3xl">
-            <div className="grid gap-2 sm:grid-cols-3">
-              <div className="sm:col-span-2">
-                <Label>Buscar equipo</Label>
-                <Input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Buscar por nombre, código o ubicación…"
-                />
-              </div>
-              <div className="grid gap-2 sm:grid-cols-2">
+            <div className="grid gap-2 sm:grid-cols-2">
                 <div>
                   <Label>Estado</Label>
                   <Select value={filterEstado} onValueChange={(v) => setFilterEstado(v as any)}>
@@ -307,7 +289,6 @@ export function PredictivePage() {
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
             </div>
 
             <div className="flex items-end justify-between gap-3 flex-wrap">
@@ -331,6 +312,9 @@ export function PredictivePage() {
                 </Select>
                 <div className="mt-1 text-xs text-muted-foreground">
                   {filteredEquipment.length} resultado(s)
+                </div>
+                <div className="mt-1 text-xs text-muted-foreground">
+                  Usa el selector para elegir un equipo disponible.
                 </div>
               </div>
 
