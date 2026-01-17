@@ -2,8 +2,19 @@ import { useEffect, useMemo, useState } from 'react'
 import type { SensorReading, SensorSummaryNode } from '@/services/sensorsRtdb'
 import { subscribeSensorReadings, subscribeSensorSummary } from '@/services/sensorsRtdb'
 import { predictFailureRisk } from '@/lib/predictive/predictor'
+import type { PredictiveThresholds } from '@/types'
 
-export function useIoTPrediction(equipmentId: string | null, options?: { limit?: number }) {
+export function useIoTPrediction(
+  equipmentId: string | null,
+  options?: {
+    limit?: number
+    thresholds?: Partial<PredictiveThresholds>
+    override?: {
+      summary?: SensorSummaryNode | null
+      readings?: SensorReading[]
+    }
+  }
+) {
   const limit = options?.limit ?? 30
 
   const [summary, setSummary] = useState<SensorSummaryNode | null>(null)
@@ -34,9 +45,16 @@ export function useIoTPrediction(equipmentId: string | null, options?: { limit?:
     }
   }, [equipmentId, limit])
 
-  const prediction = useMemo(() => {
-    return predictFailureRisk({ summary, readings })
-  }, [summary, readings])
+  const effectiveSummary = options?.override?.summary ?? summary
+  const effectiveReadings = options?.override?.readings ?? readings
 
-  return { summary, readings, prediction, error }
+  const prediction = useMemo(() => {
+    return predictFailureRisk({
+      summary: effectiveSummary,
+      readings: effectiveReadings,
+      thresholds: options?.thresholds,
+    })
+  }, [effectiveSummary, effectiveReadings, options?.thresholds])
+
+  return { summary, readings, prediction, error, effectiveSummary, effectiveReadings }
 }

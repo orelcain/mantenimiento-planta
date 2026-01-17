@@ -90,8 +90,26 @@ export interface Equipment {
   fechaInstalacion?: Date
   photoURL?: string // @deprecated - usar photos[]
   photos?: string[] // URLs de Firebase Storage para fotos de referencia del equipo
+  predictiveThresholds?: PredictiveThresholds
   createdAt: Date
   updatedAt: Date
+}
+
+// Umbrales predictivos configurables
+export interface PredictiveThresholds {
+  tempWarnLow: number
+  tempWarnHigh: number
+  tempCritLow: number
+  tempCritHigh: number
+  humWarnLow: number
+  humWarnHigh: number
+  humCritLow: number
+  humCritHigh: number
+  tempSlopeWarn: number
+  tempSlopeCrit: number
+  humSlopeWarn: number
+  humSlopeCrit: number
+  offlineMs: number
 }
 
 // Incidencia

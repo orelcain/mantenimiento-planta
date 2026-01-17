@@ -2,17 +2,19 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Activity, AlertTriangle, CheckCircle2 } from 'lucide-react'
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Switch } from '@/components/ui'
+import { Slider } from '@/components/ui/slider'
 import type { BadgeProps } from '@/components/ui/badge'
 import { useAppStore } from '@/store'
 import { useAuthStore } from '@/store'
 import { useIoTPrediction } from '@/hooks/useIoTPrediction'
 import { formatRelativeTime } from '@/lib/utils'
 import { ensurePredictiveIncident } from '@/services/predictiveIncidents'
-import { predictSensorForecast } from '@/services/ai'
+import { predictSensorForecast, suggestPredictiveThresholds } from '@/services/ai'
 import type { DeviceRow } from '@/services/devicesRtdb'
 import { subscribeDevices } from '@/services/devicesRtdb'
-import { getEquipments } from '@/services/equipment'
-import type { Equipment } from '@/types'
+import { getEquipments, updateEquipment } from '@/services/equipment'
+import type { Equipment, PredictiveThresholds } from '@/types'
+import { DEFAULT_PREDICTIVE_THRESHOLDS } from '@/lib/predictive/predictor'
 
 function normalizeTs(ts: number | undefined): number | null {
   if (typeof ts !== 'number' || !Number.isFinite(ts)) return null
@@ -107,6 +109,21 @@ export function PredictivePage() {
     recomendacion: string
   } | null>(null)
 
+  const [aiThresholdsLoading, setAiThresholdsLoading] = useState(false)
+  const [aiThresholdsError, setAiThresholdsError] = useState<string | null>(null)
+
+  const [thresholds, setThresholds] = useState<PredictiveThresholds>(DEFAULT_PREDICTIVE_THRESHOLDS)
+  const [thresholdsDirty, setThresholdsDirty] = useState(false)
+  const [thresholdsSaving, setThresholdsSaving] = useState(false)
+  const [thresholdsError, setThresholdsError] = useState<string | null>(null)
+  const [thresholdsOk, setThresholdsOk] = useState<string | null>(null)
+
+  const [testMode, setTestMode] = useState(false)
+  const [testTemp, setTestTemp] = useState(32)
+  const [testHum, setTestHum] = useState(65)
+  const [testTempSlope, setTestTempSlope] = useState(0.2)
+  const [testHumSlope, setTestHumSlope] = useState(0.3)
+
   const hasGroqKey = Boolean(import.meta.env.VITE_GROQ_API_KEY)
 
   const equipmentWithSensorIds = useMemo(() => {
@@ -136,12 +153,41 @@ export function PredictivePage() {
     [devices, selectedEquipment?.id]
   )
 
-  const { summary, readings, prediction, error } = useIoTPrediction(selectedId || null)
+  const testReadings = useMemo(() => {
+    if (!testMode) return null
+    const count = 15
+    const now = Date.now()
+    const rows = Array.from({ length: count }, (_, i) => {
+      const minutesAgo = (count - 1) - i
+      return {
+        timestamp: now - minutesAgo * 60_000,
+        temperature: Number((testTemp - testTempSlope * minutesAgo).toFixed(2)),
+        humidity: Number((testHum - testHumSlope * minutesAgo).toFixed(2)),
+        source: 'simulated',
+      }
+    })
+    return rows
+  }, [testHum, testHumSlope, testMode, testTemp, testTempSlope])
 
-  const lastReading = readings[readings.length - 1]
+  const override = useMemo(() => {
+    if (!testMode || !testReadings) return undefined
+    return {
+      summary: { online: true, lastSeen: Date.now() },
+      readings: testReadings,
+    }
+  }, [testMode, testReadings])
+
+  const { summary, readings, prediction, error, effectiveReadings, effectiveSummary } = useIoTPrediction(selectedId || null, {
+    thresholds,
+    override,
+  })
+
+  const displayReadings = testMode && effectiveReadings.length > 0 ? effectiveReadings : readings
+  const displaySummary = effectiveSummary ?? summary
+  const lastReading = displayReadings[displayReadings.length - 1]
   const lastReadingTs = normalizeTs(lastReading?.timestamp)
 
-  const canCreateIncident = Boolean(user?.id && selectedEquipment && lastReading)
+  const canCreateIncident = Boolean(user?.id && selectedEquipment && lastReading && !testMode)
 
   async function copyToClipboard(text: string) {
     try {
@@ -167,7 +213,61 @@ export function PredictivePage() {
     await copyToClipboard(snippet)
   }
 
+  function updateThreshold<K extends keyof PredictiveThresholds>(key: K, value: number) {
+    setThresholds((prev) => ({ ...prev, [key]: value }))
+    setThresholdsDirty(true)
+  }
+
+  async function saveThresholds() {
+    if (!selectedEquipment) return
+    setThresholdsSaving(true)
+    setThresholdsError(null)
+    setThresholdsOk(null)
+    try {
+      await updateEquipment(selectedEquipment.id, { predictiveThresholds: thresholds })
+      setThresholdsOk('Umbrales guardados')
+      setThresholdsDirty(false)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Error guardando umbrales'
+      setThresholdsError(msg)
+    } finally {
+      setThresholdsSaving(false)
+    }
+  }
+
+  function resetThresholds() {
+    setThresholds(DEFAULT_PREDICTIVE_THRESHOLDS)
+    setThresholdsDirty(true)
+  }
+
+  async function applyAiThresholds() {
+    if (!selectedEquipment) return
+    setAiThresholdsError(null)
+    setAiThresholdsLoading(true)
+    try {
+      const result = await suggestPredictiveThresholds({
+        equipment: selectedEquipment,
+        readings,
+      })
+      if (!result) {
+        setAiThresholdsError('No se pudo sugerir umbrales con IA.')
+        return
+      }
+      setThresholds({ ...DEFAULT_PREDICTIVE_THRESHOLDS, ...result })
+      setThresholdsDirty(true)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Error sugiriendo umbrales'
+      setAiThresholdsError(msg)
+    } finally {
+      setAiThresholdsLoading(false)
+    }
+  }
+
   async function createPredictiveIncidentNow() {
+    if (testMode) {
+      setCreateError('Desactiva modo prueba para crear incidencias.')
+      return
+    }
     if (!user?.id || !selectedEquipment) return
 
     setCreateError(null)
@@ -196,6 +296,28 @@ export function PredictivePage() {
     }
   }
 
+  useEffect(() => {
+    if (!selectedEquipment) return
+    const next = {
+      ...DEFAULT_PREDICTIVE_THRESHOLDS,
+      ...(selectedEquipment.predictiveThresholds ?? {}),
+    }
+    setThresholds(next)
+    setThresholdsDirty(false)
+    setThresholdsError(null)
+    setThresholdsOk(null)
+  }, [selectedEquipment?.id])
+
+  useEffect(() => {
+    if (testMode) return
+    if (typeof lastReading?.temperature === 'number') {
+      setTestTemp(Number(lastReading.temperature.toFixed(1)))
+    }
+    if (typeof lastReading?.humidity === 'number') {
+      setTestHum(Number(lastReading.humidity.toFixed(1)))
+    }
+  }, [lastReading?.temperature, lastReading?.humidity, testMode])
+
   async function generateAiForecast() {
     if (!selectedEquipment) return
     setAiError(null)
@@ -203,7 +325,7 @@ export function PredictivePage() {
     try {
       const result = await predictSensorForecast({
         equipment: selectedEquipment,
-        summary,
+        summary: displaySummary,
         readings,
       })
       if (!result) {
@@ -222,6 +344,7 @@ export function PredictivePage() {
   // Auto-creación cuando llega una nueva lectura y el riesgo es alto/critico.
   useEffect(() => {
     if (!autoCreate) return
+    if (testMode) return
     if (!user?.id) return
     if (!selectedEquipment) return
     if (!lastReading?.timestamp) return
@@ -241,7 +364,7 @@ export function PredictivePage() {
       lastHandledTimestampRef.current = lastReading.timestamp
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoCreate, user?.id, selectedEquipment?.id, lastReading?.timestamp, prediction.nivelRiesgo, prediction.confianza])
+  }, [autoCreate, user?.id, selectedEquipment?.id, lastReading?.timestamp, prediction.nivelRiesgo, prediction.confianza, testMode])
 
   useEffect(() => {
     if (loadedRef.current || loadingEquipment) return
@@ -390,8 +513,13 @@ export function PredictivePage() {
                   Crea una incidencia (tipo predictivo) cuando el riesgo sea alto/crítico.
                 </div>
               </div>
-              <Switch checked={autoCreate} onCheckedChange={setAutoCreate} />
+              <Switch checked={autoCreate} onCheckedChange={setAutoCreate} disabled={testMode} />
             </div>
+            {testMode && (
+              <div className="text-xs text-amber-600">
+                Modo prueba activo: auto-creación deshabilitada.
+              </div>
+            )}
 
             <div className="flex items-center gap-2">
               <Button
@@ -419,17 +547,490 @@ export function PredictivePage() {
       </Card>
 
       {selectedEquipment && (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="space-y-4">
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="flex items-center justify-between">
-                <span>Estado actual</span>
-                <Badge variant={riskBadgeVariant(prediction.nivelRiesgo)}>
-                  Riesgo: {prediction.nivelRiesgo}
-                </Badge>
+              <CardTitle className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <span>Configuración predictiva</span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={applyAiThresholds}
+                    disabled={aiThresholdsLoading || !hasGroqKey || readings.length < 5}
+                  >
+                    {aiThresholdsLoading ? 'IA…' : 'Sugerir umbrales IA'}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={resetThresholds}
+                    disabled={!thresholdsDirty}
+                  >
+                    Restaurar
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={saveThresholds}
+                    disabled={!thresholdsDirty || thresholdsSaving}
+                  >
+                    {thresholdsSaving ? 'Guardando…' : 'Guardar'}
+                  </Button>
+                </div>
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-6">
+              <div className="text-xs text-muted-foreground">
+                Ajusta umbrales de temperatura/humedad y tendencias. Usa IA para sugerencias basadas en lecturas reales.
+              </div>
+              {!hasGroqKey && (
+                <div className="text-xs text-muted-foreground">
+                  Configura VITE_GROQ_API_KEY para habilitar sugerencias IA.
+                </div>
+              )}
+              {aiThresholdsError && (
+                <div className="text-xs text-destructive">{aiThresholdsError}</div>
+              )}
+              {thresholdsError && (
+                <div className="text-xs text-destructive">{thresholdsError}</div>
+              )}
+              {thresholdsOk && (
+                <div className="text-xs text-emerald-600">{thresholdsOk}</div>
+              )}
+
+              <div className="grid gap-4 lg:grid-cols-2">
+                <div className="rounded border p-3 space-y-3">
+                  <div className="text-sm font-medium">Temperatura (°C)</div>
+                  <div className="space-y-2">
+                    <Label>Advertencia baja: {thresholds.tempWarnLow.toFixed(1)}°C</Label>
+                    <div className="flex items-center gap-2">
+                      <Slider
+                        value={[thresholds.tempWarnLow]}
+                        onValueChange={(v) => updateThreshold('tempWarnLow', v[0] ?? thresholds.tempWarnLow)}
+                        min={-5}
+                        max={80}
+                        step={0.5}
+                        className="flex-1"
+                      />
+                      <Input
+                        type="number"
+                        className="w-24"
+                        value={thresholds.tempWarnLow}
+                        onChange={(e) => {
+                          const next = Number(e.target.value)
+                          if (Number.isFinite(next)) updateThreshold('tempWarnLow', next)
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Advertencia alta: {thresholds.tempWarnHigh.toFixed(1)}°C</Label>
+                    <div className="flex items-center gap-2">
+                      <Slider
+                        value={[thresholds.tempWarnHigh]}
+                        onValueChange={(v) => updateThreshold('tempWarnHigh', v[0] ?? thresholds.tempWarnHigh)}
+                        min={-5}
+                        max={80}
+                        step={0.5}
+                        className="flex-1"
+                      />
+                      <Input
+                        type="number"
+                        className="w-24"
+                        value={thresholds.tempWarnHigh}
+                        onChange={(e) => {
+                          const next = Number(e.target.value)
+                          if (Number.isFinite(next)) updateThreshold('tempWarnHigh', next)
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Crítico bajo: {thresholds.tempCritLow.toFixed(1)}°C</Label>
+                    <div className="flex items-center gap-2">
+                      <Slider
+                        value={[thresholds.tempCritLow]}
+                        onValueChange={(v) => updateThreshold('tempCritLow', v[0] ?? thresholds.tempCritLow)}
+                        min={-5}
+                        max={80}
+                        step={0.5}
+                        className="flex-1"
+                      />
+                      <Input
+                        type="number"
+                        className="w-24"
+                        value={thresholds.tempCritLow}
+                        onChange={(e) => {
+                          const next = Number(e.target.value)
+                          if (Number.isFinite(next)) updateThreshold('tempCritLow', next)
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Crítico alto: {thresholds.tempCritHigh.toFixed(1)}°C</Label>
+                    <div className="flex items-center gap-2">
+                      <Slider
+                        value={[thresholds.tempCritHigh]}
+                        onValueChange={(v) => updateThreshold('tempCritHigh', v[0] ?? thresholds.tempCritHigh)}
+                        min={-5}
+                        max={80}
+                        step={0.5}
+                        className="flex-1"
+                      />
+                      <Input
+                        type="number"
+                        className="w-24"
+                        value={thresholds.tempCritHigh}
+                        onChange={(e) => {
+                          const next = Number(e.target.value)
+                          if (Number.isFinite(next)) updateThreshold('tempCritHigh', next)
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded border p-3 space-y-3">
+                  <div className="text-sm font-medium">Humedad (%)</div>
+                  <div className="space-y-2">
+                    <Label>Advertencia baja: {thresholds.humWarnLow.toFixed(1)}%</Label>
+                    <div className="flex items-center gap-2">
+                      <Slider
+                        value={[thresholds.humWarnLow]}
+                        onValueChange={(v) => updateThreshold('humWarnLow', v[0] ?? thresholds.humWarnLow)}
+                        min={10}
+                        max={100}
+                        step={0.5}
+                        className="flex-1"
+                      />
+                      <Input
+                        type="number"
+                        className="w-24"
+                        value={thresholds.humWarnLow}
+                        onChange={(e) => {
+                          const next = Number(e.target.value)
+                          if (Number.isFinite(next)) updateThreshold('humWarnLow', next)
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Advertencia alta: {thresholds.humWarnHigh.toFixed(1)}%</Label>
+                    <div className="flex items-center gap-2">
+                      <Slider
+                        value={[thresholds.humWarnHigh]}
+                        onValueChange={(v) => updateThreshold('humWarnHigh', v[0] ?? thresholds.humWarnHigh)}
+                        min={10}
+                        max={100}
+                        step={0.5}
+                        className="flex-1"
+                      />
+                      <Input
+                        type="number"
+                        className="w-24"
+                        value={thresholds.humWarnHigh}
+                        onChange={(e) => {
+                          const next = Number(e.target.value)
+                          if (Number.isFinite(next)) updateThreshold('humWarnHigh', next)
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Crítico bajo: {thresholds.humCritLow.toFixed(1)}%</Label>
+                    <div className="flex items-center gap-2">
+                      <Slider
+                        value={[thresholds.humCritLow]}
+                        onValueChange={(v) => updateThreshold('humCritLow', v[0] ?? thresholds.humCritLow)}
+                        min={10}
+                        max={100}
+                        step={0.5}
+                        className="flex-1"
+                      />
+                      <Input
+                        type="number"
+                        className="w-24"
+                        value={thresholds.humCritLow}
+                        onChange={(e) => {
+                          const next = Number(e.target.value)
+                          if (Number.isFinite(next)) updateThreshold('humCritLow', next)
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Crítico alto: {thresholds.humCritHigh.toFixed(1)}%</Label>
+                    <div className="flex items-center gap-2">
+                      <Slider
+                        value={[thresholds.humCritHigh]}
+                        onValueChange={(v) => updateThreshold('humCritHigh', v[0] ?? thresholds.humCritHigh)}
+                        min={10}
+                        max={100}
+                        step={0.5}
+                        className="flex-1"
+                      />
+                      <Input
+                        type="number"
+                        className="w-24"
+                        value={thresholds.humCritHigh}
+                        onChange={(e) => {
+                          const next = Number(e.target.value)
+                          if (Number.isFinite(next)) updateThreshold('humCritHigh', next)
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-3">
+                <div className="rounded border p-3 space-y-3">
+                  <div className="text-sm font-medium">Tendencia temperatura (°C/min)</div>
+                  <div className="space-y-2">
+                    <Label>Advertencia: {thresholds.tempSlopeWarn.toFixed(2)}</Label>
+                    <div className="flex items-center gap-2">
+                      <Slider
+                        value={[thresholds.tempSlopeWarn]}
+                        onValueChange={(v) => updateThreshold('tempSlopeWarn', v[0] ?? thresholds.tempSlopeWarn)}
+                        min={0}
+                        max={3}
+                        step={0.05}
+                        className="flex-1"
+                      />
+                      <Input
+                        type="number"
+                        className="w-24"
+                        value={thresholds.tempSlopeWarn}
+                        onChange={(e) => {
+                          const next = Number(e.target.value)
+                          if (Number.isFinite(next)) updateThreshold('tempSlopeWarn', next)
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Crítica: {thresholds.tempSlopeCrit.toFixed(2)}</Label>
+                    <div className="flex items-center gap-2">
+                      <Slider
+                        value={[thresholds.tempSlopeCrit]}
+                        onValueChange={(v) => updateThreshold('tempSlopeCrit', v[0] ?? thresholds.tempSlopeCrit)}
+                        min={0}
+                        max={3}
+                        step={0.05}
+                        className="flex-1"
+                      />
+                      <Input
+                        type="number"
+                        className="w-24"
+                        value={thresholds.tempSlopeCrit}
+                        onChange={(e) => {
+                          const next = Number(e.target.value)
+                          if (Number.isFinite(next)) updateThreshold('tempSlopeCrit', next)
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded border p-3 space-y-3">
+                  <div className="text-sm font-medium">Tendencia humedad (%/min)</div>
+                  <div className="space-y-2">
+                    <Label>Advertencia: {thresholds.humSlopeWarn.toFixed(2)}</Label>
+                    <div className="flex items-center gap-2">
+                      <Slider
+                        value={[thresholds.humSlopeWarn]}
+                        onValueChange={(v) => updateThreshold('humSlopeWarn', v[0] ?? thresholds.humSlopeWarn)}
+                        min={0}
+                        max={3}
+                        step={0.05}
+                        className="flex-1"
+                      />
+                      <Input
+                        type="number"
+                        className="w-24"
+                        value={thresholds.humSlopeWarn}
+                        onChange={(e) => {
+                          const next = Number(e.target.value)
+                          if (Number.isFinite(next)) updateThreshold('humSlopeWarn', next)
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Crítica: {thresholds.humSlopeCrit.toFixed(2)}</Label>
+                    <div className="flex items-center gap-2">
+                      <Slider
+                        value={[thresholds.humSlopeCrit]}
+                        onValueChange={(v) => updateThreshold('humSlopeCrit', v[0] ?? thresholds.humSlopeCrit)}
+                        min={0}
+                        max={3}
+                        step={0.05}
+                        className="flex-1"
+                      />
+                      <Input
+                        type="number"
+                        className="w-24"
+                        value={thresholds.humSlopeCrit}
+                        onChange={(e) => {
+                          const next = Number(e.target.value)
+                          if (Number.isFinite(next)) updateThreshold('humSlopeCrit', next)
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded border p-3 space-y-3">
+                  <div className="text-sm font-medium">Offline</div>
+                  <div className="space-y-2">
+                    <Label>Tiempo sin reporte: {Math.round(thresholds.offlineMs / 60000)} min</Label>
+                    <div className="flex items-center gap-2">
+                      <Slider
+                        value={[Math.round(thresholds.offlineMs / 60000)]}
+                        onValueChange={(v) => updateThreshold('offlineMs', (v[0] ?? 1) * 60000)}
+                        min={1}
+                        max={10}
+                        step={1}
+                        className="flex-1"
+                      />
+                      <Input
+                        type="number"
+                        className="w-24"
+                        value={Math.round(thresholds.offlineMs / 60000)}
+                        onChange={(e) => {
+                          const next = Number(e.target.value)
+                          if (Number.isFinite(next)) updateThreshold('offlineMs', Math.max(1, next) * 60000)
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded border p-3 space-y-3">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <div className="text-sm font-medium">Modo prueba</div>
+                    <div className="text-xs text-muted-foreground">
+                      Simula lecturas para ver cómo cambia el riesgo. No crea incidencias.
+                    </div>
+                  </div>
+                  <Switch checked={testMode} onCheckedChange={setTestMode} />
+                </div>
+                {testMode && (
+                  <div className="text-xs text-amber-600">
+                    Usando lecturas simuladas.
+                  </div>
+                )}
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Temperatura simulada: {testTemp.toFixed(1)}°C</Label>
+                    <div className="flex items-center gap-2">
+                      <Slider
+                        value={[testTemp]}
+                        onValueChange={(v) => setTestTemp(v[0] ?? testTemp)}
+                        min={-5}
+                        max={80}
+                        step={0.5}
+                        className="flex-1"
+                      />
+                      <Input
+                        type="number"
+                        className="w-24"
+                        value={testTemp}
+                        onChange={(e) => {
+                          const next = Number(e.target.value)
+                          if (Number.isFinite(next)) setTestTemp(next)
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Humedad simulada: {testHum.toFixed(1)}%</Label>
+                    <div className="flex items-center gap-2">
+                      <Slider
+                        value={[testHum]}
+                        onValueChange={(v) => setTestHum(v[0] ?? testHum)}
+                        min={10}
+                        max={100}
+                        step={0.5}
+                        className="flex-1"
+                      />
+                      <Input
+                        type="number"
+                        className="w-24"
+                        value={testHum}
+                        onChange={(e) => {
+                          const next = Number(e.target.value)
+                          if (Number.isFinite(next)) setTestHum(next)
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Subida temp (°C/min): {testTempSlope.toFixed(2)}</Label>
+                    <div className="flex items-center gap-2">
+                      <Slider
+                        value={[testTempSlope]}
+                        onValueChange={(v) => setTestTempSlope(v[0] ?? testTempSlope)}
+                        min={0}
+                        max={3}
+                        step={0.05}
+                        className="flex-1"
+                      />
+                      <Input
+                        type="number"
+                        className="w-24"
+                        value={testTempSlope}
+                        onChange={(e) => {
+                          const next = Number(e.target.value)
+                          if (Number.isFinite(next)) setTestTempSlope(next)
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Subida hum (%/min): {testHumSlope.toFixed(2)}</Label>
+                    <div className="flex items-center gap-2">
+                      <Slider
+                        value={[testHumSlope]}
+                        onValueChange={(v) => setTestHumSlope(v[0] ?? testHumSlope)}
+                        min={0}
+                        max={3}
+                        step={0.05}
+                        className="flex-1"
+                      />
+                      <Input
+                        type="number"
+                        className="w-24"
+                        value={testHumSlope}
+                        onChange={(e) => {
+                          const next = Number(e.target.value)
+                          if (Number.isFinite(next)) setTestHumSlope(next)
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center justify-between">
+                  <span>Estado actual</span>
+                  <Badge variant={riskBadgeVariant(prediction.nivelRiesgo)}>
+                    Riesgo: {prediction.nivelRiesgo}
+                  </Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
               <div className="text-sm text-muted-foreground">
                 Equipo: <span className="text-foreground font-medium">{selectedEquipment.nombre}</span>
               </div>
@@ -447,7 +1048,7 @@ export function PredictivePage() {
                       : '—'}
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    fuente: {lastReading?.source ?? summary?.temperatura?.source ?? '—'}
+                    fuente: {lastReading?.source ?? displaySummary?.temperatura?.source ?? '—'}
                   </div>
                 </div>
                 <div className="p-3 rounded border">
@@ -458,7 +1059,7 @@ export function PredictivePage() {
                       : '—'}
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    online: {summary?.online ? 'sí' : 'no'}
+                    online: {displaySummary?.online ? 'sí' : 'no'}
                   </div>
                 </div>
               </div>
@@ -560,7 +1161,7 @@ export function PredictivePage() {
               <CardTitle>Últimas lecturas</CardTitle>
             </CardHeader>
             <CardContent>
-              {readings.length === 0 ? (
+              {displayReadings.length === 0 ? (
                 <div className="text-sm text-muted-foreground">
                   Aún no hay histórico. El ESP32 empezará a poblar la ruta "sensors/&lt;equipmentId&gt;/readings".
                 </div>
@@ -568,9 +1169,9 @@ export function PredictivePage() {
                 <div className="space-y-3">
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div className="rounded border p-2">
-                      <div className="text-xs text-muted-foreground">Temperatura (últimas {Math.min(readings.length, 60)})</div>
+                      <div className="text-xs text-muted-foreground">Temperatura (últimas {Math.min(displayReadings.length, 60)})</div>
                       <Sparkline
-                        points={readings.slice(-60).map((r) => r.temperature)}
+                        points={displayReadings.slice(-60).map((r) => r.temperature)}
                         colorClass="stroke-orange-500"
                       />
                       <div className="mt-1 text-xs text-muted-foreground">
@@ -580,9 +1181,9 @@ export function PredictivePage() {
                       </div>
                     </div>
                     <div className="rounded border p-2">
-                      <div className="text-xs text-muted-foreground">Humedad (últimas {Math.min(readings.length, 60)})</div>
+                      <div className="text-xs text-muted-foreground">Humedad (últimas {Math.min(displayReadings.length, 60)})</div>
                       <Sparkline
-                        points={readings.slice(-60).map((r) => r.humidity)}
+                        points={displayReadings.slice(-60).map((r) => r.humidity)}
                         colorClass="stroke-sky-500"
                       />
                       <div className="mt-1 text-xs text-muted-foreground">
@@ -598,7 +1199,7 @@ export function PredictivePage() {
                   </div>
 
                   <div className="space-y-2 max-h-[300px] overflow-auto">
-                  {readings
+                  {displayReadings
                     .slice(-12)
                     .reverse()
                     .map((r) => (

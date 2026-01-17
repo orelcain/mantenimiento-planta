@@ -1,5 +1,5 @@
 import { logger } from '@/lib/logger'
-import type { Incident, Equipment, AIAnalysis } from '@/types'
+import type { Incident, Equipment, AIAnalysis, PredictiveThresholds } from '@/types'
 import type { SensorReading, SensorSummaryNode } from '@/services/sensorsRtdb'
 
 const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY || ''
@@ -12,6 +12,8 @@ export type SensorForecast = {
   resumen: string
   recomendacion: string
 }
+
+export type ThresholdSuggestion = PredictiveThresholds
 
 // ===== GENERACIÓN DE SÍNTOMAS CONTEXTUALES =====
 
@@ -245,6 +247,84 @@ Responde SOLO con JSON:
     return result
   } catch (error) {
     logger.error('Error generando predicción IA:', error instanceof Error ? error : new Error(String(error)))
+    return null
+  }
+}
+
+// ===== SUGERIR UMBRALES PREDICTIVOS =====
+
+export async function suggestPredictiveThresholds(params: {
+  equipment: Equipment
+  readings: SensorReading[]
+}): Promise<ThresholdSuggestion | null> {
+  if (!GROQ_API_KEY) return null
+  if (!params.readings || params.readings.length < 10) return null
+
+  try {
+    const payload = {
+      equipment: {
+        id: params.equipment.id,
+        nombre: params.equipment.nombre,
+        codigo: params.equipment.codigo,
+      },
+      recent: params.readings.slice(-30),
+    }
+
+    const prompt = `Eres un analista de mantenimiento predictivo. Sugiere umbrales para temperatura/humedad y tendencias (por minuto). Usa valores numéricos realistas para sensores industriales. Devuelve JSON.
+
+Datos:
+${JSON.stringify(payload, null, 2)}
+
+Responde SOLO con JSON:
+{
+  "tempWarnLow": number,
+  "tempWarnHigh": number,
+  "tempCritLow": number,
+  "tempCritHigh": number,
+  "humWarnLow": number,
+  "humWarnHigh": number,
+  "humCritLow": number,
+  "humCritHigh": number,
+  "tempSlopeWarn": number,
+  "tempSlopeCrit": number,
+  "humSlopeWarn": number,
+  "humSlopeCrit": number,
+  "offlineMs": number
+}`
+
+    const response = await fetch(GROQ_API_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${GROQ_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.2,
+        max_tokens: 700,
+      }),
+    })
+
+    if (!response.ok) throw new Error(`Groq API error: ${response.status}`)
+
+    const data = await response.json()
+    const result = JSON.parse(data.choices[0]?.message?.content || '{}') as ThresholdSuggestion
+
+    await saveAIAnalysis({
+      equipmentId: params.equipment.id,
+      analysisType: 'prediction',
+      input: payload,
+      output: result,
+      confidence: 0.7,
+      model: MODEL,
+      tokens: data.usage?.total_tokens || 0,
+      createdAt: new Date(),
+    })
+
+    return result
+  } catch (error) {
+    logger.error('Error sugiriendo umbrales IA:', error instanceof Error ? error : new Error(String(error)))
     return null
   }
 }

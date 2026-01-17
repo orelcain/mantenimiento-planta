@@ -1,4 +1,5 @@
 import type { SensorReading, SensorSummaryNode } from '@/services/sensorsRtdb'
+import type { PredictiveThresholds } from '@/types'
 
 export type PredictiveRiskLevel = 'bajo' | 'medio' | 'alto' | 'critico'
 
@@ -7,6 +8,22 @@ export type PredictiveResult = {
   confianza: number // 0-1
   indicadores: string[]
   recomendacion: string
+}
+
+export const DEFAULT_PREDICTIVE_THRESHOLDS: PredictiveThresholds = {
+  tempWarnLow: 18,
+  tempWarnHigh: 32,
+  tempCritLow: 10,
+  tempCritHigh: 42,
+  humWarnLow: 35,
+  humWarnHigh: 75,
+  humCritLow: 25,
+  humCritHigh: 88,
+  tempSlopeWarn: 0.2,
+  tempSlopeCrit: 0.6,
+  humSlopeWarn: 0.3,
+  humSlopeCrit: 0.8,
+  offlineMs: 120_000,
 }
 
 function clamp01(value: number) {
@@ -39,21 +56,23 @@ function linearSlopePerMinute(readings: SensorReading[], selector: (r: SensorRea
   return num / den
 }
 
-function inferOffline(summary: SensorSummaryNode | null, nowMs: number) {
+function inferOffline(summary: SensorSummaryNode | null, nowMs: number, offlineMs: number) {
   const lastSeen = summary?.lastSeen
   if (!lastSeen) return true
 
   // Si pasan 60s sin ver al sensor, asumimos offline (ajustable)
-  return nowMs - lastSeen > 60_000
+  return nowMs - lastSeen > offlineMs
 }
 
 export function predictFailureRisk(params: {
   summary: SensorSummaryNode | null
   readings: SensorReading[]
   nowMs?: number
+  thresholds?: Partial<PredictiveThresholds>
 }): PredictiveResult {
+  const thresholds = { ...DEFAULT_PREDICTIVE_THRESHOLDS, ...(params.thresholds || {}) }
   const nowMs = params.nowMs ?? Date.now()
-  const offline = inferOffline(params.summary, nowMs)
+  const offline = inferOffline(params.summary, nowMs, thresholds.offlineMs)
 
   const indicators: string[] = []
 
@@ -79,37 +98,40 @@ export function predictFailureRisk(params: {
 
   // Reglas simples (MVP)
   if (typeof temp === 'number' && Number.isFinite(temp)) {
-    if (temp >= 40) {
+    if (temp <= thresholds.tempCritLow || temp >= thresholds.tempCritHigh) {
       risk = 'critico'
       indicators.push(`Temperatura crítica (${temp.toFixed(1)}°C)`) 
-    } else if (temp >= 30) {
+    } else if (temp <= thresholds.tempWarnLow || temp >= thresholds.tempWarnHigh) {
       risk = 'alto'
       indicators.push(`Temperatura en advertencia (${temp.toFixed(1)}°C)`) 
     }
   }
 
   if (typeof hum === 'number' && Number.isFinite(hum)) {
-    if (hum >= 85) {
+    if (hum <= thresholds.humCritLow || hum >= thresholds.humCritHigh) {
       risk = 'critico'
       indicators.push(`Humedad crítica (${hum.toFixed(1)}%)`)
-    } else if (hum >= 70) {
+    } else if (hum <= thresholds.humWarnLow || hum >= thresholds.humWarnHigh) {
       risk = risk === 'critico' ? 'critico' : 'alto'
       indicators.push(`Humedad en advertencia (${hum.toFixed(1)}%)`)
     }
   }
 
   // Tendencia peligrosa (sube rápido)
-  if (tempSlope >= 0.8) {
+  if (tempSlope >= thresholds.tempSlopeCrit) {
     risk = risk === 'critico' ? 'critico' : 'alto'
     indicators.push(`Temperatura subiendo rápido (+${tempSlope.toFixed(2)} °C/min)`) 
-  } else if (tempSlope >= 0.3) {
+  } else if (tempSlope >= thresholds.tempSlopeWarn) {
     risk = risk === 'critico' || risk === 'alto' ? risk : 'medio'
     indicators.push(`Temperatura con tendencia al alza (+${tempSlope.toFixed(2)} °C/min)`) 
   }
 
-  if (humSlope >= 1.0) {
+  if (humSlope >= thresholds.humSlopeCrit) {
     risk = risk === 'critico' ? 'critico' : 'alto'
     indicators.push(`Humedad subiendo rápido (+${humSlope.toFixed(2)} %/min)`) 
+  } else if (humSlope >= thresholds.humSlopeWarn) {
+    risk = risk === 'critico' || risk === 'alto' ? risk : 'medio'
+    indicators.push(`Humedad con tendencia al alza (+${humSlope.toFixed(2)} %/min)`) 
   }
 
   // Fuente simulada baja confianza
