@@ -109,6 +109,14 @@ export function PredictivePage() {
 
   const hasGroqKey = Boolean(import.meta.env.VITE_GROQ_API_KEY)
 
+  const equipmentWithSensorIds = useMemo(() => {
+    const ids = new Set<string>()
+    devices.forEach((d) => {
+      if (d.assignedEquipmentId) ids.add(d.assignedEquipmentId)
+    })
+    return ids
+  }, [devices])
+
   const filteredEquipment = useMemo(() => {
     return equipment.filter((e) => {
       if (!equipmentWithSensorIds.has(e.id)) return false
@@ -127,14 +135,6 @@ export function PredictivePage() {
     () => devices.find((d) => d.assignedEquipmentId === selectedEquipment?.id) ?? null,
     [devices, selectedEquipment?.id]
   )
-
-  const equipmentWithSensorIds = useMemo(() => {
-    const ids = new Set<string>()
-    devices.forEach((d) => {
-      if (d.assignedEquipmentId) ids.add(d.assignedEquipmentId)
-    })
-    return ids
-  }, [devices])
 
   const { summary, readings, prediction, error } = useIoTPrediction(selectedId || null)
 
