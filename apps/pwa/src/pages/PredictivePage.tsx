@@ -1031,197 +1031,198 @@ export function PredictivePage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-              <div className="text-sm text-muted-foreground">
-                Equipo: <span className="text-foreground font-medium">{selectedEquipment.nombre}</span>
-              </div>
+                <div className="text-sm text-muted-foreground">
+                  Equipo: <span className="text-foreground font-medium">{selectedEquipment.nombre}</span>
+                </div>
 
-              <div className="text-xs text-muted-foreground">
-                ID: <span className="text-foreground">{selectedEquipment.id}</span>
-              </div>
+                <div className="text-xs text-muted-foreground">
+                  ID: <span className="text-foreground">{selectedEquipment.id}</span>
+                </div>
 
-              <div className="grid gap-2 sm:grid-cols-2">
-                <div className="p-3 rounded border">
-                  <div className="text-xs text-muted-foreground">Temperatura</div>
-                  <div className="text-xl font-semibold">
-                    {typeof lastReading?.temperature === 'number' && Number.isFinite(lastReading.temperature)
-                      ? `${lastReading.temperature.toFixed(1)} °C`
-                      : '—'}
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="p-3 rounded border">
+                    <div className="text-xs text-muted-foreground">Temperatura</div>
+                    <div className="text-xl font-semibold">
+                      {typeof lastReading?.temperature === 'number' && Number.isFinite(lastReading.temperature)
+                        ? `${lastReading.temperature.toFixed(1)} °C`
+                        : '—'}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      fuente: {lastReading?.source ?? displaySummary?.temperatura?.source ?? '—'}
+                    </div>
                   </div>
-                  <div className="text-xs text-muted-foreground">
-                    fuente: {lastReading?.source ?? displaySummary?.temperatura?.source ?? '—'}
+                  <div className="p-3 rounded border">
+                    <div className="text-xs text-muted-foreground">Humedad</div>
+                    <div className="text-xl font-semibold">
+                      {typeof lastReading?.humidity === 'number' && Number.isFinite(lastReading.humidity)
+                        ? `${lastReading.humidity.toFixed(1)} %`
+                        : '—'}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      online: {displaySummary?.online ? 'sí' : 'no'}
+                    </div>
                   </div>
                 </div>
+
                 <div className="p-3 rounded border">
-                  <div className="text-xs text-muted-foreground">Humedad</div>
-                  <div className="text-xl font-semibold">
-                    {typeof lastReading?.humidity === 'number' && Number.isFinite(lastReading.humidity)
-                      ? `${lastReading.humidity.toFixed(1)} %`
-                      : '—'}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    online: {displaySummary?.online ? 'sí' : 'no'}
+                  <div className="text-xs text-muted-foreground">Sensor vinculado</div>
+                  {linkedDevice ? (
+                    <div className="mt-1 space-y-1 text-sm">
+                      <div className="flex items-center gap-2">
+                        <Badge variant={linkedDevice.online ? 'default' : 'secondary'}>
+                          {linkedDevice.online ? 'Online' : 'Offline'}
+                        </Badge>
+                        <span className="text-muted-foreground">ID:</span>
+                        <span className="font-mono text-xs">{linkedDevice.deviceId}</span>
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        Último reporte: {linkedDevice.lastSeen ? formatRelativeTime(new Date(linkedDevice.lastSeen)) : '—'}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        RSSI: {typeof linkedDevice.rssi === 'number' ? `${linkedDevice.rssi} dBm` : '—'}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        SSID: {linkedDevice.wifiSsid || '—'} · IP: {linkedDevice.ip || '—'}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        AP: {linkedDevice.apSsid || '—'} · {linkedDevice.apIp || '—'}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      Sin sensor vinculado al equipo.
+                    </div>
+                  )}
+                  <div className="mt-2">
+                    <Button type="button" size="sm" variant="outline" onClick={() => navigate('/sensors')}>
+                      Abrir sensores
+                    </Button>
                   </div>
                 </div>
-              </div>
 
-              <div className="p-3 rounded border">
-                <div className="text-xs text-muted-foreground">Sensor vinculado</div>
-                {linkedDevice ? (
-                  <div className="mt-1 space-y-1 text-sm">
-                    <div className="flex items-center gap-2">
-                      <Badge variant={linkedDevice.online ? 'default' : 'secondary'}>
-                        {linkedDevice.online ? 'Online' : 'Offline'}
-                      </Badge>
-                      <span className="text-muted-foreground">ID:</span>
-                      <span className="font-mono text-xs">{linkedDevice.deviceId}</span>
-                    </div>
+                <div className="text-sm">
+                  <div className="font-medium mb-1">Indicadores</div>
+                  <ul className="list-disc pl-5 space-y-1">
+                    {prediction.indicadores.map((i) => (
+                      <li key={i} className="text-muted-foreground">
+                        {i}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="text-sm">
+                  <div className="font-medium mb-1">Recomendación</div>
+                  <div className="text-muted-foreground">{prediction.recomendacion}</div>
+                </div>
+
+                <div className="text-xs text-muted-foreground flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4" />
+                  Confianza estimada: {Math.round(prediction.confianza * 100)}%
+                </div>
+
+                <div className="p-3 rounded border space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs text-muted-foreground">Predicción IA (opcional)</div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={generateAiForecast}
+                      disabled={aiLoading || readings.length < 5 || !hasGroqKey}
+                    >
+                      {aiLoading ? 'Generando…' : 'Generar'}
+                    </Button>
+                  </div>
+                  {!hasGroqKey && (
                     <div className="text-xs text-muted-foreground">
-                      Último reporte: {linkedDevice.lastSeen ? formatRelativeTime(new Date(linkedDevice.lastSeen)) : '—'}
+                      Configura VITE_GROQ_API_KEY para habilitar IA.
                     </div>
-                    <div className="text-xs text-muted-foreground">
-                      RSSI: {typeof linkedDevice.rssi === 'number' ? `${linkedDevice.rssi} dBm` : '—'}
+                  )}
+                  {aiError && (
+                    <div className="text-xs text-destructive">{aiError}</div>
+                  )}
+                  {aiForecast && (
+                    <div className="space-y-1 text-xs text-muted-foreground">
+                      <div>
+                        Riesgo IA: <span className="text-foreground">{aiForecast.riesgo}</span>
+                        {' '}· Confianza: {Math.round(aiForecast.confianza * 100)}%
+                      </div>
+                      <div>{aiForecast.resumen}</div>
+                      <div className="text-foreground">{aiForecast.recomendacion}</div>
                     </div>
-                    <div className="text-xs text-muted-foreground">
-                      SSID: {linkedDevice.wifiSsid || '—'} · IP: {linkedDevice.ip || '—'}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      AP: {linkedDevice.apSsid || '—'} · {linkedDevice.apIp || '—'}
-                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle>Últimas lecturas</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {displayReadings.length === 0 ? (
+                  <div className="text-sm text-muted-foreground">
+                    Aún no hay histórico. El ESP32 empezará a poblar la ruta "sensors/&lt;equipmentId&gt;/readings".
                   </div>
                 ) : (
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    Sin sensor vinculado al equipo.
-                  </div>
-                )}
-                <div className="mt-2">
-                  <Button type="button" size="sm" variant="outline" onClick={() => navigate('/sensors')}>
-                    Abrir sensores
-                  </Button>
-                </div>
-              </div>
-
-              <div className="text-sm">
-                <div className="font-medium mb-1">Indicadores</div>
-                <ul className="list-disc pl-5 space-y-1">
-                  {prediction.indicadores.map((i) => (
-                    <li key={i} className="text-muted-foreground">
-                      {i}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              <div className="text-sm">
-                <div className="font-medium mb-1">Recomendación</div>
-                <div className="text-muted-foreground">{prediction.recomendacion}</div>
-              </div>
-
-              <div className="text-xs text-muted-foreground flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4" />
-                Confianza estimada: {Math.round(prediction.confianza * 100)}%
-              </div>
-
-              <div className="p-3 rounded border space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="text-xs text-muted-foreground">Predicción IA (opcional)</div>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={generateAiForecast}
-                    disabled={aiLoading || readings.length < 5 || !hasGroqKey}
-                  >
-                    {aiLoading ? 'Generando…' : 'Generar'}
-                  </Button>
-                </div>
-                {!hasGroqKey && (
-                  <div className="text-xs text-muted-foreground">
-                    Configura VITE_GROQ_API_KEY para habilitar IA.
-                  </div>
-                )}
-                {aiError && (
-                  <div className="text-xs text-destructive">{aiError}</div>
-                )}
-                {aiForecast && (
-                  <div className="space-y-1 text-xs text-muted-foreground">
-                    <div>
-                      Riesgo IA: <span className="text-foreground">{aiForecast.riesgo}</span>
-                      {' '}· Confianza: {Math.round(aiForecast.confianza * 100)}%
-                    </div>
-                    <div>{aiForecast.resumen}</div>
-                    <div className="text-foreground">{aiForecast.recomendacion}</div>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle>Últimas lecturas</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {displayReadings.length === 0 ? (
-                <div className="text-sm text-muted-foreground">
-                  Aún no hay histórico. El ESP32 empezará a poblar la ruta "sensors/&lt;equipmentId&gt;/readings".
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="rounded border p-2">
-                      <div className="text-xs text-muted-foreground">Temperatura (últimas {Math.min(displayReadings.length, 60)})</div>
-                      <Sparkline
-                        points={displayReadings.slice(-60).map((r) => r.temperature)}
-                        colorClass="stroke-orange-500"
-                      />
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        Último: {typeof lastReading?.temperature === 'number' && Number.isFinite(lastReading.temperature)
-                          ? `${lastReading.temperature.toFixed(1)} °C`
-                          : '—'}
-                      </div>
-                    </div>
-                    <div className="rounded border p-2">
-                      <div className="text-xs text-muted-foreground">Humedad (últimas {Math.min(displayReadings.length, 60)})</div>
-                      <Sparkline
-                        points={displayReadings.slice(-60).map((r) => r.humidity)}
-                        colorClass="stroke-sky-500"
-                      />
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        Último: {typeof lastReading?.humidity === 'number' && Number.isFinite(lastReading.humidity)
-                          ? `${lastReading.humidity.toFixed(1)} %`
-                          : '—'}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="text-xs text-muted-foreground">
-                    {lastReadingTs ? `Última lectura: ${new Date(lastReadingTs).toLocaleString()}` : 'Última lectura: —'}
-                  </div>
-
-                  <div className="space-y-2 max-h-[300px] overflow-auto">
-                  {displayReadings
-                    .slice(-12)
-                    .reverse()
-                    .map((r) => (
-                      <div key={r.timestamp} className="flex items-center justify-between p-2 rounded border">
-                        <div className="text-sm">
-                          <div className="font-medium">
-                            {r.temperature.toFixed(1)}°C · {r.humidity.toFixed(1)}%
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {formatRelativeTime(new Date(normalizeTs(r.timestamp) ?? r.timestamp))} · {r.source ?? '—'}
-                          </div>
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {new Date(normalizeTs(r.timestamp) ?? r.timestamp).toLocaleTimeString()}
+                  <div className="space-y-3">
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="rounded border p-2">
+                        <div className="text-xs text-muted-foreground">Temperatura (últimas {Math.min(displayReadings.length, 60)})</div>
+                        <Sparkline
+                          points={displayReadings.slice(-60).map((r) => r.temperature)}
+                          colorClass="stroke-orange-500"
+                        />
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          Último: {typeof lastReading?.temperature === 'number' && Number.isFinite(lastReading.temperature)
+                            ? `${lastReading.temperature.toFixed(1)} °C`
+                            : '—'}
                         </div>
                       </div>
-                    ))}
+                      <div className="rounded border p-2">
+                        <div className="text-xs text-muted-foreground">Humedad (últimas {Math.min(displayReadings.length, 60)})</div>
+                        <Sparkline
+                          points={displayReadings.slice(-60).map((r) => r.humidity)}
+                          colorClass="stroke-sky-500"
+                        />
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          Último: {typeof lastReading?.humidity === 'number' && Number.isFinite(lastReading.humidity)
+                            ? `${lastReading.humidity.toFixed(1)} %`
+                            : '—'}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="text-xs text-muted-foreground">
+                      {lastReadingTs ? `Última lectura: ${new Date(lastReadingTs).toLocaleString()}` : 'Última lectura: —'}
+                    </div>
+
+                    <div className="space-y-2 max-h-[300px] overflow-auto">
+                      {displayReadings
+                        .slice(-12)
+                        .reverse()
+                        .map((r) => (
+                          <div key={r.timestamp} className="flex items-center justify-between p-2 rounded border">
+                            <div className="text-sm">
+                              <div className="font-medium">
+                                {r.temperature.toFixed(1)}°C · {r.humidity.toFixed(1)}%
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {formatRelativeTime(new Date(normalizeTs(r.timestamp) ?? r.timestamp))} · {r.source ?? '—'}
+                              </div>
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {new Date(normalizeTs(r.timestamp) ?? r.timestamp).toLocaleTimeString()}
+                            </div>
+                          </div>
+                        ))}
+                    </div>
                   </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </div>
       )}
     </div>
