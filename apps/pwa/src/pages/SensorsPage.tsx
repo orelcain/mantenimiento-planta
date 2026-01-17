@@ -265,6 +265,16 @@ export function SensorsPage() {
     }
   }
 
+  const getRssiRateEstimate = (rssi: number | undefined, online: boolean | undefined) => {
+    if (!online) return 'Sin señal'
+    if (typeof rssi !== 'number' || rssi === 0) return 'Sin señal'
+    if (rssi >= -50) return 'Alta (≥50 Mbps)'
+    if (rssi >= -60) return 'Media (20–50 Mbps)'
+    if (rssi >= -70) return 'Baja (5–20 Mbps)'
+    if (rssi >= -80) return 'Muy baja (1–5 Mbps)'
+    return 'Sin señal'
+  }
+
   // Cargar configuración AP actual del dispositivo seleccionado
   useEffect(() => {
     if (selectedDevice) {
@@ -1276,6 +1286,11 @@ export function SensorsPage() {
                             <span className={getRssiQualityClass(selectedDevice.rssi, selectedDevice.online)}>
                               ({getRssiQuality(selectedDevice.rssi, selectedDevice.online)})
                             </span>
+                          </div>
+                        )}
+                        {typeof selectedDevice.rssi === 'number' && (
+                          <div className="text-xs text-muted-foreground">
+                            Tasa est.: {getRssiRateEstimate(selectedDevice.rssi, selectedDevice.online)}
                           </div>
                         )}
                         {typeof selectedDevice.rssi === 'number' && (

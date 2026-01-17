@@ -100,6 +100,7 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
     <div class="row"><strong>SSID</strong><span id="ssid">--</span></div>
     <div class="row"><strong>IP</strong><span id="ip">--</span></div>
     <div class="row"><strong>RSSI</strong><span id="rssi" class="q-sin">--</span></div>
+    <div class="row"><strong>Tasa est.</strong><span id="rate">--</span></div>
     <div id="rssiBar" class="bar sin"><span></span></div>
   </div>
   <a class="btn" href="/status.json">Ver estado JSON</a>
@@ -120,6 +121,16 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
       if(q==='Regular') return 'q-regular';
       if(q==='Mala') return 'q-mala';
       return 'q-sin';
+    }
+
+    function rssiRate(rssi, connected){
+      if(!connected) return 'Sin señal';
+      if(typeof rssi!=='number' || rssi===0) return 'Sin señal';
+      if(rssi>=-50) return 'Alta (≥50 Mbps)';
+      if(rssi>=-60) return 'Media (20–50 Mbps)';
+      if(rssi>=-70) return 'Baja (5–20 Mbps)';
+      if(rssi>=-80) return 'Muy baja (1–5 Mbps)';
+      return 'Sin señal';
     }
 
     async function load(){
@@ -147,6 +158,7 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
         rssiEl.className = rssiClass(q);
         const bar = document.getElementById('rssiBar');
         bar.className = `bar ${q === 'Excelente' ? 'excelente' : q === 'Buena' ? 'buena' : q === 'Regular' ? 'regular' : q === 'Mala' ? 'mala' : 'sin'}`;
+        document.getElementById('rate').textContent = rssiRate(s.rssi, s.wifiConnected);
       }catch(e){}
     }
     load();
