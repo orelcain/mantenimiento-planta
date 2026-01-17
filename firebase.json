@@ -9,6 +9,9 @@
   "storage": {
     "rules": "storage.rules"
   },
+  "functions": {
+    "source": "functions"
+  },
   "hosting": {
     "public": "apps/pwa/dist",
     "ignore": [

@@ -147,6 +147,19 @@ service cloud.firestore {
     }
 
     // ============================================
+    // FCM TOKENS - Notificaciones Push
+    // ============================================
+    match /fcmTokens/{userId} {
+      allow read: if isAuthenticated() && (isAdmin() || isOwner(userId));
+      allow create, update: if isActiveUser()
+        && isOwner(userId)
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.token is string
+        && request.resource.data.token.size() > 0;
+      allow delete: if isActiveUser() && isOwner(userId);
+    }
+
+    // ============================================
     // INCIDENCIAS - Validación de reportes
     // ============================================
     match /incidents/{incidentId} {
