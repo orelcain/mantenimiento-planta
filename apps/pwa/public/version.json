@@ -1,8 +1,11 @@
 {
-  "version": "2.22.1",
-  "buildDate": "2026-01-16",
-  "buildTimestamp": 1768595880000,
+  "version": "2.22.2",
+  "buildDate": "2026-01-17",
+  "buildTimestamp": 1768682280000,
   "features": [
+    "UI Predictivo con estado del sensor (online, RSSI, SSID/IP/AP)",
+    "Predicción IA opcional con Groq (lecturas recientes)",
+    "Botón rápido para abrir Sensores desde Predictivo",
     "OTA por WiFi habilitado en ESP32",
     "Panel local muestra SSID/IP/RSSI",
     "🔧 Fix validación gráfico: acepta temperatura/humedad = 0 como valores válidos",

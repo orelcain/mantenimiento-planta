@@ -1,14 +1,24 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.22.1**
+## Versión Actual: **v2.22.2**
 
-**Fecha de lanzamiento**: 16 de enero de 2026  \
+**Fecha de lanzamiento**: 17 de enero de 2026  \
 **Estado**: ✅ PRODUCCIÓN READY  \
 **Build**: ✅ Último build local OK
 
 ---
 
 ## 📋 Información de la Versión
+
+### v2.22.2 - Predictivo + IA IoT (17/01/2026)
+
+**Nuevas Funcionalidades:**
+- ✅ **Estado del sensor en Predictivo** (online, RSSI, SSID/IP/AP y lastSeen)
+- ✅ **Predicción IA opcional** con Groq (lecturas recientes)
+- ✅ **Atajo a Sensores** desde Predictivo
+
+**Mejoras Técnicas:**
+- ✅ Integración RTDB `devices/` en Predictivo
 
 ### v2.22.1 - OTA por WiFi + estado de red local (16/01/2026)
 
