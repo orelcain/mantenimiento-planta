@@ -111,11 +111,12 @@ export function PredictivePage() {
 
   const filteredEquipment = useMemo(() => {
     return equipment.filter((e) => {
+      if (!equipmentWithSensorIds.has(e.id)) return false
       if (filterEstado !== 'todas' && e.estado !== filterEstado) return false
       if (filterCriticidad !== 'todas' && e.criticidad !== filterCriticidad) return false
       return true
     })
-  }, [equipment, filterCriticidad, filterEstado])
+  }, [equipment, equipmentWithSensorIds, filterCriticidad, filterEstado])
 
   const selectedEquipment = useMemo(
     () => equipment.find((e) => e.id === selectedId) ?? null,
@@ -126,6 +127,14 @@ export function PredictivePage() {
     () => devices.find((d) => d.assignedEquipmentId === selectedEquipment?.id) ?? null,
     [devices, selectedEquipment?.id]
   )
+
+  const equipmentWithSensorIds = useMemo(() => {
+    const ids = new Set<string>()
+    devices.forEach((d) => {
+      if (d.assignedEquipmentId) ids.add(d.assignedEquipmentId)
+    })
+    return ids
+  }, [devices])
 
   const { summary, readings, prediction, error } = useIoTPrediction(selectedId || null)
 
@@ -340,6 +349,11 @@ export function PredictivePage() {
                 <div className="mt-1 text-xs text-muted-foreground">
                   {filteredEquipment.length} resultado(s)
                 </div>
+                {filteredEquipment.length === 0 && !loadingEquipment && (
+                  <div className="mt-1 text-xs text-amber-600">
+                    No hay equipos con sensor asociado.
+                  </div>
+                )}
                 <div className="mt-1 text-xs text-muted-foreground">
                   Usa el selector para elegir un equipo disponible.
                 </div>
