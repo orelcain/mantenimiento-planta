@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.22.2**
+## Versión Actual: **v2.23.0**
 
 **Fecha de lanzamiento**: 17 de enero de 2026  \
 **Estado**: ✅ PRODUCCIÓN READY  \
@@ -9,6 +9,20 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.23.0 - Sensores + limpieza RTDB (17/01/2026)
+
+**Nuevas Funcionalidades:**
+- ✅ **Eliminar dispositivos duplicados en Firebase RTDB**
+- ✅ **UI Sensores reorganizada en 2 columnas** con dashboard de estadísticas
+- ✅ **Cards separadas** para Telemetría, Emparejar y WiFi AP
+- ✅ **Device list mejorada** con deviceName, apSsid e IP
+
+**Fixes Técnicos:**
+- ✅ Fix detección real-time sin throttling
+- ✅ Fix propagación de eventos en botón eliminar
+
+---
 
 ### v2.22.2 - Predictivo + IA IoT (17/01/2026)
 

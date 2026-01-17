@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.22.2' as const
+export const APP_VERSION = '2.23.0' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-01-17' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Predictivo + IA IoT' as const
+export const VERSION_NAME = 'Sensores + limpieza RTDB' as const
 
 /**
  * Nota:

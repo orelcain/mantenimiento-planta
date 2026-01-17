@@ -1,8 +1,14 @@
 {
-  "version": "2.22.2",
+  "version": "2.23.0",
   "buildDate": "2026-01-17",
-  "buildTimestamp": 1768682280000,
+  "buildTimestamp": 1768618800000,
   "features": [
+    "Eliminar dispositivos duplicados en Firebase RTDB",
+    "UI de Sensores reorganizada en 2 columnas con dashboard de estadísticas",
+    "Cards separadas para Telemetría, Emparejar y WiFi AP",
+    "Detección real-time sin throttling",
+    "Fix propagación de eventos en botón eliminar",
+    "Device list mejorada mostrando deviceName, apSsid e IP",
     "UI Predictivo con estado del sensor (online, RSSI, SSID/IP/AP)",
     "Predicción IA opcional con Groq (lecturas recientes)",
     "Botón rápido para abrir Sensores desde Predictivo",
