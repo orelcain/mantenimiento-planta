@@ -207,6 +207,32 @@ export function SensorsPage() {
   const otaHostLabel = otaHostname ? `${otaHostname}.local` : ''
   const otaPassword = '12345678'
 
+  const getRssiQuality = (rssi: number | undefined, online: boolean | undefined) => {
+    if (!online) return 'Sin señal'
+    if (typeof rssi !== 'number' || rssi === 0) return 'Sin señal'
+    if (rssi >= -50) return 'Excelente'
+    if (rssi >= -60) return 'Buena'
+    if (rssi >= -70) return 'Regular'
+    if (rssi >= -80) return 'Mala'
+    return 'Sin señal'
+  }
+
+  const getRssiQualityClass = (rssi: number | undefined, online: boolean | undefined) => {
+    const q = getRssiQuality(rssi, online)
+    switch (q) {
+      case 'Excelente':
+        return 'text-emerald-600 dark:text-emerald-400'
+      case 'Buena':
+        return 'text-green-600 dark:text-green-400'
+      case 'Regular':
+        return 'text-yellow-600 dark:text-yellow-400'
+      case 'Mala':
+        return 'text-orange-600 dark:text-orange-400'
+      default:
+        return 'text-red-600 dark:text-red-400'
+    }
+  }
+
   // Cargar configuración AP actual del dispositivo seleccionado
   useEffect(() => {
     if (selectedDevice) {
@@ -1212,9 +1238,12 @@ export function SensorsPage() {
                             IP: {selectedDevice.ip}
                           </div>
                         )}
-                        {selectedDevice.rssi && (
+                        {typeof selectedDevice.rssi === 'number' && (
                           <div className="text-xs text-muted-foreground">
-                            Señal: {selectedDevice.rssi} dBm
+                            Señal: {selectedDevice.rssi} dBm{' '}
+                            <span className={getRssiQualityClass(selectedDevice.rssi, selectedDevice.online)}>
+                              ({getRssiQuality(selectedDevice.rssi, selectedDevice.online)})
+                            </span>
                           </div>
                         )}
                       </div>
@@ -1334,7 +1363,14 @@ export function SensorsPage() {
                     <div className="font-mono text-sm">{selectedDevice.deviceId}</div>
                     <div className="text-xs text-muted-foreground">
                       {selectedDevice.ip ? `IP: ${selectedDevice.ip}` : ''}
-                      {typeof selectedDevice.rssi === 'number' ? ` · RSSI: ${selectedDevice.rssi} dBm` : ''}
+                      {typeof selectedDevice.rssi === 'number' && (
+                        <span>
+                          {' '}· RSSI: {selectedDevice.rssi} dBm{' '}
+                          <span className={getRssiQualityClass(selectedDevice.rssi, selectedDevice.online)}>
+                            ({getRssiQuality(selectedDevice.rssi, selectedDevice.online)})
+                          </span>
+                        </span>
+                      )}
                     </div>
                     {selectedDevice.firmwareVersion && (
                       <div className="text-xs text-muted-foreground">Firmware: {selectedDevice.firmwareVersion}</div>

@@ -73,6 +73,11 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
     .row{display:flex;justify-content:space-between;margin:6px 0}
     .muted{color:#6b7280;font-size:0.9em}
     .btn{display:inline-block;margin-top:12px;background:#2563eb;color:#fff;padding:10px 14px;border-radius:8px;text-decoration:none}
+    .q-excelente{color:#059669}
+    .q-buena{color:#16a34a}
+    .q-regular{color:#d97706}
+    .q-mala{color:#ea580c}
+    .q-sin{color:#dc2626}
   </style>
 </head>
 <body>
@@ -87,10 +92,28 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
     <div class="row"><strong>WiFi</strong><span id="wifi">--</span></div>
     <div class="row"><strong>SSID</strong><span id="ssid">--</span></div>
     <div class="row"><strong>IP</strong><span id="ip">--</span></div>
-    <div class="row"><strong>RSSI</strong><span id="rssi">--</span></div>
+    <div class="row"><strong>RSSI</strong><span id="rssi" class="q-sin">--</span></div>
   </div>
   <a class="btn" href="/status.json">Ver estado JSON</a>
   <script>
+    function rssiQuality(rssi, connected){
+      if(!connected) return 'Sin señal';
+      if(typeof rssi!=='number' || rssi===0) return 'Sin señal';
+      if(rssi>=-50) return 'Excelente';
+      if(rssi>=-60) return 'Buena';
+      if(rssi>=-70) return 'Regular';
+      if(rssi>=-80) return 'Mala';
+      return 'Sin señal';
+    }
+
+    function rssiClass(q){
+      if(q==='Excelente') return 'q-excelente';
+      if(q==='Buena') return 'q-buena';
+      if(q==='Regular') return 'q-regular';
+      if(q==='Mala') return 'q-mala';
+      return 'q-sin';
+    }
+
     async function load(){
       try{
         const r=await fetch('/api/current',{cache:'no-store'});
@@ -109,7 +132,11 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
         document.getElementById('wifi').textContent = s.wifiConnected ? 'Conectado' : 'Desconectado';
         document.getElementById('ssid').textContent = s.ssid || '--';
         document.getElementById('ip').textContent = s.ip || '--';
-        document.getElementById('rssi').textContent = (s.rssi ?? '--') + ' dBm';
+        const q = rssiQuality(s.rssi, s.wifiConnected);
+        const rssiText = (s.rssi ?? '--') + ' dBm' + (q ? ` · ${q}` : '');
+        const rssiEl = document.getElementById('rssi');
+        rssiEl.textContent = rssiText;
+        rssiEl.className = rssiClass(q);
       }catch(e){}
     }
     load();
