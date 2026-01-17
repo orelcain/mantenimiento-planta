@@ -11,6 +11,7 @@ import { ensurePredictiveIncident } from '@/services/predictiveIncidents'
 import { predictSensorForecast } from '@/services/ai'
 import type { DeviceRow } from '@/services/devicesRtdb'
 import { subscribeDevices } from '@/services/devicesRtdb'
+import { getEquipments } from '@/services/equipment'
 import type { Equipment } from '@/types'
 
 function normalizeTs(ts: number | undefined): number | null {
@@ -79,6 +80,7 @@ function riskBadgeVariant(risk: string): BadgeProps['variant'] {
 export function PredictivePage() {
   const navigate = useNavigate()
   const equipment = useAppStore((s) => s.equipment)
+  const setEquipment = useAppStore((s) => s.setEquipment)
   const user = useAuthStore((s) => s.user)
 
   const [selectedId, setSelectedId] = useState<string>(() => equipment[0]?.id ?? '')
@@ -92,6 +94,9 @@ export function PredictivePage() {
 
   const [devices, setDevices] = useState<DeviceRow[]>([])
   const [devicesError, setDevicesError] = useState<string | null>(null)
+
+  const [loadingEquipment, setLoadingEquipment] = useState(false)
+  const loadedRef = useRef(false)
 
   const [aiLoading, setAiLoading] = useState(false)
   const [aiError, setAiError] = useState<string | null>(null)
@@ -230,6 +235,26 @@ export function PredictivePage() {
   }, [autoCreate, user?.id, selectedEquipment?.id, lastReading?.timestamp, prediction.nivelRiesgo, prediction.confianza])
 
   useEffect(() => {
+    if (loadedRef.current || loadingEquipment) return
+
+    if (equipment.length > 0) {
+      loadedRef.current = true
+      return
+    }
+
+    loadedRef.current = true
+    setLoadingEquipment(true)
+    void (async () => {
+      try {
+        const data = await getEquipments()
+        setEquipment(data)
+      } finally {
+        setLoadingEquipment(false)
+      }
+    })()
+  }, [equipment.length, loadingEquipment, setEquipment])
+
+  useEffect(() => {
     const unsub = subscribeDevices(
       (rows) => {
         setDevices(rows)
@@ -299,7 +324,9 @@ export function PredictivePage() {
                     <SelectValue placeholder="Selecciona un equipo" />
                   </SelectTrigger>
                   <SelectContent>
-                    {filteredEquipment.length === 0 ? (
+                    {loadingEquipment ? (
+                      <div className="p-2 text-sm text-muted-foreground">Cargando equipos…</div>
+                    ) : filteredEquipment.length === 0 ? (
                       <div className="p-2 text-sm text-muted-foreground">Sin resultados</div>
                     ) : (
                       filteredEquipment.map((e) => (
