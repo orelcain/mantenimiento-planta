@@ -126,11 +126,27 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
     function rssiRate(rssi, connected){
       if(!connected) return 'Sin señal';
       if(typeof rssi!=='number' || rssi===0) return 'Sin señal';
-      if(rssi>=-50) return 'Alta (≥50 Mbps)';
-      if(rssi>=-60) return 'Media (20–50 Mbps)';
-      if(rssi>=-70) return 'Baja (5–20 Mbps)';
-      if(rssi>=-80) return 'Muy baja (1–5 Mbps)';
-      return 'Sin señal';
+      if(rssi>=-40) return 'R1 (≥150 Mbps)';
+      if(rssi>=-43) return 'R2 (130–150 Mbps)';
+      if(rssi>=-46) return 'R3 (110–130 Mbps)';
+      if(rssi>=-49) return 'R4 (90–110 Mbps)';
+      if(rssi>=-52) return 'R5 (75–90 Mbps)';
+      if(rssi>=-55) return 'R6 (65–75 Mbps)';
+      if(rssi>=-58) return 'R7 (55–65 Mbps)';
+      if(rssi>=-61) return 'R8 (45–55 Mbps)';
+      if(rssi>=-64) return 'R9 (38–45 Mbps)';
+      if(rssi>=-67) return 'R10 (32–38 Mbps)';
+      if(rssi>=-70) return 'R11 (26–32 Mbps)';
+      if(rssi>=-73) return 'R12 (20–26 Mbps)';
+      if(rssi>=-76) return 'R13 (15–20 Mbps)';
+      if(rssi>=-79) return 'R14 (11–15 Mbps)';
+      if(rssi>=-82) return 'R15 (8–11 Mbps)';
+      if(rssi>=-85) return 'R16 (6–8 Mbps)';
+      if(rssi>=-88) return 'R17 (4–6 Mbps)';
+      if(rssi>=-91) return 'R18 (3–4 Mbps)';
+      if(rssi>=-94) return 'R19 (2–3 Mbps)';
+      if(rssi>=-97) return 'R20 (1–2 Mbps)';
+      return 'Sin señal (<1 Mbps)';
     }
 
     async function load(){
