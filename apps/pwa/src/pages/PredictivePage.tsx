@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Activity, AlertTriangle, CheckCircle2 } from 'lucide-react'
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Switch } from '@/components/ui'
 import type { BadgeProps } from '@/components/ui/badge'
@@ -7,6 +8,9 @@ import { useAuthStore } from '@/store'
 import { useIoTPrediction } from '@/hooks/useIoTPrediction'
 import { formatRelativeTime } from '@/lib/utils'
 import { ensurePredictiveIncident } from '@/services/predictiveIncidents'
+import { predictSensorForecast } from '@/services/ai'
+import type { DeviceRow } from '@/services/devicesRtdb'
+import { subscribeDevices } from '@/services/devicesRtdb'
 import type { Equipment } from '@/types'
 
 function normalizeTs(ts: number | undefined): number | null {
@@ -78,6 +82,7 @@ function riskBadgeVariant(risk: string): BadgeProps['variant'] {
 }
 
 export function PredictivePage() {
+  const navigate = useNavigate()
   const equipment = useAppStore((s) => s.equipment)
   const user = useAuthStore((s) => s.user)
 
@@ -90,6 +95,20 @@ export function PredictivePage() {
   const [createdIncidentId, setCreatedIncidentId] = useState<string | null>(null)
   const [createError, setCreateError] = useState<string | null>(null)
   const lastHandledTimestampRef = useRef<number | null>(null)
+
+  const [devices, setDevices] = useState<DeviceRow[]>([])
+  const [devicesError, setDevicesError] = useState<string | null>(null)
+
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiError, setAiError] = useState<string | null>(null)
+  const [aiForecast, setAiForecast] = useState<{
+    riesgo: 'bajo' | 'medio' | 'alto' | 'critico'
+    confianza: number
+    resumen: string
+    recomendacion: string
+  } | null>(null)
+
+  const hasGroqKey = Boolean(import.meta.env.VITE_GROQ_API_KEY)
 
   const filteredEquipment = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -105,6 +124,11 @@ export function PredictivePage() {
   const selectedEquipment = useMemo(
     () => equipment.find((e) => e.id === selectedId) ?? null,
     [equipment, selectedId]
+  )
+
+  const linkedDevice = useMemo(
+    () => devices.find((d) => d.assignedEquipmentId === selectedEquipment?.id) ?? null,
+    [devices, selectedEquipment?.id]
   )
 
   const { summary, readings, prediction, error } = useIoTPrediction(selectedId || null)
@@ -167,6 +191,29 @@ export function PredictivePage() {
     }
   }
 
+  async function generateAiForecast() {
+    if (!selectedEquipment) return
+    setAiError(null)
+    setAiLoading(true)
+    try {
+      const result = await predictSensorForecast({
+        equipment: selectedEquipment,
+        summary,
+        readings,
+      })
+      if (!result) {
+        setAiError('No se pudo generar predicción IA. Revisa API key y datos.')
+      }
+      setAiForecast(result)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Error generando predicción IA.'
+      setAiError(msg)
+      setAiForecast(null)
+    } finally {
+      setAiLoading(false)
+    }
+  }
+
   // Auto-creación cuando llega una nueva lectura y el riesgo es alto/critico.
   useEffect(() => {
     if (!autoCreate) return
@@ -190,6 +237,17 @@ export function PredictivePage() {
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoCreate, user?.id, selectedEquipment?.id, lastReading?.timestamp, prediction.nivelRiesgo, prediction.confianza])
+
+  useEffect(() => {
+    const unsub = subscribeDevices(
+      (rows) => {
+        setDevices(rows)
+        setDevicesError(null)
+      },
+      () => setDevicesError('No se pudo leer devices/ (RTDB).')
+    )
+    return () => unsub()
+  }, [])
 
   return (
     <div className="space-y-6">
@@ -292,6 +350,12 @@ export function PredictivePage() {
               {error}
             </div>
           )}
+          {devicesError && (
+            <div className="mt-2 text-sm text-destructive flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4" />
+              {devicesError}
+            </div>
+          )}
 
           <div className="mt-4 flex flex-col gap-3">
             <div className="flex items-center justify-between gap-4 max-w-xl">
@@ -374,6 +438,42 @@ export function PredictivePage() {
                 </div>
               </div>
 
+              <div className="p-3 rounded border">
+                <div className="text-xs text-muted-foreground">Sensor vinculado</div>
+                {linkedDevice ? (
+                  <div className="mt-1 space-y-1 text-sm">
+                    <div className="flex items-center gap-2">
+                      <Badge variant={linkedDevice.online ? 'default' : 'secondary'}>
+                        {linkedDevice.online ? 'Online' : 'Offline'}
+                      </Badge>
+                      <span className="text-muted-foreground">ID:</span>
+                      <span className="font-mono text-xs">{linkedDevice.deviceId}</span>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      Último reporte: {linkedDevice.lastSeen ? formatRelativeTime(new Date(linkedDevice.lastSeen)) : '—'}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      RSSI: {typeof linkedDevice.rssi === 'number' ? `${linkedDevice.rssi} dBm` : '—'}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      SSID: {linkedDevice.wifiSsid || '—'} · IP: {linkedDevice.ip || '—'}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      AP: {linkedDevice.apSsid || '—'} · {linkedDevice.apIp || '—'}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    Sin sensor vinculado al equipo.
+                  </div>
+                )}
+                <div className="mt-2">
+                  <Button type="button" size="sm" variant="outline" onClick={() => navigate('/sensors')}>
+                    Abrir sensores
+                  </Button>
+                </div>
+              </div>
+
               <div className="text-sm">
                 <div className="font-medium mb-1">Indicadores</div>
                 <ul className="list-disc pl-5 space-y-1">
@@ -393,6 +493,39 @@ export function PredictivePage() {
               <div className="text-xs text-muted-foreground flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4" />
                 Confianza estimada: {Math.round(prediction.confianza * 100)}%
+              </div>
+
+              <div className="p-3 rounded border space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="text-xs text-muted-foreground">Predicción IA (opcional)</div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={generateAiForecast}
+                    disabled={aiLoading || readings.length < 5 || !hasGroqKey}
+                  >
+                    {aiLoading ? 'Generando…' : 'Generar'}
+                  </Button>
+                </div>
+                {!hasGroqKey && (
+                  <div className="text-xs text-muted-foreground">
+                    Configura VITE_GROQ_API_KEY para habilitar IA.
+                  </div>
+                )}
+                {aiError && (
+                  <div className="text-xs text-destructive">{aiError}</div>
+                )}
+                {aiForecast && (
+                  <div className="space-y-1 text-xs text-muted-foreground">
+                    <div>
+                      Riesgo IA: <span className="text-foreground">{aiForecast.riesgo}</span>
+                      {' '}· Confianza: {Math.round(aiForecast.confianza * 100)}%
+                    </div>
+                    <div>{aiForecast.resumen}</div>
+                    <div className="text-foreground">{aiForecast.recomendacion}</div>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
