@@ -147,34 +147,6 @@ Responde SOLO con JSON:
         temperature: 0.2,
         max_tokens: 1500,
       }),
-
-      // ===== PREDICCIÓN IA DESDE LECTURAS IoT =====
-
-      export async function predictSensorForecast(params: {
-        equipment: Equipment
-        summary: SensorSummaryNode | null
-        readings: SensorReading[]
-      }): Promise<SensorForecast | null> {
-        if (!GROQ_API_KEY) return null
-        if (!params.readings || params.readings.length < 5) return null
-
-        try {
-          const last = params.readings[params.readings.length - 1]
-          const payload = {
-            equipment: {
-              id: params.equipment.id,
-              nombre: params.equipment.nombre,
-              codigo: params.equipment.codigo,
-            },
-            summary: {
-              online: params.summary?.online ?? null,
-              lastSeen: params.summary?.lastSeen ?? null,
-            },
-            lastReading: last,
-            recent: params.readings.slice(-20),
-          }
-
-          const prompt = `Eres un analista de mantenimiento predictivo. Con base en las últimas lecturas de un sensor, estima riesgo y recomendación.
     })
 
     if (!response.ok) throw new Error(`Groq API error: ${response.status}`)
@@ -186,45 +158,6 @@ Responde SOLO con JSON:
       analysisType: 'pattern_detection',
       input: { incidentCount: incidents.length },
       output: result,
-
-          const response = await fetch(GROQ_API_URL, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${GROQ_API_KEY}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              model: MODEL,
-              messages: [{ role: 'user', content: prompt }],
-              temperature: 0.2,
-              max_tokens: 600,
-            }),
-          })
-
-          if (!response.ok) {
-            throw new Error(`Groq API error: ${response.status}`)
-          }
-
-          const data = await response.json()
-          const result = JSON.parse(data.choices[0]?.message?.content || '{}') as SensorForecast
-
-          await saveAIAnalysis({
-            equipmentId: params.equipment.id,
-            analysisType: 'prediction',
-            input: payload,
-            output: result,
-            confidence: result.confianza || 0,
-            model: MODEL,
-            tokens: data.usage?.total_tokens || 0,
-            createdAt: new Date(),
-          })
-
-          return result
-        } catch (error) {
-          logger.error('Error generando predicción IA:', error instanceof Error ? error : new Error(String(error)))
-          return null
-        }
-      }
       confidence: result.confidence || 0,
       model: MODEL,
       tokens: data.usage?.total_tokens || 0,
@@ -235,6 +168,84 @@ Responde SOLO con JSON:
   } catch (error) {
     logger.error('Error analizando patrones:', error instanceof Error ? error : new Error(String(error)))
     return { patterns: [], confidence: 0 }
+  }
+}
+
+// ===== PREDICCIÓN IA DESDE LECTURAS IoT =====
+
+export async function predictSensorForecast(params: {
+  equipment: Equipment
+  summary: SensorSummaryNode | null
+  readings: SensorReading[]
+}): Promise<SensorForecast | null> {
+  if (!GROQ_API_KEY) return null
+  if (!params.readings || params.readings.length < 5) return null
+
+  try {
+    const last = params.readings[params.readings.length - 1]
+    const payload = {
+      equipment: {
+        id: params.equipment.id,
+        nombre: params.equipment.nombre,
+        codigo: params.equipment.codigo,
+      },
+      summary: {
+        online: params.summary?.online ?? null,
+        lastSeen: params.summary?.lastSeen ?? null,
+      },
+      lastReading: last,
+      recent: params.readings.slice(-20),
+    }
+
+    const prompt = `Eres un analista de mantenimiento predictivo. Con base en las últimas lecturas de un sensor, estima riesgo y recomendación.
+
+Datos:
+${JSON.stringify(payload, null, 2)}
+
+Responde SOLO con JSON:
+{
+  "riesgo": "bajo|medio|alto|critico",
+  "confianza": 0.0-1.0,
+  "resumen": "Resumen breve",
+  "recomendacion": "Acción sugerida"
+}`
+
+    const response = await fetch(GROQ_API_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${GROQ_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.2,
+        max_tokens: 600,
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error(`Groq API error: ${response.status}`)
+    }
+
+    const data = await response.json()
+    const result = JSON.parse(data.choices[0]?.message?.content || '{}') as SensorForecast
+
+    await saveAIAnalysis({
+      equipmentId: params.equipment.id,
+      analysisType: 'prediction',
+      input: payload,
+      output: result,
+      confidence: result.confianza || 0,
+      model: MODEL,
+      tokens: data.usage?.total_tokens || 0,
+      createdAt: new Date(),
+    })
+
+    return result
+  } catch (error) {
+    logger.error('Error generando predicción IA:', error instanceof Error ? error : new Error(String(error)))
+    return null
   }
 }
 
