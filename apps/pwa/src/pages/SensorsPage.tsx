@@ -233,6 +233,38 @@ export function SensorsPage() {
     }
   }
 
+  const getRssiBarClass = (rssi: number | undefined, online: boolean | undefined) => {
+    const q = getRssiQuality(rssi, online)
+    switch (q) {
+      case 'Excelente':
+        return 'bg-emerald-500'
+      case 'Buena':
+        return 'bg-green-500'
+      case 'Regular':
+        return 'bg-yellow-500'
+      case 'Mala':
+        return 'bg-orange-500'
+      default:
+        return 'bg-red-500'
+    }
+  }
+
+  const getRssiBarWidth = (rssi: number | undefined, online: boolean | undefined) => {
+    const q = getRssiQuality(rssi, online)
+    switch (q) {
+      case 'Excelente':
+        return 'w-full'
+      case 'Buena':
+        return 'w-4/5'
+      case 'Regular':
+        return 'w-3/5'
+      case 'Mala':
+        return 'w-2/5'
+      default:
+        return 'w-1/5'
+    }
+  }
+
   // Cargar configuración AP actual del dispositivo seleccionado
   useEffect(() => {
     if (selectedDevice) {
@@ -1246,6 +1278,15 @@ export function SensorsPage() {
                             </span>
                           </div>
                         )}
+                        {typeof selectedDevice.rssi === 'number' && (
+                          <div className="mt-1">
+                            <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                              <div
+                                className={`h-full transition-all ${getRssiBarClass(selectedDevice.rssi, selectedDevice.online)} ${getRssiBarWidth(selectedDevice.rssi, selectedDevice.online)}`}
+                              />
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -1368,6 +1409,13 @@ export function SensorsPage() {
                           {' '}· RSSI: {selectedDevice.rssi} dBm{' '}
                           <span className={getRssiQualityClass(selectedDevice.rssi, selectedDevice.online)}>
                             ({getRssiQuality(selectedDevice.rssi, selectedDevice.online)})
+                          </span>
+                          <span className="inline-flex items-center ml-2 align-middle">
+                            <span className="h-1 w-20 rounded-full bg-muted overflow-hidden">
+                              <span
+                                className={`block h-full ${getRssiBarClass(selectedDevice.rssi, selectedDevice.online)} ${getRssiBarWidth(selectedDevice.rssi, selectedDevice.online)}`}
+                              />
+                            </span>
                           </span>
                         </span>
                       )}

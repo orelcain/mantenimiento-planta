@@ -78,6 +78,13 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
     .q-regular{color:#d97706}
     .q-mala{color:#ea580c}
     .q-sin{color:#dc2626}
+    .bar{height:6px;background:#e5e7eb;border-radius:999px;overflow:hidden;margin-top:4px}
+    .bar > span{display:block;height:100%;background:#dc2626;width:20%}
+    .bar.excelente > span{width:100%;background:#059669}
+    .bar.buena > span{width:80%;background:#16a34a}
+    .bar.regular > span{width:60%;background:#d97706}
+    .bar.mala > span{width:40%;background:#ea580c}
+    .bar.sin > span{width:20%;background:#dc2626}
   </style>
 </head>
 <body>
@@ -93,6 +100,7 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
     <div class="row"><strong>SSID</strong><span id="ssid">--</span></div>
     <div class="row"><strong>IP</strong><span id="ip">--</span></div>
     <div class="row"><strong>RSSI</strong><span id="rssi" class="q-sin">--</span></div>
+    <div id="rssiBar" class="bar sin"><span></span></div>
   </div>
   <a class="btn" href="/status.json">Ver estado JSON</a>
   <script>
@@ -137,6 +145,8 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
         const rssiEl = document.getElementById('rssi');
         rssiEl.textContent = rssiText;
         rssiEl.className = rssiClass(q);
+        const bar = document.getElementById('rssiBar');
+        bar.className = `bar ${q === 'Excelente' ? 'excelente' : q === 'Buena' ? 'buena' : q === 'Regular' ? 'regular' : q === 'Mala' ? 'mala' : 'sin'}`;
       }catch(e){}
     }
     load();
