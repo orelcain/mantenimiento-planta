@@ -22,21 +22,47 @@ export async function requestNotificationPermission(userId: string): Promise<str
       return null
     }
 
+    logger.info('Requesting notification permission...')
+
     // Solicitar permiso al usuario
     const permission = await Notification.requestPermission()
     
+    logger.info('Notification permission result:', { permission })
+    
     if (permission !== 'granted') {
-      logger.warn('Notification permission denied')
+      logger.warn('Notification permission denied', { permission })
       return null
     }
 
+    logger.info('Getting FCM token...')
+
     // Obtener token de FCM
-    const token = await getToken(messaging, {
-      vapidKey: 'BNjR3wX8X_W-VxqQ9yF8ZdvKq5xG8dR4qY7wJ6K3dX5pQ8vF9rT3wN2xJ7yK5dR6vL8qT9wF3xN4yH7rJ2kP5dV',  // Tu VAPID key de Firebase Console
-    })
+    // Nota: Si no especificamos vapidKey, Firebase intenta usar uno configurado en la consola
+    // Si quieres especificar uno, asegúrate de generarlo en Firebase Console → Project Settings → Cloud Messaging
+    let token: string | undefined
+    
+    try {
+      // Intentar primero sin VAPID key (Firebase usará el configurado por defecto)
+      token = await getToken(messaging)
+      logger.info('✅ Token obtained without explicit VAPID key')
+    } catch (error) {
+      logger.warn('Failed to get token without VAPID key, trying with explicit VAPID key...', error instanceof Error ? error.message : String(error))
+      
+      try {
+        // Fallback: intentar con VAPID key explícita
+        // IMPORTANTE: Reemplaza esto con el VAPID key real de tu Firebase Console
+        token = await getToken(messaging, {
+          vapidKey: 'BNjR3wX8X_W-VxqQ9yF8ZdvKq5xG8dR4qY7wJ6K3dX5pQ8vF9rT3wN2xJ7yK5dR6vL8qT9wF3xN4yH7rJ2kP5dV',
+        })
+        logger.info('✅ Token obtained with explicit VAPID key')
+      } catch (vapidError) {
+        logger.error('Failed with explicit VAPID key too:', vapidError instanceof Error ? vapidError.message : String(vapidError))
+        throw vapidError
+      }
+    }
 
     if (token) {
-      logger.info('FCM token obtained', { tokenPreview: token.substring(0, 20) + '...' })
+      logger.info('✅ FCM token obtained successfully', { tokenPreview: token.substring(0, 20) + '...' })
       
       // Guardar token por dispositivo (docId = token)
       await setDoc(doc(db, 'fcmTokens', token), {
@@ -55,9 +81,13 @@ export async function requestNotificationPermission(userId: string): Promise<str
       return token
     }
 
+    logger.warn('No token received from getToken()')
     return null
   } catch (error) {
-    logger.error('Error getting FCM token', error instanceof Error ? error : new Error(String(error)))
+    logger.error('❌ Error requesting notification permission', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    })
     return null
   }
 }
