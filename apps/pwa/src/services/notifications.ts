@@ -35,13 +35,19 @@ export async function requestNotificationPermission(userId: string): Promise<str
     if (token) {
       logger.info('FCM token obtained', { tokenPreview: token.substring(0, 20) + '...' })
       
-      // Guardar token en Firestore para el usuario
-      await setDoc(doc(db, 'fcmTokens', userId), {
+      // Guardar token por dispositivo (docId = token)
+      await setDoc(doc(db, 'fcmTokens', token), {
         token,
         userId,
         updatedAt: serverTimestamp(),
         platform: navigator.userAgent.includes('Mobile') ? 'mobile' : 'desktop',
       })
+
+      try {
+        localStorage.setItem('fcm_token', token)
+      } catch {
+        // noop
+      }
       
       return token
     }
@@ -77,11 +83,26 @@ export async function revokeNotificationPermission(userId: string): Promise<void
   try {
     if (!messaging) return
 
+    let storedToken: string | null = null
+    try {
+      storedToken = localStorage.getItem('fcm_token')
+    } catch {
+      storedToken = null
+    }
+
     // Eliminar token de FCM
     await deleteToken(messaging)
-    
-    // Eliminar token de Firestore
-    await deleteDoc(doc(db, 'fcmTokens', userId))
+
+    // Eliminar token de Firestore (por token)
+    if (storedToken) {
+      await deleteDoc(doc(db, 'fcmTokens', storedToken))
+    }
+
+    try {
+      localStorage.removeItem('fcm_token')
+    } catch {
+      // noop
+    }
     
     logger.info('FCM token revoked successfully')
   } catch (error) {

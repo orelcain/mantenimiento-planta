@@ -37,7 +37,7 @@ firebase deploy --only functions
 ### Flujo esperado
 1. Usuario entra a Configuración → Notificaciones.
 2. Presiona **Activar notificaciones**.
-3. Se guarda token en Firestore `fcmTokens/{userId}`.
+3. Se guarda token en Firestore `fcmTokens/{token}` (un token por dispositivo).
 4. Al crear incidencia predictiva crítica/alta se envía push.
 
 ---
