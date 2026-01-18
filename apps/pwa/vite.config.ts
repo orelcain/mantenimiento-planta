@@ -7,21 +7,18 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
+      // Desactivar completamente la generación de SW de Workbox
+      // Usamos nuestro propio sw.js y firebase-messaging-sw.js en public/
+      strategies: 'injectManifest',
+      srcDir: 'public',
+      filename: 'sw.js',
       registerType: 'autoUpdate',
-      // Desactivar el registro automático para evitar 404 en GitHub Pages
-      injectRegister: null,
-      injectManifest: {
-        globPatterns: ['**/*.{js,css,html,ico,svg,webp}']
+      injectRegister: false,  // No inyectar registro automático
+      devOptions: {
+        enabled: false  // Desactivar en desarrollo
       },
-      workbox: {
-        clientsClaim: true,
-        skipWaiting: true,
-        globPatterns: ['**/*.{js,css,html,ico,svg,webp}'],
-        // NO cachear imágenes PNG - Firebase Storage las sirve directamente
-        navigateFallback: 'index.html',
-        navigateFallbackDenylist: [/^\/api/, /firebasestorage/, /googleapis/],
-        // Sin runtimeCaching - las imágenes van directo a la red
-        runtimeCaching: []
+      injectManifest: {
+        injectionPoint: undefined  // No inyectar nada en el SW
       },
       manifest: {
         name: 'Sistema de Mantenimiento Industrial',
