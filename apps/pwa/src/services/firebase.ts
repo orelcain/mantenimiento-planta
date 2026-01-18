@@ -28,18 +28,37 @@ export const rtdb = getDatabase(app)
 
 // Messaging (con verificación de soporte)
 let messaging: ReturnType<typeof getMessaging> | null = null
-isSupported().then((supported) => {
-  if (supported) {
-    messaging = getMessaging(app)
-    console.log('✅ Firebase Messaging supported')
-  } else {
-    console.warn('⚠️ Firebase Messaging not supported in this browser')
-  }
-}).catch((error) => {
-  console.error('❌ Error checking messaging support:', error)
-})
+let messagingInitPromise: Promise<ReturnType<typeof getMessaging> | null> | null = null
+
+// Inicializar messaging de forma asíncrona
+messagingInitPromise = isSupported()
+  .then((supported) => {
+    if (supported) {
+      messaging = getMessaging(app)
+      console.log('✅ Firebase Messaging supported')
+      return messaging
+    } else {
+      console.warn('⚠️ Firebase Messaging not supported in this browser')
+      return null
+    }
+  })
+  .catch((error) => {
+    console.error('❌ Error checking messaging support:', error)
+    return null
+  })
 
 export { messaging }
+
+/**
+ * Esperar a que Firebase Messaging esté listo
+ * @returns Promise que se resuelve con el objeto messaging o null si no está soportado
+ */
+export async function getMessagingInstance(): Promise<ReturnType<typeof getMessaging> | null> {
+  if (messagingInitPromise) {
+    await messagingInitPromise
+  }
+  return messaging
+}
 
 console.log('✅ Firebase initialized successfully for project:', firebaseConfig.projectId)
 

@@ -41,15 +41,21 @@ export function useNotifications() {
   useEffect(() => {
     if (!isEnabled) return
 
-    const unsubscribe = setupForegroundMessageListener((payload: MessagePayload) => {
+    let unsubscribe: (() => void) | undefined
+
+    setupForegroundMessageListener((payload: MessagePayload) => {
       // Mostrar notificación local cuando la app está en foreground
       const { title, body } = payload.notification || {}
       if (title) {
         showLocalNotification(title, { body })
       }
+    }).then((unsub) => {
+      unsubscribe = unsub
     })
 
-    return unsubscribe
+    return () => {
+      if (unsubscribe) unsubscribe()
+    }
   }, [isEnabled])
 
   // Solicitar permisos

@@ -8,6 +8,11 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      injectRegister: 'auto',
+      // No registrar automáticamente el SW de VitePWA, lo haremos manualmente junto con Firebase
+      injectManifest: {
+        globPatterns: ['**/*.{js,css,html,ico,svg,webp}']
+      },
       workbox: {
         clientsClaim: true,
         skipWaiting: true,

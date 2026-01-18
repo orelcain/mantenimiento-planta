@@ -4,7 +4,7 @@
  */
 
 import { getToken, onMessage, deleteToken, MessagePayload } from 'firebase/messaging'
-import { messaging } from './firebase'
+import { getMessagingInstance } from './firebase'
 import { db } from './firebase'
 import { doc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore'
 import { logger } from '@/lib/logger'
@@ -14,6 +14,9 @@ import { logger } from '@/lib/logger'
  */
 export async function requestNotificationPermission(userId: string): Promise<string | null> {
   try {
+    // Esperar a que messaging esté listo
+    const messaging = await getMessagingInstance()
+    
     if (!messaging) {
       logger.warn('Messaging not supported')
       return null
@@ -31,19 +34,33 @@ export async function requestNotificationPermission(userId: string): Promise<str
     const serviceWorkerRegistration = await (async () => {
       if (!('serviceWorker' in navigator)) return undefined
 
-      const swUrl = `${import.meta.env.BASE_URL}firebase-messaging-sw.js`
+      // Firebase Messaging SW debe estar en /firebase-messaging-sw.js (sin BASE_URL)
+      const swUrl = '/firebase-messaging-sw.js'
       try {
-        return await navigator.serviceWorker.register(swUrl)
+        const registration = await navigator.serviceWorker.register(swUrl, {
+          scope: '/'
+        })
+        logger.info('FCM Service Worker registered successfully')
+        return registration
       } catch (swError) {
         logger.error('Error registering FCM service worker', swError instanceof Error ? swError : new Error(String(swError)))
-        return undefined
+        
+        // Intentar con BASE_URL si falla
+        try {
+          const fallbackUrl = `${import.meta.env.BASE_URL}firebase-messaging-sw.js`
+          const registration = await navigator.serviceWorker.register(fallbackUrl)
+          logger.info('FCM Service Worker registered with BASE_URL')
+          return registration
+        } catch {
+          return undefined
+        }
       }
     })()
 
     // Obtener token de FCM
     const token = await getToken(messaging, {
-      vapidKey: 'BNjR3wX8X_W-VxqQ9yF8ZdvKq5xG8dR4qY7wJ6K3dX5pQ8vF9rT3wN2xJ7yK5dR6vL8qT9wF3xN4yH7rJ2kP5dV'  // Tu VAPID key de Firebase Console
-      ,serviceWorkerRegistration,
+      vapidKey: 'BNjR3wX8X_W-VxqQ9yF8ZdvKq5xG8dR4qY7wJ6K3dX5pQ8vF9rT3wN2xJ7yK5dR6vL8qT9wF3xN4yH7rJ2kP5dV',  // Tu VAPID key de Firebase Console
+      serviceWorkerRegistration,
     })
 
     if (token) {
@@ -103,6 +120,8 @@ export function getNotificationPermission(): NotificationPermission {
  */
 export async function revokeNotificationPermission(userId: string): Promise<void> {
   try {
+    const messaging = await getMessagingInstance()
+    
     if (!messaging) return
 
     let storedToken: string | null = null
@@ -135,9 +154,11 @@ export async function revokeNotificationPermission(userId: string): Promise<void
 /**
  * Configurar listener para mensajes en foreground
  */
-export function setupForegroundMessageListener(
+export async function setupForegroundMessageListener(
   callback: (payload: MessagePayload) => void
-): () => void {
+): Promise<() => void> {
+  const messaging = await getMessagingInstance()
+  
   if (!messaging) {
     return () => {}
   }
