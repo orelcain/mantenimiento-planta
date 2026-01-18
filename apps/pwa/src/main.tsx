@@ -9,18 +9,22 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   </React.StrictMode>
 )
 
-// Limpiar TODOS los Service Workers antiguos al cargar la app
-// Esto evita errores 404 de SWs obsoletos generados por VitePWA
+// Limpiar TODOS los Service Workers problemáticos
+// Firebase Auth SDK y VitePWA registran SWs que causan errores 404
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.getRegistrations().then((registrations) => {
     registrations.forEach((registration) => {
-      const scriptUrl = registration.active?.scriptURL || ''
+      const scriptUrl = registration.active?.scriptURL || registration.installing?.scriptURL || registration.waiting?.scriptURL || ''
       
-      // Solo mantener firebase-messaging-sw.js, eliminar todos los demás
+      // Solo mantener firebase-messaging-sw.js, eliminar TODOS los demás
+      // Esto incluye:
+      // - sw.js (VitePWA)
+      // - service-worker.js (Firebase Auth SDK)
+      // - Cualquier otro SW problemático
       if (!scriptUrl.includes('firebase-messaging-sw.js')) {
         registration.unregister().then((success) => {
           if (success) {
-            console.log('🧹 Removed old SW:', scriptUrl || registration.scope)
+            console.log('🧹 Removed problematic SW:', scriptUrl || registration.scope)
           }
         })
       }
