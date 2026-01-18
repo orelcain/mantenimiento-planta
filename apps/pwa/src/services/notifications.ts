@@ -34,27 +34,27 @@ export async function requestNotificationPermission(userId: string): Promise<str
     const serviceWorkerRegistration = await (async () => {
       if (!('serviceWorker' in navigator)) return undefined
 
-      // Firebase Messaging SW debe estar en /firebase-messaging-sw.js (sin BASE_URL)
-      const swUrl = '/firebase-messaging-sw.js'
-      try {
-        const registration = await navigator.serviceWorker.register(swUrl, {
-          scope: '/'
-        })
-        logger.info('FCM Service Worker registered successfully')
-        return registration
-      } catch (swError) {
-        logger.error('Error registering FCM service worker', swError instanceof Error ? swError : new Error(String(swError)))
-        
-        // Intentar con BASE_URL si falla
+      // Intentar registrar el SW en la ruta correcta
+      const swPaths = [
+        '/mantenimiento-planta/firebase-messaging-sw.js',  // GitHub Pages
+        `${import.meta.env.BASE_URL}firebase-messaging-sw.js`,  // Fallback con BASE_URL
+        '/firebase-messaging-sw.js',  // Raíz absoluta
+      ]
+
+      for (const swUrl of swPaths) {
         try {
-          const fallbackUrl = `${import.meta.env.BASE_URL}firebase-messaging-sw.js`
-          const registration = await navigator.serviceWorker.register(fallbackUrl)
-          logger.info('FCM Service Worker registered with BASE_URL')
+          const registration = await navigator.serviceWorker.register(swUrl, {
+            scope: import.meta.env.BASE_URL || '/'
+          })
+          logger.info('FCM Service Worker registered successfully', { url: swUrl })
           return registration
-        } catch {
-          return undefined
+        } catch (error) {
+          logger.warn(`Failed to register SW at ${swUrl}`, error instanceof Error ? error.message : String(error))
         }
       }
+      
+      logger.error('Failed to register FCM Service Worker at all paths')
+      return undefined
     })()
 
     // Obtener token de FCM
