@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app'
-import { getAuth } from 'firebase/auth'
+import { initializeAuth, browserLocalPersistence, indexedDBLocalPersistence } from 'firebase/auth'
 import { getFirestore } from 'firebase/firestore'
 import { getStorage } from 'firebase/storage'
 import { getDatabase } from 'firebase/database'
@@ -20,8 +20,13 @@ const firebaseConfig = {
 // Inicializar Firebase
 const app = initializeApp(firebaseConfig)
 
-// Servicios de Firebase
-export const auth = getAuth(app)
+// Inicializar Auth con configuración que NO usa service workers
+// Esto evita que Firebase Auth intente registrar service-worker.js
+export const auth = initializeAuth(app, {
+  persistence: [indexedDBLocalPersistence, browserLocalPersistence],
+  // No popupRedirectResolver para evitar service workers de Firebase Auth
+})
+
 export const db = getFirestore(app)
 export const storage = getStorage(app)
 export const rtdb = getDatabase(app)
