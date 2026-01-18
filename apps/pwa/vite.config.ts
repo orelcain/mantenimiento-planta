@@ -8,8 +8,8 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      injectRegister: 'auto',
-      // No registrar automáticamente el SW de VitePWA, lo haremos manualmente junto con Firebase
+      // Desactivar el registro automático para evitar 404 en GitHub Pages
+      injectRegister: null,
       injectManifest: {
         globPatterns: ['**/*.{js,css,html,ico,svg,webp}']
       },
