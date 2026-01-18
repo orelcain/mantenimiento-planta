@@ -27,9 +27,23 @@ export async function requestNotificationPermission(userId: string): Promise<str
       return null
     }
 
+    // Registrar Service Worker de Firebase Messaging
+    const serviceWorkerRegistration = await (async () => {
+      if (!('serviceWorker' in navigator)) return undefined
+
+      const swUrl = `${import.meta.env.BASE_URL}firebase-messaging-sw.js`
+      try {
+        return await navigator.serviceWorker.register(swUrl)
+      } catch (swError) {
+        logger.error('Error registering FCM service worker', swError instanceof Error ? swError : new Error(String(swError)))
+        return undefined
+      }
+    })()
+
     // Obtener token de FCM
     const token = await getToken(messaging, {
       vapidKey: 'BNjR3wX8X_W-VxqQ9yF8ZdvKq5xG8dR4qY7wJ6K3dX5pQ8vF9rT3wN2xJ7yK5dR6vL8qT9wF3xN4yH7rJ2kP5dV'  // Tu VAPID key de Firebase Console
+      ,serviceWorkerRegistration,
     })
 
     if (token) {
