@@ -60,15 +60,18 @@ import {
   FRECUENCIA_OPCIONES,
 } from '@/services/preventive'
 import { getEquipments } from '@/services/equipment'
+import { getTechnicians } from '@/services/auth'
 import { useAuthStore } from '@/store'
-import type { PreventiveTask, PreventiveExecution, Equipment } from '@/types'
+import type { PreventiveTask, PreventiveExecution, Equipment, User } from '@/types'
 import { cn } from '@/lib/utils'
+import { HierarchySelector } from '@/components/hierarchy/HierarchySelector'
 
 export function PreventivePage() {
   const user = useAuthStore((state) => state.user)
   const [tasks, setTasks] = useState<PreventiveTask[]>([])
   const [executions, setExecutions] = useState<PreventiveExecution[]>([])
   const [equipment, setEquipment] = useState<Equipment[]>([])
+  const [technicians, setTechnicians] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState({
     totalTasks: 0,
@@ -102,16 +105,18 @@ export function PreventivePage() {
   const loadData = async () => {
     setLoading(true)
     try {
-      const [tasksData, equipmentData, statsData, executionsData] = await Promise.all([
+      const [tasksData, equipmentData, statsData, executionsData, techniciansData] = await Promise.all([
         getPreventiveTasks(),
         getEquipments(),
         getPreventiveStats(),
         getExecutions(),
+        getTechnicians(),
       ])
       setTasks(tasksData)
       setEquipment(equipmentData)
       setStats(statsData)
       setExecutions(executionsData)
+      setTechnicians(techniciansData)
     } catch (error) {
       logger.error('Error loading preventive maintenance data', error instanceof Error ? error : new Error(String(error)))
     } finally {
@@ -249,6 +254,7 @@ export function PreventivePage() {
           <TaskDialog
             task={editingTask}
             equipment={equipment}
+            technicians={technicians}
             onClose={() => {
               setShowTaskDialog(false)
               setEditingTask(null)
@@ -722,11 +728,13 @@ function TaskCard({
 function TaskDialog({
   task,
   equipment,
+  technicians,
   onClose,
   onSave,
 }: {
   task: PreventiveTask | null
   equipment: Equipment[]
+  technicians: User[]
   onClose: () => void
   onSave: () => void
 }) {
@@ -757,6 +765,28 @@ function TaskDialog({
     asignadoA: task?.asignadoA || '',
     checklist: task?.checklist?.map(c => ({ id: c.id, tarea: c.tarea, completado: c.completado })) || [{ id: '1', tarea: '', completado: false }],
   })
+  const [selectedHierarchyId, setSelectedHierarchyId] = useState<string | undefined>(() => {
+    if (task?.equipmentId) {
+      const eq = equipment.find((e) => e.id === task.equipmentId)
+      return eq?.hierarchyNodeId
+    }
+    return undefined
+  })
+
+  useEffect(() => {
+    if (task?.equipmentId) {
+      const eq = equipment.find((e) => e.id === task.equipmentId)
+      setSelectedHierarchyId(eq?.hierarchyNodeId)
+    } else {
+      setSelectedHierarchyId(undefined)
+    }
+  }, [task?.equipmentId, equipment])
+
+  const filteredEquipment = useMemo(() => {
+    if (!selectedHierarchyId) return equipment
+    return equipment.filter((eq) => eq.hierarchyNodeId === selectedHierarchyId)
+  }, [equipment, selectedHierarchyId])
+
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
 
@@ -781,6 +811,7 @@ function TaskDialog({
         const formattedErrors = formatZodErrors(validation.error)
         setErrors(formattedErrors)
         logger.warn('Preventive task validation failed', { errors: formattedErrors, taskId: task?.id })
+        setSaving(false)
         return
       }
 
@@ -846,6 +877,26 @@ function TaskDialog({
         )}
 
         <div className="space-y-2">
+          <Label>Ubicación (Jerarquía)</Label>
+          <HierarchySelector
+            value={selectedHierarchyId}
+            onChange={(nodeId) => {
+              setSelectedHierarchyId(nodeId ?? undefined)
+              // Limpiar equipo si ya no corresponde al filtro
+              if (nodeId && formData.equipmentId) {
+                const stillValid = equipment.some(
+                  (eq) => eq.id === formData.equipmentId && eq.hierarchyNodeId === nodeId
+                )
+                if (!stillValid) {
+                  setFormData({ ...formData, equipmentId: '' })
+                }
+              }
+            }}
+            minLevel={3}
+          />
+        </div>
+
+        <div className="space-y-2">
           <Label>Equipo *</Label>
           <Select
             value={formData.equipmentId}
@@ -856,11 +907,16 @@ function TaskDialog({
               <SelectValue placeholder="Seleccionar equipo" />
             </SelectTrigger>
             <SelectContent>
-              {equipment.map((eq) => (
+              {filteredEquipment.map((eq) => (
                 <SelectItem key={eq.id} value={eq.id}>
                   {eq.nombre} ({eq.codigo})
                 </SelectItem>
               ))}
+              {filteredEquipment.length === 0 && (
+                <SelectItem value="" disabled>
+                  No hay equipos en esta ubicación
+                </SelectItem>
+              )}
             </SelectContent>
           </Select>
           {errors.equipmentId && (
@@ -997,13 +1053,23 @@ function TaskDialog({
         </div>
 
         <div className="space-y-2">
-          <Label>Asignado a (Email)</Label>
-          <Input
-            type="email"
+          <Label>Asignado a</Label>
+          <Select
             value={formData.asignadoA}
-            onChange={(e) => setFormData({ ...formData, asignadoA: e.target.value })}
-            placeholder="usuario@empresa.com"
-          />
+            onValueChange={(v) => setFormData({ ...formData, asignadoA: v })}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Seleccionar técnico (opcional)" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">Sin asignar</SelectItem>
+              {technicians.map((tech) => (
+                <SelectItem key={tech.id} value={tech.id}>
+                  {tech.nombre || tech.email} ({tech.email})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           {errors.asignadoA && (
             <p className="text-sm text-red-600">{errors.asignadoA}</p>
           )}
