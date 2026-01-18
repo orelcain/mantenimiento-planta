@@ -30,37 +30,9 @@ export async function requestNotificationPermission(userId: string): Promise<str
       return null
     }
 
-    // Registrar Service Worker de Firebase Messaging
-    const serviceWorkerRegistration = await (async () => {
-      if (!('serviceWorker' in navigator)) return undefined
-
-      // Intentar registrar el SW en la ruta correcta
-      const swPaths = [
-        '/mantenimiento-planta/firebase-messaging-sw.js',  // GitHub Pages
-        `${import.meta.env.BASE_URL}firebase-messaging-sw.js`,  // Fallback con BASE_URL
-        '/firebase-messaging-sw.js',  // Raíz absoluta
-      ]
-
-      for (const swUrl of swPaths) {
-        try {
-          const registration = await navigator.serviceWorker.register(swUrl, {
-            scope: import.meta.env.BASE_URL || '/'
-          })
-          logger.info('FCM Service Worker registered successfully', { url: swUrl })
-          return registration
-        } catch (error) {
-          logger.warn(`Failed to register SW at ${swUrl}`, error instanceof Error ? error.message : String(error))
-        }
-      }
-      
-      logger.error('Failed to register FCM Service Worker at all paths')
-      return undefined
-    })()
-
     // Obtener token de FCM
     const token = await getToken(messaging, {
       vapidKey: 'BNjR3wX8X_W-VxqQ9yF8ZdvKq5xG8dR4qY7wJ6K3dX5pQ8vF9rT3wN2xJ7yK5dR6vL8qT9wF3xN4yH7rJ2kP5dV',  // Tu VAPID key de Firebase Console
-      serviceWorkerRegistration,
     })
 
     if (token) {

@@ -31,9 +31,24 @@ let messaging: ReturnType<typeof getMessaging> | null = null
 let messagingInitPromise: Promise<ReturnType<typeof getMessaging> | null> | null = null
 
 // Inicializar messaging de forma asíncrona
-messagingInitPromise = isSupported()
-  .then((supported) => {
+messagingInitPromise = (async () => {
+  try {
+    const supported = await isSupported()
     if (supported) {
+      // Registrar el service worker primero
+      if ('serviceWorker' in navigator) {
+        try {
+          const baseUrl = import.meta.env.BASE_URL || '/'
+          const swUrl = `${baseUrl}firebase-messaging-sw.js`
+          const registration = await navigator.serviceWorker.register(swUrl, {
+            scope: baseUrl
+          })
+          console.log('✅ Firebase Messaging Service Worker registered:', swUrl)
+        } catch (swError) {
+          console.warn('⚠️ Error registering FCM service worker:', swError instanceof Error ? swError.message : String(swError))
+        }
+      }
+      
       messaging = getMessaging(app)
       console.log('✅ Firebase Messaging supported')
       return messaging
@@ -41,11 +56,11 @@ messagingInitPromise = isSupported()
       console.warn('⚠️ Firebase Messaging not supported in this browser')
       return null
     }
-  })
-  .catch((error) => {
+  } catch (error) {
     console.error('❌ Error checking messaging support:', error)
     return null
-  })
+  }
+})()
 
 export { messaging }
 
