@@ -796,9 +796,16 @@ function TaskDialog({
     setSaving(true)
 
     try {
+      const parsedDate = new Date(`${formData.proximaEjecucion}T00:00:00`)
+      if (Number.isNaN(parsedDate.getTime())) {
+        setErrors({ proximaEjecucion: 'Fecha inválida' })
+        setSaving(false)
+        return
+      }
+
       const data = {
         ...formData,
-        proximaEjecucion: new Date(formData.proximaEjecucion),
+        proximaEjecucion: parsedDate,
         checklist: formData.checklist.filter((c) => c.tarea.trim() !== ''),
         activo: true,
       }
