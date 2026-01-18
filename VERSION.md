@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.25.0**
+## Versión Actual: **v2.24.0**
 
 **Fecha de lanzamiento**: 18 de enero de 2026  \
 **Estado**: ✅ PRODUCCIÓN READY  \
@@ -9,6 +9,24 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.24.0 - Tareas Preventivas + Notificaciones (18/01/2026)
+
+**Nuevas Funcionalidades:**
+- ✅ **Tareas Preventivas** con creación, edición y ejecución
+- ✅ **Selector de Jerarquía** para filtrar equipos por ubicación
+- ✅ **Asignación de técnicos** a tareas preventivas
+- ✅ **Notificaciones Push** para tareas preventivas y ejecuciones
+- ✅ **Notificaciones omnidireccionales** (técnico asignado + supervisores/admins)
+- ✅ **Historial de ejecuciones** de tareas de mantenimiento
+
+**Mejoras Técnicas:**
+- ✅ Firebase Cloud Messaging (FCM) integrado para notificaciones
+- ✅ Triggers Cloud Functions para eventos de preventive tasks/executions
+- ✅ Validación Zod en formularios de preventiva
+- ✅ Sincronización de estado UI con firebase
+
+---
 
 ### v2.23.0 - Sensores + limpieza RTDB (17/01/2026)
 
