@@ -796,8 +796,11 @@ function TaskDialog({
     setSaving(true)
 
     try {
+      console.log('🔵 [DEBUG] Parseando fecha:', formData.proximaEjecucion)
       const parsedDate = new Date(`${formData.proximaEjecucion}T00:00:00`)
+      console.log('🔵 [DEBUG] Fecha parseada:', parsedDate, 'isValid:', !Number.isNaN(parsedDate.getTime()))
       if (Number.isNaN(parsedDate.getTime())) {
+        console.log('🔴 [DEBUG] Fecha inválida detectada')
         setErrors({ proximaEjecucion: 'Fecha inválida' })
         setSaving(false)
         return
@@ -809,33 +812,43 @@ function TaskDialog({
         checklist: formData.checklist.filter((c) => c.tarea.trim() !== ''),
         activo: true,
       }
+      console.log('🔵 [DEBUG] Data a validar:', data)
 
       // Validación con Zod
       const schema = task ? updatePreventiveTaskSchema : createPreventiveTaskSchema
+      console.log('🔵 [DEBUG] Usando schema:', task ? 'update' : 'create')
       const validation = schema.safeParse(data)
+      console.log('🔵 [DEBUG] Validación resultado:', validation.success)
 
       if (!validation.success) {
+        console.log('🔴 [DEBUG] Validación fallida:', validation.error.issues)
         const formattedErrors = formatZodErrors(validation.error)
+        console.log('🔴 [DEBUG] Errores formateados:', formattedErrors)
         setErrors(formattedErrors)
         logger.warn('Preventive task validation failed', { errors: formattedErrors, taskId: task?.id })
         setSaving(false)
         return
       }
 
+      console.log('🔵 [DEBUG] Validación OK, guardando...')
       if (task) {
         await updatePreventiveTask(task.id, validation.data)
       } else {
         // Para crear, validation.data tiene todos los campos requeridos
+        console.log('🔵 [DEBUG] Creando tarea con data:', validation.data)
         await createPreventiveTask(validation.data as Omit<PreventiveTask, 'id' | 'createdAt' | 'updatedAt'>)
       }
 
+      console.log('✅ [DEBUG] Tarea guardada exitosamente')
       logger.info('Preventive task saved', { taskId: task?.id, isNew: !task })
       onSave()
       onClose()
     } catch (error) {
+      console.error('🔴 [DEBUG] Error en handleSubmit:', error)
       logger.error('Error saving preventive task', error instanceof Error ? error : new Error(String(error)), { taskId: task?.id })
     } finally {
       setSaving(false)
+      console.log('🔵 [DEBUG] handleSubmit finalizado')
     }
   }
 
