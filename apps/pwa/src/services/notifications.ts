@@ -63,7 +63,15 @@ export async function requestNotificationPermission(userId: string): Promise<str
  * Verificar si las notificaciones están habilitadas
  */
 export function areNotificationsEnabled(): boolean {
-  return 'Notification' in window && Notification.permission === 'granted'
+  if (!('Notification' in window) || Notification.permission !== 'granted') {
+    return false
+  }
+
+  try {
+    return Boolean(localStorage.getItem('fcm_token'))
+  } catch {
+    return false
+  }
 }
 
 /**

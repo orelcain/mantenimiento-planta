@@ -109,7 +109,7 @@ export function useNotifications() {
     isEnabled,
     permission,
     isLoading,
-    canRequest: permission === 'default',
+    canRequest: permission !== 'denied' && !isEnabled,
     isDenied: permission === 'denied',
     requestPermission,
     revokePermission,
