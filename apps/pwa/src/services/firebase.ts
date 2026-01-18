@@ -1,12 +1,11 @@
 import { initializeApp } from 'firebase/app'
-import { initializeAuth, browserLocalPersistence, indexedDBLocalPersistence } from 'firebase/auth'
+import { getAuth } from 'firebase/auth'
 import { getFirestore } from 'firebase/firestore'
 import { getStorage } from 'firebase/storage'
 import { getDatabase } from 'firebase/database'
 import { getMessaging, isSupported } from 'firebase/messaging'
 
 // Configuración de Firebase hardcodeada (segura para cliente)
-// Estos valores son públicos y se incluyen en el bundle del cliente
 const firebaseConfig = {
   apiKey: "AIzaSyBsJSh6x3ZGEyuXsM18dSWsJKyU7--KJss",
   authDomain: "mantenimiento-planta-771a3.firebaseapp.com",
@@ -20,86 +19,34 @@ const firebaseConfig = {
 // Inicializar Firebase
 const app = initializeApp(firebaseConfig)
 
-// Inicializar Auth con configuración que NO usa service workers
-// Esto evita que Firebase Auth intente registrar service-worker.js
-export const auth = initializeAuth(app, {
-  persistence: [indexedDBLocalPersistence, browserLocalPersistence],
-  // No popupRedirectResolver para evitar service workers de Firebase Auth
-})
-
+// Servicios básicos
+export const auth = getAuth(app)
 export const db = getFirestore(app)
 export const storage = getStorage(app)
 export const rtdb = getDatabase(app)
 
-// Messaging (con verificación de soporte)
+// Messaging - inicializar solo cuando se solicite
 let messaging: ReturnType<typeof getMessaging> | null = null
-let messagingInitPromise: Promise<ReturnType<typeof getMessaging> | null> | null = null
 
-// Inicializar messaging de forma asíncrona
-messagingInitPromise = (async () => {
+export async function getMessagingInstance(): Promise<ReturnType<typeof getMessaging> | null> {
+  if (messaging) return messaging
+  
   try {
-    console.log('🔄 Checking Firebase Messaging support...')
     const supported = await isSupported()
-    
-    if (supported) {
-      console.log('✅ Firebase Messaging is supported')
-      
-      // Registrar el service worker primero
-      if ('serviceWorker' in navigator) {
-        try {
-          const baseUrl = import.meta.env.BASE_URL || '/'
-          const swUrl = `${baseUrl}firebase-messaging-sw.js`
-          console.log(`📝 Registering SW at: ${swUrl} (scope: ${baseUrl})`)
-          
-          const registration = await navigator.serviceWorker.register(swUrl, {
-            scope: baseUrl
-          })
-          console.log('✅ Firebase Messaging Service Worker registered:', swUrl)
-          console.log('   Active:', !!registration.active)
-          console.log('   Scope:', registration.scope)
-        } catch (swError) {
-          console.warn('⚠️ Error registering FCM service worker:')
-          console.warn('   Message:', swError instanceof Error ? swError.message : String(swError))
-          if (swError instanceof Error) {
-            console.warn('   Stack:', swError.stack)
-          }
-        }
-      } else {
-        console.warn('⚠️ Service Workers not available in this environment')
-      }
-      
-      console.log('📦 Initializing Firebase Messaging instance...')
-      messaging = getMessaging(app)
-      console.log('✅ Firebase Messaging initialized successfully')
-      return messaging
-    } else {
-      console.warn('⚠️ Firebase Messaging not supported in this browser')
-      console.warn('   Browser:', navigator.userAgent)
+    if (!supported) {
+      console.warn('Firebase Messaging not supported')
       return null
     }
+    
+    messaging = getMessaging(app)
+    console.log('✅ Firebase Messaging initialized')
+    return messaging
   } catch (error) {
-    console.error('❌ Error checking messaging support:')
-    console.error('   Error:', error instanceof Error ? error.message : String(error))
-    if (error instanceof Error) {
-      console.error('   Stack:', error.stack)
-    }
+    console.error('Error initializing messaging:', error)
     return null
   }
-})()
-
-export { messaging }
-
-/**
- * Esperar a que Firebase Messaging esté listo
- * @returns Promise que se resuelve con el objeto messaging o null si no está soportado
- */
-export async function getMessagingInstance(): Promise<ReturnType<typeof getMessaging> | null> {
-  if (messagingInitPromise) {
-    await messagingInitPromise
-  }
-  return messaging
 }
 
-console.log('✅ Firebase initialized successfully for project:', firebaseConfig.projectId)
+console.log('✅ Firebase initialized:', firebaseConfig.projectId)
 
 export default app
