@@ -913,7 +913,7 @@ function TaskDialog({
                 </SelectItem>
               ))}
               {filteredEquipment.length === 0 && (
-                <SelectItem value="" disabled>
+                <SelectItem value="no-equipment" disabled>
                   No hay equipos en esta ubicación
                 </SelectItem>
               )}

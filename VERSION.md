@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.24.0**
+## Versión Actual: **v2.24.1**
 
 **Fecha de lanzamiento**: 18 de enero de 2026  \
 **Estado**: ✅ PRODUCCIÓN READY  \
@@ -9,6 +9,13 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.24.1 - Fix Select Preventivo (18/01/2026)
+
+**Fixes Técnicos:**
+- ✅ Radix Select sin valores vacíos en "Asignado a" y "Equipos" (evita crash al crear tareas)
+
+---
 
 ### v2.24.0 - Tareas Preventivas + Notificaciones (18/01/2026)
 
