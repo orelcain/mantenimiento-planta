@@ -63,7 +63,7 @@ export async function requestNotificationPermission(userId: string): Promise<str
       
       // Fallback con VAPID key
       const token = await getToken(messaging, {
-        vapidKey: 'BNjR3wX8X_W-VxqQ9yF8ZdvKq5xG8dR4qY7wJ6K3dX5pQ8vF9rT3wN2xJ7yK5dR6vL8qT9wF3xN4yH7rJ2kP5dV',
+        vapidKey: 'BB2ESVcTn4BvFVxnGpIuZsGTRpNgQMeS-4LBQ4QQHQiBrWEb-ZK7zglHTEfc5eJBQZv1MlBsvAKZfCSVMOavCz2o',
         serviceWorkerRegistration: registration
       })
       logger.info('✅ Token obtained (with VAPID):', { preview: token.substring(0, 20) })
