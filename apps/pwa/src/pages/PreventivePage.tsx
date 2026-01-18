@@ -1055,14 +1055,14 @@ function TaskDialog({
         <div className="space-y-2">
           <Label>Asignado a</Label>
           <Select
-            value={formData.asignadoA}
-            onValueChange={(v) => setFormData({ ...formData, asignadoA: v })}
+            value={formData.asignadoA || 'none'}
+            onValueChange={(v) => setFormData({ ...formData, asignadoA: v === 'none' ? '' : v })}
           >
             <SelectTrigger>
               <SelectValue placeholder="Seleccionar técnico (opcional)" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Sin asignar</SelectItem>
+              <SelectItem value="none">Sin asignar</SelectItem>
               {technicians.map((tech) => (
                 <SelectItem key={tech.id} value={tech.id}>
                   {tech.nombre || tech.email} ({tech.email})
