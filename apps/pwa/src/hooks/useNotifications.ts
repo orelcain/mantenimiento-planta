@@ -70,8 +70,19 @@ export function useNotifications() {
       const token = await requestNotificationPermission(user.id)
       const success = token !== null
       
+      // Actualizar estado inmediatamente
       setIsEnabled(success)
       setPermission(success ? 'granted' : 'denied')
+      
+      // Re-verificar desde localStorage después de un pequeño delay
+      // para asegurar que el estado se sincroniza correctamente
+      setTimeout(() => {
+        const enabled = areNotificationsEnabled()
+        const perm = getNotificationPermission()
+        setIsEnabled(enabled)
+        setPermission(perm)
+        logger.info('✅ Estado verificado:', { enabled, permission: perm })
+      }, 100)
       
       return success
     } catch (error) {

@@ -51,6 +51,12 @@ export async function requestNotificationPermission(userId: string): Promise<str
       })
 
       localStorage.setItem('fcm_token', token)
+      logger.info('✅ Token guardado en localStorage y Firestore')
+      logger.info('📱 Verificación:', { 
+        tokenLength: token.length,
+        inLocalStorage: localStorage.getItem('fcm_token') !== null,
+        areEnabled: areNotificationsEnabled()
+      })
       return token
     } catch (error) {
       logger.warn('Failed without VAPID, trying with VAPID key...')
@@ -70,6 +76,12 @@ export async function requestNotificationPermission(userId: string): Promise<str
       })
 
       localStorage.setItem('fcm_token', token)
+      logger.info('✅ Token guardado en localStorage y Firestore (VAPID)')
+      logger.info('📱 Verificación:', { 
+        tokenLength: token.length,
+        inLocalStorage: localStorage.getItem('fcm_token') !== null,
+        areEnabled: areNotificationsEnabled()
+      })
       return token
     }
   } catch (error) {
