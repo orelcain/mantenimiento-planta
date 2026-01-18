@@ -307,6 +307,7 @@ export const createPreventiveTaskSchema = z.object({
     .int('Frecuencia debe ser un número entero')
     .positive('Frecuencia debe ser positiva')
     .max(365, 'Frecuencia máxima: 365 días'),
+  proximaEjecucion: z.date(),
   checklist: z.array(z.object({
     id: z.string(),
     tarea: z.string().min(5).max(200),
