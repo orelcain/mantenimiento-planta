@@ -61,6 +61,10 @@ async function getSupervisorsAndAdmins() {
   return snapshot.docs.map((doc) => doc.id)
 }
 
+function dedupeTokens(list) {
+  return Array.from(new Set(list.filter(Boolean)))
+}
+
 /**
  * Enviar notificación a tokens específicos
  */
@@ -235,5 +239,90 @@ exports.onIncidentUpdated = onDocumentUpdated('incidents/{incidentId}', async (e
       )
     }
   }
+})
+
+/**
+ * 3. Nueva tarea preventiva → Notificar asignado + supervisores/admins
+ */
+exports.onPreventiveTaskCreated = onDocumentCreated('preventiveTasks/{taskId}', async (event) => {
+  const task = event.data?.data()
+  const taskId = event.params.taskId
+
+  if (!task) return
+
+  const recipients = []
+
+  if (task.asignadoA) {
+    const tokens = await getTokensForUser(task.asignadoA)
+    recipients.push(...tokens)
+  }
+
+  const supervisors = await getSupervisorsAndAdmins()
+  const supervisorTokens = await getTokensForUsers(supervisors)
+  recipients.push(...supervisorTokens)
+
+  const tokens = dedupeTokens(recipients)
+
+  if (tokens.length === 0) {
+    logger.warn('No recipients for preventive task', { taskId })
+    return
+  }
+
+  const title = '🗓️ Nueva tarea preventiva'
+  const freq = task.frecuenciaDias ? `cada ${task.frecuenciaDias} días` : 'tarea programada'
+  const body = `${task.nombre || 'Tarea preventiva'} (${freq})`
+
+  await sendNotification(tokens, title, body, {
+    type: 'PREVENTIVE_TASK_CREATED',
+    taskId,
+    equipmentId: task.equipmentId || '',
+    url: `/mantenimiento-planta/preventive/${taskId}`,
+  })
+})
+
+/**
+ * 4. Ejecución preventiva creada → Notificar asignado + supervisores/admins
+ */
+exports.onPreventiveExecutionCreated = onDocumentCreated('preventiveExecutions/{executionId}', async (event) => {
+  const execution = event.data?.data()
+  const executionId = event.params.executionId
+
+  if (!execution) return
+
+  // Cargar tarea para obtener nombre y asignadoA
+  let task = null
+  if (execution.taskId) {
+    const snap = await db.collection('preventiveTasks').doc(execution.taskId).get()
+    if (snap.exists) task = snap.data()
+  }
+
+  const recipients = []
+
+  if (task?.asignadoA) {
+    const tokens = await getTokensForUser(task.asignadoA)
+    recipients.push(...tokens)
+  }
+
+  const supervisors = await getSupervisorsAndAdmins()
+  const supervisorTokens = await getTokensForUsers(supervisors)
+  recipients.push(...supervisorTokens)
+
+  const tokens = dedupeTokens(recipients)
+
+  if (tokens.length === 0) {
+    logger.warn('No recipients for preventive execution', { executionId })
+    return
+  }
+
+  const title = '✅ Preventivo ejecutado'
+  const body = `${task?.nombre || 'Tarea preventiva'} completada`
+
+  await sendNotification(tokens, title, body, {
+    type: 'PREVENTIVE_EXECUTED',
+    executionId,
+    taskId: execution.taskId || '',
+    equipmentId: execution.equipmentId || '',
+    url: `/mantenimiento-planta/preventive/${execution.taskId || ''}`,
+  })
 })
 
