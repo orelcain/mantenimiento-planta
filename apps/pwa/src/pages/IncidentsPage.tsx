@@ -74,7 +74,10 @@ export function IncidentsPage() {
     
     const matchesStatus = filterStatus === 'all' || incident.status === filterStatus
     const matchesPriority = filterPriority === 'all' || incident.prioridad === filterPriority
-    const matchesAssigned = !filterAssigned || incident.asignadoA === user?.id
+    // "Mis Incidencias" incluye tanto las creadas como las asignadas al usuario
+    const matchesAssigned = !filterAssigned || 
+      incident.creadoPor === user?.id || 
+      incident.asignadoA === user?.id
     
     return matchesSearch && matchesStatus && matchesPriority && matchesAssigned
   })
@@ -84,7 +87,8 @@ export function IncidentsPage() {
     total: incidents.length,
     pendientes: incidents.filter((i) => i.status === 'pendiente').length,
     enProceso: incidents.filter((i) => i.status === 'en_proceso').length,
-    misIncidencias: incidents.filter((i) => i.asignadoA === user?.id).length,
+    // Mis incidencias: creadas por mí O asignadas a mí
+    misIncidencias: incidents.filter((i) => i.creadoPor === user?.id || i.asignadoA === user?.id).length,
     criticas: incidents.filter((i) => i.prioridad === 'critica' && i.status !== 'cerrada').length,
   }
 
@@ -265,6 +269,20 @@ function IncidentCard({
             <p className="text-sm text-muted-foreground line-clamp-2">
               {incident.descripcion}
             </p>
+            <div className="flex flex-wrap gap-2 mt-2 text-xs text-muted-foreground">
+              {incident.creadoPorNombre && (
+                <span className="flex items-center gap-1">
+                  <User className="h-3 w-3" />
+                  Creado por: <span className="font-medium">{incident.creadoPorNombre}</span>
+                </span>
+              )}
+              {incident.asignadoANombre && (
+                <span className="flex items-center gap-1">
+                  <User className="h-3 w-3" />
+                  Asignado a: <span className="font-medium">{incident.asignadoANombre}</span>
+                </span>
+              )}
+            </div>
           </div>
           <div className="text-right text-sm text-muted-foreground shrink-0">
             <div>{formatRelativeTime(incident.createdAt)}</div>
