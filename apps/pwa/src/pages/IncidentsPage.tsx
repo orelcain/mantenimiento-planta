@@ -15,12 +15,23 @@ import { IncidentForm } from '@/components/incidents/IncidentForm'
 import { IncidentDetail } from '@/components/incidents/IncidentDetail'
 import { debounce } from '@/lib/utils'
 
-const STATUS_CONFIG: Record<IncidentStatus, { label: string; icon: any; variant: any }> = {
-  pendiente: { label: 'Pendiente', icon: Clock, variant: 'warning' },
-  confirmada: { label: 'Confirmada', icon: CheckCircle, variant: 'default' },
-  rechazada: { label: 'Rechazada', icon: XCircle, variant: 'destructive' },
-  en_proceso: { label: 'En Proceso', icon: AlertTriangle, variant: 'secondary' },
-  cerrada: { label: 'Cerrada', icon: CheckCircle, variant: 'success' },
+const getStatusIcon = (status: IncidentStatus) => {
+  const iconMap: Record<IncidentStatus, any> = {
+    pendiente: Clock,
+    confirmada: CheckCircle,
+    rechazada: XCircle,
+    en_proceso: AlertTriangle,
+    cerrada: CheckCircle,
+  }
+  return iconMap[status]
+}
+
+const STATUS_CONFIG: Record<IncidentStatus, { label: string; variant: any }> = {
+  pendiente: { label: 'Pendiente', variant: 'warning' },
+  confirmada: { label: 'Confirmada', variant: 'default' },
+  rechazada: { label: 'Rechazada', variant: 'destructive' },
+  en_proceso: { label: 'En Proceso', variant: 'secondary' },
+  cerrada: { label: 'Cerrada', variant: 'success' },
 }
 
 const PRIORITY_CONFIG: Record<IncidentPriority, { label: string; className: string }> = {
@@ -285,7 +296,7 @@ function IncidentCard({
 }) {
   const statusConfig = STATUS_CONFIG[incident.status]
   const priorityConfig = PRIORITY_CONFIG[incident.prioridad]
-  const StatusIcon = statusConfig.icon
+  const StatusIcon = getStatusIcon(incident.status)
 
   return (
     <Card
