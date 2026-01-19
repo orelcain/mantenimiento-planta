@@ -18,13 +18,22 @@ if ('serviceWorker' in navigator && originalRegister) {
     const isAllowed = allowedSWs.some(allowed => urlString.includes(allowed))
     
     if (!isAllowed) {
-      console.warn('🚫 Blocked SW registration:', urlString)
+      console.warn('🚫 Blocked SW registration attempt:', urlString)
       // Devolver una promesa rechazada
       return Promise.reject(new Error(`Service Worker registration blocked: ${urlString}`))
     }
     
     console.log('✅ Allowed SW registration:', urlString)
-    return originalRegister.call(navigator.serviceWorker, scriptURL, options)
+    const result = originalRegister.call(navigator.serviceWorker, scriptURL, options)
+    
+    // Agregar logging al resultado
+    result.then(() => {
+      console.log('✅ SW registered successfully')
+    }).catch((error) => {
+      console.error('❌ SW registration failed:', error)
+    })
+    
+    return result
   }
   
   console.log('🛡️ Service Worker registration interceptor installed')

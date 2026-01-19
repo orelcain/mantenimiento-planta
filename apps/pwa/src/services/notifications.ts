@@ -43,6 +43,10 @@ export async function requestNotificationPermission(userId: string): Promise<str
         )
         logger.info('✅ SW registered (already granted)')
         
+        // Esperar a que esté listo antes de pedir token
+        await navigator.serviceWorker.ready
+        logger.info('✅ SW is ready')
+        
         const token = await getToken(messaging, { 
           serviceWorkerRegistration: registration,
           vapidKey: 'BB2ESVcTn4BvFVxnGpIuZsGTRpNgQMeS-4LBQ4QQHQiBrWEb-ZK7zglHTEfc5eJBQZv1MlBsvAKZfCSVMOavCz2o'
