@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.27.0**
+## Versión Actual: **v2.28.0**
 
 **Fecha de lanzamiento**: 19 de enero de 2026  \
 **Estado**: ✅ PRODUCCIÓN READY  \
@@ -9,6 +9,26 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.28.0 - Sensores UI Completa + Device Management (19/01/2026)
+
+**Nuevas Funcionalidades:**
+- ✅ **Función eliminar dispositivos duplicados** en Firebase RTDB para sensores IoT
+- ✅ **UI Sensores reorganizada** en 2 columnas con dashboard de estadísticas integrado
+- ✅ **Cards separadas** para Telemetría, Emparejar Dispositivos y WiFi Access Point
+- ✅ **Device list mejorada** mostrando deviceName, apSsid e IP local en formato legible
+
+**Mejoras Técnicas:**
+- ✅ Fix detección real-time sin throttling en suscripción de sensores
+- ✅ Fix propagación de eventos en botón eliminar dispositivo (event bubbling)
+- ✅ Dashboard de estadísticas en página SensorsPage con contadores
+- ✅ Mejor separación visual entre funcionalidades con cards independientes
+
+**Bug Fixes:**
+- ✅ Botón eliminar dispositivo no propagaba eventos correctamente
+- ✅ Real-time updates ahora se procesan sin retrasos artificiales
+
+---
 
 ### v2.27.0 - Dashboard de Incidencias Interactivo + Admin Only Edit/Delete (19/01/2026)
 
@@ -29,6 +49,7 @@
 - ✅ Fetch one-shot de sensores: `fetchSensorSummaryOnce()` y `fetchLastSensorReadings()`
 - ✅ Fix JSX fragments en DashboardPage (cajas críticas)
 - ✅ Limpieza de imports no utilizados en IncidentsPage
+- ✅ Fix runtime "Clock is not defined" con evaluación lazy de iconos
 
 **Bug Fixes:**
 - ✅ Fix referencias indefinidas a `filterStatus`/`filterPriority`
@@ -40,16 +61,10 @@
 ### v2.26.0 - Sensores Dashboard + Mis Incidencias Mejorado (19/01/2026)
 
 **Nuevas Funcionalidades:**
-- ✅ **Función eliminar dispositivos duplicados** en Firebase RTDB para sensores IoT
-- ✅ **UI Sensores reorganizada** en 2 columnas con dashboard de estadísticas
-- ✅ **Cards separadas** para Telemetría, Emparejar y WiFi AP (mejor UX)
-- ✅ **Device list mejorada** mostrando deviceName, apSsid e IP local
 - ✅ **Filtro "Mis Incidencias" mejorado** - ahora incluye creadas Y asignadas al usuario
 - ✅ **Info creador/asignado en tarjetas** de incidencias (visibilidad)
 
 **Mejoras Técnicas:**
-- ✅ Fix detección real-time sin throttling en sensores
-- ✅ Fix propagación de eventos en botón eliminar dispositivo
 - ✅ Tipo `Incident` extendido con `creadoPor`, `creadoPorNombre`, `asignadoANombre`
 - ✅ Stats counter "Mis Incidencias" ahora usa lógica OR (creadas || asignadas)
 
