@@ -62,28 +62,25 @@ type TabType = 'general' | 'users' | 'invites' | 'notifications' | 'system'
 export function SettingsPage() {
   const { user } = useAuthStore()
   const [activeTab, setActiveTab] = useState<TabType>('general')
-  
-  // Verificar si es admin
-  if (user?.rol !== 'admin') {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <Card className="p-8 text-center">
-          <Shield className="h-12 w-12 mx-auto mb-4 text-destructive" />
-          <h2 className="text-xl font-bold">Acceso Denegado</h2>
-          <p className="text-muted-foreground mt-2">
-            Solo los administradores pueden acceder a esta página.
-          </p>
-        </Card>
-      </div>
-    )
-  }
 
-  const tabs = [
+  const isAdmin = user?.rol === 'admin'
+  
+  // Si no es admin, forzar tab de notificaciones
+  useEffect(() => {
+    if (!isAdmin && activeTab !== 'notifications') {
+      setActiveTab('notifications')
+    }
+  }, [isAdmin, activeTab])
+
+  // Tabs según el rol
+  const tabs = isAdmin ? [
     { id: 'general' as const, label: 'General', icon: Settings },
     { id: 'users' as const, label: 'Usuarios', icon: Users },
     { id: 'invites' as const, label: 'Invitaciones', icon: Key },
     { id: 'notifications' as const, label: 'Notificaciones', icon: Bell },
     { id: 'system' as const, label: 'Sistema', icon: Database },
+  ] : [
+    { id: 'notifications' as const, label: 'Notificaciones', icon: Bell },
   ]
 
   return (
@@ -92,31 +89,33 @@ export function SettingsPage() {
       <div>
         <h1 className="text-2xl font-bold">Configuración</h1>
         <p className="text-muted-foreground">
-          Administra la configuración del sistema
+          {isAdmin ? 'Administra la configuración del sistema' : 'Gestiona tus notificaciones'}
         </p>
       </div>
 
-      {/* Tabs */}
-      <div className="flex flex-wrap gap-2 border-b border-border pb-2">
-        {tabs.map((tab) => (
-          <Button
-            key={tab.id}
-            variant={activeTab === tab.id ? 'default' : 'ghost'}
-            onClick={() => setActiveTab(tab.id)}
-            className="gap-2"
-          >
-            <tab.icon className="h-4 w-4" />
-            {tab.label}
-          </Button>
-        ))}
-      </div>
+      {/* Tabs (solo mostrar si es admin) */}
+      {isAdmin && (
+        <div className="flex flex-wrap gap-2 border-b border-border pb-2">
+          {tabs.map((tab) => (
+            <Button
+              key={tab.id}
+              variant={activeTab === tab.id ? 'default' : 'ghost'}
+              onClick={() => setActiveTab(tab.id)}
+              className="gap-2"
+            >
+              <tab.icon className="h-4 w-4" />
+              {tab.label}
+            </Button>
+          ))}
+        </div>
+      )}
 
       {/* Content */}
-      {activeTab === 'general' && <GeneralSettings />}
-      {activeTab === 'users' && <UsersSettings />}
-      {activeTab === 'invites' && <InvitesSettings />}
+      {isAdmin && activeTab === 'general' && <GeneralSettings />}
+      {isAdmin && activeTab === 'users' && <UsersSettings />}
+      {isAdmin && activeTab === 'invites' && <InvitesSettings />}
       {activeTab === 'notifications' && <NotificationsPushSettings />}
-      {activeTab === 'system' && <SystemSettings />}
+      {isAdmin && activeTab === 'system' && <SystemSettings />}
     </div>
   )
 }

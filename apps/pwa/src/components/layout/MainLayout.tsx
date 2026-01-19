@@ -34,11 +34,11 @@ const navigation = [
   { name: 'Sensores', href: '/sensors', icon: Cpu },
   { name: 'Mapa', href: '/map', icon: Map },
   { name: 'Equipos', href: '/equipment', icon: Wrench },
+  { name: 'Configuración', href: '/settings', icon: Settings },
 ]
 
 const adminNavigation = [
   { name: 'Jerarquías', href: '/hierarchy', icon: FolderTree },
-  { name: 'Configuración', href: '/settings', icon: Settings },
 ]
 
 export function MainLayout() {

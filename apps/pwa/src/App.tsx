@@ -174,11 +174,9 @@ export function App() {
               </Suspense>
             } />
             <Route path="settings" element={
-              <AdminRoute>
-                <Suspense fallback={<LoadingScreen />}>
-                  <SettingsPage />
-                </Suspense>
-              </AdminRoute>
+              <Suspense fallback={<LoadingScreen />}>
+                <SettingsPage />
+              </Suspense>
             } />
             <Route path="hierarchy" element={
               <AdminRoute>
