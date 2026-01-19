@@ -86,13 +86,40 @@ export function PreventivePage() {
   const [editingTask, setEditingTask] = useState<PreventiveTask | null>(null)
   const [executingTask, setExecutingTask] = useState<PreventiveTask | null>(null)
   const [filterEquipment, setFilterEquipment] = useState<string>('all')
+  const [filterTechnician, setFilterTechnician] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [selectedTaskDetail, setSelectedTaskDetail] = useState<PreventiveTask | null>(null)
 
   const debouncedSetSearch = useMemo(
     () => debounce((value: string) => setDebouncedSearch(value), 300),
     []
   )
+
+  // Colores asignados a técnicos (consistente entre renderizados)
+  const technicianColors: Record<string, string> = useMemo(() => {
+    const colors = [
+      'bg-blue-500', 'bg-purple-500', 'bg-pink-500', 'bg-green-500',
+      'bg-cyan-500', 'bg-amber-500', 'bg-rose-500', 'bg-indigo-500',
+      'bg-teal-500', 'bg-orange-500'
+    ]
+    const result: Record<string, string> = {}
+    technicians.forEach((tech, index) => {
+      result[tech.id] = colors[index % colors.length]
+    })
+    return result
+  }, [technicians])
+
+  const getColorForTechnician = (userId: string | undefined) => {
+    if (!userId) return 'bg-gray-500'
+    return technicianColors[userId] || 'bg-gray-500'
+  }
+
+  const getTechnicianName = (userId: string | undefined) => {
+    if (!userId) return 'Sin asignar'
+    const tech = technicians.find((t) => t.id === userId)
+    return tech ? `${tech.nombre} ${tech.apellido}` : 'Desconocido'
+  }
 
   useEffect(() => {
     debouncedSetSearch(searchQuery)
@@ -167,6 +194,8 @@ export function PreventivePage() {
     return tasks.filter((t) => {
       if (filterEquipment !== 'all' && t.equipmentId !== filterEquipment) return false
       
+      if (filterTechnician !== 'all' && (t.asignadoA || 'unassigned') !== filterTechnician) return false
+      
       if (debouncedSearch) {
         const searchLower = debouncedSearch.toLowerCase()
         const matchesSearch =
@@ -177,7 +206,7 @@ export function PreventivePage() {
       
       return true
     })
-  }, [tasks, filterEquipment, debouncedSearch])
+  }, [tasks, filterEquipment, filterTechnician, debouncedSearch])
 
   const overdueTasks = filteredTasks.filter(
     (t) => t.activo && t.proximaEjecucion < new Date()
@@ -372,6 +401,21 @@ export function PreventivePage() {
                     ))}
                   </SelectContent>
                 </Select>
+                <Select value={filterTechnician} onValueChange={setFilterTechnician}>
+                  <SelectTrigger className="w-48">
+                    <Wrench className="h-4 w-4 mr-2" />
+                    <SelectValue placeholder="Filtrar por técnico" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los técnicos</SelectItem>
+                    <SelectItem value="unassigned">Sin asignar</SelectItem>
+                    {technicians.map((tech) => (
+                      <SelectItem key={tech.id} value={tech.id}>
+                        {tech.nombre} {tech.apellido}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </CardHeader>
             <CardContent>
@@ -424,11 +468,16 @@ export function PreventivePage() {
                           <div
                             key={task.id}
                             className={cn(
-                              'text-xs px-1 py-0.5 rounded truncate',
+                              'text-xs px-1 py-0.5 rounded truncate cursor-pointer transition-all hover:scale-105',
                               task.proximaEjecucion < new Date()
                                 ? 'bg-red-500/20 text-red-500'
-                                : 'bg-blue-500/20 text-blue-500'
+                                : `${getColorForTechnician(task.asignadoA)}/20 text-white`
                             )}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setSelectedTaskDetail(task)
+                            }}
+                            title={getTechnicianName(task.asignadoA)}
                           >
                             {task.nombre}
                           </div>
@@ -651,6 +700,106 @@ export function PreventivePage() {
               }}
               onSave={loadData}
             />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Task Detail Dialog */}
+      <Dialog open={!!selectedTaskDetail} onOpenChange={(open) => !open && setSelectedTaskDetail(null)}>
+        <DialogContent className="max-w-md">
+          {selectedTaskDetail && (
+            <>
+              <DialogHeader>
+                <DialogTitle>{selectedTaskDetail.nombre}</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                {/* Equipment */}
+                <div>
+                  <Label className="text-xs text-muted-foreground">Equipo</Label>
+                  <p className="font-medium">
+                    {equipment.find((e) => e.id === selectedTaskDetail.equipmentId)?.nombre || 'Desconocido'}
+                  </p>
+                </div>
+
+                {/* Assigned To */}
+                <div>
+                  <Label className="text-xs text-muted-foreground">Asignado a</Label>
+                  <div className="flex items-center gap-2">
+                    <div
+                      className={cn(
+                        'w-3 h-3 rounded-full',
+                        getColorForTechnician(selectedTaskDetail.asignadoA)
+                      )}
+                    />
+                    <p className="font-medium">{getTechnicianName(selectedTaskDetail.asignadoA)}</p>
+                  </div>
+                </div>
+
+                {/* Type and Frequency */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Tipo</Label>
+                    <p className="font-medium text-sm">{selectedTaskDetail.tipo}</p>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Frecuencia</Label>
+                    <p className="font-medium text-sm">{selectedTaskDetail.frecuenciaDias} días</p>
+                  </div>
+                </div>
+
+                {/* Description */}
+                {selectedTaskDetail.descripcion && (
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Descripción</Label>
+                    <p className="text-sm">{selectedTaskDetail.descripcion}</p>
+                  </div>
+                )}
+
+                {/* Dates */}
+                <div className="grid grid-cols-2 gap-2">
+                  {selectedTaskDetail.ultimaEjecucion && (
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Última ejecución</Label>
+                      <p className="text-sm">
+                        {selectedTaskDetail.ultimaEjecucion.toLocaleDateString('es-ES')}
+                      </p>
+                    </div>
+                  )}
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Próxima ejecución</Label>
+                    <p className={cn(
+                      'text-sm font-medium',
+                      selectedTaskDetail.proximaEjecucion < new Date() && 'text-red-500'
+                    )}>
+                      {selectedTaskDetail.proximaEjecucion.toLocaleDateString('es-ES')}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Checklist */}
+                {selectedTaskDetail.checklist.length > 0 && (
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Checklist ({selectedTaskDetail.checklist.length} tareas)</Label>
+                    <div className="space-y-1 text-sm mt-2">
+                      {selectedTaskDetail.checklist.map((item) => (
+                        <div key={item.id} className="flex items-start gap-2">
+                          <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
+                          <span>{item.tarea}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Status */}
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs text-muted-foreground">Estado</Label>
+                  <Badge variant={selectedTaskDetail.activo ? 'default' : 'secondary'}>
+                    {selectedTaskDetail.activo ? 'Activa' : 'Inactiva'}
+                  </Badge>
+                </div>
+              </div>
+            </>
           )}
         </DialogContent>
       </Dialog>

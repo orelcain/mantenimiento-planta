@@ -250,21 +250,33 @@ exports.onPreventiveTaskCreated = onDocumentCreated('preventiveTasks/{taskId}', 
 
   if (!task) return
 
+  logger.info('onPreventiveTaskCreated triggered', { taskId, asignadoA: task.asignadoA })
+
   const recipients = []
 
+  // Obtener tokens del técnico asignado
   if (task.asignadoA) {
+    logger.info('Fetching tokens for assigned technician', { userId: task.asignadoA })
     const tokens = await getTokensForUser(task.asignadoA)
+    logger.info('Tokens for technician', { userId: task.asignadoA, tokenCount: tokens.length })
     recipients.push(...tokens)
+  } else {
+    logger.warn('No technician assigned to preventive task', { taskId })
   }
 
+  // Obtener tokens de supervisores y admins
   const supervisors = await getSupervisorsAndAdmins()
+  logger.info('Supervisors and admins found', { count: supervisors.length, userIds: supervisors })
   const supervisorTokens = await getTokensForUsers(supervisors)
+  logger.info('Tokens for supervisors', { count: supervisorTokens.length })
   recipients.push(...supervisorTokens)
 
   const tokens = dedupeTokens(recipients)
 
+  logger.info('Total deduplicated tokens', { count: tokens.length })
+
   if (tokens.length === 0) {
-    logger.warn('No recipients for preventive task', { taskId })
+    logger.warn('No recipients for preventive task', { taskId, asignadoA: task.asignadoA })
     return
   }
 
