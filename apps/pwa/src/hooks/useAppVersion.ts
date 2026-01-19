@@ -128,11 +128,18 @@ export function useAppVersion() {
       }
     }
 
-    // 3) Fallback fuerte: desregistrar SW para salir de un SW “pegado”
+    // 3) Fallback fuerte: desregistrar SW EXCEPTO firebase-messaging-sw.js (needed for notifications)
     if ('serviceWorker' in navigator) {
       try {
         const registrations = await navigator.serviceWorker.getRegistrations()
-        await Promise.all(registrations.map((r) => r.unregister()))
+        await Promise.all(
+          registrations
+            .filter(r => {
+              const scriptUrl = r.active?.scriptURL || r.installing?.scriptURL || r.waiting?.scriptURL || ''
+              return !scriptUrl.includes('firebase-messaging-sw.js')
+            })
+            .map((r) => r.unregister())
+        )
       } catch {
         // ignore
       }

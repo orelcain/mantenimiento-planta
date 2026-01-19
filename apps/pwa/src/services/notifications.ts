@@ -77,25 +77,40 @@ export async function requestNotificationPermission(userId: string): Promise<str
 
     logger.info('✅ Permission granted!')
 
-    // Registrar SW
+    // Registrar SW - con retry
     logger.info('🔧 Registering Service Worker...')
-    try {
-      const registration = await navigator.serviceWorker.register(
-        `${import.meta.env.BASE_URL}firebase-messaging-sw.js`,
-        { scope: import.meta.env.BASE_URL }
-      )
-      logger.info('✅ SW registered successfully')
-    } catch (swError) {
-      logger.error('⚠️ SW registration failed (continuing anyway):', swError instanceof Error ? swError.message : String(swError))
+    let registration: ServiceWorkerRegistration | null = null
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        registration = await navigator.serviceWorker.register(
+          `${import.meta.env.BASE_URL}firebase-messaging-sw.js`,
+          { scope: import.meta.env.BASE_URL }
+        )
+        logger.info('✅ SW registered successfully on attempt', { attempt })
+        break
+      } catch (swError) {
+        logger.warn(`⚠️ SW registration attempt ${attempt} failed:`, swError instanceof Error ? swError.message : String(swError))
+        if (attempt < 3) {
+          await new Promise(r => setTimeout(r, 500 * attempt))
+        }
+      }
+    }
+
+    if (!registration) {
+      logger.error('❌ SW registration failed after 3 attempts')
+      return null
     }
 
     // Obtener token
     logger.info('🔑 Getting FCM token...')
     try {
-      const registration = await navigator.serviceWorker.ready
+      // Esperar a que el SW esté listo
+      const swRegistration = await navigator.serviceWorker.ready
+      logger.info('✅ Service Worker is ready')
+      
       const token = await getToken(messaging, {
         vapidKey: 'BB2ESVcTn4BvFVxnGpIuZsGTRpNgQMeS-4LBQ4QQHQiBrWEb-ZK7zglHTEfc5eJBQZv1MlBsvAKZfCSVMOavCz2o',
-        serviceWorkerRegistration: registration
+        serviceWorkerRegistration: swRegistration
       })
       logger.info('✅ Token obtained:', { preview: token.substring(0, 20) + '...', length: token.length })
       
@@ -290,5 +305,36 @@ export function getNotificationConfig(type: NotificationType, data: any): { titl
         title: 'Notificación',
         body: 'Tienes una nueva actualización',
       }
+  }
+}
+
+/**
+ * Reset notificaciones después de un update/unregister
+ * Limpia tokens y prepara para re-registrase
+ */
+export async function resetNotifications(userId: string): Promise<void> {
+  try {
+    logger.info('🔄 Resetting notifications...')
+    
+    // Limpiar localStorage
+    localStorage.removeItem('fcm_token')
+    
+    // Obtener y eliminar registro anterior
+    if ('serviceWorker' in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations()
+      const messagingSW = registrations.find(r => {
+        const scriptUrl = r.active?.scriptURL || r.installing?.scriptURL || r.waiting?.scriptURL || ''
+        return scriptUrl.includes('firebase-messaging-sw.js')
+      })
+      
+      if (messagingSW) {
+        await messagingSW.unregister()
+        logger.info('✅ Messaging SW unregistered')
+      }
+    }
+    
+    logger.info('✅ Notifications reset complete')
+  } catch (error) {
+    logger.error('❌ Error resetting notifications:', error)
   }
 }
