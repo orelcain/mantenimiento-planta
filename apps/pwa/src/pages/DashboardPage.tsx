@@ -31,6 +31,7 @@ export function DashboardPage() {
   const [iotDetails, setIotDetails] = useState<Record<string, {
     temp?: { current: number; avg: number; unit?: string }
     hum?: { current: number; avg: number; unit?: string }
+    source?: string
   }>>({})
 
   // Preparar equipoIds involucrados en tarjetas visibles
@@ -55,6 +56,7 @@ export function DashboardPage() {
           const last = readings[readings.length - 1]
           const avgTemp = readings.length ? readings.reduce((s, r) => s + (r.temperature || 0), 0) / readings.length : undefined
           const avgHum = readings.length ? readings.reduce((s, r) => s + (r.humidity || 0), 0) / readings.length : undefined
+          const source = last?.source ?? summary?.temperatura?.source ?? summary?.humedad?.source
 
           setIotDetails(prev => ({
             ...prev,
@@ -69,6 +71,7 @@ export function DashboardPage() {
                 avg: Number.isFinite(avgHum) ? Number(avgHum!.toFixed(1)) : Number((summary?.humedad?.value ?? NaN).toFixed?.(1) ?? NaN),
                 unit: summary?.humedad?.unit ?? '%',
               } : undefined,
+              source,
             }
           }))
         } catch (e) {
@@ -153,6 +156,9 @@ export function DashboardPage() {
                   </div>
                   {incident.equipmentId && iotDetails[incident.equipmentId] && (
                     <div className="pl-6 text-xs text-muted-foreground space-y-1">
+                      {iotDetails[incident.equipmentId].source === 'simulated' && (
+                        <div className="text-[11px] uppercase tracking-wide text-amber-600">Dato simulado</div>
+                      )}
                       {iotDetails[incident.equipmentId].temp && (
                         <div>
                           Temp: {iotDetails[incident.equipmentId].temp!.current.toFixed(1)}{iotDetails[incident.equipmentId].temp!.unit} 
@@ -311,6 +317,9 @@ export function DashboardPage() {
                       </p>
                       {incident.equipmentId && iotDetails[incident.equipmentId] && (
                         <div className="mt-1 text-xs text-muted-foreground space-y-0.5">
+                          {iotDetails[incident.equipmentId].source === 'simulated' && (
+                            <div className="text-[11px] uppercase tracking-wide text-amber-600">Dato simulado</div>
+                          )}
                           {iotDetails[incident.equipmentId].temp && (
                             <div>
                               Temp: {iotDetails[incident.equipmentId].temp!.current.toFixed(1)}{iotDetails[incident.equipmentId].temp!.unit} 
