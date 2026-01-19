@@ -57,6 +57,28 @@
       margin-top: 0;
     }
   </style>
+  <!-- Firebase SDKs for debug page -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js"></script>
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyBsJSh6x3ZGEyuXsM18dSWsJKyU7--KJss",
+      authDomain: "mantenimiento-planta-771a3.firebaseapp.com",
+      databaseURL: "https://mantenimiento-planta-771a3-default-rtdb.firebaseio.com",
+      projectId: "mantenimiento-planta-771a3",
+      storageBucket: "mantenimiento-planta-771a3.firebasestorage.app",
+      messagingSenderId: "1019421112530",
+      appId: "1:1019421112530:web:9afd9962e0b53152f8d50b",
+    }
+
+    // Detect base URL (GitHub Pages vs local)
+    function getBaseUrl() {
+      if (location.hostname.includes('github.io')) {
+        return '/mantenimiento-planta/'
+      }
+      return '/'
+    }
+  </script>
 </head>
 <body>
   <h1>🔧 Debug Notificaciones Push</h1>
@@ -180,16 +202,55 @@
 
     async function getTokenDebug() {
       addLog('Attempting to get FCM token...', 'info');
-      
-      const token = localStorage.getItem('fcm_token');
-      if (token) {
-        addLog('✅ Token found in localStorage', 'success');
-        addLog('Token: ' + token, 'info');
-      } else {
-        addLog('❌ No token in localStorage', 'error');
-        addLog('💡 Try requesting permission first', 'info');
+
+      if (typeof firebase === 'undefined') {
+        addLog('❌ Firebase SDK not loaded', 'error');
+        return;
       }
-      updateStatus();
+
+      const tokenLS = localStorage.getItem('fcm_token');
+      if (tokenLS) {
+        addLog('ℹ️ Token already in localStorage: ' + tokenLS.substring(0, 24) + '...', 'info');
+      }
+
+      try {
+        addLog('📦 Initializing Firebase app...', 'info');
+        const app = firebase.apps && firebase.apps.length ? firebase.apps[0] : firebase.initializeApp(firebaseConfig)
+        const messaging = firebase.messaging(app)
+        addLog('✅ Firebase Messaging ready', 'success')
+
+        const baseUrl = getBaseUrl()
+        const swUrl = `${baseUrl}firebase-messaging-sw.js`
+        addLog(`📄 Registering SW at: ${swUrl}`, 'info')
+
+        const registration = await navigator.serviceWorker.register(swUrl, { scope: baseUrl })
+        addLog('✅ SW registered for messaging', 'success')
+
+        // Esperar ready para asegurar estado
+        await navigator.serviceWorker.ready
+        addLog('✅ Service worker ready', 'success')
+
+        addLog('🔑 Calling getToken (compat)...', 'info')
+        const token = await messaging.getToken({
+          vapidKey: 'BB2ESVcTn4BvFVxnGpIuZsGTRpNgQMeS-4LBQ4QQHQiBrWEb-ZK7zglHTEfc5eJBQZv1MlBsvAKZfCSVMOavCz2o',
+          serviceWorkerRegistration: registration,
+        })
+
+        if (!token) {
+          addLog('❌ getToken returned null/empty', 'error')
+          updateStatus()
+          return
+        }
+
+        addLog('✅ Token obtained: ' + token, 'success')
+        localStorage.setItem('fcm_token', token)
+        addLog('💾 Token saved to localStorage', 'success')
+        updateStatus()
+      } catch (error) {
+        addLog('❌ Error getting token: ' + (error && error.message ? error.message : String(error)), 'error')
+        console.error(error)
+        updateStatus()
+      }
     }
 
     function clearAll() {
