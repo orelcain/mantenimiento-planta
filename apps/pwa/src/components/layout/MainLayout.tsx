@@ -17,6 +17,7 @@ import {
   Camera,
   Activity,
   Cpu,
+  Zap,
 } from 'lucide-react'
 import { Avatar, AvatarFallback, Button } from '@/components/ui'
 import { useAuthStore, useIsAdmin, useAppStore } from '@/store'
@@ -39,6 +40,7 @@ const navigation = [
   { name: 'Mapa', href: '/map', icon: Map },
   { name: 'Equipos', href: '/equipment', icon: Wrench },
   { name: 'Repuestos', href: '/repuestos', icon: Package },
+  { name: 'Catálogo de Bases', href: '/repuestos/bases', icon: Zap },
   { name: 'Configuración', href: '/settings', icon: Settings },
 ]
 

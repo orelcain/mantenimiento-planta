@@ -7,6 +7,7 @@ import { LoadingScreen } from '@/components/ui'
 import { MainLayout } from '@/components/layout'
 import { HelpProvider } from '@/components/help'
 import { initializeHierarchySystem, isHierarchyInitialized } from '@/services/hierarchyInit'
+import { Toaster } from '@/components/ui/toaster'
 import {
   LoginPage,
   DashboardPage,
@@ -14,6 +15,7 @@ import {
   EquipmentPage,
   PredictivePage,
   RepuestosDashboard,
+  CatalogoBases,
 } from '@/pages'
 
 // Code Splitting: Lazy load para páginas pesadas o menos usadas
@@ -117,6 +119,7 @@ export function App() {
   return (
     <HelpProvider>
       <BrowserRouter basename={import.meta.env.BASE_URL}>
+        <Toaster />
         <Routes>
           {/* Public routes */}
           <Route
@@ -164,6 +167,7 @@ export function App() {
             } />
             <Route path="equipment" element={<EquipmentPage />} />
             <Route path="repuestos" element={<RepuestosDashboard />} />
+            <Route path="repuestos/bases" element={<CatalogoBases />} />
             <Route path="predictive" element={<PredictivePage />} />
             <Route path="sensors" element={
               <Suspense fallback={<LoadingScreen />}>
