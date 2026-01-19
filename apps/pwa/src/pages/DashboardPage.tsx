@@ -18,11 +18,68 @@ import {
 } from '@/components/ui'
 import { useAppStore, useAuthStore } from '@/store'
 import { formatRelativeTime } from '@/lib/utils'
+import { fetchLastSensorReadings, fetchSensorSummaryOnce } from '@/services/sensorsRtdb'
+import { DEFAULT_PREDICTIVE_THRESHOLDS } from '@/lib/predictive/predictor'
+import { useEffect, useState } from 'react'
 
 export function DashboardPage() {
   const navigate = useNavigate()
   const user = useAuthStore((state) => state.user)
   const { incidents, equipment, zones, setSelectedIncident } = useAppStore()
+
+  // Cache local de detalles IoT por equipo
+  const [iotDetails, setIotDetails] = useState<Record<string, {
+    temp?: { current: number; avg: number; unit?: string }
+    hum?: { current: number; avg: number; unit?: string }
+  }>>({})
+
+  // Preparar equipoIds involucrados en tarjetas visibles
+  const visibleEquipmentIds = Array.from(
+    new Set([
+      ...incidents.filter(i => i.prioridad === 'critica' && i.status !== 'cerrada')
+        .map(i => i.equipmentId).filter(Boolean) as string[],
+      ...incidents.slice(0, 5).map(i => i.equipmentId).filter(Boolean) as string[],
+    ])
+  )
+
+  useEffect(() => {
+    const load = async () => {
+      const thresholds = DEFAULT_PREDICTIVE_THRESHOLDS
+      for (const eqId of visibleEquipmentIds) {
+        if (iotDetails[eqId]) continue
+        try {
+          const [summary, readings] = await Promise.all([
+            fetchSensorSummaryOnce(eqId),
+            fetchLastSensorReadings(eqId, 15),
+          ])
+          const last = readings[readings.length - 1]
+          const avgTemp = readings.length ? readings.reduce((s, r) => s + (r.temperature || 0), 0) / readings.length : undefined
+          const avgHum = readings.length ? readings.reduce((s, r) => s + (r.humidity || 0), 0) / readings.length : undefined
+
+          setIotDetails(prev => ({
+            ...prev,
+            [eqId]: {
+              temp: (typeof last?.temperature === 'number' || typeof avgTemp === 'number' || summary?.temperatura?.value != null) ? {
+                current: (typeof last?.temperature === 'number' ? last!.temperature : (summary?.temperatura?.value ?? NaN)),
+                avg: Number.isFinite(avgTemp) ? Number(avgTemp!.toFixed(1)) : Number((summary?.temperatura?.value ?? NaN).toFixed?.(1) ?? NaN),
+                unit: summary?.temperatura?.unit ?? '°C',
+              } : undefined,
+              hum: (typeof last?.humidity === 'number' || typeof avgHum === 'number' || summary?.humedad?.value != null) ? {
+                current: (typeof last?.humidity === 'number' ? last!.humidity : (summary?.humedad?.value ?? NaN)),
+                avg: Number.isFinite(avgHum) ? Number(avgHum!.toFixed(1)) : Number((summary?.humedad?.value ?? NaN).toFixed?.(1) ?? NaN),
+                unit: summary?.humedad?.unit ?? '%',
+              } : undefined,
+            }
+          }))
+        } catch (e) {
+          // Ignorar errores silenciosamente para no bloquear el dashboard
+          console.warn('IoT details load error for', eqId, e)
+        }
+      }
+    }
+    if (visibleEquipmentIds.length > 0) load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleEquipmentIds.join('|')])
 
   // Estadísticas
   const stats = {
@@ -77,22 +134,44 @@ export function DashboardPage() {
           <CardContent>
             <div className="space-y-2">
               {criticalIncidents.slice(0, 3).map((incident) => (
-                <div
-                  key={incident.id}
-                  className="flex items-center justify-between p-2 bg-card rounded cursor-pointer hover:bg-muted"
-                  onClick={() => {
-                    setSelectedIncident(incident)
-                    navigate('/incidents')
-                  }}
-                >
-                  <div className="flex items-center gap-2">
-                    <AlertTriangle className="h-4 w-4 text-destructive" />
-                    <span className="font-medium">{incident.titulo}</span>
+                <>
+                  <div
+                    key={incident.id}
+                    className="flex items-center justify-between p-2 bg-card rounded cursor-pointer hover:bg-muted"
+                    onClick={() => {
+                      setSelectedIncident(incident)
+                      navigate('/incidents')
+                    }}
+                  >
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4 text-destructive" />
+                      <span className="font-medium">{incident.titulo}</span>
+                    </div>
+                    <span className="text-sm text-muted-foreground">
+                      {formatRelativeTime(incident.createdAt)}
+                    </span>
                   </div>
-                  <span className="text-sm text-muted-foreground">
-                    {formatRelativeTime(incident.createdAt)}
-                  </span>
-                </div>
+                  {incident.equipmentId && iotDetails[incident.equipmentId] && (
+                    <div className="pl-6 text-xs text-muted-foreground space-y-1">
+                      {iotDetails[incident.equipmentId].temp && (
+                        <div>
+                          Temp: {iotDetails[incident.equipmentId].temp!.current.toFixed(1)}{iotDetails[incident.equipmentId].temp!.unit} 
+                          (prom {iotDetails[incident.equipmentId].temp!.avg.toFixed(1)}{iotDetails[incident.equipmentId].temp!.unit}, 
+                          warn {DEFAULT_PREDICTIVE_THRESHOLDS.tempWarnLow}-{DEFAULT_PREDICTIVE_THRESHOLDS.tempWarnHigh}, 
+                          crit {DEFAULT_PREDICTIVE_THRESHOLDS.tempCritLow}-{DEFAULT_PREDICTIVE_THRESHOLDS.tempCritHigh})
+                        </div>
+                      )}
+                      {iotDetails[incident.equipmentId].hum && (
+                        <div>
+                          Hum: {iotDetails[incident.equipmentId].hum!.current.toFixed(1)}{iotDetails[incident.equipmentId].hum!.unit} 
+                          (prom {iotDetails[incident.equipmentId].hum!.avg.toFixed(1)}{iotDetails[incident.equipmentId].hum!.unit}, 
+                          warn {DEFAULT_PREDICTIVE_THRESHOLDS.humWarnLow}-{DEFAULT_PREDICTIVE_THRESHOLDS.humWarnHigh}, 
+                          crit {DEFAULT_PREDICTIVE_THRESHOLDS.humCritLow}-{DEFAULT_PREDICTIVE_THRESHOLDS.humCritHigh})
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
               ))}
             </div>
           </CardContent>
@@ -230,6 +309,22 @@ export function DashboardPage() {
                         {incident.status === 'en_proceso' && 'En proceso'}
                         {incident.status === 'cerrada' && 'Cerrada'}
                       </p>
+                      {incident.equipmentId && iotDetails[incident.equipmentId] && (
+                        <div className="mt-1 text-xs text-muted-foreground space-y-0.5">
+                          {iotDetails[incident.equipmentId].temp && (
+                            <div>
+                              Temp: {iotDetails[incident.equipmentId].temp!.current.toFixed(1)}{iotDetails[incident.equipmentId].temp!.unit} 
+                              (prom {iotDetails[incident.equipmentId].temp!.avg.toFixed(1)}{iotDetails[incident.equipmentId].temp!.unit})
+                            </div>
+                          )}
+                          {iotDetails[incident.equipmentId].hum && (
+                            <div>
+                              Hum: {iotDetails[incident.equipmentId].hum!.current.toFixed(1)}{iotDetails[incident.equipmentId].hum!.unit} 
+                              (prom {iotDetails[incident.equipmentId].hum!.avg.toFixed(1)}{iotDetails[incident.equipmentId].hum!.unit})
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <span className="text-sm text-muted-foreground shrink-0">
                       {formatRelativeTime(incident.createdAt)}

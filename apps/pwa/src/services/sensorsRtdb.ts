@@ -180,6 +180,27 @@ export function subscribeSensorReadings(
   }
 }
 
+// Lectura única del resumen de sensores para un equipo
+export async function fetchSensorSummaryOnce(equipmentId: string): Promise<SensorSummaryNode | null> {
+  const path = `sensors/${equipmentId}`
+  const r = ref(rtdb, path)
+  const snap = await get(r)
+  const raw = (snap.val() as SensorSummaryNode | null) ?? null
+  return normalizeSummary(raw)
+}
+
+// Lectura única de las últimas N lecturas
+export async function fetchLastSensorReadings(
+  equipmentId: string,
+  limitCount: number
+): Promise<SensorReading[]> {
+  const path = `sensors/${equipmentId}/readings`
+  const r = ref(rtdb, path)
+  const q = query(r, orderByChild('timestamp'), limitToLast(limitCount))
+  const snap = await get(q)
+  return snapshotToReadings(snap)
+}
+
 export async function fetchSensorReadingsRange(params: {
   equipmentId: string
   fromMs: number
