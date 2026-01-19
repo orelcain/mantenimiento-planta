@@ -11,6 +11,9 @@ import {
   Camera,
   X,
   Trash2,
+  TrendingUp,
+  Thermometer,
+  Droplets,
 } from 'lucide-react'
 import {
   Dialog,
@@ -29,12 +32,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui'
-import { useAuthStore } from '@/store'
+import { useAppStore, useAuthStore } from '@/store'
 import { usePermissions } from '@/hooks/usePermissions'
 import { confirmIncident, rejectIncident, closeIncident, assignIncident, deleteIncident } from '@/services/incidents'
 import { getTechnicians, getUserById } from '@/services/auth'
 import type { Incident, IncidentStatus, IncidentPriority, User as UserType } from '@/types'
 import { formatDate } from '@/lib/utils'
+import { fetchLastSensorReadings, fetchSensorSummaryOnce } from '@/services/sensorsRtdb'
+import { DEFAULT_PREDICTIVE_THRESHOLDS } from '@/lib/predictive/predictor'
 
 const STATUS_CONFIG: Record<IncidentStatus, { label: string; icon: any; color: string }> = {
   pendiente: { label: 'Pendiente de validación', icon: Clock, color: 'text-warning' },
@@ -59,6 +64,11 @@ interface IncidentDetailProps {
 
 export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetailProps) {
   const user = useAuthStore((state) => state.user)
+  const equipment = useAppStore((state) =>
+    incident.equipmentId
+      ? state.equipment.find((eq) => eq.id === incident.equipmentId)
+      : null
+  )
   const permissions = usePermissions()
   const [isLoading, setIsLoading] = useState(false)
   const [showRejectForm, setShowRejectForm] = useState(false)
@@ -70,6 +80,13 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
   const [technicians, setTechnicians] = useState<UserType[]>([])
   const [selectedTechnician, setSelectedTechnician] = useState<string>('')
   const [assignedUser, setAssignedUser] = useState<UserType | null>(null)
+  const [iotLoading, setIotLoading] = useState(false)
+  const [iotError, setIotError] = useState<string | null>(null)
+  const [iotData, setIotData] = useState<{
+    temp?: { current: number; avg: number; unit?: string }
+    hum?: { current: number; avg: number; unit?: string }
+    source?: string
+  } | null>(null)
 
   // Cargar lista de técnicos
   useEffect(() => {
@@ -88,6 +105,72 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
         .catch((error) => logger.error('Error loading assigned user', error instanceof Error ? error : new Error(String(error))))
     }
   }, [incident.asignadoA])
+
+  // Cargar datos IoT del equipo asociado
+  useEffect(() => {
+    let active = true
+    const load = async () => {
+      if (!incident.equipmentId) {
+        setIotData(null)
+        setIotError(null)
+        return
+      }
+      setIotLoading(true)
+      setIotError(null)
+      try {
+        const [summary, readings] = await Promise.all([
+          fetchSensorSummaryOnce(incident.equipmentId),
+          fetchLastSensorReadings(incident.equipmentId, 20),
+        ])
+
+        if (!active) return
+
+        const validTemps = readings
+          .map((r) => r.temperature)
+          .filter((v): v is number => typeof v === 'number' && Number.isFinite(v))
+        const validHums = readings
+          .map((r) => r.humidity)
+          .filter((v): v is number => typeof v === 'number' && Number.isFinite(v))
+        const lastReading = readings[readings.length - 1]
+
+        const tempCurrent = typeof validTemps[validTemps.length - 1] === 'number'
+          ? validTemps[validTemps.length - 1]
+          : (typeof summary?.temperatura?.value === 'number' ? summary.temperatura.value : undefined)
+        const humCurrent = typeof validHums[validHums.length - 1] === 'number'
+          ? validHums[validHums.length - 1]
+          : (typeof summary?.humedad?.value === 'number' ? summary.humedad.value : undefined)
+
+        const tempAvg = validTemps.length
+          ? Number((validTemps.reduce((s, v) => s + v, 0) / validTemps.length).toFixed(1))
+          : (typeof summary?.temperatura?.value === 'number' ? Number(summary.temperatura.value.toFixed?.(1) ?? summary.temperatura.value) : undefined)
+        const humAvg = validHums.length
+          ? Number((validHums.reduce((s, v) => s + v, 0) / validHums.length).toFixed(1))
+          : (typeof summary?.humedad?.value === 'number' ? Number(summary.humedad.value.toFixed?.(1) ?? summary.humedad.value) : undefined)
+
+        const source = lastReading?.source ?? summary?.temperatura?.source ?? summary?.humedad?.source
+
+        setIotData({
+          temp: typeof tempCurrent === 'number' && Number.isFinite(tempCurrent)
+            ? { current: tempCurrent, avg: tempAvg ?? tempCurrent, unit: summary?.temperatura?.unit ?? '°C' }
+            : undefined,
+          hum: typeof humCurrent === 'number' && Number.isFinite(humCurrent)
+            ? { current: humCurrent, avg: humAvg ?? humCurrent, unit: summary?.humedad?.unit ?? '%' }
+            : undefined,
+          source,
+        })
+      } catch (error: unknown) {
+        const err = error instanceof Error ? error : new Error('Error loading IoT data')
+        logger.error('Error loading IoT data', err)
+        if (active) setIotError('No se pudieron cargar los datos IoT del equipo.')
+      } finally {
+        if (active) setIotLoading(false)
+      }
+    }
+    load()
+    return () => {
+      active = false
+    }
+  }, [incident.equipmentId])
 
   const statusConfig = STATUS_CONFIG[incident.status]
   const priorityConfig = PRIORITY_CONFIG[incident.prioridad]
@@ -220,6 +303,83 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
                     </Badge>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* Datos IoT del equipo */}
+            {incident.equipmentId && (
+              <div className="p-4 border rounded-lg bg-muted/30 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4 text-primary" />
+                    <div>
+                      <h4 className="font-medium">Datos IoT del equipo</h4>
+                      <p className="text-xs text-muted-foreground">
+                        {equipment?.nombre || 'Equipo vinculado'}
+                        {equipment?.codigo ? ` · ${equipment.codigo}` : ''}
+                      </p>
+                    </div>
+                  </div>
+                  {iotData?.source === 'simulated' && (
+                    <Badge variant="outline" className="text-amber-600 border-amber-300 bg-amber-50">
+                      Dato simulado
+                    </Badge>
+                  )}
+                </div>
+
+                {iotLoading && (
+                  <p className="text-sm text-muted-foreground">Cargando lecturas...</p>
+                )}
+
+                {iotError && (
+                  <p className="text-sm text-destructive">{iotError}</p>
+                )}
+
+                {!iotLoading && !iotError && !iotData && (
+                  <p className="text-sm text-muted-foreground">Sin lecturas IoT para este equipo.</p>
+                )}
+
+                {!iotLoading && !iotError && iotData && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                    <div className="p-3 rounded border bg-background space-y-1">
+                      <div className="flex items-center gap-2 text-xs uppercase text-muted-foreground tracking-wide">
+                        <Thermometer className="h-4 w-4" />
+                        <span>Temperatura</span>
+                      </div>
+                      {iotData.temp ? (
+                        <>
+                          <div className="text-lg font-semibold">
+                            {iotData.temp.current.toFixed(1)}{iotData.temp.unit ?? '°C'}
+                          </div>
+                          <div className="text-xs text-muted-foreground leading-snug">
+                            Prom {iotData.temp.avg.toFixed(1)}{iotData.temp.unit ?? '°C'} · Warn {DEFAULT_PREDICTIVE_THRESHOLDS.tempWarnLow}-{DEFAULT_PREDICTIVE_THRESHOLDS.tempWarnHigh} · Crit {DEFAULT_PREDICTIVE_THRESHOLDS.tempCritLow}-{DEFAULT_PREDICTIVE_THRESHOLDS.tempCritHigh}
+                          </div>
+                        </>
+                      ) : (
+                        <p className="text-muted-foreground">Sin lecturas recientes.</p>
+                      )}
+                    </div>
+
+                    <div className="p-3 rounded border bg-background space-y-1">
+                      <div className="flex items-center gap-2 text-xs uppercase text-muted-foreground tracking-wide">
+                        <Droplets className="h-4 w-4" />
+                        <span>Humedad</span>
+                      </div>
+                      {iotData.hum ? (
+                        <>
+                          <div className="text-lg font-semibold">
+                            {iotData.hum.current.toFixed(1)}{iotData.hum.unit ?? '%'}
+                          </div>
+                          <div className="text-xs text-muted-foreground leading-snug">
+                            Prom {iotData.hum.avg.toFixed(1)}{iotData.hum.unit ?? '%'} · Warn {DEFAULT_PREDICTIVE_THRESHOLDS.humWarnLow}-{DEFAULT_PREDICTIVE_THRESHOLDS.humWarnHigh} · Crit {DEFAULT_PREDICTIVE_THRESHOLDS.humCritLow}-{DEFAULT_PREDICTIVE_THRESHOLDS.humCritHigh}
+                          </div>
+                        </>
+                      ) : (
+                        <p className="text-muted-foreground">Sin lecturas recientes.</p>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

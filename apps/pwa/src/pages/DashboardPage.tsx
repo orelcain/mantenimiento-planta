@@ -137,9 +137,8 @@ export function DashboardPage() {
           <CardContent>
             <div className="space-y-2">
               {criticalIncidents.slice(0, 3).map((incident) => (
-                <>
+                <div key={incident.id} className="space-y-1">
                   <div
-                    key={incident.id}
                     className="flex items-center justify-between p-2 bg-card rounded cursor-pointer hover:bg-muted"
                     onClick={() => {
                       setSelectedIncident(incident)
@@ -177,7 +176,7 @@ export function DashboardPage() {
                       )}
                     </div>
                   )}
-                </>
+                </div>
               ))}
             </div>
           </CardContent>
