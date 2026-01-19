@@ -6,6 +6,7 @@ import {
   Map,
   Wrench,
   Settings,
+  Package,
   Menu,
   X,
   LogOut,
@@ -37,6 +38,7 @@ const navigation = [
   { name: 'Sensores', href: '/sensors', icon: Cpu },
   { name: 'Mapa', href: '/map', icon: Map },
   { name: 'Equipos', href: '/equipment', icon: Wrench },
+  { name: 'Repuestos', href: '/repuestos', icon: Package },
   { name: 'Configuración', href: '/settings', icon: Settings },
 ]
 
