@@ -14,6 +14,7 @@ import {
   TrendingUp,
   Thermometer,
   Droplets,
+  Edit,
 } from 'lucide-react'
 import {
   Dialog,
@@ -40,6 +41,7 @@ import type { Incident, IncidentStatus, IncidentPriority, User as UserType } fro
 import { formatDate } from '@/lib/utils'
 import { fetchLastSensorReadings, fetchSensorSummaryOnce } from '@/services/sensorsRtdb'
 import { DEFAULT_PREDICTIVE_THRESHOLDS } from '@/lib/predictive/predictor'
+import { IncidentForm } from './IncidentForm'
 
 const STATUS_CONFIG: Record<IncidentStatus, { label: string; icon: any; color: string }> = {
   pendiente: { label: 'Pendiente de validación', icon: Clock, color: 'text-warning' },
@@ -74,6 +76,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
   const [showRejectForm, setShowRejectForm] = useState(false)
   const [showCloseForm, setShowCloseForm] = useState(false)
   const [showAssignForm, setShowAssignForm] = useState(false)
+  const [showEditForm, setShowEditForm] = useState(false)
   const [rejectionReason, setRejectionReason] = useState('')
   const [resolution, setResolution] = useState('')
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null)
@@ -618,6 +621,17 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
               </Button>
             )}
 
+            {/* Botón de editar (solo Admin) */}
+            {permissions.canEditIncident && !showEditForm && (
+              <Button
+                variant="default"
+                onClick={() => setShowEditForm(true)}
+              >
+                <Edit className="h-4 w-4 mr-2" />
+                Editar
+              </Button>
+            )}
+
             {/* Botón de eliminar (solo Admin) */}
             {permissions.canDeleteIncident && (
               <Button
@@ -640,6 +654,18 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Modal de edición */}
+      {showEditForm && (
+        <IncidentForm
+          incident={incident}
+          onClose={() => setShowEditForm(false)}
+          onSuccess={() => {
+            setShowEditForm(false)
+            onClose()
+          }}
+        />
+      )}
 
       {/* Modal de foto ampliada */}
       {selectedPhoto && (

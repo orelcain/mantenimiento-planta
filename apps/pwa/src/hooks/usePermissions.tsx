@@ -78,8 +78,8 @@ export function usePermissions(): Permissions {
     
     // Permisos de incidencias
     canCreateIncident: true, // Todos pueden reportar
-    canEditIncident: isAdmin || isSupervisor, // Admin/Supervisor editan cualquiera
-    canDeleteIncident: isAdmin,
+    canEditIncident: isAdmin, // Solo Admin edita
+    canDeleteIncident: isAdmin, // Solo Admin elimina
     canValidateIncident: isAdmin || isSupervisor, // Solo supervisores validan
     canAssignIncident: isAdmin || isSupervisor, // Solo supervisores asignan
     canCloseIncident: isAdmin || isSupervisor || isTechnician, // Técnicos cierran las asignadas

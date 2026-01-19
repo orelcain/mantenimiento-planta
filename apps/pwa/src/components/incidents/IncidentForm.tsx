@@ -12,7 +12,7 @@ import {
   Spinner,
 } from '@/components/ui'
 import { useAuthStore, useAppStore } from '@/store'
-import { createIncident } from '@/services/incidents'
+import { createIncident, updateIncident } from '@/services/incidents'
 import { uploadIncidentPhoto, compressImage } from '@/services/storage'
 import { generateSymptoms } from '@/services/ai'
 import type { IncidentPriority, Incident, Equipment } from '@/types'
@@ -26,6 +26,7 @@ interface IncidentFormProps {
   onClose: () => void
   onSuccess: () => void
   preselectedZoneId?: string
+  incident?: Incident // Para modo edición
 }
 
 const PRIORITY_OPTIONS = [
@@ -40,7 +41,7 @@ const COMMON_SYMPTOMS = [
   'Fuga de agua', 'Humo', 'Olor extraño', 'No enciende', 'Se detiene solo', 'Otro'
 ]
 
-export function IncidentForm({ onClose, onSuccess, preselectedZoneId }: IncidentFormProps) {
+export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }: IncidentFormProps) {
   const user = useAuthStore((state) => state.user)
   const { zones } = useAppStore()
   const cameraInputRef = useRef<HTMLInputElement>(null)
@@ -55,20 +56,32 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId }: Incident
   const [isGeneratingSymptoms, setIsGeneratingSymptoms] = useState(false)
   const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null)
 
+  const isEditMode = !!incident
+
   const [formData, setFormData] = useState({
-    titulo: '',
-    descripcion: '',
-    zoneId: preselectedZoneId || '',
-    hierarchyNodeId: undefined as string | undefined,
-    prioridad: 'media' as IncidentPriority,
+    titulo: incident?.titulo || '',
+    descripcion: incident?.descripcion || '',
+    zoneId: incident?.zoneId || preselectedZoneId || '',
+    hierarchyNodeId: incident?.hierarchyNodeId as string | undefined,
+    prioridad: (incident?.prioridad || 'media') as IncidentPriority,
   })
+
+  // Inicializar datos de edición
+  useEffect(() => {
+    if (incident) {
+      setSelectedSymptoms(incident.sintomas || [])
+      if (incident.fotos?.length) {
+        setPhotoPreview(incident.fotos)
+      }
+    }
+  }, [incident])
 
   // Si hay zona preseleccionada, establecerla
   useEffect(() => {
-    if (preselectedZoneId) {
+    if (preselectedZoneId && !isEditMode) {
       setFormData(prev => ({ ...prev, zoneId: preselectedZoneId }))
     }
-  }, [preselectedZoneId])
+  }, [preselectedZoneId, isEditMode])
 
   // Generar síntomas con IA cuando se selecciona nodo de jerarquía
   const handleHierarchyChange = async (nodeId: string | undefined, equipment?: Equipment) => {
@@ -208,16 +221,16 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId }: Incident
       }
 
       console.log('💾 Creando incidencia en Firestore...', incidentData)
-      const incident = await createIncident(incidentData)
-      console.log('✅ Incidencia creada:', incident.id)
-      logger.info('Incident created successfully', { incidentId: incident.id })
+      const createdIncident = await createIncident(incidentData)
+      console.log('✅ Incidencia creada:', createdIncident.id)
+      logger.info('Incident created successfully', { incidentId: createdIncident.id })
 
       // Subir fotos
       if (photos.length > 0) {
         console.log('📸 Subiendo fotos:', photos.length)
         logger.info('Uploading photos', { count: photos.length })
         await Promise.all(
-          photos.map((photo) => uploadIncidentPhoto(incident.id, photo))
+          photos.map((photo) => uploadIncidentPhoto(createdIncident.id, photo))
         )
         console.log('✅ Fotos subidas')
       }
@@ -234,43 +247,78 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId }: Incident
     }
   }
 
+  const handleEditSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    if (!incident || !user) return
+
+    if (!formData.titulo.trim() || !formData.descripcion.trim()) {
+      setValidationErrors({ general: 'Título y descripción son requeridos' })
+      return
+    }
+
+    setIsLoading(true)
+    setValidationErrors({})
+
+    try {
+      logger.info('Updating incident', { incidentId: incident.id })
+
+      const updateData = {
+        titulo: formData.titulo,
+        descripcion: formData.descripcion,
+        prioridad: formData.prioridad,
+        ...(selectedSymptoms.length > 0 && { sintomas: selectedSymptoms }),
+      }
+
+      await updateIncident(incident.id, updateData)
+      logger.info('Incident updated successfully', { incidentId: incident.id })
+      onSuccess()
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error('Error al actualizar la incidencia')
+      logger.error('Error updating incident', err)
+      setValidationErrors({ general: 'Error al actualizar. Por favor intenta de nuevo.' })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   return (
     <Dialog open onOpenChange={onClose}>
       <DialogContent className="max-w-lg max-h-[95vh] overflow-y-auto p-4 sm:p-6">
         <DialogHeader className="pb-2">
           <DialogTitle className="flex items-center gap-2">
             <AlertTriangle className="h-5 w-5 text-warning" />
-            Reportar Incidencia
+            {isEditMode ? 'Editar Incidencia' : 'Reportar Incidencia'}
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Ubicación jerárquica - Selector en cascada */}
-          <div className="space-y-2">
-            <Label className="text-sm font-medium">📍 Ubicación *</Label>
-            <div className="border rounded-lg p-3 bg-muted/30">
-              <HierarchySelector
-                value={formData.hierarchyNodeId}
-                onChange={(nodeId: string | null) => {
-                  console.log('🔄 HierarchySelector onChange:', nodeId)
-                  handleHierarchyChange(nodeId || undefined, undefined)
-                }}
-                minLevel={HierarchyLevel.SUB_AREA}
-                maxLevel={HierarchyLevel.ELEMENTO}
-                error={validationErrors.hierarchyNodeId}
-              />
-            </div>
-            {validationErrors.hierarchyNodeId && (
-              <p className="text-sm text-destructive mt-1">{validationErrors.hierarchyNodeId}</p>
-            )}
-            
-            {/* Zonas legacy (fallback) */}
-            {zones.length > 0 && !formData.hierarchyNodeId && (
-              <details className="mt-2">
-                <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
-                  O seleccionar zona legacy
-                </summary>
-                <div className="grid grid-cols-2 gap-2 mt-2">
+        <form onSubmit={isEditMode ? handleEditSubmit : handleSubmit} className="space-y-4">
+          {/* Ubicación jerárquica - Solo en modo creación */}
+          {!isEditMode && (
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">📍 Ubicación *</Label>
+              <div className="border rounded-lg p-3 bg-muted/30">
+                <HierarchySelector
+                  value={formData.hierarchyNodeId}
+                  onChange={(nodeId: string | null) => {
+                    console.log('🔄 HierarchySelector onChange:', nodeId)
+                    handleHierarchyChange(nodeId || undefined, undefined)
+                  }}
+                  minLevel={HierarchyLevel.SUB_AREA}
+                  maxLevel={HierarchyLevel.ELEMENTO}
+                  error={validationErrors.hierarchyNodeId}
+                />
+              </div>
+              {validationErrors.hierarchyNodeId && (
+                <p className="text-sm text-destructive mt-1">{validationErrors.hierarchyNodeId}</p>
+              )}
+              
+              {/* Zonas legacy (fallback) */}
+              {zones.length > 0 && !formData.hierarchyNodeId && (
+                <details className="mt-2">
+                  <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
+                    O seleccionar zona legacy
+                  </summary>
+                  <div className="grid grid-cols-2 gap-2 mt-2">
                   {zones.map((zone) => (
                     <button
                       key={zone.id}
@@ -295,7 +343,8 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId }: Incident
                 </div>
               </details>
             )}
-          </div>
+            </div>
+          )}
 
           {/* Prioridad - Botones grandes para móvil */}
           <div className="space-y-2">
@@ -357,73 +406,76 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId }: Incident
             )}
           </div>
 
-          {/* Síntomas - Chips seleccionables con IA */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label className="text-sm font-medium">🔍 Síntomas (opcional)</Label>
-              {selectedEquipment && (
-                <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                  {isGeneratingSymptoms ? (
-                    <>
-                      <Spinner size="sm" />
-                      <span>Generando con IA...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="h-3 w-3 text-primary" />
-                      <span>Sugerencias IA</span>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {aiSymptoms.map((symptom) => (
-                <button
-                  key={symptom}
-                  type="button"
-                  onClick={() => {
-                    setSelectedSymptoms(prev => 
-                      prev.includes(symptom) 
-                        ? prev.filter(s => s !== symptom)
-                        : [...prev, symptom]
-                    )
-                  }}
-                  disabled={isGeneratingSymptoms}
-                  className={cn(
-                    'px-3 py-1.5 rounded-full text-sm border transition-colors',
-                    selectedSymptoms.includes(symptom)
-                      ? 'bg-primary text-primary-foreground border-primary'
-                      : 'bg-muted/50 border-muted hover:border-primary/50',
-                    isGeneratingSymptoms && 'opacity-50 cursor-not-allowed'
-                  )}
-                >
-                  {symptom}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Fotos - Botón grande para cámara */}
-          <div className="space-y-2">
-            <Label className="text-sm font-medium">📷 Fotos (máx. 5)</Label>
-            <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
-              {photoPreview.map((preview, index) => (
-                <div key={index} className="relative aspect-square">
-                  <img
-                    src={preview}
-                    alt={`Foto ${index + 1}`}
-                    className="w-full h-full object-cover rounded-lg"
-                  />
+          {/* Síntomas - Solo en modo creación */}
+          {!isEditMode && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium">🔍 Síntomas (opcional)</Label>
+                {selectedEquipment && (
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    {isGeneratingSymptoms ? (
+                      <>
+                        <Spinner size="sm" />
+                        <span>Generando con IA...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-3 w-3 text-primary" />
+                        <span>Sugerencias IA</span>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {aiSymptoms.map((symptom) => (
                   <button
+                    key={symptom}
                     type="button"
-                    onClick={() => handleRemovePhoto(index)}
-                    className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1 shadow-lg"
+                    onClick={() => {
+                      setSelectedSymptoms(prev => 
+                        prev.includes(symptom) 
+                          ? prev.filter(s => s !== symptom)
+                          : [...prev, symptom]
+                      )
+                    }}
+                    disabled={isGeneratingSymptoms}
+                    className={cn(
+                      'px-3 py-1.5 rounded-full text-sm border transition-colors',
+                      selectedSymptoms.includes(symptom)
+                        ? 'bg-primary text-primary-foreground border-primary'
+                        : 'bg-muted/50 border-muted hover:border-primary/50',
+                      isGeneratingSymptoms && 'opacity-50 cursor-not-allowed'
+                    )}
                   >
-                    <X className="h-3 w-3" />
+                    {symptom}
                   </button>
-                </div>
-              ))}
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Fotos - Solo en modo creación */}
+          {!isEditMode && (
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">📷 Fotos (máx. 5)</Label>
+              <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
+                {photoPreview.map((preview, index) => (
+                  <div key={index} className="relative aspect-square">
+                    <img
+                      src={preview}
+                      alt={`Foto ${index + 1}`}
+                      className="w-full h-full object-cover rounded-lg"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleRemovePhoto(index)}
+                      className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1 shadow-lg"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
               
               {photos.length < 5 && (
                 <>
@@ -468,7 +520,8 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId }: Incident
               onChange={handlePhotoSelect}
               className="hidden"
             />
-          </div>
+            </div>
+          )}
 
           {/* Botones de acción */}
           <div className="flex flex-col gap-2 pt-4 border-t">
@@ -488,7 +541,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId }: Incident
               </Button>
               <Button 
                 type="submit" 
-                disabled={isLoading || (!formData.hierarchyNodeId && !formData.zoneId) || !formData.titulo}
+                disabled={isLoading || (!isEditMode && (!formData.hierarchyNodeId && !formData.zoneId)) || !formData.titulo}
                 className="w-full sm:w-auto sm:flex-1"
               >
                 {isLoading ? (
