@@ -108,14 +108,35 @@ export async function requestNotificationPermission(userId: string): Promise<str
     // Obtener token
     logger.info('🔑 Getting FCM token...')
     try {
+      // Validar messaging
+      if (!messaging) {
+        logger.error('❌ Messaging instance is null!')
+        return null
+      }
+      logger.info('✅ Messaging instance is valid')
+      
       // Esperar a que el SW esté listo
       const swRegistration = await navigator.serviceWorker.ready
       logger.info('✅ Service Worker is ready')
       
+      // Validar registration
+      if (!swRegistration) {
+        logger.error('❌ SW registration is null!')
+        return null
+      }
+      logger.info('✅ SW registration is valid')
+      
+      logger.info('📥 Calling getToken with VAPID key...')
       const token = await getToken(messaging, {
         vapidKey: 'BB2ESVcTn4BvFVxnGpIuZsGTRpNgQMeS-4LBQ4QQHQiBrWEb-ZK7zglHTEfc5eJBQZv1MlBsvAKZfCSVMOavCz2o',
         serviceWorkerRegistration: swRegistration
       })
+      
+      if (!token) {
+        logger.error('❌ getToken returned empty token!')
+        return null
+      }
+      
       logger.info('✅ Token obtained:', { preview: token.substring(0, 20) + '...', length: token.length })
       
       // Guardar token en Firestore
@@ -143,8 +164,10 @@ export async function requestNotificationPermission(userId: string): Promise<str
     } catch (tokenError) {
       logger.error('❌ Failed to get token:', tokenError instanceof Error ? tokenError.message : String(tokenError))
       if (tokenError instanceof Error) {
-        logger.error('❌ Token error details:', { name: tokenError.name, stack: tokenError.stack })
+        logger.error('❌ Token error stack:', tokenError.stack)
+        logger.error('❌ Token error name:', tokenError.name)
       }
+      logger.error('❌ Full error object:', tokenError)
       return null
     }
   } catch (error) {
