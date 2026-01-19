@@ -246,7 +246,7 @@ export function IncidentsPage() {
               <AlertTriangle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <h3 className="text-lg font-medium">No hay incidencias</h3>
               <p className="text-muted-foreground">
-                {searchQuery || filterStatus !== 'all' || filterPriority !== 'all'
+                {searchQuery || activeFilter !== null
                   ? 'No se encontraron incidencias con los filtros aplicados'
                   : 'Comienza creando una nueva incidencia'}
               </p>
