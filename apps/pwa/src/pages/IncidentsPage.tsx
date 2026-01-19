@@ -44,9 +44,7 @@ export function IncidentsPage() {
   const [showForm, setShowForm] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
-  const [filterStatus, setFilterStatus] = useState<string>('all')
-  const [filterPriority, setFilterPriority] = useState<string>('all')
-  const [filterAssigned, setFilterAssigned] = useState<boolean>(false)
+  const [activeFilter, setActiveFilter] = useState<string | null>(null) // null = todos
 
   // Debounce search con 300ms
   const debouncedSetSearch = useMemo(
@@ -66,29 +64,40 @@ export function IncidentsPage() {
     return () => unsubscribe()
   }, [setIncidents])
 
-  // Filtrar incidencias con búsqueda debounced
+  // Filtrar incidencias basado en búsqueda y filtro activo
   const filteredIncidents = incidents.filter((incident) => {
     const matchesSearch =
       incident.titulo.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
       incident.descripcion.toLowerCase().includes(debouncedSearch.toLowerCase())
     
-    const matchesStatus = filterStatus === 'all' || incident.status === filterStatus
-    const matchesPriority = filterPriority === 'all' || incident.prioridad === filterPriority
-    // "Mis Incidencias" incluye tanto las creadas como las asignadas al usuario
-    const matchesAssigned = !filterAssigned || 
-      incident.creadoPor === user?.id || 
-      incident.asignadoA === user?.id
+    if (!matchesSearch) return false
     
-    return matchesSearch && matchesStatus && matchesPriority && matchesAssigned
+    // Aplicar filtro activo
+    if (activeFilter === null) return true
+    
+    // Filtros específicos
+    if (activeFilter === 'pendientes') return incident.status === 'pendiente'
+    if (activeFilter === 'confirmadas') return incident.status === 'confirmada'
+    if (activeFilter === 'confirmadas-asignadas') return incident.status === 'confirmada' && !!incident.asignadoA
+    if (activeFilter === 'confirmadas-sin-asignar') return incident.status === 'confirmada' && !incident.asignadoA
+    if (activeFilter === 'en-proceso') return incident.status === 'en_proceso'
+    if (activeFilter === 'cerradas') return incident.status === 'cerrada'
+    if (activeFilter === 'rechazadas') return incident.status === 'rechazada'
+    if (activeFilter === 'criticas') return incident.prioridad === 'critica' && incident.status !== 'cerrada'
+    
+    return true
   })
 
   // Estadísticas
   const stats = {
     total: incidents.length,
     pendientes: incidents.filter((i) => i.status === 'pendiente').length,
+    confirmadas: incidents.filter((i) => i.status === 'confirmada').length,
+    confirmadas_asignadas: incidents.filter((i) => i.status === 'confirmada' && !!i.asignadoA).length,
+    confirmadas_sin_asignar: incidents.filter((i) => i.status === 'confirmada' && !i.asignadoA).length,
     enProceso: incidents.filter((i) => i.status === 'en_proceso').length,
-    // Mis incidencias: creadas por mí O asignadas a mí
-    misIncidencias: incidents.filter((i) => i.creadoPor === user?.id || i.asignadoA === user?.id).length,
+    cerradas: incidents.filter((i) => i.status === 'cerrada').length,
+    rechazadas: incidents.filter((i) => i.status === 'rechazada').length,
     criticas: incidents.filter((i) => i.prioridad === 'critica' && i.status !== 'cerrada').length,
   }
 
@@ -106,91 +115,128 @@ export function IncidentsPage() {
         </Button>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <Card>
+      {/* Stats - Clickeable para filtrar */}
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3">
+        {/* Total */}
+        <Card
+          className={`cursor-pointer transition-all hover:border-primary/50 ${activeFilter === null ? 'border-primary bg-primary/10' : ''}`}
+          onClick={() => setActiveFilter(null)}
+        >
           <CardContent className="p-4">
             <div className="text-2xl font-bold">{stats.total}</div>
             <div className="text-sm text-muted-foreground">Total</div>
           </CardContent>
         </Card>
-        <Card>
+
+        {/* Pendientes */}
+        <Card
+          className={`cursor-pointer transition-all hover:border-warning/50 ${activeFilter === 'pendientes' ? 'border-warning bg-warning/10' : ''}`}
+          onClick={() => setActiveFilter('pendientes')}
+        >
           <CardContent className="p-4">
             <div className="text-2xl font-bold text-warning">{stats.pendientes}</div>
             <div className="text-sm text-muted-foreground">Pendientes</div>
           </CardContent>
         </Card>
-        <Card>
+
+        {/* Confirmadas */}
+        <Card
+          className={`cursor-pointer transition-all hover:border-primary/50 ${activeFilter === 'confirmadas' ? 'border-primary bg-primary/10' : ''}`}
+          onClick={() => setActiveFilter('confirmadas')}
+        >
           <CardContent className="p-4">
-            <div className="text-2xl font-bold text-primary">{stats.enProceso}</div>
+            <div className="text-2xl font-bold text-primary">{stats.confirmadas}</div>
+            <div className="text-sm text-muted-foreground">Confirmadas</div>
+          </CardContent>
+        </Card>
+
+        {/* Confirmadas Asignadas */}
+        <Card
+          className={`cursor-pointer transition-all hover:border-blue-400/50 ${activeFilter === 'confirmadas-asignadas' ? 'border-blue-400 bg-blue-400/10' : ''}`}
+          onClick={() => setActiveFilter('confirmadas-asignadas')}
+        >
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold text-blue-600">{stats.confirmadas_asignadas}</div>
+            <div className="text-xs text-muted-foreground">Asignadas</div>
+          </CardContent>
+        </Card>
+
+        {/* Confirmadas Sin Asignar */}
+        <Card
+          className={`cursor-pointer transition-all hover:border-orange-400/50 ${activeFilter === 'confirmadas-sin-asignar' ? 'border-orange-400 bg-orange-400/10' : ''}`}
+          onClick={() => setActiveFilter('confirmadas-sin-asignar')}
+        >
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold text-orange-500">{stats.confirmadas_sin_asignar}</div>
+            <div className="text-xs text-muted-foreground">Sin Asignar</div>
+          </CardContent>
+        </Card>
+
+        {/* En Proceso */}
+        <Card
+          className={`cursor-pointer transition-all hover:border-blue-500/50 ${activeFilter === 'en-proceso' ? 'border-blue-500 bg-blue-500/10' : ''}`}
+          onClick={() => setActiveFilter('en-proceso')}
+        >
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold text-blue-500">{stats.enProceso}</div>
             <div className="text-sm text-muted-foreground">En Proceso</div>
           </CardContent>
         </Card>
-        <Card>
+
+        {/* Críticas */}
+        <Card
+          className={`cursor-pointer transition-all hover:border-destructive/50 ${activeFilter === 'criticas' ? 'border-destructive bg-destructive/10' : ''}`}
+          onClick={() => setActiveFilter('criticas')}
+        >
           <CardContent className="p-4">
             <div className="text-2xl font-bold text-destructive">{stats.criticas}</div>
             <div className="text-sm text-muted-foreground">Críticas</div>
           </CardContent>
         </Card>
-        <Card>
+
+        {/* Cerradas */}
+        <Card
+          className={`cursor-pointer transition-all hover:border-green-500/50 ${activeFilter === 'cerradas' ? 'border-green-500 bg-green-500/10' : ''}`}
+          onClick={() => setActiveFilter('cerradas')}
+        >
           <CardContent className="p-4">
-            <div className="text-2xl font-bold text-blue-600">{stats.misIncidencias}</div>
-            <div className="text-sm text-muted-foreground">Mis Incidencias</div>
+            <div className="text-2xl font-bold text-green-600">{stats.cerradas}</div>
+            <div className="text-sm text-muted-foreground">Cerradas</div>
+          </CardContent>
+        </Card>
+
+        {/* Rechazadas */}
+        <Card
+          className={`cursor-pointer transition-all hover:border-red-500/50 ${activeFilter === 'rechazadas' ? 'border-red-500 bg-red-500/10' : ''}`}
+          onClick={() => setActiveFilter('rechazadas')}
+        >
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold text-red-600">{stats.rechazadas}</div>
+            <div className="text-sm text-muted-foreground">Rechazadas</div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Filters */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar incidencias..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-            <Button
-              variant={filterAssigned ? 'default' : 'outline'}
-              onClick={() => setFilterAssigned(!filterAssigned)}
-              className="w-full sm:w-auto"
-            >
-              <User className="h-4 w-4 mr-2" />
-              Mis Incidencias
-              {filterAssigned && <Badge className="ml-2">{stats.misIncidencias}</Badge>}
-            </Button>
-            <Select value={filterStatus} onValueChange={setFilterStatus}>
-              <SelectTrigger className="w-full sm:w-[180px]">
-                <Filter className="h-4 w-4 mr-2" />
-                <SelectValue placeholder="Estado" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos los estados</SelectItem>
-                <SelectItem value="pendiente">Pendiente</SelectItem>
-                <SelectItem value="confirmada">Confirmada</SelectItem>
-                <SelectItem value="en_proceso">En Proceso</SelectItem>
-                <SelectItem value="cerrada">Cerrada</SelectItem>
-                <SelectItem value="rechazada">Rechazada</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={filterPriority} onValueChange={setFilterPriority}>
-              <SelectTrigger className="w-full sm:w-[180px]">
-                <SelectValue placeholder="Prioridad" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas las prioridades</SelectItem>
-                <SelectItem value="critica">Crítica</SelectItem>
-                <SelectItem value="alta">Alta</SelectItem>
-                <SelectItem value="media">Media</SelectItem>
-                <SelectItem value="baja">Baja</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Search - Simplificado */}
+      <div className="flex gap-2">
+        <div className="flex-1 relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar incidencias..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        {activeFilter && (
+          <Button
+            variant="outline"
+            onClick={() => setActiveFilter(null)}
+          >
+            Limpiar filtro
+          </Button>
+        )}
+      </div>
 
       {/* Incident List */}
       <div className="space-y-4">
