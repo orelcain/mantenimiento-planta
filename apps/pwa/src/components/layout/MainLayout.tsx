@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard,
@@ -18,7 +18,10 @@ import {
   Cpu,
 } from 'lucide-react'
 import { Avatar, AvatarFallback, Button } from '@/components/ui'
-import { useAuthStore, useIsAdmin } from '@/store'
+import { useAuthStore, useIsAdmin, useAppStore } from '@/store'
+import { getZones } from '@/services/zones'
+import { getEquipments } from '@/services/equipment'
+import { subscribeToIncidents } from '@/services/incidents'
 import { signOut } from '@/services/auth'
 import { cn } from '@/lib/utils'
 import { HelpButton, HelpModal, WelcomeModal } from '@/components/help'
@@ -49,6 +52,7 @@ export function MainLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const { hasUpdate, newVersion, reload } = useAppVersion()
+  const { setZones, setEquipment, setIncidents } = useAppStore()
 
   const handleSignOut = async () => {
     await signOut()
@@ -63,6 +67,31 @@ export function MainLayout() {
   const allNavigation = isAdmin
     ? [...navigation, ...adminNavigation]
     : navigation
+
+  // Carga inicial de datos para el Dashboard (incidencias, equipos, zonas)
+  useEffect(() => {
+    let unsubscribe: undefined | (() => void)
+    async function init() {
+      try {
+        const [zonesData, equipmentData] = await Promise.all([
+          getZones(),
+          getEquipments(),
+        ])
+        setZones(zonesData)
+        setEquipment(equipmentData)
+      } catch (error) {
+        // Silenciar errores de carga inicial para no bloquear UI
+        console.warn('Init load error:', error)
+      }
+      unsubscribe = subscribeToIncidents((list) => setIncidents(list))
+    }
+    if (user?.id) {
+      init()
+    }
+    return () => {
+      if (unsubscribe) unsubscribe()
+    }
+  }, [user?.id, setZones, setEquipment, setIncidents])
 
   return (
     <div className="min-h-screen bg-background">
