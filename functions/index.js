@@ -263,11 +263,15 @@ exports.sendTestNotification = onCall({ region: 'us-central1' }, async (request)
   logger.info('sendTestNotification triggered', { userId, userRole: user.rol })
 
   try {
-    // Obtener todos los admins y supervisores activos
-    const supervisors = await getSupervisorsAndAdmins()
-    logger.info('Target users found', { count: supervisors.length, userIds: supervisors })
+    // Obtener TODOS los usuarios activos del sistema
+    const usersSnapshot = await db.collection('users').where('activo', '==', true).get()
+    const allUserIds = []
+    usersSnapshot.forEach((doc) => {
+      allUserIds.push(doc.id)
+    })
+    logger.info('Target users found', { count: allUserIds.length, userIds: allUserIds })
 
-    const tokens = await getTokensForUsers(supervisors)
+    const tokens = await getTokensForUsers(allUserIds)
     logger.info('Tokens found', { count: tokens.length })
 
     if (tokens.length === 0) {
