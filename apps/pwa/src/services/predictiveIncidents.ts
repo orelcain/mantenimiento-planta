@@ -94,6 +94,7 @@ export async function ensurePredictiveIncident(params: {
     status: 'pendiente',
     fotos: [],
     reportadoPor: params.reportedByUserId,
+    creadoPor: params.reportedByUserId,
     requiresValidation: true,
   })
 }

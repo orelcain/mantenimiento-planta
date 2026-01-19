@@ -198,6 +198,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId }: Incident
         status: 'pendiente',
         fotos: [],
         reportadoPor: user.id,
+        creadoPor: user.id,
         requiresValidation: true,
       }
       

@@ -132,7 +132,10 @@ export interface Incident {
   fotos: string[] // URLs de Firebase Storage
   // Asignación
   reportadoPor: string // userId
+  creadoPor: string // userId (alias de reportadoPor para claridad)
+  creadoPorNombre?: string // Nombre del usuario que creó la incidencia
   asignadoA?: string // userId
+  asignadoANombre?: string // Nombre del usuario asignado
   // Validación
   requiresValidation: boolean
   validatedBy?: string
