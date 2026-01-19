@@ -37,16 +37,18 @@ messaging.onBackgroundMessage((payload) => {
   console.log('[firebase-messaging-sw.js] Received background message:', payload)
   
   const notificationTitle = payload.notification?.title || 'Nueva notificación'
+  
+  // Usar rutas relativas simples para evitar 404
   const notificationOptions = {
     body: payload.notification?.body || '',
-    icon: `${baseUrl}icons/icon-192.svg`,
-    badge: `${baseUrl}icons/icon-192.svg`,
+    icon: './icons/icon-192.svg',
+    badge: './icons/icon-192.svg',
     tag: payload.data?.incidentId || 'general',
     data: payload.data,
     requireInteraction: true,
   }
 
-  self.registration.showNotification(notificationTitle, notificationOptions)
+  return self.registration.showNotification(notificationTitle, notificationOptions)
 })
 
 // Manejar clics en notificaciones
