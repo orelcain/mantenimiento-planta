@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.26.0**
+## Versión Actual: **v2.27.0**
 
 **Fecha de lanzamiento**: 19 de enero de 2026  \
 **Estado**: ✅ PRODUCCIÓN READY  \
@@ -9,6 +9,33 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.27.0 - Dashboard de Incidencias Interactivo + Admin Only Edit/Delete (19/01/2026)
+
+**Nuevas Funcionalidades:**
+- ✅ **Dashboard de incidencias interactivo** - Stats convertidas en filtros clickeables
+- ✅ **Cards de estado ampliadas** - Total, Pendientes, Confirmadas, Asignadas, Sin Asignar, En Proceso, Críticas, Cerradas, Rechazadas
+- ✅ **Filtro visual mejorado** - Highlight del filtro activo con color temático
+- ✅ **Botón "Limpiar filtro"** para volver a vista general
+- ✅ **Permisos restrictos** - Solo admin puede editar y eliminar incidencias
+- ✅ **Modal de edición** en IncidentForm para admin
+- ✅ **Botón "Editar"** solo visible para admin en IncidentDetail
+- ✅ **Datos IoT en modal** de incidencias - temp/hum actual, promedio, rangos warn/crit
+- ✅ **Badge "Dato simulado"** cuando fuente de sensores es simulada
+
+**Mejoras Técnicas:**
+- ✅ Permisos `canEditIncident` restricto solo a admin
+- ✅ IncidentForm soporta modo edición con props `incident`
+- ✅ Fetch one-shot de sensores: `fetchSensorSummaryOnce()` y `fetchLastSensorReadings()`
+- ✅ Fix JSX fragments en DashboardPage (cajas críticas)
+- ✅ Limpieza de imports no utilizados en IncidentsPage
+
+**Bug Fixes:**
+- ✅ Fix referencias indefinidas a `filterStatus`/`filterPriority`
+- ✅ Fix pantalla negra al no haber incidencias en filtro
+- ✅ Fix mensaje dinámico en "Sin resultados"
+
+---
 
 ### v2.26.0 - Sensores Dashboard + Mis Incidencias Mejorado (19/01/2026)
 
