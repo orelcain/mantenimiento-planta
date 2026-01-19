@@ -22,7 +22,7 @@ import { formatRelativeTime } from '@/lib/utils'
 export function DashboardPage() {
   const navigate = useNavigate()
   const user = useAuthStore((state) => state.user)
-  const { incidents, equipment, zones } = useAppStore()
+  const { incidents, equipment, zones, setSelectedIncident } = useAppStore()
 
   // Estadísticas
   const stats = {
@@ -80,7 +80,10 @@ export function DashboardPage() {
                 <div
                   key={incident.id}
                   className="flex items-center justify-between p-2 bg-card rounded cursor-pointer hover:bg-muted"
-                  onClick={() => navigate('/incidents')}
+                  onClick={() => {
+                    setSelectedIncident(incident)
+                    navigate('/incidents')
+                  }}
                 >
                   <div className="flex items-center gap-2">
                     <AlertTriangle className="h-4 w-4 text-destructive" />
@@ -205,7 +208,10 @@ export function DashboardPage() {
                   <div
                     key={incident.id}
                     className="flex items-center gap-4 cursor-pointer hover:bg-muted p-2 rounded -mx-2"
-                    onClick={() => navigate('/incidents')}
+                    onClick={() => {
+                      setSelectedIncident(incident)
+                      navigate('/incidents')
+                    }}
                   >
                     <div
                       className={`w-2 h-2 rounded-full ${
