@@ -14,78 +14,125 @@ import { logger } from '@/lib/logger'
  */
 export async function requestNotificationPermission(userId: string): Promise<string | null> {
   try {
+    logger.info('🔔 Starting notification request process')
+    
+    // Verificar soporte
+    if (!('Notification' in window)) {
+      logger.error('❌ Notifications not supported by browser')
+      return null
+    }
+
+    logger.info('✅ Notifications supported, current permission:', { permission: Notification.permission })
+
     const messaging = await getMessagingInstance()
     
     if (!messaging) {
-      logger.warn('Messaging not supported')
+      logger.error('❌ Messaging not supported')
       return null
     }
 
-    // Solicitar permiso
+    logger.info('✅ Messaging instance obtained')
+
+    // Si ya tiene permiso, solo obtener token
+    if (Notification.permission === 'granted') {
+      logger.info('✅ Notification permission already granted, skipping browser prompt')
+      try {
+        const registration = await navigator.serviceWorker.register(
+          `${import.meta.env.BASE_URL}firebase-messaging-sw.js`,
+          { scope: import.meta.env.BASE_URL }
+        )
+        logger.info('✅ SW registered (already granted)')
+        
+        const token = await getToken(messaging, { 
+          serviceWorkerRegistration: registration,
+          vapidKey: 'BB2ESVcTn4BvFVxnGpIuZsGTRpNgQMeS-4LBQ4QQHQiBrWEb-ZK7zglHTEfc5eJBQZv1MlBsvAKZfCSVMOavCz2o'
+        })
+        logger.info('✅ Token obtained (already granted)')
+        
+        await setDoc(doc(db, 'fcmTokens', token), {
+          token,
+          userId,
+          updatedAt: serverTimestamp(),
+          platform: navigator.userAgent.includes('Mobile') ? 'mobile' : 'desktop',
+        })
+        
+        localStorage.setItem('fcm_token', token)
+        logger.info('✅ Token saved to Firestore and localStorage')
+        return token
+      } catch (error) {
+        logger.error('❌ Error getting token (already granted):', error instanceof Error ? error.message : String(error))
+        return null
+      }
+    }
+
+    // Solicitar permiso (esto DEBE mostrar popup del navegador)
+    logger.info('🔔 Requesting notification permission from browser...')
     const permission = await Notification.requestPermission()
-    logger.info('Permission result:', { permission })
+    logger.info('📋 Permission result:', { permission })
     
     if (permission !== 'granted') {
-      logger.warn('Permission denied')
+      logger.warn('❌ Permission denied or dismissed by user')
       return null
     }
 
+    logger.info('✅ Permission granted!')
+
     // Registrar SW
-    const registration = await navigator.serviceWorker.register(
-      `${import.meta.env.BASE_URL}firebase-messaging-sw.js`,
-      { scope: import.meta.env.BASE_URL }
-    )
-    logger.info('SW registered')
-
-    // Intentar obtener token SIN VAPID key primero
+    logger.info('🔧 Registering Service Worker...')
     try {
-      const token = await getToken(messaging, { serviceWorkerRegistration: registration })
-      logger.info('✅ Token obtained (no VAPID):', { preview: token.substring(0, 20) })
-      
-      // Guardar token
-      await setDoc(doc(db, 'fcmTokens', token), {
-        token,
-        userId,
-        updatedAt: serverTimestamp(),
-        platform: navigator.userAgent.includes('Mobile') ? 'mobile' : 'desktop',
-      })
+      const registration = await navigator.serviceWorker.register(
+        `${import.meta.env.BASE_URL}firebase-messaging-sw.js`,
+        { scope: import.meta.env.BASE_URL }
+      )
+      logger.info('✅ SW registered successfully')
+    } catch (swError) {
+      logger.error('⚠️ SW registration failed (continuing anyway):', swError instanceof Error ? swError.message : String(swError))
+    }
 
-      localStorage.setItem('fcm_token', token)
-      logger.info('✅ Token guardado en localStorage y Firestore')
-      logger.info('📱 Verificación:', { 
-        tokenLength: token.length,
-        inLocalStorage: localStorage.getItem('fcm_token') !== null,
-        areEnabled: areNotificationsEnabled()
-      })
-      return token
-    } catch (error) {
-      logger.warn('Failed without VAPID, trying with VAPID key...')
-      
-      // Fallback con VAPID key
+    // Obtener token
+    logger.info('🔑 Getting FCM token...')
+    try {
+      const registration = await navigator.serviceWorker.ready
       const token = await getToken(messaging, {
         vapidKey: 'BB2ESVcTn4BvFVxnGpIuZsGTRpNgQMeS-4LBQ4QQHQiBrWEb-ZK7zglHTEfc5eJBQZv1MlBsvAKZfCSVMOavCz2o',
         serviceWorkerRegistration: registration
       })
-      logger.info('✅ Token obtained (with VAPID):', { preview: token.substring(0, 20) })
+      logger.info('✅ Token obtained:', { preview: token.substring(0, 20) + '...', length: token.length })
       
+      // Guardar token en Firestore
+      logger.info('💾 Saving token to Firestore...')
       await setDoc(doc(db, 'fcmTokens', token), {
         token,
         userId,
         updatedAt: serverTimestamp(),
         platform: navigator.userAgent.includes('Mobile') ? 'mobile' : 'desktop',
       })
+      logger.info('✅ Token saved to Firestore')
 
+      // Guardar token en localStorage
       localStorage.setItem('fcm_token', token)
-      logger.info('✅ Token guardado en localStorage y Firestore (VAPID)')
-      logger.info('📱 Verificación:', { 
+      logger.info('✅ Token saved to localStorage')
+      
+      logger.info('📱 Final verification:', { 
         tokenLength: token.length,
         inLocalStorage: localStorage.getItem('fcm_token') !== null,
-        areEnabled: areNotificationsEnabled()
+        notificationsEnabled: areNotificationsEnabled(),
+        permission: Notification.permission
       })
+      
       return token
+    } catch (tokenError) {
+      logger.error('❌ Failed to get token:', tokenError instanceof Error ? tokenError.message : String(tokenError))
+      if (tokenError instanceof Error) {
+        logger.error('❌ Token error details:', { name: tokenError.name, stack: tokenError.stack })
+      }
+      return null
     }
   } catch (error) {
-    logger.error('❌ Error:', error instanceof Error ? error.message : String(error))
+    logger.error('❌ Unexpected error in requestNotificationPermission:', error instanceof Error ? error.message : String(error))
+    if (error instanceof Error) {
+      logger.error('❌ Error details:', { name: error.name, stack: error.stack })
+    }
     return null
   }
 }
