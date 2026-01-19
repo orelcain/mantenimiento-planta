@@ -1,4 +1,5 @@
 const { onDocumentCreated, onDocumentUpdated } = require('firebase-functions/v2/firestore')
+const { onCall } = require('firebase-functions/v2/https')
 const { logger } = require('firebase-functions')
 const { initializeApp } = require('firebase-admin/app')
 const { getFirestore } = require('firebase-admin/firestore')
@@ -242,7 +243,67 @@ exports.onIncidentUpdated = onDocumentUpdated('incidents/{incidentId}', async (e
 })
 
 /**
- * 3. Nueva tarea preventiva → Notificar asignado + supervisores/admins
+ * 5. Notificación de prueba (manual) - Enviar a todos los admins y supervisores
+ */
+exports.sendTestNotification = onCall({ region: 'us-central1' }, async (request) => {
+  const userId = request.auth?.uid
+
+  if (!userId) {
+    throw new functions.https.HttpsError('unauthenticated', 'User not authenticated')
+  }
+
+  // Verificar que el usuario es admin
+  const userSnap = await db.collection('users').doc(userId).get()
+  const user = userSnap.data()
+
+  if (!user || !['admin', 'supervisor'].includes(user.rol)) {
+    throw new functions.https.HttpsError('permission-denied', 'Only admins and supervisors can send test notifications')
+  }
+
+  logger.info('sendTestNotification triggered', { userId, userRole: user.rol })
+
+  try {
+    // Obtener todos los admins y supervisores activos
+    const supervisors = await getSupervisorsAndAdmins()
+    logger.info('Target users found', { count: supervisors.length, userIds: supervisors })
+
+    const tokens = await getTokensForUsers(supervisors)
+    logger.info('Tokens found', { count: tokens.length })
+
+    if (tokens.length === 0) {
+      logger.warn('No tokens to send test notification')
+      return { success: true, message: 'No tokens available', count: 0 }
+    }
+
+    const title = '🧪 Notificación de prueba'
+    const body = `Enviada por ${user.nombre} ${user.apellido} - Sistema funcionando correctamente`
+
+    const response = await sendNotification(tokens, title, body, {
+      type: 'TEST_NOTIFICATION',
+      sentBy: userId,
+      sentAt: new Date().toISOString(),
+      url: `/mantenimiento-planta/settings`,
+    })
+
+    logger.info('Test notification sent successfully', {
+      successCount: response.successCount,
+      failureCount: response.failureCount,
+    })
+
+    return {
+      success: true,
+      message: 'Test notification sent',
+      sent: response.successCount,
+      failed: response.failureCount,
+    }
+  } catch (error) {
+    logger.error('Error sending test notification', error)
+    throw new functions.https.HttpsError('internal', 'Failed to send test notification')
+  }
+})
+
+/**
+ * 5. Notificación de prueba (manual) - Enviar a todos los admins y supervisores
  */
 exports.onPreventiveTaskCreated = onDocumentCreated('preventiveTasks/{taskId}', async (event) => {
   const task = event.data?.data()

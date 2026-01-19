@@ -105,7 +105,7 @@ export function PreventivePage() {
     ]
     const result: Record<string, string> = {}
     technicians.forEach((tech, index) => {
-      result[tech.id] = colors[index % colors.length]
+      result[tech.id] = colors[index % colors.length] ?? '#3b82f6'
     })
     return result
   }, [technicians])

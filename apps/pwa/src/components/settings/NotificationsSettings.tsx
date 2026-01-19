@@ -3,9 +3,13 @@
  * Permite activar/desactivar notificaciones y probar el sistema
  */
 
-import { Bell, BellOff, AlertCircle, CheckCircle, Loader2 } from 'lucide-react'
+import { useState } from 'react'
+import { Bell, BellOff, AlertCircle, CheckCircle, Loader2, Send } from 'lucide-react'
 import { Card, CardContent, Button, Badge } from '@/components/ui'
 import { useNotifications } from '@/hooks/useNotifications'
+import { useIsAdmin } from '@/store'
+import { sendTestNotification } from '@/services/test-notifications'
+import { logger } from '@/lib/logger'
 
 export function NotificationsSettings() {
   const {
@@ -17,6 +21,24 @@ export function NotificationsSettings() {
     revokePermission,
     showTestNotification,
   } = useNotifications()
+  
+  const isAdmin = useIsAdmin()
+  const [isSendingTest, setIsSendingTest] = useState(false)
+
+  const handleSendTestNotification = async () => {
+    setIsSendingTest(true)
+    try {
+      const result = await sendTestNotification()
+      logger.info('✅ Test notification sent:', result)
+      // Mostrar un toast o alert de éxito
+      alert(`✅ Notificación enviada a ${result.sent} dispositivos${result.failed > 0 ? ` (${result.failed} fallidas)` : ''}`)
+    } catch (error) {
+      logger.error('❌ Error sending test notification:', error)
+      alert('❌ Error al enviar notificación de prueba')
+    } finally {
+      setIsSendingTest(false)
+    }
+  }
 
   return (
     <Card>
@@ -92,12 +114,12 @@ export function NotificationsSettings() {
         </div>
 
         {/* Botones de acción */}
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           {canRequest && (
             <Button
               onClick={requestPermission}
               disabled={isLoading}
-              className="flex-1"
+              className="flex-1 min-w-[150px]"
             >
               {isLoading ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -116,8 +138,23 @@ export function NotificationsSettings() {
                 disabled={isLoading}
               >
                 <Bell className="h-4 w-4 mr-2" />
-                Probar
+                Probar local
               </Button>
+              {isAdmin && (
+                <Button
+                  variant="default"
+                  onClick={handleSendTestNotification}
+                  disabled={isSendingTest}
+                  className="gap-2"
+                >
+                  {isSendingTest ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4" />
+                  )}
+                  Enviar a todos (Admin)
+                </Button>
+              )}
               <Button
                 variant="outline"
                 onClick={revokePermission}

@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.24.1**
+## Versión Actual: **v2.25.0**
 
 **Fecha de lanzamiento**: 18 de enero de 2026  \
 **Estado**: ✅ PRODUCCIÓN READY  \
@@ -9,6 +9,26 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.25.0 - Notificaciones Test Admin + Sensores Dashboard (18/01/2026)
+
+**Nuevas Funcionalidades:**
+- ✅ **Botón test notificaciones para admins** - envía push FCM real a todos los supervisores/admins
+- ✅ **Sensores Dashboard reorganizado** en 2 columnas con estadísticas
+- ✅ **Cards separadas** para Telemetría, Emparejar y WiFi AP
+- ✅ **Device list mejorada** mostrando deviceName, apSsid e IP
+- ✅ **Función eliminar dispositivos duplicados** en Firebase RTDB
+
+**Mejoras Técnicas:**
+- ✅ Cloud Function `sendTestNotification` con auth y role check
+- ✅ Service `test-notifications.ts` para llamar Cloud Function
+- ✅ NotificationsSettings UI con botón admin-only
+- ✅ Fix detección real-time sin throttling en sensores
+- ✅ Fix propagación de eventos en botón eliminar
+- ✅ Fix imports `onCall` desde `firebase-functions/v2/https`
+- ✅ Fix tipo en `technicianColors` con fallback `?? '#3b82f6'`
+
+---
 
 ### v2.24.1 - Fix Select Preventivo (18/01/2026)
 

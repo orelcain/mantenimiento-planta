@@ -282,12 +282,17 @@ service cloud.firestore {
       allow create: if (isAdmin() || isSupervisor())
         && isValidDocSize()
         && isNonEmptyString(request.resource.data.nombre, 5, 100)
-        && isNonEmptyString(request.resource.data.descripcion, 10, 500)
+        // Descripción opcional; si viene, validar longitud razonable
+        && (!('descripcion' in request.resource.data) || isNonEmptyString(request.resource.data.descripcion, 5, 1000))
         && request.resource.data.equipmentId is string
         && request.resource.data.frecuenciaDias is int
         && request.resource.data.frecuenciaDias > 0
         && request.resource.data.frecuenciaDias <= 365
-        && request.resource.data.activa is bool
+        // Compatibilidad: el frontend usa "activo" pero se admite también "activa"
+        && (
+          ('activo' in request.resource.data && request.resource.data.activo is bool)
+          || ('activa' in request.resource.data && request.resource.data.activa is bool)
+        )
         && request.resource.data.createdAt is timestamp
         && request.resource.data.proximaEjecucion is timestamp
         && isFutureTimestamp(request.resource.data.proximaEjecucion)
