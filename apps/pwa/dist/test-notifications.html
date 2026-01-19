@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test Notificaciones - Firebase</title>
+  <style>
+    body {
+      font-family: monospace;
+      padding: 20px;
+      background: #1a1a1a;
+      color: #fff;
+    }
+    button {
+      padding: 10px 20px;
+      margin: 10px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    .status {
+      margin: 10px 0;
+      padding: 10px;
+      border-left: 4px solid #4CAF50;
+      background: #2a2a2a;
+    }
+    .error {
+      border-left-color: #f44336;
+    }
+    .success {
+      border-left-color: #4CAF50;
+    }
+  </style>
+</head>
+<body>
+  <h1>🔔 Test Sistema de Notificaciones</h1>
+  
+  <button onclick="testStep1()">1. Verificar soporte</button>
+  <button onclick="testStep2()">2. Solicitar permiso</button>
+  <button onclick="testStep3()">3. Obtener token (sin VAPID)</button>
+  <button onclick="testStep4()">4. Obtener token (con VAPID)</button>
+  <button onclick="testStep5()">5. Mostrar notificación test</button>
+  
+  <div id="log"></div>
+
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js'
+    import { getMessaging, getToken, onMessage } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging.js'
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBsJSh6x3ZGEyuXsM18dSWsJKyU7--KJss",
+      authDomain: "mantenimiento-planta-771a3.firebaseapp.com",
+      projectId: "mantenimiento-planta-771a3",
+      storageBucket: "mantenimiento-planta-771a3.firebasestorage.app",
+      messagingSenderId: "1019421112530",
+      appId: "1:1019421112530:web:9afd9962e0b53152f8d50b",
+    }
+
+    const app = initializeApp(firebaseConfig)
+    let messaging = null
+
+    function log(message, isError = false) {
+      const div = document.createElement('div')
+      div.className = 'status ' + (isError ? 'error' : 'success')
+      div.textContent = new Date().toLocaleTimeString() + ' - ' + message
+      document.getElementById('log').prepend(div)
+      console.log(message)
+    }
+
+    window.testStep1 = async () => {
+      log('📋 Verificando soporte...')
+      
+      if (!('Notification' in window)) {
+        log('❌ Notification API no soportada', true)
+        return
+      }
+      log('✅ Notification API soportada')
+      
+      if (!('serviceWorker' in navigator)) {
+        log('❌ Service Workers no soportados', true)
+        return
+      }
+      log('✅ Service Workers soportados')
+      
+      try {
+        messaging = getMessaging(app)
+        log('✅ Firebase Messaging inicializado')
+      } catch (error) {
+        log('❌ Error inicializando Messaging: ' + error.message, true)
+      }
+    }
+
+    window.testStep2 = async () => {
+      log('📋 Solicitando permiso...')
+      
+      const permission = await Notification.requestPermission()
+      log('Permiso: ' + permission)
+      
+      if (permission === 'granted') {
+        log('✅ Permiso concedido')
+      } else {
+        log('❌ Permiso denegado', true)
+      }
+    }
+
+    window.testStep3 = async () => {
+      log('📋 Obteniendo token SIN VAPID key...')
+      
+      if (!messaging) {
+        log('❌ Primero ejecuta paso 1', true)
+        return
+      }
+      
+      try {
+        // Registrar SW manualmente
+        const registration = await navigator.serviceWorker.register('/mantenimiento-planta/firebase-messaging-sw.js')
+        log('✅ Service Worker registrado')
+        
+        const token = await getToken(messaging, { serviceWorkerRegistration: registration })
+        log('✅ TOKEN OBTENIDO (sin VAPID): ' + token.substring(0, 30) + '...')
+        navigator.clipboard.writeText(token)
+        log('📋 Token copiado al portapapeles')
+      } catch (error) {
+        log('❌ Error: ' + error.message, true)
+        log('Detalles: ' + error.code, true)
+      }
+    }
+
+    window.testStep4 = async () => {
+      log('📋 Obteniendo token CON VAPID key...')
+      
+      if (!messaging) {
+        log('❌ Primero ejecuta paso 1', true)
+        return
+      }
+      
+      try {
+        const registration = await navigator.serviceWorker.register('/mantenimiento-planta/firebase-messaging-sw.js')
+        
+        const token = await getToken(messaging, {
+          vapidKey: 'BB2ESVcTn4BvFVxnGpIuZsGTRpNgQMeS-4LBQ4QQHQiBrWEb-ZK7zglHTEfc5eJBQZv1MlBsvAKZfCSVMOavCz2o',
+          serviceWorkerRegistration: registration
+        })
+        log('✅ TOKEN OBTENIDO (con VAPID): ' + token.substring(0, 30) + '...')
+        navigator.clipboard.writeText(token)
+        log('📋 Token copiado al portapapeles')
+      } catch (error) {
+        log('❌ Error: ' + error.message, true)
+        log('Detalles: ' + error.code, true)
+      }
+    }
+
+    window.testStep5 = () => {
+      log('📋 Mostrando notificación test...')
+      
+      if (Notification.permission !== 'granted') {
+        log('❌ Permiso no concedido', true)
+        return
+      }
+      
+      new Notification('🔔 Test Exitoso', {
+        body: 'Las notificaciones locales funcionan correctamente',
+        icon: '/mantenimiento-planta/icons/icon-192.svg'
+      })
+      
+      log('✅ Notificación mostrada')
+    }
+
+    // Log inicial
+    log('🚀 Sistema de pruebas cargado')
+    log('👉 Ejecuta los pasos en orden')
+  </script>
+</body>
+</html>
