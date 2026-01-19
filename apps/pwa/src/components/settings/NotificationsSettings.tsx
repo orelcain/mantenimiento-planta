@@ -30,11 +30,32 @@ export function NotificationsSettings() {
     try {
       const result = await sendTestNotification()
       logger.info('✅ Test notification sent:', result)
-      // Mostrar un toast o alert de éxito
-      alert(`✅ Notificación enviada a ${result.sent} dispositivos${result.failed > 0 ? ` (${result.failed} fallidas)` : ''}`)
+      
+      // Construir mensaje detallado
+      let mensaje = `✅ Notificación enviada por: ${result.emisario}\n\n`
+      mensaje += `📤 Enviadas exitosamente: ${result.sent}\n`
+      
+      if (result.destinatarios && result.destinatarios.length > 0) {
+        mensaje += `\n👥 Recibieron (${result.destinatarios.length}):\n`
+        mensaje += result.destinatarios.map(d => `  • ${d}`).join('\n')
+      }
+      
+      if (result.failed > 0) {
+        mensaje += `\n\n❌ Fallidas: ${result.failed}\n`
+        if (result.fallidos && result.fallidos.length > 0) {
+          mensaje += result.fallidos.map(f => `  • ${f.nombre}: ${f.razon}`).join('\n')
+        }
+      }
+      
+      if (result.sinToken && result.sinToken.length > 0) {
+        mensaje += `\n\n⚠️ Sin notificaciones activadas (${result.sinToken.length}):\n`
+        mensaje += result.sinToken.map(u => `  • ${u}`).join('\n')
+      }
+      
+      alert(mensaje)
     } catch (error) {
       logger.error('❌ Error sending test notification:', error)
-      alert('❌ Error al enviar notificación de prueba')
+      alert('❌ Error al enviar notificación de prueba. Verifica la consola para más detalles.')
     } finally {
       setIsSendingTest(false)
     }

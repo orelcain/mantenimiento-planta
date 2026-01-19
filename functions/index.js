@@ -243,7 +243,7 @@ exports.onIncidentUpdated = onDocumentUpdated('incidents/{incidentId}', async (e
 })
 
 /**
- * 5. Notificación de prueba (manual) - Enviar a todos los admins y supervisores
+ * 5. Notificación de prueba (manual) - Enviar a todos los usuarios activos
  */
 exports.sendTestNotification = onCall({ region: 'us-central1' }, async (request) => {
   const userId = request.auth?.uid
@@ -263,42 +263,130 @@ exports.sendTestNotification = onCall({ region: 'us-central1' }, async (request)
   logger.info('sendTestNotification triggered', { userId, userRole: user.rol })
 
   try {
-    // Obtener TODOS los usuarios activos del sistema
+    // Obtener TODOS los usuarios activos del sistema con sus datos
     const usersSnapshot = await db.collection('users').where('activo', '==', true).get()
+    const usersMap = new Map()
     const allUserIds = []
+    
     usersSnapshot.forEach((doc) => {
+      const userData = doc.data()
       allUserIds.push(doc.id)
+      usersMap.set(doc.id, {
+        id: doc.id,
+        nombre: userData.nombre || 'Usuario',
+        apellido: userData.apellido || '',
+        email: userData.email || ''
+      })
     })
-    logger.info('Target users found', { count: allUserIds.length, userIds: allUserIds })
+    
+    logger.info('Target users found', { count: allUserIds.length })
 
-    const tokens = await getTokensForUsers(allUserIds)
-    logger.info('Tokens found', { count: tokens.length })
+    // Obtener tokens de FCM por usuario
+    const tokensSnapshot = await db.collection('fcmTokens').get()
+    const userTokensMap = new Map() // userId -> [tokens]
+    
+    tokensSnapshot.forEach((doc) => {
+      const data = doc.data()
+      if (data?.userId && data?.token && allUserIds.includes(data.userId)) {
+        if (!userTokensMap.has(data.userId)) {
+          userTokensMap.set(data.userId, [])
+        }
+        userTokensMap.get(data.userId).push(data.token)
+      }
+    })
 
-    if (tokens.length === 0) {
+    // Recopilar todos los tokens
+    const allTokens = []
+    userTokensMap.forEach(tokens => allTokens.push(...tokens))
+    
+    logger.info('Tokens found', { count: allTokens.length, usersWithTokens: userTokensMap.size })
+
+    if (allTokens.length === 0) {
       logger.warn('No tokens to send test notification')
-      return { success: true, message: 'No tokens available', count: 0 }
+      
+      const usersWithoutTokens = allUserIds.filter(uid => !userTokensMap.has(uid))
+      const noTokensDetails = usersWithoutTokens.map(uid => {
+        const u = usersMap.get(uid)
+        return `${u.nombre} ${u.apellido}`.trim()
+      })
+      
+      return { 
+        success: true, 
+        message: 'No hay tokens disponibles',
+        emisario: `${user.nombre} ${user.apellido}`.trim(),
+        sent: 0,
+        failed: 0,
+        destinatarios: [],
+        sinToken: noTokensDetails
+      }
     }
 
     const title = '🧪 Notificación de prueba'
-    const body = `Enviada por ${user.nombre} ${user.apellido} - Sistema funcionando correctamente`
+    const emisarioName = `${user.nombre} ${user.apellido}`.trim()
+    const body = `Enviada por ${emisarioName} - Sistema funcionando correctamente`
 
-    const response = await sendNotification(tokens, title, body, {
+    const response = await sendNotification(allTokens, title, body, {
       type: 'TEST_NOTIFICATION',
       sentBy: userId,
+      sentByName: emisarioName,
       sentAt: new Date().toISOString(),
       url: `/mantenimiento-planta/settings`,
     })
 
-    logger.info('Test notification sent successfully', {
+    logger.info('Test notification sent', {
       successCount: response.successCount,
       failureCount: response.failureCount,
     })
 
+    // Identificar usuarios que recibieron y los que fallaron
+    const destinatariosExitosos = []
+    const destinatariosFallidos = []
+    const sinToken = []
+    
+    // Procesar respuestas individuales
+    const failedTokens = new Set()
+    response.responses.forEach((res, idx) => {
+      if (!res.success) {
+        failedTokens.add(allTokens[idx])
+      }
+    })
+
+    // Clasificar usuarios
+    userTokensMap.forEach((tokens, uid) => {
+      const u = usersMap.get(uid)
+      const userName = `${u.nombre} ${u.apellido}`.trim()
+      
+      const hasFailed = tokens.some(t => failedTokens.has(t))
+      const hasSuccess = tokens.some(t => !failedTokens.has(t))
+      
+      if (hasSuccess) {
+        destinatariosExitosos.push(userName)
+      }
+      if (hasFailed) {
+        destinatariosFallidos.push({
+          nombre: userName,
+          razon: 'Token inválido o expirado'
+        })
+      }
+    })
+
+    // Usuarios sin token
+    allUserIds.forEach(uid => {
+      if (!userTokensMap.has(uid)) {
+        const u = usersMap.get(uid)
+        sinToken.push(`${u.nombre} ${u.apellido}`.trim())
+      }
+    })
+
     return {
       success: true,
-      message: 'Test notification sent',
+      message: 'Notificación enviada',
+      emisario: emisarioName,
       sent: response.successCount,
       failed: response.failureCount,
+      destinatarios: destinatariosExitosos,
+      fallidos: destinatariosFallidos,
+      sinToken: sinToken
     }
   } catch (error) {
     logger.error('Error sending test notification', error)

@@ -11,8 +11,12 @@ const functions = getFunctions()
 export async function sendTestNotification(): Promise<{
   success: boolean
   message: string
+  emisario: string
   sent: number
   failed: number
+  destinatarios: string[]
+  fallidos: { nombre: string; razon: string }[]
+  sinToken: string[]
 }> {
   try {
     logger.info('🧪 Calling sendTestNotification...')
