@@ -1,10 +1,11 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Plus, Search, AlertTriangle } from 'lucide-react'
+import { Plus, Search, AlertTriangle, Clock, CheckCircle, XCircle, User } from 'lucide-react'
 import {
   Card,
   CardContent,
   Button,
   Input,
+  Badge,
 } from '@/components/ui'
 import { useAppStore, useCanValidateIncidents } from '@/store'
 import { subscribeToIncidents } from '@/services/incidents'
@@ -31,7 +32,6 @@ const PRIORITY_CONFIG: Record<IncidentPriority, { label: string; className: stri
 
 export function IncidentsPage() {
   const canValidate = useCanValidateIncidents()
-  const user = useAuthStore((state) => state.user)
   const { incidents, setIncidents, selectedIncident, setSelectedIncident } = useAppStore()
   
   const [showForm, setShowForm] = useState(false)
