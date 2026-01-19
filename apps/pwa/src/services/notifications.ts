@@ -49,7 +49,7 @@ export async function requestNotificationPermission(userId: string): Promise<str
         
         const token = await getToken(messaging, { 
           serviceWorkerRegistration: registration,
-          vapidKey: 'BB2ESVcTn4BvFVxnGpIuZsGTRpNgQMeS-4LBQ4QQHQiBrWEb-ZK7zglHTEfc5eJBQZv1MlBsvAKZfCSVMOavCz2o'
+          vapidKey: 'BPZESYrTn48vEfVxnGp1uZsGTBoNgQMcS-4LB040Oh08rWlPbZK7zgHTEfc5sJBQZvtMiBsvAKZfCSVM0avCz2o'
         })
         logger.info('✅ Token obtained (already granted)')
         
@@ -128,7 +128,7 @@ export async function requestNotificationPermission(userId: string): Promise<str
       
       logger.info('📥 Calling getToken with VAPID key...')
       const token = await getToken(messaging, {
-        vapidKey: 'BB2ESVcTn4BvFVxnGpIuZsGTRpNgQMeS-4LBQ4QQHQiBrWEb-ZK7zglHTEfc5eJBQZv1MlBsvAKZfCSVMOavCz2o',
+        vapidKey: 'BPZESYrTn48vEfVxnGp1uZsGTBoNgQMcS-4LB040Oh08rWlPbZK7zgHTEfc5sJBQZvtMiBsvAKZfCSVM0avCz2o',
         serviceWorkerRegistration: swRegistration
       })
       

@@ -22,7 +22,7 @@ export function debugFirebaseConfig() {
 }
 
 export function debugVAPIDKey() {
-  const vapidKey = 'BB2ESVcTn4BvFVxnGpIuZsGTRpNgQMeS-4LBQ4QQHQiBrWEb-ZK7zglHTEfc5eJBQZv1MlBsvAKZfCSVMOavCz2o'
+  const vapidKey = 'BPZESYrTn48vEfVxnGp1uZsGTBoNgQMcS-4LB040Oh08rWlPbZK7zgHTEfc5sJBQZvtMiBsvAKZfCSVM0avCz2o'
   
   console.group('🔑 VAPID Key Debug')
   console.log('Key length:', vapidKey.length)
