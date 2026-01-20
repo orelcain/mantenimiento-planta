@@ -16,7 +16,6 @@ import {
   EquipmentPage,
   PredictivePage,
   RepuestosDashboard,
-  CatalogoBases,
 } from '@/pages'
 
 // Code Splitting: Lazy load para páginas pesadas o menos usadas
@@ -169,7 +168,6 @@ export function App() {
             } />
             <Route path="equipment" element={<EquipmentPage />} />
             <Route path="repuestos" element={<RepuestosDashboard />} />
-            <Route path="repuestos/bases" element={<CatalogoBases />} />
             <Route path="predictive" element={<PredictivePage />} />
             <Route path="sensors" element={
               <Suspense fallback={<LoadingScreen />}>

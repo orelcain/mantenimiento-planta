@@ -399,5 +399,32 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow write: if isAdmin();
     }
+
+    // ============================================
+    // REPUESTOS - MÁQUINAS
+    // ============================================
+    match /machines/{machineId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
+
+      // Repuestos por máquina
+      match /repuestos/{repuestoId} {
+        allow read: if isAuthenticated();
+        allow create, update, delete: if isAuthenticated();
+      }
+    }
+
+    // ============================================
+    // CATÁLOGO DE BASES - MOTORES Y BOMBAS
+    // ============================================
+    match /plantAssets/{assetId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAuthenticated();
+    }
+
+    match /plantMaps/{mapId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
+    }
   }
 }
