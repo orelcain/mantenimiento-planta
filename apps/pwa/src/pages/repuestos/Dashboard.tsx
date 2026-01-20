@@ -5,6 +5,7 @@ import { RepuestoFormModal } from '@/components/repuestos/RepuestoForm'
 import { RepuestosFilters } from '@/components/repuestos/RepuestosFilters'
 import { RepuestosPagination } from '@/components/repuestos/RepuestosPagination'
 import { EmptyState } from '@/components/repuestos/EmptyState'
+import { CategorySelector } from '@/components/repuestos/CategorySelector'
 import { MachineSelector } from '@/components/repuestos/MachineSelector'
 import { RepuestoPhotosModal } from '@/components/repuestos/RepuestoPhotosModal'
 import { RepuestoManualModal } from '@/components/repuestos/RepuestoManualModal'
@@ -65,6 +66,9 @@ export function RepuestosDashboard() {
   const [manualModal, setManualModal] = useState<Repuesto | null>(null)
   const [historyModal, setHistoryModal] = useState<Repuesto | null>(null)
 
+  // Filtro de categorías
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null)
+
   // Filtros y paginación
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedTags, setSelectedTags] = useState<string[]>([])
@@ -85,6 +89,18 @@ export function RepuestosDashboard() {
   } = useRepuestos(currentMachine?.id || 'baader-200')
 
   const { tags, loading: tagsLoading, error: tagsError } = useTags(repuestos, currentMachine?.id || 'baader-200')
+
+  // Calcular conteos de máquinas por categoría
+  const machineCountsByCategory = useMemo(() => {
+    const counts: Record<string, number> = {}
+    machines.forEach((machine) => {
+      if (machine.activa) {
+        const categoryId = machine.categoryId || 'sin-categoria'
+        counts[categoryId] = (counts[categoryId] || 0) + 1
+      }
+    })
+    return counts
+  }, [machines])
 
   // Filtrar repuestos
   const filteredRepuestos = useMemo(() => {
@@ -304,8 +320,18 @@ export function RepuestosDashboard() {
 
   return (
     <div className="flex flex-col h-full">
+      {/* Category Selector Tabs */}
+      <CategorySelector
+        selectedCategoryId={selectedCategoryId}
+        onSelectCategory={setSelectedCategoryId}
+        machineCountsByCategory={machineCountsByCategory}
+      />
+
       {/* Machine Selector Tabs */}
-      <MachineSelector repuestosCounts={repuestosCounts} />
+      <MachineSelector
+        repuestosCounts={repuestosCounts}
+        selectedCategoryId={selectedCategoryId}
+      />
 
       <div className="flex-1 p-6 space-y-6">
         {/* Header */}

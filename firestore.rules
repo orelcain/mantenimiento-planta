@@ -401,6 +401,14 @@ service cloud.firestore {
     }
 
     // ============================================
+    // REPUESTOS - CATEGORÍAS DE MÁQUINAS
+    // ============================================
+    match /machineCategories/{categoryId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ============================================
     // REPUESTOS - MÁQUINAS
     // ============================================
     match /machines/{machineId} {

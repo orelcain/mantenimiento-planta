@@ -69,7 +69,6 @@ const TagsBadge = ({ tags }: { tags: (string | TagAsignado)[] }) => {
 export function RepuestosTable({
   repuestos,
   loading,
-  machineId,
   onEdit,
   onDelete,
   onViewManual,
@@ -126,7 +125,6 @@ export function RepuestosTable({
                   onViewManual={onViewManual}
                   onViewPhotos={onViewPhotos}
                   onViewHistory={onViewHistory}
-                  isCompact={false}
                 />
               </td>
             </tr>

@@ -6,7 +6,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  Button,
 } from '@/components/ui'
 
 interface RepuestoPhotosModalProps {
@@ -31,7 +30,7 @@ export function RepuestoPhotosModal({
     if (photo.url) {
       const a = document.createElement('a')
       a.href = photo.url
-      a.download = photo.nombre || 'foto'
+      a.download = photo.url?.split('/').pop() || 'foto'
       a.click()
     }
   }
@@ -59,7 +58,7 @@ export function RepuestoPhotosModal({
                       {foto.url ? (
                         <img
                           src={foto.url}
-                          alt={foto.nombre || `Foto ${idx + 1}`}
+                          alt={`Foto ${idx + 1}`}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                         />
                       ) : (
@@ -90,7 +89,7 @@ export function RepuestoPhotosModal({
                       {img.url ? (
                         <img
                           src={img.url}
-                          alt={img.nombre || `Imagen ${idx + 1}`}
+                          alt={`Imagen ${idx + 1}`}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                         />
                       ) : (
@@ -143,7 +142,7 @@ export function RepuestoPhotosModal({
             {selectedPhoto.url ? (
               <img
                 src={selectedPhoto.url}
-                alt={selectedPhoto.nombre || 'Foto'}
+                alt="Foto expandida"
                 className="max-w-full max-h-full object-contain"
               />
             ) : (

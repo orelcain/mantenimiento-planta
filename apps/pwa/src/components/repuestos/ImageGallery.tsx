@@ -31,7 +31,6 @@ export function ImageGallery({
   imagenesManual,
   fotosReales,
   onImageAdded,
-  onImageDeleted,
   readOnly = false,
   className = '',
 }: ImageGalleryProps) {

@@ -73,6 +73,20 @@ export interface Repuesto {
 }
 
 /**
+ * Categoría de máquinas
+ */
+export interface MachineCategory {
+  id: string; // slug: "maquinas-principales", "motores-bombas"
+  nombre: string; // "Máquinas Principales"
+  descripcion?: string;
+  icono: string; // nombre del ícono de lucide-react: "Factory", "Zap", "Link"
+  orden: number; // orden de visualización
+  activa: boolean;
+  createdAt: Date;
+  updatedAt?: Date;
+}
+
+/**
  * Máquina/Equipo individual
  */
 export interface Machine {
@@ -81,6 +95,7 @@ export interface Machine {
   marca: string; // "Baader"
   modelo: string; // "200"
   descripcion?: string;
+  categoryId?: string | null; // ID de la categoría: "maquinas-principales", "cintas-transportadoras"
   activa: boolean; // si está activa o archivada
   color: string; // color para la UI (hex): "#3b82f6"
   orden: number; // orden de visualización

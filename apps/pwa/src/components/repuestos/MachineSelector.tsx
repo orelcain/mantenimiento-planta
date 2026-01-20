@@ -6,25 +6,42 @@
  * - Badge con cantidad de repuestos
  * - Indicador de máquina activa
  * - Scroll horizontal en móviles
+ * - Filtrado por categoría
  */
 
 import { useCurrentMachine, useActiveMachines, useMachineContext } from '@/contexts/MachineContext';
 
 interface MachineSelectorProps {
   repuestosCounts?: Record<string, number>; // { "baader-200": 202, "fishken": 7 }
+  selectedCategoryId?: string | null; // null = "Todas"
   className?: string;
 }
 
-export function MachineSelector({ repuestosCounts, className = '' }: MachineSelectorProps) {
+export function MachineSelector({ 
+  repuestosCounts, 
+  selectedCategoryId = null,
+  className = '' 
+}: MachineSelectorProps) {
   const currentMachine = useCurrentMachine();
   const activeMachines = useActiveMachines();
   const { setCurrentMachine } = useMachineContext();
 
-  if (activeMachines.length === 0) {
+  // Filtrar máquinas por categoría seleccionada
+  const filteredMachines = selectedCategoryId === null
+    ? activeMachines
+    : activeMachines.filter((m) => m.categoryId === selectedCategoryId);
+
+  if (filteredMachines.length === 0) {
+    const message = selectedCategoryId === null
+      ? 'No hay máquinas configuradas'
+      : 'No hay máquinas en esta categoría';
+    
     return (
       <div className="text-center py-8 text-gray-500">
-        <p>No hay máquinas configuradas</p>
-        <p className="text-sm mt-2">Configure las máquinas en la sección de administración</p>
+        <p>{message}</p>
+        {selectedCategoryId === null && (
+          <p className="text-sm mt-2">Configure las máquinas en la sección de administración</p>
+        )}
       </div>
     );
   }
@@ -32,7 +49,7 @@ export function MachineSelector({ repuestosCounts, className = '' }: MachineSele
   return (
     <div className={`border-b border-gray-200 ${className}`}>
       <nav className="flex space-x-2 overflow-x-auto pb-px" aria-label="Máquinas">
-        {activeMachines.map((machine) => {
+        {filteredMachines.map((machine) => {
           const isActive = currentMachine?.id === machine.id;
           const count = repuestosCounts?.[machine.id] ?? 0;
 
@@ -76,3 +93,4 @@ export function MachineSelector({ repuestosCounts, className = '' }: MachineSele
     </div>
   );
 }
+
