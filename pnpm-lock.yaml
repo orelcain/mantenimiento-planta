@@ -11,6 +11,9 @@ importers:
       firebase-admin:
         specifier: ^13.6.0
         version: 13.6.0
+      xlsx:
+        specifier: ^0.18.5
+        version: 0.18.5
     devDependencies:
       ts-node:
         specifier: ^10.9.2

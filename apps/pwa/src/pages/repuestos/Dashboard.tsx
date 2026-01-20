@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, Plus, FileSpreadsheet, FileText } from 'lucide-react'
+import { AlertTriangle, Plus, FileSpreadsheet, FileText, Upload } from 'lucide-react'
 import { RepuestosTable } from '@/components/repuestos/RepuestosTable'
 import { RepuestoFormModal } from '@/components/repuestos/RepuestoForm'
 import { RepuestosFilters } from '@/components/repuestos/RepuestosFilters'
@@ -12,10 +12,10 @@ import { useToast } from '@/hooks/useToast'
 import { useMachineContext, useCurrentMachine } from '@/contexts/MachineContext'
 import type { Repuesto, RepuestoFormData } from '@/types/repuestos'
 import { isTagAsignado, getTagNombre } from '@/types/tags'
+import { ImportRepuestosModal } from './ImportRepuestosModal'
 import {
   exportRepuestosToExcel,
   exportRepuestosToPDF,
-  exportTagsReportToPDF,
 } from '@/utils/repuestos'
 import {
   Button,
@@ -53,6 +53,7 @@ export function RepuestosDashboard() {
   const currentMachine = useCurrentMachine()
   const { toast } = useToast()
   const [createOpen, setCreateOpen] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<Repuesto | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<Repuesto | null>(null)
   const [saving, setSaving] = useState(false)
@@ -73,6 +74,8 @@ export function RepuestosDashboard() {
     createRepuesto,
     updateRepuesto,
     deleteRepuesto,
+    importCatalogoDesdeExcel,
+    importCantidadesPorTag,
   } = useRepuestos(currentMachine?.id || 'baader-200')
 
   const { tags, loading: tagsLoading, error: tagsError } = useTags(repuestos, currentMachine?.id || 'baader-200')
@@ -204,21 +207,13 @@ export function RepuestosDashboard() {
     }
   }
 
-  const handleExportTagsReport = async () => {
-    try {
-      await exportTagsReportToPDF(filteredRepuestos, currentMachine?.nombre || 'Repuestos')
-      toast({
-        title: 'Exportación exitosa',
-        description: 'El reporte de tags ha sido descargado.',
-        variant: 'success',
-      })
-    } catch (err) {
-      toast({
-        title: 'Error al exportar',
-        description: err instanceof Error ? err.message : 'No se pudo exportar el reporte.',
-        variant: 'destructive',
-      })
-    }
+  const handleImportSuccess = (message: string) => {
+    toast({ title: 'Importación exitosa', description: message, variant: 'success' })
+    setImportOpen(false)
+  }
+
+  const handleImportError = (message: string) => {
+    toast({ title: 'Error al importar', description: message, variant: 'destructive' })
   }
 
   const handleCreate = async (payload: RepuestoFormData) => {
@@ -313,6 +308,10 @@ export function RepuestosDashboard() {
             Repuestos - {currentMachine.nombre}
           </h1>
           <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setImportOpen(true)} className="gap-2" title="Importar desde Excel">
+              <Upload className="h-4 w-4" />
+              Importar
+            </Button>
             {/* Botones de exportación */}
             <Button variant="outline" onClick={handleExportExcel} className="gap-2" title="Exportar a Excel">
               <FileSpreadsheet className="h-4 w-4" />
@@ -446,6 +445,16 @@ export function RepuestosDashboard() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ImportRepuestosModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onSuccess={handleImportSuccess}
+        onError={handleImportError}
+        machineName={currentMachine.nombre}
+        importCatalogoDesdeExcel={importCatalogoDesdeExcel}
+        importCantidadesPorTag={importCantidadesPorTag}
+      />
     </div>
   )
 }
