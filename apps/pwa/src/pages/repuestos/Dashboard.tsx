@@ -6,6 +6,9 @@ import { RepuestosFilters } from '@/components/repuestos/RepuestosFilters'
 import { RepuestosPagination } from '@/components/repuestos/RepuestosPagination'
 import { EmptyState } from '@/components/repuestos/EmptyState'
 import { MachineSelector } from '@/components/repuestos/MachineSelector'
+import { RepuestoPhotosModal } from '@/components/repuestos/RepuestoPhotosModal'
+import { RepuestoManualModal } from '@/components/repuestos/RepuestoManualModal'
+import { RepuestoHistoryModal } from '@/components/repuestos/RepuestoHistoryModal'
 import { useRepuestos } from '@/hooks/repuestos/useRepuestos'
 import { useTags } from '@/hooks/repuestos/useTags'
 import { useToast } from '@/hooks/useToast'
@@ -58,6 +61,9 @@ export function RepuestosDashboard() {
   const [confirmDelete, setConfirmDelete] = useState<Repuesto | null>(null)
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [photoModal, setPhotoModal] = useState<Repuesto | null>(null)
+  const [manualModal, setManualModal] = useState<Repuesto | null>(null)
+  const [historyModal, setHistoryModal] = useState<Repuesto | null>(null)
 
   // Filtros y paginación
   const [searchQuery, setSearchQuery] = useState('')
@@ -380,8 +386,12 @@ export function RepuestosDashboard() {
               <RepuestosTable
                 repuestos={paginatedRepuestos}
                 loading={repuestosLoading}
+                machineId={currentMachine?.id}
                 onEdit={(rep) => setEditTarget(rep)}
                 onDelete={(rep) => setConfirmDelete(rep)}
+                onViewPhotos={(rep) => setPhotoModal(rep)}
+                onViewManual={(rep) => setManualModal(rep)}
+                onViewHistory={(rep) => setHistoryModal(rep)}
               />
 
               <RepuestosPagination
@@ -455,6 +465,34 @@ export function RepuestosDashboard() {
         importCatalogoDesdeExcel={importCatalogoDesdeExcel}
         importCantidadesPorTag={importCantidadesPorTag}
       />
+
+      {/* Modales de vista adicional */}
+      {photoModal && (
+        <RepuestoPhotosModal
+          open={true}
+          onOpenChange={(open) => !open && setPhotoModal(null)}
+          fotosReales={photoModal.fotosReales || []}
+          imagenesManual={photoModal.imagenesManual || []}
+          repuestoName={photoModal.textoBreve || photoModal.codigoSAP || 'Repuesto'}
+        />
+      )}
+
+      {manualModal && (
+        <RepuestoManualModal
+          open={true}
+          onOpenChange={(open) => !open && setManualModal(null)}
+          repuesto={manualModal}
+        />
+      )}
+
+      {historyModal && (
+        <RepuestoHistoryModal
+          open={true}
+          onOpenChange={(open) => !open && setHistoryModal(null)}
+          repuesto={historyModal}
+          machineId={currentMachine?.id}
+        />
+      )}
     </div>
   )
 }

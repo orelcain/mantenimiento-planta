@@ -1,14 +1,17 @@
-import { Pencil, Trash2 } from 'lucide-react'
 import type { Repuesto } from '@/types/repuestos'
 import type { TagAsignado } from '@/types/tags'
 import { getTagNombre, isTagAsignado } from '@/types/tags'
-import { Button } from '@/components/ui'
+import { RepuestoActionsMenu } from './RepuestoActionsMenu'
 
 interface RepuestosTableProps {
   repuestos: Repuesto[]
   loading?: boolean
+  machineId?: string
   onEdit?: (repuesto: Repuesto) => void
   onDelete?: (repuesto: Repuesto) => void
+  onViewManual?: (repuesto: Repuesto) => void
+  onViewPhotos?: (repuesto: Repuesto) => void
+  onViewHistory?: (repuesto: Repuesto) => void
 }
 
 const formatNumber = (value: number) =>
@@ -63,7 +66,16 @@ const TagsBadge = ({ tags }: { tags: (string | TagAsignado)[] }) => {
   );
 };
 
-export function RepuestosTable({ repuestos, loading, onEdit, onDelete }: RepuestosTableProps) {
+export function RepuestosTable({
+  repuestos,
+  loading,
+  machineId,
+  onEdit,
+  onDelete,
+  onViewManual,
+  onViewPhotos,
+  onViewHistory,
+}: RepuestosTableProps) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12 text-muted-foreground">
@@ -107,20 +119,15 @@ export function RepuestosTable({ repuestos, loading, onEdit, onDelete }: Repuest
               <td className="px-4 py-3 text-right">${formatNumber(rep.valorUnitario || 0)}</td>
               <td className="px-4 py-3"><TagsBadge tags={rep.tags || []} /></td>
               <td className="px-4 py-3">
-                <div className="flex justify-end gap-2">
-                  {onEdit ? (
-                    <Button variant="ghost" size="sm" onClick={() => onEdit(rep)}>
-                      <Pencil className="h-4 w-4" />
-                      Editar
-                    </Button>
-                  ) : null}
-                  {onDelete ? (
-                    <Button variant="ghost" size="sm" onClick={() => onDelete(rep)}>
-                      <Trash2 className="h-4 w-4" />
-                      Borrar
-                    </Button>
-                  ) : null}
-                </div>
+                <RepuestoActionsMenu
+                  repuesto={rep}
+                  onEdit={onEdit}
+                  onDelete={onDelete}
+                  onViewManual={onViewManual}
+                  onViewPhotos={onViewPhotos}
+                  onViewHistory={onViewHistory}
+                  isCompact={false}
+                />
               </td>
             </tr>
           ))}
