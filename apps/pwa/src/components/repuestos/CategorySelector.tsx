@@ -7,13 +7,32 @@
  * - Dropdown de gestión (admin only): crear, editar, eliminar categorías
  * - Badge con cantidad de máquinas por categoría
  * - Scroll horizontal en móviles
+ * - Drag & drop para reordenar (admin only)
  */
 
 import { useState } from 'react';
-import { MoreVertical, Plus, Pencil, Trash2, Check } from 'lucide-react';
+import { MoreVertical, Plus, Pencil, Trash2, Check, GripVertical } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  horizontalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { useMachineCategories } from '@/hooks/repuestos/useMachineCategories';
 import { useAuthStore } from '@/store';
+import type { MachineCategory } from '@/types/repuestos';
 import {
   Button,
   DropdownMenu,
@@ -37,13 +56,76 @@ interface CategorySelectorProps {
   className?: string;
 }
 
+// Componente SortableTab para drag & drop
+function SortableTab({
+  category,
+  isActive,
+  count,
+  isAdmin,
+  onClick,
+  renderIcon,
+}: {
+  category: MachineCategory;
+  isActive: boolean;
+  count: number;
+  isAdmin: boolean;
+  onClick: () => void;
+  renderIcon: (iconName: string) => JSX.Element;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: category.id,
+    disabled: !isAdmin,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className="flex items-center">
+      {isAdmin && (
+        <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing mr-1">
+          <GripVertical className="h-4 w-4 text-gray-400" />
+        </div>
+      )}
+      <button
+        onClick={onClick}
+        className={`
+          relative px-4 py-2 min-w-[120px] text-sm font-medium rounded-t-lg
+          transition-all duration-200 flex items-center gap-2
+          ${
+            isActive
+              ? 'bg-white text-blue-600 shadow-sm border border-b-0 border-gray-200'
+              : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'
+          }
+        `}
+      >
+        {renderIcon(category.icono)}
+        <span>{category.nombre}</span>
+        {count > 0 && (
+          <span
+            className={`
+              inline-flex items-center justify-center px-2 py-0.5 text-xs font-bold rounded-full
+              ${isActive ? 'bg-blue-100 text-blue-700' : 'bg-gray-200 text-gray-700'}
+            `}
+          >
+            {count}
+          </span>
+        )}
+      </button>
+    </div>
+  );
+}
+
 export function CategorySelector({
   selectedCategoryId,
   onSelectCategory,
   machineCountsByCategory = {},
   className = '',
 }: CategorySelectorProps) {
-  const { categories, loading, createCategory, updateCategory, deleteCategory } =
+  const { categories, loading, createCategory, updateCategory, deleteCategory, reorderCategories } =
     useMachineCategories();
   const { user } = useAuthStore();
   const isAdmin = user?.rol === 'admin';
@@ -61,6 +143,33 @@ export function CategorySelector({
 
   // Total de todas las máquinas
   const totalMachines = Object.values(machineCountsByCategory).reduce((sum, count) => sum + count, 0);
+
+  // Sensores para drag & drop
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  // Handler de drag end
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      const oldIndex = activeCategories.findIndex((c) => c.id === active.id);
+      const newIndex = activeCategories.findIndex((c) => c.id === over.id);
+
+      const reordered = arrayMove(activeCategories, oldIndex, newIndex);
+      const newOrder = reordered.map((c) => c.id);
+
+      try {
+        await reorderCategories(newOrder);
+      } catch (error) {
+        console.error('Error reordering categories:', error);
+      }
+    }
+  };
 
   // Renderizar ícono dinámico desde lucide-react
   const renderIcon = (iconName: string) => {
@@ -174,42 +283,29 @@ export function CategorySelector({
               )}
             </button>
 
-            {/* Tabs de categorías */}
-            {activeCategories.map((category) => {
-              const isActive = selectedCategoryId === category.id;
-              const count = machineCountsByCategory[category.id] ?? 0;
+            {/* Tabs de categorías con drag & drop */}
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <SortableContext items={activeCategories.map((c) => c.id)} strategy={horizontalListSortingStrategy}>
+                <div className="flex space-x-2">
+                  {activeCategories.map((category) => {
+                    const isActive = selectedCategoryId === category.id;
+                    const count = machineCountsByCategory[category.id] ?? 0;
 
-              return (
-                <button
-                  key={category.id}
-                  onClick={() => onSelectCategory(category.id)}
-                  className={`
-                    relative px-4 py-2 min-w-[120px] text-sm font-medium rounded-t-lg
-                    transition-all duration-200 flex items-center gap-2
-                    ${
-                      isActive
-                        ? 'bg-white text-blue-600 shadow-sm border border-b-0 border-gray-200'
-                        : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'
-                    }
-                  `}
-                >
-                  {renderIcon(category.icono)}
-                  <span>{category.nombre}</span>
-                  {count > 0 && (
-                    <span
-                      className={`
-                        inline-flex items-center justify-center px-2 py-0.5 text-xs font-bold rounded-full
-                        ${
-                          isActive ? 'bg-blue-100 text-blue-700' : 'bg-gray-200 text-gray-700'
-                        }
-                      `}
-                    >
-                      {count}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
+                    return (
+                      <SortableTab
+                        key={category.id}
+                        category={category}
+                        isActive={isActive}
+                        count={count}
+                        isAdmin={isAdmin}
+                        onClick={() => onSelectCategory(category.id)}
+                        renderIcon={renderIcon}
+                      />
+                    );
+                  })}
+                </div>
+              </SortableContext>
+            </DndContext>
           </nav>
 
           {/* Botón de gestión (solo admin) */}
