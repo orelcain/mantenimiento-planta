@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es" class="dark">
+<html lang="es">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
@@ -9,7 +9,16 @@
     <link rel="apple-touch-icon" href="/mantenimiento-planta/icons/icon-192.svg" />
     <link rel="manifest" href="/mantenimiento-planta/manifest.json" />
     <title>Mantenimiento Industrial</title>
-    <script type="module" crossorigin src="/mantenimiento-planta/assets/index-DtC5tVlN.js"></script>
+    <!-- Script inline para aplicar tema antes de que React cargue (evita flash) -->
+    <script>
+      (function() {
+        const theme = localStorage.getItem('app-theme') || 'dark';
+        if (theme === 'dark') {
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
+    <script type="module" crossorigin src="/mantenimiento-planta/assets/index-1X-S6Xf6.js"></script>
     <link rel="modulepreload" crossorigin href="/mantenimiento-planta/assets/vendor-DVqSOM3W.js">
     <link rel="modulepreload" crossorigin href="/mantenimiento-planta/assets/firebase-DDwcFH9B.js">
     <link rel="modulepreload" crossorigin href="/mantenimiento-planta/assets/ui-BUaDrKyO.js">

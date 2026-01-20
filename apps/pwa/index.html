@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es" class="dark">
+<html lang="es">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
@@ -9,6 +9,15 @@
     <link rel="apple-touch-icon" href="/mantenimiento-planta/icons/icon-192.svg" />
     <link rel="manifest" href="/mantenimiento-planta/manifest.json" />
     <title>Mantenimiento Industrial</title>
+    <!-- Script inline para aplicar tema antes de que React cargue (evita flash) -->
+    <script>
+      (function() {
+        const theme = localStorage.getItem('app-theme') || 'dark';
+        if (theme === 'dark') {
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
   </head>
   <body class="bg-background text-foreground">
     <div id="root"></div>

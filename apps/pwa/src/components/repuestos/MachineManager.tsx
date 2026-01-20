@@ -74,9 +74,9 @@ export function MachineManager() {
   const handleEdit = (machine: Machine) => {
     setEditingMachine(machine);
     setFormData({
-      nombre: machine.nombre,
-      marca: machine.marca,
-      modelo: machine.modelo,
+      nombre: machine.nombre || '',
+      marca: machine.marca || '',
+      modelo: machine.modelo || '',
       descripcion: machine.descripcion || '',
       categoryId: machine.categoryId ?? 'none',
       color: machine.color || '#3b82f6',
@@ -87,7 +87,11 @@ export function MachineManager() {
   // Guardar (crear o actualizar)
   const handleSave = async () => {
     try {
-      if (!formData.nombre.trim() || !formData.marca.trim() || !formData.modelo.trim()) {
+      const nombre = (formData.nombre || '').trim();
+      const marca = (formData.marca || '').trim();
+      const modelo = (formData.modelo || '').trim();
+
+      if (!nombre || !marca || !modelo) {
         toast({
           title: 'Error',
           description: 'Los campos Nombre, Marca y Modelo son obligatorios',
@@ -99,9 +103,9 @@ export function MachineManager() {
       if (editingMachine) {
         // Actualizar
         await updateMachine(editingMachine.id, {
-          nombre: formData.nombre,
-          marca: formData.marca,
-          modelo: formData.modelo,
+          nombre,
+          marca,
+          modelo,
           descripcion: formData.descripcion,
           categoryId: formData.categoryId === 'none' ? null : formData.categoryId,
           color: formData.color,
@@ -109,14 +113,14 @@ export function MachineManager() {
 
         toast({
           title: 'Máquina actualizada',
-          description: `${formData.nombre} actualizada correctamente`,
+          description: `${nombre} actualizada correctamente`,
         });
       } else {
         // Crear
         await createMachine({
-          nombre: formData.nombre,
-          marca: formData.marca,
-          modelo: formData.modelo,
+          nombre,
+          marca,
+          modelo,
           descripcion: formData.descripcion,
           categoryId: formData.categoryId === 'none' ? null : formData.categoryId,
           color: formData.color,
@@ -126,7 +130,7 @@ export function MachineManager() {
 
         toast({
           title: 'Máquina creada',
-          description: `${formData.nombre} creada correctamente`,
+          description: `${nombre} creada correctamente`,
         });
       }
 

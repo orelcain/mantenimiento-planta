@@ -14,6 +14,8 @@ import {
   Database,
   RefreshCw,
   Wrench,
+  Moon,
+  Sun,
 } from 'lucide-react'
 import {
   Card,
@@ -38,6 +40,7 @@ import {
   Spinner,
 } from '@/components/ui'
 import { useAuthStore } from '@/store'
+import { useTheme } from '@/hooks/useTheme'
 import { createInviteCode } from '@/services/auth'
 import { fixPCBOtoPCHO } from '@/scripts/fixPCBOtoPCHO'
 import { 
@@ -125,6 +128,7 @@ export function SettingsPage() {
 
 // Configuración General
 function GeneralSettings() {
+  const { theme, toggleTheme, isDark } = useTheme()
   const [requireValidation, setRequireValidation] = useState(true)
   const [autoAssign, setAutoAssign] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -149,6 +153,40 @@ function GeneralSettings() {
 
   return (
     <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Apariencia</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label>Modo Oscuro</Label>
+              <p className="text-sm text-muted-foreground">
+                Cambiar entre tema claro y oscuro
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={toggleTheme}
+              className="gap-2"
+            >
+              {isDark ? (
+                <>
+                  <Moon className="h-4 w-4" />
+                  Oscuro
+                </>
+              ) : (
+                <>
+                  <Sun className="h-4 w-4" />
+                  Claro
+                </>
+              )}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>Flujo de Incidencias</CardTitle>
