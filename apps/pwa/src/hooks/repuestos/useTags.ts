@@ -7,10 +7,6 @@ import { isTagAsignado, DEFAULT_TAGS } from '@/types/tags';
 
 // Construir ruta del documento dinámicamente por máquina
 const getSettingsDocPath = (machineId: string) => {
-  // COMPATIBILIDAD TEMPORAL: Para Baader 200, usar ruta antigua
-  if (machineId === 'baader-200') {
-    return 'settings/tags';
-  }
   return `machines/${machineId}/settings/tags`;
 };
 

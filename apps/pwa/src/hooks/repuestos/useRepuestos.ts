@@ -89,14 +89,7 @@ const chunk = <T,>(arr: T[], size: number): T[][] => {
 // Rutas de colecciones para compatibilidad con máquinas existentes y nuevas
 const getCollectionPath = (machineId: string) => {
   console.log(`   ⚙️ [getCollectionPath] Using collection for ${machineId}`);
-  // Para compatibilidad legacy (Baader 200)
-  if (machineId === 'baader-200') {
-    console.log(`   📁 [getCollectionPath] Using legacy collection for baader-200`);
-    return 'repuestosBaader200';
-  }
-  
-  // Para nuevas máquinas: usar subcolección dentro del documento de la máquina
-  // Estructura: machines/{machineId}/repuestos
+  // Ruta única para todas las máquinas: machines/{machineId}/repuestos
   return `machines/${machineId}/repuestos`;
 };
 

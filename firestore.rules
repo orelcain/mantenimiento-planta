@@ -407,10 +407,31 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow create, update, delete: if isAdmin();
 
+      // Configuración por máquina (tags, etc.)
+      match /settings/{settingId} {
+        allow read: if isAuthenticated();
+        allow create, update, delete: if isAuthenticated();
+      }
+
       // Repuestos por máquina
       match /repuestos/{repuestoId} {
         allow read: if isAuthenticated();
         allow create, update, delete: if isAuthenticated();
+
+        // Historial de repuestos (subcolección)
+        match /historial/{historialId} {
+          allow read, create, update, delete: if isAuthenticated();
+        }
+      }
+    }
+
+    // Compatibilidad legacy (Baader 200)
+    match /repuestosBaader200/{repuestoId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAuthenticated();
+
+      match /historial/{historialId} {
+        allow read, create, update, delete: if isAuthenticated();
       }
     }
 
