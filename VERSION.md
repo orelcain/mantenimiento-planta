@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.31.1**
+## Versión Actual: **v2.31.2**
 
 **Fecha de lanzamiento**: 20 de enero de 2026  \
 **Estado**: ✅ PRODUCCIÓN READY  \
@@ -9,6 +9,17 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.31.2 - Persistencia de tema y fix filtrado categorías (20/01/2026)
+
+**Nuevas Funcionalidades:**
+- ✅ Toggle de tema oscuro/claro en Configuración > General con persistencia en localStorage
+- ✅ Script de migración para agregar categoryId a máquinas existentes
+- ✅ Tema se recuerda entre sesiones sin flash
+
+**Correcciones:**
+- 🔧 Fix filtrado de máquinas por categoría (todas las máquinas tienen categoryId configurado)
+- 🔧 Tema se aplica antes de que React cargue (script inline en HTML)
 
 ### v2.31.1 - Fix categorías máquinas (20/01/2026)
 
