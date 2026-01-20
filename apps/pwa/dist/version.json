@@ -1,6 +1,6 @@
 {
-  "version": "2.28.0",
-  "buildDate": "2026-01-19",
+  "version": "2.30.0",
+  "buildDate": "2026-01-20",
   "buildTimestamp": 1768840752818,
   "features": [
     "Fix sistema de notificaciones push",

@@ -1,0 +1,92 @@
+[
+  {
+    "id": "baader-200",
+    "nombre": "Baader 200",
+    "marca": "Baader",
+    "modelo": "200",
+    "descripcion": "Máquina principal - Fileteadora Baader 200",
+    "activa": true,
+    "color": "#3b82f6",
+    "orden": 0
+  },
+  {
+    "id": "cinta-esquelones",
+    "nombre": "Cinta Esquelones",
+    "marca": "Desconocido",
+    "modelo": "Cinta",
+    "descripcion": "Cinta de transporte para esquelones",
+    "activa": true,
+    "color": "#8b5cf6",
+    "orden": 1
+  },
+  {
+    "id": "cinta-salida-filete",
+    "nombre": "Cinta Salida Filete",
+    "marca": "Desconocido",
+    "modelo": "Cinta",
+    "descripcion": "Cinta de salida para filetes",
+    "activa": true,
+    "color": "#ec4899",
+    "orden": 2
+  },
+  {
+    "id": "balanza-dinamica-marel",
+    "nombre": "Balanza Dinámica MAREL",
+    "marca": "MAREL",
+    "modelo": "Balanza Dinámica",
+    "descripcion": "Sistema de pesaje dinámico",
+    "activa": true,
+    "color": "#06b6d4",
+    "orden": 3
+  },
+  {
+    "id": "cinta-aceleracion-marel",
+    "nombre": "Cinta Aceleración MAREL",
+    "marca": "MAREL",
+    "modelo": "Cinta",
+    "descripcion": "Cinta de aceleración para MAREL",
+    "activa": true,
+    "color": "#10b981",
+    "orden": 4
+  },
+  {
+    "id": "cinta-alimentacion-baader",
+    "nombre": "Cinta Alimentación Baader",
+    "marca": "Baader",
+    "modelo": "Cinta",
+    "descripcion": "Cinta de alimentación para Baader 200",
+    "activa": true,
+    "color": "#f59e0b",
+    "orden": 5
+  },
+  {
+    "id": "volcador-bins",
+    "nombre": "Volcador Bins",
+    "marca": "Baader",
+    "modelo": "Volcador",
+    "descripcion": "Sistema de volcado de bins",
+    "activa": true,
+    "color": "#ef4444",
+    "orden": 6
+  },
+  {
+    "id": "sistema-bombeo-peces-n1",
+    "nombre": "Sistema Bombeo Peces N1",
+    "marca": "Diversas",
+    "modelo": "Sistema",
+    "descripcion": "Sistema de bombeo de peces N1",
+    "activa": true,
+    "color": "#6366f1",
+    "orden": 7
+  },
+  {
+    "id": "sistema-bombeo-peces-n2",
+    "nombre": "Sistema Bombeo Peces N2",
+    "marca": "Diversas",
+    "modelo": "Sistema",
+    "descripcion": "Sistema de bombeo de peces N2",
+    "activa": true,
+    "color": "#a855f7",
+    "orden": 8
+  }
+]

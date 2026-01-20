@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.29.0**
+## Versión Actual: **v2.30.0**
 
 **Fecha de lanzamiento**: 20 de enero de 2026  \
 **Estado**: ✅ PRODUCCIÓN READY  \
@@ -9,6 +9,27 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.30.0 - Migración de Máquinas y Repuestos (20/01/2026)
+
+**Nuevas Funcionalidades:**
+- ✅ **9 Máquinas creadas** - Baader 200, cintas, MAREL, sistemas bombeo
+- ✅ **61 PlantAssets registrados** - Motores (7) y Bombas (54)
+- ✅ **Scripts de migración** - Generación e importación de datos
+- ✅ **Guía de migración** - Instrucciones para Firebase Console/Admin SDK
+- ✅ **Estructura Firestore** - Colecciones `machines` y `plantAssets`
+
+**Archivos Nuevos:**
+- `scripts/generate_migration_data.js` - Genera JSON para importar
+- `scripts/import_migration_data.js` - Importa vía Admin SDK
+- `scripts/migrate_machines_and_assets.js` - Script completo
+- `scripts/migrate_instructions.js` - Muestra instrucciones
+- `functions/migrate_data.js` - Cloud Function para migración
+- `MIGRATION_GUIDE.md` - Guía completa de migración
+- `output/machines.json` - 9 máquinas
+- `output/plant_assets.json` - 61 motores/bombas
+
+---
 
 ### v2.29.0 - Módulo Repuestos Completo + Catálogo de Bases (20/01/2026)
 
