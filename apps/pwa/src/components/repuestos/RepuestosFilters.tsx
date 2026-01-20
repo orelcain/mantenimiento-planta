@@ -1,6 +1,6 @@
 import { Search, X } from 'lucide-react'
 import { Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Button, Badge } from '@/components/ui'
-import type { TagGlobal } from '@/types/repuestos'
+import type { TagGlobal } from '@/types/tags'
 
 interface RepuestosFiltersProps {
   searchQuery: string

@@ -1,7 +1,8 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
-import type { Repuesto, RepuestoFormData, TagAsignado, TagGlobal } from '@/types/repuestos'
-import { isTagAsignado } from '@/types/repuestos'
+import type { Repuesto, RepuestoFormData } from '@/types/repuestos'
+import type { TagAsignado, TagGlobal } from '@/types/tags'
+import { isTagAsignado } from '@/types/tags'
 import {
   Button,
   Dialog,

@@ -6,6 +6,7 @@ import { logger } from '@/lib/logger'
 import { LoadingScreen } from '@/components/ui'
 import { MainLayout } from '@/components/layout'
 import { HelpProvider } from '@/components/help'
+import { MachineProvider } from '@/contexts/MachineContext'
 import { initializeHierarchySystem, isHierarchyInitialized } from '@/services/hierarchyInit'
 import { Toaster } from '@/components/ui/toaster'
 import {
@@ -117,10 +118,11 @@ export function App() {
   }, [setUser, setLoading])
 
   return (
-    <HelpProvider>
-      <BrowserRouter basename={import.meta.env.BASE_URL}>
-        <Toaster />
-        <Routes>
+    <MachineProvider>
+      <HelpProvider>
+        <BrowserRouter basename={import.meta.env.BASE_URL}>
+          <Toaster />
+          <Routes>
           {/* Public routes */}
           <Route
             path="/login"
@@ -203,5 +205,6 @@ export function App() {
         </Routes>
       </BrowserRouter>
     </HelpProvider>
+    </MachineProvider>
   )
 }

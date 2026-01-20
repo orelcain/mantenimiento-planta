@@ -1,6 +1,6 @@
 {
   "name": "@mantenimiento/pwa",
-  "version": "2.30.0",
+  "version": "2.31.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -38,12 +38,14 @@
     "jspdf-autotable": "^5.0.7",
     "lodash": "^4.17.21",
     "lucide-react": "^0.468.0",
+    "pdfjs-dist": "3.11.174",
     "qrcode.react": "^4.2.0",
     "react": "^18.3.1",
     "react-chartjs-2": "^5.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^7.1.0",
     "tailwind-merge": "^2.6.0",
+    "xlsx": "^0.18.5",
     "zod": "^4.2.1",
     "zustand": "^5.0.2"
   },

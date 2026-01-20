@@ -1,20 +1,9 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/services/firebase';
-import type { TagGlobal, Repuesto } from '@/types/repuestos';
-import { isTagAsignado } from '@/types/repuestos';
-
-// Tags iniciales por defecto (se usan si no hay datos en Firestore)
-const DEFAULT_TAGS: TagGlobal[] = [
-  { nombre: 'Overhaul temporada baja', tipo: 'solicitud', createdAt: new Date() },
-  { nombre: 'Urgentes este mes', tipo: 'solicitud', createdAt: new Date() },
-  { nombre: 'Críticos', tipo: 'solicitud', createdAt: new Date() },
-  { nombre: 'En espera proveedor', tipo: 'solicitud', createdAt: new Date() },
-  { nombre: 'Pedido realizado', tipo: 'solicitud', createdAt: new Date() },
-  { nombre: 'Stock mínimo', tipo: 'stock', createdAt: new Date() },
-  { nombre: 'Stock actual', tipo: 'stock', createdAt: new Date() },
-  { nombre: 'Preventivo mensual', tipo: 'solicitud', createdAt: new Date() }
-];
+import type { Repuesto } from '@/types/repuestos';
+import type { TagGlobal } from '@/types/tags';
+import { isTagAsignado, DEFAULT_TAGS } from '@/types/tags';
 
 // Construir ruta del documento dinámicamente por máquina
 const getSettingsDocPath = (machineId: string) => {

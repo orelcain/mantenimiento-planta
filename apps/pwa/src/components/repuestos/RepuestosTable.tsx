@@ -1,6 +1,7 @@
 import { Pencil, Trash2 } from 'lucide-react'
-import type { Repuesto, TagAsignado } from '@/types/repuestos'
-import { getTagNombre, isTagAsignado } from '@/types/repuestos'
+import type { Repuesto } from '@/types/repuestos'
+import type { TagAsignado } from '@/types/tags'
+import { getTagNombre, isTagAsignado } from '@/types/tags'
 import { Button } from '@/components/ui'
 
 interface RepuestosTableProps {

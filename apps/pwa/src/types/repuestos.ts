@@ -1,86 +1,34 @@
-// ===================================
-// TIPOS DEL MÓDULO DE REPUESTOS
-// Migrado desde Repuestos-App
-// ===================================
+/**
+ * Tipos para el módulo de Repuestos
+ * Sistema multi-máquina con gestión de inventario y tags por evento
+ */
 
-// Tag global con su tipo definido (solicitud o stock)
-export interface TagGlobal {
-  nombre: string;
-  tipo: 'solicitud' | 'stock';
-  createdAt?: Date;
-}
+import { Timestamp } from 'firebase/firestore';
+import { TagAsignado } from './tags';
+import { VinculoManual } from './vinculos';
 
-// Tag asignado a un repuesto con cantidad específica del evento
-export interface TagAsignado {
-  nombre: string;                    // Nombre del tag/evento
-  tipo: 'solicitud' | 'stock';       // A qué columna aplica (heredado del TagGlobal)
-  cantidad: number;                  // Cantidad en este evento
-  fecha: Date;                       // Cuándo se asignó/creó el evento
-}
-
-// Helper para verificar si es un TagGlobal
-export function isTagGlobal(tag: unknown): tag is TagGlobal {
-  return typeof tag === 'object' && tag !== null && 'nombre' in tag && 'tipo' in tag && !('cantidad' in tag);
-}
-
-// Tipo principal de Repuesto
-export interface Repuesto {
-  id: string;
-  codigoSAP: string;
-  textoBreve: string;
-  descripcion: string;
-  nombreManual?: string;  // Nombre según el manual
-  codigoBaader: string;
-  cantidadSolicitada: number;       // DEPRECATED: usar tags para cantidades por evento
-  valorUnitario: number;
-  total: number;                     // DEPRECATED: se calcula desde tags
-  cantidadStockBodega: number;       // DEPRECATED: usar tags para cantidades por evento
-  fechaUltimaActualizacionInventario: Date | null;
-  tags: (string | TagAsignado)[];    // Soporta formato antiguo (string) y nuevo (TagAsignado)
-  vinculosManual: VinculoManual[];
-  imagenesManual: ImagenRepuesto[];
-  fotosReales: ImagenRepuesto[];
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-// Helper para verificar si un tag es del nuevo formato
-export function isTagAsignado(tag: string | TagAsignado): tag is TagAsignado {
-  return typeof tag === 'object' && tag !== null && 'nombre' in tag && 'cantidad' in tag;
-}
-
-// Helper para obtener el nombre de un tag (compatible con ambos formatos)
-export function getTagNombre(tag: string | TagAsignado): string {
-  return typeof tag === 'string' ? tag : tag.nombre;
-}
-
-// Vínculo a página/área del manual PDF con marcador visual
-export interface VinculoManual {
-  id: string;
-  pageNumber: number;
-  area: { x: number; y: number; width: number; height: number };
-  descripcion: string;
-  createdAt: Date;
-}
-
-// Imagen asociada al repuesto
+/**
+ * Imagen asociada a un repuesto
+ */
 export interface ImagenRepuesto {
   id: string;
   url: string;
   descripcion: string;
   orden: number;
   esPrincipal: boolean;
-  tipo: 'manual' | 'real';
+  tipo: 'manual' | 'real'; // manual: captura del PDF, real: foto del repuesto físico
   createdAt: Date;
 
-  // Metadata opcional para depurar/visualizar compresión
+  // Metadata opcional para debugging de compresión
   sizeOriginal?: number; // bytes
-  sizeFinal?: number; // bytes (archivo subido)
+  sizeFinal?: number; // bytes del archivo subido
   formatFinal?: 'webp' | 'jpeg' | 'original';
   qualityFinal?: number;
 }
 
-// Historial de cambios
+/**
+ * Historial de cambios de un repuesto
+ */
 export interface HistorialCambio {
   id: string;
   repuestoId: string;
@@ -90,50 +38,102 @@ export interface HistorialCambio {
   fecha: Date;
 }
 
-// Formulario de repuesto
+/**
+ * Repuesto principal
+ * Compatible con sistema legacy y nuevo con tags
+ */
+export interface Repuesto {
+  id: string;
+  codigoSAP: string;
+  textoBreve: string;
+  descripcion: string;
+  nombreManual?: string; // Nombre según el manual del fabricante
+  codigoBaader: string; // o código del fabricante
+  
+  // DEPRECATED: usar tags para cantidades por evento
+  cantidadSolicitada: number;
+  cantidadStockBodega: number;
+  
+  valorUnitario: number;
+  total: number; // DEPRECATED: se calcula desde tags
+  fechaUltimaActualizacionInventario: Date | null;
+  
+  // Sistema de tags: soporta formato antiguo (string) y nuevo (TagAsignado)
+  tags: (string | TagAsignado)[];
+  
+  // Vínculos a páginas del manual con marcadores visuales
+  vinculosManual: VinculoManual[];
+  
+  // Imágenes del manual y fotos reales
+  imagenesManual: ImagenRepuesto[];
+  fotosReales: ImagenRepuesto[];
+  
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+/**
+ * Máquina/Equipo individual
+ */
+export interface Machine {
+  id: string; // slug: "baader-200", "marel-i-cut"
+  nombre: string; // "Baader 200"
+  marca: string; // "Baader"
+  modelo: string; // "200"
+  descripcion?: string;
+  activa: boolean; // si está activa o archivada
+  color: string; // color para la UI (hex): "#3b82f6"
+  orden: number; // orden de visualización
+  manuals?: string[]; // URLs de los manuales PDF
+  infografias?: string[]; // URLs de infografías/diagramas
+  createdAt: Date;
+  updatedAt?: Date;
+}
+
+/**
+ * Estado del contexto de máquinas
+ */
+export interface MachineContextType {
+  currentMachine: Machine | null;
+  machines: Machine[];
+  loading: boolean;
+  setCurrentMachine: (machineId: string) => Promise<void>;
+}
+
+/**
+ * Formulario de repuesto
+ */
 export interface RepuestoFormData {
   codigoSAP: string;
   textoBreve: string;
   descripcion?: string;
   nombreManual?: string;
   codigoBaader: string;
-  cantidadSolicitada: number;      // DEPRECATED: usar tags para cantidades por evento
+  cantidadSolicitada: number; // DEPRECATED
   valorUnitario: number;
-  cantidadStockBodega: number;     // DEPRECATED: usar tags para cantidades por evento
-  tags?: (string | TagAsignado)[];  // Soporta formato antiguo y nuevo
+  cantidadStockBodega: number; // DEPRECATED
+  tags?: (string | TagAsignado)[]; // soporta ambos formatos
 }
 
-// Datos de exportación
+/**
+ * Datos de exportación
+ */
 export interface ExportData {
   repuestos: Repuesto[];
   includeImages: boolean;
   format: 'excel' | 'pdf';
 }
 
-// === SISTEMA MULTI-MÁQUINA ===
-
-// Máquina/Equipo individual con sus datos y configuración
-export interface Machine {
-  id: string;                    // ID único (slug): ej. "baader-200", "marel-i-cut"
-  nombre: string;                // Nombre para mostrar: "Baader 200"
-  marca: string;                 // Fabricante: "Baader"
-  modelo: string;                // Modelo específico: "200"
-  descripcion?: string;          // Descripción adicional opcional
-  activa: boolean;               // Si está activa/archivada
-  color: string;                 // Color para la tab (hex): "#3b82f6"
-  orden: number;                 // Orden de las tabs (para drag & drop)
-  manuals?: string[];            // URLs de los manuales PDF de esta máquina
-  infografias?: string[];        // URLs de infografías/diagramas (imágenes, modelos 3D)
-  createdAt: Date;               // Fecha de creación
-  updatedAt?: Date;              // Última modificación
-}
-
-// Estado del contexto de máquinas
-export interface MachineContextType {
-  currentMachine: Machine | null;
-  machines: Machine[];
-  loading: boolean;
-  setCurrentMachine: (machineId: string) => Promise<void>;
+/**
+ * Fila del Excel de importación
+ */
+export interface ImportCantidadRow {
+  codigoSAP: string;
+  codigoBaader: string;
+  textoBreve?: string;
+  descripcion?: string;
+  cantidad: number;
+  valorUnitario: number;
 }
 
 // === MAPAS DE PLANTA ===
@@ -220,7 +220,19 @@ export interface PlantAsset {
   relacionReduccion: string;
   corriente: string;
   eje: string;
-  // === Datos específicos de bomba (opcionales) ===
+  // Datos específicos de bomba (opcionales)
+  fabricaBomba?: string;
+  modeloBomba?: string;
+  serieBomba?: string;
+  impellerBomba?: string;
+  porVoltaje?: string;
+  marcaBomba?: string;
+  caudal?: string;
+  presion?: string;
+  rpm?: string;
+  materialCarcasa?: string;
+  materialImpeller?: string;
+  sellos?: string;
   caudalM3h?: string; // m3/h
   alturaM?: string; // H (m)
   acople?: string;
@@ -233,13 +245,23 @@ export interface PlantAsset {
   updatedAt?: Date;
 }
 
-// === TIPOS AUXILIARES ===
+// === FUNCIONES AUXILIARES ===
 
-export interface ImportCantidadRow {
-  codigoSAP: string;
-  codigoBaader: string;
-  textoBreve?: string;
-  descripcion?: string;
-  cantidad: number;
-  valorUnitario: number;
+/**
+ * Convertir Timestamp de Firestore a Date
+ */
+export function timestampToDate(timestamp: Timestamp | Date | undefined | null): Date {
+  if (!timestamp) return new Date();
+  if (timestamp instanceof Date) return timestamp;
+  return timestamp.toDate();
+}
+
+/**
+ * Sanitizar imagen para Firestore (remover undefined)
+ */
+export function sanitizeImagen(img: ImagenRepuesto): ImagenRepuesto {
+  const cleaned = Object.fromEntries(
+    Object.entries(img).filter(([, v]) => v !== undefined)
+  ) as ImagenRepuesto;
+  return cleaned;
 }

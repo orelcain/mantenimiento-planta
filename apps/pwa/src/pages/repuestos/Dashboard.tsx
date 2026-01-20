@@ -1,16 +1,22 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, Plus } from 'lucide-react'
+import { AlertTriangle, Plus, FileSpreadsheet, FileText } from 'lucide-react'
 import { RepuestosTable } from '@/components/repuestos/RepuestosTable'
 import { RepuestoFormModal } from '@/components/repuestos/RepuestoForm'
 import { RepuestosFilters } from '@/components/repuestos/RepuestosFilters'
 import { RepuestosPagination } from '@/components/repuestos/RepuestosPagination'
 import { EmptyState } from '@/components/repuestos/EmptyState'
-import { useMachines } from '@/hooks/repuestos/useMachines'
+import { MachineSelector } from '@/components/repuestos/MachineSelector'
 import { useRepuestos } from '@/hooks/repuestos/useRepuestos'
 import { useTags } from '@/hooks/repuestos/useTags'
 import { useToast } from '@/hooks/useToast'
-import type { Machine, Repuesto, RepuestoFormData } from '@/types/repuestos'
-import { isTagAsignado, getTagNombre } from '@/types/repuestos'
+import { useMachineContext, useCurrentMachine } from '@/contexts/MachineContext'
+import type { Repuesto, RepuestoFormData } from '@/types/repuestos'
+import { isTagAsignado, getTagNombre } from '@/types/tags'
+import {
+  exportRepuestosToExcel,
+  exportRepuestosToPDF,
+  exportTagsReportToPDF,
+} from '@/utils/repuestos'
 import {
   Button,
   Dialog,
@@ -43,9 +49,9 @@ const getSolicitudTotal = (repuesto: Repuesto) => {
 }
 
 export function RepuestosDashboard() {
-  const { machines, loading: machinesLoading, error: machinesError } = useMachines()
+  const { machines, loading: machinesLoading } = useMachineContext()
+  const currentMachine = useCurrentMachine()
   const { toast } = useToast()
-  const [selectedMachineId, setSelectedMachineId] = useState<string | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<Repuesto | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<Repuesto | null>(null)
@@ -60,18 +66,6 @@ export function RepuestosDashboard() {
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(25)
 
-  useEffect(() => {
-    if (selectedMachineId) return
-    if (machines.length === 0) return
-    const active = machines.find((m) => m.activa)
-    setSelectedMachineId((active?.id || machines[0]?.id) || null)
-  }, [machines, selectedMachineId])
-
-  const selectedMachine: Machine | null = useMemo(
-    () => machines.find((m) => m.id === selectedMachineId) || null,
-    [machines, selectedMachineId]
-  )
-
   const {
     repuestos,
     loading: repuestosLoading,
@@ -79,9 +73,9 @@ export function RepuestosDashboard() {
     createRepuesto,
     updateRepuesto,
     deleteRepuesto,
-  } = useRepuestos(selectedMachineId)
+  } = useRepuestos(currentMachine?.id || 'baader-200')
 
-  const { tags, loading: tagsLoading, error: tagsError } = useTags(repuestos, selectedMachineId)
+  const { tags, loading: tagsLoading, error: tagsError } = useTags(repuestos, currentMachine?.id || 'baader-200')
 
   // Filtrar repuestos
   const filteredRepuestos = useMemo(() => {
@@ -152,6 +146,15 @@ export function RepuestosDashboard() {
     return { total, withStock, withSolicitud, valorStock }
   }, [repuestos])
 
+  // Contar repuestos por máquina para el MachineSelector
+  const repuestosCounts = useMemo(() => {
+    const counts: Record<string, number> = {}
+    machines.forEach(m => {
+      counts[m.id] = m.id === currentMachine?.id ? repuestos.length : 0
+    })
+    return counts
+  }, [machines, currentMachine, repuestos])
+
   const handleClearFilters = () => {
     setSearchQuery('')
     setSelectedTags([])
@@ -159,8 +162,67 @@ export function RepuestosDashboard() {
     setSolicitudFilter('all')
   }
 
+  const handleExportExcel = async () => {
+    try {
+      await exportRepuestosToExcel(filteredRepuestos, {
+        machineName: currentMachine?.nombre || 'Repuestos',
+        includeTags: true,
+        includeImages: true,
+      })
+      toast({
+        title: 'Exportación exitosa',
+        description: 'El archivo Excel ha sido descargado.',
+        variant: 'success',
+      })
+    } catch (err) {
+      toast({
+        title: 'Error al exportar',
+        description: err instanceof Error ? err.message : 'No se pudo exportar a Excel.',
+        variant: 'destructive',
+      })
+    }
+  }
+
+  const handleExportPDF = async () => {
+    try {
+      await exportRepuestosToPDF(filteredRepuestos, {
+        machineName: currentMachine?.nombre || 'Repuestos',
+        includeStats: true,
+        includeTagsDetail: true,
+      })
+      toast({
+        title: 'Exportación exitosa',
+        description: 'El archivo PDF ha sido descargado.',
+        variant: 'success',
+      })
+    } catch (err) {
+      toast({
+        title: 'Error al exportar',
+        description: err instanceof Error ? err.message : 'No se pudo exportar a PDF.',
+        variant: 'destructive',
+      })
+    }
+  }
+
+  const handleExportTagsReport = async () => {
+    try {
+      await exportTagsReportToPDF(filteredRepuestos, currentMachine?.nombre || 'Repuestos')
+      toast({
+        title: 'Exportación exitosa',
+        description: 'El reporte de tags ha sido descargado.',
+        variant: 'success',
+      })
+    } catch (err) {
+      toast({
+        title: 'Error al exportar',
+        description: err instanceof Error ? err.message : 'No se pudo exportar el reporte.',
+        variant: 'destructive',
+      })
+    }
+  }
+
   const handleCreate = async (payload: RepuestoFormData) => {
-    if (!selectedMachineId) return
+    if (!currentMachine?.id) return
     setSaving(true)
     try {
       await createRepuesto(payload)
@@ -230,136 +292,136 @@ export function RepuestosDashboard() {
 
   if (machinesLoading) return <LoadingScreen />
 
-  if (!selectedMachineId) {
+  if (!currentMachine) {
     return (
       <div className="p-6 space-y-4">
         <h1 className="text-2xl font-bold">Repuestos</h1>
         <p className="text-muted-foreground">No hay máquinas configuradas aún.</p>
-        {machinesError ? <p className="text-sm text-destructive">{machinesError}</p> : null}
       </div>
     )
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Repuestos</h1>
-          <p className="text-muted-foreground">
-            Catálogo por máquina con inventario, tags y visibilidad en tiempo real.
-          </p>
-        </div>
-        <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-3">
-          <div className="flex items-center gap-2">
-            <label className="text-sm text-muted-foreground" htmlFor="machine-select">
-              Máquina
-            </label>
-            <select
-              id="machine-select"
-              className="min-w-[220px] rounded-lg border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-              value={selectedMachineId || ''}
-              onChange={(e) => setSelectedMachineId(e.target.value)}
-            >
-              {machines.map((machine) => (
-                <option key={machine.id} value={machine.id}>
-                  {machine.nombre}
-                </option>
-              ))}
-            </select>
-          </div>
-          <Button onClick={() => setCreateOpen(true)} className="w-full md:w-auto">
-            <Plus className="h-4 w-4" />
-            Nuevo repuesto
-          </Button>
-        </div>
-      </div>
+    <div className="flex flex-col h-full">
+      {/* Machine Selector Tabs */}
+      <MachineSelector repuestosCounts={repuestosCounts} />
 
-      {selectedMachine ? (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard label="Repuestos" value={stats.total.toLocaleString('es-CL')} subtle={selectedMachine.nombre} />
+      <div className="flex-1 p-6 space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <h1 className="text-3xl font-bold text-foreground">
+            Repuestos - {currentMachine.nombre}
+          </h1>
+          <div className="flex gap-2">
+            {/* Botones de exportación */}
+            <Button variant="outline" onClick={handleExportExcel} className="gap-2" title="Exportar a Excel">
+              <FileSpreadsheet className="h-4 w-4" />
+              Excel
+            </Button>
+            <Button variant="outline" onClick={handleExportPDF} className="gap-2" title="Exportar catálogo a PDF">
+              <FileText className="h-4 w-4" />
+              PDF
+            </Button>
+            
+            {/* Botón nuevo repuesto */}
+            <Button onClick={() => setCreateOpen(true)} className="gap-2">
+              <Plus className="h-4 w-4" />
+              Nuevo repuesto
+            </Button>
+          </div>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <StatCard label="Repuestos" value={stats.total.toLocaleString('es-CL')} subtle={currentMachine.nombre} />
           <StatCard label="Con stock" value={stats.withStock.toLocaleString('es-CL')} />
           <StatCard label="Con solicitudes" value={stats.withSolicitud.toLocaleString('es-CL')} />
           <StatCard label="Valor de stock" value={`$${stats.valorStock.toLocaleString('es-CL')}`} />
         </div>
-      ) : null}
 
-      {(machinesError || repuestosError || tagsError) && (
-        <div className="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive flex items-center gap-2">
-          <AlertTriangle className="h-4 w-4" />
-          {machinesError || repuestosError || tagsError}
-        </div>
-      )}
-
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex flex-col">
-            <span className="text-sm font-semibold text-foreground">Listado de repuestos</span>
-            <span className="text-xs text-muted-foreground">
-              {filteredRepuestos.length} de {repuestos.length} elementos — Tags {tagsLoading ? 'cargando...' : `${tags.length}`} disponibles.
-            </span>
+        {/* Error Display */}
+        {(repuestosError || tagsError) && (
+          <div className="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4" />
+            {repuestosError || tagsError}
           </div>
-        </div>
+        )}
 
-        <RepuestosFilters
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          selectedTags={selectedTags}
-          onTagsChange={setSelectedTags}
-          stockFilter={stockFilter}
-          onStockFilterChange={setStockFilter}
-          solicitudFilter={solicitudFilter}
-          onSolicitudFilterChange={setSolicitudFilter}
-          availableTags={tags}
-          onClearFilters={handleClearFilters}
-        />
+        {/* Content Area */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex flex-col">
+              <span className="text-sm font-semibold text-foreground">Listado de repuestos</span>
+              <span className="text-xs text-muted-foreground">
+                {filteredRepuestos.length} de {repuestos.length} elementos — Tags {tagsLoading ? 'cargando...' : `${tags.length}`} disponibles.
+              </span>
+            </div>
+          </div>
 
-        {filteredRepuestos.length === 0 ? (
-          <EmptyState
-            hasFilters={searchQuery !== '' || selectedTags.length > 0 || stockFilter !== 'all' || solicitudFilter !== 'all'}
+          <RepuestosFilters
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            selectedTags={selectedTags}
+            onTagsChange={setSelectedTags}
+            stockFilter={stockFilter}
+            onStockFilterChange={setStockFilter}
+            solicitudFilter={solicitudFilter}
+            onSolicitudFilterChange={setSolicitudFilter}
+            availableTags={tags}
             onClearFilters={handleClearFilters}
           />
-        ) : (
-          <>
-            <RepuestosTable
-              repuestos={paginatedRepuestos}
-              loading={repuestosLoading}
-              onEdit={(rep) => setEditTarget(rep)}
-              onDelete={(rep) => setConfirmDelete(rep)}
-            />
 
-            <RepuestosPagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              pageSize={pageSize}
-              totalItems={filteredRepuestos.length}
-              onPageChange={setCurrentPage}
-              onPageSizeChange={setPageSize}
+          {filteredRepuestos.length === 0 ? (
+            <EmptyState
+              hasFilters={searchQuery !== '' || selectedTags.length > 0 || stockFilter !== 'all' || solicitudFilter !== 'all'}
+              onClearFilters={handleClearFilters}
             />
-          </>
-        )}
+          ) : (
+            <>
+              <RepuestosTable
+                repuestos={paginatedRepuestos}
+                loading={repuestosLoading}
+                onEdit={(rep) => setEditTarget(rep)}
+                onDelete={(rep) => setConfirmDelete(rep)}
+              />
+
+              <RepuestosPagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                pageSize={pageSize}
+                totalItems={filteredRepuestos.length}
+                onPageChange={setCurrentPage}
+                onPageSizeChange={setPageSize}
+              />
+            </>
+          )}
+        </div>
       </div>
 
+      {/* Create Modal */}
       <RepuestoFormModal
         open={createOpen}
         onClose={() => setCreateOpen(false)}
         mode="create"
-        machineName={selectedMachine?.nombre}
+        machineName={currentMachine.nombre}
         availableTags={tags}
         onSubmit={handleCreate}
         loading={saving}
       />
 
+      {/* Edit Modal */}
       <RepuestoFormModal
         open={Boolean(editTarget)}
         onClose={() => setEditTarget(null)}
         mode="edit"
-        machineName={selectedMachine?.nombre}
+        machineName={currentMachine.nombre}
         availableTags={tags}
         initialData={editTarget || undefined}
         onSubmit={handleUpdate}
         loading={saving}
       />
 
+      {/* Delete Confirmation Dialog */}
       <Dialog open={Boolean(confirmDelete)} onOpenChange={(open) => (!open ? setConfirmDelete(null) : null)}>
         <DialogContent>
           <DialogHeader>

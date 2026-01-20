@@ -17,9 +17,9 @@ import type {
   Repuesto, 
   HistorialCambio, 
   RepuestoFormData, 
-  TagAsignado
 } from '@/types/repuestos';
-import { getTagNombre, isTagAsignado } from '@/types/repuestos';
+import type { TagAsignado } from '@/types/tags';
+import { isTagAsignado, computeTotalFromTags, getTagNombre } from '@/types/tags';
 
 export interface ImportCantidadRow {
   codigoSAP?: string;
@@ -36,14 +36,6 @@ export interface ImportCantidadRow {
     valorUnitario?: boolean;
   };
 }
-
-const computeTotalFromTags = (tags: unknown, valorUnitario: number) => {
-  if (!Array.isArray(tags) || !Number.isFinite(valorUnitario)) return 0;
-  return tags.reduce((sum, tag) => {
-    if (isTagAsignado(tag)) return sum + (tag.cantidad || 0) * valorUnitario;
-    return sum;
-  }, 0);
-};
 
 const hasAnyStockFromTags = (tags: unknown) => {
   if (!Array.isArray(tags)) return false;
@@ -194,7 +186,7 @@ export function useRepuestos(machineId: string | null) {
       console.log('   📂 Saving to collection:', collectionPath);
       console.log('   📦 Repuesto data:', { codigoSAP: data.codigoSAP, textoBreve: data.textoBreve });
       
-      const totalFromTags = computeTotalFromTags(data.tags, data.valorUnitario);
+      const totalFromTags = computeTotalFromTags(data.tags || [], data.valorUnitario);
       const totalLegacy = (data.cantidadSolicitada * data.valorUnitario) + (data.cantidadStockBodega * data.valorUnitario);
       const total = totalFromTags > 0 ? totalFromTags : totalLegacy;
       const hasStock = hasAnyStockFromTags(data.tags) || data.cantidadStockBodega > 0;
@@ -248,7 +240,7 @@ export function useRepuestos(machineId: string | null) {
         const valor = data.valorUnitario ?? originalData?.valorUnitario ?? 0;
         const tags = data.tags ?? originalData?.tags;
 
-        const totalFromTags = computeTotalFromTags(tags, valor);
+        const totalFromTags = computeTotalFromTags(tags || [], valor);
         const cantidadSolicitada = data.cantidadSolicitada ?? originalData?.cantidadSolicitada ?? 0;
         const cantidadStock = data.cantidadStockBodega ?? originalData?.cantidadStockBodega ?? 0;
         const totalLegacy = (cantidadSolicitada * valor) + (cantidadStock * valor);
