@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.31.0**
+## Versión Actual: **v2.31.1**
 
 **Fecha de lanzamiento**: 20 de enero de 2026  \
 **Estado**: ✅ PRODUCCIÓN READY  \
@@ -9,6 +9,20 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.31.1 - Fix categorías máquinas (20/01/2026)
+
+**Nuevas Funcionalidades:**
+- ✅ Gestión de máquinas en Configuración (admin) con selector de categoría
+- ✅ Drag & drop de categorías con persistencia
+
+**Correcciones:**
+- 🔧 Fix Radix Select: se evita valor vacío en edición de máquina/categoría
+- 🔧 Auto-asignación inicial de categorías a máquinas existentes
+
+**Tipo de cambio:** fix
+
+---
 
 ### v2.31.0 - Mejoras UI Sensores y Gestión Dispositivos RTDB (20/01/2026)
 

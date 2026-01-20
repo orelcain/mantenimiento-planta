@@ -47,7 +47,7 @@ export function MachineManager() {
     marca: '',
     modelo: '',
     descripcion: '',
-    categoryId: '',
+    categoryId: 'none', // usar 'none' como sentinel para "Sin categoría"
     color: '#3b82f6',
   });
 
@@ -58,7 +58,7 @@ export function MachineManager() {
       marca: '',
       modelo: '',
       descripcion: '',
-      categoryId: '',
+      categoryId: 'none',
       color: '#3b82f6',
     });
     setEditingMachine(null);
@@ -78,7 +78,7 @@ export function MachineManager() {
       marca: machine.marca,
       modelo: machine.modelo,
       descripcion: machine.descripcion || '',
-      categoryId: machine.categoryId || '',
+      categoryId: machine.categoryId ?? 'none',
       color: machine.color || '#3b82f6',
     });
     setShowDialog(true);
@@ -103,7 +103,7 @@ export function MachineManager() {
           marca: formData.marca,
           modelo: formData.modelo,
           descripcion: formData.descripcion,
-          categoryId: formData.categoryId || null,
+          categoryId: formData.categoryId === 'none' ? null : formData.categoryId,
           color: formData.color,
         });
 
@@ -118,7 +118,7 @@ export function MachineManager() {
           marca: formData.marca,
           modelo: formData.modelo,
           descripcion: formData.descripcion,
-          categoryId: formData.categoryId || null,
+          categoryId: formData.categoryId === 'none' ? null : formData.categoryId,
           color: formData.color,
           activa: true,
           orden: 0,
@@ -395,7 +395,7 @@ export function MachineManager() {
                   <SelectValue placeholder="Seleccionar categoría" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Sin categoría</SelectItem>
+                  <SelectItem value="none">Sin categoría</SelectItem>
                   {categories
                     .filter((c) => c.activa)
                     .map((category) => (
