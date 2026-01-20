@@ -1,0 +1,988 @@
+[
+  {
+    "id": "map-acopio",
+    "nombre": "Planta Acopio",
+    "descripcion": "Mapa general del área de acopio con ubicación de equipos",
+    "imageUrl": "/images/maps/planta-acopio.png",
+    "orden": 0,
+    "marcadores": [
+      {
+        "id": "marker-acopio-001",
+        "x": 0.7378506595657486,
+        "y": 0.15672033472213154,
+        "label": "Bomba Vacío N1",
+        "assetId": "asset-720000000",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.656Z",
+        "updatedAt": "2026-01-20T04:24:51.656Z"
+      },
+      {
+        "id": "marker-acopio-002",
+        "x": 0.50055526504721,
+        "y": 0.5650541028628,
+        "label": "Bomba Flujo N1",
+        "assetId": "asset-720000001",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.656Z",
+        "updatedAt": "2026-01-20T04:24:51.656Z"
+      },
+      {
+        "id": "marker-acopio-003",
+        "x": 0.46996474232581975,
+        "y": 0.8853711547695227,
+        "label": "Compresor N1",
+        "assetId": "asset-720000002",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.656Z",
+        "updatedAt": "2026-01-20T04:24:51.656Z"
+      },
+      {
+        "id": "marker-acopio-004",
+        "x": 0.40036771347623534,
+        "y": 0.6538031734977676,
+        "label": "Bomba Vacío N2",
+        "assetId": "asset-720000003",
+        "type": "motor",
+        "createdAt": "2026-01-20T04:24:51.656Z",
+        "updatedAt": "2026-01-20T04:24:51.656Z"
+      },
+      {
+        "id": "marker-acopio-005",
+        "x": 0.2757347827014387,
+        "y": 0.9668108605955996,
+        "label": "Bomba Flujo N2",
+        "assetId": "asset-720000004",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.656Z",
+        "updatedAt": "2026-01-20T04:24:51.656Z"
+      },
+      {
+        "id": "marker-acopio-006",
+        "x": 0.1732958089745884,
+        "y": 0.5843242398058726,
+        "label": "Compresor N2",
+        "assetId": "asset-720000005",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.656Z",
+        "updatedAt": "2026-01-20T04:24:51.656Z"
+      },
+      {
+        "id": "marker-acopio-007",
+        "x": 0.3260642206821964,
+        "y": 0.254943398193485,
+        "label": "Sistema Refrigeración",
+        "assetId": "asset-720000006",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.656Z",
+        "updatedAt": "2026-01-20T04:24:51.656Z"
+      },
+      {
+        "id": "marker-acopio-008",
+        "x": 0.38769151005690117,
+        "y": 0.7058471365039634,
+        "label": "Extractor Aire Caliente",
+        "assetId": "asset-720000007",
+        "type": "motor",
+        "createdAt": "2026-01-20T04:24:51.656Z",
+        "updatedAt": "2026-01-20T04:24:51.656Z"
+      },
+      {
+        "id": "marker-acopio-009",
+        "x": 0.835746846736753,
+        "y": 0.326538238714875,
+        "label": "Huinche Levante",
+        "assetId": "asset-720000008",
+        "type": "motor",
+        "createdAt": "2026-01-20T04:24:51.656Z",
+        "updatedAt": "2026-01-20T04:24:51.656Z"
+      },
+      {
+        "id": "marker-acopio-010",
+        "x": 0.23167248768373572,
+        "y": 0.5445536924561305,
+        "label": "Motobomba Agua",
+        "assetId": "asset-720000009",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-acopio-011",
+        "x": 0.09409891476557308,
+        "y": 0.4443680133652044,
+        "label": "Bomba Vacío N1",
+        "assetId": "asset-720000010",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-acopio-012",
+        "x": 0.9164273801155225,
+        "y": 0.8151610698780218,
+        "label": "Bomba Flujo N1",
+        "assetId": "asset-720000011",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-acopio-013",
+        "x": 0.6908871868804707,
+        "y": 0.25015942418466075,
+        "label": "Compresor N1",
+        "assetId": "asset-720000012",
+        "type": "motor",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-acopio-014",
+        "x": 0.4258347633198749,
+        "y": 0.18898184158344078,
+        "label": "Bomba Vacío N2",
+        "assetId": "asset-720000013",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-acopio-015",
+        "x": 0.08612664650691548,
+        "y": 0.1899509047039707,
+        "label": "Bomba Flujo N2",
+        "assetId": "asset-720000014",
+        "type": "motor",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-acopio-016",
+        "x": 0.448234910465805,
+        "y": 0.9408615300808849,
+        "label": "Compresor N2",
+        "assetId": "asset-720000015",
+        "type": "motor",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-acopio-017",
+        "x": 0.6128866521356326,
+        "y": 0.332756695559705,
+        "label": "Sistema Refrigeración",
+        "assetId": "asset-720000016",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-acopio-018",
+        "x": 0.6876186021672814,
+        "y": 0.9135981001771278,
+        "label": "Extractor Aire Caliente",
+        "assetId": "asset-720000017",
+        "type": "motor",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-acopio-019",
+        "x": 0.02707470032331516,
+        "y": 0.9937931428155031,
+        "label": "Huinche Levante",
+        "assetId": "asset-720000018",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-acopio-020",
+        "x": 0.3831493998489366,
+        "y": 0.9811551699807426,
+        "label": "Motobomba Agua",
+        "assetId": "asset-720000019",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-acopio-021",
+        "x": 0.43687948381803277,
+        "y": 0.28298473775859856,
+        "label": "Bomba Vacío N1",
+        "assetId": "asset-720000020",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-acopio-022",
+        "x": 0.004531011957847886,
+        "y": 0.893663919822099,
+        "label": "Bomba Flujo N1",
+        "assetId": "asset-720000021",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-acopio-023",
+        "x": 0.13939018033436934,
+        "y": 0.21444323977491453,
+        "label": "Compresor N1",
+        "assetId": "asset-720000022",
+        "type": "motor",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-acopio-024",
+        "x": 0.34154268548047595,
+        "y": 0.8057105897736605,
+        "label": "Bomba Vacío N2",
+        "assetId": "asset-720000023",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-acopio-025",
+        "x": 0.5175153401584842,
+        "y": 0.86541977587937,
+        "label": "Bomba Flujo N2",
+        "assetId": "asset-720000024",
+        "type": "motor",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-acopio-026",
+        "x": 0.7524586506863953,
+        "y": 0.370664974345148,
+        "label": "Compresor N2",
+        "assetId": "asset-720000025",
+        "type": "motor",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-acopio-027",
+        "x": 0.4914684200198578,
+        "y": 0.4925865882425189,
+        "label": "Sistema Refrigeración",
+        "assetId": "asset-720000026",
+        "type": "motor",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-acopio-028",
+        "x": 0.8273203752971898,
+        "y": 0.9719930697853627,
+        "label": "Extractor Aire Caliente",
+        "assetId": "asset-720000027",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-acopio-029",
+        "x": 0.3227334770440937,
+        "y": 0.6458666311193098,
+        "label": "Huinche Levante",
+        "assetId": "asset-720000028",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-acopio-030",
+        "x": 0.5324762103616736,
+        "y": 0.07352382187401507,
+        "label": "Motobomba Agua",
+        "assetId": "asset-720000029",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-acopio-031",
+        "x": 0.015206540403579938,
+        "y": 0.050362547359435794,
+        "label": "Bomba Vacío N1",
+        "assetId": "asset-720000030",
+        "type": "motor",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-acopio-032",
+        "x": 0.9950898038986706,
+        "y": 0.1272976875108356,
+        "label": "Bomba Flujo N1",
+        "assetId": "asset-720000031",
+        "type": "motor",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-acopio-033",
+        "x": 0.3113086938687708,
+        "y": 0.06188603808070492,
+        "label": "Compresor N1",
+        "assetId": "asset-720000032",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-acopio-034",
+        "x": 0.4492536769985245,
+        "y": 0.2701674363757749,
+        "label": "Bomba Vacío N2",
+        "assetId": "asset-720000033",
+        "type": "motor",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-acopio-035",
+        "x": 0.8335044956349396,
+        "y": 0.4825716336658705,
+        "label": "Bomba Flujo N2",
+        "assetId": "asset-720000034",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-acopio-036",
+        "x": 0.15585916644207898,
+        "y": 0.27899578945470505,
+        "label": "Compresor N2",
+        "assetId": "asset-720000035",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-acopio-037",
+        "x": 0.5021721471545428,
+        "y": 0.09414936091502413,
+        "label": "Sistema Refrigeración",
+        "assetId": "asset-720000036",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-acopio-038",
+        "x": 0.017604432159893157,
+        "y": 0.3301926113234783,
+        "label": "Extractor Aire Caliente",
+        "assetId": "asset-720000037",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-acopio-039",
+        "x": 0.9064038007620456,
+        "y": 0.6030176739579798,
+        "label": "Huinche Levante",
+        "assetId": "asset-720000038",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-acopio-040",
+        "x": 0.273627001278292,
+        "y": 0.17266786868594286,
+        "label": "Motobomba Agua",
+        "assetId": "asset-720000039",
+        "type": "motor",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      }
+    ],
+    "areas": [],
+    "createdAt": "2025-11-04T15:29:35.952Z",
+    "updatedAt": "2026-01-20T04:24:51.657Z"
+  },
+  {
+    "id": "map-chonchi",
+    "nombre": "Planta Chonchi - Línea Producción",
+    "descripcion": "Mapa de la línea de producción principal con motores y bombas",
+    "imageUrl": "/images/maps/planta-chonchi.png",
+    "orden": 1,
+    "marcadores": [
+      {
+        "id": "marker-chonchi-001",
+        "x": 0.21077642417906017,
+        "y": 0.52473478305916,
+        "label": "Fileteadora Baader N1",
+        "assetId": "asset-720000000",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-chonchi-002",
+        "x": 0.4741713852369638,
+        "y": 0.43604720095920624,
+        "label": "Fileteadora Baader N2",
+        "assetId": "asset-720000001",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-chonchi-003",
+        "x": 0.5795301863037756,
+        "y": 0.4167508536711497,
+        "label": "Cinta Alimentación",
+        "assetId": "asset-720000002",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-chonchi-004",
+        "x": 0.4267835690296635,
+        "y": 0.9185488886137452,
+        "label": "Cinta Esquelones",
+        "assetId": "asset-720000003",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-chonchi-005",
+        "x": 0.3703306699051365,
+        "y": 0.07291485763142647,
+        "label": "Cinta Salida",
+        "assetId": "asset-720000004",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-chonchi-006",
+        "x": 0.5947070983315916,
+        "y": 0.6749221121012456,
+        "label": "Balanza Dinámica",
+        "assetId": "asset-720000005",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-chonchi-007",
+        "x": 0.2317385548771851,
+        "y": 0.15780572667371073,
+        "label": "Volcador Bins",
+        "assetId": "asset-720000006",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-chonchi-008",
+        "x": 0.23892170732558538,
+        "y": 0.8478916263136047,
+        "label": "Compresor Central",
+        "assetId": "asset-720000007",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-chonchi-009",
+        "x": 0.9983444579777221,
+        "y": 0.8544748188683038,
+        "label": "Bomba Principal",
+        "assetId": "asset-720000008",
+        "type": "motor",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-chonchi-010",
+        "x": 0.8630953832263764,
+        "y": 0.9544446434814786,
+        "label": "Sistema Extracción",
+        "assetId": "asset-720000009",
+        "type": "motor",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-chonchi-011",
+        "x": 0.712754566601179,
+        "y": 0.8649702677081714,
+        "label": "Fileteadora Baader N1",
+        "assetId": "asset-720000010",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-chonchi-012",
+        "x": 0.18127581216181543,
+        "y": 0.2569295348618037,
+        "label": "Fileteadora Baader N2",
+        "assetId": "asset-720000011",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-chonchi-013",
+        "x": 0.2777610555890906,
+        "y": 0.5794076069722305,
+        "label": "Cinta Alimentación",
+        "assetId": "asset-720000012",
+        "type": "motor",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-chonchi-014",
+        "x": 0.6645498156947076,
+        "y": 0.8183966445107957,
+        "label": "Cinta Esquelones",
+        "assetId": "asset-720000013",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-chonchi-015",
+        "x": 0.5891303745569765,
+        "y": 0.07808471079937629,
+        "label": "Cinta Salida",
+        "assetId": "asset-720000014",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-chonchi-016",
+        "x": 0.035695361129452596,
+        "y": 0.8049794108297845,
+        "label": "Balanza Dinámica",
+        "assetId": "asset-720000015",
+        "type": "motor",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-chonchi-017",
+        "x": 0.43494539910078367,
+        "y": 0.7112091837148136,
+        "label": "Volcador Bins",
+        "assetId": "asset-720000016",
+        "type": "motor",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-chonchi-018",
+        "x": 0.2988548491981702,
+        "y": 0.9207990693096189,
+        "label": "Compresor Central",
+        "assetId": "asset-720000017",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-chonchi-019",
+        "x": 0.6323768115853803,
+        "y": 0.3134175513079287,
+        "label": "Bomba Principal",
+        "assetId": "asset-720000018",
+        "type": "motor",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-chonchi-020",
+        "x": 0.17480798907301454,
+        "y": 0.10894584367126425,
+        "label": "Sistema Extracción",
+        "assetId": "asset-720000019",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-chonchi-021",
+        "x": 0.5920376717606559,
+        "y": 0.2712298247932554,
+        "label": "Fileteadora Baader N1",
+        "assetId": "asset-720000020",
+        "type": "motor",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-chonchi-022",
+        "x": 0.34060787361332245,
+        "y": 0.45913468211158115,
+        "label": "Fileteadora Baader N2",
+        "assetId": "asset-720000021",
+        "type": "motor",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-chonchi-023",
+        "x": 0.796329773248931,
+        "y": 0.9784432358673132,
+        "label": "Cinta Alimentación",
+        "assetId": "asset-720000022",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-chonchi-024",
+        "x": 0.6077713231463091,
+        "y": 0.05726368305785101,
+        "label": "Cinta Esquelones",
+        "assetId": "asset-720000023",
+        "type": "motor",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-chonchi-025",
+        "x": 0.13819131703072496,
+        "y": 0.6440778243503482,
+        "label": "Cinta Salida",
+        "assetId": "asset-720000024",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-chonchi-026",
+        "x": 0.602110315830831,
+        "y": 0.8721922720657869,
+        "label": "Balanza Dinámica",
+        "assetId": "asset-720000025",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-chonchi-027",
+        "x": 0.31636877035522026,
+        "y": 0.08786634363548296,
+        "label": "Volcador Bins",
+        "assetId": "asset-720000026",
+        "type": "motor",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-chonchi-028",
+        "x": 0.027833440843523682,
+        "y": 0.14223180758393883,
+        "label": "Compresor Central",
+        "assetId": "asset-720000027",
+        "type": "motor",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-chonchi-029",
+        "x": 0.18185017881104892,
+        "y": 0.5041465126105618,
+        "label": "Bomba Principal",
+        "assetId": "asset-720000028",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-chonchi-030",
+        "x": 0.9721977893716243,
+        "y": 0.2068249670299278,
+        "label": "Sistema Extracción",
+        "assetId": "asset-720000029",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      }
+    ],
+    "areas": [],
+    "createdAt": "2025-11-13T08:35:53.749Z",
+    "updatedAt": "2026-01-20T04:24:51.657Z"
+  },
+  {
+    "id": "map-yal",
+    "nombre": "Planta Yal - Área de Tratamiento",
+    "descripcion": "Mapa del área de tratamiento de agua y sistemas complementarios",
+    "imageUrl": "/images/maps/planta-yal.png",
+    "orden": 2,
+    "marcadores": [
+      {
+        "id": "marker-yal-001",
+        "x": 0.5317319737112505,
+        "y": 0.9981423457457077,
+        "label": "Sistema Bombeo Peces N1",
+        "assetId": "asset-720000000",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-yal-002",
+        "x": 0.048141048609692705,
+        "y": 0.06688243719482401,
+        "label": "Sistema Bombeo Peces N2",
+        "assetId": "asset-720000001",
+        "type": "motor",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-yal-003",
+        "x": 0.7955220249901152,
+        "y": 0.9712068466253505,
+        "label": "Clorador Agua Dulce",
+        "assetId": "asset-720000002",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-yal-004",
+        "x": 0.7634732021283672,
+        "y": 0.16586813125202315,
+        "label": "Clorador Agua Salada",
+        "assetId": "asset-720000003",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-yal-005",
+        "x": 0.8339013627859488,
+        "y": 0.4665135116009971,
+        "label": "Bomba Dosificación",
+        "assetId": "asset-720000004",
+        "type": "motor",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-yal-006",
+        "x": 0.8654589762586709,
+        "y": 0.09725159036952835,
+        "label": "Caudalímetro",
+        "assetId": "asset-720000005",
+        "type": "motor",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-yal-007",
+        "x": 0.1690762964127428,
+        "y": 0.3014618829010254,
+        "label": "Bomba Tratamiento",
+        "assetId": "asset-720000006",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-yal-008",
+        "x": 0.9590698376954987,
+        "y": 0.4293603643235453,
+        "label": "Compresor Aire",
+        "assetId": "asset-720000007",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-yal-009",
+        "x": 0.6862684904784147,
+        "y": 0.6544867246816035,
+        "label": "Bomba Recirculación",
+        "assetId": "asset-720000008",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-yal-010",
+        "x": 0.6062645516509195,
+        "y": 0.9948553826800777,
+        "label": "Filtro Principal",
+        "assetId": "asset-720000009",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-yal-011",
+        "x": 0.7408844467546869,
+        "y": 0.41079111674111046,
+        "label": "Sistema Bombeo Peces N1",
+        "assetId": "asset-720000010",
+        "type": "motor",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-yal-012",
+        "x": 0.3954065923652472,
+        "y": 0.33299778191693874,
+        "label": "Sistema Bombeo Peces N2",
+        "assetId": "asset-720000011",
+        "type": "motor",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-yal-013",
+        "x": 0.7121258048375239,
+        "y": 0.44036497021805365,
+        "label": "Clorador Agua Dulce",
+        "assetId": "asset-720000012",
+        "type": "motor",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-yal-014",
+        "x": 0.17783578873601757,
+        "y": 0.18403993916611583,
+        "label": "Clorador Agua Salada",
+        "assetId": "asset-720000013",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-yal-015",
+        "x": 0.041834892069073426,
+        "y": 0.07290205317033771,
+        "label": "Bomba Dosificación",
+        "assetId": "asset-720000014",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-yal-016",
+        "x": 0.26391747302552115,
+        "y": 0.23039890170293487,
+        "label": "Caudalímetro",
+        "assetId": "asset-720000015",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-yal-017",
+        "x": 0.14362290624928975,
+        "y": 0.08037095368190839,
+        "label": "Bomba Tratamiento",
+        "assetId": "asset-720000016",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-yal-018",
+        "x": 0.6044116302739617,
+        "y": 0.25316386341101493,
+        "label": "Compresor Aire",
+        "assetId": "asset-720000017",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-yal-019",
+        "x": 0.7520822085967769,
+        "y": 0.06020112117313392,
+        "label": "Bomba Recirculación",
+        "assetId": "asset-720000018",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-yal-020",
+        "x": 0.42474342844645974,
+        "y": 0.7132682385253031,
+        "label": "Filtro Principal",
+        "assetId": "asset-720000019",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-yal-021",
+        "x": 0.40725933324425667,
+        "y": 0.06527391101954927,
+        "label": "Sistema Bombeo Peces N1",
+        "assetId": "asset-720000020",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-yal-022",
+        "x": 0.7904570973313094,
+        "y": 0.44538794098433154,
+        "label": "Sistema Bombeo Peces N2",
+        "assetId": "asset-720000021",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-yal-023",
+        "x": 0.917324270256143,
+        "y": 0.2932114076151837,
+        "label": "Clorador Agua Dulce",
+        "assetId": "asset-720000022",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-yal-024",
+        "x": 0.017335787197262365,
+        "y": 0.67260944504213,
+        "label": "Clorador Agua Salada",
+        "assetId": "asset-720000023",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      },
+      {
+        "id": "marker-yal-025",
+        "x": 0.7870970046748744,
+        "y": 0.9104014038127006,
+        "label": "Bomba Dosificación",
+        "assetId": "asset-720000024",
+        "type": "bomba",
+        "createdAt": "2026-01-20T04:24:51.657Z",
+        "updatedAt": "2026-01-20T04:24:51.657Z"
+      }
+    ],
+    "areas": [],
+    "createdAt": "2025-11-29T08:48:02.382Z",
+    "updatedAt": "2026-01-20T04:24:51.657Z"
+  }
+]

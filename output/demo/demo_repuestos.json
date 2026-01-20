@@ -1,0 +1,4634 @@
+[
+  {
+    "id": "rep-0001",
+    "codigoSAP": "4500000000",
+    "codigoBaader": "200-ROD-001",
+    "textoBreve": "Motor SKF #1",
+    "descripcion": "Motor para Baader 200 - Rodillos y Correas. Marca: SKF. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 1,
+    "cantidadStockBodega": 2,
+    "valorUnitario": 187771,
+    "tags": [
+      {
+        "nombre": "Stock mínimo",
+        "tipo": "stock",
+        "cantidad": 13,
+        "fecha": "2026-01-20T04:24:51.646Z"
+      },
+      {
+        "nombre": "Críticos",
+        "tipo": "solicitud",
+        "cantidad": 7,
+        "fecha": "2026-01-20T04:24:51.648Z"
+      },
+      {
+        "nombre": "Pedido realizado",
+        "tipo": "solicitud",
+        "cantidad": 10,
+        "fecha": "2026-01-20T04:24:51.649Z"
+      }
+    ],
+    "total": 563313,
+    "nombreManual": "SKF Motor",
+    "fechaUltimaActualizacionInventario": "2026-01-04T20:10:05.533Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-05-08T11:15:38.991Z",
+    "updatedAt": "2025-12-25T14:12:38.790Z"
+  },
+  {
+    "id": "rep-0002",
+    "codigoSAP": "4500000001",
+    "codigoBaader": "200-MOT-002",
+    "textoBreve": "Bomba NSK #2",
+    "descripcion": "Bomba para Baader 200 - Motores y Reductores. Marca: NSK. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 4,
+    "cantidadStockBodega": 6,
+    "valorUnitario": 26919,
+    "tags": [
+      {
+        "nombre": "Críticos",
+        "tipo": "solicitud",
+        "cantidad": 11,
+        "fecha": "2026-01-20T04:24:51.649Z"
+      },
+      {
+        "nombre": "Obsoleto",
+        "tipo": "stock",
+        "cantidad": 12,
+        "fecha": "2026-01-20T04:24:51.649Z"
+      },
+      {
+        "nombre": "Stock mínimo",
+        "tipo": "stock",
+        "cantidad": 1,
+        "fecha": "2026-01-20T04:24:51.649Z"
+      }
+    ],
+    "total": 269190,
+    "nombreManual": "NSK Bomba",
+    "fechaUltimaActualizacionInventario": "2025-11-19T04:05:29.982Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-04-06T07:42:57.039Z",
+    "updatedAt": "2026-01-16T10:50:53.164Z"
+  },
+  {
+    "id": "rep-0003",
+    "codigoSAP": "4500000002",
+    "codigoBaader": "200-BOM-003",
+    "textoBreve": "Válvula TIMKEN #3",
+    "descripcion": "Válvula para Baader 200 - Bombas y Válvulas. Marca: TIMKEN. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 1,
+    "cantidadStockBodega": 2,
+    "valorUnitario": 116676,
+    "tags": [
+      {
+        "nombre": "Obsoleto",
+        "tipo": "stock",
+        "cantidad": 17,
+        "fecha": "2026-01-20T04:24:51.649Z"
+      },
+      {
+        "nombre": "En espera proveedor",
+        "tipo": "solicitud",
+        "cantidad": 1,
+        "fecha": "2026-01-20T04:24:51.649Z"
+      }
+    ],
+    "total": 350028,
+    "nombreManual": "TIMKEN Válvula",
+    "fechaUltimaActualizacionInventario": "2025-11-20T22:52:46.890Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-03-09T09:02:33.985Z",
+    "updatedAt": "2026-01-14T14:06:40.542Z"
+  },
+  {
+    "id": "rep-0004",
+    "codigoSAP": "4500000003",
+    "codigoBaader": "200-SEN-004",
+    "textoBreve": "Rodillo Siemens #4",
+    "descripcion": "Rodillo para Baader 200 - Sensores. Marca: Siemens. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 1,
+    "cantidadStockBodega": 8,
+    "valorUnitario": 123902,
+    "tags": [
+      {
+        "nombre": "Obsoleto",
+        "tipo": "stock",
+        "cantidad": 14,
+        "fecha": "2026-01-20T04:24:51.649Z"
+      },
+      {
+        "nombre": "En espera proveedor",
+        "tipo": "solicitud",
+        "cantidad": 10,
+        "fecha": "2026-01-20T04:24:51.649Z"
+      }
+    ],
+    "total": 1115118,
+    "nombreManual": "Siemens Rodillo",
+    "fechaUltimaActualizacionInventario": "2025-11-08T19:01:24.297Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-05-20T06:43:25.769Z",
+    "updatedAt": "2025-12-27T16:54:29.452Z"
+  },
+  {
+    "id": "rep-0005",
+    "codigoSAP": "4500000004",
+    "codigoBaader": "200-COM-005",
+    "textoBreve": "Sensor ABB #5",
+    "descripcion": "Sensor para Baader 200 - Componentes Hidráulicos. Marca: ABB. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 2,
+    "cantidadStockBodega": 4,
+    "valorUnitario": 232225,
+    "tags": [
+      {
+        "nombre": "Overstock",
+        "tipo": "stock",
+        "cantidad": 11,
+        "fecha": "2026-01-20T04:24:51.649Z"
+      }
+    ],
+    "total": 1393350,
+    "nombreManual": "ABB Sensor",
+    "fechaUltimaActualizacionInventario": "2025-11-13T20:15:53.691Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-04-29T00:55:58.442Z",
+    "updatedAt": "2026-01-12T03:28:13.333Z"
+  },
+  {
+    "id": "rep-0006",
+    "codigoSAP": "4500000005",
+    "codigoBaader": "200-ELE-006",
+    "textoBreve": "Compresor Grundfos #6",
+    "descripcion": "Compresor para Baader 200 - Elementos de Corte. Marca: Grundfos. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 0,
+    "cantidadStockBodega": 7,
+    "valorUnitario": 258102,
+    "tags": [
+      {
+        "nombre": "En espera proveedor",
+        "tipo": "solicitud",
+        "cantidad": 14,
+        "fecha": "2026-01-20T04:24:51.649Z"
+      },
+      {
+        "nombre": "Stock mínimo",
+        "tipo": "stock",
+        "cantidad": 7,
+        "fecha": "2026-01-20T04:24:51.649Z"
+      }
+    ],
+    "total": 1806714,
+    "nombreManual": "Grundfos Compresor",
+    "fechaUltimaActualizacionInventario": "2026-01-05T01:03:53.942Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-11-05T02:38:41.662Z",
+    "updatedAt": "2026-01-06T09:18:56.646Z"
+  },
+  {
+    "id": "rep-0007",
+    "codigoSAP": "4500000006",
+    "codigoBaader": "200-COJ-007",
+    "textoBreve": "Motor Rexroth #7",
+    "descripcion": "Motor para Baader 200 - Cojinetes. Marca: Rexroth. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 2,
+    "cantidadStockBodega": 0,
+    "valorUnitario": 60088,
+    "tags": [
+      {
+        "nombre": "En espera proveedor",
+        "tipo": "solicitud",
+        "cantidad": 4,
+        "fecha": "2026-01-20T04:24:51.649Z"
+      },
+      {
+        "nombre": "Obsoleto",
+        "tipo": "stock",
+        "cantidad": 15,
+        "fecha": "2026-01-20T04:24:51.649Z"
+      }
+    ],
+    "total": 120176,
+    "nombreManual": "Rexroth Motor",
+    "fechaUltimaActualizacionInventario": "2025-11-26T00:51:50.443Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-08-12T06:07:45.950Z",
+    "updatedAt": "2026-01-19T00:36:13.821Z"
+  },
+  {
+    "id": "rep-0008",
+    "codigoSAP": "4500000007",
+    "codigoBaader": "200-SEL-008",
+    "textoBreve": "Bomba Parker #8",
+    "descripcion": "Bomba para Baader 200 - Sellos y Juntas. Marca: Parker. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 1,
+    "cantidadStockBodega": 9,
+    "valorUnitario": 221300,
+    "tags": [
+      {
+        "nombre": "Críticos",
+        "tipo": "solicitud",
+        "cantidad": 13,
+        "fecha": "2026-01-20T04:24:51.649Z"
+      },
+      {
+        "nombre": "Urgentes este mes",
+        "tipo": "solicitud",
+        "cantidad": 3,
+        "fecha": "2026-01-20T04:24:51.649Z"
+      }
+    ],
+    "total": 2213000,
+    "nombreManual": "Parker Bomba",
+    "fechaUltimaActualizacionInventario": "2025-11-11T14:23:17.920Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-11-16T21:34:21.669Z",
+    "updatedAt": "2025-12-23T04:38:49.458Z"
+  },
+  {
+    "id": "rep-0009",
+    "codigoSAP": "4500000008",
+    "codigoBaader": "200-CAB-009",
+    "textoBreve": "Válvula Bosch #9",
+    "descripcion": "Válvula para Baader 200 - Cables y Conectores. Marca: Bosch. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 0,
+    "cantidadStockBodega": 7,
+    "valorUnitario": 208000,
+    "tags": [
+      {
+        "nombre": "Urgentes este mes",
+        "tipo": "solicitud",
+        "cantidad": 6,
+        "fecha": "2026-01-20T04:24:51.649Z"
+      },
+      {
+        "nombre": "Overstock",
+        "tipo": "stock",
+        "cantidad": 0,
+        "fecha": "2026-01-20T04:24:51.649Z"
+      }
+    ],
+    "total": 1456000,
+    "nombreManual": "Bosch Válvula",
+    "fechaUltimaActualizacionInventario": "2026-01-05T14:43:01.031Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-03-31T11:07:14.186Z",
+    "updatedAt": "2025-12-25T06:27:13.480Z"
+  },
+  {
+    "id": "rep-0010",
+    "codigoSAP": "4500000009",
+    "codigoBaader": "200-PIE-010",
+    "textoBreve": "Rodillo Festo #10",
+    "descripcion": "Rodillo para Baader 200 - Piezas de Wear. Marca: Festo. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 1,
+    "cantidadStockBodega": 1,
+    "valorUnitario": 17905,
+    "tags": [
+      {
+        "nombre": "Overhaul temporada baja",
+        "tipo": "solicitud",
+        "cantidad": 0,
+        "fecha": "2026-01-20T04:24:51.649Z"
+      }
+    ],
+    "total": 35810,
+    "nombreManual": "Festo Rodillo",
+    "fechaUltimaActualizacionInventario": "2025-10-31T04:02:24.100Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-02-26T04:43:27.921Z",
+    "updatedAt": "2025-12-27T06:27:16.847Z"
+  },
+  {
+    "id": "rep-0011",
+    "codigoSAP": "4500000010",
+    "codigoBaader": "200-ROD-011",
+    "textoBreve": "Sensor SKF #11",
+    "descripcion": "Sensor para Baader 200 - Rodillos y Correas. Marca: SKF. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 4,
+    "cantidadStockBodega": 8,
+    "valorUnitario": 123699,
+    "tags": [
+      {
+        "nombre": "Obsoleto",
+        "tipo": "stock",
+        "cantidad": 3,
+        "fecha": "2026-01-20T04:24:51.649Z"
+      },
+      {
+        "nombre": "Urgentes este mes",
+        "tipo": "solicitud",
+        "cantidad": 15,
+        "fecha": "2026-01-20T04:24:51.649Z"
+      }
+    ],
+    "total": 1484388,
+    "nombreManual": "SKF Sensor",
+    "fechaUltimaActualizacionInventario": "2025-11-12T09:32:46.160Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-10-11T08:53:20.448Z",
+    "updatedAt": "2025-12-23T05:16:12.298Z"
+  },
+  {
+    "id": "rep-0012",
+    "codigoSAP": "4500000011",
+    "codigoBaader": "200-MOT-012",
+    "textoBreve": "Compresor NSK #12",
+    "descripcion": "Compresor para Baader 200 - Motores y Reductores. Marca: NSK. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 3,
+    "cantidadStockBodega": 5,
+    "valorUnitario": 187364,
+    "tags": [
+      {
+        "nombre": "Obsoleto",
+        "tipo": "stock",
+        "cantidad": 11,
+        "fecha": "2026-01-20T04:24:51.649Z"
+      },
+      {
+        "nombre": "Urgentes este mes",
+        "tipo": "solicitud",
+        "cantidad": 0,
+        "fecha": "2026-01-20T04:24:51.649Z"
+      }
+    ],
+    "total": 1498912,
+    "nombreManual": "NSK Compresor",
+    "fechaUltimaActualizacionInventario": "2025-12-18T10:00:37.063Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2026-01-19T13:26:35.864Z",
+    "updatedAt": "2026-01-18T01:20:40.364Z"
+  },
+  {
+    "id": "rep-0013",
+    "codigoSAP": "4500000012",
+    "codigoBaader": "200-BOM-013",
+    "textoBreve": "Motor TIMKEN #13",
+    "descripcion": "Motor para Baader 200 - Bombas y Válvulas. Marca: TIMKEN. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 1,
+    "cantidadStockBodega": 5,
+    "valorUnitario": 209252,
+    "tags": [
+      {
+        "nombre": "Críticos",
+        "tipo": "solicitud",
+        "cantidad": 12,
+        "fecha": "2026-01-20T04:24:51.649Z"
+      }
+    ],
+    "total": 1255512,
+    "nombreManual": "TIMKEN Motor",
+    "fechaUltimaActualizacionInventario": "2025-11-15T13:51:24.057Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-01-26T15:44:44.583Z",
+    "updatedAt": "2025-12-22T06:52:31.338Z"
+  },
+  {
+    "id": "rep-0014",
+    "codigoSAP": "4500000013",
+    "codigoBaader": "200-SEN-014",
+    "textoBreve": "Bomba Siemens #14",
+    "descripcion": "Bomba para Baader 200 - Sensores. Marca: Siemens. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 1,
+    "cantidadStockBodega": 0,
+    "valorUnitario": 110544,
+    "tags": [
+      {
+        "nombre": "Overhaul temporada baja",
+        "tipo": "solicitud",
+        "cantidad": 16,
+        "fecha": "2026-01-20T04:24:51.649Z"
+      },
+      {
+        "nombre": "En espera proveedor",
+        "tipo": "solicitud",
+        "cantidad": 15,
+        "fecha": "2026-01-20T04:24:51.649Z"
+      },
+      {
+        "nombre": "Críticos",
+        "tipo": "solicitud",
+        "cantidad": 3,
+        "fecha": "2026-01-20T04:24:51.649Z"
+      }
+    ],
+    "total": 110544,
+    "nombreManual": "Siemens Bomba",
+    "fechaUltimaActualizacionInventario": "2025-12-19T15:14:57.622Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-10-31T00:34:33.008Z",
+    "updatedAt": "2026-01-09T17:17:42.688Z"
+  },
+  {
+    "id": "rep-0015",
+    "codigoSAP": "4500000014",
+    "codigoBaader": "200-COM-015",
+    "textoBreve": "Válvula ABB #15",
+    "descripcion": "Válvula para Baader 200 - Componentes Hidráulicos. Marca: ABB. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 4,
+    "cantidadStockBodega": 9,
+    "valorUnitario": 106967,
+    "tags": [
+      {
+        "nombre": "Overhaul temporada baja",
+        "tipo": "solicitud",
+        "cantidad": 19,
+        "fecha": "2026-01-20T04:24:51.649Z"
+      },
+      {
+        "nombre": "Críticos",
+        "tipo": "solicitud",
+        "cantidad": 0,
+        "fecha": "2026-01-20T04:24:51.649Z"
+      },
+      {
+        "nombre": "Pedido realizado",
+        "tipo": "solicitud",
+        "cantidad": 18,
+        "fecha": "2026-01-20T04:24:51.649Z"
+      }
+    ],
+    "total": 1390571,
+    "nombreManual": "ABB Válvula",
+    "fechaUltimaActualizacionInventario": "2025-11-13T03:21:05.728Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-02-18T11:19:50.449Z",
+    "updatedAt": "2026-01-17T02:57:32.285Z"
+  },
+  {
+    "id": "rep-0016",
+    "codigoSAP": "4500000015",
+    "codigoBaader": "200-ELE-016",
+    "textoBreve": "Rodillo Grundfos #16",
+    "descripcion": "Rodillo para Baader 200 - Elementos de Corte. Marca: Grundfos. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 0,
+    "cantidadStockBodega": 3,
+    "valorUnitario": 20678,
+    "tags": [
+      {
+        "nombre": "Críticos",
+        "tipo": "solicitud",
+        "cantidad": 11,
+        "fecha": "2026-01-20T04:24:51.649Z"
+      },
+      {
+        "nombre": "En espera proveedor",
+        "tipo": "solicitud",
+        "cantidad": 0,
+        "fecha": "2026-01-20T04:24:51.649Z"
+      }
+    ],
+    "total": 62034,
+    "nombreManual": "Grundfos Rodillo",
+    "fechaUltimaActualizacionInventario": "2025-11-22T01:33:58.234Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-06-05T08:50:03.890Z",
+    "updatedAt": "2026-01-01T18:53:08.211Z"
+  },
+  {
+    "id": "rep-0017",
+    "codigoSAP": "4500000016",
+    "codigoBaader": "200-COJ-017",
+    "textoBreve": "Sensor Rexroth #17",
+    "descripcion": "Sensor para Baader 200 - Cojinetes. Marca: Rexroth. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 4,
+    "cantidadStockBodega": 5,
+    "valorUnitario": 136247,
+    "tags": [
+      {
+        "nombre": "Urgentes este mes",
+        "tipo": "solicitud",
+        "cantidad": 1,
+        "fecha": "2026-01-20T04:24:51.649Z"
+      },
+      {
+        "nombre": "Overhaul temporada baja",
+        "tipo": "solicitud",
+        "cantidad": 10,
+        "fecha": "2026-01-20T04:24:51.649Z"
+      },
+      {
+        "nombre": "Críticos",
+        "tipo": "solicitud",
+        "cantidad": 18,
+        "fecha": "2026-01-20T04:24:51.649Z"
+      }
+    ],
+    "total": 1226223,
+    "nombreManual": "Rexroth Sensor",
+    "fechaUltimaActualizacionInventario": "2025-10-29T22:00:59.783Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-11-15T04:23:16.466Z",
+    "updatedAt": "2026-01-17T16:23:04.634Z"
+  },
+  {
+    "id": "rep-0018",
+    "codigoSAP": "4500000017",
+    "codigoBaader": "200-SEL-018",
+    "textoBreve": "Compresor Parker #18",
+    "descripcion": "Compresor para Baader 200 - Sellos y Juntas. Marca: Parker. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 2,
+    "cantidadStockBodega": 1,
+    "valorUnitario": 89969,
+    "tags": [
+      {
+        "nombre": "Overstock",
+        "tipo": "stock",
+        "cantidad": 12,
+        "fecha": "2026-01-20T04:24:51.649Z"
+      }
+    ],
+    "total": 269907,
+    "nombreManual": "Parker Compresor",
+    "fechaUltimaActualizacionInventario": "2025-12-18T01:34:36.316Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-02-27T21:03:33.660Z",
+    "updatedAt": "2026-01-14T03:02:24.731Z"
+  },
+  {
+    "id": "rep-0019",
+    "codigoSAP": "4500000018",
+    "codigoBaader": "200-CAB-019",
+    "textoBreve": "Motor Bosch #19",
+    "descripcion": "Motor para Baader 200 - Cables y Conectores. Marca: Bosch. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 2,
+    "cantidadStockBodega": 1,
+    "valorUnitario": 159731,
+    "tags": [
+      {
+        "nombre": "Críticos",
+        "tipo": "solicitud",
+        "cantidad": 0,
+        "fecha": "2026-01-20T04:24:51.649Z"
+      }
+    ],
+    "total": 479193,
+    "nombreManual": "Bosch Motor",
+    "fechaUltimaActualizacionInventario": "2025-11-09T06:16:16.826Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-04-16T13:44:53.183Z",
+    "updatedAt": "2025-12-27T15:04:26.913Z"
+  },
+  {
+    "id": "rep-0020",
+    "codigoSAP": "4500000019",
+    "codigoBaader": "200-PIE-020",
+    "textoBreve": "Bomba Festo #20",
+    "descripcion": "Bomba para Baader 200 - Piezas de Wear. Marca: Festo. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 3,
+    "cantidadStockBodega": 7,
+    "valorUnitario": 45148,
+    "tags": [
+      {
+        "nombre": "En espera proveedor",
+        "tipo": "solicitud",
+        "cantidad": 4,
+        "fecha": "2026-01-20T04:24:51.649Z"
+      },
+      {
+        "nombre": "Overstock",
+        "tipo": "stock",
+        "cantidad": 6,
+        "fecha": "2026-01-20T04:24:51.649Z"
+      },
+      {
+        "nombre": "Stock mínimo",
+        "tipo": "stock",
+        "cantidad": 18,
+        "fecha": "2026-01-20T04:24:51.649Z"
+      }
+    ],
+    "total": 451480,
+    "nombreManual": "Festo Bomba",
+    "fechaUltimaActualizacionInventario": "2025-12-16T08:17:27.414Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-02-24T20:15:34.650Z",
+    "updatedAt": "2026-01-18T20:28:20.361Z"
+  },
+  {
+    "id": "rep-0021",
+    "codigoSAP": "4500000020",
+    "codigoBaader": "200-ROD-021",
+    "textoBreve": "Válvula SKF #21",
+    "descripcion": "Válvula para Baader 200 - Rodillos y Correas. Marca: SKF. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 1,
+    "cantidadStockBodega": 0,
+    "valorUnitario": 108945,
+    "tags": [
+      {
+        "nombre": "Urgentes este mes",
+        "tipo": "solicitud",
+        "cantidad": 2,
+        "fecha": "2026-01-20T04:24:51.649Z"
+      }
+    ],
+    "total": 108945,
+    "nombreManual": "SKF Válvula",
+    "fechaUltimaActualizacionInventario": "2025-12-27T04:06:07.890Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-02-16T03:33:55.722Z",
+    "updatedAt": "2025-12-23T20:45:45.132Z"
+  },
+  {
+    "id": "rep-0022",
+    "codigoSAP": "4500000021",
+    "codigoBaader": "200-MOT-022",
+    "textoBreve": "Rodillo NSK #22",
+    "descripcion": "Rodillo para Baader 200 - Motores y Reductores. Marca: NSK. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 2,
+    "cantidadStockBodega": 7,
+    "valorUnitario": 25121,
+    "tags": [
+      {
+        "nombre": "Stock mínimo",
+        "tipo": "stock",
+        "cantidad": 8,
+        "fecha": "2026-01-20T04:24:51.649Z"
+      },
+      {
+        "nombre": "Pedido realizado",
+        "tipo": "solicitud",
+        "cantidad": 11,
+        "fecha": "2026-01-20T04:24:51.649Z"
+      }
+    ],
+    "total": 226089,
+    "nombreManual": "NSK Rodillo",
+    "fechaUltimaActualizacionInventario": "2026-01-08T17:26:27.971Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-05-21T20:12:24.706Z",
+    "updatedAt": "2026-01-02T05:44:01.983Z"
+  },
+  {
+    "id": "rep-0023",
+    "codigoSAP": "4500000022",
+    "codigoBaader": "200-BOM-023",
+    "textoBreve": "Sensor TIMKEN #23",
+    "descripcion": "Sensor para Baader 200 - Bombas y Válvulas. Marca: TIMKEN. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 3,
+    "cantidadStockBodega": 2,
+    "valorUnitario": 160746,
+    "tags": [
+      {
+        "nombre": "Overhaul temporada baja",
+        "tipo": "solicitud",
+        "cantidad": 14,
+        "fecha": "2026-01-20T04:24:51.649Z"
+      }
+    ],
+    "total": 803730,
+    "nombreManual": "TIMKEN Sensor",
+    "fechaUltimaActualizacionInventario": "2025-12-12T19:03:28.229Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-10-18T07:01:46.113Z",
+    "updatedAt": "2025-12-23T22:20:34.414Z"
+  },
+  {
+    "id": "rep-0024",
+    "codigoSAP": "4500000023",
+    "codigoBaader": "200-SEN-024",
+    "textoBreve": "Compresor Siemens #24",
+    "descripcion": "Compresor para Baader 200 - Sensores. Marca: Siemens. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 0,
+    "cantidadStockBodega": 8,
+    "valorUnitario": 138785,
+    "tags": [
+      {
+        "nombre": "Overhaul temporada baja",
+        "tipo": "solicitud",
+        "cantidad": 16,
+        "fecha": "2026-01-20T04:24:51.649Z"
+      },
+      {
+        "nombre": "Críticos",
+        "tipo": "solicitud",
+        "cantidad": 5,
+        "fecha": "2026-01-20T04:24:51.649Z"
+      }
+    ],
+    "total": 1110280,
+    "nombreManual": "Siemens Compresor",
+    "fechaUltimaActualizacionInventario": "2025-10-24T00:42:13.758Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-07-21T12:54:22.071Z",
+    "updatedAt": "2026-01-11T08:42:37.923Z"
+  },
+  {
+    "id": "rep-0025",
+    "codigoSAP": "4500000024",
+    "codigoBaader": "200-COM-025",
+    "textoBreve": "Motor ABB #25",
+    "descripcion": "Motor para Baader 200 - Componentes Hidráulicos. Marca: ABB. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 0,
+    "cantidadStockBodega": 4,
+    "valorUnitario": 35703,
+    "tags": [
+      {
+        "nombre": "Urgentes este mes",
+        "tipo": "solicitud",
+        "cantidad": 9,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 142812,
+    "nombreManual": "ABB Motor",
+    "fechaUltimaActualizacionInventario": "2026-01-01T21:03:36.558Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-05-22T00:06:30.308Z",
+    "updatedAt": "2026-01-14T21:36:14.068Z"
+  },
+  {
+    "id": "rep-0026",
+    "codigoSAP": "4500000025",
+    "codigoBaader": "200-ELE-026",
+    "textoBreve": "Bomba Grundfos #26",
+    "descripcion": "Bomba para Baader 200 - Elementos de Corte. Marca: Grundfos. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 4,
+    "cantidadStockBodega": 0,
+    "valorUnitario": 116963,
+    "tags": [
+      {
+        "nombre": "Obsoleto",
+        "tipo": "stock",
+        "cantidad": 2,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 467852,
+    "nombreManual": "Grundfos Bomba",
+    "fechaUltimaActualizacionInventario": "2025-12-01T10:15:11.189Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-04-08T01:56:42.818Z",
+    "updatedAt": "2026-01-17T02:21:09.831Z"
+  },
+  {
+    "id": "rep-0027",
+    "codigoSAP": "4500000026",
+    "codigoBaader": "200-COJ-027",
+    "textoBreve": "Válvula Rexroth #27",
+    "descripcion": "Válvula para Baader 200 - Cojinetes. Marca: Rexroth. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 0,
+    "cantidadStockBodega": 8,
+    "valorUnitario": 21181,
+    "tags": [
+      {
+        "nombre": "Pedido realizado",
+        "tipo": "solicitud",
+        "cantidad": 18,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 169448,
+    "nombreManual": "Rexroth Válvula",
+    "fechaUltimaActualizacionInventario": "2026-01-17T14:14:19.185Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-01-24T12:40:17.029Z",
+    "updatedAt": "2026-01-06T08:49:06.315Z"
+  },
+  {
+    "id": "rep-0028",
+    "codigoSAP": "4500000027",
+    "codigoBaader": "200-SEL-028",
+    "textoBreve": "Rodillo Parker #28",
+    "descripcion": "Rodillo para Baader 200 - Sellos y Juntas. Marca: Parker. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 3,
+    "cantidadStockBodega": 0,
+    "valorUnitario": 136119,
+    "tags": [
+      {
+        "nombre": "Críticos",
+        "tipo": "solicitud",
+        "cantidad": 16,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      },
+      {
+        "nombre": "Stock mínimo",
+        "tipo": "stock",
+        "cantidad": 7,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 408357,
+    "nombreManual": "Parker Rodillo",
+    "fechaUltimaActualizacionInventario": "2025-12-29T03:48:23.718Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-09-27T19:27:21.935Z",
+    "updatedAt": "2025-12-24T18:21:13.754Z"
+  },
+  {
+    "id": "rep-0029",
+    "codigoSAP": "4500000028",
+    "codigoBaader": "200-CAB-029",
+    "textoBreve": "Sensor Bosch #29",
+    "descripcion": "Sensor para Baader 200 - Cables y Conectores. Marca: Bosch. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 1,
+    "cantidadStockBodega": 3,
+    "valorUnitario": 248514,
+    "tags": [
+      {
+        "nombre": "Overhaul temporada baja",
+        "tipo": "solicitud",
+        "cantidad": 4,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 994056,
+    "nombreManual": "Bosch Sensor",
+    "fechaUltimaActualizacionInventario": "2025-11-08T14:01:17.184Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-08-16T11:50:31.995Z",
+    "updatedAt": "2025-12-21T15:11:04.587Z"
+  },
+  {
+    "id": "rep-0030",
+    "codigoSAP": "4500000029",
+    "codigoBaader": "200-PIE-030",
+    "textoBreve": "Compresor Festo #30",
+    "descripcion": "Compresor para Baader 200 - Piezas de Wear. Marca: Festo. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 3,
+    "cantidadStockBodega": 9,
+    "valorUnitario": 237376,
+    "tags": [
+      {
+        "nombre": "Urgentes este mes",
+        "tipo": "solicitud",
+        "cantidad": 11,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 2848512,
+    "nombreManual": "Festo Compresor",
+    "fechaUltimaActualizacionInventario": "2025-12-30T02:26:02.640Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-11-17T23:12:07.150Z",
+    "updatedAt": "2026-01-18T23:37:39.484Z"
+  },
+  {
+    "id": "rep-0031",
+    "codigoSAP": "4500000030",
+    "codigoBaader": "200-ROD-031",
+    "textoBreve": "Motor SKF #31",
+    "descripcion": "Motor para Baader 200 - Rodillos y Correas. Marca: SKF. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 3,
+    "cantidadStockBodega": 3,
+    "valorUnitario": 165494,
+    "tags": [
+      {
+        "nombre": "Stock mínimo",
+        "tipo": "stock",
+        "cantidad": 6,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      },
+      {
+        "nombre": "En espera proveedor",
+        "tipo": "solicitud",
+        "cantidad": 15,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      },
+      {
+        "nombre": "Pedido realizado",
+        "tipo": "solicitud",
+        "cantidad": 9,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 992964,
+    "nombreManual": "SKF Motor",
+    "fechaUltimaActualizacionInventario": "2025-12-25T09:52:15.028Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-03-14T10:40:26.227Z",
+    "updatedAt": "2025-12-25T16:55:46.368Z"
+  },
+  {
+    "id": "rep-0032",
+    "codigoSAP": "4500000031",
+    "codigoBaader": "200-MOT-032",
+    "textoBreve": "Bomba NSK #32",
+    "descripcion": "Bomba para Baader 200 - Motores y Reductores. Marca: NSK. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 3,
+    "cantidadStockBodega": 6,
+    "valorUnitario": 255116,
+    "tags": [
+      {
+        "nombre": "Pedido realizado",
+        "tipo": "solicitud",
+        "cantidad": 8,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      },
+      {
+        "nombre": "Obsoleto",
+        "tipo": "stock",
+        "cantidad": 7,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 2296044,
+    "nombreManual": "NSK Bomba",
+    "fechaUltimaActualizacionInventario": "2025-12-11T06:02:50.745Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-05-21T20:02:31.845Z",
+    "updatedAt": "2025-12-28T11:55:31.415Z"
+  },
+  {
+    "id": "rep-0033",
+    "codigoSAP": "4500000032",
+    "codigoBaader": "200-BOM-033",
+    "textoBreve": "Válvula TIMKEN #33",
+    "descripcion": "Válvula para Baader 200 - Bombas y Válvulas. Marca: TIMKEN. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 4,
+    "cantidadStockBodega": 8,
+    "valorUnitario": 177498,
+    "tags": [
+      {
+        "nombre": "Urgentes este mes",
+        "tipo": "solicitud",
+        "cantidad": 18,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 2129976,
+    "nombreManual": "TIMKEN Válvula",
+    "fechaUltimaActualizacionInventario": "2025-11-14T23:25:10.604Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-05-28T06:05:05.292Z",
+    "updatedAt": "2026-01-17T15:38:31.849Z"
+  },
+  {
+    "id": "rep-0034",
+    "codigoSAP": "4500000033",
+    "codigoBaader": "200-SEN-034",
+    "textoBreve": "Rodillo Siemens #34",
+    "descripcion": "Rodillo para Baader 200 - Sensores. Marca: Siemens. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 3,
+    "cantidadStockBodega": 8,
+    "valorUnitario": 236566,
+    "tags": [
+      {
+        "nombre": "Overhaul temporada baja",
+        "tipo": "solicitud",
+        "cantidad": 9,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 2602226,
+    "nombreManual": "Siemens Rodillo",
+    "fechaUltimaActualizacionInventario": "2025-11-04T10:08:31.630Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-09-27T01:35:41.805Z",
+    "updatedAt": "2026-01-06T12:14:37.372Z"
+  },
+  {
+    "id": "rep-0035",
+    "codigoSAP": "4500000034",
+    "codigoBaader": "200-COM-035",
+    "textoBreve": "Sensor ABB #35",
+    "descripcion": "Sensor para Baader 200 - Componentes Hidráulicos. Marca: ABB. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 0,
+    "cantidadStockBodega": 8,
+    "valorUnitario": 187926,
+    "tags": [
+      {
+        "nombre": "Obsoleto",
+        "tipo": "stock",
+        "cantidad": 15,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 1503408,
+    "nombreManual": "ABB Sensor",
+    "fechaUltimaActualizacionInventario": "2025-12-27T23:42:11.728Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-10-19T19:30:43.329Z",
+    "updatedAt": "2026-01-05T11:08:28.628Z"
+  },
+  {
+    "id": "rep-0036",
+    "codigoSAP": "4500000035",
+    "codigoBaader": "200-ELE-036",
+    "textoBreve": "Compresor Grundfos #36",
+    "descripcion": "Compresor para Baader 200 - Elementos de Corte. Marca: Grundfos. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 2,
+    "cantidadStockBodega": 8,
+    "valorUnitario": 163282,
+    "tags": [
+      {
+        "nombre": "Pedido realizado",
+        "tipo": "solicitud",
+        "cantidad": 4,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      },
+      {
+        "nombre": "Urgentes este mes",
+        "tipo": "solicitud",
+        "cantidad": 14,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 1632820,
+    "nombreManual": "Grundfos Compresor",
+    "fechaUltimaActualizacionInventario": "2025-12-20T11:36:57.791Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-10-01T20:03:32.801Z",
+    "updatedAt": "2026-01-18T08:31:19.763Z"
+  },
+  {
+    "id": "rep-0037",
+    "codigoSAP": "4500000036",
+    "codigoBaader": "200-COJ-037",
+    "textoBreve": "Motor Rexroth #37",
+    "descripcion": "Motor para Baader 200 - Cojinetes. Marca: Rexroth. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 2,
+    "cantidadStockBodega": 9,
+    "valorUnitario": 72456,
+    "tags": [
+      {
+        "nombre": "Stock mínimo",
+        "tipo": "stock",
+        "cantidad": 10,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      },
+      {
+        "nombre": "En espera proveedor",
+        "tipo": "solicitud",
+        "cantidad": 5,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 797016,
+    "nombreManual": "Rexroth Motor",
+    "fechaUltimaActualizacionInventario": "2025-10-30T14:18:48.254Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-03-03T19:57:34.698Z",
+    "updatedAt": "2025-12-23T03:09:28.205Z"
+  },
+  {
+    "id": "rep-0038",
+    "codigoSAP": "4500000037",
+    "codigoBaader": "200-SEL-038",
+    "textoBreve": "Bomba Parker #38",
+    "descripcion": "Bomba para Baader 200 - Sellos y Juntas. Marca: Parker. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 1,
+    "cantidadStockBodega": 7,
+    "valorUnitario": 224509,
+    "tags": [
+      {
+        "nombre": "Overstock",
+        "tipo": "stock",
+        "cantidad": 6,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 1796072,
+    "nombreManual": "Parker Bomba",
+    "fechaUltimaActualizacionInventario": "2025-11-06T23:45:46.483Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-04-24T15:16:06.416Z",
+    "updatedAt": "2025-12-21T19:29:21.013Z"
+  },
+  {
+    "id": "rep-0039",
+    "codigoSAP": "4500000038",
+    "codigoBaader": "200-CAB-039",
+    "textoBreve": "Válvula Bosch #39",
+    "descripcion": "Válvula para Baader 200 - Cables y Conectores. Marca: Bosch. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 3,
+    "cantidadStockBodega": 4,
+    "valorUnitario": 70763,
+    "tags": [
+      {
+        "nombre": "Overstock",
+        "tipo": "stock",
+        "cantidad": 10,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 495341,
+    "nombreManual": "Bosch Válvula",
+    "fechaUltimaActualizacionInventario": "2026-01-08T03:38:22.943Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-03-15T06:07:07.617Z",
+    "updatedAt": "2026-01-15T23:10:59.980Z"
+  },
+  {
+    "id": "rep-0040",
+    "codigoSAP": "4500000039",
+    "codigoBaader": "200-PIE-040",
+    "textoBreve": "Rodillo Festo #40",
+    "descripcion": "Rodillo para Baader 200 - Piezas de Wear. Marca: Festo. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 1,
+    "cantidadStockBodega": 1,
+    "valorUnitario": 250935,
+    "tags": [
+      {
+        "nombre": "Urgentes este mes",
+        "tipo": "solicitud",
+        "cantidad": 4,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      },
+      {
+        "nombre": "En espera proveedor",
+        "tipo": "solicitud",
+        "cantidad": 9,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 501870,
+    "nombreManual": "Festo Rodillo",
+    "fechaUltimaActualizacionInventario": "2025-11-06T23:47:22.428Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-04-28T05:37:06.653Z",
+    "updatedAt": "2026-01-09T01:17:24.927Z"
+  },
+  {
+    "id": "rep-0041",
+    "codigoSAP": "4500000040",
+    "codigoBaader": "200-ROD-041",
+    "textoBreve": "Sensor SKF #41",
+    "descripcion": "Sensor para Baader 200 - Rodillos y Correas. Marca: SKF. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 2,
+    "cantidadStockBodega": 9,
+    "valorUnitario": 175770,
+    "tags": [
+      {
+        "nombre": "Stock mínimo",
+        "tipo": "stock",
+        "cantidad": 18,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 1933470,
+    "nombreManual": "SKF Sensor",
+    "fechaUltimaActualizacionInventario": "2025-12-13T05:40:45.420Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-10-21T00:29:18.741Z",
+    "updatedAt": "2026-01-18T09:03:25.926Z"
+  },
+  {
+    "id": "rep-0042",
+    "codigoSAP": "4500000041",
+    "codigoBaader": "200-MOT-042",
+    "textoBreve": "Compresor NSK #42",
+    "descripcion": "Compresor para Baader 200 - Motores y Reductores. Marca: NSK. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 1,
+    "cantidadStockBodega": 6,
+    "valorUnitario": 75023,
+    "tags": [
+      {
+        "nombre": "Overstock",
+        "tipo": "stock",
+        "cantidad": 10,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 525161,
+    "nombreManual": "NSK Compresor",
+    "fechaUltimaActualizacionInventario": "2025-10-23T23:50:08.049Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-11-17T18:14:32.924Z",
+    "updatedAt": "2026-01-19T22:17:25.231Z"
+  },
+  {
+    "id": "rep-0043",
+    "codigoSAP": "4500000042",
+    "codigoBaader": "200-BOM-043",
+    "textoBreve": "Motor TIMKEN #43",
+    "descripcion": "Motor para Baader 200 - Bombas y Válvulas. Marca: TIMKEN. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 3,
+    "cantidadStockBodega": 0,
+    "valorUnitario": 109689,
+    "tags": [
+      {
+        "nombre": "Stock mínimo",
+        "tipo": "stock",
+        "cantidad": 3,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      },
+      {
+        "nombre": "Urgentes este mes",
+        "tipo": "solicitud",
+        "cantidad": 4,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 329067,
+    "nombreManual": "TIMKEN Motor",
+    "fechaUltimaActualizacionInventario": "2025-10-31T04:27:27.609Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-02-21T07:16:40.644Z",
+    "updatedAt": "2026-01-09T18:47:23.411Z"
+  },
+  {
+    "id": "rep-0044",
+    "codigoSAP": "4500000043",
+    "codigoBaader": "200-SEN-044",
+    "textoBreve": "Bomba Siemens #44",
+    "descripcion": "Bomba para Baader 200 - Sensores. Marca: Siemens. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 4,
+    "cantidadStockBodega": 7,
+    "valorUnitario": 197760,
+    "tags": [
+      {
+        "nombre": "Overstock",
+        "tipo": "stock",
+        "cantidad": 15,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      },
+      {
+        "nombre": "Pedido realizado",
+        "tipo": "solicitud",
+        "cantidad": 8,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      },
+      {
+        "nombre": "Obsoleto",
+        "tipo": "stock",
+        "cantidad": 15,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 2175360,
+    "nombreManual": "Siemens Bomba",
+    "fechaUltimaActualizacionInventario": "2025-12-29T02:29:24.927Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-03-19T05:22:06.041Z",
+    "updatedAt": "2025-12-26T08:21:12.594Z"
+  },
+  {
+    "id": "rep-0045",
+    "codigoSAP": "4500000044",
+    "codigoBaader": "200-COM-045",
+    "textoBreve": "Válvula ABB #45",
+    "descripcion": "Válvula para Baader 200 - Componentes Hidráulicos. Marca: ABB. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 1,
+    "cantidadStockBodega": 1,
+    "valorUnitario": 86814,
+    "tags": [
+      {
+        "nombre": "Críticos",
+        "tipo": "solicitud",
+        "cantidad": 7,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      },
+      {
+        "nombre": "Urgentes este mes",
+        "tipo": "solicitud",
+        "cantidad": 3,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 173628,
+    "nombreManual": "ABB Válvula",
+    "fechaUltimaActualizacionInventario": "2025-10-30T15:18:38.300Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-04-16T07:12:54.361Z",
+    "updatedAt": "2026-01-10T14:30:41.044Z"
+  },
+  {
+    "id": "rep-0046",
+    "codigoSAP": "4500000045",
+    "codigoBaader": "200-ELE-046",
+    "textoBreve": "Rodillo Grundfos #46",
+    "descripcion": "Rodillo para Baader 200 - Elementos de Corte. Marca: Grundfos. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 1,
+    "cantidadStockBodega": 0,
+    "valorUnitario": 173141,
+    "tags": [
+      {
+        "nombre": "Stock mínimo",
+        "tipo": "stock",
+        "cantidad": 13,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 173141,
+    "nombreManual": "Grundfos Rodillo",
+    "fechaUltimaActualizacionInventario": "2025-12-21T12:10:53.089Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-12-23T22:19:20.308Z",
+    "updatedAt": "2025-12-27T04:05:14.660Z"
+  },
+  {
+    "id": "rep-0047",
+    "codigoSAP": "4500000046",
+    "codigoBaader": "200-COJ-047",
+    "textoBreve": "Sensor Rexroth #47",
+    "descripcion": "Sensor para Baader 200 - Cojinetes. Marca: Rexroth. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 3,
+    "cantidadStockBodega": 1,
+    "valorUnitario": 46757,
+    "tags": [
+      {
+        "nombre": "En espera proveedor",
+        "tipo": "solicitud",
+        "cantidad": 2,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      },
+      {
+        "nombre": "Overhaul temporada baja",
+        "tipo": "solicitud",
+        "cantidad": 3,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 187028,
+    "nombreManual": "Rexroth Sensor",
+    "fechaUltimaActualizacionInventario": "2025-12-04T18:52:32.029Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-12-11T13:18:55.731Z",
+    "updatedAt": "2026-01-06T20:07:22.413Z"
+  },
+  {
+    "id": "rep-0048",
+    "codigoSAP": "4500000047",
+    "codigoBaader": "200-SEL-048",
+    "textoBreve": "Compresor Parker #48",
+    "descripcion": "Compresor para Baader 200 - Sellos y Juntas. Marca: Parker. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 3,
+    "cantidadStockBodega": 0,
+    "valorUnitario": 226784,
+    "tags": [
+      {
+        "nombre": "Overstock",
+        "tipo": "stock",
+        "cantidad": 4,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 680352,
+    "nombreManual": "Parker Compresor",
+    "fechaUltimaActualizacionInventario": "2025-11-03T14:12:26.909Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-04-14T20:11:43.069Z",
+    "updatedAt": "2026-01-05T19:01:58.479Z"
+  },
+  {
+    "id": "rep-0049",
+    "codigoSAP": "4500000048",
+    "codigoBaader": "200-CAB-049",
+    "textoBreve": "Motor Bosch #49",
+    "descripcion": "Motor para Baader 200 - Cables y Conectores. Marca: Bosch. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 2,
+    "cantidadStockBodega": 5,
+    "valorUnitario": 212888,
+    "tags": [
+      {
+        "nombre": "Urgentes este mes",
+        "tipo": "solicitud",
+        "cantidad": 13,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      },
+      {
+        "nombre": "Críticos",
+        "tipo": "solicitud",
+        "cantidad": 0,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 1490216,
+    "nombreManual": "Bosch Motor",
+    "fechaUltimaActualizacionInventario": "2025-12-22T15:12:48.641Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-06-08T11:46:00.164Z",
+    "updatedAt": "2026-01-16T20:14:48.725Z"
+  },
+  {
+    "id": "rep-0050",
+    "codigoSAP": "4500000049",
+    "codigoBaader": "200-PIE-050",
+    "textoBreve": "Bomba Festo #50",
+    "descripcion": "Bomba para Baader 200 - Piezas de Wear. Marca: Festo. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 0,
+    "cantidadStockBodega": 6,
+    "valorUnitario": 258781,
+    "tags": [
+      {
+        "nombre": "Stock mínimo",
+        "tipo": "stock",
+        "cantidad": 14,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 1552686,
+    "nombreManual": "Festo Bomba",
+    "fechaUltimaActualizacionInventario": "2025-11-27T11:33:29.725Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-04-13T05:24:21.668Z",
+    "updatedAt": "2026-01-11T08:01:35.610Z"
+  },
+  {
+    "id": "rep-0051",
+    "codigoSAP": "4500000050",
+    "codigoBaader": "200-ROD-051",
+    "textoBreve": "Válvula SKF #51",
+    "descripcion": "Válvula para Baader 200 - Rodillos y Correas. Marca: SKF. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 1,
+    "cantidadStockBodega": 5,
+    "valorUnitario": 210949,
+    "tags": [
+      {
+        "nombre": "Críticos",
+        "tipo": "solicitud",
+        "cantidad": 2,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 1265694,
+    "nombreManual": "SKF Válvula",
+    "fechaUltimaActualizacionInventario": "2025-12-27T20:40:16.065Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-10-10T08:27:19.111Z",
+    "updatedAt": "2026-01-14T22:30:23.578Z"
+  },
+  {
+    "id": "rep-0052",
+    "codigoSAP": "4500000051",
+    "codigoBaader": "200-MOT-052",
+    "textoBreve": "Rodillo NSK #52",
+    "descripcion": "Rodillo para Baader 200 - Motores y Reductores. Marca: NSK. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 2,
+    "cantidadStockBodega": 2,
+    "valorUnitario": 213732,
+    "tags": [
+      {
+        "nombre": "Pedido realizado",
+        "tipo": "solicitud",
+        "cantidad": 13,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      },
+      {
+        "nombre": "Overhaul temporada baja",
+        "tipo": "solicitud",
+        "cantidad": 8,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 854928,
+    "nombreManual": "NSK Rodillo",
+    "fechaUltimaActualizacionInventario": "2025-12-13T15:23:49.491Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-05-20T08:26:19.655Z",
+    "updatedAt": "2025-12-30T02:33:39.974Z"
+  },
+  {
+    "id": "rep-0053",
+    "codigoSAP": "4500000052",
+    "codigoBaader": "200-BOM-053",
+    "textoBreve": "Sensor TIMKEN #53",
+    "descripcion": "Sensor para Baader 200 - Bombas y Válvulas. Marca: TIMKEN. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 0,
+    "cantidadStockBodega": 8,
+    "valorUnitario": 215492,
+    "tags": [
+      {
+        "nombre": "Urgentes este mes",
+        "tipo": "solicitud",
+        "cantidad": 14,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      },
+      {
+        "nombre": "Overhaul temporada baja",
+        "tipo": "solicitud",
+        "cantidad": 18,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 1723936,
+    "nombreManual": "TIMKEN Sensor",
+    "fechaUltimaActualizacionInventario": "2025-12-23T03:23:33.914Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-10-18T20:21:51.785Z",
+    "updatedAt": "2025-12-30T23:49:35.088Z"
+  },
+  {
+    "id": "rep-0054",
+    "codigoSAP": "4500000053",
+    "codigoBaader": "200-SEN-054",
+    "textoBreve": "Compresor Siemens #54",
+    "descripcion": "Compresor para Baader 200 - Sensores. Marca: Siemens. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 2,
+    "cantidadStockBodega": 0,
+    "valorUnitario": 77033,
+    "tags": [
+      {
+        "nombre": "En espera proveedor",
+        "tipo": "solicitud",
+        "cantidad": 6,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      },
+      {
+        "nombre": "Overhaul temporada baja",
+        "tipo": "solicitud",
+        "cantidad": 19,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      },
+      {
+        "nombre": "Pedido realizado",
+        "tipo": "solicitud",
+        "cantidad": 9,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 154066,
+    "nombreManual": "Siemens Compresor",
+    "fechaUltimaActualizacionInventario": "2025-11-15T21:15:52.297Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-12-23T17:59:07.810Z",
+    "updatedAt": "2026-01-15T15:37:47.678Z"
+  },
+  {
+    "id": "rep-0055",
+    "codigoSAP": "4500000054",
+    "codigoBaader": "200-COM-055",
+    "textoBreve": "Motor ABB #55",
+    "descripcion": "Motor para Baader 200 - Componentes Hidráulicos. Marca: ABB. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 0,
+    "cantidadStockBodega": 6,
+    "valorUnitario": 130762,
+    "tags": [
+      {
+        "nombre": "Urgentes este mes",
+        "tipo": "solicitud",
+        "cantidad": 13,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 784572,
+    "nombreManual": "ABB Motor",
+    "fechaUltimaActualizacionInventario": "2025-11-24T03:53:27.030Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-08-04T20:01:19.480Z",
+    "updatedAt": "2025-12-29T23:26:37.152Z"
+  },
+  {
+    "id": "rep-0056",
+    "codigoSAP": "4500000055",
+    "codigoBaader": "200-ELE-056",
+    "textoBreve": "Bomba Grundfos #56",
+    "descripcion": "Bomba para Baader 200 - Elementos de Corte. Marca: Grundfos. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 2,
+    "cantidadStockBodega": 2,
+    "valorUnitario": 251985,
+    "tags": [
+      {
+        "nombre": "Urgentes este mes",
+        "tipo": "solicitud",
+        "cantidad": 19,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 1007940,
+    "nombreManual": "Grundfos Bomba",
+    "fechaUltimaActualizacionInventario": "2025-11-19T06:12:47.904Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-04-13T07:11:39.033Z",
+    "updatedAt": "2026-01-19T13:04:38.932Z"
+  },
+  {
+    "id": "rep-0057",
+    "codigoSAP": "4500000056",
+    "codigoBaader": "200-COJ-057",
+    "textoBreve": "Válvula Rexroth #57",
+    "descripcion": "Válvula para Baader 200 - Cojinetes. Marca: Rexroth. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 0,
+    "cantidadStockBodega": 0,
+    "valorUnitario": 180407,
+    "tags": [
+      {
+        "nombre": "En espera proveedor",
+        "tipo": "solicitud",
+        "cantidad": 18,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 0,
+    "nombreManual": "Rexroth Válvula",
+    "fechaUltimaActualizacionInventario": "2025-11-12T06:52:45.331Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-12-06T00:19:44.065Z",
+    "updatedAt": "2026-01-18T20:12:50.831Z"
+  },
+  {
+    "id": "rep-0058",
+    "codigoSAP": "4500000057",
+    "codigoBaader": "200-SEL-058",
+    "textoBreve": "Rodillo Parker #58",
+    "descripcion": "Rodillo para Baader 200 - Sellos y Juntas. Marca: Parker. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 2,
+    "cantidadStockBodega": 4,
+    "valorUnitario": 178144,
+    "tags": [
+      {
+        "nombre": "En espera proveedor",
+        "tipo": "solicitud",
+        "cantidad": 16,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      },
+      {
+        "nombre": "Pedido realizado",
+        "tipo": "solicitud",
+        "cantidad": 13,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 1068864,
+    "nombreManual": "Parker Rodillo",
+    "fechaUltimaActualizacionInventario": "2025-12-26T15:12:42.762Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-05-07T20:10:18.703Z",
+    "updatedAt": "2025-12-30T03:54:54.357Z"
+  },
+  {
+    "id": "rep-0059",
+    "codigoSAP": "4500000058",
+    "codigoBaader": "200-CAB-059",
+    "textoBreve": "Sensor Bosch #59",
+    "descripcion": "Sensor para Baader 200 - Cables y Conectores. Marca: Bosch. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 2,
+    "cantidadStockBodega": 4,
+    "valorUnitario": 222003,
+    "tags": [
+      {
+        "nombre": "Overhaul temporada baja",
+        "tipo": "solicitud",
+        "cantidad": 19,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 1332018,
+    "nombreManual": "Bosch Sensor",
+    "fechaUltimaActualizacionInventario": "2025-12-07T12:11:00.920Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-10-03T17:33:09.938Z",
+    "updatedAt": "2026-01-11T21:18:06.433Z"
+  },
+  {
+    "id": "rep-0060",
+    "codigoSAP": "4500000059",
+    "codigoBaader": "200-PIE-060",
+    "textoBreve": "Compresor Festo #60",
+    "descripcion": "Compresor para Baader 200 - Piezas de Wear. Marca: Festo. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 1,
+    "cantidadStockBodega": 3,
+    "valorUnitario": 170703,
+    "tags": [
+      {
+        "nombre": "En espera proveedor",
+        "tipo": "solicitud",
+        "cantidad": 17,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 682812,
+    "nombreManual": "Festo Compresor",
+    "fechaUltimaActualizacionInventario": "2025-12-09T04:59:02.072Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-01-20T15:39:38.975Z",
+    "updatedAt": "2026-01-19T01:51:32.002Z"
+  },
+  {
+    "id": "rep-0061",
+    "codigoSAP": "4500000060",
+    "codigoBaader": "200-ROD-061",
+    "textoBreve": "Motor SKF #61",
+    "descripcion": "Motor para Baader 200 - Rodillos y Correas. Marca: SKF. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 2,
+    "cantidadStockBodega": 4,
+    "valorUnitario": 27073,
+    "tags": [
+      {
+        "nombre": "Urgentes este mes",
+        "tipo": "solicitud",
+        "cantidad": 10,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 162438,
+    "nombreManual": "SKF Motor",
+    "fechaUltimaActualizacionInventario": "2025-12-30T12:12:22.086Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-10-10T13:50:36.577Z",
+    "updatedAt": "2026-01-20T00:38:52.379Z"
+  },
+  {
+    "id": "rep-0062",
+    "codigoSAP": "4500000061",
+    "codigoBaader": "200-MOT-062",
+    "textoBreve": "Bomba NSK #62",
+    "descripcion": "Bomba para Baader 200 - Motores y Reductores. Marca: NSK. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 2,
+    "cantidadStockBodega": 9,
+    "valorUnitario": 137502,
+    "tags": [
+      {
+        "nombre": "Overhaul temporada baja",
+        "tipo": "solicitud",
+        "cantidad": 13,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      },
+      {
+        "nombre": "Críticos",
+        "tipo": "solicitud",
+        "cantidad": 19,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      },
+      {
+        "nombre": "Pedido realizado",
+        "tipo": "solicitud",
+        "cantidad": 0,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 1512522,
+    "nombreManual": "NSK Bomba",
+    "fechaUltimaActualizacionInventario": "2025-11-08T13:18:31.921Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-04-25T04:14:35.966Z",
+    "updatedAt": "2026-01-19T04:33:24.816Z"
+  },
+  {
+    "id": "rep-0063",
+    "codigoSAP": "4500000062",
+    "codigoBaader": "200-BOM-063",
+    "textoBreve": "Válvula TIMKEN #63",
+    "descripcion": "Válvula para Baader 200 - Bombas y Válvulas. Marca: TIMKEN. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 1,
+    "cantidadStockBodega": 5,
+    "valorUnitario": 34698,
+    "tags": [
+      {
+        "nombre": "Overhaul temporada baja",
+        "tipo": "solicitud",
+        "cantidad": 14,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      },
+      {
+        "nombre": "Overstock",
+        "tipo": "stock",
+        "cantidad": 16,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 208188,
+    "nombreManual": "TIMKEN Válvula",
+    "fechaUltimaActualizacionInventario": "2025-11-09T13:21:24.987Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-04-16T07:42:52.117Z",
+    "updatedAt": "2026-01-19T01:48:23.055Z"
+  },
+  {
+    "id": "rep-0064",
+    "codigoSAP": "4500000063",
+    "codigoBaader": "200-SEN-064",
+    "textoBreve": "Rodillo Siemens #64",
+    "descripcion": "Rodillo para Baader 200 - Sensores. Marca: Siemens. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 1,
+    "cantidadStockBodega": 8,
+    "valorUnitario": 134268,
+    "tags": [
+      {
+        "nombre": "Obsoleto",
+        "tipo": "stock",
+        "cantidad": 5,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      },
+      {
+        "nombre": "Urgentes este mes",
+        "tipo": "solicitud",
+        "cantidad": 1,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 1208412,
+    "nombreManual": "Siemens Rodillo",
+    "fechaUltimaActualizacionInventario": "2025-11-21T05:50:59.355Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-06-27T05:14:28.111Z",
+    "updatedAt": "2026-01-15T20:29:58.384Z"
+  },
+  {
+    "id": "rep-0065",
+    "codigoSAP": "4500000064",
+    "codigoBaader": "200-COM-065",
+    "textoBreve": "Sensor ABB #65",
+    "descripcion": "Sensor para Baader 200 - Componentes Hidráulicos. Marca: ABB. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 0,
+    "cantidadStockBodega": 0,
+    "valorUnitario": 140820,
+    "tags": [
+      {
+        "nombre": "Stock mínimo",
+        "tipo": "stock",
+        "cantidad": 9,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      },
+      {
+        "nombre": "En espera proveedor",
+        "tipo": "solicitud",
+        "cantidad": 3,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      },
+      {
+        "nombre": "Overhaul temporada baja",
+        "tipo": "solicitud",
+        "cantidad": 17,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 0,
+    "nombreManual": "ABB Sensor",
+    "fechaUltimaActualizacionInventario": "2025-11-05T23:21:44.926Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-06-13T01:28:29.319Z",
+    "updatedAt": "2026-01-08T15:52:03.656Z"
+  },
+  {
+    "id": "rep-0066",
+    "codigoSAP": "4500000065",
+    "codigoBaader": "200-ELE-066",
+    "textoBreve": "Compresor Grundfos #66",
+    "descripcion": "Compresor para Baader 200 - Elementos de Corte. Marca: Grundfos. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 2,
+    "cantidadStockBodega": 7,
+    "valorUnitario": 114600,
+    "tags": [
+      {
+        "nombre": "Críticos",
+        "tipo": "solicitud",
+        "cantidad": 12,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 1031400,
+    "nombreManual": "Grundfos Compresor",
+    "fechaUltimaActualizacionInventario": "2025-12-30T23:30:44.183Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-06-13T20:28:36.805Z",
+    "updatedAt": "2026-01-06T12:57:26.365Z"
+  },
+  {
+    "id": "rep-0067",
+    "codigoSAP": "4500000066",
+    "codigoBaader": "200-COJ-067",
+    "textoBreve": "Motor Rexroth #67",
+    "descripcion": "Motor para Baader 200 - Cojinetes. Marca: Rexroth. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 2,
+    "cantidadStockBodega": 7,
+    "valorUnitario": 103439,
+    "tags": [
+      {
+        "nombre": "Obsoleto",
+        "tipo": "stock",
+        "cantidad": 2,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      },
+      {
+        "nombre": "Overhaul temporada baja",
+        "tipo": "solicitud",
+        "cantidad": 5,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 930951,
+    "nombreManual": "Rexroth Motor",
+    "fechaUltimaActualizacionInventario": "2026-01-19T20:35:16.813Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-03-11T04:57:04.009Z",
+    "updatedAt": "2025-12-29T09:31:54.116Z"
+  },
+  {
+    "id": "rep-0068",
+    "codigoSAP": "4500000067",
+    "codigoBaader": "200-SEL-068",
+    "textoBreve": "Bomba Parker #68",
+    "descripcion": "Bomba para Baader 200 - Sellos y Juntas. Marca: Parker. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 2,
+    "cantidadStockBodega": 0,
+    "valorUnitario": 40983,
+    "tags": [
+      {
+        "nombre": "Críticos",
+        "tipo": "solicitud",
+        "cantidad": 3,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 81966,
+    "nombreManual": "Parker Bomba",
+    "fechaUltimaActualizacionInventario": "2025-12-30T04:37:33.216Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-09-08T11:00:36.151Z",
+    "updatedAt": "2026-01-05T14:21:23.221Z"
+  },
+  {
+    "id": "rep-0069",
+    "codigoSAP": "4500000068",
+    "codigoBaader": "200-CAB-069",
+    "textoBreve": "Válvula Bosch #69",
+    "descripcion": "Válvula para Baader 200 - Cables y Conectores. Marca: Bosch. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 3,
+    "cantidadStockBodega": 6,
+    "valorUnitario": 23358,
+    "tags": [
+      {
+        "nombre": "En espera proveedor",
+        "tipo": "solicitud",
+        "cantidad": 11,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 210222,
+    "nombreManual": "Bosch Válvula",
+    "fechaUltimaActualizacionInventario": "2025-10-30T06:10:09.766Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-03-25T17:02:30.437Z",
+    "updatedAt": "2026-01-14T02:55:32.694Z"
+  },
+  {
+    "id": "rep-0070",
+    "codigoSAP": "4500000069",
+    "codigoBaader": "200-PIE-070",
+    "textoBreve": "Rodillo Festo #70",
+    "descripcion": "Rodillo para Baader 200 - Piezas de Wear. Marca: Festo. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 1,
+    "cantidadStockBodega": 5,
+    "valorUnitario": 203645,
+    "tags": [
+      {
+        "nombre": "Stock mínimo",
+        "tipo": "stock",
+        "cantidad": 9,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      },
+      {
+        "nombre": "Críticos",
+        "tipo": "solicitud",
+        "cantidad": 6,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 1221870,
+    "nombreManual": "Festo Rodillo",
+    "fechaUltimaActualizacionInventario": "2025-12-10T13:47:51.031Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-10-28T08:26:08.463Z",
+    "updatedAt": "2026-01-09T14:33:38.297Z"
+  },
+  {
+    "id": "rep-0071",
+    "codigoSAP": "4500000070",
+    "codigoBaader": "200-ROD-071",
+    "textoBreve": "Sensor SKF #71",
+    "descripcion": "Sensor para Baader 200 - Rodillos y Correas. Marca: SKF. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 2,
+    "cantidadStockBodega": 5,
+    "valorUnitario": 161178,
+    "tags": [
+      {
+        "nombre": "Overstock",
+        "tipo": "stock",
+        "cantidad": 11,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      },
+      {
+        "nombre": "Stock mínimo",
+        "tipo": "stock",
+        "cantidad": 8,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 1128246,
+    "nombreManual": "SKF Sensor",
+    "fechaUltimaActualizacionInventario": "2026-01-16T20:54:36.515Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-09-13T01:07:19.756Z",
+    "updatedAt": "2026-01-14T12:54:56.603Z"
+  },
+  {
+    "id": "rep-0072",
+    "codigoSAP": "4500000071",
+    "codigoBaader": "200-MOT-072",
+    "textoBreve": "Compresor NSK #72",
+    "descripcion": "Compresor para Baader 200 - Motores y Reductores. Marca: NSK. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 3,
+    "cantidadStockBodega": 7,
+    "valorUnitario": 111666,
+    "tags": [
+      {
+        "nombre": "Overstock",
+        "tipo": "stock",
+        "cantidad": 16,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      },
+      {
+        "nombre": "Pedido realizado",
+        "tipo": "solicitud",
+        "cantidad": 4,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 1116660,
+    "nombreManual": "NSK Compresor",
+    "fechaUltimaActualizacionInventario": "2025-12-29T00:39:37.338Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-11-17T16:42:46.125Z",
+    "updatedAt": "2026-01-04T03:15:36.858Z"
+  },
+  {
+    "id": "rep-0073",
+    "codigoSAP": "4500000072",
+    "codigoBaader": "200-BOM-073",
+    "textoBreve": "Motor TIMKEN #73",
+    "descripcion": "Motor para Baader 200 - Bombas y Válvulas. Marca: TIMKEN. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 2,
+    "cantidadStockBodega": 2,
+    "valorUnitario": 118796,
+    "tags": [
+      {
+        "nombre": "Overstock",
+        "tipo": "stock",
+        "cantidad": 14,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      },
+      {
+        "nombre": "Obsoleto",
+        "tipo": "stock",
+        "cantidad": 7,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 475184,
+    "nombreManual": "TIMKEN Motor",
+    "fechaUltimaActualizacionInventario": "2025-12-31T15:05:49.498Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-04-30T20:05:03.871Z",
+    "updatedAt": "2026-01-02T11:45:01.902Z"
+  },
+  {
+    "id": "rep-0074",
+    "codigoSAP": "4500000073",
+    "codigoBaader": "200-SEN-074",
+    "textoBreve": "Bomba Siemens #74",
+    "descripcion": "Bomba para Baader 200 - Sensores. Marca: Siemens. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 0,
+    "cantidadStockBodega": 8,
+    "valorUnitario": 69340,
+    "tags": [
+      {
+        "nombre": "Overstock",
+        "tipo": "stock",
+        "cantidad": 16,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 554720,
+    "nombreManual": "Siemens Bomba",
+    "fechaUltimaActualizacionInventario": "2025-11-20T18:43:41.484Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-02-26T18:05:55.891Z",
+    "updatedAt": "2025-12-24T05:42:44.367Z"
+  },
+  {
+    "id": "rep-0075",
+    "codigoSAP": "4500000074",
+    "codigoBaader": "200-COM-075",
+    "textoBreve": "Válvula ABB #75",
+    "descripcion": "Válvula para Baader 200 - Componentes Hidráulicos. Marca: ABB. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 3,
+    "cantidadStockBodega": 4,
+    "valorUnitario": 16632,
+    "tags": [
+      {
+        "nombre": "En espera proveedor",
+        "tipo": "solicitud",
+        "cantidad": 1,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 116424,
+    "nombreManual": "ABB Válvula",
+    "fechaUltimaActualizacionInventario": "2025-11-13T15:54:24.898Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-08-28T15:59:05.515Z",
+    "updatedAt": "2025-12-30T11:22:33.408Z"
+  },
+  {
+    "id": "rep-0076",
+    "codigoSAP": "4500000075",
+    "codigoBaader": "200-ELE-076",
+    "textoBreve": "Rodillo Grundfos #76",
+    "descripcion": "Rodillo para Baader 200 - Elementos de Corte. Marca: Grundfos. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 0,
+    "cantidadStockBodega": 0,
+    "valorUnitario": 157198,
+    "tags": [
+      {
+        "nombre": "Overstock",
+        "tipo": "stock",
+        "cantidad": 11,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      },
+      {
+        "nombre": "Pedido realizado",
+        "tipo": "solicitud",
+        "cantidad": 10,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 0,
+    "nombreManual": "Grundfos Rodillo",
+    "fechaUltimaActualizacionInventario": "2025-12-04T11:01:21.428Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-10-26T10:11:49.974Z",
+    "updatedAt": "2026-01-02T10:54:42.419Z"
+  },
+  {
+    "id": "rep-0077",
+    "codigoSAP": "4500000076",
+    "codigoBaader": "200-COJ-077",
+    "textoBreve": "Sensor Rexroth #77",
+    "descripcion": "Sensor para Baader 200 - Cojinetes. Marca: Rexroth. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 2,
+    "cantidadStockBodega": 1,
+    "valorUnitario": 185015,
+    "tags": [
+      {
+        "nombre": "Stock mínimo",
+        "tipo": "stock",
+        "cantidad": 15,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      },
+      {
+        "nombre": "Overstock",
+        "tipo": "stock",
+        "cantidad": 10,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      },
+      {
+        "nombre": "Pedido realizado",
+        "tipo": "solicitud",
+        "cantidad": 17,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 555045,
+    "nombreManual": "Rexroth Sensor",
+    "fechaUltimaActualizacionInventario": "2025-11-20T23:17:26.249Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2026-01-04T19:06:19.840Z",
+    "updatedAt": "2026-01-06T12:03:29.384Z"
+  },
+  {
+    "id": "rep-0078",
+    "codigoSAP": "4500000077",
+    "codigoBaader": "200-SEL-078",
+    "textoBreve": "Compresor Parker #78",
+    "descripcion": "Compresor para Baader 200 - Sellos y Juntas. Marca: Parker. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 2,
+    "cantidadStockBodega": 7,
+    "valorUnitario": 43548,
+    "tags": [
+      {
+        "nombre": "Pedido realizado",
+        "tipo": "solicitud",
+        "cantidad": 19,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      },
+      {
+        "nombre": "En espera proveedor",
+        "tipo": "solicitud",
+        "cantidad": 13,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      },
+      {
+        "nombre": "Críticos",
+        "tipo": "solicitud",
+        "cantidad": 5,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 391932,
+    "nombreManual": "Parker Compresor",
+    "fechaUltimaActualizacionInventario": "2025-10-29T05:57:22.133Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-05-27T05:50:19.492Z",
+    "updatedAt": "2025-12-27T12:16:31.430Z"
+  },
+  {
+    "id": "rep-0079",
+    "codigoSAP": "4500000078",
+    "codigoBaader": "200-CAB-079",
+    "textoBreve": "Motor Bosch #79",
+    "descripcion": "Motor para Baader 200 - Cables y Conectores. Marca: Bosch. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 4,
+    "cantidadStockBodega": 1,
+    "valorUnitario": 247952,
+    "tags": [
+      {
+        "nombre": "Obsoleto",
+        "tipo": "stock",
+        "cantidad": 15,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      },
+      {
+        "nombre": "Pedido realizado",
+        "tipo": "solicitud",
+        "cantidad": 17,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 1239760,
+    "nombreManual": "Bosch Motor",
+    "fechaUltimaActualizacionInventario": "2026-01-17T01:12:53.090Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-02-25T07:43:37.352Z",
+    "updatedAt": "2026-01-16T11:50:49.645Z"
+  },
+  {
+    "id": "rep-0080",
+    "codigoSAP": "4500000079",
+    "codigoBaader": "200-PIE-080",
+    "textoBreve": "Bomba Festo #80",
+    "descripcion": "Bomba para Baader 200 - Piezas de Wear. Marca: Festo. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 4,
+    "cantidadStockBodega": 6,
+    "valorUnitario": 39943,
+    "tags": [
+      {
+        "nombre": "Críticos",
+        "tipo": "solicitud",
+        "cantidad": 1,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 399430,
+    "nombreManual": "Festo Bomba",
+    "fechaUltimaActualizacionInventario": "2025-12-25T17:54:02.318Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-08-21T05:07:20.293Z",
+    "updatedAt": "2026-01-10T20:33:15.529Z"
+  },
+  {
+    "id": "rep-0081",
+    "codigoSAP": "4500000080",
+    "codigoBaader": "200-ROD-081",
+    "textoBreve": "Válvula SKF #81",
+    "descripcion": "Válvula para Baader 200 - Rodillos y Correas. Marca: SKF. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 0,
+    "cantidadStockBodega": 0,
+    "valorUnitario": 97812,
+    "tags": [
+      {
+        "nombre": "Críticos",
+        "tipo": "solicitud",
+        "cantidad": 15,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      },
+      {
+        "nombre": "Urgentes este mes",
+        "tipo": "solicitud",
+        "cantidad": 9,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 0,
+    "nombreManual": "SKF Válvula",
+    "fechaUltimaActualizacionInventario": "2025-12-31T21:48:17.150Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-10-10T20:01:22.112Z",
+    "updatedAt": "2026-01-04T11:33:37.984Z"
+  },
+  {
+    "id": "rep-0082",
+    "codigoSAP": "4500000081",
+    "codigoBaader": "200-MOT-082",
+    "textoBreve": "Rodillo NSK #82",
+    "descripcion": "Rodillo para Baader 200 - Motores y Reductores. Marca: NSK. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 3,
+    "cantidadStockBodega": 2,
+    "valorUnitario": 101573,
+    "tags": [
+      {
+        "nombre": "Stock mínimo",
+        "tipo": "stock",
+        "cantidad": 19,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 507865,
+    "nombreManual": "NSK Rodillo",
+    "fechaUltimaActualizacionInventario": "2025-12-17T09:35:31.691Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-03-19T10:55:21.854Z",
+    "updatedAt": "2025-12-22T20:46:15.488Z"
+  },
+  {
+    "id": "rep-0083",
+    "codigoSAP": "4500000082",
+    "codigoBaader": "200-BOM-083",
+    "textoBreve": "Sensor TIMKEN #83",
+    "descripcion": "Sensor para Baader 200 - Bombas y Válvulas. Marca: TIMKEN. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 4,
+    "cantidadStockBodega": 4,
+    "valorUnitario": 237152,
+    "tags": [
+      {
+        "nombre": "Pedido realizado",
+        "tipo": "solicitud",
+        "cantidad": 11,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      },
+      {
+        "nombre": "Obsoleto",
+        "tipo": "stock",
+        "cantidad": 19,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 1897216,
+    "nombreManual": "TIMKEN Sensor",
+    "fechaUltimaActualizacionInventario": "2025-12-29T11:16:05.262Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-11-02T00:27:10.665Z",
+    "updatedAt": "2026-01-16T18:20:39.561Z"
+  },
+  {
+    "id": "rep-0084",
+    "codigoSAP": "4500000083",
+    "codigoBaader": "200-SEN-084",
+    "textoBreve": "Compresor Siemens #84",
+    "descripcion": "Compresor para Baader 200 - Sensores. Marca: Siemens. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 0,
+    "cantidadStockBodega": 1,
+    "valorUnitario": 184428,
+    "tags": [
+      {
+        "nombre": "Críticos",
+        "tipo": "solicitud",
+        "cantidad": 1,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      },
+      {
+        "nombre": "Overstock",
+        "tipo": "stock",
+        "cantidad": 8,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 184428,
+    "nombreManual": "Siemens Compresor",
+    "fechaUltimaActualizacionInventario": "2025-11-12T20:57:49.677Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-07-28T23:16:31.521Z",
+    "updatedAt": "2026-01-07T22:14:44.005Z"
+  },
+  {
+    "id": "rep-0085",
+    "codigoSAP": "4500000084",
+    "codigoBaader": "200-COM-085",
+    "textoBreve": "Motor ABB #85",
+    "descripcion": "Motor para Baader 200 - Componentes Hidráulicos. Marca: ABB. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 1,
+    "cantidadStockBodega": 2,
+    "valorUnitario": 195068,
+    "tags": [
+      {
+        "nombre": "Críticos",
+        "tipo": "solicitud",
+        "cantidad": 5,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 585204,
+    "nombreManual": "ABB Motor",
+    "fechaUltimaActualizacionInventario": "2026-01-17T03:13:18.064Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-02-14T05:42:43.208Z",
+    "updatedAt": "2026-01-07T06:36:10.937Z"
+  },
+  {
+    "id": "rep-0086",
+    "codigoSAP": "4500000085",
+    "codigoBaader": "200-ELE-086",
+    "textoBreve": "Bomba Grundfos #86",
+    "descripcion": "Bomba para Baader 200 - Elementos de Corte. Marca: Grundfos. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 4,
+    "cantidadStockBodega": 8,
+    "valorUnitario": 188348,
+    "tags": [
+      {
+        "nombre": "Stock mínimo",
+        "tipo": "stock",
+        "cantidad": 17,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 2260176,
+    "nombreManual": "Grundfos Bomba",
+    "fechaUltimaActualizacionInventario": "2025-11-21T21:47:21.362Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-01-23T22:48:09.134Z",
+    "updatedAt": "2025-12-22T03:43:31.722Z"
+  },
+  {
+    "id": "rep-0087",
+    "codigoSAP": "4500000086",
+    "codigoBaader": "200-COJ-087",
+    "textoBreve": "Válvula Rexroth #87",
+    "descripcion": "Válvula para Baader 200 - Cojinetes. Marca: Rexroth. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 4,
+    "cantidadStockBodega": 4,
+    "valorUnitario": 192074,
+    "tags": [
+      {
+        "nombre": "Overhaul temporada baja",
+        "tipo": "solicitud",
+        "cantidad": 15,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 1536592,
+    "nombreManual": "Rexroth Válvula",
+    "fechaUltimaActualizacionInventario": "2025-11-25T01:34:37.296Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-11-18T19:16:17.373Z",
+    "updatedAt": "2026-01-03T08:41:42.333Z"
+  },
+  {
+    "id": "rep-0088",
+    "codigoSAP": "4500000087",
+    "codigoBaader": "200-SEL-088",
+    "textoBreve": "Rodillo Parker #88",
+    "descripcion": "Rodillo para Baader 200 - Sellos y Juntas. Marca: Parker. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 1,
+    "cantidadStockBodega": 2,
+    "valorUnitario": 71472,
+    "tags": [
+      {
+        "nombre": "En espera proveedor",
+        "tipo": "solicitud",
+        "cantidad": 14,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 214416,
+    "nombreManual": "Parker Rodillo",
+    "fechaUltimaActualizacionInventario": "2026-01-19T20:59:06.879Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-04-08T13:52:18.488Z",
+    "updatedAt": "2025-12-24T03:29:45.147Z"
+  },
+  {
+    "id": "rep-0089",
+    "codigoSAP": "4500000088",
+    "codigoBaader": "200-CAB-089",
+    "textoBreve": "Sensor Bosch #89",
+    "descripcion": "Sensor para Baader 200 - Cables y Conectores. Marca: Bosch. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 1,
+    "cantidadStockBodega": 3,
+    "valorUnitario": 209128,
+    "tags": [
+      {
+        "nombre": "Stock mínimo",
+        "tipo": "stock",
+        "cantidad": 14,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      },
+      {
+        "nombre": "Pedido realizado",
+        "tipo": "solicitud",
+        "cantidad": 6,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 836512,
+    "nombreManual": "Bosch Sensor",
+    "fechaUltimaActualizacionInventario": "2025-12-01T17:33:21.966Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-05-26T09:40:54.300Z",
+    "updatedAt": "2026-01-01T07:09:56.810Z"
+  },
+  {
+    "id": "rep-0090",
+    "codigoSAP": "4500000089",
+    "codigoBaader": "200-PIE-090",
+    "textoBreve": "Compresor Festo #90",
+    "descripcion": "Compresor para Baader 200 - Piezas de Wear. Marca: Festo. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 4,
+    "cantidadStockBodega": 5,
+    "valorUnitario": 253036,
+    "tags": [
+      {
+        "nombre": "Urgentes este mes",
+        "tipo": "solicitud",
+        "cantidad": 6,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      },
+      {
+        "nombre": "Críticos",
+        "tipo": "solicitud",
+        "cantidad": 0,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      },
+      {
+        "nombre": "Pedido realizado",
+        "tipo": "solicitud",
+        "cantidad": 2,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 2277324,
+    "nombreManual": "Festo Compresor",
+    "fechaUltimaActualizacionInventario": "2025-11-16T14:21:55.352Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-06-05T06:12:28.864Z",
+    "updatedAt": "2026-01-11T02:53:32.027Z"
+  },
+  {
+    "id": "rep-0091",
+    "codigoSAP": "4500000090",
+    "codigoBaader": "200-ROD-091",
+    "textoBreve": "Motor SKF #91",
+    "descripcion": "Motor para Baader 200 - Rodillos y Correas. Marca: SKF. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 0,
+    "cantidadStockBodega": 2,
+    "valorUnitario": 147073,
+    "tags": [
+      {
+        "nombre": "En espera proveedor",
+        "tipo": "solicitud",
+        "cantidad": 3,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      },
+      {
+        "nombre": "Obsoleto",
+        "tipo": "stock",
+        "cantidad": 18,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      },
+      {
+        "nombre": "Overstock",
+        "tipo": "stock",
+        "cantidad": 8,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 294146,
+    "nombreManual": "SKF Motor",
+    "fechaUltimaActualizacionInventario": "2025-12-11T01:06:37.385Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-07-30T19:58:48.199Z",
+    "updatedAt": "2026-01-13T04:38:15.543Z"
+  },
+  {
+    "id": "rep-0092",
+    "codigoSAP": "4500000091",
+    "codigoBaader": "200-MOT-092",
+    "textoBreve": "Bomba NSK #92",
+    "descripcion": "Bomba para Baader 200 - Motores y Reductores. Marca: NSK. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 3,
+    "cantidadStockBodega": 6,
+    "valorUnitario": 80685,
+    "tags": [
+      {
+        "nombre": "Stock mínimo",
+        "tipo": "stock",
+        "cantidad": 3,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 726165,
+    "nombreManual": "NSK Bomba",
+    "fechaUltimaActualizacionInventario": "2025-12-23T15:19:21.272Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-06-28T17:13:26.132Z",
+    "updatedAt": "2026-01-02T10:47:09.099Z"
+  },
+  {
+    "id": "rep-0093",
+    "codigoSAP": "4500000092",
+    "codigoBaader": "200-BOM-093",
+    "textoBreve": "Válvula TIMKEN #93",
+    "descripcion": "Válvula para Baader 200 - Bombas y Válvulas. Marca: TIMKEN. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 0,
+    "cantidadStockBodega": 0,
+    "valorUnitario": 69442,
+    "tags": [
+      {
+        "nombre": "Pedido realizado",
+        "tipo": "solicitud",
+        "cantidad": 13,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      },
+      {
+        "nombre": "Urgentes este mes",
+        "tipo": "solicitud",
+        "cantidad": 9,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      },
+      {
+        "nombre": "Stock mínimo",
+        "tipo": "stock",
+        "cantidad": 6,
+        "fecha": "2026-01-20T04:24:51.650Z"
+      }
+    ],
+    "total": 0,
+    "nombreManual": "TIMKEN Válvula",
+    "fechaUltimaActualizacionInventario": "2025-11-18T23:52:10.143Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-02-21T12:31:17.043Z",
+    "updatedAt": "2026-01-12T10:10:30.480Z"
+  },
+  {
+    "id": "rep-0094",
+    "codigoSAP": "4500000093",
+    "codigoBaader": "200-SEN-094",
+    "textoBreve": "Rodillo Siemens #94",
+    "descripcion": "Rodillo para Baader 200 - Sensores. Marca: Siemens. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 4,
+    "cantidadStockBodega": 0,
+    "valorUnitario": 125500,
+    "tags": [
+      {
+        "nombre": "Obsoleto",
+        "tipo": "stock",
+        "cantidad": 0,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      },
+      {
+        "nombre": "Pedido realizado",
+        "tipo": "solicitud",
+        "cantidad": 3,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      },
+      {
+        "nombre": "Overstock",
+        "tipo": "stock",
+        "cantidad": 1,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      }
+    ],
+    "total": 502000,
+    "nombreManual": "Siemens Rodillo",
+    "fechaUltimaActualizacionInventario": "2026-01-06T09:59:37.832Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-12-17T10:35:25.900Z",
+    "updatedAt": "2026-01-06T13:46:27.206Z"
+  },
+  {
+    "id": "rep-0095",
+    "codigoSAP": "4500000094",
+    "codigoBaader": "200-COM-095",
+    "textoBreve": "Sensor ABB #95",
+    "descripcion": "Sensor para Baader 200 - Componentes Hidráulicos. Marca: ABB. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 3,
+    "cantidadStockBodega": 9,
+    "valorUnitario": 158324,
+    "tags": [
+      {
+        "nombre": "Pedido realizado",
+        "tipo": "solicitud",
+        "cantidad": 12,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      },
+      {
+        "nombre": "Críticos",
+        "tipo": "solicitud",
+        "cantidad": 19,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      },
+      {
+        "nombre": "Urgentes este mes",
+        "tipo": "solicitud",
+        "cantidad": 0,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      }
+    ],
+    "total": 1899888,
+    "nombreManual": "ABB Sensor",
+    "fechaUltimaActualizacionInventario": "2025-12-19T11:41:33.188Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-05-29T05:17:11.096Z",
+    "updatedAt": "2025-12-30T00:54:21.450Z"
+  },
+  {
+    "id": "rep-0096",
+    "codigoSAP": "4500000095",
+    "codigoBaader": "200-ELE-096",
+    "textoBreve": "Compresor Grundfos #96",
+    "descripcion": "Compresor para Baader 200 - Elementos de Corte. Marca: Grundfos. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 4,
+    "cantidadStockBodega": 1,
+    "valorUnitario": 122954,
+    "tags": [
+      {
+        "nombre": "Overhaul temporada baja",
+        "tipo": "solicitud",
+        "cantidad": 3,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      }
+    ],
+    "total": 614770,
+    "nombreManual": "Grundfos Compresor",
+    "fechaUltimaActualizacionInventario": "2025-12-21T04:09:32.345Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-12-06T21:15:51.803Z",
+    "updatedAt": "2025-12-27T19:48:04.945Z"
+  },
+  {
+    "id": "rep-0097",
+    "codigoSAP": "4500000096",
+    "codigoBaader": "200-COJ-097",
+    "textoBreve": "Motor Rexroth #97",
+    "descripcion": "Motor para Baader 200 - Cojinetes. Marca: Rexroth. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 0,
+    "cantidadStockBodega": 1,
+    "valorUnitario": 232073,
+    "tags": [
+      {
+        "nombre": "Obsoleto",
+        "tipo": "stock",
+        "cantidad": 1,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      },
+      {
+        "nombre": "Stock mínimo",
+        "tipo": "stock",
+        "cantidad": 3,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      }
+    ],
+    "total": 232073,
+    "nombreManual": "Rexroth Motor",
+    "fechaUltimaActualizacionInventario": "2025-11-26T03:29:28.887Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-04-03T12:45:21.346Z",
+    "updatedAt": "2026-01-16T11:27:26.098Z"
+  },
+  {
+    "id": "rep-0098",
+    "codigoSAP": "4500000097",
+    "codigoBaader": "200-SEL-098",
+    "textoBreve": "Bomba Parker #98",
+    "descripcion": "Bomba para Baader 200 - Sellos y Juntas. Marca: Parker. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 0,
+    "cantidadStockBodega": 4,
+    "valorUnitario": 41426,
+    "tags": [
+      {
+        "nombre": "Overstock",
+        "tipo": "stock",
+        "cantidad": 8,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      }
+    ],
+    "total": 165704,
+    "nombreManual": "Parker Bomba",
+    "fechaUltimaActualizacionInventario": "2026-01-08T00:21:34.189Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-02-04T09:44:54.428Z",
+    "updatedAt": "2026-01-04T08:00:06.511Z"
+  },
+  {
+    "id": "rep-0099",
+    "codigoSAP": "4500000098",
+    "codigoBaader": "200-CAB-099",
+    "textoBreve": "Válvula Bosch #99",
+    "descripcion": "Válvula para Baader 200 - Cables y Conectores. Marca: Bosch. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 3,
+    "cantidadStockBodega": 9,
+    "valorUnitario": 16150,
+    "tags": [
+      {
+        "nombre": "Urgentes este mes",
+        "tipo": "solicitud",
+        "cantidad": 14,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      },
+      {
+        "nombre": "Overhaul temporada baja",
+        "tipo": "solicitud",
+        "cantidad": 4,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      },
+      {
+        "nombre": "Stock mínimo",
+        "tipo": "stock",
+        "cantidad": 19,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      }
+    ],
+    "total": 193800,
+    "nombreManual": "Bosch Válvula",
+    "fechaUltimaActualizacionInventario": "2025-11-15T10:17:15.850Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-05-08T03:50:44.123Z",
+    "updatedAt": "2026-01-07T17:14:55.019Z"
+  },
+  {
+    "id": "rep-0100",
+    "codigoSAP": "4500000099",
+    "codigoBaader": "200-PIE-100",
+    "textoBreve": "Rodillo Festo #100",
+    "descripcion": "Rodillo para Baader 200 - Piezas de Wear. Marca: Festo. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 0,
+    "cantidadStockBodega": 3,
+    "valorUnitario": 100498,
+    "tags": [
+      {
+        "nombre": "Pedido realizado",
+        "tipo": "solicitud",
+        "cantidad": 8,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      }
+    ],
+    "total": 301494,
+    "nombreManual": "Festo Rodillo",
+    "fechaUltimaActualizacionInventario": "2025-11-30T03:13:09.629Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-10-10T23:44:56.719Z",
+    "updatedAt": "2025-12-22T11:03:43.766Z"
+  },
+  {
+    "id": "rep-0101",
+    "codigoSAP": "4500000100",
+    "codigoBaader": "200-ROD-101",
+    "textoBreve": "Sensor SKF #101",
+    "descripcion": "Sensor para Baader 200 - Rodillos y Correas. Marca: SKF. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 3,
+    "cantidadStockBodega": 0,
+    "valorUnitario": 232483,
+    "tags": [
+      {
+        "nombre": "Stock mínimo",
+        "tipo": "stock",
+        "cantidad": 14,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      }
+    ],
+    "total": 697449,
+    "nombreManual": "SKF Sensor",
+    "fechaUltimaActualizacionInventario": "2025-11-08T00:35:07.871Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-02-22T22:05:20.684Z",
+    "updatedAt": "2025-12-24T03:11:12.880Z"
+  },
+  {
+    "id": "rep-0102",
+    "codigoSAP": "4500000101",
+    "codigoBaader": "200-MOT-102",
+    "textoBreve": "Compresor NSK #102",
+    "descripcion": "Compresor para Baader 200 - Motores y Reductores. Marca: NSK. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 0,
+    "cantidadStockBodega": 3,
+    "valorUnitario": 253736,
+    "tags": [
+      {
+        "nombre": "Críticos",
+        "tipo": "solicitud",
+        "cantidad": 10,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      },
+      {
+        "nombre": "En espera proveedor",
+        "tipo": "solicitud",
+        "cantidad": 8,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      },
+      {
+        "nombre": "Stock mínimo",
+        "tipo": "stock",
+        "cantidad": 2,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      }
+    ],
+    "total": 761208,
+    "nombreManual": "NSK Compresor",
+    "fechaUltimaActualizacionInventario": "2026-01-18T18:22:13.509Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-07-26T22:56:17.282Z",
+    "updatedAt": "2025-12-23T10:37:56.121Z"
+  },
+  {
+    "id": "rep-0103",
+    "codigoSAP": "4500000102",
+    "codigoBaader": "200-BOM-103",
+    "textoBreve": "Motor TIMKEN #103",
+    "descripcion": "Motor para Baader 200 - Bombas y Válvulas. Marca: TIMKEN. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 2,
+    "cantidadStockBodega": 8,
+    "valorUnitario": 39291,
+    "tags": [
+      {
+        "nombre": "Obsoleto",
+        "tipo": "stock",
+        "cantidad": 16,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      },
+      {
+        "nombre": "En espera proveedor",
+        "tipo": "solicitud",
+        "cantidad": 4,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      },
+      {
+        "nombre": "Overhaul temporada baja",
+        "tipo": "solicitud",
+        "cantidad": 3,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      }
+    ],
+    "total": 392910,
+    "nombreManual": "TIMKEN Motor",
+    "fechaUltimaActualizacionInventario": "2025-11-04T07:07:02.236Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2026-01-13T13:10:45.854Z",
+    "updatedAt": "2026-01-06T17:29:48.924Z"
+  },
+  {
+    "id": "rep-0104",
+    "codigoSAP": "4500000103",
+    "codigoBaader": "200-SEN-104",
+    "textoBreve": "Bomba Siemens #104",
+    "descripcion": "Bomba para Baader 200 - Sensores. Marca: Siemens. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 4,
+    "cantidadStockBodega": 0,
+    "valorUnitario": 193575,
+    "tags": [
+      {
+        "nombre": "En espera proveedor",
+        "tipo": "solicitud",
+        "cantidad": 7,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      },
+      {
+        "nombre": "Urgentes este mes",
+        "tipo": "solicitud",
+        "cantidad": 14,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      }
+    ],
+    "total": 774300,
+    "nombreManual": "Siemens Bomba",
+    "fechaUltimaActualizacionInventario": "2025-11-21T03:46:18.957Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-11-17T21:26:47.085Z",
+    "updatedAt": "2026-01-13T15:21:50.547Z"
+  },
+  {
+    "id": "rep-0105",
+    "codigoSAP": "4500000104",
+    "codigoBaader": "200-COM-105",
+    "textoBreve": "Válvula ABB #105",
+    "descripcion": "Válvula para Baader 200 - Componentes Hidráulicos. Marca: ABB. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 0,
+    "cantidadStockBodega": 8,
+    "valorUnitario": 64609,
+    "tags": [
+      {
+        "nombre": "Urgentes este mes",
+        "tipo": "solicitud",
+        "cantidad": 16,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      }
+    ],
+    "total": 516872,
+    "nombreManual": "ABB Válvula",
+    "fechaUltimaActualizacionInventario": "2026-01-06T03:31:21.335Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-06-16T05:25:15.234Z",
+    "updatedAt": "2025-12-28T10:02:01.765Z"
+  },
+  {
+    "id": "rep-0106",
+    "codigoSAP": "4500000105",
+    "codigoBaader": "200-ELE-106",
+    "textoBreve": "Rodillo Grundfos #106",
+    "descripcion": "Rodillo para Baader 200 - Elementos de Corte. Marca: Grundfos. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 0,
+    "cantidadStockBodega": 1,
+    "valorUnitario": 95911,
+    "tags": [
+      {
+        "nombre": "Pedido realizado",
+        "tipo": "solicitud",
+        "cantidad": 3,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      },
+      {
+        "nombre": "Críticos",
+        "tipo": "solicitud",
+        "cantidad": 11,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      }
+    ],
+    "total": 95911,
+    "nombreManual": "Grundfos Rodillo",
+    "fechaUltimaActualizacionInventario": "2025-11-29T18:44:43.884Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-12-04T14:53:43.545Z",
+    "updatedAt": "2025-12-31T00:17:19.780Z"
+  },
+  {
+    "id": "rep-0107",
+    "codigoSAP": "4500000106",
+    "codigoBaader": "200-COJ-107",
+    "textoBreve": "Sensor Rexroth #107",
+    "descripcion": "Sensor para Baader 200 - Cojinetes. Marca: Rexroth. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 3,
+    "cantidadStockBodega": 1,
+    "valorUnitario": 89446,
+    "tags": [
+      {
+        "nombre": "Overhaul temporada baja",
+        "tipo": "solicitud",
+        "cantidad": 10,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      },
+      {
+        "nombre": "Críticos",
+        "tipo": "solicitud",
+        "cantidad": 8,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      }
+    ],
+    "total": 357784,
+    "nombreManual": "Rexroth Sensor",
+    "fechaUltimaActualizacionInventario": "2025-11-24T09:00:21.831Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-04-10T02:02:07.424Z",
+    "updatedAt": "2025-12-25T07:44:21.078Z"
+  },
+  {
+    "id": "rep-0108",
+    "codigoSAP": "4500000107",
+    "codigoBaader": "200-SEL-108",
+    "textoBreve": "Compresor Parker #108",
+    "descripcion": "Compresor para Baader 200 - Sellos y Juntas. Marca: Parker. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 1,
+    "cantidadStockBodega": 1,
+    "valorUnitario": 170042,
+    "tags": [
+      {
+        "nombre": "Obsoleto",
+        "tipo": "stock",
+        "cantidad": 7,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      },
+      {
+        "nombre": "Pedido realizado",
+        "tipo": "solicitud",
+        "cantidad": 10,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      },
+      {
+        "nombre": "Overstock",
+        "tipo": "stock",
+        "cantidad": 9,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      }
+    ],
+    "total": 340084,
+    "nombreManual": "Parker Compresor",
+    "fechaUltimaActualizacionInventario": "2025-12-27T07:40:12.509Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-06-24T02:45:09.073Z",
+    "updatedAt": "2026-01-17T01:47:00.754Z"
+  },
+  {
+    "id": "rep-0109",
+    "codigoSAP": "4500000108",
+    "codigoBaader": "200-CAB-109",
+    "textoBreve": "Motor Bosch #109",
+    "descripcion": "Motor para Baader 200 - Cables y Conectores. Marca: Bosch. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 3,
+    "cantidadStockBodega": 9,
+    "valorUnitario": 145217,
+    "tags": [
+      {
+        "nombre": "Críticos",
+        "tipo": "solicitud",
+        "cantidad": 10,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      }
+    ],
+    "total": 1742604,
+    "nombreManual": "Bosch Motor",
+    "fechaUltimaActualizacionInventario": "2025-11-22T04:11:12.335Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-11-10T23:19:51.032Z",
+    "updatedAt": "2025-12-31T17:50:26.454Z"
+  },
+  {
+    "id": "rep-0110",
+    "codigoSAP": "4500000109",
+    "codigoBaader": "200-PIE-110",
+    "textoBreve": "Bomba Festo #110",
+    "descripcion": "Bomba para Baader 200 - Piezas de Wear. Marca: Festo. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 4,
+    "cantidadStockBodega": 3,
+    "valorUnitario": 208438,
+    "tags": [
+      {
+        "nombre": "Obsoleto",
+        "tipo": "stock",
+        "cantidad": 16,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      },
+      {
+        "nombre": "Urgentes este mes",
+        "tipo": "solicitud",
+        "cantidad": 13,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      }
+    ],
+    "total": 1459066,
+    "nombreManual": "Festo Bomba",
+    "fechaUltimaActualizacionInventario": "2026-01-16T03:13:29.513Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-04-15T06:50:32.738Z",
+    "updatedAt": "2026-01-10T00:54:55.675Z"
+  },
+  {
+    "id": "rep-0111",
+    "codigoSAP": "4500000110",
+    "codigoBaader": "200-ROD-111",
+    "textoBreve": "Válvula SKF #111",
+    "descripcion": "Válvula para Baader 200 - Rodillos y Correas. Marca: SKF. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 3,
+    "cantidadStockBodega": 1,
+    "valorUnitario": 18782,
+    "tags": [
+      {
+        "nombre": "Overstock",
+        "tipo": "stock",
+        "cantidad": 8,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      },
+      {
+        "nombre": "Overhaul temporada baja",
+        "tipo": "solicitud",
+        "cantidad": 1,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      },
+      {
+        "nombre": "Urgentes este mes",
+        "tipo": "solicitud",
+        "cantidad": 7,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      }
+    ],
+    "total": 75128,
+    "nombreManual": "SKF Válvula",
+    "fechaUltimaActualizacionInventario": "2025-12-30T19:06:24.247Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-05-01T20:49:03.599Z",
+    "updatedAt": "2026-01-02T19:47:43.275Z"
+  },
+  {
+    "id": "rep-0112",
+    "codigoSAP": "4500000111",
+    "codigoBaader": "200-MOT-112",
+    "textoBreve": "Rodillo NSK #112",
+    "descripcion": "Rodillo para Baader 200 - Motores y Reductores. Marca: NSK. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 3,
+    "cantidadStockBodega": 9,
+    "valorUnitario": 57808,
+    "tags": [
+      {
+        "nombre": "Urgentes este mes",
+        "tipo": "solicitud",
+        "cantidad": 14,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      },
+      {
+        "nombre": "Overhaul temporada baja",
+        "tipo": "solicitud",
+        "cantidad": 19,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      }
+    ],
+    "total": 693696,
+    "nombreManual": "NSK Rodillo",
+    "fechaUltimaActualizacionInventario": "2025-11-25T16:02:23.357Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-09-21T19:07:15.641Z",
+    "updatedAt": "2026-01-04T07:31:01.952Z"
+  },
+  {
+    "id": "rep-0113",
+    "codigoSAP": "4500000112",
+    "codigoBaader": "200-BOM-113",
+    "textoBreve": "Sensor TIMKEN #113",
+    "descripcion": "Sensor para Baader 200 - Bombas y Válvulas. Marca: TIMKEN. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 2,
+    "cantidadStockBodega": 6,
+    "valorUnitario": 167220,
+    "tags": [
+      {
+        "nombre": "Obsoleto",
+        "tipo": "stock",
+        "cantidad": 0,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      }
+    ],
+    "total": 1337760,
+    "nombreManual": "TIMKEN Sensor",
+    "fechaUltimaActualizacionInventario": "2025-12-04T19:06:09.920Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-07-05T12:23:37.256Z",
+    "updatedAt": "2026-01-12T11:52:14.224Z"
+  },
+  {
+    "id": "rep-0114",
+    "codigoSAP": "4500000113",
+    "codigoBaader": "200-SEN-114",
+    "textoBreve": "Compresor Siemens #114",
+    "descripcion": "Compresor para Baader 200 - Sensores. Marca: Siemens. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 4,
+    "cantidadStockBodega": 5,
+    "valorUnitario": 161277,
+    "tags": [
+      {
+        "nombre": "Pedido realizado",
+        "tipo": "solicitud",
+        "cantidad": 2,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      },
+      {
+        "nombre": "Overstock",
+        "tipo": "stock",
+        "cantidad": 3,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      },
+      {
+        "nombre": "Obsoleto",
+        "tipo": "stock",
+        "cantidad": 19,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      }
+    ],
+    "total": 1451493,
+    "nombreManual": "Siemens Compresor",
+    "fechaUltimaActualizacionInventario": "2025-10-23T23:37:15.672Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-10-15T12:05:49.418Z",
+    "updatedAt": "2025-12-30T19:24:58.402Z"
+  },
+  {
+    "id": "rep-0115",
+    "codigoSAP": "4500000114",
+    "codigoBaader": "200-COM-115",
+    "textoBreve": "Motor ABB #115",
+    "descripcion": "Motor para Baader 200 - Componentes Hidráulicos. Marca: ABB. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 1,
+    "cantidadStockBodega": 1,
+    "valorUnitario": 64018,
+    "tags": [
+      {
+        "nombre": "Stock mínimo",
+        "tipo": "stock",
+        "cantidad": 6,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      }
+    ],
+    "total": 128036,
+    "nombreManual": "ABB Motor",
+    "fechaUltimaActualizacionInventario": "2025-10-28T15:07:16.387Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-07-15T22:36:40.391Z",
+    "updatedAt": "2025-12-21T23:25:30.395Z"
+  },
+  {
+    "id": "rep-0116",
+    "codigoSAP": "4500000115",
+    "codigoBaader": "200-ELE-116",
+    "textoBreve": "Bomba Grundfos #116",
+    "descripcion": "Bomba para Baader 200 - Elementos de Corte. Marca: Grundfos. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 0,
+    "cantidadStockBodega": 2,
+    "valorUnitario": 163833,
+    "tags": [
+      {
+        "nombre": "Stock mínimo",
+        "tipo": "stock",
+        "cantidad": 8,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      },
+      {
+        "nombre": "Urgentes este mes",
+        "tipo": "solicitud",
+        "cantidad": 15,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      }
+    ],
+    "total": 327666,
+    "nombreManual": "Grundfos Bomba",
+    "fechaUltimaActualizacionInventario": "2025-12-02T01:27:00.478Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-09-17T19:49:11.850Z",
+    "updatedAt": "2026-01-06T08:14:36.972Z"
+  },
+  {
+    "id": "rep-0117",
+    "codigoSAP": "4500000116",
+    "codigoBaader": "200-COJ-117",
+    "textoBreve": "Válvula Rexroth #117",
+    "descripcion": "Válvula para Baader 200 - Cojinetes. Marca: Rexroth. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 1,
+    "cantidadStockBodega": 5,
+    "valorUnitario": 97295,
+    "tags": [
+      {
+        "nombre": "En espera proveedor",
+        "tipo": "solicitud",
+        "cantidad": 9,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      },
+      {
+        "nombre": "Obsoleto",
+        "tipo": "stock",
+        "cantidad": 18,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      },
+      {
+        "nombre": "Overhaul temporada baja",
+        "tipo": "solicitud",
+        "cantidad": 5,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      }
+    ],
+    "total": 583770,
+    "nombreManual": "Rexroth Válvula",
+    "fechaUltimaActualizacionInventario": "2025-10-25T05:19:35.065Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2026-01-08T22:47:44.849Z",
+    "updatedAt": "2025-12-30T02:11:44.042Z"
+  },
+  {
+    "id": "rep-0118",
+    "codigoSAP": "4500000117",
+    "codigoBaader": "200-SEL-118",
+    "textoBreve": "Rodillo Parker #118",
+    "descripcion": "Rodillo para Baader 200 - Sellos y Juntas. Marca: Parker. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 2,
+    "cantidadStockBodega": 9,
+    "valorUnitario": 182220,
+    "tags": [
+      {
+        "nombre": "En espera proveedor",
+        "tipo": "solicitud",
+        "cantidad": 19,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      },
+      {
+        "nombre": "Overstock",
+        "tipo": "stock",
+        "cantidad": 5,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      }
+    ],
+    "total": 2004420,
+    "nombreManual": "Parker Rodillo",
+    "fechaUltimaActualizacionInventario": "2025-10-24T12:50:30.561Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-11-03T23:58:41.799Z",
+    "updatedAt": "2025-12-23T12:41:02.056Z"
+  },
+  {
+    "id": "rep-0119",
+    "codigoSAP": "4500000118",
+    "codigoBaader": "200-CAB-119",
+    "textoBreve": "Sensor Bosch #119",
+    "descripcion": "Sensor para Baader 200 - Cables y Conectores. Marca: Bosch. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 3,
+    "cantidadStockBodega": 5,
+    "valorUnitario": 130055,
+    "tags": [
+      {
+        "nombre": "Overstock",
+        "tipo": "stock",
+        "cantidad": 8,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      },
+      {
+        "nombre": "Overhaul temporada baja",
+        "tipo": "solicitud",
+        "cantidad": 5,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      },
+      {
+        "nombre": "Pedido realizado",
+        "tipo": "solicitud",
+        "cantidad": 10,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      }
+    ],
+    "total": 1040440,
+    "nombreManual": "Bosch Sensor",
+    "fechaUltimaActualizacionInventario": "2025-12-31T13:42:17.616Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-08-18T01:40:33.664Z",
+    "updatedAt": "2025-12-23T23:04:54.547Z"
+  },
+  {
+    "id": "rep-0120",
+    "codigoSAP": "4500000119",
+    "codigoBaader": "200-PIE-120",
+    "textoBreve": "Compresor Festo #120",
+    "descripcion": "Compresor para Baader 200 - Piezas de Wear. Marca: Festo. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 4,
+    "cantidadStockBodega": 8,
+    "valorUnitario": 87585,
+    "tags": [
+      {
+        "nombre": "Overhaul temporada baja",
+        "tipo": "solicitud",
+        "cantidad": 4,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      }
+    ],
+    "total": 1051020,
+    "nombreManual": "Festo Compresor",
+    "fechaUltimaActualizacionInventario": "2026-01-05T10:31:47.441Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-10-17T21:45:01.069Z",
+    "updatedAt": "2026-01-19T00:22:29.287Z"
+  },
+  {
+    "id": "rep-0121",
+    "codigoSAP": "4500000120",
+    "codigoBaader": "200-ROD-121",
+    "textoBreve": "Motor SKF #121",
+    "descripcion": "Motor para Baader 200 - Rodillos y Correas. Marca: SKF. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 3,
+    "cantidadStockBodega": 9,
+    "valorUnitario": 184327,
+    "tags": [
+      {
+        "nombre": "Pedido realizado",
+        "tipo": "solicitud",
+        "cantidad": 14,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      }
+    ],
+    "total": 2211924,
+    "nombreManual": "SKF Motor",
+    "fechaUltimaActualizacionInventario": "2025-10-25T16:26:17.293Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-08-22T18:16:24.444Z",
+    "updatedAt": "2025-12-31T15:33:31.008Z"
+  },
+  {
+    "id": "rep-0122",
+    "codigoSAP": "4500000121",
+    "codigoBaader": "200-MOT-122",
+    "textoBreve": "Bomba NSK #122",
+    "descripcion": "Bomba para Baader 200 - Motores y Reductores. Marca: NSK. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 3,
+    "cantidadStockBodega": 0,
+    "valorUnitario": 62152,
+    "tags": [
+      {
+        "nombre": "Overstock",
+        "tipo": "stock",
+        "cantidad": 14,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      },
+      {
+        "nombre": "Urgentes este mes",
+        "tipo": "solicitud",
+        "cantidad": 4,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      }
+    ],
+    "total": 186456,
+    "nombreManual": "NSK Bomba",
+    "fechaUltimaActualizacionInventario": "2025-12-31T14:39:07.981Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-08-21T03:10:24.346Z",
+    "updatedAt": "2026-01-12T21:27:00.311Z"
+  },
+  {
+    "id": "rep-0123",
+    "codigoSAP": "4500000122",
+    "codigoBaader": "200-BOM-123",
+    "textoBreve": "Válvula TIMKEN #123",
+    "descripcion": "Válvula para Baader 200 - Bombas y Válvulas. Marca: TIMKEN. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 1,
+    "cantidadStockBodega": 8,
+    "valorUnitario": 223551,
+    "tags": [
+      {
+        "nombre": "Críticos",
+        "tipo": "solicitud",
+        "cantidad": 18,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      }
+    ],
+    "total": 2011959,
+    "nombreManual": "TIMKEN Válvula",
+    "fechaUltimaActualizacionInventario": "2025-11-11T19:41:38.604Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-02-24T06:56:33.720Z",
+    "updatedAt": "2025-12-23T13:32:22.183Z"
+  },
+  {
+    "id": "rep-0124",
+    "codigoSAP": "4500000123",
+    "codigoBaader": "200-SEN-124",
+    "textoBreve": "Rodillo Siemens #124",
+    "descripcion": "Rodillo para Baader 200 - Sensores. Marca: Siemens. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 2,
+    "cantidadStockBodega": 4,
+    "valorUnitario": 224620,
+    "tags": [
+      {
+        "nombre": "En espera proveedor",
+        "tipo": "solicitud",
+        "cantidad": 19,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      },
+      {
+        "nombre": "Overhaul temporada baja",
+        "tipo": "solicitud",
+        "cantidad": 6,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      }
+    ],
+    "total": 1347720,
+    "nombreManual": "Siemens Rodillo",
+    "fechaUltimaActualizacionInventario": "2025-11-30T10:58:10.252Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-09-28T12:41:58.682Z",
+    "updatedAt": "2026-01-03T06:04:25.123Z"
+  },
+  {
+    "id": "rep-0125",
+    "codigoSAP": "4500000124",
+    "codigoBaader": "200-COM-125",
+    "textoBreve": "Sensor ABB #125",
+    "descripcion": "Sensor para Baader 200 - Componentes Hidráulicos. Marca: ABB. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 0,
+    "cantidadStockBodega": 2,
+    "valorUnitario": 70056,
+    "tags": [
+      {
+        "nombre": "Urgentes este mes",
+        "tipo": "solicitud",
+        "cantidad": 0,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      },
+      {
+        "nombre": "Pedido realizado",
+        "tipo": "solicitud",
+        "cantidad": 3,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      },
+      {
+        "nombre": "Stock mínimo",
+        "tipo": "stock",
+        "cantidad": 12,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      }
+    ],
+    "total": 140112,
+    "nombreManual": "ABB Sensor",
+    "fechaUltimaActualizacionInventario": "2025-12-11T09:04:35.326Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-07-03T11:43:10.862Z",
+    "updatedAt": "2025-12-22T15:10:08.685Z"
+  },
+  {
+    "id": "rep-0126",
+    "codigoSAP": "4500000125",
+    "codigoBaader": "200-ELE-126",
+    "textoBreve": "Compresor Grundfos #126",
+    "descripcion": "Compresor para Baader 200 - Elementos de Corte. Marca: Grundfos. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 0,
+    "cantidadStockBodega": 3,
+    "valorUnitario": 93042,
+    "tags": [
+      {
+        "nombre": "Stock mínimo",
+        "tipo": "stock",
+        "cantidad": 11,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      }
+    ],
+    "total": 279126,
+    "nombreManual": "Grundfos Compresor",
+    "fechaUltimaActualizacionInventario": "2025-11-07T16:12:15.745Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-06-27T14:10:19.710Z",
+    "updatedAt": "2026-01-14T08:30:48.159Z"
+  },
+  {
+    "id": "rep-0127",
+    "codigoSAP": "4500000126",
+    "codigoBaader": "200-COJ-127",
+    "textoBreve": "Motor Rexroth #127",
+    "descripcion": "Motor para Baader 200 - Cojinetes. Marca: Rexroth. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 4,
+    "cantidadStockBodega": 1,
+    "valorUnitario": 250452,
+    "tags": [
+      {
+        "nombre": "Obsoleto",
+        "tipo": "stock",
+        "cantidad": 15,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      },
+      {
+        "nombre": "Stock mínimo",
+        "tipo": "stock",
+        "cantidad": 11,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      }
+    ],
+    "total": 1252260,
+    "nombreManual": "Rexroth Motor",
+    "fechaUltimaActualizacionInventario": "2025-12-12T06:29:06.445Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-09-01T04:27:56.491Z",
+    "updatedAt": "2025-12-30T15:47:49.338Z"
+  },
+  {
+    "id": "rep-0128",
+    "codigoSAP": "4500000127",
+    "codigoBaader": "200-SEL-128",
+    "textoBreve": "Bomba Parker #128",
+    "descripcion": "Bomba para Baader 200 - Sellos y Juntas. Marca: Parker. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 0,
+    "cantidadStockBodega": 4,
+    "valorUnitario": 97902,
+    "tags": [
+      {
+        "nombre": "Overstock",
+        "tipo": "stock",
+        "cantidad": 17,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      },
+      {
+        "nombre": "Pedido realizado",
+        "tipo": "solicitud",
+        "cantidad": 11,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      }
+    ],
+    "total": 391608,
+    "nombreManual": "Parker Bomba",
+    "fechaUltimaActualizacionInventario": "2025-12-29T08:47:46.347Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-03-19T05:01:39.235Z",
+    "updatedAt": "2026-01-05T20:36:36.122Z"
+  },
+  {
+    "id": "rep-0129",
+    "codigoSAP": "4500000128",
+    "codigoBaader": "200-CAB-129",
+    "textoBreve": "Válvula Bosch #129",
+    "descripcion": "Válvula para Baader 200 - Cables y Conectores. Marca: Bosch. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 3,
+    "cantidadStockBodega": 5,
+    "valorUnitario": 116041,
+    "tags": [
+      {
+        "nombre": "Urgentes este mes",
+        "tipo": "solicitud",
+        "cantidad": 8,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      },
+      {
+        "nombre": "Stock mínimo",
+        "tipo": "stock",
+        "cantidad": 3,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      },
+      {
+        "nombre": "Overstock",
+        "tipo": "stock",
+        "cantidad": 0,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      }
+    ],
+    "total": 928328,
+    "nombreManual": "Bosch Válvula",
+    "fechaUltimaActualizacionInventario": "2025-11-25T14:39:38.619Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-06-23T08:36:25.135Z",
+    "updatedAt": "2026-01-15T06:48:20.803Z"
+  },
+  {
+    "id": "rep-0130",
+    "codigoSAP": "4500000129",
+    "codigoBaader": "200-PIE-130",
+    "textoBreve": "Rodillo Festo #130",
+    "descripcion": "Rodillo para Baader 200 - Piezas de Wear. Marca: Festo. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 0,
+    "cantidadStockBodega": 7,
+    "valorUnitario": 59243,
+    "tags": [
+      {
+        "nombre": "Overstock",
+        "tipo": "stock",
+        "cantidad": 13,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      },
+      {
+        "nombre": "Críticos",
+        "tipo": "solicitud",
+        "cantidad": 15,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      },
+      {
+        "nombre": "Obsoleto",
+        "tipo": "stock",
+        "cantidad": 2,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      }
+    ],
+    "total": 414701,
+    "nombreManual": "Festo Rodillo",
+    "fechaUltimaActualizacionInventario": "2026-01-06T01:42:57.705Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-09-28T14:42:35.809Z",
+    "updatedAt": "2026-01-02T08:55:35.546Z"
+  },
+  {
+    "id": "rep-0131",
+    "codigoSAP": "4500000130",
+    "codigoBaader": "200-ROD-131",
+    "textoBreve": "Sensor SKF #131",
+    "descripcion": "Sensor para Baader 200 - Rodillos y Correas. Marca: SKF. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 2,
+    "cantidadStockBodega": 3,
+    "valorUnitario": 92819,
+    "tags": [
+      {
+        "nombre": "Stock mínimo",
+        "tipo": "stock",
+        "cantidad": 2,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      },
+      {
+        "nombre": "Obsoleto",
+        "tipo": "stock",
+        "cantidad": 0,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      },
+      {
+        "nombre": "Overhaul temporada baja",
+        "tipo": "solicitud",
+        "cantidad": 19,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      }
+    ],
+    "total": 464095,
+    "nombreManual": "SKF Sensor",
+    "fechaUltimaActualizacionInventario": "2026-01-05T15:36:51.657Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-09-09T00:19:16.109Z",
+    "updatedAt": "2026-01-05T16:47:29.604Z"
+  },
+  {
+    "id": "rep-0132",
+    "codigoSAP": "4500000131",
+    "codigoBaader": "200-MOT-132",
+    "textoBreve": "Compresor NSK #132",
+    "descripcion": "Compresor para Baader 200 - Motores y Reductores. Marca: NSK. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 0,
+    "cantidadStockBodega": 5,
+    "valorUnitario": 127687,
+    "tags": [
+      {
+        "nombre": "Urgentes este mes",
+        "tipo": "solicitud",
+        "cantidad": 13,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      },
+      {
+        "nombre": "Overhaul temporada baja",
+        "tipo": "solicitud",
+        "cantidad": 6,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      }
+    ],
+    "total": 638435,
+    "nombreManual": "NSK Compresor",
+    "fechaUltimaActualizacionInventario": "2026-01-07T12:10:26.337Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-04-19T00:15:58.931Z",
+    "updatedAt": "2026-01-04T19:19:30.671Z"
+  },
+  {
+    "id": "rep-0133",
+    "codigoSAP": "4500000132",
+    "codigoBaader": "200-BOM-133",
+    "textoBreve": "Motor TIMKEN #133",
+    "descripcion": "Motor para Baader 200 - Bombas y Válvulas. Marca: TIMKEN. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 2,
+    "cantidadStockBodega": 5,
+    "valorUnitario": 31507,
+    "tags": [
+      {
+        "nombre": "Urgentes este mes",
+        "tipo": "solicitud",
+        "cantidad": 12,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      },
+      {
+        "nombre": "Overhaul temporada baja",
+        "tipo": "solicitud",
+        "cantidad": 4,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      }
+    ],
+    "total": 220549,
+    "nombreManual": "TIMKEN Motor",
+    "fechaUltimaActualizacionInventario": "2025-12-16T11:03:16.561Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-04-28T18:35:26.479Z",
+    "updatedAt": "2026-01-02T23:36:58.539Z"
+  },
+  {
+    "id": "rep-0134",
+    "codigoSAP": "4500000133",
+    "codigoBaader": "200-SEN-134",
+    "textoBreve": "Bomba Siemens #134",
+    "descripcion": "Bomba para Baader 200 - Sensores. Marca: Siemens. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 4,
+    "cantidadStockBodega": 5,
+    "valorUnitario": 115419,
+    "tags": [
+      {
+        "nombre": "Stock mínimo",
+        "tipo": "stock",
+        "cantidad": 11,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      }
+    ],
+    "total": 1038771,
+    "nombreManual": "Siemens Bomba",
+    "fechaUltimaActualizacionInventario": "2025-12-27T15:05:08.755Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-09-03T05:07:50.959Z",
+    "updatedAt": "2025-12-29T06:21:55.087Z"
+  },
+  {
+    "id": "rep-0135",
+    "codigoSAP": "4500000134",
+    "codigoBaader": "200-COM-135",
+    "textoBreve": "Válvula ABB #135",
+    "descripcion": "Válvula para Baader 200 - Componentes Hidráulicos. Marca: ABB. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 2,
+    "cantidadStockBodega": 0,
+    "valorUnitario": 32765,
+    "tags": [
+      {
+        "nombre": "Overstock",
+        "tipo": "stock",
+        "cantidad": 16,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      }
+    ],
+    "total": 65530,
+    "nombreManual": "ABB Válvula",
+    "fechaUltimaActualizacionInventario": "2025-12-21T21:07:31.507Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-07-15T08:02:47.391Z",
+    "updatedAt": "2026-01-12T13:47:00.909Z"
+  },
+  {
+    "id": "rep-0136",
+    "codigoSAP": "4500000135",
+    "codigoBaader": "200-ELE-136",
+    "textoBreve": "Rodillo Grundfos #136",
+    "descripcion": "Rodillo para Baader 200 - Elementos de Corte. Marca: Grundfos. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 2,
+    "cantidadStockBodega": 3,
+    "valorUnitario": 84171,
+    "tags": [
+      {
+        "nombre": "Urgentes este mes",
+        "tipo": "solicitud",
+        "cantidad": 8,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      }
+    ],
+    "total": 420855,
+    "nombreManual": "Grundfos Rodillo",
+    "fechaUltimaActualizacionInventario": "2026-01-08T13:56:23.676Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-11-04T07:02:15.598Z",
+    "updatedAt": "2026-01-18T13:12:37.129Z"
+  },
+  {
+    "id": "rep-0137",
+    "codigoSAP": "4500000136",
+    "codigoBaader": "200-COJ-137",
+    "textoBreve": "Sensor Rexroth #137",
+    "descripcion": "Sensor para Baader 200 - Cojinetes. Marca: Rexroth. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 3,
+    "cantidadStockBodega": 2,
+    "valorUnitario": 251514,
+    "tags": [
+      {
+        "nombre": "Stock mínimo",
+        "tipo": "stock",
+        "cantidad": 3,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      },
+      {
+        "nombre": "Overstock",
+        "tipo": "stock",
+        "cantidad": 2,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      }
+    ],
+    "total": 1257570,
+    "nombreManual": "Rexroth Sensor",
+    "fechaUltimaActualizacionInventario": "2025-11-19T16:13:02.277Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-07-27T03:44:54.479Z",
+    "updatedAt": "2026-01-16T22:26:29.316Z"
+  },
+  {
+    "id": "rep-0138",
+    "codigoSAP": "4500000137",
+    "codigoBaader": "200-SEL-138",
+    "textoBreve": "Compresor Parker #138",
+    "descripcion": "Compresor para Baader 200 - Sellos y Juntas. Marca: Parker. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 3,
+    "cantidadStockBodega": 4,
+    "valorUnitario": 15810,
+    "tags": [
+      {
+        "nombre": "Stock mínimo",
+        "tipo": "stock",
+        "cantidad": 19,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      }
+    ],
+    "total": 110670,
+    "nombreManual": "Parker Compresor",
+    "fechaUltimaActualizacionInventario": "2025-11-27T20:48:31.965Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-11-17T22:20:02.446Z",
+    "updatedAt": "2026-01-11T21:00:14.075Z"
+  },
+  {
+    "id": "rep-0139",
+    "codigoSAP": "4500000138",
+    "codigoBaader": "200-CAB-139",
+    "textoBreve": "Motor Bosch #139",
+    "descripcion": "Motor para Baader 200 - Cables y Conectores. Marca: Bosch. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 4,
+    "cantidadStockBodega": 9,
+    "valorUnitario": 206545,
+    "tags": [
+      {
+        "nombre": "En espera proveedor",
+        "tipo": "solicitud",
+        "cantidad": 11,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      }
+    ],
+    "total": 2685085,
+    "nombreManual": "Bosch Motor",
+    "fechaUltimaActualizacionInventario": "2025-12-24T18:55:22.461Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-02-03T04:55:26.230Z",
+    "updatedAt": "2026-01-12T06:24:33.559Z"
+  },
+  {
+    "id": "rep-0140",
+    "codigoSAP": "4500000139",
+    "codigoBaader": "200-PIE-140",
+    "textoBreve": "Bomba Festo #140",
+    "descripcion": "Bomba para Baader 200 - Piezas de Wear. Marca: Festo. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 4,
+    "cantidadStockBodega": 6,
+    "valorUnitario": 243753,
+    "tags": [
+      {
+        "nombre": "Urgentes este mes",
+        "tipo": "solicitud",
+        "cantidad": 12,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      },
+      {
+        "nombre": "En espera proveedor",
+        "tipo": "solicitud",
+        "cantidad": 19,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      }
+    ],
+    "total": 2437530,
+    "nombreManual": "Festo Bomba",
+    "fechaUltimaActualizacionInventario": "2025-11-28T20:36:55.694Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-06-12T02:34:41.768Z",
+    "updatedAt": "2026-01-06T02:20:45.372Z"
+  },
+  {
+    "id": "rep-0141",
+    "codigoSAP": "4500000140",
+    "codigoBaader": "200-ROD-141",
+    "textoBreve": "Válvula SKF #141",
+    "descripcion": "Válvula para Baader 200 - Rodillos y Correas. Marca: SKF. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 1,
+    "cantidadStockBodega": 9,
+    "valorUnitario": 115568,
+    "tags": [
+      {
+        "nombre": "Urgentes este mes",
+        "tipo": "solicitud",
+        "cantidad": 16,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      }
+    ],
+    "total": 1155680,
+    "nombreManual": "SKF Válvula",
+    "fechaUltimaActualizacionInventario": "2025-12-13T22:37:34.636Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-08-30T15:58:31.337Z",
+    "updatedAt": "2026-01-12T23:07:23.824Z"
+  },
+  {
+    "id": "rep-0142",
+    "codigoSAP": "4500000141",
+    "codigoBaader": "200-MOT-142",
+    "textoBreve": "Rodillo NSK #142",
+    "descripcion": "Rodillo para Baader 200 - Motores y Reductores. Marca: NSK. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 0,
+    "cantidadStockBodega": 4,
+    "valorUnitario": 249490,
+    "tags": [
+      {
+        "nombre": "Overstock",
+        "tipo": "stock",
+        "cantidad": 19,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      },
+      {
+        "nombre": "Críticos",
+        "tipo": "solicitud",
+        "cantidad": 4,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      },
+      {
+        "nombre": "Obsoleto",
+        "tipo": "stock",
+        "cantidad": 17,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      }
+    ],
+    "total": 997960,
+    "nombreManual": "NSK Rodillo",
+    "fechaUltimaActualizacionInventario": "2026-01-09T23:34:50.038Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-05-06T18:39:55.996Z",
+    "updatedAt": "2026-01-15T18:58:21.621Z"
+  },
+  {
+    "id": "rep-0143",
+    "codigoSAP": "4500000142",
+    "codigoBaader": "200-BOM-143",
+    "textoBreve": "Sensor TIMKEN #143",
+    "descripcion": "Sensor para Baader 200 - Bombas y Válvulas. Marca: TIMKEN. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 1,
+    "cantidadStockBodega": 7,
+    "valorUnitario": 81846,
+    "tags": [
+      {
+        "nombre": "Obsoleto",
+        "tipo": "stock",
+        "cantidad": 19,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      },
+      {
+        "nombre": "Urgentes este mes",
+        "tipo": "solicitud",
+        "cantidad": 2,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      }
+    ],
+    "total": 654768,
+    "nombreManual": "TIMKEN Sensor",
+    "fechaUltimaActualizacionInventario": "2026-01-07T01:08:21.447Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-04-15T07:00:14.815Z",
+    "updatedAt": "2026-01-04T20:07:15.016Z"
+  },
+  {
+    "id": "rep-0144",
+    "codigoSAP": "4500000143",
+    "codigoBaader": "200-SEN-144",
+    "textoBreve": "Compresor Siemens #144",
+    "descripcion": "Compresor para Baader 200 - Sensores. Marca: Siemens. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 3,
+    "cantidadStockBodega": 1,
+    "valorUnitario": 136535,
+    "tags": [
+      {
+        "nombre": "En espera proveedor",
+        "tipo": "solicitud",
+        "cantidad": 2,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      },
+      {
+        "nombre": "Urgentes este mes",
+        "tipo": "solicitud",
+        "cantidad": 12,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      }
+    ],
+    "total": 546140,
+    "nombreManual": "Siemens Compresor",
+    "fechaUltimaActualizacionInventario": "2025-12-26T13:36:19.195Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-09-26T01:40:31.308Z",
+    "updatedAt": "2026-01-14T21:48:02.422Z"
+  },
+  {
+    "id": "rep-0145",
+    "codigoSAP": "4500000144",
+    "codigoBaader": "200-COM-145",
+    "textoBreve": "Motor ABB #145",
+    "descripcion": "Motor para Baader 200 - Componentes Hidráulicos. Marca: ABB. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 2,
+    "cantidadStockBodega": 8,
+    "valorUnitario": 200893,
+    "tags": [
+      {
+        "nombre": "En espera proveedor",
+        "tipo": "solicitud",
+        "cantidad": 15,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      },
+      {
+        "nombre": "Críticos",
+        "tipo": "solicitud",
+        "cantidad": 15,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      }
+    ],
+    "total": 2008930,
+    "nombreManual": "ABB Motor",
+    "fechaUltimaActualizacionInventario": "2025-12-05T20:02:34.793Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-09-27T12:13:00.013Z",
+    "updatedAt": "2026-01-10T12:57:42.824Z"
+  },
+  {
+    "id": "rep-0146",
+    "codigoSAP": "4500000145",
+    "codigoBaader": "200-ELE-146",
+    "textoBreve": "Bomba Grundfos #146",
+    "descripcion": "Bomba para Baader 200 - Elementos de Corte. Marca: Grundfos. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 3,
+    "cantidadStockBodega": 4,
+    "valorUnitario": 264874,
+    "tags": [
+      {
+        "nombre": "Stock mínimo",
+        "tipo": "stock",
+        "cantidad": 9,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      },
+      {
+        "nombre": "Overstock",
+        "tipo": "stock",
+        "cantidad": 12,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      },
+      {
+        "nombre": "Pedido realizado",
+        "tipo": "solicitud",
+        "cantidad": 1,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      }
+    ],
+    "total": 1854118,
+    "nombreManual": "Grundfos Bomba",
+    "fechaUltimaActualizacionInventario": "2025-11-25T05:08:32.393Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-10-18T01:03:51.714Z",
+    "updatedAt": "2026-01-10T16:48:12.298Z"
+  },
+  {
+    "id": "rep-0147",
+    "codigoSAP": "4500000146",
+    "codigoBaader": "200-COJ-147",
+    "textoBreve": "Válvula Rexroth #147",
+    "descripcion": "Válvula para Baader 200 - Cojinetes. Marca: Rexroth. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 3,
+    "cantidadStockBodega": 2,
+    "valorUnitario": 113386,
+    "tags": [
+      {
+        "nombre": "Obsoleto",
+        "tipo": "stock",
+        "cantidad": 1,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      }
+    ],
+    "total": 566930,
+    "nombreManual": "Rexroth Válvula",
+    "fechaUltimaActualizacionInventario": "2026-01-13T12:07:17.170Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-08-12T00:47:00.475Z",
+    "updatedAt": "2026-01-16T11:56:25.969Z"
+  },
+  {
+    "id": "rep-0148",
+    "codigoSAP": "4500000147",
+    "codigoBaader": "200-SEL-148",
+    "textoBreve": "Rodillo Parker #148",
+    "descripcion": "Rodillo para Baader 200 - Sellos y Juntas. Marca: Parker. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 1,
+    "cantidadStockBodega": 1,
+    "valorUnitario": 52197,
+    "tags": [
+      {
+        "nombre": "Críticos",
+        "tipo": "solicitud",
+        "cantidad": 17,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      }
+    ],
+    "total": 104394,
+    "nombreManual": "Parker Rodillo",
+    "fechaUltimaActualizacionInventario": "2025-12-20T01:43:51.171Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-03-08T18:09:20.216Z",
+    "updatedAt": "2026-01-15T18:22:06.301Z"
+  },
+  {
+    "id": "rep-0149",
+    "codigoSAP": "4500000148",
+    "codigoBaader": "200-CAB-149",
+    "textoBreve": "Sensor Bosch #149",
+    "descripcion": "Sensor para Baader 200 - Cables y Conectores. Marca: Bosch. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 4,
+    "cantidadStockBodega": 6,
+    "valorUnitario": 55694,
+    "tags": [
+      {
+        "nombre": "Stock mínimo",
+        "tipo": "stock",
+        "cantidad": 3,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      },
+      {
+        "nombre": "Overstock",
+        "tipo": "stock",
+        "cantidad": 19,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      },
+      {
+        "nombre": "Overhaul temporada baja",
+        "tipo": "solicitud",
+        "cantidad": 7,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      }
+    ],
+    "total": 556940,
+    "nombreManual": "Bosch Sensor",
+    "fechaUltimaActualizacionInventario": "2026-01-17T20:02:17.300Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-04-25T17:20:58.464Z",
+    "updatedAt": "2025-12-31T17:15:09.897Z"
+  },
+  {
+    "id": "rep-0150",
+    "codigoSAP": "4500000149",
+    "codigoBaader": "200-PIE-150",
+    "textoBreve": "Compresor Festo #150",
+    "descripcion": "Compresor para Baader 200 - Piezas de Wear. Marca: Festo. Especificaciones técnicas incluidas.",
+    "cantidadSolicitada": 2,
+    "cantidadStockBodega": 6,
+    "valorUnitario": 69896,
+    "tags": [
+      {
+        "nombre": "Urgentes este mes",
+        "tipo": "solicitud",
+        "cantidad": 8,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      },
+      {
+        "nombre": "Overstock",
+        "tipo": "stock",
+        "cantidad": 7,
+        "fecha": "2026-01-20T04:24:51.651Z"
+      }
+    ],
+    "total": 559168,
+    "nombreManual": "Festo Compresor",
+    "fechaUltimaActualizacionInventario": "2025-12-22T21:34:07.333Z",
+    "vinculosManual": [],
+    "imagenesManual": [],
+    "fotosReales": [],
+    "createdAt": "2025-05-16T23:37:09.791Z",
+    "updatedAt": "2025-12-24T19:55:21.620Z"
+  }
+]

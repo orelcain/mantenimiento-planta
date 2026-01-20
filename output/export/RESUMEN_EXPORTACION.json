@@ -1,0 +1,21 @@
+{
+  "timestamp": "2026-01-20T04:23:02.456Z",
+  "exportPath": "D:\\a\\APP leventamiento de insidencias en planta\\output\\export",
+  "data": {
+    "repuestos": {
+      "total": 0,
+      "byMachine": {
+        "baader-200": 0
+      }
+    },
+    "plantAssets": {
+      "total": 0,
+      "motores": 0,
+      "bombas": 0
+    },
+    "maps": {
+      "total": 0,
+      "totalMarkers": 0
+    }
+  }
+}
