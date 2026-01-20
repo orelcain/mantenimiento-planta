@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/services/firebase';
-import type { TagGlobal, Repuesto, isTagAsignado } from '@/types/repuestos';
+import type { TagGlobal, Repuesto } from '@/types/repuestos';
+import { isTagAsignado } from '@/types/repuestos';
 
 // Tags iniciales por defecto (se usan si no hay datos en Firestore)
 const DEFAULT_TAGS: TagGlobal[] = [
@@ -184,12 +185,6 @@ export function useTags(repuestos?: Repuesto[], machineId?: string | null) {
     );
     return await saveTags(updatedTags);
   }, [tags, saveTags]);
-
-  // Obtener el tipo de un tag por su nombre
-  const getTagTipo = useCallback((tagNombre: string): 'solicitud' | 'stock' | null => {
-    const tag = tags.find(t => t.nombre === tagNombre);
-    return tag ? tag.tipo : null;
-  }, [tags]);
 
   // Agregar múltiples tags a la vez (útil para importación)
   const addMultipleTags = useCallback(async (newTags: { nombre: string; tipo: 'solicitud' | 'stock' }[]) => {

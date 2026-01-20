@@ -17,10 +17,9 @@ import type {
   Repuesto, 
   HistorialCambio, 
   RepuestoFormData, 
-  TagAsignado, 
-  getTagNombre, 
-  isTagAsignado 
+  TagAsignado
 } from '@/types/repuestos';
+import { getTagNombre, isTagAsignado } from '@/types/repuestos';
 
 export interface ImportCantidadRow {
   codigoSAP?: string;

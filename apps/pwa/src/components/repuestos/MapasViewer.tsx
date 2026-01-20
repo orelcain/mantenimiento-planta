@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
-import { MapPin, Plus, X, Image as ImageIcon } from 'lucide-react'
-import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input, Label } from '@/components/ui'
+import { MapPin, Plus, X } from 'lucide-react'
+import { Button } from '@/components/ui'
 import type { PlantMap, PlantMarker, PlantAsset } from '@/types/repuestos'
 
 interface MapasViewerProps {

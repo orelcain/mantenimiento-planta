@@ -1,16 +1,16 @@
 import { useState, useMemo } from 'react'
 import { Package, AlertTriangle } from 'lucide-react'
-import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, LoadingScreen, Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, LoadingScreen, Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui'
 import { MotorasBombasTable } from '@/components/repuestos/MotorasBombasTable'
 import { MapasViewer } from '@/components/repuestos/MapasViewer'
 import { AssetDetailModal } from '@/components/repuestos/AssetDetailModal'
 import { usePlantAssets } from '@/hooks/repuestos/usePlantAssets'
 import { usePlantMaps } from '@/hooks/repuestos/usePlantMaps'
-import type { PlantAsset, PlantMap, PlantMarker } from '@/types/repuestos'
+import type { PlantAsset } from '@/types/repuestos'
 
 export function CatalogoBases() {
-  const { items: assets, loading: assetsLoading, error: assetsError } = usePlantAssets()
-  const { items: maps, loading: mapsLoading, error: mapsError } = usePlantMaps()
+  const { assets, loading: assetsLoading, error: assetsError } = usePlantAssets()
+  const { maps, loading: mapsLoading, error: mapsError } = usePlantMaps()
 
   const [selectedAsset, setSelectedAsset] = useState<PlantAsset | null>(null)
   const [showDetailModal, setShowDetailModal] = useState(false)
@@ -19,10 +19,10 @@ export function CatalogoBases() {
   const stats = useMemo(() => {
     return {
       total: assets.length,
-      motores: assets.filter((a) => a.tipo === 'motor').length,
-      bombas: assets.filter((a) => a.tipo === 'bomba').length,
-      conImagenes: assets.filter((a) => (a.imagenes?.length ?? 0) > 0).length,
-      conMarcadores: assets.filter((a) => (a.marcadores?.length ?? 0) > 0).length,
+      motores: assets.filter((a: PlantAsset) => a.tipo === 'motor').length,
+      bombas: assets.filter((a: PlantAsset) => a.tipo === 'bomba').length,
+      conImagenes: assets.filter((a: PlantAsset) => (a.imagenes?.length ?? 0) > 0).length,
+      conMarcadores: assets.filter((a: PlantAsset) => (a.marcadores?.length ?? 0) > 0).length,
     }
   }, [assets])
 
@@ -148,8 +148,8 @@ export function CatalogoBases() {
                   assets={assets}
                   loading={mapsLoading}
                   onMarkerClick={(marker) => {
-                    const asset = assets.find((a) =>
-                      a.marcadores?.some((m) => m.id === marker.id)
+                    const asset = assets.find((a: PlantAsset) =>
+                      a.marcadores?.some((m: any) => m.id === marker.id)
                     )
                     if (asset) {
                       setSelectedAsset(asset)

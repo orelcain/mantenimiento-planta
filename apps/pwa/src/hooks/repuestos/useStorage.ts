@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { ref, uploadBytes, uploadBytesResumable, getDownloadURL, deleteObject, listAll } from 'firebase/storage';
 import { storage } from '@/services/firebase';
 import type { ImagenRepuesto } from '@/types/repuestos';
-import { optimizeImage } from '@/utils/repuestos/imageUtils';
+import { optimizeImage } from '@/utils/repuestos';
 
 export function useStorage(machineId: string | null) {
   const [uploading, setUploading] = useState(false);
@@ -45,7 +45,7 @@ export function useStorage(machineId: string | null) {
       if (shouldOptimize) {
         try {
           const quality = options?.quality ?? 0.85;
-          fileToUpload = (await optimizeImage(file, quality)).file;
+          fileToUpload = await optimizeImage(file, 1200, 1200, quality);
         } catch (err) {
           console.warn('[useStorage] No se pudo optimizar imagen; subiendo original', err);
           fileToUpload = file;
@@ -173,7 +173,7 @@ export function useStorage(machineId: string | null) {
   }, [machineId]);
 
   // Obtener URL del manual - busca cualquier PDF en las carpetas usando listAll()
-  const getManualURL = useCallback(async (manualName: string = 'manual_principal'): Promise<string | null> => {
+  const getManualURL = useCallback(async (): Promise<string | null> => {
     if (!machineId) {
       return null;
     }

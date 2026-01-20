@@ -64,7 +64,7 @@ export function RepuestosDashboard() {
     if (selectedMachineId) return
     if (machines.length === 0) return
     const active = machines.find((m) => m.activa)
-    setSelectedMachineId((active || machines[0]).id)
+    setSelectedMachineId((active?.id || machines[0]?.id) || null)
   }, [machines, selectedMachineId])
 
   const selectedMachine: Machine | null = useMemo(

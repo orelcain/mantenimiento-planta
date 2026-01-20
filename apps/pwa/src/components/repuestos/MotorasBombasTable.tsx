@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Search, MoreVertical, MapPin, Zap } from 'lucide-react'
+import { Search, MoreVertical, Zap } from 'lucide-react'
 import { Button, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Badge } from '@/components/ui'
 import type { PlantAsset } from '@/types/repuestos'
 

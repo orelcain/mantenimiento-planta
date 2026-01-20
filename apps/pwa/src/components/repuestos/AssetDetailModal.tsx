@@ -1,5 +1,4 @@
-import { useState } from 'react'
-import { X, Download, Copy, MapPin, Zap, Droplet, Volume2 } from 'lucide-react'
+import { Download, Copy, MapPin, Zap, Droplet } from 'lucide-react'
 import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Badge, Card, CardContent } from '@/components/ui'
 import type { PlantAsset } from '@/types/repuestos'
 
