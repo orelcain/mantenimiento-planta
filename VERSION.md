@@ -1,14 +1,54 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.28.0**
+## Versión Actual: **v2.29.0**
 
-**Fecha de lanzamiento**: 19 de enero de 2026  \
+**Fecha de lanzamiento**: 20 de enero de 2026  \
 **Estado**: ✅ PRODUCCIÓN READY  \
 **Build**: ✅ Último build local OK
 
 ---
 
 ## 📋 Información de la Versión
+
+### v2.29.0 - Módulo Repuestos Completo + Catálogo de Bases (20/01/2026)
+
+**Nuevas Funcionalidades:**
+- ✅ **Sistema completo de Repuestos por máquina** - Gestión multi-máquina con tabs
+- ✅ **CRUD de Repuestos** - Crear, editar, eliminar con validación
+- ✅ **Gestión de Tags** - Tags globales (solicitud/stock) con asignación a repuestos
+- ✅ **Filtros avanzados** - Búsqueda por código SAP, texto breve, descripción
+- ✅ **Paginación flexible** - 10/25/50/100 items por página
+- ✅ **Toast notifications** - Sistema global de notificaciones con variantes
+- ✅ **Catálogo de Bases (Motores/Bombas)** - Vista tabla y mapas interactivos
+- ✅ **Mapas de Planta** - Visualización de ubicaciones de equipos con marcadores
+- ✅ **Modal de detalles técnicos** - Especificaciones completas, referencias, imágenes
+- ✅ **Utilidades de imágenes** - Optimización, validación, conversión a base64
+- ✅ **Estado vacío contextual** - Mensajes específicos para filtros sin resultados
+
+**Mejoras Técnicas:**
+- ✅ Estructura modular: hooks, componentes, tipos, utilidades separados
+- ✅ Real-time Firestore listeners con sincronización automática
+- ✅ Compresión de imágenes con Canvas API
+- ✅ Estadísticas dinámicas (total, con stock, con solicitudes, con imágenes)
+- ✅ Historial de cambios de repuestos con Firestore subcollections
+- ✅ Export en pages/index.ts para todas las nuevas páginas
+
+**Bug Fixes:**
+- ✅ 36 errores de TypeScript corregidos en módulo repuestos
+- ✅ Importaciones de funciones desde tipos corregidas
+- ✅ Tipificación de parámetros en callbacks completada
+
+**Archivos Nuevos (17 archivos):**
+- Páginas: Dashboard.tsx, CatalogoBases.tsx
+- Componentes: RepuestosTable, RepuestoForm, RepuestosFilters, RepuestosPagination, EmptyState
+- Componentes: MotorasBombasTable, MapasViewer, AssetDetailModal
+- Componentes UI: toast.tsx, toaster.tsx
+- Hooks: useRepuestos, useTags, useMachines, useStorage, usePlantMaps, usePlantAssets, usePlantMapAreas, useToast
+- Tipos: repuestos.ts (~246 líneas completas)
+- Utilidades: imageUtils.ts, utils/repuestos/index.ts
+- Estilos: Integración con Tailwind y Radix UI
+
+---
 
 ### v2.28.0 - Sensores UI Completa + Device Management (19/01/2026)
 
