@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.31.3**
+## Versión Actual: **v2.31.4**
 
 **Fecha de lanzamiento**: 21 de enero de 2026  \
 **Estado**: ✅ PRODUCCIÓN READY  \
@@ -9,6 +9,30 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.31.4 - CategoryManager y pestaña Categorías en Configuración (21/01/2026)
+
+**Nuevas Funcionalidades:**
+- ✅ Componente CategoryManager.tsx con gestión completa de categorías de máquinas
+- ✅ Pestaña "Categorías" en Configuración (Settings) para administradores
+- ✅ Vista de categorías activas con drag & drop para reordenar
+- ✅ Vista separada de categorías archivadas
+- ✅ Contador de máquinas asignadas por categoría
+- ✅ Iconos dinámicos de Lucide para cada categoría
+- ✅ Diálogos de creación y edición de categorías
+- ✅ Validación: no se puede eliminar categoría con máquinas asignadas
+
+**Mejoras:**
+- 🎨 Reorganización de pestañas en SettingsPage: General → Usuarios → Invitaciones → Notificaciones → **Categorías** → Máquinas → Sistema
+- 🎨 Icono de "Sistema" cambiado a Shield para mejor diferenciación
+- 🎨 UI consistente con diseño de underline 3px en modo oscuro
+
+**Estructura de Gestión:**
+- Categorías (padre) → Máquinas (hijos)
+- Acceso desde Configuración para administradores
+- Separación clara entre gestión de categorías y máquinas
+
+**Tipo de cambio:** feat
 
 ### v2.31.3 - Fix categoryId mapping y guidelines de desarrollo (21/01/2026)
 
