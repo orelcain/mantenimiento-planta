@@ -257,6 +257,34 @@ export function CategorySelector({
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <SortableContext items={activeCategories.map((c) => c.id)} strategy={horizontalListSortingStrategy}>
                 <div className="flex space-x-2">
+                  {/* Tab de Máquinas Principales (pseudo-categoría) */}
+                  <button
+                    onClick={() => onSelectCategory('maquinas-principales')}
+                    className={`
+                      relative px-4 py-2 min-w-[140px] text-sm font-medium
+                      transition-all duration-200 flex items-center gap-2
+                      border-b-3 border-transparent
+                      ${
+                        selectedCategoryId === 'maquinas-principales'
+                          ? 'text-slate-200 border-b-slate-400 bg-slate-700/50 hover:bg-slate-700/60'
+                          : 'text-gray-400 hover:text-gray-300 hover:border-b-gray-500 hover:bg-slate-800/30'
+                      }
+                    `}
+                  >
+                    {renderIcon('Wrench')}
+                    <span>Máquinas Principales</span>
+                    {(machineCountsByCategory['maquinas-principales'] ?? 0) > 0 && (
+                      <span
+                        className={`
+                          inline-flex items-center justify-center px-2 py-0.5 text-xs font-bold rounded-full
+                          ${selectedCategoryId === 'maquinas-principales' ? 'bg-slate-600 text-white' : 'bg-slate-700 text-gray-300'}
+                        `}
+                      >
+                        {machineCountsByCategory['maquinas-principales']}
+                      </span>
+                    )}
+                  </button>
+
                   {activeCategories.map((category) => {
                     const isActive = selectedCategoryId === category.id;
                     const count = machineCountsByCategory[category.id] ?? 0;

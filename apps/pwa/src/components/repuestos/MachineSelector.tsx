@@ -13,7 +13,7 @@ import { useCurrentMachine, useActiveMachines, useMachineContext } from '@/conte
 
 interface MachineSelectorProps {
   repuestosCounts?: Record<string, number>; // { "baader-200": 202, "fishken": 7 }
-  selectedCategoryId?: string | null; // null = "Todas"
+  selectedCategoryId?: string | null; // "maquinas-principales" = máquinas sin categoría
   className?: string;
 }
 
@@ -27,9 +27,11 @@ export function MachineSelector({
   const { setCurrentMachine } = useMachineContext();
 
   // Filtrar máquinas por categoría seleccionada
-  const filteredMachines = selectedCategoryId === null
-    ? activeMachines
-    : activeMachines.filter((m) => m.categoryId === selectedCategoryId);
+  const filteredMachines = selectedCategoryId === 'maquinas-principales'
+    ? activeMachines.filter((m) => !m.categoryId || m.categoryId === '')
+    : selectedCategoryId === null
+      ? activeMachines
+      : activeMachines.filter((m) => m.categoryId === selectedCategoryId);
 
   if (filteredMachines.length === 0) {
     const message = selectedCategoryId === null

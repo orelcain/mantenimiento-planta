@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.31.8**
+## Versión Actual: **v2.31.9**
 
 **Fecha de lanzamiento**: 21 de enero de 2026  \
 **Estado**: ✅ PRODUCCIÓN READY  \
@@ -9,6 +9,19 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.31.9 - Default category selection: Máquinas Principales (21/01/2026)
+
+**Nuevas Funcionalidades:**
+- ✨ Agregado tab "Máquinas Principales" como categoría virtual (pseudo-categoría)
+- ✨ Por defecto, el dashboard selecciona "Máquinas Principales" (máquinas sin categoría)
+
+**Mejoras:**
+- 🎨 Nuevo comportamiento: Al abrir repuestos, ve máquinas principales por defecto
+- 🔧 CategorySelector ahora muestra "Máquinas Principales" como primer tab
+- 🔧 MachineSelector filtra correctamente máquinas sin categoryId cuando está seleccionado "maquinas-principales"
+
+**Tipo de cambio:** feature + UX improvement
 
 ### v2.31.8 - Máquinas sin categoría + Colores oscuros consistentes (21/01/2026)
 

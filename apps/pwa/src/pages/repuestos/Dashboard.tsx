@@ -67,7 +67,7 @@ export function RepuestosDashboard() {
   const [historyModal, setHistoryModal] = useState<Repuesto | null>(null)
 
   // Filtro de categorías
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null)
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>('maquinas-principales')
 
   // Filtros y paginación
   const [searchQuery, setSearchQuery] = useState('')
@@ -95,7 +95,7 @@ export function RepuestosDashboard() {
     const counts: Record<string, number> = {}
     machines.forEach((machine) => {
       if (machine.activa) {
-        const categoryId = machine.categoryId || 'sin-categoria'
+        const categoryId = machine.categoryId || 'maquinas-principales'
         counts[categoryId] = (counts[categoryId] || 0) + 1
       }
     })
