@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.31.5**
+## Versión Actual: **v2.31.6**
 
 **Fecha de lanzamiento**: 21 de enero de 2026  \
 **Estado**: ✅ PRODUCCIÓN READY  \
@@ -9,6 +9,21 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.31.6 - Selector de categoría al crear/editar máquinas (21/01/2026)
+
+**Correcciones:**
+- 🔧 Agregado selector de categoría en diálogo de crear/editar máquina
+- 🔧 Ahora se puede cambiar la categoría de una máquina existente
+- 🔧 Validación: categoría es obligatoria al crear/editar máquina
+- 🔧 Select muestra solo categorías activas
+
+**Mejoras:**
+- 🎨 Campo "Categoría" visible en formulario de máquina
+- 🎨 Dropdown con todas las categorías disponibles
+- 🎨 Pre-selecciona categoría al crear desde botón "+ Máquina" de categoría
+
+**Tipo de cambio:** fix
 
 ### v2.31.5 - Vista jerárquica: Categorías con Máquinas expandibles (21/01/2026)
 

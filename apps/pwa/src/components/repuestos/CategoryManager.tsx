@@ -44,6 +44,11 @@ import {
   Label,
   Card,
   Badge,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@/components/ui';
 
 // Componente para item draggable de categoría (con máquinas expandibles)
@@ -865,6 +870,24 @@ export function CategoryManager() {
               />
             </div>
             <div className="space-y-2">
+              <Label htmlFor="mach-categoria">Categoría *</Label>
+              <Select
+                value={machineFormData.categoryId}
+                onValueChange={(value) => setMachineFormData({ ...machineFormData, categoryId: value })}
+              >
+                <SelectTrigger id="mach-categoria">
+                  <SelectValue placeholder="Selecciona una categoría" />
+                </SelectTrigger>
+                <SelectContent>
+                  {activeCategories.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id}>
+                      {cat.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="mach-color">Color</Label>
               <div className="flex items-center gap-2">
                 <Input
@@ -884,7 +907,7 @@ export function CategoryManager() {
             </Button>
             <Button
               onClick={handleSaveMachine}
-              disabled={!machineFormData.nombre.trim() || !machineFormData.marca.trim() || !machineFormData.modelo.trim()}
+              disabled={!machineFormData.nombre.trim() || !machineFormData.marca.trim() || !machineFormData.modelo.trim() || !machineFormData.categoryId}
             >
               {editingMachine ? 'Guardar' : 'Crear'}
             </Button>
