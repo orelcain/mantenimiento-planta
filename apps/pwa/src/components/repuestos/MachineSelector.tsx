@@ -62,12 +62,12 @@ export function MachineSelector({
                 transition-all duration-200 border-b-3
                 ${
                   isActive
-                    ? 'text-white hover:opacity-90'
+                    ? 'text-slate-200 hover:opacity-90'
                     : 'text-gray-400 hover:text-gray-300 hover:bg-slate-800/50'
                 }
               `}
               style={{
-                borderBottomColor: isActive ? machine.color : 'transparent',
+                borderBottomColor: isActive ? machine.color || '#94a3b8' : 'transparent',
               }}
               aria-current={isActive ? 'page' : undefined}
             >
