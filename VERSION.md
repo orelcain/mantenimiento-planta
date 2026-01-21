@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.31.6**
+## Versión Actual: **v2.31.7**
 
 **Fecha de lanzamiento**: 21 de enero de 2026  \
 **Estado**: ✅ PRODUCCIÓN READY  \
@@ -9,6 +9,16 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.31.7 - UI Polish: Consistencia de colores + Limpieza de navegación (21/01/2026)
+
+**Mejoras Visuales:**
+- 🎨 Cambio de color en CategorySelector: azul → gris oscuro (slate-400) para consistencia con tema
+- 🎨 Ahora los enlaces de categorías usan paleta de grises oscuros (slate)
+- 🧹 Removido módulo "Catálogo de Bases" del sidebar (no utilizado)
+- 🧹 Limpieza de import no utilizado: Zap icon
+
+**Tipo de cambio:** chore (mejora UI)
 
 ### v2.31.6 - Selector de categoría al crear/editar máquinas (21/01/2026)
 
