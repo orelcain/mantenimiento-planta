@@ -60,8 +60,9 @@ import { cn } from '@/lib/utils'
 import { initializeHierarchySystem, isHierarchyInitialized } from '../services/hierarchyInit'
 import { NotificationsSettings as NotificationsPushSettings } from '@/components/settings/NotificationsSettings'
 import { MachineManager } from '@/components/repuestos/MachineManager'
+import { CategoryManager } from '@/components/repuestos/CategoryManager'
 
-type TabType = 'general' | 'users' | 'invites' | 'notifications' | 'machines' | 'system'
+type TabType = 'general' | 'users' | 'invites' | 'notifications' | 'categories' | 'machines' | 'system'
 
 export function SettingsPage() {
   const { user } = useAuthStore()
@@ -82,8 +83,9 @@ export function SettingsPage() {
     { id: 'users' as const, label: 'Usuarios', icon: Users },
     { id: 'invites' as const, label: 'Invitaciones', icon: Key },
     { id: 'notifications' as const, label: 'Notificaciones', icon: Bell },
-      { id: 'machines' as const, label: 'Máquinas', icon: Wrench },
-    { id: 'system' as const, label: 'Sistema', icon: Database },
+    { id: 'categories' as const, label: 'Categorías', icon: Database },
+    { id: 'machines' as const, label: 'Máquinas', icon: Wrench },
+    { id: 'system' as const, label: 'Sistema', icon: Shield },
   ] : [
     { id: 'notifications' as const, label: 'Notificaciones', icon: Bell },
   ]
@@ -120,7 +122,8 @@ export function SettingsPage() {
       {isAdmin && activeTab === 'users' && <UsersSettings />}
       {isAdmin && activeTab === 'invites' && <InvitesSettings />}
       {activeTab === 'notifications' && <NotificationsPushSettings />}
-        {isAdmin && activeTab === 'machines' && <MachineManager />}
+      {isAdmin && activeTab === 'categories' && <CategoryManager />}
+      {isAdmin && activeTab === 'machines' && <MachineManager />}
       {isAdmin && activeTab === 'system' && <SystemSettings />}
     </div>
   )
