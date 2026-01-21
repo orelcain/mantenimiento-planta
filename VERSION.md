@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.31.9**
+## Versión Actual: **v2.31.10**
 
 **Fecha de lanzamiento**: 21 de enero de 2026  \
 **Estado**: ✅ PRODUCCIÓN READY  \
@@ -9,6 +9,14 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.31.10 - Fix: Tab único y máquinas visibles (21/01/2026)
+
+**Correcciones:**
+- 🔧 CategorySelector ya no duplica "Máquinas Principales" si existe como categoría real
+- 🔧 MachineSelector muestra máquinas cuando la categoría real es "maquinas-principales" o cuando no tienen categoría
+
+**Tipo de cambio:** fix
 
 ### v2.31.9 - Default category selection: Máquinas Principales (21/01/2026)
 

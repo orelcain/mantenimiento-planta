@@ -28,7 +28,7 @@ export function MachineSelector({
 
   // Filtrar máquinas por categoría seleccionada
   const filteredMachines = selectedCategoryId === 'maquinas-principales'
-    ? activeMachines.filter((m) => !m.categoryId || m.categoryId === '')
+    ? activeMachines.filter((m) => !m.categoryId || m.categoryId === 'maquinas-principales')
     : selectedCategoryId === null
       ? activeMachines
       : activeMachines.filter((m) => m.categoryId === selectedCategoryId);
