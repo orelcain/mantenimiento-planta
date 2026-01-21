@@ -41,6 +41,7 @@ export function useMachines() {
           marca: data.marca,
           modelo: data.modelo,
           descripcion: data.descripcion || '',
+          categoryId: data.categoryId || null, // 👈 AGREGADO: mapear categoryId
           activa: data.activa !== false, // Por defecto true
           color: data.color || '#3b82f6',
           orden: data.orden || 0,
@@ -81,6 +82,7 @@ export function useMachines() {
             marca: data.marca,
             modelo: data.modelo,
             descripcion: data.descripcion || '',
+            categoryId: data.categoryId || null, // 👈 AGREGADO: mapear categoryId
             activa: data.activa !== false,
             color: data.color || '#3b82f6',
             orden: data.orden || 0,
@@ -118,6 +120,7 @@ export function useMachines() {
         marca: data.marca,
         modelo: data.modelo,
         descripcion: data.descripcion || '',
+        categoryId: data.categoryId || null, // 👈 AGREGADO: mapear categoryId
         activa: data.activa !== false,
         color: data.color || '#3b82f6',
         orden: data.orden || 0,
@@ -281,6 +284,7 @@ export function useMachines() {
             marca: data.marca,
             modelo: data.modelo,
             descripcion: data.descripcion || '',
+            categoryId: data.categoryId || null, // 👈 AGREGADO: mapear categoryId
             activa: data.activa !== false,
             color: data.color || '#3b82f6',
             orden: data.orden || 0,
