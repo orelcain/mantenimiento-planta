@@ -20,6 +20,24 @@ interface ImportRepuestosModalProps {
 }
 
 function normalizeNumber(value: unknown, fallback = 0): number {
+  if (value === undefined || value === null || value === '') return fallback
+
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : fallback
+  }
+
+  if (typeof value === 'string') {
+    const sanitized = value
+      .trim()
+      .replace(/\s+/g, '') // elimina espacios internos
+      .replace(/[$¢€£₱₡₲₴₺₽₹]/g, '') // quita símbolos de moneda comunes
+      .replace(/\./g, '') // quita separador de miles tipo 1.234,56
+      .replace(/,/g, '.') // convierte coma decimal en punto
+
+    const parsed = Number(sanitized)
+    return Number.isFinite(parsed) ? parsed : fallback
+  }
+
   const n = Number(value)
   return Number.isFinite(n) ? n : fallback
 }
