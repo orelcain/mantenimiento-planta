@@ -1,14 +1,30 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.31.2**
+## Versión Actual: **v2.31.3**
 
-**Fecha de lanzamiento**: 20 de enero de 2026  \
+**Fecha de lanzamiento**: 21 de enero de 2026  \
 **Estado**: ✅ PRODUCCIÓN READY  \
 **Build**: ✅ Último build local OK
 
 ---
 
 ## 📋 Información de la Versión
+
+### v2.31.3 - Fix categoryId mapping y guidelines de desarrollo (21/01/2026)
+
+**Nuevas Funcionalidades:**
+- ✅ DEVELOPMENT_GUIDELINES.md para comportamiento consistente de IA entre sesiones
+- ✅ Flujo estandarizado de finalización de iteraciones
+
+**Correcciones:**
+- 🔧 **CRÍTICO**: Mapeo de `categoryId` en todos los queries de máquinas (fetchMachines, getMachine, onSnapshot)
+- 🔧 Bug: CategoryId se guardaba pero no se leía de vuelta en la UI
+- 🔧 Mapeo incompleto en 3 lugares diferentes del hook useMachines
+
+**Notas de Desarrollo:**
+- Implementado sistema de documentación para IA
+- Definida estrategia semver para versionado
+- Establecido checklist de validación pre-deploy
 
 ### v2.31.2 - Persistencia de tema y fix filtrado categorías (20/01/2026)
 
