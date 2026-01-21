@@ -93,12 +93,13 @@ function SortableTab({
       <button
         onClick={onClick}
         className={`
-          relative px-4 py-2 min-w-[120px] text-sm font-medium rounded-t-lg
+          relative px-4 py-2 min-w-[120px] text-sm font-medium
           transition-all duration-200 flex items-center gap-2
+          border-b-3 border-transparent
           ${
             isActive
-              ? 'bg-white text-blue-600 shadow-sm border border-b-0 border-gray-200'
-              : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'
+              ? 'text-blue-400 border-b-blue-400 bg-slate-700/50 hover:bg-slate-700/60'
+              : 'text-gray-400 hover:text-gray-300 hover:border-b-gray-500 hover:bg-slate-800/30'
           }
         `}
       >
@@ -108,7 +109,7 @@ function SortableTab({
           <span
             className={`
               inline-flex items-center justify-center px-2 py-0.5 text-xs font-bold rounded-full
-              ${isActive ? 'bg-blue-100 text-blue-700' : 'bg-gray-200 text-gray-700'}
+              ${isActive ? 'bg-blue-600 text-white' : 'bg-slate-700 text-gray-300'}
             `}
           >
             {count}
@@ -249,19 +250,20 @@ export function CategorySelector({
 
   return (
     <>
-      <div className={`border-b border-gray-200 bg-gray-50 ${className}`}>
+      <div className={`border-b border-slate-700 bg-slate-900 ${className}`}>
         <div className="flex items-center justify-between px-4 py-2">
           <nav className="flex space-x-2 overflow-x-auto pb-px flex-1" aria-label="Categorías">
             {/* Tab "Todas" */}
             <button
               onClick={() => onSelectCategory(null)}
               className={`
-                relative px-4 py-2 min-w-[100px] text-sm font-medium rounded-t-lg
+                relative px-4 py-2 min-w-[100px] text-sm font-medium
                 transition-all duration-200 flex items-center gap-2
+                border-b-3 border-transparent
                 ${
                   selectedCategoryId === null
-                    ? 'bg-white text-blue-600 shadow-sm border border-b-0 border-gray-200'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'
+                    ? 'text-blue-400 border-b-blue-400 bg-slate-700/50 hover:bg-slate-700/60'
+                    : 'text-gray-400 hover:text-gray-300 hover:border-b-gray-500 hover:bg-slate-800/30'
                 }
               `}
             >
@@ -273,8 +275,8 @@ export function CategorySelector({
                     inline-flex items-center justify-center px-2 py-0.5 text-xs font-bold rounded-full
                     ${
                       selectedCategoryId === null
-                        ? 'bg-blue-100 text-blue-700'
-                        : 'bg-gray-200 text-gray-700'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-slate-700 text-gray-300'
                     }
                   `}
                 >

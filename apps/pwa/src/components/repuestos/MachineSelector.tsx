@@ -47,7 +47,7 @@ export function MachineSelector({
   }
 
   return (
-    <div className={`border-b border-gray-200 ${className}`}>
+    <div className={`border-b border-slate-700 bg-slate-900 ${className}`}>
       <nav className="flex space-x-2 overflow-x-auto pb-px" aria-label="Máquinas">
         {filteredMachines.map((machine) => {
           const isActive = currentMachine?.id === machine.id;
@@ -58,18 +58,16 @@ export function MachineSelector({
               key={machine.id}
               onClick={() => setCurrentMachine(machine.id)}
               className={`
-                relative px-4 py-3 min-w-[140px] text-sm font-medium rounded-t-lg
-                transition-all duration-200
+                relative px-4 py-3 min-w-[140px] text-sm font-medium
+                transition-all duration-200 border-b-3
                 ${
                   isActive
-                    ? 'text-white shadow-md'
-                    : 'text-gray-600 hover:text-gray-900 bg-gray-50 hover:bg-gray-100'
+                    ? 'text-white hover:opacity-90'
+                    : 'text-gray-400 hover:text-gray-300 hover:bg-slate-800/50'
                 }
               `}
               style={{
-                backgroundColor: isActive ? machine.color : undefined,
-                borderBottomColor: isActive ? machine.color : undefined,
-                borderBottomWidth: isActive ? '3px' : '0',
+                borderBottomColor: isActive ? machine.color : 'transparent',
               }}
               aria-current={isActive ? 'page' : undefined}
             >
@@ -79,7 +77,7 @@ export function MachineSelector({
                   <span
                     className={`
                       inline-flex items-center justify-center px-2 py-0.5 text-xs font-bold rounded-full
-                      ${isActive ? 'bg-white/20 text-white' : 'bg-gray-200 text-gray-700'}
+                      ${isActive ? 'bg-white/20 text-white' : 'bg-slate-700 text-gray-300'}
                     `}
                   >
                     {count}
