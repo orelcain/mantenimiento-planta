@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.31.7**
+## Versión Actual: **v2.31.8**
 
 **Fecha de lanzamiento**: 21 de enero de 2026  \
 **Estado**: ✅ PRODUCCIÓN READY  \
@@ -9,6 +9,19 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.31.8 - Máquinas sin categoría + Colores oscuros consistentes (21/01/2026)
+
+**Nuevas Funcionalidades:**
+- ✨ Mostrar máquinas sin categoría en CategoryManager (Máquinas Principales)
+- ✨ Ahora se pueden asignar categorías a máquinas sin categoría desde Configuración
+- 🐛 Arreglado: Fishken, Grader y otras máquinas no aparecían en CategoryManager
+
+**Mejoras Visuales:**
+- 🎨 Cambio de color en CategoryManager: azul → gris oscuro (slate-400) para link lucide.dev
+- 🎨 Nueva sección "Máquinas sin Categoría" con diseño destacado (azul/gris oscuro)
+
+**Tipo de cambio:** feature + fix
 
 ### v2.31.7 - UI Polish: Consistencia de colores + Limpieza de navegación (21/01/2026)
 

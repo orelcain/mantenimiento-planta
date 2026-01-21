@@ -713,6 +713,90 @@ export function CategoryManager() {
         )}
       </div>
 
+      {/* Máquinas sin Categoría (Máquinas Principales) */}
+      {machines.filter((m) => !m.categoryId || m.categoryId === '').length > 0 && (
+        <div>
+          <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+            <Wrench className="h-5 w-5" />
+            Máquinas sin Categoría ({machines.filter((m) => !m.categoryId || m.categoryId === '').length})
+          </h3>
+          <Card className="p-4 border-blue-900/50 bg-blue-900/10">
+            <div className="space-y-3">
+              {machines
+                .filter((m) => !m.categoryId || m.categoryId === '')
+                .map((machine) => (
+                  <div
+                    key={machine.id}
+                    className="flex items-center justify-between p-3 rounded-md bg-slate-900/50 border border-slate-800 hover:border-slate-700"
+                  >
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className="text-slate-400">{renderIcon('Wrench')}</div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm">{machine.nombre}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {machine.marca} {machine.modelo}
+                        </p>
+                        {machine.descripcion && (
+                          <p className="text-xs text-slate-400 mt-1">{machine.descripcion}</p>
+                        )}
+                        {!machine.activa && (
+                          <span className="inline-block mt-1 text-xs text-orange-500">Archivada</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleEditMachine(machine)}
+                        title="Editar"
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() =>
+                          machine.activa ? handleToggleActiveMachine(machine) : handleToggleActiveMachine(machine)
+                        }
+                        title={machine.activa ? 'Archivar' : 'Reactivar'}
+                      >
+                        {machine.activa ? (
+                          <Archive className="h-3 w-3" />
+                        ) : (
+                          <ArchiveRestore className="h-3 w-3" />
+                        )}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteMachine(machine)}
+                        className="hover:text-destructive"
+                        title="Eliminar"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setMachineFormData({ nombre: '', marca: '', modelo: '', descripcion: '', categoryId: '', color: '#3b82f6' });
+                  setEditingMachine(null);
+                  setShowMachineDialog(true);
+                }}
+                className="w-full"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Agregar máquina sin categoría
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
+
       {/* Categorías Archivadas */}
       {archivedCategories.length > 0 && (
         <div>
@@ -803,7 +887,7 @@ export function CategoryManager() {
                   href="https://lucide.dev/icons"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-blue-500 hover:underline"
+                  className="text-slate-400 hover:text-slate-300 hover:underline"
                 >
                   lucide.dev/icons
                 </a>
