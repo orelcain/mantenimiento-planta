@@ -1,18 +1,16 @@
 /**
- * CategoryManager - Gestión de categorías de máquinas para administradores
+ * CategoryManager - Gestión jerárquica de categorías y máquinas
  * 
  * Características:
- * - Listar todas las categorías (activas e inactivas)
- * - Crear nueva categoría con icono
- * - Editar categoría (nombre, descripción, icono)
+ * - Listar categorías con sus máquinas (expandible)
+ * - Crear/editar/eliminar categorías
+ * - Crear/editar/eliminar máquinas dentro de cada categoría
  * - Reordenar categorías (drag & drop)
- * - Archivar/Reactivar categoría
- * - Eliminar categoría (con confirmación)
- * - Vista de máquinas por categoría
+ * - Archivar/Reactivar categorías y máquinas
  */
 
 import { useState } from 'react';
-import { Plus, Pencil, Trash2, Archive, ArchiveRestore, GripVertical, Folder } from 'lucide-react';
+import { Plus, Pencil, Trash2, Archive, ArchiveRestore, GripVertical, Folder, ChevronDown, ChevronRight, Wrench } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 import {
   DndContext,
@@ -34,7 +32,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { useMachineCategories } from '@/hooks/repuestos/useMachineCategories';
 import { useMachines } from '@/hooks/repuestos/useMachines';
 import { useToast } from '@/hooks/useToast';
-import type { MachineCategory } from '@/types/repuestos';
+import type { MachineCategory, Machine } from '@/types/repuestos';
 import {
   Button,
   Dialog,
@@ -45,22 +43,35 @@ import {
   Input,
   Label,
   Card,
+  Badge,
 } from '@/components/ui';
 
-// Componente para item draggable
+// Componente para item draggable de categoría (con máquinas expandibles)
 function SortableCategoryItem({
   category,
-  machineCount,
-  onEdit,
-  onToggleActive,
-  onDelete,
+  machines,
+  isExpanded,
+  onToggleExpand,
+  onEditCategory,
+  onToggleActiveCategory,
+  onDeleteCategory,
+  onCreateMachine,
+  onEditMachine,
+  onToggleActiveMachine,
+  onDeleteMachine,
   renderIcon,
 }: {
   category: MachineCategory;
-  machineCount: number;
-  onEdit: (category: MachineCategory) => void;
-  onToggleActive: (category: MachineCategory) => void;
-  onDelete: (category: MachineCategory) => void;
+  machines: Machine[];
+  isExpanded: boolean;
+  onToggleExpand: () => void;
+  onEditCategory: (category: MachineCategory) => void;
+  onToggleActiveCategory: (category: MachineCategory) => void;
+  onDeleteCategory: (category: MachineCategory) => void;
+  onCreateMachine: (categoryId: string) => void;
+  onEditMachine: (machine: Machine) => void;
+  onToggleActiveMachine: (machine: Machine) => void;
+  onDeleteMachine: (machine: Machine) => void;
   renderIcon: (iconName: string) => JSX.Element;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -73,18 +84,35 @@ function SortableCategoryItem({
     opacity: isDragging ? 0.5 : 1,
   };
 
+  const activeMachines = machines.filter((m) => m.activa);
+
   return (
     <Card
       ref={setNodeRef}
       style={style}
       className={`p-4 ${!category.activa ? 'opacity-60' : ''}`}
     >
+      {/* Header de categoría */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4 flex-1">
           {/* Drag handle */}
           <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing">
             <GripVertical className="h-5 w-5 text-gray-400" />
           </div>
+
+          {/* Expand/Collapse */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onToggleExpand}
+            className="p-0 h-auto hover:bg-transparent"
+          >
+            {isExpanded ? (
+              <ChevronDown className="h-5 w-5 text-slate-400" />
+            ) : (
+              <ChevronRight className="h-5 w-5 text-slate-400" />
+            )}
+          </Button>
 
           {/* Icon */}
           <div className="text-slate-400">
@@ -100,7 +128,7 @@ function SortableCategoryItem({
             <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
               <span>Orden: {category.orden}</span>
               <span>•</span>
-              <span>{machineCount} máquina{machineCount !== 1 ? 's' : ''}</span>
+              <span>{activeMachines.length} máquina{activeMachines.length !== 1 ? 's' : ''}</span>
               {!category.activa && (
                 <>
                   <span>•</span>
@@ -111,15 +139,24 @@ function SortableCategoryItem({
           </div>
         </div>
 
-        {/* Actions */}
+        {/* Actions de categoría */}
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={() => onEdit(category)}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onCreateMachine(category.id)}
+            title="Nueva máquina"
+          >
+            <Plus className="h-4 w-4 mr-1" />
+            <Wrench className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => onEditCategory(category)}>
             <Pencil className="h-4 w-4" />
           </Button>
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => onToggleActive(category)}
+            onClick={() => onToggleActiveCategory(category)}
             title={category.activa ? 'Archivar' : 'Reactivar'}
           >
             {category.activa ? (
@@ -131,13 +168,95 @@ function SortableCategoryItem({
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => onDelete(category)}
+            onClick={() => onDeleteCategory(category)}
             className="hover:text-destructive"
           >
             <Trash2 className="h-4 w-4" />
           </Button>
         </div>
       </div>
+
+      {/* Lista de máquinas (expandible) */}
+      {isExpanded && (
+        <div className="mt-4 ml-14 space-y-2 border-l-2 border-slate-700 pl-4">
+          {machines.length === 0 ? (
+            <div className="text-sm text-muted-foreground py-2">
+              No hay máquinas en esta categoría. 
+              <Button
+                variant="link"
+                size="sm"
+                onClick={() => onCreateMachine(category.id)}
+                className="p-0 h-auto ml-1"
+              >
+                Crear una
+              </Button>
+            </div>
+          ) : (
+            machines.map((machine) => (
+              <div
+                key={machine.id}
+                className={`flex items-center justify-between p-3 rounded-md bg-slate-900/50 border border-slate-800 ${
+                  !machine.activa ? 'opacity-60' : ''
+                }`}
+              >
+                <div className="flex items-center gap-3 flex-1">
+                  {/* Color indicator */}
+                  <div
+                    className="w-3 h-3 rounded-full"
+                    style={{ backgroundColor: machine.color }}
+                  />
+
+                  {/* Machine info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">{machine.nombre}</span>
+                      {!machine.activa && (
+                        <Badge variant="outline" className="text-xs text-orange-500">
+                          Archivada
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {machine.marca} {machine.modelo && `· ${machine.modelo}`}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Machine actions */}
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onEditMachine(machine)}
+                  >
+                    <Pencil className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onToggleActiveMachine(machine)}
+                    title={machine.activa ? 'Archivar' : 'Reactivar'}
+                  >
+                    {machine.activa ? (
+                      <Archive className="h-3 w-3" />
+                    ) : (
+                      <ArchiveRestore className="h-3 w-3" />
+                    )}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onDeleteMachine(machine)}
+                    className="hover:text-destructive"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
     </Card>
   );
 }
@@ -145,7 +264,7 @@ function SortableCategoryItem({
 export function CategoryManager() {
   const {
     categories,
-    loading,
+    loading: loadingCategories,
     createCategory,
     updateCategory,
     deleteCategory,
@@ -153,17 +272,35 @@ export function CategoryManager() {
     reactivateCategory,
     reorderCategories,
   } = useMachineCategories();
-  const { machines } = useMachines();
+  const {
+    machines,
+    loading: loadingMachines,
+    createMachine,
+    updateMachine,
+    deleteMachine,
+    archiveMachine,
+    reactivateMachine,
+  } = useMachines();
   const { toast } = useToast();
 
-  const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [showEditDialog, setShowEditDialog] = useState(false);
-  const [formData, setFormData] = useState({
+  const [showCategoryDialog, setShowCategoryDialog] = useState(false);
+  const [showMachineDialog, setShowMachineDialog] = useState(false);
+  const [categoryFormData, setCategoryFormData] = useState({
     nombre: '',
     descripcion: '',
     icono: 'Folder',
   });
+  const [machineFormData, setMachineFormData] = useState({
+    nombre: '',
+    marca: '',
+    modelo: '',
+    descripcion: '',
+    categoryId: '',
+    color: '#3b82f6',
+  });
   const [editingCategory, setEditingCategory] = useState<MachineCategory | null>(null);
+  const [editingMachine, setEditingMachine] = useState<Machine | null>(null);
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
 
   const activeCategories = categories.filter((c) => c.activa);
   const archivedCategories = categories.filter((c) => !c.activa);
@@ -176,6 +313,19 @@ export function CategoryManager() {
     })
   );
 
+  // Toggle expand/collapse
+  const toggleExpand = (categoryId: string) => {
+    setExpandedCategories((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(categoryId)) {
+        newSet.delete(categoryId);
+      } else {
+        newSet.add(categoryId);
+      }
+      return newSet;
+    });
+  };
+
   // Renderizar ícono dinámico
   const renderIcon = (iconName: string) => {
     const IconComponent = (LucideIcons as any)[iconName];
@@ -185,27 +335,29 @@ export function CategoryManager() {
     return <IconComponent className="h-5 w-5" />;
   };
 
-  // Contar máquinas por categoría
-  const getMachineCount = (categoryId: string) => {
-    return machines.filter((m) => m.categoryId === categoryId && m.activa).length;
+  // Obtener máquinas de una categoría
+  const getMachinesByCategory = (categoryId: string) => {
+    return machines.filter((m) => m.categoryId === categoryId);
   };
 
+  // ==================== CATEGORÍAS ====================
+
   // Crear categoría
-  const handleCreate = async () => {
+  const handleCreateCategory = async () => {
     try {
       await createCategory({
-        nombre: formData.nombre,
-        descripcion: formData.descripcion,
-        icono: formData.icono,
+        nombre: categoryFormData.nombre,
+        descripcion: categoryFormData.descripcion,
+        icono: categoryFormData.icono,
         orden: activeCategories.length,
         activa: true,
       });
       toast({
         title: 'Categoría creada',
-        description: `${formData.nombre} creada correctamente`,
+        description: `${categoryFormData.nombre} creada correctamente`,
       });
-      setShowCreateDialog(false);
-      setFormData({ nombre: '', descripcion: '', icono: 'Folder' });
+      setShowCategoryDialog(false);
+      setCategoryFormData({ nombre: '', descripcion: '', icono: 'Folder' });
     } catch (error) {
       console.error('Error creating category:', error);
       toast({
@@ -217,32 +369,32 @@ export function CategoryManager() {
   };
 
   // Editar categoría
-  const handleEdit = (category: MachineCategory) => {
+  const handleEditCategory = (category: MachineCategory) => {
     setEditingCategory(category);
-    setFormData({
+    setCategoryFormData({
       nombre: category.nombre,
       descripcion: category.descripcion || '',
       icono: category.icono,
     });
-    setShowEditDialog(true);
+    setShowCategoryDialog(true);
   };
 
-  const handleSaveEdit = async () => {
+  const handleSaveEditCategory = async () => {
     if (!editingCategory) return;
 
     try {
       await updateCategory(editingCategory.id, {
-        nombre: formData.nombre,
-        descripcion: formData.descripcion,
-        icono: formData.icono,
+        nombre: categoryFormData.nombre,
+        descripcion: categoryFormData.descripcion,
+        icono: categoryFormData.icono,
       });
       toast({
         title: 'Categoría actualizada',
-        description: `${formData.nombre} actualizada correctamente`,
+        description: `${categoryFormData.nombre} actualizada correctamente`,
       });
-      setShowEditDialog(false);
+      setShowCategoryDialog(false);
       setEditingCategory(null);
-      setFormData({ nombre: '', descripcion: '', icono: 'Folder' });
+      setCategoryFormData({ nombre: '', descripcion: '', icono: 'Folder' });
     } catch (error) {
       console.error('Error updating category:', error);
       toast({
@@ -253,8 +405,8 @@ export function CategoryManager() {
     }
   };
 
-  // Toggle activa/archivada
-  const handleToggleActive = async (category: MachineCategory) => {
+  // Toggle activa/archivada categoría
+  const handleToggleActiveCategory = async (category: MachineCategory) => {
     try {
       if (category.activa) {
         await archiveCategory(category.id);
@@ -280,12 +432,12 @@ export function CategoryManager() {
   };
 
   // Eliminar categoría
-  const handleDelete = async (category: MachineCategory) => {
-    const machineCount = getMachineCount(category.id);
+  const handleDeleteCategory = async (category: MachineCategory) => {
+    const machineCount = getMachinesByCategory(category.id).length;
     if (machineCount > 0) {
       toast({
         title: 'No se puede eliminar',
-        description: `Esta categoría tiene ${machineCount} máquina(s) asignada(s). Reasígnalas primero.`,
+        description: `Esta categoría tiene ${machineCount} máquina(s) asignada(s). Elimínalas primero.`,
         variant: 'destructive',
       });
       return;
@@ -315,7 +467,7 @@ export function CategoryManager() {
     }
   };
 
-  // Drag & drop - reordenar
+  // Drag & drop - reordenar categorías
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
 
@@ -343,8 +495,158 @@ export function CategoryManager() {
     }
   };
 
-  if (loading) {
-    return <div className="py-8 text-center text-muted-foreground">Cargando categorías...</div>;
+  // ==================== MÁQUINAS ====================
+
+  // Crear máquina
+  const handleCreateMachine = (categoryId: string) => {
+    setEditingMachine(null);
+    setMachineFormData({
+      nombre: '',
+      marca: '',
+      modelo: '',
+      descripcion: '',
+      categoryId,
+      color: '#3b82f6',
+    });
+    setShowMachineDialog(true);
+  };
+
+  // Editar máquina
+  const handleEditMachine = (machine: Machine) => {
+    setEditingMachine(machine);
+    setMachineFormData({
+      nombre: machine.nombre || '',
+      marca: machine.marca || '',
+      modelo: machine.modelo || '',
+      descripcion: machine.descripcion || '',
+      categoryId: machine.categoryId || '',
+      color: machine.color || '#3b82f6',
+    });
+    setShowMachineDialog(true);
+  };
+
+  // Guardar máquina
+  const handleSaveMachine = async () => {
+    try {
+      const nombre = machineFormData.nombre.trim();
+      const marca = machineFormData.marca.trim();
+      const modelo = machineFormData.modelo.trim();
+
+      if (!nombre || !marca || !modelo) {
+        toast({
+          title: 'Error',
+          description: 'Los campos Nombre, Marca y Modelo son obligatorios',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      if (editingMachine) {
+        // Actualizar
+        await updateMachine(editingMachine.id, {
+          nombre,
+          marca,
+          modelo,
+          descripcion: machineFormData.descripcion,
+          categoryId: machineFormData.categoryId,
+          color: machineFormData.color,
+        });
+
+        toast({
+          title: 'Máquina actualizada',
+          description: `${nombre} actualizada correctamente`,
+        });
+      } else {
+        // Crear
+        await createMachine({
+          nombre,
+          marca,
+          modelo,
+          descripcion: machineFormData.descripcion,
+          categoryId: machineFormData.categoryId,
+          color: machineFormData.color,
+          activa: true,
+          orden: 0,
+        });
+
+        toast({
+          title: 'Máquina creada',
+          description: `${nombre} creada correctamente`,
+        });
+
+        // Expandir la categoría automáticamente
+        setExpandedCategories((prev) => new Set(prev).add(machineFormData.categoryId));
+      }
+
+      setShowMachineDialog(false);
+      setMachineFormData({
+        nombre: '',
+        marca: '',
+        modelo: '',
+        descripcion: '',
+        categoryId: '',
+        color: '#3b82f6',
+      });
+    } catch (error) {
+      console.error('Error saving machine:', error);
+      toast({
+        title: 'Error',
+        description: 'No se pudo guardar la máquina',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Toggle activa/archivada máquina
+  const handleToggleActiveMachine = async (machine: Machine) => {
+    try {
+      if (machine.activa) {
+        await archiveMachine(machine.id);
+        toast({
+          title: 'Máquina archivada',
+          description: `${machine.nombre} archivada correctamente`,
+        });
+      } else {
+        await reactivateMachine(machine.id);
+        toast({
+          title: 'Máquina reactivada',
+          description: `${machine.nombre} reactivada correctamente`,
+        });
+      }
+    } catch (error) {
+      console.error('Error toggling machine:', error);
+      toast({
+        title: 'Error',
+        description: 'No se pudo cambiar el estado de la máquina',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Eliminar máquina
+  const handleDeleteMachine = async (machine: Machine) => {
+    if (!confirm(`¿Eliminar la máquina "${machine.nombre}"? Esta acción no se puede deshacer.`)) {
+      return;
+    }
+
+    try {
+      await deleteMachine(machine.id);
+      toast({
+        title: 'Máquina eliminada',
+        description: `${machine.nombre} eliminada correctamente`,
+      });
+    } catch (error) {
+      console.error('Error deleting machine:', error);
+      toast({
+        title: 'Error',
+        description: 'No se pudo eliminar la máquina',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  if (loadingCategories || loadingMachines) {
+    return <div className="py-8 text-center text-muted-foreground">Cargando...</div>;
   }
 
   return (
@@ -352,18 +654,18 @@ export function CategoryManager() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-semibold">Gestión de Categorías</h2>
+          <h2 className="text-xl font-semibold">Gestión de Categorías y Máquinas</h2>
           <p className="text-sm text-muted-foreground">
-            Organiza las máquinas en categorías. Arrastra para reordenar.
+            Organiza tus máquinas en categorías. Haz clic en una categoría para ver sus máquinas.
           </p>
         </div>
-        <Button onClick={() => setShowCreateDialog(true)}>
+        <Button onClick={() => { setCategoryFormData({ nombre: '', descripcion: '', icono: 'Folder' }); setEditingCategory(null); setShowCategoryDialog(true); }}>
           <Plus className="mr-2 h-4 w-4" />
           Nueva Categoría
         </Button>
       </div>
 
-      {/* Categorías Activas */}
+      {/* Categorías Activas con máquinas */}
       <div>
         <h3 className="text-lg font-semibold mb-3">
           Categorías Activas ({activeCategories.length})
@@ -382,10 +684,16 @@ export function CategoryManager() {
                 <SortableCategoryItem
                   key={category.id}
                   category={category}
-                  machineCount={getMachineCount(category.id)}
-                  onEdit={handleEdit}
-                  onToggleActive={handleToggleActive}
-                  onDelete={handleDelete}
+                  machines={getMachinesByCategory(category.id)}
+                  isExpanded={expandedCategories.has(category.id)}
+                  onToggleExpand={() => toggleExpand(category.id)}
+                  onEditCategory={handleEditCategory}
+                  onToggleActiveCategory={handleToggleActiveCategory}
+                  onDeleteCategory={handleDeleteCategory}
+                  onCreateMachine={handleCreateMachine}
+                  onEditMachine={handleEditMachine}
+                  onToggleActiveMachine={handleToggleActiveMachine}
+                  onDeleteMachine={handleDeleteMachine}
                   renderIcon={renderIcon}
                 />
               ))}
@@ -420,7 +728,7 @@ export function CategoryManager() {
                         </p>
                       )}
                       <div className="flex items-center gap-3 mt-2 text-xs text-muted-foreground">
-                        <span>{getMachineCount(category.id)} máquina(s)</span>
+                        <span>{getMachinesByCategory(category.id).length} máquina(s)</span>
                         <span>•</span>
                         <span className="text-orange-500">Archivada</span>
                       </div>
@@ -430,7 +738,7 @@ export function CategoryManager() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleToggleActive(category)}
+                      onClick={() => handleToggleActiveCategory(category)}
                       title="Reactivar"
                     >
                       <ArchiveRestore className="h-4 w-4" />
@@ -438,7 +746,7 @@ export function CategoryManager() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleDelete(category)}
+                      onClick={() => handleDeleteCategory(category)}
                       className="hover:text-destructive"
                     >
                       <Trash2 className="h-4 w-4" />
@@ -451,37 +759,37 @@ export function CategoryManager() {
         </div>
       )}
 
-      {/* Diálogo Crear */}
-      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+      {/* Diálogo Crear/Editar Categoría */}
+      <Dialog open={showCategoryDialog} onOpenChange={setShowCategoryDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Nueva Categoría</DialogTitle>
+            <DialogTitle>{editingCategory ? 'Editar Categoría' : 'Nueva Categoría'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="nombre">Nombre *</Label>
+              <Label htmlFor="cat-nombre">Nombre *</Label>
               <Input
-                id="nombre"
-                value={formData.nombre}
-                onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+                id="cat-nombre"
+                value={categoryFormData.nombre}
+                onChange={(e) => setCategoryFormData({ ...categoryFormData, nombre: e.target.value })}
                 placeholder="Ej: Máquinas Principales"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="descripcion">Descripción</Label>
+              <Label htmlFor="cat-descripcion">Descripción</Label>
               <Input
-                id="descripcion"
-                value={formData.descripcion}
-                onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
+                id="cat-descripcion"
+                value={categoryFormData.descripcion}
+                onChange={(e) => setCategoryFormData({ ...categoryFormData, descripcion: e.target.value })}
                 placeholder="Opcional"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="icono">Ícono (Lucide)</Label>
+              <Label htmlFor="cat-icono">Ícono (Lucide)</Label>
               <Input
-                id="icono"
-                value={formData.icono}
-                onChange={(e) => setFormData({ ...formData, icono: e.target.value })}
+                id="cat-icono"
+                value={categoryFormData.icono}
+                onChange={(e) => setCategoryFormData({ ...categoryFormData, icono: e.target.value })}
                 placeholder="Ej: Factory, Zap, Link"
               />
               <p className="text-xs text-muted-foreground">
@@ -498,54 +806,87 @@ export function CategoryManager() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
+            <Button variant="outline" onClick={() => setShowCategoryDialog(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleCreate} disabled={!formData.nombre.trim()}>
-              Crear
+            <Button
+              onClick={editingCategory ? handleSaveEditCategory : handleCreateCategory}
+              disabled={!categoryFormData.nombre.trim()}
+            >
+              {editingCategory ? 'Guardar' : 'Crear'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Diálogo Editar */}
-      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+      {/* Diálogo Crear/Editar Máquina */}
+      <Dialog open={showMachineDialog} onOpenChange={setShowMachineDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Editar Categoría</DialogTitle>
+            <DialogTitle>{editingMachine ? 'Editar Máquina' : 'Nueva Máquina'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="edit-nombre">Nombre *</Label>
+              <Label htmlFor="mach-nombre">Nombre *</Label>
               <Input
-                id="edit-nombre"
-                value={formData.nombre}
-                onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+                id="mach-nombre"
+                value={machineFormData.nombre}
+                onChange={(e) => setMachineFormData({ ...machineFormData, nombre: e.target.value })}
+                placeholder="Ej: Torno CNC"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="mach-marca">Marca *</Label>
+                <Input
+                  id="mach-marca"
+                  value={machineFormData.marca}
+                  onChange={(e) => setMachineFormData({ ...machineFormData, marca: e.target.value })}
+                  placeholder="Ej: Haas"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="mach-modelo">Modelo *</Label>
+                <Input
+                  id="mach-modelo"
+                  value={machineFormData.modelo}
+                  onChange={(e) => setMachineFormData({ ...machineFormData, modelo: e.target.value })}
+                  placeholder="Ej: ST-20"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="mach-descripcion">Descripción</Label>
+              <Input
+                id="mach-descripcion"
+                value={machineFormData.descripcion}
+                onChange={(e) => setMachineFormData({ ...machineFormData, descripcion: e.target.value })}
+                placeholder="Opcional"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-descripcion">Descripción</Label>
-              <Input
-                id="edit-descripcion"
-                value={formData.descripcion}
-                onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-icono">Ícono (Lucide)</Label>
-              <Input
-                id="edit-icono"
-                value={formData.icono}
-                onChange={(e) => setFormData({ ...formData, icono: e.target.value })}
-              />
+              <Label htmlFor="mach-color">Color</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="mach-color"
+                  type="color"
+                  value={machineFormData.color}
+                  onChange={(e) => setMachineFormData({ ...machineFormData, color: e.target.value })}
+                  className="w-20 h-10"
+                />
+                <span className="text-sm text-muted-foreground">{machineFormData.color}</span>
+              </div>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowEditDialog(false)}>
+            <Button variant="outline" onClick={() => setShowMachineDialog(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleSaveEdit} disabled={!formData.nombre.trim()}>
-              Guardar
+            <Button
+              onClick={handleSaveMachine}
+              disabled={!machineFormData.nombre.trim() || !machineFormData.marca.trim() || !machineFormData.modelo.trim()}
+            >
+              {editingMachine ? 'Guardar' : 'Crear'}
             </Button>
           </DialogFooter>
         </DialogContent>

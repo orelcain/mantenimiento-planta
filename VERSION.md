@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.31.4**
+## Versión Actual: **v2.31.5**
 
 **Fecha de lanzamiento**: 21 de enero de 2026  \
 **Estado**: ✅ PRODUCCIÓN READY  \
@@ -9,6 +9,37 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.31.5 - Vista jerárquica: Categorías con Máquinas expandibles (21/01/2026)
+
+**Nuevas Funcionalidades:**
+- ✅ **Vista jerárquica unificada**: Categorías → Máquinas dentro de cada categoría (expandible)
+- ✅ Botón "+ Máquina" en cada categoría para crear en contexto
+- ✅ Lista expandible/colapsable de máquinas por categoría
+- ✅ Gestión completa de máquinas desde dentro de cada categoría
+- ✅ Indicador visual de máquinas con color + marca + modelo
+- ✅ Auto-expansión de categoría al crear nueva máquina
+
+**Mejoras:**
+- 🎨 Pestaña única "Categorías y Máquinas" (eliminada pestaña separada "Máquinas")
+- 🎨 UI más intuitiva: todo se gestiona desde la jerarquía visual
+- 🎨 Borde izquierdo en lista de máquinas para mejor separación visual
+- ♻️ Simplificación: menos pestañas, más contexto
+
+**Estructura Final de Configuración:**
+1. General
+2. Usuarios
+3. Invitaciones
+4. Notificaciones
+5. **Categorías y Máquinas** (vista jerárquica unificada)
+6. Sistema
+
+**UX mejorado:**
+- Crear máquina en contexto de su categoría
+- Ver todas las máquinas de una categoría con un clic
+- Gestión más intuitiva y organizada
+
+**Tipo de cambio:** feat
 
 ### v2.31.4 - CategoryManager y pestaña Categorías en Configuración (21/01/2026)
 
