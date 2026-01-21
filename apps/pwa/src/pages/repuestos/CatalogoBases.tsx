@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { Package, AlertTriangle } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, LoadingScreen, Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui'
+import { useToast } from '@/hooks/useToast'
 import { MotorasBombasTable } from '@/components/repuestos/MotorasBombasTable'
 import { MapasViewer } from '@/components/repuestos/MapasViewer'
 import { AssetDetailModal } from '@/components/repuestos/AssetDetailModal'
@@ -9,8 +10,9 @@ import { usePlantMaps } from '@/hooks/repuestos/usePlantMaps'
 import type { PlantAsset } from '@/types/repuestos'
 
 export function CatalogoBases() {
-  const { assets, loading: assetsLoading, error: assetsError } = usePlantAssets()
+  const { assets, loading: assetsLoading, error: assetsError, addMarker, deleteMarker } = usePlantAssets()
   const { maps, loading: mapsLoading, error: mapsError } = usePlantMaps()
+  const { toast } = useToast()
 
   const [selectedAsset, setSelectedAsset] = useState<PlantAsset | null>(null)
   const [showDetailModal, setShowDetailModal] = useState(false)
@@ -29,6 +31,50 @@ export function CatalogoBases() {
   const handleAssetSelect = (asset: PlantAsset) => {
     setSelectedAsset(asset)
     setShowDetailModal(true)
+  }
+
+  const handleCreateMarker = async (assetId: string, mapId: string, x: number, y: number, label?: string) => {
+    try {
+      const asset = assets.find(a => a.id === assetId)
+      if (!asset) throw new Error('Asset no encontrado')
+      
+      await addMarker(asset, { mapId, x, y, label })
+      toast({
+        title: 'Marcador creado',
+        description: `Marcador agregado para ${asset.equipo}`,
+        variant: 'success',
+      })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Error al crear marcador'
+      toast({
+        title: 'Error',
+        description: message,
+        variant: 'destructive',
+      })
+      throw err
+    }
+  }
+
+  const handleDeleteMarker = async (assetId: string, markerId: string) => {
+    try {
+      const asset = assets.find(a => a.id === assetId)
+      if (!asset) throw new Error('Asset no encontrado')
+      
+      await deleteMarker(asset, markerId)
+      toast({
+        title: 'Marcador eliminado',
+        description: 'El marcador ha sido eliminado exitosamente',
+        variant: 'success',
+      })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Error al eliminar marcador'
+      toast({
+        title: 'Error',
+        description: message,
+        variant: 'destructive',
+      })
+      throw err
+    }
   }
 
   if (assetsLoading || mapsLoading) {
@@ -147,6 +193,7 @@ export function CatalogoBases() {
                   maps={maps}
                   assets={assets}
                   loading={mapsLoading}
+                  selectedAssetId={selectedAsset?.id || null}
                   onMarkerClick={(marker) => {
                     const asset = assets.find((a: PlantAsset) =>
                       a.marcadores?.some((m: any) => m.id === marker.id)
@@ -156,6 +203,8 @@ export function CatalogoBases() {
                       setShowDetailModal(true)
                     }
                   }}
+                  onCreateMarker={handleCreateMarker}
+                  onDeleteMarker={handleDeleteMarker}
                 />
               )}
             </CardContent>

@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
-import { MapPin, Plus, X } from 'lucide-react'
-import { Button } from '@/components/ui'
+import { MapPin, Plus, X, Check } from 'lucide-react'
+import { Button, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Input, Label, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui'
 import type { PlantMap, PlantMarker, PlantAsset } from '@/types/repuestos'
 
 interface MapasViewerProps {
@@ -8,12 +8,20 @@ interface MapasViewerProps {
   assets: PlantAsset[]
   loading: boolean
   onMarkerClick?: (marker: PlantMarker, map: PlantMap) => void
+  onCreateMarker?: (assetId: string, mapId: string, x: number, y: number, label?: string) => Promise<void>
+  onDeleteMarker?: (assetId: string, markerId: string) => Promise<void>
+  selectedAssetId?: string | null
 }
 
-export function MapasViewer({ maps, assets, loading, onMarkerClick }: MapasViewerProps) {
+export function MapasViewer({ maps, assets, loading, onMarkerClick, onCreateMarker, onDeleteMarker, selectedAssetId }: MapasViewerProps) {
   const [selectedMap, setSelectedMap] = useState<PlantMap | null>(maps[0] || null)
   const [showAddMarker, setShowAddMarker] = useState(false)
   const [markerPosition, setMarkerPosition] = useState<{ x: number; y: number } | null>(null)
+  const [showCreateDialog, setShowCreateDialog] = useState(false)
+  const [newMarkerAssetId, setNewMarkerAssetId] = useState<string>('')
+  const [newMarkerLabel, setNewMarkerLabel] = useState('')
+  const [isCreating, setIsCreating] = useState(false)
+  const [isDeletingId, setIsDeletingId] = useState<string | null>(null)
 
   // Obtener marcadores del asset para este mapa
   const mapMarkers = useMemo(() => {
@@ -36,7 +44,48 @@ export function MapasViewer({ maps, assets, loading, onMarkerClick }: MapasViewe
     const x = (e.clientX - rect.left) / rect.width
     const y = (e.clientY - rect.top) / rect.height
 
-    setMarkerPosition({ x: Math.max(0, Math.min(1, x)), y: Math.max(0, Math.min(1, y)) })
+    const position = { x: Math.max(0, Math.min(1, x)), y: Math.max(0, Math.min(1, y)) }
+    setMarkerPosition(position)
+    setNewMarkerAssetId(selectedAssetId || '')
+    setShowCreateDialog(true)
+  }
+
+  const handleCreateMarker = async () => {
+    if (!markerPosition || !selectedMap || !newMarkerAssetId || !onCreateMarker) return
+    
+    setIsCreating(true)
+    try {
+      await onCreateMarker(
+        newMarkerAssetId,
+        selectedMap.id,
+        markerPosition.x,
+        markerPosition.y,
+        newMarkerLabel.trim() || undefined
+      )
+      setShowCreateDialog(false)
+      setMarkerPosition(null)
+      setNewMarkerLabel('')
+      setShowAddMarker(false)
+    } catch (err) {
+      console.error('Error creando marcador:', err)
+      alert(err instanceof Error ? err.message : 'Error al crear marcador')
+    } finally {
+      setIsCreating(false)
+    }
+  }
+
+  const handleDeleteMarker = async (asset: PlantAsset, markerId: string) => {
+    if (!onDeleteMarker || !confirm('¿Eliminar este marcador?')) return
+    
+    setIsDeletingId(markerId)
+    try {
+      await onDeleteMarker(asset.id, markerId)
+    } catch (err) {
+      console.error('Error eliminando marcador:', err)
+      alert(err instanceof Error ? err.message : 'Error al eliminar marcador')
+    } finally {
+      setIsDeletingId(null)
+    }
   }
 
   if (loading) {
@@ -113,26 +162,47 @@ export function MapasViewer({ maps, assets, loading, onMarkerClick }: MapasViewe
           />
 
           {/* Marcadores */}
-          {mapMarkers.map(({ marker, asset }) => (
-            <button
-              key={marker.id}
-              onClick={() => onMarkerClick?.(marker, selectedMap)}
-              className="absolute -translate-x-1/2 -translate-y-1/2 group"
-              style={{
-                left: `${marker.x * 100}%`,
-                top: `${marker.y * 100}%`,
-              }}
-              title={`${asset.equipo} - ${marker.label || 'Sin etiqueta'}`}
-            >
-              <div className="relative">
-                <div className="w-6 h-6 bg-blue-500 rounded-full border-2 border-white shadow-lg cursor-pointer hover:scale-125 transition-transform" />
-                <div className="absolute left-full ml-2 top-0 bg-popover border rounded px-2 py-1 text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                  <div className="font-medium">{asset.equipo}</div>
-                  <div className="text-muted-foreground">{marker.label}</div>
-                </div>
+          {mapMarkers.map(({ marker, asset }) => {
+            const isSelected = selectedAssetId === asset.id
+            const isDeleting = isDeletingId === marker.id
+            return (
+              <div
+                key={marker.id}
+                className="absolute -translate-x-1/2 -translate-y-1/2 group"
+                style={{
+                  left: `${marker.x * 100}%`,
+                  top: `${marker.y * 100}%`,
+                }}
+              >
+                <button
+                  onClick={() => onMarkerClick?.(marker, selectedMap)}
+                  className="relative"
+                  title={`${asset.equipo} - ${marker.label || 'Sin etiqueta'}`}
+                  disabled={isDeleting}
+                >
+                  <div className="relative">
+                    <div className={`w-6 h-6 rounded-full border-2 shadow-lg cursor-pointer hover:scale-125 transition-transform ${
+                      isSelected ? 'bg-yellow-500 border-yellow-300 ring-2 ring-yellow-300' : 'bg-blue-500 border-white'
+                    } ${isDeleting ? 'opacity-50' : ''}`} />
+                    <div className="absolute left-full ml-2 top-0 bg-popover border rounded px-2 py-1 text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                      <div className="font-medium">{asset.equipo}</div>
+                      <div className="text-muted-foreground">{marker.label}</div>
+                    </div>
+                  </div>
+                </button>
+                {onDeleteMarker && (
+                  <button
+                    onClick={() => handleDeleteMarker(asset, marker.id)}
+                    disabled={isDeleting}
+                    className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center hover:bg-red-600 disabled:opacity-50"
+                    title="Eliminar marcador"
+                  >
+                    <X className="h-3 w-3 text-white" />
+                  </button>
+                )}
               </div>
-            </button>
-          ))}
+            )
+          })}
 
           {/* Posición del nuevo marcador */}
           {markerPosition && (
@@ -150,9 +220,78 @@ export function MapasViewer({ maps, assets, loading, onMarkerClick }: MapasViewe
 
         {/* Info de marcadores */}
         <div className="text-xs text-muted-foreground">
-          {mapMarkers.length} marcadores {showAddMarker && markerPosition && '→ haz click para confirmar'}
+          {mapMarkers.length} marcadores {showAddMarker && !markerPosition && '→ haz clic en el mapa para ubicar'}
         </div>
       </div>
+
+      {/* Dialog para crear marcador */}
+      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Nuevo marcador en {selectedMap?.nombre}</DialogTitle>
+            <DialogDescription>
+              Selecciona el motor/bomba y opcionalmente una etiqueta para el marcador.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="asset">Motor/Bomba *</Label>
+              <Select value={newMarkerAssetId} onValueChange={setNewMarkerAssetId}>
+                <SelectTrigger id="asset">
+                  <SelectValue placeholder="Selecciona equipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  {assets.map((asset) => (
+                    <SelectItem key={asset.id} value={asset.id}>
+                      {asset.equipo} ({asset.area})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="label">Etiqueta (opcional)</Label>
+              <Input
+                id="label"
+                placeholder="Ej: Entrada, Salida, Principal..."
+                value={newMarkerLabel}
+                onChange={(e) => setNewMarkerLabel(e.target.value)}
+                maxLength={50}
+              />
+            </div>
+            {markerPosition && (
+              <div className="text-xs text-muted-foreground">
+                Posición: {Math.round(markerPosition.x * 100)}%, {Math.round(markerPosition.y * 100)}%
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowCreateDialog(false)
+                setMarkerPosition(null)
+              }}
+              disabled={isCreating}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleCreateMarker}
+              disabled={!newMarkerAssetId || isCreating}
+            >
+              {isCreating ? (
+                'Guardando...'
+              ) : (
+                <>
+                  <Check className="h-4 w-4 mr-2" />
+                  Crear
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Lista de marcadores en este mapa */}
       {mapMarkers.length > 0 && (
