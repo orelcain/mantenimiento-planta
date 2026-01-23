@@ -49,6 +49,7 @@ export function MachineHierarchySelector({
   const [step, setStep] = useState<'area' | 'subarea' | 'details'>('area');
   const [selectedAreaId, setSelectedAreaId] = useState<string>('');
   const [selectedSubareaId, setSelectedSubareaId] = useState<string>('');
+  const [selectedLocationId, setSelectedLocationId] = useState<string>('');
   const [formData, setFormData] = useState({
     nombre: '',
     marca: '',
@@ -92,17 +93,21 @@ export function MachineHierarchySelector({
     }
   }, [open]);
 
-  // Obtener áreas (nivel 1) – no filtramos por parentId porque la jerarquía técnica tiene padre propio
-  const areas = categories.filter((c) => c.nivel === 1);
+  // Nivel 1: áreas (tomamos nodos sin padre para mostrar raíz técnica)
+  const areas = categories.filter((c) => !c.parentId);
 
-  // Obtener subáreas (nivel 2)
-  const subareas = categories.filter((c) => c.nivel === 2 && c.parentId === selectedAreaId);
+  // Nivel 2: subáreas hijas del área seleccionada
+  const subareas = categories.filter((c) => c.parentId === selectedAreaId);
 
-  // Obtener la categoría final (nivel 2 o 3)
-  const selectedCategory = categories.find(c => c.id === selectedSubareaId);
+  // Nivel 3: ubicaciones hijas de la subárea seleccionada (si existen)
+  const locations = categories.filter((c) => c.parentId === selectedSubareaId);
+
+  // Categoría seleccionada final (toma el nivel más profundo elegido)
+  const selectedCategory = categories.find((c) => c.id === (selectedLocationId || selectedSubareaId || selectedAreaId));
 
   const handleSubmit = async () => {
-    if (!selectedSubareaId || !formData.nombre) return;
+    const targetCategoryId = selectedLocationId || selectedSubareaId || selectedAreaId;
+    if (!targetCategoryId || !formData.nombre) return;
 
     try {
       const newMachine: Partial<Machine> = {
@@ -110,7 +115,7 @@ export function MachineHierarchySelector({
         marca: formData.marca,
         modelo: formData.modelo,
         descripcion: formData.descripcion,
-        categoryId: selectedSubareaId,
+        categoryId: targetCategoryId,
         activa: true,
         color: '#3b82f6',
         createdAt: Timestamp.now() as any,
@@ -145,6 +150,7 @@ export function MachineHierarchySelector({
     setStep('area');
     setSelectedAreaId('');
     setSelectedSubareaId('');
+    setSelectedLocationId('');
     setFormData({ nombre: '', marca: '', modelo: '', descripcion: '' });
   };
 
@@ -197,7 +203,13 @@ export function MachineHierarchySelector({
                 <span>Subárea (Nivel 2)</span>
                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
               </Label>
-              <Select value={selectedSubareaId} onValueChange={setSelectedSubareaId}>
+              <Select
+                value={selectedSubareaId}
+                onValueChange={(val) => {
+                  setSelectedSubareaId(val);
+                  setSelectedLocationId('');
+                }}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecciona una subárea" />
                 </SelectTrigger>
@@ -207,12 +219,34 @@ export function MachineHierarchySelector({
                       No hay subáreas en esta área
                     </div>
                   ) : (
-                    subareas.map(subarea => (
+                    subareas.map((subarea) => (
                       <SelectItem key={subarea.id} value={subarea.id}>
                         🔧 {subarea.nombre}
                       </SelectItem>
                     ))
                   )}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* PASO 3: Seleccionar ubicación final (Nivel 3+) */}
+          {selectedSubareaId && locations.length > 0 && (
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <span>Ubicación (Nivel 3)</span>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              </Label>
+              <Select value={selectedLocationId} onValueChange={setSelectedLocationId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecciona una ubicación" />
+                </SelectTrigger>
+                <SelectContent>
+                  {locations.map((loc) => (
+                    <SelectItem key={loc.id} value={loc.id}>
+                      📦 {loc.nombre}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
