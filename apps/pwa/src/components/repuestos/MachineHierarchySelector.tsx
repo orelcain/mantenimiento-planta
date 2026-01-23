@@ -100,10 +100,15 @@ export function MachineHierarchySelector({
     ? categories.find((c) => c.id === selectedPath[selectedPath.length - 1])
     : null;
 
+  // Raíces de jerarquía técnica (ids generados por scripts: "jer-...")
+  const hierarchyRoots = categories.filter((c) => !c.parentId && c.id?.startsWith('jer-'));
+
   // Si no hay nodos raíz en el camino, mostrar raíces (sin padre) o hijos de categoryId
   const rootCategories = categories.filter((c) => !c.parentId);
-  const optionsToShow = selectedPath.length === 0 
-    ? (categoryId ? currentChildren : rootCategories)
+  const optionsToShow = selectedPath.length === 0
+    ? (categoryId
+        ? (currentChildren.length > 0 ? currentChildren : hierarchyRoots)
+        : rootCategories)
     : currentChildren;
 
   const handleSubmit = async () => {
