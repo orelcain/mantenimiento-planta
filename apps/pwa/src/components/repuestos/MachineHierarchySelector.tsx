@@ -95,11 +95,14 @@ export function MachineHierarchySelector({
   }, [open]);
 
   // Obtener hijos del nodo actual en la jerarquía
-  const baseParentId = categoryId || null; // Punto de partida: categoría implícita o nada
+  const baseParentId = categoryId || null;
   const currentParentId = selectedPath.length > 0 
     ? selectedPath[selectedPath.length - 1] 
-    : baseParentId; // Si no hay selección, buscar hijos de la categoría
+    : baseParentId;
   const currentChildren = categories.filter((c) => c.parentId === currentParentId);
+
+  // Verificar si la categoría tiene jerarquía debajo
+  const hasHierarchy = categoryId ? currentChildren.length > 0 : true;
 
   // Categoría seleccionada final (el nodo más profundo en el camino)
   const selectedCategory = selectedPath.length > 0 
@@ -191,8 +194,23 @@ export function MachineHierarchySelector({
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* JERARQUÍA DINÁMICA: mostrar camino actual */}
-          {selectedPath.length > 0 && (
+          {/* Si categoryId no tiene jerarquía, ir directamente a detalles */}
+          {step === 'hierarchy' && !hasHierarchy && categoryId && (
+            <div className="p-3 bg-blue-900/30 border border-blue-600/50 rounded-lg text-sm text-blue-300">
+              ✓ Esta categoría no tiene niveles jerárquicos. Completa los detalles del equipo.
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setStep('details')}
+                className="w-full mt-2 text-xs"
+              >
+                Continuar a detalles del equipo →
+              </Button>
+            </div>
+          )}
+
+          {/* JERARQUÍA DINÁMICA: mostrar solo si tiene jerarquía */}
+          {step === 'hierarchy' && hasHierarchy && (
             <div className="space-y-2 p-2 bg-slate-800/50 rounded-lg">
               <Label className="text-xs uppercase tracking-wide">Camino seleccionado:</Label>
               <div className="flex flex-wrap gap-1">
@@ -284,13 +302,22 @@ export function MachineHierarchySelector({
           )}
 
           {/* DETALLES DEL EQUIPO */}
-          {step === 'details' && selectedPath.length > 0 && (
+          {step === 'details' && (selectedPath.length > 0 || !hasHierarchy) && (
             <div className="space-y-3 pt-4 border-t">
-              <div className="p-2 bg-green-900/20 rounded-lg border border-green-700/50">
-                <p className="text-xs text-green-300">
-                  Ubicación: <strong>{selectedCategory?.nombre || 'Desconocida'}</strong>
-                </p>
-              </div>
+              {selectedPath.length > 0 && (
+                <div className="p-2 bg-green-900/20 rounded-lg border border-green-700/50">
+                  <p className="text-xs text-green-300">
+                    Ubicación: <strong>{selectedCategory?.nombre || 'Desconocida'}</strong>
+                  </p>
+                </div>
+              )}
+              {!hasHierarchy && categoryId && (
+                <div className="p-2 bg-blue-900/20 rounded-lg border border-blue-700/50">
+                  <p className="text-xs text-blue-300">
+                    Categoría: <strong>{categories.find(c => c.id === categoryId)?.nombre || 'Desconocida'}</strong>
+                  </p>
+                </div>
+              )}
               <div>
                 <Label htmlFor="nombre">Nombre del equipo *</Label>
                 <Input
