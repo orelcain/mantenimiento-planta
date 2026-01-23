@@ -53,7 +53,7 @@ const getSolicitudTotal = (repuesto: Repuesto) => {
 }
 
 export function RepuestosDashboard() {
-  const { machines, loading: machinesLoading } = useMachineContext()
+  const { machines, loading: machinesLoading, setCurrentMachine } = useMachineContext()
   const currentMachine = useCurrentMachine()
   const { toast } = useToast()
   const [createOpen, setCreateOpen] = useState(false)
@@ -162,6 +162,24 @@ export function RepuestosDashboard() {
   useEffect(() => {
     setCurrentPage(1)
   }, [searchQuery, selectedTags, stockFilter, solicitudFilter, pageSize])
+
+  // Limpiar máquina cuando cambia de categoría
+  useEffect(() => {
+    if (!machines.length) return
+
+    // Verificar si la máquina actual pertenece a la categoría seleccionada
+    const machineInCategory = currentMachine && machines.some((m) => {
+      if (selectedCategoryId === 'maquinas-principales') {
+        return m.id === currentMachine.id && (!m.categoryId || m.categoryId === 'maquinas-principales')
+      }
+      return m.id === currentMachine.id && m.categoryId === selectedCategoryId
+    })
+
+    // Si la máquina no está en la categoría, limpiar la selección
+    if (!machineInCategory) {
+      setCurrentMachine(null)
+    }
+  }, [selectedCategoryId, machines, currentMachine, setCurrentMachine])
 
   const stats = useMemo(() => {
     const total = repuestos.length
