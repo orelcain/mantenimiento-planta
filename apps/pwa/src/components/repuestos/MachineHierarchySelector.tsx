@@ -92,11 +92,11 @@ export function MachineHierarchySelector({
     }
   }, [open]);
 
-  // Obtener áreas (nivel 1)
-  const areas = categories.filter(c => c.nivel === 1 && !c.parentId);
+  // Obtener áreas (nivel 1) – no filtramos por parentId porque la jerarquía técnica tiene padre propio
+  const areas = categories.filter((c) => c.nivel === 1);
 
   // Obtener subáreas (nivel 2)
-  const subareas = categories.filter(c => c.nivel === 2 && c.parentId === selectedAreaId);
+  const subareas = categories.filter((c) => c.nivel === 2 && c.parentId === selectedAreaId);
 
   // Obtener la categoría final (nivel 2 o 3)
   const selectedCategory = categories.find(c => c.id === selectedSubareaId);
