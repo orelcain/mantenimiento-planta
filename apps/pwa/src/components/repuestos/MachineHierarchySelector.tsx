@@ -101,7 +101,10 @@ export function MachineHierarchySelector({
     : null;
 
   // Raíces de jerarquía técnica (ids generados por scripts: "jer-...")
-  const hierarchyRoots = categories.filter((c) => !c.parentId && c.id?.startsWith('jer-'));
+  // Fallback: usar nivel 0 si los parentId no están definidos correctamente
+  const hierarchyRoots = categories.filter(
+    (c) => (!c.parentId && c.id?.startsWith('jer-')) || c.nivel === 0
+  );
 
   // Si no hay nodos raíz en el camino, mostrar raíces (sin padre) o hijos de categoryId
   const rootCategories = categories.filter((c) => !c.parentId);
