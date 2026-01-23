@@ -1,20 +1,20 @@
 /**
  * MachineHierarchySelector.tsx
  * 
- * Selector jerárquico para ubicar nuevos equipos (motores, bombas, etc.)
- * USA LA JERARQUÍA TÉCNICA REAL del módulo Jerarquía (colección 'hierarchy')
- * NO usa machineCategories - esa es solo para clasificación de repuestos
+ * Selector y creador jerárquico para el módulo de Repuestos.
+ * Permite:
+ * - Crear SUBCATEGORÍAS dentro de categorías existentes
+ * - Crear EQUIPOS dentro de cualquier categoría/subcategoría
+ * - Navegar por la jerarquía de machineCategories
  * 
- * Flujo: Empresa → Área → Sub-área → Sistema → Sub-sistema → Sección → Elemento
+ * Usa la colección 'machineCategories' para gestionar la estructura.
  */
 
-import { useState, useMemo } from 'react';
-import { ChevronRight, Loader2, MapPin } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { ChevronRight, Loader2, FolderPlus, Plus, Folder, Settings2 } from 'lucide-react';
 import { db } from '@/services/firebase';
-import { collection, addDoc, Timestamp } from 'firebase/firestore';
-import { useHierarchyTree } from '@/hooks/useHierarchy';
-import type { HierarchyNodeWithChildren } from '@/types/hierarchy';
-import type { Machine } from '@/types/repuestos';
+import { collection, getDocs, addDoc, Timestamp, doc, setDoc } from 'firebase/firestore';
+import type { MachineCategory, Machine } from '@/types/repuestos';
 import {
   Button,
   Dialog,
@@ -30,129 +30,129 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
 } from '@/components/ui';
 
 interface MachineHierarchySelectorProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onMachineCreated?: (machine: Machine) => void;
-  onCreateMachine?: (machine: Partial<Machine>) => Promise<void>;
+  onSubcategoryCreated?: (category: MachineCategory) => void;
   loading?: boolean;
-  categoryId?: string; // Categoría de repuestos (motores-bombas, cintas, etc.) - se guarda en el equipo
+  categoryId?: string; // Categoría padre inicial
 }
 
 export function MachineHierarchySelector({
   open,
   onOpenChange,
   onMachineCreated,
-  onCreateMachine,
+  onSubcategoryCreated,
   loading = false,
   categoryId,
 }: MachineHierarchySelectorProps) {
-  // Usar el hook de jerarquía técnica REAL
-  const { tree: hierarchyTree, loading: loadingHierarchy } = useHierarchyTree();
+  const [categories, setCategories] = useState<MachineCategory[]>([]);
+  const [loadingCategories, setLoadingCategories] = useState(false);
+  const [activeTab, setActiveTab] = useState<'equipo' | 'subcategoria'>('equipo');
+
+  // Estado del formulario - navegación jerárquica
+  const [selectedPath, setSelectedPath] = useState<string[]>([]); // IDs desde raíz hasta ubicación
+  const [selectedValue, setSelectedValue] = useState<string>('');
   
-  // Estado del formulario - jerarquía dinámica
-  const [selectedPath, setSelectedPath] = useState<string[]>([]); // IDs desde raíz hasta ubicación final
-  const [selectedValue, setSelectedValue] = useState<string>(''); // Valor temporal del Select
-  const [formData, setFormData] = useState({
+  // Formulario de equipo
+  const [equipoData, setEquipoData] = useState({
     nombre: '',
     marca: '',
     modelo: '',
     descripcion: '',
   });
 
-  // Aplanar el árbol para búsquedas rápidas
-  const flatNodes = useMemo(() => {
-    const result: HierarchyNodeWithChildren[] = [];
-    const flatten = (nodes: HierarchyNodeWithChildren[]) => {
-      for (const node of nodes) {
-        result.push(node);
-        if (node.children?.length) {
-          flatten(node.children);
-        }
+  // Formulario de subcategoría
+  const [subcatData, setSubcatData] = useState({
+    nombre: '',
+    descripcion: '',
+    icono: 'Folder',
+  });
+
+  // Cargar categorías
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        setLoadingCategories(true);
+        const snapshot = await getDocs(collection(db, 'machineCategories'));
+        const cats = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...(doc.data() as Omit<MachineCategory, 'id'>),
+        })) as MachineCategory[];
+        
+        // Ordenar por nivel y orden
+        cats.sort((a, b) => {
+          const levelDiff = (a.nivel ?? 0) - (b.nivel ?? 0);
+          if (levelDiff !== 0) return levelDiff;
+          return (a.orden ?? 0) - (b.orden ?? 0);
+        });
+
+        setCategories(cats);
+      } catch (err) {
+        console.error('Error al cargar categorías:', err);
+      } finally {
+        setLoadingCategories(false);
       }
     };
-    flatten(hierarchyTree);
-    return result;
-  }, [hierarchyTree]);
 
-  // Obtener las opciones actuales basadas en el path seleccionado
-  const currentOptions = useMemo(() => {
-    if (selectedPath.length === 0) {
-      // Sin selección: mostrar raíces (nivel 1)
-      return hierarchyTree;
-    }
-    
-    // Buscar el último nodo seleccionado y mostrar sus hijos
-    const lastSelectedId = selectedPath[selectedPath.length - 1];
-    const lastNode = flatNodes.find(n => n.id === lastSelectedId);
-    return lastNode?.children || [];
-  }, [hierarchyTree, flatNodes, selectedPath]);
-
-  // Nodo final seleccionado (para mostrar ubicación)
-  const selectedNode = useMemo(() => {
-    if (selectedPath.length === 0) return null;
-    const lastId = selectedPath[selectedPath.length - 1];
-    return flatNodes.find(n => n.id === lastId) || null;
-  }, [flatNodes, selectedPath]);
-
-  // Construir el path completo para mostrar breadcrumb
-  const pathNodes = useMemo(() => {
-    return selectedPath.map(id => flatNodes.find(n => n.id === id)).filter(Boolean) as HierarchyNodeWithChildren[];
-  }, [flatNodes, selectedPath]);
-
-  const handleSubmit = async () => {
-    // Validar que tenemos ubicación y nombre
-    const hierarchyNodeId = selectedPath.length > 0 ? selectedPath[selectedPath.length - 1] : null;
-    
-    if (!formData.nombre) return;
-
-    try {
-      // Construir el path completo de nombres para referencia
-      const hierarchyPath = pathNodes.map(n => n.nombre).join(' > ');
-      
-      const newMachine: Partial<Machine> = {
-        nombre: formData.nombre,
-        marca: formData.marca,
-        modelo: formData.modelo,
-        descripcion: formData.descripcion,
-        categoryId: categoryId || undefined, // Categoría de repuestos (tipo de equipo)
-        hierarchyNodeId: hierarchyNodeId || undefined, // ID del nodo en la jerarquía técnica
-        hierarchyPath: hierarchyPath || undefined, // Path legible (para búsquedas/display)
-        activa: true,
-        color: '#3b82f6',
-        createdAt: Timestamp.now() as any,
-        updatedAt: Timestamp.now() as any,
-      };
-
-      if (onMachineCreated) {
-        // Crear el equipo directamente en la BD
-        const machinesCollection = collection(db, 'machines');
-        const docRef = await addDoc(machinesCollection, newMachine);
-        
-        const createdMachine: Machine = {
-          id: docRef.id,
-          ...newMachine,
-        } as Machine;
-        
-        onMachineCreated(createdMachine);
-      } else if (onCreateMachine) {
-        await onCreateMachine(newMachine);
+    if (open) {
+      loadCategories();
+      // Si hay categoryId, iniciar con ese como primer nodo del path
+      if (categoryId) {
+        setSelectedPath([categoryId]);
       }
-
-      onOpenChange(false);
-      resetForm();
-    } catch (err) {
-      console.error('Error al crear máquina:', err);
     }
-  };
+  }, [open, categoryId]);
 
-  const resetForm = () => {
-    setSelectedPath([]);
-    setSelectedValue('');
-    setFormData({ nombre: '', marca: '', modelo: '', descripcion: '' });
-  };
+  // Calcular el parentId actual (último elemento del path o categoryId inicial)
+  const currentParentId = useMemo(() => {
+    if (selectedPath.length > 0) {
+      return selectedPath[selectedPath.length - 1];
+    }
+    return null;
+  }, [selectedPath]);
+
+  // Obtener hijos del nodo actual
+  const currentChildren = useMemo(() => {
+    return categories.filter(c => c.parentId === currentParentId);
+  }, [categories, currentParentId]);
+
+  // Categorías raíz (sin padre)
+  const rootCategories = useMemo(() => {
+    return categories.filter(c => !c.parentId);
+  }, [categories]);
+
+  // Opciones a mostrar
+  const optionsToShow = useMemo(() => {
+    if (selectedPath.length === 0) {
+      return rootCategories;
+    }
+    return currentChildren;
+  }, [selectedPath, rootCategories, currentChildren]);
+
+  // Nodos del path para breadcrumb
+  const pathNodes = useMemo(() => {
+    return selectedPath.map(id => categories.find(c => c.id === id)).filter(Boolean) as MachineCategory[];
+  }, [selectedPath, categories]);
+
+  // Nodo actual seleccionado
+  const currentNode = useMemo(() => {
+    if (selectedPath.length === 0) return null;
+    return categories.find(c => c.id === selectedPath[selectedPath.length - 1]) || null;
+  }, [selectedPath, categories]);
+
+  // Calcular nivel actual
+  const currentLevel = useMemo(() => {
+    if (currentNode) return (currentNode.nivel ?? 0) + 1;
+    return 0;
+  }, [currentNode]);
 
   const handleSelectNode = (nodeId: string) => {
     setSelectedPath([...selectedPath, nodeId]);
@@ -168,175 +168,349 @@ export function MachineHierarchySelector({
     onOpenChange(false);
   };
 
-  // Determinar si mostrar formulario (cuando no hay más hijos o se llegó a un nodo final)
-  const showForm = selectedPath.length > 0 && (currentOptions.length === 0 || selectedPath.length >= 2);
+  const resetForm = () => {
+    setSelectedPath(categoryId ? [categoryId] : []);
+    setSelectedValue('');
+    setEquipoData({ nombre: '', marca: '', modelo: '', descripcion: '' });
+    setSubcatData({ nombre: '', descripcion: '', icono: 'Folder' });
+    setActiveTab('equipo');
+  };
+
+  // Crear equipo
+  const handleCreateEquipo = async () => {
+    if (!equipoData.nombre) return;
+
+    try {
+      const newMachine: Partial<Machine> = {
+        nombre: equipoData.nombre,
+        marca: equipoData.marca,
+        modelo: equipoData.modelo,
+        descripcion: equipoData.descripcion,
+        categoryId: currentParentId || categoryId || undefined,
+        activa: true,
+        color: '#3b82f6',
+        orden: 0,
+        createdAt: Timestamp.now() as any,
+        updatedAt: Timestamp.now() as any,
+      };
+
+      const machinesCollection = collection(db, 'machines');
+      const docRef = await addDoc(machinesCollection, newMachine);
+      
+      const createdMachine: Machine = {
+        id: docRef.id,
+        ...newMachine,
+      } as Machine;
+
+      if (onMachineCreated) {
+        onMachineCreated(createdMachine);
+      }
+
+      onOpenChange(false);
+      resetForm();
+    } catch (err) {
+      console.error('Error al crear equipo:', err);
+    }
+  };
+
+  // Crear subcategoría
+  const handleCreateSubcategoria = async () => {
+    if (!subcatData.nombre) return;
+
+    try {
+      // Generar ID slug
+      const slug = subcatData.nombre
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+      
+      const catId = `${slug}-${Date.now().toString(36)}`;
+
+      const newCategory: Omit<MachineCategory, 'id'> = {
+        nombre: subcatData.nombre,
+        descripcion: subcatData.descripcion || `Subcategoría de ${currentNode?.nombre || 'raíz'}`,
+        icono: subcatData.icono,
+        orden: currentChildren.length,
+        activa: true,
+        parentId: currentParentId || null,
+        nivel: currentLevel,
+      };
+
+      // Guardar en Firestore
+      await setDoc(doc(db, 'machineCategories', catId), {
+        ...newCategory,
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      });
+
+      const createdCategory: MachineCategory = {
+        id: catId,
+        ...newCategory,
+      };
+
+      // Actualizar lista local
+      setCategories(prev => [...prev, createdCategory]);
+
+      if (onSubcategoryCreated) {
+        onSubcategoryCreated(createdCategory);
+      }
+
+      // Limpiar form pero mantener el modal abierto para seguir creando
+      setSubcatData({ nombre: '', descripcion: '', icono: 'Folder' });
+      
+      // Navegar a la subcategoría recién creada
+      setSelectedPath([...selectedPath, catId]);
+
+    } catch (err) {
+      console.error('Error al crear subcategoría:', err);
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Agregar nuevo equipo</DialogTitle>
+          <DialogTitle>Gestión de Categorías y Equipos</DialogTitle>
           <DialogDescription>
-            Navega por la jerarquía técnica para ubicar el equipo
+            Crea subcategorías para organizar o agrega equipos directamente
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
-          {/* BREADCRUMB: Camino seleccionado */}
-          {pathNodes.length > 0 && (
-            <div className="space-y-2 p-3 bg-slate-800/50 rounded-lg">
-              <Label className="text-xs uppercase tracking-wide text-slate-400">
-                <MapPin className="h-3 w-3 inline mr-1" />
-                Ubicación seleccionada:
-              </Label>
-              <div className="flex flex-wrap gap-1">
-                {pathNodes.map((node, idx) => (
-                  <span 
-                    key={node.id} 
-                    className="inline-flex items-center gap-1 px-2 py-1 bg-slate-700 rounded text-xs text-slate-200"
-                  >
-                    {node.nombre}
-                    {idx < pathNodes.length - 1 && (
-                      <ChevronRight className="h-3 w-3 text-slate-500" />
-                    )}
-                  </span>
-                ))}
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleGoBack}
-                className="w-full text-xs mt-2"
-              >
-                ← Volver un nivel
-              </Button>
-            </div>
-          )}
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'equipo' | 'subcategoria')}>
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="equipo" className="flex items-center gap-2">
+              <Settings2 className="h-4 w-4" />
+              Nuevo Equipo
+            </TabsTrigger>
+            <TabsTrigger value="subcategoria" className="flex items-center gap-2">
+              <FolderPlus className="h-4 w-4" />
+              Nueva Subcategoría
+            </TabsTrigger>
+          </TabsList>
 
-          {/* SELECTOR: Mostrar siempre que haya opciones */}
-          {(currentOptions.length > 0 || loadingHierarchy) && (
-            <div className="space-y-2">
-              <Label className="text-sm">
-                {selectedPath.length === 0
-                  ? 'Selecciona la empresa/planta:'
-                  : `Nivel ${selectedPath.length + 1}: Selecciona siguiente ubicación`}
-              </Label>
-              {loadingHierarchy ? (
-                <div className="flex items-center justify-center gap-2 p-4 text-muted-foreground">
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                  <span>Cargando jerarquía...</span>
+          {/* CONTENIDO COMÚN: Navegación */}
+          <div className="mt-4 space-y-4">
+            {/* BREADCRUMB: Ubicación actual */}
+            {pathNodes.length > 0 && (
+              <div className="space-y-2 p-3 bg-slate-800/50 rounded-lg">
+                <Label className="text-xs uppercase tracking-wide text-slate-400">
+                  <Folder className="h-3 w-3 inline mr-1" />
+                  Ubicación actual:
+                </Label>
+                <div className="flex flex-wrap gap-1">
+                  {pathNodes.map((node, idx) => (
+                    <span 
+                      key={node.id} 
+                      className="inline-flex items-center gap-1 px-2 py-1 bg-slate-700 rounded text-xs text-slate-200"
+                    >
+                      {node.nombre}
+                      {idx < pathNodes.length - 1 && (
+                        <ChevronRight className="h-3 w-3 text-slate-500" />
+                      )}
+                    </span>
+                  ))}
                 </div>
-              ) : (
-                <Select value={selectedValue} onValueChange={handleSelectNode}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecciona una opción..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {currentOptions.map((option) => (
-                      <SelectItem key={option.id} value={option.id}>
-                        {option.nombre}
-                        {option.children && option.children.length > 0 && ' ➜'}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleGoBack}
+                  className="w-full text-xs mt-2"
+                >
+                  ← Volver un nivel
+                </Button>
+              </div>
+            )}
 
-              {/* Indicador de nodo final */}
-              {selectedPath.length > 0 && currentOptions.length === 0 && (
-                <p className="text-xs text-green-400">
-                  ✓ Ubicación final alcanzada. Completa los detalles del equipo.
-                </p>
-              )}
-            </div>
-          )}
-
-          {/* FORMULARIO DE DETALLES */}
-          {showForm && !loadingHierarchy && (
-            <div className="space-y-3 pt-4 border-t border-slate-700">
-              <div className="p-2 bg-green-900/20 rounded-lg border border-green-700/50">
-                <p className="text-xs text-green-300">
-                  📍 Ubicación: <strong>{selectedNode?.nombre || 'Sin ubicación'}</strong>
-                </p>
-                {categoryId && (
-                  <p className="text-xs text-blue-300 mt-1">
-                    📦 Categoría: <strong>{categoryId}</strong>
+            {/* SELECTOR: Navegar más profundo si hay subcategorías */}
+            {(optionsToShow.length > 0 || loadingCategories) && (
+              <div className="space-y-2">
+                <Label className="text-sm">
+                  {selectedPath.length === 0
+                    ? 'Selecciona una categoría (opcional):'
+                    : currentChildren.length > 0 
+                      ? 'Navegar a subcategoría (opcional):'
+                      : 'No hay subcategorías'}
+                </Label>
+                {loadingCategories ? (
+                  <div className="flex items-center justify-center gap-2 p-4 text-muted-foreground">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    <span>Cargando...</span>
+                  </div>
+                ) : optionsToShow.length > 0 ? (
+                  <Select value={selectedValue} onValueChange={handleSelectNode}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecciona para navegar más profundo..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {optionsToShow.map((option) => {
+                        const hasChildren = categories.some(c => c.parentId === option.id);
+                        return (
+                          <SelectItem key={option.id} value={option.id}>
+                            {option.nombre}
+                            {hasChildren && ' 📁'}
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <p className="text-xs text-muted-foreground italic">
+                    Esta categoría no tiene subcategorías. Puedes crear una o agregar un equipo aquí.
                   </p>
                 )}
               </div>
-              
+            )}
+          </div>
+
+          {/* TAB: Nuevo Equipo */}
+          <TabsContent value="equipo" className="space-y-4 mt-4">
+            <div className="p-3 bg-blue-900/20 rounded-lg border border-blue-700/50">
+              <p className="text-xs text-blue-300">
+                📍 El equipo se creará en: <strong>{currentNode?.nombre || 'Raíz (sin categoría)'}</strong>
+              </p>
+            </div>
+
+            <div className="space-y-3">
               <div>
-                <Label htmlFor="nombre">Nombre del equipo *</Label>
+                <Label htmlFor="equipo-nombre">Nombre del equipo *</Label>
                 <Input
-                  id="nombre"
-                  placeholder="ej: Motor SEW Principal"
-                  value={formData.nombre}
-                  onChange={e => setFormData({ ...formData, nombre: e.target.value })}
+                  id="equipo-nombre"
+                  placeholder="ej: Bomba caseta mar 40/26"
+                  value={equipoData.nombre}
+                  onChange={e => setEquipoData({ ...equipoData, nombre: e.target.value })}
                 />
               </div>
               <div>
-                <Label htmlFor="marca">Marca</Label>
+                <Label htmlFor="equipo-marca">Marca</Label>
                 <Input
-                  id="marca"
+                  id="equipo-marca"
                   placeholder="ej: SEW, Siemens, etc."
-                  value={formData.marca}
-                  onChange={e => setFormData({ ...formData, marca: e.target.value })}
+                  value={equipoData.marca}
+                  onChange={e => setEquipoData({ ...equipoData, marca: e.target.value })}
                 />
               </div>
               <div>
-                <Label htmlFor="modelo">Modelo</Label>
+                <Label htmlFor="equipo-modelo">Modelo</Label>
                 <Input
-                  id="modelo"
+                  id="equipo-modelo"
                   placeholder="ej: IE3 90L"
-                  value={formData.modelo}
-                  onChange={e => setFormData({ ...formData, modelo: e.target.value })}
+                  value={equipoData.modelo}
+                  onChange={e => setEquipoData({ ...equipoData, modelo: e.target.value })}
                 />
               </div>
               <div>
-                <Label htmlFor="descripcion">Descripción</Label>
+                <Label htmlFor="equipo-descripcion">Descripción</Label>
                 <Input
-                  id="descripcion"
+                  id="equipo-descripcion"
                   placeholder="ej: Motor trifásico para bombeo"
-                  value={formData.descripcion}
-                  onChange={e => setFormData({ ...formData, descripcion: e.target.value })}
+                  value={equipoData.descripcion}
+                  onChange={e => setEquipoData({ ...equipoData, descripcion: e.target.value })}
                 />
               </div>
             </div>
-          )}
 
-          {/* Mensaje inicial si no hay jerarquía */}
-          {!loadingHierarchy && hierarchyTree.length === 0 && (
-            <div className="p-4 bg-yellow-900/20 rounded-lg border border-yellow-700/50 text-center">
-              <p className="text-sm text-yellow-300">
-                ⚠️ No hay jerarquía técnica configurada.
+            <DialogFooter>
+              <Button variant="ghost" onClick={handleClose}>
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleCreateEquipo}
+                disabled={!equipoData.nombre || loading}
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Creando...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Crear equipo
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </TabsContent>
+
+          {/* TAB: Nueva Subcategoría */}
+          <TabsContent value="subcategoria" className="space-y-4 mt-4">
+            <div className="p-3 bg-amber-900/20 rounded-lg border border-amber-700/50">
+              <p className="text-xs text-amber-300">
+                📁 La subcategoría se creará dentro de: <strong>{currentNode?.nombre || 'Raíz (nivel 0)'}</strong>
               </p>
-              <p className="text-xs text-yellow-400 mt-1">
-                Ve a Configuración → Jerarquía para crear la estructura.
+              <p className="text-xs text-amber-400 mt-1">
+                Nivel: {currentLevel}
               </p>
             </div>
-          )}
-        </div>
 
-        <DialogFooter>
-          <Button variant="ghost" onClick={handleClose}>
-            Cancelar
-          </Button>
-          {showForm && (
-            <Button
-              onClick={handleSubmit}
-              disabled={!formData.nombre || loading}
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Creando...
-                </>
-              ) : (
-                'Crear equipo'
-              )}
-            </Button>
-          )}
-        </DialogFooter>
+            <div className="space-y-3">
+              <div>
+                <Label htmlFor="subcat-nombre">Nombre de la subcategoría *</Label>
+                <Input
+                  id="subcat-nombre"
+                  placeholder="ej: Bombas de agua, Motores SEW, etc."
+                  value={subcatData.nombre}
+                  onChange={e => setSubcatData({ ...subcatData, nombre: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="subcat-descripcion">Descripción (opcional)</Label>
+                <Input
+                  id="subcat-descripcion"
+                  placeholder="ej: Bombas para sistema de agua de mar"
+                  value={subcatData.descripcion}
+                  onChange={e => setSubcatData({ ...subcatData, descripcion: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="subcat-icono">Icono</Label>
+                <Select 
+                  value={subcatData.icono} 
+                  onValueChange={(v) => setSubcatData({ ...subcatData, icono: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Folder">📁 Carpeta</SelectItem>
+                    <SelectItem value="Cog">⚙️ Engranaje</SelectItem>
+                    <SelectItem value="Zap">⚡ Energía</SelectItem>
+                    <SelectItem value="Droplet">💧 Agua</SelectItem>
+                    <SelectItem value="Wind">💨 Aire</SelectItem>
+                    <SelectItem value="Thermometer">🌡️ Temperatura</SelectItem>
+                    <SelectItem value="Factory">🏭 Fábrica</SelectItem>
+                    <SelectItem value="Wrench">🔧 Herramienta</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="ghost" onClick={handleClose}>
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleCreateSubcategoria}
+                disabled={!subcatData.nombre || loading}
+                variant="secondary"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Creando...
+                  </>
+                ) : (
+                  <>
+                    <FolderPlus className="h-4 w-4 mr-2" />
+                    Crear subcategoría
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );

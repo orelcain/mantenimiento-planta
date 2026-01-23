@@ -549,18 +549,24 @@ export function RepuestosDashboard() {
         />
       )}
 
-      {/* Modal para crear nuevo equipo */}
+      {/* Modal para crear nuevo equipo o subcategoría */}
       <MachineHierarchySelector
         open={newMachineOpen}
         onOpenChange={setNewMachineOpen}
         categoryId={selectedCategoryId || undefined}
         onMachineCreated={(machine) => {
           // Al crear un nuevo equipo, lo establecemos directamente
-          // (evita error "Machine not found" porque la lista aún no se actualizó)
           setCurrentMachineDirect(machine)
           toast({
             title: 'Equipo creado',
             description: `${machine.nombre} ha sido creado exitosamente.`,
+            variant: 'success',
+          })
+        }}
+        onSubcategoryCreated={(category) => {
+          toast({
+            title: 'Subcategoría creada',
+            description: `${category.nombre} ha sido creada. Puedes seguir agregando equipos o más subcategorías.`,
             variant: 'success',
           })
         }}
