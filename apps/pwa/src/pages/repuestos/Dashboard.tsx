@@ -54,7 +54,7 @@ const getSolicitudTotal = (repuesto: Repuesto) => {
 }
 
 export function RepuestosDashboard() {
-  const { machines, loading: machinesLoading, setCurrentMachine } = useMachineContext()
+  const { machines, loading: machinesLoading, setCurrentMachine, setCurrentMachineDirect } = useMachineContext()
   const currentMachine = useCurrentMachine()
   const { toast } = useToast()
   const [createOpen, setCreateOpen] = useState(false)
@@ -555,8 +555,9 @@ export function RepuestosDashboard() {
         onOpenChange={setNewMachineOpen}
         categoryId={selectedCategoryId || undefined}
         onMachineCreated={(machine) => {
-          // Al crear un nuevo equipo, cambiamos a ese equipo
-          setCurrentMachine(machine.id)
+          // Al crear un nuevo equipo, lo establecemos directamente
+          // (evita error "Machine not found" porque la lista aún no se actualizó)
+          setCurrentMachineDirect(machine)
           toast({
             title: 'Equipo creado',
             description: `${machine.nombre} ha sido creado exitosamente.`,

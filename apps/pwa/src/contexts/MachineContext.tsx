@@ -63,12 +63,15 @@ export function MachineProvider({ children }: MachineProviderProps) {
     setLoading(false);
   }, [machines, machinesLoading]);
 
-  // Cambiar máquina actual
+  // Cambiar máquina actual (busca en lista cargada)
   const setCurrentMachine = async (machineId: string) => {
     const machine = machines.find(m => m.id === machineId);
     
     if (!machine) {
-      console.error(`Machine not found: ${machineId}`);
+      // Si no existe en la lista, puede ser una máquina recién creada
+      // El listener de Firestore actualizará la lista automáticamente
+      console.warn(`Machine not found in current list: ${machineId} - waiting for refresh...`);
+      localStorage.setItem(STORAGE_KEY, machineId); // Guardar para auto-selección cuando se actualice
       return;
     }
 
@@ -83,11 +86,19 @@ export function MachineProvider({ children }: MachineProviderProps) {
     console.log(`✅ Switched to machine: ${machine.nombre} (${machineId})`);
   };
 
+  // Establecer máquina directamente (útil después de crear una nueva)
+  const setCurrentMachineDirect = (machine: Machine) => {
+    setCurrentMachineState(machine);
+    localStorage.setItem(STORAGE_KEY, machine.id);
+    console.log(`✅ Set machine directly: ${machine.nombre} (${machine.id})`);
+  };
+
   const value: MachineContextType = {
     currentMachine,
     machines,
     loading: loading || machinesLoading,
     setCurrentMachine,
+    setCurrentMachineDirect,
   };
 
   return (
