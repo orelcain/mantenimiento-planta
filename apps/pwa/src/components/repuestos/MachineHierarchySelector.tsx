@@ -201,23 +201,8 @@ export function MachineHierarchySelector({
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Si categoryId no tiene jerarquía, ir directamente a detalles */}
-          {step === 'hierarchy' && !hasHierarchy && categoryId && (
-            <div className="p-3 bg-blue-900/30 border border-blue-600/50 rounded-lg text-sm text-blue-300">
-              ✓ Esta categoría no tiene niveles jerárquicos. Completa los detalles del equipo.
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setStep('details')}
-                className="w-full mt-2 text-xs"
-              >
-                Continuar a detalles del equipo →
-              </Button>
-            </div>
-          )}
-
-          {/* JERARQUÍA DINÁMICA: mostrar solo si tiene jerarquía */}
-          {step === 'hierarchy' && hasHierarchy && (
+          {/* JERARQUÍA DINÁMICA: mostrar camino actual cuando hay selecciones */}
+          {selectedPath.length > 0 && (
             <div className="space-y-2 p-2 bg-slate-800/50 rounded-lg">
               <Label className="text-xs uppercase tracking-wide">Camino seleccionado:</Label>
               <div className="flex flex-wrap gap-1">
