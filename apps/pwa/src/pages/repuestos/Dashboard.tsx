@@ -163,21 +163,24 @@ export function RepuestosDashboard() {
     setCurrentPage(1)
   }, [searchQuery, selectedTags, stockFilter, solicitudFilter, pageSize])
 
-  // Limpiar máquina cuando cambia de categoría
+  // Resetear máquina cuando cambia de categoría
   useEffect(() => {
     if (!machines.length) return
 
-    // Verificar si la máquina actual pertenece a la categoría seleccionada
-    const machineInCategory = currentMachine && machines.some((m) => {
+    // Filtrar máquinas de la categoría seleccionada
+    const machinesInCategory = machines.filter((m) => {
       if (selectedCategoryId === 'maquinas-principales') {
-        return m.id === currentMachine.id && (!m.categoryId || m.categoryId === 'maquinas-principales')
+        return !m.categoryId || m.categoryId === 'maquinas-principales'
       }
-      return m.id === currentMachine.id && m.categoryId === selectedCategoryId
+      return m.categoryId === selectedCategoryId
     })
 
-    // Si la máquina no está en la categoría, limpiar la selección
-    if (!machineInCategory) {
-      setCurrentMachine(null)
+    // Verificar si la máquina actual pertenece a la categoría
+    const machineInCategory = currentMachine && machinesInCategory.some((m) => m.id === currentMachine.id)
+
+    // Si la máquina no está en la categoría, seleccionar la primera disponible
+    if (!machineInCategory && machinesInCategory.length > 0) {
+      setCurrentMachine(machinesInCategory[0].id)
     }
   }, [selectedCategoryId, machines, currentMachine, setCurrentMachine])
 
