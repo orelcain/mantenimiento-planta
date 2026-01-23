@@ -51,6 +51,9 @@ export function useMachineCategories() {
           icono: data.icono || 'Folder',
           orden: data.orden || 0,
           activa: data.activa !== false,
+          visible: data.visible !== false, // Nuevo: si no existe, por defecto true
+          parentId: data.parentId || null, // Nuevo: para jerarquía
+          nivel: data.nivel ?? 0, // Nuevo: para jerarquía
           createdAt: data.createdAt?.toDate() || new Date(),
           updatedAt: data.updatedAt?.toDate(),
         } as MachineCategory;
@@ -83,6 +86,9 @@ export function useMachineCategories() {
         icono: data.icono || 'Folder',
         orden: data.orden || 0,
         activa: data.activa !== false,
+        visible: data.visible !== false,
+        parentId: data.parentId || null,
+        nivel: data.nivel ?? 0,
         createdAt: data.createdAt?.toDate() || new Date(),
         updatedAt: data.updatedAt?.toDate(),
       } as MachineCategory;
@@ -216,6 +222,9 @@ export function useMachineCategories() {
             icono: data.icono || 'Folder',
             orden: data.orden || 0,
             activa: data.activa !== false,
+            visible: data.visible !== false,
+            parentId: data.parentId || null,
+            nivel: data.nivel ?? 0,
             createdAt: data.createdAt?.toDate() || new Date(),
             updatedAt: data.updatedAt?.toDate(),
           } as MachineCategory;
