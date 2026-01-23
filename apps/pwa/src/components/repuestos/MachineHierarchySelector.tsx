@@ -115,12 +115,12 @@ export function MachineHierarchySelector({
     ? (categoryId ? currentChildren : rootCategories)
     : currentChildren;
 
-  // Si estamos en 'hierarchy' pero no hay opciones, ir a 'details' automáticamente
+  // Si estamos en 'hierarchy' pero no hay opciones (Y ya cargaron las categorías), ir a 'details' automáticamente
   useEffect(() => {
-    if (step === 'hierarchy' && !loadingCategories && optionsToShow.length === 0) {
+    if (step === 'hierarchy' && !loadingCategories && categories.length > 0 && optionsToShow.length === 0) {
       setStep('details');
     }
-  }, [step, loadingCategories, optionsToShow.length]);
+  }, [step, loadingCategories, categories.length, optionsToShow.length]);
 
   const handleSubmit = async () => {
     // Si hay selectedPath, usar el último nodo como ubicación final
