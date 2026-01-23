@@ -109,9 +109,7 @@ export function MachineHierarchySelector({
   // Si no hay nodos raíz en el camino, mostrar raíces (sin padre) o hijos de categoryId
   const rootCategories = categories.filter((c) => !c.parentId);
   const optionsToShow = selectedPath.length === 0
-    ? (categoryId
-        ? (currentChildren.length > 0 ? currentChildren : hierarchyRoots)
-        : rootCategories)
+    ? (categoryId ? hierarchyRoots : rootCategories)
     : currentChildren;
 
   const handleSubmit = async () => {
