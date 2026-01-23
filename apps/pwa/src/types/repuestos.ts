@@ -73,7 +73,7 @@ export interface Repuesto {
 }
 
 /**
- * Categoría de máquinas
+ * Categoría de máquinas (ahora con soporte para jerarquías)
  */
 export interface MachineCategory {
   id: string; // slug: "maquinas-principales", "motores-bombas"
@@ -82,6 +82,8 @@ export interface MachineCategory {
   icono: string; // nombre del ícono de lucide-react: "Factory", "Zap", "Link"
   orden: number; // orden de visualización
   activa: boolean;
+  parentId?: string | null; // ID de la categoría padre (para subcategorías)
+  nivel?: number; // 0=raíz, 1=subcategoría, 2=sub-subcategoría
   createdAt: Date;
   updatedAt?: Date;
 }
