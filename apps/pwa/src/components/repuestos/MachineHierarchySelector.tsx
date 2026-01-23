@@ -45,11 +45,9 @@ export function MachineHierarchySelector({
   const [categories, setCategories] = useState<MachineCategory[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(false);
 
-  // Estado del formulario
-  const [step, setStep] = useState<'area' | 'subarea' | 'details'>('area');
-  const [selectedAreaId, setSelectedAreaId] = useState<string>('');
-  const [selectedSubareaId, setSelectedSubareaId] = useState<string>('');
-  const [selectedLocationId, setSelectedLocationId] = useState<string>('');
+  // Estado del formulario - jerarquía dinámica
+  const [step, setStep] = useState<'hierarchy' | 'details'>('hierarchy');
+  const [selectedPath, setSelectedPath] = useState<string[]>([]); // Camino desde raíz hasta ubicación final
   const [formData, setFormData] = useState({
     nombre: '',
     marca: '',
@@ -93,23 +91,22 @@ export function MachineHierarchySelector({
     }
   }, [open]);
 
-  // Nivel 1: áreas (preferimos nivel 1; si no hay, usamos nivel 0 como fallback)
-  const areasLevel1 = categories.filter((c) => c.nivel === 1);
-  const areasFallback = categories.filter((c) => c.nivel === 0);
-  const areas = areasLevel1.length > 0 ? areasLevel1 : areasFallback;
+  // Obtener hijos del nodo actual en la jerarquía
+  const currentParentId = selectedPath.length > 0 ? selectedPath[selectedPath.length - 1] : null;
+  const currentChildren = categories.filter((c) => c.parentId === currentParentId);
 
-  // Nivel 2: subáreas hijas del área seleccionada (nivel 2)
-  const subareas = categories.filter((c) => c.nivel === 2 && c.parentId === selectedAreaId);
+  // Categoría seleccionada final (el nodo más profundo en el camino)
+  const selectedCategory = selectedPath.length > 0 
+    ? categories.find((c) => c.id === selectedPath[selectedPath.length - 1])
+    : null;
 
-  // Nivel 3+: ubicaciones hijas de la subárea seleccionada (nivel 3 o más)
-  const locations = categories.filter((c) => (c.nivel ?? 0) >= 3 && c.parentId === selectedSubareaId);
-
-  // Categoría seleccionada final (toma el nivel más profundo elegido)
-  const selectedCategory = categories.find((c) => c.id === (selectedLocationId || selectedSubareaId || selectedAreaId));
+  // Si no hay nodos raíz en el camino, mostrar raíces (sin padre)
+  const rootCategories = categories.filter((c) => !c.parentId);
+  const optionsToShow = selectedPath.length === 0 ? rootCategories : currentChildren;
 
   const handleSubmit = async () => {
-    const targetCategoryId = selectedLocationId || selectedSubareaId || selectedAreaId;
-    if (!targetCategoryId || !formData.nombre) return;
+    if (selectedPath.length === 0 || !formData.nombre) return;
+    const targetCategoryId = selectedPath[selectedPath.length - 1];
 
     try {
       const newMachine: Partial<Machine> = {
@@ -149,11 +146,17 @@ export function MachineHierarchySelector({
   };
 
   const resetForm = () => {
-    setStep('area');
-    setSelectedAreaId('');
-    setSelectedSubareaId('');
-    setSelectedLocationId('');
+    setStep('hierarchy');
+    setSelectedPath([]);
     setFormData({ nombre: '', marca: '', modelo: '', descripcion: '' });
+  };
+
+  const handleSelectNode = (nodeId: string) => {
+    setSelectedPath([...selectedPath, nodeId]);
+  };
+
+  const handleGoBack = () => {
+    setSelectedPath((prev) => prev.slice(0, -1));
   };
 
   const handleClose = () => {
@@ -172,13 +175,45 @@ export function MachineHierarchySelector({
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* PASO 1: Seleccionar Área (Nivel 1) */}
-          {(step === 'area' || !selectedAreaId) && (
+          {/* JERARQUÍA DINÁMICA: mostrar camino actual */}
+          {selectedPath.length > 0 && (
+            <div className="space-y-2 p-2 bg-slate-800/50 rounded-lg">
+              <Label className="text-xs uppercase tracking-wide">Camino seleccionado:</Label>
+              <div className="flex flex-wrap gap-1">
+                {selectedPath.map((nodeId, idx) => {
+                  const node = categories.find((c) => c.id === nodeId);
+                  return (
+                    <span key={nodeId} className="inline-flex items-center gap-1 px-2 py-1 bg-slate-700 rounded text-xs text-slate-200">
+                      {node?.nombre || 'Desconocido'}
+                      {idx < selectedPath.length - 1 && (
+                        <ChevronRight className="h-3 w-3" />
+                      )}
+                    </span>
+                  );
+                })}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleGoBack}
+                className="w-full text-xs"
+              >
+                ← Volver un nivel
+              </Button>
+            </div>
+          )}
+
+          {/* SELECTOR JERÁRQUICO: opciones disponibles */}
+          {step === 'hierarchy' && (
             <div className="space-y-2">
-              <Label>Área (Nivel 1)</Label>
-              <Select value={selectedAreaId} onValueChange={setSelectedAreaId}>
+              <Label className="text-sm">
+                {selectedPath.length === 0
+                  ? 'Selecciona el punto de partida:'
+                  : `Selecciona el siguiente nivel (${selectedPath.length} nivel${selectedPath.length > 1 ? 'es' : ''}):`}
+              </Label>
+              <Select>
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecciona un área" />
+                  <SelectValue placeholder="Selecciona una opción..." />
                 </SelectTrigger>
                 <SelectContent>
                   {loadingCategories ? (
@@ -186,77 +221,59 @@ export function MachineHierarchySelector({
                       <Loader2 className="h-4 w-4 animate-spin" />
                       Cargando...
                     </div>
-                  ) : (
-                    areas.map(area => (
-                      <SelectItem key={area.id} value={area.id}>
-                        📍 {area.nombre}
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          {/* PASO 2: Seleccionar Subárea (Nivel 2) */}
-          {selectedAreaId && (
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <span>Subárea (Nivel 2)</span>
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-              </Label>
-              <Select
-                value={selectedSubareaId}
-                onValueChange={(val) => {
-                  setSelectedSubareaId(val);
-                  setSelectedLocationId('');
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecciona una subárea" />
-                </SelectTrigger>
-                <SelectContent>
-                  {subareas.length === 0 ? (
+                  ) : optionsToShow.length === 0 ? (
                     <div className="p-2 text-sm text-muted-foreground">
-                      No hay subáreas en esta área
+                      No hay opciones disponibles
                     </div>
                   ) : (
-                    subareas.map((subarea) => (
-                      <SelectItem key={subarea.id} value={subarea.id}>
-                        🔧 {subarea.nombre}
+                    optionsToShow.map((option) => (
+                      <SelectItem
+                        key={option.id}
+                        value={option.id}
+                        onSelect={() => handleSelectNode(option.id)}
+                      >
+                        {option.nombre}
+                        {currentChildren.some((c) => c.parentId === option.id) && ' ➜'}
                       </SelectItem>
                     ))
                   )}
                 </SelectContent>
               </Select>
+
+              {/* Indicador de si hay más niveles */}
+              {selectedPath.length > 0 && currentChildren.length > 0 && (
+                <p className="text-xs text-amber-400">
+                  ✓ Este nivel tiene {currentChildren.length} opción(es) más. Continúa navegando o ve a detalles.
+                </p>
+              )}
+              {selectedPath.length > 0 && currentChildren.length === 0 && (
+                <p className="text-xs text-green-400">
+                  ✓ Ubicación final seleccionada. Completa los detalles del equipo.
+                </p>
+              )}
+
+              {/* Botón para pasar a detalles */}
+              {selectedPath.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setStep('details')}
+                  className="w-full"
+                >
+                  Continuar a detalles del equipo →
+                </Button>
+              )}
             </div>
           )}
 
-          {/* PASO 3: Seleccionar ubicación final (Nivel 3+) */}
-          {selectedSubareaId && locations.length > 0 && (
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <span>Ubicación (Nivel 3)</span>
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-              </Label>
-              <Select value={selectedLocationId} onValueChange={setSelectedLocationId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecciona una ubicación" />
-                </SelectTrigger>
-                <SelectContent>
-                  {locations.map((loc) => (
-                    <SelectItem key={loc.id} value={loc.id}>
-                      📦 {loc.nombre}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          {/* PASO 3: Detalles del equipo */}
-          {selectedSubareaId && (
+          {/* DETALLES DEL EQUIPO */}
+          {step === 'details' && selectedPath.length > 0 && (
             <div className="space-y-3 pt-4 border-t">
+              <div className="p-2 bg-green-900/20 rounded-lg border border-green-700/50">
+                <p className="text-xs text-green-300">
+                  Ubicación: <strong>{selectedCategory?.nombre || 'Desconocida'}</strong>
+                </p>
+              </div>
               <div>
                 <Label htmlFor="nombre">Nombre del equipo *</Label>
                 <Input
@@ -294,18 +311,15 @@ export function MachineHierarchySelector({
                 />
               </div>
 
-              {/* Resumen de ubicación */}
-              <div className="bg-blue-50 dark:bg-blue-950 p-3 rounded border border-blue-200 dark:border-blue-800">
-                <p className="text-sm font-semibold text-blue-900 dark:text-blue-200">
-                  Ubicación:
-                </p>
-                <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
-                  {categories.find(c => c.id === selectedAreaId)?.nombre}
-                </p>
-                <p className="text-xs text-blue-700 dark:text-blue-300">
-                  → {selectedCategory?.nombre}
-                </p>
-              </div>
+              {/* Botón volver */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setStep('hierarchy')}
+                className="w-full"
+              >
+                ← Volver a seleccionar ubicación
+              </Button>
             </div>
           )}
         </div>
@@ -314,7 +328,7 @@ export function MachineHierarchySelector({
           <Button variant="ghost" onClick={handleClose}>
             Cancelar
           </Button>
-          {selectedSubareaId && (
+          {step === 'details' && selectedPath.length > 0 && (
             <Button
               onClick={handleSubmit}
               disabled={!formData.nombre || loading}
