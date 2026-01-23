@@ -553,6 +553,7 @@ export function RepuestosDashboard() {
       <MachineHierarchySelector
         open={newMachineOpen}
         onOpenChange={setNewMachineOpen}
+        categoryId={selectedCategoryId || undefined}
         onMachineCreated={(machine) => {
           // Al crear un nuevo equipo, cambiamos a ese equipo
           setCurrentMachine(machine.id)

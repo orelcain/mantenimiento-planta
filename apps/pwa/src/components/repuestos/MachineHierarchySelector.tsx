@@ -33,6 +33,7 @@ interface MachineHierarchySelectorProps {
   onMachineCreated?: (machine: Machine) => void;
   onCreateMachine?: (machine: Partial<Machine>) => Promise<void>;
   loading?: boolean;
+  categoryId?: string;
 }
 
 export function MachineHierarchySelector({
@@ -41,6 +42,7 @@ export function MachineHierarchySelector({
   onMachineCreated,
   onCreateMachine,
   loading = false,
+  categoryId,
 }: MachineHierarchySelectorProps) {
   const [categories, setCategories] = useState<MachineCategory[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(false);
@@ -56,7 +58,7 @@ export function MachineHierarchySelector({
     descripcion: '',
   });
 
-  // Cargar categorías
+  // Cargar categorías e inicializar con categoryId si se proporciona
   useEffect(() => {
     const loadCategories = async () => {
       try {
@@ -80,6 +82,11 @@ export function MachineHierarchySelector({
         });
 
         setCategories(cats);
+
+        // Si se proporciona categoryId, empezar desde ahí
+        if (categoryId) {
+          setSelectedPath([categoryId]);
+        }
       } catch (err) {
         console.error('Error al cargar categorías:', err);
       } finally {
@@ -90,7 +97,7 @@ export function MachineHierarchySelector({
     if (open) {
       loadCategories();
     }
-  }, [open]);
+  }, [open, categoryId]);
 
   // Obtener hijos del nodo actual en la jerarquía
   const currentParentId = selectedPath.length > 0 ? selectedPath[selectedPath.length - 1] : null;
@@ -148,7 +155,7 @@ export function MachineHierarchySelector({
 
   const resetForm = () => {
     setStep('hierarchy');
-    setSelectedPath([]);
+    setSelectedPath(categoryId ? [categoryId] : []);
     setSelectedValue('');
     setFormData({ nombre: '', marca: '', modelo: '', descripcion: '' });
   };
