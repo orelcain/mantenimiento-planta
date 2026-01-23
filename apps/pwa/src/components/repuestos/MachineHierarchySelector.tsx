@@ -48,6 +48,7 @@ export function MachineHierarchySelector({
   // Estado del formulario - jerarquía dinámica
   const [step, setStep] = useState<'hierarchy' | 'details'>('hierarchy');
   const [selectedPath, setSelectedPath] = useState<string[]>([]); // Camino desde raíz hasta ubicación final
+  const [selectedValue, setSelectedValue] = useState<string>(''); // Valor temporal del Select
   const [formData, setFormData] = useState({
     nombre: '',
     marca: '',
@@ -148,11 +149,13 @@ export function MachineHierarchySelector({
   const resetForm = () => {
     setStep('hierarchy');
     setSelectedPath([]);
+    setSelectedValue('');
     setFormData({ nombre: '', marca: '', modelo: '', descripcion: '' });
   };
 
   const handleSelectNode = (nodeId: string) => {
     setSelectedPath([...selectedPath, nodeId]);
+    setSelectedValue(''); // Limpiar el select
   };
 
   const handleGoBack = () => {
@@ -211,7 +214,7 @@ export function MachineHierarchySelector({
                   ? 'Selecciona el punto de partida:'
                   : `Selecciona el siguiente nivel (${selectedPath.length} nivel${selectedPath.length > 1 ? 'es' : ''}):`}
               </Label>
-              <Select>
+              <Select value={selectedValue} onValueChange={handleSelectNode}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecciona una opción..." />
                 </SelectTrigger>
@@ -230,7 +233,6 @@ export function MachineHierarchySelector({
                       <SelectItem
                         key={option.id}
                         value={option.id}
-                        onSelect={() => handleSelectNode(option.id)}
                       >
                         {option.nombre}
                         {currentChildren.some((c) => c.parentId === option.id) && ' ➜'}
