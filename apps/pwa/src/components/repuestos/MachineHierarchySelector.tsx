@@ -8,7 +8,7 @@
 import { useState, useEffect } from 'react';
 import { ChevronRight, Loader2 } from 'lucide-react';
 import { db } from '@/services/firebase';
-import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
+import { collection, query, where, getDocs, Timestamp, addDoc } from 'firebase/firestore';
 import type { MachineCategory, Machine } from '@/types/repuestos';
 import {
   Button,
@@ -30,13 +30,15 @@ import {
 interface MachineHierarchySelectorProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreateMachine: (machine: Partial<Machine>) => Promise<void>;
+  onMachineCreated?: (machine: Machine) => void;
+  onCreateMachine?: (machine: Partial<Machine>) => Promise<void>;
   loading?: boolean;
 }
 
 export function MachineHierarchySelector({
   open,
   onOpenChange,
+  onMachineCreated,
   onCreateMachine,
   loading = false,
 }: MachineHierarchySelectorProps) {
@@ -114,7 +116,23 @@ export function MachineHierarchySelector({
         updatedAt: Timestamp.now() as any,
       };
 
-      await onCreateMachine(newMachine);
+      // Si se proporciona onMachineCreated, usarla directamente
+      if (onMachineCreated) {
+        // Crear el equipo directamente en la BD
+        const machinesCollection = collection(db, 'machines');
+        const docRef = await addDoc(machinesCollection, newMachine);
+        
+        const createdMachine: Machine = {
+          id: docRef.id,
+          ...newMachine,
+        } as Machine;
+        
+        onMachineCreated(createdMachine);
+      } else if (onCreateMachine) {
+        // Usar callback si se proporciona
+        await onCreateMachine(newMachine);
+      }
+
       onOpenChange(false);
       resetForm();
     } catch (err) {

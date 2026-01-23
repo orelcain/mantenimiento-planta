@@ -7,6 +7,7 @@ import { RepuestosPagination } from '@/components/repuestos/RepuestosPagination'
 import { EmptyState } from '@/components/repuestos/EmptyState'
 import { CategorySelector } from '@/components/repuestos/CategorySelector'
 import { MachineSelector } from '@/components/repuestos/MachineSelector'
+import { MachineHierarchySelector } from '@/components/repuestos/MachineHierarchySelector'
 import { RepuestoPhotosModal } from '@/components/repuestos/RepuestoPhotosModal'
 import { RepuestoManualModal } from '@/components/repuestos/RepuestoManualModal'
 import { RepuestoHistoryModal } from '@/components/repuestos/RepuestoHistoryModal'
@@ -65,6 +66,7 @@ export function RepuestosDashboard() {
   const [photoModal, setPhotoModal] = useState<Repuesto | null>(null)
   const [manualModal, setManualModal] = useState<Repuesto | null>(null)
   const [historyModal, setHistoryModal] = useState<Repuesto | null>(null)
+  const [newMachineOpen, setNewMachineOpen] = useState(false)
 
   // Filtro de categorías
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>('maquinas-principales')
@@ -380,6 +382,12 @@ export function RepuestosDashboard() {
               <Plus className="h-4 w-4" />
               Nuevo repuesto
             </Button>
+            
+            {/* Botón crear nuevo equipo */}
+            <Button onClick={() => setNewMachineOpen(true)} className="gap-2" variant="outline">
+              <Plus className="h-4 w-4" />
+              Nuevo equipo
+            </Button>
           </div>
         </div>
 
@@ -540,6 +548,21 @@ export function RepuestosDashboard() {
           machineId={currentMachine?.id}
         />
       )}
+
+      {/* Modal para crear nuevo equipo */}
+      <MachineHierarchySelector
+        open={newMachineOpen}
+        onOpenChange={setNewMachineOpen}
+        onMachineCreated={(machine) => {
+          // Al crear un nuevo equipo, cambiamos a ese equipo
+          setCurrentMachine(machine.id)
+          toast({
+            title: 'Equipo creado',
+            description: `${machine.nombre} ha sido creado exitosamente.`,
+            variant: 'success',
+          })
+        }}
+      />
     </div>
   )
 }
