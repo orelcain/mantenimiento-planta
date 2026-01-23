@@ -1,14 +1,14 @@
 
-> @mantenimiento/pwa@2.32.7 prebuild D:\a\APP leventamiento de insidencias en planta\apps\pwa
+> @mantenimiento/pwa@2.32.8 prebuild D:\a\APP leventamiento de insidencias en planta\apps\pwa
 > pnpm run sync:version
 
 
-> @mantenimiento/pwa@2.32.7 sync:version D:\a\APP leventamiento de insidencias en planta\apps\pwa
+> @mantenimiento/pwa@2.32.8 sync:version D:\a\APP leventamiento de insidencias en planta\apps\pwa
 > node ../../scripts/sync-pwa-version.mjs
 
-[sync-pwa-version] OK: ya estaba sincronizado (v2.32.7)
+[sync-pwa-version] OK: ya estaba sincronizado (v2.32.8)
 
-> @mantenimiento/pwa@2.32.7 build D:\a\APP leventamiento de insidencias en planta\apps\pwa
+> @mantenimiento/pwa@2.32.8 build D:\a\APP leventamiento de insidencias en planta\apps\pwa
 > vite build
 
 [36mvite v6.4.1 [32mbuilding for production...[36m[39m
@@ -18,23 +18,23 @@ rendering chunks...
 computing gzip size...
 [2mdist/[22m[32mindex.html                              [39m[1m[2m    1.57 kB[22m[1m[22m[2m │ gzip:   0.69 kB[22m
 [2mdist/[22m[35massets/index-BlvZTuN6.css               [39m[1m[2m   64.57 kB[22m[1m[22m[2m │ gzip:  10.82 kB[22m
-[2mdist/[22m[36massets/PublicEquipmentView-CkZgvrNz.js  [39m[1m[2m   10.92 kB[22m[1m[22m[2m │ gzip:   3.42 kB[22m
-[2mdist/[22m[36massets/HierarchyPage-B8fFCrhg.js        [39m[1m[2m   20.36 kB[22m[1m[22m[2m │ gzip:   6.15 kB[22m
-[2mdist/[22m[36massets/purify.es-B9ZVCkUG.js            [39m[1m[2m   22.64 kB[22m[1m[22m[2m │ gzip:   8.75 kB[22m
+[2mdist/[22m[36massets/PublicEquipmentView-2XWskEv8.js  [39m[1m[2m   10.92 kB[22m[1m[22m[2m │ gzip:   3.42 kB[22m
+[2mdist/[22m[36massets/HierarchyPage-CUrCrVGG.js        [39m[1m[2m   20.36 kB[22m[1m[22m[2m │ gzip:   6.15 kB[22m
 [33m
+[2mdist/[22m[36massets/purify.es-B9ZVCkUG.js            [39m[1m[2m   22.64 kB[22m[1m[22m[2m │ gzip:   8.75 kB[22m
+[2mdist/[22m[36massets/PreventivePage-DtcZZV7i.js       [39m[1m[2m   29.75 kB[22m[1m[22m[2m │ gzip:   7.72 kB[22m
+[2mdist/[22m[36massets/MapPage-B9f-Y0oW.js              [39m[1m[2m   35.83 kB[22m[1m[22m[2m │ gzip:  11.14 kB[22m
+[2mdist/[22m[36massets/SettingsPage-B70ejilM.js         [39m[1m[2m   46.02 kB[22m[1m[22m[2m │ gzip:  11.74 kB[22m
+[2mdist/[22m[36massets/SensorsPage-gzVdnb-p.js          [39m[1m[2m   70.21 kB[22m[1m[22m[2m │ gzip:  17.55 kB[22m
+[2mdist/[22m[36massets/PhotoEvidencePage-GsaP_ngt.js    [39m[1m[2m   83.63 kB[22m[1m[22m[2m │ gzip:  24.07 kB[22m
+[2mdist/[22m[36massets/ui-BUaDrKyO.js                   [39m[1m[2m  101.04 kB[22m[1m[22m[2m │ gzip:  33.34 kB[22m
+[2mdist/[22m[36massets/index.es-942aFTeC.js             [39m[1m[2m  159.44 kB[22m[1m[22m[2m │ gzip:  53.46 kB[22m
 (!) Some chunks are larger than 500 kB after minification. Consider:
 - Using dynamic import() to code-split the application
 - Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
-[2mdist/[22m[36massets/PreventivePage-DiMIAn0E.js       [39m[1m[2m   29.75 kB[22m[1m[22m[2m │ gzip:   7.72 kB[22m
-[2mdist/[22m[36massets/MapPage-BnlI1mQA.js              [39m[1m[2m   35.83 kB[22m[1m[22m[2m │ gzip:  11.14 kB[22m
-- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.[39m
-[2mdist/[22m[36massets/SettingsPage-EkdnbJL9.js         [39m[1m[2m   46.02 kB[22m[1m[22m[2m │ gzip:  11.74 kB[22m
-[2mdist/[22m[36massets/SensorsPage-CTGk1OeU.js          [39m[1m[2m   70.21 kB[22m[1m[22m[2m │ gzip:  17.55 kB[22m
-[2mdist/[22m[36massets/PhotoEvidencePage-CK06mZer.js    [39m[1m[2m   83.63 kB[22m[1m[22m[2m │ gzip:  24.07 kB[22m
-[2mdist/[22m[36massets/ui-BUaDrKyO.js                   [39m[1m[2m  101.04 kB[22m[1m[22m[2m │ gzip:  33.34 kB[22m
-[2mdist/[22m[36massets/index.es-DiUndWkP.js             [39m[1m[2m  159.44 kB[22m[1m[22m[2m │ gzip:  53.46 kB[22m
 [2mdist/[22m[36massets/vendor-DVqSOM3W.js               [39m[1m[2m  179.49 kB[22m[1m[22m[2m │ gzip:  59.13 kB[22m
 [2mdist/[22m[36massets/html2canvas.esm-QH1iLAAe.js      [39m[1m[2m  202.38 kB[22m[1m[22m[2m │ gzip:  48.04 kB[22m
 [2mdist/[22m[36massets/firebase-DDwcFH9B.js             [39m[1m[33m  530.89 kB[39m[22m[2m │ gzip: 125.07 kB[22m
-[2mdist/[22m[36massets/index-AIa_UZj9.js                [39m[1m[33m2,752.80 kB[39m[22m[2m │ gzip: 738.98 kB[22m
-[32m✓ built in 20.91s[39m
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.[39m
+[2mdist/[22m[36massets/index-DVh0vlYq.js                [39m[1m[33m2,752.88 kB[39m[22m[2m │ gzip: 739.05 kB[22m
+[32m✓ built in 19.41s[39m

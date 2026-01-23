@@ -93,14 +93,16 @@ export function MachineHierarchySelector({
     }
   }, [open]);
 
-  // Nivel 1: áreas (tomamos nodos sin padre para mostrar raíz técnica)
-  const areas = categories.filter((c) => !c.parentId);
+  // Nivel 1: áreas (preferimos nivel 1; si no hay, usamos nivel 0 como fallback)
+  const areasLevel1 = categories.filter((c) => c.nivel === 1);
+  const areasFallback = categories.filter((c) => c.nivel === 0);
+  const areas = areasLevel1.length > 0 ? areasLevel1 : areasFallback;
 
-  // Nivel 2: subáreas hijas del área seleccionada
-  const subareas = categories.filter((c) => c.parentId === selectedAreaId);
+  // Nivel 2: subáreas hijas del área seleccionada (nivel 2)
+  const subareas = categories.filter((c) => c.nivel === 2 && c.parentId === selectedAreaId);
 
-  // Nivel 3: ubicaciones hijas de la subárea seleccionada (si existen)
-  const locations = categories.filter((c) => c.parentId === selectedSubareaId);
+  // Nivel 3+: ubicaciones hijas de la subárea seleccionada (nivel 3 o más)
+  const locations = categories.filter((c) => (c.nivel ?? 0) >= 3 && c.parentId === selectedSubareaId);
 
   // Categoría seleccionada final (toma el nivel más profundo elegido)
   const selectedCategory = categories.find((c) => c.id === (selectedLocationId || selectedSubareaId || selectedAreaId));
