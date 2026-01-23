@@ -212,8 +212,8 @@ export function MachineHierarchySelector({
             </div>
           )}
 
-          {/* SELECTOR: solo si hay opciones disponibles */}
-          {optionsToShow.length > 0 && !loadingCategories && (
+          {/* SELECTOR: mostrar SIEMPRE si hay opciones O si aún está cargando */}
+          {(optionsToShow.length > 0 || loadingCategories) && (
             <div className="space-y-2">
               <Label className="text-sm">
                 {categoryId
@@ -222,19 +222,26 @@ export function MachineHierarchySelector({
                   ? 'Selecciona el punto de partida:'
                   : `Selecciona el siguiente nivel (${selectedPath.length} nivel${selectedPath.length > 1 ? 'es' : ''}):`}
               </Label>
-              <Select value={selectedValue} onValueChange={handleSelectNode}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecciona una opción..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {optionsToShow.map((option) => (
-                    <SelectItem key={option.id} value={option.id}>
-                      {option.nombre}
-                      {categories.some((c) => c.parentId === option.id) && ' ➜'}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {loadingCategories ? (
+                <div className="flex items-center justify-center gap-2 p-4 text-muted-foreground">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  <span>Cargando opciones...</span>
+                </div>
+              ) : (
+                <Select value={selectedValue} onValueChange={handleSelectNode}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona una opción..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {optionsToShow.map((option) => (
+                      <SelectItem key={option.id} value={option.id}>
+                        {option.nombre}
+                        {categories.some((c) => c.parentId === option.id) && ' ➜'}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
 
               {/* Botones de acción */}
               {selectedPath.length > 0 && currentChildren.length === 0 && (
@@ -242,14 +249,6 @@ export function MachineHierarchySelector({
                   ✓ Ubicación final. Completa los detalles del equipo abajo.
                 </p>
               )}
-            </div>
-          )}
-
-          {/* LOADING */}
-          {loadingCategories && (
-            <div className="flex items-center justify-center gap-2 p-4 text-muted-foreground">
-              <Loader2 className="h-5 w-5 animate-spin" />
-              <span>Cargando opciones...</span>
             </div>
           )}
 
