@@ -104,27 +104,21 @@ export function MachineSelector({
     <div className={`bg-slate-900 ${className}`}>
       {/* NIVEL 1: Subcategorías (si existen) */}
       {subcategories.length > 0 && (
-        <div className="border-b border-slate-700 px-2 py-2">
-          <div className="flex items-center gap-2 overflow-x-auto">
-            <span className="text-xs text-slate-500 uppercase tracking-wide shrink-0">
-              <Folder className="h-3 w-3 inline mr-1" />
-              Ubicación:
-            </span>
-            
+        <div className="border-b border-slate-700 px-2 py-1.5">
+          <div className="flex items-center gap-1.5 overflow-x-auto">
             {/* Opción "Todos" o "Sin ubicación" */}
             {directMachines.length > 0 && (
               <button
                 onClick={() => setSelectedSubcatId(null)}
                 className={`
-                  px-3 py-1.5 text-sm rounded-md transition-all shrink-0
+                  px-2.5 py-1 text-xs rounded transition-all shrink-0
                   ${!selectedSubcatId
                     ? 'bg-blue-600 text-white'
                     : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-300'
                   }
                 `}
               >
-                Todos
-                <span className="ml-1 text-xs opacity-75">({directMachines.length})</span>
+                Todos ({directMachines.length})
               </button>
             )}
             
@@ -138,17 +132,17 @@ export function MachineSelector({
                   key={subcat.id}
                   onClick={() => setSelectedSubcatId(subcat.id)}
                   className={`
-                    px-3 py-1.5 text-sm rounded-md transition-all shrink-0 flex items-center gap-1
+                    px-2.5 py-1 text-xs rounded transition-all shrink-0 flex items-center gap-1
                     ${isSelected
                       ? 'bg-amber-600 text-white'
                       : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-300'
                     }
                   `}
                 >
-                  <Folder className="h-3.5 w-3.5" />
+                  <Folder className="h-3 w-3" />
                   {subcat.nombre}
                   {count > 0 && (
-                    <span className={`text-xs ${isSelected ? 'text-amber-200' : 'text-slate-500'}`}>
+                    <span className={`${isSelected ? 'text-amber-200' : 'text-slate-500'}`}>
                       ({count})
                     </span>
                   )}
@@ -172,8 +166,8 @@ export function MachineSelector({
                   key={machine.id}
                   onClick={() => setCurrentMachine(machine.id)}
                   className={`
-                    relative px-4 py-2.5 min-w-[140px] text-sm font-medium
-                    transition-all duration-200 rounded-t border-b-2 shrink-0
+                    relative px-3 py-1.5 text-xs font-medium
+                    transition-all duration-200 rounded border-b-2 shrink-0
                     ${
                       isActive
                         ? 'text-slate-100 bg-slate-700/60'
@@ -185,12 +179,12 @@ export function MachineSelector({
                   }}
                   aria-current={isActive ? 'page' : undefined}
                 >
-                  <div className="flex items-center justify-center gap-2">
-                    <span className="truncate">{machine.nombre}</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="truncate max-w-[150px]">{machine.nombre}</span>
                     {count > 0 && (
                       <span
                         className={`
-                          inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold rounded-full
+                          inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-bold rounded-full
                           ${isActive ? 'bg-white/20 text-white' : 'bg-slate-700 text-gray-300'}
                         `}
                       >
@@ -204,9 +198,9 @@ export function MachineSelector({
           </nav>
         </div>
       ) : selectedSubcatId ? (
-        <div className="text-center py-6 text-gray-500 border-b border-slate-700">
-          <p>No hay equipos en "{subcategories.find(s => s.id === selectedSubcatId)?.nombre}"</p>
-          <p className="text-sm mt-1 text-blue-400">Usa "Nuevo equipo" para agregar uno.</p>
+        <div className="text-center py-4 text-gray-500 text-sm border-b border-slate-700">
+          <p>No hay equipos en esta ubicación</p>
+          <p className="text-xs mt-1 text-blue-400">Usa "Nuevo equipo" para agregar.</p>
         </div>
       ) : null}
     </div>
