@@ -100,17 +100,26 @@ export function MachineHierarchySelector({
     ? categories.find((c) => c.id === selectedPath[selectedPath.length - 1])
     : null;
 
-  // Raíces de jerarquía técnica (ids generados por scripts: "jer-...")
-  // Fallback: usar nivel 0 si los parentId no están definidos correctamente
+  // Raíces de jerarquía técnica REAL: solo categorías que empiecen con "jer-" Y tengan parentId null
+  // Esto incluye CHONCHI como raíz principal de la jerarquía técnica
   const hierarchyRoots = categories.filter(
-    (c) => (!c.parentId && c.id?.startsWith('jer-')) || c.nivel === 0
+    (c) => c.id?.startsWith('jer-') && !c.parentId
   );
 
-  // Si no hay nodos raíz en el camino, mostrar raíces (sin padre) o hijos de categoryId
+  // Si no hay nodos raíz en el camino, mostrar raíces o hijos de categoryId
   const rootCategories = categories.filter((c) => !c.parentId);
+  
+  // Debug en consola (temporal)
+  console.log('[MHS] categoryId:', categoryId);
+  console.log('[MHS] selectedPath:', selectedPath);
+  console.log('[MHS] hierarchyRoots:', hierarchyRoots.map(c => c.id));
+  console.log('[MHS] categories total:', categories.length);
+  
   const optionsToShow = selectedPath.length === 0
     ? (categoryId ? hierarchyRoots : rootCategories)
     : currentChildren;
+  
+  console.log('[MHS] optionsToShow:', optionsToShow.map(c => c.id));
 
   const handleSubmit = async () => {
     // Si hay selectedPath, usar el último nodo como ubicación final
