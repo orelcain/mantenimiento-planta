@@ -82,11 +82,6 @@ export function MachineHierarchySelector({
         });
 
         setCategories(cats);
-
-        // Si se proporciona categoryId, empezar desde ahí
-        if (categoryId) {
-          setSelectedPath([categoryId]);
-        }
       } catch (err) {
         console.error('Error al cargar categorías:', err);
       } finally {
@@ -97,10 +92,13 @@ export function MachineHierarchySelector({
     if (open) {
       loadCategories();
     }
-  }, [open, categoryId]);
+  }, [open]);
 
   // Obtener hijos del nodo actual en la jerarquía
-  const currentParentId = selectedPath.length > 0 ? selectedPath[selectedPath.length - 1] : null;
+  const baseParentId = categoryId || null; // Punto de partida: categoría implícita o nada
+  const currentParentId = selectedPath.length > 0 
+    ? selectedPath[selectedPath.length - 1] 
+    : baseParentId; // Si no hay selección, buscar hijos de la categoría
   const currentChildren = categories.filter((c) => c.parentId === currentParentId);
 
   // Categoría seleccionada final (el nodo más profundo en el camino)
@@ -108,13 +106,21 @@ export function MachineHierarchySelector({
     ? categories.find((c) => c.id === selectedPath[selectedPath.length - 1])
     : null;
 
-  // Si no hay nodos raíz en el camino, mostrar raíces (sin padre)
+  // Si no hay nodos raíz en el camino, mostrar raíces (sin padre) o hijos de categoryId
   const rootCategories = categories.filter((c) => !c.parentId);
-  const optionsToShow = selectedPath.length === 0 ? rootCategories : currentChildren;
+  const optionsToShow = selectedPath.length === 0 
+    ? (categoryId ? currentChildren : rootCategories)
+    : currentChildren;
 
   const handleSubmit = async () => {
-    if (selectedPath.length === 0 || !formData.nombre) return;
-    const targetCategoryId = selectedPath[selectedPath.length - 1];
+    // Si hay selectedPath, usar el último nodo como ubicación final
+    // Si no hay selectedPath pero hay categoryId, usar categoryId directamente
+    // Si no hay ninguno, no proceder
+    const targetLocationId = selectedPath.length > 0 
+      ? selectedPath[selectedPath.length - 1]
+      : categoryId;
+    
+    if (!targetLocationId || !formData.nombre) return;
 
     try {
       const newMachine: Partial<Machine> = {
@@ -122,7 +128,7 @@ export function MachineHierarchySelector({
         marca: formData.marca,
         modelo: formData.modelo,
         descripcion: formData.descripcion,
-        categoryId: targetCategoryId,
+        categoryId: categoryId || targetLocationId, // Si hay categoryId implícita, usarla; si no, usar el nodo seleccionado
         activa: true,
         color: '#3b82f6',
         createdAt: Timestamp.now() as any,
@@ -155,7 +161,7 @@ export function MachineHierarchySelector({
 
   const resetForm = () => {
     setStep('hierarchy');
-    setSelectedPath(categoryId ? [categoryId] : []);
+    setSelectedPath([]); // Empezar desde raíz (o hijos de categoryId si se proporciona)
     setSelectedValue('');
     setFormData({ nombre: '', marca: '', modelo: '', descripcion: '' });
   };
@@ -217,7 +223,9 @@ export function MachineHierarchySelector({
           {step === 'hierarchy' && (
             <div className="space-y-2">
               <Label className="text-sm">
-                {selectedPath.length === 0
+                {categoryId
+                  ? 'Selecciona la ubicación dentro de la jerarquía:'
+                  : selectedPath.length === 0
                   ? 'Selecciona el punto de partida:'
                   : `Selecciona el siguiente nivel (${selectedPath.length} nivel${selectedPath.length > 1 ? 'es' : ''}):`}
               </Label>
