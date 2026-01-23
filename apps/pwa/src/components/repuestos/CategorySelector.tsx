@@ -140,7 +140,8 @@ export function CategorySelector({
   });
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
 
-  const activeCategories = categories.filter((c) => c.activa && c.visible !== false);
+  // Solo mostrar categorías raíz (sin parentId) en las pestañas principales
+  const activeCategories = categories.filter((c) => c.activa && c.visible !== false && !c.parentId);
   const hasMainCategory = activeCategories.some((c) => c.id === 'maquinas-principales');
 
   // Total de todas las máquinas

@@ -104,20 +104,26 @@ export function MachineHierarchySelector({
 
     if (open) {
       loadCategories();
-      // Si hay categoryId, iniciar con ese como primer nodo del path
-      if (categoryId) {
-        setSelectedPath([categoryId]);
-      }
+    }
+  }, [open]);
+
+  // Inicializar path cuando se abre el modal con categoryId
+  useEffect(() => {
+    if (open && categoryId) {
+      setSelectedPath([categoryId]);
+    } else if (!open) {
+      setSelectedPath([]);
     }
   }, [open, categoryId]);
 
-  // Calcular el parentId actual (último elemento del path o categoryId inicial)
+  // Calcular el parentId actual - IMPORTANTE: usar categoryId como fallback
   const currentParentId = useMemo(() => {
     if (selectedPath.length > 0) {
       return selectedPath[selectedPath.length - 1];
     }
-    return null;
-  }, [selectedPath]);
+    // Fallback: si no hay path pero sí categoryId, usar categoryId
+    return categoryId || null;
+  }, [selectedPath, categoryId]);
 
   // Obtener hijos del nodo actual
   const currentChildren = useMemo(() => {
@@ -129,38 +135,56 @@ export function MachineHierarchySelector({
     return categories.filter(c => !c.parentId);
   }, [categories]);
 
-  // Opciones a mostrar
+  // Opciones a mostrar (subcategorías del nodo actual)
   const optionsToShow = useMemo(() => {
-    if (selectedPath.length === 0) {
-      return rootCategories;
+    // Si hay un parentId (ya sea del path o del categoryId), mostrar sus hijos
+    if (currentParentId) {
+      return currentChildren;
     }
-    return currentChildren;
-  }, [selectedPath, rootCategories, currentChildren]);
+    // Si no hay nada seleccionado, mostrar raíces
+    return rootCategories;
+  }, [currentParentId, currentChildren, rootCategories]);
 
-  // Nodos del path para breadcrumb
+  // Nodos del path para breadcrumb - incluir categoryId inicial si está presente
   const pathNodes = useMemo(() => {
-    return selectedPath.map(id => categories.find(c => c.id === id)).filter(Boolean) as MachineCategory[];
-  }, [selectedPath, categories]);
+    const pathToUse = selectedPath.length > 0 ? selectedPath : (categoryId ? [categoryId] : []);
+    return pathToUse.map(id => categories.find(c => c.id === id)).filter(Boolean) as MachineCategory[];
+  }, [selectedPath, categories, categoryId]);
 
-  // Nodo actual seleccionado
+  // Nodo actual seleccionado - usar categoryId como fallback
   const currentNode = useMemo(() => {
-    if (selectedPath.length === 0) return null;
-    return categories.find(c => c.id === selectedPath[selectedPath.length - 1]) || null;
-  }, [selectedPath, categories]);
+    const nodeId = selectedPath.length > 0 
+      ? selectedPath[selectedPath.length - 1] 
+      : categoryId;
+    if (!nodeId) return null;
+    return categories.find(c => c.id === nodeId) || null;
+  }, [selectedPath, categories, categoryId]);
 
-  // Calcular nivel actual
+  // Calcular nivel actual para la nueva subcategoría
   const currentLevel = useMemo(() => {
     if (currentNode) return (currentNode.nivel ?? 0) + 1;
     return 0;
   }, [currentNode]);
 
   const handleSelectNode = (nodeId: string) => {
-    setSelectedPath([...selectedPath, nodeId]);
+    // Si no hay path pero sí categoryId, iniciar el path con categoryId primero
+    if (selectedPath.length === 0 && categoryId) {
+      setSelectedPath([categoryId, nodeId]);
+    } else {
+      setSelectedPath([...selectedPath, nodeId]);
+    }
     setSelectedValue('');
   };
 
   const handleGoBack = () => {
-    setSelectedPath(prev => prev.slice(0, -1));
+    setSelectedPath(prev => {
+      const newPath = prev.slice(0, -1);
+      // Si después de retroceder quedamos en el categoryId inicial, mantenerlo
+      if (newPath.length === 0 && categoryId) {
+        return [categoryId];
+      }
+      return newPath;
+    });
   };
 
   const handleClose = () => {
