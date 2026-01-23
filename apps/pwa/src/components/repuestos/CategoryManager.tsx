@@ -307,8 +307,8 @@ export function CategoryManager() {
   const [editingMachine, setEditingMachine] = useState<Machine | null>(null);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
 
-  const activeCategories = categories.filter((c) => c.activa);
-  const archivedCategories = categories.filter((c) => !c.activa);
+  const activeCategories = categories.filter((c) => c.activa && c.visible !== false);
+  const archivedCategories = categories.filter((c) => !c.activa && c.visible !== false);
 
   // Sensores para drag & drop
   const sensors = useSensors(
