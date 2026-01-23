@@ -98,7 +98,9 @@ export interface Machine {
   marca: string; // "Baader"
   modelo: string; // "200"
   descripcion?: string;
-  categoryId?: string | null; // ID de la categoría: "maquinas-principales", "cintas-transportadoras"
+  categoryId?: string | null; // ID de la categoría de repuestos: "motores-bombas", "cintas-transportadoras"
+  hierarchyNodeId?: string; // ID del nodo en la jerarquía técnica (colección 'hierarchy')
+  hierarchyPath?: string; // Path legible: "CHONCHI > ACOPIO > TRATAMIENTO AGUAS"
   activa: boolean; // si está activa o archivada
   color: string; // color para la UI (hex): "#3b82f6"
   orden: number; // orden de visualización

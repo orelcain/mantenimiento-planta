@@ -1,15 +1,20 @@
 /**
  * MachineHierarchySelector.tsx
  * 
- * Selector jerárquico para ubicar nuevos motores/bombas
- * Flujo: Nivel 1 (Área) → Nivel 2 (Subárea) → Nivel 3 (ubicación final)
+ * Selector jerárquico para ubicar nuevos equipos (motores, bombas, etc.)
+ * USA LA JERARQUÍA TÉCNICA REAL del módulo Jerarquía (colección 'hierarchy')
+ * NO usa machineCategories - esa es solo para clasificación de repuestos
+ * 
+ * Flujo: Empresa → Área → Sub-área → Sistema → Sub-sistema → Sección → Elemento
  */
 
-import { useState, useEffect } from 'react';
-import { ChevronRight, Loader2 } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { ChevronRight, Loader2, MapPin } from 'lucide-react';
 import { db } from '@/services/firebase';
-import { collection, getDocs, Timestamp, addDoc } from 'firebase/firestore';
-import type { MachineCategory, Machine } from '@/types/repuestos';
+import { collection, addDoc, Timestamp } from 'firebase/firestore';
+import { useHierarchyTree } from '@/hooks/useHierarchy';
+import type { HierarchyNodeWithChildren } from '@/types/hierarchy';
+import type { Machine } from '@/types/repuestos';
 import {
   Button,
   Dialog,
@@ -33,7 +38,7 @@ interface MachineHierarchySelectorProps {
   onMachineCreated?: (machine: Machine) => void;
   onCreateMachine?: (machine: Partial<Machine>) => Promise<void>;
   loading?: boolean;
-  categoryId?: string;
+  categoryId?: string; // Categoría de repuestos (motores-bombas, cintas, etc.) - se guarda en el equipo
 }
 
 export function MachineHierarchySelector({
@@ -44,11 +49,11 @@ export function MachineHierarchySelector({
   loading = false,
   categoryId,
 }: MachineHierarchySelectorProps) {
-  const [categories, setCategories] = useState<MachineCategory[]>([]);
-  const [loadingCategories, setLoadingCategories] = useState(false);
-
+  // Usar el hook de jerarquía técnica REAL
+  const { tree: hierarchyTree, loading: loadingHierarchy } = useHierarchyTree();
+  
   // Estado del formulario - jerarquía dinámica
-  const [selectedPath, setSelectedPath] = useState<string[]>([]); // Camino desde raíz hasta ubicación final
+  const [selectedPath, setSelectedPath] = useState<string[]>([]); // IDs desde raíz hasta ubicación final
   const [selectedValue, setSelectedValue] = useState<string>(''); // Valor temporal del Select
   const [formData, setFormData] = useState({
     nombre: '',
@@ -57,94 +62,70 @@ export function MachineHierarchySelector({
     descripcion: '',
   });
 
-  // Cargar categorías e inicializar con categoryId si se proporciona
-  useEffect(() => {
-    const loadCategories = async () => {
-      try {
-        setLoadingCategories(true);
-        const snapshot = await getDocs(collection(db, 'machineCategories'));
-        const cats = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...(doc.data() as Omit<MachineCategory, 'id'>),
-        })) as MachineCategory[];
-        
-        // Ordenar por nivel y orden
-        cats.sort((a, b) => {
-          const levelDiff = (a.nivel ?? 0) - (b.nivel ?? 0);
-          if (levelDiff !== 0) return levelDiff;
-          return (a.orden ?? 0) - (b.orden ?? 0);
-        });
-
-        setCategories(cats);
-      } catch (err) {
-        console.error('Error al cargar categorías:', err);
-      } finally {
-        setLoadingCategories(false);
+  // Aplanar el árbol para búsquedas rápidas
+  const flatNodes = useMemo(() => {
+    const result: HierarchyNodeWithChildren[] = [];
+    const flatten = (nodes: HierarchyNodeWithChildren[]) => {
+      for (const node of nodes) {
+        result.push(node);
+        if (node.children?.length) {
+          flatten(node.children);
+        }
       }
     };
+    flatten(hierarchyTree);
+    return result;
+  }, [hierarchyTree]);
 
-    if (open) {
-      loadCategories();
+  // Obtener las opciones actuales basadas en el path seleccionado
+  const currentOptions = useMemo(() => {
+    if (selectedPath.length === 0) {
+      // Sin selección: mostrar raíces (nivel 1)
+      return hierarchyTree;
     }
-  }, [open]);
+    
+    // Buscar el último nodo seleccionado y mostrar sus hijos
+    const lastSelectedId = selectedPath[selectedPath.length - 1];
+    const lastNode = flatNodes.find(n => n.id === lastSelectedId);
+    return lastNode?.children || [];
+  }, [hierarchyTree, flatNodes, selectedPath]);
 
-  // Obtener hijos del nodo actual en la jerarquía
-  const baseParentId = categoryId || null;
-  const currentParentId = selectedPath.length > 0 
-    ? selectedPath[selectedPath.length - 1] 
-    : baseParentId;
-  const currentChildren = categories.filter((c) => c.parentId === currentParentId);
+  // Nodo final seleccionado (para mostrar ubicación)
+  const selectedNode = useMemo(() => {
+    if (selectedPath.length === 0) return null;
+    const lastId = selectedPath[selectedPath.length - 1];
+    return flatNodes.find(n => n.id === lastId) || null;
+  }, [flatNodes, selectedPath]);
 
-  // Categoría seleccionada final (el nodo más profundo en el camino)
-  const selectedCategory = selectedPath.length > 0 
-    ? categories.find((c) => c.id === selectedPath[selectedPath.length - 1])
-    : null;
-
-  // Raíces de jerarquía técnica REAL: solo categorías que empiecen con "jer-" Y tengan parentId null
-  // Esto incluye CHONCHI como raíz principal de la jerarquía técnica
-  const hierarchyRoots = categories.filter(
-    (c) => c.id?.startsWith('jer-') && !c.parentId
-  );
-
-  // Si no hay nodos raíz en el camino, mostrar raíces o hijos de categoryId
-  const rootCategories = categories.filter((c) => !c.parentId);
-  
-  // Debug en consola (temporal)
-  console.log('[MHS] categoryId:', categoryId);
-  console.log('[MHS] selectedPath:', selectedPath);
-  console.log('[MHS] hierarchyRoots:', hierarchyRoots.map(c => c.id));
-  console.log('[MHS] categories total:', categories.length);
-  
-  const optionsToShow = selectedPath.length === 0
-    ? (categoryId ? hierarchyRoots : rootCategories)
-    : currentChildren;
-  
-  console.log('[MHS] optionsToShow:', optionsToShow.map(c => c.id));
+  // Construir el path completo para mostrar breadcrumb
+  const pathNodes = useMemo(() => {
+    return selectedPath.map(id => flatNodes.find(n => n.id === id)).filter(Boolean) as HierarchyNodeWithChildren[];
+  }, [flatNodes, selectedPath]);
 
   const handleSubmit = async () => {
-    // Si hay selectedPath, usar el último nodo como ubicación final
-    // Si no hay selectedPath pero hay categoryId, usar categoryId directamente
-    // Si no hay ninguno, no proceder
-    const targetLocationId = selectedPath.length > 0 
-      ? selectedPath[selectedPath.length - 1]
-      : categoryId;
+    // Validar que tenemos ubicación y nombre
+    const hierarchyNodeId = selectedPath.length > 0 ? selectedPath[selectedPath.length - 1] : null;
     
-    if (!targetLocationId || !formData.nombre) return;
+    if (!formData.nombre) return;
 
     try {
+      // Construir el path completo de nombres para referencia
+      const hierarchyPath = pathNodes.map(n => n.nombre).join(' > ');
+      
       const newMachine: Partial<Machine> = {
         nombre: formData.nombre,
         marca: formData.marca,
         modelo: formData.modelo,
         descripcion: formData.descripcion,
-        categoryId: categoryId || targetLocationId, // Si hay categoryId implícita, usarla; si no, usar el nodo seleccionado
+        categoryId: categoryId || undefined, // Categoría de repuestos (tipo de equipo)
+        hierarchyNodeId: hierarchyNodeId || undefined, // ID del nodo en la jerarquía técnica
+        hierarchyPath: hierarchyPath || undefined, // Path legible (para búsquedas/display)
         activa: true,
         color: '#3b82f6',
         createdAt: Timestamp.now() as any,
         updatedAt: Timestamp.now() as any,
       };
 
-      // Si se proporciona onMachineCreated, usarla directamente
       if (onMachineCreated) {
         // Crear el equipo directamente en la BD
         const machinesCollection = collection(db, 'machines');
@@ -157,7 +138,6 @@ export function MachineHierarchySelector({
         
         onMachineCreated(createdMachine);
       } else if (onCreateMachine) {
-        // Usar callback si se proporciona
         await onCreateMachine(newMachine);
       }
 
@@ -169,18 +149,18 @@ export function MachineHierarchySelector({
   };
 
   const resetForm = () => {
-    setSelectedPath([]); // Empezar desde raíz (o hijos de categoryId si se proporciona)
+    setSelectedPath([]);
     setSelectedValue('');
     setFormData({ nombre: '', marca: '', modelo: '', descripcion: '' });
   };
 
   const handleSelectNode = (nodeId: string) => {
     setSelectedPath([...selectedPath, nodeId]);
-    setSelectedValue(''); // Limpiar el select
+    setSelectedValue('');
   };
 
   const handleGoBack = () => {
-    setSelectedPath((prev) => prev.slice(0, -1));
+    setSelectedPath(prev => prev.slice(0, -1));
   };
 
   const handleClose = () => {
@@ -188,59 +168,63 @@ export function MachineHierarchySelector({
     onOpenChange(false);
   };
 
+  // Determinar si mostrar formulario (cuando no hay más hijos o se llegó a un nodo final)
+  const showForm = selectedPath.length > 0 && (currentOptions.length === 0 || selectedPath.length >= 2);
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Agregar nuevo equipo</DialogTitle>
           <DialogDescription>
-            Selecciona la ubicación del equipo según la jerarquía técnica
+            Navega por la jerarquía técnica para ubicar el equipo
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* CAMINO SELECCIONADO: mostrar cuando hay selecciones */}
-          {selectedPath.length > 0 && (
-            <div className="space-y-2 p-2 bg-slate-800/50 rounded-lg">
-              <Label className="text-xs uppercase tracking-wide">Camino seleccionado:</Label>
+          {/* BREADCRUMB: Camino seleccionado */}
+          {pathNodes.length > 0 && (
+            <div className="space-y-2 p-3 bg-slate-800/50 rounded-lg">
+              <Label className="text-xs uppercase tracking-wide text-slate-400">
+                <MapPin className="h-3 w-3 inline mr-1" />
+                Ubicación seleccionada:
+              </Label>
               <div className="flex flex-wrap gap-1">
-                {selectedPath.map((nodeId, idx) => {
-                  const node = categories.find((c) => c.id === nodeId);
-                  return (
-                    <span key={nodeId} className="inline-flex items-center gap-1 px-2 py-1 bg-slate-700 rounded text-xs text-slate-200">
-                      {node?.nombre || 'Desconocido'}
-                      {idx < selectedPath.length - 1 && (
-                        <ChevronRight className="h-3 w-3" />
-                      )}
-                    </span>
-                  );
-                })}
+                {pathNodes.map((node, idx) => (
+                  <span 
+                    key={node.id} 
+                    className="inline-flex items-center gap-1 px-2 py-1 bg-slate-700 rounded text-xs text-slate-200"
+                  >
+                    {node.nombre}
+                    {idx < pathNodes.length - 1 && (
+                      <ChevronRight className="h-3 w-3 text-slate-500" />
+                    )}
+                  </span>
+                ))}
               </div>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleGoBack}
-                className="w-full text-xs"
+                className="w-full text-xs mt-2"
               >
                 ← Volver un nivel
               </Button>
             </div>
           )}
 
-          {/* SELECTOR: mostrar SIEMPRE si hay opciones O si aún está cargando */}
-          {(optionsToShow.length > 0 || loadingCategories) && (
+          {/* SELECTOR: Mostrar siempre que haya opciones */}
+          {(currentOptions.length > 0 || loadingHierarchy) && (
             <div className="space-y-2">
               <Label className="text-sm">
-                {categoryId
-                  ? 'Selecciona la ubicación dentro de la jerarquía:'
-                  : selectedPath.length === 0
-                  ? 'Selecciona el punto de partida:'
-                  : `Selecciona el siguiente nivel (${selectedPath.length} nivel${selectedPath.length > 1 ? 'es' : ''}):`}
+                {selectedPath.length === 0
+                  ? 'Selecciona la empresa/planta:'
+                  : `Nivel ${selectedPath.length + 1}: Selecciona siguiente ubicación`}
               </Label>
-              {loadingCategories ? (
+              {loadingHierarchy ? (
                 <div className="flex items-center justify-center gap-2 p-4 text-muted-foreground">
                   <Loader2 className="h-5 w-5 animate-spin" />
-                  <span>Cargando opciones...</span>
+                  <span>Cargando jerarquía...</span>
                 </div>
               ) : (
                 <Select value={selectedValue} onValueChange={handleSelectNode}>
@@ -248,42 +232,39 @@ export function MachineHierarchySelector({
                     <SelectValue placeholder="Selecciona una opción..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {optionsToShow.map((option) => (
+                    {currentOptions.map((option) => (
                       <SelectItem key={option.id} value={option.id}>
                         {option.nombre}
-                        {categories.some((c) => c.parentId === option.id) && ' ➜'}
+                        {option.children && option.children.length > 0 && ' ➜'}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               )}
 
-              {/* Botones de acción */}
-              {selectedPath.length > 0 && currentChildren.length === 0 && (
+              {/* Indicador de nodo final */}
+              {selectedPath.length > 0 && currentOptions.length === 0 && (
                 <p className="text-xs text-green-400">
-                  ✓ Ubicación final. Completa los detalles del equipo abajo.
+                  ✓ Ubicación final alcanzada. Completa los detalles del equipo.
                 </p>
               )}
             </div>
           )}
 
-          {/* FORMULARIO DE DETALLES: mostrar cuando no hay más opciones O cuando ya se seleccionó algo */}
-          {!loadingCategories && (optionsToShow.length === 0 || selectedPath.length > 0) && (
-            <div className="space-y-3 pt-4 border-t">
-              {selectedPath.length > 0 && (
-                <div className="p-2 bg-green-900/20 rounded-lg border border-green-700/50">
-                  <p className="text-xs text-green-300">
-                    Ubicación: <strong>{selectedCategory?.nombre || 'Desconocida'}</strong>
+          {/* FORMULARIO DE DETALLES */}
+          {showForm && !loadingHierarchy && (
+            <div className="space-y-3 pt-4 border-t border-slate-700">
+              <div className="p-2 bg-green-900/20 rounded-lg border border-green-700/50">
+                <p className="text-xs text-green-300">
+                  📍 Ubicación: <strong>{selectedNode?.nombre || 'Sin ubicación'}</strong>
+                </p>
+                {categoryId && (
+                  <p className="text-xs text-blue-300 mt-1">
+                    📦 Categoría: <strong>{categoryId}</strong>
                   </p>
-                </div>
-              )}
-              {optionsToShow.length === 0 && categoryId && selectedPath.length === 0 && (
-                <div className="p-2 bg-blue-900/20 rounded-lg border border-blue-700/50">
-                  <p className="text-xs text-blue-300">
-                    Categoría: <strong>{categories.find(c => c.id === categoryId)?.nombre || 'Sin jerarquía'}</strong>
-                  </p>
-                </div>
-              )}
+                )}
+              </div>
+              
               <div>
                 <Label htmlFor="nombre">Nombre del equipo *</Label>
                 <Input
@@ -322,13 +303,25 @@ export function MachineHierarchySelector({
               </div>
             </div>
           )}
+
+          {/* Mensaje inicial si no hay jerarquía */}
+          {!loadingHierarchy && hierarchyTree.length === 0 && (
+            <div className="p-4 bg-yellow-900/20 rounded-lg border border-yellow-700/50 text-center">
+              <p className="text-sm text-yellow-300">
+                ⚠️ No hay jerarquía técnica configurada.
+              </p>
+              <p className="text-xs text-yellow-400 mt-1">
+                Ve a Configuración → Jerarquía para crear la estructura.
+              </p>
+            </div>
+          )}
         </div>
 
         <DialogFooter>
           <Button variant="ghost" onClick={handleClose}>
             Cancelar
           </Button>
-          {(selectedPath.length > 0 || optionsToShow.length === 0) && (
+          {showForm && (
             <Button
               onClick={handleSubmit}
               disabled={!formData.nombre || loading}
