@@ -61,9 +61,10 @@ export function MachineHierarchySelector({
     const loadCategories = async () => {
       try {
         setLoadingCategories(true);
+        // Cargar TODAS las categorías (sin filtrar por activa)
+        // porque la jerarquía puede tener categorías inactivas pero que siguen siendo válidas
         const q = query(
-          collection(db, 'machineCategories'),
-          where('activa', '==', true)
+          collection(db, 'machineCategories')
         );
         const snapshot = await getDocs(q);
         const cats = snapshot.docs.map(doc => ({
