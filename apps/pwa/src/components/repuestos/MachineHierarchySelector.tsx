@@ -101,8 +101,8 @@ export function MachineHierarchySelector({
     : baseParentId;
   const currentChildren = categories.filter((c) => c.parentId === currentParentId);
 
-  // Verificar si la categoría tiene jerarquía debajo
-  const hasHierarchy = categoryId ? currentChildren.length > 0 : true;
+  // Verificar si hay opciones en el nivel actual
+  const hasOptionsInCurrentLevel = currentChildren.length > 0;
 
   // Categoría seleccionada final (el nodo más profundo en el camino)
   const selectedCategory = selectedPath.length > 0 
@@ -114,6 +114,13 @@ export function MachineHierarchySelector({
   const optionsToShow = selectedPath.length === 0 
     ? (categoryId ? currentChildren : rootCategories)
     : currentChildren;
+
+  // Si estamos en 'hierarchy' pero no hay opciones, ir a 'details' automáticamente
+  useEffect(() => {
+    if (step === 'hierarchy' && !loadingCategories && optionsToShow.length === 0) {
+      setStep('details');
+    }
+  }, [step, loadingCategories, optionsToShow.length]);
 
   const handleSubmit = async () => {
     // Si hay selectedPath, usar el último nodo como ubicación final
@@ -237,8 +244,8 @@ export function MachineHierarchySelector({
             </div>
           )}
 
-          {/* SELECTOR JERÁRQUICO: opciones disponibles */}
-          {step === 'hierarchy' && (
+          {/* SELECTOR JERÁRQUICO: solo mostrar si hay opciones */}
+          {step === 'hierarchy' && optionsToShow.length > 0 && (
             <div className="space-y-2">
               <Label className="text-sm">
                 {categoryId
@@ -302,7 +309,7 @@ export function MachineHierarchySelector({
           )}
 
           {/* DETALLES DEL EQUIPO */}
-          {step === 'details' && (selectedPath.length > 0 || !hasHierarchy) && (
+          {step === 'details' && (selectedPath.length > 0 || optionsToShow.length === 0) && (
             <div className="space-y-3 pt-4 border-t">
               {selectedPath.length > 0 && (
                 <div className="p-2 bg-green-900/20 rounded-lg border border-green-700/50">
@@ -311,7 +318,7 @@ export function MachineHierarchySelector({
                   </p>
                 </div>
               )}
-              {!hasHierarchy && categoryId && (
+              {optionsToShow.length === 0 && categoryId && (
                 <div className="p-2 bg-blue-900/20 rounded-lg border border-blue-700/50">
                   <p className="text-xs text-blue-300">
                     Categoría: <strong>{categories.find(c => c.id === categoryId)?.nombre || 'Desconocida'}</strong>
