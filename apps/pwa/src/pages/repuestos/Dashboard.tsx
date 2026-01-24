@@ -407,9 +407,7 @@ export function RepuestosDashboard() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
-          <StatCard label="Repuestos" value={stats.total.toLocaleString('es-CL')} subtle={currentMachine.nombre} />
-        </div>
+        {/* Resumen oculto por ahora */}
 
         {/* Error Display */}
         {(repuestosError || tagsError) && (
