@@ -8,7 +8,7 @@ import type { SensorSummaryNode } from '@/services/sensorsRtdb'
 import { assignDeviceToEquipment, subscribeDevices, deleteDevice } from '@/services/devicesRtdb'
 import { subscribeSensorSummary } from '@/services/sensorsRtdb'
 import { saveApConfig } from '@/services/apConfigRtdb'
-import { saveSendInterval, getSendInterval } from '@/services/deviceConfigRtdb'
+import { saveSendInterval } from '@/services/deviceConfigRtdb'
 import { useUsbDetection } from '@/hooks/useUsbDetection'
 import { getEquipments } from '@/services/equipment'
 import { TelemetryChart, type ChartType } from '@/components/telemetry/TelemetryChart'
@@ -315,11 +315,7 @@ export function SensorsPage() {
   // Cargar intervalo de lectura del dispositivo seleccionado
   useEffect(() => {
     if (selectedDevice) {
-      getSendInterval(selectedDevice.deviceId).then((interval) => {
-        setSendInterval(interval ?? 10)
-      }).catch(() => {
-        setSendInterval(10)
-      })
+      setSendInterval(selectedDevice.sendInterval ?? 10)
     } else {
       setSendInterval(10)
     }

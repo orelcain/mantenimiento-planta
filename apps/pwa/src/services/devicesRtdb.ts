@@ -14,6 +14,7 @@ export type DeviceNode = {
   rssi?: number
   firmwareVersion?: string
   sensorType?: string
+  sendInterval?: number
   assignedEquipmentId?: string | null
   assignmentUpdatedAt?: number
   assignmentUpdatedBy?: string
@@ -74,6 +75,12 @@ function normalizeTelemetry(node: DeviceNode['telemetry'] | undefined): DeviceNo
   }
 }
 
+function normalizeNumber(value: unknown): number | undefined {
+  const n = Number(value)
+  if (!Number.isFinite(n)) return undefined
+  return n
+}
+
 function snapshotToDevices(snapshot: DataSnapshot): DeviceRow[] {
   const raw = snapshot.val() as Record<string, DeviceNode> | null
   if (!raw) return []
@@ -84,6 +91,7 @@ function snapshotToDevices(snapshot: DataSnapshot): DeviceRow[] {
       ...node,
       lastSeen: normalizeTimestamp(node?.lastSeen),
       assignmentUpdatedAt: normalizeTimestamp(node?.assignmentUpdatedAt),
+      sendInterval: normalizeNumber(node?.sendInterval),
       telemetry: normalizeTelemetry(node?.telemetry),
     }))
     .sort((a, b) => (b.lastSeen ?? 0) - (a.lastSeen ?? 0))
