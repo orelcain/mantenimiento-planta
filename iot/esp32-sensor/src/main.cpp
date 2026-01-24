@@ -1296,6 +1296,64 @@ static void startWifiConfigStream() {
   Serial.printf("👂 Escuchando WiFi principal en: %s\n", path.c_str());
 }
 
+// ============ STREAM: SOLICITUD ESCANEO WIFI ============
+static FirebaseData wifiScanStream;
+
+static void publishWifiScanResults() {
+  if (WiFi.getMode() == WIFI_MODE_NULL) return;
+
+  Serial.println("🔎 Escaneando redes WiFi...");
+  int found = WiFi.scanNetworks(false, true);
+  FirebaseJson json;
+  json.set("ts", (double)getTimestamp());
+
+  FirebaseJsonArray arr;
+  const int limit = found > 0 ? min(found, 12) : 0;
+  for (int i = 0; i < limit; i++) {
+    FirebaseJson item;
+    item.set("ssid", WiFi.SSID(i));
+    item.set("rssi", WiFi.RSSI(i));
+    item.set("secure", WiFi.encryptionType(i) != WIFI_AUTH_OPEN);
+    arr.add(item);
+  }
+  json.set("networks", arr);
+  WiFi.scanDelete();
+
+  String path = String("devices/") + deviceId + "/wifiScan";
+  if (!Firebase.RTDB.setJSON(&fbdo, path.c_str(), &json)) {
+    Serial.printf("⚠ Error publicando wifiScan: %s\n", fbdo.errorReason().c_str());
+  } else {
+    Serial.printf("✓ wifiScan publicado (%d redes)\n", limit);
+  }
+}
+
+static void wifiScanStreamCallback(FirebaseStream data) {
+  // Cualquier cambio en wifiScanRequest dispara un escaneo
+  publishWifiScanResults();
+  // Limpiar request
+  String path = String("devices/") + deviceId + "/wifiScanRequest";
+  Firebase.RTDB.deleteNode(&fbdo, path.c_str());
+}
+
+static void wifiScanStreamTimeoutCallback(bool timeout) {
+  if (timeout) {
+    Serial.println("⚠ Stream wifiScanRequest timeout (se reconecta automáticamente).");
+  }
+}
+
+static void startWifiScanRequestStream() {
+  if (!firebaseReady) return;
+  if (deviceId.length() == 0) return;
+
+  String path = String("devices/") + deviceId + "/wifiScanRequest";
+  if (!Firebase.RTDB.beginStream(&wifiScanStream, path.c_str())) {
+    Serial.printf("⚠ No se pudo iniciar stream wifiScanRequest: %s\n", wifiScanStream.errorReason().c_str());
+    return;
+  }
+  Firebase.RTDB.setStreamCallback(&wifiScanStream, wifiScanStreamCallback, wifiScanStreamTimeoutCallback);
+  Serial.printf("👂 Escuchando solicitud de scan WiFi en: %s\n", path.c_str());
+}
+
 // ============ STREAM: INTERVALO DE LECTURA ============
 static FirebaseData sendIntervalStream;
 
@@ -1785,6 +1843,7 @@ void setupFirebase() {
     startApConfigStream();
     startWifiConfigStream();
     startSendIntervalStream();
+    startWifiScanRequestStream();
     
     // Enviar estado inicial
     sendOnlineStatus(true);

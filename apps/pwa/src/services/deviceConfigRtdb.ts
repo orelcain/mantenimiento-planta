@@ -52,3 +52,12 @@ export async function saveWifiConfig(deviceId: string, config: WifiConfig): Prom
   })
   console.log(`[deviceConfigRtdb] WiFi config guardada para ${deviceId}`)
 }
+
+/**
+ * Solicita al ESP32 escanear redes WiFi y publicar resultados en devices/{deviceId}/wifiScan
+ */
+export async function requestWifiScan(deviceId: string): Promise<void> {
+  const scanRef = ref(rtdb, `devices/${deviceId}/wifiScanRequest`)
+  await set(scanRef, Date.now())
+  console.log(`[deviceConfigRtdb] Solicitud de escaneo WiFi enviada a ${deviceId}`)
+}

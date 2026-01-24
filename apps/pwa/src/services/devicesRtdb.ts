@@ -15,6 +15,14 @@ export type DeviceNode = {
   firmwareVersion?: string
   sensorType?: string
   sendInterval?: number
+  wifiScan?: {
+    ts?: number
+    networks?: Array<{
+      ssid?: string
+      rssi?: number
+      secure?: boolean
+    }>
+  }
   assignedEquipmentId?: string | null
   assignmentUpdatedAt?: number
   assignmentUpdatedBy?: string
@@ -75,6 +83,20 @@ function normalizeTelemetry(node: DeviceNode['telemetry'] | undefined): DeviceNo
   }
 }
 
+function normalizeWifiScan(node: DeviceNode['wifiScan'] | undefined): DeviceNode['wifiScan'] | undefined {
+  if (!node) return undefined
+  return {
+    ts: node.ts != null ? normalizeTimestamp(node.ts) : undefined,
+    networks: Array.isArray(node.networks)
+      ? node.networks.map((n) => ({
+          ssid: n?.ssid,
+          rssi: n?.rssi != null ? Number(n.rssi) : n?.rssi,
+          secure: n?.secure != null ? Boolean(n.secure) : n?.secure,
+        }))
+      : undefined,
+  }
+}
+
 function normalizeNumber(value: unknown): number | undefined {
   const n = Number(value)
   if (!Number.isFinite(n)) return undefined
@@ -92,6 +114,7 @@ function snapshotToDevices(snapshot: DataSnapshot): DeviceRow[] {
       lastSeen: normalizeTimestamp(node?.lastSeen),
       assignmentUpdatedAt: normalizeTimestamp(node?.assignmentUpdatedAt),
       sendInterval: normalizeNumber(node?.sendInterval),
+      wifiScan: normalizeWifiScan(node?.wifiScan),
       telemetry: normalizeTelemetry(node?.telemetry),
     }))
     .sort((a, b) => (b.lastSeen ?? 0) - (a.lastSeen ?? 0))

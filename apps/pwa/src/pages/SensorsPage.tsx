@@ -8,7 +8,7 @@ import type { SensorSummaryNode } from '@/services/sensorsRtdb'
 import { assignDeviceToEquipment, subscribeDevices, deleteDevice } from '@/services/devicesRtdb'
 import { subscribeSensorSummary } from '@/services/sensorsRtdb'
 import { saveApConfig } from '@/services/apConfigRtdb'
-import { saveSendInterval, saveWifiConfig } from '@/services/deviceConfigRtdb'
+import { saveSendInterval, saveWifiConfig, requestWifiScan } from '@/services/deviceConfigRtdb'
 import { useUsbDetection } from '@/hooks/useUsbDetection'
 import { getEquipments } from '@/services/equipment'
 import { TelemetryChart, type ChartType } from '@/components/telemetry/TelemetryChart'
@@ -163,6 +163,9 @@ export function SensorsPage() {
   const [savingWifi, setSavingWifi] = useState(false)
   const [wifiSaveError, setWifiSaveError] = useState<string | null>(null)
   const [wifiSaveOk, setWifiSaveOk] = useState<string | null>(null)
+  const [scanningWifi, setScanningWifi] = useState(false)
+  const [wifiScanError, setWifiScanError] = useState<string | null>(null)
+  const [lastScanTs, setLastScanTs] = useState<number | null>(null)
 
   // Estado para eliminar dispositivos
   const [deletingDevice, setDeletingDevice] = useState<string | null>(null)
@@ -382,6 +385,16 @@ export function SensorsPage() {
     if (!id) return null
     return equipment.find((e) => e.id === id) ?? null
   }, [equipment, selectedDevice?.assignedEquipmentId])
+
+  // Finalizar estado de escaneo cuando llegan nuevos resultados
+  useEffect(() => {
+    const ts = selectedDevice?.wifiScan?.ts ?? null
+    if (ts && ts !== lastScanTs) {
+      setLastScanTs(ts)
+      setScanningWifi(false)
+      setWifiScanError(null)
+    }
+  }, [selectedDevice?.wifiScan?.ts, lastScanTs])
 
   // Suscribirse a telemetría del sensor cuando hay equipo asignado
   useEffect(() => {
@@ -784,6 +797,18 @@ export function SensorsPage() {
       setWifiSaveError(err instanceof Error ? err.message : 'Error guardando WiFi')
     } finally {
       setSavingWifi(false)
+    }
+  }
+
+  async function handleWifiScan() {
+    if (!selectedDevice) return
+    setWifiScanError(null)
+    setScanningWifi(true)
+    try {
+      await requestWifiScan(selectedDevice.deviceId)
+    } catch (err) {
+      setScanningWifi(false)
+      setWifiScanError(err instanceof Error ? err.message : 'Error solicitando escaneo')
     }
   }
 
@@ -1409,6 +1434,46 @@ export function SensorsPage() {
                       Cambiar WiFi Principal
                     </div>
                     <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="text-xs text-muted-foreground">
+                          Redes disponibles{selectedDevice.wifiScan?.ts ? ` (último: ${formatDateTime(selectedDevice.wifiScan?.ts)})` : ''}
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleWifiScan}
+                          disabled={scanningWifi}
+                          className="gap-1"
+                        >
+                          <RefreshCw className="h-3 w-3" />
+                          {scanningWifi ? 'Buscando…' : 'Buscar redes'}
+                        </Button>
+                      </div>
+                      {wifiScanError && (
+                        <div className="text-xs text-destructive flex items-center gap-2">
+                          <AlertTriangle className="h-3 w-3" />
+                          {wifiScanError}
+                        </div>
+                      )}
+                      {selectedDevice.wifiScan?.networks?.length ? (
+                        <div className="flex flex-wrap gap-2">
+                          {selectedDevice.wifiScan.networks.map((n, idx) => (
+                            <Button
+                              key={`${n.ssid}-${idx}`}
+                              variant={wifiStaSsid === (n.ssid || '') ? 'default' : 'outline'}
+                              size="sm"
+                              onClick={() => setWifiStaSsid(n.ssid || '')}
+                              className="text-xs"
+                            >
+                              {n.ssid || '(oculta)'} {typeof n.rssi === 'number' ? `· ${n.rssi} dBm` : ''}{n.secure ? ' 🔒' : ''}
+                            </Button>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-xs text-muted-foreground">
+                          {scanningWifi ? 'Escaneando...' : 'Sin resultados aún.'}
+                        </div>
+                      )}
                       <div className="space-y-1">
                         <Label htmlFor="wifiStaSsid" className="text-xs text-muted-foreground">SSID</Label>
                         <Input
