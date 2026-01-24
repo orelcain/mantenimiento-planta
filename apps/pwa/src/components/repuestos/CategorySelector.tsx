@@ -103,7 +103,6 @@ function SortableTab({
           }
         `}
       >
-        {renderIcon(category.icono)}
         <span>{category.nombre}</span>
         {count > 0 && (
           <span
@@ -274,7 +273,6 @@ export function CategorySelector({
                         }
                       `}
                     >
-                      {renderIcon('Wrench')}
                       <span>Máquinas Principales</span>
                       {(machineCountsByCategory['maquinas-principales'] ?? 0) > 0 && (
                         <span
