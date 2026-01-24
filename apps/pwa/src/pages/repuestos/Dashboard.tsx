@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, Plus, FileSpreadsheet, FileText, Upload } from 'lucide-react'
 import { RepuestosTable } from '@/components/repuestos/RepuestosTable'
 import { RepuestoFormModal } from '@/components/repuestos/RepuestoForm'
@@ -72,6 +72,7 @@ export function RepuestosDashboard() {
 
   // Filtro de categorías
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>('maquinas-principales')
+  const lastCategoryRef = useRef<string | null>(selectedCategoryId)
 
   // Filtros y paginación
   const [searchQuery, setSearchQuery] = useState('')
@@ -178,6 +179,8 @@ export function RepuestosDashboard() {
   // Seleccionar primera máquina cuando cambia de categoría
   useEffect(() => {
     if (!machines.length) return
+    if (lastCategoryRef.current === selectedCategoryId) return
+    lastCategoryRef.current = selectedCategoryId
 
     // Filtrar máquinas de la categoría seleccionada (incluyendo subcategorías)
     const machinesInCategory = machines.filter((m) => {

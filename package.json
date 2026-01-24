@@ -1,6 +1,6 @@
 {
   "name": "mantenimiento-industrial",
-  "version": "2.35.13",
+  "version": "2.35.14",
   "private": true,
   "description": "PWA para levantamiento de incidencias y mantenimiento industrial",
   "scripts": {
