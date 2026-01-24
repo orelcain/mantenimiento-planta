@@ -374,7 +374,7 @@ export function RepuestosDashboard() {
       <div className="flex-1 p-6 space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold text-foreground">
+          <h1 className="text-xl font-semibold text-foreground">
             Repuestos - {currentMachine.nombre}
           </h1>
           <div className="flex gap-2">
@@ -591,7 +591,7 @@ function StatCard({ label, value, subtle }: { label: string; value: string | num
   return (
     <div className="rounded-lg border bg-card px-4 py-3 shadow-sm">
       <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
-      <div className="text-2xl font-semibold text-foreground">{value}</div>
+      {/* oculto valor grande por ahora */}
       {subtle ? <div className="text-xs text-muted-foreground">{subtle}</div> : null}
     </div>
   )
