@@ -1,4 +1,5 @@
-import { Search, X } from 'lucide-react'
+import { useState } from 'react'
+import { ChevronDown, ChevronUp, Search, X } from 'lucide-react'
 import { Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Button, Badge } from '@/components/ui'
 import type { TagGlobal } from '@/types/tags'
 
@@ -27,6 +28,7 @@ export function RepuestosFilters({
   availableTags,
   onClearFilters,
 }: RepuestosFiltersProps) {
+  const [tagsOpen, setTagsOpen] = useState(false)
   const hasActiveFilters = 
     searchQuery !== '' || 
     selectedTags.length > 0 || 
@@ -106,28 +108,47 @@ export function RepuestosFilters({
         </div>
       </div>
 
-      {/* Tags filter */}
+      {/* Tags filter (colapsable) */}
       {availableTags.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm font-medium text-muted-foreground">Tags:</span>
-          {availableTags.map((tag) => {
-            const isSelected = selectedTags.includes(tag.nombre)
-            return (
-              <Badge
-                key={tag.nombre}
-                variant={isSelected ? 'default' : 'outline'}
-                className="cursor-pointer hover:bg-accent transition-colors"
-                onClick={() => handleTagToggle(tag.nombre)}
-              >
-                {tag.nombre}
-                {tag.tipo && (
-                  <span className="ml-1 text-xs opacity-75">
-                    ({tag.tipo === 'stock' ? '📦' : '📋'})
-                  </span>
-                )}
-              </Badge>
-            )
-          })}
+        <div className="space-y-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setTagsOpen((v) => !v)}
+            className="gap-2"
+          >
+            Sistema de tags
+            <span className="text-xs text-muted-foreground">({availableTags.length})</span>
+            {selectedTags.length > 0 && (
+              <span className="text-xs text-foreground">· {selectedTags.length} activos</span>
+            )}
+            {tagsOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </Button>
+
+          {tagsOpen && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-medium text-muted-foreground">Tags:</span>
+              {availableTags.map((tag) => {
+                const isSelected = selectedTags.includes(tag.nombre)
+                return (
+                  <Badge
+                    key={tag.nombre}
+                    variant={isSelected ? 'default' : 'outline'}
+                    className="cursor-pointer hover:bg-accent transition-colors"
+                    onClick={() => handleTagToggle(tag.nombre)}
+                  >
+                    {tag.nombre}
+                    {tag.tipo && (
+                      <span className="ml-1 text-xs opacity-75">
+                        ({tag.tipo === 'stock' ? '📦' : '📋'})
+                      </span>
+                    )}
+                  </Badge>
+                )
+              })}
+            </div>
+          )}
         </div>
       )}
 
