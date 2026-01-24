@@ -8,6 +8,7 @@ import type { SensorSummaryNode } from '@/services/sensorsRtdb'
 import { assignDeviceToEquipment, subscribeDevices, deleteDevice } from '@/services/devicesRtdb'
 import { subscribeSensorSummary } from '@/services/sensorsRtdb'
 import { saveApConfig } from '@/services/apConfigRtdb'
+import { saveSendInterval, getSendInterval } from '@/services/deviceConfigRtdb'
 import { useUsbDetection } from '@/hooks/useUsbDetection'
 import { getEquipments } from '@/services/equipment'
 import { TelemetryChart, type ChartType } from '@/components/telemetry/TelemetryChart'
@@ -148,6 +149,13 @@ export function SensorsPage() {
   const [apSaveError, setApSaveError] = useState<string | null>(null)
   const [apSaveOk, setApSaveOk] = useState<string | null>(null)
   const [copiedField, setCopiedField] = useState<'ssid' | 'password' | 'otaHost' | 'otaPassword' | null>(null)
+
+  // Estado para intervalo de lectura
+  const [sendInterval, setSendInterval] = useState(10) // por defecto 10 segundos
+  const [savingInterval, setSavingInterval] = useState(false)
+  const [intervalSaveError, setIntervalSaveError] = useState<string | null>(null)
+  const [intervalSaveOk, setIntervalSaveOk] = useState<string | null>(null)
+  const [isIntervalExpanded, setIsIntervalExpanded] = useState(false)
 
   // Estado para eliminar dispositivos
   const [deletingDevice, setDeletingDevice] = useState<string | null>(null)
@@ -301,6 +309,19 @@ export function SensorsPage() {
       setApSsid('')
       setApPassword('')
       setApEnabled(true)
+    }
+  }, [selectedDevice])
+
+  // Cargar intervalo de lectura del dispositivo seleccionado
+  useEffect(() => {
+    if (selectedDevice) {
+      getSendInterval(selectedDevice.deviceId).then((interval) => {
+        setSendInterval(interval ?? 10)
+      }).catch(() => {
+        setSendInterval(10)
+      })
+    } else {
+      setSendInterval(10)
     }
   }, [selectedDevice])
 
@@ -723,6 +744,25 @@ export function SensorsPage() {
       setApSaveError(err instanceof Error ? err.message : 'Error guardando configuración AP')
     } finally {
       setSavingAp(false)
+    }
+  }
+
+  async function saveIntervalConfiguration() {
+    if (!selectedDevice) return
+
+    setIntervalSaveError(null)
+    setIntervalSaveOk(null)
+    setSavingInterval(true)
+
+    try {
+      await saveSendInterval(selectedDevice.deviceId, sendInterval)
+      setIntervalSaveOk(`✓ Intervalo configurado a ${sendInterval}s`)
+      // Limpiar mensaje después de 3 segundos
+      setTimeout(() => setIntervalSaveOk(null), 3000)
+    } catch (err) {
+      setIntervalSaveError(err instanceof Error ? err.message : 'Error guardando intervalo')
+    } finally {
+      setSavingInterval(false)
     }
   }
 
@@ -2171,6 +2211,91 @@ export function SensorsPage() {
                     </div>
                   )}
                   </div>
+                  </CardContent>
+                )}
+              </Card>
+
+              {/* Configuración Intervalo de Lectura */}
+              <Card className="border-slate-200 dark:border-slate-700">
+                <CardHeader 
+                  className="cursor-pointer hover:bg-muted/50 transition-colors"
+                  onClick={() => setIsIntervalExpanded(!isIntervalExpanded)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Activity className="h-5 w-5 text-blue-500" />
+                      <CardTitle className="text-base">Intervalo de Lectura</CardTitle>
+                    </div>
+                    {isIntervalExpanded ? (
+                      <ChevronUp className="h-5 w-5 text-muted-foreground" />
+                    ) : (
+                      <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                    )}
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Frecuencia de envío de datos del sensor
+                  </p>
+                </CardHeader>
+                {isIntervalExpanded && (
+                  <CardContent>
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="sendInterval">Intervalo (segundos)</Label>
+                        <div className="flex items-center gap-3">
+                          <Input
+                            id="sendInterval"
+                            type="number"
+                            min={5}
+                            max={300}
+                            value={sendInterval}
+                            onChange={(e) => setSendInterval(Math.max(5, Math.min(300, parseInt(e.target.value) || 10)))}
+                            className="w-24"
+                          />
+                          <div className="flex gap-1">
+                            {[5, 10, 30, 60, 120].map((val) => (
+                              <Button
+                                key={val}
+                                variant={sendInterval === val ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => setSendInterval(val)}
+                                className="px-2 py-1 h-8 text-xs"
+                              >
+                                {val}s
+                              </Button>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="text-xs text-muted-foreground space-y-1">
+                          <p>⏱️ Mínimo: 5s | Máximo: 300s (5 min)</p>
+                          <p className={sendInterval <= 10 ? 'text-amber-600 dark:text-amber-400' : ''}>
+                            {sendInterval <= 10 && '⚠️ '}{sendInterval}s = ~{Math.round(86400 / sendInterval).toLocaleString()} lecturas/día
+                            {sendInterval <= 10 && ' (alto consumo)'}
+                          </p>
+                        </div>
+                      </div>
+
+                      <Button
+                        onClick={saveIntervalConfiguration}
+                        disabled={savingInterval}
+                        className="w-full gap-2"
+                      >
+                        <Activity className="h-4 w-4" />
+                        {savingInterval ? 'Enviando…' : 'Guardar Intervalo'}
+                      </Button>
+
+                      {intervalSaveError && (
+                        <div className="text-sm text-destructive flex items-center gap-2">
+                          <AlertTriangle className="h-4 w-4" />
+                          {intervalSaveError}
+                        </div>
+                      )}
+
+                      {intervalSaveOk && (
+                        <div className="text-sm text-green-600 font-medium">
+                          {intervalSaveOk}
+                        </div>
+                      )}
+                    </div>
                   </CardContent>
                 )}
               </Card>

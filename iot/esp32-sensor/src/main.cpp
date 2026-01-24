@@ -1219,6 +1219,51 @@ static void startApConfigStream() {
   Serial.printf("👂 Escuchando config AP en: %s\n", path.c_str());
 }
 
+// ============ STREAM: INTERVALO DE LECTURA ============
+static FirebaseData sendIntervalStream;
+
+static void sendIntervalStreamCallback(FirebaseStream data) {
+  if (data.dataTypeEnum() == fb_esp_rtdb_data_type_integer ||
+      data.dataTypeEnum() == fb_esp_rtdb_data_type_float ||
+      data.dataTypeEnum() == fb_esp_rtdb_data_type_double) {
+    uint16_t newInterval = (uint16_t)data.intData();
+    
+    // Validar rango
+    if (newInterval < MIN_SEND_INTERVAL) newInterval = MIN_SEND_INTERVAL;
+    if (newInterval > MAX_SEND_INTERVAL) newInterval = MAX_SEND_INTERVAL;
+    
+    if (newInterval != sendIntervalSeconds) {
+      Serial.printf("⏱️ Intervalo recibido desde Firebase: %d segundos\n", newInterval);
+      setSendIntervalSeconds(newInterval);
+    }
+  }
+}
+
+static void sendIntervalStreamTimeoutCallback(bool timeout) {
+  if (timeout) {
+    Serial.println("⚠ Stream sendInterval timeout (se reconecta automáticamente).");
+  }
+}
+
+static void startSendIntervalStream() {
+  if (!firebaseReady) return;
+  if (deviceId.length() == 0) return;
+
+  String path;
+  path.reserve(80);
+  path = "devices/";
+  path += deviceId;
+  path += "/sendInterval";
+
+  if (!Firebase.RTDB.beginStream(&sendIntervalStream, path.c_str())) {
+    Serial.printf("⚠ No se pudo iniciar stream sendInterval: %s\n", sendIntervalStream.errorReason().c_str());
+    return;
+  }
+
+  Firebase.RTDB.setStreamCallback(&sendIntervalStream, sendIntervalStreamCallback, sendIntervalStreamTimeoutCallback);
+  Serial.printf("👂 Escuchando intervalo de lectura en: %s\n", path.c_str());
+}
+
 static void printDhtPinState(const char* context) {
   // El DHT normalmente deja la línea en HIGH (pull-up). Si queda siempre LOW,
   // suele ser corto a GND / pinout incorrecto / sensor trabado.
@@ -1661,6 +1706,7 @@ void setupFirebase() {
     startDeviceAssignmentStream();
     startEquipmentPathStream();
     startApConfigStream();
+    startSendIntervalStream();
     
     // Enviar estado inicial
     sendOnlineStatus(true);
