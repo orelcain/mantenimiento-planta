@@ -73,6 +73,15 @@ export function MachineSelector({
     return directMachines;
   }, [selectedSubcatId, subcatMachines, directMachines]);
 
+  // Auto-seleccionar primera máquina visible si la actual no pertenece
+  useEffect(() => {
+    if (machinesToShow.length === 0) return;
+    const inList = currentMachine && machinesToShow.some((m) => m.id === currentMachine.id);
+    if (!inList) {
+      setCurrentMachine(machinesToShow[0].id);
+    }
+  }, [machinesToShow, currentMachine, setCurrentMachine]);
+
   // Contar máquinas por subcategoría
   const machineCountBySubcat = useMemo(() => {
     const counts: Record<string, number> = {};
