@@ -404,11 +404,8 @@ export function RepuestosDashboard() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
           <StatCard label="Repuestos" value={stats.total.toLocaleString('es-CL')} subtle={currentMachine.nombre} />
-          <StatCard label="Con stock" value={stats.withStock.toLocaleString('es-CL')} />
-          <StatCard label="Con solicitudes" value={stats.withSolicitud.toLocaleString('es-CL')} />
-          <StatCard label="Valor de stock" value={`$${stats.valorStock.toLocaleString('es-CL')}`} />
         </div>
 
         {/* Error Display */}
@@ -425,7 +422,7 @@ export function RepuestosDashboard() {
             <div className="flex flex-col">
               <span className="text-sm font-semibold text-foreground">Listado de repuestos</span>
               <span className="text-xs text-muted-foreground">
-                {filteredRepuestos.length} de {repuestos.length} elementos — Tags {tagsLoading ? 'cargando...' : `${tags.length}`} disponibles.
+                {filteredRepuestos.length} de {repuestos.length} elementos.
               </span>
             </div>
           </div>

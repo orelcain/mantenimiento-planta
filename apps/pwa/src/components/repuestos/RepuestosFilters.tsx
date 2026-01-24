@@ -1,6 +1,5 @@
-import { useState } from 'react'
-import { ChevronDown, ChevronUp, Search, X } from 'lucide-react'
-import { Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Button, Badge } from '@/components/ui'
+import { Search, X } from 'lucide-react'
+import { Input, Button } from '@/components/ui'
 import type { TagGlobal } from '@/types/tags'
 
 interface RepuestosFiltersProps {
@@ -28,20 +27,11 @@ export function RepuestosFilters({
   availableTags,
   onClearFilters,
 }: RepuestosFiltersProps) {
-  const [tagsOpen, setTagsOpen] = useState(false)
   const hasActiveFilters = 
     searchQuery !== '' || 
     selectedTags.length > 0 || 
     stockFilter !== 'all' || 
     solicitudFilter !== 'all'
-
-  const handleTagToggle = (tagNombre: string) => {
-    if (selectedTags.includes(tagNombre)) {
-      onTagsChange(selectedTags.filter((t) => t !== tagNombre))
-    } else {
-      onTagsChange([...selectedTags, tagNombre])
-    }
-  }
 
   return (
     <div className="space-y-3">
@@ -75,96 +65,6 @@ export function RepuestosFilters({
         )}
       </div>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        {/* Stock filter */}
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">Stock:</span>
-          <Select value={stockFilter} onValueChange={onStockFilterChange}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="with-stock">Con stock</SelectItem>
-              <SelectItem value="without-stock">Sin stock</SelectItem>
-              <SelectItem value="low-stock">Stock bajo (&lt;5)</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Solicitud filter */}
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">Solicitud:</span>
-          <Select value={solicitudFilter} onValueChange={onSolicitudFilterChange}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="with-solicitud">Con solicitud</SelectItem>
-              <SelectItem value="without-solicitud">Sin solicitud</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      {/* Tags filter (colapsable) */}
-      {availableTags.length > 0 && (
-        <div className="space-y-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setTagsOpen((v) => !v)}
-            className="gap-2"
-          >
-            Sistema de tags
-            <span className="text-xs text-muted-foreground">({availableTags.length})</span>
-            {selectedTags.length > 0 && (
-              <span className="text-xs text-foreground">· {selectedTags.length} activos</span>
-            )}
-            {tagsOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-          </Button>
-
-          {tagsOpen && (
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm font-medium text-muted-foreground">Tags:</span>
-              {availableTags.map((tag) => {
-                const isSelected = selectedTags.includes(tag.nombre)
-                return (
-                  <Badge
-                    key={tag.nombre}
-                    variant={isSelected ? 'default' : 'outline'}
-                    className="cursor-pointer hover:bg-accent transition-colors"
-                    onClick={() => handleTagToggle(tag.nombre)}
-                  >
-                    {tag.nombre}
-                    {tag.tipo && (
-                      <span className="ml-1 text-xs opacity-75">
-                        ({tag.tipo === 'stock' ? '📦' : '📋'})
-                      </span>
-                    )}
-                  </Badge>
-                )
-              })}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Active filters summary */}
-      {hasActiveFilters && (
-        <div className="text-xs text-muted-foreground">
-          Filtros activos:{' '}
-          {searchQuery && <span className="font-medium">búsqueda</span>}
-          {searchQuery && (selectedTags.length > 0 || stockFilter !== 'all' || solicitudFilter !== 'all') && ', '}
-          {selectedTags.length > 0 && <span className="font-medium">{selectedTags.length} tag(s)</span>}
-          {selectedTags.length > 0 && (stockFilter !== 'all' || solicitudFilter !== 'all') && ', '}
-          {stockFilter !== 'all' && <span className="font-medium">stock</span>}
-          {stockFilter !== 'all' && solicitudFilter !== 'all' && ', '}
-          {solicitudFilter !== 'all' && <span className="font-medium">solicitud</span>}
-        </div>
-      )}
     </div>
   )
 }
