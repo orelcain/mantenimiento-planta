@@ -38,6 +38,7 @@ extern uint16_t getSendIntervalSeconds();
 extern void setSendIntervalSeconds(uint16_t sec);
 extern uint32_t getFlashHistoryCount();
 extern bool getFlashReading(uint32_t index, uint64_t& ts, float& temp, float& hum, uint8_t& tempSt, uint8_t& humSt, bool& sim);
+extern void applyWifiConfig(const String& ssid, const String& password, bool reconnect);
 
 // ============ UMBRALES DE ALERTA (TEMP/HUM) ============
 struct AlertThresholds {
@@ -103,6 +104,16 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
     <div class="row"><strong>Tasa est.</strong><span id="rate">--</span></div>
     <div id="rssiBar" class="bar sin"><span></span></div>
   </div>
+  <div class="card" style="margin-top:10px">
+    <div class="row"><strong>Conectar WiFi</strong></div>
+    <div class="muted" style="margin:6px 0">Configura la WiFi principal (STA)</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <input id="wifiSsid" placeholder="SSID" style="padding:8px;border:1px solid #e5e7eb;border-radius:8px" />
+      <input id="wifiPass" placeholder="Contraseña (opcional)" type="password" style="padding:8px;border:1px solid #e5e7eb;border-radius:8px" />
+      <button class="btn" style="text-align:center" onclick="saveWifi()">Guardar y conectar</button>
+      <div id="wifiMsg" class="muted"></div>
+    </div>
+  </div>
   <a class="btn" href="/status.json">Ver estado JSON</a>
   <script>
     function rssiQuality(rssi, connected){
@@ -147,6 +158,27 @@ const char HTML_DASHBOARD[] PROGMEM = R"rawliteral(
       if(rssi>=-94) return 'R19 (2–3 Mbps)';
       if(rssi>=-97) return 'R20 (1–2 Mbps)';
       return 'Sin señal (<1 Mbps)';
+    }
+
+    async function saveWifi(){
+      const ssid = document.getElementById('wifiSsid').value.trim();
+      const password = document.getElementById('wifiPass').value;
+      const msg = document.getElementById('wifiMsg');
+      if(!ssid){
+        msg.textContent = 'SSID requerido';
+        return;
+      }
+      msg.textContent = 'Enviando...';
+      try{
+        const r = await fetch('/api/wifi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ssid, password, reconnect:true})});
+        if(!r.ok){
+          msg.textContent = 'Error al guardar';
+          return;
+        }
+        msg.textContent = 'WiFi enviada, intentando reconectar...';
+      }catch(e){
+        msg.textContent = 'Error de conexión';
+      }
     }
 
     async function load(){

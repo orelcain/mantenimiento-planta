@@ -32,3 +32,23 @@ export async function getSendInterval(deviceId: string): Promise<number | null> 
   }
   return null
 }
+
+export interface WifiConfig {
+  ssid: string
+  password?: string
+  reconnect?: boolean
+}
+
+/**
+ * Guarda la configuración WiFi (STA) en Firebase.
+ * El ESP32 escucha cambios en devices/{deviceId}/wifiConfig y aplica la conexión.
+ */
+export async function saveWifiConfig(deviceId: string, config: WifiConfig): Promise<void> {
+  const wifiRef = ref(rtdb, `devices/${deviceId}/wifiConfig`)
+  await set(wifiRef, {
+    ssid: config.ssid,
+    password: config.password ?? '',
+    reconnect: config.reconnect ?? true,
+  })
+  console.log(`[deviceConfigRtdb] WiFi config guardada para ${deviceId}`)
+}

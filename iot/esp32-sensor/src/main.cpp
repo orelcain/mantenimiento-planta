@@ -697,6 +697,30 @@ static void clearWifiNetworksFromPrefs() {
   prefs.end();
 }
 
+void applyWifiConfig(const String& ssid, const String& password, bool reconnect) {
+  String ssids[WIFI_MAX_NETWORKS];
+  String passes[WIFI_MAX_NETWORKS];
+  uint8_t count = 0;
+
+  if (ssid.length() > 0) {
+    ssids[0] = ssid;
+    passes[0] = password;
+    count = 1;
+  }
+
+  saveWifiNetworksToPrefs(ssids, passes, count);
+  loadSavedWifiNetworks();
+
+  Serial.printf("📡 WiFi config guardada (ssid=%s). Reconnect=%s\n",
+                ssid.c_str(), reconnect ? "true" : "false");
+
+  if (reconnect) {
+    WiFi.disconnect(true, true);
+    delay(300);
+    connectWiFi();
+  }
+}
+
 // ============ VARIABLES DE ESTADO ============
 unsigned long lastSendTime = 0;
 unsigned long lastReconnectTime = 0;
@@ -1025,6 +1049,7 @@ static void sendDeviceStatus(bool online) {
   json.set("deviceName", deviceName);
   json.set("firmwareVersion", "2.14.0");
   json.set("sensorType", "dht11");
+  json.set("sendInterval", (int)sendIntervalSeconds);
   json.set("assignedEquipmentId", hasAssignedEquipment() ? currentEquipmentId : "");
   json.set("apAlwaysOn", apAlwaysOn);
   json.set("apSsid", WiFi.softAPSSID());
@@ -1217,6 +1242,58 @@ static void startApConfigStream() {
 
   Firebase.RTDB.setStreamCallback(&apConfigStream, apConfigStreamCallback, apConfigStreamTimeoutCallback);
   Serial.printf("👂 Escuchando config AP en: %s\n", path.c_str());
+}
+
+// ============ STREAM: WIFI PRINCIPAL (STA) ============
+static FirebaseData wifiConfigStream;
+
+static void wifiConfigStreamCallback(FirebaseStream data) {
+  if (data.dataTypeEnum() == fb_esp_rtdb_data_type_json) {
+    FirebaseJson json;
+    json.setJsonData(data.stringData());
+
+    FirebaseJsonData ssid, password, reconnect;
+    json.get(ssid, "ssid");
+    json.get(password, "password");
+    json.get(reconnect, "reconnect");
+
+    String newSsid = ssid.success ? ssid.to<String>() : "";
+    String newPass = password.success ? password.to<String>() : "";
+    const bool doReconnect = reconnect.success ? reconnect.to<bool>() : true;
+
+    newSsid.trim();
+    newPass.trim();
+
+    if (newSsid.length() > 0) {
+      Serial.printf("📡 WiFi config recibida: ssid='%s'\n", newSsid.c_str());
+      applyWifiConfig(newSsid, newPass, doReconnect);
+    }
+  }
+}
+
+static void wifiConfigStreamTimeoutCallback(bool timeout) {
+  if (timeout) {
+    Serial.println("⚠ Stream wifiConfig timeout (se reconecta automáticamente).");
+  }
+}
+
+static void startWifiConfigStream() {
+  if (!firebaseReady) return;
+  if (deviceId.length() == 0) return;
+
+  String path;
+  path.reserve(80);
+  path = "devices/";
+  path += deviceId;
+  path += "/wifiConfig";
+
+  if (!Firebase.RTDB.beginStream(&wifiConfigStream, path.c_str())) {
+    Serial.printf("⚠ No se pudo iniciar stream wifiConfig: %s\n", wifiConfigStream.errorReason().c_str());
+    return;
+  }
+
+  Firebase.RTDB.setStreamCallback(&wifiConfigStream, wifiConfigStreamCallback, wifiConfigStreamTimeoutCallback);
+  Serial.printf("👂 Escuchando WiFi principal en: %s\n", path.c_str());
 }
 
 // ============ STREAM: INTERVALO DE LECTURA ============
@@ -1706,6 +1783,7 @@ void setupFirebase() {
     startDeviceAssignmentStream();
     startEquipmentPathStream();
     startApConfigStream();
+    startWifiConfigStream();
     startSendIntervalStream();
     
     // Enviar estado inicial

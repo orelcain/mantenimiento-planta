@@ -8,7 +8,7 @@ import type { SensorSummaryNode } from '@/services/sensorsRtdb'
 import { assignDeviceToEquipment, subscribeDevices, deleteDevice } from '@/services/devicesRtdb'
 import { subscribeSensorSummary } from '@/services/sensorsRtdb'
 import { saveApConfig } from '@/services/apConfigRtdb'
-import { saveSendInterval } from '@/services/deviceConfigRtdb'
+import { saveSendInterval, saveWifiConfig } from '@/services/deviceConfigRtdb'
 import { useUsbDetection } from '@/hooks/useUsbDetection'
 import { getEquipments } from '@/services/equipment'
 import { TelemetryChart, type ChartType } from '@/components/telemetry/TelemetryChart'
@@ -156,6 +156,13 @@ export function SensorsPage() {
   const [intervalSaveError, setIntervalSaveError] = useState<string | null>(null)
   const [intervalSaveOk, setIntervalSaveOk] = useState<string | null>(null)
   const [isIntervalExpanded, setIsIntervalExpanded] = useState(false)
+
+  // Estado para WiFi principal (STA)
+  const [wifiStaSsid, setWifiStaSsid] = useState('')
+  const [wifiStaPassword, setWifiStaPassword] = useState('')
+  const [savingWifi, setSavingWifi] = useState(false)
+  const [wifiSaveError, setWifiSaveError] = useState<string | null>(null)
+  const [wifiSaveOk, setWifiSaveOk] = useState<string | null>(null)
 
   // Estado para eliminar dispositivos
   const [deletingDevice, setDeletingDevice] = useState<string | null>(null)
@@ -309,6 +316,17 @@ export function SensorsPage() {
       setApSsid('')
       setApPassword('')
       setApEnabled(true)
+    }
+  }, [selectedDevice])
+
+  // Cargar WiFi principal actual (solo SSID) al cambiar dispositivo
+  useEffect(() => {
+    if (selectedDevice) {
+      setWifiStaSsid(selectedDevice.wifiSsid || '')
+      setWifiStaPassword('')
+    } else {
+      setWifiStaSsid('')
+      setWifiStaPassword('')
     }
   }, [selectedDevice])
 
@@ -740,6 +758,32 @@ export function SensorsPage() {
       setApSaveError(err instanceof Error ? err.message : 'Error guardando configuración AP')
     } finally {
       setSavingAp(false)
+    }
+  }
+
+  async function saveWifiConfiguration() {
+    if (!selectedDevice) return
+    if (!wifiStaSsid.trim()) {
+      setWifiSaveError('Debes ingresar un SSID válido')
+      return
+    }
+
+    setWifiSaveError(null)
+    setWifiSaveOk(null)
+    setSavingWifi(true)
+
+    try {
+      await saveWifiConfig(selectedDevice.deviceId, {
+        ssid: wifiStaSsid.trim(),
+        password: wifiStaPassword.trim() || undefined,
+        reconnect: true,
+      })
+      setWifiSaveOk('✓ WiFi enviada al dispositivo (intentará reconectar)')
+      setTimeout(() => setWifiSaveOk(null), 3000)
+    } catch (err) {
+      setWifiSaveError(err instanceof Error ? err.message : 'Error guardando WiFi')
+    } finally {
+      setSavingWifi(false)
     }
   }
 
@@ -1357,6 +1401,60 @@ export function SensorsPage() {
                       </div>
                     </div>
                   )}
+
+                  {/* Configurar nueva WiFi principal */}
+                  <div className="rounded border p-3 bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 border-amber-200 dark:border-amber-800">
+                    <div className="text-xs font-semibold text-amber-700 dark:text-amber-300 mb-2 flex items-center gap-1">
+                      <Wifi className="h-3 w-3" />
+                      Cambiar WiFi Principal
+                    </div>
+                    <div className="space-y-3">
+                      <div className="space-y-1">
+                        <Label htmlFor="wifiStaSsid" className="text-xs text-muted-foreground">SSID</Label>
+                        <Input
+                          id="wifiStaSsid"
+                          value={wifiStaSsid}
+                          onChange={(e) => setWifiStaSsid(e.target.value)}
+                          placeholder="Nombre de la red"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label htmlFor="wifiStaPassword" className="text-xs text-muted-foreground">Contraseña</Label>
+                        <Input
+                          id="wifiStaPassword"
+                          type={showApPassword ? 'text' : 'password'}
+                          value={wifiStaPassword}
+                          onChange={(e) => setWifiStaPassword(e.target.value)}
+                          placeholder="(opcional)"
+                        />
+                        <div className="text-[11px] text-muted-foreground">
+                          Si la red es abierta, deja vacío.
+                        </div>
+                      </div>
+                      <Button
+                        onClick={saveWifiConfiguration}
+                        disabled={savingWifi}
+                        className="w-full gap-2"
+                        variant="outline"
+                      >
+                        <RefreshCw className="h-4 w-4" />
+                        {savingWifi ? 'Enviando…' : 'Conectar a esta WiFi'}
+                      </Button>
+
+                      {wifiSaveError && (
+                        <div className="text-sm text-destructive flex items-center gap-2">
+                          <AlertTriangle className="h-4 w-4" />
+                          {wifiSaveError}
+                        </div>
+                      )}
+
+                      {wifiSaveOk && (
+                        <div className="text-sm text-green-600 font-medium">
+                          {wifiSaveOk}
+                        </div>
+                      )}
+                    </div>
+                  </div>
 
                   {/* WiFi AP Local */}
                   {selectedDevice.apSsid && (

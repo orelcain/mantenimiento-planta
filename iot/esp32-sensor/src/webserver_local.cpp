@@ -85,12 +85,53 @@ void handleApiCurrent() {
   portalServer.send(200, "application/json", json);
 }
 
+void handleApiWifiStatus() {
+  JsonDocument doc;
+  doc["ssid"] = WiFi.SSID();
+  doc["ip"] = WiFi.localIP().toString();
+  doc["connected"] = (WiFi.status() == WL_CONNECTED);
+
+  String json;
+  serializeJson(doc, json);
+  portalServer.sendHeader("Connection", "close");
+  portalServer.send(200, "application/json", json);
+}
+
+void handleApiWifiConfig() {
+  if (portalServer.method() != HTTP_POST) {
+    portalServer.send(405, "application/json", "{\"error\":\"Method not allowed\"}");
+    return;
+  }
+
+  String body = portalServer.arg("plain");
+  JsonDocument doc;
+  auto err = deserializeJson(doc, body);
+  if (err) {
+    portalServer.send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
+    return;
+  }
+
+  const char* ssid = doc["ssid"] | "";
+  const char* password = doc["password"] | "";
+  const bool reconnect = doc["reconnect"] | true;
+
+  if (!ssid || String(ssid).length() == 0) {
+    portalServer.send(400, "application/json", "{\"error\":\"SSID requerido\"}");
+    return;
+  }
+
+  applyWifiConfig(String(ssid), String(password), reconnect);
+  portalServer.send(200, "application/json", "{\"ok\":true}");
+}
+
 // ============ SETUP ============
 
 void setupLocalWebServer() {
   // Registrar endpoints del dashboard en portalServer
   portalServer.on("/", handleDashboard);
   portalServer.on("/api/current", handleApiCurrent);
+  portalServer.on("/api/wifi", HTTP_GET, handleApiWifiStatus);
+  portalServer.on("/api/wifi", HTTP_POST, handleApiWifiConfig);
 
   Serial.println("✅ Endpoints del dashboard registrados en puerto " + String(LOCAL_WEB_SERVER_PORT));
   Serial.println("🌐 Accede via:");
