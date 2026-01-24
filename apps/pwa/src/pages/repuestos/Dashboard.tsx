@@ -13,6 +13,7 @@ import { RepuestoManualModal } from '@/components/repuestos/RepuestoManualModal'
 import { RepuestoHistoryModal } from '@/components/repuestos/RepuestoHistoryModal'
 import { useRepuestos } from '@/hooks/repuestos/useRepuestos'
 import { useTags } from '@/hooks/repuestos/useTags'
+import { useMachineCategories } from '@/hooks/repuestos/useMachineCategories'
 import { useToast } from '@/hooks/useToast'
 import { useMachineContext, useCurrentMachine } from '@/contexts/MachineContext'
 import type { Repuesto, RepuestoFormData } from '@/types/repuestos'
@@ -56,6 +57,7 @@ const getSolicitudTotal = (repuesto: Repuesto) => {
 export function RepuestosDashboard() {
   const { machines, loading: machinesLoading, setCurrentMachine, setCurrentMachineDirect } = useMachineContext()
   const currentMachine = useCurrentMachine()
+  const { categories } = useMachineCategories()
   const { toast } = useToast()
   const [createOpen, setCreateOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
@@ -165,26 +167,36 @@ export function RepuestosDashboard() {
     setCurrentPage(1)
   }, [searchQuery, selectedTags, stockFilter, solicitudFilter, pageSize])
 
-  // Resetear máquina cuando cambia de categoría
+  // IDs de subcategorías de la categoría seleccionada
+  const subcategoryIds = useMemo(() => {
+    if (!selectedCategoryId) return []
+    return categories
+      .filter(c => c.parentId === selectedCategoryId)
+      .map(c => c.id)
+  }, [categories, selectedCategoryId])
+
+  // Seleccionar primera máquina cuando cambia de categoría
   useEffect(() => {
     if (!machines.length) return
 
-    // Filtrar máquinas de la categoría seleccionada
+    // Filtrar máquinas de la categoría seleccionada (incluyendo subcategorías)
     const machinesInCategory = machines.filter((m) => {
+      if (!m.activa) return false
       if (selectedCategoryId === 'maquinas-principales') {
         return !m.categoryId || m.categoryId === 'maquinas-principales'
       }
-      return m.categoryId === selectedCategoryId
+      // Incluir máquinas directas de la categoría
+      if (m.categoryId === selectedCategoryId) return true
+      // También incluir máquinas de subcategorías
+      if (subcategoryIds.includes(m.categoryId || '')) return true
+      return false
     })
 
-    // Verificar si la máquina actual pertenece a la categoría
-    const machineInCategory = currentMachine && machinesInCategory.some((m) => m.id === currentMachine.id)
-
-    // Si la máquina no está en la categoría, seleccionar la primera disponible
-    if (!machineInCategory && machinesInCategory.length > 0) {
+    // Seleccionar la primera máquina de la categoría
+    if (machinesInCategory.length > 0) {
       setCurrentMachine(machinesInCategory[0].id)
     }
-  }, [selectedCategoryId, machines, currentMachine, setCurrentMachine])
+  }, [selectedCategoryId, machines, subcategoryIds, setCurrentMachine])
 
   const stats = useMemo(() => {
     const total = repuestos.length
