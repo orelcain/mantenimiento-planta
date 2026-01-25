@@ -16,6 +16,7 @@ import { useTags } from '@/hooks/repuestos/useTags'
 import { useMachineCategories } from '@/hooks/repuestos/useMachineCategories'
 import { useToast } from '@/hooks/useToast'
 import { useMachineContext, useCurrentMachine } from '@/contexts/MachineContext'
+import { useIsAdmin } from '@/store/authStore'
 import type { Repuesto, RepuestoFormData } from '@/types/repuestos'
 import { isTagAsignado, getTagNombre } from '@/types/tags'
 import { CategoryManager } from '@/components/repuestos/CategoryManager'
@@ -58,6 +59,7 @@ const getSolicitudTotal = (repuesto: Repuesto) => {
 export function RepuestosDashboard() {
   const { machines, loading: machinesLoading, setCurrentMachine, setCurrentMachineDirect } = useMachineContext()
   const currentMachine = useCurrentMachine()
+  const isAdmin = useIsAdmin()
   const { categories } = useMachineCategories()
   const { toast } = useToast()
   const [createOpen, setCreateOpen] = useState(false)
@@ -414,27 +416,33 @@ export function RepuestosDashboard() {
                     <FileText className="h-3 w-3" /> <span className="text-xs">PDF</span>
                   </Button>
                </div>
-               <div className="flex w-full gap-2">
-                   <Button onClick={() => setStructureManagerOpen(true)} className="flex-1 gap-1" variant="outline" size="sm">
-                    <FolderTree className="h-3 w-3" />
-                    <span className="text-xs">Estructura</span>
-                  </Button>
-                   <Button onClick={() => setNewMachineOpen(true)} className="flex-1 gap-1" variant="outline" size="sm">
-                    <Plus className="h-3 w-3" />
-                    <span className="text-xs">Equipo</span>
-                  </Button>
-               </div>
+               {isAdmin && (
+                 <div className="flex w-full gap-2">
+                     <Button onClick={() => setStructureManagerOpen(true)} className="flex-1 gap-1" variant="outline" size="sm">
+                      <FolderTree className="h-3 w-3" />
+                      <span className="text-xs">Estructura</span>
+                    </Button>
+                     <Button onClick={() => setNewMachineOpen(true)} className="flex-1 gap-1" variant="outline" size="sm">
+                      <Plus className="h-3 w-3" />
+                      <span className="text-xs">Equipo</span>
+                    </Button>
+                 </div>
+               )}
              </div>
              
              <div className="hidden sm:flex gap-2">
-               <Button onClick={() => setStructureManagerOpen(true)} className="gap-2" variant="outline" size="sm">
-                 <FolderTree className="h-4 w-4" />
-                 Estructura
-               </Button>
-               <Button onClick={() => setNewMachineOpen(true)} className="gap-2" variant="outline" size="sm">
-                 <Plus className="h-4 w-4" />
-                 Nuevo equipo
-               </Button>
+               {isAdmin && (
+                 <>
+                   <Button onClick={() => setStructureManagerOpen(true)} className="gap-2" variant="outline" size="sm">
+                     <FolderTree className="h-4 w-4" />
+                     Estructura
+                   </Button>
+                   <Button onClick={() => setNewMachineOpen(true)} className="gap-2" variant="outline" size="sm">
+                     <Plus className="h-4 w-4" />
+                     Nuevo equipo
+                   </Button>
+                 </>
+               )}
              </div>
           </div>
         </div>
