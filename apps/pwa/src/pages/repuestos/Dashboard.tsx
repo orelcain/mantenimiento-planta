@@ -11,13 +11,14 @@ import { MachineHierarchySelector } from '@/components/repuestos/MachineHierarch
 import { RepuestoPhotosModal } from '@/components/repuestos/RepuestoPhotosModal'
 import { RepuestoManualModal } from '@/components/repuestos/RepuestoManualModal'
 import { RepuestoHistoryModal } from '@/components/repuestos/RepuestoHistoryModal'
+import { TechnicalSpecsModal } from '@/components/repuestos/TechnicalSpecsModal'
 import { useRepuestos } from '@/hooks/repuestos/useRepuestos'
 import { useTags } from '@/hooks/repuestos/useTags'
 import { useMachineCategories } from '@/hooks/repuestos/useMachineCategories'
 import { useToast } from '@/hooks/useToast'
 import { useMachineContext, useCurrentMachine } from '@/contexts/MachineContext'
 import { useIsAdmin } from '@/store/authStore'
-import type { Repuesto, RepuestoFormData } from '@/types/repuestos'
+import type { Repuesto, RepuestoFormData, TechnicalSpecs, MachineImage } from '@/types/repuestos'
 import { isTagAsignado, getTagNombre } from '@/types/tags'
 import { CategoryManager } from '@/components/repuestos/CategoryManager'
 import { ImportRepuestosModal } from './ImportRepuestosModal'
@@ -71,6 +72,7 @@ export function RepuestosDashboard() {
   const [photoModal, setPhotoModal] = useState<Repuesto | null>(null)
   const [manualModal, setManualModal] = useState<Repuesto | null>(null)
   const [historyModal, setHistoryModal] = useState<Repuesto | null>(null)
+  const [specsTarget, setSpecsTarget] = useState<{repuesto: Repuesto, tab: 'specs' | 'gallery'} | null>(null)
   const [newMachineOpen, setNewMachineOpen] = useState(false)
   const [structureManagerOpen, setStructureManagerOpen] = useState(false)
 
@@ -98,6 +100,25 @@ export function RepuestosDashboard() {
   } = useRepuestos(currentMachine?.id || 'baader-200')
 
   const { tags, loading: tagsLoading, error: tagsError } = useTags(repuestos, currentMachine?.id || 'baader-200')
+
+  const handleSaveSpecs = async (repuestoId: string, specs: TechnicalSpecs, gallery: MachineImage[]) => {
+    try {
+      await updateRepuesto(repuestoId, { technicalSpecs: specs, gallery: gallery });
+      toast({
+        title: 'Ficha técnica actualizada',
+        description: 'Los cambios se han guardado correctamente.',
+      });
+      // El modal se cierra desde el componente hijo llamando a onOpenChange
+    } catch (err) {
+      console.error('Error saving specs:', err);
+      toast({
+        variant: 'destructive',
+        title: 'Error al guardar',
+        description: 'No se pudieron guardar los cambios en la ficha técnica.',
+      });
+      throw err; // Re-throw to let the modal handle loading state if necessary
+    }
+  }
 
   // Calcular conteos de máquinas por categoría
   const machineCountsByCategory = useMemo(() => {
@@ -498,8 +519,8 @@ export function RepuestosDashboard() {
                 onViewPhotos={(rep) => setPhotoModal(rep)}
                 onViewManual={(rep) => setManualModal(rep)}
                 onViewHistory={(rep) => setHistoryModal(rep)}
-                onViewSpecs={(rep) => console.log('View Specs', rep)}
-                onViewGallery={(rep) => console.log('View Gallery', rep)}
+                onViewSpecs={(rep) => setSpecsTarget({ repuesto: rep, tab: 'specs' })}
+                onViewGallery={(rep) => setSpecsTarget({ repuesto: rep, tab: 'gallery' })}
               />
 
               <RepuestosPagination
@@ -599,6 +620,17 @@ export function RepuestosDashboard() {
           onOpenChange={(open) => !open && setHistoryModal(null)}
           repuesto={historyModal}
           machineId={currentMachine?.id}
+        />
+      )}
+
+      {/* Modal de Ficha Técnica */}
+      {specsTarget && (
+        <TechnicalSpecsModal
+          open={!!specsTarget}
+          onOpenChange={(open) => !open && setSpecsTarget(null)}
+          repuesto={specsTarget.repuesto}
+          initialTab={specsTarget.tab}
+          onSave={handleSaveSpecs}
         />
       )}
 
