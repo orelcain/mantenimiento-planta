@@ -260,6 +260,8 @@ export function MachineHierarchySelector({
         activa: true,
         parentId: currentParentId || null,
         nivel: currentLevel,
+        createdAt: Timestamp.now(),
+        visible: true,
       };
 
       // Guardar en Firestore

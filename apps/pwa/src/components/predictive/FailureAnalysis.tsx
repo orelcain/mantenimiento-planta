@@ -15,13 +15,9 @@ import {
   Tooltip,
   Legend,
   ArcElement,
-  InteractionItem
 } from 'chart.js'
-import { getElementAtEvent } from 'react-chartjs-2' 
 import { Bar, Pie } from 'react-chartjs-2'
-import { Loader2, BrainCircuit, AlertTriangle, CheckCircle2, ChevronRight, Calendar, AlertCircle } from 'lucide-react'
-import { format } from 'date-fns'
-import { es } from 'date-fns/locale'
+import { Loader2, BrainCircuit, AlertTriangle, ChevronRight } from 'lucide-react'
 
 // Registrar componentes de ChartJS
 ChartJS.register(
@@ -153,8 +149,9 @@ export function FailureAnalysis() {
             <Card 
                 className="cursor-pointer hover:bg-muted/50 transition-colors relative overflow-hidden group"
                 onClick={() => {
-                   if (symptomStats.length > 0) {
-                      setSelectedSymptom(symptomStats[0][0])
+                   const topSymptom = symptomStats[0]
+                   if (topSymptom) {
+                      setSelectedSymptom(topSymptom[0])
                    }
                 }}
             >
@@ -208,10 +205,10 @@ export function FailureAnalysis() {
                                 },
                                 scales: {
                                     x: { grid: { display: false } },
-                                    y: { cursor: 'pointer', grid: { display: false } }
+                                    y: { grid: { display: false } }
                                 },
                                 onClick: (_evt, elements) => {
-                                    if (elements.length > 0) {
+                                    if (elements.length > 0 && elements[0]) {
                                         const idx = elements[0].index
                                         const label = symptomData.labels[idx]
                                         if (label) setSelectedSymptom(label)
