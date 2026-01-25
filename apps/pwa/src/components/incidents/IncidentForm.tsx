@@ -139,11 +139,22 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
 
       setFormData(prev => ({ ...prev, descripcion: refined }))
       
-      // 2. Extraer síntomas
-      const symptoms = await extractSymptomsFromDescription(refined, aiSymptoms)
+      // 2. Extraer síntomas con mayor contexto
+      const context = {
+        title: formData.titulo,
+        priority: formData.prioridad,
+        equipmentName: selectedEquipment?.nombre
+      }
+      
+      const symptoms = await extractSymptomsFromDescription(refined, aiSymptoms, context)
+      
       if (symptoms.length > 0) {
-        // Combinar con existentes sin duplicados
+        // Asegurar que los síntomas extraídos sean visibles en las opciones
+        setAiSymptoms(prev => Array.from(new Set([...prev, ...symptoms])))
+        
+        // Seleccionarlos automáticamente
         setSelectedSymptoms(prev => Array.from(new Set([...prev, ...symptoms])))
+        
         logger.info('Síntomas extraídos automáticamente', { count: symptoms.length })
         
         toast({

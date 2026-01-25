@@ -15,6 +15,7 @@ import {
   Thermometer,
   Droplets,
   Edit,
+  Wand2,
 } from 'lucide-react'
 import {
   Dialog,
@@ -25,6 +26,7 @@ import {
   Button,
   Badge,
   Textarea,
+  SpeechTextarea,
   Label,
   Spinner,
   Select,
@@ -37,6 +39,8 @@ import { useAppStore, useAuthStore } from '@/store'
 import { usePermissions } from '@/hooks/usePermissions'
 import { confirmIncident, rejectIncident, closeIncident, assignIncident, deleteIncident } from '@/services/incidents'
 import { getTechnicians, getUserById } from '@/services/auth'
+import { refineText, isAIConfigured } from '@/services/ai'
+import { useToast } from '@/hooks/useToast'
 import type { Incident, IncidentStatus, IncidentPriority, User as UserType } from '@/types'
 import { formatDate } from '@/lib/utils'
 import { fetchLastSensorReadings, fetchSensorSummaryOnce } from '@/services/sensorsRtdb'
@@ -72,10 +76,13 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
       : null
   )
   const permissions = usePermissions()
+  const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
   const [showRejectForm, setShowRejectForm] = useState(false)
   const [showCloseForm, setShowCloseForm] = useState(false)
   const [showAssignForm, setShowAssignForm] = useState(false)
+  const [isRefiningRejection, setIsRefiningRejection] = useState(false)
+  const [isRefiningResolution, setIsRefiningResolution] = useState(false)
   const [showEditForm, setShowEditForm] = useState(false)
   const [rejectionReason, setRejectionReason] = useState('')
   const [resolution, setResolution] = useState('')
@@ -260,6 +267,50 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
       alert('Error al eliminar la incidencia')
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handleRefineRejection = async () => {
+    if (!rejectionReason || rejectionReason.length < 5) return
+    
+    if (!isAIConfigured()) {
+      toast({ variant: "destructive", title: "Error", description: "Falta API Key de IA" })
+      return
+    }
+
+    setIsRefiningRejection(true)
+    toast({ description: "Mejorando redacción..." })
+    
+    try {
+      const refined = await refineText(rejectionReason)
+      setRejectionReason(refined)
+      toast({ title: "¡Listo!", description: "Texto mejorado." })
+    } catch {
+      toast({ variant: "destructive", title: "Error", description: "Falló la IA" })
+    } finally {
+      setIsRefiningRejection(false)
+    }
+  }
+
+  const handleRefineResolution = async () => {
+    if (!resolution || resolution.length < 5) return
+    
+    if (!isAIConfigured()) {
+      toast({ variant: "destructive", title: "Error", description: "Falta API Key de IA" })
+      return
+    }
+
+    setIsRefiningResolution(true)
+    toast({ description: "Mejorando redacción..." })
+    
+    try {
+      const refined = await refineText(resolution)
+      setResolution(refined)
+      toast({ title: "¡Listo!", description: "Texto mejorado." })
+    } catch {
+      toast({ variant: "destructive", title: "Error", description: "Falló la IA" })
+    } finally {
+      setIsRefiningResolution(false)
     }
   }
 
@@ -475,12 +526,34 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
               <div className="p-4 bg-muted rounded-lg space-y-4">
                 <h4 className="font-medium">Rechazar incidencia</h4>
                 <div className="space-y-2">
-                  <Label htmlFor="rejectionReason">Motivo del rechazo *</Label>
-                  <Textarea
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="rejectionReason">Motivo del rechazo *</Label>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleRefineRejection}
+                      disabled={isRefiningRejection || !rejectionReason || rejectionReason.length < 5}
+                      className="h-6 px-2 text-xs text-primary hover:text-primary hover:bg-primary/10"
+                    >
+                      {isRefiningRejection ? (
+                         <>
+                           <Spinner size="sm" />
+                           <span className="ml-2">Mejorando...</span>
+                         </>
+                      ) : (
+                        <>
+                           <Wand2 className="h-3 w-3 mr-1" />
+                           <span>Mejorar redacción</span>
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                  <SpeechTextarea
                     id="rejectionReason"
                     value={rejectionReason}
                     onChange={(e) => setRejectionReason(e.target.value)}
-                    placeholder="Explica por qué se rechaza esta incidencia..."
+                    placeholder="Explica por qué se rechaza... (o usa micrófono)"
                     rows={3}
                   />
                 </div>
@@ -507,12 +580,34 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
               <div className="p-4 bg-muted rounded-lg space-y-4">
                 <h4 className="font-medium">Cerrar incidencia</h4>
                 <div className="space-y-2">
-                  <Label htmlFor="resolution">Resolución aplicada *</Label>
-                  <Textarea
+                   <div className="flex items-center justify-between">
+                    <Label htmlFor="resolution">Resolución aplicada *</Label>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleRefineResolution}
+                      disabled={isRefiningResolution || !resolution || resolution.length < 5}
+                      className="h-6 px-2 text-xs text-primary hover:text-primary hover:bg-primary/10"
+                    >
+                      {isRefiningResolution ? (
+                         <>
+                           <Spinner size="sm" />
+                           <span className="ml-2">Mejorando...</span>
+                         </>
+                      ) : (
+                        <>
+                           <Wand2 className="h-3 w-3 mr-1" />
+                           <span>Mejorar redacción</span>
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                  <SpeechTextarea
                     id="resolution"
                     value={resolution}
                     onChange={(e) => setResolution(e.target.value)}
-                    placeholder="Describe cómo se resolvió el problema..."
+                    placeholder="Describe cómo se resolvió... (o usa micrófono)"
                     rows={3}
                   />
                 </div>

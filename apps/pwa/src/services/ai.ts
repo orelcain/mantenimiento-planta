@@ -544,7 +544,15 @@ Responde SOLO con el texto reescrito.`
 
 // ===== EXTRACCIÓN DE SÍNTOMAS DESDE DESCRIPCIÓN =====
 
-export async function extractSymptomsFromDescription(description: string, knownSymptoms?: string[]): Promise<string[]> {
+export async function extractSymptomsFromDescription(
+  description: string, 
+  knownSymptoms?: string[],
+  context?: {
+    title?: string
+    priority?: string
+    equipmentName?: string
+  }
+): Promise<string[]> {
   if (!GROQ_API_KEY) {
     logger.warn('GROQ_API_KEY faltante en extractSymptomsFromDescription.')
     return []
@@ -553,7 +561,10 @@ export async function extractSymptomsFromDescription(description: string, knownS
 
   try {
     const prompt = `Analiza esta descripción de falla y extrae una lista de síntomas breves.
-${knownSymptoms ? 'Considera estos síntomas conocidos: ' + JSON.stringify(knownSymptoms) : ''}
+${knownSymptoms ? 'Síntomas conocidos para mapear (si aplica): ' + JSON.stringify(knownSymptoms) : ''}
+${context?.title ? 'Título: ' + context.title : ''}
+${context?.equipmentName ? 'Equipo: ' + context.equipmentName : ''}
+${context?.priority ? 'Prioridad: ' + context.priority : ''}
 
 Descripción: "${description}"
 

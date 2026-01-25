@@ -1,14 +1,23 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.35.27**
+## Versión Actual: **v2.35.28**
 
 **Fecha de lanzamiento**: 25 de enero de 2026  \
-**Estado**: ✅ PRODUCCIÓN READY  \
-**Build**: ✅ Último build local OK
+**Estado**: 🚀 DEPLOYING...  \
+**Build**: ✅ Testing Local OK
 
 ---
 
 ## 📋 Información de la Versión
+
+### v2.35.28 - Feature: AI Context & Extended Voice (25/01/2026)
+
+**Cambios:**
+- 🧠 **IA Contextual**: Mejorada extracción de síntomas incluyendo título, prioridad y equipo para mayor precisión.
+- 🎤 **Voz & IA**: Extendido soporte de dictado y "Magic Button" a formularios de Resolución y Rechazo.
+- 🐛 **Fix**: Corrección en auto-selección de síntomas (fusión de estados en `IncidentForm`).
+
+**Tipo de cambio:** feat
 
 ### v2.35.27 - DevOps: Secrets Integration (25/01/2026)
 
