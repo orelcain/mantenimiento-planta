@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.35.49**
+## Versión Actual: **v2.35.50**
 
 **Fecha de lanzamiento**: 25 de enero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.35.50 - Quality & Interaction Fixes (25/01/2026)
+- **Fix**: Restauración del menú de opciones (3 puntos) en categorías y máquinas.
+- **Code**: Corrección de errores de linter (variables no usadas, expresiones ternarias sin asignación).
+- **Refactor**: Limpieza de listeners de eventos para evitar bloqueos en menús desplegables.
 
 ### v2.35.49 - Category UX Refinements (25/01/2026)
 - **Fix**: Corrección de títulos en diálogos (Subcategoría vs Categoría) y acciones de botones.

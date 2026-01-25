@@ -14,7 +14,6 @@ import { useState, useMemo } from 'react';
 import { Plus, Pencil, Trash2, Archive, ArchiveRestore, GripVertical, ChevronDown, ChevronRight, Wrench, MoreVertical, FolderPlus } from 'lucide-react';
 import {
   DndContext,
-  closestCenter,
   pointerWithin,
   KeyboardSensor,
   PointerSensor,
@@ -251,7 +250,6 @@ function SortableCategoryItem({
          </div>
 
         {/* Actions Menu */}
-        <div onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>
            <DropdownMenuTrigger asChild>
              <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -279,7 +277,6 @@ function SortableCategoryItem({
               </DropdownMenuItem>
            </DropdownMenuContent>
         </DropdownMenu>
-        </div>
       </div>
 
       {/* Contenido Expandible */}
@@ -523,7 +520,7 @@ export function CategoryManager() {
         });
         toast({ title: 'Categoría creada' });
         setShowCategoryDialog(false);
-      } catch (e) { toast({ title: 'Error', variant: 'destructive' }); }
+      } catch { toast({ title: 'Error', variant: 'destructive' }); }
   };
   const handleEditCategory = (c: MachineCategory) => {
       setEditingCategory(c);
@@ -537,13 +534,13 @@ export function CategoryManager() {
           await updateCategory(editingCategory.id, { ...categoryFormData, parentId, nivel: parentId ? 1 : 0 });
           toast({ title: 'Categoría actualizada' });
           setShowCategoryDialog(false);
-      } catch(e) { toast({ title: 'Error', variant: 'destructive' }); }
+      } catch { toast({ title: 'Error', variant: 'destructive' }); }
   };
   const handleToggleActiveCategory = async (c: MachineCategory) => {
       try {
-          c.activa ? await archiveCategory(c.id) : await reactivateCategory(c.id);
+          if (c.activa) await archiveCategory(c.id); else await reactivateCategory(c.id);
           toast({ title: c.activa ? 'Archivada' : 'Reactivada' });
-      } catch(e) { toast({ title: 'Error', variant: 'destructive' }); }
+      } catch { toast({ title: 'Error', variant: 'destructive' }); }
   };
   const handleDeleteCategory = async (c: MachineCategory) => {
       if (getMachinesByCategory(c.id).length > 0) return toast({ title: 'No vacía', description: 'Elimina las máquinas primero.', variant: 'destructive' });
@@ -571,10 +568,10 @@ export function CategoryManager() {
               setExpandedCategories(prev => new Set(prev).add(machineFormData.categoryId));
           }
           setShowMachineDialog(false);
-      } catch(e) { toast({ title: 'Error', variant: 'destructive' }); }
+      } catch { toast({ title: 'Error', variant: 'destructive' }); }
   };
   const handleToggleActiveMachine = async (m: Machine) => {
-       m.activa ? await archiveMachine(m.id) : await reactivateMachine(m.id);
+       if (m.activa) await archiveMachine(m.id); else await reactivateMachine(m.id);
   };
   const handleDeleteMachine = async (m: Machine) => {
       if (confirm('¿Eliminar máquina?')) await deleteMachine(m.id);
