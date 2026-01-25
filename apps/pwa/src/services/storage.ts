@@ -209,7 +209,11 @@ export async function compressImage(
       if (useWebP) {
         canvas.toBlob(
           (webpBlob) => {
-            if (!webpBlob) {
+            // Check if backend returned valid WebP. 
+            // Some browsers (iOS < 14, some Android) return PNG if WebP is not supported for encoding.
+            // PNG is lossless and much larger, so we must avoid it.
+            if (!webpBlob || webpBlob.type !== 'image/webp') {
+              console.warn('WebP compression not supported or returned PNG. Falling back to JPEG.')
               tryJpeg()
               return
             }
