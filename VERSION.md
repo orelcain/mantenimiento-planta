@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.35.22**
+## Versión Actual: **v2.35.23**
 
 **Fecha de lanzamiento**: 25 de enero de 2026  \
 **Estado**: ✅ PRODUCCIÓN READY  \
@@ -9,6 +9,14 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.35.23 - Fix: Validación de claves IA y configuración (25/01/2026)
+
+**Correcciones:**
+- 🔧 Agregada validación y logging explícito cuando falta la API Key de Groq
+- 🔧 Actualizada configuración de entorno para incluir `VITE_GROQ_API_KEY`
+
+**Tipo de cambio:** fix
 
 ### v2.35.22 - Feat: Magic Button & Symptom Extraction (25/01/2026)
 
