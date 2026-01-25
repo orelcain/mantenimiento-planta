@@ -106,8 +106,41 @@ export interface Machine {
   orden: number; // orden de visualización
   manuals?: string[]; // URLs de los manuales PDF
   infografias?: string[]; // URLs de infografías/diagramas
+  
+  // Ficha Técnica y Galería
+  technicalSpecs?: TechnicalSpecs;
+  gallery?: MachineImage[];
+
   createdAt: Date;
   updatedAt?: Date;
+}
+
+//Tipos para Ficha Técnica y Galería
+export type TechnicalDataType = 'motor' | 'pump' | 'conveyor' | 'reductor' | 'general';
+
+export interface TechnicalDataField {
+  id: string;
+  label: string;
+  value: string;
+  isCustom: boolean;
+}
+
+export interface TechnicalSpecs {
+  type: TechnicalDataType;
+  // Valores de los campos estandar (Potencia, RPM, etc)
+  standardValues: Record<string, string | number>;
+  // Campos adicionales creados por el usuario
+  customFields: TechnicalDataField[];
+  notes?: string;
+  updatedAt: number;
+}
+
+export interface MachineImage {
+  id: string;
+  url: string;
+  type: 'plate' | 'equipment' | 'part' | 'other';
+  timestamp: number;
+  notes?: string;
 }
 
 /**

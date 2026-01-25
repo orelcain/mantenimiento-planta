@@ -11,7 +11,7 @@
  */
 
 import { useState, useMemo } from 'react';
-import { Plus, Pencil, Trash2, Archive, ArchiveRestore, GripVertical, ChevronDown, ChevronRight, Wrench, MoreVertical, FolderPlus } from 'lucide-react';
+import { Plus, Pencil, Trash2, Archive, ArchiveRestore, GripVertical, ChevronDown, ChevronRight, Wrench, MoreVertical, FolderPlus, Database, Camera, FileText } from 'lucide-react';
 import {
   DndContext,
   pointerWithin,
@@ -70,11 +70,15 @@ function SortableMachineItem({
   onEdit,
   onToggleActive,
   onDelete,
+  onOpenSpecs,
+  onOpenGallery
 }: {
   machine: Machine;
   onEdit: (m: Machine) => void;
   onToggleActive: (m: Machine) => void;
   onDelete: (m: Machine) => void;
+  onOpenSpecs: (m: Machine) => void;
+  onOpenGallery: (m: Machine) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: `machine-${machine.id}`,
@@ -113,26 +117,49 @@ function SortableMachineItem({
         </span>
       </div>
 
-      {/* Actions Dropdown */}
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" className="h-8 w-8">
-            <MoreVertical className="h-4 w-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={() => onEdit(machine)}>
-            <Pencil className="mr-2 h-4 w-4" /> Editar
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => onToggleActive(machine)}>
-             {machine.activa ? <><Archive className="mr-2 h-4 w-4"/> Archivar</> : <><ArchiveRestore className="mr-2 h-4 w-4"/> Reactivar</>}
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => onDelete(machine)} className="text-destructive focus:text-destructive">
-            <Trash2 className="mr-2 h-4 w-4" /> Eliminar
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      {/* Acciones Rápidas */}
+      <div className="flex items-center">
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="h-8 w-8 text-blue-400 hover:text-blue-300 hover:bg-blue-900/20" 
+          onClick={() => onOpenSpecs(machine)} 
+          title="Ficha Técnica"
+        >
+          <Database className="h-4 w-4" />
+        </Button>
+        
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="h-8 w-8 text-amber-400 hover:text-amber-300 hover:bg-amber-900/20" 
+          onClick={() => onOpenGallery(machine)} 
+          title="Galería"
+        >
+          <Camera className="h-4 w-4" />
+        </Button>
+
+        {/* Actions Dropdown */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8">
+              <MoreVertical className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => onEdit(machine)}>
+              <Pencil className="mr-2 h-4 w-4" /> Editar
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onToggleActive(machine)}>
+               {machine.activa ? <><Archive className="mr-2 h-4 w-4"/> Archivar</> : <><ArchiveRestore className="mr-2 h-4 w-4"/> Reactivar</>}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => onDelete(machine)} className="text-destructive focus:text-destructive">
+              <Trash2 className="mr-2 h-4 w-4" /> Eliminar
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
     </div>
   );
 }
@@ -151,6 +178,8 @@ function SortableCategoryItem({
   onEditMachine,
   onToggleActiveMachine,
   onDeleteMachine,
+  onOpenSpecs,
+  onOpenGallery,
   onCreateSubcategory,
   allCategories,
   getMachinesByCategory,
@@ -170,6 +199,8 @@ function SortableCategoryItem({
   onEditMachine: (m: Machine) => void;
   onToggleActiveMachine: (m: Machine) => void;
   onDeleteMachine: (m: Machine) => void;
+  onOpenSpecs: (m: Machine) => void;
+  onOpenGallery: (m: Machine) => void;
   onCreateSubcategory: (parentId: string) => void;
   allCategories: MachineCategory[];
   getMachinesByCategory: (id: string) => Machine[];
@@ -280,6 +311,8 @@ function SortableCategoryItem({
                     onEditMachine={onEditMachine}
                     onToggleActiveMachine={onToggleActiveMachine}
                     onDeleteMachine={onDeleteMachine}
+                    onOpenSpecs={onOpenSpecs}
+                    onOpenGallery={onOpenGallery}
                     onCreateSubcategory={onCreateSubcategory}
                     allCategories={allCategories}
                     getMachinesByCategory={getMachinesByCategory}
@@ -300,6 +333,8 @@ function SortableCategoryItem({
                         onEdit={onEditMachine}
                         onToggleActive={onToggleActiveMachine}
                         onDelete={onDeleteMachine}
+                        onOpenSpecs={onOpenSpecs}
+                        onOpenGallery={onOpenGallery}
                      />
                   ))}
                </div>
@@ -363,6 +398,21 @@ export function CategoryManager() {
   const [editingMachine, setEditingMachine] = useState<Machine | null>(null);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [activeId, setActiveId] = useState<string | null>(null);
+  
+  // Estados para Ficha Técnica y Galería
+  const [showSpecsDialog, setShowSpecsDialog] = useState(false);
+  const [showGalleryDialog, setShowGalleryDialog] = useState(false);
+  const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null);
+
+  const handleOpenSpecs = (m: Machine) => {
+    setSelectedMachine(m);
+    setShowSpecsDialog(true);
+  };
+
+  const handleOpenGallery = (m: Machine) => {
+    setSelectedMachine(m);
+    setShowGalleryDialog(true);
+  };
 
   // Filtros
   const activeCategories = useMemo(() => categories.filter((c) => c.activa && (c.visible !== false)), [categories]);
@@ -602,6 +652,8 @@ export function CategoryManager() {
                    onEditMachine={handleEditMachine}
                    onToggleActiveMachine={handleToggleActiveMachine}
                    onDeleteMachine={handleDeleteMachine}
+                   onOpenSpecs={handleOpenSpecs}
+                   onOpenGallery={handleOpenGallery}
                    onCreateSubcategory={(parentId) => {
                        setCategoryFormData({ nombre: '', descripcion: '', icono: '', parentId });
                        setEditingCategory(null);
@@ -663,6 +715,63 @@ export function CategoryManager() {
             </div>
             <DialogFooter><Button onClick={handleSaveMachine}>Guardar</Button></DialogFooter>
          </DialogContent>
+      </Dialog>
+
+      {/* Diálogo Ficha Técnica */}
+      <Dialog open={showSpecsDialog} onOpenChange={setShowSpecsDialog}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                    <Database className="h-5 w-5 text-blue-500" />
+                    Datos Técnicos: {selectedMachine?.nombre}
+                </DialogTitle>
+            </DialogHeader>
+            <div className="py-8">
+                <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-muted rounded-lg bg-muted/10 text-center">
+                    <div className="bg-blue-500/10 p-4 rounded-full mb-4">
+                        <Database className="h-8 w-8 text-blue-500" />
+                    </div>
+                    <h3 className="font-semibold text-lg mb-1">Módulo de Ficha Técnica</h3>
+                    <p className="text-muted-foreground max-w-sm mx-auto mb-4">
+                        Aquí podrás gestionar las especificaciones técnicas (Motor, Bomba, Cinta, etc.) y campos personalizados.
+                    </p>
+                    <div className="flex gap-2">
+                        <Button variant="outline" size="sm" disabled><FileText className="mr-2 h-4 w-4"/> Generar PDF (Pronto)</Button>
+                        <Button size="sm" disabled>Configurar Campos</Button>
+                    </div>
+                </div>
+            </div>
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setShowSpecsDialog(false)}>Cerrar</Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Diálogo Galería */}
+      <Dialog open={showGalleryDialog} onOpenChange={setShowGalleryDialog}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                    <Camera className="h-5 w-5 text-amber-500" />
+                    Galería e Imágenes: {selectedMachine?.nombre}
+                </DialogTitle>
+            </DialogHeader>
+            <div className="py-8">
+                 <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-muted rounded-lg bg-muted/10 text-center">
+                    <div className="bg-amber-500/10 p-4 rounded-full mb-4">
+                        <Camera className="h-8 w-8 text-amber-500" />
+                    </div>
+                    <h3 className="font-semibold text-lg mb-1">Galería de Imágenes</h3>
+                    <p className="text-muted-foreground max-w-sm mx-auto mb-4">
+                        Aquí podrás subir fotos de placas, equipos y evidencias visuales.
+                    </p>
+                    <Button size="sm" disabled>Subir Imagen</Button>
+                </div>
+            </div>
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setShowGalleryDialog(false)}>Cerrar</Button>
+            </DialogFooter>
+        </DialogContent>
       </Dialog>
     </div>
   );
