@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.35.30**
+## Versión Actual: **v2.35.31**
 
 **Fecha de lanzamiento**: 25 de enero de 2026  \
 **Estado**: 🚀 DEPLOYING...  \
@@ -9,6 +9,20 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.35.31 - Feature: UI Refresh & Custom Symptoms (25/01/2026)
+
+**Nuevas Funcionalidades:**
+- 🏷️ **Síntomas Personalizados**: Al seleccionar "Otro", ahora puedes escribir un síntoma nuevo directamente.
+- 📐 **Ubicación Compacta**: La sección de ubicación se ha rediseñado con un "zoom out" (70%) para ocupar menos espacio vertical.
+- 🎤 **Título AI**: Agregado soporte para "Mejorar redacción" (Magic Button) en el campo de título.
+- 📷 **Metadata en Fotos**: Las fotos ahora muestran su resolución y peso comprimido en una leyenda.
+- 🎛️ **Prioridad Compacta**: Selectores de prioridad rediseñados para ser más compactos (4 en línea).
+
+**Mejoras Técnicas:**
+- **Compresión**: Se visualiza explícitamente el ahorro de espacio gracias a WebP.
+
+**Tipo de cambio:** feat/style
 
 ### v2.35.30 - UI/UX Refinement (25/01/2026)
 

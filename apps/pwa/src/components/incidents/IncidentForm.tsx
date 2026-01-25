@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Camera, X, Upload, AlertTriangle, Image as ImageIcon, Sparkles, Wand2 } from 'lucide-react'
+import { Camera, X, Upload, AlertTriangle, Image as ImageIcon, Sparkles, Wand2, Mic, Plus } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -32,10 +32,10 @@ interface IncidentFormProps {
 }
 
 const PRIORITY_OPTIONS = [
-  { value: 'critica', label: '🔴 Crítica', desc: 'Detiene producción', color: 'bg-red-500' },
-  { value: 'alta', label: '🟠 Alta', desc: 'Afecta operación', color: 'bg-orange-500' },
-  { value: 'media', label: '🔵 Media', desc: 'Requiere atención', color: 'bg-blue-500' },
-  { value: 'baja', label: '⚪ Baja', desc: 'Puede esperar', color: 'bg-gray-400' },
+  { value: 'critica', label: 'Crítica', desc: 'Detiene prod.', color: 'bg-red-500', border: 'border-red-500' },
+  { value: 'alta', label: 'Alta', desc: 'Afecta op.', color: 'bg-orange-500', border: 'border-orange-500' },
+  { value: 'media', label: 'Media', desc: 'Atención', color: 'bg-blue-500', border: 'border-blue-500' },
+  { value: 'baja', label: 'Baja', desc: 'Puede esperar', color: 'bg-gray-400', border: 'border-gray-400' },
 ]
 
 const COMMON_SYMPTOMS = [
@@ -59,6 +59,14 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
   const [isGeneratingSymptoms, setIsGeneratingSymptoms] = useState(false)
   const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null)
   const [isRefining, setIsRefining] = useState(false)
+  const [isRefiningTitle, setIsRefiningTitle] = useState(false)
+  
+  // Estados para "Otro" síntoma
+  const [isAddingSymptom, setIsAddingSymptom] = useState(false)
+  const [customSymptom, setCustomSymptom] = useState('')
+  
+  // Metadatos de fotos
+  const [photoMeta, setPhotoMeta] = useState<{size: string, dim: string}[]>([])
 
   const isEditMode = !!incident
 
@@ -106,6 +114,22 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
       }
     } else {
       setAiSymptoms(COMMON_SYMPTOMS)
+    }
+  }
+
+  // Refinar título con IA
+  const handleRefineTitle = async () => {
+    if (!formData.titulo || formData.titulo.length < 3) return
+    if (!isAIConfigured()) return
+
+    setIsRefiningTitle(true)
+    try {
+      const refined = await refineText(formData.titulo)
+      setFormData(prev => ({ ...prev, titulo: refined.replace(/\.$/, '') })) // Quitar punto final en títulos
+    } catch(e) {
+      console.error(e)
+    } finally {
+      setIsRefiningTitle(false)
     }
   }
 
@@ -199,14 +223,25 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
     for (const file of files) {
       if (photos.length >= 5) break
       
-      // Comprimir imagen
+      // Comprimir imagen (ya usa WebP por defecto en storage.ts)
       const compressed = await compressImage(file, 1920, 0.8)
       setPhotos((prev) => [...prev, compressed])
       
-      // Crear preview
+      // Crear preview y obtener metadatos
       const reader = new FileReader()
       reader.onloadend = () => {
-        setPhotoPreview((prev) => [...prev, reader.result as string])
+        const result = reader.result as string
+        setPhotoPreview((prev) => [...prev, result])
+        
+        // Obtener dimensiones
+        const img = new Image()
+        img.src = result
+        img.onload = () => {
+           setPhotoMeta(prev => [...prev, {
+             size: (compressed.size / 1024).toFixed(1) + ' KB',
+             dim: `${img.width}x${img.height} px`
+           }])
+        }
       }
       reader.readAsDataURL(compressed)
     }
@@ -216,6 +251,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
   const handleRemovePhoto = (index: number) => {
     setPhotos((prev) => prev.filter((_, i) => i !== index))
     setPhotoPreview((prev) => prev.filter((_, i) => i !== index))
+    setPhotoMeta((prev) => prev.filter((_, i) => i !== index))
   }
 
   // Enviar formulario
@@ -370,19 +406,21 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
         <form onSubmit={isEditMode ? handleEditSubmit : handleSubmit} className="space-y-4">
           {/* Ubicación jerárquica - Solo en modo creación */}
           {!isEditMode && (
-            <div className="space-y-2">
+            <div className="space-y-1">
               <Label className="text-sm font-medium">📍 Ubicación *</Label>
-              <div className="border rounded-lg p-3 bg-muted/30">
-                <HierarchySelector
-                  value={formData.hierarchyNodeId}
-                  onChange={(nodeId: string | null) => {
-                    console.log('🔄 HierarchySelector onChange:', nodeId)
-                    handleHierarchyChange(nodeId || undefined, undefined)
-                  }}
-                  minLevel={HierarchyLevel.SUB_AREA}
-                  maxLevel={HierarchyLevel.ELEMENTO}
-                  error={validationErrors.hierarchyNodeId}
-                />
+              {/* Contenedor con zoom out para ver mejor la jerarquía */}
+              <div className="border rounded-lg p-2 bg-muted/30 overflow-hidden relative" style={{ height: '180px' }}>
+                <div className="origin-top-left absolute top-2 left-2 w-[142%]" style={{ transform: 'scale(0.7)' }}>
+                  <HierarchySelector
+                    value={formData.hierarchyNodeId}
+                    onChange={(nodeId: string | null) => {
+                      handleHierarchyChange(nodeId || undefined, undefined)
+                    }}
+                    minLevel={HierarchyLevel.SUB_AREA}
+                    maxLevel={HierarchyLevel.ELEMENTO}
+                    error={validationErrors.hierarchyNodeId}
+                  />
+                </div>
               </div>
               {validationErrors.hierarchyNodeId && (
                 <p className="text-sm text-destructive mt-1">{validationErrors.hierarchyNodeId}</p>
@@ -422,44 +460,56 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
             </div>
           )}
 
-          {/* Prioridad - Botones grandes para móvil */}
+          {/* Prioridad - Botones compactos */}
           <div className="space-y-2">
             <Label className="text-sm font-medium">⚠️ Prioridad *</Label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-4 gap-2">
               {PRIORITY_OPTIONS.map((opt) => (
                 <button
                   key={opt.value}
                   type="button"
                   onClick={() => setFormData({ ...formData, prioridad: opt.value as IncidentPriority })}
                   className={cn(
-                    'p-3 rounded-lg border-2 text-left transition-all',
+                    'p-2 rounded-lg border-2 text-center transition-all flex flex-col items-center justify-center h-20',
                     formData.prioridad === opt.value 
-                      ? 'border-primary bg-primary/10' 
-                      : 'border-muted hover:border-primary/50'
+                      ? `${opt.border} bg-opacity-10 bg-current` 
+                      : 'border-muted hover:border-gray-300'
                   )}
-                >
-                  <div className="flex items-center gap-2">
-                    <div>
-                      <p className="font-medium text-sm">{opt.label}</p>
-                      <p className="text-xs text-muted-foreground">{opt.desc}</p>
-                    </div>
-                  </div>
+                > 
+                  <div className={cn("w-3 h-3 rounded-full mb-1", opt.color.replace('bg-', 'bg-'))} />
+                  <span className="font-semibold text-xs">{opt.label}</span>
+                  <span className="text-[10px] text-muted-foreground leading-tight mt-1">{opt.desc}</span>
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Título */}
+          {/* Título con Mic y Magia */}
           <div className="space-y-2">
             <Label htmlFor="titulo" className="text-sm font-medium">📝 Título *</Label>
-            <Input
-              id="titulo"
-              value={formData.titulo}
-              onChange={(e) => setFormData({ ...formData, titulo: e.target.value })}
-              placeholder="Ej: Fuga de aceite en bomba principal"
-              className="text-base" // Más grande en móvil
-              required
-            />
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Input
+                  id="titulo"
+                  value={formData.titulo}
+                  onChange={(e) => setFormData({ ...formData, titulo: e.target.value })}
+                  placeholder="Ej: Fuga de aceite..."
+                  className="pr-10"
+                  required
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleRefineTitle}
+                  disabled={isRefiningTitle || !formData.titulo}
+                  className="absolute right-1 top-1 h-8 w-8 p-0 text-muted-foreground hover:text-primary"
+                  title="Mejorar título"
+                >
+                  {isRefiningTitle ? <Spinner size="sm" /> : <Wand2 className="h-4 w-4" />}
+                </Button>
+              </div>
+            </div>
             {validationErrors.titulo && (
               <p className="text-sm text-destructive mt-1">{validationErrors.titulo}</p>
             )}
@@ -532,24 +582,65 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
                     key={symptom}
                     type="button"
                     onClick={() => {
-                      setSelectedSymptoms(prev => 
-                        prev.includes(symptom) 
-                          ? prev.filter(s => s !== symptom)
-                          : [...prev, symptom]
-                      )
+                      if (symptom === 'Otro') {
+                         setIsAddingSymptom(true)
+                         // No seleccionamos "Otro" como tal, abrimos input
+                      } else {
+                        setSelectedSymptoms(prev => 
+                          prev.includes(symptom) 
+                            ? prev.filter(s => s !== symptom)
+                            : [...prev, symptom]
+                        )
+                      }
                     }}
                     disabled={isGeneratingSymptoms}
                     className={cn(
-                      'px-3 py-1.5 rounded-full text-sm border transition-colors',
+                      'px-3 py-1.5 rounded-full text-xs border transition-colors',
                       selectedSymptoms.includes(symptom)
                         ? 'bg-primary text-primary-foreground border-primary'
                         : 'bg-muted/50 border-muted hover:border-primary/50',
-                      isGeneratingSymptoms && 'opacity-50 cursor-not-allowed'
+                      symptom === 'Otro' && 'border-dashed'
                     )}
                   >
                     {symptom}
                   </button>
                 ))}
+                
+                {/* Input para nuevo síntoma */}
+                {isAddingSymptom && (
+                  <div className="flex items-center gap-1 animate-in fade-in zoom-in duration-200">
+                    <Input
+                      autoFocus
+                      value={customSymptom}
+                      onChange={(e) => setCustomSymptom(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          if (customSymptom.trim()) {
+                            setSelectedSymptoms(prev => [...prev, customSymptom.trim()])
+                            setAiSymptoms(prev => [...prev, customSymptom.trim()])
+                            setCustomSymptom('')
+                            setIsAddingSymptom(false)
+                          }
+                        } else if (e.key === 'Escape') {
+                           setIsAddingSymptom(false)
+                        }
+                      }}
+                      onBlur={() => {
+                         if (customSymptom.trim()) {
+                            setSelectedSymptoms(prev => [...prev, customSymptom.trim()])
+                            setAiSymptoms(prev => [...prev, customSymptom.trim()])
+                         }
+                         setCustomSymptom('')
+                         setIsAddingSymptom(false)
+                      }}
+                      placeholder="Escribe síntoma..."
+                      className="h-8 text-xs w-40"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
               </div>
             </div>
           )}
@@ -560,19 +651,26 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
               <Label className="text-sm font-medium">📷 Fotos (máx. 5)</Label>
               <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
                 {photoPreview.map((preview, index) => (
-                  <div key={index} className="relative aspect-square">
+                  <div key={index} className="relative aspect-square group">
                     <img
                       src={preview}
                       alt={`Foto ${index + 1}`}
-                      className="w-full h-full object-cover rounded-lg"
+                      className="w-full h-full object-cover rounded-lg border"
                     />
+                    {/* Botón eliminar */}
                     <button
                       type="button"
                       onClick={() => handleRemovePhoto(index)}
-                      className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1 shadow-lg"
+                      className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1 shadow-lg transform scale-75 group-hover:scale-100 transition-transform"
                     >
                       <X className="h-3 w-3" />
                     </button>
+                    {/* Metadatos (overlay en hover o siempre visible pequeño) */}
+                    {photoMeta[index] && (
+                       <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-[8px] text-white p-0.5 text-center truncate rounded-b-lg backdrop-blur-[1px]">
+                         {photoMeta[index].dim} <br/> {photoMeta[index].size}
+                       </div>
+                    )}
                   </div>
                 ))}
               
