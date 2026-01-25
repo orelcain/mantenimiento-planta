@@ -15,6 +15,7 @@ import { Plus, Pencil, Trash2, Archive, ArchiveRestore, GripVertical, ChevronDow
 import {
   DndContext,
   closestCenter,
+  pointerWithin,
   KeyboardSensor,
   PointerSensor,
   useSensor,
@@ -177,7 +178,7 @@ function SortableCategoryItem({
   toggleExpand: (id: string) => void;
   depth?: number;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging, isOver } = useSortable({
     id: `category-${category.id}`,
     data: { type: 'category', item: category, parentId: category.parentId }
   });
@@ -201,7 +202,7 @@ function SortableCategoryItem({
   const indentClass = depth === 0 ? '' : 'ml-3 border-lborder-border/40';
 
   return (
-    <div ref={setNodeRef} style={style} className={`mb-1 rounded-lg ${depth === 0 ? 'bg-card border border-border/50 shadow-sm' : ''} ${!category.activa ? 'opacity-60' : ''}`}>
+    <div ref={setNodeRef} style={style} className={`mb-1 rounded-lg transition-colors ${depth === 0 ? 'bg-card border border-border/50 shadow-sm' : ''} ${!category.activa ? 'opacity-60' : ''} ${isOver ? 'ring-2 ring-primary/50 bg-accent' : ''}`}>
       
       {/* Header Compacto */}
       <div className={`flex items-center p-2 gap-2 min-h-[3rem] ${depth > 0 ? 'hover:bg-accent/30 rounded-md': ''}`}>
@@ -225,6 +226,28 @@ function SortableCategoryItem({
                   {activeMachines.length} equipos • {sortedSubcategories.length} subcat.
                </span>
             </div>
+         </div>
+
+         {/* Quick Actions (Visible) */}
+         <div className="flex items-center mr-1">
+             <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8 text-muted-foreground hover:text-primary hidden sm:flex" 
+                onClick={(e) => { e.stopPropagation(); onCreateSubcategory(category.id); }}
+                title="Nueva subcategoría"
+             >
+                <FolderPlus className="h-4 w-4" />
+             </Button>
+             <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8 text-muted-foreground hover:text-primary" 
+                onClick={(e) => { e.stopPropagation(); onCreateMachine(category.id); }}
+                title="Nuevo equipo"
+             >
+                <Plus className="h-4 w-4" />
+             </Button>
          </div>
 
         {/* Actions Menu */}
@@ -574,7 +597,7 @@ export function CategoryManager() {
 
       <DndContext
           sensors={sensors}
-          collisionDetection={closestCenter}
+          collisionDetection={pointerWithin} // Mejor detección para anidamiento (drop target)
           onDragStart={(e) => setActiveId(String(e.active.id))}
           onDragEnd={handleDragEnd}
         >
