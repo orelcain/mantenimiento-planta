@@ -452,6 +452,23 @@ export function CategoryManager() {
     (c) => c.visible !== false && !c.parentId && (!editingCategory || c.id !== editingCategory.id)
   ), [categories, editingCategory]);
 
+  // Construir opciones jerárquicas para el Select de máquina
+  const hierarchicalOptions = useMemo(() => {
+    const buildOptions = (parentId: string | null = null, depth = 0): {id: string, nombre: string, depth: number}[] => {
+        const children = activeCategories
+           .filter(c => (c.parentId || null) === parentId)
+           .sort((a,b) => a.orden - b.orden);
+        
+        let result: {id: string, nombre: string, depth: number}[] = [];
+        children.forEach(child => {
+            result.push({ id: child.id, nombre: child.nombre, depth });
+            result = [...result, ...buildOptions(child.id, depth + 1)];
+        });
+        return result;
+    };
+    return buildOptions(null, 0);
+  }, [activeCategories]);
+
   // Sensores para drag & drop
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -978,7 +995,14 @@ export function CategoryManager() {
                >
                   <SelectTrigger id="mach-categoria"><SelectValue placeholder="Selecciona una categoría" /></SelectTrigger>
                   <SelectContent>
-                     {activeCategories.map((cat) => <SelectItem key={cat.id} value={cat.id}>{cat.nombre}</SelectItem>)}
+                     {hierarchicalOptions.map((opt) => (
+                        <SelectItem key={opt.id} value={opt.id}>
+                           <span style={{ paddingLeft: `${opt.depth * 16}px` }}>
+                             {opt.depth > 0 && '↳ '} 
+                             {opt.nombre}
+                           </span>
+                        </SelectItem>
+                     ))}
                   </SelectContent>
                </Select>
             </div>
