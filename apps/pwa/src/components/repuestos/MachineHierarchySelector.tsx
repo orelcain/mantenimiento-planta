@@ -260,7 +260,7 @@ export function MachineHierarchySelector({
         activa: true,
         parentId: currentParentId || null,
         nivel: currentLevel,
-        createdAt: Timestamp.now(),
+        createdAt: new Date(),
         visible: true,
       };
 

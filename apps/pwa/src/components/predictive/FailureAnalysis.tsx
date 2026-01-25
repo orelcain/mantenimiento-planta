@@ -17,7 +17,7 @@ import {
   ArcElement,
 } from 'chart.js'
 import { Bar, Pie } from 'react-chartjs-2'
-import { Loader2, BrainCircuit, AlertTriangle, ChevronRight } from 'lucide-react'
+import { Loader2, BrainCircuit, AlertTriangle, ChevronRight, CheckCircle2, Calendar } from 'lucide-react'
 
 // Registrar componentes de ChartJS
 ChartJS.register(
