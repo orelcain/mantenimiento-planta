@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.35.47**
+## Versión Actual: **v2.35.48**
 
 **Fecha de lanzamiento**: 25 de enero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,18 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.35.48 - Compact Mobile Structure (25/01/2026)
+- **UX**: Refactor total del `CategoryManager` para móviles. Diseño compacto sin tarjetas y acciones agrupadas.
+- **UI**: Interfaz minimalista con alta densidad de información.
+- **Feat**: Acciones de gestión (Editar, Archivar, Mover) consolidadas en menú desplegable.
+
+### v2.35.47 - Nested Interactions (25/01/2026)
+- **Feat**: Botones explícitos para añadir subcategorías.
+- **Fix**: Visualización de jerarquía en selectores de ubicación.
+
+### v2.35.46 - Admin Integration (25/01/2026)
+- **Feat**: Acceso directo a estructura desde panel de administración.
 
 ### v2.35.45 - Structure Management (25/01/2026)
 - **Feature**: Integración del Gestor de Estructura en el Dashboard. Nuevo botón "Estructura" para gestionar categorías y máquinas sin salir del módulo.
