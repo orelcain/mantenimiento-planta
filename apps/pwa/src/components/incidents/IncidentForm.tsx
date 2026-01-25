@@ -702,6 +702,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
                   </div>
                 )}
               </div>
+            </div>
               <div className="flex flex-wrap gap-2">
                 {aiSymptoms.map((symptom) => (
                   <button
@@ -732,7 +733,6 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
                   </button>
                 ))}
                 
-                {/* Input para nuevo síntoma */}
                 {isAddingSymptom && (
                   <div className="flex items-center gap-1 animate-in fade-in zoom-in duration-200">
                     <Input
