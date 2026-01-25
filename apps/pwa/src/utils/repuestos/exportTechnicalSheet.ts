@@ -1,6 +1,6 @@
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
-import type { Repuesto, TechnicalSpecs, MachineImage, TechnicalDataField } from '@/types/repuestos'
+import type { Repuesto, TechnicalDataField } from '@/types/repuestos'
 
 /**
  * Exporta la ficha técnica y galería de un repuesto a PDF

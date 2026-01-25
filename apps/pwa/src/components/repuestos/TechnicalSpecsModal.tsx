@@ -1,22 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
 import { 
   ClipboardList, 
-  Database, 
   Camera, 
-  Image as ImageIcon, 
   Trash2, 
   Plus, 
   Save, 
-  X, 
   Loader2,
-  ChevronDown,
-  Upload,
   FileDown
 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
   DialogTitle,
   Button,
   Input,
@@ -215,7 +209,10 @@ export function TechnicalSpecsModal({
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0 || !repuesto) return;
     
+    // Explicitly assert file exists because of the check above
     const file = e.target.files[0];
+    if (!file) return;
+
     if (!machineId) {
         toast({ title: 'Error', description: 'Falta ID de máquina para subir fotos', variant: 'destructive'});
         return;
@@ -229,7 +226,7 @@ export function TechnicalSpecsModal({
         const newGalleryItem: MachineImage = {
             id: uploadedImg.id,
             url: uploadedImg.url,
-            type: 'eq_part', // Start as generic part
+            type: 'equipment', // Start as generic equipment/part
             timestamp: Date.now(),
             notes: ''
         };
@@ -311,7 +308,7 @@ export function TechnicalSpecsModal({
                     </div>
                     
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {Object.entries(TEMPLATES[specs.type].fields).map(([fieldKey, label]) => (
+                      {Object.entries(TEMPLATES[specs.type]?.fields || {}).map(([fieldKey, label]) => (
                         <div key={fieldKey} className="space-y-1">
                           <label className="text-[10px] font-medium text-muted-foreground uppercase">{label}</label>
                           <Input 

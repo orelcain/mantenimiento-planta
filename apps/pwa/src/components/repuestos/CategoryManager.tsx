@@ -722,14 +722,14 @@ export function CategoryManager() {
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
-                    <Database className="h-5 w-5 text-blue-500" />
+                    <ClipboardList className="h-5 w-5 text-blue-500" />
                     Datos Técnicos: {selectedMachine?.nombre}
                 </DialogTitle>
             </DialogHeader>
             <div className="py-8">
                 <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-muted rounded-lg bg-muted/10 text-center">
                     <div className="bg-blue-500/10 p-4 rounded-full mb-4">
-                        <Database className="h-8 w-8 text-blue-500" />
+                        <ClipboardList className="h-8 w-8 text-blue-500" />
                     </div>
                     <h3 className="font-semibold text-lg mb-1">Módulo de Ficha Técnica</h3>
                     <p className="text-muted-foreground max-w-sm mx-auto mb-4">
