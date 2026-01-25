@@ -395,8 +395,8 @@ export function FailureAnalysis() {
                                 )}
                                 <div className="border rounded-lg p-3">
                                     <div className="text-xs text-muted-foreground mb-1">Reportado Por</div>
-                                    <div className="font-medium">
-                                        {selectedIncident.reportadoPor || 'Usuario del Sistema'}
+                                    <div className="font-medium truncate">
+                                        {selectedIncident.creadoPorNombre || 'Usuario del Sistema'}
                                     </div>
                                 </div>
                             </div>
@@ -407,7 +407,7 @@ export function FailureAnalysis() {
                                     <h4 className="text-sm font-semibold mb-2 text-muted-foreground uppercase tracking-wider">Síntomas Identificados</h4>
                                     <div className="flex flex-wrap gap-2">
                                         {selectedIncident.sintomas.map(s => (
-                                            <Badge key={s} variant="outline" className="px-3 py-1 bg-blue-50/50 text-blue-700 border-blue-200">
+                                            <Badge key={s} variant="secondary" className="px-3 py-1 text-secondary-foreground">
                                                 {s}
                                             </Badge>
                                         ))}
