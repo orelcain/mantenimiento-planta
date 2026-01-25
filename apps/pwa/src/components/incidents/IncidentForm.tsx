@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Camera, X, Upload, AlertTriangle, Image as ImageIcon, Sparkles, Wand2, Mic, Plus } from 'lucide-react'
+import { Camera, X, Upload, AlertTriangle, Image as ImageIcon, Sparkles, Wand2 } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -8,7 +8,6 @@ import {
   Button,
   Input,
   Label,
-  Textarea,
   SpeechTextarea,
   Spinner,
 } from '@/components/ui'

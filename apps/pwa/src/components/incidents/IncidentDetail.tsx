@@ -25,7 +25,6 @@ import {
   DialogFooter,
   Button,
   Badge,
-  Textarea,
   SpeechTextarea,
   Label,
   Spinner,
