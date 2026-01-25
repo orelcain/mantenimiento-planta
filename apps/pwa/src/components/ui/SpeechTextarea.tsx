@@ -57,6 +57,9 @@ const SpeechTextarea = React.forwardRef<HTMLTextAreaElement, SpeechTextareaProps
       recognition.onerror = (event: any) => {
         console.error('Error de reconocimiento de voz:', event.error)
         setIsListening(false)
+        if (event.error === 'not-allowed') {
+          alert('Permiso de micrófono denegado. Por favor actívalo en la configuración.')
+        }
       }
 
       recognition.onend = () => {
@@ -87,7 +90,11 @@ const SpeechTextarea = React.forwardRef<HTMLTextAreaElement, SpeechTextareaProps
       if (!recognitionRef.current) return
 
       if (isListening) {
-        recognitionRef.current.stop()
+        try {
+          recognitionRef.current.stop()
+        } catch (e) {
+          // Ignorar error si ya estaba detenido
+        }
         setIsListening(false)
       } else {
         try {
