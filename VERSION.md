@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.35.53**
+## Versión Actual: **v2.35.54**
 
 **Fecha de lanzamiento**: 25 de enero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,10 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.35.54 - Corrected Overlay Stacking (25/01/2026)
+- **Fix**: Aplicación correcta del `z-index: 9999` al componente principal `DropdownMenuContent`.
+- **Refactor**: Corrección de error de selección de componente (SubMenu vs Menu) que impedía la visualización correcta.
 
 ### v2.35.53 - Dropdown Visibility Force (25/01/2026)
 - **Fix**: Elevación extrema del `z-index` (9999) en menús desplegables para corregir problemas de visualización en ventanas modales oscuras.
