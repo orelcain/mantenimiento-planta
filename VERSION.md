@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.35.56**
+## Versión Actual: **v2.35.57**
 
 **Fecha de lanzamiento**: 25 de enero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,9 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.35.57 - Subcategory Icons Removal (25/01/2026)
+- **UI**: Eliminación de iconos de carpeta en la barra de selección de subcategorías (`MachineSelector`) para reducir ruido visual como solicitado.
 
 ### v2.35.56 - Minimalist UI Cleanup (25/01/2026)
 - **UI**: Eliminación de iconos de carpeta decorativos redundantes en gestión de categorías.

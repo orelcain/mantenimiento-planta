@@ -10,7 +10,7 @@
  */
 
 import { useState, useMemo, useEffect } from 'react';
-import { Folder, ChevronDown } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import { useCurrentMachine, useActiveMachines, useMachineContext } from '@/contexts/MachineContext';
 import { useMachineCategories } from '@/hooks/repuestos/useMachineCategories';
 import type { Machine } from '@/types/repuestos';
@@ -148,7 +148,6 @@ export function MachineSelector({
                     }
                   `}
                 >
-                  <Folder className="h-3 w-3" />
                   {subcat.nombre}
                   {count > 0 && (
                     <span className={`${isSelected ? 'text-amber-200' : 'text-slate-500'}`}>
