@@ -495,7 +495,14 @@ async function saveAIAnalysis(analysis: Omit<AIAnalysis, 'id'>): Promise<void> {
 // ===== REFINAMIENTO DE TEXTO (BOTÓN MÁGICO) =====
 
 export async function refineText(text: string): Promise<string> {
-  if (!GROQ_API_KEY || !text || text.length < 5) return text
+  if (!GROQ_API_KEY) {
+    logger.warn('GROQ_API_KEY faltante en refineText.')
+    return text
+  }
+  if (!text || text.length < 5) {
+    logger.warn('Texto muy corto para refinar:', text)
+    return text
+  }
 
   try {
     const prompt = `Eres un experto técnico industrial.
@@ -536,7 +543,11 @@ Responde SOLO con el texto reescrito.`
 // ===== EXTRACCIÓN DE SÍNTOMAS DESDE DESCRIPCIÓN =====
 
 export async function extractSymptomsFromDescription(description: string, knownSymptoms?: string[]): Promise<string[]> {
-  if (!GROQ_API_KEY || !description || description.length < 10) return []
+  if (!GROQ_API_KEY) {
+    logger.warn('GROQ_API_KEY faltante en extractSymptomsFromDescription.')
+    return []
+  }
+  if (!description || description.length < 10) return []
 
   try {
     const prompt = `Analiza esta descripción de falla y extrae una lista de síntomas breves.
