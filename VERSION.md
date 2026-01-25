@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.35.23**
+## Versión Actual: **v2.35.24**
 
 **Fecha de lanzamiento**: 25 de enero de 2026  \
 **Estado**: ✅ PRODUCCIÓN READY  \
@@ -9,6 +9,14 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.35.24 - Producción: Magic Button Stable (25/01/2026)
+
+**Cambios:**
+- 🚀 **Producción**: Versión estable con "Magic Button" validado.
+- 🔒 **Seguridad**: Eliminado rastreo de archivo de variables locales (`.env.local`).
+
+**Tipo de cambio:** chore
 
 ### v2.35.23 - Fix: Validación de claves IA y configuración (25/01/2026)
 
