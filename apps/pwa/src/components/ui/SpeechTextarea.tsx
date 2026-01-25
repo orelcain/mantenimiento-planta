@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Mic, MicOff } from 'lucide-react'
+import { Mic, StopCircle } from 'lucide-react'
 import { Textarea, TextareaProps } from './textarea'
 import { Button } from './button'
 import { cn } from '@/lib/utils'
@@ -42,15 +42,22 @@ const SpeechTextarea = React.forwardRef<HTMLTextAreaElement, SpeechTextareaProps
       }
 
       const recognition = new SpeechRecognition()
-      recognition.continuous = false // Para móviles es mejor false y dictar frases cortas
-      recognition.interimResults = false
+      recognition.continuous = true // Permitir dictado continuo hasta que el usuario pare
+      recognition.interimResults = true // Necesario para que Android no cierre prematuramente
       recognition.lang = 'es-ES'
 
       recognition.onresult = (event: any) => {
-        const lastResult = event.results[event.results.length - 1]
-        if (lastResult.isFinal) {
-          const transcript = lastResult[0].transcript
-          handleTranscript(transcript)
+        let newText = ''
+        // Iterar solo sobre los nuevos resultados
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const result = event.results[i]
+          if (result.isFinal) {
+            newText += result[0].transcript + ' '
+          }
+        }
+        
+        if (newText) {
+          handleTranscript(newText.trim())
         }
       }
 
@@ -130,7 +137,11 @@ const SpeechTextarea = React.forwardRef<HTMLTextAreaElement, SpeechTextareaProps
             onClick={toggleListening}
             title={isListening ? "Detener dictado" : "Dictar por voz"}
           >
-            {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+            {isListening ? (
+              <StopCircle className="h-4 w-4 animate-pulse fill-current" /> 
+            ) : (
+              <Mic className="h-4 w-4" />
+            )}
           </Button>
         )}
       </div>
