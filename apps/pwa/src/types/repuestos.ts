@@ -68,6 +68,10 @@ export interface Repuesto {
   imagenesManual: ImagenRepuesto[];
   fotosReales: ImagenRepuesto[];
   
+  // Ficha Técnica y Galería (Extendido de Machine)
+  technicalSpecs?: TechnicalSpecs;
+  gallery?: MachineImage[];
+
   createdAt: Date;
   updatedAt: Date;
 }

@@ -11,7 +11,7 @@
  */
 
 import { useState, useMemo } from 'react';
-import { Plus, Pencil, Trash2, Archive, ArchiveRestore, GripVertical, ChevronDown, ChevronRight, Wrench, MoreVertical, FolderPlus, Database, Camera, FileText } from 'lucide-react';
+import { Plus, Pencil, Trash2, Archive, ArchiveRestore, GripVertical, ChevronDown, ChevronRight, Wrench, MoreVertical, FolderPlus, ClipboardList, Camera, FileText } from 'lucide-react';
 import {
   DndContext,
   pointerWithin,
@@ -126,7 +126,7 @@ function SortableMachineItem({
           onClick={() => onOpenSpecs(machine)} 
           title="Ficha Técnica"
         >
-          <Database className="h-4 w-4" />
+          <ClipboardList className="h-4 w-4" />
         </Button>
         
         <Button 

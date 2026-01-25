@@ -498,6 +498,8 @@ export function RepuestosDashboard() {
                 onViewPhotos={(rep) => setPhotoModal(rep)}
                 onViewManual={(rep) => setManualModal(rep)}
                 onViewHistory={(rep) => setHistoryModal(rep)}
+                onViewSpecs={(rep) => console.log('View Specs', rep)}
+                onViewGallery={(rep) => console.log('View Gallery', rep)}
               />
 
               <RepuestosPagination

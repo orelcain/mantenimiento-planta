@@ -10,6 +10,8 @@ interface RepuestosTableProps {
   onViewManual?: (repuesto: Repuesto) => void
   onViewPhotos?: (repuesto: Repuesto) => void
   onViewHistory?: (repuesto: Repuesto) => void
+  onViewSpecs?: (repuesto: Repuesto) => void
+  onViewGallery?: (repuesto: Repuesto) => void
 }
 
 const formatNumber = (value: number) =>
@@ -24,6 +26,8 @@ export function RepuestosTable({
   onViewManual,
   onViewPhotos,
   onViewHistory,
+  onViewSpecs,
+  onViewGallery,
 }: RepuestosTableProps) {
   if (loading) {
     return (
@@ -59,6 +63,8 @@ export function RepuestosTable({
                   onViewManual={onViewManual}
                   onViewPhotos={onViewPhotos}
                   onViewHistory={onViewHistory}
+                  onViewSpecs={onViewSpecs}
+                  onViewGallery={onViewGallery}
                 />
              </div>
              
@@ -112,6 +118,8 @@ export function RepuestosTable({
                     onViewManual={onViewManual}
                     onViewPhotos={onViewPhotos}
                     onViewHistory={onViewHistory}
+                    onViewSpecs={onViewSpecs}
+                    onViewGallery={onViewGallery}
                   />
                 </td>
               </tr>
