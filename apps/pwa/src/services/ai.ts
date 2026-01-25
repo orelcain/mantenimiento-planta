@@ -582,15 +582,30 @@ export async function extractSymptomsFromDescription(
   if (!description || description.length < 10) return []
 
   try {
-    const prompt = `Analiza esta descripción de falla y extrae una lista de síntomas breves.
-${knownSymptoms ? 'Síntomas conocidos para mapear (si aplica): ' + JSON.stringify(knownSymptoms) : ''}
-${context?.title ? 'Título: ' + context.title : ''}
-${context?.equipmentName ? 'Equipo: ' + context.equipmentName : ''}
-${context?.priority ? 'Prioridad: ' + context.priority : ''}
+    const contextPrompt = context 
+    ? `
+Contexto Adicional:
+- Título: ${context.title || 'N/A'}
+- Prioridad: ${context.priority || 'N/A'}
+- Equipo/Ubicación: ${context.equipmentName || context.locationName || 'N/A'}
+` : ''
 
-Descripción: "${description}"
+    const prompt = `Como experto técnico senior en diagnóstico de fallas industriales (RCA), analiza la siguiente descripción y extrae los síntoma raíz o modos de falla físicos.
 
-Responde SOLO con JSON array: ["Síntoma 1", "Síntoma 2"]`
+Entrada: "${description}"
+${contextPrompt}
+
+Reglas estrictas:
+1. Sé extremadamente técnico, preciso y conciso (máx 3 palabras por síntoma).
+2. Evita términos vagos como "fallo", "problema", "mal funcionamiento". Usa el síntoma físico observable.
+3. Si el texto implica una consecuencia (ej: "se paró la línea"), deduce la causa física probable si hay contexto (ej: "Bloqueo mecánico", "Falla eléctrica").
+4. Normaliza los términos (ej: "ruido raro" -> "Ruido anormal", "vibradera" -> "Vibración excesiva").
+5. Responde SOLO con un array JSON de strings.
+
+Síntomas Conocidos (prioriza estos si aplican):
+${knownSymptoms ? JSON.stringify(knownSymptoms) : 'Ninguno'}
+
+Ejemplo Salida: ["Fuga de refrigerante", "Sobrecalentamiento motor"]`
 
     const response = await fetch(GROQ_API_URL, {
       method: 'POST',

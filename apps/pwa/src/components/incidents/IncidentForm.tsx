@@ -40,7 +40,7 @@ const PRIORITY_OPTIONS = [
 
 const COMMON_SYMPTOMS = [
   'Vibración', 'Ruido anormal', 'Calentamiento', 'Fuga de aceite', 
-  'Fuga de agua', 'Humo', 'Olor extraño', 'No enciende', 'Se detiene solo', 'Otro'
+  'Fuga de agua', 'Humo', 'Olor extraño', 'No enciende', 'Se detiene solo'
 ]
 
 export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }: IncidentFormProps) {
@@ -70,7 +70,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false)
   
   // Metadatos de fotos
-  const [photoMeta, setPhotoMeta] = useState<{size: string, dim: string}[]>([])
+  const [photoMeta, setPhotoMeta] = useState<{original: string, compressed: string, dim: string, format: string}[]>([])
 
   const isEditMode = !!incident
 
@@ -276,8 +276,10 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
         img.src = result
         img.onload = () => {
            setPhotoMeta(prev => [...prev, {
-             size: (compressed.size / 1024).toFixed(1) + ' KB',
-             dim: `${img.width}x${img.height} px`
+             original: (file.size / 1024).toFixed(0) + 'KB',
+             compressed: (compressed.size / 1024).toFixed(0) + 'KB',
+             format: compressed.type.split('/')[1].toUpperCase(),
+             dim: `${img.width}x${img.height}`
            }])
         }
       }
@@ -580,12 +582,14 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
             <Label htmlFor="titulo" className="text-sm font-medium">📝 Título *</Label>
             <div className="flex gap-2">
               <div className="relative flex-1">
-                <SpeechInput
+                <SpeechTextarea
                   id="titulo"
+                  name="titulo"
                   value={formData.titulo}
-                  onChange={(e) => setFormData({ ...formData, titulo: e.target.value })}
+                  onChange={(e) => setFormData(prev => ({ ...prev, titulo: e.target.value }))}
                   placeholder="Ej: Fuga de aceite..."
-                  className="pr-24"
+                  className="pr-24 resize-none overflow-hidden min-h-[40px] leading-relaxed"
+                  rows={1}
                   required
                 />
                 <Button
@@ -709,29 +713,35 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
                     key={symptom}
                     type="button"
                     onClick={() => {
-                      if (symptom === 'Otro') {
-                         setIsAddingSymptom(true)
-                         // No seleccionamos "Otro" como tal, abrimos input
-                      } else {
-                        setSelectedSymptoms(prev => 
+                       setSelectedSymptoms(prev => 
                           prev.includes(symptom) 
                             ? prev.filter(s => s !== symptom)
                             : [...prev, symptom]
                         )
-                      }
                     }}
                     disabled={isGeneratingSymptoms}
                     className={cn(
                       'px-3 py-1.5 rounded-full text-xs border transition-colors',
                       selectedSymptoms.includes(symptom)
                         ? 'bg-primary text-primary-foreground border-primary'
-                        : 'bg-muted/50 border-muted hover:border-primary/50',
-                      symptom === 'Otro' && 'border-dashed'
+                        : 'bg-muted/50 border-muted hover:border-primary/50'
                     )}
                   >
                     {symptom}
                   </button>
                 ))}
+
+                {/* Síntoma "Otro" siempre disponible al final */}
+                <button
+                    type="button"
+                    onClick={() => setIsAddingSymptom(true)}
+                    className={cn(
+                      'px-3 py-1.5 rounded-full text-xs border border-dashed transition-colors',
+                       'bg-muted/30 border-muted hover:border-primary/50 text-muted-foreground'
+                    )}
+                >
+                    Otro...
+                </button>
                 
                 {isAddingSymptom && (
                   <div className="flex items-center gap-1 animate-in fade-in zoom-in duration-200">
@@ -791,8 +801,10 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
                     </button>
                     {/* Metadatos (overlay en hover o siempre visible pequeño) */}
                     {photoMeta[index] && (
-                       <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-[8px] text-white p-0.5 text-center truncate rounded-b-lg backdrop-blur-[1px]">
-                         {photoMeta[index].dim} <br/> {photoMeta[index].size}
+                       <div className="absolute bottom-0 left-0 right-0 bg-black/70 text-[9px] text-white p-1 text-center truncate rounded-b-lg backdrop-blur-[2px] leading-tight">
+                         <div className="font-semibold text-yellow-300">{photoMeta[index].compressed} ({photoMeta[index].format})</div>
+                         <div className="opacity-75">{photoMeta[index].dim}</div>
+                         <div className="scale-[0.8] opacity-50 line-through">{photoMeta[index].original}</div>
                        </div>
                     )}
                   </div>
