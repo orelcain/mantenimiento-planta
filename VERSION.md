@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.35.51**
+## Versión Actual: **v2.35.52**
 
 **Fecha de lanzamiento**: 25 de enero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,10 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.35.52 - UI Clean Up & Z-Index Polishing (25/01/2026)
+- **UI**: Eliminación de botones redundantes en lista de categorías (ahora exclusivos en menú de opciones).
+- **Fix**: Elevación del `z-index` en menús desplegables para garantizar visibilidad sobre modales.
 
 ### v2.35.51 - Z-Index Fixes (25/01/2026)
 - **Fix**: Solución a los menús desplegables ocultos detrás de los modales (z-index correction).

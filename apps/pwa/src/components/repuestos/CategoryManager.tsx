@@ -227,29 +227,7 @@ function SortableCategoryItem({
             </div>
          </div>
 
-         {/* Quick Actions (Visible) */}
-         <div className="flex items-center mr-1">
-             <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-8 w-8 text-muted-foreground hover:text-primary hidden sm:flex" 
-                onClick={(e) => { e.stopPropagation(); onCreateSubcategory(category.id); }}
-                title="Nueva subcategoría"
-             >
-                <FolderPlus className="h-4 w-4" />
-             </Button>
-             <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-8 w-8 text-muted-foreground hover:text-primary" 
-                onClick={(e) => { e.stopPropagation(); onCreateMachine(category.id); }}
-                title="Nuevo equipo"
-             >
-                <Plus className="h-4 w-4" />
-             </Button>
-         </div>
-
-        {/* Actions Menu */}
+         {/* Actions Menu */}
         <DropdownMenu>
            <DropdownMenuTrigger asChild>
              <Button variant="ghost" size="icon" className="h-8 w-8">
