@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.35.55**
+## Versión Actual: **v2.35.56**
 
 **Fecha de lanzamiento**: 25 de enero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,10 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.35.56 - Minimalist UI Cleanup (25/01/2026)
+- **UI**: Eliminación de iconos de carpeta decorativos redundantes en gestión de categorías.
+- **UI**: Retirada del botón de menú de administración (3 puntos) en las pestañas de selección de categoría (`CategorySelector`), ya que la gestión se realiza desde el módulo dedicado.
 
 ### v2.35.55 - Hierarchy Visuals (25/01/2026)
 - **UI**: Mejora en la distinción visual de jerarquías. Ahora las subcategorías tienen su propio marco y fondo distintivo para facilitar la lectura.

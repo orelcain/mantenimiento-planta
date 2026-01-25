@@ -309,53 +309,7 @@ export function CategorySelector({
           </nav>
 
           {/* Botón de gestión (solo admin) */}
-          {isAdmin && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="ml-2">
-                  <MoreVertical className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuItem onClick={() => setShowCreateDialog(true)}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Nueva Categoría
-                </DropdownMenuItem>
-
-                {activeCategories.length > 0 && (
-                  <>
-                    <DropdownMenuSeparator />
-                    {activeCategories.map((category) => (
-                      <div key={category.id} className="px-2 py-1 flex items-center justify-between">
-                        <span className="text-sm flex items-center gap-2">
-                          {renderIcon(category.icono)}
-                          {category.nombre}
-                        </span>
-                        <div className="flex gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => openEditDialog(category.id)}
-                            className="h-6 w-6 p-0"
-                          >
-                            <Pencil className="h-3 w-3" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDelete(category.id, category.nombre)}
-                            className="h-6 w-6 p-0 hover:text-destructive"
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+          {/* Eliminado botón redundante de gestión global de categorías */}
         </div>
       </div>
 

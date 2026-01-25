@@ -348,7 +348,7 @@ export function CategoryManager() {
   const [categoryFormData, setCategoryFormData] = useState({
     nombre: '',
     descripcion: '',
-    icono: 'Folder',
+    icono: '', // Default vacío, no se usan iconos
     parentId: NO_PARENT_VALUE,
   });
   const [machineFormData, setMachineFormData] = useState({
@@ -567,7 +567,7 @@ export function CategoryManager() {
       <div className="flex items-center justify-between mb-4 sticky top-0 bg-background z-10 py-2 border-b">
         <h2 className="text-lg font-bold">Estructura</h2>
         <Button size="sm" onClick={() => {
-          setCategoryFormData({ nombre: '', descripcion: '', icono: 'Folder', parentId: NO_PARENT_VALUE });
+          setCategoryFormData({ nombre: '', descripcion: '', icono: '', parentId: NO_PARENT_VALUE });
           setEditingCategory(null);
           setShowCategoryDialog(true);
         }}>
@@ -603,7 +603,7 @@ export function CategoryManager() {
                    onToggleActiveMachine={handleToggleActiveMachine}
                    onDeleteMachine={handleDeleteMachine}
                    onCreateSubcategory={(parentId) => {
-                       setCategoryFormData({ nombre: '', descripcion: '', icono: 'Folder', parentId });
+                       setCategoryFormData({ nombre: '', descripcion: '', icono: '', parentId });
                        setEditingCategory(null);
                        setShowCategoryDialog(true);
                    }}
