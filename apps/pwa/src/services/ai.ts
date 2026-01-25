@@ -508,8 +508,10 @@ export async function refineText(text: string): Promise<string> {
 
   try {
     const prompt = `Eres un experto técnico industrial.
-Reescribe esta descripción para que sea clara, técnica y profesional.
-Corrige ortografía y gramática.
+Reescribe esta descripción para que sea clara, técnica, CONCISA y profesional.
+Elimina redundancias y palabras innecesarias. Sé directo.
+NO uses comillas en la respuesta.
+NO escribas párrafos largos.
 
 Texto original: "${text}"
 

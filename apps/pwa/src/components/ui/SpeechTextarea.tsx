@@ -31,6 +31,19 @@ const SpeechTextarea = React.forwardRef<HTMLTextAreaElement, SpeechTextareaProps
     const [isListening, setIsListening] = React.useState(false)
     const [isSupported, setIsSupported] = React.useState(true)
     const recognitionRef = React.useRef<SpeechRecognition | null>(null)
+    const innerRef = React.useRef<HTMLTextAreaElement>(null)
+
+    // Sincronizar ref externa
+    React.useImperativeHandle(ref, () => innerRef.current!)
+
+    // Auto-ajuste de altura (al cambiar valor externamente, ej: AI)
+    React.useEffect(() => {
+      const textarea = innerRef.current
+      if (textarea) {
+        textarea.style.height = 'auto'
+        textarea.style.height = `${textarea.scrollHeight}px`
+      }
+    }, [value])
 
     React.useEffect(() => {
       if (typeof window === 'undefined') return
@@ -117,10 +130,15 @@ const SpeechTextarea = React.forwardRef<HTMLTextAreaElement, SpeechTextareaProps
     return (
       <div className="relative">
         <Textarea
-          ref={ref}
+          ref={innerRef}
           value={value}
-          onChange={onChange}
-          className={cn("pr-12", className)} // Espacio para el botón
+          onChange={(e) => {
+            // Ajuste inmediato al escribir
+            e.target.style.height = 'auto'
+            e.target.style.height = `${e.target.scrollHeight}px`
+            onChange?.(e)
+          }}
+          className={cn("pr-12 resize-none overflow-hidden", className)}
           {...props}
         />
         {isSupported && (

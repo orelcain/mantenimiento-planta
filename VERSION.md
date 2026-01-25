@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.35.29**
+## Versión Actual: **v2.35.30**
 
 **Fecha de lanzamiento**: 25 de enero de 2026  \
 **Estado**: 🚀 DEPLOYING...  \
@@ -9,6 +9,14 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.35.30 - UI/UX Refinement (25/01/2026)
+
+**Mejoras:**
+- 📐 **UI Adaptable**: El campo de texto (`SpeechTextarea`) ahora se ajusta automáticamente a la altura del contenido (auto-resize).
+- 🧠 **IA Precisa**: Ajustado el prompt de refinamiento para generar textos técnicos más concisos, evitando redundancias, comillas y párrafos extensos.
+
+**Tipo de cambio:** style/refactor
 
 ### v2.35.29 - Fix: UX/UI Síntomas (25/01/2026)
 
