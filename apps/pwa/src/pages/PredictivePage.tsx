@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Activity, AlertTriangle, CheckCircle2 } from 'lucide-react'
-import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Switch } from '@/components/ui'
+import { Activity, AlertTriangle, CheckCircle2, LineChart, Cpu } from 'lucide-react'
+import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Switch, Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui'
 import { Slider } from '@/components/ui/slider'
 import type { BadgeProps } from '@/components/ui/badge'
 import { useAppStore } from '@/store'
@@ -15,6 +15,7 @@ import { subscribeDevices } from '@/services/devicesRtdb'
 import { getEquipments, updateEquipment } from '@/services/equipment'
 import type { Equipment, PredictiveThresholds } from '@/types'
 import { DEFAULT_PREDICTIVE_THRESHOLDS } from '@/lib/predictive/predictor'
+import { FailureAnalysis } from '@/components/predictive/FailureAnalysis'
 
 function normalizeTs(ts: number | undefined): number | null {
   if (typeof ts !== 'number' || !Number.isFinite(ts)) return null
@@ -403,12 +404,29 @@ export function PredictivePage() {
         <div>
           <h1 className="text-2xl font-bold">Módulo Predictivo</h1>
           <p className="text-muted-foreground">
-            Sensores IoT por máquina + tendencia + alertas de riesgo
+            Gestión inteligente: IoT y Análisis de Fallas
           </p>
         </div>
       </div>
 
-      <Card>
+      <Tabs defaultValue="iot" className="space-y-4">
+        <TabsList>
+            <TabsTrigger value="iot" className="flex items-center gap-2">
+                <Cpu className="h-4 w-4" />
+                Monitoreo IoT
+            </TabsTrigger>
+            <TabsTrigger value="analysis" className="flex items-center gap-2">
+                <LineChart className="h-4 w-4" />
+                Análisis de Fallas
+            </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="analysis">
+            <FailureAnalysis />
+        </TabsContent>
+
+        <TabsContent value="iot" className="space-y-6">
+          <Card>
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2">
             <Activity className="h-5 w-5" />
@@ -1225,6 +1243,8 @@ export function PredictivePage() {
           </div>
         </div>
       )}
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

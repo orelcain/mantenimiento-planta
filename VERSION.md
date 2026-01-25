@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.35.31**
+## Versión Actual: **v2.35.32**
 
 **Fecha de lanzamiento**: 25 de enero de 2026  \
 **Estado**: 🚀 DEPLOYING...  \
@@ -9,6 +9,21 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.35.32 - Feature: Failure Analysis Module (25/01/2026)
+
+**Nuevas Funcionalidades:**
+- 📈 **Módulo Análisis de Fallas**: Nuevo submódulo dentro de "Predictivo" para analizar patrones históricos.
+- 📊 **Dashboards Visuales**: 
+    - Pareto de Síntomas (Frecuencia de fallas).
+    - Distribución de Estados (Pie chart).
+    - KPIs Automáticos (Tasa de cierre, top síntoma).
+- 🧠 **Insights**: Listado de los últimos "Hallazgos Críticos" basado en la prioridad.
+
+**Infraestructura:**
+- Integración de `chart.js` para visualización de datos.
+
+**Tipo de cambio:** feat
 
 ### v2.35.31 - Feature: UI Refresh & Custom Symptoms (25/01/2026)
 
