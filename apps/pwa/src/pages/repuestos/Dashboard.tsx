@@ -357,56 +357,73 @@ export function RepuestosDashboard() {
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-background">
       {/* Category Selector Tabs */}
-      <CategorySelector
-        selectedCategoryId={selectedCategoryId}
-        onSelectCategory={setSelectedCategoryId}
-        machineCountsByCategory={machineCountsByCategory}
-      />
+      <div className="sticky top-0 z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
+         <CategorySelector
+            selectedCategoryId={selectedCategoryId}
+            onSelectCategory={setSelectedCategoryId}
+            machineCountsByCategory={machineCountsByCategory}
+          />
+         <MachineSelector
+            repuestosCounts={repuestosCounts}
+            selectedCategoryId={selectedCategoryId}
+        />
+      </div>
 
-      {/* Machine Selector Tabs */}
-      <MachineSelector
-        repuestosCounts={repuestosCounts}
-        selectedCategoryId={selectedCategoryId}
-      />
-
-      <div className="flex-1 p-6 space-y-6">
+      <div className="flex-1 p-3 sm:p-6 space-y-4 sm:space-y-6 overflow-x-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <h1 className="text-xl font-semibold text-foreground">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <h1 className="text-lg sm:text-xl font-semibold text-foreground truncate">
             Repuestos - {currentMachine.nombre}
           </h1>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setImportOpen(true)} className="gap-2" title="Importar desde Excel">
-              <Upload className="h-4 w-4" />
-              Importar
-            </Button>
-            {/* Botones de exportación */}
-            <Button variant="outline" onClick={handleExportExcel} className="gap-2" title="Exportar a Excel">
-              <FileSpreadsheet className="h-4 w-4" />
-              Excel
-            </Button>
-            <Button variant="outline" onClick={handleExportPDF} className="gap-2" title="Exportar catálogo a PDF">
-              <FileText className="h-4 w-4" />
-              PDF
-            </Button>
-            
-            {/* Botón nuevo repuesto */}
-            <Button onClick={() => setCreateOpen(true)} className="gap-2">
-              <Plus className="h-4 w-4" />
-              Nuevo repuesto
-            </Button>
-            
-            {/* Botón crear nuevo equipo */}
-            <Button onClick={() => setNewMachineOpen(true)} className="gap-2" variant="outline">
-              <Plus className="h-4 w-4" />
-              Nuevo equipo
-            </Button>
+          
+          <div className="flex flex-wrap gap-2">
+             {/* Mobile: Collapse secondary actions or use icons only if needed */}
+             
+             <div className="flex items-center gap-2 w-full sm:w-auto">
+                <Button variant="outline" size="sm" onClick={() => setImportOpen(true)} className="flex-1 sm:flex-none gap-2" title="Importar">
+                  <Upload className="h-4 w-4" />
+                  <span className="sm:inline">Importar</span>
+                </Button>
+                
+                <div className="hidden sm:flex gap-2">
+                   <Button variant="outline" size="sm" onClick={handleExportExcel} className="gap-2" title="Exportar Excel">
+                      <FileSpreadsheet className="h-4 w-4" />
+                   </Button>
+                   <Button variant="outline" size="sm" onClick={handleExportPDF} className="gap-2" title="Exportar PDF">
+                      <FileText className="h-4 w-4" />
+                   </Button>
+                </div>
+
+                <Button size="sm" onClick={() => setCreateOpen(true)} className="flex-1 sm:flex-none gap-2">
+                  <Plus className="h-4 w-4" />
+                  <span className="truncate">Repuesto</span>
+                </Button>
+             </div>
+             
+             {/* Mas opciones mobile */}
+             <div className="flex sm:hidden w-full gap-2">
+                <Button variant="outline" size="sm" onClick={handleExportExcel} className="flex-1 gap-1" title="Excel">
+                  <FileSpreadsheet className="h-3 w-3" /> <span className="text-xs">Excel</span>
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleExportPDF} className="flex-1 gap-1" title="PDF">
+                  <FileText className="h-3 w-3" /> <span className="text-xs">PDF</span>
+                </Button>
+                 <Button onClick={() => setNewMachineOpen(true)} className="flex-1 gap-1" variant="outline" size="sm">
+                  <Plus className="h-3 w-3" />
+                  <span className="text-xs">Equipo</span>
+                </Button>
+             </div>
+             
+             <Button onClick={() => setNewMachineOpen(true)} className="hidden sm:flex gap-2" variant="outline" size="sm">
+               <Plus className="h-4 w-4" />
+               Nuevo equipo
+             </Button>
           </div>
         </div>
 
-        {/* Stats Cards */}
+        {/* Stats Cards - Hidden for now */}
         {/* Resumen oculto por ahora */}
 
         {/* Error Display */}
