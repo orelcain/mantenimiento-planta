@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Camera, X, Upload, AlertTriangle, Image as ImageIcon, Sparkles } from 'lucide-react'
+import { Camera, X, Upload, AlertTriangle, Image as ImageIcon, Sparkles, Wand2 } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -15,7 +15,7 @@ import {
 import { useAuthStore, useAppStore } from '@/store'
 import { createIncident, updateIncident } from '@/services/incidents'
 import { uploadIncidentPhoto, compressImage } from '@/services/storage'
-import { generateSymptoms } from '@/services/ai'
+import { generateSymptoms, refineText, extractSymptomsFromDescription } from '@/services/ai'
 import type { IncidentPriority, Incident, Equipment } from '@/types'
 import { HierarchyLevel } from '@/types/hierarchy'
 import { cn } from '@/lib/utils'
@@ -56,6 +56,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
   const [aiSymptoms, setAiSymptoms] = useState<string[]>(COMMON_SYMPTOMS)
   const [isGeneratingSymptoms, setIsGeneratingSymptoms] = useState(false)
   const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null)
+  const [isRefining, setIsRefining] = useState(false)
 
   const isEditMode = !!incident
 
@@ -103,6 +104,30 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
       }
     } else {
       setAiSymptoms(COMMON_SYMPTOMS)
+    }
+  }
+
+  // Refinar descripción con IA
+  const handleRefineDescription = async () => {
+    if (!formData.descripcion || formData.descripcion.length < 5) return
+    
+    setIsRefining(true)
+    try {
+      // 1. Refinar texto
+      const refined = await refineText(formData.descripcion)
+      setFormData(prev => ({ ...prev, descripcion: refined }))
+      
+      // 2. Extraer síntomas
+      const symptoms = await extractSymptomsFromDescription(refined, aiSymptoms)
+      if (symptoms.length > 0) {
+        // Combinar con existentes sin duplicados
+        setSelectedSymptoms(prev => Array.from(new Set([...prev, ...symptoms])))
+        logger.info('Síntomas extraídos automáticamente', { count: symptoms.length })
+      }
+    } catch (error) {
+      logger.error('Error refinando descripción', error instanceof Error ? error : new Error(String(error)))
+    } finally {
+      setIsRefining(false)
     }
   }
 
@@ -392,7 +417,29 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
 
           {/* Descripción */}
           <div className="space-y-2">
-            <Label htmlFor="descripcion" className="text-sm font-medium">📋 Descripción *</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="descripcion" className="text-sm font-medium">📋 Descripción *</Label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={handleRefineDescription}
+                disabled={isRefining || !formData.descripcion || formData.descripcion.length < 5}
+                className="h-6 px-2 text-xs text-primary hover:text-primary hover:bg-primary/10"
+              >
+                {isRefining ? (
+                  <>
+                    <Spinner size="sm" />
+                    <span className="ml-2">Mejorando...</span>
+                  </>
+                ) : (
+                  <>
+                    <Wand2 className="h-3 w-3 mr-1" />
+                    <span>Mejorar redacción</span>
+                  </>
+                )}
+              </Button>
+            </div>
             <SpeechTextarea
               id="descripcion"
               name="descripcion"

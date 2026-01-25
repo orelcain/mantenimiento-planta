@@ -491,3 +491,89 @@ async function saveAIAnalysis(analysis: Omit<AIAnalysis, 'id'>): Promise<void> {
     logger.error('Error guardando análisis:', error instanceof Error ? error : new Error(String(error)))
   }
 }
+
+// ===== REFINAMIENTO DE TEXTO (BOTÓN MÁGICO) =====
+
+export async function refineText(text: string): Promise<string> {
+  if (!GROQ_API_KEY || !text || text.length < 5) return text
+
+  try {
+    const prompt = `Eres un experto técnico industrial.
+Reescribe esta descripción para que sea clara, técnica y profesional.
+Corrige ortografía y gramática.
+
+Texto original: "${text}"
+
+Responde SOLO con el texto reescrito.`
+
+    const response = await fetch(GROQ_API_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${GROQ_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.2,
+        max_tokens: 500,
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error(`Groq API error: ${response.status}`)
+    }
+
+    const data = await response.json()
+    return data.choices[0]?.message?.content?.trim() || text
+
+  } catch (error) {
+    logger.error('Error refinando texto con IA:', error instanceof Error ? error : new Error(String(error)))
+    return text
+  }
+}
+
+// ===== EXTRACCIÓN DE SÍNTOMAS DESDE DESCRIPCIÓN =====
+
+export async function extractSymptomsFromDescription(description: string, knownSymptoms?: string[]): Promise<string[]> {
+  if (!GROQ_API_KEY || !description || description.length < 10) return []
+
+  try {
+    const prompt = `Analiza esta descripción de falla y extrae una lista de síntomas breves.
+${knownSymptoms ? 'Considera estos síntomas conocidos: ' + JSON.stringify(knownSymptoms) : ''}
+
+Descripción: "${description}"
+
+Responde SOLO con JSON array: ["Síntoma 1", "Síntoma 2"]`
+
+    const response = await fetch(GROQ_API_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${GROQ_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.1,
+        max_tokens: 300,
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error(`Groq API error: ${response.status}`)
+    }
+
+    const data = await response.json()
+    const content = data.choices[0]?.message?.content || '[]'
+    
+    // Limpieza básica por si el modelo incluye markdown
+    const jsonStr = content.replace(/```json/g, '').replace(/```/g, '').trim()
+    
+    return JSON.parse(jsonStr)
+
+  } catch (error) {
+    logger.error('Error extrayendo síntomas con IA:', error instanceof Error ? error : new Error(String(error)))
+    return []
+  }
+}
