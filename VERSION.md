@@ -1,14 +1,27 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.35.21**
+## Versión Actual: **v2.35.22**
 
-**Fecha de lanzamiento**: 21 de enero de 2026  \
+**Fecha de lanzamiento**: 25 de enero de 2026  \
 **Estado**: ✅ PRODUCCIÓN READY  \
 **Build**: ✅ Último build local OK
 
 ---
 
 ## 📋 Información de la Versión
+
+### v2.35.22 - Feat: Magic Button & Symptom Extraction (25/01/2026)
+
+**Nuevas Funcionalidades:**
+- ✨ **Botón Mágico (AI):** Nueva funcionalidad para refinar descripciones de incidencias automáticamente usando IA
+- ✨ **Extracción de Síntomas:** La IA analiza la descripción y selecciona los síntomas correspondientes automáticamente
+- ✨ Integración completa con Groq (Llama 3) para procesamiento de lenguaje natural
+
+**Mejoras:**
+- 🎨 UI de redacción mejorada con feedback visual durante el procesamiento
+- 🔧 Reparación y optimización del servicio `ai.ts`
+
+**Tipo de cambio:** feat
 
 ### v2.31.10 - Fix: Tab único y máquinas visibles (21/01/2026)
 
