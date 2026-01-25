@@ -149,10 +149,12 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
       const symptoms = await extractSymptomsFromDescription(refined, aiSymptoms, context)
       
       if (symptoms.length > 0) {
-        // Asegurar que los síntomas extraídos sean visibles en las opciones
-        setAiSymptoms(prev => Array.from(new Set([...prev, ...symptoms])))
+        // Actualizar la lista de síntomas disponibles:
+        // Mantenemos los nuevos detectados + los que el usuario ya tenía seleccionados manually.
+        // Esto "oculta" los anteriores que no son relevantes ni están seleccionados.
+        setAiSymptoms(Array.from(new Set([...symptoms, ...selectedSymptoms])))
         
-        // Seleccionarlos automáticamente
+        // Seleccionarlos automáticamente (merge con los existentes)
         setSelectedSymptoms(prev => Array.from(new Set([...prev, ...symptoms])))
         
         logger.info('Síntomas extraídos automáticamente', { count: symptoms.length })

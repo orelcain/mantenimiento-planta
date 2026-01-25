@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.35.28**
+## Versión Actual: **v2.35.29**
 
 **Fecha de lanzamiento**: 25 de enero de 2026  \
 **Estado**: 🚀 DEPLOYING...  \
@@ -9,6 +9,14 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.35.29 - Fix: UX/UI Síntomas (25/01/2026)
+
+**Correcciones:**
+- 🐛 **Limpieza de Síntomas**: Al refinar la descripción, la lista de síntomas ahora se filtra para mostrar solo los detectados por la IA + los seleccionados, eliminando sugerencias antiguas irrelevantes.
+- 👁️ **Visibilidad**: Asegura que los nuevos síntomas detectados sean inmediatamente visibles y seleccionables.
+
+**Tipo de cambio:** fix
 
 ### v2.35.28 - Feature: AI Context & Extended Voice (25/01/2026)
 
