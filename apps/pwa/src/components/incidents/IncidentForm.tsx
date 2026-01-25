@@ -9,6 +9,7 @@ import {
   Input,
   Label,
   SpeechTextarea,
+  SpeechInput,
   Spinner,
 } from '@/components/ui'
 import { useAuthStore, useAppStore } from '@/store'
@@ -488,12 +489,12 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
             <Label htmlFor="titulo" className="text-sm font-medium">📝 Título *</Label>
             <div className="flex gap-2">
               <div className="relative flex-1">
-                <Input
+                <SpeechInput
                   id="titulo"
                   value={formData.titulo}
                   onChange={(e) => setFormData({ ...formData, titulo: e.target.value })}
                   placeholder="Ej: Fuga de aceite..."
-                  className="pr-10"
+                  className="pr-24"
                   required
                 />
                 <Button
@@ -502,7 +503,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
                   size="sm"
                   onClick={handleRefineTitle}
                   disabled={isRefiningTitle || !formData.titulo}
-                  className="absolute right-1 top-1 h-8 w-8 p-0 text-muted-foreground hover:text-primary"
+                  className="absolute right-12 top-1 h-8 w-8 p-0 text-muted-foreground hover:text-primary z-10"
                   title="Mejorar título"
                 >
                   {isRefiningTitle ? <Spinner size="sm" /> : <Wand2 className="h-4 w-4" />}

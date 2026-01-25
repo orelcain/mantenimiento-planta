@@ -31,3 +31,4 @@ export {
   DropdownMenuRadioGroup,
 } from './dropdown-menu'
 export { SpeechTextarea } from './SpeechTextarea'
+export { SpeechInput } from './SpeechInput'
