@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.35.50**
+## Versión Actual: **v2.35.51**
 
 **Fecha de lanzamiento**: 25 de enero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,10 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.35.51 - Z-Index Fixes (25/01/2026)
+- **Fix**: Solución a los menús desplegables ocultos detrás de los modales (z-index correction).
+- **UI**: Mejora en la visualización de opciones flotantes.
 
 ### v2.35.50 - Quality & Interaction Fixes (25/01/2026)
 - **Fix**: Restauración del menú de opciones (3 puntos) en categorías y máquinas.
