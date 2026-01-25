@@ -1,14 +1,49 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.35.36**
+## Versión Actual: **v2.35.37**
 
 **Fecha de lanzamiento**: 25 de enero de 2026  \
-**Estado**: 🚀 DEPLOYING...  \
-**Build**: ✅ Testing Local OK
+**Estado**: 🚀 PRODUCTION READY  \
+**Build**: ✅ Stable
 
 ---
 
 ## 📋 Información de la Versión
+
+### v2.35.37 - Fixes & Cleanup (25/01/2026)
+
+**Correcciones y Mejoras:**
+- 🐛 **TypeScript Fixes**: Resolución de errores de tipado en `MachineHierarchySelector` (propiedades faltantes en `MachineCategory`).
+- 🧹 **Code Cleanup**: Eliminación de imports no utilizados en `FailureAnalysis.tsx` y limpieza de código muerto.
+- 🔧 **Estabilidad**: Corrección de validaciones nulas en gráficos y restauración de iconos faltantes (`CheckCircle2`, `Calendar`).
+
+**Tipo de cambio:** fix
+
+---
+
+### v2.35.36 - Feature: Interactive Analysis (25/01/2026)
+
+**Nuevas Funcionalidades:**
+- 👆 **Gráficos Interactivos**: Al hacer clic en una barra del gráfico "Pareto de Síntomas" o en la tarjeta "Síntoma Top #1", se abre un detalle.
+- 🗂️ **Listado Contextual**: Modal emergente que filtra y muestra todas las incidencias históricas relacionadas con el síntoma seleccionado.
+
+**Tipo de cambio:** feat
+
+### v2.35.35 - Maintenance: Cleanup (25/01/2026)
+
+**Mantenimiento:**
+- 🧹 **Cleanup**: Eliminados imports no utilizados (`Textarea`, `Mic`, `Plus`) en formularios de incidencias.
+- 🔧 **Estabilidad**: Validación final de build tras corrección de sintaxis.
+
+**Tipo de cambio:** chore
+
+### v2.35.34 - Fix: Build Syntax Error (25/01/2026)
+
+**Correcciones:**
+- 🐛 **Build Critical**: Solucionado error de sintaxis (tags HTML duplicados) en `IncidentForm` que rompía la compilación en producción.
+- ✅ **Validación**: Verificada compilación local exitosa (`pnpm build`).
+
+**Tipo de cambio:** fix
 
 ### v2.35.33 - Fix: Failure Analysis Types (25/01/2026)
 
