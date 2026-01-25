@@ -41,6 +41,9 @@ jobs:
 
       - name: Build PWA
         working-directory: apps/pwa
+        env: 
+          VITE_GROQ_API_KEY: ${{ secrets.VITE_GROQ_API_KEY }}
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
         run: pnpm build
         # Firebase config está hardcodeada en el código (segura para cliente)
 

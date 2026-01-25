@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.35.26**
+## Versión Actual: **v2.35.27**
 
 **Fecha de lanzamiento**: 25 de enero de 2026  \
 **Estado**: ✅ PRODUCCIÓN READY  \
@@ -9,6 +9,14 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.35.27 - DevOps: Secrets Integration (25/01/2026)
+
+**Cambios:**
+- 🔧 **CI/CD**: Actualizado workflow de despliegue para inyectar `VITE_GROQ_API_KEY` desde GitHub Secrets.
+- 🔒 **Seguridad**: Habilitado soporte para variables de entorno en build de producción.
+
+**Tipo de cambio:** chore
 
 ### v2.35.26 - Maintenance: Version Synchronization (25/01/2026)
 
