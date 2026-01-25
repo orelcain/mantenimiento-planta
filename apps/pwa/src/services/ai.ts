@@ -496,26 +496,40 @@ async function saveAIAnalysis(analysis: Omit<AIAnalysis, 'id'>): Promise<void> {
 
 // ===== REFINAMIENTO DE TEXTO (BOTÓN MÁGICO) =====
 
-export async function refineText(text: string): Promise<string> {
+// Extender refineText para soportar contexto de transcripción
+export async function refineText(text: string, isTranscriptionCleanup = false): Promise<string> {
   if (!GROQ_API_KEY) {
     logger.warn('GROQ_API_KEY faltante en refineText.')
     return text
   }
-  if (!text || text.length < 5) {
-    logger.warn('Texto muy corto para refinar:', text)
+  if (!text || text.length < 3) {
     return text
   }
 
   try {
-    const prompt = `Eres un experto técnico industrial.
-Reescribe esta descripción para que sea clara, técnica, CONCISA y profesional.
-Elimina redundancias y palabras innecesarias. Sé directo.
-NO uses comillas en la respuesta.
-NO escribas párrafos largos.
+    const prompt = isTranscriptionCleanup 
+      ? `Eres un experto técnico industrial.
+Tu tarea es corregir la transcripción de voz a texto de un reporte de mantenimiento.
+El texto original puede tener errores fonéticos, palabras mal interpretadas o muletillas dado que fue dictado.
+1. Corrije los errores técnicos (Ej: "bomba centriguga" -> "bomba centrífuga").
+2. Hazlo CONCISO y PRECISO.
+3. Mantén el sentido original pero con lenguaje profesional.
+4. NO agregues introducciones ni explicaciones.
+5. NO uses comillas.
 
-Texto original: "${text}"
+Texto original transcrito: "${text}"
 
-Responde SOLO con el texto reescrito.`
+Responde SOLO con el texto corregido.`
+      : `Eres un redactor técnico industrial SENIOR.
+Tu tarea es generar un TÍTULO o DESCRIPCIÓN para un reporte de falla técnica.
+Debe ser EXTREMADAMENTE CONCISO, DIRECTO y PROFESIONAL.
+Evita verbos pasivos. Usa formato sujeto + falla o falla + componente.
+Ejemplos buenos: "Fuga de aceite en motor", "Rodamiento atascado", "Vibración excesiva eje X".
+Ejemplos malos: "Me parece que la maquina esta sonando mal", "Problema con el aceite".
+
+Texto base: "${text}"
+
+Responde SOLO con el texto técnico mejorado. Sin comillas ni puntos finales.`
 
     const response = await fetch(GROQ_API_URL, {
       method: 'POST',
@@ -526,8 +540,8 @@ Responde SOLO con el texto reescrito.`
       body: JSON.stringify({
         model: MODEL,
         messages: [{ role: 'user', content: prompt }],
-        temperature: 0.2,
-        max_tokens: 500,
+        temperature: 0.1, // Más determinista para correcciones técnicas
+        max_tokens: 300,
       }),
     })
 
@@ -536,7 +550,11 @@ Responde SOLO con el texto reescrito.`
     }
 
     const data = await response.json()
-    return data.choices[0]?.message?.content?.trim() || text
+    let refined = data.choices[0]?.message?.content?.trim() || text
+    // Limpieza extra
+    refined = refined.replace(/^"|"$/g, '').replace(/\.$/, '')
+    
+    return refined
 
   } catch (error) {
     logger.error('Error refinando texto con IA:', error instanceof Error ? error : new Error(String(error)))
@@ -546,6 +564,7 @@ Responde SOLO con el texto reescrito.`
 
 // ===== EXTRACCIÓN DE SÍNTOMAS DESDE DESCRIPCIÓN =====
 
+// Extender input para considerar todo el contexto
 export async function extractSymptomsFromDescription(
   description: string, 
   knownSymptoms?: string[],
@@ -553,12 +572,79 @@ export async function extractSymptomsFromDescription(
     title?: string
     priority?: string
     equipmentName?: string
+    locationName?: string
   }
 ): Promise<string[]> {
   if (!GROQ_API_KEY) {
-    logger.warn('GROQ_API_KEY faltante en extractSymptomsFromDescription.')
     return []
   }
+
+  try {
+    const contextPrompt = context 
+    ? `
+Contexto Adicional:
+- Título: ${context.title || 'N/A'}
+- Prioridad: ${context.priority || 'N/A'}
+- Equipo/Ubicación: ${context.equipmentName || context.locationName || 'N/A'}
+` : ''
+
+    const prompt = `Como experto en diagnóstico de fallas industriales, analiza la siguiente información y extrae/deduce los síntomas técnicos presentes.
+
+Descripción del problema: "${description}"
+${contextPrompt}
+
+Lista de síntomas conocidos (úsala de referencia pero puedes proponer nuevos si son relevantes):
+${knownSymptoms ? knownSymptoms.join(', ') : 'Ninguno'}
+
+Instrucciones:
+1. Identifica los modos de falla y síntomas físicos claros.
+2. Si el texto menciona "aceite", "mancha", considera "Fuga de aceite".
+3. Si menciona "ruido", "golpeteo", considera "Ruido anormal".
+4. Sé específico.
+5. Responde SOLO con un array JSON de strings.
+
+Ejemplo: ["Fuga de aceite", "Alta temperatura"]`
+
+    const response = await fetch(GROQ_API_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${GROQ_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.1,
+        max_tokens: 200,
+      }),
+    })
+
+    if (!response.ok) throw new Error(`Groq API error: ${response.status}`)
+
+    const data = await response.json()
+    const content = data.choices[0]?.message?.content || '[]'
+    // Intenta parsear
+    let symptoms = []
+    try {
+        // Buscar el array JSON dentro de la respuesta (por si el modelo incluye texto extra)
+        const match = content.match(/\[.*\]/s)
+        if (match) {
+            symptoms = JSON.parse(match[0])
+        } else {
+            symptoms = JSON.parse(content)
+        }
+    } catch (e) {
+        // Fallback simple si falla el parseo JSON
+        symptoms = content.split(',').map(s => s.trim().replace(/"/g, ''))
+    }
+    
+    return Array.isArray(symptoms) ? symptoms.filter(s => typeof s === 'string' && s.length > 2) : []
+
+  } catch (error) {
+    logger.error('Error extrayendo síntomas IA:', error)
+    return []
+  }
+}
   if (!description || description.length < 10) return []
 
   try {

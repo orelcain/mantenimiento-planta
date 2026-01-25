@@ -61,6 +61,9 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
   const [isRefining, setIsRefining] = useState(false)
   const [isRefiningTitle, setIsRefiningTitle] = useState(false)
   
+  // Debounce ref para autogeneración de síntomas
+  const symptomsDebounceRef = useRef<NodeJS.Timeout | null>(null)
+  
   // Estados para "Otro" síntoma
   const [isAddingSymptom, setIsAddingSymptom] = useState(false)
   const [customSymptom, setCustomSymptom] = useState('')
@@ -99,34 +102,68 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
   // Generar síntomas con IA cuando se selecciona nodo de jerarquía
   const handleHierarchyChange = async (nodeId: string | undefined, equipment?: Equipment) => {
     setFormData(prev => ({ ...prev, hierarchyNodeId: nodeId }))
-    
-    if (equipment) {
-      setSelectedEquipment(equipment)
-      setIsGeneratingSymptoms(true)
-      try {
-        const symptoms = await generateSymptoms(equipment)
-        setAiSymptoms(symptoms)
-        logger.info('Síntomas generados con IA', { equipmentId: equipment.id, count: symptoms.length })
-      } catch (error) {
-        logger.error('Error generando síntomas con IA', error instanceof Error ? error : new Error(String(error)))
-        setAiSymptoms(COMMON_SYMPTOMS) // Fallback a síntomas estáticos
-      } finally {
-        setIsGeneratingSymptoms(false)
-      }
-    } else {
-      setAiSymptoms(COMMON_SYMPTOMS)
-    }
+    if (equipment) setSelectedEquipment(equipment)
+     // Nota: El useEffect se encargará de regenerar síntomas
   }
+  useEffect(() => {
+     // Solo si hay algo de texto relevante
+     if (!formData.titulo && !formData.descripcion) return
+     if (!isAIConfigured()) return
 
-  // Refinar título con IA
+     if (symptomsDebounceRef.current) clearTimeout(symptomsDebounceRef.current)
+
+     symptomsDebounceRef.current = setTimeout(async () => {
+        // Validar condiciones mínimas para no saturar API
+        if (formData.titulo.length < 3 && formData.descripcion.length < 3) return
+
+        setIsGeneratingSymptoms(true)
+        try {
+            const context = {
+                title: formData.titulo,
+                priority: formData.prioridad,
+                equipmentName: selectedEquipment?.nombre,
+                // Si no hay equipo seleccionado, usa el ID de jerarquía como referencia
+                locationName: formData.hierarchyNodeId 
+            }
+            
+            // Usamos description o titulo como base
+            const textBase = formData.descripcion.length > formData.titulo.length ? formData.descripcion : formData.titulo
+            
+            const newSymptoms = await extractSymptomsFromDescription(textBase, aiSymptoms, context)
+            
+            if (newSymptoms.length > 0) {
+                 // Combinamos evitando duplicados
+                 setAiSymptoms(prev => {
+                     const combined = new Set([...prev, ...newSymptoms])
+                     return Array.from(combined)
+                 })
+            }
+        } catch (e) {
+            console.error(e)
+        } finally {
+            setIsGeneratingSymptoms(false)
+        }
+     }, 2000) // 2 segundos de inactividad para disparar
+
+     return () => {
+         if (symptomsDebounceRef.current) clearTimeout(symptomsDebounceRef.current)
+     }
+  }, [formData.titulo, formData.descripcion, formData.prioridad, selectedEquipment, formData.hierarchyNodeId])
+
+
+  // Refinar título con IA (Corrección y Resumen)
   const handleRefineTitle = async () => {
     if (!formData.titulo || formData.titulo.length < 3) return
     if (!isAIConfigured()) return
 
     setIsRefiningTitle(true)
     try {
-      const refined = await refineText(formData.titulo)
-      setFormData(prev => ({ ...prev, titulo: refined.replace(/\.$/, '') })) // Quitar punto final en títulos
+      // Usamos el flag isTranscriptionCleanup = false, pero dentro de refineText
+      // hemos ajustado el prompt para que sea "EXTREMADAMENTE CONCISO" para títulos.
+      // Ojo: Si el titulo vino de voz, puede que queramos limpiarlo primero.
+      // Vamos a asumir que el usuario quiere 'Tecnificar' el título.
+      const refined = await refineText(formData.titulo, false)
+      setFormData(prev => ({ ...prev, titulo: refined.replace(/\.$/, '') })) 
     } catch(e) {
       console.error(e)
     } finally {
@@ -614,8 +651,43 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label className="text-sm font-medium">🔍 Síntomas (opcional)</Label>
-                {selectedEquipment && (
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <div className="flex items-center gap-2">
+                   {/* Botón Mágico para Síntomas */}
+                   <Button
+                      type="button"
+                      variant="ghost" 
+                      size="sm"
+                      onClick={async () => {
+                          setIsGeneratingSymptoms(true)
+                          try {
+                             const context = {
+                                title: formData.titulo,
+                                priority: formData.prioridad,
+                                equipmentName: selectedEquipment?.nombre,
+                                locationName: formData.hierarchyNodeId 
+                             }
+                             const textBase = formData.descripcion || formData.titulo || "Falla general"
+                             const newSymptoms = await extractSymptomsFromDescription(textBase, aiSymptoms, context)
+                             
+                             if (newSymptoms.length > 0) {
+                                setAiSymptoms(prev => Array.from(new Set([...prev, ...newSymptoms])))
+                                toast({ title: "Síntomas actualizados", description: `Se detectaron ${newSymptoms.length} variantes.`})
+                             } else {
+                                toast({ title: "Sin novedades", description: "La IA no detectó síntomas adicionales."})
+                             }
+                          } finally {
+                              setIsGeneratingSymptoms(false)
+                          }
+                      }}
+                      className="h-6 px-2 text-primary hover:bg-primary/10"
+                      title="Proponer variantes de síntomas"
+                   >
+                       <Sparkles className="h-3 w-3 mr-1" />
+                       <span className="text-[10px]">Sugerir</span>
+                   </Button>
+
+                   {selectedEquipment && (
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
                     {isGeneratingSymptoms ? (
                       <>
                         <Spinner size="sm" />
