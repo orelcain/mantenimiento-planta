@@ -199,7 +199,7 @@ function SortableCategoryItem({
   const hasChildren = sortedMachines.length > 0 || sortedSubcategories.length > 0;
   
   // Padding dinámico basado en profundidad (mucho más compacto)
-  const indentClass = depth === 0 ? '' : 'ml-3 border-lborder-border/40';
+  const indentClass = depth === 0 ? '' : 'ml-6 border-l-2 border-border/50 pl-2';
 
   return (
     <div ref={setNodeRef} style={style} className={`mb-1 rounded-lg transition-colors ${depth === 0 ? 'bg-card border border-border/50 shadow-sm' : ''} ${!category.activa ? 'opacity-60' : ''} ${isOver ? 'ring-2 ring-primary/50 bg-accent' : ''}`}>
@@ -251,6 +251,7 @@ function SortableCategoryItem({
          </div>
 
         {/* Actions Menu */}
+        <div onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>
            <DropdownMenuTrigger asChild>
              <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -278,6 +279,7 @@ function SortableCategoryItem({
               </DropdownMenuItem>
            </DropdownMenuContent>
         </DropdownMenu>
+        </div>
       </div>
 
       {/* Contenido Expandible */}
@@ -644,7 +646,11 @@ export function CategoryManager() {
       {/* DIALOGS - Simplified for brevity */}
       <Dialog open={showCategoryDialog} onOpenChange={setShowCategoryDialog}>
          <DialogContent className="max-w-sm">
-            <DialogHeader><DialogTitle>{editingCategory?'Editar':'Nueva'} Categoría</DialogTitle></DialogHeader>
+            <DialogHeader>
+                <DialogTitle>
+                    {editingCategory ? 'Editar Categoría' : (categoryFormData.parentId !== NO_PARENT_VALUE ? 'Nueva Subcategoría' : 'Nueva Categoría')}
+                </DialogTitle>
+            </DialogHeader>
             <div className="space-y-3 py-2">
                <div><Label>Nombre</Label><Input value={categoryFormData.nombre} onChange={e=>setCategoryFormData({...categoryFormData, nombre:e.target.value})} /></div>
                <div><Label>Padre</Label>
