@@ -1,5 +1,9 @@
-import { useEffect, useState, useMemo } from 'react'
-import { Card, CardContent, CardHeader, CardTitle, Badge } from '@/components/ui'
+import { useEffect, useState, useMemo, useRef } from 'react'
+import { 
+    Card, CardContent, CardHeader, CardTitle, 
+    Badge, 
+    Dialog, DialogContent, DialogHeader, DialogTitle 
+} from '@/components/ui'
 import { getIncidents } from '@/services/incidents'
 import type { Incident } from '@/types'
 import {
@@ -11,9 +15,13 @@ import {
   Tooltip,
   Legend,
   ArcElement,
+  InteractionItem
 } from 'chart.js'
+import { getElementAtEvent } from 'react-chartjs-2' 
 import { Bar, Pie } from 'react-chartjs-2'
-import { Loader2, BrainCircuit, AlertTriangle, CheckCircle2 } from 'lucide-react'
+import { Loader2, BrainCircuit, AlertTriangle, CheckCircle2, ChevronRight, Calendar, AlertCircle } from 'lucide-react'
+import { format } from 'date-fns'
+import { es } from 'date-fns/locale'
 
 // Registrar componentes de ChartJS
 ChartJS.register(
@@ -29,6 +37,8 @@ ChartJS.register(
 export function FailureAnalysis() {
   const [incidents, setIncidents] = useState<Incident[]>([])
   const [loading, setLoading] = useState(true)
+  const [selectedSymptom, setSelectedSymptom] = useState<string | null>(null)
+  const chartRef = useRef<any>(null)
 
   // Cargar datos al montar
   useEffect(() => {
@@ -140,13 +150,22 @@ export function FailureAnalysis() {
                     <p className="text-xs text-muted-foreground">Incidencias Analizadas</p>
                 </CardContent>
             </Card>
-            <Card>
-                <CardContent className="pt-6">
-                    <div className="text-2xl font-bold text-blue-600 truncate">
+            <Card 
+                className="cursor-pointer hover:bg-muted/50 transition-colors relative overflow-hidden group"
+                onClick={() => {
+                   if (symptomStats.length > 0) {
+                      setSelectedSymptom(symptomStats[0][0])
+                   }
+                }}
+            >
+                <CardContent className="pt-6 relative z-10">
+                    <div className="text-2xl font-bold text-blue-600 truncate flex items-center gap-2">
                         {symptomStats.length > 0 && symptomStats[0] ? symptomStats[0][0] : 'N/A'}
+                        {symptomStats.length > 0 && <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />}
                     </div>
-                    <p className="text-xs text-muted-foreground">Síntoma Top #1</p>
+                    <p className="text-xs text-muted-foreground">Síntoma Top #1 (Click para ver)</p>
                 </CardContent>
+                <div className="absolute right-0 top-0 h-full w-1 bg-blue-500 transform scale-y-0 group-hover:scale-y-100 transition-transform origin-bottom" />
             </Card>
             <Card>
                 <CardContent className="pt-6">
@@ -173,15 +192,34 @@ export function FailureAnalysis() {
                 <CardContent>
                     <div className="h-[300px] w-full">
                          <Bar 
+                            ref={chartRef}
                             data={symptomData} 
                             options={{ 
                                 indexAxis: 'y', 
                                 responsive: true,
                                 maintainAspectRatio: false,
-                                plugins: { legend: { display: false } },
+                                plugins: { 
+                                    legend: { display: false },
+                                    tooltip: {
+                                        callbacks: {
+                                            label: (ctx) => `${ctx.raw} incidencias`
+                                        }
+                                    }
+                                },
                                 scales: {
                                     x: { grid: { display: false } },
-                                    y: { grid: { display: false } }
+                                    y: { cursor: 'pointer', grid: { display: false } }
+                                },
+                                onClick: (_evt, elements) => {
+                                    if (elements.length > 0) {
+                                        const idx = elements[0].index
+                                        const label = symptomData.labels[idx]
+                                        if (label) setSelectedSymptom(label)
+                                    }
+                                },
+                                onHover: (event, chartElement) => {
+                                    // @ts-ignore
+                                    event.native.target.style.cursor = chartElement.length ? 'pointer' : 'default'
                                 }
                             }} 
                          />
@@ -252,6 +290,59 @@ export function FailureAnalysis() {
                 </div>
             </CardContent>
         </Card>
+
+        {/* Modal Detalle de Síntomas */}
+        <Dialog open={!!selectedSymptom} onOpenChange={(open) => !open && setSelectedSymptom(null)}>
+            <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto w-[95%] rounded-xl">
+                <DialogHeader className="pb-4 border-b">
+                    <DialogTitle className="flex items-center gap-2 text-xl">
+                        <AlertTriangle className="h-6 w-6 text-orange-500" />
+                        Incidencias: <span className="text-primary">"{selectedSymptom}"</span>
+                    </DialogTitle>
+                </DialogHeader>
+                
+                <div className="space-y-4 mt-4">
+                    {incidents
+                        .filter(i => i.sintomas?.includes(selectedSymptom || ''))
+                        .map(inc => (
+                             <div key={inc.id} className="border rounded-lg p-4 bg-card/50 hover:bg-muted/30 transition-colors animate-in slide-in-from-bottom-2 duration-300">
+                                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-2 gap-2">
+                                    <h4 className="font-semibold text-base leading-tight">{inc.titulo}</h4>
+                                    <Badge variant={inc.prioridad === 'critica' ? 'destructive' : inc.prioridad === 'alta' ? 'warning' : 'outline'} className="w-fit">
+                                        {inc.prioridad?.toUpperCase()}
+                                    </Badge>
+                                </div>
+                                <p className="text-sm text-foreground/80 mb-3 line-clamp-2">{inc.descripcion}</p>
+                                
+                                <div className="flex items-center gap-4 text-xs text-muted-foreground pt-2 border-t">
+                                    <div className="flex items-center gap-1.5">
+                                        <Calendar className="h-3.5 w-3.5" />
+                                        <span>
+                                            {inc.createdAt ? new Date((inc.createdAt as any).seconds ? (inc.createdAt as any).seconds * 1000 : inc.createdAt).toLocaleDateString() : 'N/A'}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center gap-1.5">
+                                       <div className={`h-2 w-2 rounded-full ${inc.status === 'confirmada' ? 'bg-green-500' : inc.status === 'pendiente' ? 'bg-yellow-500' : 'bg-gray-400'}`} />
+                                       {inc.status?.toUpperCase()}
+                                    </div>
+                                    {inc.equipmentId && (
+                                       <Badge variant="secondary" className="text-[10px] ml-auto">
+                                            EQUIPO REF.
+                                       </Badge>
+                                    )}
+                                </div>
+                             </div>
+                        ))
+                    }
+                    {incidents.filter(i => i.sintomas?.includes(selectedSymptom || '')).length === 0 && (
+                        <div className="text-center py-12 text-muted-foreground flex flex-col items-center">
+                            <CheckCircle2 className="h-12 w-12 mb-2 text-muted" />
+                            <p>No se encontraron incidencias activas para este síntoma.</p>
+                        </div>
+                    )}
+                </div>
+            </DialogContent>
+        </Dialog>
     </div>
   )
 }
