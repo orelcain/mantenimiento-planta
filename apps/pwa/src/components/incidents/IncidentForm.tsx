@@ -9,6 +9,7 @@ import {
   Input,
   Label,
   Textarea,
+  SpeechTextarea,
   Spinner,
 } from '@/components/ui'
 import { useAuthStore, useAppStore } from '@/store'
@@ -392,11 +393,12 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
           {/* Descripción */}
           <div className="space-y-2">
             <Label htmlFor="descripcion" className="text-sm font-medium">📋 Descripción *</Label>
-            <Textarea
+            <SpeechTextarea
               id="descripcion"
+              name="descripcion"
               value={formData.descripcion}
               onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
-              placeholder="Describe el problema con detalle..."
+              placeholder="Describe el problema con detalle... (o usa el micrófono 🎤)"
               rows={3}
               className="text-base"
               required

@@ -30,3 +30,4 @@ export {
   DropdownMenuSubTrigger,
   DropdownMenuRadioGroup,
 } from './dropdown-menu'
+export { SpeechTextarea } from './SpeechTextarea'
