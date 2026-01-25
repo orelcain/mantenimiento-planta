@@ -15,13 +15,14 @@ import {
 import { useAuthStore, useAppStore } from '@/store'
 import { createIncident, updateIncident } from '@/services/incidents'
 import { uploadIncidentPhoto, compressImage } from '@/services/storage'
-import { generateSymptoms, refineText, extractSymptomsFromDescription } from '@/services/ai'
+import { generateSymptoms, refineText, extractSymptomsFromDescription, isAIConfigured } from '@/services/ai'
 import type { IncidentPriority, Incident, Equipment } from '@/types'
 import { HierarchyLevel } from '@/types/hierarchy'
 import { cn } from '@/lib/utils'
 import { createIncidentSchema, validateFileList } from '@/lib/validation'
 import { logger } from '@/lib/logger'
 import { HierarchySelector } from '../hierarchy/HierarchySelector'
+import { useToast } from '@/hooks/useToast'
 
 interface IncidentFormProps {
   onClose: () => void
@@ -45,6 +46,7 @@ const COMMON_SYMPTOMS = [
 export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }: IncidentFormProps) {
   const user = useAuthStore((state) => state.user)
   const { zones } = useAppStore()
+  const { toast } = useToast()
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const galleryInputRef = useRef<HTMLInputElement>(null)
 
@@ -110,11 +112,31 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
   // Refinar descripción con IA
   const handleRefineDescription = async () => {
     if (!formData.descripcion || formData.descripcion.length < 5) return
+
+    if (!isAIConfigured()) {
+      toast({
+        variant: "destructive",
+        title: "Error de configuración",
+        description: "No se detectó la API Key de IA. Revisa la consola o el archivo .env.local",
+      })
+      console.error('Magic Button: GROQ_API_KEY no encontrada.')
+      return
+    }
     
     setIsRefining(true)
+    toast({
+      title: "Mejorando redacción...",
+      description: "La IA está procesando tu descripción.",
+    })
+
     try {
       // 1. Refinar texto
       const refined = await refineText(formData.descripcion)
+      
+      if (refined === formData.descripcion) {
+         console.warn('Magic Button: El texto no cambió (posible error API o texto muy corto)')
+      }
+
       setFormData(prev => ({ ...prev, descripcion: refined }))
       
       // 2. Extraer síntomas
@@ -123,9 +145,24 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
         // Combinar con existentes sin duplicados
         setSelectedSymptoms(prev => Array.from(new Set([...prev, ...symptoms])))
         logger.info('Síntomas extraídos automáticamente', { count: symptoms.length })
+        
+        toast({
+          title: "¡Listo!",
+          description: `Texto mejorado y ${symptoms.length} síntomas detectados.`,
+        })
+      } else {
+         toast({
+          title: "¡Listo!",
+          description: "Texto mejorado correctamente.",
+        })
       }
     } catch (error) {
       logger.error('Error refinando descripción', error instanceof Error ? error : new Error(String(error)))
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "No se pudo conectar con el servicio de IA.",
+      })
     } finally {
       setIsRefining(false)
     }

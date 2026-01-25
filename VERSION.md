@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.35.24**
+## Versión Actual: **v2.35.25**
 
 **Fecha de lanzamiento**: 25 de enero de 2026  \
 **Estado**: ✅ PRODUCCIÓN READY  \
@@ -9,6 +9,15 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.35.25 - UX: Feedback Visual "Magic Button" (25/01/2026)
+
+**Mejoras:**
+- ✨ **Feedback UI**: Agregados mensajes (Toasts) de estado: "Mejorando...", "Error de configuración", "¡Listo!".
+- 🔧 **Validación**: Comprobación explícita de API Key antes de enviar petición a Groq.
+- 🐛 **Log**: Mensajes de error más descriptivos en consola para facilitar debugging.
+
+**Tipo de cambio:** feat
 
 ### v2.35.24 - Producción: Magic Button Stable (25/01/2026)
 
