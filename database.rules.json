@@ -1,43 +1,17 @@
 {
   "rules": {
-    ".read": "auth != null",
-    ".write": "auth != null",
-
     "devices": {
+      ".read": "auth != null",
       "$deviceId": {
         ".read": "auth != null",
-        ".write": "auth != null || newData.child('online').exists()"
+        ".write": "auth != null"
       }
     },
-
     "sensors": {
+      ".read": "auth != null",
       "$equipmentId": {
         ".read": "auth != null",
-        ".write": "auth != null",
-
-        "online": {
-          ".write": "auth != null || newData.isBoolean()"
-        },
-        "lastSeen": {
-          ".write": "auth != null || newData.isNumber()"
-        },
-        "equipmentId": {
-          ".write": "auth != null || newData.isString()"
-        },
-
-        "temperatura": {
-          ".write": "auth != null || (newData.child('value').isNumber() && newData.child('timestamp').isNumber())"
-        },
-        "humedad": {
-          ".write": "auth != null || (newData.child('value').isNumber() && newData.child('timestamp').isNumber())"
-        },
-
-        "readings": {
-          ".indexOn": ["timestamp"],
-          "$readingId": {
-            ".write": "auth != null || (newData.child('timestamp').isNumber() && newData.child('temperature').isNumber() && newData.child('humidity').isNumber())"
-          }
-        }
+        ".write": "auth != null"
       }
     }
   }

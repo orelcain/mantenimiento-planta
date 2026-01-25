@@ -122,6 +122,8 @@ export function useMachineCategories() {
         icono: categoryData.icono || 'Folder',
         orden: categoryData.orden ?? maxOrden + 1,
         activa: categoryData.activa ?? true,
+        parentId: categoryData.parentId ?? null,
+        nivel: categoryData.nivel ?? (categoryData.parentId ? 1 : 0),
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now(),
       };

@@ -288,12 +288,15 @@ export function CategoryManager() {
   } = useMachines();
   const { toast } = useToast();
 
+  const NO_PARENT_VALUE = '__none__';
+
   const [showCategoryDialog, setShowCategoryDialog] = useState(false);
   const [showMachineDialog, setShowMachineDialog] = useState(false);
   const [categoryFormData, setCategoryFormData] = useState({
     nombre: '',
     descripcion: '',
     icono: 'Folder',
+    parentId: NO_PARENT_VALUE,
   });
   const [machineFormData, setMachineFormData] = useState({
     nombre: '',
@@ -309,6 +312,9 @@ export function CategoryManager() {
 
   const activeCategories = categories.filter((c) => c.activa && c.visible !== false);
   const archivedCategories = categories.filter((c) => !c.activa && c.visible !== false);
+  const parentCategoryOptions = categories.filter(
+    (c) => c.visible !== false && !c.parentId && (!editingCategory || c.id !== editingCategory.id)
+  );
 
   // Sensores para drag & drop
   const sensors = useSensors(
@@ -350,19 +356,24 @@ export function CategoryManager() {
   // Crear categoría
   const handleCreateCategory = async () => {
     try {
+      const parentId =
+        categoryFormData.parentId === NO_PARENT_VALUE ? null : categoryFormData.parentId;
       await createCategory({
         nombre: categoryFormData.nombre,
         descripcion: categoryFormData.descripcion,
         icono: categoryFormData.icono,
         orden: activeCategories.length,
         activa: true,
+        visible: true,
+        parentId,
+        nivel: parentId ? 1 : 0,
       });
       toast({
         title: 'Categoría creada',
         description: `${categoryFormData.nombre} creada correctamente`,
       });
       setShowCategoryDialog(false);
-      setCategoryFormData({ nombre: '', descripcion: '', icono: 'Folder' });
+      setCategoryFormData({ nombre: '', descripcion: '', icono: 'Folder', parentId: NO_PARENT_VALUE });
     } catch (error) {
       console.error('Error creating category:', error);
       toast({
@@ -380,6 +391,7 @@ export function CategoryManager() {
       nombre: category.nombre,
       descripcion: category.descripcion || '',
       icono: category.icono,
+      parentId: category.parentId ?? NO_PARENT_VALUE,
     });
     setShowCategoryDialog(true);
   };
@@ -388,10 +400,14 @@ export function CategoryManager() {
     if (!editingCategory) return;
 
     try {
+      const parentId =
+        categoryFormData.parentId === NO_PARENT_VALUE ? null : categoryFormData.parentId;
       await updateCategory(editingCategory.id, {
         nombre: categoryFormData.nombre,
         descripcion: categoryFormData.descripcion,
         icono: categoryFormData.icono,
+        parentId,
+        nivel: parentId ? 1 : 0,
       });
       toast({
         title: 'Categoría actualizada',
@@ -399,7 +415,7 @@ export function CategoryManager() {
       });
       setShowCategoryDialog(false);
       setEditingCategory(null);
-      setCategoryFormData({ nombre: '', descripcion: '', icono: 'Folder' });
+      setCategoryFormData({ nombre: '', descripcion: '', icono: 'Folder', parentId: NO_PARENT_VALUE });
     } catch (error) {
       console.error('Error updating category:', error);
       toast({
@@ -664,7 +680,7 @@ export function CategoryManager() {
             Organiza tus máquinas en categorías. Haz clic en una categoría para ver sus máquinas.
           </p>
         </div>
-        <Button onClick={() => { setCategoryFormData({ nombre: '', descripcion: '', icono: 'Folder' }); setEditingCategory(null); setShowCategoryDialog(true); }}>
+        <Button onClick={() => { setCategoryFormData({ nombre: '', descripcion: '', icono: 'Folder', parentId: NO_PARENT_VALUE }); setEditingCategory(null); setShowCategoryDialog(true); }}>
           <Plus className="mr-2 h-4 w-4" />
           Nueva Categoría
         </Button>
@@ -872,6 +888,30 @@ export function CategoryManager() {
                 onChange={(e) => setCategoryFormData({ ...categoryFormData, descripcion: e.target.value })}
                 placeholder="Opcional"
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="cat-parent">Categoría padre (opcional)</Label>
+              <Select
+                value={categoryFormData.parentId}
+                onValueChange={(value) =>
+                  setCategoryFormData({ ...categoryFormData, parentId: value })
+                }
+              >
+                <SelectTrigger id="cat-parent">
+                  <SelectValue placeholder="Sin categoría padre" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_PARENT_VALUE}>Sin categoría padre</SelectItem>
+                  {parentCategoryOptions.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id}>
+                      {cat.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Si seleccionas una categoría padre, esta será una subcategoría.
+              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="cat-icono">Ícono (Lucide)</Label>
