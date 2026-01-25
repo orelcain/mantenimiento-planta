@@ -641,8 +641,6 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
                 )}
               </div>
             </div>
-              </div>
-            </div>
           )}
 
           {/* Fotos - Solo en modo creación */}
