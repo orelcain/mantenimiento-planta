@@ -629,6 +629,7 @@ export function RepuestosDashboard() {
           open={!!specsTarget}
           onOpenChange={(open) => !open && setSpecsTarget(null)}
           repuesto={specsTarget.repuesto}
+          machineId={currentMachine?.id} // Pasamos el ID de la máquina actual
           initialTab={specsTarget.tab}
           onSave={handleSaveSpecs}
         />

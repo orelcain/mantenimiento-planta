@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { 
   ClipboardList, 
   Database, 
@@ -9,7 +9,9 @@ import {
   Save, 
   X, 
   Loader2,
-  ChevronDown
+  ChevronDown,
+  Upload,
+  FileDown
 } from 'lucide-react';
 import {
   Dialog,
@@ -30,11 +32,15 @@ import {
   TabsContent,
 } from '@/components/ui';
 import type { Repuesto, TechnicalSpecs, MachineImage, TechnicalDataField, TechnicalDataType } from '@/types/repuestos';
+import { useStorage } from '@/hooks/repuestos/useStorage';
+import { exportTechnicalSheetToPDF } from '@/utils/repuestos/exportTechnicalSheet';
+import { useToast } from '@/hooks/useToast';
 
 interface TechnicalSpecsModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   repuesto: Repuesto | null;
+  machineId?: string; // Needed for storage path
   initialTab?: 'specs' | 'gallery';
   onSave?: (repuestoId: string, specs: TechnicalSpecs, gallery: MachineImage[]) => Promise<void>;
 }
@@ -85,11 +91,20 @@ export function TechnicalSpecsModal({
   open,
   onOpenChange,
   repuesto,
+  machineId,
   initialTab = 'specs',
   onSave
 }: TechnicalSpecsModalProps) {
   const [activeTab, setActiveTab] = useState<string>(initialTab);
   const [saving, setSaving] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
+  
+  // Storage Hook
+  // We don't have direct access to 'uploadImage' that returns URL easily from here without refactoring useStorage 
+  // or assuming machineId is passed. Ideally pass machineId prop.
+  const { uploadImage, uploading } = useStorage(machineId || null);
   
   // State for Specs
   const [specs, setSpecs] = useState<TechnicalSpecs>({
@@ -178,6 +193,63 @@ export function TechnicalSpecsModal({
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleExportPDF = async () => {
+    if (!repuesto) return;
+    setExporting(true);
+    try {
+        await exportTechnicalSheetToPDF(
+             { ...repuesto, technicalSpecs: specs, gallery }, // Use current state
+             machineId // We might want machine name, but ID is what we have. API can resolve name if needed or pass as prop.
+        );
+        toast({ title: 'PDF Exportado', description: 'La ficha técnica se ha descargado.'});
+    } catch (err) {
+        console.error(err);
+        toast({ title: 'Error', description: 'No se pudo generar el PDF', variant: 'destructive'});
+    } finally {
+        setExporting(false);
+    }
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0 || !repuesto) return;
+    
+    const file = e.target.files[0];
+    if (!machineId) {
+        toast({ title: 'Error', description: 'Falta ID de máquina para subir fotos', variant: 'destructive'});
+        return;
+    }
+
+    try {
+        // Upload
+        const uploadedImg = await uploadImage(file, repuesto.id, 'real');
+        
+        // Add to gallery state
+        const newGalleryItem: MachineImage = {
+            id: uploadedImg.id,
+            url: uploadedImg.url,
+            type: 'eq_part', // Start as generic part
+            timestamp: Date.now(),
+            notes: ''
+        };
+        
+        setGallery(prev => [newGalleryItem, ...prev]);
+        toast({ title: 'Imagen subida', description: 'La imagen se agregó a la galería' });
+
+    } catch (err) {
+        console.error(err);
+        toast({ title: 'Error subiendo imagen', description: 'Intente nuevamente', variant: 'destructive' });
+    } finally {
+        // Clear input
+        if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleDeleteImage = (imgId: string) => {
+      // Note: This only removes from the list reference, not from Storage to avoid accidental data loss via modal cancel.
+      // If immediate delete is required, deleteObject should be called.
+      setGallery(prev => prev.filter(img => img.id !== imgId));
   };
 
   if (!repuesto) return null;
@@ -315,27 +387,59 @@ export function TechnicalSpecsModal({
               </TabsContent>
 
               <TabsContent value="gallery" className="mt-0 space-y-4">
+                
+                {/* Hidden Input */}
+                <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    className="hidden" 
+                    accept="image/*"
+                    onChange={handleFileSelect}
+                />
+
                 {/* Upload Placeholder */}
-                <div className="border-2 border-dashed border-muted-foreground/25 hover:border-blue-500/50 hover:bg-muted/10 rounded-lg p-6 flex flex-col items-center justify-center text-center transition-all cursor-pointer">
+                <div 
+                    onClick={() => !uploading && fileInputRef.current?.click()}
+                    className={`border-2 border-dashed border-muted-foreground/25 hover:border-blue-500/50 hover:bg-muted/10 rounded-lg p-6 flex flex-col items-center justify-center text-center transition-all cursor-pointer ${uploading ? 'opacity-50 pointer-events-none' : ''}`}
+                >
                   <div className="bg-muted p-3 rounded-full mb-3">
-                    <Camera className="w-6 h-6 text-muted-foreground" />
+                    {uploading ? <Loader2 className="w-6 h-6 animate-spin text-blue-500"/> : <Camera className="w-6 h-6 text-muted-foreground" />}
                   </div>
-                  <p className="text-sm font-medium">Click para subir nuevas fotos</p>
+                  <p className="text-sm font-medium">{uploading ? 'Subiendo imagen...' : 'Click para subir nuevas fotos'}</p>
                   <p className="text-xs text-muted-foreground mt-1">Placas, detalles o estado actual</p>
                 </div>
 
                 <div className="space-y-2">
-                   <h3 className="text-xs font-semibold uppercase text-muted-foreground mb-2">Imágenes Guardadas</h3>
+                   <h3 className="text-xs font-semibold uppercase text-muted-foreground mb-2">Imágenes Guardadas ({gallery.length})</h3>
                    {gallery.length === 0 ? (
                      <div className="text-center py-8 text-muted-foreground text-sm">
                        No hay imágenes en la galería
                      </div>
                    ) : (
-                     <div className="grid grid-cols-1 gap-2">
-                       {/* Todo: Implement Gallery List mapping from 'gallery' state */}
-                       <div className="text-xs text-muted-foreground">
-                         (Implementación de lista de imágenes en progreso...)
-                       </div>
+                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                       {gallery.map((img) => (
+                           <div key={img.id} className="group relative aspect-square bg-muted rounded-lg overflow-hidden border border-border">
+                               <img src={img.url} alt="Gallery item" className="w-full h-full object-cover" />
+                               
+                               {/* Overlay Actions */}
+                               <div className="absolute inset-x-0 bottom-0 bg-black/60 p-2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-between">
+                                   <span className="text-[10px] text-white truncate max-w-[70%]">{new Date(img.timestamp).toLocaleDateString()}</span>
+                                   <Button 
+                                    variant="destructive" 
+                                    size="icon" 
+                                    className="h-6 w-6" 
+                                    onClick={(e) => { e.stopPropagation(); handleDeleteImage(img.id); }}
+                                   >
+                                       <Trash2 className="w-3 h-3" />
+                                   </Button>
+                               </div>
+
+                               {/* Type Badge */}
+                               <div className="absolute top-2 left-2 px-1.5 py-0.5 bg-black/50 backdrop-blur rounded text-[10px] text-white font-medium uppercase">
+                                   {img.type === 'plate' ? 'Placa' : img.type === 'equipment' ? 'Equipo' : 'Repuesto'}
+                               </div>
+                           </div>
+                       ))}
                      </div>
                    )}
                 </div>
@@ -345,21 +449,28 @@ export function TechnicalSpecsModal({
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t bg-background flex justify-end gap-2">
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            Cancelar
-          </Button>
-          <Button onClick={handleSave} disabled={saving} className="bg-blue-600 hover:bg-blue-500 text-white">
-            {saving ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Guardando...
-              </>
-            ) : (
-              <>
-                <Save className="w-4 h-4 mr-2" /> Guardar Cambios
-              </>
-            )}
-          </Button>
+        <div className="p-4 border-t bg-background flex justify-between gap-2">
+           <Button variant="outline" onClick={handleExportPDF} disabled={exporting} className="gap-2">
+              {exporting ? <Loader2 className="w-4 h-4 animate-spin"/> : <FileDown className="w-4 h-4"/>}
+              PDF
+           </Button>
+
+           <div className="flex gap-2">
+              <Button variant="ghost" onClick={() => onOpenChange(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleSave} disabled={saving} className="bg-blue-600 hover:bg-blue-500 text-white">
+                {saving ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Guardando...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4 mr-2" /> Guardar Cambios
+                  </>
+                )}
+              </Button>
+           </div>
         </div>
       </DialogContent>
     </Dialog>
