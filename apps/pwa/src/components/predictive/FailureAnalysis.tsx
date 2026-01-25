@@ -34,6 +34,7 @@ export function FailureAnalysis() {
   const [incidents, setIncidents] = useState<Incident[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedSymptom, setSelectedSymptom] = useState<string | null>(null)
+  const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null)
   const chartRef = useRef<any>(null)
 
   // Cargar datos al montar
@@ -302,9 +303,13 @@ export function FailureAnalysis() {
                     {incidents
                         .filter(i => i.sintomas?.includes(selectedSymptom || ''))
                         .map(inc => (
-                             <div key={inc.id} className="border rounded-lg p-4 bg-card/50 hover:bg-muted/30 transition-colors animate-in slide-in-from-bottom-2 duration-300">
+                             <div 
+                                key={inc.id} 
+                                onClick={() => setSelectedIncident(inc)}
+                                className="border rounded-lg p-4 bg-card/50 hover:bg-muted/30 transition-colors animate-in slide-in-from-bottom-2 duration-300 cursor-pointer group"
+                             >
                                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start mb-2 gap-2">
-                                    <h4 className="font-semibold text-base leading-tight">{inc.titulo}</h4>
+                                    <h4 className="font-semibold text-base leading-tight group-hover:text-primary transition-colors">{inc.titulo}</h4>
                                     <Badge variant={inc.prioridad === 'critica' ? 'destructive' : inc.prioridad === 'alta' ? 'warning' : 'outline'} className="w-fit">
                                         {inc.prioridad?.toUpperCase()}
                                     </Badge>
@@ -338,6 +343,107 @@ export function FailureAnalysis() {
                         </div>
                     )}
                 </div>
+            </DialogContent>
+        </Dialog>
+
+        {/* Modal Detalle de Incidencia */}
+        <Dialog open={!!selectedIncident} onOpenChange={(open) => !open && setSelectedIncident(null)}>
+            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto w-[95%] rounded-xl">
+                 {selectedIncident && (
+                    <>
+                        <DialogHeader className="pb-4 border-b">
+                            <div className="flex flex-col gap-2">
+                                <div className="flex justify-between items-start">
+                                    <DialogTitle className="text-xl font-bold leading-tight pr-8">
+                                        {selectedIncident.titulo}
+                                    </DialogTitle>
+                                    <Badge variant={selectedIncident.prioridad === 'critica' ? 'destructive' : selectedIncident.prioridad === 'alta' ? 'warning' : 'outline'}>
+                                        {selectedIncident.prioridad?.toUpperCase()}
+                                    </Badge>
+                                </div>
+                                <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                                    <div className="flex items-center gap-1">
+                                        <Calendar className="h-4 w-4" />
+                                        {selectedIncident.createdAt ? new Date((selectedIncident.createdAt as any).seconds ? (selectedIncident.createdAt as any).seconds * 1000 : selectedIncident.createdAt).toLocaleDateString() : 'N/A'}
+                                    </div>
+                                    <Badge variant="secondary" className="text-xs">
+                                        {selectedIncident.status?.toUpperCase().replace('_', ' ')}
+                                    </Badge>
+                                </div>
+                            </div>
+                        </DialogHeader>
+
+                        <div className="space-y-6 mt-4">
+                            {/* Descripción */}
+                            <div>
+                                <h4 className="text-sm font-semibold mb-2 text-muted-foreground uppercase tracking-wider">Descripción del Hallazgo</h4>
+                                <div className="p-4 bg-muted/30 rounded-lg text-sm leading-relaxed whitespace-pre-wrap">
+                                    {selectedIncident.descripcion}
+                                </div>
+                            </div>
+
+                            {/* Equipo y Ubicación */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                {selectedIncident.equipmentId && (
+                                    <div className="border rounded-lg p-3">
+                                        <div className="text-xs text-muted-foreground mb-1">Equipo Afectado</div>
+                                        <div className="font-medium flex items-center gap-2">
+                                            <BrainCircuit className="h-4 w-4 text-blue-500" />
+                                            {selectedIncident.equipmentId}
+                                        </div>
+                                    </div>
+                                )}
+                                <div className="border rounded-lg p-3">
+                                    <div className="text-xs text-muted-foreground mb-1">Reportado Por</div>
+                                    <div className="font-medium">
+                                        {selectedIncident.reportadoPor || 'Usuario del Sistema'}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Síntomas Detectados */}
+                            {selectedIncident.sintomas && selectedIncident.sintomas.length > 0 && (
+                                <div>
+                                    <h4 className="text-sm font-semibold mb-2 text-muted-foreground uppercase tracking-wider">Síntomas Identificados</h4>
+                                    <div className="flex flex-wrap gap-2">
+                                        {selectedIncident.sintomas.map(s => (
+                                            <Badge key={s} variant="outline" className="px-3 py-1 bg-blue-50/50 text-blue-700 border-blue-200">
+                                                {s}
+                                            </Badge>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Evidencias / Fotos */}
+                            {selectedIncident.fotos && selectedIncident.fotos.length > 0 && (
+                                <div>
+                                    <h4 className="text-sm font-semibold mb-2 text-muted-foreground uppercase tracking-wider">Evidencia Fotográfica</h4>
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                        {selectedIncident.fotos.map((foto, idx) => (
+                                            <a key={idx} href={foto} target="_blank" rel="noopener noreferrer" className="relative aspect-square rounded-lg overflow-hidden border group cursor-zoom-in">
+                                                <img src={foto} alt={`Evidencia ${idx + 1}`} className="object-cover w-full h-full transition-transform group-hover:scale-105" />
+                                            </a>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Resolución (si existe) */}
+                            {selectedIncident.resolucion && (
+                                <div className="bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                                    <h4 className="text-sm font-semibold mb-1 text-green-800 dark:text-green-400 flex items-center gap-2">
+                                        <CheckCircle2 className="h-4 w-4" />
+                                        Resolución Aplicada
+                                    </h4>
+                                    <p className="text-sm text-green-700 dark:text-green-300">
+                                        {selectedIncident.resolucion}
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    </>
+                 )}
             </DialogContent>
         </Dialog>
     </div>
