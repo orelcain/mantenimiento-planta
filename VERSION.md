@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.35.48**
+## Versión Actual: **v2.35.49**
 
 **Fecha de lanzamiento**: 25 de enero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.35.49 - Category UX Refinements (25/01/2026)
+- **Fix**: Corrección de títulos en diálogos (Subcategoría vs Categoría) y acciones de botones.
+- **UI**: Mejora visual en niveles de anidación (mayor sangría y bordes guía).
+- **UX**: Optimización de Drag & Drop (colisiones) y botones de acción rápida visibles.
 
 ### v2.35.48 - Compact Mobile Structure (25/01/2026)
 - **UX**: Refactor total del `CategoryManager` para móviles. Diseño compacto sin tarjetas y acciones agrupadas.
