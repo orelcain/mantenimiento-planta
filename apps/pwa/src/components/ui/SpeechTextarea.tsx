@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { Mic, MicOff } from 'lucide-react'
-import { Textarea, TextareaProps } from './Textarea'
-import { Button } from './Button'
+import { Textarea, TextareaProps } from './textarea'
+import { Button } from './button'
 import { cn } from '@/lib/utils'
 
 // Definición básica de tipos para Web Speech API
