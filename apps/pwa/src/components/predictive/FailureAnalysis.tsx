@@ -83,23 +83,28 @@ export function FailureAnalysis() {
     const stats: Record<string, number> = {
         'pendiente': 0,
         'en_proceso': 0,
-        'resuelta': 0,
+        'cerrada': 0,
+        'confirmada': 0,
         'rechazada': 0
     }
     
     incidents.forEach(inc => {
         const s = inc.status || 'pendiente'
-        stats[s] = (stats[s] || 0) + 1
+        // Type safeguard
+        if (Object.prototype.hasOwnProperty.call(stats, s)) {
+            stats[s] = (stats[s] || 0) + 1
+        }
     })
 
     return {
-        labels: ['Pendiente', 'En Proceso', 'Resuelta', 'Rechazada'],
+        labels: ['Pendiente', 'En Proceso', 'Confirmada', 'Cerrada', 'Rechazada'],
         datasets: [{
-            data: [stats.pendiente, stats.en_proceso, stats.resuelta, stats.rechazada],
+            data: [stats.pendiente, stats.en_proceso, stats.confirmada, stats.cerrada, stats.rechazada],
             backgroundColor: [
                 '#fbbf24', // Pendiente (Warning)
                 '#3b82f6', // En proceso (Blue)
-                '#22c55e', // Resuelta (Green)
+                '#10b981', // Confirmada (Emerald)
+                '#22c55e', // Cerrada (Green)
                 '#ef4444', // Rechazada (Red)
             ],
             borderWidth: 0
@@ -137,8 +142,8 @@ export function FailureAnalysis() {
             </Card>
             <Card>
                 <CardContent className="pt-6">
-                    <div className="text-2xl font-bold text-blue-600">
-                        {symptomStats.length > 0 ? symptomStats[0][0] : 'N/A'}
+                    <div className="text-2xl font-bold text-blue-600 truncate">
+                        {symptomStats.length > 0 && symptomStats[0] ? symptomStats[0][0] : 'N/A'}
                     </div>
                     <p className="text-xs text-muted-foreground">Síntoma Top #1</p>
                 </CardContent>
@@ -147,7 +152,9 @@ export function FailureAnalysis() {
                 <CardContent className="pt-6">
                      {/* Calcula tasa de resolución simple */}
                     <div className="text-2xl font-bold text-green-600">
-                        {Math.round((incidents.filter(i => i.status === 'resuelta' || i.status === 'confirmada').length / incidents.length) * 100)}%
+                        {incidents.length > 0 
+                            ? Math.round((incidents.filter(i => i.status === 'cerrada' || i.status === 'confirmada').length / incidents.length) * 100)
+                            : 0}%
                     </div>
                     <p className="text-xs text-muted-foreground">Tasa Resolución</p>
                 </CardContent>

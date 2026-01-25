@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.35.32**
+## Versión Actual: **v2.35.33**
 
 **Fecha de lanzamiento**: 25 de enero de 2026  \
 **Estado**: 🚀 DEPLOYING...  \
@@ -9,6 +9,16 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.35.33 - Fix: Failure Analysis Types (25/01/2026)
+
+**Correcciones:**
+- 🐛 **TypeScript Errors**: Corregidos errores de tipos en el módulo de Análisis de Fallas.
+    - Manejo seguro de arrays vacíos en `symptomStats`.
+    - Corrección de claves de estado (`cerrada` y `confirmada` en lugar de `resuelta`).
+    - Lógica de conteo de estados alineada con el modelo de datos real.
+
+**Tipo de cambio:** fix
 
 ### v2.35.32 - Feature: Failure Analysis Module (25/01/2026)
 
