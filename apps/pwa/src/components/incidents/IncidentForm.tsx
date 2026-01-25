@@ -35,7 +35,7 @@ const PRIORITY_OPTIONS = [
   { value: 'critica', label: 'Crítica', desc: 'Detiene prod.', color: 'bg-red-500', border: 'border-red-500' },
   { value: 'alta', label: 'Alta', desc: 'Afecta op.', color: 'bg-orange-500', border: 'border-orange-500' },
   { value: 'media', label: 'Media', desc: 'Atención', color: 'bg-blue-500', border: 'border-blue-500' },
-  { value: 'baja', label: 'Baja', desc: 'Puede esperar', color: 'bg-gray-400', border: 'border-gray-400' },
+  { value: 'baja', label: 'Baja', desc: 'Puede esperar', color: 'bg-zinc-500', border: 'border-zinc-500' },
 ]
 
 const COMMON_SYMPTOMS = [
@@ -64,6 +64,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
   // Estados para "Otro" síntoma
   const [isAddingSymptom, setIsAddingSymptom] = useState(false)
   const [customSymptom, setCustomSymptom] = useState('')
+  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false)
   
   // Metadatos de fotos
   const [photoMeta, setPhotoMeta] = useState<{size: string, dim: string}[]>([])
@@ -408,24 +409,66 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
           {!isEditMode && (
             <div className="space-y-1">
               <Label className="text-sm font-medium">📍 Ubicación *</Label>
-              {/* Contenedor con zoom out para ver mejor la jerarquía */}
-              <div className="border rounded-lg p-2 bg-muted/30 overflow-hidden relative" style={{ height: '180px' }}>
-                <div className="origin-top-left absolute top-2 left-2 w-[142%]" style={{ transform: 'scale(0.7)' }}>
-                  <HierarchySelector
-                    value={formData.hierarchyNodeId}
-                    onChange={(nodeId: string | null) => {
-                      handleHierarchyChange(nodeId || undefined, undefined)
-                    }}
-                    minLevel={HierarchyLevel.SUB_AREA}
-                    maxLevel={HierarchyLevel.ELEMENTO}
-                    error={validationErrors.hierarchyNodeId}
-                  />
-                </div>
+              
+              <div 
+                className="border rounded-lg p-3 bg-muted/20 hover:bg-muted/40 cursor-pointer transition-colors flex items-center justify-between group"
+                onClick={() => setIsLocationModalOpen(true)}
+              >
+                  <div className="flex flex-col gap-1 overflow-hidden">
+                      {formData.hierarchyNodeId ? (
+                        <div className="flex flex-col">
+                             <span className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Ubicación Seleccionada</span>
+                             <div className="text-sm font-medium text-primary flex items-center gap-1.5 truncate">
+                                {/* Componente de visualización de ID o fetch del nombre */}
+                                {/* Dado que solo tenemos el ID aquí, mostraremos algo genérico o el ID 
+                                    (Idealmente el HierarchySelector debería pasar el objeto seleccionado o nombre) */}
+                                <div className="h-2 w-2 rounded-full bg-green-500" />
+                                <span className="truncate">Confirmada (Click para cambiar)</span>
+                             </div>
+                        </div>
+                      ) : (
+                          <div className="flex items-center gap-2 text-muted-foreground group-hover:text-foreground">
+                             <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
+                                <Sparkles className="h-4 w-4" />
+                             </div>
+                             <span className="text-sm">Tocar para seleccionar ubicación...</span>
+                          </div>
+                      )}
+                  </div>
+                  <Button type="button" variant="ghost" size="sm" className="shrink-0">
+                      Cambiar
+                  </Button>
               </div>
+
               {validationErrors.hierarchyNodeId && (
                 <p className="text-sm text-destructive mt-1">{validationErrors.hierarchyNodeId}</p>
               )}
               
+              <Dialog open={isLocationModalOpen} onOpenChange={setIsLocationModalOpen}>
+                  <DialogContent className="max-w-md h-[80vh] flex flex-col p-0 gap-0">
+                      <DialogHeader className="p-4 pb-2 border-b">
+                          <DialogTitle>Seleccionar Ubicación</DialogTitle>
+                      </DialogHeader>
+                      <div className="flex-1 overflow-y-auto p-4">
+                        <HierarchySelector
+                            value={formData.hierarchyNodeId}
+                            onChange={(nodeId: string | null) => {
+                                handleHierarchyChange(nodeId || undefined, undefined)
+                                // No cerramos automáticamente para permitir correcciones, el usuario cierra manual
+                            }}
+                            minLevel={HierarchyLevel.SUB_AREA}
+                            maxLevel={HierarchyLevel.ELEMENTO}
+                            error={validationErrors.hierarchyNodeId}
+                        />
+                      </div>
+                      <div className="p-4 border-t bg-muted/20 flex justify-end">
+                          <Button onClick={() => setIsLocationModalOpen(false)}>
+                              Confirmar Ubicación
+                          </Button>
+                      </div>
+                  </DialogContent>
+              </Dialog>
+
               {/* Zonas legacy (fallback) */}
               {zones.length > 0 && !formData.hierarchyNodeId && (
                 <details className="mt-2">
@@ -470,15 +513,26 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
                   type="button"
                   onClick={() => setFormData({ ...formData, prioridad: opt.value as IncidentPriority })}
                   className={cn(
-                    'p-2 rounded-lg border-2 text-center transition-all flex flex-col items-center justify-center h-20',
+                    'p-2 rounded-lg border text-center transition-all flex flex-col items-center justify-center h-20 shadow-sm relative overflow-hidden',
                     formData.prioridad === opt.value 
-                      ? `${opt.border} bg-opacity-10 bg-current` 
-                      : 'border-muted hover:border-gray-300'
+                      ? `${opt.color} text-white border-transparent ring-2 ring-offset-1 ring-offset-background`
+                      : 'bg-card border-muted hover:border-sidebar-accent hover:bg-sidebar-accent/50 text-muted-foreground hover:text-foreground'
                   )}
                 > 
-                  <div className={cn("w-3 h-3 rounded-full mb-1", opt.color.replace('bg-', 'bg-'))} />
-                  <span className="font-semibold text-xs">{opt.label}</span>
-                  <span className="text-[10px] text-muted-foreground leading-tight mt-1">{opt.desc}</span>
+                  {/* Highlight Glow Effect */}
+                  {formData.prioridad === opt.value && (
+                      <div className="absolute inset-0 bg-white/20" />
+                  )}
+                  
+                  <div className={cn(
+                      "w-3 h-3 rounded-full mb-1 transition-colors", 
+                      formData.prioridad === opt.value ? "bg-white shadow-sm" : opt.color
+                  )} />
+                  <span className="font-semibold text-xs relative z-10">{opt.label}</span>
+                  <span className={cn(
+                      "text-[10px] leading-tight mt-1 relative z-10",
+                      formData.prioridad === opt.value ? "text-white/90" : "text-muted-foreground"
+                  )}>{opt.desc}</span>
                 </button>
               ))}
             </div>
