@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.35.37**
+## Versión Actual: **v2.35.45**
 
 **Fecha de lanzamiento**: 25 de enero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,43 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.35.45 - Structure Management (25/01/2026)
+- **Feature**: Integración del Gestor de Estructura en el Dashboard. Nuevo botón "Estructura" para gestionar categorías y máquinas sin salir del módulo.
+- **Admin**: Modal completo para crear/editar categorías (incluyendo subcategorías) y máquinas.
+- **UX**: Soporte para mover máquinas entre categorías (vía edición) y reordenar categorías con drag & drop.
+
+### v2.35.44 - Spares PWA UX (25/01/2026)
+- **UX**: Reescrito el dashboard de repuestos para ser totalmente responsive en móviles. 
+- **Component**: Nueva vista de tarjetas para la tabla de repuestos en pantallas pequeñas, evitando el scroll horizontal incómodo.
+- **Layout**: Header adaptativo con botones colapsables en móvil.
+
+### v2.35.43 - Mobile Image Optimization (25/01/2026)
+- **Fix**: Reparada la optimización de imágenes en móviles. Ahora detecta si el navegador no soporta codificación `image/webp` (ej. iOS antiguos o webviews incompletos) y hace fallback automático a JPEG para evitar subir PNGs gigantes.
+
+### v2.35.42 - Technical UI & Smart Inputs (25/01/2026)
+- **Feature**: Metadata detallada en fotos (Compresión/Formato/Resolución).
+- **UX**: Input de Título expandible y corregido con dictado por voz.
+- **AI**: Prompt de síntomas ajustado para ser "Senior Technical Analyst" (conciso y preciso).
+
+### v2.35.41 - AI Logic & Speech Input Fixes (25/01/2026)
+- **Fix**: Resuelto conflicto de código duplicado en el servicio de IA y errores JSX.
+- **Feature**: Mejorada la detección de síntomas con contexto completo y limpieza de transcripción.
+
+### v2.35.40 - Microphone in Title (25/01/2026)
+- **Feature**: Agregado soporte de dictado por voz (micrófono) también en el campo "Título" al crear incidencias.
+- **UI**: Ajustado el layout del formulario para acomodar tanto el botón de "Mejorar con IA" como el de "Dictado".
+
+### v2.35.39 - Visual Polish & Reporter UX (25/01/2026)
+- **UX**: Ahora se muestra el nombre real del usuario que reportó la incidencia en lugar de su ID interno.
+- **UI**: Mejorado el contraste de los badges de síntomas en el modal de detalle para mejor legibilidad en temas oscuros/claros.
+
+### v2.35.38 - Deep Drill-Down Details (25/01/2026)
+
+**Nuevas Características:**
+- **Detalle de Incidencia Interactivo**: Implementado modal de detalle profundo al hacer clic en incidencias dentro del Análisis de Fallas. Permite ver descripción completa, evidencias fotográficas, resolución y metadatos sin salir del dashboard predictivo.
+
+---
 
 ### v2.35.37 - Fixes & Cleanup (25/01/2026)
 
