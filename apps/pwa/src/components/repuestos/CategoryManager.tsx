@@ -20,8 +20,6 @@ import {
   useSensor,
   useSensors,
   DragEndEvent,
-  DragOverEvent,
-  DragStartEvent,
   DragOverlay,
 } from '@dnd-kit/core';
 import {
@@ -366,9 +364,6 @@ export function CategoryManager() {
   // Filtros
   const activeCategories = useMemo(() => categories.filter((c) => c.activa && (c.visible !== false)), [categories]);
   const activeRootCategories = useMemo(() => activeCategories.filter(c => !c.parentId), [activeCategories]);
-  const parentCategoryOptions = useMemo(() => categories.filter(
-    (c) => c.visible !== false && !c.parentId && (!editingCategory || c.id !== editingCategory.id)
-  ), [categories, editingCategory]);
 
   // Construir opciones jerárquicas
   const hierarchicalOptions = useMemo(() => {
