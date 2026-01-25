@@ -173,6 +173,7 @@ function SortableCategoryItem({
   onEditMachine,
   onToggleActiveMachine,
   onDeleteMachine,
+  onCreateSubcategory,
   renderIcon,
   // Pasar props recursivos
   allCategories,
@@ -192,6 +193,7 @@ function SortableCategoryItem({
   onEditMachine: (machine: Machine) => void;
   onToggleActiveMachine: (machine: Machine) => void;
   onDeleteMachine: (machine: Machine) => void;
+  onCreateSubcategory: (parentId: string) => void;
   renderIcon: (iconName: string) => JSX.Element;
   allCategories: MachineCategory[];
   getMachinesByCategory: (id: string) => Machine[];
@@ -273,14 +275,23 @@ function SortableCategoryItem({
 
         {/* Actions de categoría */}
         <div className="flex items-center gap-2">
+            <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onCreateSubcategory(category.id)}
+            title="Nueva subcategoría"
+          >
+            <Folder className="h-4 w-4 mr-1" />
+            <Plus className="h-3 w-3" />
+          </Button>
           <Button
             variant="ghost"
             size="sm"
             onClick={() => onCreateMachine(category.id)}
-            title="Nueva máquina / subcategoría"
+            title="Nueva máquina"
           >
-            <Plus className="h-4 w-4 mr-1" />
-            <Wrench className="h-4 w-4" />
+             <Wrench className="h-4 w-4 mr-1" />
+             <Plus className="h-3 w-3" />
           </Button>
           <Button variant="ghost" size="sm" onClick={() => onEditCategory(category)}>
             <Pencil className="h-4 w-4" />
@@ -341,6 +352,7 @@ function SortableCategoryItem({
                           onEditMachine={onEditMachine}
                           onToggleActiveMachine={onToggleActiveMachine}
                           onDeleteMachine={onDeleteMachine}
+                          onCreateSubcategory={onCreateSubcategory}
                           renderIcon={renderIcon}
                           allCategories={allCategories}
                           getMachinesByCategory={getMachinesByCategory}
@@ -835,6 +847,11 @@ export function CategoryManager() {
                   onEditMachine={handleEditMachine}
                   onToggleActiveMachine={handleToggleActiveMachine}
                   onDeleteMachine={handleDeleteMachine}
+                  onCreateSubcategory={(parentId) => {
+                      setCategoryFormData({ nombre: '', descripcion: '', icono: 'Folder', parentId });
+                      setEditingCategory(null);
+                      setShowCategoryDialog(true);
+                  }}
                   renderIcon={renderIcon}
                 />
               ))}
