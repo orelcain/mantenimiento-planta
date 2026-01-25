@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.35.54**
+## Versión Actual: **v2.35.55**
 
 **Fecha de lanzamiento**: 25 de enero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,10 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.35.55 - Hierarchy Visuals (25/01/2026)
+- **UI**: Mejora en la distinción visual de jerarquías. Ahora las subcategorías tienen su propio marco y fondo distintivo para facilitar la lectura.
+- **Style**: Ajuste de márgenes y bordes para "recuadrar" mejor cada nivel.
 
 ### v2.35.54 - Corrected Overlay Stacking (25/01/2026)
 - **Fix**: Aplicación correcta del `z-index: 9999` al componente principal `DropdownMenuContent`.

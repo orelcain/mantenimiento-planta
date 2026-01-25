@@ -197,14 +197,17 @@ function SortableCategoryItem({
 
   const hasChildren = sortedMachines.length > 0 || sortedSubcategories.length > 0;
   
-  // Padding dinámico basado en profundidad (mucho más compacto)
-  const indentClass = depth === 0 ? '' : 'ml-6 border-l-2 border-border/50 pl-2';
+  // Estilos visuales según profundidad
+  const isRoot = depth === 0;
+  const containerClasses = isRoot
+    ? 'bg-card border border-border shadow-sm mb-3' 
+    : 'mt-2 border border-border/60 bg-muted/20 ml-3'; // Subcategorías: marco propio y sangría
 
   return (
-    <div ref={setNodeRef} style={style} className={`mb-1 rounded-lg transition-colors ${depth === 0 ? 'bg-card border border-border/50 shadow-sm' : ''} ${!category.activa ? 'opacity-60' : ''} ${isOver ? 'ring-2 ring-primary/50 bg-accent' : ''}`}>
+    <div ref={setNodeRef} style={style} className={`rounded-lg transition-colors ${containerClasses} ${!category.activa ? 'opacity-60' : ''} ${isOver ? 'ring-2 ring-primary/50 bg-accent' : ''}`}>
       
       {/* Header Compacto */}
-      <div className={`flex items-center p-2 gap-2 min-h-[3rem] ${depth > 0 ? 'hover:bg-accent/30 rounded-md': ''}`}>
+      <div className={`flex items-center p-2 gap-2 min-h-[3rem] rounded-t-lg ${depth > 0 ? '': ''}`}>
         
         {/* Drag */}
         <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing p-1 text-muted-foreground/50 hover:text-foreground">
@@ -259,7 +262,7 @@ function SortableCategoryItem({
 
       {/* Contenido Expandible */}
       {isExpanded && (
-        <div className={`pl-2 pr-1 pb-2 ${indentClass}`}>
+        <div className={`px-2 pb-2 ${isRoot ? '' : ''}`}>
             {/* Subcategorías */}
             <SortableContext items={sortedSubcategories.map(c => `category-${c.id}`)} strategy={verticalListSortingStrategy}>
                {sortedSubcategories.map(subcat => (
