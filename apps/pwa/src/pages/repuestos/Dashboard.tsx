@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, Plus, FileSpreadsheet, FileText, Upload } from 'lucide-react'
+import { AlertTriangle, Plus, FileSpreadsheet, FileText, Upload, FolderTree } from 'lucide-react'
 import { RepuestosTable } from '@/components/repuestos/RepuestosTable'
 import { RepuestoFormModal } from '@/components/repuestos/RepuestoForm'
 import { RepuestosFilters } from '@/components/repuestos/RepuestosFilters'
@@ -18,6 +18,7 @@ import { useToast } from '@/hooks/useToast'
 import { useMachineContext, useCurrentMachine } from '@/contexts/MachineContext'
 import type { Repuesto, RepuestoFormData } from '@/types/repuestos'
 import { isTagAsignado, getTagNombre } from '@/types/tags'
+import { CategoryManager } from '@/components/repuestos/CategoryManager'
 import { ImportRepuestosModal } from './ImportRepuestosModal'
 import {
   exportRepuestosToExcel,
@@ -69,6 +70,7 @@ export function RepuestosDashboard() {
   const [manualModal, setManualModal] = useState<Repuesto | null>(null)
   const [historyModal, setHistoryModal] = useState<Repuesto | null>(null)
   const [newMachineOpen, setNewMachineOpen] = useState(false)
+  const [structureManagerOpen, setStructureManagerOpen] = useState(false)
 
   // Filtro de categorías
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>('maquinas-principales')
@@ -403,23 +405,37 @@ export function RepuestosDashboard() {
              </div>
              
              {/* Mas opciones mobile */}
-             <div className="flex sm:hidden w-full gap-2">
-                <Button variant="outline" size="sm" onClick={handleExportExcel} className="flex-1 gap-1" title="Excel">
-                  <FileSpreadsheet className="h-3 w-3" /> <span className="text-xs">Excel</span>
-                </Button>
-                <Button variant="outline" size="sm" onClick={handleExportPDF} className="flex-1 gap-1" title="PDF">
-                  <FileText className="h-3 w-3" /> <span className="text-xs">PDF</span>
-                </Button>
-                 <Button onClick={() => setNewMachineOpen(true)} className="flex-1 gap-1" variant="outline" size="sm">
-                  <Plus className="h-3 w-3" />
-                  <span className="text-xs">Equipo</span>
-                </Button>
+             <div className="flex flex-col sm:hidden w-full gap-2">
+               <div className="flex w-full gap-2">
+                  <Button variant="outline" size="sm" onClick={handleExportExcel} className="flex-1 gap-1" title="Excel">
+                    <FileSpreadsheet className="h-3 w-3" /> <span className="text-xs">Excel</span>
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={handleExportPDF} className="flex-1 gap-1" title="PDF">
+                    <FileText className="h-3 w-3" /> <span className="text-xs">PDF</span>
+                  </Button>
+               </div>
+               <div className="flex w-full gap-2">
+                   <Button onClick={() => setStructureManagerOpen(true)} className="flex-1 gap-1" variant="outline" size="sm">
+                    <FolderTree className="h-3 w-3" />
+                    <span className="text-xs">Estructura</span>
+                  </Button>
+                   <Button onClick={() => setNewMachineOpen(true)} className="flex-1 gap-1" variant="outline" size="sm">
+                    <Plus className="h-3 w-3" />
+                    <span className="text-xs">Equipo</span>
+                  </Button>
+               </div>
              </div>
              
-             <Button onClick={() => setNewMachineOpen(true)} className="hidden sm:flex gap-2" variant="outline" size="sm">
-               <Plus className="h-4 w-4" />
-               Nuevo equipo
-             </Button>
+             <div className="hidden sm:flex gap-2">
+               <Button onClick={() => setStructureManagerOpen(true)} className="gap-2" variant="outline" size="sm">
+                 <FolderTree className="h-4 w-4" />
+                 Estructura
+               </Button>
+               <Button onClick={() => setNewMachineOpen(true)} className="gap-2" variant="outline" size="sm">
+                 <Plus className="h-4 w-4" />
+                 Nuevo equipo
+               </Button>
+             </div>
           </div>
         </div>
 
@@ -598,6 +614,17 @@ export function RepuestosDashboard() {
           })
         }}
       />
+
+      <Dialog open={structureManagerOpen} onOpenChange={setStructureManagerOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-0">
+          <DialogHeader className="px-6 py-4 border-b">
+            <DialogTitle>Gestión de Estructura de Planta</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto px-6 py-4">
+             <CategoryManager />
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
