@@ -224,7 +224,8 @@ export function RepuestoFormModal({
             />
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2 bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-border/50">
+          {/* Legacy fields ocultos por ahora */}
+          {/* <div className="grid gap-4 md:grid-cols-2 bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-border/50">
             <div className="space-y-2">
               <Label htmlFor="cantidadSolicitada" className="text-xs uppercase tracking-wide text-muted-foreground">Cantidad Solicitada</Label>
               <Input
@@ -247,7 +248,7 @@ export function RepuestoFormModal({
                 onChange={(e) => setForm({ ...form, cantidadStockBodega: Number(e.target.value) })}
               />
             </div>
-          </div>
+          </div> */}
 
           {/* Sección de Tags oculta por ahora - Modo Catálogo solo */}
           {/* 
