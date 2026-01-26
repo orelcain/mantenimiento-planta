@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, Plus, FileSpreadsheet, FileText, Upload, FolderTree } from 'lucide-react'
+import { AlertTriangle, Plus, FileSpreadsheet, FileText, Upload, FolderTree, ClipboardList } from 'lucide-react'
 import { RepuestosTable } from '@/components/repuestos/RepuestosTable'
 import { RepuestoFormModal } from '@/components/repuestos/RepuestoForm'
 import { RepuestosFilters } from '@/components/repuestos/RepuestosFilters'
