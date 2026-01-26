@@ -292,6 +292,7 @@ export function RepuestoFormModal({
           </div> 
           */}
 
+          {/* Legacy Tags Display - Disabled
           {form.tags && form.tags.length > 0 && false ? (
             <div className="rounded-lg border bg-muted/30 p-3">
               <div className="mb-2 text-sm font-semibold text-foreground">Tags asignados</div>
@@ -320,6 +321,7 @@ export function RepuestoFormModal({
               </div>
             </div>
           ) : null}
+          */}
 
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
 

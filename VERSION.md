@@ -1,14 +1,20 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.35.62**
+## Versión Actual: **v2.35.63**
 
-**Fecha de lanzamiento**: 25 de enero de 2026  \
+**Fecha de lanzamiento**: 26 de enero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
 **Build**: ✅ Stable
 
 ---
 
 ## 📋 Información de la Versión
+
+### v2.35.63 - PDF Exports & Translations (26/01/2026)
+- **Feat**: Nuevo modal de exportación selectiva (Por Categoría/Individual) para fichas técnicas.
+- **Feat**: Traducción automática de claves técnicas (English -> Español) en PDF generado.
+- **Fix**: Corrección de aspecto de imágenes "distorsionadas" en PDF (Contain Strategy).
+- **Refactor**: Corrección de problemas de linter en código de repuestos.
 
 ### v2.35.62 - Image Optimization & Meta (25/01/2026)
 - **Feat**: Optimización automática de imágenes de repuestos a formato WebP.
