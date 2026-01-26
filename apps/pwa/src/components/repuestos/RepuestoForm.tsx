@@ -201,7 +201,7 @@ export function RepuestoFormModal({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="valorUnitario">Valor unitario ($)</Label>
+              <Label htmlFor="valorUnitario">Valor unitario (USD)</Label>
               <Input
                 id="valorUnitario"
                 type="number"
@@ -249,6 +249,8 @@ export function RepuestoFormModal({
             </div>
           </div>
 
+          {/* Sección de Tags oculta por ahora - Modo Catálogo solo */}
+          {/* 
           <div className="space-y-3 pt-2 border-t">
             <Label className="text-base font-semibold">Inventario por Evento (Tags)</Label>
             
@@ -286,9 +288,10 @@ export function RepuestoFormModal({
                   Añadir
                 </Button>
             </div>
-          </div>
+          </div> 
+          */}
 
-          {form.tags && form.tags.length > 0 ? (
+          {form.tags && form.tags.length > 0 && false ? (
             <div className="rounded-lg border bg-muted/30 p-3">
               <div className="mb-2 text-sm font-semibold text-foreground">Tags asignados</div>
               <div className="flex flex-wrap gap-2">
