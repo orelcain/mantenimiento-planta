@@ -248,10 +248,7 @@ export function RepuestosDashboard() {
   }
 
   const handleOpenExportReport = () => {
-    if (filteredRepuestos.length === 0) {
-      toast({ title: 'Sin repuestos', description: 'No hay repuestos para exportar', variant: 'warning' })
-      return
-    }
+    // Ya no bloqueamos si no hay filtrados, porque el modal ahora permite seleccionar todo el catálogo
     setExportReportOpen(true)
   }
 
@@ -634,7 +631,8 @@ export function RepuestosDashboard() {
       <ExportReportModal 
         isOpen={exportReportOpen}
         onClose={() => setExportReportOpen(false)}
-        repuestos={filteredRepuestos}
+        repuestos={repuestos}
+        filteredRepuestos={filteredRepuestos}
         categories={categories}
         machineName={currentMachine?.nombre}
       />
