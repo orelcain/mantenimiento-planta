@@ -216,7 +216,7 @@ export function FailureAnalysis() {
                                     }
                                 },
                                 onHover: (event, chartElement) => {
-                                    // @ts-ignore
+                                    // @ts-expect-error - Chart.js types definition issue with event target
                                     event.native.target.style.cursor = chartElement.length ? 'pointer' : 'default'
                                 }
                             }} 

@@ -226,13 +226,12 @@ export function RepuestosDashboard() {
     }
   }, [selectedCategoryId, machines, subcategoryIds, setCurrentMachine])
 
+  // Elimino stats porque no se usa
+  /*
   const stats = useMemo(() => {
-    const total = repuestos.length
-    const withStock = repuestos.filter((r) => getStockTotal(r) > 0).length
-    const withSolicitud = repuestos.filter((r) => getSolicitudTotal(r) > 0).length
-    const valorStock = repuestos.reduce((sum, r) => sum + getStockTotal(r) * (r.valorUnitario || 0), 0)
-    return { total, withStock, withSolicitud, valorStock }
+    ...
   }, [repuestos])
+  */
 
   // Contar repuestos por máquina para el MachineSelector
   const repuestosCounts = useMemo(() => {
@@ -672,12 +671,10 @@ export function RepuestosDashboard() {
   )
 }
 
-function StatCard({ label, value, subtle }: { label: string; value: string | number; subtle?: string }) {
-  return (
-    <div className="rounded-lg border bg-card px-4 py-3 shadow-sm">
-      <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
-      {/* oculto valor grande por ahora */}
-      {subtle ? <div className="text-xs text-muted-foreground">{subtle}</div> : null}
-    </div>
-  )
-}
+
+   1. Unused "StatCard"
+   2. Unused "stats"
+   3. Unused "tagsLoading"
+   
+   I will remove "StatCard" component, "stats" computation, and "tagsLoading" variable.
+

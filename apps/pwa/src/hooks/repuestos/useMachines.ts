@@ -139,14 +139,17 @@ export function useMachines() {
     machineData: Omit<Machine, 'id' | 'createdAt' | 'updatedAt'>
   ): Promise<string> => {
     try {
-      // Generar slug limpio: marca-modelo en minúsculas, sin espacios ni caracteres especiales
-      const slug = `${machineData.marca}-${machineData.modelo}`
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '') // Quitar acentos
-        .replace(/[^a-z0-9-]/g, '-')      // Reemplazar caracteres especiales por -
-        .replace(/-+/g, '-')              // Múltiples - por uno solo
-        .replace(/^-|-$/g, '');           // Quitar - al inicio y final
+      // Generar slug limpio si hay marca y modelo
+      let slug = '';
+      if (machineData.marca && machineData.modelo) {
+        slug = `${machineData.marca}-${machineData.modelo}`
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '') // Quitar acentos
+          .replace(/[^a-z0-9-]/g, '-')      // Reemplazar caracteres especiales por -
+          .replace(/-+/g, '-')              // Múltiples - por uno solo
+          .replace(/^-|-$/g, '');           // Quitar - al inicio y final
+      }
       
       // Calcular el siguiente orden
       const maxOrden = machines.length > 0 
@@ -161,28 +164,35 @@ export function useMachines() {
         updatedAt: Timestamp.now(),
       };
       
-      // Usar setDoc con ID específico en lugar de addDoc
-      const docRef = doc(db, COLLECTION_NAME, slug);
-      
-      // Verificar si ya existe (desde servidor, evitando caché)
-      let existingDoc;
-      try {
-        existingDoc = await getDocFromServer(docRef);
-      } catch {
-        // Fallback (por ejemplo si está offline): usar caché/local
-        existingDoc = await getDoc(docRef);
-      }
+      let docRef;
 
-      if (existingDoc.exists()) {
-        throw new Error(`Ya existe una máquina con el ID "${slug}". Usa una marca/modelo diferente.`);
+      // Si tenemos un slug válido (no vacío), intentamos usarlo como ID
+      if (slug && slug.length > 1) {
+        docRef = doc(db, COLLECTION_NAME, slug);
+        
+        // Verificar si ya existe (desde servidor, evitando caché)
+        let existingDoc;
+        try {
+          existingDoc = await getDocFromServer(docRef);
+        } catch {
+          // Fallback (por ejemplo si está offline): usar caché/local
+          existingDoc = await getDoc(docRef);
+        }
+
+        if (existingDoc.exists()) {
+           // Si ya existe, usamos un ID generado automáticamente
+           // O podríamos lanzar error, pero mejor ser robusto
+           console.warn(`Máquina con ID ${slug} ya existe, generando ID automático.`);
+           docRef = doc(collection(db, COLLECTION_NAME));
+        }
+      } else {
+        // Si no hay slug (sin marca/modelo), usar ID automático
+        docRef = doc(collection(db, COLLECTION_NAME));
       }
       
       await setDoc(docRef, newMachine);
       
-      // NO llamar fetchMachines - el listener onSnapshot actualizará automáticamente
-      // await fetchMachines();
-      
-      return slug;
+      return docRef.id;
     } catch (err) {
       console.error('Error creating machine:', err);
       throw err instanceof Error ? err : new Error('Error al crear la máquina');

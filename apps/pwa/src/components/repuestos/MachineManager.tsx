@@ -91,10 +91,10 @@ export function MachineManager() {
       const marca = (formData.marca || '').trim();
       const modelo = (formData.modelo || '').trim();
 
-      if (!nombre || !marca || !modelo) {
+      if (!nombre) {
         toast({
           title: 'Error',
-          description: 'Los campos Nombre, Marca y Modelo son obligatorios',
+          description: 'El campo Nombre es obligatorio',
           variant: 'destructive',
         });
         return;
@@ -359,7 +359,7 @@ export function MachineManager() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="marca">Marca *</Label>
+                <Label htmlFor="marca">Marca (opcional)</Label>
                 <Input
                   id="marca"
                   value={formData.marca}
@@ -369,7 +369,7 @@ export function MachineManager() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="modelo">Modelo *</Label>
+                <Label htmlFor="modelo">Modelo (opcional)</Label>
                 <Input
                   id="modelo"
                   value={formData.modelo}
