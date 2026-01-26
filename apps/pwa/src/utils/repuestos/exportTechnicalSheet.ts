@@ -163,7 +163,28 @@ async function addTechnicalSheetToDoc(
             const base64Img = await imageUrlToBase64(img.url);
             
             if (base64Img) {
-              doc.addImage(base64Img, 'JPEG', xPos, yPos, imgWidth, imgHeight);
+              // Calcular dimensiones para mantener aspecto (Contain)
+              const imgProps = doc.getImageProperties(base64Img);
+              const imgRatio = imgProps.width / imgProps.height;
+              const boxRatio = imgWidth / imgHeight;
+              
+              let drawW = imgWidth;
+              let drawH = imgHeight;
+              let drawX = xPos;
+              let drawY = yPos;
+
+              if (imgRatio > boxRatio) {
+                 // La imagen es más ancha que el cuadro (ajustar al ancho)
+                 drawH = imgWidth / imgRatio;
+                 drawY = yPos + (imgHeight - drawH) / 2;
+              } else {
+                 // La imagen es más alta que el cuadro (ajustar al alto)
+                 drawW = imgHeight * imgRatio;
+                 drawX = xPos + (imgWidth - drawW) / 2;
+              }
+              
+              // Usar coordenadas ajustadas
+              doc.addImage(base64Img, drawX, drawY, drawW, drawH);
             } else {
                // Fallback si falla la carga
                doc.rect(xPos, yPos, imgWidth, imgHeight);
