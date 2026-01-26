@@ -36,6 +36,7 @@ interface TechnicalSpecsModalProps {
   repuesto: Repuesto | null;
   machineId?: string; // Needed for storage path
   initialTab?: 'specs' | 'gallery';
+  readOnly?: boolean;
   onSave?: (repuestoId: string, specs: TechnicalSpecs, gallery: MachineImage[]) => Promise<void>;
 }
 
@@ -86,8 +87,7 @@ export function TechnicalSpecsModal({
   onOpenChange,
   repuesto,
   machineId,
-  initialTab = 'specs',
-  onSave
+  initialTab = 'specs',  readOnly = false,  onSave
 }: TechnicalSpecsModalProps) {
   const [activeTab, setActiveTab] = useState<string>(initialTab);
   const [saving, setSaving] = useState(false);
@@ -285,6 +285,7 @@ export function TechnicalSpecsModal({
                 <div className="space-y-2">
                   <span className="text-xs font-semibold text-muted-foreground uppercase">Tipo de Componente</span>
                   <Select 
+                    disabled={readOnly}
                     value={specs.type} 
                     onValueChange={(val: TechnicalDataType) => setSpecs(prev => ({ ...prev, type: val }))}
                   >
@@ -312,6 +313,7 @@ export function TechnicalSpecsModal({
                         <div key={fieldKey} className="space-y-1">
                           <label className="text-[10px] font-medium text-muted-foreground uppercase">{label}</label>
                           <Input 
+                            disabled={readOnly}
                             value={specs.standardValues[fieldKey] || ''} 
                             onChange={(e) => handleStandardChange(fieldKey, e.target.value)}
                             className="bg-background h-8 text-sm"
@@ -330,9 +332,11 @@ export function TechnicalSpecsModal({
                       <div className="w-1.5 h-1.5 rounded-full bg-amber-500"></div>
                       <h3 className="text-xs font-semibold uppercase text-muted-foreground">Campos Adicionales</h3>
                     </div>
+                    {!readOnly && (
                     <Button variant="outline" size="sm" onClick={addCustomField} className="h-7 text-xs gap-1">
                       <Plus className="w-3 h-3" /> Agregar
                     </Button>
+                    )}
                   </div>
 
                   {specs.customFields.length === 0 ? (
@@ -345,18 +349,21 @@ export function TechnicalSpecsModal({
                         <div key={field.id} className="flex gap-2 items-start animate-in fade-in slide-in-from-left-2 duration-200">
                           <div className="flex-1 grid grid-cols-2 gap-2">
                             <Input 
+                              disabled={readOnly}
                               placeholder="Nombre (ej: Marca sello)"
                               value={field.label}
                               onChange={(e) => handleCustomChange(field.id, 'label', e.target.value)}
                               className="h-8 text-xs font-medium"
                             />
                             <Input 
+                              disabled={readOnly}
                               placeholder="Valor"
                               value={field.value}
                               onChange={(e) => handleCustomChange(field.id, 'value', e.target.value)}
                               className="h-8 text-sm"
                             />
                           </div>
+                          {!readOnly && (
                           <Button 
                             variant="ghost" 
                             size="icon" 
@@ -365,6 +372,7 @@ export function TechnicalSpecsModal({
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -375,6 +383,7 @@ export function TechnicalSpecsModal({
                 <div className="space-y-2 pt-2 border-t">
                   <span className="text-xs font-semibold text-muted-foreground uppercase">Observaciones</span>
                   <Textarea 
+                    disabled={readOnly}
                     value={specs.notes || ''} 
                     onChange={(e) => setSpecs(prev => ({ ...prev, notes: e.target.value }))}
                     className="min-h-[80px] bg-background resize-none text-sm" 
@@ -395,6 +404,7 @@ export function TechnicalSpecsModal({
                 />
 
                 {/* Upload Placeholder */}
+                {!readOnly && (
                 <div 
                     onClick={() => !uploading && fileInputRef.current?.click()}
                     className={`border-2 border-dashed border-muted-foreground/25 hover:border-blue-500/50 hover:bg-muted/10 rounded-lg p-6 flex flex-col items-center justify-center text-center transition-all cursor-pointer ${uploading ? 'opacity-50 pointer-events-none' : ''}`}
@@ -405,6 +415,7 @@ export function TechnicalSpecsModal({
                   <p className="text-sm font-medium">{uploading ? 'Subiendo imagen...' : 'Click para subir nuevas fotos'}</p>
                   <p className="text-xs text-muted-foreground mt-1">Placas, detalles o estado actual</p>
                 </div>
+                )}
 
                 <div className="space-y-2">
                    <h3 className="text-xs font-semibold uppercase text-muted-foreground mb-2">Imágenes Guardadas ({gallery.length})</h3>
@@ -421,6 +432,7 @@ export function TechnicalSpecsModal({
                                {/* Overlay Actions */}
                                <div className="absolute inset-x-0 bottom-0 bg-black/60 p-2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-between">
                                    <span className="text-[10px] text-white truncate max-w-[70%]">{new Date(img.timestamp).toLocaleDateString()}</span>
+                                   {!readOnly && (
                                    <Button 
                                     variant="destructive" 
                                     size="icon" 
@@ -429,6 +441,7 @@ export function TechnicalSpecsModal({
                                    >
                                        <Trash2 className="w-3 h-3" />
                                    </Button>
+                                   )}
                                </div>
 
                                {/* Type Badge */}
@@ -454,8 +467,9 @@ export function TechnicalSpecsModal({
 
            <div className="flex gap-2">
               <Button variant="ghost" onClick={() => onOpenChange(false)}>
-                Cancelar
+                {readOnly ? 'Cerrar' : 'Cancelar'}
               </Button>
+              {!readOnly && (
               <Button onClick={handleSave} disabled={saving} className="bg-blue-600 hover:bg-blue-500 text-white">
                 {saving ? (
                   <>
@@ -467,6 +481,7 @@ export function TechnicalSpecsModal({
                   </>
                 )}
               </Button>
+              )}
            </div>
         </div>
       </DialogContent>

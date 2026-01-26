@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.35.59**
+## Versión Actual: **v2.35.60**
 
 **Fecha de lanzamiento**: 25 de enero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,12 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.35.60 - RBAC & Catalog Mode (25/01/2026)
+- **Feat**: Implementación de permisos (RBAC). Edición/Creación de repuestos solo para Admins.
+- **Feat**: Fichas Técnicas en modo "Solo Lectura" para usuarios estándar.
+- **UX**: Simplificación de formulario (Modo Catálogo). Ocultos tags y stock legacy.
+- **Fix**: Reglas de Storage actualizadas para permitir subida de imágenes de repuestos.
 
 ### v2.35.59 - Build Fix (25/01/2026)
 - **Fix**: Corrección de error de compilación (texto residual en `Dashboard.tsx`).

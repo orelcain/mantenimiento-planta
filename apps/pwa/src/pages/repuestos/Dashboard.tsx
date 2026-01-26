@@ -406,10 +406,12 @@ export function RepuestosDashboard() {
              {/* Mobile: Collapse secondary actions or use icons only if needed */}
              
              <div className="flex items-center gap-2 w-full sm:w-auto">
+                {isAdmin && (
                 <Button variant="outline" size="sm" onClick={() => setImportOpen(true)} className="flex-1 sm:flex-none gap-2" title="Importar">
                   <Upload className="h-4 w-4" />
                   <span className="sm:inline">Importar</span>
                 </Button>
+                )}
                 
                 <div className="hidden sm:flex gap-2">
                    <Button variant="outline" size="sm" onClick={handleExportExcel} className="gap-2" title="Exportar Excel">
@@ -420,10 +422,12 @@ export function RepuestosDashboard() {
                    </Button>
                 </div>
 
+                {isAdmin && (
                 <Button size="sm" onClick={() => setCreateOpen(true)} className="flex-1 sm:flex-none gap-2">
                   <Plus className="h-4 w-4" />
                   <span className="truncate">Repuesto</span>
                 </Button>
+                )}
              </div>
              
              {/* Mas opciones mobile */}
@@ -513,8 +517,8 @@ export function RepuestosDashboard() {
                 repuestos={paginatedRepuestos}
                 loading={repuestosLoading}
                 machineId={currentMachine?.id}
-                onEdit={(rep) => setEditTarget(rep)}
-                onDelete={(rep) => setConfirmDelete(rep)}
+                onEdit={isAdmin ? (rep) => setEditTarget(rep) : undefined}
+                onDelete={isAdmin ? (rep) => setConfirmDelete(rep) : undefined}
                 onViewPhotos={(rep) => setPhotoModal(rep)}
                 onViewManual={(rep) => setManualModal(rep)}
                 onViewHistory={(rep) => setHistoryModal(rep)}
@@ -631,6 +635,7 @@ export function RepuestosDashboard() {
           machineId={currentMachine?.id} // Pasamos el ID de la máquina actual
           initialTab={specsTarget.tab}
           onSave={handleSaveSpecs}
+          readOnly={!isAdmin}
         />
       )}
 
