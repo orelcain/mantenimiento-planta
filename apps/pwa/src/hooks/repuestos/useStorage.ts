@@ -42,10 +42,16 @@ export function useStorage(machineId: string | null) {
         file.type.startsWith('image/') &&
         !['image/gif', 'image/svg+xml'].includes(file.type);
       let fileToUpload = file;
+      let width: number | undefined;
+      let height: number | undefined;
+
       if (shouldOptimize) {
         try {
           const quality = options?.quality ?? 0.85;
-          fileToUpload = await optimizeImage(file, 1200, 1200, quality);
+          const result = await optimizeImage(file, 1200, 1200, quality);
+          fileToUpload = result.file;
+          width = result.width;
+          height = result.height;
         } catch (err) {
           console.warn('[useStorage] No se pudo optimizar imagen; subiendo original', err);
           fileToUpload = file;
@@ -89,7 +95,9 @@ export function useStorage(machineId: string | null) {
         sizeOriginal,
         sizeFinal: fileToUpload.size,
         formatFinal,
-        qualityFinal: options?.meta?.chosen?.quality
+        qualityFinal: options?.meta?.chosen?.quality,
+        width,
+        height
       };
 
       return imagen;

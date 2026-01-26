@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.35.61**
+## Versión Actual: **v2.35.62**
 
 **Fecha de lanzamiento**: 25 de enero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.35.62 - Image Optimization & Meta (25/01/2026)
+- **Feat**: Optimización automática de imágenes de repuestos a formato WebP.
+- **UI**: Visualización de metadatos en galería (Resolución, Peso y Formato).
+- **Code**: Refactorización de `useStorage` y `imageUtils` para manejar dimensiones de imagen.
 
 ### v2.35.61 - Storage Rules Update (25/01/2026)
 - **Fix**: Añadidas reglas de Storage para soporte legacy (Baader 200) y nuevas máquinas.

@@ -24,6 +24,8 @@ export interface ImagenRepuesto {
   sizeFinal?: number; // bytes del archivo subido
   formatFinal?: 'webp' | 'jpeg' | 'original';
   qualityFinal?: number;
+  width?: number;
+  height?: number;
 }
 
 /**
@@ -145,6 +147,10 @@ export interface MachineImage {
   type: 'plate' | 'equipment' | 'part' | 'other';
   timestamp: number;
   notes?: string;
+  // Metadata de archivo
+  size?: number; // bytes
+  format?: string;
+  dimensions?: { width: number; height: number };
 }
 
 /**

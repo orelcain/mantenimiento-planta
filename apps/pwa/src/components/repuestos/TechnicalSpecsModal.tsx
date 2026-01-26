@@ -228,7 +228,10 @@ export function TechnicalSpecsModal({
             url: uploadedImg.url,
             type: 'equipment', // Start as generic equipment/part
             timestamp: Date.now(),
-            notes: ''
+            notes: '',
+            size: uploadedImg.sizeFinal,
+            format: uploadedImg.formatFinal,
+            dimensions: (uploadedImg.width && uploadedImg.height) ? { width: uploadedImg.width, height: uploadedImg.height } : undefined
         };
         
         setGallery(prev => [newGalleryItem, ...prev]);
@@ -430,18 +433,30 @@ export function TechnicalSpecsModal({
                                <img src={img.url} alt="Gallery item" className="w-full h-full object-cover" />
                                
                                {/* Overlay Actions */}
-                               <div className="absolute inset-x-0 bottom-0 bg-black/60 p-2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-between">
-                                   <span className="text-[10px] text-white truncate max-w-[70%]">{new Date(img.timestamp).toLocaleDateString()}</span>
-                                   {!readOnly && (
-                                   <Button 
-                                    variant="destructive" 
-                                    size="icon" 
-                                    className="h-6 w-6" 
-                                    onClick={(e) => { e.stopPropagation(); handleDeleteImage(img.id); }}
-                                   >
-                                       <Trash2 className="w-3 h-3" />
-                                   </Button>
-                                   )}
+                               <div className="absolute inset-x-0 bottom-0 bg-black/60 p-2 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col gap-1">
+                                   <div className="flex items-center justify-between">
+                                       <span className="text-[10px] text-white truncate max-w-[70%]">{new Date(img.timestamp).toLocaleDateString()}</span>
+                                       {!readOnly && (
+                                       <Button 
+                                        variant="destructive" 
+                                        size="icon" 
+                                        className="h-6 w-6" 
+                                        onClick={(e) => { e.stopPropagation(); handleDeleteImage(img.id); }}
+                                       >
+                                           <Trash2 className="w-3 h-3" />
+                                       </Button>
+                                       )}
+                                   </div>
+                                    {/* Info Técnica */}
+                                    <div className="flex flex-col text-[9px] text-gray-300 font-mono leading-tight">
+                                        {img.dimensions && <span>{img.dimensions.width}x{img.dimensions.height}</span>}
+                                        {(img.size || img.format) && (
+                                            <span>
+                                                {img.size ? `${Math.round(img.size / 1024)}KB` : ''} 
+                                                {img.format ? ` • ${img.format.toUpperCase()}` : ''}
+                                            </span>
+                                        )}
+                                    </div>
                                </div>
 
                                {/* Type Badge */}

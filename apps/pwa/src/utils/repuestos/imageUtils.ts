@@ -4,14 +4,14 @@
  * @param maxWidth Ancho máximo en píxeles (default: 1200)
  * @param maxHeight Alto máximo en píxeles (default: 1200)
  * @param quality Calidad de compresión 0-1 (default: 0.8)
- * @returns Promise con el archivo optimizado
+ * @returns Promise con el archivo optimizado y sus dimensiones
  */
 export async function optimizeImage(
   file: File,
   maxWidth: number = 1200,
   maxHeight: number = 1200,
   quality: number = 0.8
-): Promise<File> {
+): Promise<{ file: File; width: number; height: number }> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     
@@ -60,14 +60,15 @@ export async function optimizeImage(
               }
               
               // Crear nuevo archivo
-              const optimizedFile = new File([blob], file.name, {
-                type: 'image/jpeg',
+              const fileName = file.name.replace(/\.[^/.]+$/, "") + ".webp"
+              const optimizedFile = new File([blob], fileName, {
+                type: 'image/webp',
                 lastModified: Date.now(),
               })
               
-              resolve(optimizedFile)
+              resolve({ file: optimizedFile, width, height })
             },
-            'image/jpeg',
+            'image/webp',
             quality
           )
         } catch (error) {
