@@ -163,13 +163,21 @@ async function addTechnicalSheetToDoc(
             const base64Img = await imageUrlToBase64(img.url);
             
             if (base64Img) {
-              // Obtener dimensiones reales usando DOM para mayor precisión
-              const ratio = await new Promise<number>((resolve) => {
-                 const i = new Image();
-                 i.onload = () => resolve(i.naturalWidth / i.naturalHeight);
-                 i.onerror = () => resolve(1);
-                 i.src = base64Img;
-              });
+              // 1. Intentar usar dimensiones guardadas (Metadata) - MÁS PRECISO Y RÁPIDO
+              let ratio = img.dimensions ? (img.dimensions.width / img.dimensions.height) : 0;
+              
+              // 2. Si no hay metadata, calcular usando el objeto Image del navegador
+              if (!ratio || isNaN(ratio)) {
+                 ratio = await new Promise<number>((resolve) => {
+                     const i = new Image();
+                     i.onload = () => resolve(i.naturalWidth / i.naturalHeight);
+                     i.onerror = () => resolve(0); // Marcar como fallido para usar fallback visual
+                     i.src = base64Img;
+                 });
+              }
+
+              // Fallback final si todo falla: asumir cuadrado (1:1)
+              if (!ratio || isNaN(ratio) || ratio === 0) ratio = 1;
 
               // Calcular dimensiones para mantener aspecto (Contain)
               const boxRatio = imgWidth / imgHeight;
@@ -189,7 +197,7 @@ async function addTechnicalSheetToDoc(
                  drawX = xPos + (imgWidth - drawW) / 2;
               }
               
-              // Detectar formato
+              // Detectar formato desde la cabecera Base64 (ej: data:image/webp;base64,...)
               const format = base64Img.match(/^data:image\/(\w+);base64,/)?.[1]?.toUpperCase() || 'JPEG';
               
               // Usar coordenadas ajustadas
