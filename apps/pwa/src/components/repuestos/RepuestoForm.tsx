@@ -159,11 +159,15 @@ export function RepuestoFormModal({
         <DialogHeader>
           <DialogTitle>
             {mode === 'create' ? 'Nuevo repuesto' : 'Editar repuesto'}
-            {machineName ? <span className="ml-2 text-sm text-muted-foreground">({machineName})</span> : null}
           </DialogTitle>
+          {machineName && (
+            <p className="text-sm text-muted-foreground mt-1">
+              Asociado a: <span className="font-medium text-foreground">{machineName}</span>
+            </p>
+          )}
         </DialogHeader>
 
-        <form className="space-y-4" onSubmit={handleSubmit}>
+        <form className="space-y-5 py-2" onSubmit={handleSubmit}>
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="codigoSAP">Código SAP</Label>
@@ -220,55 +224,67 @@ export function RepuestoFormModal({
             />
           </div>
 
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-2 bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-border/50">
             <div className="space-y-2">
-              <Label htmlFor="cantidadSolicitada">Solicitado (legacy)</Label>
+              <Label htmlFor="cantidadSolicitada" className="text-xs uppercase tracking-wide text-muted-foreground">Solicitado (Legacy)</Label>
               <Input
                 id="cantidadSolicitada"
                 type="number"
                 min="0"
+                className="bg-background"
                 value={form.cantidadSolicitada}
                 onChange={(e) => setForm({ ...form, cantidadSolicitada: Number(e.target.value) })}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="cantidadStockBodega">Stock (legacy)</Label>
+              <Label htmlFor="cantidadStockBodega" className="text-xs uppercase tracking-wide text-muted-foreground">Stock (Legacy)</Label>
               <Input
                 id="cantidadStockBodega"
                 type="number"
                 min="0"
+                className="bg-background"
                 value={form.cantidadStockBodega}
                 onChange={(e) => setForm({ ...form, cantidadStockBodega: Number(e.target.value) })}
               />
             </div>
-            <div className="space-y-2">
-              <Label>Tags (inventario por evento)</Label>
-              <div className="flex gap-2">
-                <select
-                  className="flex-1 rounded-md border bg-background px-3 py-2 text-sm"
+          </div>
+
+          <div className="space-y-3 pt-2 border-t">
+            <Label className="text-base font-semibold">Inventario por Evento (Tags)</Label>
+            
+            <div className="flex gap-2 items-end">
+               <div className="flex-1 space-y-1">
+                 <Label className="text-xs text-muted-foreground">Seleccionar Tag</Label>
+                 <select
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   value={tagName}
                   onChange={(e) => setTagName(e.target.value)}
                 >
-                  <option value="">Selecciona un tag</option>
+                  <option value="">Selecciona un tag...</option>
                   {tagOptions.map((tag) => (
                     <option key={tag.nombre} value={tag.nombre}>
-                      {tag.nombre} ({tag.tipo === 'stock' ? 'stock' : 'solicitud'})
+                      {tag.nombre} ({tag.tipo === 'stock' ? 'Stock' : 'Solicitud'})
                     </option>
                   ))}
                 </select>
-                <Input
-                  className="w-28"
-                  type="number"
-                  min="0"
-                  value={tagCantidad}
-                  onChange={(e) => setTagCantidad(e.target.value)}
-                  placeholder="Cant"
-                />
-                <Button type="button" variant="secondary" onClick={handleAddTag}>
-                  <Plus className="h-4 w-4" />
+               </div>
+
+                <div className="w-24 space-y-1">
+                   <Label className="text-xs text-muted-foreground">Cantidad</Label>
+                   <Input
+                    type="number"
+                    min="0"
+                    translate="no"
+                    value={tagCantidad}
+                    onChange={(e) => setTagCantidad(e.target.value)}
+                    placeholder="0"
+                  />
+                </div>
+
+                <Button type="button" variant="secondary" onClick={handleAddTag} className="mb-[1px]">
+                  <Plus className="h-4 w-4 mr-2" />
                   Añadir
                 </Button>
-              </div>
             </div>
           </div>
 
