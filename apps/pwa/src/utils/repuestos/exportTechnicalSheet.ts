@@ -3,21 +3,33 @@ import autoTable from 'jspdf-autotable'
 import type { Repuesto, TechnicalDataField } from '@/types/repuestos'
 
 /**
- * Exporta la ficha técnica y galería de un repuesto a PDF
+ * Convierte una URL de imagen a Base64
  */
-export async function exportTechnicalSheetToPDF(
+async function imageUrlToBase64(url: string): Promise<string | null> {
+  try {
+    const response = await fetch(url);
+    const blob = await response.blob();
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  } catch (error) {
+    console.warn('Error fetching image for PDF:', error);
+    return null;
+  }
+}
+
+/**
+ * Genera el contenido de una ficha técnica en el documento PDF dado
+ * @returns La posición Y final
+ */
+async function addTechnicalSheetToDoc(
+  doc: jsPDF,
   repuesto: Repuesto,
   machineName?: string
 ): Promise<void> {
-
-  // 1. Configurar documento
-  const doc = new jsPDF({
-    orientation: 'portrait',
-    unit: 'mm',
-    format: 'a4',
-  })
-
-  // Funciona con jsPDF para obtener ancho y alto usable
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 15;
@@ -44,12 +56,13 @@ export async function exportTechnicalSheetToPDF(
 
   doc.setFontSize(14);
   doc.setFont('helvetica', 'bold');
-  doc.text(repuesto.textoBreve || 'Sin Nombre', margin + 5, yPos + 8);
+  const title = repuesto.textoBreve || 'Sin Nombre';
+  doc.text(title.substring(0, 50) + (title.length > 50 ? '...' : ''), margin + 5, yPos + 8);
   
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
   doc.text(`Código SAP: ${repuesto.codigoSAP || 'N/A'}`, margin + 5, yPos + 18);
-  doc.text(`Descripción: ${repuesto.descripcion?.substring(0, 100) || 'Sin descripción'}`, margin + 5, yPos + 24);
+  doc.text(`Descripción: ${repuesto.descripcion?.substring(0, 130) || 'Sin descripción'}`, margin + 5, yPos + 24);
 
   yPos += 40;
 
@@ -67,27 +80,26 @@ export async function exportTechnicalSheetToPDF(
     // Datos Standard
     if (specs.standardValues) {
         Object.entries(specs.standardValues).forEach(([key, value]) => {
-           tableData.push(['Estándar', key.toUpperCase(), value.toString()]);
+           tableData.push([key.toUpperCase(), value.toString()]);
         });
     }
 
     // Datos Custom
     if (specs.customFields && specs.customFields.length > 0) {
         specs.customFields.forEach((field: TechnicalDataField) => {
-            tableData.push(['Adicional', field.label || 'Campo', field.value || '-']);
+            tableData.push([field.label || 'Campo', field.value || '-']);
         });
     }
 
     if (tableData.length > 0) {
         autoTable(doc, {
-            head: [['Tipo', 'Dato', 'Valor']],
+            head: [['Dato', 'Valor']],
             body: tableData,
             startY: yPos,
             theme: 'grid',
             headStyles: { fillColor: [66, 66, 66] },
             columnStyles: {
-                0: { cellWidth: 30, fontStyle: 'italic', textColor: 100 },
-                1: { cellWidth: 70, fontStyle: 'bold' },
+                0: { cellWidth: 70, fontStyle: 'bold' },
             },
             margin: { left: margin, right: margin }
         });
@@ -143,17 +155,21 @@ export async function exportTechnicalSheetToPDF(
         if (yPos + imgHeight > pageHeight - margin) {
             doc.addPage();
             yPos = margin;
+            xPos = margin; // Reset X on new page
         }
 
         try {
-            // Intentar cargar imagen (puede fallar por CORS si no está configurado)
-            // Se asume URL accesible o base64. 
-            // Si es URL remota, jsPDF necesita cargarla.
-            // Para simplicidad, agregamos el link si falla, o placeholder.
+            // Cargar imagen como Base64
+            const base64Img = await imageUrlToBase64(img.url);
             
-            // Nota: Para imágenes remotas en PDF client-side, a veces es complejo.
-            // Vamos a intentar agregar la imagen.
-            doc.addImage(img.url, 'JPEG', xPos, yPos, imgWidth, imgHeight);
+            if (base64Img) {
+              doc.addImage(base64Img, 'JPEG', xPos, yPos, imgWidth, imgHeight);
+            } else {
+               // Fallback si falla la carga
+               doc.rect(xPos, yPos, imgWidth, imgHeight);
+               doc.setFontSize(8);
+               doc.text('Error de carga', xPos + 5, yPos + 30);
+            }
             
             // Borde
             doc.setDrawColor(200);
@@ -162,13 +178,21 @@ export async function exportTechnicalSheetToPDF(
             // Notas de imagen
             if (img.notes) {
                  doc.setFontSize(8);
-                 doc.text(img.notes, xPos, yPos + imgHeight + 4);
+                 const notePreview = img.notes.substring(0, 30) + (img.notes.length > 30 ? '...' : '');
+                 doc.text(notePreview, xPos, yPos + imgHeight + 4);
             }
+             
+             // Info de resolución
+             if (img.dimensions) {
+                doc.setFontSize(7);
+                doc.setTextColor(150);
+                doc.text(`${img.dimensions.width}x${img.dimensions.height}`, xPos + imgWidth - 2, yPos + imgHeight - 2, { align: 'right' })
+                doc.setTextColor(0);
+             }
 
         } catch (e) {
             console.warn('No se pudo agregar imagen al PDF', e);
             doc.rect(xPos, yPos, imgWidth, imgHeight);
-            doc.text('Error cargando imagen', xPos + 5, yPos + 30);
         }
 
         // Mover cursor grid (2 columnas)
@@ -180,8 +204,48 @@ export async function exportTechnicalSheetToPDF(
         }
       }
   }
+}
 
-  // Guardar archivo
+/**
+ * Exporta la ficha técnica y galería de un repuesto a PDF
+ */
+export async function exportTechnicalSheetToPDF(
+  repuesto: Repuesto,
+  machineName?: string
+): Promise<void> {
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4',
+  });
+
+  await addTechnicalSheetToDoc(doc, repuesto, machineName);
+
   const filename = `Ficha_${repuesto.codigoSAP || 'REP'}_${new Date().getTime()}.pdf`;
+  doc.save(filename);
+}
+
+/**
+ * Exporta multiples fichas técnicas en un solo PDF
+ */
+export async function exportMultipleTechnicalSheetsToPDF(
+  repuestos: Repuesto[],
+  machineName?: string
+): Promise<void> {
+  if (repuestos.length === 0) return;
+
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4',
+  });
+
+  // Iterar y añadir página para cada uno (excepto el primero que ya tiene página por defecto)
+  for (let i = 0; i < repuestos.length; i++) {
+    if (i > 0) doc.addPage();
+    await addTechnicalSheetToDoc(doc, repuestos[i], machineName);
+  }
+
+  const filename = `Fichas_Tecnicas_Pack_${new Date().getTime()}.pdf`;
   doc.save(filename);
 }

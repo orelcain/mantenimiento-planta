@@ -25,6 +25,7 @@ import { ImportRepuestosModal } from './ImportRepuestosModal'
 import {
   exportRepuestosToExcel,
   exportRepuestosToPDF,
+  exportMultipleTechnicalSheetsToPDF,
 } from '@/utils/repuestos'
 import {
   Button,
@@ -291,6 +292,22 @@ export function RepuestosDashboard() {
     }
   }
 
+  const handleExportTechnicalSheets = async () => {
+    if (filteredRepuestos.length === 0) {
+      toast({ title: 'Sin repuestos', description: 'No hay repuestos para exportar', variant: 'warning' })
+      return
+    }
+
+    try {
+      toast({ title: 'Generando PDF...', description: `Exportando ${filteredRepuestos.length} fichas técnicas.` })
+      await exportMultipleTechnicalSheetsToPDF(filteredRepuestos, currentMachine?.nombre)
+      toast({ title: 'Exportación exitosa', description: 'El PDF con las fichas técnicas se ha descargado.', variant: 'success' })
+    } catch (err) {
+      console.error(err)
+      toast({ title: 'Error', description: 'No se pudo generar el PDF multiple', variant: 'destructive' })
+    }
+  }
+
   const handleImportSuccess = (message: string) => {
     toast({ title: 'Importación exitosa', description: message, variant: 'success' })
     setImportOpen(false)
@@ -417,8 +434,11 @@ export function RepuestosDashboard() {
                    <Button variant="outline" size="sm" onClick={handleExportExcel} className="gap-2" title="Exportar Excel">
                       <FileSpreadsheet className="h-4 w-4" />
                    </Button>
-                   <Button variant="outline" size="sm" onClick={handleExportPDF} className="gap-2" title="Exportar PDF">
+                   <Button variant="outline" size="sm" onClick={handleExportPDF} className="gap-2" title="Exportar Catálogo (PDF)">
                       <FileText className="h-4 w-4" />
+                   </Button>
+                   <Button variant="outline" size="sm" onClick={handleExportTechnicalSheets} className="gap-2" title="Exportar Fichas Técnicas (PDF Multiple)">
+                      <ClipboardList className="h-4 w-4" />
                    </Button>
                 </div>
 
