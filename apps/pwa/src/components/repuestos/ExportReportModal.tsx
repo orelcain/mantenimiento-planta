@@ -1,14 +1,12 @@
 import { useState, useMemo, useEffect } from 'react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
-import { FileText, FileSpreadsheet, ClipboardList, ChevronRight, ChevronDown, CheckSquare, Square, Image as ImageIcon } from 'lucide-react'
+import { FileText, FileSpreadsheet, ClipboardList, ChevronRight, ChevronDown, CheckSquare, Square } from 'lucide-react'
 import type { Repuesto } from '@/types/repuestos'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import * as repuestoExports from '@/utils/repuestos'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import { Separator } from '@/components/ui/separator'
 
 export type ReportType = 'technical_sheet' | 'catalog' | 'excel'
 
@@ -16,12 +14,11 @@ interface ExportReportModalProps {
   isOpen: boolean
   onClose: () => void
   repuestos: Repuesto[]
-  filteredRepuestos?: Repuesto[] // Optional: passed from current search results
+  filteredRepuestos?: Repuesto[] 
   categories: { id: string, nombre: string, parentId?: string }[]
   machineName?: string
 }
 
-// Helper to build tree
 type TreeNode = {
     id: string
     label: string
@@ -39,36 +36,40 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set())
   const [filterMode, setFilterMode] = useState<'all' | 'filtered'>('all')
 
-  // Effect to default selection to filtered if available
   useEffect(() => {
     if (isOpen && filteredRepuestos && filteredRepuestos.length < repuestos.length) {
         setFilterMode('filtered')
-        // Default to filtered selection
         setSelectedIds(new Set(filteredRepuestos.map(r => r.id)))
     } else if (isOpen) {
         setFilterMode('all')
-        // Automatically select all if opening full mode initially? No, user might want to pick.
-        // But better UX might be empty selection.
         setSelectedIds(new Set())
     }
   }, [isOpen, filteredRepuestos, repuestos.length])
 
-  // Build Tree
+  // Helper to determine category for a repuesto since it doesn't have a direct categoryId
+  const getRepuestoCategoryId = (rep: Repuesto): string | undefined => {
+      // 1. Try to find a tag that exactly matches a category ID
+      for (const tag of rep.tags) {
+          const tagStr = typeof tag === 'string' ? tag : tag.nombre
+          // Check EXACT ID match first
+          const catById = categories.find(c => c.id === tagStr)
+          if (catById) return catById.id
+      }
+      // 2. Try to find a tag that matches matches name
+      for (const tag of rep.tags) {
+          const tagStr = typeof tag === 'string' ? tag : tag.nombre
+          const catByName = categories.find(c => c.nombre.toLowerCase() === tagStr.toLowerCase())
+          if (catByName) return catByName.id
+      }
+      return undefined
+  }
+
   const treeData = useMemo(() => {
-    // 1. Determine source list based on mode
     const sourceList = filterMode === 'filtered' && filteredRepuestos ? filteredRepuestos : repuestos
 
-    // 2. Identify active categories based on repuestos
-    const activeCategoryIds = new Set<string>()
-    sourceList.forEach(r => {
-        if (r.categoryId) activeCategoryIds.add(r.categoryId)
-    })
-
-    // 3. Build Category Map
     const rootNodes: TreeNode[] = []
     const categoryNodes = new Map<string, TreeNode>()
 
-    // Create Category Nodes
     categories.forEach(cat => {
         categoryNodes.set(cat.id, {
             id: cat.id,
@@ -79,8 +80,6 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
         })
     })
 
-    // Helper to get or create node
-    // Assemble Hierarchy
     categoryNodes.forEach(node => {
         if (node.parentId && categoryNodes.has(node.parentId)) {
             const parent = categoryNodes.get(node.parentId)!
@@ -90,34 +89,33 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
         }
     })
 
-    // Add Items to Categories
     const unassignedNode: TreeNode = { id: 'unassigned', label: 'Sin Categoría', type: 'category', children: [] }
     let hasUnassigned = false
 
     sourceList.forEach(rep => {
+        const catId = getRepuestoCategoryId(rep)
+        
         const itemNode: TreeNode = {
             id: rep.id,
             label: `${rep.codigoSAP || 'S/C'} - ${rep.textoBreve}`,
             type: 'item',
             children: [],
             item: rep,
-            parentId: rep.categoryId
+            parentId: catId
         }
 
-        if (rep.categoryId && categoryNodes.has(rep.categoryId)) {
-            categoryNodes.get(rep.categoryId)!.children.push(itemNode)
+        if (catId && categoryNodes.has(catId)) {
+            categoryNodes.get(catId)!.children.push(itemNode)
         } else {
             unassignedNode.children.push(itemNode)
             hasUnassigned = true
         }
     })
 
-    // Prune empty branches (recursive)
     const prune = (nodes: TreeNode[]): TreeNode[] => {
         return nodes.filter(node => {
             if (node.type === 'item') return true
             node.children = prune(node.children)
-            // Keep category if it has items OR subcategories with items
             return node.children.length > 0
         })
     }
@@ -128,8 +126,6 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
     return prunedRoots
   }, [repuestos, filteredRepuestos, categories, filterMode])
 
-
-  // Recursively get all item IDs under a node
   const getNodeItemIds = (node: TreeNode): string[] => {
       if (node.type === 'item') return [node.id]
       return node.children.flatMap(getNodeItemIds)
@@ -153,7 +149,6 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
       setExpandedNodes(newSet)
   }
 
-  // Check state helpers
   const getNodeState = (node: TreeNode): 'checked' | 'unchecked' | 'indeterminate' => {
       const allIds = getNodeItemIds(node)
       if (allIds.length === 0) return 'unchecked'
@@ -207,9 +202,6 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
   }
 
   const handleExport = async () => {
-    // Always export from the Full List of Repuestos, matching the selected IDs
-    // This allows selecting something that might be currently filtered out if we switch modes, 
-    // though in this UI we restrict view to mode. But logic is safer using full list + ID set.
     const selected = repuestos.filter(r => selectedIds.has(r.id)) 
     if (selected.length === 0) return
 
@@ -217,7 +209,6 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
     try {
         switch (reportType) {
             case 'technical_sheet':
-                // Pass includeImages flag if the function supports it (it usually assumes yes for technical sheets but check utils)
                 await repuestoExports.exportMultipleTechnicalSheetsToPDF(selected, machineName)
                 break
             case 'catalog':
@@ -225,7 +216,6 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
                     machineName, 
                     includeStats: true, 
                     includeTagsDetail: true
-                    // TODO: Add support for includeImages in catalog table if not present
                 }) 
                 break
             case 'excel':
@@ -292,7 +282,7 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
                         }}>Todos</Button>
                     </div>
                 </div>
-                <ScrollArea className="flex-1 p-2">
+                <div className="flex-1 overflow-y-auto p-2">
                     {treeData.length === 0 ? (
                         <div className="flex flex-col items-center justify-center h-40 text-muted-foreground text-sm">
                             <p>No se encontraron ítems</p>
@@ -302,7 +292,7 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
                             {renderTree(treeData)}
                         </div>
                     )}
-                </ScrollArea>
+                </div>
                 <div className="p-2 border-t text-xs text-muted-foreground text-center bg-muted/10">
                     {totalSelected} ítems seleccionados para exportar
                 </div>
@@ -310,7 +300,6 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
 
             {/* Right Panel: Options */}
             <div className="w-[55%] flex flex-col p-6 space-y-8 bg-muted/5 overflow-y-auto">
-                
                 <div className="space-y-4">
                     <h3 className="font-semibold text-sm uppercase tracking-wide text-foreground flex items-center gap-2">
                         <span className="w-1 h-4 bg-primary rounded-full"/>
@@ -329,7 +318,7 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
                                     <div className="text-left space-y-1">
                                         <div className="font-semibold text-foreground">Fichas Técnicas</div>
                                         <div className="text-xs text-muted-foreground font-normal leading-relaxed">
-                                            Genera un documento PDF detallado donde cada ítem ocupa una página completa. Incluye fotos grandes, galería y todas las especificaciones técnicas. Ideal para imprimir carpetas de mantenimiento.
+                                            Genera un documento PDF detallado donde cada ítem ocupa una página completa. Incluye fotos grandes, galería y todas las especificaciones técnicas.
                                         </div>
                                     </div>
                                 </div>
@@ -345,7 +334,7 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
                                     <div className="text-left space-y-1">
                                         <div className="font-semibold text-foreground">Catálogo Resumen</div>
                                         <div className="text-xs text-muted-foreground font-normal leading-relaxed">
-                                            Genera un listado compacto en formato tabla. Optimizado para mostrar la mayor cantidad de ítems por página. Ideal para inventarios físicos, checklists o búsquedas rápidas.
+                                            Genera un listado compacto en formato tabla. Optimizado para mostrar la mayor cantidad de ítems por página.
                                         </div>
                                     </div>
                                 </div>
@@ -361,7 +350,7 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
                                     <div className="text-left space-y-1">
                                         <div className="font-semibold text-foreground">Datos Excel</div>
                                         <div className="text-xs text-muted-foreground font-normal leading-relaxed">
-                                            Descarga los datos crudos en formato .xlsx. La estructura es tabular plana, perfecta para importar en Power BI, tablas dinámicas o migraciones de datos.
+                                            Descarga los datos crudos en formato .xlsx. Estructura tabular plana ideal para Power BI.
                                         </div>
                                     </div>
                                 </div>
@@ -400,7 +389,7 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
           <Button variant="ghost" onClick={onClose}>Cancelar</Button>
           <Button onClick={handleExport} disabled={selectedIds.size === 0 || isExporting} className="gap-2 min-w-[180px]">
             {isExporting ? (
-                <>Generando reporte...</>
+                <>Generando...</>
             ) : (
                 <>Exportar Selección ({selectedIds.size})</>
             )}
