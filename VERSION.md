@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.35.57**
+## Versión Actual: **v2.35.58**
 
 **Fecha de lanzamiento**: 25 de enero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.35.58 - Machine Creation Fixes (25/01/2026)
+- **Fix**: Solucionado error "Invalid document reference" al crear equipos (ahora se usa `doc()` explícito con IDs autogenerados).
+- **UX**: Campos "Marca", "Modelo" y "Descripción" ahora marcados explícitamente como opcionales en el creador de jerarquías.
+- **Code**: Limpieza de imports no utilizados en `MachineHierarchySelector`.
 
 ### v2.35.57 - Subcategory Icons Removal (25/01/2026)
 - **UI**: Eliminación de iconos de carpeta en la barra de selección de subcategorías (`MachineSelector`) para reducir ruido visual como solicitado.

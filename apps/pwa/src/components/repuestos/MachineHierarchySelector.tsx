@@ -13,7 +13,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { ChevronRight, Loader2, FolderPlus, Plus, Folder, Settings2 } from 'lucide-react';
 import { db } from '@/services/firebase';
-import { collection, getDocs, addDoc, Timestamp, doc, setDoc } from 'firebase/firestore';
+import { collection, getDocs, Timestamp, doc, setDoc } from 'firebase/firestore';
 import type { MachineCategory, Machine } from '@/types/repuestos';
 import {
   Button,
@@ -219,10 +219,12 @@ export function MachineHierarchySelector({
       };
 
       const machinesCollection = collection(db, 'machines');
-      const docRef = await addDoc(machinesCollection, newMachine);
+      // Usamos doc() para generar un ID automáticamente y asegur la referencia correcta
+      const newDocRef = doc(machinesCollection);
+      await setDoc(newDocRef, newMachine);
       
       const createdMachine: Machine = {
-        id: docRef.id,
+        id: newDocRef.id,
         ...newMachine,
       } as Machine;
 
@@ -409,7 +411,7 @@ export function MachineHierarchySelector({
                 />
               </div>
               <div>
-                <Label htmlFor="equipo-marca">Marca</Label>
+                <Label htmlFor="equipo-marca">Marca (opcional)</Label>
                 <Input
                   id="equipo-marca"
                   placeholder="ej: SEW, Siemens, etc."
@@ -418,7 +420,7 @@ export function MachineHierarchySelector({
                 />
               </div>
               <div>
-                <Label htmlFor="equipo-modelo">Modelo</Label>
+                <Label htmlFor="equipo-modelo">Modelo (opcional)</Label>
                 <Input
                   id="equipo-modelo"
                   placeholder="ej: IE3 90L"
@@ -427,7 +429,7 @@ export function MachineHierarchySelector({
                 />
               </div>
               <div>
-                <Label htmlFor="equipo-descripcion">Descripción</Label>
+                <Label htmlFor="equipo-descripcion">Descripción (opcional)</Label>
                 <Input
                   id="equipo-descripcion"
                   placeholder="ej: Motor trifásico para bombeo"
