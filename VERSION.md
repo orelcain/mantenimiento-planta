@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.35.60**
+## Versión Actual: **v2.35.61**
 
 **Fecha de lanzamiento**: 25 de enero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,10 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.35.61 - Storage Rules Update (25/01/2026)
+- **Fix**: Añadidas reglas de Storage para soporte legacy (Baader 200) y nuevas máquinas.
+- **Deploy Note**: Estas reglas deben desplegarse manualmente (`firebase deploy --only storage`).
 
 ### v2.35.60 - RBAC & Catalog Mode (25/01/2026)
 - **Feat**: Implementación de permisos (RBAC). Edición/Creación de repuestos solo para Admins.
