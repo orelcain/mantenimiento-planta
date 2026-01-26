@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, Plus, FileSpreadsheet, FileText, Upload, FolderTree, ClipboardList } from 'lucide-react'
+import { AlertTriangle, Plus, FileText, Upload, FolderTree, ClipboardList } from 'lucide-react'
 import { RepuestosTable } from '@/components/repuestos/RepuestosTable'
 import { RepuestoFormModal } from '@/components/repuestos/RepuestoForm'
 import { RepuestosFilters } from '@/components/repuestos/RepuestosFilters'
@@ -23,11 +23,6 @@ import { isTagAsignado, getTagNombre } from '@/types/tags'
 import { CategoryManager } from '@/components/repuestos/CategoryManager'
 import { ImportRepuestosModal } from './ImportRepuestosModal'
 import { ExportReportModal } from '@/components/repuestos/ExportReportModal'
-import {
-  exportRepuestosToExcel,
-  exportRepuestosToPDF,
-  exportMultipleTechnicalSheetsToPDF,
-} from '@/utils/repuestos'
 import {
   Button,
   Dialog,
@@ -250,48 +245,6 @@ export function RepuestosDashboard() {
     setSelectedTags([])
     setStockFilter('all')
     setSolicitudFilter('all')
-  }
-
-  const handleExportExcel = async () => {
-    try {
-      await exportRepuestosToExcel(filteredRepuestos, {
-        machineName: currentMachine?.nombre || 'Repuestos',
-        includeTags: true,
-        includeImages: true,
-      })
-      toast({
-        title: 'Exportación exitosa',
-        description: 'El archivo Excel ha sido descargado.',
-        variant: 'success',
-      })
-    } catch (err) {
-      toast({
-        title: 'Error al exportar',
-        description: err instanceof Error ? err.message : 'No se pudo exportar a Excel.',
-        variant: 'destructive',
-      })
-    }
-  }
-
-  const handleExportPDF = async () => {
-    try {
-      await exportRepuestosToPDF(filteredRepuestos, {
-        machineName: currentMachine?.nombre || 'Repuestos',
-        includeStats: true,
-        includeTagsDetail: true,
-      })
-      toast({
-        title: 'Exportación exitosa',
-        description: 'El archivo PDF ha sido descargado.',
-        variant: 'success',
-      })
-    } catch (err) {
-      toast({
-        title: 'Error al exportar',
-        description: err instanceof Error ? err.message : 'No se pudo exportar a PDF.',
-        variant: 'destructive',
-      })
-    }
   }
 
   const handleOpenExportReport = () => {
