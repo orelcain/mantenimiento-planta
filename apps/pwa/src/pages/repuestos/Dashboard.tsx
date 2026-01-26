@@ -22,7 +22,7 @@ import type { Repuesto, RepuestoFormData, TechnicalSpecs, MachineImage } from '@
 import { isTagAsignado, getTagNombre } from '@/types/tags'
 import { CategoryManager } from '@/components/repuestos/CategoryManager'
 import { ImportRepuestosModal } from './ImportRepuestosModal'
-import { ExportPDFModal } from '@/components/repuestos/ExportPDFModal'
+import { ExportReportModal } from '@/components/repuestos/ExportReportModal'
 import {
   exportRepuestosToExcel,
   exportRepuestosToPDF,
@@ -77,7 +77,7 @@ export function RepuestosDashboard() {
   const [specsTarget, setSpecsTarget] = useState<{repuesto: Repuesto, tab: 'specs' | 'gallery'} | null>(null)
   const [newMachineOpen, setNewMachineOpen] = useState(false)
   const [structureManagerOpen, setStructureManagerOpen] = useState(false)
-  const [exportModalOpen, setExportModalOpen] = useState(false)
+  const [exportReportOpen, setExportReportOpen] = useState(false)
 
   // Filtro de categorías
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>('maquinas-principales')
@@ -294,25 +294,12 @@ export function RepuestosDashboard() {
     }
   }
 
-  const handleOpenExportModal = () => {
+  const handleOpenExportReport = () => {
     if (filteredRepuestos.length === 0) {
       toast({ title: 'Sin repuestos', description: 'No hay repuestos para exportar', variant: 'warning' })
       return
     }
-    setExportModalOpen(true)
-  }
-
-  const handleExportFromModal = async (selectedRepuestos: Repuesto[]) => {
-    try {
-      toast({ title: 'Generando PDF...', description: `Exportando ${selectedRepuestos.length} fichas técnicas.` })
-      // Asegurar que pasamos un nombre de máquina legible
-      const machineName = currentMachine ? currentMachine.nombre : 'Planta General';
-      await exportMultipleTechnicalSheetsToPDF(selectedRepuestos, machineName)
-      toast({ title: 'Exportación exitosa', description: 'El PDF con las fichas técnicas se ha descargado.', variant: 'success' })
-    } catch (err) {
-      console.error(err)
-      toast({ title: 'Error', description: 'No se pudo generar el PDF multiple', variant: 'destructive' })
-    }
+    setExportReportOpen(true)
   }
 
   const handleImportSuccess = (message: string) => {
@@ -438,14 +425,8 @@ export function RepuestosDashboard() {
                 )}
                 
                 <div className="hidden sm:flex gap-2">
-                   <Button variant="outline" size="sm" onClick={handleExportExcel} className="gap-2" title="Exportar Excel">
-                      <FileSpreadsheet className="h-4 w-4" />
-                   </Button>
-                   <Button variant="outline" size="sm" onClick={handleExportPDF} className="gap-2" title="Exportar Catálogo (PDF)">
-                      <FileText className="h-4 w-4" />
-                   </Button>
-                   <Button variant="outline" size="sm" onClick={handleOpenExportModal} className="gap-2" title="Exportar Fichas Técnicas (PDF Multiple)">
-                      <ClipboardList className="h-4 w-4" />
+                   <Button variant="outline" size="sm" onClick={handleOpenExportReport} className="gap-2" title="Centro de Exportación / Reportes">
+                      <FileText className="h-4 w-4" /> Exportar / Reportes
                    </Button>
                 </div>
 
@@ -460,11 +441,8 @@ export function RepuestosDashboard() {
              {/* Mas opciones mobile */}
              <div className="flex flex-col sm:hidden w-full gap-2">
                <div className="flex w-full gap-2">
-                  <Button variant="outline" size="sm" onClick={handleExportExcel} className="flex-1 gap-1" title="Excel">
-                    <FileSpreadsheet className="h-3 w-3" /> <span className="text-xs">Excel</span>
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={handleExportPDF} className="flex-1 gap-1" title="PDF">
-                    <FileText className="h-3 w-3" /> <span className="text-xs">PDF</span>
+                  <Button variant="outline" size="sm" onClick={handleOpenExportReport} className="flex-1 gap-1" title="Reportes">
+                    <FileText className="h-3 w-3" /> <span className="text-xs">Reportes</span>
                   </Button>
                </div>
                {isAdmin && (
@@ -700,12 +678,12 @@ export function RepuestosDashboard() {
         </DialogContent>
       </Dialog>
       
-      <ExportPDFModal 
-        isOpen={exportModalOpen}
-        onClose={() => setExportModalOpen(false)}
-        onExport={handleExportFromModal}
+      <ExportReportModal 
+        isOpen={exportReportOpen}
+        onClose={() => setExportReportOpen(false)}
         repuestos={filteredRepuestos}
         categories={categories}
+        machineName={currentMachine?.nombre}
       />
     </div>
   )
