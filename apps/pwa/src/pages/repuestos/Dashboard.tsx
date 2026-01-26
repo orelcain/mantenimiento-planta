@@ -99,7 +99,7 @@ export function RepuestosDashboard() {
     importCantidadesPorTag,
   } = useRepuestos(currentMachine?.id || 'baader-200')
 
-  const { tags, loading: tagsLoading, error: tagsError } = useTags(repuestos, currentMachine?.id || 'baader-200')
+  const { tags, error: tagsError } = useTags(repuestos, currentMachine?.id || 'baader-200')
 
   const handleSaveSpecs = async (repuestoId: string, specs: TechnicalSpecs, gallery: MachineImage[]) => {
     try {
@@ -670,11 +670,3 @@ export function RepuestosDashboard() {
     </div>
   )
 }
-
-
-   1. Unused "StatCard"
-   2. Unused "stats"
-   3. Unused "tagsLoading"
-   
-   I will remove "StatCard" component, "stats" computation, and "tagsLoading" variable.
-

@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.35.58**
+## Versión Actual: **v2.35.59**
 
 **Fecha de lanzamiento**: 25 de enero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,10 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.35.59 - Build Fix (25/01/2026)
+- **Fix**: Corrección de error de compilación (texto residual en `Dashboard.tsx`).
+- **Code**: Eliminación de variables no usadas (`tagsLoading`).
 
 ### v2.35.58 - Machine Creation Fixes (25/01/2026)
 - **Fix**: Solucionado error "Invalid document reference" al crear equipos (ahora se usa `doc()` explícito con IDs autogenerados).
