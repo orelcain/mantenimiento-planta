@@ -1,13 +1,11 @@
-import React, { useState, useMemo } from 'react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/Dialog'
-import { Button } from '@/components/ui/Button'
-import { Checkbox } from '@/components/ui/Checkbox'
-import { Label } from '@/components/ui/Label'
-import { ScrollArea } from '@/components/ui/ScrollArea'
+import { useState, useMemo } from 'react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Label } from '@/components/ui/label'
 import { FolderTree, FileText } from 'lucide-react'
 import type { Repuesto } from '@/types/repuestos'
 import { Badge } from '@/components/ui/badge'
-// import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/Accordion' // Si está disponible
 
 interface ExportPDFModalProps {
   isOpen: boolean
@@ -27,7 +25,6 @@ export function ExportPDFModal({ isOpen, onClose, onExport, repuestos, categorie
   
   const groupedRepuestos = useMemo(() => {
     const groups: Record<string, Repuesto[]> = {}
-    const uncategorized: Repuesto[] = []
 
     // Inicializar grupos con categorías conocidas
     categories.forEach(c => {
@@ -45,7 +42,8 @@ export function ExportPDFModal({ isOpen, onClose, onExport, repuestos, categorie
                 // Búsqueda simple por coincidencia
                 const cat = categories.find(c => c.id === tagStr || c.nombre.toLowerCase() === tagStr.toLowerCase())
                 if (cat) {
-                    groups[cat.id].push(rep)
+                    if (!groups[cat.id]) groups[cat.id] = []
+                    groups[cat.id]!.push(rep)
                     found = true
                     break // Asignar a la primera que encuentre
                 }
@@ -53,7 +51,8 @@ export function ExportPDFModal({ isOpen, onClose, onExport, repuestos, categorie
         }
         
         if (!found) {
-            groups['otros'].push(rep)
+            if (!groups['otros']) groups['otros'] = []
+            groups['otros']!.push(rep)
         }
     })
 
@@ -77,7 +76,10 @@ export function ExportPDFModal({ isOpen, onClose, onExport, repuestos, categorie
     setSelectedIds(newSet)
   }
 
-  const handleToggleCategory = (catId: string, reps: Repuesto[]) => {
+  const handleToggleCategory = (reps: Repuesto[]) => {
+    // Si no hay repuestos, no hacer nada
+    if (!reps || reps.length === 0) return
+
     const newSet = new Set(selectedIds)
     const allSelected = reps.every(r => newSet.has(r.id))
 
@@ -127,14 +129,13 @@ export function ExportPDFModal({ isOpen, onClose, onExport, repuestos, categorie
             </div>
         </div>
 
-        <ScrollArea className="flex-1 pr-4">
+        <div className="flex-1 overflow-y-auto pr-4">
             <div className="space-y-6 py-4">
                 {categories.map(cat => {
                     const groupReps = groupedRepuestos[cat.id] || []
                     if (groupReps.length === 0) return null
 
                     const allSelected = groupReps.every(r => selectedIds.has(r.id))
-                    const someSelected = groupReps.some(r => selectedIds.has(r.id))
 
                     return (
                         <div key={cat.id} className="border rounded-md p-3 bg-gray-50/50">
@@ -143,7 +144,7 @@ export function ExportPDFModal({ isOpen, onClose, onExport, repuestos, categorie
                                     id={`cat-${cat.id}`}
                                     checked={allSelected} 
                                     // indeterminate={someSelected && !allSelected} // Checkbox UI might not support indeterminate prop directly in all versions
-                                    onCheckedChange={() => handleToggleCategory(cat.id, groupReps)}
+                                    onCheckedChange={() => handleToggleCategory(groupReps)}
                                 />
                                 <Label htmlFor={`cat-${cat.id}`} className="font-semibold flex items-center cursor-pointer">
                                     <FolderTree className="h-4 w-4 mr-2 text-blue-500"/>
@@ -180,7 +181,7 @@ export function ExportPDFModal({ isOpen, onClose, onExport, repuestos, categorie
                              <Checkbox 
                                 id="cat-otros"
                                 checked={groupedRepuestos['otros'].every(r => selectedIds.has(r.id))}
-                                onCheckedChange={() => handleToggleCategory('otros', groupedRepuestos['otros'])}
+                                onCheckedChange={() => handleToggleCategory(groupedRepuestos['otros'] || [])}
                             />
                             <Label htmlFor="cat-otros" className="font-semibold flex items-center cursor-pointer">
                                 <FileText className="h-4 w-4 mr-2 text-gray-500"/>
@@ -208,7 +209,7 @@ export function ExportPDFModal({ isOpen, onClose, onExport, repuestos, categorie
                     </div>
                 )}
             </div>
-        </ScrollArea>
+        </div>
 
         <DialogFooter className="border-t pt-4">
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
