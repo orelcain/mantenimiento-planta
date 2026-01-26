@@ -21,6 +21,43 @@ async function imageUrlToBase64(url: string): Promise<string | null> {
   }
 }
 
+
+const TECHNICAL_KEY_TRANSLATIONS: Record<string, string> = {
+  // Dimensiones
+  'WIDTH': 'ANCHO',
+  'LENGTH': 'LARGO',
+  'HEIGHT': 'ALTO',
+  'WEIGHT': 'PESO',
+  'DEPTH': 'PROFUNDIDAD',
+  'DIAMETER': 'DIÁMETRO',
+  'THICKNESS': 'ESPESOR',
+  
+  // Eléctrico
+  'POWER': 'POTENCIA',
+  'VOLTAGE': 'VOLTAJE',
+  'CURRENT': 'CORRIENTE',
+  'FREQUENCY': 'FRECUENCIA',
+  'SPEED': 'VELOCIDAD',
+  
+  // Bomba/Motor
+  'FLOW': 'CAUDAL',
+  'PRESSURE': 'PRESIÓN',
+  'HEAD': 'ALTURA',
+  'MATERIAL': 'MATERIAL',
+  'TYPE': 'TIPO',
+  'MODEL': 'MODELO',
+  'BRAND': 'MARCA',
+  'SERIAL': 'SERIE',
+  'RPM': 'RPM',
+  'HP': 'HP',
+  'KW': 'KW',
+  
+  // Otros
+  'CAPACITY': 'CAPACIDAD',
+  'RATIO': 'RELACIÓN',
+  'SIZE': 'TAMAÑO'
+};
+
 /**
  * Genera el contenido de una ficha técnica en el documento PDF dado
  * @returns La posición Y final
@@ -44,7 +81,9 @@ async function addTechnicalSheetToDoc(
 
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
-  doc.text(`Equipo: ${machineName || 'Desconocido'}`, pageWidth / 2, yPos, { align: 'center' });
+  // Ajuste: si machineName es un ID largo (probable auto-ID), mostrar "Planta General" o similar
+  const displayName = (!machineName || machineName.length > 20) ? 'Planta General / Sin Asignar' : machineName;
+  doc.text(`Equipo: ${displayName}`, pageWidth / 2, yPos, { align: 'center' });
   yPos += 5;
   doc.text(`Fecha: ${new Date().toLocaleDateString('es-CL')}`, pageWidth / 2, yPos, { align: 'center' });
   yPos += 10;
@@ -80,7 +119,12 @@ async function addTechnicalSheetToDoc(
     // Datos Standard
     if (specs.standardValues) {
         Object.entries(specs.standardValues).forEach(([key, value]) => {
-           tableData.push([key.toUpperCase(), value.toString()]);
+           // Traducir clave si existe en el diccionario
+           const upperKey = key.toUpperCase();
+           const label = TECHNICAL_KEY_TRANSLATIONS[upperKey] || upperKey;
+           // Formato de valor si es numérico y tiene unidad conocida (simple heurística)
+           // Por ahora raw
+           tableData.push([label, value.toString()]);
         });
     }
 

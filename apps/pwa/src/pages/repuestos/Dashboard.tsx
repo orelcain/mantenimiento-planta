@@ -22,6 +22,7 @@ import type { Repuesto, RepuestoFormData, TechnicalSpecs, MachineImage } from '@
 import { isTagAsignado, getTagNombre } from '@/types/tags'
 import { CategoryManager } from '@/components/repuestos/CategoryManager'
 import { ImportRepuestosModal } from './ImportRepuestosModal'
+import { ExportPDFModal } from '@/components/repuestos/ExportPDFModal'
 import {
   exportRepuestosToExcel,
   exportRepuestosToPDF,
@@ -76,6 +77,7 @@ export function RepuestosDashboard() {
   const [specsTarget, setSpecsTarget] = useState<{repuesto: Repuesto, tab: 'specs' | 'gallery'} | null>(null)
   const [newMachineOpen, setNewMachineOpen] = useState(false)
   const [structureManagerOpen, setStructureManagerOpen] = useState(false)
+  const [exportModalOpen, setExportModalOpen] = useState(false)
 
   // Filtro de categorías
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>('maquinas-principales')
@@ -292,15 +294,20 @@ export function RepuestosDashboard() {
     }
   }
 
-  const handleExportTechnicalSheets = async () => {
+  const handleOpenExportModal = () => {
     if (filteredRepuestos.length === 0) {
       toast({ title: 'Sin repuestos', description: 'No hay repuestos para exportar', variant: 'warning' })
       return
     }
+    setExportModalOpen(true)
+  }
 
+  const handleExportFromModal = async (selectedRepuestos: Repuesto[]) => {
     try {
-      toast({ title: 'Generando PDF...', description: `Exportando ${filteredRepuestos.length} fichas técnicas.` })
-      await exportMultipleTechnicalSheetsToPDF(filteredRepuestos, currentMachine?.nombre)
+      toast({ title: 'Generando PDF...', description: `Exportando ${selectedRepuestos.length} fichas técnicas.` })
+      // Asegurar que pasamos un nombre de máquina legible
+      const machineName = currentMachine ? currentMachine.nombre : 'Planta General';
+      await exportMultipleTechnicalSheetsToPDF(selectedRepuestos, machineName)
       toast({ title: 'Exportación exitosa', description: 'El PDF con las fichas técnicas se ha descargado.', variant: 'success' })
     } catch (err) {
       console.error(err)
@@ -437,7 +444,7 @@ export function RepuestosDashboard() {
                    <Button variant="outline" size="sm" onClick={handleExportPDF} className="gap-2" title="Exportar Catálogo (PDF)">
                       <FileText className="h-4 w-4" />
                    </Button>
-                   <Button variant="outline" size="sm" onClick={handleExportTechnicalSheets} className="gap-2" title="Exportar Fichas Técnicas (PDF Multiple)">
+                   <Button variant="outline" size="sm" onClick={handleOpenExportModal} className="gap-2" title="Exportar Fichas Técnicas (PDF Multiple)">
                       <ClipboardList className="h-4 w-4" />
                    </Button>
                 </div>
@@ -692,6 +699,14 @@ export function RepuestosDashboard() {
           </div>
         </DialogContent>
       </Dialog>
+      
+      <ExportPDFModal 
+        isOpen={exportModalOpen}
+        onClose={() => setExportModalOpen(false)}
+        onExport={handleExportFromModal}
+        repuestos={filteredRepuestos}
+        categories={categories}
+      />
     </div>
   )
 }
