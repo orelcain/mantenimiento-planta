@@ -163,9 +163,15 @@ async function addTechnicalSheetToDoc(
             const base64Img = await imageUrlToBase64(img.url);
             
             if (base64Img) {
+              // Obtener dimensiones reales usando DOM para mayor precisión
+              const ratio = await new Promise<number>((resolve) => {
+                 const i = new Image();
+                 i.onload = () => resolve(i.naturalWidth / i.naturalHeight);
+                 i.onerror = () => resolve(1);
+                 i.src = base64Img;
+              });
+
               // Calcular dimensiones para mantener aspecto (Contain)
-              const imgProps = doc.getImageProperties(base64Img);
-              const imgRatio = imgProps.width / imgProps.height;
               const boxRatio = imgWidth / imgHeight;
               
               let drawW = imgWidth;
@@ -173,18 +179,21 @@ async function addTechnicalSheetToDoc(
               let drawX = xPos;
               let drawY = yPos;
 
-              if (imgRatio > boxRatio) {
+              if (ratio > boxRatio) {
                  // La imagen es más ancha que el cuadro (ajustar al ancho)
-                 drawH = imgWidth / imgRatio;
+                 drawH = imgWidth / ratio;
                  drawY = yPos + (imgHeight - drawH) / 2;
               } else {
                  // La imagen es más alta que el cuadro (ajustar al alto)
-                 drawW = imgHeight * imgRatio;
+                 drawW = imgHeight * ratio;
                  drawX = xPos + (imgWidth - drawW) / 2;
               }
               
+              // Detectar formato
+              const format = base64Img.match(/^data:image\/(\w+);base64,/)?.[1]?.toUpperCase() || 'JPEG';
+              
               // Usar coordenadas ajustadas
-              doc.addImage(base64Img, drawX, drawY, drawW, drawH);
+              doc.addImage(base64Img, format, drawX, drawY, drawW, drawH);
             } else {
                // Fallback si falla la carga
                doc.rect(xPos, yPos, imgWidth, imgHeight);
