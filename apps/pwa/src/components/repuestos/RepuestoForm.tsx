@@ -226,7 +226,7 @@ export function RepuestoFormModal({
 
           <div className="grid gap-4 md:grid-cols-2 bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-border/50">
             <div className="space-y-2">
-              <Label htmlFor="cantidadSolicitada" className="text-xs uppercase tracking-wide text-muted-foreground">Solicitado (Legacy)</Label>
+              <Label htmlFor="cantidadSolicitada" className="text-xs uppercase tracking-wide text-muted-foreground">Cantidad Solicitada</Label>
               <Input
                 id="cantidadSolicitada"
                 type="number"
@@ -237,7 +237,7 @@ export function RepuestoFormModal({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="cantidadStockBodega" className="text-xs uppercase tracking-wide text-muted-foreground">Stock (Legacy)</Label>
+              <Label htmlFor="cantidadStockBodega" className="text-xs uppercase tracking-wide text-muted-foreground">Stock Actual</Label>
               <Input
                 id="cantidadStockBodega"
                 type="number"
