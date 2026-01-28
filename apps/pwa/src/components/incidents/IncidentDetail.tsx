@@ -16,6 +16,7 @@ import {
   Droplets,
   Edit,
   Wand2,
+  Map,
 } from 'lucide-react'
 import {
   Dialog,
@@ -44,6 +45,9 @@ import type { Incident, IncidentStatus, IncidentPriority, User as UserType } fro
 import { formatDate } from '@/lib/utils'
 import { fetchLastSensorReadings, fetchSensorSummaryOnce } from '@/services/sensorsRtdb'
 import { DEFAULT_PREDICTIVE_THRESHOLDS } from '@/lib/predictive/predictor'
+import { getMapVersionById, getMapLocationById } from '@/services/maps'
+import { MapViewer } from '@/components/maps'
+import type { MapVersion, MapLocation } from '@/types/maps'
 import { IncidentForm } from './IncidentForm'
 
 const STATUS_CONFIG: Record<IncidentStatus, { label: string; icon: any; color: string }> = {
@@ -96,6 +100,11 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
     hum?: { current: number; avg: number; unit?: string }
     source?: string
   } | null>(null)
+  
+  // Estados para visualización del mapa
+  const [mapVersion, setMapVersion] = useState<MapVersion | null>(null)
+  const [mapLocation, setMapLocation] = useState<MapLocation | null>(null)
+  const [mapLoading, setMapLoading] = useState(false)
 
   // Cargar lista de técnicos
   useEffect(() => {
@@ -114,6 +123,33 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
         .catch((error) => logger.error('Error loading assigned user', error instanceof Error ? error : new Error(String(error))))
     }
   }, [incident.asignadoA])
+
+  // Cargar datos del mapa si la incidencia tiene posición en mapa
+  useEffect(() => {
+    const loadMapData = async () => {
+      if (!incident.mapVersionId || !incident.mapLocationId) {
+        setMapVersion(null)
+        setMapLocation(null)
+        return
+      }
+      
+      setMapLoading(true)
+      try {
+        const [versionData, locationData] = await Promise.all([
+          getMapVersionById(incident.mapVersionId),
+          getMapLocationById(incident.mapLocationId)
+        ])
+        setMapVersion(versionData)
+        setMapLocation(locationData)
+      } catch (error) {
+        logger.error('Error loading map data', error instanceof Error ? error : new Error(String(error)))
+      } finally {
+        setMapLoading(false)
+      }
+    }
+    
+    loadMapData()
+  }, [incident.mapVersionId, incident.mapLocationId])
 
   // Cargar datos IoT del equipo asociado
   useEffect(() => {
@@ -454,6 +490,39 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
                     />
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* Ubicación en mapa */}
+            {incident.mapPosition && mapVersion && (
+              <div>
+                <h4 className="font-medium mb-2 flex items-center gap-2">
+                  <Map className="h-4 w-4" />
+                  Ubicación en mapa
+                  {mapLocation && (
+                    <Badge variant="outline" className="ml-1">
+                      {mapLocation.nombre}
+                    </Badge>
+                  )}
+                </h4>
+                {mapLoading ? (
+                  <div className="h-40 flex items-center justify-center bg-muted rounded-lg">
+                    <Spinner className="h-6 w-6" />
+                  </div>
+                ) : (
+                  <MapViewer
+                    imageUrl={mapVersion.imageUrl}
+                    markers={[{
+                      id: incident.id,
+                      position: incident.mapPosition,
+                      title: incident.titulo
+                    }]}
+                    editable={false}
+                    showControls={false}
+                    className="h-48 rounded-lg overflow-hidden"
+                    markerColor="#ef4444"
+                  />
+                )}
               </div>
             )}
 

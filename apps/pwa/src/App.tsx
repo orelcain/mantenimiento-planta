@@ -28,6 +28,7 @@ const PublicEquipmentView = lazy(() => import('@/pages/PublicEquipmentView').the
 const SensorsPage = lazy(() => import('@/pages/SensorsPage').then((mod) => ({ default: mod.SensorsPage })))
 const MapsAdminPage = lazy(() => import('@/pages/admin/MapsAdminPage').then((mod) => ({ default: mod.MapsAdminPage })))
 const InspectionsPage = lazy(() => import('@/pages/InspectionsPage').then((mod) => ({ default: mod.InspectionsPage })))
+const MapViewPage = lazy(() => import('@/pages/MapViewPage').then((mod) => ({ default: mod.MapViewPage })))
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuthStore()
@@ -208,6 +209,11 @@ export function App() {
             <Route path="inspections" element={
               <Suspense fallback={<LoadingScreen />}>
                 <InspectionsPage />
+              </Suspense>
+            } />
+            <Route path="map-view" element={
+              <Suspense fallback={<LoadingScreen />}>
+                <MapViewPage />
               </Suspense>
             } />
           </Route>

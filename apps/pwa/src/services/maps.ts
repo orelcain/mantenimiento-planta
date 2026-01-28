@@ -353,6 +353,35 @@ export async function deleteMapMarker(id: string): Promise<void> {
   await deleteDoc(doc(db, MARKERS_COLLECTION, id))
 }
 
+/**
+ * Obtener marcadores por ubicación (todos los de esa ubicación)
+ */
+export async function getMarkersByLocation(locationId: string): Promise<MapMarker[]> {
+  const snap = await getDocs(
+    query(
+      collection(db, MARKERS_COLLECTION),
+      where('locationId', '==', locationId),
+      orderBy('createdAt', 'desc')
+    )
+  )
+
+  return snap.docs.map((doc) => parseMarker(doc))
+}
+
+/**
+ * Obtener todas las inspecciones (para admin/visualización)
+ */
+export async function getAllInspections(): Promise<Inspection[]> {
+  const snap = await getDocs(
+    query(
+      collection(db, INSPECTIONS_COLLECTION),
+      orderBy('createdAt', 'desc')
+    )
+  )
+
+  return snap.docs.map((doc) => parseInspection(doc))
+}
+
 // ============================================================
 // INSPECTIONS
 // ============================================================

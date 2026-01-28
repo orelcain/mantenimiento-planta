@@ -44,9 +44,11 @@ import {
   finalizeInspection,
   getInspectionItems,
   getMapLocations,
-  getLatestMapVersion
+  getLatestMapVersion,
+  getMapVersionById
 } from '@/services/maps'
 import { MapViewer } from '@/components/maps'
+import { exportInspectionToPDF } from '@/utils/maps'
 import type { 
   Inspection, 
   InspectionItem, 
@@ -288,12 +290,36 @@ export function InspectionsPage() {
     loadData() // Recargar lista
   }
   
-  // Exportar a PDF (placeholder - se implementará con jsPDF)
-  const handleExportPDF = () => {
-    toast({
-      title: 'Exportando PDF...',
-      description: 'Esta función estará disponible próximamente'
-    })
+  // Exportar a PDF
+  const handleExportPDF = async () => {
+    if (!activeInspection || !activeMapVersion) return
+    
+    try {
+      toast({
+        title: 'Generando PDF...',
+        description: 'Por favor espera un momento'
+      })
+      
+      await exportInspectionToPDF({
+        inspection: activeInspection,
+        items: inspectionItems,
+        mapVersion: activeMapVersion,
+        includePhotos: inspectionItems.some(i => i.fotos.length > 0),
+        includeStats: true
+      })
+      
+      toast({
+        title: 'PDF generado',
+        description: 'El archivo se ha descargado'
+      })
+    } catch (error) {
+      console.error('Error exporting PDF:', error)
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'No se pudo generar el PDF'
+      })
+    }
   }
   
   if (isLoading) {

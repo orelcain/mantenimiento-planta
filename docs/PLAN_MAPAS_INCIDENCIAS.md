@@ -1,7 +1,7 @@
 # 🗺️ Plan de Implementación: Mapas con Marcadores para Incidencias
 
 ## Fecha: 28 de enero de 2026
-## Estado: ✅ FASE 1-5 COMPLETADAS
+## Estado: ✅ IMPLEMENTACIÓN COMPLETA
 
 ---
 
@@ -155,7 +155,7 @@ interface Incident {
 - [x] Modal selector de ubicación/mapa
 - [x] Flujo: Seleccionar mapa → Colocar marcador → Confirmar → Formulario
 - [x] Campos mapLocationId, mapVersionId, mapPosition en Incident
-- [ ] Mostrar marcador en detalle de incidencia
+- [x] Mostrar marcador en detalle de incidencia
 - [ ] Filtrar incidencias por mapa/ubicación
 
 ### Fase 5: Rutas de Inspección ⏱️ ~3h ✅ COMPLETADA
@@ -165,17 +165,18 @@ interface Incident {
 - [x] Lista de puntos levantados
 - [x] Finalizar inspección
 
-### Fase 6: Visualización y Filtros ⏱️ ~1.5h 🔲 PENDIENTE
-- [ ] Vista de mapa con todos los marcadores
-- [ ] Filtrar por fecha
-- [ ] Filtrar por inspección
-- [ ] Popup con info del marcador
+### Fase 6: Visualización y Filtros ⏱️ ~1.5h ✅ COMPLETADA
+- [x] Vista de mapa con todos los marcadores (`/map-view`)
+- [x] Filtrar por fecha
+- [x] Filtrar por inspección
+- [x] Popup con info del marcador
+- [x] Botón de exportación PDF
 
-### Fase 7: Exportación PDF ⏱️ ~2h 🔲 PENDIENTE
-- [ ] Generar PDF con mapa y marcadores numerados
-- [ ] Tabla de incidencias con número correspondiente
-- [ ] Fotos asociadas
-- [ ] Estadísticas de la inspección
+### Fase 7: Exportación PDF ⏱️ ~2h ✅ COMPLETADA
+- [x] Generar PDF con mapa y marcadores numerados
+- [x] Tabla de incidencias con número correspondiente
+- [x] Fotos asociadas (opcional)
+- [x] Estadísticas de la inspección
 
 ---
 

@@ -1,14 +1,23 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.36.0**
+## Versión Actual: **v2.37.0**
 
-**Fecha de lanzamiento**: 26 de enero de 2026  \
+**Fecha de lanzamiento**: 28 de enero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
 **Build**: ✅ Stable
 
 ---
 
 ## 📋 Información de la Versión
+
+### v2.37.0 - Maps Complete: PDF Export & Visualization (28/01/2026)
+- **Feat**: Página de Vista de Mapa (`/map-view`) con todos los marcadores de incidencias e inspecciones
+- **Feat**: Filtros por tipo (inspección/incidencia), por inspección específica y por rango de fechas
+- **Feat**: Exportación a PDF de inspecciones con mapa, marcadores numerados y tabla de puntos
+- **Feat**: Exportación a PDF de vista de mapa con todos los marcadores filtrados
+- **Feat**: Visualización del marcador en el detalle de incidencia (MapViewer integrado)
+- **UI**: Botones de exportación PDF en páginas de inspecciones y vista de mapa
+- **UI**: Navegación actualizada: "Vista de Mapa" agregado al menú principal
 
 ### v2.36.0 - Maps & Inspection Routes System (26/01/2026)
 - **Feat**: Sistema completo de mapas para ubicaciones físicas (Planta, Recinto, Acopio, etc.)
