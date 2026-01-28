@@ -1,15 +1,22 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Plus, Search, AlertTriangle, Clock, CheckCircle, XCircle, User } from 'lucide-react'
+import { Plus, Search, AlertTriangle, Clock, CheckCircle, XCircle, User, MapPin } from 'lucide-react'
 import {
   Card,
   CardContent,
   Button,
   Input,
   Badge,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@/components/ui'
 import { useAppStore, useCanValidateIncidents } from '@/store'
 import { subscribeToIncidents } from '@/services/incidents'
+import { getMapLocations } from '@/services/maps'
 import type { Incident, IncidentStatus, IncidentPriority } from '@/types'
+import type { MapLocation } from '@/types/maps'
 import { formatRelativeTime } from '@/lib/utils'
 import { IncidentForm } from '@/components/incidents/IncidentForm'
 import { IncidentDetail } from '@/components/incidents/IncidentDetail'
@@ -49,6 +56,13 @@ export function IncidentsPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [activeFilter, setActiveFilter] = useState<string | null>(null) // null = todos
+  const [mapLocations, setMapLocations] = useState<MapLocation[]>([])
+  const [selectedMapLocation, setSelectedMapLocation] = useState<string>('all')
+
+  // Cargar ubicaciones de mapa
+  useEffect(() => {
+    getMapLocations().then(setMapLocations).catch(console.error)
+  }, [])
 
   // Debounce search con 300ms
   const debouncedSetSearch = useMemo(
@@ -75,6 +89,20 @@ export function IncidentsPage() {
       incident.descripcion.toLowerCase().includes(debouncedSearch.toLowerCase())
     
     if (!matchesSearch) return false
+    
+    // Filtro por ubicación de mapa
+    if (selectedMapLocation !== 'all') {
+      if (selectedMapLocation === 'with-map') {
+        // Solo incidencias con marcador en mapa
+        if (!incident.mapLocationId) return false
+      } else if (selectedMapLocation === 'without-map') {
+        // Solo incidencias sin marcador en mapa
+        if (incident.mapLocationId) return false
+      } else {
+        // Ubicación específica
+        if (incident.mapLocationId !== selectedMapLocation) return false
+      }
+    }
     
     // Aplicar filtro activo
     if (activeFilter === null) return true
@@ -222,7 +250,7 @@ export function IncidentsPage() {
       </div>
 
       {/* Search - Simplificado */}
-      <div className="flex gap-2">
+      <div className="flex flex-col sm:flex-row gap-2">
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -232,12 +260,36 @@ export function IncidentsPage() {
             className="pl-9"
           />
         </div>
-        {activeFilter && (
+        
+        {/* Filtro por ubicación de mapa */}
+        {mapLocations.length > 0 && (
+          <Select value={selectedMapLocation} onValueChange={setSelectedMapLocation}>
+            <SelectTrigger className="w-full sm:w-[200px]">
+              <MapPin className="h-4 w-4 mr-2 text-muted-foreground" />
+              <SelectValue placeholder="Ubicación" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas las ubicaciones</SelectItem>
+              <SelectItem value="with-map">📍 Con marcador</SelectItem>
+              <SelectItem value="without-map">Sin marcador</SelectItem>
+              {mapLocations.map(loc => (
+                <SelectItem key={loc.id} value={loc.id}>
+                  {loc.nombre}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+        
+        {(activeFilter || selectedMapLocation !== 'all') && (
           <Button
             variant="outline"
-            onClick={() => setActiveFilter(null)}
+            onClick={() => {
+              setActiveFilter(null)
+              setSelectedMapLocation('all')
+            }}
           >
-            Limpiar filtro
+            Limpiar filtros
           </Button>
         )}
       </div>

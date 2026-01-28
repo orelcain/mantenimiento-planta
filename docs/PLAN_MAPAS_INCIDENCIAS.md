@@ -156,7 +156,7 @@ interface Incident {
 - [x] Flujo: Seleccionar mapa → Colocar marcador → Confirmar → Formulario
 - [x] Campos mapLocationId, mapVersionId, mapPosition en Incident
 - [x] Mostrar marcador en detalle de incidencia
-- [ ] Filtrar incidencias por mapa/ubicación
+- [x] Filtrar incidencias por mapa/ubicación
 
 ### Fase 5: Rutas de Inspección ⏱️ ~3h ✅ COMPLETADA
 - [x] Página crear inspección (`/inspections`)
