@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.35.63**
+## Versión Actual: **v2.36.0**
 
 **Fecha de lanzamiento**: 26 de enero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,16 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.36.0 - Maps & Inspection Routes System (26/01/2026)
+- **Feat**: Sistema completo de mapas para ubicaciones físicas (Planta, Recinto, Acopio, etc.)
+- **Feat**: Administración de mapas con versionado (historial de versiones de planos)
+- **Feat**: Selector de mapa integrado en formulario de incidencias (marcador opcional)
+- **Feat**: Rutas de Inspección con múltiples marcadores numerados en un solo mapa
+- **Feat**: Visualizador interactivo de mapas con zoom/pan y colocación de marcadores
+- **UI**: Página de administración de mapas solo para admins (/admin/maps)
+- **UI**: Nueva página de Inspecciones accesible desde el menú lateral
+- **Types**: Nuevos tipos: MapLocation, MapVersion, MapMarker, Inspection, InspectionItem
 
 ### v2.35.63 - PDF Exports & Translations (26/01/2026)
 - **Feat**: Nuevo modal de exportación selectiva (Por Categoría/Individual) para fichas técnicas.

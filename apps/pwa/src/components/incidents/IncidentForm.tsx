@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Camera, X, Upload, AlertTriangle, Image as ImageIcon, Sparkles, Wand2 } from 'lucide-react'
+import { Camera, X, Upload, AlertTriangle, Image as ImageIcon, Sparkles, Wand2, MapPin } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -9,13 +9,12 @@ import {
   Input,
   Label,
   SpeechTextarea,
-  SpeechInput,
   Spinner,
 } from '@/components/ui'
 import { useAuthStore, useAppStore } from '@/store'
 import { createIncident, updateIncident } from '@/services/incidents'
 import { uploadIncidentPhoto, compressImage } from '@/services/storage'
-import { generateSymptoms, refineText, extractSymptomsFromDescription, isAIConfigured } from '@/services/ai'
+import { refineText, extractSymptomsFromDescription, isAIConfigured } from '@/services/ai'
 import type { IncidentPriority, Incident, Equipment } from '@/types'
 import { HierarchyLevel } from '@/types/hierarchy'
 import { cn } from '@/lib/utils'
@@ -23,6 +22,7 @@ import { createIncidentSchema, validateFileList } from '@/lib/validation'
 import { logger } from '@/lib/logger'
 import { HierarchySelector } from '../hierarchy/HierarchySelector'
 import { useToast } from '@/hooks/useToast'
+import { MapLocationSelector } from '../maps/MapLocationSelector'
 
 interface IncidentFormProps {
   onClose: () => void
@@ -71,6 +71,16 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
   
   // Metadatos de fotos
   const [photoMeta, setPhotoMeta] = useState<{original: string, compressed: string, dim: string, format: string}[]>([])
+
+  // Estados para ubicación en mapa físico
+  const [isMapSelectorOpen, setIsMapSelectorOpen] = useState(false)
+  const [mapLocation, setMapLocation] = useState<{
+    locationId: string
+    locationName: string
+    mapVersionId: string
+    position: { x: number; y: number }
+    mapImageUrl?: string
+  } | null>(null)
 
   const isEditMode = !!incident
 
@@ -275,10 +285,11 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
         const img = new Image()
         img.src = result
         img.onload = () => {
+           const typeParts = compressed.type.split('/')
            setPhotoMeta(prev => [...prev, {
              original: (file.size / 1024).toFixed(0) + 'KB',
              compressed: (compressed.size / 1024).toFixed(0) + 'KB',
-             format: compressed.type.split('/')[1].toUpperCase(),
+             format: (typeParts[1] || 'image').toUpperCase(),
              dim: `${img.width}x${img.height}`
            }])
         }
@@ -365,6 +376,12 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
         reportadoPor: user.id,
         creadoPor: user.id,
         requiresValidation: true,
+        // Datos de ubicación en mapa físico
+        ...(mapLocation && {
+          mapLocationId: mapLocation.locationId,
+          mapVersionId: mapLocation.mapVersionId,
+          mapPosition: mapLocation.position
+        })
       }
       
       // Solo agregar sintomas si hay seleccionados
@@ -539,6 +556,72 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
                 </div>
               </details>
             )}
+            </div>
+          )}
+
+          {/* Ubicación en Mapa Físico (opcional) - Solo en modo creación */}
+          {!isEditMode && (
+            <div className="space-y-1">
+              <Label className="text-sm font-medium flex items-center gap-2">
+                <MapPin className="h-4 w-4" />
+                Marcar en Mapa (opcional)
+              </Label>
+              
+              {mapLocation ? (
+                <div className="border rounded-lg p-3 bg-muted/20">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center">
+                        <MapPin className="h-4 w-4 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">{mapLocation.locationName}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Posición: ({(mapLocation.position.x * 100).toFixed(0)}%, {(mapLocation.position.y * 100).toFixed(0)}%)
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex gap-1">
+                      <Button 
+                        type="button" 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => setIsMapSelectorOpen(true)}
+                      >
+                        Cambiar
+                      </Button>
+                      <Button 
+                        type="button" 
+                        variant="ghost" 
+                        size="sm"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => setMapLocation(null)}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full justify-start text-muted-foreground"
+                  onClick={() => setIsMapSelectorOpen(true)}
+                >
+                  <MapPin className="h-4 w-4 mr-2" />
+                  Seleccionar ubicación en mapa...
+                </Button>
+              )}
+              
+              <MapLocationSelector
+                open={isMapSelectorOpen}
+                onOpenChange={setIsMapSelectorOpen}
+                onConfirm={(data) => {
+                  setMapLocation(data)
+                  setIsMapSelectorOpen(false)
+                }}
+              />
             </div>
           )}
 

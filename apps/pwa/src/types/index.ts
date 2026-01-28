@@ -125,6 +125,10 @@ export interface Incident {
   position?: { x: number; y: number }
   prioridad: IncidentPriority
   status: IncidentStatus
+  // Ubicación en mapa físico
+  mapLocationId?: string   // ID de la ubicación del mapa (ej: "planta-principal")
+  mapVersionId?: string    // ID de la versión del mapa usada
+  mapPosition?: { x: number; y: number } // Posición normalizada (0-1) en el mapa
   // Síntomas y detalles
   sintomas?: string[]
   causaRaiz?: string

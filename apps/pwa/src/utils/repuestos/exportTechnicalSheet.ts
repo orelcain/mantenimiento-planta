@@ -324,8 +324,10 @@ export async function exportMultipleTechnicalSheetsToPDF(
 
   // Iterar y añadir página para cada uno (excepto el primero que ya tiene página por defecto)
   for (let i = 0; i < repuestos.length; i++) {
+    const repuesto = repuestos[i];
+    if (!repuesto) continue; // Skip undefined
     if (i > 0) doc.addPage();
-    await addTechnicalSheetToDoc(doc, repuestos[i], machineName);
+    await addTechnicalSheetToDoc(doc, repuesto, machineName);
   }
 
   const filename = `Fichas_Tecnicas_Pack_${new Date().getTime()}.pdf`;

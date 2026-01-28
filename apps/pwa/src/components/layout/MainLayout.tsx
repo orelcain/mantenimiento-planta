@@ -17,6 +17,8 @@ import {
   Camera,
   Activity,
   Cpu,
+  MapPin,
+  Route,
 } from 'lucide-react'
 import { Avatar, AvatarFallback, Button } from '@/components/ui'
 import { useAuthStore, useIsAdmin, useAppStore } from '@/store'
@@ -32,6 +34,7 @@ import { useAppVersion } from '@/hooks/useAppVersion'
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Incidencias', href: '/incidents', icon: AlertTriangle },
+  { name: 'Inspecciones', href: '/inspections', icon: Route },
   { name: 'Evidencias', href: '/photo-evidence', icon: Camera },
   { name: 'Preventivo', href: '/preventive', icon: CalendarClock },
   { name: 'Predictivo', href: '/predictive', icon: Activity },
@@ -44,6 +47,7 @@ const navigation = [
 
 const adminNavigation = [
   { name: 'Jerarquías', href: '/hierarchy', icon: FolderTree },
+  { name: 'Mapas', href: '/admin/maps', icon: MapPin },
 ]
 
 export function MainLayout() {
