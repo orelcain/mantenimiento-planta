@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.37.7**
+## Versión Actual: **v2.38.2**
 
 **Fecha de lanzamiento**: 28 de enero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,28 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.38.2 - Fix Firestore rules for inspectionItems (28/01/2026)
+- 🔧 Fix: Reglas de Firestore para colección `inspectionItems` (colección independiente)
+- 🔧 Fix: Índice de Firestore para `inspectionItems` (inspectionId + order)
+- 🔧 Fix: Corrige error "Missing or insufficient permissions" al abrir inspección
+
+### v2.38.1 - Fix Firestore indexes for inspections (28/01/2026)
+- 🔧 Fix: Índice de Firestore para `inspections` (createdBy + createdAt DESC)
+- 🔧 Fix: Índice de Firestore para `inspections` (locationId + createdAt DESC)
+- 🔧 Fix: Corrige error "query requires an index" en página de inspecciones
+
+### v2.38.0 - Inspections Page Enabled (28/01/2026)
+- ✨ Feat: Página de Rutas de Inspección habilitada y accesible desde menú
+- ✨ Feat: Enlace "Inspecciones" agregado al menú lateral con icono Route
+- ✨ Feat: Lazy loading para InspectionsPage
+- 🎨 UX: Permite crear inspecciones con múltiples marcadores en un mapa
+- 🎨 UX: Ideal para levantamiento grupal de incidencias en una sola sesión
+
+### v2.37.8 - Fix MapViewer JSX structure (28/01/2026)
+- 🔧 Fix: Estructura JSX de MapViewer corregida - div de cierre faltante
+- 🔧 Fix: Botones "Modificar" y "Confirmar Posición" ahora fuera del contenedor overflow
+- 🔧 Fix: Corrige que los botones no aparecían al colocar marcador
 
 ### v2.37.7 - Fix confirmation buttons visibility (28/01/2026)
 - 🔧 Fix: Botones "Modificar" y "Confirmar Posición" ahora visibles al colocar marcador
