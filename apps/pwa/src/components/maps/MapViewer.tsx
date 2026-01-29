@@ -5,11 +5,12 @@
  * - Renderizar imagen de mapa
  * - Mostrar marcadores existentes
  * - Modo edición: click para colocar/mover marcador
- * - Zoom y pan básico
+ * - Zoom con scroll y pinch táctil
+ * - Pan con arrastre (mouse y táctil)
  */
 
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { MapPin, ZoomIn, ZoomOut, RotateCcw, Move, Check, X } from 'lucide-react'
+import { MapPin, ZoomIn, ZoomOut, RotateCcw, Hand, Check, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -68,9 +69,15 @@ export function MapViewer({
   
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
-  const [isDragging, setIsDragging] = useState(false)
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
+  const [isPanning, setIsPanning] = useState(false)
+  const [panStart, setPanStart] = useState({ x: 0, y: 0, panX: 0, panY: 0 })
   const [imageLoaded, setImageLoaded] = useState(false)
+  
+  // Estado para distinguir entre pan y click
+  const [hasMoved, setHasMoved] = useState(false)
+  
+  // Touch state para pinch zoom
+  const [lastTouchDistance, setLastTouchDistance] = useState<number | null>(null)
 
   // Reset zoom/pan cuando cambia el mapa
   useEffect(() => {
@@ -80,15 +87,15 @@ export function MapViewer({
   }, [mapImageUrl])
 
   // Calcular posición del click en coordenadas normalizadas
-  const getClickPosition = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+  const getClickPosition = useCallback((clientX: number, clientY: number) => {
     if (!containerRef.current || !imageRef.current) return null
 
     const rect = containerRef.current.getBoundingClientRect()
     const img = imageRef.current
 
     // Posición del click relativa al contenedor
-    const clickX = e.clientX - rect.left
-    const clickY = e.clientY - rect.top
+    const clickX = clientX - rect.left
+    const clickY = clientY - rect.top
 
     // Calcular dimensiones de la imagen escalada
     const scaledWidth = img.naturalWidth * zoom
@@ -112,44 +119,141 @@ export function MapViewer({
     return { x, y }
   }, [zoom, pan])
 
-  // Manejar click en el mapa
-  const handleMapClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    if (!editable || isDragging) return
-
-    const position = getClickPosition(e)
-    if (position && onPositionSelect) {
-      onPositionSelect(position)
-    }
-  }, [editable, isDragging, getClickPosition, onPositionSelect])
-
   // Controles de zoom
-  const handleZoomIn = () => setZoom((z) => Math.min(z * 1.25, 4))
-  const handleZoomOut = () => setZoom((z) => Math.max(z / 1.25, 0.5))
+  const handleZoomIn = () => setZoom((z) => Math.min(z * 1.25, 5))
+  const handleZoomOut = () => setZoom((z) => Math.max(z / 1.25, 0.25))
   const handleReset = () => {
     setZoom(1)
     setPan({ x: 0, y: 0 })
   }
 
-  // Pan con drag
-  const handleMouseDown = (e: React.MouseEvent) => {
+  // Zoom con wheel
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    e.preventDefault()
+    const delta = e.deltaY > 0 ? 0.9 : 1.1
+    setZoom((z) => Math.min(Math.max(z * delta, 0.25), 5))
+  }, [])
+
+  // --- MOUSE EVENTS ---
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.button !== 0) return // Solo click izquierdo
-    if (editable && !e.ctrlKey && !e.metaKey) return // En modo edición, drag solo con ctrl/cmd
     
-    setIsDragging(true)
-    setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y })
-  }
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging) return
-    setPan({
-      x: e.clientX - dragStart.x,
-      y: e.clientY - dragStart.y,
+    setIsPanning(true)
+    setHasMoved(false)
+    setPanStart({ 
+      x: e.clientX, 
+      y: e.clientY, 
+      panX: pan.x, 
+      panY: pan.y 
     })
+  }, [pan])
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!isPanning) return
+    
+    const dx = e.clientX - panStart.x
+    const dy = e.clientY - panStart.y
+    
+    // Si se movió más de 5px, es pan, no click
+    if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+      setHasMoved(true)
+    }
+    
+    setPan({
+      x: panStart.panX + dx,
+      y: panStart.panY + dy,
+    })
+  }, [isPanning, panStart])
+
+  const handleMouseUp = useCallback((e: React.MouseEvent) => {
+    if (!isPanning) return
+    
+    setIsPanning(false)
+    
+    // Si no se movió y es modo editable, colocar marcador
+    if (!hasMoved && editable && onPositionSelect) {
+      const position = getClickPosition(e.clientX, e.clientY)
+      if (position) {
+        onPositionSelect(position)
+      }
+    }
+  }, [isPanning, hasMoved, editable, onPositionSelect, getClickPosition])
+
+  // --- TOUCH EVENTS ---
+  const getTouchDistance = (touches: React.TouchList) => {
+    if (touches.length < 2) return null
+    const dx = touches[0].clientX - touches[1].clientX
+    const dy = touches[0].clientY - touches[1].clientY
+    return Math.sqrt(dx * dx + dy * dy)
   }
 
-  const handleMouseUp = () => {
-    setIsDragging(false)
-  }
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      // Single touch - pan
+      setIsPanning(true)
+      setHasMoved(false)
+      setPanStart({ 
+        x: e.touches[0].clientX, 
+        y: e.touches[0].clientY, 
+        panX: pan.x, 
+        panY: pan.y 
+      })
+    } else if (e.touches.length === 2) {
+      // Two fingers - prepare for pinch
+      setLastTouchDistance(getTouchDistance(e.touches))
+    }
+  }, [pan])
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    e.preventDefault() // Prevent page scroll
+    
+    if (e.touches.length === 1 && isPanning) {
+      // Single touch - pan
+      const dx = e.touches[0].clientX - panStart.x
+      const dy = e.touches[0].clientY - panStart.y
+      
+      if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+        setHasMoved(true)
+      }
+      
+      setPan({
+        x: panStart.panX + dx,
+        y: panStart.panY + dy,
+      })
+    } else if (e.touches.length === 2) {
+      // Pinch zoom
+      const distance = getTouchDistance(e.touches)
+      if (distance && lastTouchDistance) {
+        const scale = distance / lastTouchDistance
+        setZoom((z) => Math.min(Math.max(z * scale, 0.25), 5))
+        setLastTouchDistance(distance)
+      }
+    }
+  }, [isPanning, panStart, lastTouchDistance])
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length === 0) {
+      // All fingers lifted
+      if (isPanning && !hasMoved && editable && onPositionSelect && e.changedTouches.length > 0) {
+        const touch = e.changedTouches[0]
+        const position = getClickPosition(touch.clientX, touch.clientY)
+        if (position) {
+          onPositionSelect(position)
+        }
+      }
+      setIsPanning(false)
+      setLastTouchDistance(null)
+    } else if (e.touches.length === 1) {
+      // One finger remaining - continue pan from new position
+      setPanStart({ 
+        x: e.touches[0].clientX, 
+        y: e.touches[0].clientY, 
+        panX: pan.x, 
+        panY: pan.y 
+      })
+      setLastTouchDistance(null)
+    }
+  }, [isPanning, hasMoved, editable, onPositionSelect, getClickPosition, pan])
 
   // Calcular posición de marcador en píxeles
   const getMarkerPosition = useCallback((position: { x: number; y: number }) => {
@@ -173,7 +277,7 @@ export function MapViewer({
   }, [zoom, pan, imageLoaded])
 
   return (
-    <div className={cn('relative overflow-hidden bg-muted rounded-lg', className)}>
+    <div className={cn('relative overflow-hidden bg-muted rounded-lg touch-none', className)}>
       {/* Controles de zoom */}
       {showControls && (
         <div className="absolute top-2 right-2 z-10 flex flex-col gap-1 bg-background/90 backdrop-blur rounded-lg p-1 shadow-md">
@@ -204,16 +308,6 @@ export function MapViewer({
           >
             <RotateCcw className="h-4 w-4" />
           </Button>
-          {!editable && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              title="Mantener y arrastrar para mover"
-            >
-              <Move className="h-4 w-4" />
-            </Button>
-          )}
         </div>
       )}
 
@@ -225,18 +319,29 @@ export function MapViewer({
         </div>
       )}
 
+      {/* Indicador de navegación */}
+      {editable && (
+        <div className="absolute bottom-2 left-2 z-10 bg-background/80 text-muted-foreground text-xs px-2 py-1 rounded-md flex items-center gap-1">
+          <Hand className="h-3 w-3" />
+          Arrastra para mover
+        </div>
+      )}
+
       {/* Contenedor del mapa */}
       <div
         ref={containerRef}
         className={cn(
           'relative w-full h-full min-h-[300px] flex items-center justify-center',
-          editable ? 'cursor-crosshair' : isDragging ? 'cursor-grabbing' : 'cursor-grab'
+          isPanning ? 'cursor-grabbing' : 'cursor-grab'
         )}
-        onClick={handleMapClick}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
+        onWheel={handleWheel}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
       >
         {/* Imagen del mapa */}
         <img

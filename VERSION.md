@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.37.4**
+## Versión Actual: **v2.37.5**
 
 **Fecha de lanzamiento**: 28 de enero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,14 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.37.5 - Enhanced MapViewer navigation (28/01/2026)
+- ✨ Feat: Zoom con scroll del mouse en MapViewer
+- ✨ Feat: Zoom con pinch táctil (dos dedos) en dispositivos móviles
+- ✨ Feat: Pan/arrastre con mouse (click + arrastrar)
+- ✨ Feat: Pan/arrastre táctil (un dedo) en PWA
+- 🎨 UX: Navegación fluida del mapa manteniendo capacidad de colocar marcadores
+- 🎨 UX: Indicador visual "Arrastra para mover" en modo edición
 
 ### v2.37.4 - Fix Firestore index for mapVersions (28/01/2026)
 - 🔧 Fix: Índice de Firestore corregido para `mapVersions` (locationId + version DESC)
