@@ -720,6 +720,38 @@ function parseInspectionItem(doc: { id: string; data: () => Record<string, unkno
 }
 
 /**
+ * Subir fotos para un item de inspección
+ */
+export async function uploadInspectionItemPhotos(
+  inspectionId: string,
+  itemId: string,
+  photos: File[]
+): Promise<string[]> {
+  const uploadedUrls: string[] = []
+
+  for (const photo of photos) {
+    const photoId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    const ext = photo.name.split('.').pop() || 'jpg'
+    const storagePath = `inspections/${inspectionId}/${itemId}/${photoId}.${ext}`
+
+    const storageRef = ref(storage, storagePath)
+    await uploadBytes(storageRef, photo)
+    const url = await getDownloadURL(storageRef)
+    uploadedUrls.push(url)
+  }
+
+  // Actualizar el item con las URLs de las fotos
+  if (uploadedUrls.length > 0) {
+    await updateDoc(doc(db, INSPECTION_ITEMS_COLLECTION, itemId), {
+      fotos: uploadedUrls,
+      updatedAt: serverTimestamp()
+    })
+  }
+
+  return uploadedUrls
+}
+
+/**
  * Obtener dimensiones de una imagen
  */
 function getImageDimensions(file: Blob): Promise<{ width: number; height: number }> {

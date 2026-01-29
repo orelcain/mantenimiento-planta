@@ -5,7 +5,7 @@
  * Ideal para levantamientos masivos de incidencias en una sola sesión.
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { 
   MapPin, 
   Plus, 
@@ -15,7 +15,9 @@ import {
   AlertTriangle,
   Camera,
   Download,
-  CheckCircle2
+  CheckCircle2,
+  Image,
+  X
 } from 'lucide-react'
 import { 
   Button, 
@@ -32,7 +34,12 @@ import {
   Label,
   SpeechTextarea,
   Spinner,
-  Badge
+  Badge,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
 } from '@/components/ui'
 import { useAuthStore } from '@/store'
 import { useToast } from '@/hooks/useToast'
@@ -45,7 +52,8 @@ import {
   getInspectionItems,
   getMapLocations,
   getLatestMapVersion,
-  getMapVersionById
+  getMapVersionById,
+  uploadInspectionItemPhotos
 } from '@/services/maps'
 import { MapViewer } from '@/components/maps'
 import { exportInspectionToPDF } from '@/utils/maps'
@@ -83,7 +91,14 @@ export function InspectionsPage() {
   const [pendingPosition, setPendingPosition] = useState<{ x: number; y: number } | null>(null)
   const [newItemTitle, setNewItemTitle] = useState('')
   const [newItemDescription, setNewItemDescription] = useState('')
+  const [newItemPhotos, setNewItemPhotos] = useState<File[]>([])
+  const [photoPreviewUrls, setPhotoPreviewUrls] = useState<string[]>([])
   const [isAddingItem, setIsAddingItem] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  
+  // Modal de opciones PDF
+  const [isPdfModalOpen, setIsPdfModalOpen] = useState(false)
+  const [pdfLayout, setPdfLayout] = useState<'portrait' | 'landscape-full'>('portrait')
   
   // Cargar inspecciones y ubicaciones al montar
   useEffect(() => {
@@ -196,6 +211,31 @@ export function InspectionsPage() {
     setIsAddItemModalOpen(true)
   }
   
+  // Manejar selección de fotos
+  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    if (files.length === 0) return
+    
+    // Limitar a 5 fotos
+    const newPhotos = [...newItemPhotos, ...files].slice(0, 5)
+    setNewItemPhotos(newPhotos)
+    
+    // Crear previews
+    const urls = newPhotos.map(f => URL.createObjectURL(f))
+    // Revocar URLs anteriores
+    photoPreviewUrls.forEach(url => URL.revokeObjectURL(url))
+    setPhotoPreviewUrls(urls)
+  }
+  
+  // Eliminar foto seleccionada
+  const handleRemovePhoto = (index: number) => {
+    const newPhotos = newItemPhotos.filter((_, i) => i !== index)
+    setNewItemPhotos(newPhotos)
+    
+    URL.revokeObjectURL(photoPreviewUrls[index])
+    setPhotoPreviewUrls(prev => prev.filter((_, i) => i !== index))
+  }
+  
   // Agregar item a la inspección
   const handleAddItem = async () => {
     if (!activeInspection || !pendingPosition || !newItemTitle.trim()) return
@@ -210,7 +250,18 @@ export function InspectionsPage() {
         order: inspectionItems.length + 1
       }
       
-      const item = await addInspectionItem(data)
+      let item = await addInspectionItem(data)
+      
+      // Subir fotos si hay
+      if (newItemPhotos.length > 0) {
+        const photoUrls = await uploadInspectionItemPhotos(
+          activeInspection.id,
+          item.id,
+          newItemPhotos
+        )
+        item = { ...item, fotos: photoUrls }
+      }
+      
       setInspectionItems(prev => [...prev, item])
       
       // Resetear modal
@@ -218,6 +269,9 @@ export function InspectionsPage() {
       setPendingPosition(null)
       setNewItemTitle('')
       setNewItemDescription('')
+      setNewItemPhotos([])
+      photoPreviewUrls.forEach(url => URL.revokeObjectURL(url))
+      setPhotoPreviewUrls([])
       
       toast({
         title: `Punto #${item.order} agregado`,
@@ -290,9 +344,16 @@ export function InspectionsPage() {
     loadData() // Recargar lista
   }
   
+  // Abrir modal de opciones PDF
+  const handleOpenPdfOptions = () => {
+    setIsPdfModalOpen(true)
+  }
+  
   // Exportar a PDF
   const handleExportPDF = async () => {
     if (!activeInspection || !activeMapVersion) return
+    
+    setIsPdfModalOpen(false)
     
     try {
       toast({
@@ -305,7 +366,8 @@ export function InspectionsPage() {
         items: inspectionItems,
         mapVersion: activeMapVersion,
         includePhotos: inspectionItems.some(i => i.fotos.length > 0),
-        includeStats: true
+        includeStats: true,
+        layout: pdfLayout
       })
       
       toast({
@@ -356,7 +418,7 @@ export function InspectionsPage() {
                 Finalizar
               </Button>
             )}
-            <Button variant="outline" onClick={handleExportPDF}>
+            <Button variant="outline" onClick={handleOpenPdfOptions}>
               <Download className="h-4 w-4 mr-2" />
               PDF
             </Button>
@@ -484,10 +546,54 @@ export function InspectionsPage() {
                   rows={3}
                 />
               </div>
+              
+              {/* Fotos */}
+              <div className="space-y-2">
+                <Label>Fotos (máx. 5)</Label>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handlePhotoSelect}
+                  className="hidden"
+                />
+                
+                <div className="flex flex-wrap gap-2">
+                  {photoPreviewUrls.map((url, index) => (
+                    <div key={index} className="relative w-16 h-16 rounded-lg overflow-hidden border">
+                      <img src={url} alt={`Foto ${index + 1}`} className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => handleRemovePhoto(index)}
+                        className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full p-0.5"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                  
+                  {newItemPhotos.length < 5 && (
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="w-16 h-16 rounded-lg border-2 border-dashed border-muted-foreground/30 flex flex-col items-center justify-center text-muted-foreground hover:border-primary hover:text-primary transition-colors"
+                    >
+                      <Camera className="h-5 w-5" />
+                      <span className="text-[10px]">Agregar</span>
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
             
             <DialogFooter>
-              <Button variant="outline" onClick={() => setIsAddItemModalOpen(false)}>
+              <Button variant="outline" onClick={() => {
+                setIsAddItemModalOpen(false)
+                setNewItemPhotos([])
+                photoPreviewUrls.forEach(url => URL.revokeObjectURL(url))
+                setPhotoPreviewUrls([])
+              }}>
                 Cancelar
               </Button>
               <Button 
@@ -496,6 +602,64 @@ export function InspectionsPage() {
               >
                 {isAddingItem && <Spinner className="h-4 w-4 mr-2" />}
                 Agregar Punto
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        
+        {/* Modal de opciones PDF */}
+        <Dialog open={isPdfModalOpen} onOpenChange={setIsPdfModalOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Opciones de Exportación PDF</DialogTitle>
+            </DialogHeader>
+            
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Diseño del PDF</Label>
+                <Select value={pdfLayout} onValueChange={(v) => setPdfLayout(v as typeof pdfLayout)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="portrait">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4" />
+                        <div>
+                          <div className="font-medium">Estándar (Vertical)</div>
+                          <div className="text-xs text-muted-foreground">Mapa + tabla de puntos</div>
+                        </div>
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="landscape-full">
+                      <div className="flex items-center gap-2">
+                        <Image className="h-4 w-4" />
+                        <div>
+                          <div className="font-medium">Mapa Grande (Horizontal)</div>
+                          <div className="text-xs text-muted-foreground">Mapa ocupa página completa</div>
+                        </div>
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">
+                {pdfLayout === 'portrait' ? (
+                  <p>El informe incluirá el mapa con marcadores, estadísticas y una tabla detallada de todos los puntos.</p>
+                ) : (
+                  <p>El mapa con marcadores se mostrará en una página completa horizontal para mejor visualización. La tabla de puntos estará en páginas adicionales.</p>
+                )}
+              </div>
+            </div>
+            
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsPdfModalOpen(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleExportPDF}>
+                <Download className="h-4 w-4 mr-2" />
+                Generar PDF
               </Button>
             </DialogFooter>
           </DialogContent>

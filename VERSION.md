@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.38.3**
+## Versión Actual: **v2.39.0**
 
 **Fecha de lanzamiento**: 28 de enero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,15 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.39.0 - Photos in Inspections & Landscape PDF (28/01/2026)
+- ✨ Feat: Agregar fotos a cada punto de inspección (máx. 5 por punto)
+- ✨ Feat: Preview de fotos en modal antes de guardar
+- ✨ Feat: Exportación PDF con opción "Mapa Grande (Horizontal)"
+- ✨ Feat: Mapa ocupa página completa A4 landscape para mejor visualización
+- ✨ Feat: Modal de opciones antes de exportar PDF
+- 🔧 Fix: Reglas de Storage para fotos de inspecciones
+- 🎨 UX: Selector visual de diseño de PDF (estándar vs landscape)
 
 ### v2.38.3 - Fix undefined fields in inspectionItems (28/01/2026)
 - 🔧 Fix: Campo `markerId` ya no se envía como undefined a Firestore

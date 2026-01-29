@@ -17,12 +17,15 @@ import type {
   MapVersion 
 } from '@/types/maps'
 
+export type PDFLayout = 'portrait' | 'landscape-full'
+
 interface ExportInspectionPDFOptions {
   inspection: Inspection
   items: InspectionItem[]
   mapVersion: MapVersion
   includePhotos?: boolean
   includeStats?: boolean
+  layout?: PDFLayout
 }
 
 /**
@@ -143,10 +146,16 @@ export async function exportInspectionToPDF(
     items, 
     mapVersion,
     includePhotos = false,
-    includeStats = true 
+    includeStats = true,
+    layout = 'portrait'
   } = options
 
-  // Crear documento
+  // Si es landscape-full, usar función especializada
+  if (layout === 'landscape-full') {
+    return exportInspectionLandscapePDF(options)
+  }
+
+  // Crear documento portrait estándar
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
@@ -574,5 +583,170 @@ export async function exportMapViewToPDF(
   }
 
   const fileName = `Mapa_${locationName.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`
+  doc.save(fileName)
+}
+
+/**
+ * Exporta inspección con mapa en página completa horizontal
+ */
+async function exportInspectionLandscapePDF(
+  options: ExportInspectionPDFOptions
+): Promise<void> {
+  const { 
+    inspection, 
+    items, 
+    mapVersion
+  } = options
+
+  // Crear documento LANDSCAPE
+  const doc = new jsPDF({
+    orientation: 'landscape',
+    unit: 'mm',
+    format: 'a4',
+  })
+
+  const pageWidth = doc.internal.pageSize.getWidth() // ~297mm en landscape
+  const pageHeight = doc.internal.pageSize.getHeight() // ~210mm en landscape
+  const margin = 10
+
+  // ===== PÁGINA 1: MAPA EN PÁGINA COMPLETA =====
+  
+  // Título pequeño en la parte superior
+  doc.setFontSize(14)
+  doc.setFont('helvetica', 'bold')
+  doc.text(inspection.nombre, pageWidth / 2, margin + 5, { align: 'center' })
+  
+  doc.setFontSize(9)
+  doc.setFont('helvetica', 'normal')
+  doc.setTextColor(100)
+  doc.text(
+    `${inspection.locationName} • ${items.length} puntos • ${formatDate(inspection.createdAt)}`,
+    pageWidth / 2, 
+    margin + 11, 
+    { align: 'center' }
+  )
+  doc.setTextColor(0)
+
+  // Generar mapa con marcadores - tamaño grande para landscape
+  const mapMaxWidth = pageWidth - (margin * 2) // Casi toda la página
+  const mapMaxHeight = pageHeight - 35 // Dejar espacio para título y footer
+  
+  try {
+    const mapWithMarkers = await generateMapWithMarkers(
+      mapVersion.imageUrl,
+      items,
+      2000 // Mayor resolución para página grande
+    )
+    
+    // Calcular dimensiones manteniendo aspecto
+    const aspectRatio = mapVersion.width / mapVersion.height
+    let mapWidth = mapMaxWidth
+    let mapHeight = mapWidth / aspectRatio
+    
+    // Si es muy alto, ajustar por altura
+    if (mapHeight > mapMaxHeight) {
+      mapHeight = mapMaxHeight
+      mapWidth = mapHeight * aspectRatio
+    }
+    
+    // Centrar horizontalmente
+    const mapX = margin + (mapMaxWidth - mapWidth) / 2
+    const mapY = 20 // Después del título
+    
+    doc.addImage(mapWithMarkers, 'JPEG', mapX, mapY, mapWidth, mapHeight)
+    
+  } catch (error) {
+    console.error('Error generando mapa landscape:', error)
+    doc.setFontSize(12)
+    doc.text('Error al cargar el mapa', pageWidth / 2, pageHeight / 2, { align: 'center' })
+  }
+
+  // Footer de página 1
+  doc.setFontSize(8)
+  doc.setTextColor(128)
+  doc.text(
+    `Generado: ${new Date().toLocaleString('es-CL')}`,
+    margin,
+    pageHeight - 5
+  )
+  doc.setTextColor(0)
+
+  // ===== PÁGINA 2+: TABLA DE PUNTOS =====
+  doc.addPage('a4', 'portrait') // Volver a portrait para la tabla
+  
+  const tablePageWidth = doc.internal.pageSize.getWidth()
+  let yPosition = margin
+
+  // Encabezado
+  doc.setFontSize(16)
+  doc.setFont('helvetica', 'bold')
+  doc.text('Detalle de Puntos de Inspección', tablePageWidth / 2, yPosition, { align: 'center' })
+  yPosition += 8
+
+  doc.setFontSize(10)
+  doc.setFont('helvetica', 'normal')
+  doc.text(inspection.nombre, tablePageWidth / 2, yPosition, { align: 'center' })
+  yPosition += 10
+
+  // Línea decorativa
+  doc.setDrawColor(41, 128, 185)
+  doc.setLineWidth(0.5)
+  doc.line(margin, yPosition, tablePageWidth - margin, yPosition)
+  yPosition += 8
+
+  // Tabla de puntos
+  const tableData = items.map((item) => [
+    item.order.toString(),
+    item.title,
+    item.description || '-',
+    item.prioridad || '-',
+    item.fotos.length > 0 ? `${item.fotos.length} foto(s)` : '-'
+  ])
+
+  autoTable(doc, {
+    head: [['#', 'Título', 'Descripción', 'Prioridad', 'Fotos']],
+    body: tableData,
+    startY: yPosition,
+    theme: 'striped',
+    headStyles: {
+      fillColor: [41, 128, 185],
+      textColor: 255,
+      fontStyle: 'bold',
+      fontSize: 10,
+    },
+    bodyStyles: {
+      fontSize: 9,
+    },
+    columnStyles: {
+      0: { cellWidth: 10, halign: 'center' },
+      1: { cellWidth: 50 },
+      2: { cellWidth: 'auto' },
+      3: { cellWidth: 25, halign: 'center' },
+      4: { cellWidth: 25, halign: 'center' },
+    },
+    margin: { left: margin, right: margin },
+  })
+
+  // Pie de página en todas las páginas
+  const pageCount = doc.getNumberOfPages()
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i)
+    doc.setFontSize(8)
+    doc.setTextColor(128)
+    
+    const currentPageWidth = doc.internal.pageSize.getWidth()
+    const currentPageHeight = doc.internal.pageSize.getHeight()
+    
+    doc.text(
+      `Página ${i} de ${pageCount}`,
+      currentPageWidth - margin,
+      currentPageHeight - 5,
+      { align: 'right' }
+    )
+    doc.setTextColor(0)
+  }
+
+  // Guardar
+  const fileName = `Inspeccion_${inspection.nombre.replace(/[^a-zA-Z0-9]/g, '_')}_${formatDate(inspection.createdAt).replace(/\//g, '-')}.pdf`
   doc.save(fileName)
 }
