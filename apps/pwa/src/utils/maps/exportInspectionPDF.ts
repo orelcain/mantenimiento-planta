@@ -653,10 +653,10 @@ async function exportInspectionLandscapePDF(
   doc.setFont('helvetica', 'normal')
   
   const infoText = [
-    `📍 ${inspection.locationName}`,
-    `📅 ${formatDate(inspection.createdAt)}`,
-    `📊 ${items.length} puntos`,
-    `👤 ${inspection.createdByName || 'Sistema'}`
+    `Ubicacion: ${inspection.locationName}`,
+    `Fecha: ${formatDate(inspection.createdAt)}`,
+    `Puntos: ${items.length}`,
+    `Usuario: ${inspection.createdByName || 'Sistema'}`
   ].join('  |  ')
   
   doc.text(infoText, margin, yPosition)
