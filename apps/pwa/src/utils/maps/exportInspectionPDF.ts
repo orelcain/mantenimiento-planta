@@ -8,6 +8,20 @@
  * - Fotos asociadas (opcional)
  */
 
+// Funcion para limpiar caracteres especiales (jsPDF no soporta UTF-8 completo)
+function sanitizeText(text: string): string {
+  if (!text) return ''
+  return text
+    .replace(/á/g, 'a').replace(/Á/g, 'A')
+    .replace(/é/g, 'e').replace(/É/g, 'E')
+    .replace(/í/g, 'i').replace(/Í/g, 'I')
+    .replace(/ó/g, 'o').replace(/Ó/g, 'O')
+    .replace(/ú/g, 'u').replace(/Ú/g, 'U')
+    .replace(/ñ/g, 'n').replace(/Ñ/g, 'N')
+    .replace(/ü/g, 'u').replace(/Ü/g, 'U')
+    .replace(/[^\x00-\x7F]/g, '') // Eliminar cualquier otro caracter no-ASCII
+}
+
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { formatDate } from '@/lib/utils'
@@ -638,7 +652,7 @@ async function exportInspectionLandscapePDF(
   doc.setFontSize(16)
   doc.setFont('helvetica', 'bold')
   doc.setTextColor(41, 128, 185)
-  doc.text(inspection.nombre, margin, yPosition)
+  doc.text(sanitizeText(inspection.nombre), margin, yPosition)
   doc.setTextColor(0)
   yPosition += 6
 
@@ -653,11 +667,11 @@ async function exportInspectionLandscapePDF(
   doc.setFont('helvetica', 'normal')
   
   const infoText = [
-    `Ubicacion: ${inspection.locationName}`,
+    `Ubicacion: ${sanitizeText(inspection.locationName)}`,
     `Fecha: ${formatDate(inspection.createdAt)}`,
     `Puntos: ${items.length}`,
-    `Usuario: ${inspection.createdByName || 'Sistema'}`
-  ].join('  |  ')
+    `Usuario: ${sanitizeText(inspection.createdByName || 'Sistema')}`
+  ].join('  -  ')
   
   doc.text(infoText, margin, yPosition)
   yPosition += 4
@@ -677,7 +691,7 @@ async function exportInspectionLandscapePDF(
   }
   
   const priorityLabels: Record<string, string> = {
-    critica: 'Crítica',
+    critica: 'Critica',
     alta: 'Alta',
     media: 'Media',
     baja: 'Baja',
@@ -687,7 +701,7 @@ async function exportInspectionLandscapePDF(
   const prioritySummary = Object.entries(countByPriority)
     .filter(([_, count]) => count > 0)
     .map(([key, count]) => `${priorityLabels[key]}: ${count}`)
-    .join('  |  ')
+    .join('  -  ')
   
   if (prioritySummary) {
     doc.setFont('helvetica', 'bold')
