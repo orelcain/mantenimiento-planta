@@ -629,55 +629,40 @@ async function exportInspectionLandscapePDF(
 
   const pageWidth = doc.internal.pageSize.getWidth() // ~297mm en landscape
   const pageHeight = doc.internal.pageSize.getHeight() // ~210mm en landscape
-  const margin = 12
+  const margin = 10
   let yPosition = margin
 
-  // ===== PÁGINA 1: MAPA EN PÁGINA COMPLETA CON INFO =====
+  // ===== PÁGINA 1: MAPA OCUPANDO 80% CON INFO COMPACTA EN LA PARTE SUPERIOR =====
   
-  // Encabezado mejorado
-  doc.setFontSize(20)
+  // Encabezado compacto
+  doc.setFontSize(16)
   doc.setFont('helvetica', 'bold')
   doc.setTextColor(41, 128, 185)
   doc.text(inspection.nombre, margin, yPosition)
   doc.setTextColor(0)
-  yPosition += 8
+  yPosition += 6
 
   // Línea decorativa
   doc.setDrawColor(41, 128, 185)
-  doc.setLineWidth(1)
+  doc.setLineWidth(0.8)
   doc.line(margin, yPosition, pageWidth - margin, yPosition)
-  yPosition += 5
+  yPosition += 4
 
-  // Información en dos columnas
-  doc.setFontSize(9)
+  // Información compacta en una línea horizontal
+  doc.setFontSize(8)
   doc.setFont('helvetica', 'normal')
   
-  // Columna izquierda - Información general
-  const leftColX = margin
-  const rightColX = pageWidth / 2
+  const infoText = [
+    `📍 ${inspection.locationName}`,
+    `📅 ${formatDate(inspection.createdAt)}`,
+    `📊 ${items.length} puntos`,
+    `👤 ${inspection.createdByName || 'Sistema'}`
+  ].join('  |  ')
   
-  doc.setFont('helvetica', 'bold')
-  doc.setTextColor(50)
-  doc.text('INFORMACIÓN GENERAL', leftColX, yPosition)
-  doc.setFont('helvetica', 'normal')
-  doc.setTextColor(0)
-  yPosition += 6
-  
-  const infoLines = [
-    `Ubicación: ${inspection.locationName}`,
-    `Fecha: ${formatDate(inspection.createdAt)}`,
-    `Total de puntos: ${items.length}`,
-    `Estado: ${inspection.status === 'finalizado' ? 'Finalizado' : 'En Progreso'}`,
-    inspection.createdByName ? `Realizado por: ${inspection.createdByName}` : '',
-    inspection.motivoInspeccion ? `Motivo: ${inspection.motivoInspeccion}` : ''
-  ].filter(l => l)
-  
-  for (const line of infoLines) {
-    doc.text(line, leftColX, yPosition)
-    yPosition += 5
-  }
-  
-  // Contar por prioridad
+  doc.text(infoText, margin, yPosition)
+  yPosition += 4
+
+  // Resumen por prioridad en línea compacta
   const countByPriority: Record<string, number> = {
     critica: 0,
     alta: 0,
@@ -691,14 +676,6 @@ async function exportInspectionLandscapePDF(
     countByPriority[key] = (countByPriority[key] || 0) + 1
   }
   
-  yPosition += 3
-  doc.setFont('helvetica', 'bold')
-  doc.setTextColor(50)
-  doc.text('RESUMEN POR PRIORIDAD', leftColX, yPosition)
-  doc.setFont('helvetica', 'normal')
-  doc.setTextColor(0)
-  yPosition += 5
-  
   const priorityLabels: Record<string, string> = {
     critica: 'Crítica',
     alta: 'Alta',
@@ -707,24 +684,30 @@ async function exportInspectionLandscapePDF(
     sin_prioridad: 'Sin definir'
   }
   
-  for (const [key, count] of Object.entries(countByPriority)) {
-    if (count > 0) {
-      const label = `${priorityLabels[key]}: ${count}`
-      doc.text(label, leftColX, yPosition)
-      yPosition += 4
-    }
+  const prioritySummary = Object.entries(countByPriority)
+    .filter(([_, count]) => count > 0)
+    .map(([key, count]) => `${priorityLabels[key]}: ${count}`)
+    .join('  |  ')
+  
+  if (prioritySummary) {
+    doc.setFont('helvetica', 'bold')
+    doc.setTextColor(60)
+    doc.text(`Prioridades: ${prioritySummary}`, margin, yPosition)
+    doc.setTextColor(0)
+    yPosition += 4
   }
   
-  // Mapa en el lado derecho (más pequeño)
-  const mapStartY = margin + 8
-  const mapMaxWidth = pageWidth - rightColX - margin // Lado derecho
-  const mapMaxHeight = pageHeight - mapStartY - margin - 15 // Menos altura
+  yPosition += 2
+
+  // Mapa ocupando 80% de la página (casi toda horizontal)
+  const mapMaxWidth = pageWidth - (margin * 2) // 80% del ancho disponible
+  const mapMaxHeight = pageHeight - yPosition - margin - 10 // Espacio restante
   
   try {
     const mapWithMarkers = await generateMapWithMarkers(
       mapVersion.imageUrl,
       items,
-      1500
+      2000
     )
     
     // Calcular dimensiones manteniendo aspecto
@@ -738,15 +721,15 @@ async function exportInspectionLandscapePDF(
       mapWidth = mapHeight * aspectRatio
     }
     
-    // Posicionar mapa a la derecha
-    const mapX = rightColX
+    // Centrar horizontalmente
+    const mapX = margin + (mapMaxWidth - mapWidth) / 2
     
-    doc.addImage(mapWithMarkers, 'JPEG', mapX, mapStartY, mapWidth, mapHeight)
+    doc.addImage(mapWithMarkers, 'JPEG', mapX, yPosition, mapWidth, mapHeight)
     
   } catch (error) {
     console.error('Error generando mapa landscape:', error)
     doc.setFontSize(12)
-    doc.text('Error al cargar el mapa', rightColX + 20, pageHeight / 2, { align: 'center' })
+    doc.text('Error al cargar el mapa', pageWidth / 2, pageHeight / 2, { align: 'center' })
   }
 
   // Footer de página 1
@@ -755,7 +738,7 @@ async function exportInspectionLandscapePDF(
   doc.text(
     `Generado: ${new Date().toLocaleString('es-CL')}`,
     margin,
-    pageHeight - 8
+    pageHeight - 6
   )
   doc.setTextColor(0)
 
