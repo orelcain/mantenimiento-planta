@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.41.0**
+## Versión Actual: **v2.41.1**
 
 **Fecha de lanzamiento**: 29 de enero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,10 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.41.1 - PDF Photos Keep Aspect Ratio (29/01/2026)
+- 🐛 Fix: Fotos en PDF ahora mantienen su relación de aspecto original
+- 🎨 UX: Ajuste de imágenes dentro del contenedor sin deformación
 
 ### v2.41.0 - Interactive Marker Popup & Zoom Image Viewer (29/01/2026)
 - ✨ Feat: Popup interactivo al hacer click en marcador del mapa

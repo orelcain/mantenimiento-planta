@@ -53,6 +53,18 @@ async function urlToBase64(url: string): Promise<string> {
 }
 
 /**
+ * Obtiene dimensiones reales de una imagen (dataURL)
+ */
+async function getImageDimensions(dataUrl: string): Promise<{ width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => resolve({ width: img.width, height: img.height })
+    img.onerror = reject
+    img.src = dataUrl
+  })
+}
+
+/**
  * Dibuja un marcador numerado en el canvas
  */
 function drawMarker(
@@ -383,7 +395,10 @@ export async function exportInspectionToPDF(
 
         for (let i = 0; i < Math.min(item.fotos.length, 4); i++) {
           try {
-            const photoBase64 = await urlToBase64(item.fotos[i] || '')
+            const fotoUrl = item.fotos[i]
+            if (!fotoUrl) continue
+            const photoBase64 = await urlToBase64(fotoUrl)
+            const { width, height } = await getImageDimensions(photoBase64)
             
             if (yPosition + photoHeight > pageHeight - 20) {
               doc.addPage()
@@ -391,7 +406,13 @@ export async function exportInspectionToPDF(
               xPos = margin
             }
 
-            doc.addImage(photoBase64, 'JPEG', xPos, yPosition, photoWidth, photoHeight)
+            const scale = Math.min(photoWidth / width, photoHeight / height)
+            const drawWidth = width * scale
+            const drawHeight = height * scale
+            const drawX = xPos + (photoWidth - drawWidth) / 2
+            const drawY = yPosition + (photoHeight - drawHeight) / 2
+
+            doc.addImage(photoBase64, 'JPEG', drawX, drawY, drawWidth, drawHeight)
             
             if (i % 2 === 0) {
               xPos = margin + photoWidth + 10
@@ -803,7 +824,13 @@ async function exportInspectionLandscapePDF(
             const fotoUrl = item.fotos[i]
             if (!fotoUrl) continue
             const photoBase64 = await urlToBase64(fotoUrl)
-            doc.addImage(photoBase64, 'JPEG', photoXPos, photoYPosition, photoWidth, photoHeight)
+            const { width, height } = await getImageDimensions(photoBase64)
+            const scale = Math.min(photoWidth / width, photoHeight / height)
+            const drawWidth = width * scale
+            const drawHeight = height * scale
+            const drawX = photoXPos + (photoWidth - drawWidth) / 2
+            const drawY = photoYPosition + (photoHeight - drawHeight) / 2
+            doc.addImage(photoBase64, 'JPEG', drawX, drawY, drawWidth, drawHeight)
             
             // Etiqueta de foto
             doc.setFontSize(7)
