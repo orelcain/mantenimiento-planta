@@ -409,12 +409,15 @@ export async function exportInspectionToPDF(
 
         for (let i = 0; i < Math.min(item.fotos.length, 4); i++) {
           try {
-            const fotoUrl = item.fotos[i]
-            if (!fotoUrl) continue
-            const photoBase64 = await urlToBase64(fotoUrl)
+            const foto = item.fotos[i]
+            if (!foto || !foto.url) continue
+            const photoBase64 = await urlToBase64(foto.url)
             const { width, height } = await getImageDimensions(photoBase64)
             
-            if (yPosition + photoHeight > pageHeight - 20) {
+            // Espacio extra para descripción
+            const totalPhotoHeight = photoHeight + (foto.descripcion ? 8 : 0)
+            
+            if (yPosition + totalPhotoHeight > pageHeight - 20) {
               doc.addPage()
               yPosition = margin
               xPos = margin
@@ -428,11 +431,21 @@ export async function exportInspectionToPDF(
 
             doc.addImage(photoBase64, 'JPEG', drawX, drawY, drawWidth, drawHeight)
             
+            // Agregar descripción de la foto si existe
+            if (foto.descripcion) {
+              doc.setFontSize(7)
+              doc.setFont('helvetica', 'italic')
+              doc.setTextColor(80)
+              const descText = sanitizeText(foto.descripcion).substring(0, 50)
+              doc.text(descText, xPos + photoWidth / 2, yPosition + photoHeight + 4, { align: 'center' })
+              doc.setTextColor(0)
+            }
+            
             if (i % 2 === 0) {
               xPos = margin + photoWidth + 10
             } else {
               xPos = margin
-              yPosition += photoHeight + 5
+              yPosition += totalPhotoHeight + 5
             }
           } catch (error) {
             console.error('Error cargando foto:', error)
@@ -858,7 +871,7 @@ async function exportInspectionLandscapePDF(
         // Título del punto
         doc.setFontSize(12)
         doc.setFont('helvetica', 'bold')
-        doc.text(item.title, photoMargin + 14, photoYPosition + 5)
+        doc.text(sanitizeText(item.title), photoMargin + 14, photoYPosition + 5)
         photoYPosition += 10
         
         // Descripción (si existe)
@@ -866,7 +879,7 @@ async function exportInspectionLandscapePDF(
           doc.setFontSize(9)
           doc.setFont('helvetica', 'italic')
           doc.setTextColor(100)
-          const descLines = doc.splitTextToSize(item.description, contentWidth - 10)
+          const descLines = doc.splitTextToSize(sanitizeText(item.description), contentWidth - 10)
           doc.text(descLines.slice(0, 2), photoMargin + 14, photoYPosition)
           photoYPosition += Math.min(descLines.length, 2) * 4 + 2
           doc.setTextColor(0)
@@ -878,17 +891,21 @@ async function exportInspectionLandscapePDF(
         let photoXPos = photoMargin
         
         for (let i = 0; i < Math.min(item.fotos.length, 4); i++) {
+          const foto = item.fotos[i]
+          if (!foto || !foto.url) continue
+          
+          // Espacio extra para descripción
+          const totalPhotoHeight = photoHeight + (foto.descripcion ? 8 : 0)
+          
           // Verificar espacio
-          if (photoYPosition + photoHeight > photoPageHeight - photoMargin) {
+          if (photoYPosition + totalPhotoHeight > photoPageHeight - photoMargin) {
             doc.addPage('a4', 'portrait')
             photoYPosition = photoMargin
             photoXPos = photoMargin
           }
           
           try {
-            const fotoUrl = item.fotos[i]
-            if (!fotoUrl) continue
-            const photoBase64 = await urlToBase64(fotoUrl)
+            const photoBase64 = await urlToBase64(foto.url)
             const { width, height } = await getImageDimensions(photoBase64)
             const scale = Math.min(photoWidth / width, photoHeight / height)
             const drawWidth = width * scale
@@ -897,10 +914,15 @@ async function exportInspectionLandscapePDF(
             const drawY = photoYPosition + (photoHeight - drawHeight) / 2
             doc.addImage(photoBase64, 'JPEG', drawX, drawY, drawWidth, drawHeight)
             
-            // Etiqueta de foto
+            // Etiqueta y descripción de foto
             doc.setFontSize(7)
             doc.setTextColor(100)
-            doc.text(`Foto ${i + 1}`, photoXPos + 2, photoYPosition + photoHeight + 4)
+            if (foto.descripcion) {
+              const fotoDesc = sanitizeText(foto.descripcion).substring(0, 40)
+              doc.text(`Foto ${i + 1}: ${fotoDesc}`, photoXPos + 2, photoYPosition + photoHeight + 4)
+            } else {
+              doc.text(`Foto ${i + 1}`, photoXPos + 2, photoYPosition + photoHeight + 4)
+            }
             doc.setTextColor(0)
             
             // Alternar posición
@@ -908,7 +930,7 @@ async function exportInspectionLandscapePDF(
               photoXPos = photoMargin + photoWidth + 15
             } else {
               photoXPos = photoMargin
-              photoYPosition += photoHeight + 8
+              photoYPosition += totalPhotoHeight + 8
             }
           } catch (err) {
             console.error(`Error cargando foto ${i + 1} del punto ${item.order}:`, err)

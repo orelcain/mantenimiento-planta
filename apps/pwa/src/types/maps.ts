@@ -83,6 +83,14 @@ export interface Inspection {
 }
 
 /**
+ * Foto de inspección con descripción opcional
+ */
+export interface InspectionPhoto {
+  url: string
+  descripcion?: string
+}
+
+/**
  * Item individual dentro de una inspección
  * Cada item puede tener su propia descripción y fotos
  */
@@ -94,7 +102,7 @@ export interface InspectionItem {
   position: { x: number; y: number } // Posición en el mapa
   title: string
   description?: string
-  fotos: string[] // URLs de Firebase Storage
+  fotos: InspectionPhoto[] // Fotos con descripción
   prioridad?: 'critica' | 'alta' | 'media' | 'baja'
   // Si se convierte en incidencia formal
   incidentId?: string

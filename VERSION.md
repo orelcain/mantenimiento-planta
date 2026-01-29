@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.41.2**
+## Versión Actual: **v2.42.0**
 
 **Fecha de lanzamiento**: 29 de enero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,18 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.42.0 - Full Inspection & Item Editing with Photo Descriptions (29/01/2026)
+- ✨ Feat: Modal de edicion de inspeccion principal (titulo y descripcion)
+- ✨ Feat: Modal de edicion completa de item (titulo, descripcion, prioridad, fotos)
+- ✨ Feat: Nuevo modelo de fotos con descripcion individual (InspectionPhoto)
+- ✨ Feat: Campo de descripcion por cada foto en modal de edicion
+- ✨ Feat: Migracion automatica de fotos antiguas (string[]) al nuevo formato
+- ✨ Feat: Descripciones de fotos visibles en exportacion PDF
+- ✨ Feat: Boton de editar (lapiz) en header de inspeccion activa
+- 🎨 UX: Selector de prioridad visual con colores en modal de edicion
+- 🎨 UX: Descripcion de inspeccion visible en subheader
+- 🔧 Fix: sanitizeText aplicado a textos en PDF para evitar caracteres ilegibles
 
 ### v2.41.2 - Improved PDF Landscape Layout (29/01/2026)
 - 🎨 UX: Nuevo layout de dos columnas en primera página landscape

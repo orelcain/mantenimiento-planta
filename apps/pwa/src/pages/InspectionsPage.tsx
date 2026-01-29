@@ -22,7 +22,8 @@ import {
   ZoomOut,
   ChevronLeft,
   ChevronRight,
-  RotateCcw
+  RotateCcw,
+  Pencil
 } from 'lucide-react'
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch'
 import { 
@@ -60,13 +61,15 @@ import {
   getLatestMapVersion,
   getMapVersionById,
   uploadInspectionItemPhotos,
-  updateInspectionItem
+  updateInspectionItem,
+  updateInspection
 } from '@/services/maps'
 import { MapViewer } from '@/components/maps'
 import { exportInspectionToPDF } from '@/utils/maps'
 import type { 
   Inspection, 
-  InspectionItem, 
+  InspectionItem,
+  InspectionPhoto,
   MapLocation, 
   MapVersion,
   CreateInspectionDTO,
@@ -107,12 +110,21 @@ export function InspectionsPage() {
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false)
   const [pdfLayout, setPdfLayout] = useState<'portrait' | 'landscape-full'>('portrait')
   
-  // Modal de edición de fotos de un item existente
-  const [editingItemId, setEditingItemId] = useState<string | null>(null)
-  const [editingItemPhotos, setEditingItemPhotos] = useState<string[]>([])
-  const [newPhotosForEdit, setNewPhotosForEdit] = useState<File[]>([])
-  const [newPhotosPreview, setNewPhotosPreview] = useState<string[]>([])
-  const [isSavingPhotos, setIsSavingPhotos] = useState(false)
+  // Modal de edición de inspección (título y descripción)
+  const [isEditInspectionModalOpen, setIsEditInspectionModalOpen] = useState(false)
+  const [editInspectionName, setEditInspectionName] = useState('')
+  const [editInspectionDescription, setEditInspectionDescription] = useState('')
+  const [isSavingInspection, setIsSavingInspection] = useState(false)
+  
+  // Modal de edición completa de item (título, descripción, prioridad, fotos)
+  const [editingItem, setEditingItem] = useState<InspectionItem | null>(null)
+  const [editItemTitle, setEditItemTitle] = useState('')
+  const [editItemDescription, setEditItemDescription] = useState('')
+  const [editItemPriority, setEditItemPriority] = useState<string>('')
+  const [editItemPhotos, setEditItemPhotos] = useState<InspectionPhoto[]>([])
+  const [newPhotosForItem, setNewPhotosForItem] = useState<File[]>([])
+  const [newPhotosPreviewItem, setNewPhotosPreviewItem] = useState<string[]>([])
+  const [isSavingItem, setIsSavingItem] = useState(false)
   
   // Modal de imagen grande con zoom/pan
   const [viewingImage, setViewingImage] = useState<string | null>(null)
@@ -332,91 +344,165 @@ export function InspectionsPage() {
     }
   }
   
-  // Abrir modal de edición de fotos para un item existente
-  const handleOpenEditPhotos = (item: InspectionItem) => {
-    setEditingItemId(item.id)
-    setEditingItemPhotos([...item.fotos])
-    setNewPhotosForEdit([])
-    setNewPhotosPreview([])
+  // ========== EDICIÓN DE INSPECCIÓN ==========
+  
+  // Abrir modal de edición de inspección
+  const handleOpenEditInspection = () => {
+    if (!activeInspection) return
+    setEditInspectionName(activeInspection.nombre)
+    setEditInspectionDescription(activeInspection.descripcion || '')
+    setIsEditInspectionModalOpen(true)
   }
   
-  // Agregar nuevas fotos al item existente
-  const handleAddPhotosToExisting = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Guardar cambios de inspección
+  const handleSaveInspection = async () => {
+    if (!activeInspection) return
+    
+    setIsSavingInspection(true)
+    try {
+      await updateInspection(activeInspection.id, {
+        nombre: editInspectionName.trim(),
+        descripcion: editInspectionDescription.trim() || undefined
+      })
+      
+      // Actualizar estado local
+      setActiveInspection(prev => prev ? {
+        ...prev,
+        nombre: editInspectionName.trim(),
+        descripcion: editInspectionDescription.trim() || undefined
+      } : null)
+      
+      setInspections(prev => prev.map(i => 
+        i.id === activeInspection.id ? {
+          ...i,
+          nombre: editInspectionName.trim(),
+          descripcion: editInspectionDescription.trim() || undefined
+        } : i
+      ))
+      
+      setIsEditInspectionModalOpen(false)
+      toast({ title: 'Inspeccion actualizada' })
+    } catch (error) {
+      console.error('Error updating inspection:', error)
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'No se pudo actualizar la inspeccion'
+      })
+    } finally {
+      setIsSavingInspection(false)
+    }
+  }
+  
+  // ========== EDICIÓN COMPLETA DE ITEM ==========
+  
+  // Abrir modal de edición completa de item
+  const handleOpenEditItem = (item: InspectionItem) => {
+    setEditingItem(item)
+    setEditItemTitle(item.title)
+    setEditItemDescription(item.description || '')
+    setEditItemPriority(item.prioridad || '')
+    setEditItemPhotos([...item.fotos])
+    setNewPhotosForItem([])
+    setNewPhotosPreviewItem([])
+  }
+  
+  // Agregar nuevas fotos al item
+  const handleAddPhotosToItem = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
     if (files.length === 0) return
     
     // Limitar total a 5
-    const currentTotal = editingItemPhotos.length + newPhotosForEdit.length
+    const currentTotal = editItemPhotos.length + newPhotosForItem.length
     const maxNew = 5 - currentTotal
     const filesToAdd = files.slice(0, maxNew)
     
-    setNewPhotosForEdit(prev => [...prev, ...filesToAdd])
+    setNewPhotosForItem(prev => [...prev, ...filesToAdd])
     const urls = filesToAdd.map(f => URL.createObjectURL(f))
-    setNewPhotosPreview(prev => [...prev, ...urls])
+    setNewPhotosPreviewItem(prev => [...prev, ...urls])
   }
   
-  // Eliminar foto existente
-  const handleRemoveExistingPhoto = (index: number) => {
-    setEditingItemPhotos(prev => prev.filter((_, i) => i !== index))
+  // Eliminar foto existente del item
+  const handleRemoveItemPhoto = (index: number) => {
+    setEditItemPhotos(prev => prev.filter((_, i) => i !== index))
   }
   
   // Eliminar foto nueva (no guardada)
-  const handleRemoveNewPhoto = (index: number) => {
-    URL.revokeObjectURL(newPhotosPreview[index])
-    setNewPhotosForEdit(prev => prev.filter((_, i) => i !== index))
-    setNewPhotosPreview(prev => prev.filter((_, i) => i !== index))
+  const handleRemoveNewItemPhoto = (index: number) => {
+    URL.revokeObjectURL(newPhotosPreviewItem[index])
+    setNewPhotosForItem(prev => prev.filter((_, i) => i !== index))
+    setNewPhotosPreviewItem(prev => prev.filter((_, i) => i !== index))
   }
   
-  // Guardar cambios de fotos
-  const handleSavePhotos = async () => {
-    if (!activeInspection || !editingItemId) return
+  // Actualizar descripción de foto existente
+  const handleUpdatePhotoDescription = (index: number, descripcion: string) => {
+    setEditItemPhotos(prev => prev.map((p, i) => 
+      i === index ? { ...p, descripcion } : p
+    ))
+  }
+  
+  // Guardar cambios completos del item
+  const handleSaveItem = async () => {
+    if (!activeInspection || !editingItem) return
     
-    setIsSavingPhotos(true)
+    setIsSavingItem(true)
     try {
-      let finalPhotos = [...editingItemPhotos]
+      let finalPhotos: InspectionPhoto[] = [...editItemPhotos]
       
       // Subir nuevas fotos si hay
-      if (newPhotosForEdit.length > 0) {
-        const uploadedUrls = await uploadInspectionItemPhotos(
+      if (newPhotosForItem.length > 0) {
+        const uploadedPhotos = await uploadInspectionItemPhotos(
           activeInspection.id,
-          editingItemId,
-          newPhotosForEdit
+          editingItem.id,
+          newPhotosForItem
         )
-        finalPhotos = [...finalPhotos, ...uploadedUrls]
+        finalPhotos = [...finalPhotos, ...uploadedPhotos]
       }
       
       // Actualizar item en Firestore
-      await updateInspectionItem(editingItemId, { fotos: finalPhotos })
+      await updateInspectionItem(editingItem.id, {
+        title: editItemTitle.trim(),
+        description: editItemDescription.trim() || undefined,
+        prioridad: editItemPriority as InspectionItem['prioridad'] || undefined,
+        fotos: finalPhotos
+      })
       
       // Actualizar estado local
-      setInspectionItems(prev => 
-        prev.map(i => i.id === editingItemId ? { ...i, fotos: finalPhotos } : i)
-      )
+      setInspectionItems(prev => prev.map(i => 
+        i.id === editingItem.id ? {
+          ...i,
+          title: editItemTitle.trim(),
+          description: editItemDescription.trim() || undefined,
+          prioridad: editItemPriority as InspectionItem['prioridad'] || undefined,
+          fotos: finalPhotos
+        } : i
+      ))
       
-      // Cerrar modal
-      setEditingItemId(null)
-      newPhotosPreview.forEach(url => URL.revokeObjectURL(url))
-      setNewPhotosPreview([])
-      setNewPhotosForEdit([])
+      // Cerrar modal y limpiar
+      setEditingItem(null)
+      newPhotosPreviewItem.forEach(url => URL.revokeObjectURL(url))
+      setNewPhotosPreviewItem([])
+      setNewPhotosForItem([])
       
-      toast({ title: 'Fotos actualizadas' })
+      toast({ title: 'Punto actualizado' })
     } catch (error) {
-      console.error('Error saving photos:', error)
+      console.error('Error saving item:', error)
       toast({
         variant: 'destructive',
         title: 'Error',
-        description: 'No se pudieron guardar las fotos'
+        description: 'No se pudo guardar el punto'
       })
     } finally {
-      setIsSavingPhotos(false)
+      setIsSavingItem(false)
     }
   }
   
   // Abrir visor de imagen grande con zoom/pan
-  const handleViewImage = (images: string[], index: number) => {
-    setViewingImageList(images)
+  const handleViewImage = (photos: InspectionPhoto[], index: number) => {
+    const urls = photos.map(p => p.url)
+    setViewingImageList(urls)
     setViewingImageIndex(index)
-    setViewingImage(images[index] || null)
+    setViewingImage(urls[index] || null)
   }
   
   // Navegar entre imágenes
@@ -546,9 +632,22 @@ export function InspectionsPage() {
             <h1 className="text-xl font-bold flex items-center gap-2">
               <MapPin className="h-5 w-5 text-primary" />
               {activeInspection.nombre}
+              {activeInspection.status === 'en_progreso' && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0"
+                  onClick={handleOpenEditInspection}
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+              )}
             </h1>
             <p className="text-sm text-muted-foreground">
               {activeInspection.locationName} • {inspectionItems.length} puntos
+              {activeInspection.descripcion && (
+                <span className="ml-2">• {activeInspection.descripcion}</span>
+              )}
             </p>
           </div>
           <div className="flex gap-2">
@@ -657,8 +756,8 @@ export function InspectionsPage() {
                               className="aspect-square rounded overflow-hidden border hover:ring-2 ring-primary transition-all"
                             >
                               <img 
-                                src={foto} 
-                                alt={`Foto ${idx + 1}`} 
+                                src={foto.url} 
+                                alt={foto.descripcion || `Foto ${idx + 1}`} 
                                 className="w-full h-full object-cover"
                               />
                             </button>
@@ -714,7 +813,7 @@ export function InspectionsPage() {
                                     onClick={() => handleViewImage(item.fotos, idx)}
                                     className="w-10 h-10 rounded border overflow-hidden hover:ring-2 ring-primary transition-all"
                                   >
-                                    <img src={foto} alt="" className="w-full h-full object-cover" />
+                                    <img src={foto.url} alt={foto.descripcion || ''} className="w-full h-full object-cover" />
                                   </button>
                                 ))}
                                 {item.fotos.length > 3 && (
@@ -725,16 +824,16 @@ export function InspectionsPage() {
                               </div>
                             )}
                             
-                            {/* Botón de agregar/editar fotos */}
+                            {/* Botón de editar item completo */}
                             {activeInspection.status === 'en_progreso' && (
                               <Button
                                 variant="ghost"
                                 size="sm"
                                 className="h-6 px-2 mt-1 text-xs"
-                                onClick={() => handleOpenEditPhotos(item)}
+                                onClick={() => handleOpenEditItem(item)}
                               >
-                                <Camera className="h-3 w-3 mr-1" />
-                                {item.fotos.length > 0 ? `${item.fotos.length} fotos` : 'Agregar fotos'}
+                                <FileText className="h-3 w-3 mr-1" />
+                                Editar punto
                               </Button>
                             )}
                           </div>
@@ -909,60 +1008,180 @@ export function InspectionsPage() {
           </DialogContent>
         </Dialog>
         
-        {/* Modal de edición de fotos */}
-        <Dialog 
-          open={!!editingItemId} 
-          onOpenChange={(open) => {
-            if (!open) {
-              setEditingItemId(null)
-              setEditingItemPhotos([])
-              setNewPhotosForEdit([])
-              newPhotosPreview.forEach(url => URL.revokeObjectURL(url))
-              setNewPhotosPreview([])
-            }
-          }}
-        >
+        {/* Modal de edición de inspección */}
+        <Dialog open={isEditInspectionModalOpen} onOpenChange={setIsEditInspectionModalOpen}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <Camera className="h-5 w-5" />
-                Editar Fotos
+                <Pencil className="h-5 w-5" />
+                Editar Inspeccion
               </DialogTitle>
             </DialogHeader>
             
             <div className="space-y-4 py-4">
-              {/* Fotos existentes */}
-              {editingItemPhotos.length > 0 && (
-                <div className="space-y-2">
+              <div className="space-y-2">
+                <Label htmlFor="edit-inspection-name">Nombre *</Label>
+                <Input
+                  id="edit-inspection-name"
+                  value={editInspectionName}
+                  onChange={(e) => setEditInspectionName(e.target.value)}
+                  placeholder="Nombre de la inspeccion"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="edit-inspection-description">Descripcion</Label>
+                <SpeechTextarea
+                  id="edit-inspection-description"
+                  value={editInspectionDescription}
+                  onChange={(e) => setEditInspectionDescription(e.target.value)}
+                  placeholder="Descripcion de la inspeccion..."
+                  rows={3}
+                />
+              </div>
+            </div>
+            
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsEditInspectionModalOpen(false)}>
+                Cancelar
+              </Button>
+              <Button 
+                onClick={handleSaveInspection}
+                disabled={isSavingInspection || !editInspectionName.trim()}
+              >
+                {isSavingInspection && <Spinner className="h-4 w-4 mr-2" />}
+                Guardar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        
+        {/* Modal de edición completa de item */}
+        <Dialog 
+          open={!!editingItem} 
+          onOpenChange={(open) => {
+            if (!open) {
+              setEditingItem(null)
+              setEditItemTitle('')
+              setEditItemDescription('')
+              setEditItemPriority('')
+              setEditItemPhotos([])
+              setNewPhotosForItem([])
+              newPhotosPreviewItem.forEach(url => URL.revokeObjectURL(url))
+              setNewPhotosPreviewItem([])
+            }
+          }}
+        >
+          <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Editar Punto #{editingItem?.order}
+              </DialogTitle>
+            </DialogHeader>
+            
+            <div className="space-y-4 py-4">
+              {/* Título */}
+              <div className="space-y-2">
+                <Label htmlFor="edit-item-title">Titulo *</Label>
+                <Input
+                  id="edit-item-title"
+                  value={editItemTitle}
+                  onChange={(e) => setEditItemTitle(e.target.value)}
+                  placeholder="Titulo del punto"
+                />
+              </div>
+              
+              {/* Descripción */}
+              <div className="space-y-2">
+                <Label htmlFor="edit-item-description">Descripcion</Label>
+                <SpeechTextarea
+                  id="edit-item-description"
+                  value={editItemDescription}
+                  onChange={(e) => setEditItemDescription(e.target.value)}
+                  placeholder="Descripcion detallada..."
+                  rows={3}
+                />
+              </div>
+              
+              {/* Prioridad */}
+              <div className="space-y-2">
+                <Label>Prioridad</Label>
+                <Select value={editItemPriority} onValueChange={setEditItemPriority}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sin prioridad" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Sin prioridad</SelectItem>
+                    <SelectItem value="critica">
+                      <span className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-red-500" />
+                        Critica
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="alta">
+                      <span className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-orange-500" />
+                        Alta
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="media">
+                      <span className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-yellow-500" />
+                        Media
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="baja">
+                      <span className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-green-500" />
+                        Baja
+                      </span>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {/* Fotos existentes con descripción */}
+              {editItemPhotos.length > 0 && (
+                <div className="space-y-3">
                   <Label className="text-xs text-muted-foreground">Fotos actuales</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {editingItemPhotos.map((url, index) => (
-                      <div key={`existing-${index}`} className="relative w-20 h-20 rounded-lg overflow-hidden border">
+                  {editItemPhotos.map((foto, index) => (
+                    <div key={`existing-${index}`} className="flex gap-3 p-2 border rounded-lg">
+                      <div className="relative w-20 h-20 flex-shrink-0 rounded overflow-hidden">
                         <img 
-                          src={url} 
+                          src={foto.url} 
                           alt={`Foto ${index + 1}`} 
                           className="w-full h-full object-cover cursor-pointer"
-                          onClick={() => handleViewImage(editingItemPhotos, index)}
+                          onClick={() => handleViewImage(editItemPhotos, index)}
                         />
                         <button
                           type="button"
-                          onClick={() => handleRemoveExistingPhoto(index)}
+                          onClick={() => handleRemoveItemPhoto(index)}
                           className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full p-0.5"
                         >
                           <X className="h-3 w-3" />
                         </button>
                       </div>
-                    ))}
-                  </div>
+                      <div className="flex-1">
+                        <Label className="text-xs">Descripcion foto {index + 1}</Label>
+                        <Input
+                          value={foto.descripcion || ''}
+                          onChange={(e) => handleUpdatePhotoDescription(index, e.target.value)}
+                          placeholder="Descripcion de la foto..."
+                          className="mt-1 text-sm"
+                        />
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
               
               {/* Nuevas fotos */}
-              {newPhotosPreview.length > 0 && (
+              {newPhotosPreviewItem.length > 0 && (
                 <div className="space-y-2">
                   <Label className="text-xs text-muted-foreground">Nuevas fotos</Label>
                   <div className="flex flex-wrap gap-2">
-                    {newPhotosPreview.map((url, index) => (
+                    {newPhotosPreviewItem.map((url, index) => (
                       <div key={`new-${index}`} className="relative w-20 h-20 rounded-lg overflow-hidden border border-primary">
                         <img 
                           src={url} 
@@ -971,7 +1190,7 @@ export function InspectionsPage() {
                         />
                         <button
                           type="button"
-                          onClick={() => handleRemoveNewPhoto(index)}
+                          onClick={() => handleRemoveNewItemPhoto(index)}
                           className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full p-0.5"
                         >
                           <X className="h-3 w-3" />
@@ -979,35 +1198,36 @@ export function InspectionsPage() {
                       </div>
                     ))}
                   </div>
+                  <p className="text-xs text-muted-foreground">Las descripciones se pueden agregar despues de guardar</p>
                 </div>
               )}
               
-              {/* Botón agregar más */}
+              {/* Botón agregar más fotos */}
               <input
-                id="edit-photos-input"
+                id="edit-item-photos-input"
                 type="file"
                 accept="image/*"
                 multiple
-                onChange={handleAddPhotosToExisting}
+                onChange={handleAddPhotosToItem}
                 className="hidden"
               />
               
-              {(editingItemPhotos.length + newPhotosForEdit.length) < 5 && (
+              {(editItemPhotos.length + newPhotosForItem.length) < 5 && (
                 <Button
                   variant="outline"
                   className="w-full"
-                  onClick={() => document.getElementById('edit-photos-input')?.click()}
+                  onClick={() => document.getElementById('edit-item-photos-input')?.click()}
                 >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Agregar fotos ({5 - editingItemPhotos.length - newPhotosForEdit.length} disponibles)
+                  <Camera className="h-4 w-4 mr-2" />
+                  Agregar fotos ({5 - editItemPhotos.length - newPhotosForItem.length} disponibles)
                 </Button>
               )}
               
-              {editingItemPhotos.length === 0 && newPhotosForEdit.length === 0 && (
-                <div className="flex flex-col items-center justify-center py-8 text-muted-foreground border-2 border-dashed rounded-lg">
+              {editItemPhotos.length === 0 && newPhotosForItem.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-6 text-muted-foreground border-2 border-dashed rounded-lg">
                   <Camera className="h-8 w-8 mb-2 opacity-50" />
                   <p className="text-sm">Sin fotos</p>
-                  <p className="text-xs">Haz clic en el botón para agregar</p>
+                  <p className="text-xs">Haz clic en el boton para agregar</p>
                 </div>
               )}
             </div>
@@ -1016,20 +1236,19 @@ export function InspectionsPage() {
               <Button 
                 variant="outline" 
                 onClick={() => {
-                  setEditingItemId(null)
-                  setEditingItemPhotos([])
-                  setNewPhotosForEdit([])
-                  newPhotosPreview.forEach(url => URL.revokeObjectURL(url))
-                  setNewPhotosPreview([])
+                  setEditingItem(null)
+                  newPhotosPreviewItem.forEach(url => URL.revokeObjectURL(url))
+                  setNewPhotosPreviewItem([])
+                  setNewPhotosForItem([])
                 }}
               >
                 Cancelar
               </Button>
               <Button 
-                onClick={handleSavePhotos}
-                disabled={isSavingPhotos}
+                onClick={handleSaveItem}
+                disabled={isSavingItem || !editItemTitle.trim()}
               >
-                {isSavingPhotos && <Spinner className="h-4 w-4 mr-2" />}
+                {isSavingItem && <Spinner className="h-4 w-4 mr-2" />}
                 Guardar Cambios
               </Button>
             </DialogFooter>

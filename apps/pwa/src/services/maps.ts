@@ -595,12 +595,13 @@ export async function updateInspectionItem(
 
 /**
  * Subir foto para item de inspección
+ * Retorna el objeto InspectionPhoto con URL y descripción vacía
  */
 export async function uploadInspectionItemPhoto(
   itemId: string,
   inspectionId: string,
   file: File
-): Promise<string> {
+): Promise<{ url: string; descripcion: string }> {
   const compressed = await compressImage(file, 1200, 0.8)
   const ext = compressed.type.includes('webp') ? 'webp' : 'jpg'
   const photoId = generateId()
@@ -610,17 +611,21 @@ export async function uploadInspectionItemPhoto(
   await uploadBytes(storageRef, compressed)
   const url = await getDownloadURL(storageRef)
 
-  // Actualizar array de fotos
+  // Actualizar array de fotos con nuevo formato
   const item = await getDoc(doc(db, INSPECTION_ITEMS_COLLECTION, itemId))
   if (item.exists()) {
     const currentFotos = item.data().fotos || []
+    // Migrar si hay fotos antiguas (string) a nuevo formato
+    const migratedFotos = currentFotos.map((f: string | { url: string; descripcion?: string }) => 
+      typeof f === 'string' ? { url: f, descripcion: '' } : f
+    )
     await updateDoc(doc(db, INSPECTION_ITEMS_COLLECTION, itemId), {
-      fotos: [...currentFotos, url],
+      fotos: [...migratedFotos, { url, descripcion: '' }],
       updatedAt: serverTimestamp(),
     })
   }
 
-  return url
+  return { url, descripcion: '' }
 }
 
 // ============================================================
@@ -703,6 +708,16 @@ function parseInspection(doc: { id: string; data: () => Record<string, unknown> 
 
 function parseInspectionItem(doc: { id: string; data: () => Record<string, unknown> }): InspectionItem {
   const data = doc.data()
+  
+  // Migrar fotos antiguas (string[]) a nuevo formato (InspectionPhoto[])
+  const rawFotos = data.fotos as (string | { url: string; descripcion?: string })[] || []
+  const fotos = rawFotos.map(f => {
+    if (typeof f === 'string') {
+      return { url: f, descripcion: '' }
+    }
+    return f
+  })
+  
   return {
     id: doc.id,
     inspectionId: data.inspectionId as string,
@@ -711,7 +726,7 @@ function parseInspectionItem(doc: { id: string; data: () => Record<string, unkno
     position: data.position as { x: number; y: number },
     title: data.title as string,
     description: data.description as string | undefined,
-    fotos: (data.fotos as string[]) || [],
+    fotos,
     prioridad: data.prioridad as InspectionItem['prioridad'],
     incidentId: data.incidentId as string | undefined,
     createdAt: parseTimestamp(data.createdAt),
@@ -721,13 +736,14 @@ function parseInspectionItem(doc: { id: string; data: () => Record<string, unkno
 
 /**
  * Subir fotos para un item de inspección
+ * Retorna array de InspectionPhoto con URLs y descripciones vacías
  */
 export async function uploadInspectionItemPhotos(
   inspectionId: string,
   itemId: string,
   photos: File[]
-): Promise<string[]> {
-  const uploadedUrls: string[] = []
+): Promise<{ url: string; descripcion: string }[]> {
+  const uploadedPhotos: { url: string; descripcion: string }[] = []
 
   for (const photo of photos) {
     const photoId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
@@ -737,18 +753,18 @@ export async function uploadInspectionItemPhotos(
     const storageRef = ref(storage, storagePath)
     await uploadBytes(storageRef, photo)
     const url = await getDownloadURL(storageRef)
-    uploadedUrls.push(url)
+    uploadedPhotos.push({ url, descripcion: '' })
   }
 
-  // Actualizar el item con las URLs de las fotos
-  if (uploadedUrls.length > 0) {
+  // Actualizar el item con las fotos en nuevo formato
+  if (uploadedPhotos.length > 0) {
     await updateDoc(doc(db, INSPECTION_ITEMS_COLLECTION, itemId), {
-      fotos: uploadedUrls,
+      fotos: uploadedPhotos,
       updatedAt: serverTimestamp()
     })
   }
 
-  return uploadedUrls
+  return uploadedPhotos
 }
 
 /**
