@@ -482,5 +482,11 @@ service cloud.firestore {
         allow read, write: if isAuthenticated();
       }
     }
+
+    // Colección separada de items de inspección
+    match /inspectionItems/{itemId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAuthenticated();
+    }
   }
 }

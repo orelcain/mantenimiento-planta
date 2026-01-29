@@ -147,6 +147,14 @@
         { "fieldPath": "locationId", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "inspectionItems",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "inspectionId", "order": "ASCENDING" },
+        { "fieldPath": "order", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []
