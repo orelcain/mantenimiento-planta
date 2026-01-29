@@ -211,7 +211,7 @@ export function MapLocationSelector({
                 </div>
               </div>
 
-              <div className="flex-1 p-2">
+              <div className="flex-1 min-h-0 p-2">
                 <MapViewer
                   mapVersion={mapVersion}
                   editable

@@ -196,6 +196,7 @@ export function MapViewer({
     if (!hasMoved && editable && onPositionSelect) {
       const position = getClickPosition(e.clientX, e.clientY)
       if (position) {
+        console.log('📍 Marcador colocado:', position) // DEBUG
         onPositionSelect(position)
       }
     }
@@ -260,6 +261,7 @@ export function MapViewer({
         const touch = e.changedTouches[0]
         const position = getClickPosition(touch.clientX, touch.clientY)
         if (position) {
+          console.log('📍 Marcador colocado (touch):', position) // DEBUG
           onPositionSelect(position)
         }
       }
@@ -298,10 +300,13 @@ export function MapViewer({
     }
   }, [zoom, pan, imageLoaded])
 
+  // DEBUG: Log para verificar si los botones deberían mostrarse
+  console.log('🗺️ MapViewer render - pendingPosition:', pendingPosition, 'onPositionConfirm:', !!onPositionConfirm, 'onPositionCancel:', !!onPositionCancel)
+
   return (
     <div className={cn('relative flex flex-col', className)}>
       {/* Contenedor del mapa con overflow hidden */}
-      <div className="relative flex-1 overflow-hidden bg-muted rounded-lg touch-none">
+      <div className="relative flex-1 min-h-0 overflow-hidden bg-muted rounded-lg touch-none">
         {/* Controles de zoom */}
         {showControls && (
           <div className="absolute top-2 right-2 z-10 flex flex-col gap-1 bg-background/90 backdrop-blur rounded-lg p-1 shadow-md">
@@ -440,7 +445,7 @@ export function MapViewer({
 
       {/* Botones de confirmación para posición pendiente - FUERA del overflow */}
       {pendingPosition && onPositionConfirm && onPositionCancel && (
-        <div className="flex justify-center gap-2 p-3 bg-background/95 border-t">
+        <div className="shrink-0 flex justify-center gap-2 p-3 bg-background border-t rounded-b-lg">
           <Button
             variant="outline"
             size="sm"
