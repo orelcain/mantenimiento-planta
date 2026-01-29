@@ -86,6 +86,28 @@ export function MapViewer({
     setImageLoaded(false)
   }, [mapImageUrl])
 
+  // Manejar eventos táctiles con passive: false para permitir preventDefault
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+
+    const handleTouchMoveNative = (e: TouchEvent) => {
+      e.preventDefault() // Esto ahora funciona sin warning
+    }
+
+    const handleWheelNative = (e: WheelEvent) => {
+      e.preventDefault() // Prevenir scroll de la página
+    }
+
+    container.addEventListener('touchmove', handleTouchMoveNative, { passive: false })
+    container.addEventListener('wheel', handleWheelNative, { passive: false })
+
+    return () => {
+      container.removeEventListener('touchmove', handleTouchMoveNative)
+      container.removeEventListener('wheel', handleWheelNative)
+    }
+  }, [])
+
   // Calcular posición del click en coordenadas normalizadas
   const getClickPosition = useCallback((clientX: number, clientY: number) => {
     if (!containerRef.current || !imageRef.current) return null
@@ -129,7 +151,7 @@ export function MapViewer({
 
   // Zoom con wheel
   const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault()
+    // preventDefault se maneja en el listener nativo con passive: false
     const delta = e.deltaY > 0 ? 0.9 : 1.1
     setZoom((z) => Math.min(Math.max(z * delta, 0.25), 5))
   }, [])
@@ -205,7 +227,7 @@ export function MapViewer({
   }, [pan])
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    e.preventDefault() // Prevent page scroll
+    // preventDefault se maneja en el listener nativo con passive: false
     
     if (e.touches.length === 1 && isPanning) {
       // Single touch - pan
@@ -319,8 +341,8 @@ export function MapViewer({
         </div>
       )}
 
-      {/* Indicador de navegación */}
-      {editable && (
+      {/* Indicador de navegación - ocultar cuando hay marcador pendiente */}
+      {editable && !pendingPosition && (
         <div className="absolute bottom-2 left-2 z-10 bg-background/80 text-muted-foreground text-xs px-2 py-1 rounded-md flex items-center gap-1">
           <Hand className="h-3 w-3" />
           Arrastra para mover
