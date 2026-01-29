@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.38.2**
+## Versión Actual: **v2.38.3**
 
 **Fecha de lanzamiento**: 28 de enero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.38.3 - Fix undefined fields in inspectionItems (28/01/2026)
+- 🔧 Fix: Campo `markerId` ya no se envía como undefined a Firestore
+- 🔧 Fix: Campo `description` ahora tiene valor por defecto string vacío
+- 🔧 Fix: Campos opcionales solo se agregan si están definidos
 
 ### v2.38.2 - Fix Firestore rules for inspectionItems (28/01/2026)
 - 🔧 Fix: Reglas de Firestore para colección `inspectionItems` (colección independiente)

@@ -530,11 +530,30 @@ export async function addInspectionItem(
     updatedAt: now,
   }
 
-  await setDoc(doc(db, INSPECTION_ITEMS_COLLECTION, id), {
-    ...item,
+  // Crear objeto para Firestore sin campos undefined
+  const firestoreData: Record<string, unknown> = {
+    id,
+    inspectionId: data.inspectionId,
+    order: data.order,
+    position: data.position,
+    title: data.title,
+    description: data.description || '',
+    fotos: [],
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
-  })
+  }
+
+  // Solo agregar markerId si está definido
+  if (data.markerId) {
+    firestoreData.markerId = data.markerId
+  }
+
+  // Solo agregar prioridad si está definida
+  if (data.prioridad) {
+    firestoreData.prioridad = data.prioridad
+  }
+
+  await setDoc(doc(db, INSPECTION_ITEMS_COLLECTION, id), firestoreData)
 
   return item
 }
