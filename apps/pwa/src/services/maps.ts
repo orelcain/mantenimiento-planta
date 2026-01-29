@@ -64,7 +64,7 @@ export async function createMapLocation(
   const location: MapLocation = {
     id,
     nombre: data.nombre,
-    descripcion: data.descripcion,
+    descripcion: data.descripcion || '', // Firestore no acepta undefined
     activo: true,
     orden: maxOrden + 1,
     createdAt: now,
@@ -176,7 +176,7 @@ export async function uploadMapVersion(
     imageUrl,
     imagePath: storagePath,
     version: nextVersion,
-    descripcion,
+    descripcion: descripcion || '', // Firestore no acepta undefined
     width: dimensions.width,
     height: dimensions.height,
     uploadedBy: userId,
@@ -398,11 +398,11 @@ export async function createInspection(
   const inspection: Inspection = {
     id,
     nombre: data.nombre,
-    descripcion: data.descripcion,
+    descripcion: data.descripcion || '', // Firestore no acepta undefined
     locationId: data.locationId,
     locationName: data.locationName,
     mapVersionId: data.mapVersionId,
-    motivoInspeccion: data.motivoInspeccion,
+    motivoInspeccion: data.motivoInspeccion || '', // Firestore no acepta undefined
     status: 'en_progreso',
     totalMarkers: 0,
     totalItems: 0,

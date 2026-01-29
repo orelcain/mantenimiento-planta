@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.37.1**
+## Versión Actual: **v2.37.2**
 
 **Fecha de lanzamiento**: 28 de enero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,10 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.37.2 - Fix undefined fields in Firestore (28/01/2026)
+- 🔧 Fix: Campos `descripcion` y `motivoInspeccion` no pueden ser `undefined` en Firestore
+- 🔧 Fix: Valores por defecto string vacío para campos opcionales al crear ubicación/versión/inspección
 
 ### v2.37.1 - Firestore Rules for Maps System (28/01/2026)
 - **Fix**: Agregadas reglas de Firestore para colecciones `mapLocations`, `mapVersions`, `mapMarkers` e `inspections`
