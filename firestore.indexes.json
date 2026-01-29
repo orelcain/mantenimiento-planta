@@ -121,7 +121,6 @@
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "locationId", "order": "ASCENDING" },
-        { "fieldPath": "activo", "order": "ASCENDING" },
         { "fieldPath": "version", "order": "DESCENDING" }
       ]
     },

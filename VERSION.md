@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.37.3**
+## Versión Actual: **v2.37.4**
 
 **Fecha de lanzamiento**: 28 de enero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,10 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.37.4 - Fix Firestore index for mapVersions (28/01/2026)
+- 🔧 Fix: Índice de Firestore corregido para `mapVersions` (locationId + version DESC)
+- 🛠️ Deploy: Índices de Firestore desplegados a Firebase
 
 ### v2.37.3 - Fix Storage rules for maps upload (28/01/2026)
 - 🔧 Fix: Reglas de Storage para mapas con estructura de subcarpetas `/maps/{locationId}/{fileName}`
