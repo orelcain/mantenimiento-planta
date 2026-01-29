@@ -629,35 +629,102 @@ async function exportInspectionLandscapePDF(
 
   const pageWidth = doc.internal.pageSize.getWidth() // ~297mm en landscape
   const pageHeight = doc.internal.pageSize.getHeight() // ~210mm en landscape
-  const margin = 10
+  const margin = 12
+  let yPosition = margin
 
-  // ===== PÁGINA 1: MAPA EN PÁGINA COMPLETA =====
+  // ===== PÁGINA 1: MAPA EN PÁGINA COMPLETA CON INFO =====
   
-  // Título pequeño en la parte superior
-  doc.setFontSize(14)
+  // Encabezado mejorado
+  doc.setFontSize(20)
   doc.setFont('helvetica', 'bold')
-  doc.text(inspection.nombre, pageWidth / 2, margin + 5, { align: 'center' })
-  
+  doc.setTextColor(41, 128, 185)
+  doc.text(inspection.nombre, margin, yPosition)
+  doc.setTextColor(0)
+  yPosition += 8
+
+  // Línea decorativa
+  doc.setDrawColor(41, 128, 185)
+  doc.setLineWidth(1)
+  doc.line(margin, yPosition, pageWidth - margin, yPosition)
+  yPosition += 5
+
+  // Información en dos columnas
   doc.setFontSize(9)
   doc.setFont('helvetica', 'normal')
-  doc.setTextColor(100)
-  doc.text(
-    `${inspection.locationName} • ${items.length} puntos • ${formatDate(inspection.createdAt)}`,
-    pageWidth / 2, 
-    margin + 11, 
-    { align: 'center' }
-  )
+  
+  // Columna izquierda - Información general
+  const leftColX = margin
+  const rightColX = pageWidth / 2
+  
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor(50)
+  doc.text('INFORMACIÓN GENERAL', leftColX, yPosition)
+  doc.setFont('helvetica', 'normal')
   doc.setTextColor(0)
-
-  // Generar mapa con marcadores - tamaño grande para landscape
-  const mapMaxWidth = pageWidth - (margin * 2) // Casi toda la página
-  const mapMaxHeight = pageHeight - 35 // Dejar espacio para título y footer
+  yPosition += 6
+  
+  const infoLines = [
+    `Ubicación: ${inspection.locationName}`,
+    `Fecha: ${formatDate(inspection.createdAt)}`,
+    `Total de puntos: ${items.length}`,
+    `Estado: ${inspection.status === 'finalizado' ? 'Finalizado' : 'En Progreso'}`,
+    inspection.createdByName ? `Realizado por: ${inspection.createdByName}` : '',
+    inspection.motivoInspeccion ? `Motivo: ${inspection.motivoInspeccion}` : ''
+  ].filter(l => l)
+  
+  for (const line of infoLines) {
+    doc.text(line, leftColX, yPosition)
+    yPosition += 5
+  }
+  
+  // Contar por prioridad
+  const countByPriority: Record<string, number> = {
+    critica: 0,
+    alta: 0,
+    media: 0,
+    baja: 0,
+    sin_prioridad: 0
+  }
+  
+  for (const item of items) {
+    const key = item.prioridad || 'sin_prioridad'
+    countByPriority[key] = (countByPriority[key] || 0) + 1
+  }
+  
+  yPosition += 3
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor(50)
+  doc.text('RESUMEN POR PRIORIDAD', leftColX, yPosition)
+  doc.setFont('helvetica', 'normal')
+  doc.setTextColor(0)
+  yPosition += 5
+  
+  const priorityLabels: Record<string, string> = {
+    critica: 'Crítica',
+    alta: 'Alta',
+    media: 'Media',
+    baja: 'Baja',
+    sin_prioridad: 'Sin definir'
+  }
+  
+  for (const [key, count] of Object.entries(countByPriority)) {
+    if (count > 0) {
+      const label = `${priorityLabels[key]}: ${count}`
+      doc.text(label, leftColX, yPosition)
+      yPosition += 4
+    }
+  }
+  
+  // Mapa en el lado derecho (más pequeño)
+  const mapStartY = margin + 8
+  const mapMaxWidth = pageWidth - rightColX - margin // Lado derecho
+  const mapMaxHeight = pageHeight - mapStartY - margin - 15 // Menos altura
   
   try {
     const mapWithMarkers = await generateMapWithMarkers(
       mapVersion.imageUrl,
       items,
-      2000 // Mayor resolución para página grande
+      1500
     )
     
     // Calcular dimensiones manteniendo aspecto
@@ -671,16 +738,15 @@ async function exportInspectionLandscapePDF(
       mapWidth = mapHeight * aspectRatio
     }
     
-    // Centrar horizontalmente
-    const mapX = margin + (mapMaxWidth - mapWidth) / 2
-    const mapY = 20 // Después del título
+    // Posicionar mapa a la derecha
+    const mapX = rightColX
     
-    doc.addImage(mapWithMarkers, 'JPEG', mapX, mapY, mapWidth, mapHeight)
+    doc.addImage(mapWithMarkers, 'JPEG', mapX, mapStartY, mapWidth, mapHeight)
     
   } catch (error) {
     console.error('Error generando mapa landscape:', error)
     doc.setFontSize(12)
-    doc.text('Error al cargar el mapa', pageWidth / 2, pageHeight / 2, { align: 'center' })
+    doc.text('Error al cargar el mapa', rightColX + 20, pageHeight / 2, { align: 'center' })
   }
 
   // Footer de página 1
@@ -689,7 +755,7 @@ async function exportInspectionLandscapePDF(
   doc.text(
     `Generado: ${new Date().toLocaleString('es-CL')}`,
     margin,
-    pageHeight - 5
+    pageHeight - 8
   )
   doc.setTextColor(0)
 
@@ -697,7 +763,8 @@ async function exportInspectionLandscapePDF(
   doc.addPage('a4', 'portrait') // Volver a portrait para la tabla
   
   const tablePageWidth = doc.internal.pageSize.getWidth()
-  let yPosition = margin
+  const tableMargin = 15
+  yPosition = tableMargin
 
   // Encabezado
   doc.setFontSize(16)
@@ -713,7 +780,7 @@ async function exportInspectionLandscapePDF(
   // Línea decorativa
   doc.setDrawColor(41, 128, 185)
   doc.setLineWidth(0.5)
-  doc.line(margin, yPosition, tablePageWidth - margin, yPosition)
+  doc.line(tableMargin, yPosition, tablePageWidth - tableMargin, yPosition)
   yPosition += 8
 
   // Tabla de puntos
@@ -746,7 +813,7 @@ async function exportInspectionLandscapePDF(
       3: { cellWidth: 25, halign: 'center' },
       4: { cellWidth: 25, halign: 'center' },
     },
-    margin: { left: margin, right: margin },
+    margin: { left: tableMargin, right: tableMargin },
   })
 
   // ===== PÁGINAS DE FOTOS: Agrupadas por marcador =====
@@ -757,8 +824,9 @@ async function exportInspectionLandscapePDF(
       doc.addPage('a4', 'portrait')
       const photoPageWidth = doc.internal.pageSize.getWidth()
       const photoPageHeight = doc.internal.pageSize.getHeight()
-      const contentWidth = photoPageWidth - (margin * 2)
-      let photoYPosition = margin
+      const photoMargin = 15
+      const contentWidth = photoPageWidth - (photoMargin * 2)
+      let photoYPosition = photoMargin
       
       // Título de sección
       doc.setFontSize(16)
@@ -776,24 +844,24 @@ async function exportInspectionLandscapePDF(
       // Iterar por cada punto con fotos
       for (const item of itemsWithPhotos) {
         // Verificar espacio para título + al menos 1 foto
-        if (photoYPosition + 55 > photoPageHeight - margin) {
+        if (photoYPosition + 55 > photoPageHeight - photoMargin) {
           doc.addPage('a4', 'portrait')
-          photoYPosition = margin
+          photoYPosition = photoMargin
         }
         
         // Número de marcador (círculo)
         doc.setFillColor(41, 128, 185)
-        doc.circle(margin + 5, photoYPosition + 3, 4, 'F')
+        doc.circle(photoMargin + 5, photoYPosition + 3, 4, 'F')
         doc.setTextColor(255)
         doc.setFontSize(8)
         doc.setFont('helvetica', 'bold')
-        doc.text(item.order.toString(), margin + 5, photoYPosition + 4, { align: 'center' })
+        doc.text(item.order.toString(), photoMargin + 5, photoYPosition + 4, { align: 'center' })
         doc.setTextColor(0)
         
         // Título del punto
         doc.setFontSize(12)
         doc.setFont('helvetica', 'bold')
-        doc.text(item.title, margin + 14, photoYPosition + 5)
+        doc.text(item.title, photoMargin + 14, photoYPosition + 5)
         photoYPosition += 10
         
         // Descripción (si existe)
@@ -802,7 +870,7 @@ async function exportInspectionLandscapePDF(
           doc.setFont('helvetica', 'italic')
           doc.setTextColor(100)
           const descLines = doc.splitTextToSize(item.description, contentWidth - 10)
-          doc.text(descLines.slice(0, 2), margin + 14, photoYPosition)
+          doc.text(descLines.slice(0, 2), photoMargin + 14, photoYPosition)
           photoYPosition += Math.min(descLines.length, 2) * 4 + 2
           doc.setTextColor(0)
         }
@@ -810,14 +878,14 @@ async function exportInspectionLandscapePDF(
         // Fotos del punto (hasta 4 por punto, 2 por fila)
         const photoWidth = (contentWidth - 15) / 2
         const photoHeight = 50
-        let photoXPos = margin
+        let photoXPos = photoMargin
         
         for (let i = 0; i < Math.min(item.fotos.length, 4); i++) {
           // Verificar espacio
-          if (photoYPosition + photoHeight > photoPageHeight - margin) {
+          if (photoYPosition + photoHeight > photoPageHeight - photoMargin) {
             doc.addPage('a4', 'portrait')
-            photoYPosition = margin
-            photoXPos = margin
+            photoYPosition = photoMargin
+            photoXPos = photoMargin
           }
           
           try {
@@ -840,16 +908,15 @@ async function exportInspectionLandscapePDF(
             
             // Alternar posición
             if (i % 2 === 0) {
-              photoXPos = margin + photoWidth + 15
+              photoXPos = photoMargin + photoWidth + 15
             } else {
-              photoXPos = margin
+              photoXPos = photoMargin
               photoYPosition += photoHeight + 8
             }
           } catch (err) {
             console.error(`Error cargando foto ${i + 1} del punto ${item.order}:`, err)
           }
         }
-        
         // Si terminó en columna impar, mover a siguiente fila
         if (item.fotos.length % 2 !== 0) {
           photoYPosition += photoHeight + 8
@@ -861,7 +928,7 @@ async function exportInspectionLandscapePDF(
         // Línea separadora
         doc.setDrawColor(220)
         doc.setLineWidth(0.3)
-        doc.line(margin, photoYPosition - 5, photoPageWidth - margin, photoYPosition - 5)
+        doc.line(photoMargin, photoYPosition - 5, photoPageWidth - photoMargin, photoYPosition - 5)
       }
     }
   }
@@ -878,7 +945,7 @@ async function exportInspectionLandscapePDF(
     
     doc.text(
       `Página ${i} de ${pageCount}`,
-      currentPageWidth - margin,
+      currentPageWidth - 12,
       currentPageHeight - 5,
       { align: 'right' }
     )

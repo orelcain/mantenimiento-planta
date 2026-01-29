@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.41.1**
+## Versión Actual: **v2.41.2**
 
 **Fecha de lanzamiento**: 29 de enero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,14 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.41.2 - Improved PDF Landscape Layout (29/01/2026)
+- 🎨 UX: Nuevo layout de dos columnas en primera página landscape
+- 🎨 UX: Información general visible en la izquierda con resumen de prioridades
+- 🎨 UX: Mapa reducido a la derecha para mejor proporción
+- 🎨 UX: Encabezado mejorado con línea decorativa
+- 🔧 Fix: Mejor aprovechamiento del espacio en página landscape
+- 🔧 Fix: Texto completamente legible sin sobreposición
 
 ### v2.41.1 - PDF Photos Keep Aspect Ratio (29/01/2026)
 - 🐛 Fix: Fotos en PDF ahora mantienen su relación de aspecto original
