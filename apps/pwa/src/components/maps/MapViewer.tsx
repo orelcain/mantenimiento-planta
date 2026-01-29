@@ -299,15 +299,17 @@ export function MapViewer({
   }, [zoom, pan, imageLoaded])
 
   return (
-    <div className={cn('relative overflow-hidden bg-muted rounded-lg touch-none', className)}>
-      {/* Controles de zoom */}
-      {showControls && (
-        <div className="absolute top-2 right-2 z-10 flex flex-col gap-1 bg-background/90 backdrop-blur rounded-lg p-1 shadow-md">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onClick={handleZoomIn}
+    <div className={cn('relative flex flex-col', className)}>
+      {/* Contenedor del mapa con overflow hidden */}
+      <div className="relative flex-1 overflow-hidden bg-muted rounded-lg touch-none">
+        {/* Controles de zoom */}
+        {showControls && (
+          <div className="absolute top-2 right-2 z-10 flex flex-col gap-1 bg-background/90 backdrop-blur rounded-lg p-1 shadow-md">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={handleZoomIn}
             title="Acercar"
           >
             <ZoomIn className="h-4 w-4" />
@@ -434,10 +436,11 @@ export function MapViewer({
           </div>
         )}
       </div>
+      </div>
 
-      {/* Botones de confirmación para posición pendiente */}
+      {/* Botones de confirmación para posición pendiente - FUERA del overflow */}
       {pendingPosition && onPositionConfirm && onPositionCancel && (
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex gap-2 bg-background/95 backdrop-blur p-2 rounded-lg shadow-lg">
+        <div className="flex justify-center gap-2 p-3 bg-background/95 border-t">
           <Button
             variant="outline"
             size="sm"
@@ -450,18 +453,11 @@ export function MapViewer({
           <Button
             size="sm"
             onClick={onPositionConfirm}
-            className="gap-1"
+            className="gap-1 bg-primary"
           >
             <Check className="h-4 w-4" />
             Confirmar Posición
           </Button>
-        </div>
-      )}
-
-      {/* Indicador de zoom */}
-      {showControls && zoom !== 1 && (
-        <div className="absolute bottom-2 right-2 bg-background/80 text-xs px-2 py-1 rounded">
-          {Math.round(zoom * 100)}%
         </div>
       )}
     </div>

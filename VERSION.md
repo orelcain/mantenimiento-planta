@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.37.6**
+## Versión Actual: **v2.37.7**
 
 **Fecha de lanzamiento**: 28 de enero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.37.7 - Fix confirmation buttons visibility (28/01/2026)
+- 🔧 Fix: Botones "Modificar" y "Confirmar Posición" ahora visibles al colocar marcador
+- 🎨 UX: Botones movidos fuera del contenedor con overflow para garantizar visibilidad
+- 🎨 UX: Barra de botones ahora aparece en la parte inferior del mapa
 
 ### v2.37.6 - Fix passive event listener warnings (28/01/2026)
 - 🔧 Fix: Resueltos warnings "Unable to preventDefault inside passive event listener"
