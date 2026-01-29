@@ -5,7 +5,7 @@
  * Ideal para levantamientos masivos de incidencias en una sola sesión.
  */
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { 
   MapPin, 
   Plus, 
@@ -17,8 +17,14 @@ import {
   Download,
   CheckCircle2,
   Image,
-  X
+  X,
+  ZoomIn,
+  ZoomOut,
+  ChevronLeft,
+  ChevronRight,
+  RotateCcw
 } from 'lucide-react'
+import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch'
 import { 
   Button, 
   Card, 
@@ -53,7 +59,8 @@ import {
   getMapLocations,
   getLatestMapVersion,
   getMapVersionById,
-  uploadInspectionItemPhotos
+  uploadInspectionItemPhotos,
+  updateInspectionItem
 } from '@/services/maps'
 import { MapViewer } from '@/components/maps'
 import { exportInspectionToPDF } from '@/utils/maps'
@@ -99,6 +106,22 @@ export function InspectionsPage() {
   // Modal de opciones PDF
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false)
   const [pdfLayout, setPdfLayout] = useState<'portrait' | 'landscape-full'>('portrait')
+  
+  // Modal de edición de fotos de un item existente
+  const [editingItemId, setEditingItemId] = useState<string | null>(null)
+  const [editingItemPhotos, setEditingItemPhotos] = useState<string[]>([])
+  const [newPhotosForEdit, setNewPhotosForEdit] = useState<File[]>([])
+  const [newPhotosPreview, setNewPhotosPreview] = useState<string[]>([])
+  const [isSavingPhotos, setIsSavingPhotos] = useState(false)
+  
+  // Modal de imagen grande con zoom/pan
+  const [viewingImage, setViewingImage] = useState<string | null>(null)
+  const [viewingImageIndex, setViewingImageIndex] = useState(0)
+  const [viewingImageList, setViewingImageList] = useState<string[]>([])
+  
+  // Popup de información del marcador en el mapa
+  const [selectedMarker, setSelectedMarker] = useState<InspectionItem | null>(null)
+  const mapContainerRef = useRef<HTMLDivElement>(null)
   
   // Cargar inspecciones y ubicaciones al montar
   useEffect(() => {
@@ -309,6 +332,127 @@ export function InspectionsPage() {
     }
   }
   
+  // Abrir modal de edición de fotos para un item existente
+  const handleOpenEditPhotos = (item: InspectionItem) => {
+    setEditingItemId(item.id)
+    setEditingItemPhotos([...item.fotos])
+    setNewPhotosForEdit([])
+    setNewPhotosPreview([])
+  }
+  
+  // Agregar nuevas fotos al item existente
+  const handleAddPhotosToExisting = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    if (files.length === 0) return
+    
+    // Limitar total a 5
+    const currentTotal = editingItemPhotos.length + newPhotosForEdit.length
+    const maxNew = 5 - currentTotal
+    const filesToAdd = files.slice(0, maxNew)
+    
+    setNewPhotosForEdit(prev => [...prev, ...filesToAdd])
+    const urls = filesToAdd.map(f => URL.createObjectURL(f))
+    setNewPhotosPreview(prev => [...prev, ...urls])
+  }
+  
+  // Eliminar foto existente
+  const handleRemoveExistingPhoto = (index: number) => {
+    setEditingItemPhotos(prev => prev.filter((_, i) => i !== index))
+  }
+  
+  // Eliminar foto nueva (no guardada)
+  const handleRemoveNewPhoto = (index: number) => {
+    URL.revokeObjectURL(newPhotosPreview[index])
+    setNewPhotosForEdit(prev => prev.filter((_, i) => i !== index))
+    setNewPhotosPreview(prev => prev.filter((_, i) => i !== index))
+  }
+  
+  // Guardar cambios de fotos
+  const handleSavePhotos = async () => {
+    if (!activeInspection || !editingItemId) return
+    
+    setIsSavingPhotos(true)
+    try {
+      let finalPhotos = [...editingItemPhotos]
+      
+      // Subir nuevas fotos si hay
+      if (newPhotosForEdit.length > 0) {
+        const uploadedUrls = await uploadInspectionItemPhotos(
+          activeInspection.id,
+          editingItemId,
+          newPhotosForEdit
+        )
+        finalPhotos = [...finalPhotos, ...uploadedUrls]
+      }
+      
+      // Actualizar item en Firestore
+      await updateInspectionItem(editingItemId, { fotos: finalPhotos })
+      
+      // Actualizar estado local
+      setInspectionItems(prev => 
+        prev.map(i => i.id === editingItemId ? { ...i, fotos: finalPhotos } : i)
+      )
+      
+      // Cerrar modal
+      setEditingItemId(null)
+      newPhotosPreview.forEach(url => URL.revokeObjectURL(url))
+      setNewPhotosPreview([])
+      setNewPhotosForEdit([])
+      
+      toast({ title: 'Fotos actualizadas' })
+    } catch (error) {
+      console.error('Error saving photos:', error)
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'No se pudieron guardar las fotos'
+      })
+    } finally {
+      setIsSavingPhotos(false)
+    }
+  }
+  
+  // Abrir visor de imagen grande con zoom/pan
+  const handleViewImage = (images: string[], index: number) => {
+    setViewingImageList(images)
+    setViewingImageIndex(index)
+    setViewingImage(images[index] || null)
+  }
+  
+  // Navegar entre imágenes
+  const handlePrevImage = () => {
+    const newIndex = viewingImageIndex > 0 ? viewingImageIndex - 1 : viewingImageList.length - 1
+    setViewingImageIndex(newIndex)
+    setViewingImage(viewingImageList[newIndex] || null)
+  }
+  
+  const handleNextImage = () => {
+    const newIndex = viewingImageIndex < viewingImageList.length - 1 ? viewingImageIndex + 1 : 0
+    setViewingImageIndex(newIndex)
+    setViewingImage(viewingImageList[newIndex] || null)
+  }
+  
+  // Handler para click en marcador del mapa
+  const handleMarkerClick = useCallback((marker: { id: string }) => {
+    const item = inspectionItems.find(i => i.id === marker.id)
+    if (item) {
+      setSelectedMarker(item)
+    }
+  }, [inspectionItems])
+  
+  // Cerrar popup al hacer click fuera
+  const handleMapContainerClick = useCallback((e: React.MouseEvent) => {
+    // Solo cerrar si el click es directamente en el contenedor, no en el popup
+    if (selectedMarker && e.target === e.currentTarget) {
+      setSelectedMarker(null)
+    }
+  }, [selectedMarker])
+  
+  // Abrir foto del popup en visor con zoom
+  const handlePopupPhotoClick = (item: InspectionItem, photoIndex: number) => {
+    handleViewImage(item.fotos, photoIndex)
+  }
+  
   // Finalizar inspección
   const handleFinalizeInspection = async () => {
     if (!activeInspection || inspectionItems.length === 0) return
@@ -429,7 +573,7 @@ export function InspectionsPage() {
         </div>
         
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {/* Mapa */}
+          {/* Mapa con popup de marcador */}
           <div className="lg:col-span-2">
             <Card>
               <CardHeader className="py-3">
@@ -447,7 +591,7 @@ export function InspectionsPage() {
                   )}
                 </CardTitle>
               </CardHeader>
-              <CardContent className="p-0">
+              <CardContent className="p-0 relative" ref={mapContainerRef} onClick={handleMapContainerClick}>
                 <MapViewer
                   imageUrl={activeMapVersion.imageUrl}
                   markers={inspectionItems.map(item => ({
@@ -458,8 +602,74 @@ export function InspectionsPage() {
                   }))}
                   editable={activeInspection.status === 'en_progreso'}
                   onPositionSelect={handleMapClick}
+                  onMarkerClick={handleMarkerClick}
+                  selectedMarkerId={selectedMarker?.id}
                   className="h-[500px] rounded-b-lg"
                 />
+                
+                {/* Popup de información del marcador */}
+                {selectedMarker && (
+                  <div 
+                    className="absolute z-20 bg-background border rounded-lg shadow-xl p-3 max-w-xs animate-in fade-in zoom-in-95 duration-200"
+                    style={{ 
+                      left: '50%', 
+                      top: '50%', 
+                      transform: 'translate(-50%, -50%)'
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {/* Header del popup */}
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold shrink-0">
+                          {selectedMarker.order}
+                        </div>
+                        <h3 className="font-semibold text-sm line-clamp-2">{selectedMarker.title}</h3>
+                      </div>
+                      <button 
+                        onClick={() => setSelectedMarker(null)}
+                        className="text-muted-foreground hover:text-foreground p-1 -mr-1 -mt-1"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                    
+                    {/* Descripción */}
+                    {selectedMarker.description && (
+                      <p className="text-xs text-muted-foreground mb-2 line-clamp-3">
+                        {selectedMarker.description}
+                      </p>
+                    )}
+                    
+                    {/* Fotos del marcador */}
+                    {selectedMarker.fotos.length > 0 ? (
+                      <div className="space-y-2">
+                        <p className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Camera className="h-3 w-3" />
+                          {selectedMarker.fotos.length} foto{selectedMarker.fotos.length > 1 ? 's' : ''} - Click para ampliar
+                        </p>
+                        <div className="grid grid-cols-3 gap-1">
+                          {selectedMarker.fotos.slice(0, 6).map((foto, idx) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => handlePopupPhotoClick(selectedMarker, idx)}
+                              className="aspect-square rounded overflow-hidden border hover:ring-2 ring-primary transition-all"
+                            >
+                              <img 
+                                src={foto} 
+                                alt={`Foto ${idx + 1}`} 
+                                className="w-full h-full object-cover"
+                              />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground italic">Sin fotos adjuntas</p>
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -492,6 +702,40 @@ export function InspectionsPage() {
                             <p className="font-medium text-sm truncate">{item.title}</p>
                             {item.description && (
                               <p className="text-xs text-muted-foreground line-clamp-2">{item.description}</p>
+                            )}
+                            
+                            {/* Thumbnails de fotos */}
+                            {item.fotos.length > 0 && (
+                              <div className="flex gap-1 mt-2 flex-wrap">
+                                {item.fotos.slice(0, 3).map((foto, idx) => (
+                                  <button
+                                    key={idx}
+                                    type="button"
+                                    onClick={() => handleViewImage(item.fotos, idx)}
+                                    className="w-10 h-10 rounded border overflow-hidden hover:ring-2 ring-primary transition-all"
+                                  >
+                                    <img src={foto} alt="" className="w-full h-full object-cover" />
+                                  </button>
+                                ))}
+                                {item.fotos.length > 3 && (
+                                  <div className="w-10 h-10 rounded border flex items-center justify-center bg-muted text-xs font-medium">
+                                    +{item.fotos.length - 3}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                            
+                            {/* Botón de agregar/editar fotos */}
+                            {activeInspection.status === 'en_progreso' && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 px-2 mt-1 text-xs"
+                                onClick={() => handleOpenEditPhotos(item)}
+                              >
+                                <Camera className="h-3 w-3 mr-1" />
+                                {item.fotos.length > 0 ? `${item.fotos.length} fotos` : 'Agregar fotos'}
+                              </Button>
                             )}
                           </div>
                           {activeInspection.status === 'en_progreso' && (
@@ -662,6 +906,264 @@ export function InspectionsPage() {
                 Generar PDF
               </Button>
             </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        
+        {/* Modal de edición de fotos */}
+        <Dialog 
+          open={!!editingItemId} 
+          onOpenChange={(open) => {
+            if (!open) {
+              setEditingItemId(null)
+              setEditingItemPhotos([])
+              setNewPhotosForEdit([])
+              newPhotosPreview.forEach(url => URL.revokeObjectURL(url))
+              setNewPhotosPreview([])
+            }
+          }}
+        >
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Camera className="h-5 w-5" />
+                Editar Fotos
+              </DialogTitle>
+            </DialogHeader>
+            
+            <div className="space-y-4 py-4">
+              {/* Fotos existentes */}
+              {editingItemPhotos.length > 0 && (
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Fotos actuales</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {editingItemPhotos.map((url, index) => (
+                      <div key={`existing-${index}`} className="relative w-20 h-20 rounded-lg overflow-hidden border">
+                        <img 
+                          src={url} 
+                          alt={`Foto ${index + 1}`} 
+                          className="w-full h-full object-cover cursor-pointer"
+                          onClick={() => handleViewImage(editingItemPhotos, index)}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveExistingPhoto(index)}
+                          className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full p-0.5"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Nuevas fotos */}
+              {newPhotosPreview.length > 0 && (
+                <div className="space-y-2">
+                  <Label className="text-xs text-muted-foreground">Nuevas fotos</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {newPhotosPreview.map((url, index) => (
+                      <div key={`new-${index}`} className="relative w-20 h-20 rounded-lg overflow-hidden border border-primary">
+                        <img 
+                          src={url} 
+                          alt={`Nueva foto ${index + 1}`} 
+                          className="w-full h-full object-cover"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveNewPhoto(index)}
+                          className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full p-0.5"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Botón agregar más */}
+              <input
+                id="edit-photos-input"
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={handleAddPhotosToExisting}
+                className="hidden"
+              />
+              
+              {(editingItemPhotos.length + newPhotosForEdit.length) < 5 && (
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => document.getElementById('edit-photos-input')?.click()}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Agregar fotos ({5 - editingItemPhotos.length - newPhotosForEdit.length} disponibles)
+                </Button>
+              )}
+              
+              {editingItemPhotos.length === 0 && newPhotosForEdit.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-8 text-muted-foreground border-2 border-dashed rounded-lg">
+                  <Camera className="h-8 w-8 mb-2 opacity-50" />
+                  <p className="text-sm">Sin fotos</p>
+                  <p className="text-xs">Haz clic en el botón para agregar</p>
+                </div>
+              )}
+            </div>
+            
+            <DialogFooter>
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setEditingItemId(null)
+                  setEditingItemPhotos([])
+                  setNewPhotosForEdit([])
+                  newPhotosPreview.forEach(url => URL.revokeObjectURL(url))
+                  setNewPhotosPreview([])
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button 
+                onClick={handleSavePhotos}
+                disabled={isSavingPhotos}
+              >
+                {isSavingPhotos && <Spinner className="h-4 w-4 mr-2" />}
+                Guardar Cambios
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        
+        {/* Visor de imagen grande con zoom/pan */}
+        <Dialog 
+          open={!!viewingImage} 
+          onOpenChange={(open) => {
+            if (!open) {
+              setViewingImage(null)
+              setViewingImageIndex(0)
+              setViewingImageList([])
+            }
+          }}
+        >
+          <DialogContent className="max-w-4xl p-0 overflow-hidden bg-black/95">
+            <div className="relative h-[85vh] flex flex-col">
+              {/* Controles superiores */}
+              <div className="absolute top-2 right-2 z-20 flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 bg-black/50 text-white hover:bg-black/70"
+                  onClick={() => {
+                    setViewingImage(null)
+                    setViewingImageIndex(0)
+                    setViewingImageList([])
+                  }}
+                >
+                  <X className="h-5 w-5" />
+                </Button>
+              </div>
+              
+              {/* Área de imagen con zoom/pan */}
+              {viewingImage && (
+                <TransformWrapper
+                  key={viewingImage} // Reset al cambiar de imagen
+                  initialScale={1}
+                  minScale={0.5}
+                  maxScale={5}
+                  wheel={{ step: 0.1 }}
+                  pinch={{ step: 5 }}
+                  doubleClick={{ mode: 'toggle' }}
+                >
+                  {({ zoomIn, zoomOut, resetTransform }) => (
+                    <>
+                      {/* Controles de zoom */}
+                      <div className="absolute top-2 left-2 z-20 flex items-center gap-1 bg-black/50 rounded-lg p-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-white hover:bg-black/50"
+                          onClick={() => zoomIn()}
+                          title="Acercar"
+                        >
+                          <ZoomIn className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-white hover:bg-black/50"
+                          onClick={() => zoomOut()}
+                          title="Alejar"
+                        >
+                          <ZoomOut className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-white hover:bg-black/50"
+                          onClick={() => resetTransform()}
+                          title="Restablecer"
+                        >
+                          <RotateCcw className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      
+                      {/* Contenedor de la imagen */}
+                      <TransformComponent
+                        wrapperStyle={{ 
+                          width: '100%', 
+                          height: '100%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                        contentStyle={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                      >
+                        <img 
+                          src={viewingImage} 
+                          alt="Foto ampliada" 
+                          className="max-w-full max-h-[80vh] object-contain select-none"
+                          draggable={false}
+                        />
+                      </TransformComponent>
+                    </>
+                  )}
+                </TransformWrapper>
+              )}
+              
+              {/* Navegación entre imágenes */}
+              {viewingImageList.length > 1 && (
+                <>
+                  <button
+                    onClick={handlePrevImage}
+                    className="absolute left-2 top-1/2 -translate-y-1/2 z-20 bg-black/50 text-white rounded-full p-3 hover:bg-black/70 transition-colors"
+                  >
+                    <ChevronLeft className="h-6 w-6" />
+                  </button>
+                  <button
+                    onClick={handleNextImage}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 z-20 bg-black/50 text-white rounded-full p-3 hover:bg-black/70 transition-colors"
+                  >
+                    <ChevronRight className="h-6 w-6" />
+                  </button>
+                  
+                  {/* Indicador de posición */}
+                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 bg-black/50 text-white px-4 py-2 rounded-full text-sm">
+                    {viewingImageIndex + 1} / {viewingImageList.length}
+                  </div>
+                </>
+              )}
+              
+              {/* Instrucciones */}
+              <div className="absolute bottom-4 right-4 z-20 text-white/60 text-xs hidden sm:block">
+                Scroll o pellizcar para zoom • Arrastrar para mover • Doble click para alternar
+              </div>
+            </div>
           </DialogContent>
         </Dialog>
       </div>

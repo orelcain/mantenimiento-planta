@@ -1,14 +1,39 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.37.7**
+## Versión Actual: **v2.41.0**
 
-**Fecha de lanzamiento**: 28 de enero de 2026  \
+**Fecha de lanzamiento**: 29 de enero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
 **Build**: ✅ Stable
 
 ---
 
 ## 📋 Información de la Versión
+
+### v2.41.0 - Interactive Marker Popup & Zoom Image Viewer (29/01/2026)
+- ✨ Feat: Popup interactivo al hacer click en marcador del mapa
+- ✨ Feat: Popup muestra título, descripción y fotos del punto
+- ✨ Feat: Click fuera del popup lo cierra automáticamente
+- ✨ Feat: Visor de imagen con zoom/pan usando react-zoom-pan-pinch
+- ✨ Feat: Zoom con scroll de mouse y pellizcar en táctil
+- ✨ Feat: Pan arrastrando con mouse o dedo
+- ✨ Feat: Doble click alterna entre zoom completo y original
+- ✨ Feat: Controles visuales de zoom (+/-/reset)
+- ✨ Feat: Navegación entre múltiples fotos del marcador
+- 🎨 UX: Animación fade-in al abrir popup
+- 🎨 UX: Instrucciones de uso en visor de imagen
+- 📦 Dep: Agregada librería react-zoom-pan-pinch
+
+### v2.40.0 - Photo Management & PDF Photos Export (28/01/2026)
+- ✨ Feat: Ver thumbnails de fotos en lista de puntos de inspección
+- ✨ Feat: Click en thumbnail abre visor de imagen en grande
+- ✨ Feat: Navegación entre fotos con flechas (anterior/siguiente)
+- ✨ Feat: Editar fotos de un punto existente (agregar/eliminar)
+- ✨ Feat: Modal dedicado para gestión de fotos por punto
+- ✨ Feat: Fotos incluidas en PDF agrupadas por número de marcador
+- ✨ Feat: Sección "Evidencia Fotográfica" en PDF con círculos numerados
+- 🎨 UX: Indicador de cantidad de fotos (+3 si hay más de 3)
+- 🎨 UX: Visor de imagen con navegación y contador
 
 ### v2.39.0 - Photos in Inspections & Landscape PDF (28/01/2026)
 - ✨ Feat: Agregar fotos a cada punto de inspección (máx. 5 por punto)

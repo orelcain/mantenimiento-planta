@@ -595,7 +595,8 @@ async function exportInspectionLandscapePDF(
   const { 
     inspection, 
     items, 
-    mapVersion
+    mapVersion,
+    includePhotos = true // Ahora por defecto incluye fotos
   } = options
 
   // Crear documento LANDSCAPE
@@ -726,6 +727,117 @@ async function exportInspectionLandscapePDF(
     },
     margin: { left: margin, right: margin },
   })
+
+  // ===== PÁGINAS DE FOTOS: Agrupadas por marcador =====
+  if (includePhotos) {
+    const itemsWithPhotos = items.filter(item => item.fotos.length > 0)
+    
+    if (itemsWithPhotos.length > 0) {
+      doc.addPage('a4', 'portrait')
+      const photoPageWidth = doc.internal.pageSize.getWidth()
+      const photoPageHeight = doc.internal.pageSize.getHeight()
+      const contentWidth = photoPageWidth - (margin * 2)
+      let photoYPosition = margin
+      
+      // Título de sección
+      doc.setFontSize(16)
+      doc.setFont('helvetica', 'bold')
+      doc.text('Evidencia Fotográfica', photoPageWidth / 2, photoYPosition, { align: 'center' })
+      photoYPosition += 6
+      
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(100)
+      doc.text('Fotos organizadas por punto de inspección', photoPageWidth / 2, photoYPosition, { align: 'center' })
+      doc.setTextColor(0)
+      photoYPosition += 12
+      
+      // Iterar por cada punto con fotos
+      for (const item of itemsWithPhotos) {
+        // Verificar espacio para título + al menos 1 foto
+        if (photoYPosition + 55 > photoPageHeight - margin) {
+          doc.addPage('a4', 'portrait')
+          photoYPosition = margin
+        }
+        
+        // Número de marcador (círculo)
+        doc.setFillColor(41, 128, 185)
+        doc.circle(margin + 5, photoYPosition + 3, 4, 'F')
+        doc.setTextColor(255)
+        doc.setFontSize(8)
+        doc.setFont('helvetica', 'bold')
+        doc.text(item.order.toString(), margin + 5, photoYPosition + 4, { align: 'center' })
+        doc.setTextColor(0)
+        
+        // Título del punto
+        doc.setFontSize(12)
+        doc.setFont('helvetica', 'bold')
+        doc.text(item.title, margin + 14, photoYPosition + 5)
+        photoYPosition += 10
+        
+        // Descripción (si existe)
+        if (item.description) {
+          doc.setFontSize(9)
+          doc.setFont('helvetica', 'italic')
+          doc.setTextColor(100)
+          const descLines = doc.splitTextToSize(item.description, contentWidth - 10)
+          doc.text(descLines.slice(0, 2), margin + 14, photoYPosition)
+          photoYPosition += Math.min(descLines.length, 2) * 4 + 2
+          doc.setTextColor(0)
+        }
+        
+        // Fotos del punto (hasta 4 por punto, 2 por fila)
+        const photoWidth = (contentWidth - 15) / 2
+        const photoHeight = 50
+        let photoXPos = margin
+        
+        for (let i = 0; i < Math.min(item.fotos.length, 4); i++) {
+          // Verificar espacio
+          if (photoYPosition + photoHeight > photoPageHeight - margin) {
+            doc.addPage('a4', 'portrait')
+            photoYPosition = margin
+            photoXPos = margin
+          }
+          
+          try {
+            const fotoUrl = item.fotos[i]
+            if (!fotoUrl) continue
+            const photoBase64 = await urlToBase64(fotoUrl)
+            doc.addImage(photoBase64, 'JPEG', photoXPos, photoYPosition, photoWidth, photoHeight)
+            
+            // Etiqueta de foto
+            doc.setFontSize(7)
+            doc.setTextColor(100)
+            doc.text(`Foto ${i + 1}`, photoXPos + 2, photoYPosition + photoHeight + 4)
+            doc.setTextColor(0)
+            
+            // Alternar posición
+            if (i % 2 === 0) {
+              photoXPos = margin + photoWidth + 15
+            } else {
+              photoXPos = margin
+              photoYPosition += photoHeight + 8
+            }
+          } catch (err) {
+            console.error(`Error cargando foto ${i + 1} del punto ${item.order}:`, err)
+          }
+        }
+        
+        // Si terminó en columna impar, mover a siguiente fila
+        if (item.fotos.length % 2 !== 0) {
+          photoYPosition += photoHeight + 8
+        }
+        
+        // Espaciado entre puntos
+        photoYPosition += 10
+        
+        // Línea separadora
+        doc.setDrawColor(220)
+        doc.setLineWidth(0.3)
+        doc.line(margin, photoYPosition - 5, photoPageWidth - margin, photoYPosition - 5)
+      }
+    }
+  }
 
   // Pie de página en todas las páginas
   const pageCount = doc.getNumberOfPages()
