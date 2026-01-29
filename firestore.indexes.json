@@ -107,6 +107,31 @@
         { "fieldPath": "nivel", "order": "ASCENDING" },
         { "fieldPath": "orden", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "mapLocations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "activo", "order": "ASCENDING" },
+        { "fieldPath": "orden", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "mapVersions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "locationId", "order": "ASCENDING" },
+        { "fieldPath": "activo", "order": "ASCENDING" },
+        { "fieldPath": "version", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "mapMarkers",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "mapVersionId", "order": "ASCENDING" },
+        { "fieldPath": "activo", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

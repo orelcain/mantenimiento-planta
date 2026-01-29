@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.37.0**
+## Versión Actual: **v2.37.1**
 
 **Fecha de lanzamiento**: 28 de enero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,12 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.37.1 - Firestore Rules for Maps System (28/01/2026)
+- **Fix**: Agregadas reglas de Firestore para colecciones `mapLocations`, `mapVersions`, `mapMarkers` e `inspections`
+- **Fix**: Agregados índices de Firestore para consultas de mapas
+- **Fix**: Mejorado logging de errores en MapsAdminPage para debugging
+- **Deploy**: Reglas desplegadas automáticamente a Firebase
 
 ### v2.37.0 - Maps Complete: PDF Export & Visualization (28/01/2026)
 - **Feat**: Página de Vista de Mapa (`/map-view`) con todos los marcadores de incidencias e inspecciones

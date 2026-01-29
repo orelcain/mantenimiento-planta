@@ -127,8 +127,9 @@ export function MapsAdminPage() {
       setLocationName('')
       setLocationDesc('')
       toast({ title: 'Ubicación creada', description: `"${newLoc.nombre}" ha sido creada`, variant: 'success' })
-    } catch (_e) {
-      toast({ title: 'Error', description: 'No se pudo crear la ubicación', variant: 'destructive' })
+    } catch (e) {
+      console.error('Error al crear ubicación:', e)
+      toast({ title: 'Error', description: `No se pudo crear la ubicación: ${e instanceof Error ? e.message : 'Error desconocido'}`, variant: 'destructive' })
     } finally {
       setSaving(false)
     }

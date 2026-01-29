@@ -455,5 +455,32 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow create, update, delete: if isAdmin();
     }
+
+    // ============================================
+    // SISTEMA DE MAPAS - UBICACIONES Y VERSIONES
+    // ============================================
+    match /mapLocations/{locationId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /mapVersions/{versionId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /mapMarkers/{markerId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAuthenticated();
+    }
+
+    match /inspections/{inspectionId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAuthenticated();
+
+      match /items/{itemId} {
+        allow read, write: if isAuthenticated();
+      }
+    }
   }
 }
