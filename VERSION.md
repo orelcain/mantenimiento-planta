@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.37.2**
+## Versión Actual: **v2.37.3**
 
 **Fecha de lanzamiento**: 28 de enero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.37.3 - Fix Storage rules for maps upload (28/01/2026)
+- 🔧 Fix: Reglas de Storage para mapas con estructura de subcarpetas `/maps/{locationId}/{fileName}`
+- 🔧 Fix: Mejorado logging de errores al subir mapas
+- 🛠️ Deploy: Reglas de Storage desplegadas a Firebase
 
 ### v2.37.2 - Fix undefined fields in Firestore (28/01/2026)
 - 🔧 Fix: Campos `descripcion` y `motivoInspeccion` no pueden ser `undefined` en Firestore

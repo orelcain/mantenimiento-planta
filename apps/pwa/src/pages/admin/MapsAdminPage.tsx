@@ -220,8 +220,9 @@ export function MapsAdminPage() {
         description: `Versión ${newVersion.version} creada para "${uploadingTo.nombre}"`,
         variant: 'success',
       })
-    } catch (_e) {
-      toast({ title: 'Error', description: 'No se pudo subir el mapa', variant: 'destructive' })
+    } catch (e) {
+      console.error('Error al subir mapa:', e)
+      toast({ title: 'Error', description: `No se pudo subir el mapa: ${e instanceof Error ? e.message : 'Error desconocido'}`, variant: 'destructive' })
     } finally {
       setSaving(false)
     }

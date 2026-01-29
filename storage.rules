@@ -36,8 +36,8 @@ service firebase.storage {
       allow write: if request.auth != null && request.auth.uid == userId;
     }
     
-    // Planos de planta (solo admin)
-    match /maps/{fileName} {
+    // Planos de planta (solo admin) - subcarpetas por ubicación
+    match /maps/{locationId}/{fileName} {
       allow write: if request.auth != null;
     }
     
