@@ -72,6 +72,13 @@ export function MapPage() {
   const [isDragging, setIsDragging] = useState(false)
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
   const containerRef = useRef<HTMLDivElement>(null)
+  // Refs para el zoom (evitar re-registrar el listener)
+  const scaleRef = useRef(scale)
+  const positionRef = useRef(position)
+  
+  // Mantener refs sincronizadas
+  useEffect(() => { scaleRef.current = scale }, [scale])
+  useEffect(() => { positionRef.current = position }, [position])
 
   const isAdmin = user?.rol === 'admin'
 
@@ -80,24 +87,28 @@ export function MapPage() {
     getZones().then(setZones)
   }, [setZones])
 
-  // Listener de wheel con passive: false para prevenir scroll
+  // Listener de wheel con passive: false para prevenir scroll (registrado una sola vez)
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
 
     const handleWheelPassive = (e: WheelEvent) => {
       e.preventDefault()
+      e.stopPropagation()
+      
+      const currentScale = scaleRef.current
+      const currentPosition = positionRef.current
       
       const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9
-      const newScale = Math.max(0.5, Math.min(10, scale * zoomFactor))
+      const newScale = Math.max(0.5, Math.min(10, currentScale * zoomFactor))
       
       const rect = container.getBoundingClientRect()
       const mouseX = e.clientX - rect.left
       const mouseY = e.clientY - rect.top
       
-      const scaleRatio = newScale / scale
-      const newPosX = mouseX - (mouseX - position.x) * scaleRatio
-      const newPosY = mouseY - (mouseY - position.y) * scaleRatio
+      const scaleRatio = newScale / currentScale
+      const newPosX = mouseX - (mouseX - currentPosition.x) * scaleRatio
+      const newPosY = mouseY - (mouseY - currentPosition.y) * scaleRatio
       
       setScale(newScale)
       setPosition({ x: newPosX, y: newPosY })
@@ -105,7 +116,7 @@ export function MapPage() {
 
     container.addEventListener('wheel', handleWheelPassive, { passive: false })
     return () => container.removeEventListener('wheel', handleWheelPassive)
-  }, [scale, position])
+  }, []) // Sin dependencias - se registra una sola vez
 
   // Suscribirse a incidencias activas
   useEffect(() => {
@@ -138,8 +149,6 @@ export function MapPage() {
     setScale(1)
     setPosition({ x: 0, y: 0 })
   }
-
-  // handleWheel ahora se maneja con addEventListener en useEffect para passive: false
 
   // Drag handlers
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -275,8 +284,12 @@ export function MapPage() {
         <CardContent className="p-0">
           <div
             ref={containerRef}
-            className="relative w-full h-[600px] md:h-[700px] overflow-hidden bg-muted cursor-grab active:cursor-grabbing"
-            style={{ touchAction: 'none' }}
+            className="relative w-full h-[600px] md:h-[700px] overflow-hidden bg-muted cursor-grab active:cursor-grabbing select-none"
+            style={{ 
+              touchAction: 'none',
+              WebkitOverflowScrolling: 'touch',
+              overscrollBehavior: 'contain',
+            }}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
