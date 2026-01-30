@@ -48,6 +48,11 @@ export interface Zone {
   tipo: ZoneType
   descripcion?: string
   equipmentId?: string // ID del equipo vinculado (solo para tipo 'maquina')
+  // Vinculación con jerarquía organizacional
+  hierarchyNodeId?: string // ID del nodo jerárquico asociado (planta, área, línea, etc.)
+  hierarchyPath?: string // "Planta > Área > Línea" (snapshot para display)
+  // Vinculación con ubicación de mapa
+  mapLocationId?: string // ID del MapLocation donde está esta zona
   // Polígono: array de puntos que forman la zona
   polygon: MapPoint[]
   // Bounds calculados del polígono (para búsquedas rápidas)

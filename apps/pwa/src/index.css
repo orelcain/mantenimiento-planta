@@ -12,6 +12,15 @@
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 
+  /* Evitar problemas de passive event listener en contenedores de zoom/pan */
+  .zoom-container,
+  [data-zoom-container],
+  .pan-container {
+    touch-action: none;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
   /* Scrollbar personalizada para modo oscuro */
   ::-webkit-scrollbar {
     width: 8px;

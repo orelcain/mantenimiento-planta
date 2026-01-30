@@ -222,6 +222,11 @@ export const createZoneSchema = z.object({
   color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Color debe ser hexadecimal').optional(),
   activa: z.boolean(),
   equipmentId: z.string().optional(),
+  // Vinculación con jerarquía organizacional
+  hierarchyNodeId: z.string().optional(),
+  hierarchyPath: z.string().optional(),
+  // Vinculación con ubicación de mapa
+  mapLocationId: z.string().optional(),
 })
 
 export const updateZoneSchema = createZoneSchema.partial().omit({ id: true })

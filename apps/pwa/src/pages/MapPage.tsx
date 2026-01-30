@@ -231,9 +231,9 @@ export function MapPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Mapa de Planta</h1>
+          <h1 className="text-2xl font-bold">Visor de Mapas</h1>
           <p className="text-muted-foreground">
-            Vista general de zonas e incidencias
+            Vista general de zonas e incidencias sobre el plano
           </p>
         </div>
         <div className="flex gap-2">

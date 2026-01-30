@@ -39,7 +39,7 @@ const navigation = [
   { name: 'Preventivo', href: '/preventive', icon: CalendarClock },
   { name: 'Predictivo', href: '/predictive', icon: Activity },
   { name: 'Sensores', href: '/sensors', icon: Cpu },
-  { name: 'Mapa Planta', href: '/map', icon: Map },
+  { name: 'Visor de Mapas', href: '/map', icon: Map },
   { name: 'Equipos', href: '/equipment', icon: Wrench },
   { name: 'Repuestos', href: '/repuestos', icon: Package },
   { name: 'Configuración', href: '/settings', icon: Settings },

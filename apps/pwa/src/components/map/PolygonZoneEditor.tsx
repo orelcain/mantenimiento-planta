@@ -13,6 +13,7 @@ import {
   Undo2,
   Check,
   Layers,
+  MapPin,
 } from 'lucide-react'
 import {
   Card,
@@ -34,11 +35,16 @@ import {
   SelectTrigger,
   SelectValue,
   Textarea,
+  Spinner,
 } from '@/components/ui'
 import { useAppStore, useAuthStore } from '@/store'
 import { getZones, createZone, deleteZone } from '@/services/zones'
 import { uploadMapImage, getMapImages, deleteMapImage } from '@/services/storage'
+import { getMapLocations, getLatestMapVersion } from '@/services/maps'
+import { HierarchySelector } from '@/components/hierarchy'
+import { useHierarchyPath } from '@/hooks/useHierarchy'
 import type { Zone, ZoneType, MapPoint } from '@/types'
+import type { MapLocation, MapVersion } from '@/types/maps'
 import { cn } from '@/lib/utils'
 import { getAssetUrl, isFirebaseStorageUrl } from '@/lib/config'
 import { createZoneSchema } from '@/lib/validation'
@@ -88,7 +94,7 @@ export function PolygonZoneEditor() {
   // Zona seleccionada para editar
   const [selectedZone, setSelectedZone] = useState<Zone | null>(null)
   
-  // Estado del formulario
+  // Estado del formulario - incluyendo jerarquía
   const [showZoneDialog, setShowZoneDialog] = useState(false)
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
   const [zoneForm, setZoneForm] = useState({
@@ -97,14 +103,24 @@ export function PolygonZoneEditor() {
     tipo: 'produccion' as ZoneType,
     descripcion: '',
     color: '#2196f3',
-    equipmentId: '' as string | undefined, // Para vincular con equipo
+    equipmentId: '' as string | undefined,
+    hierarchyNodeId: '' as string | undefined, // Vinculación con jerarquía
   })
   
-  // Imagen del plano
+  // Imagen del plano - ahora puede venir de MapLocation
   const [imageLoaded, setImageLoaded] = useState(false)
   const [availableMaps, setAvailableMaps] = useState<string[]>([])
   const [showMapSelector, setShowMapSelector] = useState(false)
   const [uploading, setUploading] = useState(false)
+  
+  // Ubicaciones de mapas (del sistema de mapas)
+  const [mapLocations, setMapLocations] = useState<MapLocation[]>([])
+  const [selectedLocationId, setSelectedLocationId] = useState<string>('')
+  const [currentMapVersion, setCurrentMapVersion] = useState<MapVersion | null>(null)
+  const [loadingLocations, setLoadingLocations] = useState(true)
+  
+  // Path de jerarquía para mostrar en el formulario
+  const { path: hierarchyPath } = useHierarchyPath(zoneForm.hierarchyNodeId ?? null)
   
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -117,13 +133,56 @@ export function PolygonZoneEditor() {
   const [canvasSize, setCanvasSize] = useState({ width: 1400, height: 800 })
   const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1
 
-  // Cargar mapas disponibles
+  // Cargar ubicaciones de mapas (nuevo sistema)
+  useEffect(() => {
+    async function loadLocations() {
+      setLoadingLocations(true)
+      try {
+        const locations = await getMapLocations()
+        setMapLocations(locations.filter(l => l.activo))
+        // Si hay ubicaciones y ninguna seleccionada, seleccionar la primera
+        if (locations.length > 0 && !selectedLocationId) {
+          const first = locations.find(l => l.activo)
+          if (first) setSelectedLocationId(first.id)
+        }
+      } catch (error) {
+        logger.error('Error cargando ubicaciones', error instanceof Error ? error : new Error(String(error)))
+      } finally {
+        setLoadingLocations(false)
+      }
+    }
+    loadLocations()
+  }, [])
+
+  // Cargar versión del mapa cuando cambia la ubicación
+  useEffect(() => {
+    async function loadMapVersion() {
+      if (!selectedLocationId) {
+        setCurrentMapVersion(null)
+        return
+      }
+      try {
+        const version = await getLatestMapVersion(selectedLocationId)
+        setCurrentMapVersion(version)
+        // Usar la imagen del mapa de la ubicación
+        if (version?.imageUrl) {
+          setMapImage(version.imageUrl)
+        }
+      } catch (error) {
+        logger.error('Error cargando versión del mapa', error instanceof Error ? error : new Error(String(error)))
+        setCurrentMapVersion(null)
+      }
+    }
+    loadMapVersion()
+  }, [selectedLocationId, setMapImage])
+
+  // Cargar mapas disponibles (sistema legacy)
   const loadAvailableMaps = useCallback(async () => {
     try {
       const maps = await getMapImages()
       setAvailableMaps(maps)
-      // Si no hay mapa seleccionado, usar el primero disponible
-      if (!mapImage && maps.length > 0) {
+      // Si no hay mapa seleccionado y no hay ubicación, usar el primero disponible
+      if (!mapImage && !selectedLocationId && maps.length > 0) {
         setMapImage(maps[0]!)
       }
       logger.info('Maps loaded', { count: maps.length })
@@ -131,7 +190,7 @@ export function PolygonZoneEditor() {
       logger.error('Error cargando mapas', error instanceof Error ? error : new Error(String(error)))
     }
 
-  }, [mapImage, setMapImage])
+  }, [mapImage, selectedLocationId, setMapImage])
 
   // Cargar zonas y mapas
   useEffect(() => {
@@ -474,7 +533,14 @@ export function PolygonZoneEditor() {
       descripcion: '',
       color: '#2196f3',
       equipmentId: undefined,
+      hierarchyNodeId: undefined,
     })
+  }
+
+  // Generar hierarchyPath string desde el path
+  const getHierarchyPathString = () => {
+    if (hierarchyPath.length === 0) return undefined
+    return hierarchyPath.map(n => n.nombre).join(' > ')
   }
 
   // Guardar zona
@@ -496,6 +562,13 @@ export function PolygonZoneEditor() {
       parentId: null,
       nivel: 1 as const,
       activa: true,
+      // Vincular con jerarquía organizacional
+      ...(zoneForm.hierarchyNodeId ? { 
+        hierarchyNodeId: zoneForm.hierarchyNodeId,
+        hierarchyPath: getHierarchyPathString()
+      } : {}),
+      // Vincular con ubicación del mapa
+      ...(selectedLocationId ? { mapLocationId: selectedLocationId } : {}),
       // Incluir equipmentId si es zona tipo máquina
       ...(zoneForm.tipo === 'maquina' && zoneForm.equipmentId ? { equipmentId: zoneForm.equipmentId } : {})
     }
@@ -516,7 +589,12 @@ export function PolygonZoneEditor() {
     try {
       await createZone(newZone)
       await getZones().then(setZones)
-      logger.info('Zone created successfully', { id: newZone.id, codigo: newZone.codigo })
+      logger.info('Zone created successfully', { 
+        id: newZone.id, 
+        codigo: newZone.codigo,
+        hierarchyNodeId: newZone.hierarchyNodeId,
+        mapLocationId: selectedLocationId
+      })
       
       setValidationErrors({})
       handleCancelDraw()
@@ -647,6 +725,46 @@ export function PolygonZoneEditor() {
 
   return (
     <div className="space-y-4">
+      {/* Selector de Ubicación */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="flex items-center gap-2">
+              <MapPin className="h-4 w-4 text-muted-foreground" />
+              <Label className="text-sm font-medium">Ubicación del Mapa:</Label>
+            </div>
+            {loadingLocations ? (
+              <div className="flex items-center gap-2">
+                <Spinner className="h-4 w-4" />
+                <span className="text-sm text-muted-foreground">Cargando ubicaciones...</span>
+              </div>
+            ) : mapLocations.length > 0 ? (
+              <Select value={selectedLocationId} onValueChange={setSelectedLocationId}>
+                <SelectTrigger className="w-[250px]">
+                  <SelectValue placeholder="Seleccionar ubicación..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {mapLocations.map((loc) => (
+                    <SelectItem key={loc.id} value={loc.id}>
+                      {loc.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <span className="text-sm text-muted-foreground">
+                No hay ubicaciones configuradas. Ve a Admin → Mapas para crear una.
+              </span>
+            )}
+            {currentMapVersion && (
+              <Badge variant="outline" className="text-xs">
+                Versión {currentMapVersion.version}
+              </Badge>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Toolbar */}
       <Card>
         <CardContent className="p-4">
@@ -896,11 +1014,33 @@ export function PolygonZoneEditor() {
 
       {/* Dialog para configurar zona */}
       <Dialog open={showZoneDialog} onOpenChange={(open) => !open && handleCancelDraw()}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Configurar Nueva Zona</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            {/* Vinculación con Jerarquía - IMPORTANTE */}
+            <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
+              <Label className="text-sm font-medium flex items-center gap-2 mb-3">
+                <MapPin className="h-4 w-4" />
+                Ubicación en Jerarquía Organizacional
+              </Label>
+              <HierarchySelector
+                value={zoneForm.hierarchyNodeId}
+                onChange={(nodeId) => setZoneForm({ ...zoneForm, hierarchyNodeId: nodeId ?? undefined })}
+                minLevel={1}
+                maxLevel={8}
+              />
+              {hierarchyPath.length > 0 && (
+                <div className="mt-2 text-xs text-muted-foreground bg-muted rounded px-2 py-1">
+                  📍 {hierarchyPath.map(n => n.nombre).join(' → ')}
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground mt-2">
+                Vincular esta zona a una ubicación de la jerarquía permite filtrar incidencias por área.
+              </p>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="zoneCodigo">Código</Label>
