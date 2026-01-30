@@ -488,5 +488,15 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow create, update, delete: if isAuthenticated();
     }
+
+    // ============================================
+    // ETT - Especificaciones Técnicas del Trabajo
+    // ============================================
+    match /ett/{ettId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
   }
 }
