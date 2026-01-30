@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.42.0**
+## Versión Actual: **v2.42.1**
 
 **Fecha de lanzamiento**: 29 de enero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,12 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.42.1 - Reopen Inspection & Search Filter (29/01/2026)
+- ✨ Feat: Boton "Reabrir" para inspecciones finalizadas
+- ✨ Feat: Buscador de inspecciones por nombre, ubicacion o descripcion
+- 🔧 Fix: Error de SelectItem con value vacio (changed to value="none")
+- 🎨 UX: Icono de busqueda en input de filtro
 
 ### v2.42.0 - Full Inspection & Item Editing with Photo Descriptions (29/01/2026)
 - ✨ Feat: Modal de edicion de inspeccion principal (titulo y descripcion)

@@ -23,7 +23,9 @@ import {
   ChevronLeft,
   ChevronRight,
   RotateCcw,
-  Pencil
+  Pencil,
+  RefreshCw,
+  Search
 } from 'lucide-react'
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch'
 import { 
@@ -84,6 +86,7 @@ export function InspectionsPage() {
   const [inspections, setInspections] = useState<Inspection[]>([])
   const [locations, setLocations] = useState<MapLocation[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [searchQuery, setSearchQuery] = useState('')
   
   // Modal de nueva inspección
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
@@ -566,6 +569,33 @@ export function InspectionsPage() {
     }
   }
   
+  // Reabrir inspección finalizada para seguir editando
+  const handleReopenInspection = async () => {
+    if (!activeInspection) return
+    
+    try {
+      await updateInspection(activeInspection.id, { status: 'en_progreso' })
+      
+      // Actualizar estado local
+      setActiveInspection(prev => prev ? { ...prev, status: 'en_progreso' } : null)
+      setInspections(prev => 
+        prev.map(i => i.id === activeInspection.id ? { ...i, status: 'en_progreso' as const } : i)
+      )
+      
+      toast({
+        title: 'Inspeccion reabierta',
+        description: 'Ahora puedes agregar o editar puntos'
+      })
+    } catch (error) {
+      console.error('Error reopening inspection:', error)
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'No se pudo reabrir la inspeccion'
+      })
+    }
+  }
+  
   // Cerrar panel de inspección activa
   const handleCloseInspection = () => {
     setActiveInspection(null)
@@ -659,6 +689,15 @@ export function InspectionsPage() {
               >
                 <CheckCircle2 className="h-4 w-4 mr-2" />
                 Finalizar
+              </Button>
+            )}
+            {activeInspection.status === 'finalizado' && (
+              <Button
+                variant="outline"
+                onClick={handleReopenInspection}
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Reabrir
               </Button>
             )}
             <Button variant="outline" onClick={handleOpenPdfOptions}>
@@ -1107,12 +1146,12 @@ export function InspectionsPage() {
               {/* Prioridad */}
               <div className="space-y-2">
                 <Label>Prioridad</Label>
-                <Select value={editItemPriority} onValueChange={setEditItemPriority}>
+                <Select value={editItemPriority || 'none'} onValueChange={(v) => setEditItemPriority(v === 'none' ? '' : v)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Sin prioridad" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Sin prioridad</SelectItem>
+                    <SelectItem value="none">Sin prioridad</SelectItem>
                     <SelectItem value="critica">
                       <span className="flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full bg-red-500" />
@@ -1424,6 +1463,19 @@ export function InspectionsPage() {
         </Card>
       )}
       
+      {/* Buscador de inspecciones */}
+      {inspections.length > 0 && (
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Buscar por nombre, ubicacion..."
+            className="pl-9"
+          />
+        </div>
+      )}
+      
       {/* Lista de inspecciones */}
       {inspections.length === 0 ? (
         <Card>
@@ -1435,7 +1487,17 @@ export function InspectionsPage() {
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {inspections.map((inspection) => (
+          {inspections
+            .filter(inspection => {
+              if (!searchQuery.trim()) return true
+              const query = searchQuery.toLowerCase()
+              return (
+                inspection.nombre.toLowerCase().includes(query) ||
+                inspection.locationName.toLowerCase().includes(query) ||
+                (inspection.descripcion && inspection.descripcion.toLowerCase().includes(query))
+              )
+            })
+            .map((inspection) => (
             <Card 
               key={inspection.id} 
               className="hover:shadow-md transition-shadow cursor-pointer"
