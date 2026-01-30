@@ -1,14 +1,34 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.43.0**
+## Versión Actual: **v2.44.0**
 
-**Fecha de lanzamiento**: 29 de enero de 2026  \
+**Fecha de lanzamiento**: 30 de enero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
 **Build**: ✅ Stable
 
 ---
 
 ## 📋 Información de la Versión
+
+### v2.44.0 - ETT Module: Technical Work Specifications with AI (30/01/2026)
+- ✨ Feat: Módulo completo ETT (Especificaciones Técnicas del Trabajo)
+- ✨ Feat: Formulario wizard con 6 tabs (General, Trabajo, Materiales, Procedimientos, Riesgos, Exportar)
+- ✨ Feat: Integración con IA (Groq) para mejora automática de textos
+- ✨ Feat: Botón "Mejorar con IA" en campos de texto con preview de mejoras
+- ✨ Feat: Captura de voz con Web Speech API para descripción del trabajo
+- ✨ Feat: Exportación a Word (.docx) con estilos profesionales
+- ✨ Feat: Exportación a PDF con html2canvas + jsPDF
+- ✨ Feat: CRUD completo de ETT con Firestore
+- ✨ Feat: Sistema de estados (borrador, en_revisión, aprobada, completada, archivada)
+- ✨ Feat: Ruta admin-only /admin/ett con lazy loading
+- 🎨 UX: Diálogos dinámicos para agregar materiales, procedimientos y riesgos
+- 🎨 UX: Integración en menú de administración
+- 📦 Dep: docx@9.5.1, html2canvas@1.4.1, uuid@13.0.0
+
+### v2.43.0 - Unified Map Modules with Hierarchy (29/01/2026)
+- ✨ Feat: Módulo de Mapas unificado con jerarquía (Planta/Área/Piso/Zona)
+- ✨ Feat: Selección jerárquica para asignar mapas a ubicaciones específicas
+- 🎨 UX: Mejor organización de mapas por ubicación
 
 ### v2.42.1 - Reopen Inspection & Search Filter (29/01/2026)
 - ✨ Feat: Boton "Reabrir" para inspecciones finalizadas

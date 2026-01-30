@@ -18,6 +18,7 @@ import {
   Activity,
   Cpu,
   MapPin,
+  FileText,
   Route,
 } from 'lucide-react'
 import { Avatar, AvatarFallback, Button } from '@/components/ui'
@@ -48,6 +49,7 @@ const navigation = [
 const adminNavigation = [
   { name: 'Jerarquías', href: '/hierarchy', icon: FolderTree },
   { name: 'Mapas', href: '/admin/maps', icon: MapPin },
+  { name: 'ETT', href: '/admin/ett', icon: FileText },
 ]
 
 export function MainLayout() {

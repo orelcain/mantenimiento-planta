@@ -502,3 +502,15 @@ export interface AppSettings {
     model: string
   }
 }
+
+// ETT - Especificaciones Técnicas del Trabajo
+export type { 
+  ETT, 
+  ETTGeneralInfo, 
+  ETTMaterial, 
+  ETProcedimiento, 
+  ETTRiesgo, 
+  ETTAdjunto,
+  ETTSugerenciaIA,
+  ETTCambio
+} from './ett'
