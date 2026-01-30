@@ -124,7 +124,8 @@ export function ETTPage() {
   const loadETTList = async () => {
     setLoading(true)
     try {
-      const list = await listETT({ createdBy: user?.id || '' })
+      // Admin ve todas las ETT, usuarios normales solo las suyas
+      const list = await listETT()
       setETTList(list)
     } catch (error) {
       logger.error('Error loading ETT list', error instanceof Error ? error : new Error(String(error)))
