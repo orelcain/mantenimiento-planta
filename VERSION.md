@@ -23,7 +23,13 @@
 - ✨ Feat: Ruta admin-only /admin/ett con lazy loading
 - 🎨 UX: Diálogos dinámicos para agregar materiales, procedimientos y riesgos
 - 🎨 UX: Integración en menú de administración
-- 📦 Dep: docx@9.5.1, html2canvas@1.4.1, uuid@13.0.0
+- 📦 Dep: docx@9.5.1, html2canvas@1.4.1, uuid@13.0.0, docxtemplater@3.67.6, pizzip@3.2.0
+- 🔧 Fix: Formato Word corporativo AquaChile con encabezado en tabla 2x2
+- 🔧 Fix: Bordes azul claro, celdas etiqueta con fondo gris
+- 🔧 Fix: Tablas de materiales, procedimientos y riesgos con encabezados azul oscuro
+- 🔧 Fix: Consideraciones previas con viñetas (primera en rojo)
+- 🔧 Fix: Reglas Firestore para colección ETT
+- 📝 Data: 2 ETTs de ejemplo cargadas (Paneles Entretecho y Collarines)
 
 ### v2.43.0 - Unified Map Modules with Hierarchy (29/01/2026)
 - ✨ Feat: Módulo de Mapas unificado con jerarquía (Planta/Área/Piso/Zona)
