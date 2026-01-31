@@ -60,8 +60,9 @@ import { cn } from '@/lib/utils'
 import { initializeHierarchySystem, isHierarchyInitialized } from '../services/hierarchyInit'
 import { NotificationsSettings as NotificationsPushSettings } from '@/components/settings/NotificationsSettings'
 import { CategoryManager } from '@/components/repuestos/CategoryManager'
+import { PermissionsManagerV2 } from '@/components/admin/PermissionsManagerV2'
 
-type TabType = 'general' | 'users' | 'invites' | 'notifications' | 'categories' | 'system'
+type TabType = 'general' | 'users' | 'invites' | 'notifications' | 'categories' | 'permissions' | 'system'
 
 export function SettingsPage() {
   const { user } = useAuthStore()
@@ -80,10 +81,11 @@ export function SettingsPage() {
   const tabs = isAdmin ? [
     { id: 'general' as const, label: 'General', icon: Settings },
     { id: 'users' as const, label: 'Usuarios', icon: Users },
+    { id: 'permissions' as const, label: 'Permisos', icon: Shield },
     { id: 'invites' as const, label: 'Invitaciones', icon: Key },
     { id: 'notifications' as const, label: 'Notificaciones', icon: Bell },
-    { id: 'categories' as const, label: 'Categorías y Máquinas', icon: Database },
-    { id: 'system' as const, label: 'Sistema', icon: Shield },
+    { id: 'categories' as const, label: 'Categorías', icon: Database },
+    { id: 'system' as const, label: 'Sistema', icon: Wrench },
   ] : [
     { id: 'notifications' as const, label: 'Notificaciones', icon: Bell },
   ]
@@ -118,6 +120,7 @@ export function SettingsPage() {
       {/* Content */}
       {isAdmin && activeTab === 'general' && <GeneralSettings />}
       {isAdmin && activeTab === 'users' && <UsersSettings />}
+      {isAdmin && activeTab === 'permissions' && <PermissionsManagerV2 />}
       {isAdmin && activeTab === 'invites' && <InvitesSettings />}
       {activeTab === 'notifications' && <NotificationsPushSettings />}
       {isAdmin && activeTab === 'categories' && <CategoryManager />}

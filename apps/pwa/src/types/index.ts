@@ -18,6 +18,8 @@ export interface User {
   createdAt: Date
   updatedAt: Date
   photoURL?: string
+  authProvider?: 'email' | 'google' // Proveedor de autenticación
+  permissionsOverride?: import('./permissions').UserPermissionsOverride // Override de permisos
 }
 
 // Tipo de zona

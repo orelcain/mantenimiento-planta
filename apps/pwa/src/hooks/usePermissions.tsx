@@ -1,16 +1,17 @@
 /* eslint-disable react-refresh/only-export-components */
 /**
- * Hook de permisos - Sistema de control de acceso basado en roles
+ * Hook de permisos - Sistema de control de acceso dinámico
  * 
- * Roles:
- * - admin: Acceso total al sistema
- * - supervisor: Gestión de incidencias, equipos, validación
- * - tecnico: Trabajar incidencias asignadas, ejecutar tareas
- * - usuario: Reportar incidencias solamente (no implementado aún)
+ * NUEVO: Los permisos se cargan desde Firestore y pueden ser
+ * personalizados por el admin para cada rol o usuario individual.
+ * 
+ * Mantiene compatibilidad con la API anterior (canCreateIncident, etc.)
+ * pero ahora usa el permissionsStore dinámico.
  */
 
-import { useAuthStore } from '@/store'
+import { useAuthStore, usePermissionsStore } from '@/store'
 import type { UserRole } from '@/types'
+import type { AppModule, ModuleAction } from '@/types/permissions'
 
 export interface Permissions {
   // Roles básicos
@@ -54,6 +55,10 @@ export interface Permissions {
   canUploadMaps: boolean
   canCreateInviteCodes: boolean
   
+  // Permisos de módulos (nuevo sistema dinámico)
+  canSeeModule: (modulo: AppModule) => boolean
+  canDoAction: (modulo: AppModule, accion: ModuleAction) => boolean
+  
   // Helper functions
   canEditOwnIncident: (incidentReporterId: string) => boolean
   canWorkOnIncident: (assignedUserId?: string) => boolean
@@ -61,6 +66,8 @@ export interface Permissions {
 
 export function usePermissions(): Permissions {
   const user = useAuthStore((state) => state.user)
+  const { can, canSee } = usePermissionsStore()
+  
   const rol = user?.rol as UserRole | undefined
   const userId = user?.id
   
@@ -69,6 +76,7 @@ export function usePermissions(): Permissions {
   const isTechnician = rol === 'tecnico'
   const isUser = rol === 'usuario'
   
+  // Mapeo del nuevo sistema dinámico a la API legacy
   const permissions: Permissions = {
     // Roles básicos
     isAdmin,
@@ -76,44 +84,49 @@ export function usePermissions(): Permissions {
     isTechnician,
     isUser,
     
-    // Permisos de incidencias
-    canCreateIncident: true, // Todos pueden reportar
-    canEditIncident: isAdmin, // Solo Admin edita
-    canDeleteIncident: isAdmin, // Solo Admin elimina
-    canValidateIncident: isAdmin || isSupervisor, // Solo supervisores validan
-    canAssignIncident: isAdmin || isSupervisor, // Solo supervisores asignan
-    canCloseIncident: isAdmin || isSupervisor || isTechnician, // Técnicos cierran las asignadas
-    canRejectIncident: isAdmin || isSupervisor,
+    // Permisos de incidencias (usando nuevo sistema)
+    canCreateIncident: can('incidencias', 'crear'),
+    canEditIncident: can('incidencias', 'editar'),
+    canDeleteIncident: can('incidencias', 'eliminar'),
+    canValidateIncident: can('incidencias', 'validar'),
+    canAssignIncident: can('incidencias', 'asignar'),
+    canCloseIncident: can('incidencias', 'cerrar'),
+    canRejectIncident: can('incidencias', 'validar'), // Rechazar usa mismo permiso que validar
     
     // Permisos de equipos
-    canCreateEquipment: isAdmin || isSupervisor,
-    canEditEquipment: isAdmin || isSupervisor || isTechnician,
-    canDeleteEquipment: isAdmin,
+    canCreateEquipment: can('equipos', 'crear'),
+    canEditEquipment: can('equipos', 'editar'),
+    canDeleteEquipment: can('equipos', 'eliminar'),
     
     // Permisos de zonas
-    canCreateZone: isAdmin,
-    canEditZone: isAdmin,
-    canDeleteZone: isAdmin,
+    canCreateZone: can('zonas', 'crear'),
+    canEditZone: can('zonas', 'editar'),
+    canDeleteZone: can('zonas', 'eliminar'),
     
     // Permisos de tareas preventivas
-    canCreatePreventiveTask: isAdmin || isSupervisor,
-    canExecutePreventiveTask: isAdmin || isSupervisor || isTechnician,
-    canDeletePreventiveTask: isAdmin,
+    canCreatePreventiveTask: can('preventivo', 'crear'),
+    canExecutePreventiveTask: can('preventivo', 'ejecutar'),
+    canDeletePreventiveTask: can('preventivo', 'eliminar'),
     
     // Permisos de usuarios
-    canManageUsers: isAdmin,
-    canChangeUserRole: isAdmin,
-    canDeactivateUser: isAdmin,
+    canManageUsers: can('usuarios', 'ver'),
+    canChangeUserRole: can('usuarios', 'editar'),
+    canDeactivateUser: can('usuarios', 'eliminar'),
     
     // Permisos de sistema
-    canAccessSettings: isAdmin,
-    canManageHierarchy: isAdmin,
-    canUploadMaps: isAdmin,
-    canCreateInviteCodes: isAdmin,
+    canAccessSettings: canSee('configuracion'),
+    canManageHierarchy: can('jerarquia', 'editar'),
+    canUploadMaps: can('mapa', 'configurar'),
+    canCreateInviteCodes: can('usuarios', 'crear'),
+    
+    // Nuevo sistema dinámico de módulos
+    canSeeModule: (modulo: AppModule) => canSee(modulo),
+    canDoAction: (modulo: AppModule, accion: ModuleAction) => can(modulo, accion),
     
     // Helper functions
     canEditOwnIncident: (incidentReporterId: string) => {
-      return userId === incidentReporterId || isAdmin || isSupervisor
+      if (can('incidencias', 'editar')) return true
+      return userId === incidentReporterId
     },
     
     canWorkOnIncident: (assignedUserId?: string) => {
@@ -128,12 +141,26 @@ export function usePermissions(): Permissions {
 
 /**
  * Hook para verificar si el usuario tiene un permiso específico
- * @param permissionKey - Key del permiso a verificar
- * @returns true si tiene el permiso
  */
-export function useHasPermission(permissionKey: keyof Omit<Permissions, 'canEditOwnIncident' | 'canWorkOnIncident'>): boolean {
+export function useHasPermission(permissionKey: keyof Omit<Permissions, 'canEditOwnIncident' | 'canWorkOnIncident' | 'canSeeModule' | 'canDoAction'>): boolean {
   const permissions = usePermissions()
   return permissions[permissionKey]
+}
+
+/**
+ * Hook para verificar acceso a un módulo específico
+ */
+export function useCanAccessModule(modulo: AppModule): boolean {
+  const { canSee } = usePermissionsStore()
+  return canSee(modulo)
+}
+
+/**
+ * Hook para verificar una acción en un módulo
+ */
+export function useCanDoModuleAction(modulo: AppModule, accion: ModuleAction): boolean {
+  const { can } = usePermissionsStore()
+  return can(modulo, accion)
 }
 
 /**
@@ -144,13 +171,34 @@ export function WithPermission({
   fallback,
   children,
 }: {
-  permission: keyof Omit<Permissions, 'canEditOwnIncident' | 'canWorkOnIncident'>
+  permission: keyof Omit<Permissions, 'canEditOwnIncident' | 'canWorkOnIncident' | 'canSeeModule' | 'canDoAction'>
   fallback?: React.ReactNode
   children: React.ReactNode
 }) {
   const hasPermission = useHasPermission(permission)
   
   if (!hasPermission) {
+    return fallback ? <>{fallback}</> : null
+  }
+  
+  return <>{children}</>
+}
+
+/**
+ * Componente para proteger según módulo visible
+ */
+export function WithModuleAccess({
+  modulo,
+  fallback,
+  children,
+}: {
+  modulo: AppModule
+  fallback?: React.ReactNode
+  children: React.ReactNode
+}) {
+  const canAccess = useCanAccessModule(modulo)
+  
+  if (!canAccess) {
     return fallback ? <>{fallback}</> : null
   }
   

@@ -1,14 +1,29 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.44.2**
+## Versión Actual: **v2.45.0**
 
-**Fecha de lanzamiento**: 30 de enero de 2026  \
+**Fecha de lanzamiento**: 31 de enero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
 **Build**: ✅ Stable
 
 ---
 
 ## 📋 Información de la Versión
+
+### v2.45.0 - Sistema de Permisos Dinámicos + Google Auth (31/01/2026)
+- 🔐 **Login con Google**: Nuevo botón para autenticación con cuenta Google
+- 🛡️ **Permisos Dinámicos**: Sistema completo de permisos configurables
+  - Permisos por módulo (ver, crear, editar, eliminar, etc.)
+  - Configuración por rol (Admin, Supervisor, Técnico, Usuario)
+  - Override individual por usuario
+  - Persistencia en Firestore con sincronización en tiempo real
+- ⚙️ **Nueva pestaña Permisos** en Configuración para administrar accesos
+- 📦 Nuevos archivos:
+  - `types/permissions.ts` - Tipos de módulos y acciones
+  - `services/permissions.ts` - CRUD de permisos en Firestore
+  - `store/permissionsStore.ts` - Store Zustand con listeners realtime
+  - `components/admin/PermissionsManagerV2.tsx` - UI de gestión
+  - `scripts/seed-permissions.js` - Script para inicializar roles
 
 ### v2.44.2 - ETT Export: Formato Corregido (30/01/2026)
 - 🔧 Fix: Removidas secciones incorrectas (Procedimientos, Análisis de Riesgos)

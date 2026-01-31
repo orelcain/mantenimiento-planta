@@ -5,6 +5,8 @@ import {
   onAuthStateChanged,
   User as FirebaseUser,
   updateProfile,
+  GoogleAuthProvider,
+  signInWithPopup,
 } from 'firebase/auth'
 import {
   doc,
@@ -21,7 +23,7 @@ import {
 import { auth, db } from './firebase'
 import type { User, UserRole, InviteCode } from '@/types'
 
-// Iniciar sesión
+// Iniciar sesión con email/password
 export async function signIn(email: string, password: string): Promise<User> {
   const credential = await signInWithEmailAndPassword(auth, email, password)
   const user = await getUserById(credential.user.uid)
@@ -33,6 +35,56 @@ export async function signIn(email: string, password: string): Promise<User> {
     throw new Error('Usuario desactivado. Contacte al administrador.')
   }
   return user
+}
+
+// Iniciar sesión con Google
+export async function signInWithGoogle(): Promise<User> {
+  const provider = new GoogleAuthProvider()
+  provider.setCustomParameters({
+    prompt: 'select_account'
+  })
+  
+  const credential = await signInWithPopup(auth, provider)
+  const firebaseUser = credential.user
+  
+  // Verificar si ya existe en Firestore
+  let user = await getUserById(firebaseUser.uid)
+  
+  if (user) {
+    // Usuario existente - verificar que esté activo
+    if (!user.activo) {
+      await firebaseSignOut(auth)
+      throw new Error('Usuario desactivado. Contacte al administrador.')
+    }
+    return user
+  }
+  
+  // Usuario nuevo de Google - crear perfil con rol pendiente
+  // El admin deberá aprobar y asignar rol
+  const nombres = firebaseUser.displayName?.split(' ') || ['', '']
+  const nombre = nombres[0] || ''
+  const apellido = nombres.slice(1).join(' ') || ''
+  
+  const newUser: User = {
+    id: firebaseUser.uid,
+    email: firebaseUser.email || '',
+    nombre,
+    apellido,
+    rol: 'usuario', // Rol por defecto - admin puede cambiar
+    activo: true,   // Activo pero con permisos mínimos
+    photoURL: firebaseUser.photoURL || undefined,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    authProvider: 'google', // Para saber que vino de Google
+  }
+  
+  await setDoc(doc(db, 'users', firebaseUser.uid), {
+    ...newUser,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  })
+  
+  return newUser
 }
 
 // Registrar con código de invitación

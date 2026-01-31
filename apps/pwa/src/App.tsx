@@ -1,7 +1,7 @@
 import { useEffect, lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { onAuthChange, getUserById, signOut as signOutService } from '@/services/auth'
-import { useAuthStore } from '@/store'
+import { useAuthStore, usePermissionsStore } from '@/store'
 import { logger } from '@/lib/logger'
 import { LoadingScreen } from '@/components/ui'
 import { MainLayout } from '@/components/layout'
@@ -74,6 +74,7 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
 
 export function App() {
   const { setUser, setLoading } = useAuthStore()
+  const { loadPermissions, clearPermissions } = usePermissionsStore()
 
   // Escuchar cambios en la autenticación
   useEffect(() => {
@@ -85,6 +86,7 @@ export function App() {
             logger.warn('Usuario Auth sin perfil en Firestore; cerrando sesión', { uid: firebaseUser.uid })
             await signOutService()
             setUser(null)
+            clearPermissions()
             return
           }
 
@@ -92,10 +94,14 @@ export function App() {
             logger.warn('Usuario desactivado; cerrando sesión', { uid: firebaseUser.uid })
             await signOutService()
             setUser(null)
+            clearPermissions()
             return
           }
 
           setUser(user)
+          
+          // Cargar permisos dinámicos del usuario
+          await loadPermissions(user)
           
           // Inicializar jerarquía automáticamente si es admin y no está inicializada
           if (user && user.rol === 'admin') {
@@ -110,14 +116,16 @@ export function App() {
           const err = error instanceof Error ? error : new Error('Error fetching user')
           logger.error('Error fetching user', err)
           setUser(null)
+          clearPermissions()
         }
       } else {
         setUser(null)
+        clearPermissions()
       }
     })
 
     return () => unsubscribe()
-  }, [setUser, setLoading])
+  }, [setUser, setLoading, loadPermissions, clearPermissions])
 
   return (
     <MachineProvider>
