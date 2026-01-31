@@ -1,6 +1,6 @@
 import { useEffect, lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { onAuthChange, getUserById, signOut as signOutService } from '@/services/auth'
+import { onAuthChange, getUserById, signOut as signOutService, handleGoogleRedirect } from '@/services/auth'
 import { useAuthStore, usePermissionsStore } from '@/store'
 import { logger } from '@/lib/logger'
 import { LoadingScreen } from '@/components/ui'
@@ -75,6 +75,19 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
 export function App() {
   const { setUser, setLoading } = useAuthStore()
   const { loadPermissions, clearPermissions } = usePermissionsStore()
+
+  // Manejar redirect de Google al cargar la app
+  useEffect(() => {
+    handleGoogleRedirect().then((user) => {
+      if (user) {
+        logger.info('Usuario de Google redirect procesado', { userId: user.id })
+        setUser(user)
+        loadPermissions(user)
+      }
+    }).catch((err) => {
+      logger.error('Error procesando Google redirect', err)
+    })
+  }, [])
 
   // Escuchar cambios en la autenticación
   useEffect(() => {

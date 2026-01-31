@@ -110,22 +110,20 @@ export function LoginPage() {
     }
   }
 
-  // Login con Google
+  // Login con Google (usa redirect)
   const handleGoogleLogin = async () => {
     setError(null)
     setIsGoogleLoading(true)
     
     try {
-      logger.info('Attempting Google sign in')
-      const user = await signInWithGoogle()
-      setUser(user)
-      logger.info('Google sign in successful', { userId: user.id, email: user.email })
-      navigate('/')
+      logger.info('Redirecting to Google sign in')
+      await signInWithGoogle()
+      // El usuario será redirigido a Google, luego de vuelta a la app
+      // El resultado se maneja en App.tsx con handleGoogleRedirect()
     } catch (err: unknown) {
       const errorObj = err instanceof Error ? err : new Error('Google auth error')
       logger.error('Google auth error', errorObj)
       setError(getErrorMessage((err as any).code || (err as any).message))
-    } finally {
       setIsGoogleLoading(false)
     }
   }
