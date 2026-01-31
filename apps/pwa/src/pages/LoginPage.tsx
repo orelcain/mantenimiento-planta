@@ -110,20 +110,26 @@ export function LoginPage() {
     }
   }
 
-  // Login con Google (usa redirect)
+  // Login con Google (popup)
   const handleGoogleLogin = async () => {
     setError(null)
     setIsGoogleLoading(true)
     
     try {
-      logger.info('Redirecting to Google sign in')
-      await signInWithGoogle()
-      // El usuario será redirigido a Google, luego de vuelta a la app
-      // El resultado se maneja en App.tsx con handleGoogleRedirect()
+      logger.info('Attempting Google sign in')
+      const user = await signInWithGoogle()
+      setUser(user)
+      logger.info('Google sign in successful', { userId: user.id, email: user.email })
+      navigate('/')
     } catch (err: unknown) {
       const errorObj = err instanceof Error ? err : new Error('Google auth error')
       logger.error('Google auth error', errorObj)
-      setError(getErrorMessage((err as any).code || (err as any).message))
+      const errorCode = (err as any).code || (err as any).message
+      // Ignorar si el usuario cierra el popup
+      if (errorCode !== 'auth/popup-closed-by-user' && errorCode !== 'auth/cancelled-popup-request') {
+        setError(getErrorMessage(errorCode))
+      }
+    } finally {
       setIsGoogleLoading(false)
     }
   }

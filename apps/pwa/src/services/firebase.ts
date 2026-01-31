@@ -8,7 +8,7 @@ import { getMessaging, isSupported } from 'firebase/messaging'
 // Configuración de Firebase hardcodeada (segura para cliente)
 const firebaseConfig = {
   apiKey: "AIzaSyBsJSh6x3ZGEyuXsM18dSWsJKyU7--KJss",
-  authDomain: "orelcain.github.io", // Usar dominio de GitHub Pages para OAuth redirect
+  authDomain: "mantenimiento-planta-771a3.firebaseapp.com",
   databaseURL: "https://mantenimiento-planta-771a3-default-rtdb.firebaseio.com",
   projectId: "mantenimiento-planta-771a3",
   storageBucket: "mantenimiento-planta-771a3.firebasestorage.app",

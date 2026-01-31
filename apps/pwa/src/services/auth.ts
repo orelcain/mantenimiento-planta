@@ -6,8 +6,7 @@ import {
   User as FirebaseUser,
   updateProfile,
   GoogleAuthProvider,
-  signInWithRedirect,
-  getRedirectResult,
+  signInWithPopup,
 } from 'firebase/auth'
 import {
   doc,
@@ -38,70 +37,53 @@ export async function signIn(email: string, password: string): Promise<User> {
   return user
 }
 
-// Iniciar sesión con Google (usa redirect para evitar problemas de popup)
-export async function signInWithGoogle(): Promise<void> {
+// Iniciar sesión con Google (usa popup)
+export async function signInWithGoogle(): Promise<User> {
   const provider = new GoogleAuthProvider()
   provider.setCustomParameters({
     prompt: 'select_account'
   })
   
-  // Usar redirect en lugar de popup - más compatible
-  await signInWithRedirect(auth, provider)
-  // El resultado se maneja en handleGoogleRedirect()
-}
-
-// Manejar el resultado del redirect de Google
-export async function handleGoogleRedirect(): Promise<User | null> {
-  try {
-    const result = await getRedirectResult(auth)
-    
-    if (!result) {
-      return null // No hay redirect pendiente
+  const result = await signInWithPopup(auth, provider)
+  const firebaseUser = result.user
+  
+  // Verificar si ya existe en Firestore
+  let user = await getUserById(firebaseUser.uid)
+  
+  if (user) {
+    // Usuario existente - verificar que esté activo
+    if (!user.activo) {
+      await firebaseSignOut(auth)
+      throw new Error('Usuario desactivado. Contacte al administrador.')
     }
-    
-    const firebaseUser = result.user
-    
-    // Verificar si ya existe en Firestore
-    let user = await getUserById(firebaseUser.uid)
-    
-    if (user) {
-      // Usuario existente - verificar que esté activo
-      if (!user.activo) {
-        await firebaseSignOut(auth)
-        throw new Error('Usuario desactivado. Contacte al administrador.')
-      }
-      return user
-    }
-    
-    // Usuario nuevo de Google - crear perfil
-    const nombres = firebaseUser.displayName?.split(' ') || ['', '']
-    const nombre = nombres[0] || ''
-    const apellido = nombres.slice(1).join(' ') || ''
-    
-    const newUser: User = {
-      id: firebaseUser.uid,
-      email: firebaseUser.email || '',
-      nombre,
-      apellido,
-      rol: 'usuario',
-      activo: true,
-      photoURL: firebaseUser.photoURL || undefined,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      authProvider: 'google',
-    }
-    
-    await setDoc(doc(db, 'users', firebaseUser.uid), {
-      ...newUser,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    })
-    
-    return newUser
-  } catch (error) {
-    console.error('Error handling Google redirect:', error)
-    throw error
+    return user
   }
+  
+  // Usuario nuevo de Google - crear perfil
+  const nombres = firebaseUser.displayName?.split(' ') || ['', '']
+  const nombre = nombres[0] || ''
+  const apellido = nombres.slice(1).join(' ') || ''
+  
+  const newUser: User = {
+    id: firebaseUser.uid,
+    email: firebaseUser.email || '',
+    nombre,
+    apellido,
+    rol: 'usuario',
+    activo: true,
+    photoURL: firebaseUser.photoURL || undefined,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    authProvider: 'google',
+  }
+  
+  await setDoc(doc(db, 'users', firebaseUser.uid), {
+    ...newUser,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  })
+  
+  return newUser
 }
 
 // Registrar con código de invitación
