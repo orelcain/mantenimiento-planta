@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.44.1**
+## Versión Actual: **v2.44.2**
 
 **Fecha de lanzamiento**: 30 de enero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,12 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.44.2 - ETT Export: Formato Corregido (30/01/2026)
+- 🔧 Fix: Removidas secciones incorrectas (Procedimientos, Análisis de Riesgos)
+- ✅ Agregada sección "Imágenes de referencia" (fotos del área a intervenir)
+- ✅ Agregada sección "Material Gráfico" (diagramas y documentos)
+- 📄 Formato ahora coincide exactamente con documento original AquaChile
 
 ### v2.44.1 - ETT Export: Complete AquaChile Format (30/01/2026)
 - 🔧 Fix: Exportación Word con 10 secciones exactas del formato AquaChile

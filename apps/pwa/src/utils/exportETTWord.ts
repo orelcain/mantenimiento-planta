@@ -577,92 +577,106 @@ export async function exportETTToWord(ett: ETT): Promise<Blob> {
     }
 
     // ========================================================================
-    // 4. PROCEDIMIENTOS
+    // IMÁGENES DE REFERENCIA (Adjuntos tipo imagen)
     // ========================================================================
-    if (ett.procedimientos && ett.procedimientos.length > 0) {
-      content.push(sectionTitle(4, 'PROCEDIMIENTOS'))
-      
-      const rows: TableRow[] = [
-        // Encabezado
-        new TableRow({
+    const imagenesReferencia = ett.adjuntos?.filter(adj => adj.tipo === 'imagen') || []
+    
+    if (imagenesReferencia.length > 0) {
+      content.push(
+        new Paragraph({
           children: [
-            headerCell('N°', 8),
-            headerCell('TÍTULO', 25),
-            headerCell('DESCRIPCIÓN', 47),
-            headerCell('PRECAUCIONES', 20),
+            new TextRun({
+              text: 'Imágenes de referencia:',
+              bold: true,
+              size: 20,
+              font: 'Arial',
+            }),
           ],
-        }),
-      ]
+          spacing: { before: 200, after: 100 },
+        })
+      )
 
-      // Ordenar por número
-      const procedimientosOrdenados = [...ett.procedimientos].sort((a, b) => a.numero - b.numero)
-      
-      procedimientosOrdenados.forEach((proc, idx) => {
-        rows.push(
-          new TableRow({
+      content.push(
+        new Paragraph({
+          children: [
+            new TextRun({
+              text: `Se adjuntan ${imagenesReferencia.length} fotografía(s) del área desde diferentes ángulos, donde se identifica claramente la zona a intervenir.`,
+              size: 20,
+              font: 'Arial',
+            }),
+          ],
+          spacing: { after: 80 },
+        })
+      )
+
+      // Listar las imágenes con sus descripciones
+      imagenesReferencia.forEach((img, idx) => {
+        content.push(
+          new Paragraph({
             children: [
-              numberCell(proc.numero || idx + 1, 8),
-              valueCell(proc.titulo, 25),
-              valueCell(proc.descripcion, 47),
-              valueCell(proc.precauciones || '', 20),
+              new TextRun({
+                text: `${idx + 1}. ${img.nombre}`,
+                bold: true,
+                size: 20,
+                font: 'Arial',
+              }),
+              new TextRun({
+                text: img.descripcion ? ` - ${img.descripcion}` : '',
+                size: 20,
+                font: 'Arial',
+              }),
             ],
+            spacing: { after: 40 },
+            indent: { left: 360 },
           })
         )
       })
-
-      content.push(
-        new Table({
-          width: { size: 100, type: WidthType.PERCENTAGE },
-          layout: TableLayoutType.FIXED,
-          borders: tableBorders,
-          rows,
-        })
-      )
       
       content.push(new Paragraph({ text: '', spacing: { after: 150 } }))
     }
 
     // ========================================================================
-    // 5. ANÁLISIS DE RIESGOS
+    // MATERIAL GRÁFICO (Adjuntos tipo diagrama/documento)
     // ========================================================================
-    if (ett.riesgos && ett.riesgos.length > 0) {
-      content.push(sectionTitle(5, 'ANÁLISIS DE RIESGOS'))
-      
-      const rows: TableRow[] = [
-        // Encabezado
-        new TableRow({
+    const materialGrafico = ett.adjuntos?.filter(adj => adj.tipo === 'diagrama' || adj.tipo === 'documento') || []
+    
+    if (materialGrafico.length > 0) {
+      content.push(
+        new Paragraph({
           children: [
-            headerCell('N°', 6),
-            headerCell('PELIGRO / RIESGO', 30),
-            headerCell('PROBABILIDAD', 12),
-            headerCell('CONSECUENCIA', 12),
-            headerCell('MEDIDAS PREVENTIVAS', 40),
+            new TextRun({
+              text: 'MATERIAL GRÁFICO:',
+              bold: true,
+              size: 20,
+              font: 'Arial',
+            }),
           ],
-        }),
-      ]
+          spacing: { before: 200, after: 100 },
+        })
+      )
 
-      ett.riesgos.forEach((riesgo, idx) => {
-        rows.push(
-          new TableRow({
+      // Listar el material gráfico
+      materialGrafico.forEach((mat, idx) => {
+        content.push(
+          new Paragraph({
             children: [
-              numberCell(idx + 1, 6),
-              valueCell(riesgo.peligro, 30),
-              centeredCell(riesgo.probabilidad, 12),
-              centeredCell(riesgo.consecuencia, 12),
-              valueCell(riesgo.medidas_preventivas, 40),
+              new TextRun({
+                text: `${idx + 1}. ${mat.nombre}`,
+                bold: true,
+                size: 20,
+                font: 'Arial',
+              }),
+              new TextRun({
+                text: mat.descripcion ? ` - ${mat.descripcion}` : '',
+                size: 20,
+                font: 'Arial',
+              }),
             ],
+            spacing: { after: 40 },
+            indent: { left: 360 },
           })
         )
       })
-
-      content.push(
-        new Table({
-          width: { size: 100, type: WidthType.PERCENTAGE },
-          layout: TableLayoutType.FIXED,
-          borders: tableBorders,
-          rows,
-        })
-      )
       
       content.push(new Paragraph({ text: '', spacing: { after: 150 } }))
     }
@@ -708,7 +722,7 @@ export async function exportETTToWord(ett: ETT): Promise<Blob> {
     }
 
     // ========================================================================
-    // 6. SUMINISTROS
+    // SUMINISTROS
     // ========================================================================
     content.push(
       new Paragraph({
@@ -730,7 +744,7 @@ export async function exportETTToWord(ett: ETT): Promise<Blob> {
     )
 
     // ========================================================================
-    // 7. EQUIPOS Y HERRAMIENTAS
+    // EQUIPOS Y HERRAMIENTAS
     // ========================================================================
     content.push(
       new Paragraph({
@@ -752,7 +766,7 @@ export async function exportETTToWord(ett: ETT): Promise<Blob> {
     )
 
     // ========================================================================
-    // 8. ASEO Y ENTREGA
+    // ASEO Y ENTREGA
     // ========================================================================
     content.push(
       new Paragraph({
