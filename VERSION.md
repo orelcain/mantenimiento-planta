@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.44.0**
+## Versión Actual: **v2.44.1**
 
 **Fecha de lanzamiento**: 30 de enero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,19 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.44.1 - ETT Export: Complete AquaChile Format (30/01/2026)
+- 🔧 Fix: Exportación Word con 10 secciones exactas del formato AquaChile
+- ✅ Sección 1: Encabezado corporativo (tabla 2x2)
+- ✅ Sección 2: Tabla información principal (7 campos)
+- ✅ Sección 3: Consideraciones previas (6 viñetas, primera en rojo)
+- ✅ Sección 4: Especificación servicio + área intervención
+- ✅ Sección 5: Materiales/equipos requeridos (tabla)
+- ✅ Sección 6: SUMINISTROS - Parte de la oferta
+- ✅ Sección 7: EQUIPOS Y HERRAMIENTAS - Responsabilidad contratista
+- ✅ Sección 8: ASEO Y ENTREGA - Normas limpieza y protección alimentos
+- ✅ Sección 9: Observaciones (si existen)
+- ✅ Sección 10: BASES ADMINISTRATIVAS (9 puntos estándar)
 
 ### v2.44.0 - ETT Module: Technical Work Specifications with AI (30/01/2026)
 - ✨ Feat: Módulo completo ETT (Especificaciones Técnicas del Trabajo)

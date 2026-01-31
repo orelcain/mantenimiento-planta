@@ -1,7 +1,7 @@
 {
-  "version": "2.44.0",
+  "version": "2.44.1",
   "buildDate": "2026-01-30",
-  "buildTimestamp": 1769814767618,
+  "buildTimestamp": 1769823621961,
   "features": [
     "Fix sistema de notificaciones push",
     "Eliminar VitePWA completamente",

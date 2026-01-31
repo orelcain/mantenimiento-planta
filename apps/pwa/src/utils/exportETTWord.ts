@@ -708,7 +708,99 @@ export async function exportETTToWord(ett: ETT): Promise<Blob> {
     }
 
     // ========================================================================
-    // BASES ADMINISTRATIVAS (Texto estándar corporativo)
+    // 6. SUMINISTROS
+    // ========================================================================
+    content.push(
+      new Paragraph({
+        children: [
+          new TextRun({
+            text: 'SUMINISTROS: ',
+            bold: true,
+            size: 20,
+            font: 'Arial',
+          }),
+          new TextRun({
+            text: 'Parte de la oferta',
+            size: 20,
+            font: 'Arial',
+          }),
+        ],
+        spacing: { before: 200, after: 100 },
+      })
+    )
+
+    // ========================================================================
+    // 7. EQUIPOS Y HERRAMIENTAS
+    // ========================================================================
+    content.push(
+      new Paragraph({
+        children: [
+          new TextRun({
+            text: 'EQUIPOS Y HERRAMIENTAS: ',
+            bold: true,
+            size: 20,
+            font: 'Arial',
+          }),
+          new TextRun({
+            text: 'Todas las herramientas deberán ser suministrados por la empresa contratista y será de su exclusiva responsabilidad el cuidado y deterioro de estas producto del servicio o proyecto.',
+            size: 20,
+            font: 'Arial',
+          }),
+        ],
+        spacing: { after: 100 },
+      })
+    )
+
+    // ========================================================================
+    // 8. ASEO Y ENTREGA
+    // ========================================================================
+    content.push(
+      new Paragraph({
+        children: [
+          new TextRun({
+            text: 'ASEO Y ENTREGA: ',
+            bold: true,
+            size: 20,
+            font: 'Arial',
+          }),
+          new TextRun({
+            text: 'Se deberá entregar para recepción del servicio o proyecto, todas las zonas intervenidas en perfecto estado de limpieza. Los escombros o desechos resultantes de la ejecución deberán destinarse a los sectores de segregación, incorporándose en las respectivas tolvas de desecho o reciclaje.',
+            size: 20,
+            font: 'Arial',
+          }),
+        ],
+        spacing: { after: 80 },
+      })
+    )
+
+    content.push(
+      new Paragraph({
+        children: [
+          new TextRun({
+            text: 'El contratista deberá cumplir con todas las normas de buenas prácticas de protección de alimentos, tomando todas las medidas necesarias durante su desarrollo y al término de este para prevenir la contaminación de los productos por materias extrañas a consecuencia de su trabajo, ya sea este al interior o exterior de los recintos productivos y almacenamiento.',
+            size: 20,
+            font: 'Arial',
+          }),
+        ],
+        spacing: { after: 80 },
+      })
+    )
+
+    content.push(
+      new Paragraph({
+        children: [
+          new TextRun({
+            text: 'En caso de ocurrir daños a la propiedad o inmueble, contratista deberá reponerlos en su totalidad.',
+            size: 20,
+            font: 'Arial',
+          }),
+        ],
+        spacing: { after: 200 },
+      })
+    )
+
+    // ========================================================================
+    // BASES ADMINISTRATIVAS (10 puntos estándar corporativos)
     // ========================================================================
     content.push(
       new Paragraph({
