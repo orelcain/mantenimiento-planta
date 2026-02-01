@@ -11,8 +11,15 @@ import {
   Input,
   Label,
   Spinner,
+  Switch,
 } from '@/components/ui'
-import { signIn, signUpWithInviteCode, initGoogleSignIn, renderGoogleButton } from '@/services/auth'
+import { 
+  signIn, 
+  signUpWithInviteCode, 
+  initGoogleSignIn, 
+  renderGoogleButton,
+  setAuthPersistence
+} from '@/services/auth'
 import { useAuthStore } from '@/store'
 import { loginSchema, signUpSchema } from '@/lib/validation'
 import { logger } from '@/lib/logger'
@@ -29,6 +36,7 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
   const [googleReady, setGoogleReady] = useState(false)
+  const [rememberMe, setRememberMe] = useState(true)
 
   // Form fields
   const [email, setEmail] = useState('')
@@ -36,6 +44,11 @@ export function LoginPage() {
   const [nombre, setNombre] = useState('')
   const [apellido, setApellido] = useState('')
   const [inviteCode, setInviteCode] = useState('')
+
+  // Manejar persistencia
+  useEffect(() => {
+    setAuthPersistence(rememberMe)
+  }, [rememberMe])
 
   // Inicializar Google Sign-In
   useEffect(() => {
@@ -247,6 +260,19 @@ export function LoginPage() {
                 <p className="text-sm text-destructive">{validationErrors.password}</p>
               )}
             </div>
+
+            {mode === 'login' && (
+              <div className="flex items-center space-x-2 my-2">
+                <Switch 
+                  id="remember-me" 
+                  checked={rememberMe} 
+                  onCheckedChange={setRememberMe} 
+                />
+                <Label htmlFor="remember-me" className="text-sm font-normal cursor-pointer">
+                  Mantener sesión iniciada
+                </Label>
+              </div>
+            )}
 
             {error && (
               <div className="p-3 text-sm text-destructive bg-destructive/10 rounded-md">

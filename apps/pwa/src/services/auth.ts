@@ -7,6 +7,9 @@ import {
   updateProfile,
   GoogleAuthProvider,
   signInWithCredential,
+  setPersistence,
+  browserLocalPersistence,
+  browserSessionPersistence,
 } from 'firebase/auth'
 import {
   doc,
@@ -22,6 +25,16 @@ import {
 } from 'firebase/firestore'
 import { auth, db } from './firebase'
 import type { User, UserRole, InviteCode } from '@/types'
+
+// Establecer persistencia de sesión
+export async function setAuthPersistence(remember: boolean): Promise<void> {
+  try {
+    const type = remember ? browserLocalPersistence : browserSessionPersistence
+    await setPersistence(auth, type)
+  } catch (error) {
+    console.error('Error setting persistence:', error)
+  }
+}
 
 // Iniciar sesión con email/password
 export async function signIn(email: string, password: string): Promise<User> {
@@ -53,15 +66,19 @@ export function initGoogleSignIn(onSuccess: (user: User) => void, onError: (erro
   google.accounts.id.initialize({
     client_id: GOOGLE_CLIENT_ID,
     callback: async (response: { credential: string }) => {
+      console.log('Google Sign In Callback Received')
       try {
         const user = await signInWithGoogleToken(response.credential)
         onSuccess(user)
       } catch (error) {
+        console.error('Error signing in with Google Token:', error)
         onError(error instanceof Error ? error : new Error('Error en autenticación'))
       }
     },
     auto_select: false,
     cancel_on_tap_outside: true,
+    ui_mode: 'popup', 
+    itp_support: true,
   })
 }
 
