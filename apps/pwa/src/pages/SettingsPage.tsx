@@ -60,7 +60,7 @@ import { cn } from '@/lib/utils'
 import { initializeHierarchySystem, isHierarchyInitialized } from '../services/hierarchyInit'
 import { NotificationsSettings as NotificationsPushSettings } from '@/components/settings/NotificationsSettings'
 import { CategoryManager } from '@/components/repuestos/CategoryManager'
-import { PermissionsManagerV2 } from '@/components/admin/PermissionsManagerV2'
+import { PermissionsPage } from '@/pages/admin/PermissionsPage'
 
 type TabType = 'general' | 'users' | 'invites' | 'notifications' | 'categories' | 'permissions' | 'system'
 
@@ -120,7 +120,7 @@ export function SettingsPage() {
       {/* Content */}
       {isAdmin && activeTab === 'general' && <GeneralSettings />}
       {isAdmin && activeTab === 'users' && <UsersSettings />}
-      {isAdmin && activeTab === 'permissions' && <PermissionsManagerV2 />}
+      {isAdmin && activeTab === 'permissions' && <PermissionsPage isEmbedded={true} />}
       {isAdmin && activeTab === 'invites' && <InvitesSettings />}
       {activeTab === 'notifications' && <NotificationsPushSettings />}
       {isAdmin && activeTab === 'categories' && <CategoryManager />}
