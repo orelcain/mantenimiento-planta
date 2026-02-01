@@ -1,14 +1,19 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.45.0**
+## Versión Actual: **v2.45.1**
 
-**Fecha de lanzamiento**: 31 de enero de 2026  \
+**Fecha de lanzamiento**: 01 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
 **Build**: ✅ Stable
 
 ---
 
 ## 📋 Información de la Versión
+
+### v2.45.1 - Fix Admin Permisos UI (01/02/2026)
+- 🐛 **Fix**: Correcciones críticas en `PermissionsPage.tsx` que impedían el build.
+- 🔧 **Types**: Corrección de tipado en `PermissionsMap` usando `APP_MODULES`.
+- 🗑️ **Limpieza**: Eliminación de componentes UI no utilizados (Table, Tabs, etc.).
 
 ### v2.45.0 - Sistema de Permisos Dinámicos + Google Auth (31/01/2026)
 - 🔐 **Login con Google**: Nuevo botón para autenticación con cuenta Google

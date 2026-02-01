@@ -1,11 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
   Button,
   Card,
   CardContent,
   CardHeader,
   CardTitle,
-  CardDescription,
   Input,
   Badge,
   Spinner,
@@ -17,12 +16,8 @@ import {
   DialogFooter,
   Switch,
   Label,
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
 } from '@/components/ui'
-import { Search, Shield, Save, RotateCcw, PenSquare } from 'lucide-react'
+import { Search, Shield, RotateCcw } from 'lucide-react'
 import { getAllUsers } from '@/services/auth'
 import { 
   getRolePermissions, 
@@ -36,7 +31,9 @@ import {
   MODULE_ACTIONS, 
   DEFAULT_ROLE_PERMISSIONS,
   type PermissionsMap,
-  type UserPermissionsOverride
+  type UserPermissionsOverride,
+  type AppModule,
+  type ModuleAction
 } from '@/types/permissions'
 import { useToast } from '@/hooks/useToast'
 
@@ -51,35 +48,11 @@ export function PermissionsPage({ isEmbedded = false }: { isEmbedded?: boolean }
   const [isEditing, setIsEditing] = useState(false)
   const [isLoadingPermissions, setIsLoadingPermissions] = useState(false)
   const [currentUserPerms, setCurrentUserPerms] = useState<PermissionsMap>({})
-  const [originalUserPerms, setOriginalUserPerms] = useState<PermissionsMap>({})
   const [isSaving, setIsSaving] = useState(false)
   
   const { toast } = useToast()
 
-  // Cargar usuarios
-  useEffect(() => {
-    loadUsers()
-  }, [])
-
-  // Filtrar usuarios
-  useEffect(() => {
-    if (!searchQuery) {
-      setFilteredUsers(users)
-    } else {
-      const lower = searchQuery.toLowerCase()
-      setFilteredUsers(
-        users.filter(
-          (u) =>
-            u.nombre.toLowerCase().includes(lower) ||
-            u.apellido.toLowerCase().includes(lower) ||
-            u.email.toLowerCase().includes(lower) ||
-            u.rol.toLowerCase().includes(lower)
-        )
-      )
-    }
-  }, [searchQuery, users])
-
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
     setIsLoading(true)
     try {
       const data = await getAllUsers()
@@ -95,7 +68,12 @@ export function PermissionsPage({ isEmbedded = false }: { isEmbedded?: boolean }
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [toast])
+
+  // Cargar usuarios
+  useEffect(() => {
+    loadUsers()
+  }, [loadUsers])
 
   const handleEditUser = async (user: User) => {
     setSelectedUser(user)
@@ -104,6 +82,7 @@ export function PermissionsPage({ isEmbedded = false }: { isEmbedded?: boolean }
     
     try {
       // 1. Obtener permisos base del rol
+      // getRolePermissions retorna ya el PermissionsMap
       const rolePerms = await getRolePermissions(user.rol)
       
       // 2. Obtener override específico del usuario
@@ -111,14 +90,13 @@ export function PermissionsPage({ isEmbedded = false }: { isEmbedded?: boolean }
       
       let effectivePerms: PermissionsMap
       
-      if (override) {
+      if (override && override.activo) {
         effectivePerms = override.permisos
       } else {
-        effectivePerms = rolePerms ? rolePerms.permisos : DEFAULT_ROLE_PERMISSIONS[user.rol]
+        effectivePerms = rolePerms || DEFAULT_ROLE_PERMISSIONS[user.rol]
       }
       
       setCurrentUserPerms(effectivePerms)
-      setOriginalUserPerms(effectivePerms) // Guardar copia para detectar cambios
       
     } catch (error) {
       logger.error('Error cargando permisos de usuario', error as Error)
@@ -133,39 +111,66 @@ export function PermissionsPage({ isEmbedded = false }: { isEmbedded?: boolean }
     }
   }
 
-  const handlePermissionChange = (modulo: string, accion: string, enabled: boolean) => {
+  const handlePermissionChange = (modulo: AppModule, accion: ModuleAction, enabled: boolean) => {
     setCurrentUserPerms(prev => {
       const newPerms = { ...prev }
-      
-      // Asegurar que el módulo existe
-      if (!newPerms[modulo]) {
-        newPerms[modulo] = []
-      }
+      const modulePerms = newPerms[modulo]
       
       if (enabled) {
-        // Añadir permiso si no existe
-        if (!newPerms[modulo].includes(accion)) {
-          newPerms[modulo] = [...newPerms[modulo], accion]
+        if (!modulePerms) {
+          // Si no existía el módulo, inicializar
+          newPerms[modulo] = {
+            visible: true,
+            actions: [accion]
+          }
+        } else {
+          // Agregar acción si no existe
+          if (!modulePerms.actions.includes(accion)) {
+            newPerms[modulo] = {
+              ...modulePerms,
+              actions: [...modulePerms.actions, accion]
+            }
+          }
         }
       } else {
-        // Remover permiso
-        newPerms[modulo] = newPerms[modulo].filter(a => a !== accion)
+        if (modulePerms) {
+          // Remover acción
+          newPerms[modulo] = {
+            ...modulePerms,
+            actions: modulePerms.actions.filter(a => a !== accion)
+          }
+        }
       }
       
       return newPerms
     })
   }
   
-  const handleModuleToggle = (modulo: string, enabled: boolean) => {
+  const handleModuleToggle = (modulo: AppModule, enabled: boolean) => {
     setCurrentUserPerms(prev => {
       const newPerms = { ...prev }
       
       if (enabled) {
-        // Habilitar todas las acciones del módulo ('read', 'create', 'update', 'delete', 'export')
-        newPerms[modulo] = ['read', 'create', 'update', 'delete', 'export']
+        // Habilitar con acciones por defecto (ver)
+        if (!newPerms[modulo]) {
+          newPerms[modulo] = {
+            visible: true,
+            actions: ['ver']
+          }
+        } else {
+          newPerms[modulo] = {
+            ...newPerms[modulo]!,
+            visible: true
+          }
+        }
       } else {
-        // Deshabilitar módulo completo
-        newPerms[modulo] = []
+        // Deshabilitar módulo (visible = false)
+        if (newPerms[modulo]) {
+          newPerms[modulo] = {
+            ...newPerms[modulo]!,
+            visible: false
+          }
+        }
       }
       
       return newPerms
@@ -178,13 +183,14 @@ export function PermissionsPage({ isEmbedded = false }: { isEmbedded?: boolean }
     setIsSaving(true)
     try {
       const override: UserPermissionsOverride = {
-        userId: selectedUser.id,
+        activo: true, // Marcar como activo explícitamente al guardar un override manual
         permisos: currentUserPerms,
         updatedAt: new Date(),
-        updatedBy: 'admin', // Idealmente usar ID del admin actual
+        updatedBy: 'admin',
       }
       
-      await saveUserPermissionsOverride(selectedUser.id, override)
+      // Pasar userId como argumento separado
+      await saveUserPermissionsOverride(selectedUser.id, override, 'admin')
       
       toast({
         title: 'Permisos actualizados',
@@ -209,7 +215,7 @@ export function PermissionsPage({ isEmbedded = false }: { isEmbedded?: boolean }
     
     // Simplemente recargamos los permisos base del rol
     const rolePerms = await getRolePermissions(selectedUser.rol)
-    const defaults = rolePerms ? rolePerms.permisos : DEFAULT_ROLE_PERMISSIONS[selectedUser.rol]
+    const defaults = rolePerms || DEFAULT_ROLE_PERMISSIONS[selectedUser.rol]
     
     setCurrentUserPerms(defaults)
     
@@ -322,35 +328,33 @@ export function PermissionsPage({ isEmbedded = false }: { isEmbedded?: boolean }
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {Object.entries(APP_MODULES).map(([key, label]) => {
-                  const hasAll = ['read', 'create', 'update', 'delete', 'export'].every(
-                    action => currentUserPerms[key]?.includes(action)
-                  )
-                  const hasNone = !currentUserPerms[key] || currentUserPerms[key].length === 0
+                {APP_MODULES.map((moduleName) => {
+                  const perms = currentUserPerms[moduleName]
+                  const isVisible = perms?.visible ?? false
                   
                   return (
-                    <Card key={key} className={hasNone ? 'opacity-70 bg-secondary/20' : ''}>
+                    <Card key={moduleName} className={!isVisible ? 'opacity-70 bg-secondary/20' : ''}>
                       <CardHeader className="pb-3">
                         <div className="flex items-center justify-between">
-                          <CardTitle className="text-base">{label}</CardTitle>
+                          <CardTitle className="text-base capitalize">{moduleName}</CardTitle>
                           <Switch 
-                            checked={!hasNone}
-                            onCheckedChange={(checked) => handleModuleToggle(key, checked)}
+                            checked={isVisible}
+                            onCheckedChange={(checked) => handleModuleToggle(moduleName, checked)}
                           />
                         </div>
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-3">
-                          {Object.entries(MODULE_ACTIONS).map(([actionKey, actionLabel]) => (
-                            <div key={`${key}-${actionKey}`} className="flex items-center space-x-2">
+                          {MODULE_ACTIONS.map((action) => (
+                            <div key={`${moduleName}-${action}`} className="flex items-center space-x-2">
                               <Switch 
-                                id={`${key}-${actionKey}`}
-                                checked={currentUserPerms[key]?.includes(actionKey) || false}
-                                onCheckedChange={(checked) => handlePermissionChange(key, actionKey, checked)}
-                                disabled={hasNone} // Deshabilitar si el módulo está apagado
+                                id={`${moduleName}-${action}`}
+                                checked={perms?.actions.includes(action) || false}
+                                onCheckedChange={(checked) => handlePermissionChange(moduleName, action, checked)}
+                                disabled={!isVisible}
                               />
-                              <Label htmlFor={`${key}-${actionKey}`} className="text-sm font-normal">
-                                {actionLabel}
+                              <Label htmlFor={`${moduleName}-${action}`} className="text-sm font-normal capitalize">
+                                {action}
                               </Label>
                             </div>
                           ))}
