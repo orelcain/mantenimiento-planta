@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.45.5**
+## Versión Actual: **v2.45.6**
 
 **Fecha de lanzamiento**: 01 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,10 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.45.6 - UI: Agregar Email en Sidebar (01/02/2026)
+- 📧 **UI**: Ahora se muestra el correo electrónico debajo del nombre del usuario en el sidebar.
+- 🎯 **UX**: Facilita la identificación rápida del usuario.
 
 ### v2.45.5 - UI: Admin Display Name (01/02/2026)
 - 🎨 **UI**: El usuario admin ahora se muestra como "Admin" en el sidebar en lugar del nombre completo.

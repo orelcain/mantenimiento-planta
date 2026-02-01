@@ -195,6 +195,9 @@ export function MainLayout() {
                   <p className="text-sm font-medium">
                     {displayName}
                   </p>
+                  <p className="text-xs text-muted-foreground">
+                    {user?.email}
+                  </p>
                   <p className="text-xs text-muted-foreground capitalize">
                     {user?.rol}
                   </p>
