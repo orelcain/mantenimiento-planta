@@ -113,14 +113,20 @@ export function renderGoogleButton(elementId: string): void {
 
 // Autenticar con el token JWT de Google
 async function signInWithGoogleToken(idToken: string): Promise<User> {
+  console.log('[Auth] 1. Creating credential object...')
   const credential = GoogleAuthProvider.credential(idToken)
+  
+  console.log('[Auth] 2. Signing in with credential to Firebase...')
   const result = await signInWithCredential(auth, credential)
   const firebaseUser = result.user
+  console.log('[Auth] 3. Firebase Auth success. UID:', firebaseUser.uid)
   
   // Verificar si ya existe en Firestore
+  console.log('[Auth] 4. Fetching user profile from Firestore...')
   let user = await getUserById(firebaseUser.uid)
   
   if (user) {
+    console.log('[Auth] 5. User profile found. Checking status...')
     if (!user.activo) {
       await firebaseSignOut(auth)
       throw new Error('Usuario desactivado. Contacte al administrador.')
@@ -128,6 +134,7 @@ async function signInWithGoogleToken(idToken: string): Promise<User> {
     return user
   }
   
+  console.log('[Auth] 5. New user. Creating profile...')
   // Usuario nuevo - crear perfil
   const nombres = firebaseUser.displayName?.split(' ') || ['', '']
   const nombre = nombres[0] || ''
@@ -152,6 +159,7 @@ async function signInWithGoogleToken(idToken: string): Promise<User> {
     updatedAt: serverTimestamp(),
   })
   
+  console.log('[Auth] 6. Profile created successfully')
   return newUser
 }
 

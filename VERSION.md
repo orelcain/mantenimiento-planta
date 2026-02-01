@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.45.3**
+## Versión Actual: **v2.45.4**
 
 **Fecha de lanzamiento**: 01 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,13 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.45.4 - Debug Auth Logs (01/02/2026)
+- 🔍 **Debug**: Agregados logs paso a paso en `signInWithGoogleToken` para trazar la ejecución:
+  - `[Auth] 1. Creating credential object...`
+  - `[Auth] 2. Signing in with credential to Firebase...`
+  - `[Auth] 3. Firebase Auth success...`
+  - `[Auth] 4. Fetching user profile...`
 
 ### v2.45.3 - Mejora UX Login & Auth Persistence (01/02/2026)
 - ✨ **Feature**: Opción "Mantener sesión iniciada" (Switch on/off) en pantalla de login.
