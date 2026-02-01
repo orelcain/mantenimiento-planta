@@ -38,7 +38,7 @@ export async function signIn(email: string, password: string): Promise<User> {
 }
 
 // Google Client ID (de Firebase Console)
-const GOOGLE_CLIENT_ID = '1019421112530-ouvc28l3ufakhhg4fh3kib71slcbhpg.apps.googleusercontent.com'
+const GOOGLE_CLIENT_ID = '1019421112530-ouvc28l3ufackhhg4fh3kib71slcbhpg.apps.googleusercontent.com'
 
 // Iniciar Google Identity Services y obtener token
 export function initGoogleSignIn(onSuccess: (user: User) => void, onError: (error: Error) => void): void {
