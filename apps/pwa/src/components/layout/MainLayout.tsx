@@ -69,8 +69,12 @@ export function MainLayout() {
   }
 
   const userInitials = user
-    ? `${user.nombre.charAt(0)}${user.apellido.charAt(0)}`.toUpperCase()
+    ? (user.rol === 'admin' ? 'AD' : `${user.nombre.charAt(0)}${user.apellido.charAt(0)}`.toUpperCase())
     : 'U'
+
+  const displayName = user
+    ? (user.rol === 'admin' ? 'Admin' : `${user.nombre} ${user.apellido}`)
+    : ''
 
   const allNavigation = isAdmin
     ? [...navigation, ...adminNavigation]
@@ -189,7 +193,7 @@ export function MainLayout() {
                 </Avatar>
                 <div className="flex-1 text-left">
                   <p className="text-sm font-medium">
-                    {user?.nombre} {user?.apellido}
+                    {displayName}
                   </p>
                   <p className="text-xs text-muted-foreground capitalize">
                     {user?.rol}

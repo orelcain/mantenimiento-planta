@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.45.4**
+## Versión Actual: **v2.45.5**
 
 **Fecha de lanzamiento**: 01 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,10 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.45.5 - UI: Admin Display Name (01/02/2026)
+- 🎨 **UI**: El usuario admin ahora se muestra como "Admin" en el sidebar en lugar del nombre completo.
+- 🔤 **UI**: Avatar del admin muestra iniciales "AD" en lugar de las iniciales del nombre.
 
 ### v2.45.4 - Debug Auth Logs (01/02/2026)
 - 🔍 **Debug**: Agregados logs paso a paso en `signInWithGoogleToken` para trazar la ejecución:
