@@ -110,19 +110,26 @@ export function LoginPage() {
     }
   }
 
-  // Login con Google (redirect)
+  // Login con Google (popup)
   const handleGoogleLogin = async () => {
     setError(null)
     setIsGoogleLoading(true)
     
     try {
-      logger.info('Starting Google redirect sign in')
-      await signInWithGoogle()
-      // La página se recargará después del redirect
+      logger.info('Starting Google popup sign in')
+      const user = await signInWithGoogle()
+      setUser(user)
+      logger.info('Google sign in successful', { userId: user.id })
+      navigate('/')
     } catch (err: unknown) {
       const errorObj = err instanceof Error ? err : new Error('Google auth error')
       logger.error('Google auth error', errorObj)
-      setError(getErrorMessage((err as any).code || (err as any).message))
+      const code = (err as any)?.code
+      // No mostrar error si usuario cerró el popup
+      if (code !== 'auth/popup-closed-by-user' && code !== 'auth/cancelled-popup-request') {
+        setError(getErrorMessage(code || (err as any)?.message))
+      }
+    } finally {
       setIsGoogleLoading(false)
     }
   }
