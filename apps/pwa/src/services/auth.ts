@@ -37,12 +37,12 @@ export async function signIn(email: string, password: string): Promise<User> {
   return user
 }
 
-// Google Client ID (de Firebase Console)
+// Google Client ID (de Firebase Console) - IMPORTANTE: Agregar https://orelcain.github.io a Origins en Google Cloud Console
 const GOOGLE_CLIENT_ID = '1019421112530-ouvc28l3ufackhhg4fh3kib71slcbhpg.apps.googleusercontent.com'
 
 // Iniciar Google Identity Services y obtener token
 export function initGoogleSignIn(onSuccess: (user: User) => void, onError: (error: Error) => void): void {
-  // @ts-ignore - google es global desde el script GSI
+  // @ts-expect-error - google es global desde el script GSI
   if (typeof google === 'undefined') {
     console.error('Google Identity Services not loaded')
     onError(new Error('Google Identity Services no cargado. Recarga la página.'))

@@ -15,6 +15,7 @@ import {
   onSnapshot
 } from 'firebase/firestore';
 import { db } from '@/services/firebase';
+import { useAuthStore } from '@/store';
 import type { Machine } from '@/types/repuestos';
 
 const COLLECTION_NAME = 'machines';
@@ -23,6 +24,8 @@ export function useMachines() {
   const [machines, setMachines] = useState<Machine[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const { isAuthenticated } = useAuthStore();
 
   // Cargar todas las máquinas
   const fetchMachines = async () => {
@@ -280,6 +283,11 @@ export function useMachines() {
 
   // Listener en tiempo real para cambios en máquinas
   useEffect(() => {
+    if (!isAuthenticated) {
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     
     const q = query(collection(db, COLLECTION_NAME), orderBy('orden', 'asc'));
@@ -334,7 +342,7 @@ export function useMachines() {
     );
     
     return () => unsubscribe();
-  }, []);
+  }, [isAuthenticated]);
 
   return {
     machines,

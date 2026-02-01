@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.45.1**
+## Versión Actual: **v2.45.2**
 
 **Fecha de lanzamiento**: 01 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.45.2 - Fix Auth & Permissions (01/02/2026)
+- 🐛 **Fix Firestore**: `useMachines` prevenido de ejecutarse sin autenticación (evita error `Missing or insufficient permissions` en Login).
+- 🔧 **Auth**: Documentación agregada sobre whitelist de orígenes en Google Cloud.
+- 🧹 **Lint**: Corrección de `@ts-ignore` a `@ts-expect-error` en `auth.ts`.
 
 ### v2.45.1 - Fix Admin Permisos UI (01/02/2026)
 - 🐛 **Fix**: Correcciones críticas en `PermissionsPage.tsx` que impedían el build.
