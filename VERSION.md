@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.45.6**
+## Versión Actual: **v2.45.7**
 
 **Fecha de lanzamiento**: 01 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,10 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.45.7 - UI: Indicador de Proveedor Auth (01/02/2026)
+- 📄 **UI**: Icono pequeño de correo (Google) aparece junto al nombre si la cuenta es Google.
+- 🎯 **UX**: Facilita identificar qué usuarios usan cuenta Google.
 
 ### v2.45.6 - UI: Agregar Email en Sidebar (01/02/2026)
 - 📧 **UI**: Ahora se muestra el correo electrónico debajo del nombre del usuario en el sidebar.

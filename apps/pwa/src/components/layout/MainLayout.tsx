@@ -20,6 +20,7 @@ import {
   MapPin,
   FileText,
   Route,
+  Mail,
 } from 'lucide-react'
 import { Avatar, AvatarFallback, Button } from '@/components/ui'
 import { useAuthStore, useIsAdmin, useAppStore } from '@/store'
@@ -192,9 +193,14 @@ export function MainLayout() {
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 text-left">
-                  <p className="text-sm font-medium">
-                    {displayName}
-                  </p>
+                  <div className="flex items-center gap-1">
+                    <p className="text-sm font-medium">
+                      {displayName}
+                    </p>
+                    {user?.authProvider === 'google' && (
+                      <Mail className="h-3.5 w-3.5 text-muted-foreground" title="Cuenta Google" />
+                    )}
+                  </div>
                   <p className="text-xs text-muted-foreground">
                     {user?.email}
                   </p>
