@@ -6,7 +6,7 @@ import {
   User as FirebaseUser,
   updateProfile,
   GoogleAuthProvider,
-  signInWithPopup,
+  signInWithCredential,
 } from 'firebase/auth'
 import {
   doc,
@@ -37,13 +37,67 @@ export async function signIn(email: string, password: string): Promise<User> {
   return user
 }
 
-// Iniciar sesión con Google (popup)
-export async function signInWithGoogle(): Promise<User> {
-  const provider = new GoogleAuthProvider()
-  provider.addScope('email')
-  provider.addScope('profile')
-  
-  const result = await signInWithPopup(auth, provider)
+// Google Client ID (de Firebase Console)
+const GOOGLE_CLIENT_ID = '1019421112530-ouvc28l3ufakhhg4fh3kib71slcbhpg.apps.googleusercontent.com'
+
+// Iniciar Google Identity Services y obtener token
+export function initGoogleSignIn(onSuccess: (user: User) => void, onError: (error: Error) => void): void {
+  // @ts-ignore - google es global desde el script GSI
+  if (typeof google === 'undefined') {
+    console.error('Google Identity Services not loaded')
+    onError(new Error('Google Identity Services no cargado. Recarga la página.'))
+    return
+  }
+
+  // @ts-ignore
+  google.accounts.id.initialize({
+    client_id: GOOGLE_CLIENT_ID,
+    callback: async (response: { credential: string }) => {
+      try {
+        const user = await signInWithGoogleToken(response.credential)
+        onSuccess(user)
+      } catch (error) {
+        onError(error instanceof Error ? error : new Error('Error en autenticación'))
+      }
+    },
+    auto_select: false,
+    cancel_on_tap_outside: true,
+  })
+}
+
+// Mostrar el prompt de Google (One Tap)
+export function promptGoogleSignIn(): void {
+  // @ts-ignore
+  if (typeof google !== 'undefined') {
+    // @ts-ignore
+    google.accounts.id.prompt()
+  }
+}
+
+// Renderizar botón de Google en un elemento
+export function renderGoogleButton(elementId: string): void {
+  // @ts-ignore
+  if (typeof google !== 'undefined') {
+    const element = document.getElementById(elementId)
+    if (element) {
+      // @ts-ignore
+      google.accounts.id.renderButton(element, {
+        type: 'standard',
+        theme: 'filled_black',
+        size: 'large',
+        text: 'continue_with',
+        shape: 'rectangular',
+        width: 280,
+        locale: 'es',
+      })
+    }
+  }
+}
+
+// Autenticar con el token JWT de Google
+async function signInWithGoogleToken(idToken: string): Promise<User> {
+  const credential = GoogleAuthProvider.credential(idToken)
+  const result = await signInWithCredential(auth, credential)
   const firebaseUser = result.user
   
   // Verificar si ya existe en Firestore
