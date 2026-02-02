@@ -14,8 +14,8 @@ permissions:
   id-token: write
 
 concurrency:
-  group: 'pages'
-  cancel-in-progress: false
+  group: 'pages-prod'
+  cancel-in-progress: true
 
 env:
   NODE_VERSION: '20'
