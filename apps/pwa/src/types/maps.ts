@@ -76,6 +76,10 @@ export interface Inspection {
   motivoInspeccion?: string // "Revisión mensual", "Auditoría", etc.
   responsable?: string // userId del responsable
   inspectorNames?: string // Nombres de quienes realizaron la inspección (texto libre)
+  // Campos adicionales para formato de checklist
+  horaInicio?: string // Hora de inicio de la inspección (ej: "08:00")
+  horaTermino?: string // Hora de término de la inspección (ej: "16:00")
+  folio?: string // Número de folio del documento
   createdBy: string
   createdByName?: string
   createdAt: Date
@@ -105,6 +109,13 @@ export interface InspectionItem {
   description?: string
   fotos: InspectionPhoto[] // Fotos con descripción
   prioridad?: 'critica' | 'alta' | 'media' | 'baja'
+  // Campos de checklist
+  cumple?: boolean // Cumple (C)
+  noCumple?: boolean // No Cumple (N/C)
+  observacion?: string // Observaciones del punto
+  fechaReparacion?: Date // Fecha de reparación si aplica
+  horaInicioItem?: string // Hora de inicio del trabajo en este punto
+  horaTerminoItem?: string // Hora de término del trabajo en este punto
   // Si se convierte en incidencia formal
   incidentId?: string
   createdAt: Date

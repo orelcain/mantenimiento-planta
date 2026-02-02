@@ -232,6 +232,14 @@ export async function exportInspectionToPDF(
     infoItems.push(`Realizada por: ${inspection.createdByName}`)
   }
   
+  if (inspection.horaInicio && inspection.horaTermino) {
+    infoItems.push(`Horario: ${inspection.horaInicio} - ${inspection.horaTermino}`)
+  }
+  
+  if (inspection.folio) {
+    infoItems.push(`Folio N°: ${inspection.folio}`)
+  }
+  
   if (inspection.motivoInspeccion) {
     infoItems.push(`Motivo: ${inspection.motivoInspeccion}`)
   }
@@ -346,35 +354,40 @@ export async function exportInspectionToPDF(
   doc.text('Detalle de Puntos de Inspección', margin, yPosition)
   yPosition += 6
 
-  // Preparar datos de la tabla
+  // Preparar datos de la tabla con campos de checklist
   const tableData = items.map(item => [
     item.order.toString(),
     item.title,
-    item.description || '-',
-    getPriorityLabel(item.prioridad),
-    item.fotos.length > 0 ? `${item.fotos.length} foto(s)` : '-'
+    item.cumple ? 'X' : '',
+    item.noCumple ? 'X' : '',
+    item.observacion || '-',
+    item.fechaReparacion ? formatDate(item.fechaReparacion) : '-',
+    item.fotos.length > 0 ? item.fotos.length.toString() : '-'
   ])
 
   autoTable(doc, {
-    head: [['#', 'Título', 'Descripción', 'Prioridad', 'Fotos']],
+    head: [['#', 'Actividad', 'C', 'N/C', 'Observación', 'F. Reparación', 'Fotos']],
     body: tableData,
     startY: yPosition,
-    theme: 'striped',
+    theme: 'grid',
     headStyles: {
       fillColor: [41, 128, 185],
       textColor: 255,
       fontStyle: 'bold',
-      fontSize: 9,
+      fontSize: 8,
+      halign: 'center'
     },
     bodyStyles: {
-      fontSize: 8,
+      fontSize: 7,
     },
     columnStyles: {
       0: { cellWidth: 10, halign: 'center' },
-      1: { cellWidth: 40 },
-      2: { cellWidth: 70 },
-      3: { cellWidth: 25, halign: 'center' },
-      4: { cellWidth: 25, halign: 'center' },
+      1: { cellWidth: 60 },
+      2: { cellWidth: 10, halign: 'center' },
+      3: { cellWidth: 10, halign: 'center' },
+      4: { cellWidth: 50 },
+      5: { cellWidth: 25, halign: 'center' },
+      6: { cellWidth: 15, halign: 'center' },
     },
     margin: { left: margin, right: margin },
   })

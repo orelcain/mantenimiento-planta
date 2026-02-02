@@ -98,6 +98,9 @@ export function InspectionsPage() {
   const [isCreating, setIsCreating] = useState(false)
   const [inspectorNames, setInspectorNames] = useState('')
   const [inspectionListText, setInspectionListText] = useState('')
+  const [horaInicio, setHoraInicio] = useState('08:00')
+  const [horaTermino, setHoraTermino] = useState('16:00')
+  const [folio, setFolio] = useState('')
   
   // Inspección activa (para agregar items)
   const [activeInspection, setActiveInspection] = useState<Inspection | null>(null)
@@ -131,7 +134,7 @@ export function InspectionsPage() {
   const [duplicateNewName, setDuplicateNewName] = useState('')
   const [isDuplicating, setIsDuplicating] = useState(false)
   
-  // Modal de edición completa de item (título, descripción, prioridad, fotos)
+  // Modal de edición completa de item (título, descripción, prioridad, fotos, checklist)
   const [editingItem, setEditingItem] = useState<InspectionItem | null>(null)
   const [editItemTitle, setEditItemTitle] = useState('')
   const [editItemDescription, setEditItemDescription] = useState('')
@@ -140,6 +143,13 @@ export function InspectionsPage() {
   const [newPhotosForItem, setNewPhotosForItem] = useState<File[]>([])
   const [newPhotosPreviewItem, setNewPhotosPreviewItem] = useState<string[]>([])
   const [isSavingItem, setIsSavingItem] = useState(false)
+  // Campos de checklist
+  const [editItemCumple, setEditItemCumple] = useState(false)
+  const [editItemNoCumple, setEditItemNoCumple] = useState(false)
+  const [editItemObservacion, setEditItemObservacion] = useState('')
+  const [editItemFechaReparacion, setEditItemFechaReparacion] = useState('')
+  const [editItemHoraInicio, setEditItemHoraInicio] = useState('')
+  const [editItemHoraTermino, setEditItemHoraTermino] = useState('')
   
   // Modal de imagen grande con zoom/pan
   const [viewingImage, setViewingImage] = useState<string | null>(null)
@@ -205,7 +215,10 @@ export function InspectionsPage() {
         mapVersionId: mapVersion.id,
         createdBy: user.id,
         createdByName: user.nombre || user.email,
-        inspectorNames: inspectorNames.trim() || undefined
+        inspectorNames: inspectorNames.trim() || undefined,
+        horaInicio: horaInicio.trim() || undefined,
+        horaTermino: horaTermino.trim() || undefined,
+        folio: folio.trim() || undefined
       }
       
       const inspection = await createInspection(data)
@@ -235,6 +248,9 @@ export function InspectionsPage() {
       setSelectedLocationId('')
       setInspectorNames('')
       setInspectionListText('')
+      setHoraInicio('08:00')
+      setHoraTermino('16:00')
+      setFolio('')
       
       // Abrir la inspección recién creada
       handleOpenInspection(inspection)
@@ -488,6 +504,13 @@ export function InspectionsPage() {
     setEditItemPhotos([...item.fotos])
     setNewPhotosForItem([])
     setNewPhotosPreviewItem([])
+    // Cargar campos de checklist
+    setEditItemCumple(item.cumple || false)
+    setEditItemNoCumple(item.noCumple || false)
+    setEditItemObservacion(item.observacion || '')
+    setEditItemFechaReparacion(item.fechaReparacion ? item.fechaReparacion.toISOString().split('T')[0] : '')
+    setEditItemHoraInicio(item.horaInicioItem || '')
+    setEditItemHoraTermino(item.horaTerminoItem || '')
   }
   
   // Agregar nuevas fotos al item
@@ -547,7 +570,13 @@ export function InspectionsPage() {
         title: editItemTitle.trim(),
         description: editItemDescription.trim() || undefined,
         prioridad: editItemPriority as InspectionItem['prioridad'] || undefined,
-        fotos: finalPhotos
+        fotos: finalPhotos,
+        cumple: editItemCumple || undefined,
+        noCumple: editItemNoCumple || undefined,
+        observacion: editItemObservacion.trim() || undefined,
+        fechaReparacion: editItemFechaReparacion ? new Date(editItemFechaReparacion) : undefined,
+        horaInicioItem: editItemHoraInicio.trim() || undefined,
+        horaTerminoItem: editItemHoraTermino.trim() || undefined
       })
       
       // Actualizar estado local
@@ -557,7 +586,13 @@ export function InspectionsPage() {
           title: editItemTitle.trim(),
           description: editItemDescription.trim() || undefined,
           prioridad: editItemPriority as InspectionItem['prioridad'] || undefined,
-          fotos: finalPhotos
+          fotos: finalPhotos,
+          cumple: editItemCumple || undefined,
+          noCumple: editItemNoCumple || undefined,
+          observacion: editItemObservacion.trim() || undefined,
+          fechaReparacion: editItemFechaReparacion ? new Date(editItemFechaReparacion) : undefined,
+          horaInicioItem: editItemHoraInicio.trim() || undefined,
+          horaTerminoItem: editItemHoraTermino.trim() || undefined
         } : i
       ))
       
@@ -1269,6 +1304,91 @@ export function InspectionsPage() {
                   </SelectContent>
                 </Select>
               </div>
+
+              {/* Sección de Checklist */}
+              <div className="space-y-3 p-3 border rounded-lg bg-muted/20">
+                <Label className="text-sm font-semibold">Checklist de Inspección</Label>
+                
+                {/* Cumple / No Cumple */}
+                <div className="flex items-center gap-6">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={editItemCumple}
+                      onChange={(e) => {
+                        setEditItemCumple(e.target.checked)
+                        if (e.target.checked) setEditItemNoCumple(false)
+                      }}
+                      className="w-4 h-4"
+                    />
+                    <span className="text-sm font-medium text-green-600">Cumple (C)</span>
+                  </label>
+                  
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={editItemNoCumple}
+                      onChange={(e) => {
+                        setEditItemNoCumple(e.target.checked)
+                        if (e.target.checked) setEditItemCumple(false)
+                      }}
+                      className="w-4 h-4"
+                    />
+                    <span className="text-sm font-medium text-red-600">No Cumple (N/C)</span>
+                  </label>
+                </div>
+
+                {/* Observación */}
+                <div className="space-y-2">
+                  <Label htmlFor="edit-item-observacion" className="text-xs">Observación</Label>
+                  <SpeechTextarea
+                    id="edit-item-observacion"
+                    value={editItemObservacion}
+                    onChange={(e) => setEditItemObservacion(e.target.value)}
+                    placeholder="Observaciones del punto de inspección..."
+                    rows={2}
+                    className="text-sm"
+                  />
+                </div>
+
+                {/* Fecha de reparación */}
+                {editItemNoCumple && (
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-item-fecha-reparacion" className="text-xs">Fecha Reparación</Label>
+                    <Input
+                      id="edit-item-fecha-reparacion"
+                      type="date"
+                      value={editItemFechaReparacion}
+                      onChange={(e) => setEditItemFechaReparacion(e.target.value)}
+                      className="text-sm"
+                    />
+                  </div>
+                )}
+
+                {/* Horas de trabajo */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-item-hora-inicio" className="text-xs">Hora Inicio</Label>
+                    <Input
+                      id="edit-item-hora-inicio"
+                      type="time"
+                      value={editItemHoraInicio}
+                      onChange={(e) => setEditItemHoraInicio(e.target.value)}
+                      className="text-sm"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-item-hora-termino" className="text-xs">Hora Término</Label>
+                    <Input
+                      id="edit-item-hora-termino"
+                      type="time"
+                      value={editItemHoraTermino}
+                      onChange={(e) => setEditItemHoraTermino(e.target.value)}
+                      className="text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
               
               {/* Fotos existentes con descripción */}
               {editItemPhotos.length > 0 && (
@@ -1659,6 +1779,34 @@ export function InspectionsPage() {
                 value={inspectorNames}
                 onChange={(e) => setInspectorNames(e.target.value)}
                 placeholder="Nombres de quienes realizan la inspección"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Hora Inicio</Label>
+                <Input
+                  type="time"
+                  value={horaInicio}
+                  onChange={(e) => setHoraInicio(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Hora Término</Label>
+                <Input
+                  type="time"
+                  value={horaTermino}
+                  onChange={(e) => setHoraTermino(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Folio (opcional)</Label>
+              <Input
+                value={folio}
+                onChange={(e) => setFolio(e.target.value)}
+                placeholder="Número de folio"
               />
             </div>
             

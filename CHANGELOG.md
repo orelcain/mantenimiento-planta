@@ -7,6 +7,29 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.0] - 2026-02-02
+
+### 🚀 Nuevas Funcionalidades
+
+#### Formato de Checklist para Inspecciones
+- **Adaptación a formato Excel de inspección diaria**: El sistema ahora soporta el formato completo de checklist de inspección basado en el Excel compartido.
+  - **Encabezado de inspección**: Campos adicionales para Hora Inicio, Hora Término y Folio N°.
+  - **Checklist por punto**: Cada punto de inspección ahora incluye:
+    - Checkbox "Cumple (C)" y "No Cumple (N/C)" mutuamente excluyentes.
+    - Campo de "Observación" para notas detalladas.
+    - "Fecha de Reparación" (se muestra cuando se marca No Cumple).
+    - "Hora Inicio" y "Hora Término" para cada punto.
+  - **Exportación PDF mejorada**: El PDF generado ahora incluye tabla con formato de checklist:
+    - Columnas: #, Actividad, C, N/C, Observación, F. Reparación, Fotos.
+    - Encabezado con horarios y folio.
+  - **Soporte de imágenes**: Mantiene capacidad de adjuntar hasta 5 fotos por punto con descripciones.
+
+### 🔧 Mejoras Técnicas
+- Actualizado tipo `Inspection` para incluir `horaInicio`, `horaTermino`, `folio`.
+- Actualizado tipo `InspectionItem` con campos de checklist: `cumple`, `noCumple`, `observacion`, `fechaReparacion`, `horaInicioItem`, `horaTerminoItem`.
+- Actualizados parsers de Firestore para soportar nuevos campos.
+- Modal de edición de punto expandido con sección de checklist.
+
 ## [2.47.0] - 2026-02-01
 
 ### 🚀 Nuevas Funcionalidades
