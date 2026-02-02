@@ -226,7 +226,9 @@ export async function exportInspectionToPDF(
     `Total de puntos: ${items.length}`,
   ]
   
-  if (inspection.createdByName) {
+  if (inspection.inspectorNames) {
+    infoItems.push(`Inspectores: ${inspection.inspectorNames}`)
+  } else if (inspection.createdByName) {
     infoItems.push(`Realizada por: ${inspection.createdByName}`)
   }
   
@@ -679,12 +681,19 @@ async function exportInspectionLandscapePDF(
   doc.setFontSize(8)
   doc.setFont('helvetica', 'normal')
   
-  const infoText = [
+  const infoParts = [
     `Ubicacion: ${sanitizeText(inspection.locationName)}`,
     `Fecha: ${formatDate(inspection.createdAt)}`,
-    `Puntos: ${items.length}`,
-    `Usuario: ${sanitizeText(inspection.createdByName || 'Sistema')}`
-  ].join('  -  ')
+    `Puntos: ${items.length}`
+  ]
+
+  if (inspection.inspectorNames) {
+    infoParts.push(`Inspectores: ${sanitizeText(inspection.inspectorNames)}`)
+  } else {
+    infoParts.push(`Usuario: ${sanitizeText(inspection.createdByName || 'Sistema')}`)
+  }
+  
+  const infoText = infoParts.join('  -  ')
   
   doc.text(infoText, margin, yPosition)
   yPosition += 4

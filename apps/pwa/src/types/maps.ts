@@ -75,6 +75,7 @@ export interface Inspection {
   // Metadata del levantamiento
   motivoInspeccion?: string // "Revisión mensual", "Auditoría", etc.
   responsable?: string // userId del responsable
+  inspectorNames?: string // Nombres de quienes realizaron la inspección (texto libre)
   createdBy: string
   createdByName?: string
   createdAt: Date
@@ -150,6 +151,7 @@ export interface CreateInspectionDTO {
   locationName: string
   mapVersionId: string
   motivoInspeccion?: string
+  inspectorNames?: string
   createdBy: string
   createdByName?: string
 }

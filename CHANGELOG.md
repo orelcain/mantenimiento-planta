@@ -7,6 +7,20 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.46.0] - 2026-02-01
+
+### 🗺️ Rutas de Inspección: Carga masiva y mejoras
+
+#### Añadido
+- **Carga masiva por lista**: Nuevo campo de texto al crear inspección para pegar listas de puntos (Excel/Notepad).
+- **Parseo inteligente**: Detecta y limpia numeración automática (1., -, *) al crear puntos desde lista.
+- **Campo Inspectores**: Nuevo campo "Inspectores" (opcional) para registrar nombres de quienes realizan la ruta.
+- **Edición**: Posibilidad de editar el campo de inspectores en rutas existentes.
+
+#### Mejorado
+- **PDF Export**: El reporte PDF ahora muestra los nombres de los inspectores en la cabecera si están disponibles.
+- **Tipos**: Actualizada interfaz `Inspection` con `inspectorNames`.
+
 ## [2.6.1] - 2026-01-10
 
 ### 🎯 UX Mejorada: Filtros y Persistencia

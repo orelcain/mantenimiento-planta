@@ -408,6 +408,7 @@ export async function createInspection(
     totalItems: 0,
     createdBy: data.createdBy,
     createdByName: data.createdByName,
+    inspectorNames: data.inspectorNames || data.createdByName,
     createdAt: now,
     updatedAt: now,
   }
@@ -465,7 +466,7 @@ export async function getInspectionById(id: string): Promise<Inspection | null> 
  */
 export async function updateInspection(
   id: string,
-  data: Partial<Pick<Inspection, 'nombre' | 'descripcion' | 'status' | 'totalMarkers' | 'totalItems'>>
+  data: Partial<Pick<Inspection, 'nombre' | 'descripcion' | 'status' | 'totalMarkers' | 'totalItems' | 'inspectorNames'>>
 ): Promise<void> {
   const updateData: Record<string, unknown> = {
     ...data,
@@ -585,7 +586,7 @@ export async function deleteInspectionItem(_inspectionId: string, itemId: string
  */
 export async function updateInspectionItem(
   id: string,
-  data: Partial<Pick<InspectionItem, 'title' | 'description' | 'prioridad' | 'fotos' | 'incidentId'>>
+  data: Partial<Pick<InspectionItem, 'title' | 'description' | 'prioridad' | 'fotos' | 'incidentId' | 'position'>>
 ): Promise<void> {
   await updateDoc(doc(db, INSPECTION_ITEMS_COLLECTION, id), {
     ...data,

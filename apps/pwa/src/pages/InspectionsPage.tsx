@@ -93,6 +93,8 @@ export function InspectionsPage() {
   const [newInspectionName, setNewInspectionName] = useState('')
   const [selectedLocationId, setSelectedLocationId] = useState<string>('')
   const [isCreating, setIsCreating] = useState(false)
+  const [inspectorNames, setInspectorNames] = useState('')
+  const [inspectionListText, setInspectionListText] = useState('')
   
   // Inspección activa (para agregar items)
   const [activeInspection, setActiveInspection] = useState<Inspection | null>(null)
@@ -117,6 +119,7 @@ export function InspectionsPage() {
   const [isEditInspectionModalOpen, setIsEditInspectionModalOpen] = useState(false)
   const [editInspectionName, setEditInspectionName] = useState('')
   const [editInspectionDescription, setEditInspectionDescription] = useState('')
+  const [editInspectorNames, setEditInspectorNames] = useState('')
   const [isSavingInspection, setIsSavingInspection] = useState(false)
   
   // Modal de edición completa de item (título, descripción, prioridad, fotos)
@@ -192,14 +195,37 @@ export function InspectionsPage() {
         locationName: location?.nombre || '',
         mapVersionId: mapVersion.id,
         createdBy: user.id,
-        createdByName: user.nombre || user.email
+        createdByName: user.nombre || user.email,
+        inspectorNames: inspectorNames.trim() || undefined
       }
       
       const inspection = await createInspection(data)
+
+      // Procesar lista de puntos (si existe)
+      if (inspectionListText.trim()) {
+        const lines = inspectionListText.split('\n').filter(line => line.trim().length > 0)
+        
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i].trim()
+          // Limpiar prefijos (1. , - , * )
+          const cleanTitle = line.replace(/^([0-9]+\.|-|•|\*)\s+/, '')
+          
+          const itemData: CreateInspectionItemDTO = {
+            inspectionId: inspection.id,
+            title: cleanTitle,
+            order: i + 1,
+            position: { x: 0.5, y: 0.5 }
+          }
+          await addInspectionItem(itemData)
+        }
+      }
+
       setInspections(prev => [inspection, ...prev])
       setIsCreateModalOpen(false)
       setNewInspectionName('')
       setSelectedLocationId('')
+      setInspectorNames('')
+      setInspectionListText('')
       
       // Abrir la inspección recién creada
       handleOpenInspection(inspection)
@@ -354,6 +380,7 @@ export function InspectionsPage() {
     if (!activeInspection) return
     setEditInspectionName(activeInspection.nombre)
     setEditInspectionDescription(activeInspection.descripcion || '')
+    setEditInspectorNames(activeInspection.inspectorNames || activeInspection.createdByName || '')
     setIsEditInspectionModalOpen(true)
   }
   
@@ -365,21 +392,24 @@ export function InspectionsPage() {
     try {
       await updateInspection(activeInspection.id, {
         nombre: editInspectionName.trim(),
-        descripcion: editInspectionDescription.trim() || undefined
+        descripcion: editInspectionDescription.trim() || undefined,
+        inspectorNames: editInspectorNames.trim() || undefined
       })
       
       // Actualizar estado local
       setActiveInspection(prev => prev ? {
         ...prev,
         nombre: editInspectionName.trim(),
-        descripcion: editInspectionDescription.trim() || undefined
+        descripcion: editInspectionDescription.trim() || undefined,
+        inspectorNames: editInspectorNames.trim() || undefined
       } : null)
       
       setInspections(prev => prev.map(i => 
         i.id === activeInspection.id ? {
           ...i,
           nombre: editInspectionName.trim(),
-          descripcion: editInspectionDescription.trim() || undefined
+          descripcion: editInspectionDescription.trim() || undefined,
+          inspectorNames: editInspectorNames.trim() || undefined
         } : i
       ))
       
@@ -1067,6 +1097,16 @@ export function InspectionsPage() {
                   placeholder="Nombre de la inspeccion"
                 />
               </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-inspection-inspectors">Inspectores</Label>
+                <Input
+                  id="edit-inspection-inspectors"
+                  value={editInspectorNames}
+                  onChange={(e) => setEditInspectorNames(e.target.value)}
+                  placeholder="Nombres de los inspectores"
+                />
+              </div>
               
               <div className="space-y-2">
                 <Label htmlFor="edit-inspection-description">Descripcion</Label>
@@ -1548,6 +1588,15 @@ export function InspectionsPage() {
                 placeholder="Ej: Inspección Planta - Turno Mañana"
               />
             </div>
+
+            <div className="space-y-2">
+              <Label>Inspectores (opcional)</Label>
+              <Input
+                value={inspectorNames}
+                onChange={(e) => setInspectorNames(e.target.value)}
+                placeholder="Nombres de quienes realizan la inspección"
+              />
+            </div>
             
             <div className="space-y-2">
               <Label>Ubicación / Mapa *</Label>
@@ -1570,6 +1619,20 @@ export function InspectionsPage() {
                   </button>
                 ))}
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Lista de Puntos (opcional)</Label>
+              <SpeechTextarea
+                value={inspectionListText}
+                onChange={(e) => setInspectionListText(e.target.value)}
+                placeholder="Pegue aquí la lista de puntos..."
+                rows={5}
+                className="font-mono text-sm"
+              />
+              <p className="text-xs text-muted-foreground">
+                Pegue una lista (numerada o con guiones) para crear automáticamente los puntos de inspección.
+              </p>
             </div>
           </div>
           
