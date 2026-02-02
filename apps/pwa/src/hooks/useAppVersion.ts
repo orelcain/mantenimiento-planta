@@ -19,15 +19,31 @@ export function useAppVersion() {
     const checkVersion = async () => {
       try {
         // Usar getAssetUrl para obtener la ruta correcta con BASE_URL
-        const versionUrl = getAssetUrl(`/version.json?t=${Date.now()}`)
+        // Añadir timestamp para evitar caché, usando parámetro 'v'
+        const versionUrl = getAssetUrl(`/version.json?v=${Date.now()}`)
+        
+        // Verificación de URL válida antes del fetch
+        if (!versionUrl || versionUrl.includes('undefined')) {
+          console.warn('⚠️ Invalid version URL:', versionUrl)
+          return
+        }
+
         const response = await fetch(versionUrl, {
           cache: 'no-store',
           headers: {
             'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
           },
         })
         
         if (response.ok) {
+          // Verificar contentType para asegurar que es JSON y no HTML (404 page)
+          const contentType = response.headers.get('content-type')
+          if (!contentType || !contentType.includes('application/json')) {
+            // logger.debug('Version check returned non-JSON (likely 404/HTML)', { contentType })
+            return
+          }
+
           const data = await response.json()
           const serverVersion = data.version
           

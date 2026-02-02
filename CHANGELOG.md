@@ -7,6 +7,16 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.46.1] - 2026-02-01
+
+### 🐛 Bug Fixes
+
+#### Técnico
+- **Version Check**: Corregido error `ERR_SSL_PROTOCOL_ERROR` en console log durante el polling de versión.
+  - Validación de URL antes de fetch.
+  - Verificación estricta de `content-type: application/json` para evitar parsear HTML de páginas 404 como JSON.
+  - Cambio de parámetro `t` a `v` para evitar conflictos de caché.
+
 ## [2.46.0] - 2026-02-01
 
 ### 🗺️ Rutas de Inspección: Carga masiva y mejoras
