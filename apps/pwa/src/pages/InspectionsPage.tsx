@@ -206,32 +206,40 @@ export function InspectionsPage() {
 
       const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: '' })
       let currentSection = ''
+      let inTable = false
 
       rows.forEach((row) => {
-        const cells = (row as unknown[])
-          .map(normalize)
-          .filter((value) => value.length > 0)
+        const rowValues = (row as unknown[]).map(normalize)
+        const nonEmpty = rowValues.filter((value) => value.length > 0)
+        if (!nonEmpty.length) return
 
-        if (!cells.length) return
-
-        const sectionCell = cells.find((value) => isSection(value))
+        const sectionCell = rowValues.find((value) => isSection(value))
         if (sectionCell) {
           currentSection = sectionCell
+          inTable = false
+        }
+
+        const hasHeader = rowValues.some((value) => isHeaderCell(value))
+        if (hasHeader) {
+          inTable = true
           return
         }
 
-        if (!currentSection) return
-        if (cells.some((value) => isHeaderCell(value))) return
+        if (!currentSection || !inTable) return
 
-        if (cells.length === 1) {
-          lines.push(`${currentSection} - ${cells[0]}`)
+        const colB = rowValues[1]
+        const colC = rowValues[2]
+
+        if (colC && !isHeaderCell(colC)) {
+          const equipment = colB && !isHeaderCell(colB) ? colB : ''
+          const label = equipment ? `${currentSection} - ${equipment}: ${colC}` : `${currentSection} - ${colC}`
+          lines.push(label)
           return
         }
 
-        const equipment = cells[0]
-        const activity = cells[cells.length - 1]
-        const label = equipment ? `${currentSection} - ${equipment}: ${activity}` : `${currentSection} - ${activity}`
-        lines.push(label)
+        if (colB && !isHeaderCell(colB)) {
+          lines.push(`${currentSection} - ${colB}`)
+        }
       })
     })
 
