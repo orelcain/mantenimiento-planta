@@ -6,6 +6,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import * as XLSX from 'xlsx'
 import { 
   MapPin, 
   Plus, 
@@ -98,6 +99,7 @@ export function InspectionsPage() {
   const [isCreating, setIsCreating] = useState(false)
   const [inspectorNames, setInspectorNames] = useState('')
   const [inspectionListText, setInspectionListText] = useState('')
+  const [isParsingExcel, setIsParsingExcel] = useState(false)
   const [horaInicio, setHoraInicio] = useState('08:00')
   const [horaTermino, setHoraTermino] = useState('16:00')
   const [folio, setFolio] = useState('')
@@ -116,6 +118,7 @@ export function InspectionsPage() {
   const [photoPreviewUrls, setPhotoPreviewUrls] = useState<string[]>([])
   const [isAddingItem, setIsAddingItem] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const excelInputRef = useRef<HTMLInputElement>(null)
   
   // Modal de opciones PDF
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false)
@@ -187,6 +190,79 @@ export function InspectionsPage() {
       })
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const parseInspectionExcel = (workbook: XLSX.WorkBook): string[] => {
+    const lines: string[] = []
+    const normalize = (value: unknown) => String(value ?? '').replace(/\s+/g, ' ').trim()
+    const isSection = (text: string) => /^\d+\./.test(text)
+    const isHeaderCell = (text: string) =>
+      /^(actividad|c|n\/c|obs|observacion|fecha reparacion|hora inicio|hora termino|reviso conforme)$/i.test(text)
+
+    workbook.SheetNames.forEach((sheetName) => {
+      const sheet = workbook.Sheets[sheetName]
+      if (!sheet) return
+
+      const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: '' })
+      let currentSection = ''
+
+      rows.forEach((row) => {
+        const colB = normalize((row as unknown[])[1])
+        const colC = normalize((row as unknown[])[2])
+
+        if (colB && isSection(colB)) {
+          currentSection = colB
+          return
+        }
+
+        if (!currentSection) return
+        if (isHeaderCell(colB) || isHeaderCell(colC)) return
+        if (!colB && !colC) return
+
+        if (colC) {
+          const item = colB ? `${currentSection} - ${colB}: ${colC}` : `${currentSection} - ${colC}`
+          lines.push(item)
+          return
+        }
+
+        if (colB) {
+          lines.push(`${currentSection} - ${colB}`)
+        }
+      })
+    })
+
+    return lines.filter((line) => line.trim().length > 0)
+  }
+
+  const handleExcelFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    setIsParsingExcel(true)
+    try {
+      const buffer = await file.arrayBuffer()
+      const workbook = XLSX.read(buffer, { type: 'array' })
+      if (!workbook.SheetNames.length) throw new Error('El archivo no tiene hojas')
+
+      const lines = parseInspectionExcel(workbook)
+      if (!lines.length) throw new Error('No se encontraron actividades en el Excel')
+
+      setInspectionListText(lines.join('\n'))
+      toast({
+        title: 'Excel cargado',
+        description: `Se cargaron ${lines.length} actividades desde ${workbook.SheetNames.length} hojas.`
+      })
+    } catch (error) {
+      console.error('Error leyendo Excel de inspección:', error)
+      toast({
+        variant: 'destructive',
+        title: 'Error al leer Excel',
+        description: error instanceof Error ? error.message : 'No se pudo procesar el archivo.'
+      })
+    } finally {
+      setIsParsingExcel(false)
+      if (excelInputRef.current) excelInputRef.current.value = ''
     }
   }
   
@@ -1844,6 +1920,22 @@ export function InspectionsPage() {
               />
               <p className="text-xs text-muted-foreground">
                 Pegue una lista (numerada o con guiones) para crear automáticamente los puntos de inspección.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Importar desde Excel (opcional)</Label>
+              <div className="flex items-center gap-3">
+                <Input
+                  ref={excelInputRef}
+                  type="file"
+                  accept=".xlsx,.xls"
+                  onChange={handleExcelFileChange}
+                />
+                {isParsingExcel && <Spinner className="h-4 w-4" />}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Soporta plantillas con múltiples hojas (ej: Hoja1 y Hoja2) y concatena las actividades.
               </p>
             </div>
           </div>
