@@ -208,27 +208,30 @@ export function InspectionsPage() {
       let currentSection = ''
 
       rows.forEach((row) => {
-        const colB = normalize((row as unknown[])[1])
-        const colC = normalize((row as unknown[])[2])
+        const cells = (row as unknown[])
+          .map(normalize)
+          .filter((value) => value.length > 0)
 
-        if (colB && isSection(colB)) {
-          currentSection = colB
+        if (!cells.length) return
+
+        const sectionCell = cells.find((value) => isSection(value))
+        if (sectionCell) {
+          currentSection = sectionCell
           return
         }
 
         if (!currentSection) return
-        if (isHeaderCell(colB) || isHeaderCell(colC)) return
-        if (!colB && !colC) return
+        if (cells.some((value) => isHeaderCell(value))) return
 
-        if (colC) {
-          const item = colB ? `${currentSection} - ${colB}: ${colC}` : `${currentSection} - ${colC}`
-          lines.push(item)
+        if (cells.length === 1) {
+          lines.push(`${currentSection} - ${cells[0]}`)
           return
         }
 
-        if (colB) {
-          lines.push(`${currentSection} - ${colB}`)
-        }
+        const equipment = cells[0]
+        const activity = cells[cells.length - 1]
+        const label = equipment ? `${currentSection} - ${equipment}: ${activity}` : `${currentSection} - ${activity}`
+        lines.push(label)
       })
     })
 
