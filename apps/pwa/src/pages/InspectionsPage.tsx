@@ -23,6 +23,7 @@ import {
   ChevronLeft,
   ChevronRight,
   RotateCcw,
+  Copy,
   Pencil,
   RefreshCw,
   Search
@@ -32,6 +33,7 @@ import {
   Button, 
   Card, 
   CardContent, 
+  CardFooter,
   CardHeader, 
   CardTitle,
   Dialog,
@@ -55,6 +57,7 @@ import { useToast } from '@/hooks/useToast'
 import { 
   getInspectionsByUser, 
   createInspection, 
+  duplicateInspection,
   addInspectionItem,
   deleteInspectionItem,
   finalizeInspection,
@@ -121,6 +124,12 @@ export function InspectionsPage() {
   const [editInspectionDescription, setEditInspectionDescription] = useState('')
   const [editInspectorNames, setEditInspectorNames] = useState('')
   const [isSavingInspection, setIsSavingInspection] = useState(false)
+
+  // Duplicar Inspección
+  const [isDuplicateModalOpen, setIsDuplicateModalOpen] = useState(false)
+  const [duplicateSourceId, setDuplicateSourceId] = useState<string | null>(null)
+  const [duplicateNewName, setDuplicateNewName] = useState('')
+  const [isDuplicating, setIsDuplicating] = useState(false)
   
   // Modal de edición completa de item (título, descripción, prioridad, fotos)
   const [editingItem, setEditingItem] = useState<InspectionItem | null>(null)
@@ -424,6 +433,47 @@ export function InspectionsPage() {
       })
     } finally {
       setIsSavingInspection(false)
+    }
+  }
+
+  // ========== DUPLICAR INSPECCION ==========
+
+  const handleOpenDuplicateModal = (inspection: Inspection) => {
+    setDuplicateSourceId(inspection.id)
+    setDuplicateNewName(`${inspection.nombre} (Copia)`)
+    setIsDuplicateModalOpen(true)
+  }
+
+  const handleDuplicateInspection = async () => {
+    if (!duplicateSourceId || !user) return
+
+    setIsDuplicating(true)
+    try {
+      const newInspection = await duplicateInspection(
+        duplicateSourceId,
+        user.uid,
+        user.displayName || 'Usuario',
+        undefined,
+        duplicateNewName.trim()
+      )
+
+      // Agregar a la lista local
+      setInspections(prev => [newInspection, ...prev])
+
+      setIsDuplicateModalOpen(false)
+      toast({
+        title: 'Inspección duplicada',
+        description: 'Se ha creado la copia correctamente'
+      })
+    } catch (error) {
+      console.error('Error duplicating inspection:', error)
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'No se pudo duplicar la inspección'
+      })
+    } finally {
+      setIsDuplicating(false)
     }
   }
   
@@ -1567,6 +1617,20 @@ export function InspectionsPage() {
                   </div>
                 </div>
               </CardContent>
+              <CardFooter className="pt-0 flex justify-end">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="h-8 text-muted-foreground hover:text-primary"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleOpenDuplicateModal(inspection)
+                  }}
+                >
+                  <Copy className="h-3.5 w-3.5 mr-2" />
+                  Duplicar
+                </Button>
+              </CardFooter>
             </Card>
           ))}
         </div>
@@ -1646,6 +1710,43 @@ export function InspectionsPage() {
             >
               {isCreating && <Spinner className="h-4 w-4 mr-2" />}
               Crear Inspección
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal para duplicar inspección */}
+      <Dialog open={isDuplicateModalOpen} onOpenChange={setIsDuplicateModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Duplicar Inspección</DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Nombre de la Copia</Label>
+              <Input
+                value={duplicateNewName}
+                onChange={(e) => setDuplicateNewName(e.target.value)}
+                placeholder="Nombre para la nueva inspección"
+              />
+              <p className="text-xs text-muted-foreground">
+                Se copiarán todos los puntos de la inspección original. 
+                El estado se iniciará como "En Progreso" y se limpiarán las fotos y marcadores de completado.
+              </p>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDuplicateModalOpen(false)}>
+              Cancelar
+            </Button>
+            <Button 
+              onClick={handleDuplicateInspection}
+              disabled={!duplicateNewName.trim() || isDuplicating}
+            >
+              {isDuplicating && <Spinner className="h-4 w-4 mr-2" />}
+              Duplicar
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -386,6 +386,74 @@ export async function getAllInspections(): Promise<Inspection[]> {
 // INSPECTIONS
 // ============================================================
 
+export async function duplicateInspection(
+  sourceId: string,
+  userId: string,
+  newCreatedByName: string,
+  newInspectorNames?: string,
+  customName?: string
+): Promise<Inspection> {
+  const now = new Date()
+
+  // 1. Obtener inspección original
+  const sourceInspection = await getInspectionById(sourceId)
+  if (!sourceInspection) throw new Error('Inspection not found')
+
+  // 2. Crear nueva inspección
+  const newId = generateId()
+  const newInspection: Inspection = {
+    ...sourceInspection,
+    id: newId,
+    nombre: customName || `${sourceInspection.nombre} (Copia)`,
+    status: 'en_progreso',
+    totalItems: sourceInspection.totalItems,
+    createdAt: now,
+    updatedAt: now,
+    completedAt: undefined,
+    createdBy: userId,
+    createdByName: newCreatedByName,
+    inspectorNames: newInspectorNames, // Reset or set new
+  }
+
+  // Guardar nueva inspección
+  await setDoc(doc(db, INSPECTIONS_COLLECTION, newId), {
+    ...newInspection,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    completedAt: null
+  })
+
+  // 3. Copiar items
+  const sourceItems = await getInspectionItems(sourceId)
+  
+  // Procesar items en batch (serial o parallel)
+  // Nota: Firestore tiene límite de 500 writes por batch, 
+  // si son muchos items, mejor hacerlo de a pocos o individual.
+  // Aquí lo haremos en paralelo con Promise.all por simplicidad,
+  // asumiendo que no son miles de puntos.
+  
+  await Promise.all(sourceItems.map(async (sourceItem) => {
+    const itemId = generateId()
+    const itemData = {
+      id: itemId,
+      inspectionId: newId,
+      markerId: undefined, // Desvincular de marcadores existentes si los hubiera
+      order: sourceItem.order,
+      position: sourceItem.position,
+      title: sourceItem.title,
+      description: sourceItem.description || '',
+      fotos: [], // No copiar fotos
+      prioridad: sourceItem.prioridad || null,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    }
+    
+    await setDoc(doc(db, INSPECTION_ITEMS_COLLECTION, itemId), itemData)
+  }))
+
+  return newInspection
+}
+
 /**
  * Crear una nueva inspección
  */

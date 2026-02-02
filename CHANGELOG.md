@@ -7,6 +7,17 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.0] - 2026-02-01
+
+### 🚀 Nuevas Funcionalidades
+
+#### Gestión de Inspecciones
+- **Duplicar Inspección**: Nueva funcionalidad para copiar rutas de inspección existentes.
+  - Permite reutilizar rutas configuradas anteriormente.
+  - Genera una copia limpia de los puntos de inspección (sin fotos ni estados completados).
+  - Incluye opción para personalizar el nombre de la nueva inspección.
+  - Mantiene la asignación del mapa original.
+
 ## [2.46.1] - 2026-02-01
 
 ### 🐛 Bug Fixes
