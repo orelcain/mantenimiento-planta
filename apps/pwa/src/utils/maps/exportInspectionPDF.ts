@@ -390,7 +390,7 @@ export async function exportInspectionToPDF(
       5: { cellWidth: 22, halign: 'center' },
       6: { cellWidth: 12, halign: 'center' },
       7: { cellWidth: 25 }
-    }
+    },
     margin: { left: margin, right: margin },
   })
 
