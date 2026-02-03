@@ -404,8 +404,13 @@ export function InspectionsPage() {
       setFolio('')
       
       // Abrir la inspección recién creada
-      handleOpenInspection(inspection)
+      await handleOpenInspection(inspection)
       
+      // Si se seleccionó un área predefinida, abrir automáticamente el formulario diario
+      if (selectedArea) {
+        setIsDailyFormOpen(true)
+      }
+
       toast({
         title: 'Inspección creada',
         description: 'Ahora puedes agregar marcadores en el mapa'
