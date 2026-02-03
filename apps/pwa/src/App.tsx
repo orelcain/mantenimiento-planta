@@ -18,18 +18,48 @@ import {
   RepuestosDashboard,
 } from '@/pages'
 
-// Code Splitting: Lazy load para páginas pesadas o menos usadas
-const MapPage = lazy(() => import('@/pages/MapPage').then((mod) => ({ default: mod.MapPage })))
-const PreventivePage = lazy(() => import('@/pages/PreventivePage').then((mod) => ({ default: mod.PreventivePage })))
-const SettingsPage = lazy(() => import('@/pages/SettingsPage').then((mod) => ({ default: mod.SettingsPage })))
-const HierarchyPage = lazy(() => import('@/pages/HierarchyPage').then((mod) => ({ default: mod.HierarchyPage })))
-const PhotoEvidencePage = lazy(() => import('@/pages/PhotoEvidencePage').then((mod) => ({ default: mod.PhotoEvidencePage })))
-const PublicEquipmentView = lazy(() => import('@/pages/PublicEquipmentView').then((mod) => ({ default: mod.PublicEquipmentView })))
-const SensorsPage = lazy(() => import('@/pages/SensorsPage').then((mod) => ({ default: mod.SensorsPage })))
-const MapsAdminPage = lazy(() => import('@/pages/admin/MapsAdminPage').then((mod) => ({ default: mod.MapsAdminPage })))
-const InspectionsPage = lazy(() => import('@/pages/InspectionsPage').then((mod) => ({ default: mod.InspectionsPage })))
-const ETTPage = lazy(() => import('@/pages/admin/ETTPage').then((mod) => ({ default: mod.ETTPage })))
-const PermissionsPage = lazy(() => import('@/pages/admin/PermissionsPage').then((mod) => ({ default: mod.PermissionsPage })))
+// Helper para recargar chunks automáticamente en caso de error de versión (deploy nuevo)
+const lazyWithReload = (fn: () => Promise<any>) =>
+  lazy(() =>
+    fn().catch((error) => {
+      // Verificar errores comunes de carga de módulos/chunks
+      const isChunkLoadError = 
+        error.name === 'TypeError' && 
+        (error.message?.includes('Failed to fetch dynamically imported module') ||
+         error.message?.includes('Importing a module script failed') ||
+         error.message?.includes('check the network connection'))
+
+      if (isChunkLoadError) {
+        // Guardar flag para evitar bucles infinitos de recarga
+        const storageKey = 'chunk_load_error_reload'
+        const reloaded = sessionStorage.getItem(storageKey)
+        
+        if (!reloaded) {
+          console.log('Recargando página por actualización de versión (Chunk Load Error)...')
+          sessionStorage.setItem(storageKey, 'true')
+          window.location.reload()
+          return new Promise(() => {}) // Promesa perpetua mientras recarga
+        } else {
+          // Si ya recargamos y sigue fallando, limpiar flag y dejar que explote (o mostrar error)
+          sessionStorage.removeItem(storageKey)
+        }
+      }
+      throw error
+    })
+  )
+
+// Code Splitting con autorecarga
+const MapPage = lazyWithReload(() => import('@/pages/MapPage').then((mod) => ({ default: mod.MapPage })))
+const PreventivePage = lazyWithReload(() => import('@/pages/PreventivePage').then((mod) => ({ default: mod.PreventivePage })))
+const SettingsPage = lazyWithReload(() => import('@/pages/SettingsPage').then((mod) => ({ default: mod.SettingsPage })))
+const HierarchyPage = lazyWithReload(() => import('@/pages/HierarchyPage').then((mod) => ({ default: mod.HierarchyPage })))
+const PhotoEvidencePage = lazyWithReload(() => import('@/pages/PhotoEvidencePage').then((mod) => ({ default: mod.PhotoEvidencePage })))
+const PublicEquipmentView = lazyWithReload(() => import('@/pages/PublicEquipmentView').then((mod) => ({ default: mod.PublicEquipmentView })))
+const SensorsPage = lazyWithReload(() => import('@/pages/SensorsPage').then((mod) => ({ default: mod.SensorsPage })))
+const MapsAdminPage = lazyWithReload(() => import('@/pages/admin/MapsAdminPage').then((mod) => ({ default: mod.MapsAdminPage })))
+const InspectionsPage = lazyWithReload(() => import('@/pages/InspectionsPage').then((mod) => ({ default: mod.InspectionsPage })))
+const ETTPage = lazyWithReload(() => import('@/pages/admin/ETTPage').then((mod) => ({ default: mod.ETTPage })))
+const PermissionsPage = lazyWithReload(() => import('@/pages/admin/PermissionsPage').then((mod) => ({ default: mod.PermissionsPage })))
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuthStore()
