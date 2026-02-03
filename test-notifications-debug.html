@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Debug Notificaciones</title>
+  <style>
+    body {
+      font-family: monospace;
+      background: #1e1e1e;
+      color: #d4d4d4;
+      padding: 20px;
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+    .log {
+      background: #252526;
+      border: 1px solid #3e3e42;
+      padding: 10px;
+      margin: 5px 0;
+      border-radius: 4px;
+      font-size: 12px;
+    }
+    .log.error {
+      border-left: 3px solid #f48771;
+      background: #3d2d2b;
+    }
+    .log.success {
+      border-left: 3px solid #6a9955;
+      background: #2d3d2b;
+    }
+    .log.info {
+      border-left: 3px solid #569cd6;
+    }
+    button {
+      background: #569cd6;
+      color: white;
+      border: none;
+      padding: 10px 15px;
+      margin: 5px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-family: monospace;
+    }
+    button:hover {
+      background: #4a8dd4;
+    }
+    .section {
+      margin: 20px 0;
+      padding: 15px;
+      background: #252526;
+      border: 1px solid #3e3e42;
+      border-radius: 4px;
+    }
+    h2 {
+      color: #569cd6;
+      margin-top: 0;
+    }
+  </style>
+  <!-- Firebase SDKs for debug page -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js"></script>
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyBsJSh6x3ZGEyuXsM18dSWsJKyU7--KJss",
+      authDomain: "mantenimiento-planta-771a3.firebaseapp.com",
+      databaseURL: "https://mantenimiento-planta-771a3-default-rtdb.firebaseio.com",
+      projectId: "mantenimiento-planta-771a3",
+      storageBucket: "mantenimiento-planta-771a3.firebasestorage.app",
+      messagingSenderId: "1019421112530",
+      appId: "1:1019421112530:web:9afd9962e0b53152f8d50b",
+    }
+
+    // Detect base URL (GitHub Pages vs local)
+    function getBaseUrl() {
+      if (location.hostname.includes('github.io')) {
+        return '/mantenimiento-planta/'
+      }
+      return '/'
+    }
+  </script>
+</head>
+<body>
+  <h1>🔧 Debug Notificaciones Push</h1>
+  
+  <div class="section">
+    <h2>Estado del Sistema</h2>
+    <div id="status"></div>
+  </div>
+  
+  <div class="section">
+    <h2>Controles</h2>
+    <button onclick="testNotificationSupport()">✅ Test Soporte</button>
+    <button onclick="testSWRegistration()">📱 Test Service Worker</button>
+    <button onclick="testMessaging()">🔑 Test Messaging</button>
+    <button onclick="requestNotificationPerm()">🔔 Solicitar Permiso</button>
+    <button onclick="getTokenDebug()">🎟️ Obtener Token</button>
+    <button onclick="clearAll()">🗑️ Limpiar Todo</button>
+  </div>
+  
+  <div class="section">
+    <h2>Logs</h2>
+    <div id="logs"></div>
+  </div>
+
+  <script>
+    const logs = document.getElementById('logs');
+    const status = document.getElementById('status');
+
+    function addLog(message, type = 'info') {
+      const div = document.createElement('div');
+      div.className = `log ${type}`;
+      const time = new Date().toLocaleTimeString();
+      div.textContent = `[${time}] ${message}`;
+      logs.prepend(div);
+      if (logs.children.length > 50) {
+        logs.removeChild(logs.lastChild);
+      }
+    }
+
+    function updateStatus() {
+      const notSupported = !('Notification' in window);
+      const swSupported = 'serviceWorker' in navigator;
+      const fcmToken = localStorage.getItem('fcm_token');
+      const permission = Notification.permission;
+
+      status.innerHTML = `
+        <div>🌍 Notification API: ${notSupported ? '❌' : '✅'}</div>
+        <div>📱 Service Worker: ${swSupported ? '✅' : '❌'}</div>
+        <div>🔔 Permiso: ${permission || 'default'}</div>
+        <div>🎟️ Token en localStorage: ${fcmToken ? '✅ (' + fcmToken.substring(0, 20) + '...)' : '❌'}</div>
+      `;
+    }
+
+    async function testNotificationSupport() {
+      addLog('Testing notification support...', 'info');
+      
+      if (!('Notification' in window)) {
+        addLog('❌ Notification API not supported', 'error');
+        return;
+      }
+      
+      addLog('✅ Notification API supported', 'success');
+      addLog('📋 Current permission: ' + Notification.permission, 'info');
+      updateStatus();
+    }
+
+    async function testSWRegistration() {
+      addLog('Testing Service Worker registration...', 'info');
+      
+      if (!('serviceWorker' in navigator)) {
+        addLog('❌ Service Worker not supported', 'error');
+        return;
+      }
+      
+      try {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        addLog(`✅ Found ${regs.length} SW registrations`, 'success');
+        
+        regs.forEach((reg, i) => {
+          const scriptUrl = reg.active?.scriptURL || reg.installing?.scriptURL || reg.waiting?.scriptURL || 'unknown';
+          addLog(`  [${i}] ${scriptUrl}`, 'info');
+        });
+        
+        updateStatus();
+      } catch (error) {
+        addLog('❌ Error getting SW registrations: ' + error.message, 'error');
+      }
+    }
+
+    async function testMessaging() {
+      addLog('Testing Firebase Messaging...', 'info');
+      
+      try {
+        // Nota: esto es un test simple, no carga Firebase realmente
+        if (!window.firebase) {
+          addLog('⚠️ Firebase SDK not loaded yet (loaded by main app)', 'info');
+        } else {
+          addLog('✅ Firebase SDK is available', 'success');
+        }
+      } catch (error) {
+        addLog('❌ Error: ' + error.message, 'error');
+      }
+    }
+
+    async function requestNotificationPerm() {
+      addLog('Requesting notification permission...', 'info');
+      
+      if (!('Notification' in window)) {
+        addLog('❌ Notifications not supported', 'error');
+        return;
+      }
+      
+      try {
+        const permission = await Notification.requestPermission();
+        addLog('✅ Permission requested. Result: ' + permission, 'success');
+        updateStatus();
+      } catch (error) {
+        addLog('❌ Error: ' + error.message, 'error');
+      }
+    }
+
+    async function getTokenDebug() {
+      addLog('Attempting to get FCM token...', 'info');
+
+      if (typeof firebase === 'undefined') {
+        addLog('❌ Firebase SDK not loaded', 'error');
+        return;
+      }
+
+      const tokenLS = localStorage.getItem('fcm_token');
+      if (tokenLS) {
+        addLog('ℹ️ Token already in localStorage: ' + tokenLS.substring(0, 24) + '...', 'info');
+      }
+
+      try {
+        addLog('📦 Initializing Firebase app...', 'info');
+        const app = firebase.apps && firebase.apps.length ? firebase.apps[0] : firebase.initializeApp(firebaseConfig)
+        const messaging = firebase.messaging(app)
+        addLog('✅ Firebase Messaging ready', 'success')
+
+        const baseUrl = getBaseUrl()
+        const swUrl = `${baseUrl}firebase-messaging-sw.js`
+        addLog(`📄 Registering SW at: ${swUrl}`, 'info')
+
+        const registration = await navigator.serviceWorker.register(swUrl, { scope: baseUrl })
+        addLog('✅ SW registered for messaging', 'success')
+
+        // Esperar ready para asegurar estado
+        await navigator.serviceWorker.ready
+        addLog('✅ Service worker ready', 'success')
+
+        addLog('🔑 Calling getToken (compat)...', 'info')
+        const token = await messaging.getToken({
+          vapidKey: 'BPZESYrTn48vEfVxnGp1uZsGTBoNgQMcS-4LB040Oh08rWlPbZK7zgHTEfc5sJBQZvtMiBsvAKZfCSVM0avCz2o',
+          serviceWorkerRegistration: registration,
+        })
+
+        if (!token) {
+          addLog('❌ getToken returned null/empty', 'error')
+          updateStatus()
+          return
+        }
+
+        addLog('✅ Token obtained: ' + token, 'success')
+        localStorage.setItem('fcm_token', token)
+        addLog('💾 Token saved to localStorage', 'success')
+        updateStatus()
+      } catch (error) {
+        addLog('❌ Error getting token: ' + (error && error.message ? error.message : String(error)), 'error')
+        console.error(error)
+        updateStatus()
+      }
+    }
+
+    function clearAll() {
+      addLog('Clearing everything...', 'info');
+      localStorage.removeItem('fcm_token');
+      localStorage.removeItem('notificationsEnabled');
+      addLog('✅ localStorage cleared', 'success');
+      updateStatus();
+    }
+
+    // Initial status
+    updateStatus();
+    addLog('Debug page loaded. Click buttons above to test.', 'info');
+  </script>
+</body>
+</html>

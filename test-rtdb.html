@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test RTDB - Sensores</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        .log {
+            background: #2a2a2a;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border-left: 3px solid #4CAF50;
+        }
+        .error {
+            border-left-color: #f44336;
+        }
+        pre {
+            overflow-x: auto;
+            background: #0a0a0a;
+            padding: 10px;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔍 Test de Conexión RTDB - Sensores</h1>
+    <button onclick="testConnection()">Probar Conexión</button>
+    <button onclick="testAuth()">Verificar Auth</button>
+    <div id="output"></div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js'
+        import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js'
+        import { getDatabase, ref, onValue } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js'
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBsJSh6x3ZGEyuXsM18dSWsJKyU7--KJss",
+            authDomain: "mantenimiento-planta-771a3.firebaseapp.com",
+            databaseURL: "https://mantenimiento-planta-771a3-default-rtdb.firebaseio.com",
+            projectId: "mantenimiento-planta-771a3",
+            storageBucket: "mantenimiento-planta-771a3.firebasestorage.app",
+            messagingSenderId: "1019421112530",
+            appId: "1:1019421112530:web:9afd9962e0b53152f8d50b",
+        }
+
+        const app = initializeApp(firebaseConfig)
+        const auth = getAuth(app)
+        const rtdb = getDatabase(app)
+
+        const output = document.getElementById('output')
+
+        function log(message, isError = false) {
+            const div = document.createElement('div')
+            div.className = 'log' + (isError ? ' error' : '')
+            div.textContent = new Date().toLocaleTimeString() + ' - ' + message
+            output.appendChild(div)
+        }
+
+        window.testAuth = function() {
+            log('🔑 Estado de autenticación:')
+            const user = auth.currentUser
+            if (user) {
+                log('✅ Usuario autenticado: ' + user.email)
+                log('   UID: ' + user.uid)
+            } else {
+                log('❌ No hay usuario autenticado. Por favor, inicia sesión primero en /login', true)
+            }
+        }
+
+        window.testConnection = function() {
+            log('🚀 Iniciando prueba de conexión RTDB...')
+            
+            const user = auth.currentUser
+            if (!user) {
+                log('❌ ERROR: No estás autenticado. Abre /login primero.', true)
+                return
+            }
+
+            log('✅ Usuario: ' + user.email)
+            
+            const devicesRef = ref(rtdb, 'devices')
+            
+            log('📡 Intentando leer devices/ ...')
+            
+            onValue(devicesRef, (snapshot) => {
+                const data = snapshot.val()
+                log('✅ Datos recibidos de RTDB:')
+                
+                if (!data) {
+                    log('⚠️  devices/ está vacío o no existe')
+                    return
+                }
+                
+                const devices = Object.entries(data)
+                log(`✅ ${devices.length} dispositivo(s) encontrado(s)`)
+                
+                const pre = document.createElement('pre')
+                pre.textContent = JSON.stringify(data, null, 2)
+                output.appendChild(pre)
+                
+                devices.forEach(([id, device]) => {
+                    log(`   📱 ${id}: ${device.sensorType || 'unknown'} (${device.online ? 'online' : 'offline'})`)
+                })
+            }, (error) => {
+                log('❌ ERROR leyendo RTDB:', true)
+                log('   ' + error.message, true)
+                log('   Code: ' + error.code, true)
+                
+                if (error.code === 'PERMISSION_DENIED') {
+                    log('   💡 Las reglas de RTDB no permiten lectura. Verifica database.rules.json', true)
+                }
+            })
+        }
+
+        // Auto-verificar auth al cargar
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                log('✅ Sesión detectada: ' + user.email)
+            } else {
+                log('⚠️  No hay sesión activa. Inicia sesión primero en /login')
+            }
+        })
+
+        log('🔧 Sistema de prueba cargado. Presiona "Verificar Auth" y luego "Probar Conexión"')
+    </script>
+</body>
+</html>
