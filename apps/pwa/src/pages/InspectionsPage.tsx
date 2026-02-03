@@ -122,6 +122,7 @@ export function InspectionsPage() {
   const [horaInicio, setHoraInicio] = useState('08:00')
   const [horaTermino, setHoraTermino] = useState('16:00')
   const [folio, setFolio] = useState('')
+  const [inspectionType, setInspectionType] = useState<'individual' | 'daily'>('daily')
   
   // Inspección activa (para agregar items)
   const [activeInspection, setActiveInspection] = useState<Inspection | null>(null)
@@ -2154,135 +2155,185 @@ export function InspectionsPage() {
           </DialogHeader>
           
           <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>Nombre de la Inspección *</Label>
-              <Input
-                value={newInspectionName}
-                onChange={(e) => setNewInspectionName(e.target.value)}
-                placeholder="Ej: Inspección Planta - Turno Mañana"
-              />
+            <div className="grid grid-cols-2 gap-2 mb-4">
+              <button
+                onClick={() => setInspectionType('individual')}
+                className={`p-2 rounded-lg text-sm font-medium transition-colors border ${
+                  inspectionType === 'individual'
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'bg-muted text-muted-foreground border-transparent hover:bg-muted/80'
+                }`}
+              >
+                Individual
+              </button>
+              <button
+                onClick={() => setInspectionType('daily')}
+                className={`p-2 rounded-lg text-sm font-medium transition-colors border ${
+                  inspectionType === 'daily'
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'bg-muted text-muted-foreground border-transparent hover:bg-muted/80'
+                }`}
+              >
+                Ruta Diaria
+              </button>
             </div>
 
-            <div className="space-y-2">
-              <Label>Inspectores (opcional)</Label>
-              <Input
-                value={inspectorNames}
-                onChange={(e) => setInspectorNames(e.target.value)}
-                placeholder="Nombres de quienes realizan la inspección"
-              />
-            </div>
+            {inspectionType === 'daily' ? (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Seleccionar Área de Inspección *</Label>
+                  <Select value={selectedArea} onValueChange={(v) => {
+                     setSelectedArea(v)
+                     // Auto-generar nombre
+                     const date = new Date().toLocaleDateString('es-CL').replace(/\//g, '-')
+                     const areaName = v.split('.')[1]?.trim() || v
+                     setNewInspectionName(`Insp. ${areaName} - ${date}`)
+                     
+                     // Si solo hay un mapa, seleccionarlo automáticamente
+                     if (locations.length === 1 && !selectedLocationId) {
+                       setSelectedLocationId(locations[0].id)
+                     }
+                   }}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccione un área..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DAILY_INSPECTION_AREAS.map((area) => (
+                        <SelectItem key={area.name} value={area.name}>
+                          {area.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Hora Inicio</Label>
-                <Input
-                  type="time"
-                  value={horaInicio}
-                  onChange={(e) => setHoraInicio(e.target.value)}
-                />
+                <div className="space-y-2">
+                  <Label>Ubicación / Mapa *</Label>
+                  <div className="grid gap-2">
+                    {locations.map((location) => (
+                      <button
+                        key={location.id}
+                        type="button"
+                        onClick={() => setSelectedLocationId(location.id)}
+                        className={`p-3 rounded-lg border text-left transition-all ${
+                          selectedLocationId === location.id 
+                            ? 'border-primary bg-primary/10' 
+                            : 'border-muted hover:border-primary/50'
+                        }`}
+                      >
+                        <div className="font-medium">{location.nombre}</div>
+                        {location.descripcion && (
+                          <div className="text-xs text-muted-foreground">{location.descripcion}</div>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Nombre de la Inspección</Label>
+                  <Input
+                    value={newInspectionName}
+                    onChange={(e) => setNewInspectionName(e.target.value)}
+                    placeholder="Se generará automáticamente"
+                    readOnly
+                    className="bg-muted text-muted-foreground"
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label>Hora Término</Label>
-                <Input
-                  type="time"
-                  value={horaTermino}
-                  onChange={(e) => setHoraTermino(e.target.value)}
-                />
+            ) : (
+              // Modo Individual
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Nombre de la Inspección *</Label>
+                  <Input
+                    value={newInspectionName}
+                    onChange={(e) => setNewInspectionName(e.target.value)}
+                    placeholder="Ej: Inspección Planta - Turno Mañana"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Inspectores (opcional)</Label>
+                  <Input
+                    value={inspectorNames}
+                    onChange={(e) => setInspectorNames(e.target.value)}
+                    placeholder="Nombres de quienes realizan la inspección"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Hora Inicio</Label>
+                    <Input
+                      type="time"
+                      value={horaInicio}
+                      onChange={(e) => setHoraInicio(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Hora Término</Label>
+                    <Input
+                      type="time"
+                      value={horaTermino}
+                      onChange={(e) => setHoraTermino(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Folio (opcional)</Label>
+                  <Input
+                    value={folio}
+                    onChange={(e) => setFolio(e.target.value)}
+                    placeholder="Número de folio"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Ubicación / Mapa *</Label>
+                  <Select value={selectedLocationId} onValueChange={setSelectedLocationId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccione un mapa..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {locations.map((location) => (
+                        <SelectItem key={location.id} value={location.id}>
+                          {location.nombre}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Lista de Puntos (opcional)</Label>
+                  <SpeechTextarea
+                    value={inspectionListText}
+                    onChange={(e) => {
+                      setInspectionListText(e.target.value)
+                      if (excelItems.length > 0) setExcelItems([])
+                    }}
+                    placeholder="Pegue aquí la lista de puntos..."
+                    rows={3}
+                    className="font-mono text-sm"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Importar desde Excel (opcional)</Label>
+                  <div className="flex items-center gap-3">
+                    <Input
+                      ref={excelInputRef}
+                      type="file"
+                      accept=".xlsx,.xls"
+                      onChange={handleExcelFileChange}
+                    />
+                    {isParsingExcel && <Spinner className="h-4 w-4" />}
+                  </div>
+                </div>
               </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Folio (opcional)</Label>
-              <Input
-                value={folio}
-                onChange={(e) => setFolio(e.target.value)}
-                placeholder="Número de folio"
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label>Ubicación / Mapa *</Label>
-              <div className="grid gap-2">
-                {locations.map((location) => (
-                  <button
-                    key={location.id}
-                    type="button"
-                    onClick={() => setSelectedLocationId(location.id)}
-                    className={`p-3 rounded-lg border text-left transition-all ${
-                      selectedLocationId === location.id 
-                        ? 'border-primary bg-primary/10' 
-                        : 'border-muted hover:border-primary/50'
-                    }`}
-                  >
-                    <div className="font-medium">{location.nombre}</div>
-                    {location.descripcion && (
-                      <div className="text-xs text-muted-foreground">{location.descripcion}</div>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Cargar desde Área de Inspección Diaria (opcional)</Label>
-              <Select value={selectedArea} onValueChange={(v) => {
-                 setSelectedArea(v)
-                 if (v) {
-                   setInspectionListText('')
-                   setExcelItems([])
-                 }
-               }}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccione un área..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {DAILY_INSPECTION_AREAS.map((area) => (
-                    <SelectItem key={area.name} value={area.name}>
-                      {area.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Lista de Puntos (opcional)</Label>
-              <SpeechTextarea
-                value={inspectionListText}
-                onChange={(e) => {
-                  setInspectionListText(e.target.value)
-                  if (excelItems.length > 0) setExcelItems([])
-                  setSelectedArea('')
-                }}
-                disabled={!!selectedArea}
-                placeholder="Pegue aquí la lista de puntos..."
-                rows={5}
-                className="font-mono text-sm"
-              />
-              <p className="text-xs text-muted-foreground">
-                Pegue una lista (numerada o con guiones) para crear automáticamente los puntos de inspección.
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Importar desde Excel (opcional)</Label>
-              <div className="flex items-center gap-3">
-                <Input
-                  ref={excelInputRef}
-                  type="file"
-                  accept=".xlsx,.xls"
-                  onChange={(e) => {
-                     handleExcelFileChange(e)
-                     setSelectedArea('')
-                  }}
-                  disabled={!!selectedArea}
-                />
-                {isParsingExcel && <Spinner className="h-4 w-4" />}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Soporta plantillas con múltiples hojas (ej: Hoja1 y Hoja2) y concatena las actividades.
-              </p>
-            </div>
+            )}
           </div>
           
           <DialogFooter>
