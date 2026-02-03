@@ -72,6 +72,7 @@ import {
 } from '@/services/maps'
 import { MapViewer } from '@/components/maps'
 import { exportInspectionToPDF } from '@/utils/maps'
+import { DAILY_INSPECTION_AREAS } from '@/data/dailyInspectionAreas'
 import type { 
   Inspection, 
   InspectionItem,
@@ -116,6 +117,7 @@ export function InspectionsPage() {
   const [inspectorNames, setInspectorNames] = useState('')
   const [inspectionListText, setInspectionListText] = useState('')
   const [isParsingExcel, setIsParsingExcel] = useState(false)
+  const [selectedArea, setSelectedArea] = useState<string>('')
   const [excelItems, setExcelItems] = useState<ExcelInspectionItem[]>([])
   const [horaInicio, setHoraInicio] = useState('08:00')
   const [horaTermino, setHoraTermino] = useState('16:00')
@@ -343,7 +345,22 @@ export function InspectionsPage() {
       const inspection = await createInspection(data)
 
       // Procesar lista de puntos (si existe)
-      if (excelItems.length > 0) {
+      if (selectedArea) {
+        const areaData = DAILY_INSPECTION_AREAS.find((a) => a.name === selectedArea)
+        if (areaData) {
+          for (let i = 0; i < areaData.items.length; i++) {
+            const itemTitle = areaData.items[i]
+            const itemData: CreateInspectionItemDTO = {
+              inspectionId: inspection.id,
+              title: itemTitle,
+              area: areaData.name,
+              order: i + 1,
+              position: { x: 0.5, y: 0.5 }
+            }
+            await addInspectionItem(itemData)
+          }
+        }
+      } else if (excelItems.length > 0) {
         for (let i = 0; i < excelItems.length; i++) {
           const excelItem = excelItems[i]
           const itemData: CreateInspectionItemDTO = {
@@ -381,6 +398,7 @@ export function InspectionsPage() {
       setInspectorNames('')
       setInspectionListText('')
       setExcelItems([])
+      setSelectedArea('')
       setHoraInicio('08:00')
       setHoraTermino('16:00')
       setFolio('')
@@ -2201,13 +2219,37 @@ export function InspectionsPage() {
             </div>
 
             <div className="space-y-2">
+              <Label>Cargar desde Área de Inspección Diaria (opcional)</Label>
+              <Select value={selectedArea} onValueChange={(v) => {
+                 setSelectedArea(v)
+                 if (v) {
+                   setInspectionListText('')
+                   setExcelItems([])
+                 }
+               }}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccione un área..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {DAILY_INSPECTION_AREAS.map((area) => (
+                    <SelectItem key={area.name} value={area.name}>
+                      {area.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
               <Label>Lista de Puntos (opcional)</Label>
               <SpeechTextarea
                 value={inspectionListText}
                 onChange={(e) => {
                   setInspectionListText(e.target.value)
                   if (excelItems.length > 0) setExcelItems([])
+                  setSelectedArea('')
                 }}
+                disabled={!!selectedArea}
                 placeholder="Pegue aquí la lista de puntos..."
                 rows={5}
                 className="font-mono text-sm"
@@ -2224,7 +2266,11 @@ export function InspectionsPage() {
                   ref={excelInputRef}
                   type="file"
                   accept=".xlsx,.xls"
-                  onChange={handleExcelFileChange}
+                  onChange={(e) => {
+                     handleExcelFileChange(e)
+                     setSelectedArea('')
+                  }}
+                  disabled={!!selectedArea}
                 />
                 {isParsingExcel && <Spinner className="h-4 w-4" />}
               </div>
