@@ -594,6 +594,9 @@ export async function addInspectionItem(
     position: data.position,
     title: data.title,
     description: data.description,
+    area: data.area,
+    equipo: data.equipo,
+    revisoConforme: data.revisoConforme,
     fotos: [], // Se subirán después
     createdAt: now,
     updatedAt: now,
@@ -607,6 +610,9 @@ export async function addInspectionItem(
     position: data.position,
     title: data.title,
     description: data.description || '',
+    area: data.area || '',
+    equipo: data.equipo || '',
+    revisoConforme: data.revisoConforme || '',
     fotos: [],
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
@@ -654,7 +660,23 @@ export async function deleteInspectionItem(_inspectionId: string, itemId: string
  */
 export async function updateInspectionItem(
   id: string,
-  data: Partial<Pick<InspectionItem, 'title' | 'description' | 'prioridad' | 'fotos' | 'incidentId' | 'position'>>
+  data: Partial<Pick<InspectionItem,
+    | 'title'
+    | 'description'
+    | 'area'
+    | 'equipo'
+    | 'prioridad'
+    | 'fotos'
+    | 'incidentId'
+    | 'position'
+    | 'cumple'
+    | 'noCumple'
+    | 'observacion'
+    | 'fechaReparacion'
+    | 'horaInicioItem'
+    | 'horaTerminoItem'
+    | 'revisoConforme'
+  >>
 ): Promise<void> {
   await updateDoc(doc(db, INSPECTION_ITEMS_COLLECTION, id), {
     ...data,
@@ -799,6 +821,8 @@ function parseInspectionItem(doc: { id: string; data: () => Record<string, unkno
     position: data.position as { x: number; y: number },
     title: data.title as string,
     description: data.description as string | undefined,
+    area: (data.area as string) || undefined,
+    equipo: (data.equipo as string) || undefined,
     fotos,
     prioridad: data.prioridad as InspectionItem['prioridad'],
     // Campos de checklist
@@ -808,6 +832,7 @@ function parseInspectionItem(doc: { id: string; data: () => Record<string, unkno
     fechaReparacion: data.fechaReparacion ? parseTimestamp(data.fechaReparacion) : undefined,
     horaInicioItem: data.horaInicioItem as string | undefined,
     horaTerminoItem: data.horaTerminoItem as string | undefined,
+    revisoConforme: (data.revisoConforme as string) || undefined,
     incidentId: data.incidentId as string | undefined,
     createdAt: parseTimestamp(data.createdAt),
     updatedAt: parseTimestamp(data.updatedAt),

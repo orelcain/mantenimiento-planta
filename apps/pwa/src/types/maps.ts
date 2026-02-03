@@ -107,6 +107,8 @@ export interface InspectionItem {
   position: { x: number; y: number } // Posición en el mapa
   title: string
   description?: string
+  area?: string
+  equipo?: string
   fotos: InspectionPhoto[] // Fotos con descripción
   prioridad?: 'critica' | 'alta' | 'media' | 'baja'
   // Campos de checklist
@@ -116,6 +118,7 @@ export interface InspectionItem {
   fechaReparacion?: Date // Fecha de reparación si aplica
   horaInicioItem?: string // Hora de inicio del trabajo en este punto
   horaTerminoItem?: string // Hora de término del trabajo en este punto
+  revisoConforme?: string // Nombre o firma de revisión conforme
   // Si se convierte en incidencia formal
   incidentId?: string
   createdAt: Date
@@ -177,6 +180,9 @@ export interface CreateInspectionItemDTO {
   position: { x: number; y: number }
   title: string
   description?: string
+  area?: string
+  equipo?: string
+  revisoConforme?: string
   fotos?: File[]
   prioridad?: 'critica' | 'alta' | 'media' | 'baja'
 }

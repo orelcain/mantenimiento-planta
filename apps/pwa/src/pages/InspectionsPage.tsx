@@ -82,6 +82,22 @@ import type {
   CreateInspectionItemDTO
 } from '@/types/maps'
 
+type ExcelInspectionItem = {
+  area: string
+  equipo?: string
+  actividad: string
+}
+
+type DailyFormValues = {
+  cumple: boolean
+  noCumple: boolean
+  observacion: string
+  fechaReparacion: string
+  horaInicioItem: string
+  horaTerminoItem: string
+  revisoConforme: string
+}
+
 export function InspectionsPage() {
   const { user } = useAuthStore()
   const { toast } = useToast()
@@ -100,6 +116,7 @@ export function InspectionsPage() {
   const [inspectorNames, setInspectorNames] = useState('')
   const [inspectionListText, setInspectionListText] = useState('')
   const [isParsingExcel, setIsParsingExcel] = useState(false)
+  const [excelItems, setExcelItems] = useState<ExcelInspectionItem[]>([])
   const [horaInicio, setHoraInicio] = useState('08:00')
   const [horaTermino, setHoraTermino] = useState('16:00')
   const [folio, setFolio] = useState('')
@@ -153,6 +170,12 @@ export function InspectionsPage() {
   const [editItemFechaReparacion, setEditItemFechaReparacion] = useState('')
   const [editItemHoraInicio, setEditItemHoraInicio] = useState('')
   const [editItemHoraTermino, setEditItemHoraTermino] = useState('')
+  const [editItemRevisoConforme, setEditItemRevisoConforme] = useState('')
+
+  // Formulario diario por áreas
+  const [isDailyFormOpen, setIsDailyFormOpen] = useState(false)
+  const [dailyFormValues, setDailyFormValues] = useState<Record<string, DailyFormValues>>({})
+  const [isSavingDailyForm, setIsSavingDailyForm] = useState(false)
   
   // Modal de imagen grande con zoom/pan
   const [viewingImage, setViewingImage] = useState<string | null>(null)
@@ -193,12 +216,14 @@ export function InspectionsPage() {
     }
   }
 
-  const parseInspectionExcel = (workbook: XLSX.WorkBook): string[] => {
-    const lines: string[] = []
+  const parseInspectionExcel = (workbook: XLSX.WorkBook): ExcelInspectionItem[] => {
+    const items: ExcelInspectionItem[] = []
     const normalize = (value: unknown) => String(value ?? '').replace(/\s+/g, ' ').trim()
     const isSection = (text: string) => /^\d+\./.test(text)
     const isHeaderCell = (text: string) =>
       /^(actividad|c|n\/c|obs|observacion|fecha reparacion|hora inicio|hora termino|reviso conforme)$/i.test(text)
+    const isMetaCell = (text: string) =>
+      /^(responsable|fecha|hora inicio|hora termino|folio|codigo|revisión|revision|página|pagina|registro de)/i.test(text)
 
     workbook.SheetNames.forEach((sheetName) => {
       const sheet = workbook.Sheets[sheetName]
@@ -225,25 +250,26 @@ export function InspectionsPage() {
           return
         }
 
-        if (!currentSection || !inTable) return
+        if (!currentSection) return
 
         const colB = rowValues[1]
         const colC = rowValues[2]
+        const candidate = colC || colB || rowValues.find((value) => value.length > 10) || ''
 
-        if (colC && !isHeaderCell(colC)) {
-          const equipment = colB && !isHeaderCell(colB) ? colB : ''
-          const label = equipment ? `${currentSection} - ${equipment}: ${colC}` : `${currentSection} - ${colC}`
-          lines.push(label)
-          return
-        }
+        if (!candidate || isHeaderCell(candidate) || isMetaCell(candidate)) return
 
-        if (colB && !isHeaderCell(colB)) {
-          lines.push(`${currentSection} - ${colB}`)
-        }
+        if (!inTable && !colB && !colC) return
+
+        const equipment = colC ? colB : ''
+        items.push({
+          area: currentSection,
+          equipo: equipment || undefined,
+          actividad: candidate
+        })
       })
     })
 
-    return lines.filter((line) => line.trim().length > 0)
+    return items
   }
 
   const handleExcelFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -256,13 +282,19 @@ export function InspectionsPage() {
       const workbook = XLSX.read(buffer, { type: 'array' })
       if (!workbook.SheetNames.length) throw new Error('El archivo no tiene hojas')
 
-      const lines = parseInspectionExcel(workbook)
-      if (!lines.length) throw new Error('No se encontraron actividades en el Excel')
+      const parsedItems = parseInspectionExcel(workbook)
+      if (!parsedItems.length) throw new Error('No se encontraron actividades en el Excel')
 
+      const lines = parsedItems.map((item) => {
+        const equipmentLabel = item.equipo ? `${item.equipo}: ` : ''
+        return `${item.area} - ${equipmentLabel}${item.actividad}`
+      })
+
+      setExcelItems(parsedItems)
       setInspectionListText(lines.join('\n'))
       toast({
         title: 'Excel cargado',
-        description: `Se cargaron ${lines.length} actividades desde ${workbook.SheetNames.length} hojas.`
+        description: `Se cargaron ${parsedItems.length} actividades desde ${workbook.SheetNames.length} hojas.`
       })
     } catch (error) {
       console.error('Error leyendo Excel de inspección:', error)
@@ -311,7 +343,20 @@ export function InspectionsPage() {
       const inspection = await createInspection(data)
 
       // Procesar lista de puntos (si existe)
-      if (inspectionListText.trim()) {
+      if (excelItems.length > 0) {
+        for (let i = 0; i < excelItems.length; i++) {
+          const excelItem = excelItems[i]
+          const itemData: CreateInspectionItemDTO = {
+            inspectionId: inspection.id,
+            title: excelItem.actividad,
+            area: excelItem.area,
+            equipo: excelItem.equipo,
+            order: i + 1,
+            position: { x: 0.5, y: 0.5 }
+          }
+          await addInspectionItem(itemData)
+        }
+      } else if (inspectionListText.trim()) {
         const lines = inspectionListText.split('\n').filter(line => line.trim().length > 0)
         
         for (let i = 0; i < lines.length; i++) {
@@ -335,6 +380,7 @@ export function InspectionsPage() {
       setSelectedLocationId('')
       setInspectorNames('')
       setInspectionListText('')
+      setExcelItems([])
       setHoraInicio('08:00')
       setHoraTermino('16:00')
       setFolio('')
@@ -598,6 +644,7 @@ export function InspectionsPage() {
     setEditItemFechaReparacion(item.fechaReparacion ? item.fechaReparacion.toISOString().split('T')[0] : '')
     setEditItemHoraInicio(item.horaInicioItem || '')
     setEditItemHoraTermino(item.horaTerminoItem || '')
+    setEditItemRevisoConforme(item.revisoConforme || '')
   }
   
   // Agregar nuevas fotos al item
@@ -663,7 +710,8 @@ export function InspectionsPage() {
         observacion: editItemObservacion.trim() || undefined,
         fechaReparacion: editItemFechaReparacion ? new Date(editItemFechaReparacion) : undefined,
         horaInicioItem: editItemHoraInicio.trim() || undefined,
-        horaTerminoItem: editItemHoraTermino.trim() || undefined
+        horaTerminoItem: editItemHoraTermino.trim() || undefined,
+        revisoConforme: editItemRevisoConforme.trim() || undefined
       })
       
       // Actualizar estado local
@@ -679,7 +727,8 @@ export function InspectionsPage() {
           observacion: editItemObservacion.trim() || undefined,
           fechaReparacion: editItemFechaReparacion ? new Date(editItemFechaReparacion) : undefined,
           horaInicioItem: editItemHoraInicio.trim() || undefined,
-          horaTerminoItem: editItemHoraTermino.trim() || undefined
+          horaTerminoItem: editItemHoraTermino.trim() || undefined,
+          revisoConforme: editItemRevisoConforme.trim() || undefined
         } : i
       ))
       
@@ -699,6 +748,95 @@ export function InspectionsPage() {
       })
     } finally {
       setIsSavingItem(false)
+    }
+  }
+
+  const buildDailyFormState = (items: InspectionItem[]) => {
+    const state: Record<string, DailyFormValues> = {}
+
+    items.forEach((item) => {
+      state[item.id] = {
+        cumple: item.cumple || false,
+        noCumple: item.noCumple || false,
+        observacion: item.observacion || '',
+        fechaReparacion: item.fechaReparacion ? item.fechaReparacion.toISOString().split('T')[0] : '',
+        horaInicioItem: item.horaInicioItem || '',
+        horaTerminoItem: item.horaTerminoItem || '',
+        revisoConforme: item.revisoConforme || ''
+      }
+    })
+
+    return state
+  }
+
+  useEffect(() => {
+    if (isDailyFormOpen) {
+      setDailyFormValues(buildDailyFormState(inspectionItems))
+    }
+  }, [isDailyFormOpen, inspectionItems])
+
+  const handleDailyFieldChange = (
+    itemId: string,
+    field: keyof DailyFormValues,
+    value: string | boolean
+  ) => {
+    setDailyFormValues((prev) => ({
+      ...prev,
+      [itemId]: {
+        ...prev[itemId],
+        [field]: value
+      }
+    }))
+  }
+
+  const handleSaveDailyForm = async () => {
+    if (!activeInspection) return
+
+    setIsSavingDailyForm(true)
+    try {
+      const updates = inspectionItems.map((item) => {
+        const values = dailyFormValues[item.id]
+        if (!values) return null
+
+        return updateInspectionItem(item.id, {
+          cumple: values.cumple || undefined,
+          noCumple: values.noCumple || undefined,
+          observacion: values.observacion.trim() || undefined,
+          fechaReparacion: values.fechaReparacion ? new Date(values.fechaReparacion) : undefined,
+          horaInicioItem: values.horaInicioItem.trim() || undefined,
+          horaTerminoItem: values.horaTerminoItem.trim() || undefined,
+          revisoConforme: values.revisoConforme.trim() || undefined
+        })
+      }).filter(Boolean) as Promise<void>[]
+
+      await Promise.all(updates)
+
+      setInspectionItems((prev) => prev.map((item) => {
+        const values = dailyFormValues[item.id]
+        if (!values) return item
+        return {
+          ...item,
+          cumple: values.cumple || undefined,
+          noCumple: values.noCumple || undefined,
+          observacion: values.observacion.trim() || undefined,
+          fechaReparacion: values.fechaReparacion ? new Date(values.fechaReparacion) : undefined,
+          horaInicioItem: values.horaInicioItem.trim() || undefined,
+          horaTerminoItem: values.horaTerminoItem.trim() || undefined,
+          revisoConforme: values.revisoConforme.trim() || undefined
+        }
+      }))
+
+      toast({ title: 'Formulario guardado' })
+      setIsDailyFormOpen(false)
+    } catch (error) {
+      console.error('Error guardando formulario diario:', error)
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'No se pudo guardar el formulario.'
+      })
+    } finally {
+      setIsSavingDailyForm(false)
     }
   }
   
@@ -856,6 +994,14 @@ export function InspectionsPage() {
   
   // Vista de inspección activa
   if (activeInspection && activeMapVersion) {
+    const groupedItems = inspectionItems.reduce<Record<string, InspectionItem[]>>((acc, item) => {
+      const key = item.area || 'Sin área'
+      if (!acc[key]) acc[key] = []
+      acc[key].push(item)
+      return acc
+    }, {})
+    const sortedAreas = Object.keys(groupedItems)
+
     return (
       <div className="p-4 space-y-4">
         {/* Header */}
@@ -900,6 +1046,15 @@ export function InspectionsPage() {
               >
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Reabrir
+              </Button>
+            )}
+            {activeInspection.status === 'en_progreso' && inspectionItems.length > 0 && (
+              <Button
+                variant="outline"
+                onClick={() => setIsDailyFormOpen(true)}
+              >
+                <FileText className="h-4 w-4 mr-2" />
+                Formulario Diario
               </Button>
             )}
             <Button variant="outline" onClick={handleOpenPdfOptions}>
@@ -1040,6 +1195,12 @@ export function InspectionsPage() {
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="font-medium text-sm truncate">{item.title}</p>
+                            {item.area && (
+                              <p className="text-xs text-primary/80 line-clamp-1">{item.area}</p>
+                            )}
+                            {item.equipo && (
+                              <p className="text-xs text-muted-foreground line-clamp-1">{item.equipo}</p>
+                            )}
                             {item.description && (
                               <p className="text-xs text-muted-foreground line-clamp-2">{item.description}</p>
                             )}
@@ -1191,6 +1352,114 @@ export function InspectionsPage() {
           </DialogContent>
         </Dialog>
         
+        {/* Modal de formulario diario por áreas */}
+        <Dialog open={isDailyFormOpen} onOpenChange={setIsDailyFormOpen}>
+          <DialogContent className="max-w-5xl">
+            <DialogHeader>
+              <DialogTitle>Formulario Diario por Áreas</DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-2">
+              {sortedAreas.map((area) => (
+                <div key={area} className="space-y-3">
+                  <div className="text-sm font-semibold text-primary">{area}</div>
+                  <div className="space-y-3">
+                    {groupedItems[area].map((item) => {
+                      const values = dailyFormValues[item.id]
+                      return (
+                        <div key={item.id} className="border rounded-lg p-3 space-y-3">
+                          <div className="text-sm font-medium">
+                            {item.title}
+                          </div>
+                          {(item.equipo || item.description) && (
+                            <div className="text-xs text-muted-foreground">
+                              {item.equipo || item.description}
+                            </div>
+                          )}
+
+                          <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
+                            <div className="flex items-center gap-3 md:col-span-2">
+                              <label className="flex items-center gap-2 text-sm">
+                                <input
+                                  type="checkbox"
+                                  checked={values?.cumple || false}
+                                  onChange={(e) => {
+                                    handleDailyFieldChange(item.id, 'cumple', e.target.checked)
+                                    if (e.target.checked) handleDailyFieldChange(item.id, 'noCumple', false)
+                                  }}
+                                />
+                                Cumple (C)
+                              </label>
+                              <label className="flex items-center gap-2 text-sm">
+                                <input
+                                  type="checkbox"
+                                  checked={values?.noCumple || false}
+                                  onChange={(e) => {
+                                    handleDailyFieldChange(item.id, 'noCumple', e.target.checked)
+                                    if (e.target.checked) handleDailyFieldChange(item.id, 'cumple', false)
+                                  }}
+                                />
+                                No Cumple (N/C)
+                              </label>
+                            </div>
+                            <Input
+                              value={values?.observacion || ''}
+                              onChange={(e) => handleDailyFieldChange(item.id, 'observacion', e.target.value)}
+                              placeholder="Observación"
+                              className="md:col-span-2"
+                            />
+                            <Input
+                              type="date"
+                              value={values?.fechaReparacion || ''}
+                              onChange={(e) => handleDailyFieldChange(item.id, 'fechaReparacion', e.target.value)}
+                              className="md:col-span-1"
+                            />
+                            <Input
+                              value={values?.revisoConforme || ''}
+                              onChange={(e) => handleDailyFieldChange(item.id, 'revisoConforme', e.target.value)}
+                              placeholder="Revisó conforme"
+                              className="md:col-span-1"
+                            />
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                              <Label className="text-xs">Hora Inicio</Label>
+                              <Input
+                                type="time"
+                                value={values?.horaInicioItem || ''}
+                                onChange={(e) => handleDailyFieldChange(item.id, 'horaInicioItem', e.target.value)}
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">Hora Término</Label>
+                              <Input
+                                type="time"
+                                value={values?.horaTerminoItem || ''}
+                                onChange={(e) => handleDailyFieldChange(item.id, 'horaTerminoItem', e.target.value)}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsDailyFormOpen(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleSaveDailyForm} disabled={isSavingDailyForm}>
+                {isSavingDailyForm && <Spinner className="h-4 w-4 mr-2" />}
+                Guardar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         {/* Modal de opciones PDF */}
         <Dialog open={isPdfModalOpen} onOpenChange={setIsPdfModalOpen}>
           <DialogContent className="sm:max-w-md">
@@ -1474,6 +1743,17 @@ export function InspectionsPage() {
                       className="text-sm"
                     />
                   </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-item-reviso-conforme" className="text-xs">Revisó Conforme</Label>
+                  <Input
+                    id="edit-item-reviso-conforme"
+                    value={editItemRevisoConforme}
+                    onChange={(e) => setEditItemRevisoConforme(e.target.value)}
+                    placeholder="Nombre o firma"
+                    className="text-sm"
+                  />
                 </div>
               </div>
               
@@ -1924,7 +2204,10 @@ export function InspectionsPage() {
               <Label>Lista de Puntos (opcional)</Label>
               <SpeechTextarea
                 value={inspectionListText}
-                onChange={(e) => setInspectionListText(e.target.value)}
+                onChange={(e) => {
+                  setInspectionListText(e.target.value)
+                  if (excelItems.length > 0) setExcelItems([])
+                }}
                 placeholder="Pegue aquí la lista de puntos..."
                 rows={5}
                 className="font-mono text-sm"

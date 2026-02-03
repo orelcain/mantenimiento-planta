@@ -362,11 +362,12 @@ export async function exportInspectionToPDF(
     item.noCumple ? 'X' : '',
     item.observacion || '-',
     item.fechaReparacion ? formatDate(item.fechaReparacion) : '-',
-    item.fotos.length > 0 ? item.fotos.length.toString() : '-'
+    item.fotos.length > 0 ? item.fotos.length.toString() : '-',
+    item.revisoConforme || '-'
   ])
 
   autoTable(doc, {
-    head: [['#', 'Actividad', 'C', 'N/C', 'Observación', 'F. Reparación', 'Fotos']],
+    head: [['#', 'Actividad', 'C', 'N/C', 'Observación', 'F. Reparación', 'Fotos', 'Rev. Conforme']],
     body: tableData,
     startY: yPosition,
     theme: 'grid',
@@ -382,13 +383,14 @@ export async function exportInspectionToPDF(
     },
     columnStyles: {
       0: { cellWidth: 10, halign: 'center' },
-      1: { cellWidth: 60 },
-      2: { cellWidth: 10, halign: 'center' },
-      3: { cellWidth: 10, halign: 'center' },
-      4: { cellWidth: 50 },
-      5: { cellWidth: 25, halign: 'center' },
-      6: { cellWidth: 15, halign: 'center' },
-    },
+      1: { cellWidth: 55 },
+      2: { cellWidth: 8, halign: 'center' },
+      3: { cellWidth: 8, halign: 'center' },
+      4: { cellWidth: 40 },
+      5: { cellWidth: 22, halign: 'center' },
+      6: { cellWidth: 12, halign: 'center' },
+      7: { cellWidth: 25 }
+    }
     margin: { left: margin, right: margin },
   })
 
