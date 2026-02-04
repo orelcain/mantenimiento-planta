@@ -115,6 +115,7 @@ export interface InspectionItem {
   cumple?: boolean // Cumple (C)
   noCumple?: boolean // No Cumple (N/C)
   observacion?: string // Observaciones del punto
+  fechaInspeccion?: Date // Fecha en la que se realizó la inspección del punto
   fechaReparacion?: Date // Fecha de reparación si aplica
   horaInicioItem?: string // Hora de inicio del trabajo en este punto
   horaTerminoItem?: string // Hora de término del trabajo en este punto

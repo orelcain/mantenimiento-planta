@@ -66,6 +66,7 @@ import {
   getMapLocations,
   getLatestMapVersion,
   getMapVersionById,
+  uploadInspectionItemPhoto,
   uploadInspectionItemPhotos,
   updateInspectionItem,
   updateInspection
@@ -93,10 +94,10 @@ type DailyFormValues = {
   cumple: boolean
   noCumple: boolean
   observacion: string
+  fechaInspeccion: string
   fechaReparacion: string
   horaInicioItem: string
   horaTerminoItem: string
-  revisoConforme: string
 }
 
 export function InspectionsPage() {
@@ -117,13 +118,13 @@ export function InspectionsPage() {
   const [inspectorNames, setInspectorNames] = useState('')
   const [inspectionListText, setInspectionListText] = useState('')
   const [isParsingExcel, setIsParsingExcel] = useState(false)
-  const [selectedArea, setSelectedArea] = useState<string>('')
   const [excelItems, setExcelItems] = useState<ExcelInspectionItem[]>([])
   const [horaInicio, setHoraInicio] = useState('08:00')
   const [horaTermino, setHoraTermino] = useState('16:00')
   const [folio, setFolio] = useState('')
   const [inspectionType, setInspectionType] = useState<'individual' | 'daily'>('daily')
   const [activeTab, setActiveTab] = useState(0)
+  const [dailyShift, setDailyShift] = useState<'A' | 'B' | 'C'>('A')
   
   // Inspección activa (para agregar items)
   const [activeInspection, setActiveInspection] = useState<Inspection | null>(null)
@@ -174,11 +175,12 @@ export function InspectionsPage() {
   const [editItemFechaReparacion, setEditItemFechaReparacion] = useState('')
   const [editItemHoraInicio, setEditItemHoraInicio] = useState('')
   const [editItemHoraTermino, setEditItemHoraTermino] = useState('')
-  const [editItemRevisoConforme, setEditItemRevisoConforme] = useState('')
 
   // Formulario diario por áreas
   const [isDailyFormOpen, setIsDailyFormOpen] = useState(false)
   const [dailyFormValues, setDailyFormValues] = useState<Record<string, DailyFormValues>>({})
+  const [dailyFormFiles, setDailyFormFiles] = useState<Record<string, File[]>>({})
+  const [dailyFormPreviewUrls, setDailyFormPreviewUrls] = useState<Record<string, string[]>>({})
   const [isSavingDailyForm, setIsSavingDailyForm] = useState(false)
   
   // Modal de imagen grande con zoom/pan
@@ -336,6 +338,7 @@ export function InspectionsPage() {
         locationId: selectedLocationId,
         locationName: location?.nombre || '',
         mapVersionId: mapVersion.id,
+        motivoInspeccion: inspectionType === 'daily' ? `Turno ${dailyShift}` : undefined,
         createdBy: user.id,
         createdByName: user.nombre || user.email,
         inspectorNames: inspectorNames.trim() || undefined,
@@ -400,10 +403,10 @@ export function InspectionsPage() {
       setInspectorNames('')
       setInspectionListText('')
       setExcelItems([])
-      setSelectedArea('')
       setHoraInicio('08:00')
       setHoraTermino('16:00')
       setFolio('')
+      setDailyShift('A')
       
       // Abrir la inspección recién creada
       await handleOpenInspection(inspection)
@@ -669,7 +672,6 @@ export function InspectionsPage() {
     setEditItemFechaReparacion(item.fechaReparacion ? item.fechaReparacion.toISOString().split('T')[0] : '')
     setEditItemHoraInicio(item.horaInicioItem || '')
     setEditItemHoraTermino(item.horaTerminoItem || '')
-    setEditItemRevisoConforme(item.revisoConforme || '')
   }
   
   // Agregar nuevas fotos al item
@@ -735,8 +737,7 @@ export function InspectionsPage() {
         observacion: editItemObservacion.trim() || undefined,
         fechaReparacion: editItemFechaReparacion ? new Date(editItemFechaReparacion) : undefined,
         horaInicioItem: editItemHoraInicio.trim() || undefined,
-        horaTerminoItem: editItemHoraTermino.trim() || undefined,
-        revisoConforme: editItemRevisoConforme.trim() || undefined
+        horaTerminoItem: editItemHoraTermino.trim() || undefined
       })
       
       // Actualizar estado local
@@ -752,8 +753,7 @@ export function InspectionsPage() {
           observacion: editItemObservacion.trim() || undefined,
           fechaReparacion: editItemFechaReparacion ? new Date(editItemFechaReparacion) : undefined,
           horaInicioItem: editItemHoraInicio.trim() || undefined,
-          horaTerminoItem: editItemHoraTermino.trim() || undefined,
-          revisoConforme: editItemRevisoConforme.trim() || undefined
+          horaTerminoItem: editItemHoraTermino.trim() || undefined
         } : i
       ))
       
@@ -784,10 +784,10 @@ export function InspectionsPage() {
         cumple: item.cumple || false,
         noCumple: item.noCumple || false,
         observacion: item.observacion || '',
+        fechaInspeccion: item.fechaInspeccion ? item.fechaInspeccion.toISOString().split('T')[0] : '',
         fechaReparacion: item.fechaReparacion ? item.fechaReparacion.toISOString().split('T')[0] : '',
         horaInicioItem: item.horaInicioItem || '',
-        horaTerminoItem: item.horaTerminoItem || '',
-        revisoConforme: item.revisoConforme || ''
+        horaTerminoItem: item.horaTerminoItem || ''
       }
     })
 
@@ -805,11 +805,29 @@ export function InspectionsPage() {
     field: keyof DailyFormValues,
     value: string | boolean
   ) => {
+    const now = new Date()
+    const today = now.toISOString().split('T')[0]
+    const timeNow = now.toTimeString().slice(0, 5)
+
     setDailyFormValues((prev) => ({
       ...prev,
       [itemId]: {
         ...prev[itemId],
-        [field]: value
+        [field]: value,
+        ...(field === 'cumple' && value === true
+          ? {
+              fechaInspeccion: prev[itemId]?.fechaInspeccion || today,
+              horaInicioItem: prev[itemId]?.horaInicioItem || timeNow,
+              horaTerminoItem: prev[itemId]?.horaTerminoItem || timeNow
+            }
+          : {}),
+        ...(field === 'noCumple' && value === true
+          ? {
+              fechaInspeccion: prev[itemId]?.fechaInspeccion || today,
+              horaInicioItem: prev[itemId]?.horaInicioItem || timeNow,
+              horaTerminoItem: prev[itemId]?.horaTerminoItem || timeNow
+            }
+          : {})
       }
     }))
   }
@@ -834,6 +852,36 @@ export function InspectionsPage() {
         })
       }).filter(Boolean) as Promise<void>[]
 
+      const handleDailyPhotoSelect = (itemId: string, files: FileList | null) => {
+        if (!files || files.length === 0) return
+        const selected = Array.from(files)
+        setDailyFormFiles((prev) => {
+
+          const merged = [...existing, ...selected].slice(0, 3)
+          return { ...prev, [itemId]: merged }
+        })
+
+        const newUrls = selected.map((file) => URL.createObjectURL(file))
+        setDailyFormPreviewUrls((prev) => {
+          const existing = prev[itemId] || []
+          const merged = [...existing, ...newUrls].slice(0, 3)
+          return { ...prev, [itemId]: merged }
+        })
+      }
+
+      const handleRemoveDailyPhoto = (itemId: string, index: number) => {
+        setDailyFormFiles((prev) => {
+          const next = (prev[itemId] || []).filter((_, i) => i !== index)
+          return { ...prev, [itemId]: next }
+        })
+        setDailyFormPreviewUrls((prev) => {
+          const urls = prev[itemId] || []
+          const [removed] = urls.filter((_, i) => i === index)
+          if (removed) URL.revokeObjectURL(removed)
+          const next = urls.filter((_, i) => i !== index)
+          return { ...prev, [itemId]: next }
+        })
+      }
       await Promise.all(updates)
 
       setInspectionItems((prev) => prev.map((item) => {
@@ -980,37 +1028,57 @@ export function InspectionsPage() {
     
     setIsPdfModalOpen(false)
     
-    try {
+      const updates = inspectionItems.map(async (item) => {
       toast({
         title: 'Generando PDF...',
-        description: 'Por favor espera un momento'
-      })
-      
-      await exportInspectionToPDF({
-        inspection: activeInspection,
-        items: inspectionItems,
-        mapVersion: activeMapVersion,
-        includePhotos: inspectionItems.some(i => i.fotos.length > 0),
-        includeStats: true,
-        layout: pdfLayout
-      })
-      
-      toast({
-        title: 'PDF generado',
-        description: 'El archivo se ha descargado'
-      })
-    } catch (error) {
-      console.error('Error exporting PDF:', error)
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'No se pudo generar el PDF'
-      })
-    }
-  }
-  
-  if (isLoading) {
-    return (
+        let finalFotos = item.fotos
+        const files = dailyFormFiles[item.id] || []
+
+        if (files.length > 0) {
+          const uploaded: InspectionPhoto[] = []
+          for (const file of files) {
+            const uploadedPhoto = await uploadInspectionItemPhoto(item.id, activeInspection.id, file)
+            uploaded.push(uploadedPhoto)
+          }
+          finalFotos = [...item.fotos, ...uploaded]
+        }
+
+        await updateInspectionItem(item.id, {
+          cumple: values.cumple,
+          noCumple: values.noCumple,
+          observacion: values.observacion.trim() || undefined,
+          fechaInspeccion: values.fechaInspeccion ? new Date(values.fechaInspeccion) : undefined,
+          fechaReparacion: values.fechaReparacion ? new Date(values.fechaReparacion) : undefined,
+          horaInicioItem: values.horaInicioItem.trim() || undefined,
+          horaTerminoItem: values.horaTerminoItem.trim() || undefined,
+          fotos: finalFotos
+        })
+
+        return { itemId: item.id, fotos: finalFotos }
+      }).filter(Boolean) as Promise<{ itemId: string; fotos: InspectionPhoto[] } | null>[]
+
+      const results = await Promise.all(updates)
+
+      setInspectionItems((prev) => prev.map((item) => {
+        const values = dailyFormValues[item.id]
+        if (!values) return item
+        const fotos = results.find((r) => r?.itemId === item.id)?.fotos || item.fotos
+        return {
+          ...item,
+          cumple: values.cumple,
+          noCumple: values.noCumple,
+          observacion: values.observacion.trim() || undefined,
+          fechaInspeccion: values.fechaInspeccion ? new Date(values.fechaInspeccion) : undefined,
+          fechaReparacion: values.fechaReparacion ? new Date(values.fechaReparacion) : undefined,
+          horaInicioItem: values.horaInicioItem.trim() || undefined,
+          horaTerminoItem: values.horaTerminoItem.trim() || undefined,
+          fotos
+        }
+      }))
+
+      setDailyFormFiles({})
+      Object.values(dailyFormPreviewUrls).flat().forEach((url) => URL.revokeObjectURL(url))
+      setDailyFormPreviewUrls({})
       <div className="flex items-center justify-center h-64">
         <Spinner className="h-8 w-8" />
       </div>
@@ -1378,7 +1446,17 @@ export function InspectionsPage() {
         </Dialog>
         
         {/* Modal de formulario diario por áreas */}
-        <Dialog open={isDailyFormOpen} onOpenChange={setIsDailyFormOpen}>
+        <Dialog
+          open={isDailyFormOpen}
+          onOpenChange={(open) => {
+            setIsDailyFormOpen(open)
+            if (!open) {
+              Object.values(dailyFormPreviewUrls).flat().forEach((url) => URL.revokeObjectURL(url))
+              setDailyFormFiles({})
+              setDailyFormPreviewUrls({})
+            }
+          }}
+        >
           <DialogContent className="max-w-6xl max-h-[90vh] flex flex-col p-0">
             <DialogHeader className="px-6 pt-6 pb-4 border-b">
               <DialogTitle className="text-xl">Inspección Diaria - 7 Áreas</DialogTitle>
@@ -1388,7 +1466,7 @@ export function InspectionsPage() {
             </DialogHeader>
 
             {/* Pestañas */}
-            <div className="flex overflow-x-auto border-b px-2 bg-muted/30 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
+            <div className="sticky top-0 z-20 flex overflow-x-auto border-b px-2 bg-background/95 backdrop-blur scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
               {sortedAreas.map((area, idx) => {
                 const areaItems = groupedItems[area] || []
                 const completedCount = areaItems.filter(item => {
@@ -1496,11 +1574,62 @@ export function InspectionsPage() {
                                 />
                               </div>
                               <Input
-                                value={values?.revisoConforme || ''}
-                                onChange={(e) => handleDailyFieldChange(item.id, 'revisoConforme', e.target.value)}
-                                placeholder="Revisó conforme"
+                                type="date"
+                                value={values?.fechaInspeccion || ''}
+                                onChange={(e) => handleDailyFieldChange(item.id, 'fechaInspeccion', e.target.value)}
                                 className="text-sm"
                               />
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              <div className="space-y-1">
+                                <Label className="text-xs">Hora Inicio</Label>
+                                <Input
+                                  type="time"
+                                  value={values?.horaInicioItem || ''}
+                                  onChange={(e) => handleDailyFieldChange(item.id, 'horaInicioItem', e.target.value)}
+                                  className="text-sm"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-xs">Hora Término</Label>
+                                <Input
+                                  type="time"
+                                  value={values?.horaTerminoItem || ''}
+                                  onChange={(e) => handleDailyFieldChange(item.id, 'horaTerminoItem', e.target.value)}
+                                  className="text-sm"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between">
+                                <Label className="text-xs">Fotos (opcional)</Label>
+                                <label className="text-xs text-primary cursor-pointer hover:underline">
+                                  Agregar
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    multiple
+                                    className="hidden"
+                                    onChange={(e) => handleDailyPhotoSelect(item.id, e.target.files)}
+                                  />
+                                </label>
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                {(dailyFormPreviewUrls[item.id] || []).map((url, index) => (
+                                  <div key={`${item.id}-photo-${index}`} className="relative w-16 h-16 rounded-lg overflow-hidden border">
+                                    <img src={url} alt="Foto" className="w-full h-full object-cover" />
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveDailyPhoto(item.id, index)}
+                                      className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full p-0.5"
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
                             </div>
 
                             {values?.noCumple && (
@@ -1844,16 +1973,6 @@ export function InspectionsPage() {
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="edit-item-reviso-conforme" className="text-xs">Revisó Conforme</Label>
-                  <Input
-                    id="edit-item-reviso-conforme"
-                    value={editItemRevisoConforme}
-                    onChange={(e) => setEditItemRevisoConforme(e.target.value)}
-                    placeholder="Nombre o firma"
-                    className="text-sm"
-                  />
-                </div>
               </div>
               
               {/* Fotos existentes con descripción */}
@@ -2287,7 +2406,7 @@ export function InspectionsPage() {
                     // Auto-generar nombre
                     const date = new Date().toLocaleDateString('es-CL').replace(/\//g, '-')
                     const locationName = locations.find(l => l.id === v)?.nombre || 'Planta'
-                    setNewInspectionName(`Inspección Diaria ${locationName} - ${date}`)
+                    setNewInspectionName(`Inspección Diaria ${locationName} - Turno ${dailyShift} - ${date}`)
                   }}>
                     <SelectTrigger>
                       <SelectValue placeholder="Seleccione un mapa..." />
@@ -2298,6 +2417,28 @@ export function InspectionsPage() {
                           {location.nombre}
                         </SelectItem>
                       ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Turno *</Label>
+                  <Select value={dailyShift} onValueChange={(v) => {
+                    const shift = v as 'A' | 'B' | 'C'
+                    setDailyShift(shift)
+                    if (selectedLocationId) {
+                      const date = new Date().toLocaleDateString('es-CL').replace(/\//g, '-')
+                      const locationName = locations.find(l => l.id === selectedLocationId)?.nombre || 'Planta'
+                      setNewInspectionName(`Inspección Diaria ${locationName} - Turno ${shift} - ${date}`)
+                    }
+                  }}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccione turno..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="A">Turno A</SelectItem>
+                      <SelectItem value="B">Turno B</SelectItem>
+                      <SelectItem value="C">Turno C</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

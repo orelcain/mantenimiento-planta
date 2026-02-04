@@ -672,6 +672,7 @@ export async function updateInspectionItem(
     | 'cumple'
     | 'noCumple'
     | 'observacion'
+    | 'fechaInspeccion'
     | 'fechaReparacion'
     | 'horaInicioItem'
     | 'horaTerminoItem'
@@ -829,6 +830,7 @@ function parseInspectionItem(doc: { id: string; data: () => Record<string, unkno
     cumple: data.cumple as boolean | undefined,
     noCumple: data.noCumple as boolean | undefined,
     observacion: data.observacion as string | undefined,
+    fechaInspeccion: data.fechaInspeccion ? parseTimestamp(data.fechaInspeccion) : undefined,
     fechaReparacion: data.fechaReparacion ? parseTimestamp(data.fechaReparacion) : undefined,
     horaInicioItem: data.horaInicioItem as string | undefined,
     horaTerminoItem: data.horaTerminoItem as string | undefined,
