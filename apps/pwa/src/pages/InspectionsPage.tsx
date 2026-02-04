@@ -123,6 +123,7 @@ export function InspectionsPage() {
   const [horaTermino, setHoraTermino] = useState('16:00')
   const [folio, setFolio] = useState('')
   const [inspectionType, setInspectionType] = useState<'individual' | 'daily'>('daily')
+  const [activeTab, setActiveTab] = useState(0)
   
   // Inspección activa (para agregar items)
   const [activeInspection, setActiveInspection] = useState<Inspection | null>(null)
@@ -346,16 +347,16 @@ export function InspectionsPage() {
       const inspection = await createInspection(data)
 
       // Procesar lista de puntos (si existe)
-      if (selectedArea) {
-        const areaData = DAILY_INSPECTION_AREAS.find((a) => a.name === selectedArea)
-        if (areaData) {
-          for (let i = 0; i < areaData.items.length; i++) {
-            const itemTitle = areaData.items[i]
+      if (inspectionType === 'daily') {
+        // Crear puntos para todas las 7 áreas
+        let orderCounter = 1
+        for (const areaData of DAILY_INSPECTION_AREAS) {
+          for (const itemTitle of areaData.items) {
             const itemData: CreateInspectionItemDTO = {
               inspectionId: inspection.id,
               title: itemTitle,
               area: areaData.name,
-              order: i + 1,
+              order: orderCounter++,
               position: { x: 0.5, y: 0.5 }
             }
             await addInspectionItem(itemData)
@@ -407,8 +408,8 @@ export function InspectionsPage() {
       // Abrir la inspección recién creada
       await handleOpenInspection(inspection)
       
-      // Si se seleccionó un área predefinida, abrir automáticamente el formulario diario
-      if (selectedArea) {
+      // Si es ruta diaria, abrir automáticamente el formulario con pestañas
+      if (inspectionType === 'daily') {
         setIsDailyFormOpen(true)
       }
 
@@ -1378,32 +1379,88 @@ export function InspectionsPage() {
         
         {/* Modal de formulario diario por áreas */}
         <Dialog open={isDailyFormOpen} onOpenChange={setIsDailyFormOpen}>
-          <DialogContent className="max-w-5xl">
-            <DialogHeader>
-              <DialogTitle>Formulario Diario por Áreas</DialogTitle>
+          <DialogContent className="max-w-6xl max-h-[90vh] flex flex-col p-0">
+            <DialogHeader className="px-6 pt-6 pb-4 border-b">
+              <DialogTitle className="text-xl">Inspección Diaria - 7 Áreas</DialogTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                Complete el checklist para cada área. Los cambios se guardan al final.
+              </p>
             </DialogHeader>
 
-            <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-2">
-              {sortedAreas.map((area) => (
-                <div key={area} className="space-y-3">
-                  <div className="text-sm font-semibold text-primary">{area}</div>
+            {/* Pestañas */}
+            <div className="flex overflow-x-auto border-b px-2 bg-muted/30 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
+              {sortedAreas.map((area, idx) => {
+                const areaItems = groupedItems[area] || []
+                const completedCount = areaItems.filter(item => {
+                  const values = dailyFormValues[item.id]
+                  return values?.cumple || values?.noCumple
+                }).length
+                const totalCount = areaItems.length
+                const progress = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
+                
+                return (
+                  <button
+                    key={area}
+                    onClick={() => setActiveTab(idx)}
+                    className={`flex-shrink-0 px-4 py-3 text-sm font-medium border-b-2 transition-all whitespace-nowrap ${
+                      activeTab === idx
+                        ? 'border-primary text-primary bg-background'
+                        : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold">
+                        {idx + 1}
+                      </span>
+                      <span className="max-w-[150px] truncate">{area.split('.')[1]?.trim() || area}</span>
+                      {progress > 0 && (
+                        <span className={`ml-1 text-xs px-1.5 py-0.5 rounded-full ${
+                          progress === 100 ? 'bg-green-500/20 text-green-600' : 'bg-yellow-500/20 text-yellow-600'
+                        }`}>
+                          {progress}%
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Contenido del área activa */}
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              {sortedAreas[activeTab] && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h3 className="font-semibold text-lg text-primary">{sortedAreas[activeTab]}</h3>
+                      <p className="text-sm text-muted-foreground">{groupedItems[sortedAreas[activeTab]].length} puntos de control</p>
+                    </div>
+                  </div>
+
                   <div className="space-y-3">
-                    {groupedItems[area].map((item) => {
+                    {groupedItems[sortedAreas[activeTab]].map((item, itemIdx) => {
                       const values = dailyFormValues[item.id]
                       return (
-                        <div key={item.id} className="border rounded-lg p-3 space-y-3">
-                          <div className="text-sm font-medium">
-                            {item.title}
-                          </div>
-                          {(item.equipo || item.description) && (
-                            <div className="text-xs text-muted-foreground">
-                              {item.equipo || item.description}
+                        <div key={item.id} className="border rounded-lg p-4 space-y-3 hover:border-primary/50 transition-colors bg-card">
+                          <div className="flex items-start gap-3">
+                            <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-sm font-semibold shrink-0">
+                              {itemIdx + 1}
                             </div>
-                          )}
+                            <div className="flex-1">
+                              <div className="text-sm font-medium leading-tight">
+                                {item.title}
+                              </div>
+                              {(item.equipo || item.description) && (
+                                <div className="text-xs text-muted-foreground mt-1">
+                                  {item.equipo || item.description}
+                                </div>
+                              )}
+                            </div>
+                          </div>
 
-                          <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
-                            <div className="flex items-center gap-3 md:col-span-2">
-                              <label className="flex items-center gap-2 text-sm">
+                          <div className="grid grid-cols-1 gap-3">
+                            <div className="flex items-center gap-4">
+                              <label className="flex items-center gap-2 text-sm cursor-pointer px-3 py-2 rounded-md hover:bg-green-500/10 transition-colors">
                                 <input
                                   type="checkbox"
                                   checked={values?.cumple || false}
@@ -1411,10 +1468,11 @@ export function InspectionsPage() {
                                     handleDailyFieldChange(item.id, 'cumple', e.target.checked)
                                     if (e.target.checked) handleDailyFieldChange(item.id, 'noCumple', false)
                                   }}
+                                  className="w-4 h-4"
                                 />
-                                Cumple (C)
+                                <span className="font-medium text-green-600">✓ Cumple</span>
                               </label>
-                              <label className="flex items-center gap-2 text-sm">
+                              <label className="flex items-center gap-2 text-sm cursor-pointer px-3 py-2 rounded-md hover:bg-red-500/10 transition-colors">
                                 <input
                                   type="checkbox"
                                   checked={values?.noCumple || false}
@@ -1422,65 +1480,82 @@ export function InspectionsPage() {
                                     handleDailyFieldChange(item.id, 'noCumple', e.target.checked)
                                     if (e.target.checked) handleDailyFieldChange(item.id, 'cumple', false)
                                   }}
+                                  className="w-4 h-4"
                                 />
-                                No Cumple (N/C)
+                                <span className="font-medium text-red-600">✗ No Cumple</span>
                               </label>
                             </div>
-                            <Input
-                              value={values?.observacion || ''}
-                              onChange={(e) => handleDailyFieldChange(item.id, 'observacion', e.target.value)}
-                              placeholder="Observación"
-                              className="md:col-span-2"
-                            />
-                            <Input
-                              type="date"
-                              value={values?.fechaReparacion || ''}
-                              onChange={(e) => handleDailyFieldChange(item.id, 'fechaReparacion', e.target.value)}
-                              className="md:col-span-1"
-                            />
-                            <Input
-                              value={values?.revisoConforme || ''}
-                              onChange={(e) => handleDailyFieldChange(item.id, 'revisoConforme', e.target.value)}
-                              placeholder="Revisó conforme"
-                              className="md:col-span-1"
-                            />
-                          </div>
 
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <div className="space-y-1">
-                              <Label className="text-xs">Hora Inicio</Label>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                              <div className="md:col-span-2">
+                                <Input
+                                  value={values?.observacion || ''}
+                                  onChange={(e) => handleDailyFieldChange(item.id, 'observacion', e.target.value)}
+                                  placeholder="Observaciones..."
+                                  className="text-sm"
+                                />
+                              </div>
                               <Input
-                                type="time"
-                                value={values?.horaInicioItem || ''}
-                                onChange={(e) => handleDailyFieldChange(item.id, 'horaInicioItem', e.target.value)}
+                                value={values?.revisoConforme || ''}
+                                onChange={(e) => handleDailyFieldChange(item.id, 'revisoConforme', e.target.value)}
+                                placeholder="Revisó conforme"
+                                className="text-sm"
                               />
                             </div>
-                            <div className="space-y-1">
-                              <Label className="text-xs">Hora Término</Label>
-                              <Input
-                                type="time"
-                                value={values?.horaTerminoItem || ''}
-                                onChange={(e) => handleDailyFieldChange(item.id, 'horaTerminoItem', e.target.value)}
-                              />
-                            </div>
+
+                            {values?.noCumple && (
+                              <div className="bg-red-500/5 border border-red-500/20 rounded-md p-3 space-y-2">
+                                <Label className="text-xs text-red-600 font-semibold">Fecha de Reparación</Label>
+                                <Input
+                                  type="date"
+                                  value={values?.fechaReparacion || ''}
+                                  onChange={(e) => handleDailyFieldChange(item.id, 'fechaReparacion', e.target.value)}
+                                  className="text-sm"
+                                />
+                              </div>
+                            )}
                           </div>
                         </div>
                       )
                     })}
                   </div>
                 </div>
-              ))}
+              )}
             </div>
 
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsDailyFormOpen(false)}>
-                Cancelar
-              </Button>
-              <Button onClick={handleSaveDailyForm} disabled={isSavingDailyForm}>
-                {isSavingDailyForm && <Spinner className="h-4 w-4 mr-2" />}
-                Guardar
-              </Button>
-            </DialogFooter>
+            {/* Footer con navegación */}
+            <div className="border-t px-6 py-4 bg-muted/30">
+              <div className="flex items-center justify-between">
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setActiveTab(prev => Math.max(0, prev - 1))}
+                    disabled={activeTab === 0}
+                  >
+                    ← Anterior
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setActiveTab(prev => Math.min(sortedAreas.length - 1, prev + 1))}
+                    disabled={activeTab === sortedAreas.length - 1}
+                  >
+                    Siguiente →
+                  </Button>
+                </div>
+                
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => setIsDailyFormOpen(false)}>
+                    Cerrar
+                  </Button>
+                  <Button onClick={handleSaveDailyForm} disabled={isSavingDailyForm}>
+                    {isSavingDailyForm && <Spinner className="h-4 w-4 mr-2" />}
+                    Guardar Todo
+                  </Button>
+                </div>
+              </div>
+            </div>
           </DialogContent>
         </Dialog>
 
@@ -2180,54 +2255,51 @@ export function InspectionsPage() {
 
             {inspectionType === 'daily' ? (
               <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Seleccionar Área de Inspección *</Label>
-                  <Select value={selectedArea} onValueChange={(v) => {
-                     setSelectedArea(v)
-                     // Auto-generar nombre
-                     const date = new Date().toLocaleDateString('es-CL').replace(/\//g, '-')
-                     const areaName = v.split('.')[1]?.trim() || v
-                     setNewInspectionName(`Insp. ${areaName} - ${date}`)
-                     
-                     // Si solo hay un mapa, seleccionarlo automáticamente
-                     if (locations.length === 1 && !selectedLocationId) {
-                       setSelectedLocationId(locations[0].id)
-                     }
-                   }}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccione un área..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {DAILY_INSPECTION_AREAS.map((area) => (
-                        <SelectItem key={area.name} value={area.name}>
-                          {area.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <div className="bg-primary/10 border border-primary/20 rounded-lg p-4 space-y-3">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-bold text-lg shrink-0">
+                      7
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-base">Inspección Diaria Completa</h3>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Se crearán automáticamente <strong>46 puntos de control</strong> distribuidos en las 7 áreas de la planta.
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    {DAILY_INSPECTION_AREAS.map((area, idx) => (
+                      <div key={area.name} className="flex items-center gap-2 text-muted-foreground">
+                        <div className="w-5 h-5 rounded-full bg-primary/20 text-primary flex items-center justify-center font-medium text-[10px]">
+                          {idx + 1}
+                        </div>
+                        <span className="line-clamp-1">{area.name.split('.')[1]?.trim() || area.name}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="space-y-2">
                   <Label>Ubicación / Mapa *</Label>
-                  <div className="grid gap-2">
-                    {locations.map((location) => (
-                      <button
-                        key={location.id}
-                        type="button"
-                        onClick={() => setSelectedLocationId(location.id)}
-                        className={`p-3 rounded-lg border text-left transition-all ${
-                          selectedLocationId === location.id 
-                            ? 'border-primary bg-primary/10' 
-                            : 'border-muted hover:border-primary/50'
-                        }`}
-                      >
-                        <div className="font-medium">{location.nombre}</div>
-                        {location.descripcion && (
-                          <div className="text-xs text-muted-foreground">{location.descripcion}</div>
-                        )}
-                      </button>
-                    ))}
-                  </div>
+                  <Select value={selectedLocationId} onValueChange={(v) => {
+                    setSelectedLocationId(v)
+                    // Auto-generar nombre
+                    const date = new Date().toLocaleDateString('es-CL').replace(/\//g, '-')
+                    const locationName = locations.find(l => l.id === v)?.nombre || 'Planta'
+                    setNewInspectionName(`Inspección Diaria ${locationName} - ${date}`)
+                  }}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Seleccione un mapa..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {locations.map((location) => (
+                        <SelectItem key={location.id} value={location.id}>
+                          {location.nombre}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="space-y-2">
@@ -2236,8 +2308,6 @@ export function InspectionsPage() {
                     value={newInspectionName}
                     onChange={(e) => setNewInspectionName(e.target.value)}
                     placeholder="Se generará automáticamente"
-                    readOnly
-                    className="bg-muted text-muted-foreground"
                   />
                 </div>
               </div>
