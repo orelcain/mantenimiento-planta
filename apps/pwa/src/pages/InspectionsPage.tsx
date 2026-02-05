@@ -71,7 +71,8 @@ import {
   uploadInspectionItemPhoto,
   uploadInspectionItemPhotos,
   updateInspectionItem,
-  updateInspection
+  updateInspection,
+  deleteInspection
 } from '@/services/maps'
 import { MapViewer, type MapViewerHandle } from '@/components/maps'
 import { exportInspectionToPDF } from '@/utils/maps'
@@ -658,6 +659,28 @@ export function InspectionsPage() {
       })
     } finally {
       setIsSavingInspection(false)
+    }
+  }
+
+  // ========== ELIMINAR INSPECCION ==========
+
+  const handleDeleteInspection = async (inspection: Inspection) => {
+    if (!window.confirm(`¿Estás seguro de eliminar la inspección "${inspection.nombre}" permanentemente?`)) return
+
+    try {
+      await deleteInspection(inspection.id)
+      setInspections(prev => prev.filter(i => i.id !== inspection.id))
+      toast({
+        title: 'Inspección eliminada',
+        description: 'La inspección ha sido eliminada correctamente'
+      })
+    } catch (error) {
+      console.error('Error deleting inspection:', error)
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'No se pudo eliminar la inspección'
+      })
     }
   }
 
@@ -2445,7 +2468,21 @@ export function InspectionsPage() {
                   </div>
                 </div>
               </CardContent>
-              <CardFooter className="pt-0 flex justify-end">
+              <CardFooter className="pt-0 flex justify-end gap-2">
+                {user?.rol === 'admin' && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleDeleteInspection(inspection)
+                    }}
+                  >
+                    <Trash2 className="h-3.5 w-3.5 mr-2" />
+                    Eliminar
+                  </Button>
+                )}
                 <Button 
                   variant="ghost" 
                   size="sm" 

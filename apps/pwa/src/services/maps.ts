@@ -634,6 +634,13 @@ export async function addInspectionItem(
 }
 
 /**
+ * Eliminar una inspección
+ */
+export async function deleteInspection(id: string): Promise<void> {
+  await deleteDoc(doc(db, INSPECTIONS_COLLECTION, id))
+}
+
+/**
  * Obtener items de una inspección
  */
 export async function getInspectionItems(inspectionId: string): Promise<InspectionItem[]> {
