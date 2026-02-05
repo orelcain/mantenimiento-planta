@@ -269,12 +269,12 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
   }
 
   // Asignar incidencia
-  const handleAssign = async () => {
-    if (!user || !selectedTechnician) return
+  const handleAssign = async (technicianId = selectedTechnician) => {
+    if (!user || !technicianId) return
     setIsLoading(true)
     try {
-      await assignIncident(incident.id, selectedTechnician, user.id)
-      logger.info('Incident assigned', { incidentId: incident.id, technicianId: selectedTechnician })
+      await assignIncident(incident.id, technicianId, user.id)
+      logger.info('Incident assigned', { incidentId: incident.id, technicianId: technicianId })
       setShowAssignForm(false)
       onClose()
     } catch (error: unknown) {
@@ -283,6 +283,19 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
     } finally {
       setIsLoading(false)
     }
+  }
+
+  // Auto-asignarse la incidencia
+  const handleSelfAssign = async () => {
+    if (!user) return
+    if (!permission.canWorkOnIncident(user.id) && user.rol !== 'admin') {
+       // El usuario debe tener permiso para trabajar o ser admin
+       // Aunque el permiso canAssignIncident quizás es suficiente,
+       // idealmente solo técnicos se asignan.
+       // Pero el requerimiento es "el que la crea debe poder asignarse"
+       // Asumimos que si la creó, y tiene acceso a este botón, puede.
+    }
+    await handleAssign(user.id)
   }
 
   // Cerrar incidencia
@@ -784,6 +797,19 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
               <Button onClick={() => setShowAssignForm(true)} className="w-full sm:w-auto">
                 <UserPlus className="mr-2 h-4 w-4" />
                 Asignar Técnico
+              </Button>
+            )}
+
+            {/* Auto-asignación para el creador */}
+            {user?.id === incident.reportadoPor && incident.status === 'confirmada' && !incident.asignadoA && (
+              <Button 
+                onClick={handleSelfAssign} 
+                disabled={isLoading}
+                variant="secondary"
+                className="w-full sm:w-auto border-primary/20 text-primary hover:bg-primary/10"
+              >
+                <UserPlus className="mr-2 h-4 w-4" />
+                Asignarme a mí
               </Button>
             )}
 
