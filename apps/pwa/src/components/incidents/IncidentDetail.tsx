@@ -367,7 +367,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
   return (
     <>
       <Dialog open onOpenChange={onClose}>
-        <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl w-[95vw] md:w-full max-h-[95dvh] overflow-y-auto p-4 md:p-6">
           <DialogHeader>
             <div className="flex items-start justify-between">
               <div className="space-y-1">
@@ -525,7 +525,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
                     <Spinner className="h-6 w-6" />
                   </div>
                 ) : (
-                  <div className="aspect-[4/3] w-full max-h-[60vh] min-h-[400px] rounded-lg overflow-hidden border">
+                  <div className="w-full aspect-square md:aspect-[4/3] max-h-[50vh] min-h-[300px] md:min-h-[400px] rounded-lg overflow-hidden border">
                   <MapViewer
                     imageUrl={mapVersion.imageUrl}
                     markers={[{

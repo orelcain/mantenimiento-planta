@@ -379,38 +379,38 @@ export const MapViewer = forwardRef<MapViewerHandle, MapViewerProps>(({
     <div className={cn('relative flex flex-col', className)}>
       {/* Contenedor del mapa con overflow hidden */}
       <div className="relative flex-1 min-h-0 overflow-hidden bg-muted rounded-lg touch-none">
-        {/* Controles de zoom */}
+        {/* Controles de zoom optimizados para móvil */}
         {showControls && (
           <div className="absolute top-2 right-2 z-10 flex flex-col gap-1 bg-background/90 backdrop-blur rounded-lg p-1 shadow-md">
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8"
+              className="h-10 w-10 md:h-8 md:w-8"
               onClick={handleZoomIn}
-            title="Acercar"
-          >
-            <ZoomIn className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onClick={handleZoomOut}
-            title="Alejar"
-          >
-            <ZoomOut className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onClick={handleReset}
-            title="Restablecer"
-          >
-            <RotateCcw className="h-4 w-4" />
-          </Button>
-        </div>
-      )}
+              title="Acercar"
+            >
+              <ZoomIn className="h-5 w-5 md:h-4 md:w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-10 w-10 md:h-8 md:w-8"
+              onClick={handleZoomOut}
+              title="Alejar"
+            >
+              <ZoomOut className="h-5 w-5 md:h-4 md:w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-10 w-10 md:h-8 md:w-8"
+              onClick={handleReset}
+              title="Restablecer"
+            >
+              <RotateCw className="h-5 w-5 md:h-4 md:w-4" />
+            </Button>
+          </div>
+        )}
 
       {/* Indicador de modo edición */}
       {editable && (
