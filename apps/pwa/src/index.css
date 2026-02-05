@@ -7,6 +7,16 @@
     @apply border-border;
   }
 
+  html {
+    font-size: 87.5%;
+  }
+
+  @media (max-width: 640px) {
+    html {
+      font-size: 85%;
+    }
+  }
+
   body {
     @apply bg-background text-foreground antialiased;
     font-feature-settings: "rlig" 1, "calt" 1;
