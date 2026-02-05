@@ -99,6 +99,7 @@ export const MapViewer = forwardRef<MapViewerHandle, MapViewerProps>(({
     
     // Dimensiones (añadir un mínimo para evitar zoom infinito si es un solo punto)
     // Usamos 0.2 (20%) para mostrar contexto suficiente sin pixelar la imagen
+    // Al usar un contenedor más cuadrado, esto se equilibrará mejor
     const width = Math.max(maxX - minX, 0.2) 
     const height = Math.max(maxY - minY, 0.2)
 

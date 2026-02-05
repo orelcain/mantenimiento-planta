@@ -525,7 +525,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
                     <Spinner className="h-6 w-6" />
                   </div>
                 ) : (
-                  <div className="h-[400px] w-full rounded-lg overflow-hidden border">
+                  <div className="aspect-[4/3] w-full max-h-[60vh] min-h-[400px] rounded-lg overflow-hidden border">
                   <MapViewer
                     imageUrl={mapVersion.imageUrl}
                     markers={[{
