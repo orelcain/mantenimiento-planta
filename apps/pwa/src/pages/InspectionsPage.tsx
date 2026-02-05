@@ -837,67 +837,58 @@ export function InspectionsPage() {
 
     setIsSavingDailyForm(true)
     try {
-      const updates = inspectionItems.map((item) => {
+      const updates = inspectionItems.map(async (item) => {
         const values = dailyFormValues[item.id]
         if (!values) return null
 
-        return updateInspectionItem(item.id, {
+        let finalFotos = item.fotos
+        const files = dailyFormFiles[item.id] || []
+
+        if (files.length > 0) {
+          const uploaded: InspectionPhoto[] = []
+          for (const file of files) {
+            const uploadedPhoto = await uploadInspectionItemPhoto(item.id, activeInspection.id, file)
+            uploaded.push(uploadedPhoto)
+          }
+          finalFotos = [...item.fotos, ...uploaded]
+        }
+
+        await updateInspectionItem(item.id, {
           cumple: values.cumple || undefined,
           noCumple: values.noCumple || undefined,
           observacion: values.observacion.trim() || undefined,
+          fechaInspeccion: values.fechaInspeccion ? new Date(values.fechaInspeccion) : undefined,
           fechaReparacion: values.fechaReparacion ? new Date(values.fechaReparacion) : undefined,
           horaInicioItem: values.horaInicioItem.trim() || undefined,
           horaTerminoItem: values.horaTerminoItem.trim() || undefined,
-          revisoConforme: values.revisoConforme.trim() || undefined
-        })
-      }).filter(Boolean) as Promise<void>[]
-
-      const handleDailyPhotoSelect = (itemId: string, files: FileList | null) => {
-        if (!files || files.length === 0) return
-        const selected = Array.from(files)
-        setDailyFormFiles((prev) => {
-
-          const merged = [...existing, ...selected].slice(0, 3)
-          return { ...prev, [itemId]: merged }
+          fotos: finalFotos
         })
 
-        const newUrls = selected.map((file) => URL.createObjectURL(file))
-        setDailyFormPreviewUrls((prev) => {
-          const existing = prev[itemId] || []
-          const merged = [...existing, ...newUrls].slice(0, 3)
-          return { ...prev, [itemId]: merged }
-        })
-      }
+        return { itemId: item.id, fotos: finalFotos }
+      }).filter(Boolean) as Promise<{ itemId: string; fotos: InspectionPhoto[] } | null>[]
 
-      const handleRemoveDailyPhoto = (itemId: string, index: number) => {
-        setDailyFormFiles((prev) => {
-          const next = (prev[itemId] || []).filter((_, i) => i !== index)
-          return { ...prev, [itemId]: next }
-        })
-        setDailyFormPreviewUrls((prev) => {
-          const urls = prev[itemId] || []
-          const [removed] = urls.filter((_, i) => i === index)
-          if (removed) URL.revokeObjectURL(removed)
-          const next = urls.filter((_, i) => i !== index)
-          return { ...prev, [itemId]: next }
-        })
-      }
-      await Promise.all(updates)
+      const results = await Promise.all(updates)
 
       setInspectionItems((prev) => prev.map((item) => {
         const values = dailyFormValues[item.id]
         if (!values) return item
+        const fotos = results.find((r) => r?.itemId === item.id)?.fotos || item.fotos
         return {
           ...item,
           cumple: values.cumple || undefined,
           noCumple: values.noCumple || undefined,
           observacion: values.observacion.trim() || undefined,
+          fechaInspeccion: values.fechaInspeccion ? new Date(values.fechaInspeccion) : undefined,
           fechaReparacion: values.fechaReparacion ? new Date(values.fechaReparacion) : undefined,
           horaInicioItem: values.horaInicioItem.trim() || undefined,
           horaTerminoItem: values.horaTerminoItem.trim() || undefined,
-          revisoConforme: values.revisoConforme.trim() || undefined
+          fotos
         }
       }))
+
+      setDailyFormFiles({})
+      Object.values(dailyFormPreviewUrls).flat().forEach((url) => URL.revokeObjectURL(url))
+      setDailyFormPreviewUrls({})
 
       toast({ title: 'Formulario guardado' })
       setIsDailyFormOpen(false)
@@ -911,6 +902,37 @@ export function InspectionsPage() {
     } finally {
       setIsSavingDailyForm(false)
     }
+  }
+
+  const handleDailyPhotoSelect = (itemId: string, files: FileList | null) => {
+    if (!files || files.length === 0) return
+    const selected = Array.from(files)
+    setDailyFormFiles((prev) => {
+      const existing = prev[itemId] || []
+      const merged = [...existing, ...selected].slice(0, 3)
+      return { ...prev, [itemId]: merged }
+    })
+
+    const newUrls = selected.map((file) => URL.createObjectURL(file))
+    setDailyFormPreviewUrls((prev) => {
+      const existing = prev[itemId] || []
+      const merged = [...existing, ...newUrls].slice(0, 3)
+      return { ...prev, [itemId]: merged }
+    })
+  }
+
+  const handleRemoveDailyPhoto = (itemId: string, index: number) => {
+    setDailyFormFiles((prev) => {
+      const next = (prev[itemId] || []).filter((_, i) => i !== index)
+      return { ...prev, [itemId]: next }
+    })
+    setDailyFormPreviewUrls((prev) => {
+      const urls = prev[itemId] || []
+      const [removed] = urls.filter((_, i) => i === index)
+      if (removed) URL.revokeObjectURL(removed)
+      const next = urls.filter((_, i) => i !== index)
+      return { ...prev, [itemId]: next }
+    })
   }
   
   // Abrir visor de imagen grande con zoom/pan
@@ -1027,62 +1049,34 @@ export function InspectionsPage() {
     if (!activeInspection || !activeMapVersion) return
     
     setIsPdfModalOpen(false)
-    
-      const updates = inspectionItems.map(async (item) => {
+
+    try {
       toast({
         title: 'Generando PDF...',
-        let finalFotos = item.fotos
-        const files = dailyFormFiles[item.id] || []
+        description: 'Por favor espera un momento'
+      })
 
-        if (files.length > 0) {
-          const uploaded: InspectionPhoto[] = []
-          for (const file of files) {
-            const uploadedPhoto = await uploadInspectionItemPhoto(item.id, activeInspection.id, file)
-            uploaded.push(uploadedPhoto)
-          }
-          finalFotos = [...item.fotos, ...uploaded]
-        }
+      await exportInspectionToPDF({
+        inspection: activeInspection,
+        items: inspectionItems,
+        mapVersion: activeMapVersion,
+        includePhotos: inspectionItems.some(i => i.fotos.length > 0),
+        includeStats: true,
+        layout: pdfLayout
+      })
 
-        await updateInspectionItem(item.id, {
-          cumple: values.cumple,
-          noCumple: values.noCumple,
-          observacion: values.observacion.trim() || undefined,
-          fechaInspeccion: values.fechaInspeccion ? new Date(values.fechaInspeccion) : undefined,
-          fechaReparacion: values.fechaReparacion ? new Date(values.fechaReparacion) : undefined,
-          horaInicioItem: values.horaInicioItem.trim() || undefined,
-          horaTerminoItem: values.horaTerminoItem.trim() || undefined,
-          fotos: finalFotos
-        })
-
-        return { itemId: item.id, fotos: finalFotos }
-      }).filter(Boolean) as Promise<{ itemId: string; fotos: InspectionPhoto[] } | null>[]
-
-      const results = await Promise.all(updates)
-
-      setInspectionItems((prev) => prev.map((item) => {
-        const values = dailyFormValues[item.id]
-        if (!values) return item
-        const fotos = results.find((r) => r?.itemId === item.id)?.fotos || item.fotos
-        return {
-          ...item,
-          cumple: values.cumple,
-          noCumple: values.noCumple,
-          observacion: values.observacion.trim() || undefined,
-          fechaInspeccion: values.fechaInspeccion ? new Date(values.fechaInspeccion) : undefined,
-          fechaReparacion: values.fechaReparacion ? new Date(values.fechaReparacion) : undefined,
-          horaInicioItem: values.horaInicioItem.trim() || undefined,
-          horaTerminoItem: values.horaTerminoItem.trim() || undefined,
-          fotos
-        }
-      }))
-
-      setDailyFormFiles({})
-      Object.values(dailyFormPreviewUrls).flat().forEach((url) => URL.revokeObjectURL(url))
-      setDailyFormPreviewUrls({})
-      <div className="flex items-center justify-center h-64">
-        <Spinner className="h-8 w-8" />
-      </div>
-    )
+      toast({
+        title: 'PDF generado',
+        description: 'El archivo se ha descargado'
+      })
+    } catch (error) {
+      console.error('Error exporting PDF:', error)
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'No se pudo generar el PDF'
+      })
+    }
   }
   
   // Vista de inspección activa
