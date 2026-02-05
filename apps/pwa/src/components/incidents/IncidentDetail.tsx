@@ -537,6 +537,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
                     showControls={true}
                     className="h-full w-full"
                     markerColor="#ef4444"
+                    autoFitMarkers={true}
                   />
                   </div>
                 )}

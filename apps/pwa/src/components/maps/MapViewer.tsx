@@ -49,6 +49,8 @@ interface MapViewerProps {
   showControls?: boolean
   markerColor?: string
   pendingMarkerColor?: string
+  // Opciones de vista automática
+  autoFitMarkers?: boolean
 }
 
 export const MapViewer = forwardRef<MapViewerHandle, MapViewerProps>(({
@@ -66,6 +68,7 @@ export const MapViewer = forwardRef<MapViewerHandle, MapViewerProps>(({
   showControls = true,
   markerColor = '#ef4444', // red-500
   pendingMarkerColor = '#3b82f6', // blue-500
+  autoFitMarkers = false
 }, ref) => {
   // Usar imageUrl directa o desde mapVersion
   const mapImageUrl = imageUrl || mapVersion?.imageUrl || ''
@@ -78,73 +81,67 @@ export const MapViewer = forwardRef<MapViewerHandle, MapViewerProps>(({
   const [panStart, setPanStart] = useState({ x: 0, y: 0, panX: 0, panY: 0 })
   const [imageLoaded, setImageLoaded] = useState(false)
   
+  // Función para hacer zoom a puntos específicos
+  const zoomToPoints = useCallback((points: { x: number; y: number }[]) => {
+    if (!points.length || !containerRef.current || !imageRef.current) return
+
+    const padding = 0.1 // 10% de margen
+    
+    // Calcular bounding box
+    const minX = Math.min(...points.map(p => p.x))
+    const maxX = Math.max(...points.map(p => p.x))
+    const minY = Math.min(...points.map(p => p.y))
+    const maxY = Math.max(...points.map(p => p.y))
+
+    // Centro
+    const centerX = (minX + maxX) / 2
+    const centerY = (minY + maxY) / 2
+    
+    // Dimensiones (añadir un mínimo para evitar zoom infinito si es un solo punto)
+    const width = Math.max(maxX - minX, 0.1) 
+    const height = Math.max(maxY - minY, 0.1)
+
+    const container = containerRef.current
+    const img = imageRef.current
+    const naturalWidth = img.naturalWidth
+    const naturalHeight = img.naturalHeight
+
+    if (!naturalWidth || !naturalHeight) return
+
+    // Calcular zoom necesario
+      const zoomX = container.clientWidth / (naturalWidth * width * (1 + padding))
+      const zoomY = container.clientHeight / (naturalHeight * height * (1 + padding))
+      
+      // Limitar zoom
+      let newZoom = Math.min(zoomX, zoomY, 5) // Max zoom 5
+      newZoom = Math.max(newZoom, 1) // Min zoom 1
+
+      // Calcular Pan para centrar
+      const scaledWidth = naturalWidth * newZoom
+      const scaledHeight = naturalHeight * newZoom
+      
+      const panX = scaledWidth * (0.5 - centerX)
+      const panY = scaledHeight * (0.5 - centerY)
+
+      setZoom(newZoom)
+      setPan({ x: panX, y: panY })
+  }, [])
+
   // Exponer métodos
   useImperativeHandle(ref, () => ({
     resetView: () => {
       setZoom(1)
       setPan({ x: 0, y: 0 })
     },
-    zoomToPoints: (points) => {
-      if (!points.length || !containerRef.current || !imageRef.current) return
-
-      const padding = 0.1 // 10% de margen
-      
-      // Calcular bounding box
-      const minX = Math.min(...points.map(p => p.x))
-      const maxX = Math.max(...points.map(p => p.x))
-      const minY = Math.min(...points.map(p => p.y))
-      const maxY = Math.max(...points.map(p => p.y))
-
-      // Centro
-      const centerX = (minX + maxX) / 2
-      const centerY = (minY + maxY) / 2
-      
-      // Dimensiones (añadir un mínimo para evitar zoom infinito si es un solo punto)
-      const width = Math.max(maxX - minX, 0.1) 
-      const height = Math.max(maxY - minY, 0.1)
-
-      const container = containerRef.current
-      const img = imageRef.current
-      const naturalWidth = img.naturalWidth
-      const naturalHeight = img.naturalHeight
-
-      if (!naturalWidth || !naturalHeight) return
-
-      // Calcular zoom necesario
-      // visible_w = container_w / (nat_w * zoom) >= width * (1 + padding)
-      // zoom <= container_w / (nat_w * width * (1+padding))
-
-      const zoomX = container.clientWidth / (naturalWidth * width * (1 + padding))
-      const zoomY = container.clientHeight / (naturalHeight * height * (1 + padding))
-      
-      // Limitar zoom
-      let newZoom = Math.min(zoomX, zoomY, 5) // Max zoom 5
-      newZoom = Math.max(newZoom, 1) // Min zoom 1 (o lo que sea apropiado, tal vez 0.5)
-
-      // Calcular Pan para centrar
-      // panX = scaledWidth/2 - centerX * scaledWidth
-      const scaledWidth = naturalWidth * newZoom
-      const scaledHeight = naturalHeight * newZoom
-      
-      const newPanX = (container.clientWidth - scaledWidth) / 2 + (0.5 - centerX) * scaledWidth // Ajustar offset
-      // Espera, mi fórmula anterior pan.x = scaledWidth * (0.5 - cNormX) asume que la imagen está centrada por defecto en (0,0) offset?
-      // Revisemos:
-      // offsetX = (containerW - scaledW)/2 + panX
-      // left = offsetX + X * scaledW
-      // Queremos left = containerW/2 para X=centerX
-      // containerW/2 = ((containerW - scaledW)/2 + panX) + centerX * scaledW
-      // containerW/2 = containerW/2 - scaledW/2 + panX + centerX * scaledW
-      // 0 = -scaledW/2 + panX + centerX * scaledW
-      // panX = scaledW/2 - centerX * scaledW
-      // panX = scaledW * (0.5 - centerX) -> CORRECTO
-
-      const panX = scaledWidth * (0.5 - centerX)
-      const panY = scaledHeight * (0.5 - centerY)
-
-      setZoom(newZoom)
-      setPan({ x: panX, y: panY })
-    }
+    zoomToPoints
   }))
+
+  // Auto-fit cuando se carga la imagen o cambian los marcadores
+  useEffect(() => {
+    if (imageLoaded && autoFitMarkers && markers.length > 0) {
+      zoomToPoints(markers.map(m => m.position))
+    }
+  }, [imageLoaded, autoFitMarkers, markers, zoomToPoints])
 
   // Estado para distinguir entre pan y click
   const [hasMoved, setHasMoved] = useState(false)
