@@ -1460,7 +1460,7 @@ export function InspectionsPage() {
             </DialogHeader>
 
             {/* Pestañas */}
-            <div className="sticky top-0 z-20 flex overflow-x-auto border-b bg-background shadow-sm scrollbar-hide">
+            <div className="flex-shrink-0 flex overflow-x-auto border-b bg-muted/30 shadow-sm scrollbar-hide">
               {sortedAreas.map((area, idx) => {
                 const areaLabel = area.replace(/^\d+\.\s*/, '')
                 const areaItems = groupedItems[area] || []
