@@ -27,7 +27,8 @@ import {
   Copy,
   Pencil,
   RefreshCw,
-  Search
+  Search,
+  Crosshair
 } from 'lucide-react'
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch'
 import { 
@@ -53,6 +54,7 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui'
+import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store'
 import { useToast } from '@/hooks/useToast'
 import { 
@@ -182,6 +184,9 @@ export function InspectionsPage() {
   const [dailyFormFiles, setDailyFormFiles] = useState<Record<string, File[]>>({})
   const [dailyFormPreviewUrls, setDailyFormPreviewUrls] = useState<Record<string, string[]>>({})
   const [isSavingDailyForm, setIsSavingDailyForm] = useState(false)
+
+  // Estado para reubicación de puntos
+  const [repositioningItem, setRepositioningItem] = useState<InspectionItem | null>(null)
   
   // Modal de imagen grande con zoom/pan
   const [viewingImage, setViewingImage] = useState<string | null>(null)
@@ -466,9 +471,38 @@ export function InspectionsPage() {
   }
   
   // Cuando se hace clic en el mapa
-  const handleMapClick = (position: { x: number; y: number }) => {
+  const handleMapClick = async (position: { x: number; y: number }) => {
     if (!activeInspection || activeInspection.status === 'finalizado') return
     
+    // Si estamos reubicando un punto
+    if (repositioningItem) {
+      try {
+        await updateInspectionItem(repositioningItem.id, {
+          position
+        })
+        
+        // Actualizar lista local
+        setInspectionItems(prev => prev.map(item => 
+          item.id === repositioningItem.id ? { ...item, position } : item
+        ))
+        
+        toast({
+          title: 'Punto reubicado',
+          description: 'La posición del marcador ha sido actualizada'
+        })
+      } catch (error) {
+        console.error('Error moving item:', error)
+        toast({
+          variant: 'destructive',
+          title: 'Error',
+          description: 'No se pudo mover el punto'
+        })
+      } finally {
+        setRepositioningItem(null)
+      }
+      return
+    }
+
     setPendingPosition(position)
     setIsAddItemModalOpen(true)
   }
@@ -1099,7 +1133,9 @@ export function InspectionsPage() {
       acc[key].push(item)
       return acc
     }, {})
-    const sortedAreas = Object.keys(groupedItems)
+    const sortedAreas = Object.keys(groupedItems).sort((a, b) => 
+      a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
+    )
 
     return (
       <div className="p-4 space-y-4">
@@ -1282,75 +1318,105 @@ export function InspectionsPage() {
                     <p className="text-xs">Click en el mapa para agregar</p>
                   </div>
                 ) : (
-                  <div className="space-y-2">
-                    {inspectionItems.map((item) => (
-                      <div 
-                        key={item.id}
-                        className="p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
-                      >
-                        <div className="flex items-start gap-3">
-                          <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold shrink-0">
-                            {item.order}
+                  <div className="space-y-4">
+                    {sortedAreas.map((areaGroup) => {
+                      const areaItems = groupedItems[areaGroup] || [];
+                      if (areaItems.length === 0) return null;
+
+                      return (
+                        <div key={areaGroup} className="space-y-2">
+                          <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 py-1.5 px-2 border-b font-semibold text-xs text-primary">
+                            {areaGroup}
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-sm truncate">{item.title}</p>
-                            {item.area && (
-                              <p className="text-xs text-primary/80 line-clamp-1">{item.area}</p>
-                            )}
-                            {item.equipo && (
-                              <p className="text-xs text-muted-foreground line-clamp-1">{item.equipo}</p>
-                            )}
-                            {item.description && (
-                              <p className="text-xs text-muted-foreground line-clamp-2">{item.description}</p>
-                            )}
-                            
-                            {/* Thumbnails de fotos */}
-                            {item.fotos.length > 0 && (
-                              <div className="flex gap-1 mt-2 flex-wrap">
-                                {item.fotos.slice(0, 3).map((foto, idx) => (
-                                  <button
-                                    key={idx}
-                                    type="button"
-                                    onClick={() => handleViewImage(item.fotos, idx)}
-                                    className="w-10 h-10 rounded border overflow-hidden hover:ring-2 ring-primary transition-all"
-                                  >
-                                    <img src={foto.url} alt={foto.descripcion || ''} className="w-full h-full object-cover" />
-                                  </button>
-                                ))}
-                                {item.fotos.length > 3 && (
-                                  <div className="w-10 h-10 rounded border flex items-center justify-center bg-muted text-xs font-medium">
-                                    +{item.fotos.length - 3}
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                            
-                            {/* Botón de editar item completo */}
-                            {activeInspection.status === 'en_progreso' && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-6 px-2 mt-1 text-xs"
-                                onClick={() => handleOpenEditItem(item)}
-                              >
-                                <FileText className="h-3 w-3 mr-1" />
-                                Editar punto
-                              </Button>
-                            )}
-                          </div>
-                          {activeInspection.status === 'en_progreso' && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 w-7 p-0 text-destructive hover:text-destructive"
-                              onClick={() => handleDeleteItem(item.id)}
+                          {areaItems.map((item) => (
+                            <div 
+                              key={item.id}
+                              className={cn(
+                                "p-3 rounded-lg border transition-colors",
+                                item.id === repositioningItem?.id ? "bg-primary/10 border-primary" : "bg-card hover:bg-muted/50"
+                              )}
                             >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          )}
+                              <div className="flex items-start gap-3">
+                                <div className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold shrink-0">
+                                  {item.order}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium text-sm truncate">{item.title}</p>
+                                  {item.equipo && (
+                                    <p className="text-xs text-muted-foreground line-clamp-1">{item.equipo}</p>
+                                  )}
+                                  
+                                  {/* Thumbnails de fotos */}
+                                  {item.fotos.length > 0 && (
+                                    <div className="flex gap-1 mt-2 flex-wrap">
+                                      {item.fotos.slice(0, 3).map((foto, idx) => (
+                                        <button
+                                          key={idx}
+                                          type="button"
+                                          onClick={() => handleViewImage(item.fotos, idx)}
+                                          className="w-10 h-10 rounded border overflow-hidden hover:ring-2 ring-primary transition-all"
+                                        >
+                                          <img src={foto.url} alt={foto.descripcion || ''} className="w-full h-full object-cover" />
+                                        </button>
+                                      ))}
+                                      {item.fotos.length > 3 && (
+                                        <div className="w-10 h-10 rounded border flex items-center justify-center bg-muted text-xs font-medium">
+                                          +{item.fotos.length - 3}
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                  
+                                  {/* Botones de acción */}
+                                  {activeInspection.status === 'en_progreso' && (
+                                    <div className="flex items-center gap-1 mt-2 flex-wrap">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-7 px-2 text-xs"
+                                        onClick={() => handleOpenEditItem(item)}
+                                      >
+                                        <FileText className="w-3 h-3 mr-1" />
+                                        Editar
+                                      </Button>
+                                      
+                                      <Button
+                                        variant={repositioningItem?.id === item.id ? "default" : "outline"}
+                                        size="sm"
+                                        className="h-7 px-2 text-xs"
+                                        onClick={() => {
+                                          if (repositioningItem?.id === item.id) {
+                                            setRepositioningItem(null);
+                                          } else {
+                                            setRepositioningItem(item);
+                                            toast({
+                                              title: "Modo ubicación activado",
+                                              description: "Haga click en el mapa para ubicar el punto",
+                                            });
+                                          }
+                                        }}
+                                      >
+                                        <Crosshair className="w-3 h-3 mr-1" />
+                                        {repositioningItem?.id === item.id ? 'Cancel' : 'Ubicar'}
+                                      </Button>
+
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-7 w-7 p-0 text-destructive hover:text-destructive ml-auto"
+                                        onClick={() => handleDeleteItem(item.id)}
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      </Button>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </CardContent>
