@@ -111,7 +111,7 @@ export function IncidentsPage() {
     // Filtros específicos
     if (activeFilter === 'pendientes') return incident.status === 'pendiente'
     if (activeFilter === 'confirmadas') return incident.status === 'confirmada'
-    if (activeFilter === 'confirmadas-asignadas') return incident.status === 'confirmada' && !!incident.asignadoA
+    if (activeFilter === 'confirmadas-asignadas') return !!incident.asignadoA && incident.status !== 'cerrada'
     if (activeFilter === 'confirmadas-sin-asignar') return incident.status === 'confirmada' && !incident.asignadoA
     if (activeFilter === 'mis-asignadas') return !!user?.id && incident.asignadoA === user.id && incident.status !== 'cerrada'
     if (activeFilter === 'en-proceso') return incident.status === 'en_proceso'
@@ -127,7 +127,7 @@ export function IncidentsPage() {
     total: incidents.length,
     pendientes: incidents.filter((i) => i.status === 'pendiente').length,
     confirmadas: incidents.filter((i) => i.status === 'confirmada').length,
-    confirmadas_asignadas: incidents.filter((i) => i.status === 'confirmada' && !!i.asignadoA).length,
+    confirmadas_asignadas: incidents.filter((i) => !!i.asignadoA && i.status !== 'cerrada').length,
     confirmadas_sin_asignar: incidents.filter((i) => i.status === 'confirmada' && !i.asignadoA).length,
     mis_asignadas: user?.id
       ? incidents.filter((i) => i.asignadoA === user.id && i.status !== 'cerrada').length
@@ -194,7 +194,7 @@ export function IncidentsPage() {
         >
           <CardContent className="p-4">
             <div className="text-2xl font-bold text-blue-600">{stats.confirmadas_asignadas}</div>
-            <div className="text-xs text-muted-foreground">Asignadas</div>
+            <div className="text-xs text-muted-foreground">Asignadas (todas)</div>
           </CardContent>
         </Card>
 

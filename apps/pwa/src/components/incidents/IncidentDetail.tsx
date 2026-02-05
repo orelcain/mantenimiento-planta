@@ -288,7 +288,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
   // Auto-asignarse la incidencia
   const handleSelfAssign = async () => {
     if (!user) return
-    if (!permission.canWorkOnIncident(user.id) && user.rol !== 'admin') {
+    if (!permissions.canWorkOnIncident(user.id) && user.rol !== 'admin') {
        // El usuario debe tener permiso para trabajar o ser admin
        // Aunque el permiso canAssignIncident quizás es suficiente,
        // idealmente solo técnicos se asignan.
@@ -793,7 +793,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
             )}
 
             {/* Asignación */}
-            {canValidate && incident.status === 'confirmada' && !incident.asignadoA && (
+            {permissions.canAssignIncident && incident.status === 'confirmada' && !incident.asignadoA && (
               <Button onClick={() => setShowAssignForm(true)} className="w-full sm:w-auto">
                 <UserPlus className="mr-2 h-4 w-4" />
                 Asignar Técnico
