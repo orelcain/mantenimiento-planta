@@ -367,8 +367,8 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
   return (
     <>
       <Dialog open onOpenChange={onClose}>
-        <DialogContent className="max-w-4xl w-[85vw] md:w-full max-h-[85vh] p-0 gap-0 overflow-hidden flex flex-col">
-          <DialogHeader className="p-4 border-b shrink-0 bg-card z-10">
+        <DialogContent className="max-w-4xl w-[98vw] md:w-full max-h-[92vh] p-0 gap-0 overflow-hidden flex flex-col rounded-xl">
+          <DialogHeader className="p-4 border-b shrink-0 bg-card z-10 sticky top-0">
             <div className="flex items-start justify-between">
               <div className="space-y-1">
                 <DialogTitle className="text-xl line-clamp-1">{incident.titulo}</DialogTitle>
