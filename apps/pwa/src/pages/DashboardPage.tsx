@@ -7,6 +7,8 @@ import {
   MapPin,
   TrendingUp,
   Plus,
+  X,
+  ChevronRight,
 } from 'lucide-react'
 import {
   Card,
@@ -15,17 +17,25 @@ import {
   CardTitle,
   Button,
   Badge,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
 } from '@/components/ui'
-import { useAppStore, useAuthStore } from '@/store'
+import { useAppStore, useAuthStore, useCanValidateIncidents } from '@/store'
 import { formatRelativeTime } from '@/lib/utils'
 import { fetchLastSensorReadings, fetchSensorSummaryOnce } from '@/services/sensorsRtdb'
 import { DEFAULT_PREDICTIVE_THRESHOLDS } from '@/lib/predictive/predictor'
 import { useEffect, useState } from 'react'
+import { IncidentDetail } from '@/components/incidents/IncidentDetail'
+import type { Zone } from '@/types'
 
 export function DashboardPage() {
   const navigate = useNavigate()
+  const canValidate = useCanValidateIncidents()
   const user = useAuthStore((state) => state.user)
-  const { incidents, equipment, zones, setSelectedIncident } = useAppStore()
+  const { incidents, equipment, zones, selectedIncident, setSelectedIncident } = useAppStore()
+  const [selectedZoneForDetail, setSelectedZoneForDetail] = useState<Zone | null>(null)
 
   // Cache local de detalles IoT por equipo
   const [iotDetails, setIotDetails] = useState<Record<string, {
@@ -292,10 +302,7 @@ export function DashboardPage() {
                   <div
                     key={incident.id}
                     className="flex items-center gap-4 cursor-pointer hover:bg-muted p-2 rounded -mx-2"
-                    onClick={() => {
-                      setSelectedIncident(incident)
-                      navigate('/incidents')
-                    }}
+                    onClick={() => setSelectedIncident(incident)}
                   >
                     <div
                       className={`w-2 h-2 rounded-full ${
@@ -374,7 +381,7 @@ export function DashboardPage() {
                     <div
                       key={zone.id}
                       className="flex items-center gap-4 cursor-pointer hover:bg-muted p-2 rounded -mx-2"
-                      onClick={() => navigate('/map')}
+                      onClick={() => setSelectedZoneForDetail(zone)}
                     >
                       <div
                         className="w-4 h-4 rounded"
@@ -397,6 +404,71 @@ export function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Incident Detail Modal */}
+      {selectedIncident && (
+        <IncidentDetail
+          incident={selectedIncident}
+          onClose={() => setSelectedIncident(null)}
+          canValidate={canValidate}
+        />
+      )}
+
+      {/* Zone Detail Modal */}
+      <Dialog open={!!selectedZoneForDetail} onOpenChange={(open) => !open && setSelectedZoneForDetail(null)}>
+        <DialogContent className="max-w-md w-[98vw] md:w-full max-h-[92vh] p-0 gap-0 overflow-hidden flex flex-col rounded-xl">
+          <DialogHeader className="p-4 border-b shrink-0 bg-card z-10 sticky top-0">
+            <div className="flex items-center justify-between">
+              <DialogTitle className="flex items-center gap-2">
+                <MapPin className="h-5 w-5 text-primary" />
+                {selectedZoneForDetail?.nombre}
+              </DialogTitle>
+            </div>
+          </DialogHeader>
+          
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {selectedZoneForDetail && incidents.filter(i => i.zoneId === selectedZoneForDetail.id && i.status !== 'cerrada').length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <CheckCircle className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                <p>No hay incidencias activas en esta zona</p>
+              </div>
+            ) : (
+              selectedZoneForDetail && incidents
+                .filter(i => i.zoneId === selectedZoneForDetail.id && i.status !== 'cerrada')
+                .map(incident => (
+                  <div
+                    key={incident.id}
+                    className="flex items-center gap-3 cursor-pointer hover:bg-muted p-3 rounded-lg border bg-card/50"
+                    onClick={() => {
+                      setSelectedZoneForDetail(null)
+                      setSelectedIncident(incident)
+                    }}
+                  >
+                    <div className={`w-3 h-3 rounded-full shrink-0 ${
+                      incident.prioridad === 'critica' ? 'bg-destructive' :
+                      incident.prioridad === 'alta' ? 'bg-warning' : 'bg-primary'
+                    }`} />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate text-sm">{incident.titulo}</p>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <span className="capitalize">{incident.status.replace('_', ' ')}</span>
+                        <span>•</span>
+                        <span>{formatRelativeTime(incident.createdAt)}</span>
+                      </div>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </div>
+              ))
+            )}
+          </div>
+
+          <div className="p-4 border-t bg-card shrink-0">
+            <Button variant="outline" className="w-full" onClick={() => setSelectedZoneForDetail(null)}>
+              Cerrar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
