@@ -367,11 +367,11 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
   return (
     <>
       <Dialog open onOpenChange={onClose}>
-        <DialogContent className="max-w-4xl w-[85vw] md:w-full max-h-[95dvh] overflow-y-auto p-4 md:p-6">
-          <DialogHeader>
+        <DialogContent className="max-w-4xl w-[85vw] md:w-full max-h-[85vh] p-0 gap-0 overflow-hidden flex flex-col">
+          <DialogHeader className="p-4 border-b shrink-0 bg-card z-10">
             <div className="flex items-start justify-between">
               <div className="space-y-1">
-                <DialogTitle className="text-xl">{incident.titulo}</DialogTitle>
+                <DialogTitle className="text-xl line-clamp-1">{incident.titulo}</DialogTitle>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Clock className="h-4 w-4" />
                   {formatDate(incident.createdAt)}
@@ -830,6 +830,85 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
             )}
 
             <Button variant="outline" onClick={onClose}>
+              Cerrar
+            </Button>
+          </div>
+
+          <DialogFooter className="p-4 border-t bg-card shrink-0 gap-2 sm:gap-2 flex-col sm:flex-row">
+            {/* Acciones de Validación */}
+            {canValidate && incident.status === 'pendiente' && (
+              <>
+                <Button 
+                  onClick={handleConfirm} 
+                  disabled={isLoading}
+                  className="bg-green-600 hover:bg-green-700 w-full sm:w-auto"
+                >
+                  {isLoading ? <Spinner className="mr-2" /> : <CheckCircle className="mr-2 h-4 w-4" />}
+                  Confirmar
+                </Button>
+                <Button 
+                  onClick={() => setShowRejectForm(true)} 
+                  variant="destructive"
+                  disabled={isLoading}
+                  className="w-full sm:w-auto"
+                >
+                  {isLoading ? <Spinner className="mr-2" /> : <XCircle className="mr-2 h-4 w-4" />}
+                  Rechazar
+                </Button>
+              </>
+            )}
+
+            {/* Asignación */}
+            {canValidate && incident.status === 'confirmada' && !incident.asignadoA && (
+              <Button onClick={() => setShowAssignForm(true)} className="w-full sm:w-auto">
+                <UserPlus className="mr-2 h-4 w-4" />
+                Asignar Técnico
+              </Button>
+            )}
+
+            {/* Cierre */}
+            {(user?.id === incident.asignadoA || permissions.canValidateIncident) && 
+             (incident.status === 'confirmada' || incident.status === 'en_proceso') && (
+              <Button 
+                onClick={() => setShowCloseForm(true)}
+                className="bg-success hover:bg-success/90 w-full sm:w-auto"
+              >
+                <CheckCircle className="mr-2 h-4 w-4" />
+                Cerrar Incidencia
+              </Button>
+            )}
+
+            {/* Botón de editar (Creator o Admin) */}
+            {((user?.id === incident.reportadoPor) || permissions.isAdmin) && (
+              <Button
+                variant="outline"
+                onClick={() => setShowEditForm(true)}
+                disabled={isLoading}
+                className="w-full sm:w-auto"
+              >
+                <Edit className="h-4 w-4 mr-2" />
+                Editar
+              </Button>
+            )}
+
+            {/* Botón de eliminar (solo Admin) */}
+            {permissions.canDeleteIncident && (
+              <Button
+                variant="destructive"
+                onClick={handleDelete}
+                disabled={isLoading}
+                className="w-full sm:w-auto"
+              >
+                {isLoading ? <Spinner size="sm" /> : (
+                  <>
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Eliminar
+                  </>
+                )}
+              </Button>
+            )}
+
+            <Button variant="outline" onClick={onClose} className="w-full sm:w-auto">
               Cerrar
             </Button>
           </DialogFooter>
