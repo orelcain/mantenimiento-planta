@@ -679,8 +679,12 @@ export async function updateInspectionItem(
     | 'revisoConforme'
   >>
 ): Promise<void> {
+  const cleanedData = Object.fromEntries(
+    Object.entries(data).filter(([, value]) => value !== undefined)
+  )
+
   await updateDoc(doc(db, INSPECTION_ITEMS_COLLECTION, id), {
-    ...data,
+    ...cleanedData,
     updatedAt: serverTimestamp(),
   })
 }

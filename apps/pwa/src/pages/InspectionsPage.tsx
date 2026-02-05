@@ -854,8 +854,8 @@ export function InspectionsPage() {
         }
 
         await updateInspectionItem(item.id, {
-          cumple: values.cumple || undefined,
-          noCumple: values.noCumple || undefined,
+          cumple: values.cumple,
+          noCumple: values.noCumple,
           observacion: values.observacion.trim() || undefined,
           fechaInspeccion: values.fechaInspeccion ? new Date(values.fechaInspeccion) : undefined,
           fechaReparacion: values.fechaReparacion ? new Date(values.fechaReparacion) : undefined,
@@ -875,8 +875,8 @@ export function InspectionsPage() {
         const fotos = results.find((r) => r?.itemId === item.id)?.fotos || item.fotos
         return {
           ...item,
-          cumple: values.cumple || undefined,
-          noCumple: values.noCumple || undefined,
+          cumple: values.cumple,
+          noCumple: values.noCumple,
           observacion: values.observacion.trim() || undefined,
           fechaInspeccion: values.fechaInspeccion ? new Date(values.fechaInspeccion) : undefined,
           fechaReparacion: values.fechaReparacion ? new Date(values.fechaReparacion) : undefined,
@@ -1460,8 +1460,9 @@ export function InspectionsPage() {
             </DialogHeader>
 
             {/* Pestañas */}
-            <div className="sticky top-0 z-20 flex overflow-x-auto border-b px-2 bg-background/95 backdrop-blur scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
+            <div className="sticky top-0 z-20 flex overflow-x-auto border-b px-2 bg-card/95 backdrop-blur scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
               {sortedAreas.map((area, idx) => {
+                const areaLabel = area.replace(/^\d+\.\s*/, '')
                 const areaItems = groupedItems[area] || []
                 const completedCount = areaItems.filter(item => {
                   const values = dailyFormValues[item.id]
@@ -1477,14 +1478,14 @@ export function InspectionsPage() {
                     className={`flex-shrink-0 px-4 py-3 text-sm font-medium border-b-2 transition-all whitespace-nowrap ${
                       activeTab === idx
                         ? 'border-primary text-primary bg-background'
-                        : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                        : 'border-transparent text-foreground/80 hover:text-foreground hover:bg-muted/50'
                     }`}
                   >
                     <div className="flex items-center gap-2">
                       <span className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold">
                         {idx + 1}
                       </span>
-                      <span className="max-w-[150px] truncate">{area.split('.')[1]?.trim() || area}</span>
+                      <span className="max-w-[180px] truncate">{areaLabel || area}</span>
                       {progress > 0 && (
                         <span className={`ml-1 text-xs px-1.5 py-0.5 rounded-full ${
                           progress === 100 ? 'bg-green-500/20 text-green-600' : 'bg-yellow-500/20 text-yellow-600'
