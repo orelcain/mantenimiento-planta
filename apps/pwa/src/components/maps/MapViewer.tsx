@@ -9,7 +9,7 @@
  * - Pan con arrastre (mouse y táctil)
  */
 
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useRef, useCallback, useEffect, forwardRef, useImperativeHandle } from 'react'
 import { MapPin, ZoomIn, ZoomOut, RotateCcw, Hand, Check, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -17,12 +17,17 @@ import { cn } from '@/lib/utils'
 /**
  * Marcador simplificado para visualización
  */
-interface ViewerMarker {
+export interface ViewerMarker {
   id: string
   position: { x: number; y: number }
   title?: string
   label?: string
   inspectionIndex?: number
+}
+
+export interface MapViewerHandle {
+  zoomToPoints: (points: { x: number; y: number }[]) => void
+  resetView: () => void
 }
 
 interface MapViewerProps {
@@ -46,7 +51,7 @@ interface MapViewerProps {
   pendingMarkerColor?: string
 }
 
-export function MapViewer({
+export const MapViewer = forwardRef<MapViewerHandle, MapViewerProps>(({
   mapVersion,
   imageUrl,
   markers = [],
@@ -61,7 +66,7 @@ export function MapViewer({
   showControls = true,
   markerColor = '#ef4444', // red-500
   pendingMarkerColor = '#3b82f6', // blue-500
-}: MapViewerProps) {
+}, ref) => {
   // Usar imageUrl directa o desde mapVersion
   const mapImageUrl = imageUrl || mapVersion?.imageUrl || ''
   const containerRef = useRef<HTMLDivElement>(null)
@@ -73,6 +78,74 @@ export function MapViewer({
   const [panStart, setPanStart] = useState({ x: 0, y: 0, panX: 0, panY: 0 })
   const [imageLoaded, setImageLoaded] = useState(false)
   
+  // Exponer métodos
+  useImperativeHandle(ref, () => ({
+    resetView: () => {
+      setZoom(1)
+      setPan({ x: 0, y: 0 })
+    },
+    zoomToPoints: (points) => {
+      if (!points.length || !containerRef.current || !imageRef.current) return
+
+      const padding = 0.1 // 10% de margen
+      
+      // Calcular bounding box
+      const minX = Math.min(...points.map(p => p.x))
+      const maxX = Math.max(...points.map(p => p.x))
+      const minY = Math.min(...points.map(p => p.y))
+      const maxY = Math.max(...points.map(p => p.y))
+
+      // Centro
+      const centerX = (minX + maxX) / 2
+      const centerY = (minY + maxY) / 2
+      
+      // Dimensiones (añadir un mínimo para evitar zoom infinito si es un solo punto)
+      const width = Math.max(maxX - minX, 0.1) 
+      const height = Math.max(maxY - minY, 0.1)
+
+      const container = containerRef.current
+      const img = imageRef.current
+      const naturalWidth = img.naturalWidth
+      const naturalHeight = img.naturalHeight
+
+      if (!naturalWidth || !naturalHeight) return
+
+      // Calcular zoom necesario
+      // visible_w = container_w / (nat_w * zoom) >= width * (1 + padding)
+      // zoom <= container_w / (nat_w * width * (1+padding))
+
+      const zoomX = container.clientWidth / (naturalWidth * width * (1 + padding))
+      const zoomY = container.clientHeight / (naturalHeight * height * (1 + padding))
+      
+      // Limitar zoom
+      let newZoom = Math.min(zoomX, zoomY, 5) // Max zoom 5
+      newZoom = Math.max(newZoom, 1) // Min zoom 1 (o lo que sea apropiado, tal vez 0.5)
+
+      // Calcular Pan para centrar
+      // panX = scaledWidth/2 - centerX * scaledWidth
+      const scaledWidth = naturalWidth * newZoom
+      const scaledHeight = naturalHeight * newZoom
+      
+      const newPanX = (container.clientWidth - scaledWidth) / 2 + (0.5 - centerX) * scaledWidth // Ajustar offset
+      // Espera, mi fórmula anterior pan.x = scaledWidth * (0.5 - cNormX) asume que la imagen está centrada por defecto en (0,0) offset?
+      // Revisemos:
+      // offsetX = (containerW - scaledW)/2 + panX
+      // left = offsetX + X * scaledW
+      // Queremos left = containerW/2 para X=centerX
+      // containerW/2 = ((containerW - scaledW)/2 + panX) + centerX * scaledW
+      // containerW/2 = containerW/2 - scaledW/2 + panX + centerX * scaledW
+      // 0 = -scaledW/2 + panX + centerX * scaledW
+      // panX = scaledW/2 - centerX * scaledW
+      // panX = scaledW * (0.5 - centerX) -> CORRECTO
+
+      const panX = scaledWidth * (0.5 - centerX)
+      const panY = scaledHeight * (0.5 - centerY)
+
+      setZoom(newZoom)
+      setPan({ x: panX, y: panY })
+    }
+  }))
+
   // Estado para distinguir entre pan y click
   const [hasMoved, setHasMoved] = useState(false)
   
@@ -467,4 +540,4 @@ export function MapViewer({
       )}
     </div>
   )
-}
+})

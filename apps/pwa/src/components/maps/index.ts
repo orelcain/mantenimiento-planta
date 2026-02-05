@@ -1,2 +1,2 @@
-export { MapViewer } from './MapViewer'
+export { MapViewer, type MapViewerHandle } from './MapViewer'
 export { MapLocationSelector } from './MapLocationSelector'

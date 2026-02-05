@@ -73,7 +73,7 @@ import {
   updateInspectionItem,
   updateInspection
 } from '@/services/maps'
-import { MapViewer } from '@/components/maps'
+import { MapViewer, type MapViewerHandle } from '@/components/maps'
 import { exportInspectionToPDF } from '@/utils/maps'
 import { DAILY_INSPECTION_AREAS } from '@/data/dailyInspectionAreas'
 import type { 
@@ -116,6 +116,8 @@ export function InspectionsPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [newInspectionName, setNewInspectionName] = useState('')
   const [selectedLocationId, setSelectedLocationId] = useState<string>('')
+  const [selectedArea, setSelectedArea] = useState<string>('all')
+  const mapViewerRef = useRef<MapViewerHandle>(null)
   const [isCreating, setIsCreating] = useState(false)
   const [inspectorNames, setInspectorNames] = useState('')
   const [inspectionListText, setInspectionListText] = useState('')
@@ -1223,6 +1225,7 @@ export function InspectionsPage() {
               </CardHeader>
               <CardContent className="p-0 relative" ref={mapContainerRef} onClick={handleMapContainerClick}>
                 <MapViewer
+                  ref={mapViewerRef}
                   imageUrl={activeMapVersion.imageUrl}
                   markers={inspectionItems.map(item => ({
                     id: item.id,
@@ -1307,8 +1310,34 @@ export function InspectionsPage() {
           {/* Lista de items */}
           <div>
             <Card className="h-[550px] flex flex-col">
-              <CardHeader className="py-3 border-b">
+              <CardHeader className="py-3 border-b space-y-2">
                 <CardTitle className="text-sm">Puntos de Inspección</CardTitle>
+                <Select 
+                  value={selectedArea} 
+                  onValueChange={(val) => {
+                    setSelectedArea(val);
+                    if (val === 'all') {
+                      mapViewerRef.current?.resetView();
+                    } else {
+                      const points = (groupedItems[val] || []).map(i => i.position);
+                      if (points.length > 0) {
+                        mapViewerRef.current?.zoomToPoints(points);
+                      }
+                    }
+                  }}
+                >
+                  <SelectTrigger className="h-8 text-xs w-full">
+                    <SelectValue placeholder="Filtrar por área" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas las áreas</SelectItem>
+                    {sortedAreas.map((area) => (
+                      <SelectItem key={area} value={area} className="text-xs">
+                        {area}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </CardHeader>
               <CardContent className="flex-1 overflow-y-auto p-2">
                 {inspectionItems.length === 0 ? (
@@ -1319,7 +1348,7 @@ export function InspectionsPage() {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {sortedAreas.map((areaGroup) => {
+                    {(selectedArea === 'all' ? sortedAreas : sortedAreas.filter(a => a === selectedArea)).map((areaGroup) => {
                       const areaItems = groupedItems[areaGroup] || [];
                       if (areaItems.length === 0) return null;
 
