@@ -8,6 +8,7 @@ import {
   Button,
   Input,
   Label,
+  Checkbox,
   SpeechTextarea,
   Spinner,
 } from '@/components/ui'
@@ -60,6 +61,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
   const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null)
   const [isRefining, setIsRefining] = useState(false)
   const [isRefiningTitle, setIsRefiningTitle] = useState(false)
+  const [assignToSelf, setAssignToSelf] = useState(false)
   
   // Debounce ref para autogeneración de síntomas
   const symptomsDebounceRef = useRef<NodeJS.Timeout | null>(null)
@@ -340,6 +342,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
         status: 'pendiente' as const,
         fotos: [],
         reportadoPor: user.id,
+        ...(assignToSelf && { asignadoA: user.id }),
         requiresValidation: true,
         ...(selectedSymptoms.length > 0 && { sintomas: selectedSymptoms }),
       }
@@ -375,6 +378,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
         fotos: [],
         reportadoPor: user.id,
         creadoPor: user.id,
+        ...(assignToSelf && { asignadoA: user.id }),
         requiresValidation: true,
         // Datos de ubicación en mapa físico
         ...(mapLocation && {
@@ -659,6 +663,19 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
               ))}
             </div>
           </div>
+
+          {!isEditMode && user && (
+            <div className="flex items-center gap-2 pt-2">
+              <Checkbox
+                id="assign-to-self"
+                checked={assignToSelf}
+                onCheckedChange={(checked) => setAssignToSelf(checked === true)}
+              />
+              <Label htmlFor="assign-to-self" className="text-sm">
+                Asignarme esta incidencia
+              </Label>
+            </div>
+          )}
 
           {/* Título con Mic y Magia */}
           <div className="space-y-2">

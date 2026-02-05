@@ -149,6 +149,7 @@ export const createIncidentSchema = z.object({
   status: z.string().optional(),
   fotos: z.array(z.string()).optional(),
   reportadoPor: z.string(),
+  asignadoA: z.string().optional(),
   requiresValidation: z.boolean().optional(),
   sintomas: z.array(z.string()).max(20, 'Máximo 20 síntomas').optional(),
   equipmentId: z.string().optional(),

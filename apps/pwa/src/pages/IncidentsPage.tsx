@@ -21,6 +21,7 @@ import { formatRelativeTime } from '@/lib/utils'
 import { IncidentForm } from '@/components/incidents/IncidentForm'
 import { IncidentDetail } from '@/components/incidents/IncidentDetail'
 import { debounce } from '@/lib/utils'
+import { getUserDisplayNameMap } from '@/services/userDisplay'
 
 const getStatusIcon = (status: IncidentStatus) => {
   const iconMap: Record<IncidentStatus, any> = {
@@ -59,6 +60,10 @@ export function IncidentsPage() {
   const [activeFilter, setActiveFilter] = useState<string | null>(null) // null = todos
   const [mapLocations, setMapLocations] = useState<MapLocation[]>([])
   const [selectedMapLocation, setSelectedMapLocation] = useState<string>('all')
+  const [selectedReporter, setSelectedReporter] = useState<string>('all')
+  const [reporterNames, setReporterNames] = useState<Record<string, string>>({})
+
+  const isAdminOrSupervisor = user?.rol === 'admin' || user?.rol === 'supervisor'
 
   // Cargar ubicaciones de mapa
   useEffect(() => {
@@ -105,6 +110,11 @@ export function IncidentsPage() {
       }
     }
     
+    // Filtro por creador (solo admin/supervisor)
+    if (isAdminOrSupervisor && selectedReporter !== 'all') {
+      if (incident.reportadoPor !== selectedReporter && incident.creadoPor !== selectedReporter) return false
+    }
+
     // Aplicar filtro activo
     if (activeFilter === null) return true
     
@@ -114,6 +124,7 @@ export function IncidentsPage() {
     if (activeFilter === 'confirmadas-asignadas') return !!incident.asignadoA && incident.status !== 'cerrada'
     if (activeFilter === 'confirmadas-sin-asignar') return incident.status === 'confirmada' && !incident.asignadoA
     if (activeFilter === 'mis-asignadas') return !!user?.id && incident.asignadoA === user.id && incident.status !== 'cerrada'
+    if (activeFilter === 'mis-creadas') return !!user?.id && (incident.reportadoPor === user.id || incident.creadoPor === user.id)
     if (activeFilter === 'en-proceso') return incident.status === 'en_proceso'
     if (activeFilter === 'cerradas') return incident.status === 'cerrada'
     if (activeFilter === 'rechazadas') return incident.status === 'rechazada'
@@ -132,11 +143,29 @@ export function IncidentsPage() {
     mis_asignadas: user?.id
       ? incidents.filter((i) => i.asignadoA === user.id && i.status !== 'cerrada').length
       : 0,
+    mis_creadas: user?.id
+      ? incidents.filter((i) => i.reportadoPor === user.id || i.creadoPor === user.id).length
+      : 0,
     enProceso: incidents.filter((i) => i.status === 'en_proceso').length,
     cerradas: incidents.filter((i) => i.status === 'cerrada').length,
     rechazadas: incidents.filter((i) => i.status === 'rechazada').length,
     criticas: incidents.filter((i) => i.prioridad === 'critica' && i.status !== 'cerrada').length,
   }
+
+  useEffect(() => {
+    if (!isAdminOrSupervisor) return
+    const ids = Array.from(
+      new Set(
+        incidents
+          .map((i) => i.reportadoPor || i.creadoPor)
+          .filter((id): id is string => typeof id === 'string' && id.length > 0)
+      )
+    )
+    if (ids.length === 0) return
+    getUserDisplayNameMap(ids).then(setReporterNames).catch(() => {
+      setReporterNames({})
+    })
+  }, [incidents, isAdminOrSupervisor])
 
   return (
     <div className="space-y-6">
@@ -206,6 +235,17 @@ export function IncidentsPage() {
           <CardContent className="p-4">
             <div className="text-2xl font-bold text-violet-600">{stats.mis_asignadas}</div>
             <div className="text-xs text-muted-foreground">Mis asignadas</div>
+          </CardContent>
+        </Card>
+
+        {/* Mis creadas */}
+        <Card
+          className={`cursor-pointer transition-all hover:border-emerald-400/50 ${activeFilter === 'mis-creadas' ? 'border-emerald-400 bg-emerald-400/10' : ''}`}
+          onClick={() => setActiveFilter('mis-creadas')}
+        >
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold text-emerald-600">{stats.mis_creadas}</div>
+            <div className="text-xs text-muted-foreground">Mis creadas</div>
           </CardContent>
         </Card>
 
@@ -296,13 +336,32 @@ export function IncidentsPage() {
             </SelectContent>
           </Select>
         )}
+
+        {/* Filtro por creador (admin/supervisor) */}
+        {isAdminOrSupervisor && (
+          <Select value={selectedReporter} onValueChange={setSelectedReporter}>
+            <SelectTrigger className="w-full sm:w-[220px]">
+              <User className="h-4 w-4 mr-2 text-muted-foreground" />
+              <SelectValue placeholder="Creador" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los usuarios</SelectItem>
+              {Object.entries(reporterNames).map(([id, name]) => (
+                <SelectItem key={id} value={id}>
+                  {name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
         
-        {(activeFilter || selectedMapLocation !== 'all') && (
+        {(activeFilter || selectedMapLocation !== 'all' || (isAdminOrSupervisor && selectedReporter !== 'all')) && (
           <Button
             variant="outline"
             onClick={() => {
               setActiveFilter(null)
               setSelectedMapLocation('all')
+              setSelectedReporter('all')
             }}
           >
             Limpiar filtros
