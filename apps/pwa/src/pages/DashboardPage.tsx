@@ -75,6 +75,8 @@ export function DashboardPage() {
     return fallback
   }
 
+  const recentIncidents = incidents.slice(0, 5)
+
   const recentUserIds = useMemo(() => {
     const ids = new Set<string>()
     for (const incident of recentIncidents) {
@@ -169,8 +171,6 @@ export function DashboardPage() {
   }
 
   // Últimas incidencias
-  const recentIncidents = incidents.slice(0, 5)
-
   // Incidencias críticas
   const criticalIncidents = incidents.filter(
     (i) => i.prioridad === 'critica' && i.status !== 'cerrada'
