@@ -71,7 +71,6 @@ export function DashboardPage() {
       return `${userData.nombre} ${userData.apellido} · ${roleLabels[userData.rol]} · ${providerLabel}`
     }
     if (!fallback) return 'Desconocido'
-    if (fallback.length > 18) return `${fallback.slice(0, 18)}…`
     return fallback
   }
 
@@ -308,7 +307,7 @@ export function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="-mx-3 sm:mx-0 rounded-none sm:rounded-lg border-x-0 sm:border">
+        <Card className="-mx-4 sm:mx-0 rounded-none sm:rounded-lg border-x-0 sm:border">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">
               Tasa Resolución
@@ -360,7 +359,7 @@ export function DashboardPage() {
                 {recentIncidents.map((incident) => (
                   <div
                     key={incident.id}
-                    className="flex items-center gap-4 cursor-pointer hover:bg-muted px-2 py-3 rounded-lg"
+                    className="flex items-start gap-3 cursor-pointer hover:bg-muted px-3 py-3 rounded-lg"
                     onClick={() => setSelectedIncident(incident)}
                   >
                     <div
@@ -373,10 +372,10 @@ export function DashboardPage() {
                       }`}
                     />
                     <div className="flex-1 min-w-0 space-y-1">
-                      <p className="font-medium truncate text-base">{incident.titulo}</p>
+                      <p className="font-medium text-base break-words">{incident.titulo}</p>
                       
                       {/* Estado y Tiempos */}
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                         <Badge variant="outline" className="text-[10px] h-5 px-1.5 py-0 font-normal">
                           {incident.status === 'pendiente' && 'Pendiente'}
                           {incident.status === 'confirmada' && 'Confirmada'}
@@ -391,14 +390,14 @@ export function DashboardPage() {
                       <div className="flex flex-col gap-0.5 text-xs text-muted-foreground/80 pt-0.5">
                         <div className="flex items-center gap-1">
                           <span className="font-medium text-muted-foreground">Reportado:</span>
-                          <span className="truncate max-w-[200px]">
+                          <span className="break-words whitespace-normal">
                             {formatUserLabel(usersCache[incident.reportadoPor], incident.reportadoPor)}
                           </span>
                         </div>
                         {incident.asignadoA && (
                            <div className="flex items-center gap-1">
                              <span className="font-medium text-muted-foreground">Asignado:</span>
-                             <span className="truncate max-w-[200px] text-primary">
+                             <span className="break-words whitespace-normal text-primary">
                                {formatUserLabel(usersCache[incident.asignadoA], incident.asignadoA)}
                              </span>
                            </div>
@@ -432,7 +431,7 @@ export function DashboardPage() {
         </Card>
 
         {/* Resumen por zona */}
-        <Card>
+        <Card className="-mx-4 sm:mx-0 rounded-none sm:rounded-lg border-x-0 sm:border">
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <span>Incidencias por Zona</span>
@@ -460,7 +459,7 @@ export function DashboardPage() {
                   return (
                     <div
                       key={zone.id}
-                      className="flex items-center gap-4 cursor-pointer hover:bg-muted px-2 py-3 rounded-lg"
+                      className="flex items-center gap-4 cursor-pointer hover:bg-muted px-3 py-3 rounded-lg"
                       onClick={() => setSelectedZoneForDetail(zone)}
                     >
                       <div
