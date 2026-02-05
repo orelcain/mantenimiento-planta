@@ -367,7 +367,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
   return (
     <>
       <Dialog open onOpenChange={onClose}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <div className="flex items-start justify-between">
               <div className="space-y-1">
