@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui'
-import { useAppStore, useCanValidateIncidents } from '@/store'
+import { useAppStore, useAuthStore, useCanValidateIncidents } from '@/store'
 import { subscribeToIncidents } from '@/services/incidents'
 import { getMapLocations } from '@/services/maps'
 import type { Incident, IncidentStatus, IncidentPriority } from '@/types'
@@ -50,6 +50,7 @@ const PRIORITY_CONFIG: Record<IncidentPriority, { label: string; className: stri
 
 export function IncidentsPage() {
   const canValidate = useCanValidateIncidents()
+  const { user } = useAuthStore()
   const { incidents, setIncidents, selectedIncident, setSelectedIncident } = useAppStore()
   
   const [showForm, setShowForm] = useState(false)
@@ -112,6 +113,7 @@ export function IncidentsPage() {
     if (activeFilter === 'confirmadas') return incident.status === 'confirmada'
     if (activeFilter === 'confirmadas-asignadas') return incident.status === 'confirmada' && !!incident.asignadoA
     if (activeFilter === 'confirmadas-sin-asignar') return incident.status === 'confirmada' && !incident.asignadoA
+    if (activeFilter === 'mis-asignadas') return !!user?.id && incident.asignadoA === user.id && incident.status !== 'cerrada'
     if (activeFilter === 'en-proceso') return incident.status === 'en_proceso'
     if (activeFilter === 'cerradas') return incident.status === 'cerrada'
     if (activeFilter === 'rechazadas') return incident.status === 'rechazada'
@@ -127,6 +129,9 @@ export function IncidentsPage() {
     confirmadas: incidents.filter((i) => i.status === 'confirmada').length,
     confirmadas_asignadas: incidents.filter((i) => i.status === 'confirmada' && !!i.asignadoA).length,
     confirmadas_sin_asignar: incidents.filter((i) => i.status === 'confirmada' && !i.asignadoA).length,
+    mis_asignadas: user?.id
+      ? incidents.filter((i) => i.asignadoA === user.id && i.status !== 'cerrada').length
+      : 0,
     enProceso: incidents.filter((i) => i.status === 'en_proceso').length,
     cerradas: incidents.filter((i) => i.status === 'cerrada').length,
     rechazadas: incidents.filter((i) => i.status === 'rechazada').length,
@@ -190,6 +195,17 @@ export function IncidentsPage() {
           <CardContent className="p-4">
             <div className="text-2xl font-bold text-blue-600">{stats.confirmadas_asignadas}</div>
             <div className="text-xs text-muted-foreground">Asignadas</div>
+          </CardContent>
+        </Card>
+
+        {/* Mis Asignadas */}
+        <Card
+          className={`cursor-pointer transition-all hover:border-violet-400/50 ${activeFilter === 'mis-asignadas' ? 'border-violet-400 bg-violet-400/10' : ''}`}
+          onClick={() => setActiveFilter('mis-asignadas')}
+        >
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold text-violet-600">{stats.mis_asignadas}</div>
+            <div className="text-xs text-muted-foreground">Mis asignadas</div>
           </CardContent>
         </Card>
 
