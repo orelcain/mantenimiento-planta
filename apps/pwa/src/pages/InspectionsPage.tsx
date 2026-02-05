@@ -1460,7 +1460,7 @@ export function InspectionsPage() {
             </DialogHeader>
 
             {/* Pestañas */}
-            <div className="sticky top-0 z-20 flex overflow-x-auto border-b px-2 bg-card/95 backdrop-blur scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
+            <div className="sticky top-0 z-20 flex overflow-x-auto border-b bg-background shadow-sm scrollbar-hide">
               {sortedAreas.map((area, idx) => {
                 const areaLabel = area.replace(/^\d+\.\s*/, '')
                 const areaItems = groupedItems[area] || []
@@ -1475,19 +1475,21 @@ export function InspectionsPage() {
                   <button
                     key={area}
                     onClick={() => setActiveTab(idx)}
-                    className={`flex-shrink-0 px-4 py-3 text-sm font-medium border-b-2 transition-all whitespace-nowrap ${
+                    className={`flex-shrink-0 px-6 py-4 text-sm font-medium border-b-2 transition-all whitespace-nowrap ${
                       activeTab === idx
-                        ? 'border-primary text-primary bg-background'
-                        : 'border-transparent text-foreground/80 hover:text-foreground hover:bg-muted/50'
+                        ? 'border-primary text-primary bg-primary/5'
+                        : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50'
                     }`}
                   >
-                    <div className="flex items-center gap-2">
-                      <span className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold">
+                    <div className="flex items-center gap-3">
+                      <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
+                        activeTab === idx ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+                      }`}>
                         {idx + 1}
                       </span>
-                      <span className="max-w-[180px] truncate">{areaLabel || area}</span>
+                      <span>{areaLabel || area}</span>
                       {progress > 0 && (
-                        <span className={`ml-1 text-xs px-1.5 py-0.5 rounded-full ${
+                        <span className={`ml-1 text-xs px-2 py-0.5 rounded-full ${
                           progress === 100 ? 'bg-green-500/20 text-green-600' : 'bg-yellow-500/20 text-yellow-600'
                         }`}>
                           {progress}%
