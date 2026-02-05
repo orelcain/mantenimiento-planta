@@ -26,9 +26,10 @@ import { useAppStore, useAuthStore, useCanValidateIncidents } from '@/store'
 import { formatRelativeTime } from '@/lib/utils'
 import { fetchLastSensorReadings, fetchSensorSummaryOnce } from '@/services/sensorsRtdb'
 import { DEFAULT_PREDICTIVE_THRESHOLDS } from '@/lib/predictive/predictor'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { IncidentDetail } from '@/components/incidents/IncidentDetail'
-import type { Zone } from '@/types'
+import type { User, UserRole, Zone } from '@/types'
+import { getUserById } from '@/services/auth'
 
 export function DashboardPage() {
   const navigate = useNavigate()
@@ -36,6 +37,7 @@ export function DashboardPage() {
   const user = useAuthStore((state) => state.user)
   const { incidents, equipment, zones, selectedIncident, setSelectedIncident } = useAppStore()
   const [selectedZoneForDetail, setSelectedZoneForDetail] = useState<Zone | null>(null)
+  const [usersCache, setUsersCache] = useState<Record<string, User>>({})
 
   // Cache local de detalles IoT por equipo
   const [iotDetails, setIotDetails] = useState<Record<string, {
@@ -52,6 +54,63 @@ export function DashboardPage() {
       ...incidents.slice(0, 5).map(i => i.equipmentId).filter(Boolean) as string[],
     ])
   )
+
+  const roleLabels: Record<UserRole, string> = {
+    admin: 'Admin',
+    supervisor: 'Supervisor',
+    tecnico: 'Técnico',
+    usuario: 'Usuario',
+  }
+
+  const isLikelyUserId = (value?: string) =>
+    !!value && value.length > 20 && !value.includes(' ')
+
+  const formatUserLabel = (userData?: User, fallback?: string) => {
+    if (userData) {
+      const providerLabel = userData.authProvider === 'google' ? 'Google' : 'Email'
+      return `${userData.nombre} ${userData.apellido} · ${roleLabels[userData.rol]} · ${providerLabel}`
+    }
+    if (!fallback) return 'Desconocido'
+    if (fallback.length > 18) return `${fallback.slice(0, 18)}…`
+    return fallback
+  }
+
+  const recentUserIds = useMemo(() => {
+    const ids = new Set<string>()
+    for (const incident of recentIncidents) {
+      if (isLikelyUserId(incident.reportadoPor)) ids.add(incident.reportadoPor)
+      if (isLikelyUserId(incident.asignadoA)) ids.add(incident.asignadoA)
+    }
+    return Array.from(ids)
+  }, [recentIncidents])
+
+  useEffect(() => {
+    const pending = recentUserIds.filter((id) => !usersCache[id])
+    if (pending.length === 0) return
+
+    let active = true
+    Promise.all(
+      pending.map(async (id) => {
+        try {
+          const userData = await getUserById(id)
+          return { id, userData }
+        } catch {
+          return null
+        }
+      })
+    ).then((results) => {
+      if (!active) return
+      const next = { ...usersCache }
+      results.forEach((item) => {
+        if (item?.userData) next[item.id] = item.userData
+      })
+      setUsersCache(next)
+    })
+
+    return () => {
+      active = false
+    }
+  }, [recentUserIds, usersCache])
 
   useEffect(() => {
     const load = async () => {
@@ -249,7 +308,7 @@ export function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="-mx-3 sm:mx-0 rounded-none sm:rounded-lg border-x-0 sm:border">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">
               Tasa Resolución
@@ -277,7 +336,7 @@ export function DashboardPage() {
       {/* Recent Activity */}
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Últimas incidencias */}
-        <Card>
+        <Card className="-mx-3 sm:mx-0 rounded-none sm:rounded-lg border-x-0 sm:border">
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <span>Últimas Incidencias</span>
@@ -301,7 +360,7 @@ export function DashboardPage() {
                 {recentIncidents.map((incident) => (
                   <div
                     key={incident.id}
-                    className="flex items-center gap-4 cursor-pointer hover:bg-muted p-2 rounded -mx-2"
+                    className="flex items-center gap-4 cursor-pointer hover:bg-muted px-2 py-3 rounded-lg"
                     onClick={() => setSelectedIncident(incident)}
                   >
                     <div
@@ -332,12 +391,16 @@ export function DashboardPage() {
                       <div className="flex flex-col gap-0.5 text-xs text-muted-foreground/80 pt-0.5">
                         <div className="flex items-center gap-1">
                           <span className="font-medium text-muted-foreground">Reportado:</span>
-                          <span className="truncate max-w-[150px]">{incident.reportadoPor}</span>
+                          <span className="truncate max-w-[200px]">
+                            {formatUserLabel(usersCache[incident.reportadoPor], incident.reportadoPor)}
+                          </span>
                         </div>
                         {incident.asignadoA && (
                            <div className="flex items-center gap-1">
                              <span className="font-medium text-muted-foreground">Asignado:</span>
-                             <span className="truncate max-w-[150px] text-primary">{incident.asignadoA}</span>
+                             <span className="truncate max-w-[200px] text-primary">
+                               {formatUserLabel(usersCache[incident.asignadoA], incident.asignadoA)}
+                             </span>
                            </div>
                         )}
                       </div>
@@ -397,7 +460,7 @@ export function DashboardPage() {
                   return (
                     <div
                       key={zone.id}
-                      className="flex items-center gap-4 cursor-pointer hover:bg-muted p-2 rounded -mx-2"
+                      className="flex items-center gap-4 cursor-pointer hover:bg-muted px-2 py-3 rounded-lg"
                       onClick={() => setSelectedZoneForDetail(zone)}
                     >
                       <div
