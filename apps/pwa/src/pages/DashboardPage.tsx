@@ -313,14 +313,34 @@ export function DashboardPage() {
                           : 'bg-primary'
                       }`}
                     />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{incident.titulo}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {incident.status === 'pendiente' && 'Pendiente'}
-                        {incident.status === 'confirmada' && 'Confirmada'}
-                        {incident.status === 'en_proceso' && 'En proceso'}
-                        {incident.status === 'cerrada' && 'Cerrada'}
-                      </p>
+                    <div className="flex-1 min-w-0 space-y-1">
+                      <p className="font-medium truncate text-base">{incident.titulo}</p>
+                      
+                      {/* Estado y Tiempos */}
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Badge variant="outline" className="text-[10px] h-5 px-1.5 py-0 font-normal">
+                          {incident.status === 'pendiente' && 'Pendiente'}
+                          {incident.status === 'confirmada' && 'Confirmada'}
+                          {incident.status === 'en_proceso' && 'En proceso'}
+                          {incident.status === 'cerrada' && 'Cerrada'}
+                        </Badge>
+                        <span>•</span>
+                        <span>{formatRelativeTime(incident.createdAt)}</span>
+                      </div>
+
+                      {/* Información de Creador y Asignado */}
+                      <div className="flex flex-col gap-0.5 text-xs text-muted-foreground/80 pt-0.5">
+                        <div className="flex items-center gap-1">
+                          <span className="font-medium text-muted-foreground">Reportado:</span>
+                          <span className="truncate max-w-[150px]">{incident.reportadoPor}</span>
+                        </div>
+                        {incident.asignadoA && (
+                           <div className="flex items-center gap-1">
+                             <span className="font-medium text-muted-foreground">Asignado:</span>
+                             <span className="truncate max-w-[150px] text-primary">{incident.asignadoA}</span>
+                           </div>
+                        )}
+                      </div>
                       {incident.equipmentId && iotDetails[incident.equipmentId] && (
                         <div className="mt-1 text-xs text-muted-foreground space-y-0.5">
                           {iotDetails[incident.equipmentId].source === 'simulated' && (
@@ -341,9 +361,6 @@ export function DashboardPage() {
                         </div>
                       )}
                     </div>
-                    <span className="text-sm text-muted-foreground shrink-0">
-                      {formatRelativeTime(incident.createdAt)}
-                    </span>
                   </div>
                 ))}
               </div>

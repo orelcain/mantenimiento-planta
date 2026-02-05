@@ -302,7 +302,7 @@ export function MainLayout() {
         )}
 
         {/* Page content */}
-        <main className="p-4 lg:p-6">
+        <main className="p-3 lg:p-6 w-full max-w-[100vw] overflow-x-hidden">
           <Outlet />
         </main>
       </div>

@@ -2079,4 +2079,10 @@ firebase deploy --only hosting
  -   C o r r e c c i ó n   c r í t i c a   e n   I n c i d e n t D e t a i l   ( e r r o r   d e   s i n t a x i s   e n   b u i l d ) . 
  -   A j u s t e   f i n a l   d e   l a y o u t   m o d a l   m ó v i l   ( 9 8 v w ,   h e a d e r / f o o t e r   s t i c k y ) . 
   
+ # #   2 . 4 8 . 1 5 
+ 
+ -   M e j o r a   v i s u a l   e n   l i s t a   d e l   D a s h b o a r d   ( d e t a l l e   d e   r e p o r t e r o / a s i g n a d o ) . 
+ -   A j u s t e   d e   c o n t e n e d o r   p r i n c i p a l   ( M a i n L a y o u t )   p a r a   e v i t a r   d e s b o r d a m i e n t o   h o r i z o n t a l . 
+ -   S i n c r o n i z a c i ó n   d e   v e r s i o n e s . 
+  
  
