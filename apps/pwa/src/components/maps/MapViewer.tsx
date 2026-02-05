@@ -98,9 +98,9 @@ export const MapViewer = forwardRef<MapViewerHandle, MapViewerProps>(({
     const centerY = (minY + maxY) / 2
     
     // Dimensiones (añadir un mínimo para evitar zoom infinito si es un solo punto)
-    // Usamos 0.02 (2%) para forzar un zoom mayor cuando es un solo punto
-    const width = Math.max(maxX - minX, 0.02) 
-    const height = Math.max(maxY - minY, 0.02)
+    // Usamos 0.2 (20%) para mostrar contexto suficiente sin pixelar la imagen
+    const width = Math.max(maxX - minX, 0.2) 
+    const height = Math.max(maxY - minY, 0.2)
 
     const container = containerRef.current
     const img = imageRef.current
@@ -113,8 +113,8 @@ export const MapViewer = forwardRef<MapViewerHandle, MapViewerProps>(({
       const zoomX = container.clientWidth / (naturalWidth * width * (1 + padding))
       const zoomY = container.clientHeight / (naturalHeight * height * (1 + padding))
       
-      // Limitar zoom
-      let newZoom = Math.min(zoomX, zoomY, 8) // Max zoom 8
+      // Limitar zoom (máximo 3x para evitar pixelación excesiva)
+      let newZoom = Math.min(zoomX, zoomY, 3) 
       newZoom = Math.max(newZoom, 1) // Min zoom 1
 
       // Calcular Pan para centrar
