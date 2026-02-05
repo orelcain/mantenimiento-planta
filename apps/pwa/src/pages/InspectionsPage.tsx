@@ -355,10 +355,22 @@ export function InspectionsPage() {
         let orderCounter = 1
         for (const areaData of DAILY_INSPECTION_AREAS) {
           for (const itemTitle of areaData.items) {
+            // Detectar formato "EQUIPO: ACTIVIDAD"
+            let title = itemTitle
+            let equipo = undefined
+            const parts = itemTitle.split(':')
+            
+            // Si hay separador y la primera parte parece un equipo (no es muy larga y está en mayúsculas preferiblemente, o simplemente tiene estructura de título)
+            if (parts.length > 1 && parts[0].length < 50) {
+               equipo = parts[0].trim()
+               title = parts.slice(1).join(':').trim()
+            }
+
             const itemData: CreateInspectionItemDTO = {
               inspectionId: inspection.id,
-              title: itemTitle,
+              title: title,
               area: areaData.name,
+              equipo: equipo,
               order: orderCounter++,
               position: { x: 0.5, y: 0.5 }
             }
@@ -1515,19 +1527,38 @@ export function InspectionsPage() {
                   <div className="space-y-3">
                     {groupedItems[sortedAreas[activeTab]].map((item, itemIdx) => {
                       const values = dailyFormValues[item.id]
+                      
+                      // Lógica de visualización: separar Equipo vs Actividad
+                      let displayEquipo = item.equipo
+                      let displayTitle = item.title
+                      
+                      // Fallback para datos antiguos o estructurados como string único
+                      if (!displayEquipo && displayTitle.includes(':')) {
+                         const parts = displayTitle.split(':')
+                         if (parts.length > 1 && parts[0].length < 60) {
+                            displayEquipo = parts[0].trim()
+                            displayTitle = parts.slice(1).join(':').trim()
+                         }
+                      }
+
                       return (
                         <div key={item.id} className="border rounded-lg p-4 space-y-3 hover:border-primary/50 transition-colors bg-card">
                           <div className="flex items-start gap-3">
-                            <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-sm font-semibold shrink-0">
+                            <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-sm font-semibold shrink-0 mt-0.5">
                               {itemIdx + 1}
                             </div>
                             <div className="flex-1">
-                              <div className="text-sm font-medium leading-tight">
-                                {item.title}
+                              {displayEquipo && (
+                                <div className="text-sm font-bold text-primary mb-1 uppercase tracking-tight">
+                                  {displayEquipo}
+                                </div>
+                              )}
+                              <div className="text-sm font-medium leading-snug text-foreground/90">
+                                {displayTitle}
                               </div>
-                              {(item.equipo || item.description) && (
+                              {item.description && item.description !== displayTitle && (
                                 <div className="text-xs text-muted-foreground mt-1">
-                                  {item.equipo || item.description}
+                                  {item.description}
                                 </div>
                               )}
                             </div>
