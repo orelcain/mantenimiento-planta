@@ -389,7 +389,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
             </div>
           </DialogHeader>
 
-          <div className="space-y-6">
+          <div className="flex-1 overflow-y-auto p-4 space-y-6">
             {/* Descripción */}
             <div>
               <h4 className="font-medium mb-2">Descripción</h4>
@@ -753,86 +753,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
             )}
           </div>
 
-          <DialogFooter className="flex-wrap gap-2">
-            {/* Acciones según estado y rol */}
-            {incident.status === 'pendiente' && canValidate && !showRejectForm && (
-              <>
-                <Button
-                  variant="outline"
-                  onClick={() => setShowRejectForm(true)}
-                >
-                  <XCircle className="h-4 w-4 mr-2" />
-                  Rechazar
-                </Button>
-                <Button onClick={handleConfirm} disabled={isLoading}>
-                  {isLoading ? <Spinner size="sm" /> : (
-                    <>
-                      <CheckCircle className="h-4 w-4 mr-2" />
-                      Confirmar
-                    </>
-                  )}
-                </Button>
-              </>
-            )}
 
-            {/* Botón de asignar técnico */}
-            {incident.status === 'confirmada' && 
-              !incident.asignadoA && 
-              permissions.canAssignIncident && 
-              !showAssignForm && (
-              <Button
-                variant="default"
-                onClick={() => setShowAssignForm(true)}
-              >
-                <UserPlus className="h-4 w-4 mr-2" />
-                Asignar Técnico
-              </Button>
-            )}
-
-            {/* Botón de cerrar incidencia */}
-            {(incident.status === 'confirmada' || incident.status === 'en_proceso') && 
-              permissions.canWorkOnIncident(incident.asignadoA) &&
-              !showCloseForm && !showAssignForm && (
-              <Button
-                variant="success"
-                onClick={() => setShowCloseForm(true)}
-              >
-                <CheckCircle className="h-4 w-4 mr-2" />
-                Cerrar Incidencia
-              </Button>
-            )}
-
-            {/* Botón de editar (solo Admin) */}
-            {permissions.canEditIncident && !showEditForm && (
-              <Button
-                variant="default"
-                onClick={() => setShowEditForm(true)}
-              >
-                <Edit className="h-4 w-4 mr-2" />
-                Editar
-              </Button>
-            )}
-
-            {/* Botón de eliminar (solo Admin) */}
-            {permissions.canDeleteIncident && (
-              <Button
-                variant="destructive"
-                onClick={handleDelete}
-                disabled={isLoading}
-              >
-                {isLoading ? <Spinner size="sm" /> : (
-                  <>
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Eliminar
-                  </>
-                )}
-              </Button>
-            )}
-
-            <Button variant="outline" onClick={onClose}>
-              Cerrar
-            </Button>
-          </div>
 
           <DialogFooter className="p-4 border-t bg-card shrink-0 gap-2 sm:gap-2 flex-col sm:flex-row">
             {/* Acciones de Validación */}
