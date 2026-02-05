@@ -105,6 +105,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
   const [mapVersion, setMapVersion] = useState<MapVersion | null>(null)
   const [mapLocation, setMapLocation] = useState<MapLocation | null>(null)
   const [mapLoading, setMapLoading] = useState(false)
+  const [reporterName, setReporterName] = useState<string>('')
 
   // Cargar lista de técnicos
   useEffect(() => {
@@ -123,6 +124,20 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
         .catch((error) => logger.error('Error loading assigned user', error instanceof Error ? error : new Error(String(error))))
     }
   }, [incident.asignadoA])
+
+  // Cargar nombre del reportador
+  useEffect(() => {
+    if (incident.reportadoPor) {
+      // Si parece un ID de Firebase (alphanumeric > 10 chars), intentar buscar
+      if (incident.reportadoPor.length > 20 && !incident.reportadoPor.includes(' ')) {
+        getUserById(incident.reportadoPor)
+          .then(user => setReporterName(`${user.nombre} ${user.apellido}`))
+          .catch(() => setReporterName(incident.reportadoPor))
+      } else {
+        setReporterName(incident.reportadoPor)
+      }
+    }
+  }, [incident.reportadoPor])
 
   // Cargar datos del mapa si la incidencia tiene posición en mapa
   useEffect(() => {
@@ -510,6 +525,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
                     <Spinner className="h-6 w-6" />
                   </div>
                 ) : (
+                  <div className="h-[400px] w-full rounded-lg overflow-hidden border">
                   <MapViewer
                     imageUrl={mapVersion.imageUrl}
                     markers={[{
@@ -518,10 +534,11 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
                       title: incident.titulo
                     }]}
                     editable={false}
-                    showControls={false}
-                    className="h-48 rounded-lg overflow-hidden"
+                    showControls={true}
+                    className="h-full w-full"
                     markerColor="#ef4444"
                   />
+                  </div>
                 )}
               </div>
             )}
@@ -536,7 +553,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
                   </div>
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <User className="h-4 w-4" />
-                    <span>Reportado por: {incident.reportadoPor}</span>
+                    <span>Reportado por: {reporterName || incident.reportadoPor}</span>
                   </div>
                 </div>
 
