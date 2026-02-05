@@ -25,7 +25,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui'
-import { useAppStore, useAuthStore } from '@/store'
+import { IncidentDetail } from '@/components/incidents/IncidentDetail'
+import { useAppStore, useAuthStore, useCanValidateIncidents } from '@/store'
 import { getZones } from '@/services/zones'
 import { subscribeToIncidents } from '@/services/incidents'
 import { PolygonZoneEditor, InteractiveSVGMap } from '@/components/map'
@@ -53,6 +54,7 @@ const STATUS_CONFIG: Record<IncidentStatus, { label: string; variant: string }> 
 }
 
 export function MapPage() {
+  const canValidate = useCanValidateIncidents()
   const { user } = useAuthStore()
   const { zones, setZones, setSelectedZone, incidents, setIncidents, mapImage } = useAppStore()
   const [viewMode, setViewMode] = useState<ViewMode>('view')
@@ -519,10 +521,10 @@ export function MapPage() {
 
       {/* Diálogo de detalle de incidencia */}
       {selectedIncident && (
-        <IncidentQuickView 
+        <IncidentDetail 
           incident={selectedIncident} 
-          zone={zones.find(z => z.id === selectedIncident.zoneId)}
           onClose={() => setSelectedIncident(null)} 
+          canValidate={canValidate}
         />
       )}
 
@@ -640,103 +642,4 @@ function ZoneOverlay({
   return null
 }
 
-// Vista rápida de incidencia
-function IncidentQuickView({ 
-  incident, 
-  zone,
-  onClose 
-}: { 
-  incident: Incident
-  zone?: Zone
-  onClose: () => void 
-}) {
-  const priorityConfig = PRIORITY_CONFIG[incident.prioridad]
-  const statusConfig = STATUS_CONFIG[incident.status]
-  
-  return (
-    <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-start gap-2">
-            <div className={cn('w-3 h-3 rounded-full mt-1.5 flex-shrink-0', priorityConfig.bg)} />
-            <span>{incident.titulo}</span>
-          </DialogTitle>
-        </DialogHeader>
-        
-        <div className="space-y-4">
-          {/* Estado y prioridad */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <Badge variant={statusConfig.variant as any}>
-              {statusConfig.label}
-            </Badge>
-            <Badge variant="outline" className={priorityConfig.color}>
-              {priorityConfig.label}
-            </Badge>
-          </div>
-          
-          {/* Zona */}
-          {zone && (
-            <div className="flex items-center gap-2 text-sm">
-              <MapPin className="h-4 w-4 text-muted-foreground" />
-              <div 
-                className="w-3 h-3 rounded-full" 
-                style={{ backgroundColor: zone.color || '#2196f3' }}
-              />
-              <span>{zone.nombre}</span>
-            </div>
-          )}
-          
-          {/* Descripción */}
-          <div>
-            <p className="text-sm text-muted-foreground">{incident.descripcion}</p>
-          </div>
-          
-          {/* Síntomas */}
-          {incident.sintomas && incident.sintomas.length > 0 && (
-            <div>
-              <p className="text-xs font-medium text-muted-foreground mb-1">Síntomas:</p>
-              <div className="flex flex-wrap gap-1">
-                {incident.sintomas.map((s, i) => (
-                  <Badge key={i} variant="secondary" className="text-xs">{s}</Badge>
-                ))}
-              </div>
-            </div>
-          )}
-          
-          {/* Fotos */}
-          {incident.fotos.length > 0 && (
-            <div>
-              <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
-                <Camera className="h-3 w-3" />
-                Fotos ({incident.fotos.length})
-              </p>
-              <div className="grid grid-cols-3 gap-2">
-                {incident.fotos.slice(0, 3).map((foto, i) => (
-                  <img 
-                    key={i}
-                    src={foto}
-                    alt={`Foto ${i + 1}`}
-                    className="w-full aspect-square object-cover rounded-md cursor-pointer hover:opacity-80"
-                    onClick={() => window.open(foto, '_blank')}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-          
-          {/* Info */}
-          <div className="flex items-center gap-4 text-xs text-muted-foreground pt-2 border-t">
-            <div className="flex items-center gap-1">
-              <Clock className="h-3 w-3" />
-              {formatRelativeTime(incident.createdAt)}
-            </div>
-            <div className="flex items-center gap-1">
-              <User className="h-3 w-3" />
-              Reportado
-            </div>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-  )
-}
+// Vista rápida de incidencia reemplazada por IncidentDetail
