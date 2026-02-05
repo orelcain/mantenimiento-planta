@@ -10,7 +10,7 @@
  */
 
 import { useState, useRef, useCallback, useEffect, forwardRef, useImperativeHandle } from 'react'
-import { MapPin, ZoomIn, ZoomOut, RotateCcw, Hand, Check, X } from 'lucide-react'
+import { MapPin, ZoomIn, ZoomOut, RotateCw, Hand, Check, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
