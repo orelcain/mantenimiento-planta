@@ -263,20 +263,29 @@ export async function setupForegroundMessageListener(
 /**
  * Mostrar notificación local (para mensajes en foreground)
  */
-export function showLocalNotification(title: string, options?: NotificationOptions): void {
+export function showLocalNotification(title: string, options?: NotificationOptions): Notification | null {
   if (!areNotificationsEnabled()) {
     logger.warn('Cannot show notification: permission not granted')
-    return
+    return null
   }
 
   try {
-    new Notification(title, {
+    const notification = new Notification(title, {
       icon: '/mantenimiento-planta/icons/icon-192.svg',
       badge: '/mantenimiento-planta/icons/icon-192.svg',
       ...options,
     })
+    if (options?.data && typeof (options.data as any).url === 'string') {
+      const target = (options.data as any).url as string
+      notification.onclick = () => {
+        const targetUrl = new URL(target, window.location.origin).toString()
+        window.open(targetUrl, '_blank')
+      }
+    }
+    return notification
   } catch (error) {
     logger.error('Error showing notification', error instanceof Error ? error : new Error(String(error)))
+    return null
   }
 }
 

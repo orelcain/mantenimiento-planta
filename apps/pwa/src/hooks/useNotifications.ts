@@ -47,7 +47,7 @@ export function useNotifications() {
       // Mostrar notificación local cuando la app está en foreground
       const { title, body } = payload.notification || {}
       if (title) {
-        showLocalNotification(title, { body })
+        showLocalNotification(title, { body, data: payload.data })
       }
     }).then((unsub) => {
       unsubscribe = unsub
