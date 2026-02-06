@@ -93,6 +93,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
   const [technicians, setTechnicians] = useState<UserType[]>([])
   const [selectedTechnician, setSelectedTechnician] = useState<string>('')
   const [assignedUser, setAssignedUser] = useState<UserType | null>(null)
+  const [reporterUser, setReporterUser] = useState<UserType | null>(null)
   const [iotLoading, setIotLoading] = useState(false)
   const [iotError, setIotError] = useState<string | null>(null)
   const [iotData, setIotData] = useState<{
@@ -125,13 +126,32 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
     }
   }, [incident.asignadoA])
 
+  const roleLabel = (role?: string) => {
+    if (role === 'admin') return 'Admin'
+    if (role === 'supervisor') return 'Supervisor'
+    if (role === 'tecnico') return 'Técnico'
+    return 'Usuario'
+  }
+
+  const providerLabel = (provider?: string) => (provider === 'google' ? 'Google' : 'Email')
+
+  const formatUserLabel = (userInfo?: UserType | null, fallback?: string) => {
+    if (!userInfo) return fallback || ''
+    return `${userInfo.nombre} ${userInfo.apellido} · ${roleLabel(userInfo.rol)} · ${providerLabel(userInfo.authProvider)}`
+  }
+
   // Cargar nombre del reportador
   useEffect(() => {
     if (incident.reportadoPor) {
       // Si parece un ID de Firebase (alphanumeric > 10 chars), intentar buscar
       if (incident.reportadoPor.length > 20 && !incident.reportadoPor.includes(' ')) {
         getUserById(incident.reportadoPor)
-          .then(user => setReporterName(`${user.nombre} ${user.apellido}`))
+          .then(user => {
+            if (user) {
+              setReporterUser(user)
+              setReporterName(`${user.nombre} ${user.apellido}`)
+            }
+          })
           .catch(() => setReporterName(incident.reportadoPor))
       } else {
         setReporterName(incident.reportadoPor)
@@ -567,7 +587,9 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
                   </div>
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <User className="h-4 w-4" />
-                    <span>Reportado por: {reporterName || incident.reportadoPor}</span>
+                    <span>
+                      Reportado por: {formatUserLabel(reporterUser, reporterName || incident.reportadoPor)}
+                    </span>
                   </div>
                 </div>
 
@@ -581,10 +603,14 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
                     <p className="text-sm">
                       {assignedUser.nombre} {assignedUser.apellido}
                     </p>
-                    <Badge variant="outline" className="mt-1">
-                      {assignedUser.rol === 'admin' ? 'Admin' :
-                       assignedUser.rol === 'supervisor' ? 'Supervisor' : 'Técnico'}
-                    </Badge>
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      <Badge variant="outline">
+                        {roleLabel(assignedUser.rol)}
+                      </Badge>
+                      <Badge variant="secondary">
+                        {providerLabel(assignedUser.authProvider)}
+                      </Badge>
+                    </div>
                   </div>
                 ) : incident.status === 'confirmada' && permissions.canAssignIncident && (
                   <div className="p-3 bg-warning/10 rounded-lg border border-warning/20">

@@ -21,7 +21,7 @@ import { formatRelativeTime } from '@/lib/utils'
 import { IncidentForm } from '@/components/incidents/IncidentForm'
 import { IncidentDetail } from '@/components/incidents/IncidentDetail'
 import { debounce } from '@/lib/utils'
-import { getUserDisplayNameMap } from '@/services/userDisplay'
+import { getUserDisplayNameMap, getUserInfoLabelMap } from '@/services/userDisplay'
 
 const getStatusIcon = (status: IncidentStatus) => {
   const iconMap: Record<IncidentStatus, any> = {
@@ -63,6 +63,7 @@ export function IncidentsPage() {
   const [selectedMapLocation, setSelectedMapLocation] = useState<string>('all')
   const [selectedReporter, setSelectedReporter] = useState<string>('all')
   const [reporterNames, setReporterNames] = useState<Record<string, string>>({})
+  const [userInfoLabels, setUserInfoLabels] = useState<Record<string, string>>({})
 
   const isAdminOrSupervisor = user?.rol === 'admin' || user?.rol === 'supervisor'
 
@@ -170,6 +171,20 @@ export function IncidentsPage() {
       setReporterNames({})
     })
   }, [incidents, isAdminOrSupervisor])
+
+  useEffect(() => {
+    const ids = Array.from(
+      new Set(
+        visibleIncidents
+          .flatMap((i) => [i.reportadoPor, i.creadoPor, i.asignadoA])
+          .filter((id): id is string => typeof id === 'string' && id.length > 0)
+      )
+    )
+    if (ids.length === 0) return
+    getUserInfoLabelMap(ids).then(setUserInfoLabels).catch(() => {
+      setUserInfoLabels({})
+    })
+  }, [visibleIncidents])
 
   return (
     <div className="space-y-6">
@@ -392,6 +407,7 @@ export function IncidentsPage() {
             <IncidentCard
               key={incident.id}
               incident={incident}
+              userInfoLabels={userInfoLabels}
               onClick={() => setSelectedIncident(incident)}
             />
           ))
@@ -420,9 +436,11 @@ export function IncidentsPage() {
 
 function IncidentCard({
   incident,
+  userInfoLabels,
   onClick,
 }: {
   incident: Incident
+  userInfoLabels: Record<string, string>
   onClick: () => void
 }) {
   const statusConfig = STATUS_CONFIG[incident.status]
@@ -451,16 +469,22 @@ function IncidentCard({
               {incident.descripcion}
             </p>
             <div className="flex flex-wrap gap-2 mt-2 text-xs text-muted-foreground">
-              {incident.creadoPorNombre && (
+              {(incident.creadoPor || incident.reportadoPor) && (
                 <span className="flex items-center gap-1">
                   <User className="h-3 w-3" />
-                  Creado por: <span className="font-medium">{incident.creadoPorNombre}</span>
+                  Creado por:{' '}
+                  <span className="font-medium">
+                    {userInfoLabels[incident.creadoPor || incident.reportadoPor] || incident.creadoPor || incident.reportadoPor}
+                  </span>
                 </span>
               )}
-              {incident.asignadoANombre && (
+              {incident.asignadoA && (
                 <span className="flex items-center gap-1">
                   <User className="h-3 w-3" />
-                  Asignado a: <span className="font-medium">{incident.asignadoANombre}</span>
+                  Asignado a:{' '}
+                  <span className="font-medium">
+                    {userInfoLabels[incident.asignadoA] || incident.asignadoA}
+                  </span>
                 </span>
               )}
             </div>
