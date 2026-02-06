@@ -295,11 +295,13 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
     try {
       await assignIncident(incident.id, technicianId, user.id)
       logger.info('Incident assigned', { incidentId: incident.id, technicianId: technicianId })
+      toast({ title: 'Asignación realizada', description: 'La incidencia fue asignada correctamente.' })
       setShowAssignForm(false)
       onClose()
     } catch (error: unknown) {
       const err = error instanceof Error ? error : new Error('Error assigning incident')
       logger.error('Error assigning incident', err)
+      toast({ variant: 'destructive', title: 'Error al asignar', description: err.message })
     } finally {
       setIsLoading(false)
     }
