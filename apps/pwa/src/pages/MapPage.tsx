@@ -59,6 +59,7 @@ export function MapPage() {
   const { zones, setZones, setSelectedZone, incidents, setIncidents, mapImage } = useAppStore()
   const [viewMode, setViewMode] = useState<ViewMode>('view')
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null)
+  const [selectedZoneForDetail, setSelectedZoneForDetail] = useState<Zone | null>(null)
   const [showIncidentPanel, setShowIncidentPanel] = useState(true)
   // Si es URL de Firebase Storage, usarla directamente; si es local, agregar basePath
   // Si no hay mapa, será null y se mostrará un placeholder
@@ -321,7 +322,10 @@ export function MapPage() {
                     position={position}
                     onZoneClick={(zoneId: string) => {
                       const zone = zones.find(z => z.id === zoneId)
-                      if (zone) setSelectedZone(zone)
+                      if (zone) {
+                        setSelectedZone(zone)
+                        setSelectedZoneForDetail(zone)
+                      }
                     }}
                     onIncidentClick={setSelectedIncident}
                   />
@@ -356,7 +360,10 @@ export function MapPage() {
                       key={zone.id}
                       zone={zone}
                       incidents={incidentsByZone[zone.id] || []}
-                      onClick={() => setSelectedZone(zone)}
+                      onClick={() => {
+                        setSelectedZone(zone)
+                        setSelectedZoneForDetail(zone)
+                      }}
                       onIncidentClick={setSelectedIncident}
                     />
                   ))
@@ -528,6 +535,66 @@ export function MapPage() {
         />
       )}
 
+      {/* Zone Detail Modal */}
+      <Dialog open={!!selectedZoneForDetail} onOpenChange={(open) => !open && setSelectedZoneForDetail(null)}>
+        <DialogContent className="max-w-md w-[98vw] md:w-full max-h-[92vh] p-0 gap-0 overflow-hidden flex flex-col rounded-xl">
+          <DialogHeader className="p-4 border-b shrink-0 bg-card z-10 sticky top-0">
+            <div className="flex items-center justify-between">
+              <DialogTitle className="flex items-center gap-2">
+                <MapPin className="h-5 w-5 text-primary" />
+                {selectedZoneForDetail?.nombre}
+              </DialogTitle>
+            </div>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {selectedZoneForDetail && (incidentsByZone[selectedZoneForDetail.id] || []).filter(i => i.status !== 'cerrada').length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <MapPin className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                <p>No hay incidencias activas en esta zona</p>
+              </div>
+            ) : (
+              selectedZoneForDetail && (incidentsByZone[selectedZoneForDetail.id] || [])
+                .filter(i => i.status !== 'cerrada')
+                .map(incident => (
+                  <div
+                    key={incident.id}
+                    className="flex items-center gap-3 cursor-pointer hover:bg-muted p-3 rounded-lg border bg-card/50"
+                    onClick={() => {
+                      setSelectedZoneForDetail(null)
+                      setSelectedIncident(incident)
+                    }}
+                  >
+                    <div className={cn(
+                      'w-3 h-3 rounded-full shrink-0',
+                      incident.prioridad === 'critica'
+                        ? 'bg-destructive'
+                        : incident.prioridad === 'alta'
+                        ? 'bg-warning'
+                        : 'bg-primary'
+                    )} />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate text-sm">{incident.titulo}</p>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <span className="capitalize">{incident.status.replace('_', ' ')}</span>
+                        <span>•</span>
+                        <span>{formatRelativeTime(incident.createdAt)}</span>
+                      </div>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                ))
+            )}
+          </div>
+
+          <div className="p-4 border-t bg-card shrink-0">
+            <Button variant="outline" className="w-full" onClick={() => setSelectedZoneForDetail(null)}>
+              Cerrar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Zone Stats */}
       {zones.length > 0 && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -544,7 +611,10 @@ export function MapPage() {
                   'cursor-pointer hover:border-primary/50 transition-colors',
                   criticalCount > 0 && 'border-destructive'
                 )}
-                onClick={() => setSelectedZone(zone)}
+                onClick={() => {
+                  setSelectedZone(zone)
+                  setSelectedZoneForDetail(zone)
+                }}
               >
                 <CardHeader className="p-4 pb-2">
                   <CardTitle className="text-sm font-medium flex items-center gap-2">
