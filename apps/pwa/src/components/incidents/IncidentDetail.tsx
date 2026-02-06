@@ -801,7 +801,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
                     Cancelar
                   </Button>
                   <Button
-                    onClick={handleAssign}
+                    onClick={() => handleAssign()}
                     disabled={isLoading || !selectedTechnician}
                   >
                     {isLoading ? <Spinner size="sm" /> : 'Asignar Técnico'}

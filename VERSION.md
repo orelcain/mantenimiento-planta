@@ -1,14 +1,18 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.48.31**
+## Versión Actual: **v2.48.32**
 
-**Fecha de lanzamiento**: 01 de febrero de 2026  \
+**Fecha de lanzamiento**: 05 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
 **Build**: ✅ Stable
 
 ---
 
 ## 📋 Información de la Versión
+
+### v2.48.32 - HOTFIX: Asignación Técnica (05/02/2026)
+- 🐛 **FIX**: Corregido error crítico que impedía asignar incidentes (el evento de clic se pasaba como ID).
+- 🔄 **UX**: La asignación ahora funciona correctamente al hacer clic en "Asignar Técnico".
 
 ### v2.45.7 - UI: Indicador de Proveedor Auth (01/02/2026)
 - 📄 **UI**: Icono pequeño de correo (Google) aparece junto al nombre si la cuenta es Google.
@@ -2073,90 +2077,111 @@ firebase deploy --only hosting
  -   U n i f i c a c i � n   d e   v i s u a l i z a c i � n   d e   d e t a l l e   d e   i n c i d e n c i a s   e n   M a p P a g e . 
  -   R e e m p l a z o   d e   I n c i d e n t Q u i c k V i e w   p o r   I n c i d e n t D e t a i l . 
  -   V e r i f i c a c i � n   y   e s t a n d a r i z a c i � n   d e   m o d a l e s   a   8 5 v w   e n   m � v i l . 
-  
+ 
+ 
  # #   2 . 4 8 . 1 4 
  
  -   C o r r e c c i � n   c r � t i c a   e n   I n c i d e n t D e t a i l   ( e r r o r   d e   s i n t a x i s   e n   b u i l d ) . 
  -   A j u s t e   f i n a l   d e   l a y o u t   m o d a l   m � v i l   ( 9 8 v w ,   h e a d e r / f o o t e r   s t i c k y ) . 
-  
+ 
+ 
  # #   2 . 4 8 . 1 5 
  
  -   M e j o r a   v i s u a l   e n   l i s t a   d e l   D a s h b o a r d   ( d e t a l l e   d e   r e p o r t e r o / a s i g n a d o ) . 
  -   A j u s t e   d e   c o n t e n e d o r   p r i n c i p a l   ( M a i n L a y o u t )   p a r a   e v i t a r   d e s b o r d a m i e n t o   h o r i z o n t a l . 
  -   S i n c r o n i z a c i � n   d e   v e r s i o n e s . 
-  
+ 
+ 
  # #   2 . 4 8 . 1 6 
  
  -   D a s h b o a r d :   m o s t r a r   n o m b r e ,   r o l   y   p r o v e e d o r   d e   a u t e n t i c a c i � n   e n   r e p o r t a d o / a s i g n a d o . 
  -   A j u s t e   d e   t a r j e t a s   d e l   d a s h b o a r d   a   a n c h o   c o m p l e t o   e n   m � v i l . 
-  
+ 
+ 
  # #   2 . 4 8 . 1 7 
  
  -   F i x :   e v i t a   R e f e r e n c e E r r o r   e n   D a s h b o a r d   ( o r d e n   d e   r e c e n t I n c i d e n t s ) . 
-  
+ 
+ 
  # #   2 . 4 8 . 1 8 
  
  -   D a s h b o a r d   m � v i l :   t a r j e t a s   a   a n c h o   c o m p l e t o   y   e t i q u e t a s   c o n   s a l t o   d e   l � n e a . 
  -   R e p o r t a d o / A s i g n a d o :   m o s t r a r   t e x t o   c o m p l e t o   s i n   t r u n c a d o . 
-  
+ 
+ 
  # #   2 . 4 8 . 1 9 
  
- -   I n c i d e n c i a s :   c o n t e o   y   f i l t r o   d e   \  
- M i s  
+ -   I n c i d e n c i a s :   c o n t e o   y   f i l t r o   d e   \ 
+ 
+ M i s 
+ 
  a s i g n a d a s \   s e g � n   u s u a r i o   l o g e a d o . 
-  
+ 
+ 
  # #   2 . 4 8 . 2 0 
  
  -   I n c i d e n c i a s :   a s i g n a d a s   i n c l u y e   t o d a s   l a s   a s i g n a d a s   n o   c e r r a d a s . 
  -   D e t a l l e :   p e r m i t i r   a s i g n a r   t � c n i c o s   c o n   p e r m i s o   d e   a s i g n a c i � n . 
  -   A u t o - a s i g n a c i � n   c o r r e g i d a   ( r e f e r e n c i a   a   p e r m i s o s ) . 
-  
+ 
+ 
  # #   2 . 4 8 . 2 1 
  
  -   I n c i d e n c i a s :   f i l t r o s   y   c o n t e o s   d e   c r e a d a s   p o r   u s u a r i o . 
  -   A d m i n / s u p e r v i s o r :   s e l e c t o r   d e   c r e a d o r . 
  -   C r e a r   i n c i d e n c i a :   o p c i � n   d e   a s i g n a r s e   a   s �   m i s m o . 
-  
+ 
+ 
  # #   2 . 4 8 . 2 2 
  
  -   E s c a l a   g l o b a l   d e   U I   ( r e m )   p a r a   r e d u c i r   t a m a � o s   e n   t o d a   l a   P W A . 
-  
+ 
+ 
  # #   2 . 4 8 . 2 3 
  
  -   M a p a :   m o d a l   d e   z o n a   c o n   l i s t a   d e   i n c i d e n c i a s   y   a c c e s o   a   d e t a l l e . 
-  
+ 
+ 
  # #   2 . 4 8 . 2 4 
  
  -   I n c i d e n c i a s :   v i s i b i l i d a d   u n i f i c a d a   p o r   r o l   ( a d m i n / s u p e r v i s o r   v e n   t o d o ;   o t r o s   s o l o   p r o p i a s / a s i g n a d a s ) . 
-  
+ 
+ 
  # #   2 . 4 8 . 2 5 
  
  -   S i n c r o n i z a c i � n   d e   e s t a d o s :   s u s c r i p c i � n   � n i c a   g l o b a l   p a r a   i n c i d e n c i a s . 
  -   M a p a   u s a   l i s t a   a c t i v a   d e r i v a d a   d e l   s t o r e   g l o b a l . 
-  
+ 
+ 
  # #   2 . 4 8 . 2 6 
  
  -   N o t i f i c a c i o n e s   f o r e g r o u n d :   i n c l u y e n   U R L   y   n a v e g a n   a l   h a c e r   c l i c k . 
-  
+ 
+ 
  # #   2 . 4 8 . 2 7 
  
  -   N o r m a l i z a c i � n   d e   d a t o s   d e   u s u a r i o   ( n o m b r e / r o l / p r o v e e d o r )   e n   i n c i d e n c i a s . 
-  
+ 
+ 
  # #   2 . 4 8 . 2 8 
  
  -   V a l i d a c i � n   d e   u b i c a c i � n   e n   m a p a   a l   c r e a r   i n c i d e n c i a s . 
-  
+ 
+ 
  # #   2 . 4 8 . 2 9 
  
  -   R e g l a s :   p e r m i t i r   a u t o - a s i g n a c i � n   d e l   r e p o r t a d o r . 
  -   D e t a l l e :   f e e d b a c k   a l   a s i g n a r   t � c n i c o . 
-  
+ 
+ 
  # #   2 . 4 8 . 3 0 
  
  -   A s i g n a c i � n :   n o r m a l i z a   t � c n i c o   a   s t r i n g   y   e v i t a   o b j e t o s   e n   F i r e s t o r e . 
-  
+ 
+ 
  # #   2 . 4 8 . 3 1 
  
  -   A s i g n a c i � n :   f i l t r a   t � c n i c o s   i n v � l i d o s   y   p r e s e l e c c i o n a   u n o   d i s p o n i b l e . 
-  
+ 
+ 
  
