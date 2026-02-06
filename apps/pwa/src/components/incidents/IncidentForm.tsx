@@ -347,6 +347,14 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
         ...(selectedSymptoms.length > 0 && { sintomas: selectedSymptoms }),
       }
 
+      if (mapLocation && (!mapLocation.locationId || !mapLocation.mapVersionId || !mapLocation.position)) {
+        setValidationErrors({
+          ...validationErrors,
+          mapLocation: 'Selecciona una ubicación válida en el mapa.'
+        })
+        return
+      }
+
       console.log('🔒 Validando con Zod...', dataToValidate)
       // Validar con el schema de Zod
       const validation = createIncidentSchema.safeParse(dataToValidate)
@@ -626,6 +634,9 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
                   setIsMapSelectorOpen(false)
                 }}
               />
+              {validationErrors.mapLocation && (
+                <p className="text-sm text-destructive mt-1">{validationErrors.mapLocation}</p>
+              )}
             </div>
           )}
 

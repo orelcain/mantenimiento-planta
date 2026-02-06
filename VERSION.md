@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.48.27**
+## Versión Actual: **v2.48.28**
 
 **Fecha de lanzamiento**: 01 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -2141,5 +2141,9 @@ firebase deploy --only hosting
  # #   2 . 4 8 . 2 7 
  
  -   N o r m a l i z a c i � n   d e   d a t o s   d e   u s u a r i o   ( n o m b r e / r o l / p r o v e e d o r )   e n   i n c i d e n c i a s . 
+  
+ # #   2 . 4 8 . 2 8 
+ 
+ -   V a l i d a c i � n   d e   u b i c a c i � n   e n   m a p a   a l   c r e a r   i n c i d e n c i a s . 
   
  

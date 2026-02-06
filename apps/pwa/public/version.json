@@ -1,7 +1,7 @@
 {
-  "version": "2.48.27",
+  "version": "2.48.28",
   "buildDate": "2026-02-05",
-  "buildTimestamp": 1770340059964,
+  "buildTimestamp": 1770340455677,
   "features": [
     "Fix sistema de notificaciones push",
     "Eliminar VitePWA completamente",
