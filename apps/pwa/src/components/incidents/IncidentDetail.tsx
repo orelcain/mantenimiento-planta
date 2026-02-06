@@ -290,11 +290,18 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
 
   // Asignar incidencia
   const handleAssign = async (technicianId = selectedTechnician) => {
-    if (!user || !technicianId) return
+    if (!user) return
+    const normalizedTechnicianId = typeof technicianId === 'string'
+      ? technicianId
+      : (technicianId as any)?.id
+    if (!normalizedTechnicianId) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Técnico inválido para asignación.' })
+      return
+    }
     setIsLoading(true)
     try {
-      await assignIncident(incident.id, technicianId, user.id)
-      logger.info('Incident assigned', { incidentId: incident.id, technicianId: technicianId })
+      await assignIncident(incident.id, normalizedTechnicianId, user.id)
+      logger.info('Incident assigned', { incidentId: incident.id, technicianId: normalizedTechnicianId })
       toast({ title: 'Asignación realizada', description: 'La incidencia fue asignada correctamente.' })
       setShowAssignForm(false)
       onClose()
@@ -762,7 +769,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
                 <h4 className="font-medium">Asignar técnico</h4>
                 <div className="space-y-2">
                   <Label htmlFor="technician">Técnico responsable *</Label>
-                  <Select value={selectedTechnician} onValueChange={setSelectedTechnician}>
+                  <Select value={selectedTechnician} onValueChange={(value) => setSelectedTechnician(String(value))}>
                     <SelectTrigger>
                       <SelectValue placeholder="Seleccionar técnico..." />
                     </SelectTrigger>
