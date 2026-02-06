@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from '@/components/ui'
 import { useAppStore, useAuthStore, useCanValidateIncidents } from '@/store'
+import { usePermissions } from '@/hooks/usePermissions'
 import { subscribeToIncidents } from '@/services/incidents'
 import { getMapLocations } from '@/services/maps'
 import type { Incident, IncidentStatus, IncidentPriority } from '@/types'
@@ -52,6 +53,7 @@ const PRIORITY_CONFIG: Record<IncidentPriority, { label: string; className: stri
 export function IncidentsPage() {
   const canValidate = useCanValidateIncidents()
   const { user } = useAuthStore()
+  const permissions = usePermissions()
   const { incidents, setIncidents, selectedIncident, setSelectedIncident } = useAppStore()
   
   const [showForm, setShowForm] = useState(false)
@@ -89,7 +91,16 @@ export function IncidentsPage() {
   }, [setIncidents])
 
   // Filtrar incidencias basado en búsqueda y filtro activo
-  const filteredIncidents = incidents.filter((incident) => {
+  const canSeeAllIncidents = permissions.isAdmin || permissions.isSupervisor
+  const visibleIncidents = canSeeAllIncidents
+    ? incidents
+    : incidents.filter((incident) =>
+        incident.reportadoPor === user?.id ||
+        incident.creadoPor === user?.id ||
+        incident.asignadoA === user?.id
+      )
+
+  const filteredIncidents = visibleIncidents.filter((incident) => {
     const matchesSearch =
       incident.titulo.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
       incident.descripcion.toLowerCase().includes(debouncedSearch.toLowerCase())
@@ -135,21 +146,21 @@ export function IncidentsPage() {
 
   // Estadísticas
   const stats = {
-    total: incidents.length,
-    pendientes: incidents.filter((i) => i.status === 'pendiente').length,
-    confirmadas: incidents.filter((i) => i.status === 'confirmada').length,
-    confirmadas_asignadas: incidents.filter((i) => !!i.asignadoA && i.status !== 'cerrada').length,
-    confirmadas_sin_asignar: incidents.filter((i) => i.status === 'confirmada' && !i.asignadoA).length,
+    total: visibleIncidents.length,
+    pendientes: visibleIncidents.filter((i) => i.status === 'pendiente').length,
+    confirmadas: visibleIncidents.filter((i) => i.status === 'confirmada').length,
+    confirmadas_asignadas: visibleIncidents.filter((i) => !!i.asignadoA && i.status !== 'cerrada').length,
+    confirmadas_sin_asignar: visibleIncidents.filter((i) => i.status === 'confirmada' && !i.asignadoA).length,
     mis_asignadas: user?.id
-      ? incidents.filter((i) => i.asignadoA === user.id && i.status !== 'cerrada').length
+      ? visibleIncidents.filter((i) => i.asignadoA === user.id && i.status !== 'cerrada').length
       : 0,
     mis_creadas: user?.id
-      ? incidents.filter((i) => i.reportadoPor === user.id || i.creadoPor === user.id).length
+      ? visibleIncidents.filter((i) => i.reportadoPor === user.id || i.creadoPor === user.id).length
       : 0,
-    enProceso: incidents.filter((i) => i.status === 'en_proceso').length,
-    cerradas: incidents.filter((i) => i.status === 'cerrada').length,
-    rechazadas: incidents.filter((i) => i.status === 'rechazada').length,
-    criticas: incidents.filter((i) => i.prioridad === 'critica' && i.status !== 'cerrada').length,
+    enProceso: visibleIncidents.filter((i) => i.status === 'en_proceso').length,
+    cerradas: visibleIncidents.filter((i) => i.status === 'cerrada').length,
+    rechazadas: visibleIncidents.filter((i) => i.status === 'rechazada').length,
+    criticas: visibleIncidents.filter((i) => i.prioridad === 'critica' && i.status !== 'cerrada').length,
   }
 
   useEffect(() => {
