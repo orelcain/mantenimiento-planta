@@ -112,10 +112,20 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
   useEffect(() => {
     if (permissions.canAssignIncident) {
       getTechnicians()
-        .then(setTechnicians)
+        .then((list) => {
+          const valid = list.filter((tech) => Boolean(tech.id))
+          setTechnicians(valid)
+        })
         .catch((error) => logger.error('Error loading technicians', error instanceof Error ? error : new Error(String(error))))
     }
   }, [permissions.canAssignIncident])
+
+  useEffect(() => {
+    if (!showAssignForm) return
+    if (selectedTechnician) return
+    if (technicians.length === 0) return
+    setSelectedTechnician(technicians[0].id)
+  }, [showAssignForm, selectedTechnician, technicians])
 
   // Cargar información del usuario asignado
   useEffect(() => {
@@ -295,7 +305,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
       ? technicianId
       : (technicianId as any)?.id
     if (!normalizedTechnicianId) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Técnico inválido para asignación.' })
+      toast({ variant: 'destructive', title: 'Error', description: 'No hay técnico válido para asignación.' })
       return
     }
     setIsLoading(true)
