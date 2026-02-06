@@ -28,7 +28,6 @@ import {
 import { IncidentDetail } from '@/components/incidents/IncidentDetail'
 import { useAppStore, useAuthStore, useCanValidateIncidents } from '@/store'
 import { getZones } from '@/services/zones'
-import { subscribeToIncidents } from '@/services/incidents'
 import { PolygonZoneEditor, InteractiveSVGMap } from '@/components/map'
 import type { Zone, Incident, IncidentPriority, IncidentStatus } from '@/types'
 import { cn } from '@/lib/utils'
@@ -56,7 +55,7 @@ const STATUS_CONFIG: Record<IncidentStatus, { label: string; variant: string }> 
 export function MapPage() {
   const canValidate = useCanValidateIncidents()
   const { user } = useAuthStore()
-  const { zones, setZones, setSelectedZone, incidents, setIncidents, mapImage } = useAppStore()
+  const { zones, setZones, setSelectedZone, incidents, mapImage } = useAppStore()
   const [viewMode, setViewMode] = useState<ViewMode>('view')
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null)
   const [selectedZoneForDetail, setSelectedZoneForDetail] = useState<Zone | null>(null)
@@ -121,16 +120,13 @@ export function MapPage() {
     return () => container.removeEventListener('wheel', handleWheelPassive)
   }, []) // Sin dependencias - se registra una sola vez
 
-  // Suscribirse a incidencias activas
-  useEffect(() => {
-    const unsubscribe = subscribeToIncidents(setIncidents, {
-      status: ['pendiente', 'confirmada', 'en_proceso'],
-    })
-    return () => unsubscribe()
-  }, [setIncidents])
+  // Incidencias activas derivadas del store global
+  const activeIncidents = incidents.filter((i) =>
+    i.status === 'pendiente' || i.status === 'confirmada' || i.status === 'en_proceso'
+  )
 
   // Incidencias por zona
-  const incidentsByZone = incidents.reduce(
+  const incidentsByZone = activeIncidents.reduce(
     (acc, incident) => {
       const zoneId = incident.zoneId || 'unknown'
       if (!acc[zoneId]) {
@@ -317,7 +313,7 @@ export function MapPage() {
                   <InteractiveSVGMap
                     svgUrl={mapUrl}
                     zones={zones}
-                    incidents={incidents}
+                    incidents={activeIncidents}
                     scale={scale}
                     position={position}
                     onZoneClick={(zoneId: string) => {
@@ -387,7 +383,7 @@ export function MapPage() {
                 )}
 
                 {/* Marcadores de incidencias individuales - Estilo Leaflet optimizado */}
-                {incidents.map((incident) => {
+                {activeIncidents.map((incident) => {
                   const zone = zones.find(z => z.id === incident.zoneId)
                   if (!zone?.bounds) return null
                   
@@ -396,7 +392,7 @@ export function MapPage() {
                   const centerY = (zone.bounds.minY + zone.bounds.maxY) / 2
                   
                   // Distribuir incidencias dentro de la zona con un pequeño offset
-                  const zoneIncidents = incidents.filter(i => i.zoneId === incident.zoneId)
+                  const zoneIncidents = activeIncidents.filter(i => i.zoneId === incident.zoneId)
                   const idx = zoneIncidents.findIndex(i => i.id === incident.id)
                   const angle = (idx / zoneIncidents.length) * 2 * Math.PI
                   const radius = Math.min(
@@ -449,7 +445,7 @@ export function MapPage() {
             )}>
               <div className="h-full flex flex-col">
                 <div className="p-3 border-b flex items-center justify-between">
-                  <h3 className="font-semibold">Incidencias Activas ({incidents.length})</h3>
+                  <h3 className="font-semibold">Incidencias Activas ({activeIncidents.length})</h3>
                   <Button 
                     variant="ghost" 
                     size="icon"
@@ -459,12 +455,12 @@ export function MapPage() {
                   </Button>
                 </div>
                 <div className="flex-1 overflow-y-auto p-2 space-y-2">
-                  {incidents.length === 0 ? (
+                  {activeIncidents.length === 0 ? (
                     <p className="text-center text-muted-foreground py-8">
                       No hay incidencias activas
                     </p>
                   ) : (
-                    incidents.map((incident) => {
+                    activeIncidents.map((incident) => {
                       const zone = zones.find(z => z.id === incident.zoneId)
                       const priorityConfig = PRIORITY_CONFIG[incident.prioridad]
                       const statusConfig = STATUS_CONFIG[incident.status]
@@ -514,7 +510,7 @@ export function MapPage() {
                 onClick={() => setShowIncidentPanel(true)}
               >
                 <AlertTriangle className="h-4 w-4 mr-1" />
-                {incidents.length}
+                {activeIncidents.length}
               </Button>
             )}
 

@@ -14,7 +14,6 @@ import {
 } from '@/components/ui'
 import { useAppStore, useAuthStore, useCanValidateIncidents } from '@/store'
 import { usePermissions } from '@/hooks/usePermissions'
-import { subscribeToIncidents } from '@/services/incidents'
 import { getMapLocations } from '@/services/maps'
 import type { Incident, IncidentStatus, IncidentPriority } from '@/types'
 import type { MapLocation } from '@/types/maps'
@@ -54,7 +53,7 @@ export function IncidentsPage() {
   const canValidate = useCanValidateIncidents()
   const { user } = useAuthStore()
   const permissions = usePermissions()
-  const { incidents, setIncidents, selectedIncident, setSelectedIncident } = useAppStore()
+  const { incidents, selectedIncident, setSelectedIncident } = useAppStore()
   
   const [showForm, setShowForm] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -82,13 +81,7 @@ export function IncidentsPage() {
     debouncedSetSearch(searchQuery)
   }, [searchQuery, debouncedSetSearch])
 
-  // Suscribirse a cambios en tiempo real
-  useEffect(() => {
-    const unsubscribe = subscribeToIncidents((newIncidents) => {
-      setIncidents(newIncidents)
-    })
-    return () => unsubscribe()
-  }, [setIncidents])
+  // Suscripción global en MainLayout
 
   // Filtrar incidencias basado en búsqueda y filtro activo
   const canSeeAllIncidents = permissions.isAdmin || permissions.isSupervisor
