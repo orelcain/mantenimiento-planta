@@ -109,9 +109,17 @@ export async function updateIncident(
   id: string,
   data: Partial<Omit<Incident, 'id' | 'createdAt'>>
 ): Promise<void> {
+  // Limpiar undefined
+  const cleanData = Object.entries(data).reduce((acc, [key, value]) => {
+    if (value !== undefined) {
+      acc[key] = value
+    }
+    return acc
+  }, {} as any)
+
   const docRef = doc(db, COLLECTION, id)
   await updateDoc(docRef, {
-    ...data,
+    ...cleanData,
     updatedAt: serverTimestamp(),
   })
 }
@@ -184,13 +192,18 @@ export async function resolveIncident(
       ? Math.round((now.getTime() - incident.confirmedAt.getTime()) / 60000)
       : undefined
 
-  await updateIncident(id, {
+  const updateData: any = {
     status: 'resuelta',
     resolucion,
     resolvedAt: now,
     tiempoResolucionMinutos: tiempoResolucion,
-    repuestosUsados,
-  })
+  }
+
+  if (repuestosUsados !== undefined) {
+    updateData.repuestosUsados = repuestosUsados
+  }
+
+  await updateIncident(id, updateData)
 }
 
 // Cerrar incidencia
@@ -208,14 +221,21 @@ export async function closeIncident(
     ? Math.round((now.getTime() - incident.confirmedAt.getTime()) / 60000)
     : undefined
 
-  await updateIncident(id, {
+  const updateData: any = {
     status: 'cerrada',
     resolucion,
     closedAt: now,
     tiempoResolucionMinutos: tiempoResolucion,
-    repuestosUsados,
-    firmaCierre,
-  })
+  }
+
+  if (repuestosUsados !== undefined) {
+    updateData.repuestosUsados = repuestosUsados
+  }
+  if (firmaCierre !== undefined) {
+    updateData.firmaCierre = firmaCierre
+  }
+
+  await updateIncident(id, updateData)
 }
 
 // Eliminar incidencia

@@ -1,14 +1,19 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.48.33**
+## Versión Actual: **v2.48.34**
 
-**Fecha de lanzamiento**: 06 de febrero de 2026  \
+**Fecha de lanzamiento**: 07 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
 **Build**: ✅ Stable
 
 ---
 
 ## 📋 Información de la Versión
+
+### v2.48.34 - BUGFIX: Resolución de Incidencias (07/02/2026)
+- 🐛 **FIX CRÍTICO**: Corregido error al resolver incidencias ("Unsupported field value: undefined").
+- 🛠️ **CORE**: Implementada limpieza automática de campos `undefined` antes de enviar a Firestore.
+- 🛡️ **UI**: Añadido ErrorBoundary para prevenir pantallas negras en errores de renderizado.
 
 ### v2.48.33 - FEATURE: Flujo de Resolución y Cierre Técnico (06/02/2026)
 - 🛠️ **WORKFLOW**: Nuevo estado intermedio **"Resuelta"**.
