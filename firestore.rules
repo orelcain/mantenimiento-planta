@@ -169,7 +169,7 @@ service cloud.firestore {
         && isNonEmptyString(request.resource.data.titulo, 5, 100)
         && isNonEmptyString(request.resource.data.descripcion, 10, 1000)
         && request.resource.data.prioridad in ['critica', 'alta', 'media', 'baja']
-        && request.resource.data.status in ['pendiente', 'confirmada', 'rechazada', 'en_proceso', 'cerrada']
+        && request.resource.data.status in ['pendiente', 'confirmada', 'rechazada', 'en_proceso', 'resuelta', 'cerrada']
         && request.resource.data.tipo in ['correctivo', 'preventivo', 'predictivo', 'proactivo']
         && request.resource.data.reportadoPor == request.auth.uid
         && request.resource.data.requiresValidation is bool
@@ -201,7 +201,7 @@ service cloud.firestore {
         && (!('titulo' in request.resource.data) || isNonEmptyString(request.resource.data.titulo, 5, 100))
         && (!('descripcion' in request.resource.data) || isNonEmptyString(request.resource.data.descripcion, 10, 1000))
         && (!('prioridad' in request.resource.data) || request.resource.data.prioridad in ['critica', 'alta', 'media', 'baja'])
-        && (!('status' in request.resource.data) || request.resource.data.status in ['pendiente', 'confirmada', 'rechazada', 'en_proceso', 'cerrada'])
+        && (!('status' in request.resource.data) || request.resource.data.status in ['pendiente', 'confirmada', 'rechazada', 'en_proceso', 'resuelta', 'cerrada'])
         && (!('sintomas' in request.resource.data) || (
           request.resource.data.sintomas is list
           && request.resource.data.sintomas.size() <= 20

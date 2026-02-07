@@ -29,6 +29,7 @@ const getStatusIcon = (status: IncidentStatus) => {
     confirmada: CheckCircle,
     rechazada: XCircle,
     en_proceso: AlertTriangle,
+    resuelta: CheckCircle,
     cerrada: CheckCircle,
   }
   return iconMap[status]
@@ -39,6 +40,7 @@ const STATUS_CONFIG: Record<IncidentStatus, { label: string; variant: any }> = {
   confirmada: { label: 'Confirmada', variant: 'default' },
   rechazada: { label: 'Rechazada', variant: 'destructive' },
   en_proceso: { label: 'En Proceso', variant: 'secondary' },
+  resuelta: { label: 'Resuelta (Por Validar)', variant: 'outline' },
   cerrada: { label: 'Cerrada', variant: 'success' },
 }
 
@@ -126,11 +128,12 @@ export function IncidentsPage() {
     // Filtros específicos
     if (activeFilter === 'pendientes') return incident.status === 'pendiente'
     if (activeFilter === 'confirmadas') return incident.status === 'confirmada'
-    if (activeFilter === 'confirmadas-asignadas') return !!incident.asignadoA && incident.status !== 'cerrada'
+    if (activeFilter === 'confirmadas-asignadas') return !!incident.asignadoA && ['en_proceso', 'resuelta'].includes(incident.status)
     if (activeFilter === 'confirmadas-sin-asignar') return incident.status === 'confirmada' && !incident.asignadoA
-    if (activeFilter === 'mis-asignadas') return !!user?.id && incident.asignadoA === user.id && incident.status !== 'cerrada'
+    if (activeFilter === 'mis-asignadas') return !!user?.id && incident.asignadoA === user.id && ['en_proceso', 'resuelta'].includes(incident.status)
     if (activeFilter === 'mis-creadas') return !!user?.id && (incident.reportadoPor === user.id || incident.creadoPor === user.id)
     if (activeFilter === 'en-proceso') return incident.status === 'en_proceso'
+    if (activeFilter === 'por-validar') return incident.status === 'resuelta'
     if (activeFilter === 'cerradas') return incident.status === 'cerrada'
     if (activeFilter === 'rechazadas') return incident.status === 'rechazada'
     if (activeFilter === 'criticas') return incident.prioridad === 'critica' && incident.status !== 'cerrada'
@@ -143,11 +146,12 @@ export function IncidentsPage() {
     total: visibleIncidents.length,
     pendientes: visibleIncidents.filter((i) => i.status === 'pendiente').length,
     confirmadas: visibleIncidents.filter((i) => i.status === 'confirmada').length,
-    confirmadas_asignadas: visibleIncidents.filter((i) => !!i.asignadoA && i.status !== 'cerrada').length,
+    confirmadas_asignadas: visibleIncidents.filter((i) => !!i.asignadoA && ['en_proceso', 'resuelta'].includes(i.status)).length,
     confirmadas_sin_asignar: visibleIncidents.filter((i) => i.status === 'confirmada' && !i.asignadoA).length,
     mis_asignadas: user?.id
-      ? visibleIncidents.filter((i) => i.asignadoA === user.id && i.status !== 'cerrada').length
+      ? visibleIncidents.filter((i) => i.asignadoA === user.id && ['en_proceso', 'resuelta'].includes(i.status)).length
       : 0,
+    por_validar: visibleIncidents.filter((i) => i.status === 'resuelta').length,
     mis_creadas: user?.id
       ? visibleIncidents.filter((i) => i.reportadoPor === user.id || i.creadoPor === user.id).length
       : 0,
@@ -235,16 +239,29 @@ export function IncidentsPage() {
           </CardContent>
         </Card>
 
-        {/* Confirmadas Asignadas */}
+        {/* Confirmadas Asignadas (En Proceso + Resueltas/PorValidar) */}
         <Card
           className={`cursor-pointer transition-all hover:border-blue-400/50 ${activeFilter === 'confirmadas-asignadas' ? 'border-blue-400 bg-blue-400/10' : ''}`}
           onClick={() => setActiveFilter('confirmadas-asignadas')}
         >
           <CardContent className="p-4">
             <div className="text-2xl font-bold text-blue-600">{stats.confirmadas_asignadas}</div>
-            <div className="text-xs text-muted-foreground">Asignadas (todas)</div>
+            <div className="text-xs text-muted-foreground">En curso / Resueltas</div>
           </CardContent>
         </Card>
+
+        {/* Por Validar (Técnico ha resuelto) - Solo Admin/Supervisor */}
+        {isAdminOrSupervisor && (
+          <Card
+            className={`cursor-pointer transition-all hover:border-violet-500/50 ${activeFilter === 'por-validar' ? 'border-violet-500 bg-violet-500/10' : ''}`}
+            onClick={() => setActiveFilter('por-validar')}
+          >
+            <CardContent className="p-4">
+              <div className="text-2xl font-bold text-violet-600">{stats.por_validar}</div>
+              <div className="text-xs text-muted-foreground">Por Validar (Cierre Téc.)</div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Mis Asignadas */}
         <Card
