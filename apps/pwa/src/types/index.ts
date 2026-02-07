@@ -1,7 +1,7 @@
 // Tipos base del sistema
 export type UserRole = 'admin' | 'supervisor' | 'tecnico' | 'usuario'
 
-export type IncidentStatus = 'pendiente' | 'confirmada' | 'rechazada' | 'en_proceso' | 'cerrada'
+export type IncidentStatus = 'pendiente' | 'confirmada' | 'rechazada' | 'en_proceso' | 'resuelta' | 'cerrada'
 
 export type IncidentPriority = 'critica' | 'alta' | 'media' | 'baja'
 
@@ -156,6 +156,7 @@ export interface Incident {
   createdAt: Date
   updatedAt: Date
   confirmedAt?: Date
+  resolvedAt?: Date
   closedAt?: Date
   // Resolución
   resolucion?: string

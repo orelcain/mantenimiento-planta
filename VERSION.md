@@ -1,14 +1,20 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.48.32**
+## Versión Actual: **v2.48.33**
 
-**Fecha de lanzamiento**: 05 de febrero de 2026  \
+**Fecha de lanzamiento**: 06 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
 **Build**: ✅ Stable
 
 ---
 
 ## 📋 Información de la Versión
+
+### v2.48.33 - FEATURE: Flujo de Resolución y Cierre Técnico (06/02/2026)
+- 🛠️ **WORKFLOW**: Nuevo estado intermedio **"Resuelta"**.
+- 👷‍♂️ **Técnicos**: Ahora marcan la incidencia como **"Resuelta"** al finalizar trabajo (se envía notificación al supervisor).
+- 👔 **Supervisores**: Realizan el **"Cierre Técnico"** validando la resolución.
+- 🔔 **Notificaciones**: Avisos automáticos a supervisores cuando un técnico resuelve una incidencia.
 
 ### v2.48.32 - HOTFIX: Asignación Técnica (05/02/2026)
 - 🐛 **FIX**: Corregido error crítico que impedía asignar incidentes (el evento de clic se pasaba como ID).

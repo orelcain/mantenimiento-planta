@@ -170,6 +170,29 @@ export async function assignTechnician(
   })
 }
 
+// Resolver incidencia (Técnico ha terminado)
+export async function resolveIncident(
+  id: string,
+  resolucion: string,
+  repuestosUsados?: { repuestoId: string; cantidad: number }[]
+): Promise<void> {
+  const incident = await getIncidentById(id)
+  if (!incident) throw new Error('Incidencia no encontrada')
+
+  const now = new Date()
+  const tiempoResolucion = incident.confirmedAt
+      ? Math.round((now.getTime() - incident.confirmedAt.getTime()) / 60000)
+      : undefined
+
+  await updateIncident(id, {
+    status: 'resuelta',
+    resolucion,
+    resolvedAt: now,
+    tiempoResolucionMinutos: tiempoResolucion,
+    repuestosUsados,
+  })
+}
+
 // Cerrar incidencia
 export async function closeIncident(
   id: string,
@@ -239,6 +262,7 @@ function parseIncidentDoc(doc: DocumentSnapshot | QueryDocumentSnapshot): Incide
     createdAt: toDate(data.createdAt),
     updatedAt: toDate(data.updatedAt),
     confirmedAt: toDate(data.confirmedAt),
+    resolvedAt: toDate(data.resolvedAt),
     closedAt: toDate(data.closedAt),
     validatedAt: toDate(data.validatedAt),
   } as Incident

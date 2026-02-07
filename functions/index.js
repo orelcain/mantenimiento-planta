@@ -205,7 +205,27 @@ exports.onIncidentUpdated = onDocumentUpdated('incidents/{incidentId}', async (e
     }
   }
 
-  // CASO 4: Incidencia cerrada
+  // CASO 4: Incidencia resuelta (Técnico terminó)
+  if (before.status !== 'resuelta' && after.status === 'resuelta') {
+    // Notificar a supervisores y admins para validación (Cierre técnico)
+    const supervisors = await getSupervisorsAndAdmins()
+    const supervisorTokens = await getTokensForUsers(supervisors)
+    
+    if (supervisorTokens.length > 0) {
+      await sendNotification(
+        supervisorTokens,
+        '🛠️ Incidencia Resuelta',
+        `El técnico ha marcado "${after.titulo}" como resuelta. Requiere cierre técnico.`,
+        {
+          type: 'INCIDENT_RESOLVED',
+          incidentId,
+          url: `/mantenimiento-planta/incidents/${incidentId}`,
+        }
+      )
+    }
+  }
+
+  // CASO 5: Incidencia cerrada
   if (before.status !== 'cerrada' && after.status === 'cerrada') {
     // Notificar al reportador
     const reporterTokens = await getTokensForUser(after.reportadoPor)

@@ -37,7 +37,7 @@ import {
 } from '@/components/ui'
 import { useAppStore, useAuthStore } from '@/store'
 import { usePermissions } from '@/hooks/usePermissions'
-import { confirmIncident, rejectIncident, closeIncident, assignIncident, deleteIncident } from '@/services/incidents'
+import { confirmIncident, rejectIncident, closeIncident, assignIncident, deleteIncident, resolveIncident } from '@/services/incidents'
 import { getTechnicians, getUserById } from '@/services/auth'
 import { refineText, isAIConfigured } from '@/services/ai'
 import { useToast } from '@/hooks/useToast'
@@ -55,6 +55,7 @@ const STATUS_CONFIG: Record<IncidentStatus, { label: string; icon: any; color: s
   confirmada: { label: 'Confirmada', icon: CheckCircle, color: 'text-primary' },
   rechazada: { label: 'Rechazada', icon: XCircle, color: 'text-destructive' },
   en_proceso: { label: 'En proceso', icon: AlertTriangle, color: 'text-blue-400' },
+  resuelta: { label: 'Resuelta', icon: CheckCircle, color: 'text-green-500' },
   cerrada: { label: 'Cerrada', icon: CheckCircle, color: 'text-success' },
 }
 
@@ -83,6 +84,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
   const [isLoading, setIsLoading] = useState(false)
   const [showRejectForm, setShowRejectForm] = useState(false)
   const [showCloseForm, setShowCloseForm] = useState(false)
+  const [showResolveForm, setShowResolveForm] = useState(false)
   const [showAssignForm, setShowAssignForm] = useState(false)
   const [isRefiningRejection, setIsRefiningRejection] = useState(false)
   const [isRefiningResolution, setIsRefiningResolution] = useState(false)
@@ -149,6 +151,12 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
     if (!userInfo) return fallback || ''
     return `${userInfo.nombre} ${userInfo.apellido} · ${roleLabel(userInfo.rol)} · ${providerLabel(userInfo.authProvider)}`
   }
+
+  useEffect(() => {
+    if (incident.resolucion) {
+      setResolution(incident.resolucion)
+    }
+  }, [incident.resolucion])
 
   // Cargar nombre del reportador
   useEffect(() => {
@@ -335,6 +343,24 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
        // Asumimos que si la creó, y tiene acceso a este botón, puede.
     }
     await handleAssign(user.id)
+  }
+
+  // Resolver incidencia (Técnico finaliza)
+  const handleResolve = async () => {
+    if (!resolution.trim()) return
+    setIsLoading(true)
+    try {
+      await resolveIncident(incident.id, resolution)
+      logger.info('Incident resolved', { incidentId: incident.id })
+      toast({ title: 'Incidencia resuelta', description: 'Se ha notificado al supervisor para su validación.' })
+      onClose()
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error('Error resolving incident')
+      logger.error('Error resolving incident', err)
+      toast({ variant: 'destructive', title: 'Error', description: err.message })
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   // Cerrar incidencia
@@ -719,10 +745,10 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
               </div>
             )}
 
-            {/* Formulario de cierre */}
-            {showCloseForm && (
+            {/* Formulario de resolución (Técnico) */}
+            {showResolveForm && (
               <div className="p-4 bg-muted rounded-lg space-y-4">
-                <h4 className="font-medium">Cerrar incidencia</h4>
+                <h4 className="font-medium">Resolver incidencia</h4>
                 <div className="space-y-2">
                    <div className="flex items-center justify-between">
                     <Label htmlFor="resolution">Resolución aplicada *</Label>
@@ -751,7 +777,61 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
                     id="resolution"
                     value={resolution}
                     onChange={(e) => setResolution(e.target.value)}
-                    placeholder="Describe cómo se resolvió... (o usa micrófono)"
+                    placeholder="Describe el trabajo realizado... (o usa micrófono)"
+                    rows={3}
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowResolveForm(false)}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    className="bg-green-600 hover:bg-green-700"
+                    onClick={handleResolve}
+                    disabled={isLoading || !resolution.trim()}
+                  >
+                    {isLoading ? <Spinner size="sm" /> : 'Marcar como Resuelta'}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Formulario de cierre (Admin/Supervisor) */}
+            {showCloseForm && (
+              <div className="p-4 bg-muted rounded-lg space-y-4">
+                <h4 className="font-medium">Cerrar incidencia (Validación Final)</h4>
+                <div className="space-y-2">
+                   <div className="flex items-center justify-between">
+                    <Label htmlFor="resolution">Resolución (Validar/Editar) *</Label>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleRefineResolution}
+                      disabled={isRefiningResolution || !resolution || resolution.length < 5}
+                      className="h-6 px-2 text-xs text-primary hover:text-primary hover:bg-primary/10"
+                    >
+                      {isRefiningResolution ? (
+                         <>
+                           <Spinner size="sm" />
+                           <span className="ml-2">Mejorando...</span>
+                         </>
+                      ) : (
+                        <>
+                           <Wand2 className="h-3 w-3 mr-1" />
+                           <span>Mejorar redacción</span>
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                  <SpeechTextarea
+                    id="resolution"
+                    value={resolution}
+                    onChange={(e) => setResolution(e.target.value)}
+                    placeholder="Valida o edita la resolución final..."
                     rows={3}
                   />
                 </div>
@@ -767,7 +847,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
                     onClick={handleClose}
                     disabled={isLoading || !resolution.trim()}
                   >
-                    {isLoading ? <Spinner size="sm" /> : 'Cerrar Incidencia'}
+                    {isLoading ? <Spinner size="sm" /> : 'Cerrar Definitivamente'}
                   </Button>
                 </div>
               </div>
@@ -858,15 +938,25 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
               </Button>
             )}
 
-            {/* Cierre */}
-            {(user?.id === incident.asignadoA || permissions.canValidateIncident) && 
-             (incident.status === 'confirmada' || incident.status === 'en_proceso') && (
+            {/* Resolver (Técnico) */}
+            {(user?.id === incident.asignadoA || permissions.isAdmin) && incident.status === 'en_proceso' && (
+              <Button 
+                onClick={() => setShowResolveForm(true)}
+                className="bg-green-600 hover:bg-green-700 w-full sm:w-auto"
+              >
+                <CheckCircle className="mr-2 h-4 w-4" />
+                Resolver Incidencia
+              </Button>
+            )}
+
+            {/* Cierre Definitivo (Validación Supervisor) */}
+            {permissions.canValidateIncident && incident.status === 'resuelta' && (
               <Button 
                 onClick={() => setShowCloseForm(true)}
                 className="bg-success hover:bg-success/90 w-full sm:w-auto"
               >
                 <CheckCircle className="mr-2 h-4 w-4" />
-                Cerrar Incidencia
+                Cierre Técnico (Validar)
               </Button>
             )}
 
