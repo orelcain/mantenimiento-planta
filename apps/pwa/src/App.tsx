@@ -9,6 +9,7 @@ import { HelpProvider } from '@/components/help'
 import { MachineProvider } from '@/contexts/MachineContext'
 import { initializeHierarchySystem, isHierarchyInitialized } from '@/services/hierarchyInit'
 import { Toaster } from '@/components/ui/toaster'
+import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import {
   LoginPage,
   DashboardPage,
@@ -163,8 +164,9 @@ export function App() {
       <HelpProvider>
         <BrowserRouter basename={import.meta.env.BASE_URL}>
           <Toaster />
-          <Routes>
-          {/* Public routes */}
+          <ErrorBoundary>
+            <Routes>
+              {/* Public routes */}
           <Route
             path="/login"
             element={
@@ -268,9 +270,10 @@ export function App() {
 
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </BrowserRouter>
-    </HelpProvider>
+            </Routes>
+          </ErrorBoundary>
+        </BrowserRouter>
+      </HelpProvider>
     </MachineProvider>
   )
 }
