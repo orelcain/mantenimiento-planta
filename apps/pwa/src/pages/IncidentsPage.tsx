@@ -88,15 +88,15 @@ export function IncidentsPage() {
 
   // Filtrar incidencias basado en búsqueda y filtro activo
   const canSeeAllIncidents = permissions.isAdmin || permissions.isSupervisor
-  const visibleIncidents = canSeeAllIncidents
+  const visibleIncidents = useMemo(() => canSeeAllIncidents
     ? incidents
     : incidents.filter((incident) =>
         incident.reportadoPor === user?.id ||
         incident.creadoPor === user?.id ||
         incident.asignadoA === user?.id
-      )
+      ), [canSeeAllIncidents, incidents, user?.id])
 
-  const filteredIncidents = visibleIncidents.filter((incident) => {
+  const filteredIncidents = useMemo(() => visibleIncidents.filter((incident) => {
     const matchesSearch =
       incident.titulo.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
       incident.descripcion.toLowerCase().includes(debouncedSearch.toLowerCase())
@@ -139,10 +139,10 @@ export function IncidentsPage() {
     if (activeFilter === 'criticas') return incident.prioridad === 'critica' && incident.status !== 'cerrada'
     
     return true
-  })
+  }), [visibleIncidents, debouncedSearch, selectedMapLocation, selectedReporter, activeFilter, isAdminOrSupervisor, user?.id])
 
   // Estadísticas
-  const stats = {
+  const stats = useMemo(() => ({
     total: visibleIncidents.length,
     pendientes: visibleIncidents.filter((i) => i.status === 'pendiente').length,
     confirmadas: visibleIncidents.filter((i) => i.status === 'confirmada').length,
@@ -159,7 +159,7 @@ export function IncidentsPage() {
     cerradas: visibleIncidents.filter((i) => i.status === 'cerrada').length,
     rechazadas: visibleIncidents.filter((i) => i.status === 'rechazada').length,
     criticas: visibleIncidents.filter((i) => i.prioridad === 'critica' && i.status !== 'cerrada').length,
-  }
+  }), [visibleIncidents, user?.id])
 
   useEffect(() => {
     if (!isAdminOrSupervisor) return
