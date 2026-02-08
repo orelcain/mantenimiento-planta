@@ -1,9 +1,9 @@
-import { useRef, useState, useMemo } from 'react'
+import { useRef, useState, useMemo, useCallback } from 'react'
 import { Html } from '@react-three/drei'
 import { useFrame, type ThreeEvent } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { Annotation3D, AnnotationStatus } from '@/types/models3d'
-import { CheckCircle, AlertTriangle, Info, MapPin, ImageIcon } from 'lucide-react'
+import { CheckCircle, AlertTriangle, Info, MapPin, ImageIcon, Pencil, X as XIcon } from 'lucide-react'
 
 interface AnnotationsToolProps {
   annotations: Annotation3D[]
@@ -26,15 +26,20 @@ function AnnotationPin({
   annotation, 
   onClick,
   onPhotoClick,
+  pinned,
+  onPin,
 }: { 
   annotation: Annotation3D; 
   onClick?: (annotation: Annotation3D) => void
-  onPhotoClick?: (photos: string[], index: number) => void 
+  onPhotoClick?: (photos: string[], index: number) => void
+  pinned: boolean
+  onPin: (id: string | null) => void
 }) {
   const [hovered, setHovered] = useState(false)
   const groupRef = useRef<THREE.Group>(null)
   const ringRef = useRef<THREE.Mesh>(null)
   const isResolved = annotation.status === 'resolved'
+  const showTooltip = hovered || pinned
   
   const config = isResolved ? RESOLVED_CONFIG : (PRIORITY_CONFIG[annotation.priority] ?? PRIORITY_CONFIG.medium)
   const PriorityIcon = isResolved ? CheckCircle : (PRIORITY_CONFIG[annotation.priority]?.Icon ?? Info)
@@ -75,7 +80,8 @@ function AnnotationPin({
       position={[annotation.position.x, annotation.position.y, annotation.position.z]}
       onClick={(e: ThreeEvent<MouseEvent>) => {
         e.stopPropagation()
-        onClick?.(annotation)
+        // Toggle pin: click to fix tooltip, click again to unpin
+        onPin(pinned ? null : annotation.id)
       }}
       onPointerOver={() => setHovered(true)}
       onPointerOut={() => setHovered(false)}
@@ -169,18 +175,19 @@ function AnnotationPin({
         </Html>
       )}
 
-      {/* Hover tooltip */}
-      {hovered && (
+      {/* Tooltip — hover preview or pinned interactive */}
+      {showTooltip && (
         <Html 
           position={[0, 0.78, 0]} 
           center 
           distanceFactor={8} 
           zIndexRange={[10, 0]}
-          style={{ pointerEvents: 'none', zIndex: 10 }}
+          style={{ pointerEvents: pinned ? 'auto' : 'none', zIndex: 10 }}
         >
           <div 
             className="annotation-ui bg-gray-900/90 backdrop-blur-md text-white rounded-lg shadow-2xl border border-white/10 whitespace-nowrap"
-            style={{ minWidth: 160 }}
+            style={{ minWidth: 180 }}
+            onClick={(e) => e.stopPropagation()}
           >
             {/* Header with priority color bar */}
             <div 
@@ -194,8 +201,17 @@ function AnnotationPin({
               <span className="text-xs px-1.5 py-0.5 rounded-full bg-white/10 font-medium" style={{ color: config.ring }}>
                 {isResolved ? 'Resuelta' : (PRIORITY_CONFIG[annotation.priority]?.label ?? 'Media')}
               </span>
+              {/* Close button when pinned */}
+              {pinned && (
+                <button
+                  className="ml-auto p-0.5 rounded-full hover:bg-white/20 transition-colors"
+                  onClick={(e) => { e.stopPropagation(); onPin(null) }}
+                >
+                  <XIcon size={12} />
+                </button>
+              )}
             </div>
-            {/* Title */}
+            {/* Title & description */}
             <div className="px-3 py-2">
               <p className="text-sm font-semibold leading-tight">{annotation.title}</p>
               {annotation.description && (
@@ -203,7 +219,7 @@ function AnnotationPin({
                   {annotation.description}
                 </p>
               )}
-              {/* Photo thumbnails – clickable */}
+              {/* Photo thumbnails – always clickable when pinned */}
               {(annotation.photos?.length ?? 0) > 0 && (
                 <div className="flex gap-1 mt-2" style={{ pointerEvents: 'auto' }}>
                   {annotation.photos!.slice(0, 3).map((url, i) => (
@@ -232,11 +248,25 @@ function AnnotationPin({
                 </div>
               )}
             </div>
-            {/* Footer hint */}
+            {/* Footer — edit button when pinned, hint when hovering */}
             <div className="px-3 py-1.5 bg-white/5 rounded-b-lg border-t border-white/5">
-              <p className="text-[10px] text-gray-500 flex items-center gap-1">
-                <MapPin size={9} /> Clic para editar
-              </p>
+              {pinned ? (
+                <button 
+                  className="flex items-center gap-1.5 w-full px-2 py-1 rounded text-xs font-medium bg-white/10 hover:bg-white/20 transition-colors text-white"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onPin(null)
+                    onClick?.(annotation)
+                  }}
+                >
+                  <Pencil size={11} />
+                  Editar anotación
+                </button>
+              ) : (
+                <p className="text-[10px] text-gray-500 flex items-center gap-1">
+                  <MapPin size={9} /> Clic para fijar y ver opciones
+                </p>
+              )}
             </div>
           </div>
         </Html>
@@ -246,16 +276,25 @@ function AnnotationPin({
 }
 
 export function AnnotationsTool({ annotations, onAnnotationClick, onPhotoClick, visible = true }: AnnotationsToolProps) {
+  const [pinnedId, setPinnedId] = useState<string | null>(null)
+
+  // Unpin when clicking on the 3D scene background (via group)
+  const handleBackgroundClick = useCallback(() => {
+    setPinnedId(null)
+  }, [])
+
   if (!visible) return null
 
   return (
-    <group>
+    <group onClick={handleBackgroundClick}>
       {annotations.map((ann) => (
         <AnnotationPin 
           key={ann.id} 
           annotation={ann} 
           onClick={onAnnotationClick}
           onPhotoClick={onPhotoClick}
+          pinned={pinnedId === ann.id}
+          onPin={setPinnedId}
         />
       ))}
     </group>
