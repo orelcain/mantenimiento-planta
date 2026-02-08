@@ -113,7 +113,7 @@ export function TelemetryChart({ equipmentId }: TelemetryChartProps) {
       tooltip: {
         callbacks: {
             title: (items: TooltipItem<any>[]) => {
-                if (!items.length) return ''
+                if (!items.length || !items[0]?.parsed) return ''
                 const date = new Date(items[0].parsed.x)
                 return date.toLocaleString('es-CL')
             }

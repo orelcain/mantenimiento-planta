@@ -2076,7 +2076,7 @@ function EquipmentDetailDialog({
           <TabsContent value="history">
             <div className="space-y-3">
               <div className="h-[400px] mb-4">
-                <TelemetryChart equipmentId={selectedEquipment.id} />
+                <TelemetryChart equipmentId={equipment.id} />
               </div>
 
               {incidentsLoading && (
