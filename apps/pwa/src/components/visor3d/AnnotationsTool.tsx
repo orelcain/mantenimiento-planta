@@ -1,9 +1,9 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, useMemo } from 'react'
 import { Html } from '@react-three/drei'
 import { useFrame, type ThreeEvent } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { Annotation3D, AnnotationStatus } from '@/types/models3d'
-import { CheckCircle } from 'lucide-react'
+import { CheckCircle, AlertTriangle, Info, MapPin } from 'lucide-react'
 
 interface AnnotationsToolProps {
   annotations: Annotation3D[]
@@ -11,6 +11,15 @@ interface AnnotationsToolProps {
   onUpdateStatus?: (id: string, status: AnnotationStatus) => void
   visible?: boolean
 }
+
+// Priority config
+const PRIORITY_CONFIG = {
+  high:    { color: '#ef4444', glow: '#ff6b6b', ring: '#fca5a5', label: 'Alta',  Icon: AlertTriangle },
+  medium:  { color: '#f59e0b', glow: '#fbbf24', ring: '#fde68a', label: 'Media', Icon: Info },
+  low:     { color: '#3b82f6', glow: '#60a5fa', ring: '#93c5fd', label: 'Baja',  Icon: Info },
+} as const
+
+const RESOLVED_CONFIG = { color: '#10b981', glow: '#34d399', ring: '#6ee7b7' }
 
 function AnnotationPin({ 
   annotation, 
@@ -21,26 +30,41 @@ function AnnotationPin({
 }) {
   const [hovered, setHovered] = useState(false)
   const groupRef = useRef<THREE.Group>(null)
+  const ringRef = useRef<THREE.Mesh>(null)
+  const isResolved = annotation.status === 'resolved'
   
-  // Color code by priority/status
-  const getColor = () => {
-    if (annotation.status === 'resolved') return '#10b981' // Green
-    switch (annotation.priority) {
-      case 'high': return '#ef4444' // Red
-      case 'medium': return '#f59e0b' // Amber
-      case 'low': return '#3b82f6' // Blue
-      default: return '#6366f1'
-    }
-  }
+  const config = isResolved ? RESOLVED_CONFIG : (PRIORITY_CONFIG[annotation.priority] ?? PRIORITY_CONFIG.medium)
+  const PriorityIcon = isResolved ? CheckCircle : (PRIORITY_CONFIG[annotation.priority]?.Icon ?? Info)
 
-  const baseColor = getColor()
-
-  // Float animation
+  // Smooth float + ring pulse animation
   useFrame(({ clock }) => {
+    const t = clock.getElapsedTime()
     if (groupRef.current) {
-      groupRef.current.position.y = annotation.position.y + Math.sin(clock.getElapsedTime() * 2) * 0.05
+      groupRef.current.position.y = annotation.position.y + Math.sin(t * 1.5) * 0.03
+    }
+    if (ringRef.current) {
+      const pulse = 1 + Math.sin(t * 3) * 0.15
+      ringRef.current.scale.set(pulse, pulse, pulse)
+      const mat = ringRef.current.material as THREE.MeshStandardMaterial
+      mat.opacity = 0.3 + Math.sin(t * 3) * 0.15
     }
   })
+
+  // Create pin shape (teardrop) geometry
+  const pinShapeGeom = useMemo(() => {
+    const shape = new THREE.Shape()
+    // Teardrop pin: círculo arriba, punta abajo
+    const r = 0.09
+    shape.moveTo(0, 0)  // punta inferior
+    shape.quadraticCurveTo(-r * 1.2, r * 1.5, -r, r * 2.2)
+    shape.absarc(0, r * 2.2, r, Math.PI, 0, false)
+    shape.quadraticCurveTo(r * 1.2, r * 1.5, 0, 0)
+
+    const extrudeSettings = { depth: 0.04, bevelEnabled: true, bevelThickness: 0.01, bevelSize: 0.01, bevelSegments: 4 }
+    const geom = new THREE.ExtrudeGeometry(shape, extrudeSettings)
+    geom.center()
+    return geom
+  }, [])
 
   return (
     <group 
@@ -53,44 +77,119 @@ function AnnotationPin({
       onPointerOver={() => setHovered(true)}
       onPointerOut={() => setHovered(false)}
     >
-      {/* Pin Line */}
-      <mesh position={[0, 0.25, 0]}>
-        <cylinderGeometry args={[0.005, 0.002, 0.5, 8]} />
-        <meshStandardMaterial color={baseColor} />
-      </mesh>
-
-      {/* Pin Head (Sphere) */}
-      <mesh position={[0, 0.5, 0]}>
-        <sphereGeometry args={[0.08, 16, 16]} />
+      {/* Ground ring (pulsating) */}
+      <mesh ref={ringRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.005, 0]}>
+        <ringGeometry args={[0.08, 0.12, 32]} />
         <meshStandardMaterial 
-          color={baseColor} 
-          emissive={baseColor} 
-          emissiveIntensity={hovered ? 0.6 : 0.2}
+          color={config.ring} 
+          transparent 
+          opacity={0.4} 
+          side={THREE.DoubleSide}
+          depthWrite={false}
         />
       </mesh>
 
-      {/* Floating Check Icon for resolved */}
-      {annotation.status === 'resolved' && (
-        <Html position={[0.15, 0.5, 0]} center distanceFactor={10} style={{ pointerEvents: 'none' }}>
-           <div className="bg-green-500 text-white p-0.5 rounded-full shadow-sm">
-             <CheckCircle size={12} strokeWidth={3} />
-           </div>
-        </Html>
-      )}
+      {/* Vertical stem */}
+      <mesh position={[0, 0.2, 0]}>
+        <cylinderGeometry args={[0.008, 0.004, 0.4, 8]} />
+        <meshStandardMaterial 
+          color={config.color} 
+          metalness={0.6} 
+          roughness={0.3} 
+        />
+      </mesh>
 
-      {/* Number Badge */}
-      <Html position={[0, 0.5, 0.08]} center distanceFactor={10} style={{ pointerEvents: 'none' }}>
-        <div className="text-white text-[10px] font-bold font-mono">
+      {/* Pin head (Teardrop / Marker shape) */}
+      <group position={[0, 0.5, 0]} scale={hovered ? 1.25 : 1}>
+        <mesh geometry={pinShapeGeom} rotation={[0, 0, Math.PI]}>
+          <meshStandardMaterial 
+            color={config.color} 
+            emissive={config.glow} 
+            emissiveIntensity={hovered ? 0.7 : 0.25}
+            metalness={0.3}
+            roughness={0.4}
+          />
+        </mesh>
+
+        {/* Inner white dot (like Google Maps pin center) */}
+        <mesh position={[0, 0.02, 0.03]}>
+          <circleGeometry args={[0.04, 16]} />
+          <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={0.3} />
+        </mesh>
+      </group>
+
+      {/* Number badge via Html (always visible) */}
+      <Html 
+        position={[0, 0.5, 0]} 
+        center 
+        distanceFactor={8}
+        style={{ pointerEvents: 'none', userSelect: 'none' }}
+      >
+        <div 
+          className="flex items-center justify-center rounded-full font-bold font-mono text-white shadow-lg"
+          style={{
+            width: 22,
+            height: 22,
+            fontSize: 11,
+            backgroundColor: config.color,
+            border: `2px solid ${config.ring}`,
+            boxShadow: `0 0 8px ${config.glow}80`,
+            transform: 'translateY(-2px)',
+          }}
+        >
           {annotation.number}
         </div>
       </Html>
 
-      {/* Label (Visible on Hover) */}
+      {/* Resolved check icon */}
+      {isResolved && (
+        <Html position={[0.14, 0.62, 0]} center distanceFactor={8} style={{ pointerEvents: 'none' }}>
+          <div className="bg-emerald-500 text-white p-0.5 rounded-full shadow-md ring-2 ring-emerald-300/50">
+            <CheckCircle size={11} strokeWidth={3} />
+          </div>
+        </Html>
+      )}
+
+      {/* Hover tooltip */}
       {hovered && (
-        <Html position={[0, 0.65, 0]} center distanceFactor={10} style={{ pointerEvents: 'none', zIndex: 100 }}>
-          <div className="bg-black/80 backdrop-blur-sm text-white px-3 py-1.5 rounded-md shadow-lg border border-white/20 whitespace-nowrap flex items-center gap-2">
-            <span className="font-bold">#{annotation.number}</span>
-            <span className="text-sm font-medium">{annotation.title}</span>
+        <Html 
+          position={[0, 0.78, 0]} 
+          center 
+          distanceFactor={8} 
+          style={{ pointerEvents: 'none', zIndex: 100 }}
+        >
+          <div 
+            className="annotation-ui bg-gray-900/90 backdrop-blur-md text-white rounded-lg shadow-2xl border border-white/10 whitespace-nowrap"
+            style={{ minWidth: 160 }}
+          >
+            {/* Header with priority color bar */}
+            <div 
+              className="flex items-center gap-2 px-3 py-2 rounded-t-lg border-b border-white/10"
+              style={{ backgroundColor: `${config.color}20` }}
+            >
+              <PriorityIcon size={14} style={{ color: config.color }} />
+              <span className="font-bold text-sm" style={{ color: config.color }}>
+                #{annotation.number}
+              </span>
+              <span className="text-xs px-1.5 py-0.5 rounded-full bg-white/10 font-medium" style={{ color: config.ring }}>
+                {isResolved ? 'Resuelta' : (PRIORITY_CONFIG[annotation.priority]?.label ?? 'Media')}
+              </span>
+            </div>
+            {/* Title */}
+            <div className="px-3 py-2">
+              <p className="text-sm font-semibold leading-tight">{annotation.title}</p>
+              {annotation.description && (
+                <p className="text-xs text-gray-400 mt-1 leading-snug max-w-[200px] truncate">
+                  {annotation.description}
+                </p>
+              )}
+            </div>
+            {/* Footer hint */}
+            <div className="px-3 py-1.5 bg-white/5 rounded-b-lg border-t border-white/5">
+              <p className="text-[10px] text-gray-500 flex items-center gap-1">
+                <MapPin size={9} /> Clic para editar
+              </p>
+            </div>
           </div>
         </Html>
       )}
