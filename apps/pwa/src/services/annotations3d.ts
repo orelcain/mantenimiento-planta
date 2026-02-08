@@ -69,7 +69,7 @@ export async function createAnnotation(
   // Get next number
   const q = query(colRef, orderBy('number', 'desc'))
   const snap = await getDocs(q)
-  const lastNum = snap.empty ? 0 : snap.docs[0].data().number || 0
+  const lastNum = snap.empty ? 0 : (snap.docs[0]?.data().number ?? 0)
   const number = lastNum + 1
 
   await setDoc(doc(colRef, id), {

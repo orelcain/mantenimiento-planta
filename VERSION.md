@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.43.0**
+## Versión Actual: **v2.43.1**
 
 **Fecha de lanzamiento**: 08 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,13 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.43.1 - FIX: Permisos Firebase y estabilidad (08/02/2026)
+- 🔐 **Firebase Rules verificadas**: Permisos públicos para annotations, dimensions y materialOverrides confirmados.
+- 🐛 **Fix ErrorBoundary**: Eliminado import no usado de React.
+- 🐛 **Fix annotations3d**: Corregido acceso posiblemente undefined en snap.docs.
+- 🔧 **Fix DimensionsTool**: Hooks condicionales movidos antes de early returns.
+- 🔧 **Fix regex lint**: Eliminados escapes innecesarios en regex.
 
 ### v2.43.0 - FEATURE: Anotaciones y Pines 3D (08/02/2026)
 - 📍 **Anotaciones 3D**: Nuevo sistema de "Pines" para marcar incidencias directamente sobre el modelo.
