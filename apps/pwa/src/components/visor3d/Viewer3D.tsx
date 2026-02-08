@@ -36,7 +36,10 @@ interface Viewer3DProps {
   resetKey?: number
   /** Cotas: callback al hacer click en superficie */
   onPointClick?: (point: Point3D) => void
+  /** Punto pendiente único (retrocompat) */
   pendingPoint?: Point3D | null
+  /** Puntos pendientes para mediciones multi-punto */
+  pendingPoints?: Point3D[]
   /** Pintura: modo activo + color seleccionado */
   paintMode?: boolean
   paintColor?: string | null
@@ -357,8 +360,8 @@ function findNearestEdge(
       const edges = [[i0, i1], [i1, i2], [i2, i0]]
 
       for (const [ea, eb] of edges) {
-        a.fromBufferAttribute(posAttr, ea).applyMatrix4(matrixWorld)
-        b.fromBufferAttribute(posAttr, eb).applyMatrix4(matrixWorld)
+        a.fromBufferAttribute(posAttr, ea!).applyMatrix4(matrixWorld)
+        b.fromBufferAttribute(posAttr, eb!).applyMatrix4(matrixWorld)
 
         // Punto más cercano en el segmento
         const closest = closestPointOnSegment(hitPoint, a, b)
@@ -382,8 +385,8 @@ function findNearestEdge(
       const edges = [[base, base + 1], [base + 1, base + 2], [base + 2, base]]
 
       for (const [ea, eb] of edges) {
-        a.fromBufferAttribute(posAttr, ea).applyMatrix4(matrixWorld)
-        b.fromBufferAttribute(posAttr, eb).applyMatrix4(matrixWorld)
+        a.fromBufferAttribute(posAttr, ea!).applyMatrix4(matrixWorld)
+        b.fromBufferAttribute(posAttr, eb!).applyMatrix4(matrixWorld)
 
         const closest = closestPointOnSegment(hitPoint, a, b)
         const closestScreen = closest.clone().project(camera)
@@ -451,7 +454,6 @@ function ClickHandler({ onPointClick }: { onPointClick: (point: Point3D) => void
   // Snap indicator state
   const snapIndicatorRef = useRef<THREE.Group>(null!)
   const snapSphereRef = useRef<THREE.Mesh>(null!)
-  const snapLineRef = useRef<THREE.Line>(null!)
   const currentSnap = useRef<SnapResult | null>(null)
 
   // Perform raycast + snap on mouse move → show indicator
@@ -707,7 +709,7 @@ class ErrorBoundary3D extends Component<{ children: ReactNode; onError: (msg: st
 // ============================================================================
 
 function SceneContent(props: Viewer3DProps) {
-  const { url, format, resetKey, onPointClick, pendingPoint, paintMode, paintColor, paintErase, materialOverrides, onMeshPainted, children } = props
+  const { url, format, resetKey, onPointClick, pendingPoint, pendingPoints, paintMode, paintColor, paintErase, materialOverrides, onMeshPainted, children } = props
   const [modelInfo, setModelInfo] = useState<ModelInfo | null>(null)
   const [hasError, setHasError] = useState(false)
 
@@ -740,7 +742,8 @@ function SceneContent(props: Viewer3DProps) {
       {onPointClick && !paintMode && <ClickHandler onPointClick={onPointClick} />}
       {paintMode && onMeshPainted && <PaintClickHandler paintColor={paintColor ?? null} paintErase={paintErase ?? false} onMeshPainted={onMeshPainted} />}
 
-      {pendingPoint && <PendingPointMarker point={pendingPoint} />}
+      {pendingPoint && !pendingPoints?.length && <PendingPointMarker point={pendingPoint} />}
+      {pendingPoints && pendingPoints.map((p, i) => <PendingPointMarker key={i} point={p} />)}
 
       {/* Model */}
       <Suspense fallback={<InCanvasLoader />}>

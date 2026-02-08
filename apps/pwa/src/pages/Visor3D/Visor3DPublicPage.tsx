@@ -24,6 +24,9 @@ import {
   Paintbrush,
   Trash2,
   X,
+  Circle,
+  SquareDashed,
+  PenTool,
 } from 'lucide-react'
 import {
   Button,
@@ -32,12 +35,26 @@ import {
   Badge,
 } from '@/components/ui'
 import { getModel3DById } from '@/services/models3d'
-import { subscribeToDimensions, createDimension, deleteDimension, calculateDistance, convertUnit } from '@/services/dimensions'
+import {
+  subscribeToDimensions,
+  createDimension,
+  deleteDimension,
+  calculateDistance,
+  convertUnit,
+  calculatePolygonArea,
+  calculateCircleFrom3Points,
+  calculateBoxVolume,
+  convertAreaUnit,
+  convertVolumeUnit,
+  getRequiredPoints,
+  formatMeasurement,
+} from '@/services/dimensions'
 import { subscribeToMaterialOverrides, setMaterialOverride, deleteMaterialOverride, deleteAllMaterialOverrides } from '@/services/materials3d'
 import { Viewer3D } from '@/components/visor3d/Viewer3D'
 import { DimensionsTool } from '@/components/visor3d/DimensionsTool'
 import { ColorPalette } from '@/components/visor3d/ColorPalette'
-import type { Model3D, MaterialOverride, Dimension3D, DimensionUnit, Point3D } from '@/types/models3d'
+import type { Model3D, MaterialOverride, Dimension3D, DimensionUnit, Point3D, MeasurementType } from '@/types/models3d'
+import { getUnitSuffix } from '@/types/models3d'
 
 /** ID anónimo para vista pública */
 const PUBLIC_USER_ID = 'public-viewer'
@@ -54,7 +71,8 @@ export function Visor3DPublicPage() {
   const [showDimensions, setShowDimensions] = useState(true)
   const [creatingDimension, setCreatingDimension] = useState(false)
   const [selectedUnit, setSelectedUnit] = useState<DimensionUnit>('cm')
-  const [pendingPoint, setPendingPoint] = useState<Point3D | null>(null)
+  const [pendingPoints, setPendingPoints] = useState<Point3D[]>([])
+  const [measurementType, setMeasurementType] = useState<MeasurementType>('distance')
 
   // Paint state
   const [paintMode, setPaintMode] = useState(false)
@@ -116,26 +134,94 @@ export function Visor3DPublicPage() {
     async (point: Point3D) => {
       if (!creatingDimension || !modelId) return
 
-      if (!pendingPoint) {
-        setPendingPoint(point)
-      } else {
-        const distance = calculateDistance(pendingPoint, point)
-        const length = convertUnit(distance, selectedUnit)
+      const newPoints = [...pendingPoints, point]
+      const required = getRequiredPoints(measurementType)
 
+      // For area: accumulate, don't auto-close (needs manual close)
+      if (required === 'multi') {
+        setPendingPoints(newPoints)
+        return
+      }
+
+      // Not enough points yet
+      if (newPoints.length < required) {
+        setPendingPoints(newPoints)
+        return
+      }
+
+      // We have enough points — create the dimension
+      if (measurementType === 'distance') {
+        const distance = calculateDistance(newPoints[0]!, newPoints[1]!)
+        const length = convertUnit(distance, selectedUnit)
         await createDimension(modelId, {
-          p1: pendingPoint,
-          p2: point,
+          type: 'distance',
+          points: newPoints,
+          p1: newPoints[0]!,
+          p2: newPoints[1]!,
+          value: length,
           length,
           unit: selectedUnit,
           createdBy: PUBLIC_USER_ID,
         })
-
-        setPendingPoint(null)
-        setCreatingDimension(false)
+      } else if (measurementType === 'circumference') {
+        const circle = calculateCircleFrom3Points(newPoints[0]!, newPoints[1]!, newPoints[2]!)
+        if (!circle) {
+          setPendingPoints([])
+          return
+        }
+        const radiusConverted = convertUnit(circle.radius, selectedUnit)
+        const circumference = 2 * Math.PI * radiusConverted
+        await createDimension(modelId, {
+          type: 'circumference',
+          points: newPoints,
+          p1: newPoints[0]!,
+          p2: newPoints[2]!,
+          value: circumference,
+          length: circumference,
+          unit: selectedUnit,
+          radius: radiusConverted,
+          diameter: radiusConverted * 2,
+          createdBy: PUBLIC_USER_ID,
+        })
+      } else if (measurementType === 'volume') {
+        const vol = calculateBoxVolume(newPoints[0]!, newPoints[1]!)
+        const volConverted = convertVolumeUnit(vol, selectedUnit)
+        await createDimension(modelId, {
+          type: 'volume',
+          points: newPoints,
+          p1: newPoints[0]!,
+          p2: newPoints[1]!,
+          value: volConverted,
+          length: volConverted,
+          unit: selectedUnit,
+          createdBy: PUBLIC_USER_ID,
+        })
       }
+
+      setPendingPoints([])
+      setCreatingDimension(false)
     },
-    [creatingDimension, pendingPoint, modelId, selectedUnit]
+    [creatingDimension, pendingPoints, modelId, selectedUnit, measurementType]
   )
+
+  // Close area polygon manually
+  const handleClosePolygon = useCallback(async () => {
+    if (!modelId || pendingPoints.length < 3) return
+    const area = calculatePolygonArea(pendingPoints)
+    const areaConverted = convertAreaUnit(area, selectedUnit)
+    await createDimension(modelId, {
+      type: 'area',
+      points: pendingPoints,
+      p1: pendingPoints[0]!,
+      p2: pendingPoints[pendingPoints.length - 1]!,
+      value: areaConverted,
+      length: areaConverted,
+      unit: selectedUnit,
+      createdBy: PUBLIC_USER_ID,
+    })
+    setPendingPoints([])
+    setCreatingDimension(false)
+  }, [modelId, pendingPoints, selectedUnit])
 
   // Handle paint mesh
   const handleMeshPainted = useCallback(
@@ -181,7 +267,7 @@ export function Visor3DPublicPage() {
     } else {
       setPaintMode(true)
       setCreatingDimension(false)
-      setPendingPoint(null)
+      setPendingPoints([])
     }
   }, [paintMode])
 
@@ -189,9 +275,10 @@ export function Visor3DPublicPage() {
   const toggleDimensionCreation = useCallback(() => {
     if (creatingDimension) {
       setCreatingDimension(false)
-      setPendingPoint(null)
+      setPendingPoints([])
     } else {
       setCreatingDimension(true)
+      setPendingPoints([])
       setPaintMode(false)
       setPaintColor(null)
       setPaintErase(false)
@@ -310,34 +397,76 @@ export function Visor3DPublicPage() {
 
       {/* Dimension creation indicator */}
       {creatingDimension && (
-        <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-500/10 border-b border-blue-500/30 shrink-0">
-          <Ruler className="h-4 w-4 text-blue-400 shrink-0" />
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium text-blue-400">
-              {pendingPoint ? 'Clic en el 2do punto' : 'Clic en el 1er punto del modelo'}
-            </p>
-            <p className="text-[10px] text-muted-foreground">
-              <span className="text-green-400">●</span> vértice &nbsp;
-              <span className="text-blue-400">●</span> arista &nbsp;
-              <span className="text-gray-400">●</span> superficie
-            </p>
-          </div>
-          <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
-            {(['mm', 'cm', 'm'] as DimensionUnit[]).map((u) => (
+        <div className="flex flex-col gap-1 px-3 py-1.5 bg-blue-500/10 border-b border-blue-500/30 shrink-0">
+          {/* Measurement type selector */}
+          <div className="flex items-center gap-1 flex-wrap">
+            {([
+              { type: 'distance' as MeasurementType, icon: <Ruler className="h-3 w-3" />, label: '📏 Distancia' },
+              { type: 'area' as MeasurementType, icon: <PenTool className="h-3 w-3" />, label: '📐 Área' },
+              { type: 'circumference' as MeasurementType, icon: <Circle className="h-3 w-3" />, label: '⭕ Circunf.' },
+              { type: 'volume' as MeasurementType, icon: <SquareDashed className="h-3 w-3" />, label: '📦 Volumen' },
+            ]).map(({ type, label }) => (
               <button
-                key={u}
-                className={`px-1.5 py-0.5 rounded ${selectedUnit === u ? 'bg-blue-500 text-white' : 'hover:bg-muted'}`}
-                onClick={() => setSelectedUnit(u)}
+                key={type}
+                className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                  measurementType === type
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-muted/50 text-muted-foreground hover:bg-muted'
+                }`}
+                onClick={() => { setMeasurementType(type); setPendingPoints([]) }}
               >
-                {u}
+                {label}
               </button>
             ))}
           </div>
-          {pendingPoint && (
-            <Button variant="ghost" size="sm" className="h-6 text-[10px] px-2" onClick={() => setPendingPoint(null)}>
-              Deshacer
-            </Button>
-          )}
+          {/* Instructions + unit + undo */}
+          <div className="flex items-center gap-2">
+            <Ruler className="h-4 w-4 text-blue-400 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-blue-400">
+                {measurementType === 'distance' && (pendingPoints.length === 0 ? 'Clic en el 1er punto' : 'Clic en el 2do punto')}
+                {measurementType === 'area' && (pendingPoints.length < 3 ? `Clic punto ${pendingPoints.length + 1} (mín. 3)` : `${pendingPoints.length} puntos — clic más o cerrar`)}
+                {measurementType === 'circumference' && `Clic punto ${pendingPoints.length + 1} de 3`}
+                {measurementType === 'volume' && (pendingPoints.length === 0 ? 'Clic en esquina 1' : 'Clic en esquina opuesta')}
+              </p>
+              <p className="text-[10px] text-muted-foreground">
+                <span className="text-green-400">●</span> vértice &nbsp;
+                <span className="text-blue-400">●</span> arista &nbsp;
+                <span className="text-gray-400">●</span> superficie
+              </p>
+            </div>
+            <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+              {(['mm', 'cm', 'm'] as DimensionUnit[]).map((u) => (
+                <button
+                  key={u}
+                  className={`px-1.5 py-0.5 rounded ${selectedUnit === u ? 'bg-blue-500 text-white' : 'hover:bg-muted'}`}
+                  onClick={() => setSelectedUnit(u)}
+                >
+                  {u}
+                </button>
+              ))}
+            </div>
+            {pendingPoints.length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 text-[10px] px-2"
+                onClick={() => setPendingPoints(pendingPoints.slice(0, -1))}
+              >
+                Deshacer
+              </Button>
+            )}
+            {measurementType === 'area' && pendingPoints.length >= 3 && (
+              <Button
+                variant="default"
+                size="sm"
+                className="h-6 text-[10px] px-2 bg-green-600 hover:bg-green-700"
+                onClick={handleClosePolygon}
+              >
+                Cerrar polígono
+              </Button>
+            )}
+          </div>
         </div>
       )}
 
@@ -348,14 +477,15 @@ export function Visor3DPublicPage() {
           format={model.format}
           resetKey={resetKey}
           onPointClick={creatingDimension ? handleModelClick : undefined}
-          pendingPoint={pendingPoint}
+          pendingPoint={pendingPoints.length === 1 ? pendingPoints[0] : null}
+          pendingPoints={pendingPoints}
           paintMode={paintMode}
           paintColor={paintColor}
           paintErase={paintErase}
           materialOverrides={materialOverrides}
           onMeshPainted={handleMeshPainted}
         >
-          {showDimensions && <DimensionsTool dimensions={dimensions} />}
+          {showDimensions && <DimensionsTool dimensions={dimensions} pendingPoints={pendingPoints} />}
         </Viewer3D>
 
         {/* Color palette overlay */}
@@ -378,32 +508,39 @@ export function Visor3DPublicPage() {
           <div className="px-3 py-1.5">
             <h3 className="text-[10px] font-medium text-muted-foreground mb-1 flex items-center gap-1">
               <Ruler className="h-3 w-3" />
-              Cotas ({dimensions.length})
+              Mediciones ({dimensions.length})
             </h3>
             <div className="space-y-0.5">
-              {dimensions.map((dim) => (
-                <div
-                  key={dim.id}
-                  className="flex items-center justify-between py-1 px-1.5 rounded hover:bg-muted/50 text-xs"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono font-medium text-[11px]">
-                      {dim.length.toFixed(1)} {dim.unit}
-                    </span>
-                    {dim.label && (
-                      <span className="text-muted-foreground text-[10px]">{dim.label}</span>
-                    )}
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-5 w-5 p-0 text-destructive hover:text-destructive"
-                    onClick={() => handleDeleteDimension(dim.id)}
+              {dimensions.map((dim) => {
+                const typeIcon = dim.type === 'area' ? '📐' : dim.type === 'circumference' ? '⭕' : dim.type === 'volume' ? '📦' : '📏'
+                const suffix = getUnitSuffix(dim.unit, dim.type)
+                return (
+                  <div
+                    key={dim.id}
+                    className="flex items-center justify-between py-1 px-1.5 rounded hover:bg-muted/50 text-xs"
                   >
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
-                </div>
-              ))}
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px]">{typeIcon}</span>
+                      <span className="font-mono font-medium text-[11px]">
+                        {dim.type === 'circumference' && dim.diameter
+                          ? `⌀${dim.diameter.toFixed(1)} ${suffix}`
+                          : formatMeasurement(dim.value, dim.unit, dim.type)}
+                      </span>
+                      {dim.label && (
+                        <span className="text-muted-foreground text-[10px]">{dim.label}</span>
+                      )}
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-5 w-5 p-0 text-destructive hover:text-destructive"
+                      onClick={() => handleDeleteDimension(dim.id)}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                )
+              })}
             </div>
           </div>
         </div>

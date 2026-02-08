@@ -8,6 +8,30 @@ export type Model3DFormat = 'glb' | 'gltf' | 'obj' | 'fbx'
 /** Unidad de medida para cotas */
 export type DimensionUnit = 'mm' | 'cm' | 'm'
 
+/** Tipo de medición */
+export type MeasurementType = 'distance' | 'area' | 'circumference' | 'volume'
+
+/** Etiquetas de medición para UI */
+export const MEASUREMENT_LABELS: Record<MeasurementType, string> = {
+  distance: 'Distancia',
+  area: 'Área',
+  circumference: 'Circunferencia',
+  volume: 'Volumen',
+}
+
+/** Íconos/sufijos de unidad según tipo */
+export function getUnitSuffix(unit: DimensionUnit, type: MeasurementType): string {
+  switch (type) {
+    case 'distance':
+    case 'circumference':
+      return unit
+    case 'area':
+      return `${unit}²`
+    case 'volume':
+      return `${unit}³`
+  }
+}
+
 /** Punto 3D */
 export interface Point3D {
   x: number
@@ -49,27 +73,43 @@ export interface CreateModel3DData {
 /** Cota / dimensión asociada a un modelo 3D */
 export interface Dimension3D {
   id: string
-  /** Punto de inicio */
+  /** Tipo de medición (default: 'distance' para retrocompatibilidad) */
+  type: MeasurementType
+  /** Todos los puntos de la medición */
+  points: Point3D[]
+  /** Punto de inicio (retrocompat) */
   p1: Point3D
-  /** Punto final */
+  /** Punto final (retrocompat) */
   p2: Point3D
-  /** Longitud calculada */
+  /** Valor principal calculado (longitud, área, circunferencia, o volumen) */
+  value: number
+  /** Longitud calculada (alias de value para retrocompat) */
   length: number
   /** Unidad de medida */
   unit: DimensionUnit
   /** Etiqueta opcional */
   label: string
+  /** Para circunferencias: radio */
+  radius?: number
+  /** Para circunferencias: diámetro */
+  diameter?: number
   createdAt: Date
   createdBy: string
 }
 
 /** Datos para crear una cota */
 export interface CreateDimensionData {
+  type?: MeasurementType
+  points?: Point3D[]
   p1: Point3D
   p2: Point3D
+  /** Valor principal de la medición */
+  value?: number
   length: number
   unit: DimensionUnit
   label?: string
+  radius?: number
+  diameter?: number
   createdBy: string
 }
 

@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.41.1**
+## Versión Actual: **v2.42.0**
 
 **Fecha de lanzamiento**: 08 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,16 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.42.0 - FEATURE: Sistema de Mediciones Avanzado (08/02/2026)
+- 📏 **Distancia**: Medición lineal entre 2 puntos (existente, mejorado).
+- 📐 **Área (m²)**: Polígono de 3+ puntos con relleno semitransparente verde, cierre manual.
+- ⭕ **Circunferencia**: Círculo circunscrito por 3 puntos, muestra diámetro y circunferencia.
+- 📦 **Volumen (m³)**: Bounding box entre 2 esquinas diagonales, wireframe rojo.
+- 📏 **Selector de unidades**: mm / cm / m con sufijos automáticos (², ³).
+- 🎨 **UI**: Selector de tipo de medición, botón "Cerrar polígono", deshacer punto.
+- 🔄 **Retrocompat**: Cotas existentes (distance) siguen funcionando sin cambios.
+- 🛠️ **Fix**: Corregidos 52 errores de TypeScript strict mode.
 
 ### v2.48.34 - BUGFIX: Resolución de Incidencias (07/02/2026)
 - 🐛 **FIX CRÍTICO**: Corregido error al resolver incidencias ("Unsupported field value: undefined").
