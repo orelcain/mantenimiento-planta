@@ -41,6 +41,55 @@ export type SensorReadingRow = SensorReading & {
   id: string
 }
 
+// Obtener historial de lecturas (limitado para gráficas)
+export async function fetchSensorHistory(
+  equipmentId: string,
+  startTs: number,
+  endTs: number
+): Promise<SensorReading[]> {
+  try {
+    const dbRef = ref(rtdb, `sensors/${equipmentId}/history`)
+    // Obtener los datos dentro del rango, asumiendo que el key es el timestamp o que hay un índice por timestamp
+    // Si no tienes indice por timestamp, y usas push key, esto puede ser complejo.
+    // Asumiremos que se guardan con timestamp como key o que hay un campo timestamp.
+    // Para simplificar y dado que esto es demo, consultamos los últimos X y filtramos en cliente si no hay estructura óptima.
+    
+    // Mejor aproximación si usamos push IDs: orderByChild('timestamp').startAt(startTs).endAt(endTs)
+    // Asegurarse de tener reglas de índice en Firebase Realtime Database: ".indexOn": ["timestamp"]
+    
+    const q = query(
+      dbRef,
+      orderByChild('timestamp'),
+      startAt(startTs),
+      endAt(endTs),
+      limitToLast(500) // Limite de seguridad
+    )
+
+    const snapshot = await get(q)
+    if (!snapshot.exists()) return []
+
+    const results: SensorReading[] = []
+    snapshot.forEach((child) => {
+      const val = child.val()
+      if (val && typeof val.timestamp === 'number') {
+        results.push({
+            timestamp: val.timestamp, // Ya debe venir corregido/absoluto desde backend IoT
+            temperature: typeof val.temperature === 'number' ? val.temperature : 0,
+            humidity: typeof val.humidity === 'number' ? val.humidity : 0,
+            tempStatus: val.tempStatus,
+            humStatus: val.humStatus,
+            source: val.source
+        })
+      }
+    })
+
+    return results.sort((a, b) => a.timestamp - b.timestamp)
+  } catch (error) {
+    console.warn('Error fetching sensor history:', error)
+    return []
+  }
+}
+
 const TS_WRAP_MOD = 2 ** 32
 
 function unwrapWrappedMs(tsWrappedMs: number, nowMs: number): number {

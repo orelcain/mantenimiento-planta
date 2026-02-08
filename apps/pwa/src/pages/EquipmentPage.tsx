@@ -59,6 +59,7 @@ import { debounce, formatRelativeTime, generateId } from '@/lib/utils'
 import { logger } from '@/lib/logger'
 import { usePermissions } from '@/hooks/usePermissions'
 import { PhotoAnnotationEditor } from '@/components/PhotoAnnotationEditor'
+import { TelemetryChart } from '@/components/equipment/TelemetryChart'
 import type { Equipment, Incident } from '@/types'
 
 const ITEMS_PER_PAGE = 12
