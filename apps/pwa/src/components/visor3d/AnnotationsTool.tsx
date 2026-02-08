@@ -24,6 +24,12 @@ const RESOLVED_CONFIG = { color: '#10b981', glow: '#34d399', ring: '#6ee7b7' }
 
 const DESC_TRUNCATE_LEN = 60
 
+/** Check if description needs truncation (>2 visual lines or long text) */
+function needsTruncation(text: string): boolean {
+  const lines = text.split('\n')
+  return lines.length > 2 || text.length > DESC_TRUNCATE_LEN
+}
+
 function AnnotationPin({ 
   annotation, 
   onClick,
@@ -231,12 +237,16 @@ function AnnotationPin({
               <p className="text-sm font-semibold leading-tight">{annotation.title}</p>
               {annotation.description && (
                 <div className="mt-1 max-w-[220px]">
-                  <p className="text-xs text-gray-400 leading-snug whitespace-normal">
-                    {descExpanded || annotation.description.length <= DESC_TRUNCATE_LEN
-                      ? annotation.description
-                      : `${annotation.description.slice(0, DESC_TRUNCATE_LEN)}…`}
-                  </p>
-                  {annotation.description.length > DESC_TRUNCATE_LEN && (
+                  {descExpanded || !needsTruncation(annotation.description) ? (
+                    <p className="text-xs text-gray-400 leading-snug whitespace-pre-wrap">
+                      {annotation.description}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-gray-400 leading-snug whitespace-pre-wrap line-clamp-2">
+                      {annotation.description}
+                    </p>
+                  )}
+                  {needsTruncation(annotation.description) && (
                     <button
                       className="text-[10px] text-blue-400 hover:text-blue-300 mt-0.5 font-medium"
                       onClick={(e) => { e.stopPropagation(); setDescExpanded(!descExpanded) }}

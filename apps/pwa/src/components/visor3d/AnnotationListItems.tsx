@@ -8,6 +8,12 @@ import { ChevronDown, ChevronUp } from 'lucide-react'
 
 const DESC_LIMIT = 80
 
+/** Check if description needs truncation (>2 visual lines or long text) */
+function needsTruncation(text: string): boolean {
+  const lines = text.split('\n')
+  return lines.length > 2 || text.length > DESC_LIMIT
+}
+
 const PRIORITY_COLORS: Record<string, string> = {
   high: 'text-red-500',
   medium: 'text-amber-500',
@@ -38,7 +44,7 @@ export function AnnotationListItems({ annotations, onFocus, compact }: Props) {
       {annotations.map((ann) => {
         const color = PRIORITY_COLORS[ann.priority] ?? 'text-amber-500'
         const isExpanded = expandedId === ann.id
-        const hasLongDesc = (ann.description?.length ?? 0) > DESC_LIMIT
+        const hasLongDesc = needsTruncation(ann.description ?? '')
 
         return (
           <div key={ann.id} className="rounded hover:bg-muted/50 transition-colors">
@@ -84,25 +90,23 @@ export function AnnotationListItems({ annotations, onFocus, compact }: Props) {
               </div>
             </div>
 
-            {/* Description — collapsed by default, expandable */}
+            {/* Description — collapsed shows max 2 lines, expandable */}
             {ann.description && (
-              <div className={`px-2 pb-1.5 ${!isExpanded && !hasLongDesc ? '' : ''}`}>
+              <div className="px-2 pb-1.5">
                 {isExpanded ? (
                   <p className="text-[11px] text-muted-foreground leading-snug whitespace-pre-wrap pl-5">
                     {ann.description}
                   </p>
                 ) : (
                   <p
-                    className="text-[11px] text-muted-foreground leading-snug truncate pl-5 cursor-pointer"
+                    className="text-[11px] text-muted-foreground leading-snug whitespace-pre-wrap line-clamp-2 pl-5 cursor-pointer"
                     onClick={(e) => {
                       e.stopPropagation()
-                      setExpandedId(ann.id)
+                      if (hasLongDesc) setExpandedId(ann.id)
                     }}
-                    title="Clic para ver completo"
+                    title={hasLongDesc ? 'Clic para ver completo' : undefined}
                   >
-                    {ann.description.length > DESC_LIMIT
-                      ? `${ann.description.slice(0, DESC_LIMIT)}…`
-                      : ann.description}
+                    {ann.description}
                   </p>
                 )}
                 {hasLongDesc && (
