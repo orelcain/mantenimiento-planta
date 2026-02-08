@@ -591,7 +591,7 @@ export function Visor3DViewerPage() {
         }`}
       >
         <Viewer3D
-          url={model.storagePath}
+          url={model.downloadURL}
           format={model.format}
           resetKey={resetKey}
           onPointClick={handleModelClick}
