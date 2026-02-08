@@ -341,7 +341,7 @@ export function Visor3DViewerPage() {
         })
       } else {
         // Borrar override
-        const overrideId = meshId.replace(/[\/\.#\[\]]/g, '_')
+        const overrideId = meshId.replace(/[/#[\]]/g, '_').replace(/\./g, '_')
         await deleteMaterialOverride(modelId, overrideId).catch(() => {})
       }
     },

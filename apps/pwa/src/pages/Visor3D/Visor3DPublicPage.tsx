@@ -235,7 +235,7 @@ export function Visor3DPublicPage() {
           createdBy: PUBLIC_USER_ID,
         })
       } else {
-        const overrideId = meshId.replace(/[\/\.#\[\]]/g, '_')
+        const overrideId = meshId.replace(/[/#[\]]/g, '_').replace(/\./g, '_')
         await deleteMaterialOverride(modelId, overrideId).catch(() => {})
       }
     },
