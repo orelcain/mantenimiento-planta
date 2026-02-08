@@ -96,6 +96,9 @@ export function Visor3DPublicPage() {
   const [resetKey, setResetKey] = useState(0)
   const containerRef = useRef<HTMLDivElement>(null)
 
+  // Focus camera on point
+  const [focusPoint, setFocusPoint] = useState<Point3D | null>(null)
+
   // Cargar modelo (sin auth)
   useEffect(() => {
     if (!modelId) return
@@ -520,6 +523,7 @@ export function Visor3DPublicPage() {
             setLightboxPhotos(photos)
             setLightboxIndex(idx)
           }}
+          focusPoint={focusPoint}
         >
           {showDimensions && <DimensionsTool dimensions={dimensions} pendingPoints={pendingPoints} measurementType={measurementType} />}
         </Viewer3D>
@@ -538,46 +542,100 @@ export function Visor3DPublicPage() {
         )}
       </div>
 
-      {/* Panel de cotas (colapsable en la parte inferior) */}
-      {showDimensions && dimensions.length > 0 && (
-        <div className="border-t bg-card shrink-0 max-h-32 overflow-y-auto">
+      {/* Panel de cotas + anotaciones (colapsable en la parte inferior) */}
+      {((showDimensions && dimensions.length > 0) || annotations.length > 0) && (
+        <div className="border-t bg-card shrink-0 max-h-40 overflow-y-auto">
           <div className="px-3 py-1.5">
-            <h3 className="text-[10px] font-medium text-muted-foreground mb-1 flex items-center gap-1">
-              <Ruler className="h-3 w-3" />
-              Mediciones ({dimensions.length})
-            </h3>
-            <div className="space-y-0.5">
-              {dimensions.map((dim) => {
-                const typeIcon = dim.type === 'area' ? '📐' : dim.type === 'circumference' ? '⭕' : dim.type === 'volume' ? '📦' : '📏'
-                const suffix = getUnitSuffix(dim.unit, dim.type)
-                return (
-                  <div
-                    key={dim.id}
-                    className="flex items-center justify-between py-1 px-1.5 rounded hover:bg-muted/50 text-xs"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px]">{typeIcon}</span>
-                      <span className="font-mono font-medium text-[11px]">
-                        {dim.type === 'circumference' && dim.diameter
-                          ? `⌀${dim.diameter.toFixed(1)} ${suffix}`
-                          : formatMeasurement(dim.value, dim.unit, dim.type)}
-                      </span>
-                      {dim.label && (
-                        <span className="text-muted-foreground text-[10px]">{dim.label}</span>
-                      )}
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-5 w-5 p-0 text-destructive hover:text-destructive"
-                      onClick={() => handleDeleteDimension(dim.id)}
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </div>
-                )
-              })}
-            </div>
+            {/* Cotas */}
+            {showDimensions && dimensions.length > 0 && (
+              <>
+                <h3 className="text-[10px] font-medium text-muted-foreground mb-1 flex items-center gap-1">
+                  <Ruler className="h-3 w-3" />
+                  Mediciones ({dimensions.length})
+                </h3>
+                <div className="space-y-0.5 mb-2">
+                  {dimensions.map((dim) => {
+                    const typeIcon = dim.type === 'area' ? '📐' : dim.type === 'circumference' ? '⭕' : dim.type === 'volume' ? '📦' : '📏'
+                    const suffix = getUnitSuffix(dim.unit, dim.type)
+                    const center = dim.points.reduce(
+                      (acc, p) => ({ x: acc.x + p.x / dim.points.length, y: acc.y + p.y / dim.points.length, z: acc.z + p.z / dim.points.length }),
+                      { x: 0, y: 0, z: 0 }
+                    )
+                    return (
+                      <div
+                        key={dim.id}
+                        className="flex items-center justify-between py-1 px-1.5 rounded hover:bg-muted/50 text-xs cursor-pointer transition-colors"
+                        onClick={() => setFocusPoint({ ...center })}
+                        title="Clic para enfocar"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px]">{typeIcon}</span>
+                          <span className="font-mono font-medium text-[11px]">
+                            {dim.type === 'circumference' && dim.diameter
+                              ? `⌀${dim.diameter.toFixed(1)} ${suffix}`
+                              : formatMeasurement(dim.value, dim.unit, dim.type)}
+                          </span>
+                          {dim.label && (
+                            <span className="text-muted-foreground text-[10px]">{dim.label}</span>
+                          )}
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-5 w-5 p-0 text-destructive hover:text-destructive"
+                          onClick={(e) => { e.stopPropagation(); handleDeleteDimension(dim.id) }}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    )
+                  })}
+                </div>
+              </>
+            )}
+
+            {/* Anotaciones */}
+            {annotations.length > 0 && (
+              <>
+                {showDimensions && dimensions.length > 0 && (
+                  <div className="border-t my-1" />
+                )}
+                <h3 className="text-[10px] font-medium text-muted-foreground mb-1 flex items-center gap-1">
+                  <MapPin className="h-3 w-3" />
+                  Anotaciones ({annotations.length})
+                </h3>
+                <div className="space-y-0.5">
+                  {annotations.map((ann) => {
+                    const priorityColors: Record<string, string> = {
+                      high: 'text-red-500',
+                      medium: 'text-amber-500',
+                      low: 'text-blue-500',
+                    }
+                    return (
+                      <div
+                        key={ann.id}
+                        className="flex items-center justify-between py-1 px-1.5 rounded hover:bg-muted/50 text-xs cursor-pointer transition-colors"
+                        onClick={() => setFocusPoint({ ...ann.position })}
+                        title="Clic para enfocar"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className={`font-bold ${priorityColors[ann.priority] ?? 'text-amber-500'}`}>
+                            #{ann.number}
+                          </span>
+                          <span className="truncate max-w-[120px] font-medium text-[11px]">{ann.title}</span>
+                          {ann.status === 'resolved' && (
+                            <span className="text-emerald-500 text-[10px]">✓</span>
+                          )}
+                        </div>
+                        <span className={`text-[10px] ${priorityColors[ann.priority] ?? 'text-amber-500'}`}>
+                          {ann.status === 'resolved' ? '✓' : ann.priority === 'high' ? 'Alta' : ann.priority === 'low' ? 'Baja' : 'Media'}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

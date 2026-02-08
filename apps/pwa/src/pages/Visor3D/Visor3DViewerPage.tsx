@@ -112,6 +112,9 @@ export function Visor3DViewerPage() {
   const [copied, setCopied] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
+  // Focus camera on point
+  const [focusPoint, setFocusPoint] = useState<import('@/types/models3d').Point3D | null>(null)
+
   // Viewer reset trigger
   const [resetKey, setResetKey] = useState(0)
 
@@ -690,6 +693,7 @@ export function Visor3DViewerPage() {
             setLightboxPhotos(photos)
             setLightboxIndex(idx)
           }}
+          focusPoint={focusPoint}
           onAddAnnotation={handleAddAnnotationPoint}
         >
           {showDimensions && (
@@ -917,51 +921,114 @@ export function Visor3DViewerPage() {
         )}
       </div>
 
-      {/* Dimensions panel */}
-      {showDimensions && dimensions.length > 0 && (
+      {/* Dimensions & Annotations panel */}
+      {(showDimensions && dimensions.length > 0) || annotations.length > 0 ? (
         <Card>
-          <CardContent className="py-3">
-            <h3 className="text-sm font-medium mb-2 flex items-center gap-2">
-              <Ruler className="h-4 w-4" />
-              Mediciones ({dimensions.length})
-            </h3>
-            <div className="space-y-1">
-              {dimensions.map((dim) => {
-                const typeIcon = dim.type === 'area' ? '📐' : dim.type === 'circumference' ? '⭕' : dim.type === 'volume' ? '📦' : '📏'
-                const suffix = getUnitSuffix(dim.unit, dim.type)
-                return (
-                  <div
-                    key={dim.id}
-                    className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-muted/50 text-xs"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="text-sm">{typeIcon}</span>
-                      <span className="font-mono font-medium">
-                        {dim.type === 'circumference' && dim.diameter
-                          ? `⌀${dim.diameter.toFixed(1)} ${suffix}`
-                          : formatMeasurement(dim.value, dim.unit, dim.type)}
-                      </span>
-                      {dim.label && (
-                        <span className="text-muted-foreground">{dim.label}</span>
-                      )}
-                    </div>
-                    {isAdmin && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 w-6 p-0 text-destructive hover:text-destructive"
-                        onClick={() => handleDeleteDimension(dim.id)}
+          <CardContent className="py-3 max-h-48 overflow-y-auto">
+            {/* Cotas section */}
+            {showDimensions && dimensions.length > 0 && (
+              <>
+                <h3 className="text-sm font-medium mb-2 flex items-center gap-2">
+                  <Ruler className="h-4 w-4" />
+                  Mediciones ({dimensions.length})
+                </h3>
+                <div className="space-y-1 mb-3">
+                  {dimensions.map((dim) => {
+                    const typeIcon = dim.type === 'area' ? '📐' : dim.type === 'circumference' ? '⭕' : dim.type === 'volume' ? '📦' : '📏'
+                    const suffix = getUnitSuffix(dim.unit, dim.type)
+                    // Calculate center of all points for focus
+                    const center = dim.points.reduce(
+                      (acc, p) => ({ x: acc.x + p.x / dim.points.length, y: acc.y + p.y / dim.points.length, z: acc.z + p.z / dim.points.length }),
+                      { x: 0, y: 0, z: 0 }
+                    )
+                    return (
+                      <div
+                        key={dim.id}
+                        className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-muted/50 text-xs cursor-pointer transition-colors"
+                        onClick={() => setFocusPoint({ ...center })}
+                        title="Clic para enfocar"
                       >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm">{typeIcon}</span>
+                          <span className="font-mono font-medium">
+                            {dim.type === 'circumference' && dim.diameter
+                              ? `⌀${dim.diameter.toFixed(1)} ${suffix}`
+                              : formatMeasurement(dim.value, dim.unit, dim.type)}
+                          </span>
+                          {dim.label && (
+                            <span className="text-muted-foreground">{dim.label}</span>
+                          )}
+                        </div>
+                        {isAdmin && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                            onClick={(e) => { e.stopPropagation(); handleDeleteDimension(dim.id) }}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </>
+            )}
+
+            {/* Anotaciones section */}
+            {annotations.length > 0 && (
+              <>
+                {showDimensions && dimensions.length > 0 && (
+                  <div className="border-t my-2" />
+                )}
+                <h3 className="text-sm font-medium mb-2 flex items-center gap-2">
+                  <MapPin className="h-4 w-4" />
+                  Anotaciones ({annotations.length})
+                </h3>
+                <div className="space-y-1">
+                  {annotations.map((ann) => {
+                    const priorityColors: Record<string, string> = {
+                      high: 'text-red-500',
+                      medium: 'text-amber-500',
+                      low: 'text-blue-500',
+                    }
+                    const priorityLabels: Record<string, string> = {
+                      high: 'Alta',
+                      medium: 'Media',
+                      low: 'Baja',
+                    }
+                    return (
+                      <div
+                        key={ann.id}
+                        className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-muted/50 text-xs cursor-pointer transition-colors"
+                        onClick={() => setFocusPoint({ ...ann.position })}
+                        title="Clic para enfocar"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className={`font-bold ${priorityColors[ann.priority] ?? 'text-amber-500'}`}>
+                            #{ann.number}
+                          </span>
+                          <span className="truncate max-w-[140px] font-medium">{ann.title}</span>
+                          {ann.status === 'resolved' && (
+                            <span className="text-emerald-500 text-[10px]">✓</span>
+                          )}
+                          {(ann.photos?.length ?? 0) > 0 && (
+                            <span className="text-muted-foreground text-[10px]">📷{ann.photos!.length}</span>
+                          )}
+                        </div>
+                        <span className={`text-[10px] ${priorityColors[ann.priority] ?? 'text-amber-500'}`}>
+                          {ann.status === 'resolved' ? 'Resuelta' : (priorityLabels[ann.priority] ?? 'Media')}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
-      )}
+      ) : null}
 
       {/* QR Dialog */}
       <Dialog open={qrOpen} onOpenChange={setQrOpen}>

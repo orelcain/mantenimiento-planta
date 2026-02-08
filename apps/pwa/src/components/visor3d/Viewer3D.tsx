@@ -63,6 +63,8 @@ interface Viewer3DProps {
   onAnnotationClick?: (annotation: Annotation3D) => void
   /** Callback al hacer click en una foto de anotación */
   onPhotoClick?: (photos: string[], index: number) => void
+  /** Punto al que enfocar la cámara (zoom-to-focus) */
+  focusPoint?: Point3D | null
   children?: ReactNode
 }
 
@@ -213,6 +215,68 @@ function AutoFitCamera({ modelInfo, resetKey }: { modelInfo: ModelInfo | null; r
       ctrl.update()
     }
   }, [modelInfo, camera, controls, resetKey])
+
+  return null
+}
+
+// ============================================================================
+// Focus Camera — smooth zoom to a specific point
+// ============================================================================
+
+function FocusCamera({ target }: { target: Point3D | null | undefined }) {
+  const { camera, controls } = useThree()
+  const animating = useRef(false)
+  const startTime = useRef(0)
+  const startPos = useRef(new THREE.Vector3())
+  const startTarget = useRef(new THREE.Vector3())
+  const endPos = useRef(new THREE.Vector3())
+  const endTarget = useRef(new THREE.Vector3())
+  const prevTarget = useRef<string>('')
+
+  useEffect(() => {
+    if (!target) return
+    const key = `${target.x},${target.y},${target.z}`
+    if (key === prevTarget.current) return
+    prevTarget.current = key
+
+    const dest = new THREE.Vector3(target.x, target.y, target.z)
+    // Calculate camera position: offset from target based on current view direction
+    const dir = new THREE.Vector3().subVectors(camera.position, (controls && 'target' in controls) 
+      ? (controls as unknown as { target: THREE.Vector3 }).target 
+      : new THREE.Vector3()
+    ).normalize()
+    // Place camera 1.5 units away from point
+    const distance = 1.5
+    const camDest = dest.clone().add(dir.multiplyScalar(distance))
+
+    startPos.current.copy(camera.position)
+    startTarget.current.copy(
+      (controls && 'target' in controls)
+        ? (controls as unknown as { target: THREE.Vector3 }).target
+        : new THREE.Vector3()
+    )
+    endPos.current.copy(camDest)
+    endTarget.current.copy(dest)
+    startTime.current = performance.now()
+    animating.current = true
+  }, [target, camera, controls])
+
+  useFrame(() => {
+    if (!animating.current) return
+    const elapsed = (performance.now() - startTime.current) / 800 // 800ms animation
+    const t = Math.min(1, elapsed)
+    // Ease-out cubic
+    const ease = 1 - Math.pow(1 - t, 3)
+
+    camera.position.lerpVectors(startPos.current, endPos.current, ease)
+    if (controls && 'target' in controls) {
+      const ctrl = controls as unknown as { target: THREE.Vector3; update: () => void }
+      ctrl.target.lerpVectors(startTarget.current, endTarget.current, ease)
+      ctrl.update()
+    }
+
+    if (t >= 1) animating.current = false
+  })
 
   return null
 }
@@ -784,6 +848,7 @@ function SceneContent(props: Viewer3DProps) {
     url, format, resetKey, onPointClick, pendingPoints, measurementType, onClosePolygon, 
     paintMode, paintColor, paintErase, materialOverrides, onMeshPainted,
     annotations, annotationMode, onAddAnnotation, onAnnotationClick, onPhotoClick,
+    focusPoint,
     children 
   } = props
   const [modelInfo, setModelInfo] = useState<ModelInfo | null>(null)
@@ -825,6 +890,7 @@ function SceneContent(props: Viewer3DProps) {
       />
 
       <AutoFitCamera modelInfo={modelInfo} resetKey={resetKey ?? 0} />
+      <FocusCamera target={focusPoint} />
 
       {/* Click handlers - Priority: Paint > Annotation > Measure */}
       {paintMode && onMeshPainted ? (

@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.44.1' as const
+export const APP_VERSION = '2.44.2' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-02-08' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Tooltip fijable, lightbox y QR con anotaciones' as const
+export const VERSION_NAME = 'Panel lista cotas+notas con zoom-to-focus' as const
 
 /**
  * Nota:
