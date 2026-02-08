@@ -43,7 +43,7 @@ import {
   convertUnit,
   calculatePolygonArea,
   calculateCircleFrom3Points,
-  calculateBoxVolume,
+  calculateOrientedBoxVolume,
   convertAreaUnit,
   convertVolumeUnit,
   getRequiredPoints,
@@ -184,13 +184,13 @@ export function Visor3DPublicPage() {
           createdBy: PUBLIC_USER_ID,
         })
       } else if (measurementType === 'volume') {
-        const vol = calculateBoxVolume(newPoints[0]!, newPoints[1]!)
-        const volConverted = convertVolumeUnit(vol, selectedUnit)
+        const result = calculateOrientedBoxVolume(newPoints[0]!, newPoints[1]!, newPoints[2]!, newPoints[3]!)
+        const volConverted = convertVolumeUnit(result.volume, selectedUnit)
         await createDimension(modelId, {
           type: 'volume',
           points: newPoints,
           p1: newPoints[0]!,
-          p2: newPoints[1]!,
+          p2: newPoints[3]!,
           value: volConverted,
           length: volConverted,
           unit: selectedUnit,
@@ -427,7 +427,7 @@ export function Visor3DPublicPage() {
                 {measurementType === 'distance' && (pendingPoints.length === 0 ? 'Clic en el 1er punto' : 'Clic en el 2do punto')}
                 {measurementType === 'area' && (pendingPoints.length < 3 ? `Clic punto ${pendingPoints.length + 1} (mín. 3)` : `${pendingPoints.length} puntos — clic más o cerrar`)}
                 {measurementType === 'circumference' && `Clic punto ${pendingPoints.length + 1} de 3`}
-                {measurementType === 'volume' && (pendingPoints.length === 0 ? 'Clic en esquina 1' : 'Clic en esquina opuesta')}
+                {measurementType === 'volume' && `Clic punto ${pendingPoints.length + 1} de 4 — ${['esquina origen', 'fin arista largo', 'fin arista ancho', 'fin arista alto'][pendingPoints.length] ?? ''}`}
               </p>
               <p className="text-[10px] text-muted-foreground">
                 <span className="text-green-400">●</span> vértice &nbsp;

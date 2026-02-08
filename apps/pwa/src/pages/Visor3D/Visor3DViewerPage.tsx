@@ -41,7 +41,7 @@ import {
 } from '@/components/ui'
 import { useIsAdmin, useAuthStore } from '@/store'
 import { getModel3DById } from '@/services/models3d'
-import { subscribeToDimensions, createDimension, deleteDimension, calculateDistance, convertUnit, calculatePolygonArea, calculateCircleFrom3Points, calculateBoxVolume, convertAreaUnit, convertVolumeUnit, getRequiredPoints, formatMeasurement } from '@/services/dimensions'
+import { subscribeToDimensions, createDimension, deleteDimension, calculateDistance, convertUnit, calculatePolygonArea, calculateCircleFrom3Points, calculateOrientedBoxVolume, convertAreaUnit, convertVolumeUnit, getRequiredPoints, formatMeasurement } from '@/services/dimensions'
 import { subscribeToMaterialOverrides, setMaterialOverride, deleteMaterialOverride, deleteAllMaterialOverrides } from '@/services/materials3d'
 import { Viewer3D } from '@/components/visor3d/Viewer3D'
 import { DimensionsTool } from '@/components/visor3d/DimensionsTool'
@@ -199,13 +199,13 @@ export function Visor3DViewerPage() {
           createdBy: user.id,
         })
       } else if (measurementType === 'volume') {
-        const vol = calculateBoxVolume(newPoints[0]!, newPoints[1]!)
-        const volConverted = convertVolumeUnit(vol, selectedUnit)
+        const result = calculateOrientedBoxVolume(newPoints[0]!, newPoints[1]!, newPoints[2]!, newPoints[3]!)
+        const volConverted = convertVolumeUnit(result.volume, selectedUnit)
         await createDimension(modelId, {
           type: 'volume',
           points: newPoints,
           p1: newPoints[0]!,
-          p2: newPoints[1]!,
+          p2: newPoints[3]!,
           value: volConverted,
           length: volConverted,
           unit: selectedUnit,
@@ -458,7 +458,7 @@ export function Visor3DViewerPage() {
                 {measurementType === 'distance' && (pendingPoints.length === 0 ? 'Clic en el 1er punto' : 'Clic en el 2do punto')}
                 {measurementType === 'area' && (pendingPoints.length < 3 ? `Clic punto ${pendingPoints.length + 1} (mín. 3)` : `${pendingPoints.length} puntos — clic más o cerrar polígono`)}
                 {measurementType === 'circumference' && `Clic punto ${pendingPoints.length + 1} de 3`}
-                {measurementType === 'volume' && (pendingPoints.length === 0 ? 'Clic en esquina 1 del box' : 'Clic en esquina opuesta')}
+                {measurementType === 'volume' && `Clic punto ${pendingPoints.length + 1} de 4 — ${['esquina origen', 'fin arista largo', 'fin arista ancho', 'fin arista alto'][pendingPoints.length] ?? ''}`}
               </p>
               <p className="text-xs text-muted-foreground">
                 Snap: <span className="text-green-400">●</span> vértice &nbsp;

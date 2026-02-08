@@ -216,24 +216,113 @@ function CircumferenceLine({ dim }: { dim: Dimension3D }) {
 }
 
 // ============================================================================
-// Volume Box
+// Volume Box (4-point oriented parallelepiped, 2-point legacy fallback)
 // ============================================================================
 
 function VolumeBox({ dim }: { dim: Dimension3D }) {
-  const boxData = useMemo(() => {
-    const p1 = dim.p1
-    const p2 = dim.p2
-    const cx = (p1.x + p2.x) / 2
-    const cy = (p1.y + p2.y) / 2
-    const cz = (p1.z + p2.z) / 2
-    const sx = Math.abs(p2.x - p1.x)
-    const sy = Math.abs(p2.y - p1.y)
-    const sz = Math.abs(p2.z - p1.z)
-    return {
-      position: [cx, cy, cz] as [number, number, number],
-      size: [sx, sy, sz] as [number, number, number],
+  const pts = dim.points
+  const is4pt = pts.length >= 4
+
+  // 4-point parallelepiped: edges from P1 to P2, P3, P4
+  const edges = useMemo(() => {
+    if (!is4pt) return null
+    const o = pts[0]!
+    const a = pts[1]!
+    const b = pts[2]!
+    const c = pts[3]!
+    // 3 edge vectors from origin
+    const va = new THREE.Vector3(a.x - o.x, a.y - o.y, a.z - o.z)
+    const vb = new THREE.Vector3(b.x - o.x, b.y - o.y, b.z - o.z)
+    const vc = new THREE.Vector3(c.x - o.x, c.y - o.y, c.z - o.z)
+    const origin = new THREE.Vector3(o.x, o.y, o.z)
+    return { origin, va, vb, vc }
+  }, [pts, is4pt])
+
+  // 8 vertices of the parallelepiped
+  const vertices = useMemo(() => {
+    if (!edges) return null
+    const { origin: O, va, vb, vc } = edges
+    return [
+      O.clone(),                                               // 0: origin
+      O.clone().add(va),                                       // 1: +a
+      O.clone().add(vb),                                       // 2: +b
+      O.clone().add(vc),                                       // 3: +c
+      O.clone().add(va).add(vb),                               // 4: +a+b
+      O.clone().add(va).add(vc),                               // 5: +a+c
+      O.clone().add(vb).add(vc),                               // 6: +b+c
+      O.clone().add(va).add(vb).add(vc),                       // 7: +a+b+c
+    ]
+  }, [edges])
+
+  // 12 edges of the parallelepiped as line pairs
+  const edgeLines = useMemo(() => {
+    if (!vertices) return []
+    const pairs: [number, number][] = [
+      [0, 1], [0, 2], [0, 3],       // from origin
+      [1, 4], [1, 5],               // from +a
+      [2, 4], [2, 6],               // from +b
+      [3, 5], [3, 6],               // from +c
+      [4, 7], [5, 7], [6, 7],       // to +a+b+c
+    ]
+    return pairs.map(([i, j]) => [
+      [vertices[i]!.x, vertices[i]!.y, vertices[i]!.z] as [number, number, number],
+      [vertices[j]!.x, vertices[j]!.y, vertices[j]!.z] as [number, number, number],
+    ])
+  }, [vertices])
+
+  // Translucent faces (6 quads = 12 triangles)
+  const faceGeom = useMemo(() => {
+    if (!vertices) return null
+    const geom = new THREE.BufferGeometry()
+    const v = vertices
+    // Each face: 2 triangles (6 faces)
+    const faceIndices = [
+      [0, 1, 4, 2],  // bottom (a-b plane)
+      [3, 5, 7, 6],  // top (a-b plane + c)
+      [0, 1, 5, 3],  // front (a-c plane)
+      [2, 4, 7, 6],  // back (a-c plane + b)
+      [0, 2, 6, 3],  // left (b-c plane)
+      [1, 4, 7, 5],  // right (b-c plane + a)
+    ]
+    const positions: number[] = []
+    for (const face of faceIndices) {
+      const va = v[face[0]!]!, vb = v[face[1]!]!, vc = v[face[2]!]!, vd = v[face[3]!]!
+      // Triangle 1: a, b, c
+      positions.push(va.x, va.y, va.z, vb.x, vb.y, vb.z, vc.x, vc.y, vc.z)
+      // Triangle 2: a, c, d
+      positions.push(va.x, va.y, va.z, vc.x, vc.y, vc.z, vd.x, vd.y, vd.z)
     }
-  }, [dim])
+    geom.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+    geom.computeVertexNormals()
+    return geom
+  }, [vertices])
+
+  // Center for label
+  const center = useMemo(() => {
+    if (vertices) {
+      const c = vertices[7]!.clone().add(vertices[0]!).multiplyScalar(0.5)
+      return [c.x, c.y, c.z] as [number, number, number]
+    }
+    // Legacy 2-point center
+    return [
+      (dim.p1.x + dim.p2.x) / 2,
+      (dim.p1.y + dim.p2.y) / 2,
+      (dim.p1.z + dim.p2.z) / 2,
+    ] as [number, number, number]
+  }, [vertices, dim.p1, dim.p2])
+
+  // Legacy 2-point box data
+  const legacyBox = useMemo(() => {
+    if (is4pt) return null
+    return {
+      position: center,
+      size: [
+        Math.abs(dim.p2.x - dim.p1.x),
+        Math.abs(dim.p2.y - dim.p1.y),
+        Math.abs(dim.p2.z - dim.p1.z),
+      ] as [number, number, number],
+    }
+  }, [is4pt, dim.p1, dim.p2, center])
 
   const suffix = getUnitSuffix(dim.unit, 'volume')
   const text = dim.label
@@ -242,23 +331,49 @@ function VolumeBox({ dim }: { dim: Dimension3D }) {
 
   return (
     <group userData={{ isDimensionHelper: true }}>
-      <mesh position={boxData.position}>
-        <boxGeometry args={boxData.size} />
-        <meshStandardMaterial
-          color="#ef4444"
-          transparent
-          opacity={0.1}
-          side={THREE.DoubleSide}
-          depthWrite={false}
-        />
-      </mesh>
-      <lineSegments position={boxData.position}>
-        <edgesGeometry args={[new THREE.BoxGeometry(...boxData.size)]} />
-        <lineBasicMaterial color="#ef4444" />
-      </lineSegments>
-      <NumberedPoint position={[dim.p1.x, dim.p1.y, dim.p1.z]} index={1} color="#ef4444" />
-      <NumberedPoint position={[dim.p2.x, dim.p2.y, dim.p2.z]} index={2} color="#ef4444" />
-      <DimensionLabel position={boxData.position} text={text} color="#ef4444" />
+      {/* 4-point oriented parallelepiped */}
+      {is4pt && faceGeom && (
+        <>
+          <mesh geometry={faceGeom}>
+            <meshStandardMaterial
+              color="#ef4444"
+              transparent
+              opacity={0.1}
+              side={THREE.DoubleSide}
+              depthWrite={false}
+            />
+          </mesh>
+          {edgeLines.map((pair, i) => (
+            <Line key={i} points={pair} color="#ef4444" lineWidth={1.5} />
+          ))}
+        </>
+      )}
+
+      {/* Legacy 2-point axis-aligned box */}
+      {!is4pt && legacyBox && (
+        <>
+          <mesh position={legacyBox.position}>
+            <boxGeometry args={legacyBox.size} />
+            <meshStandardMaterial
+              color="#ef4444"
+              transparent
+              opacity={0.1}
+              side={THREE.DoubleSide}
+              depthWrite={false}
+            />
+          </mesh>
+          <lineSegments position={legacyBox.position}>
+            <edgesGeometry args={[new THREE.BoxGeometry(...legacyBox.size)]} />
+            <lineBasicMaterial color="#ef4444" />
+          </lineSegments>
+        </>
+      )}
+
+      {/* Numbered points */}
+      {pts.map((p, i) => (
+        <NumberedPoint key={i} position={[p.x, p.y, p.z]} index={i + 1} color="#ef4444" />
+      ))}
+      <DimensionLabel position={center} text={text} color="#ef4444" />
     </group>
   )
 }

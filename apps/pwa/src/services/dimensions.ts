@@ -188,10 +188,53 @@ function dot3(a: Point3D, b: Point3D): number {
 }
 
 /**
- * Volumen del bounding box entre 2 puntos diagonales opuestos
+ * Volumen del bounding box entre 2 puntos diagonales opuestos (legacy, axis-aligned)
  */
 export function calculateBoxVolume(p1: Point3D, p2: Point3D): number {
   return Math.abs(p2.x - p1.x) * Math.abs(p2.y - p1.y) * Math.abs(p2.z - p1.z)
+}
+
+/**
+ * Volumen de un paralelepípedo orientado definido por 4 puntos.
+ * P1 es la esquina origen. P2, P3, P4 definen las 3 aristas desde P1.
+ * Usa el producto triple escalar: V = |a · (b × c)|
+ * Además retorna las 3 dimensiones ortogonalizadas (L × W × H).
+ */
+export function calculateOrientedBoxVolume(
+  p1: Point3D, p2: Point3D, p3: Point3D, p4: Point3D
+): { volume: number; dimA: number; dimB: number; dimC: number } {
+  // Vectores de las 3 aristas desde P1
+  const a = { x: p2.x - p1.x, y: p2.y - p1.y, z: p2.z - p1.z }
+  const b = { x: p3.x - p1.x, y: p3.y - p1.y, z: p3.z - p1.z }
+  const c = { x: p4.x - p1.x, y: p4.y - p1.y, z: p4.z - p1.z }
+
+  // Producto triple escalar: a · (b × c)
+  const bxc = cross(b, c)
+  const volume = Math.abs(dot3(a, bxc))
+
+  // Dimensiones ortogonalizadas (Gram-Schmidt)
+  const dimA = Math.sqrt(a.x ** 2 + a.y ** 2 + a.z ** 2)
+
+  // b ortogonalizado respecto a 'a'
+  const aLen = dimA || 1e-10
+  const aHat = { x: a.x / aLen, y: a.y / aLen, z: a.z / aLen }
+  const bDotA = dot3(b, aHat)
+  const bOrtho = { x: b.x - bDotA * aHat.x, y: b.y - bDotA * aHat.y, z: b.z - bDotA * aHat.z }
+  const dimB = Math.sqrt(bOrtho.x ** 2 + bOrtho.y ** 2 + bOrtho.z ** 2)
+
+  // c ortogonalizado respecto a 'a' y 'bOrtho'
+  const bLen = dimB || 1e-10
+  const bHat = { x: bOrtho.x / bLen, y: bOrtho.y / bLen, z: bOrtho.z / bLen }
+  const cDotA = dot3(c, aHat)
+  const cDotB = dot3(c, bHat)
+  const cOrtho = {
+    x: c.x - cDotA * aHat.x - cDotB * bHat.x,
+    y: c.y - cDotA * aHat.y - cDotB * bHat.y,
+    z: c.z - cDotA * aHat.z - cDotB * bHat.z,
+  }
+  const dimC = Math.sqrt(cOrtho.x ** 2 + cOrtho.y ** 2 + cOrtho.z ** 2)
+
+  return { volume, dimA, dimB, dimC }
 }
 
 /**
@@ -210,7 +253,7 @@ export function getRequiredPoints(type: MeasurementType): number | 'multi' {
   switch (type) {
     case 'distance': return 2
     case 'circumference': return 3
-    case 'volume': return 2
+    case 'volume': return 4
     case 'area': return 'multi' // 3+ con cierre manual
   }
 }
