@@ -23,6 +23,25 @@ export class ErrorBoundary extends Component<Props, State> {
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error("Uncaught error:", error, errorInfo);
+
+    // Auto-reload on chunk load failures (stale deploy / cache mismatch)
+    // These happen when the app references old hashed filenames after a new deploy
+    const msg = error?.message ?? ''
+    if (
+      msg.includes('Failed to fetch dynamically imported module') ||
+      msg.includes('Loading chunk') ||
+      msg.includes('Loading CSS chunk') ||
+      msg.includes('Importing a module script failed')
+    ) {
+      // Only auto-reload once per session to avoid infinite loops
+      const key = 'chunk-reload-ts'
+      const lastReload = Number(sessionStorage.getItem(key) || 0)
+      if (Date.now() - lastReload > 10_000) {
+        sessionStorage.setItem(key, String(Date.now()))
+        window.location.reload()
+        return
+      }
+    }
   }
 
   public render() {
