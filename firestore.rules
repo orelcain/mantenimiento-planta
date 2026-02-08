@@ -223,7 +223,7 @@ service cloud.firestore {
             && (!('confirmedAt' in request.resource.data) || request.resource.data.confirmedAt is timestamp)
             && (!('firmaCierre' in request.resource.data) || request.resource.data.firmaCierre is string)
             && (!('repuestosUsados' in request.resource.data) || request.resource.data.repuestosUsados is list)
-            && (!('validatedBy' in request.resource.data) || (
+            && (!('validatedBy' in request.resource.data) || request.resource.data.validatedBy == resource.data.validatedBy || (
               isSupervisor()
               && request.resource.data.validatedBy == request.auth.uid
             ))
