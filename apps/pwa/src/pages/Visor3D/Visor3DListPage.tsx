@@ -96,7 +96,7 @@ export function Visor3DListPage() {
 
   // Copiar link
   const handleCopyLink = useCallback(async (modelId: string) => {
-    const url = `${window.location.origin}/visor-3d/${modelId}`
+    const url = `${window.location.origin}/mantenimiento-planta/visor-3d/${modelId}`
     await navigator.clipboard.writeText(url)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
@@ -104,7 +104,7 @@ export function Visor3DListPage() {
 
   // Generar URL del modelo
   const getModelUrl = (modelId: string) =>
-    `${window.location.origin}/visor-3d/${modelId}`
+    `${window.location.origin}/mantenimiento-planta/visor-3d/${modelId}`
 
   return (
     <div className="space-y-6">

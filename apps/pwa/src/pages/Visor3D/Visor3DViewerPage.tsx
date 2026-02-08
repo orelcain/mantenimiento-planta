@@ -98,7 +98,7 @@ export function Visor3DViewerPage() {
   }, [modelId])
 
   // Copiar link
-  const modelUrl = `${window.location.origin}/visor-3d/${modelId}`
+  const modelUrl = `${window.location.origin}/mantenimiento-planta/visor-3d/${modelId}`
   const handleCopyLink = useCallback(async () => {
     await navigator.clipboard.writeText(modelUrl)
     setCopied(true)
