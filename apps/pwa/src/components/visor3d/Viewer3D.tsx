@@ -24,7 +24,8 @@ import {
 } from '@react-three/drei'
 import * as THREE from 'three'
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js'
-import type { Model3DFormat, Point3D, MaterialOverride } from '@/types/models3d'
+import type { Model3DFormat, Point3D, MaterialOverride, Annotation3D, AnnotationStatus } from '@/types/models3d'
+import { AnnotationsTool } from './AnnotationsTool'
 
 // ============================================================================
 // Props
@@ -52,6 +53,14 @@ interface Viewer3DProps {
   materialOverrides?: MaterialOverride[]
   /** Callback cuando se pinta una malla */
   onMeshPainted?: (meshId: string, color: string | null) => void
+  /** Anotaciones (Pines 3D) */
+  annotations?: Annotation3D[]
+  /** Modo Anotación activo */
+  annotationMode?: boolean
+  /** Callback para agregar anotación */
+  onAddAnnotation?: (point: Point3D) => void
+  /** Callback al hacer click en una anotación */
+  onAnnotationClick?: (annotation: Annotation3D) => void
   children?: ReactNode
 }
 
@@ -688,6 +697,51 @@ function PaintClickHandler({ paintColor, paintErase, onMeshPainted }: {
 }
 
 // ============================================================================
+
+// ============================================================================
+// Annotation Click Handler
+// ============================================================================
+
+function AnnotationClickHandler({ onAddAnnotation }: { onAddAnnotation: (p: Point3D) => void }) {
+  const { camera, scene, gl } = useThree()
+  const raycaster = useRef(new THREE.Raycaster())
+  const mouse = useRef(new THREE.Vector2())
+
+  const handleClick = useCallback((event: MouseEvent) => {
+    if ((event.target as HTMLElement).closest('.annotation-ui')) return // Ignorar clicks en UI html
+
+    const rect = gl.domElement.getBoundingClientRect()
+    mouse.current.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
+    mouse.current.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
+    raycaster.current.setFromCamera(mouse.current, camera)
+    
+    // Ignore invalid objects (helpers, grids, lines)
+    const hit = raycaster.current.intersectObjects(scene.children, true).find((i) => 
+      i.object instanceof THREE.Mesh && 
+      !i.object.userData.isDimensionHelper && 
+      !i.object.userData.isGrid && 
+      !i.object.userData.isSnapIndicator &&
+      !i.object.userData.isContactShadow && 
+      i.object.visible
+    )
+
+    if (hit) {
+      onAddAnnotation({ x: hit.point.x, y: hit.point.y, z: hit.point.z })
+    }
+  }, [camera, scene, gl, onAddAnnotation])
+
+  useEffect(() => {
+    gl.domElement.addEventListener('click', handleClick)
+    gl.domElement.style.cursor = 'cell' // Indicate "Add" action
+    return () => {
+      gl.domElement.removeEventListener('click', handleClick)
+      gl.domElement.style.cursor = 'default'
+    }
+  }, [gl, handleClick])
+
+  return null
+}
+
 // In-Canvas Loader
 // ============================================================================
 
@@ -724,7 +778,12 @@ class ErrorBoundary3D extends Component<{ children: ReactNode; onError: (msg: st
 // ============================================================================
 
 function SceneContent(props: Viewer3DProps) {
-  const { url, format, resetKey, onPointClick, pendingPoints, measurementType, onClosePolygon, paintMode, paintColor, paintErase, materialOverrides, onMeshPainted, children } = props
+  const { 
+    url, format, resetKey, onPointClick, pendingPoints, measurementType, onClosePolygon, 
+    paintMode, paintColor, paintErase, materialOverrides, onMeshPainted,
+    annotations, annotationMode, onAddAnnotation, onAnnotationClick,
+    children 
+  } = props
   const [modelInfo, setModelInfo] = useState<ModelInfo | null>(null)
   const [hasError, setHasError] = useState(false)
 
@@ -765,16 +824,33 @@ function SceneContent(props: Viewer3DProps) {
 
       <AutoFitCamera modelInfo={modelInfo} resetKey={resetKey ?? 0} />
 
-      {/* Click handlers */}
-      {onPointClick && !paintMode && (
+      {/* Click handlers - Priority: Paint > Annotation > Measure */}
+      {paintMode && onMeshPainted ? (
+        <PaintClickHandler 
+          paintColor={paintColor ?? null} 
+          paintErase={paintErase ?? false} 
+          onMeshPainted={onMeshPainted} 
+        />
+      ) : annotationMode && onAddAnnotation ? (
+        <AnnotationClickHandler 
+          onAddAnnotation={onAddAnnotation} 
+        />
+      ) : onPointClick ? (
         <ClickHandler
           onPointClick={onPointClick}
           pendingPoints={pendingPoints}
           measurementType={measurementType}
           onClosePolygon={onClosePolygon}
         />
+      ) : null}
+
+      {/* Annotations */}
+      {annotations && (
+        <AnnotationsTool 
+          annotations={annotations} 
+          onAnnotationClick={onAnnotationClick} 
+        />
       )}
-      {paintMode && onMeshPainted && <PaintClickHandler paintColor={paintColor ?? null} paintErase={paintErase ?? false} onMeshPainted={onMeshPainted} />}
 
       {/* Pending points are now rendered inside DimensionsTool via pendingPoints prop */}
 

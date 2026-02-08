@@ -166,3 +166,22 @@ export function detectFormat(fileName: string): Model3DFormat | null {
 
 /** Extensiones soportadas como string para input accept */
 export const ACCEPTED_EXTENSIONS = '.glb,.gltf,.obj,.fbx'
+
+/**
+ * Annotation (Pin 3D)
+ */
+export type AnnotationStatus = 'open' | 'resolved'
+export type AnnotationPriority = 'low' | 'medium' | 'high'
+
+export interface Annotation3D {
+  id: string
+  position: Point3D
+  number: number
+  title: string
+  description?: string
+  status: AnnotationStatus
+  priority: AnnotationPriority
+  createdAt: Date
+  createdBy: string
+}
+

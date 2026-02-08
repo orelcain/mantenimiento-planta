@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.42.0**
+## Versión Actual: **v2.43.0**
 
 **Fecha de lanzamiento**: 08 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,13 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.43.0 - FEATURE: Anotaciones y Pines 3D (08/02/2026)
+- 📍 **Anotaciones 3D**: Nuevo sistema de "Pines" para marcar incidencias directamente sobre el modelo.
+- 🎨 **Priorización Visual**: Código de colores para pines según prioridad (Rojo/Ámbar/Azul) o estado (Verde=Resuelta).
+- 💬 **Badges y Títulos**: Indicadores visuales y etiquetas flotantes al pasar el mouse.
+- 🛠️ **Integración en Visor**: Nuevo modo "Anotación" en la barra de herramientas.
+- 🖱️ **Interacción**: Detección precisa de clics ignorando elementos UI para colocación exacta.
 
 ### v2.42.0 - FEATURE: Sistema de Mediciones Avanzado (08/02/2026)
 - 📏 **Distancia**: Medición lineal entre 2 puntos (existente, mejorado).
