@@ -133,21 +133,27 @@ function AnnotationPin({
         </mesh>
       </group>
 
-      {/* Number badge via Html (always visible) */}
+      {/* Number badge via Html (always visible, clickable) */}
       <Html 
         position={[0, 0.5, 0]} 
         center 
         distanceFactor={8}
         zIndexRange={[10, 0]}
-        style={{ pointerEvents: 'none', userSelect: 'none' }}
+        style={{ pointerEvents: 'auto', userSelect: 'none' }}
       >
-        <div className="flex items-center gap-1">
+        <div 
+          className="flex items-center gap-1 cursor-pointer"
+          onClick={(e) => {
+            e.stopPropagation()
+            onPin(pinned ? null : annotation.id)
+          }}
+        >
           <div 
-            className="flex items-center justify-center rounded-full font-bold font-mono text-white shadow-lg"
+            className="flex items-center justify-center rounded-full font-bold font-mono text-white shadow-lg transition-transform hover:scale-125"
             style={{
-              width: 22,
-              height: 22,
-              fontSize: 11,
+              width: 26,
+              height: 26,
+              fontSize: 12,
               backgroundColor: config.color,
               border: `2px solid ${config.ring}`,
               boxShadow: `0 0 8px ${config.glow}80`,
