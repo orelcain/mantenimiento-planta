@@ -86,6 +86,12 @@ function AnnotationPin({
       onPointerOver={() => setHovered(true)}
       onPointerOut={() => setHovered(false)}
     >
+      {/* Invisible hit area — larger click target */}
+      <mesh position={[0, 0.3, 0]}>
+        <cylinderGeometry args={[0.15, 0.15, 0.7, 16]} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+      </mesh>
+
       {/* Ground ring (pulsating) */}
       <mesh ref={ringRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.005, 0]}>
         <ringGeometry args={[0.08, 0.12, 32]} />
