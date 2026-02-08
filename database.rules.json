@@ -2,16 +2,14 @@
   "rules": {
     "devices": {
       ".read": "auth != null",
-      "$deviceId": {
-        ".read": "auth != null",
-        ".write": "auth != null"
-      }
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('rol').val() == 'admin' || root.child('users').child(auth.uid).child('rol').val() == 'tecnico')"
     },
     "sensors": {
       ".read": "auth != null",
+      ".write": "auth != null",
       "$equipmentId": {
         ".read": "auth != null",
-        ".write": "auth != null"
+        ".write": "auth != null && (root.child('users').child(auth.uid).child('rol').val() == 'admin' || root.child('users').child(auth.uid).child('rol').val() == 'tecnico')"
       }
     }
   }

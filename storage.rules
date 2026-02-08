@@ -1,9 +1,9 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    // Permitir lectura pública de imágenes
+    // Permitir lectura SOLO autenticados (antes público)
     match /{allPaths=**} {
-      allow read: if true;
+      allow read: if request.auth != null;
     }
     
     // Fotos de incidencias
