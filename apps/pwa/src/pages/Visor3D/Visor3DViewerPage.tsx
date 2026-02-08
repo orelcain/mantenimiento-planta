@@ -28,6 +28,9 @@ import {
   X,
   Paintbrush,
   MapPin,
+  Camera,
+  ImageIcon,
+  Loader2 as Loader2Icon,
 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import {
@@ -49,7 +52,7 @@ import { useIsAdmin, useAuthStore } from '@/store'
 import { getModel3DById } from '@/services/models3d'
 import { subscribeToDimensions, createDimension, deleteDimension, calculateDistance, convertUnit, calculatePolygonArea, calculateCircleFrom3Points, calculateOrientedBoxVolume, convertAreaUnit, convertVolumeUnit, getRequiredPoints, formatMeasurement } from '@/services/dimensions'
 import { subscribeToMaterialOverrides, setMaterialOverride, deleteMaterialOverride, deleteAllMaterialOverrides } from '@/services/materials3d'
-import { subscribeToAnnotations, createAnnotation, updateAnnotation, deleteAnnotation } from '@/services/annotations3d'
+import { subscribeToAnnotations, createAnnotation, updateAnnotation, deleteAnnotation, uploadAnnotationPhotos } from '@/services/annotations3d'
 import { Viewer3D } from '@/components/visor3d/Viewer3D'
 import { DimensionsTool } from '@/components/visor3d/DimensionsTool'
 import { ColorPalette } from '@/components/visor3d/ColorPalette'
@@ -93,6 +96,10 @@ export function Visor3DViewerPage() {
   const [annDesc, setAnnDesc] = useState('')
   const [annPriority, setAnnPriority] = useState<AnnotationPriority>('medium')
   const [annStatus, setAnnStatus] = useState<AnnotationStatus>('open')
+  const [annPhotos, setAnnPhotos] = useState<{ file: File; preview: string }[]>([])
+  const [annExistingPhotos, setAnnExistingPhotos] = useState<string[]>([])
+  const [uploadingPhotos, setUploadingPhotos] = useState(false)
+  const photoInputRef = useRef<HTMLInputElement>(null)
 
   // UI state
   const [isFullscreen, setIsFullscreen] = useState(false)
@@ -154,6 +161,8 @@ export function Visor3DViewerPage() {
     setAnnTitle('')
     setAnnDesc('')
     setAnnPriority('medium')
+    setAnnPhotos([])
+    setAnnExistingPhotos([])
     setSelectedAnnotation(null) // New creation
     setShowAnnotationDialog(true)
   }, [])
@@ -165,6 +174,8 @@ export function Visor3DViewerPage() {
     setAnnDesc(annotation.description || '')
     setAnnPriority(annotation.priority)
     setAnnStatus(annotation.status)
+    setAnnPhotos([])
+    setAnnExistingPhotos(annotation.photos || [])
     setShowAnnotationDialog(true)
   }, [])
 
@@ -173,29 +184,56 @@ export function Visor3DViewerPage() {
     if (!modelId || !annTitle) return
     
     try {
+      setUploadingPhotos(true)
+      
       if (selectedAnnotation) {
+        // Upload new photos if any
+        let photoUrls = [...annExistingPhotos]
+        if (annPhotos.length > 0) {
+          const newUrls = await uploadAnnotationPhotos(
+            modelId, 
+            selectedAnnotation.id, 
+            annPhotos.map(p => p.file)
+          )
+          photoUrls = [...photoUrls, ...newUrls]
+        }
         // Update
         await updateAnnotation(modelId, selectedAnnotation.id, {
           title: annTitle,
           description: annDesc,
           priority: annPriority,
-          status: annStatus
+          status: annStatus,
+          photos: photoUrls,
         })
       } else if (newAnnotationPos) {
-        // Create
-        await createAnnotation(modelId, {
+        // Create annotation first
+        const annId = await createAnnotation(modelId, {
           position: newAnnotationPos,
           title: annTitle,
           description: annDesc,
           priority: annPriority,
           status: 'open',
+          photos: [],
           createdBy: user?.id || 'anonymous'
         })
+        // Then upload photos if any
+        if (annPhotos.length > 0) {
+          const urls = await uploadAnnotationPhotos(
+            modelId, 
+            annId, 
+            annPhotos.map(p => p.file)
+          )
+          await updateAnnotation(modelId, annId, { photos: urls })
+        }
       }
       setShowAnnotationDialog(false)
-      setAnnotationMode(false) // Exit mode after placement (optional)
+      setAnnotationMode(false)
+      setAnnPhotos([])
+      setAnnExistingPhotos([])
     } catch (err) {
       console.error(err)
+    } finally {
+      setUploadingPhotos(false)
     }
   }
 
@@ -704,6 +742,126 @@ export function Visor3DViewerPage() {
                   </div>
                 )}
               </div>
+
+              {/* Photos section */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium flex items-center gap-2">
+                  <Camera className="h-4 w-4" />
+                  Fotos ({annExistingPhotos.length + annPhotos.length}/5)
+                </label>
+                
+                {/* Existing photos (from Firestore) */}
+                {(annExistingPhotos.length > 0 || annPhotos.length > 0) && (
+                  <div className="flex flex-wrap gap-2">
+                    {annExistingPhotos.map((url, i) => (
+                      <div key={`existing-${i}`} className="relative group">
+                        <img 
+                          src={url} 
+                          alt={`Foto ${i + 1}`}
+                          className="w-16 h-16 object-cover rounded-lg border border-border"
+                        />
+                        <button
+                          type="button"
+                          className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={() => setAnnExistingPhotos(prev => prev.filter((_, idx) => idx !== i))}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                    {annPhotos.map((photo, i) => (
+                      <div key={`new-${i}`} className="relative group">
+                        <img 
+                          src={photo.preview} 
+                          alt={`Nueva ${i + 1}`}
+                          className="w-16 h-16 object-cover rounded-lg border-2 border-blue-500/50"
+                        />
+                        <button
+                          type="button"
+                          className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={() => setAnnPhotos(prev => prev.filter((_, idx) => idx !== i))}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                        <div className="absolute bottom-0 left-0 right-0 bg-blue-500/80 text-white text-[8px] text-center rounded-b-lg">
+                          Nueva
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Add photo buttons */}
+                {(annExistingPhotos.length + annPhotos.length) < 5 && (
+                  <div className="flex gap-2">
+                    <input
+                      ref={photoInputRef}
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      onChange={async (e) => {
+                        const files = Array.from(e.target.files || [])
+                        if (files.length === 0) return
+                        const remaining = 5 - annExistingPhotos.length - annPhotos.length
+                        const toProcess = files.slice(0, remaining)
+                        const newPhotos: { file: File; preview: string }[] = []
+                        for (const file of toProcess) {
+                          if (!file.type.startsWith('image/')) continue
+                          const preview = await new Promise<string>((resolve) => {
+                            const reader = new FileReader()
+                            reader.onloadend = () => resolve(reader.result as string)
+                            reader.readAsDataURL(file)
+                          })
+                          newPhotos.push({ file, preview })
+                        }
+                        setAnnPhotos(prev => [...prev, ...newPhotos])
+                        if (photoInputRef.current) photoInputRef.current.value = ''
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5 flex-1"
+                      onClick={() => photoInputRef.current?.click()}
+                    >
+                      <ImageIcon className="h-4 w-4" />
+                      Galería
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5 flex-1"
+                      onClick={() => {
+                        // Create camera-only input
+                        const input = document.createElement('input')
+                        input.type = 'file'
+                        input.accept = 'image/*'
+                        input.setAttribute('capture', 'environment')
+                        input.onchange = async () => {
+                          const file = input.files?.[0]
+                          if (!file) return
+                          const preview = await new Promise<string>((resolve) => {
+                            const reader = new FileReader()
+                            reader.onloadend = () => resolve(reader.result as string)
+                            reader.readAsDataURL(file)
+                          })
+                          setAnnPhotos(prev => [...prev, { file, preview }])
+                        }
+                        input.click()
+                      }}
+                    >
+                      <Camera className="h-4 w-4" />
+                      Cámara
+                    </Button>
+                  </div>
+                )}
+                <p className="text-[11px] text-muted-foreground">
+                  Las fotos se optimizan automáticamente a WebP de alta calidad.
+                </p>
+              </div>
             </div>
             <div className="flex justify-between items-center mt-4">
               {selectedAnnotation ? (
@@ -714,8 +872,15 @@ export function Visor3DViewerPage() {
               ) : (
                 <div />
               )}
-              <Button onClick={handleSubmitAnnotation} disabled={!annTitle}>
-                {selectedAnnotation ? 'Guardar Cambios' : 'Crear Anotación'}
+              <Button onClick={handleSubmitAnnotation} disabled={!annTitle || uploadingPhotos}>
+                {uploadingPhotos ? (
+                  <>
+                    <Loader2Icon className="h-4 w-4 mr-2 animate-spin" />
+                    Subiendo fotos...
+                  </>
+                ) : (
+                  selectedAnnotation ? 'Guardar Cambios' : 'Crear Anotación'
+                )}
               </Button>
             </div>
           </DialogContent>

@@ -179,6 +179,7 @@ export interface Annotation3D {
   number: number
   title: string
   description?: string
+  photos?: string[]  // URLs de fotos WebP optimizadas
   status: AnnotationStatus
   priority: AnnotationPriority
   createdAt: Date

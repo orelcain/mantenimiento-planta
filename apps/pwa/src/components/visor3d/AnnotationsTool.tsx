@@ -3,7 +3,7 @@ import { Html } from '@react-three/drei'
 import { useFrame, type ThreeEvent } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { Annotation3D, AnnotationStatus } from '@/types/models3d'
-import { CheckCircle, AlertTriangle, Info, MapPin } from 'lucide-react'
+import { CheckCircle, AlertTriangle, Info, MapPin, ImageIcon } from 'lucide-react'
 
 interface AnnotationsToolProps {
   annotations: Annotation3D[]
@@ -125,19 +125,34 @@ function AnnotationPin({
         distanceFactor={8}
         style={{ pointerEvents: 'none', userSelect: 'none' }}
       >
-        <div 
-          className="flex items-center justify-center rounded-full font-bold font-mono text-white shadow-lg"
-          style={{
-            width: 22,
-            height: 22,
-            fontSize: 11,
-            backgroundColor: config.color,
-            border: `2px solid ${config.ring}`,
-            boxShadow: `0 0 8px ${config.glow}80`,
-            transform: 'translateY(-2px)',
-          }}
-        >
-          {annotation.number}
+        <div className="flex items-center gap-1">
+          <div 
+            className="flex items-center justify-center rounded-full font-bold font-mono text-white shadow-lg"
+            style={{
+              width: 22,
+              height: 22,
+              fontSize: 11,
+              backgroundColor: config.color,
+              border: `2px solid ${config.ring}`,
+              boxShadow: `0 0 8px ${config.glow}80`,
+              transform: 'translateY(-2px)',
+            }}
+          >
+            {annotation.number}
+          </div>
+          {(annotation.photos?.length ?? 0) > 0 && (
+            <div 
+              className="flex items-center gap-0.5 rounded-full px-1 py-0.5 text-white shadow-md"
+              style={{ 
+                backgroundColor: 'rgba(0,0,0,0.7)', 
+                fontSize: 9,
+                transform: 'translateY(-2px)',
+              }}
+            >
+              <ImageIcon size={8} />
+              <span>{annotation.photos!.length}</span>
+            </div>
+          )}
         </div>
       </Html>
 
@@ -182,6 +197,24 @@ function AnnotationPin({
                 <p className="text-xs text-gray-400 mt-1 leading-snug max-w-[200px] truncate">
                   {annotation.description}
                 </p>
+              )}
+              {/* Photo thumbnails */}
+              {(annotation.photos?.length ?? 0) > 0 && (
+                <div className="flex gap-1 mt-2">
+                  {annotation.photos!.slice(0, 3).map((url, i) => (
+                    <img 
+                      key={i}
+                      src={url} 
+                      alt={`Foto ${i + 1}`}
+                      className="w-10 h-10 object-cover rounded border border-white/20"
+                    />
+                  ))}
+                  {annotation.photos!.length > 3 && (
+                    <div className="w-10 h-10 rounded border border-white/20 bg-white/10 flex items-center justify-center text-xs text-gray-300">
+                      +{annotation.photos!.length - 3}
+                    </div>
+                  )}
+                </div>
               )}
             </div>
             {/* Footer hint */}
