@@ -61,6 +61,8 @@ const MapsAdminPage = lazyWithReload(() => import('@/pages/admin/MapsAdminPage')
 const InspectionsPage = lazyWithReload(() => import('@/pages/InspectionsPage').then((mod) => ({ default: mod.InspectionsPage })))
 const ETTPage = lazyWithReload(() => import('@/pages/admin/ETTPage').then((mod) => ({ default: mod.ETTPage })))
 const PermissionsPage = lazyWithReload(() => import('@/pages/admin/PermissionsPage').then((mod) => ({ default: mod.PermissionsPage })))
+const Visor3DListPage = lazyWithReload(() => import('@/pages/Visor3D/Visor3DListPage').then((mod) => ({ default: mod.Visor3DListPage })))
+const Visor3DViewerPage = lazyWithReload(() => import('@/pages/Visor3D/Visor3DViewerPage').then((mod) => ({ default: mod.Visor3DViewerPage })))
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuthStore()
@@ -265,6 +267,16 @@ export function App() {
                   <ETTPage />
                 </Suspense>
               </AdminRoute>
+            } />
+            <Route path="visor-3d" element={
+              <Suspense fallback={<LoadingScreen />}>
+                <Visor3DListPage />
+              </Suspense>
+            } />
+            <Route path="visor-3d/:modelId" element={
+              <Suspense fallback={<LoadingScreen />}>
+                <Visor3DViewerPage />
+              </Suspense>
             } />
           </Route>
 

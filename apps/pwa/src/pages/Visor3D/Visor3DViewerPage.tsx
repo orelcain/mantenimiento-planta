@@ -1,0 +1,380 @@
+/**
+ * Visor3DViewerPage - Página de visualización de un modelo 3D
+ * 
+ * Features:
+ * - Carga y visualiza el modelo 3D con Three.js
+ * - Orbit/zoom/pan controls
+ * - Fullscreen
+ * - Copiar link / mostrar QR
+ * - Ver/crear cotas (admin)
+ */
+
+import { useEffect, useState, useCallback, useRef } from 'react'
+import { useParams, useNavigate, Link } from 'react-router-dom'
+import {
+  ArrowLeft,
+  Copy,
+  QrCode,
+  Maximize,
+  Minimize,
+  RotateCcw,
+  Ruler,
+  Trash2,
+  Check,
+  AlertCircle,
+  Box,
+  Loader2,
+  X,
+} from 'lucide-react'
+import { QRCodeSVG } from 'qrcode.react'
+import {
+  Button,
+  Card,
+  CardContent,
+  Badge,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui'
+import { useIsAdmin, useAuthStore } from '@/store'
+import { getModel3DById } from '@/services/models3d'
+import { subscribeToDimensions, createDimension, deleteDimension, calculateDistance, convertUnit } from '@/services/dimensions'
+import { Viewer3D } from '@/components/visor3d/Viewer3D'
+import { DimensionsTool } from '@/components/visor3d/DimensionsTool'
+import type { Model3D } from '@/types/models3d'
+import type { Dimension3D, DimensionUnit, Point3D } from '@/types/models3d'
+
+export function Visor3DViewerPage() {
+  const { modelId } = useParams<{ modelId: string }>()
+  const navigate = useNavigate()
+  const isAdmin = useIsAdmin()
+  const user = useAuthStore((s) => s.user)
+
+  const [model, setModel] = useState<Model3D | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  // Dimensions state
+  const [dimensions, setDimensions] = useState<Dimension3D[]>([])
+  const [showDimensions, setShowDimensions] = useState(true)
+  const [creatingDimension, setCreatingDimension] = useState(false)
+  const [selectedUnit, setSelectedUnit] = useState<DimensionUnit>('cm')
+  const [pendingPoint, setPendingPoint] = useState<Point3D | null>(null)
+
+  // UI state
+  const [isFullscreen, setIsFullscreen] = useState(false)
+  const [qrOpen, setQrOpen] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  // Viewer reset trigger
+  const [resetKey, setResetKey] = useState(0)
+
+  // Cargar modelo
+  useEffect(() => {
+    if (!modelId) return
+    setLoading(true)
+    setError(null)
+    getModel3DById(modelId)
+      .then((m) => {
+        if (!m) {
+          setError('Modelo no encontrado')
+        } else {
+          setModel(m)
+        }
+      })
+      .catch((err) => setError(`Error cargando modelo: ${(err as Error).message}`))
+      .finally(() => setLoading(false))
+  }, [modelId])
+
+  // Suscribirse a cotas
+  useEffect(() => {
+    if (!modelId) return
+    const unsub = subscribeToDimensions(modelId, (dims) => {
+      setDimensions(dims)
+    })
+    return () => unsub()
+  }, [modelId])
+
+  // Copiar link
+  const modelUrl = `${window.location.origin}/visor-3d/${modelId}`
+  const handleCopyLink = useCallback(async () => {
+    await navigator.clipboard.writeText(modelUrl)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }, [modelUrl])
+
+  // Fullscreen
+  const toggleFullscreen = useCallback(() => {
+    if (!containerRef.current) return
+    if (!document.fullscreenElement) {
+      containerRef.current.requestFullscreen().then(() => setIsFullscreen(true)).catch(() => {})
+    } else {
+      document.exitFullscreen().then(() => setIsFullscreen(false)).catch(() => {})
+    }
+  }, [])
+
+  useEffect(() => {
+    const handler = () => setIsFullscreen(!!document.fullscreenElement)
+    document.addEventListener('fullscreenchange', handler)
+    return () => document.removeEventListener('fullscreenchange', handler)
+  }, [])
+
+  // Handle click on 3D model for dimension creation
+  const handleModelClick = useCallback(
+    async (point: Point3D) => {
+      if (!creatingDimension || !modelId || !user) return
+
+      if (!pendingPoint) {
+        // Primer punto
+        setPendingPoint(point)
+      } else {
+        // Segundo punto - crear cota
+        const distance = calculateDistance(pendingPoint, point)
+        const length = convertUnit(distance, selectedUnit)
+
+        await createDimension(modelId, {
+          p1: pendingPoint,
+          p2: point,
+          length,
+          unit: selectedUnit,
+          createdBy: user.id,
+        })
+
+        setPendingPoint(null)
+        setCreatingDimension(false)
+      }
+    },
+    [creatingDimension, pendingPoint, modelId, user, selectedUnit]
+  )
+
+  // Eliminar cota
+  const handleDeleteDimension = useCallback(
+    async (dimId: string) => {
+      if (!modelId) return
+      await deleteDimension(modelId, dimId)
+    },
+    [modelId]
+  )
+
+  // Loading
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-[60vh]">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-muted-foreground">Cargando modelo...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Error
+  if (error || !model) {
+    return (
+      <div className="flex items-center justify-center h-[60vh]">
+        <Card className="max-w-md w-full">
+          <CardContent className="flex flex-col items-center gap-4 py-8">
+            <AlertCircle className="h-12 w-12 text-destructive" />
+            <h2 className="text-lg font-medium">Error</h2>
+            <p className="text-sm text-muted-foreground text-center">
+              {error || 'Modelo no encontrado'}
+            </p>
+            <Button variant="outline" onClick={() => navigate('/visor-3d')} className="gap-2">
+              <ArrowLeft className="h-4 w-4" />
+              Volver al listado
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4" ref={containerRef}>
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" asChild>
+            <Link to="/visor-3d">
+              <ArrowLeft className="h-5 w-5" />
+            </Link>
+          </Button>
+          <div>
+            <div className="flex items-center gap-2">
+              <Box className="h-5 w-5 text-primary" />
+              <h1 className="text-xl font-bold">{model.name}</h1>
+              <Badge variant="outline" className="text-xs uppercase">
+                {model.format}
+              </Badge>
+            </div>
+            <p className="text-xs text-muted-foreground ml-7">
+              {model.originalFileName}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Dimension controls */}
+          <Button
+            variant={showDimensions ? 'default' : 'outline'}
+            size="sm"
+            className="gap-1.5"
+            onClick={() => setShowDimensions(!showDimensions)}
+          >
+            <Ruler className="h-4 w-4" />
+            Cotas ({dimensions.length})
+          </Button>
+
+          {isAdmin && (
+            <Button
+              variant={creatingDimension ? 'destructive' : 'outline'}
+              size="sm"
+              className="gap-1.5"
+              onClick={() => {
+                setCreatingDimension(!creatingDimension)
+                setPendingPoint(null)
+              }}
+            >
+              {creatingDimension ? (
+                <>
+                  <X className="h-4 w-4" />
+                  Cancelar
+                </>
+              ) : (
+                <>
+                  <Ruler className="h-4 w-4" />
+                  Nueva cota
+                </>
+              )}
+            </Button>
+          )}
+
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={handleCopyLink}>
+            {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+            {copied ? 'Copiado' : 'Link'}
+          </Button>
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setQrOpen(true)}>
+            <QrCode className="h-4 w-4" />
+            QR
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            onClick={() => setResetKey((k) => k + 1)}
+          >
+            <RotateCcw className="h-4 w-4" />
+            Reset
+          </Button>
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={toggleFullscreen}>
+            {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+          </Button>
+        </div>
+      </div>
+
+      {/* Dimension creation mode indicator */}
+      {creatingDimension && (
+        <div className="flex items-center gap-3 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+          <Ruler className="h-5 w-5 text-blue-400" />
+          <div className="flex-1">
+            <p className="text-sm font-medium text-blue-400">
+              {pendingPoint ? 'Haz clic en el segundo punto' : 'Haz clic en el primer punto del modelo'}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Unidad: {selectedUnit} — 
+              <button className="underline ml-1" onClick={() => setSelectedUnit('mm')}>mm</button>{' | '}
+              <button className="underline" onClick={() => setSelectedUnit('cm')}>cm</button>{' | '}
+              <button className="underline" onClick={() => setSelectedUnit('m')}>m</button>
+            </p>
+          </div>
+          {pendingPoint && (
+            <Button variant="ghost" size="sm" onClick={() => setPendingPoint(null)}>
+              Deshacer punto
+            </Button>
+          )}
+        </div>
+      )}
+
+      {/* 3D Viewer */}
+      <div
+        className={`relative rounded-lg overflow-hidden border bg-card ${
+          isFullscreen ? 'h-screen' : 'h-[60vh] min-h-[400px]'
+        }`}
+      >
+        <Viewer3D
+          url={model.downloadURL}
+          format={model.format}
+          resetKey={resetKey}
+          onPointClick={creatingDimension ? handleModelClick : undefined}
+          pendingPoint={pendingPoint}
+        >
+          {showDimensions && (
+            <DimensionsTool dimensions={dimensions} />
+          )}
+        </Viewer3D>
+      </div>
+
+      {/* Dimensions panel */}
+      {showDimensions && dimensions.length > 0 && (
+        <Card>
+          <CardContent className="py-3">
+            <h3 className="text-sm font-medium mb-2 flex items-center gap-2">
+              <Ruler className="h-4 w-4" />
+              Cotas ({dimensions.length})
+            </h3>
+            <div className="space-y-1">
+              {dimensions.map((dim) => (
+                <div
+                  key={dim.id}
+                  className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-muted/50 text-xs"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="font-mono font-medium">
+                      {dim.length.toFixed(1)} {dim.unit}
+                    </span>
+                    {dim.label && (
+                      <span className="text-muted-foreground">{dim.label}</span>
+                    )}
+                  </div>
+                  {isAdmin && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                      onClick={() => handleDeleteDimension(dim.id)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* QR Dialog */}
+      <Dialog open={qrOpen} onOpenChange={setQrOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-center">{model.name}</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col items-center gap-4 py-4">
+            <div className="bg-white p-4 rounded-lg">
+              <QRCodeSVG value={modelUrl} size={200} level="M" includeMargin />
+            </div>
+            <p className="text-xs text-muted-foreground text-center break-all px-4">
+              {modelUrl}
+            </p>
+            <Button variant="outline" size="sm" className="gap-2" onClick={handleCopyLink}>
+              {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+              {copied ? 'Copiado' : 'Copiar link'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}

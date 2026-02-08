@@ -481,5 +481,23 @@ service cloud.firestore {
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
+
+    // ============================================
+    // MODELOS 3D - Visor 3D
+    // ============================================
+    match /models3d/{modelId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+
+      // Subcolección de cotas/dimensiones
+      match /dimensions/{dimensionId} {
+        allow read: if isAuthenticated();
+        allow create: if isAdmin();
+        allow update: if isAdmin();
+        allow delete: if isAdmin();
+      }
+    }
   }
 }

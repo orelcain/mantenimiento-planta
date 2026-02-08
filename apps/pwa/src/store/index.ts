@@ -7,3 +7,4 @@ export {
   useVisibleModules,
   useHasPermissionsOverride,
 } from './permissionsStore'
+export { useModels3DStore } from './models3dStore'
