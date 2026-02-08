@@ -1044,7 +1044,7 @@ static void sendDeviceStatus(bool online) {
   json.set("ip", WiFi.localIP().toString());
   json.set("rssi", WiFi.RSSI());
   json.set("wifiSsid", WiFi.SSID());
-  json.set("wifiPassword", WiFi.psk()); // Contraseña WiFi actual (útil para debugging/mostrar)
+  // json.set("wifiPassword", WiFi.psk()); // Excluido por seguridad
   json.set("mdns", staHostname.length() ? (staHostname + ".local") : "");
   json.set("deviceName", deviceName);
   json.set("firmwareVersion", "2.14.0");
@@ -1054,7 +1054,7 @@ static void sendDeviceStatus(bool online) {
   json.set("apAlwaysOn", apAlwaysOn);
   json.set("apSsid", WiFi.softAPSSID());
   json.set("apIp", WiFi.softAPIP().toString());
-  json.set("apPassword", apPassword); // Contraseña del AP local
+  // json.set("apPassword", apPassword); // Excluido por seguridad
 
   String path;
   path.reserve(64);
