@@ -25,7 +25,8 @@ const RESOLVED_CONFIG = { color: '#10b981', glow: '#34d399', ring: '#6ee7b7' }
 const DESC_TRUNCATE_LEN = 60
 
 /** Check if description needs truncation (>2 visual lines or long text) */
-function needsTruncation(text: string): boolean {
+function needsTruncation(text?: string | null): boolean {
+  if (!text) return false
   const lines = text.split('\n')
   return lines.length > 2 || text.length > DESC_TRUNCATE_LEN
 }

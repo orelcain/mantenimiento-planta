@@ -9,7 +9,8 @@ import { ChevronDown, ChevronUp } from 'lucide-react'
 const DESC_LIMIT = 80
 
 /** Check if description needs truncation (>2 visual lines or long text) */
-function needsTruncation(text: string): boolean {
+function needsTruncation(text?: string | null): boolean {
+  if (!text) return false
   const lines = text.split('\n')
   return lines.length > 2 || text.length > DESC_LIMIT
 }
