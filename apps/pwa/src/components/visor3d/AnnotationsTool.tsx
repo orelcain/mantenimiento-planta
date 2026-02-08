@@ -126,6 +126,7 @@ function AnnotationPin({
         position={[0, 0.5, 0]} 
         center 
         distanceFactor={8}
+        zIndexRange={[10, 0]}
         style={{ pointerEvents: 'none', userSelect: 'none' }}
       >
         <div className="flex items-center gap-1">
@@ -161,7 +162,7 @@ function AnnotationPin({
 
       {/* Resolved check icon */}
       {isResolved && (
-        <Html position={[0.14, 0.62, 0]} center distanceFactor={8} style={{ pointerEvents: 'none' }}>
+        <Html position={[0.14, 0.62, 0]} center distanceFactor={8} zIndexRange={[10, 0]} style={{ pointerEvents: 'none' }}>
           <div className="bg-emerald-500 text-white p-0.5 rounded-full shadow-md ring-2 ring-emerald-300/50">
             <CheckCircle size={11} strokeWidth={3} />
           </div>
@@ -174,7 +175,8 @@ function AnnotationPin({
           position={[0, 0.78, 0]} 
           center 
           distanceFactor={8} 
-          style={{ pointerEvents: 'none', zIndex: 100 }}
+          zIndexRange={[10, 0]}
+          style={{ pointerEvents: 'none', zIndex: 10 }}
         >
           <div 
             className="annotation-ui bg-gray-900/90 backdrop-blur-md text-white rounded-lg shadow-2xl border border-white/10 whitespace-nowrap"

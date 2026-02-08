@@ -548,7 +548,7 @@ function NumberedPoint({
 
 function DimensionLabel({ position, text, color }: { position: [number, number, number]; text: string; color: string }) {
   return (
-    <Html position={position} center distanceFactor={3} style={{ pointerEvents: 'none' }}>
+    <Html position={position} center distanceFactor={3} zIndexRange={[10, 0]} style={{ pointerEvents: 'none' }}>
       <div
         className="px-2 py-0.5 rounded text-xs font-mono whitespace-nowrap select-none"
         style={{
