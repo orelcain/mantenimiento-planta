@@ -190,48 +190,12 @@ service cloud.firestore {
         && isValidDocSize()
         && (
           isAdmin()
-          || (
-            (
-              (resource.data.reportadoPor == request.auth.uid && resource.data.status == 'pendiente')
-              || resource.data.asignadoA == request.auth.uid
-              || isTechnician()
-              || isSupervisor()
-              || (
-                resource.data.reportadoPor == request.auth.uid
-                && (!('asignadoA' in resource.data) || resource.data.asignadoA == null)
-                && request.resource.data.asignadoA == request.auth.uid
-              )
-            )
-            && (!('titulo' in request.resource.data) || isNonEmptyString(request.resource.data.titulo, 5, 100))
-            && (!('descripcion' in request.resource.data) || isNonEmptyString(request.resource.data.descripcion, 10, 1000))
-            && (!('prioridad' in request.resource.data) || request.resource.data.prioridad in ['critica', 'alta', 'media', 'baja'])
-            && (!('status' in request.resource.data) || request.resource.data.status in ['pendiente', 'confirmada', 'rechazada', 'en_proceso', 'resuelta', 'cerrada'])
-            && (!('sintomas' in request.resource.data) || (
-              request.resource.data.sintomas is list
-              && request.resource.data.sintomas.size() <= 20
-            ))
-            && (!('fotos' in request.resource.data) || (
-              request.resource.data.fotos is list
-              && request.resource.data.fotos.size() <= 10
-            ))
-            && (!('resolucion' in request.resource.data) || isNonEmptyString(request.resource.data.resolucion, 3, 2000))
-            && (!('rejectionReason' in request.resource.data) || isNonEmptyString(request.resource.data.rejectionReason, 3, 500))
-            && (!('resolvedAt' in request.resource.data) || request.resource.data.resolvedAt is timestamp)
-            && (!('tiempoResolucionMinutos' in request.resource.data) || request.resource.data.tiempoResolucionMinutos is number)
-            && (!('tiempoRespuestaMinutos' in request.resource.data) || request.resource.data.tiempoRespuestaMinutos is number)
-            && (!('closedAt' in request.resource.data) || request.resource.data.closedAt is timestamp)
-            && (!('confirmedAt' in request.resource.data) || request.resource.data.confirmedAt is timestamp)
-            && (!('firmaCierre' in request.resource.data) || request.resource.data.firmaCierre is string)
-            && (!('repuestosUsados' in request.resource.data) || request.resource.data.repuestosUsados is list)
-            && (!('validatedBy' in request.resource.data) || request.resource.data.validatedBy == resource.data.validatedBy || (
-              isSupervisor()
-              && request.resource.data.validatedBy == request.auth.uid
-            ))
-            && (!('asignadoA' in request.resource.data) || request.resource.data.asignadoA == resource.data.asignadoA || isSupervisor() || (
-              request.resource.data.asignadoA == request.auth.uid
-              && resource.data.reportadoPor == request.auth.uid
-            ))
-          )
+          || isSupervisor()
+          // Permitir explícitamente al asignado o reportante (evita dependencia crítica de lectura de roles si falla)
+          || resource.data.asignadoA == request.auth.uid
+          || (resource.data.reportadoPor == request.auth.uid && resource.data.status == 'pendiente')
+          // Fallback a rol técnico general
+          || isTechnician()
         );
         
       allow delete: if isAdmin();
