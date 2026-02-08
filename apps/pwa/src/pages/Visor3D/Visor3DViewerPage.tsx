@@ -27,6 +27,7 @@ import {
   Loader2,
   X,
   Paintbrush,
+  MapPin,
 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import {
@@ -470,6 +471,28 @@ export function Visor3DViewerPage() {
             </Button>
           )}
 
+          {/* Annotation mode toggle */}
+          {!creatingDimension && !paintMode && (
+            <Button
+              variant={annotationMode ? 'destructive' : 'outline'}
+              size="sm"
+              className="gap-1.5"
+              onClick={() => setAnnotationMode(!annotationMode)}
+            >
+              {annotationMode ? (
+                <>
+                  <X className="h-4 w-4" />
+                  Cancelar
+                </>
+              ) : (
+                <>
+                  <MapPin className="h-4 w-4" />
+                  Anotar
+                </>
+              )}
+            </Button>
+          )}
+
           {/* Paint mode toggle (admin) */}
           {isAdmin && !creatingDimension && (
             <Button
@@ -580,6 +603,20 @@ export function Visor3DViewerPage() {
                 Cerrar polígono
               </Button>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Annotation mode indicator */}
+      {annotationMode && (
+        <div className="flex flex-col gap-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+          <div className="flex items-center gap-3">
+            <MapPin className="h-5 w-5 text-amber-500 shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-amber-500">
+                Haz clic sobre el modelo para colocar una anotación
+              </p>
+            </div>
           </div>
         </div>
       )}
