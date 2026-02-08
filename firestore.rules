@@ -509,6 +509,14 @@ service cloud.firestore {
         allow update: if true;
         allow delete: if true;
       }
+
+      // Subcolección de anotaciones (Pines de interés)
+      match /annotations/{annotationId} {
+        allow read: if true;
+        allow create: if true;
+        allow update: if true;
+        allow delete: if true;
+      }
     }
   }
 }
