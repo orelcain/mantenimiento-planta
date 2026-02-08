@@ -734,7 +734,19 @@ function SceneContent(props: Viewer3DProps) {
       <gridHelper args={[40, 40, '#1e293b', '#111827']} position={[0, -0.01, 0]} userData={{ isGrid: true }} />
 
       {/* Controls */}
-      <OrbitControls makeDefault enableDamping dampingFactor={0.08} minDistance={0.05} maxDistance={500} maxPolarAngle={Math.PI * 0.95} enablePan panSpeed={1} rotateSpeed={0.8} />
+      <OrbitControls
+        makeDefault
+        enableDamping
+        dampingFactor={0.08}
+        minDistance={0.01}
+        maxDistance={500}
+        maxPolarAngle={Math.PI * 0.95}
+        enablePan
+        panSpeed={1}
+        rotateSpeed={0.8}
+        zoomSpeed={1.2}
+        zoomToCursor
+      />
 
       <AutoFitCamera modelInfo={modelInfo} resetKey={resetKey ?? 0} />
 
