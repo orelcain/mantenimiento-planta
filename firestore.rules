@@ -493,19 +493,21 @@ service cloud.firestore {
       allow delete: if isAdmin();
 
       // Subcolección de cotas/dimensiones
+      // Escritura pública para que usuarios QR puedan medir
       match /dimensions/{dimensionId} {
         allow read: if true;
-        allow create: if isAdmin();
-        allow update: if isAdmin();
-        allow delete: if isAdmin();
+        allow create: if true;
+        allow update: if true;
+        allow delete: if true;
       }
 
       // Subcolección de overrides de material (colores de pintura)
+      // Escritura pública para que usuarios QR puedan pintar
       match /materialOverrides/{overrideId} {
         allow read: if true;
-        allow create: if isAdmin();
-        allow update: if isAdmin();
-        allow delete: if isAdmin();
+        allow create: if true;
+        allow update: if true;
+        allow delete: if true;
       }
     }
   }
