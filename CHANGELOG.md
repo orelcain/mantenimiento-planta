@@ -7,6 +7,29 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.42.0] - 2026-02-08
+
+### 🚀 Nuevas Funcionalidades
+
+#### Módulo Visor 3D
+- **Nuevo módulo completo "Visor 3D"** en el sidebar con icono Box
+- **Upload de modelos 3D**: Drag & drop con validación de formato (GLB/GLTF/OBJ/FBX) y tamaño (máx 200MB), barra de progreso
+- **Visor 3D interactivo**: Three.js + React Three Fiber con OrbitControls (orbit/zoom/pan), iluminación por entorno, grid, reset de vista, fullscreen
+- **Sistema de cotas/dimensiones**: Admin crea cotas seleccionando 2 puntos en el modelo, se renderizan como líneas + etiquetas con medidas (mm/cm/m configurable)
+- **QR y link directo**: Cada modelo tiene URL estable `/visor-3d/:modelId`, generación de QR, botón copiar link
+- **Gestión de modelos**: Listado con búsqueda, card por modelo con acciones (abrir/link/QR/eliminar)
+- **Firebase Storage**: Almacenamiento en `models3d/{modelId}/{filename}`
+- **Firestore**: Colección `models3d` con metadatos + subcolección `dimensions` para cotas
+- **Reglas de seguridad**: Lectura para autenticados, escritura/borrado solo admin
+- **Code splitting**: Three.js en chunk separado para no afectar carga inicial
+
+### 🔧 Mejoras Técnicas
+- Chunk separado para Three.js (~1MB) optimizando carga de la app
+- Error handling en snapshot listeners de Firestore
+- `.firebaserc` agregado para deploy directo desde Codespace
+
+---
+
 ## [2.48.0] - 2026-02-02
 
 ### 🚀 Nuevas Funcionalidades
