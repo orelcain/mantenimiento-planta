@@ -2075,6 +2075,10 @@ function EquipmentDetailDialog({
 
           <TabsContent value="history">
             <div className="space-y-3">
+              <div className="h-[400px] mb-4">
+                <TelemetryChart equipmentId={selectedEquipment.id} />
+              </div>
+
               {incidentsLoading && (
                 <Card>
                   <CardContent className="p-4 text-sm text-muted-foreground">Cargando incidencias…</CardContent>
