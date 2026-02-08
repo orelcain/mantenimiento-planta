@@ -99,6 +99,9 @@ function AreaPolygon({ dim }: { dim: Dimension3D }) {
   if (pts.length < 3) return null
 
   const suffix = getUnitSuffix(dim.unit, 'area')
+  const text = dim.label
+    ? `${dim.label}: ${dim.value.toFixed(1)} ${suffix}`
+    : `${dim.value.toFixed(1)} ${suffix}`
 
   return (
     <group userData={{ isDimensionHelper: true }}>
