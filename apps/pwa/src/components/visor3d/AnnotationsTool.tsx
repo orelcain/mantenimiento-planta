@@ -9,6 +9,7 @@ interface AnnotationsToolProps {
   annotations: Annotation3D[]
   onAnnotationClick?: (annotation: Annotation3D) => void
   onUpdateStatus?: (id: string, status: AnnotationStatus) => void
+  onPhotoClick?: (photos: string[], index: number) => void
   visible?: boolean
 }
 
@@ -23,10 +24,12 @@ const RESOLVED_CONFIG = { color: '#10b981', glow: '#34d399', ring: '#6ee7b7' }
 
 function AnnotationPin({ 
   annotation, 
-  onClick 
+  onClick,
+  onPhotoClick,
 }: { 
   annotation: Annotation3D; 
-  onClick?: (annotation: Annotation3D) => void 
+  onClick?: (annotation: Annotation3D) => void
+  onPhotoClick?: (photos: string[], index: number) => void 
 }) {
   const [hovered, setHovered] = useState(false)
   const groupRef = useRef<THREE.Group>(null)
@@ -198,19 +201,29 @@ function AnnotationPin({
                   {annotation.description}
                 </p>
               )}
-              {/* Photo thumbnails */}
+              {/* Photo thumbnails – clickable */}
               {(annotation.photos?.length ?? 0) > 0 && (
-                <div className="flex gap-1 mt-2">
+                <div className="flex gap-1 mt-2" style={{ pointerEvents: 'auto' }}>
                   {annotation.photos!.slice(0, 3).map((url, i) => (
                     <img 
                       key={i}
                       src={url} 
                       alt={`Foto ${i + 1}`}
-                      className="w-10 h-10 object-cover rounded border border-white/20"
+                      className="w-10 h-10 object-cover rounded border border-white/20 cursor-pointer hover:ring-2 hover:ring-white/50 transition-all"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onPhotoClick?.(annotation.photos!, i)
+                      }}
                     />
                   ))}
                   {annotation.photos!.length > 3 && (
-                    <div className="w-10 h-10 rounded border border-white/20 bg-white/10 flex items-center justify-center text-xs text-gray-300">
+                    <div 
+                      className="w-10 h-10 rounded border border-white/20 bg-white/10 flex items-center justify-center text-xs text-gray-300 cursor-pointer hover:bg-white/20 transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onPhotoClick?.(annotation.photos!, 3)
+                      }}
+                    >
                       +{annotation.photos!.length - 3}
                     </div>
                   )}
@@ -230,7 +243,7 @@ function AnnotationPin({
   )
 }
 
-export function AnnotationsTool({ annotations, onAnnotationClick, visible = true }: AnnotationsToolProps) {
+export function AnnotationsTool({ annotations, onAnnotationClick, onPhotoClick, visible = true }: AnnotationsToolProps) {
   if (!visible) return null
 
   return (
@@ -239,7 +252,8 @@ export function AnnotationsTool({ annotations, onAnnotationClick, visible = true
         <AnnotationPin 
           key={ann.id} 
           annotation={ann} 
-          onClick={onAnnotationClick} 
+          onClick={onAnnotationClick}
+          onPhotoClick={onPhotoClick}
         />
       ))}
     </group>

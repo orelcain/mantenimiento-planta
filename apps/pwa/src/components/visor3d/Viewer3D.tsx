@@ -61,6 +61,8 @@ interface Viewer3DProps {
   onAddAnnotation?: (point: Point3D) => void
   /** Callback al hacer click en una anotación */
   onAnnotationClick?: (annotation: Annotation3D) => void
+  /** Callback al hacer click en una foto de anotación */
+  onPhotoClick?: (photos: string[], index: number) => void
   children?: ReactNode
 }
 
@@ -781,7 +783,7 @@ function SceneContent(props: Viewer3DProps) {
   const { 
     url, format, resetKey, onPointClick, pendingPoints, measurementType, onClosePolygon, 
     paintMode, paintColor, paintErase, materialOverrides, onMeshPainted,
-    annotations, annotationMode, onAddAnnotation, onAnnotationClick,
+    annotations, annotationMode, onAddAnnotation, onAnnotationClick, onPhotoClick,
     children 
   } = props
   const [modelInfo, setModelInfo] = useState<ModelInfo | null>(null)
@@ -848,7 +850,8 @@ function SceneContent(props: Viewer3DProps) {
       {annotations && (
         <AnnotationsTool 
           annotations={annotations} 
-          onAnnotationClick={onAnnotationClick} 
+          onAnnotationClick={onAnnotationClick}
+          onPhotoClick={onPhotoClick}
         />
       )}
 

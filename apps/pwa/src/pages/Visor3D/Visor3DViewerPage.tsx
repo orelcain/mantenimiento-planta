@@ -56,6 +56,7 @@ import { subscribeToAnnotations, createAnnotation, updateAnnotation, deleteAnnot
 import { Viewer3D } from '@/components/visor3d/Viewer3D'
 import { DimensionsTool } from '@/components/visor3d/DimensionsTool'
 import { ColorPalette } from '@/components/visor3d/ColorPalette'
+import { ImageLightbox } from '@/components/ui/ImageLightbox'
 import type { Model3D, MaterialOverride, Annotation3D, AnnotationStatus, AnnotationPriority } from '@/types/models3d'
 import type { Dimension3D, DimensionUnit, Point3D, MeasurementType } from '@/types/models3d'
 import { getUnitSuffix } from '@/types/models3d'
@@ -100,6 +101,10 @@ export function Visor3DViewerPage() {
   const [annExistingPhotos, setAnnExistingPhotos] = useState<string[]>([])
   const [uploadingPhotos, setUploadingPhotos] = useState(false)
   const photoInputRef = useRef<HTMLInputElement>(null)
+
+  // Lightbox state (photo viewer with zoom/pan)
+  const [lightboxPhotos, setLightboxPhotos] = useState<string[] | null>(null)
+  const [lightboxIndex, setLightboxIndex] = useState(0)
 
   // UI state
   const [isFullscreen, setIsFullscreen] = useState(false)
@@ -681,6 +686,10 @@ export function Visor3DViewerPage() {
           annotations={annotations}
           annotationMode={annotationMode}
           onAnnotationClick={handleAnnotationClick}
+          onPhotoClick={(photos, idx) => {
+            setLightboxPhotos(photos)
+            setLightboxIndex(idx)
+          }}
           onAddAnnotation={handleAddAnnotationPoint}
         >
           {showDimensions && (
@@ -758,7 +767,11 @@ export function Visor3DViewerPage() {
                         <img 
                           src={url} 
                           alt={`Foto ${i + 1}`}
-                          className="w-16 h-16 object-cover rounded-lg border border-border"
+                          className="w-16 h-16 object-cover rounded-lg border border-border cursor-pointer hover:ring-2 hover:ring-primary transition-all"
+                          onClick={() => {
+                            setLightboxPhotos([...annExistingPhotos, ...annPhotos.map(p => p.preview)])
+                            setLightboxIndex(i)
+                          }}
                         />
                         <button
                           type="button"
@@ -774,7 +787,11 @@ export function Visor3DViewerPage() {
                         <img 
                           src={photo.preview} 
                           alt={`Nueva ${i + 1}`}
-                          className="w-16 h-16 object-cover rounded-lg border-2 border-blue-500/50"
+                          className="w-16 h-16 object-cover rounded-lg border-2 border-blue-500/50 cursor-pointer hover:ring-2 hover:ring-primary transition-all"
+                          onClick={() => {
+                            setLightboxPhotos([...annExistingPhotos, ...annPhotos.map(p => p.preview)])
+                            setLightboxIndex(annExistingPhotos.length + i)
+                          }}
                         />
                         <button
                           type="button"
@@ -966,6 +983,15 @@ export function Visor3DViewerPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Image Lightbox (zoom + pan viewer) */}
+      {lightboxPhotos && (
+        <ImageLightbox
+          photos={lightboxPhotos}
+          initialIndex={lightboxIndex}
+          onClose={() => setLightboxPhotos(null)}
+        />
+      )}
     </div>
   )
 }
