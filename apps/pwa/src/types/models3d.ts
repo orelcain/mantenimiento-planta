@@ -73,6 +73,27 @@ export interface CreateDimensionData {
   createdBy: string
 }
 
+/** Override de material (color) para una malla del modelo */
+export interface MaterialOverride {
+  id: string
+  /** Identificador estable de la malla (name o mesh-{index}) */
+  meshId: string
+  /** Color hexadecimal (#rrggbb) */
+  color: string
+  /** Opacidad 0-1 */
+  opacity: number
+  createdAt: Date
+  createdBy: string
+}
+
+/** Datos para crear/actualizar un override */
+export interface CreateMaterialOverrideData {
+  meshId: string
+  color: string
+  opacity?: number
+  createdBy: string
+}
+
 /** Extensiones de archivo permitidas */
 export const ALLOWED_EXTENSIONS: Record<Model3DFormat, string[]> = {
   glb: ['.glb'],

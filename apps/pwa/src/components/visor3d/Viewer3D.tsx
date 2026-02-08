@@ -1,19 +1,19 @@
 /**
  * Viewer3D - Componente de visualización Three.js
- * 
+ *
  * Features:
- * - Carga GLB/GLTF, OBJ, FBX
- * - OrbitControls (orbit/zoom/pan)
- * - Environment lighting + tone mapping
+ * - Carga GLB/GLTF, OBJ, FBX con centrado automático al origen
+ * - OrbitControls suaves (orbit/zoom/pan) — funciona en todos los formatos
+ * - Environment lighting + tone mapping ACESFilmic
  * - Auto-fit camera al bounding box del modelo
  * - Doble cara en materiales (esencial para SketchUp)
- * - Mejora de materiales por defecto
- * - Grid helper
- * - Click handler para seleccionar puntos (cotas)
- * - Reset view
+ * - Modo pintura: click en mallas para aplicar color mate
+ * - Highlight de malla al hover en modo pintura
+ * - Click handler para cotas
+ * - Grid helper + ContactShadows
  */
 
-import { Suspense, useRef, useEffect, useCallback, useState, type ReactNode } from 'react'
+import { Suspense, useRef, useEffect, useCallback, useState, Component, type ReactNode, type ErrorInfo } from 'react'
 import { Canvas, useThree, useFrame } from '@react-three/fiber'
 import {
   OrbitControls,
@@ -24,7 +24,7 @@ import {
 } from '@react-three/drei'
 import * as THREE from 'three'
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js'
-import type { Model3DFormat, Point3D } from '@/types/models3d'
+import type { Model3DFormat, Point3D, MaterialOverride } from '@/types/models3d'
 
 // ============================================================================
 // Props
@@ -34,50 +34,69 @@ interface Viewer3DProps {
   url: string
   format: Model3DFormat
   resetKey?: number
+  /** Cotas: callback al hacer click en superficie */
   onPointClick?: (point: Point3D) => void
   pendingPoint?: Point3D | null
+  /** Pintura: modo activo + color seleccionado */
+  paintMode?: boolean
+  paintColor?: string | null
+  paintErase?: boolean
+  /** Overrides de material cargados de Firestore */
+  materialOverrides?: MaterialOverride[]
+  /** Callback cuando se pinta una malla */
+  onMeshPainted?: (meshId: string, color: string | null) => void
   children?: ReactNode
 }
 
 // ============================================================================
-// Material Enhancement - Fix SketchUp exports
+// Stable Mesh ID generator
 // ============================================================================
 
-/**
- * Recorre el modelo y mejora los materiales:
- * - Activa doble cara (SketchUp exporta caras invertidas)
- * - Mejora materiales sin textura con un material físico decente
- * - Recomputa normales si faltan
- */
-function enhanceModel(object: THREE.Object3D) {
-  const box = new THREE.Box3().setFromObject(object)
-  const size = box.getSize(new THREE.Vector3())
-  const maxDim = Math.max(size.x, size.y, size.z)
-
+function assignStableMeshIds(object: THREE.Object3D): Map<THREE.Mesh, string> {
+  const map = new Map<THREE.Mesh, string>()
+  const usedIds = new Set<string>()
+  let index = 0
   object.traverse((child) => {
     if (child instanceof THREE.Mesh) {
-      // Recomputar normales si faltan
+      const base = child.name && child.name.length > 0
+        ? child.name.replace(/[\/\.#\[\]]/g, '_')
+        : `mesh_${index}`
+      let finalId = base
+      let suffix = 1
+      while (usedIds.has(finalId)) {
+        finalId = `${base}_${suffix++}`
+      }
+      usedIds.add(finalId)
+      map.set(child, finalId)
+      child.userData.stableMeshId = finalId
+      index++
+    }
+  })
+  return map
+}
+
+// ============================================================================
+// Material Enhancement
+// ============================================================================
+
+function enhanceModel(object: THREE.Object3D) {
+  object.traverse((child) => {
+    if (child instanceof THREE.Mesh) {
       if (child.geometry && !child.geometry.attributes.normal) {
         child.geometry.computeVertexNormals()
       }
 
-      // Procesar material(es)
       const materials = Array.isArray(child.material) ? child.material : [child.material]
-      materials.forEach((mat) => {
+      materials.forEach((mat, matIdx) => {
         if (mat instanceof THREE.MeshStandardMaterial || mat instanceof THREE.MeshPhysicalMaterial) {
-          // Doble cara siempre (SketchUp necesita esto)
           mat.side = THREE.DoubleSide
-          // Si el material es completamente blanco/gris sin textura, mejorarlo
           if (!mat.map && !mat.normalMap) {
-            const color = mat.color
-            const isDefault = color.r > 0.7 && color.g > 0.7 && color.b > 0.7
-            if (isDefault) {
-              // Color gris claro más interesante
+            const c = mat.color
+            if (c.r > 0.7 && c.g > 0.7 && c.b > 0.7) {
               mat.color.setHex(0xc8ccd0)
               mat.roughness = 0.6
               mat.metalness = 0.05
             } else {
-              // Mantener color original pero mejorar propiedades
               mat.roughness = Math.min(mat.roughness, 0.7)
               mat.metalness = Math.max(mat.metalness, 0.02)
             }
@@ -85,193 +104,187 @@ function enhanceModel(object: THREE.Object3D) {
           mat.envMapIntensity = 0.8
           mat.needsUpdate = true
         } else if (mat instanceof THREE.MeshBasicMaterial) {
-          // Convertir MeshBasicMaterial a MeshStandardMaterial para que responda a luces
           const newMat = new THREE.MeshStandardMaterial({
-            color: mat.color,
-            map: mat.map,
-            side: THREE.DoubleSide,
-            roughness: 0.6,
-            metalness: 0.05,
-            transparent: mat.transparent,
-            opacity: mat.opacity,
+            color: mat.color, map: mat.map, side: THREE.DoubleSide,
+            roughness: 0.6, metalness: 0.05, transparent: mat.transparent, opacity: mat.opacity,
           })
-          child.material = newMat
+          if (Array.isArray(child.material)) { child.material[matIdx] = newMat } else { child.material = newMat }
+        } else if (mat instanceof THREE.MeshPhongMaterial || mat instanceof THREE.MeshLambertMaterial) {
+          const newMat = new THREE.MeshStandardMaterial({
+            color: (mat as THREE.MeshPhongMaterial).color || new THREE.Color(0xcccccc),
+            map: (mat as THREE.MeshPhongMaterial).map || null,
+            side: THREE.DoubleSide, roughness: 0.65, metalness: 0.05,
+            transparent: mat.transparent, opacity: mat.opacity,
+          })
+          if (Array.isArray(child.material)) { child.material[matIdx] = newMat } else { child.material = newMat }
         } else {
-          // Cualquier otro material: doble cara
           mat.side = THREE.DoubleSide
         }
       })
 
-      // Habilitar sombras
       child.castShadow = true
       child.receiveShadow = true
     }
   })
+}
 
-  return { box, size, maxDim }
+/**
+ * Centra el modelo en el origen - CRÍTICO para OrbitControls en OBJ/FBX
+ */
+function centerModel(object: THREE.Object3D) {
+  const box = new THREE.Box3().setFromObject(object)
+  const center = box.getCenter(new THREE.Vector3())
+  const size = box.getSize(new THREE.Vector3())
+  const maxDim = Math.max(size.x, size.y, size.z)
+
+  // Centrar en X y Z, apoyar en Y=0
+  object.position.x -= center.x
+  object.position.z -= center.z
+  const newBox = new THREE.Box3().setFromObject(object)
+  object.position.y -= newBox.min.y
+
+  const finalCenter = new THREE.Vector3(0, size.y / 2, 0)
+  return { center: finalCenter, size, maxDim }
 }
 
 // ============================================================================
-// Auto-fit Camera to model bounding box
+// Apply Material Overrides
 // ============================================================================
 
-function AutoFitCamera({ object, resetKey }: { object: THREE.Object3D | null; resetKey: number }) {
+function applyMaterialOverrides(object: THREE.Object3D, overrides: MaterialOverride[]) {
+  if (!overrides.length) return
+  const map = new Map(overrides.map((o) => [o.meshId, o]))
+  object.traverse((child) => {
+    if (child instanceof THREE.Mesh && child.userData.stableMeshId) {
+      const ov = map.get(child.userData.stableMeshId)
+      if (ov) {
+        if (!child.userData.originalMaterial) child.userData.originalMaterial = child.material
+        child.material = new THREE.MeshStandardMaterial({
+          color: ov.color, roughness: 1, metalness: 0, side: THREE.DoubleSide,
+          opacity: ov.opacity, transparent: ov.opacity < 1,
+        })
+      }
+    }
+  })
+}
+
+// ============================================================================
+// Auto-fit Camera
+// ============================================================================
+
+interface ModelInfo { center: THREE.Vector3; maxDim: number }
+
+function AutoFitCamera({ modelInfo, resetKey }: { modelInfo: ModelInfo | null; resetKey: number }) {
   const { camera, controls } = useThree()
-  const fitted = useRef(false)
 
   useEffect(() => {
-    if (!object) return
-    
-    const box = new THREE.Box3().setFromObject(object)
-    const size = box.getSize(new THREE.Vector3())
-    const center = box.getCenter(new THREE.Vector3())
-    const maxDim = Math.max(size.x, size.y, size.z)
-    
-    if (maxDim === 0) return
-
-    // Distancia de cámara basada en el tamaño del modelo
+    if (!modelInfo || modelInfo.maxDim === 0) return
+    const { center, maxDim } = modelInfo
     const fov = (camera as THREE.PerspectiveCamera).fov * (Math.PI / 180)
-    const cameraDistance = maxDim / (2 * Math.tan(fov / 2)) * 1.8
+    const dist = maxDim / (2 * Math.tan(fov / 2)) * 2.0
 
-    // Posicionar cámara mirando en diagonal
-    camera.position.set(
-      center.x + cameraDistance * 0.7,
-      center.y + cameraDistance * 0.5,
-      center.z + cameraDistance * 0.7
-    )
+    camera.position.set(center.x + dist * 0.6, center.y + dist * 0.5, center.z + dist * 0.6)
     camera.lookAt(center)
-    camera.near = maxDim * 0.001
-    camera.far = maxDim * 100
+    camera.near = Math.max(maxDim * 0.001, 0.001)
+    camera.far = maxDim * 200
     camera.updateProjectionMatrix()
 
-    // Actualizar controls target
     if (controls && 'target' in controls) {
-      (controls as unknown as { target: THREE.Vector3 }).target.copy(center)
+      const ctrl = controls as unknown as { target: THREE.Vector3; update: () => void }
+      ctrl.target.copy(center)
+      ctrl.update()
     }
-
-    fitted.current = true
-  }, [object, camera, controls, resetKey])
+  }, [modelInfo, camera, controls, resetKey])
 
   return null
 }
 
 // ============================================================================
-// Model Loaders (with material enhancement)
+// Model Loaders
 // ============================================================================
 
-function GLBModel({ url, onLoaded }: { url: string; onLoaded: (obj: THREE.Object3D) => void }) {
+interface LoaderResult { center: THREE.Vector3; size: THREE.Vector3; maxDim: number; meshIds: Map<THREE.Mesh, string> }
+
+function GLBModel({ url, overrides, onLoaded }: { url: string; overrides: MaterialOverride[]; onLoaded: (obj: THREE.Object3D, info: LoaderResult) => void }) {
   const { scene } = useGLTF(url)
   const cloned = useRef<THREE.Group | null>(null)
-
   useEffect(() => {
     const clone = scene.clone(true)
     enhanceModel(clone)
+    const meshIds = assignStableMeshIds(clone)
+    const info = centerModel(clone)
+    applyMaterialOverrides(clone, overrides)
     cloned.current = clone
-    onLoaded(clone)
-  }, [scene, onLoaded])
-
+    onLoaded(clone, { ...info, meshIds })
+  }, [scene]) // eslint-disable-line
   if (!cloned.current) return null
   return <primitive object={cloned.current} />
 }
 
-function FBXModel({ url, onLoaded }: { url: string; onLoaded: (obj: THREE.Object3D) => void }) {
+function FBXModel({ url, overrides, onLoaded }: { url: string; overrides: MaterialOverride[]; onLoaded: (obj: THREE.Object3D, info: LoaderResult) => void }) {
   const fbx = useFBX(url)
   const cloned = useRef<THREE.Group | null>(null)
-
   useEffect(() => {
     const clone = fbx.clone(true)
     enhanceModel(clone)
+    const meshIds = assignStableMeshIds(clone)
+    const info = centerModel(clone)
+    applyMaterialOverrides(clone, overrides)
     cloned.current = clone
-    onLoaded(clone)
-  }, [fbx, onLoaded])
-
+    onLoaded(clone, { ...info, meshIds })
+  }, [fbx]) // eslint-disable-line
   if (!cloned.current) return null
   return <primitive object={cloned.current} />
 }
 
-function OBJModel({ url, onLoaded }: { url: string; onLoaded: (obj: THREE.Object3D) => void }) {
+function OBJModel({ url, overrides, onLoaded }: { url: string; overrides: MaterialOverride[]; onLoaded: (obj: THREE.Object3D, info: LoaderResult) => void }) {
   const [obj, setObj] = useState<THREE.Group | null>(null)
-
   useEffect(() => {
     const loader = new OBJLoader()
-    loader.load(
-      url,
-      (object) => {
-        enhanceModel(object)
-        setObj(object)
-        onLoaded(object)
-      },
-      undefined,
-      (err) => console.error('Error loading OBJ:', err)
-    )
-  }, [url, onLoaded])
-
+    loader.load(url, (object) => {
+      enhanceModel(object)
+      const meshIds = assignStableMeshIds(object)
+      const info = centerModel(object)
+      applyMaterialOverrides(object, overrides)
+      setObj(object)
+      onLoaded(object, { ...info, meshIds })
+    }, undefined, (err) => console.error('Error loading OBJ:', err))
+  }, [url]) // eslint-disable-line
   if (!obj) return null
   return <primitive object={obj} />
 }
 
-function ModelLoader({
-  url,
-  format,
-  onLoaded,
-}: {
-  url: string
-  format: Model3DFormat
-  onLoaded: (obj: THREE.Object3D) => void
-}) {
+function ModelLoader({ url, format, overrides, onLoaded }: { url: string; format: Model3DFormat; overrides: MaterialOverride[]; onLoaded: (obj: THREE.Object3D, info: LoaderResult) => void }) {
   switch (format) {
-    case 'glb':
-    case 'gltf':
-      return <GLBModel url={url} onLoaded={onLoaded} />
-    case 'fbx':
-      return <FBXModel url={url} onLoaded={onLoaded} />
-    case 'obj':
-      return <OBJModel url={url} onLoaded={onLoaded} />
-    default:
-      return null
+    case 'glb': case 'gltf': return <GLBModel url={url} overrides={overrides} onLoaded={onLoaded} />
+    case 'fbx': return <FBXModel url={url} overrides={overrides} onLoaded={onLoaded} />
+    case 'obj': return <OBJModel url={url} overrides={overrides} onLoaded={onLoaded} />
+    default: return null
   }
 }
 
 // ============================================================================
-// Click Handler (Raycasting for dimension points)
+// Click Handler (cotas)
 // ============================================================================
 
-function ClickHandler({
-  onPointClick,
-}: {
-  onPointClick: (point: Point3D) => void
-}) {
+function ClickHandler({ onPointClick }: { onPointClick: (point: Point3D) => void }) {
   const { camera, scene, gl } = useThree()
   const raycaster = useRef(new THREE.Raycaster())
   const mouse = useRef(new THREE.Vector2())
 
-  const handleClick = useCallback(
-    (event: MouseEvent) => {
-      const rect = gl.domElement.getBoundingClientRect()
-      mouse.current.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
-      mouse.current.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
-
-      raycaster.current.setFromCamera(mouse.current, camera)
-      const intersects = raycaster.current.intersectObjects(scene.children, true)
-
-      // Filter out helpers, grids, dimension lines etc.
-      const hit = intersects.find(
-        (i) =>
-          i.object.type === 'Mesh' &&
-          !i.object.userData.isDimensionHelper &&
-          !i.object.userData.isGrid
-      )
-
-      if (hit) {
-        onPointClick({
-          x: hit.point.x,
-          y: hit.point.y,
-          z: hit.point.z,
-        })
-      }
-    },
-    [camera, scene, gl, onPointClick]
-  )
+  const handleClick = useCallback((event: MouseEvent) => {
+    const rect = gl.domElement.getBoundingClientRect()
+    mouse.current.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
+    mouse.current.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
+    raycaster.current.setFromCamera(mouse.current, camera)
+    const intersects = raycaster.current.intersectObjects(scene.children, true)
+    const hit = intersects.find((i) =>
+      i.object.type === 'Mesh' && !i.object.userData.isDimensionHelper && !i.object.userData.isGrid && !i.object.userData.isHighlight
+    )
+    if (hit) {
+      onPointClick({ x: hit.point.x, y: hit.point.y, z: hit.point.z })
+    }
+  }, [camera, scene, gl, onPointClick])
 
   useEffect(() => {
     gl.domElement.addEventListener('click', handleClick)
@@ -282,19 +295,110 @@ function ClickHandler({
 }
 
 // ============================================================================
+// Paint Click Handler
+// ============================================================================
+
+function PaintClickHandler({ paintColor, paintErase, onMeshPainted }: {
+  paintColor: string | null; paintErase: boolean; onMeshPainted: (meshId: string, color: string | null) => void
+}) {
+  const { camera, scene, gl } = useThree()
+  const raycaster = useRef(new THREE.Raycaster())
+  const mouse = useRef(new THREE.Vector2())
+  const hoveredMesh = useRef<THREE.Mesh | null>(null)
+  const highlightMat = useRef(new THREE.MeshStandardMaterial({
+    color: '#ffffff', emissive: '#4488ff', emissiveIntensity: 0.3,
+    transparent: true, opacity: 0.6, side: THREE.DoubleSide, depthWrite: false,
+  }))
+
+  const handleClick = useCallback((event: MouseEvent) => {
+    const rect = gl.domElement.getBoundingClientRect()
+    mouse.current.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
+    mouse.current.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
+    raycaster.current.setFromCamera(mouse.current, camera)
+    const hit = raycaster.current.intersectObjects(scene.children, true).find((i) =>
+      i.object instanceof THREE.Mesh && !i.object.userData.isDimensionHelper && !i.object.userData.isGrid && !i.object.userData.isHighlight
+    )
+    if (hit && hit.object instanceof THREE.Mesh) {
+      const mesh = hit.object
+      const meshId = mesh.userData.stableMeshId
+      if (!meshId) return
+
+      // Restaurar del hover primero
+      if (mesh.userData.preHoverMaterial) {
+        mesh.material = mesh.userData.preHoverMaterial
+        delete mesh.userData.preHoverMaterial
+      }
+
+      if (paintErase) {
+        if (mesh.userData.originalMaterial) {
+          mesh.material = mesh.userData.originalMaterial
+          delete mesh.userData.originalMaterial
+        }
+        onMeshPainted(meshId, null)
+      } else if (paintColor) {
+        if (!mesh.userData.originalMaterial) mesh.userData.originalMaterial = mesh.material
+        mesh.material = new THREE.MeshStandardMaterial({
+          color: paintColor, roughness: 1, metalness: 0, side: THREE.DoubleSide,
+        })
+        onMeshPainted(meshId, paintColor)
+      }
+    }
+  }, [camera, scene, gl, paintColor, paintErase, onMeshPainted])
+
+  const handleMove = useCallback((event: MouseEvent) => {
+    const rect = gl.domElement.getBoundingClientRect()
+    mouse.current.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
+    mouse.current.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
+    raycaster.current.setFromCamera(mouse.current, camera)
+    const hit = raycaster.current.intersectObjects(scene.children, true).find((i) =>
+      i.object instanceof THREE.Mesh && !i.object.userData.isDimensionHelper && !i.object.userData.isGrid && !i.object.userData.isHighlight
+    )
+    const newHovered = hit ? (hit.object as THREE.Mesh) : null
+    if (newHovered !== hoveredMesh.current) {
+      if (hoveredMesh.current?.userData.preHoverMaterial) {
+        hoveredMesh.current.material = hoveredMesh.current.userData.preHoverMaterial
+        delete hoveredMesh.current.userData.preHoverMaterial
+      }
+      if (newHovered) {
+        newHovered.userData.preHoverMaterial = newHovered.material
+        newHovered.material = highlightMat.current
+        gl.domElement.style.cursor = 'crosshair'
+      } else {
+        gl.domElement.style.cursor = 'default'
+      }
+      hoveredMesh.current = newHovered
+    }
+  }, [camera, scene, gl])
+
+  useEffect(() => {
+    gl.domElement.addEventListener('click', handleClick)
+    gl.domElement.addEventListener('mousemove', handleMove)
+    gl.domElement.style.cursor = 'crosshair'
+    return () => {
+      gl.domElement.removeEventListener('click', handleClick)
+      gl.domElement.removeEventListener('mousemove', handleMove)
+      gl.domElement.style.cursor = 'default'
+      if (hoveredMesh.current?.userData.preHoverMaterial) {
+        hoveredMesh.current.material = hoveredMesh.current.userData.preHoverMaterial
+        delete hoveredMesh.current.userData.preHoverMaterial
+      }
+    }
+  }, [gl, handleClick, handleMove])
+
+  return null
+}
+
+// ============================================================================
 // Pending Point Marker
 // ============================================================================
 
 function PendingPointMarker({ point }: { point: Point3D }) {
   const meshRef = useRef<THREE.Mesh>(null)
-
   useFrame(({ clock }) => {
     if (meshRef.current) {
-      const scale = 1 + Math.sin(clock.getElapsedTime() * 4) * 0.3
-      meshRef.current.scale.setScalar(scale)
+      meshRef.current.scale.setScalar(1 + Math.sin(clock.getElapsedTime() * 4) * 0.3)
     }
   })
-
   return (
     <mesh ref={meshRef} position={[point.x, point.y, point.z]} userData={{ isDimensionHelper: true }}>
       <sphereGeometry args={[0.03, 16, 16]} />
@@ -304,18 +408,12 @@ function PendingPointMarker({ point }: { point: Point3D }) {
 }
 
 // ============================================================================
-// Loading fallback inside Canvas
+// In-Canvas Loader
 // ============================================================================
 
 function InCanvasLoader() {
   const meshRef = useRef<THREE.Mesh>(null)
-
-  useFrame(({ clock }) => {
-    if (meshRef.current) {
-      meshRef.current.rotation.y = clock.getElapsedTime()
-    }
-  })
-
+  useFrame(({ clock }) => { if (meshRef.current) meshRef.current.rotation.y = clock.getElapsedTime() })
   return (
     <mesh ref={meshRef}>
       <boxGeometry args={[0.5, 0.5, 0.5]} />
@@ -325,143 +423,73 @@ function InCanvasLoader() {
 }
 
 // ============================================================================
-// Error Boundary for 3D Content
+// Error Boundary
 // ============================================================================
 
-import { Component, type ErrorInfo } from 'react'
-
-interface ErrorBoundary3DProps {
-  children: ReactNode
-  onError: (message: string) => void
-}
-
-interface ErrorBoundary3DState {
-  hasError: boolean
-}
-
-class ErrorBoundary3D extends Component<ErrorBoundary3DProps, ErrorBoundary3DState> {
-  constructor(props: ErrorBoundary3DProps) {
+class ErrorBoundary3D extends Component<{ children: ReactNode; onError: (msg: string) => void }, { hasError: boolean }> {
+  constructor(props: { children: ReactNode; onError: (msg: string) => void }) {
     super(props)
     this.state = { hasError: false }
   }
-
-  static getDerivedStateFromError(): ErrorBoundary3DState {
-    return { hasError: true }
-  }
-
-  componentDidCatch(error: Error, _info: ErrorInfo) {
-    this.props.onError(error.message)
-  }
-
+  static getDerivedStateFromError() { return { hasError: true } }
+  componentDidCatch(error: Error, _info: ErrorInfo) { this.props.onError(error.message) }
   render() {
-    if (this.state.hasError) {
-      return (
-        <mesh>
-          <boxGeometry args={[1, 1, 1]} />
-          <meshStandardMaterial color="#ef4444" wireframe />
-        </mesh>
-      )
-    }
+    if (this.state.hasError) return <mesh><boxGeometry args={[1, 1, 1]} /><meshStandardMaterial color="#ef4444" wireframe /></mesh>
     return this.props.children
   }
 }
 
 // ============================================================================
-// Scene Content (inside Canvas)
+// Scene Content
 // ============================================================================
 
-function SceneContent({
-  url,
-  format,
-  resetKey,
-  onPointClick,
-  pendingPoint,
-  children,
-}: Viewer3DProps) {
-  const [loadedObject, setLoadedObject] = useState<THREE.Object3D | null>(null)
+function SceneContent(props: Viewer3DProps) {
+  const { url, format, resetKey, onPointClick, pendingPoint, paintMode, paintColor, paintErase, materialOverrides, onMeshPainted, children } = props
+  const [modelInfo, setModelInfo] = useState<ModelInfo | null>(null)
   const [hasError, setHasError] = useState(false)
 
-  const handleModelLoaded = useCallback((obj: THREE.Object3D) => {
-    setLoadedObject(obj)
+  const handleModelLoaded = useCallback((_o: THREE.Object3D, info: LoaderResult) => {
+    setModelInfo({ center: info.center, maxDim: info.maxDim })
   }, [])
 
   return (
     <>
-      {/* Background */}
       <color attach="background" args={['#0a0a0f']} />
 
-      {/* Improved lighting setup for SketchUp models */}
+      {/* Lighting */}
       <ambientLight intensity={0.6} />
-      <directionalLight
-        position={[8, 10, 5]}
-        intensity={1.0}
-        castShadow
-        shadow-mapSize-width={2048}
-        shadow-mapSize-height={2048}
-        shadow-camera-far={50}
-        shadow-camera-near={0.1}
-      />
+      <directionalLight position={[8, 10, 5]} intensity={1.0} castShadow shadow-mapSize-width={2048} shadow-mapSize-height={2048} />
       <directionalLight position={[-5, 5, -5]} intensity={0.4} />
       <directionalLight position={[0, -3, 5]} intensity={0.2} />
-
-      {/* Hemisphere light for natural outdoor feel */}
-      <hemisphereLight
-        args={['#b1e1ff', '#b97a20', 0.5]}
-      />
-
-      {/* Environment for realistic reflections */}
+      <hemisphereLight args={['#b1e1ff', '#b97a20', 0.5]} />
       <Environment preset="apartment" />
-
-      {/* Contact shadows under model */}
-      <ContactShadows
-        position={[0, -0.01, 0]}
-        opacity={0.4}
-        scale={20}
-        blur={2}
-        far={4}
-      />
+      <ContactShadows position={[0, -0.01, 0]} opacity={0.4} scale={20} blur={2} far={4} />
 
       {/* Grid */}
-      <gridHelper
-        args={[40, 40, '#1e293b', '#111827']}
-        position={[0, -0.01, 0]}
-        userData={{ isGrid: true }}
-      />
+      <gridHelper args={[40, 40, '#1e293b', '#111827']} position={[0, -0.01, 0]} userData={{ isGrid: true }} />
 
       {/* Controls */}
-      <OrbitControls
-        makeDefault
-        enableDamping
-        dampingFactor={0.08}
-        minDistance={0.1}
-        maxDistance={200}
-        maxPolarAngle={Math.PI * 0.95}
-      />
+      <OrbitControls makeDefault enableDamping dampingFactor={0.08} minDistance={0.05} maxDistance={500} maxPolarAngle={Math.PI * 0.95} enablePan panSpeed={1} rotateSpeed={0.8} />
 
-      {/* Auto-fit camera to model */}
-      <AutoFitCamera object={loadedObject} resetKey={resetKey ?? 0} />
+      <AutoFitCamera modelInfo={modelInfo} resetKey={resetKey ?? 0} />
 
-      {/* Click handler for dimension creation */}
-      {onPointClick && <ClickHandler onPointClick={onPointClick} />}
+      {/* Click handlers */}
+      {onPointClick && !paintMode && <ClickHandler onPointClick={onPointClick} />}
+      {paintMode && onMeshPainted && <PaintClickHandler paintColor={paintColor ?? null} paintErase={paintErase ?? false} onMeshPainted={onMeshPainted} />}
 
-      {/* Pending point marker */}
       {pendingPoint && <PendingPointMarker point={pendingPoint} />}
 
       {/* Model */}
       <Suspense fallback={<InCanvasLoader />}>
         {!hasError ? (
           <ErrorBoundary3D onError={() => setHasError(true)}>
-            <ModelLoader url={url} format={format} onLoaded={handleModelLoaded} />
+            <ModelLoader url={url} format={format} overrides={materialOverrides ?? []} onLoaded={handleModelLoaded} />
           </ErrorBoundary3D>
         ) : (
-          <mesh>
-            <boxGeometry args={[1, 1, 1]} />
-            <meshStandardMaterial color="#ef4444" wireframe />
-          </mesh>
+          <mesh><boxGeometry args={[1, 1, 1]} /><meshStandardMaterial color="#ef4444" wireframe /></mesh>
         )}
       </Suspense>
 
-      {/* Dimension overlays (children from parent) */}
       {children}
     </>
   )
@@ -488,8 +516,6 @@ export function Viewer3D(props: Viewer3DProps) {
       >
         <SceneContent {...props} />
       </Canvas>
-
-      {/* Corner label */}
       <div className="absolute bottom-2 right-2 text-[10px] text-muted-foreground/50 select-none pointer-events-none">
         Orbit: clic izq · Zoom: scroll · Pan: clic der
       </div>

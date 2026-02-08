@@ -1,5 +1,5 @@
 import { useEffect, lazy, Suspense } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useSearchParams } from 'react-router-dom'
 import { onAuthChange, getUserById, signOut as signOutService } from '@/services/auth'
 import { useAuthStore, usePermissionsStore } from '@/store'
 import { logger } from '@/lib/logger'
@@ -63,6 +63,7 @@ const ETTPage = lazyWithReload(() => import('@/pages/admin/ETTPage').then((mod) 
 const PermissionsPage = lazyWithReload(() => import('@/pages/admin/PermissionsPage').then((mod) => ({ default: mod.PermissionsPage })))
 const Visor3DListPage = lazyWithReload(() => import('@/pages/Visor3D/Visor3DListPage').then((mod) => ({ default: mod.Visor3DListPage })))
 const Visor3DViewerPage = lazyWithReload(() => import('@/pages/Visor3D/Visor3DViewerPage').then((mod) => ({ default: mod.Visor3DViewerPage })))
+const Visor3DPublicPage = lazyWithReload(() => import('@/pages/Visor3D/Visor3DPublicPage').then((mod) => ({ default: mod.Visor3DPublicPage })))
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuthStore()
@@ -80,13 +81,16 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuthStore()
+  const [searchParams] = useSearchParams()
 
   if (isLoading) {
     return <LoadingScreen />
   }
 
   if (isAuthenticated) {
-    return <Navigate to="/" replace />
+    // Si hay un redirect query param (ej. desde QR), ir ahí en vez de /
+    const redirectTo = searchParams.get('redirect') || '/'
+    return <Navigate to={redirectTo} replace />
   }
 
   return <>{children}</>
@@ -175,6 +179,16 @@ export function App() {
               <PublicRoute>
                 <LoginPage />
               </PublicRoute>
+            }
+          />
+
+          {/* Public 3D viewer (requires auth but no sidebar) */}
+          <Route
+            path="/v/:modelId"
+            element={
+              <Suspense fallback={<LoadingScreen />}>
+                <Visor3DPublicPage />
+              </Suspense>
             }
           />
 

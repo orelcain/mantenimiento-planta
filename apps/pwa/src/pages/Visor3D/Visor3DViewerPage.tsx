@@ -1,12 +1,13 @@
 /**
  * Visor3DViewerPage - Página de visualización de un modelo 3D
- * 
+ *
  * Features:
  * - Carga y visualiza el modelo 3D con Three.js
  * - Orbit/zoom/pan controls
  * - Fullscreen
  * - Copiar link / mostrar QR
  * - Ver/crear cotas (admin)
+ * - Modo pintura: colorear piezas con colores mate (admin)
  */
 
 import { useEffect, useState, useCallback, useRef } from 'react'
@@ -25,6 +26,7 @@ import {
   Box,
   Loader2,
   X,
+  Paintbrush,
 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import {
@@ -40,9 +42,11 @@ import {
 import { useIsAdmin, useAuthStore } from '@/store'
 import { getModel3DById } from '@/services/models3d'
 import { subscribeToDimensions, createDimension, deleteDimension, calculateDistance, convertUnit } from '@/services/dimensions'
+import { subscribeToMaterialOverrides, setMaterialOverride, deleteMaterialOverride, deleteAllMaterialOverrides } from '@/services/materials3d'
 import { Viewer3D } from '@/components/visor3d/Viewer3D'
 import { DimensionsTool } from '@/components/visor3d/DimensionsTool'
-import type { Model3D } from '@/types/models3d'
+import { ColorPalette } from '@/components/visor3d/ColorPalette'
+import type { Model3D, MaterialOverride } from '@/types/models3d'
 import type { Dimension3D, DimensionUnit, Point3D } from '@/types/models3d'
 
 export function Visor3DViewerPage() {
@@ -61,6 +65,12 @@ export function Visor3DViewerPage() {
   const [creatingDimension, setCreatingDimension] = useState(false)
   const [selectedUnit, setSelectedUnit] = useState<DimensionUnit>('cm')
   const [pendingPoint, setPendingPoint] = useState<Point3D | null>(null)
+
+  // Paint state
+  const [paintMode, setPaintMode] = useState(false)
+  const [paintColor, setPaintColor] = useState<string | null>(null)
+  const [paintErase, setPaintErase] = useState(false)
+  const [materialOverrides, setMaterialOverrides] = useState<MaterialOverride[]>([])
 
   // UI state
   const [isFullscreen, setIsFullscreen] = useState(false)
@@ -97,8 +107,19 @@ export function Visor3DViewerPage() {
     return () => unsub()
   }, [modelId])
 
+  // Suscribirse a material overrides
+  useEffect(() => {
+    if (!modelId) return
+    const unsub = subscribeToMaterialOverrides(modelId, (overrides) => {
+      setMaterialOverrides(overrides)
+    })
+    return () => unsub()
+  }, [modelId])
+
+  // QR URL: ruta pública aislada
+  const modelUrl = `${window.location.origin}/mantenimiento-planta/v/${modelId}`
+
   // Copiar link
-  const modelUrl = `${window.location.origin}/mantenimiento-planta/visor-3d/${modelId}`
   const handleCopyLink = useCallback(async () => {
     await navigator.clipboard.writeText(modelUrl)
     setCopied(true)
@@ -127,10 +148,8 @@ export function Visor3DViewerPage() {
       if (!creatingDimension || !modelId || !user) return
 
       if (!pendingPoint) {
-        // Primer punto
         setPendingPoint(point)
       } else {
-        // Segundo punto - crear cota
         const distance = calculateDistance(pendingPoint, point)
         const length = convertUnit(distance, selectedUnit)
 
@@ -149,6 +168,34 @@ export function Visor3DViewerPage() {
     [creatingDimension, pendingPoint, modelId, user, selectedUnit]
   )
 
+  // Handle paint mesh
+  const handleMeshPainted = useCallback(
+    async (meshId: string, color: string | null) => {
+      if (!modelId || !user) return
+      if (color) {
+        await setMaterialOverride(modelId, {
+          meshId,
+          color,
+          opacity: 1,
+          createdBy: user.id,
+        })
+      } else {
+        // Borrar override
+        const overrideId = meshId.replace(/[\/\.#\[\]]/g, '_')
+        await deleteMaterialOverride(modelId, overrideId).catch(() => {})
+      }
+    },
+    [modelId, user]
+  )
+
+  // Reset all paint
+  const handleResetAllPaint = useCallback(async () => {
+    if (!modelId) return
+    await deleteAllMaterialOverrides(modelId)
+    // Force reload model by incrementing resetKey
+    setResetKey((k) => k + 1)
+  }, [modelId])
+
   // Eliminar cota
   const handleDeleteDimension = useCallback(
     async (dimId: string) => {
@@ -157,6 +204,19 @@ export function Visor3DViewerPage() {
     },
     [modelId]
   )
+
+  // Toggle paint mode
+  const togglePaintMode = useCallback(() => {
+    if (paintMode) {
+      setPaintMode(false)
+      setPaintColor(null)
+      setPaintErase(false)
+    } else {
+      setPaintMode(true)
+      setCreatingDimension(false)
+      setPendingPoint(null)
+    }
+  }, [paintMode])
 
   // Loading
   if (loading) {
@@ -227,7 +287,7 @@ export function Visor3DViewerPage() {
             Cotas ({dimensions.length})
           </Button>
 
-          {isAdmin && (
+          {isAdmin && !paintMode && (
             <Button
               variant={creatingDimension ? 'destructive' : 'outline'}
               size="sm"
@@ -246,6 +306,28 @@ export function Visor3DViewerPage() {
                 <>
                   <Ruler className="h-4 w-4" />
                   Nueva cota
+                </>
+              )}
+            </Button>
+          )}
+
+          {/* Paint mode toggle (admin) */}
+          {isAdmin && !creatingDimension && (
+            <Button
+              variant={paintMode ? 'destructive' : 'outline'}
+              size="sm"
+              className="gap-1.5"
+              onClick={togglePaintMode}
+            >
+              {paintMode ? (
+                <>
+                  <X className="h-4 w-4" />
+                  Cerrar pintura
+                </>
+              ) : (
+                <>
+                  <Paintbrush className="h-4 w-4" />
+                  Pintar
                 </>
               )}
             </Button>
@@ -283,7 +365,7 @@ export function Visor3DViewerPage() {
               {pendingPoint ? 'Haz clic en el segundo punto' : 'Haz clic en el primer punto del modelo'}
             </p>
             <p className="text-xs text-muted-foreground">
-              Unidad: {selectedUnit} — 
+              Unidad: {selectedUnit} —{' '}
               <button className="underline ml-1" onClick={() => setSelectedUnit('mm')}>mm</button>{' | '}
               <button className="underline" onClick={() => setSelectedUnit('cm')}>cm</button>{' | '}
               <button className="underline" onClick={() => setSelectedUnit('m')}>m</button>
@@ -309,11 +391,29 @@ export function Visor3DViewerPage() {
           resetKey={resetKey}
           onPointClick={creatingDimension ? handleModelClick : undefined}
           pendingPoint={pendingPoint}
+          paintMode={paintMode}
+          paintColor={paintColor}
+          paintErase={paintErase}
+          materialOverrides={materialOverrides}
+          onMeshPainted={handleMeshPainted}
         >
           {showDimensions && (
             <DimensionsTool dimensions={dimensions} />
           )}
         </Viewer3D>
+
+        {/* Color palette overlay (inside viewer container) */}
+        {paintMode && (
+          <ColorPalette
+            selectedColor={paintColor}
+            onSelectColor={(c) => { setPaintColor(c); setPaintErase(false) }}
+            onClearMode={togglePaintMode}
+            onResetAll={handleResetAllPaint}
+            isEraseMode={paintErase}
+            onToggleErase={() => { setPaintErase(!paintErase); setPaintColor(null) }}
+            paintedCount={materialOverrides.length}
+          />
+        )}
       </div>
 
       {/* Dimensions panel */}

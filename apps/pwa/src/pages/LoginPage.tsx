@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Wrench, LogIn, UserPlus } from 'lucide-react'
 import {
   Card,
@@ -29,6 +29,8 @@ type AuthMode = 'login' | 'register'
 
 export function LoginPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const redirectTo = searchParams.get('redirect') || '/'
   const setUser = useAuthStore((state) => state.setUser)
   
   const [mode, setMode] = useState<AuthMode>('login')
@@ -57,7 +59,7 @@ export function LoginPage() {
         (user) => {
           logger.info('Google sign in successful', { userId: user.id })
           setUser(user)
-          navigate('/')
+          navigate(redirectTo)
         },
         (err) => {
           logger.error('Google sign in error', err)
@@ -139,7 +141,7 @@ export function LoginPage() {
       
       setUser(user)
       logger.info(`${mode} successful`, { userId: user.id, email: user.email })
-      navigate('/')
+      navigate(redirectTo)
     } catch (err: unknown) {
       const errorObj = err instanceof Error ? err : new Error('Authentication error')
       logger.error('Auth error', errorObj)

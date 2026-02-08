@@ -498,6 +498,14 @@ service cloud.firestore {
         allow update: if isAdmin();
         allow delete: if isAdmin();
       }
+
+      // Subcolección de overrides de material (colores de pintura)
+      match /materialOverrides/{overrideId} {
+        allow read: if isAuthenticated();
+        allow create: if isAdmin();
+        allow update: if isAdmin();
+        allow delete: if isAdmin();
+      }
     }
   }
 }
