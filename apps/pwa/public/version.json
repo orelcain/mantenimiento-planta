@@ -1,7 +1,7 @@
 {
-  "version": "2.41.1",
+  "version": "2.42.0",
   "buildDate": "2026-02-08",
-  "buildTimestamp": 1770530357956,
+  "buildTimestamp": 1770532227221,
   "features": [
     "Nuevo módulo Visor 3D con Three.js",
     "Upload de modelos GLB/GLTF/OBJ/FBX a Firebase Storage",
