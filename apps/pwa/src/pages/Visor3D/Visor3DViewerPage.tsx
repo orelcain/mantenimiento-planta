@@ -38,15 +38,21 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '@/components/ui'
 import { useIsAdmin, useAuthStore } from '@/store'
 import { getModel3DById } from '@/services/models3d'
 import { subscribeToDimensions, createDimension, deleteDimension, calculateDistance, convertUnit, calculatePolygonArea, calculateCircleFrom3Points, calculateOrientedBoxVolume, convertAreaUnit, convertVolumeUnit, getRequiredPoints, formatMeasurement } from '@/services/dimensions'
 import { subscribeToMaterialOverrides, setMaterialOverride, deleteMaterialOverride, deleteAllMaterialOverrides } from '@/services/materials3d'
+import { subscribeToAnnotations, createAnnotation, updateAnnotation, deleteAnnotation } from '@/services/annotations3d'
 import { Viewer3D } from '@/components/visor3d/Viewer3D'
 import { DimensionsTool } from '@/components/visor3d/DimensionsTool'
 import { ColorPalette } from '@/components/visor3d/ColorPalette'
-import type { Model3D, MaterialOverride } from '@/types/models3d'
+import type { Model3D, MaterialOverride, Annotation3D, AnnotationStatus, AnnotationPriority } from '@/types/models3d'
 import type { Dimension3D, DimensionUnit, Point3D, MeasurementType } from '@/types/models3d'
 import { getUnitSuffix } from '@/types/models3d'
 
@@ -73,6 +79,19 @@ export function Visor3DViewerPage() {
   const [paintColor, setPaintColor] = useState<string | null>(null)
   const [paintErase, setPaintErase] = useState(false)
   const [materialOverrides, setMaterialOverrides] = useState<MaterialOverride[]>([])
+
+  // Annotation state
+  const [annotations, setAnnotations] = useState<Annotation3D[]>([])
+  const [annotationMode, setAnnotationMode] = useState(false)
+  const [showAnnotationDialog, setShowAnnotationDialog] = useState(false)
+  const [newAnnotationPos, setNewAnnotationPos] = useState<Point3D | null>(null)
+  const [selectedAnnotation, setSelectedAnnotation] = useState<Annotation3D | null>(null)
+  
+  // Annotation form
+  const [annTitle, setAnnTitle] = useState('')
+  const [annDesc, setAnnDesc] = useState('')
+  const [annPriority, setAnnPriority] = useState<AnnotationPriority>('medium')
+  const [annStatus, setAnnStatus] = useState<AnnotationStatus>('open')
 
   // UI state
   const [isFullscreen, setIsFullscreen] = useState(false)
@@ -117,6 +136,76 @@ export function Visor3DViewerPage() {
     })
     return () => unsub()
   }, [modelId])
+
+  // Suscribirse a anotaciones
+  useEffect(() => {
+    if (!modelId) return
+    const unsub = subscribeToAnnotations(modelId, (anns) => {
+      setAnnotations(anns)
+    })
+    return () => unsub()
+  }, [modelId])
+
+
+  // Init creation of annotation
+  const handleAddAnnotationPoint = useCallback((point: Point3D) => {
+    setNewAnnotationPos(point)
+    setAnnTitle('')
+    setAnnDesc('')
+    setAnnPriority('medium')
+    setSelectedAnnotation(null) // New creation
+    setShowAnnotationDialog(true)
+  }, [])
+
+  // Click on existing annotation
+  const handleAnnotationClick = useCallback((annotation: Annotation3D) => {
+    setSelectedAnnotation(annotation)
+    setAnnTitle(annotation.title)
+    setAnnDesc(annotation.description || '')
+    setAnnPriority(annotation.priority)
+    setAnnStatus(annotation.status)
+    setShowAnnotationDialog(true)
+  }, [])
+
+  // Submit annotation (Create or Update)
+  const handleSubmitAnnotation = async () => {
+    if (!modelId || !annTitle) return
+    
+    try {
+      if (selectedAnnotation) {
+        // Update
+        await updateAnnotation(modelId, selectedAnnotation.id, {
+          title: annTitle,
+          description: annDesc,
+          priority: annPriority,
+          status: annStatus
+        })
+      } else if (newAnnotationPos) {
+        // Create
+        await createAnnotation(modelId, {
+          position: newAnnotationPos,
+          title: annTitle,
+          description: annDesc,
+          priority: annPriority,
+          status: 'open',
+          createdBy: user?.id || 'anonymous'
+        })
+      }
+      setShowAnnotationDialog(false)
+      setAnnotationMode(false) // Exit mode after placement (optional)
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  // Delete annotation
+  const handleDeleteAnnotation = async () => {
+    if (!modelId || !selectedAnnotation) return
+    if (confirm('¿Eliminar esta anotación?')) {
+      await deleteAnnotation(modelId, selectedAnnotation.id)
+      setShowAnnotationDialog(false)
+    }
+  }
 
   // QR URL: ruta pública aislada
   const modelUrl = `${window.location.origin}/mantenimiento-planta/v/${modelId}`
@@ -502,10 +591,10 @@ export function Visor3DViewerPage() {
         }`}
       >
         <Viewer3D
-          url={model.downloadURL}
+          url={model.storagePath}
           format={model.format}
           resetKey={resetKey}
-          onPointClick={creatingDimension ? handleModelClick : undefined}
+          onPointClick={handleModelClick}
           pendingPoints={pendingPoints}
           measurementType={measurementType}
           onClosePolygon={handleClosePolygon}
@@ -514,11 +603,86 @@ export function Visor3DViewerPage() {
           paintErase={paintErase}
           materialOverrides={materialOverrides}
           onMeshPainted={handleMeshPainted}
+          annotations={annotations}
+          annotationMode={annotationMode}
+          onAnnotationClick={handleAnnotationClick}
+          onAddAnnotation={handleAddAnnotationPoint}
         >
           {showDimensions && (
             <DimensionsTool dimensions={dimensions} pendingPoints={pendingPoints} measurementType={measurementType} />
           )}
         </Viewer3D>
+
+        {/* Annotation Creation/Edit Dialog */}
+        <Dialog open={showAnnotationDialog} onOpenChange={setShowAnnotationDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{selectedAnnotation ? 'Editar Anotación' : 'Nueva Anotación'}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Título</label>
+                <input 
+                  className="w-full flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                  value={annTitle} 
+                  onChange={e => setAnnTitle(e.target.value)} 
+                  placeholder="Ej. Revisar corrosión"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Descripción</label>
+                <textarea 
+                  className="w-full flex min-h-[80px] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                  value={annDesc} 
+                  onChange={e => setAnnDesc(e.target.value)} 
+                  placeholder="Detalles adicionales..."
+                />
+              </div>
+              <div className="flex gap-4">
+                <div className="space-y-2 flex-1">
+                  <label className="text-sm font-medium">Prioridad</label>
+                  <Select value={annPriority} onValueChange={(v: AnnotationPriority) => setAnnPriority(v)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Baja (Azul)</SelectItem>
+                      <SelectItem value="medium">Media (Ámbar)</SelectItem>
+                      <SelectItem value="high">Alta (Rojo)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {selectedAnnotation && (
+                  <div className="space-y-2 flex-1">
+                    <label className="text-sm font-medium">Estado</label>
+                    <Select value={annStatus} onValueChange={(v: AnnotationStatus) => setAnnStatus(v)}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="open">Abierta</SelectItem>
+                        <SelectItem value="resolved">Resuelta (Verde)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="flex justify-between items-center mt-4">
+              {selectedAnnotation ? (
+                <Button variant="destructive" size="sm" onClick={handleDeleteAnnotation}>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Eliminar
+                </Button>
+              ) : (
+                <div />
+              )}
+              <Button onClick={handleSubmitAnnotation} disabled={!annTitle}>
+                {selectedAnnotation ? 'Guardar Cambios' : 'Crear Anotación'}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Color palette overlay (inside viewer container) */}
         {paintMode && (
