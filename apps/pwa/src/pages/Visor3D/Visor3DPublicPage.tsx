@@ -55,6 +55,7 @@ import { subscribeToAnnotations } from '@/services/annotations3d'
 import { Viewer3D } from '@/components/visor3d/Viewer3D'
 import { DimensionsTool } from '@/components/visor3d/DimensionsTool'
 import { ColorPalette } from '@/components/visor3d/ColorPalette'
+import { AnnotationListItems } from '@/components/visor3d/AnnotationListItems'
 import { ImageLightbox } from '@/components/ui/ImageLightbox'
 import type { Model3D, MaterialOverride, Annotation3D, Dimension3D, DimensionUnit, Point3D, MeasurementType } from '@/types/models3d'
 import { getUnitSuffix } from '@/types/models3d'
@@ -604,36 +605,7 @@ export function Visor3DPublicPage() {
                   <MapPin className="h-3 w-3" />
                   Anotaciones ({annotations.length})
                 </h3>
-                <div className="space-y-0.5">
-                  {annotations.map((ann) => {
-                    const priorityColors: Record<string, string> = {
-                      high: 'text-red-500',
-                      medium: 'text-amber-500',
-                      low: 'text-blue-500',
-                    }
-                    return (
-                      <div
-                        key={ann.id}
-                        className="flex items-center justify-between py-1 px-1.5 rounded hover:bg-muted/50 text-xs cursor-pointer transition-colors"
-                        onClick={() => setFocusPoint({ ...ann.position })}
-                        title="Clic para enfocar"
-                      >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className={`font-bold ${priorityColors[ann.priority] ?? 'text-amber-500'}`}>
-                            #{ann.number}
-                          </span>
-                          <span className="truncate max-w-[120px] font-medium text-[11px]">{ann.title}</span>
-                          {ann.status === 'resolved' && (
-                            <span className="text-emerald-500 text-[10px]">✓</span>
-                          )}
-                        </div>
-                        <span className={`text-[10px] ${priorityColors[ann.priority] ?? 'text-amber-500'}`}>
-                          {ann.status === 'resolved' ? '✓' : ann.priority === 'high' ? 'Alta' : ann.priority === 'low' ? 'Baja' : 'Media'}
-                        </span>
-                      </div>
-                    )
-                  })}
-                </div>
+                <AnnotationListItems annotations={annotations} onFocus={setFocusPoint} compact />
               </>
             )}
           </div>

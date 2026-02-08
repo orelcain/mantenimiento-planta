@@ -22,6 +22,8 @@ const PRIORITY_CONFIG = {
 
 const RESOLVED_CONFIG = { color: '#10b981', glow: '#34d399', ring: '#6ee7b7' }
 
+const DESC_TRUNCATE_LEN = 60
+
 function AnnotationPin({ 
   annotation, 
   onClick,
@@ -36,6 +38,7 @@ function AnnotationPin({
   onPin: (id: string | null) => void
 }) {
   const [hovered, setHovered] = useState(false)
+  const [descExpanded, setDescExpanded] = useState(false)
   const groupRef = useRef<THREE.Group>(null)
   const ringRef = useRef<THREE.Mesh>(null)
   const isResolved = annotation.status === 'resolved'
@@ -227,9 +230,21 @@ function AnnotationPin({
             <div className="px-3 py-2">
               <p className="text-sm font-semibold leading-tight">{annotation.title}</p>
               {annotation.description && (
-                <p className="text-xs text-gray-400 mt-1 leading-snug max-w-[200px] truncate">
-                  {annotation.description}
-                </p>
+                <div className="mt-1 max-w-[220px]">
+                  <p className="text-xs text-gray-400 leading-snug whitespace-normal">
+                    {descExpanded || annotation.description.length <= DESC_TRUNCATE_LEN
+                      ? annotation.description
+                      : `${annotation.description.slice(0, DESC_TRUNCATE_LEN)}…`}
+                  </p>
+                  {annotation.description.length > DESC_TRUNCATE_LEN && (
+                    <button
+                      className="text-[10px] text-blue-400 hover:text-blue-300 mt-0.5 font-medium"
+                      onClick={(e) => { e.stopPropagation(); setDescExpanded(!descExpanded) }}
+                    >
+                      {descExpanded ? 'Ver menos' : 'Ver más'}
+                    </button>
+                  )}
+                </div>
               )}
               {/* Photo thumbnails – always clickable when pinned */}
               {(annotation.photos?.length ?? 0) > 0 && (
