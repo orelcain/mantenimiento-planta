@@ -460,9 +460,9 @@ function IncidentCard({
   userInfoLabels: Record<string, string>
   onClick: () => void
 }) {
-  const statusConfig = STATUS_CONFIG[incident.status]
-  const priorityConfig = PRIORITY_CONFIG[incident.prioridad]
-  const StatusIcon = getStatusIcon(incident.status)
+  const statusConfig = STATUS_CONFIG[incident.status] || STATUS_CONFIG['pendiente']
+  const priorityConfig = PRIORITY_CONFIG[incident.prioridad] || PRIORITY_CONFIG['media']
+  const StatusIcon = getStatusIcon(incident.status) || getStatusIcon('pendiente')
 
   return (
     <Card
@@ -508,8 +508,8 @@ function IncidentCard({
           </div>
           <div className="text-right text-sm text-muted-foreground shrink-0">
             <div>{formatRelativeTime(incident.createdAt)}</div>
-            {incident.fotos.length > 0 && (
-              <div className="text-xs mt-1">{incident.fotos.length} foto(s)</div>
+            {(incident.fotos?.length || 0) > 0 && (
+              <div className="text-xs mt-1">{incident.fotos?.length || 0} foto(s)</div>
             )}
           </div>
         </div>

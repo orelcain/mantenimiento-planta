@@ -216,7 +216,7 @@ service cloud.firestore {
           isSupervisor()
           && request.resource.data.validatedBy == request.auth.uid
         ))
-        && (!('asignadoA' in request.resource.data) || isSupervisor() || (
+        && (!('asignadoA' in request.resource.data) || request.resource.data.asignadoA == resource.data.asignadoA || isSupervisor() || (
           request.resource.data.asignadoA == request.auth.uid
           && resource.data.reportadoPor == request.auth.uid
         ))
