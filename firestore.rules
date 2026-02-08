@@ -210,7 +210,7 @@ service cloud.firestore {
           request.resource.data.fotos is list
           && request.resource.data.fotos.size() <= 10
         ))
-        && (!('resolucion' in request.resource.data) || isNonEmptyString(request.resource.data.resolucion, 20, 1000))
+        && (!('resolucion' in request.resource.data) || isNonEmptyString(request.resource.data.resolucion, 3, 2000))
         && (!('rejectionReason' in request.resource.data) || isNonEmptyString(request.resource.data.rejectionReason, 10, 500))
         && (!('validatedBy' in request.resource.data) || (
           isSupervisor()

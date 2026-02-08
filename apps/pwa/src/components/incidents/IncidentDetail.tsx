@@ -348,6 +348,10 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
   // Resolver incidencia (Técnico finaliza)
   const handleResolve = async () => {
     if (!resolution.trim()) return
+    if (resolution.trim().length < 3) {
+      toast({ variant: 'destructive', title: 'Error', description: 'La resolución debe tener al menos 3 caracteres.' })
+      return
+    }
     setIsLoading(true)
     try {
       await resolveIncident(incident.id, resolution)
