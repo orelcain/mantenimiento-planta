@@ -11,6 +11,16 @@
     <link rel="apple-touch-icon" href="/mantenimiento-planta/icons/icon-192.svg" />
     <link rel="manifest" href="/mantenimiento-planta/manifest.json" />
     <title>Mantenimiento Industrial</title>
+    <!-- SPA redirect: restaurar la URL original guardada por 404.html (GitHub Pages) -->
+    <script>
+      (function() {
+        var redirect = sessionStorage.getItem('spa-redirect');
+        if (redirect) {
+          sessionStorage.removeItem('spa-redirect');
+          window.history.replaceState(null, null, redirect);
+        }
+      })();
+    </script>
     <!-- Script inline para aplicar tema antes de que React cargue (evita flash) -->
     <script>
       (function() {
