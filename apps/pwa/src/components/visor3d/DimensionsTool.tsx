@@ -65,28 +65,24 @@ function DistanceLine({ dim }: { dim: Dimension3D }) {
 
 function AreaPolygon({ dim }: { dim: Dimension3D }) {
   const pts = dim.points
-  if (pts.length < 3) return null
 
   const linePoints = useMemo(() => {
+    if (pts.length < 3) return []
     const arr = pts.map((p) => [p.x, p.y, p.z] as [number, number, number])
     arr.push(arr[0]!) // cerrar polígono
     return arr
   }, [pts])
 
   const centroid = useMemo(() => {
+    if (pts.length < 3) return [0, 0, 0] as [number, number, number]
     const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length
     const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length
     const cz = pts.reduce((s, p) => s + p.z, 0) / pts.length
     return [cx, cy, cz] as [number, number, number]
   }, [pts])
 
-  const suffix = getUnitSuffix(dim.unit, 'area')
-  const text = dim.label
-    ? `${dim.label}: ${dim.value.toFixed(2)} ${suffix}`
-    : `${dim.value.toFixed(2)} ${suffix}`
-
-  // Mesh fill (triangulate from centroid as simple fan)
   const fillGeom = useMemo(() => {
+    if (pts.length < 3) return null
     const geom = new THREE.BufferGeometry()
     const vertices: number[] = []
     const c = centroid
@@ -99,6 +95,10 @@ function AreaPolygon({ dim }: { dim: Dimension3D }) {
     geom.computeVertexNormals()
     return geom
   }, [pts, centroid])
+
+  if (pts.length < 3) return null
+
+  const suffix = getUnitSuffix(dim.unit, 'area')
 
   return (
     <group userData={{ isDimensionHelper: true }}>
@@ -126,10 +126,10 @@ function AreaPolygon({ dim }: { dim: Dimension3D }) {
 
 function CircumferenceLine({ dim }: { dim: Dimension3D }) {
   const pts = dim.points
-  if (pts.length < 3 || !dim.radius) return null
 
   // Recrear el centro y el círculo a partir de la info guardada
   const circlePoints = useMemo(() => {
+    if (pts.length < 3 || !dim.radius) return []
     const p0 = pts[0]!, p1 = pts[1]!, p2 = pts[2]!
 
     // Calcular centro real y normal del plano
@@ -173,6 +173,7 @@ function CircumferenceLine({ dim }: { dim: Dimension3D }) {
   }, [pts, dim.radius])
 
   const centerPos = useMemo(() => {
+    if (pts.length < 3) return [0, 0, 0] as [number, number, number]
     const p0 = pts[0]!, p1 = pts[1]!, p2 = pts[2]!
     const A = new THREE.Vector3(p0.x, p0.y, p0.z)
     const B = new THREE.Vector3(p1.x, p1.y, p1.z)
@@ -194,7 +195,7 @@ function CircumferenceLine({ dim }: { dim: Dimension3D }) {
     return [cc.x, cc.y, cc.z] as [number, number, number]
   }, [pts])
 
-  if (circlePoints.length === 0) return null
+  if (pts.length < 3 || !dim.radius || circlePoints.length === 0) return null
 
   const suffix = getUnitSuffix(dim.unit, 'circumference')
   const text = `⌀${dim.diameter?.toFixed(1)} ${suffix} · C=${dim.value.toFixed(1)} ${suffix}`
@@ -383,11 +384,11 @@ function VolumeBox({ dim }: { dim: Dimension3D }) {
 // ============================================================================
 
 function PendingPointsPreview({ points, measurementType }: { points: Point3D[]; measurementType?: MeasurementType }) {
-  if (points.length === 0) return null
-
   const linePoints = useMemo(() => {
     return points.map((p) => [p.x, p.y, p.z] as [number, number, number])
   }, [points])
+
+  if (points.length === 0) return null
 
   // Can close polygon? (area mode with 3+ points)
   const canClose = measurementType === 'area' && points.length >= 3
