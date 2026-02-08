@@ -477,15 +477,16 @@ export function Visor3DPublicPage() {
           format={model.format}
           resetKey={resetKey}
           onPointClick={creatingDimension ? handleModelClick : undefined}
-          pendingPoint={pendingPoints.length === 1 ? pendingPoints[0] : null}
           pendingPoints={pendingPoints}
+          measurementType={measurementType}
+          onClosePolygon={handleClosePolygon}
           paintMode={paintMode}
           paintColor={paintColor}
           paintErase={paintErase}
           materialOverrides={materialOverrides}
           onMeshPainted={handleMeshPainted}
         >
-          {showDimensions && <DimensionsTool dimensions={dimensions} pendingPoints={pendingPoints} />}
+          {showDimensions && <DimensionsTool dimensions={dimensions} pendingPoints={pendingPoints} measurementType={measurementType} />}
         </Viewer3D>
 
         {/* Color palette overlay */}

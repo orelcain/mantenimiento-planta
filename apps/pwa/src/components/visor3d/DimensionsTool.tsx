@@ -8,16 +8,19 @@
  * - Volumen: caja wireframe entre 2 puntos diagonales
  */
 
-import { useMemo } from 'react'
+import { useMemo, useRef } from 'react'
 import { Line, Html } from '@react-three/drei'
+import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import type { Dimension3D, Point3D } from '@/types/models3d'
+import type { Dimension3D, Point3D, MeasurementType } from '@/types/models3d'
 import { getUnitSuffix } from '@/types/models3d'
 
 interface DimensionsToolProps {
   dimensions: Dimension3D[]
   /** Puntos pendientes mientras se crea una medición */
   pendingPoints?: Point3D[]
+  /** Tipo de medición activa (para el indicador de cierre) */
+  measurementType?: MeasurementType
 }
 
 // ============================================================================
@@ -49,14 +52,8 @@ function DistanceLine({ dim }: { dim: Dimension3D }) {
   return (
     <group userData={{ isDimensionHelper: true }}>
       <Line points={points} color="#f59e0b" lineWidth={2} />
-      <mesh position={[dim.p1.x, dim.p1.y, dim.p1.z]}>
-        <sphereGeometry args={[0.02, 8, 8]} />
-        <meshStandardMaterial color="#f59e0b" emissive="#f59e0b" emissiveIntensity={0.3} />
-      </mesh>
-      <mesh position={[dim.p2.x, dim.p2.y, dim.p2.z]}>
-        <sphereGeometry args={[0.02, 8, 8]} />
-        <meshStandardMaterial color="#f59e0b" emissive="#f59e0b" emissiveIntensity={0.3} />
-      </mesh>
+      <NumberedPoint position={[dim.p1.x, dim.p1.y, dim.p1.z]} index={1} color="#f59e0b" />
+      <NumberedPoint position={[dim.p2.x, dim.p2.y, dim.p2.z]} index={2} color="#f59e0b" />
       <DimensionLabel position={midPoint} text={text} color="#f59e0b" />
     </group>
   )
@@ -107,10 +104,7 @@ function AreaPolygon({ dim }: { dim: Dimension3D }) {
     <group userData={{ isDimensionHelper: true }}>
       <Line points={linePoints} color="#10b981" lineWidth={2} />
       {pts.map((p, i) => (
-        <mesh key={i} position={[p.x, p.y, p.z]}>
-          <sphereGeometry args={[0.02, 8, 8]} />
-          <meshStandardMaterial color="#10b981" emissive="#10b981" emissiveIntensity={0.3} />
-        </mesh>
+        <NumberedPoint key={i} position={[p.x, p.y, p.z]} index={i + 1} color="#10b981" />
       ))}
       <mesh geometry={fillGeom}>
         <meshStandardMaterial
@@ -209,15 +203,12 @@ function CircumferenceLine({ dim }: { dim: Dimension3D }) {
     <group userData={{ isDimensionHelper: true }}>
       <Line points={circlePoints} color="#8b5cf6" lineWidth={2} />
       {pts.map((p, i) => (
-        <mesh key={i} position={[p.x, p.y, p.z]}>
-          <sphereGeometry args={[0.02, 8, 8]} />
-          <meshStandardMaterial color="#8b5cf6" emissive="#8b5cf6" emissiveIntensity={0.3} />
-        </mesh>
+        <NumberedPoint key={i} position={[p.x, p.y, p.z]} index={i + 1} color="#8b5cf6" />
       ))}
       {/* Center point */}
       <mesh position={centerPos}>
-        <sphereGeometry args={[0.015, 8, 8]} />
-        <meshStandardMaterial color="#c4b5fd" emissive="#c4b5fd" emissiveIntensity={0.4} />
+        <ringGeometry args={[0.008, 0.015, 16]} />
+        <meshStandardMaterial color="#c4b5fd" emissive="#c4b5fd" emissiveIntensity={0.4} side={THREE.DoubleSide} />
       </mesh>
       <DimensionLabel position={centerPos} text={text} color="#8b5cf6" />
     </group>
@@ -265,14 +256,8 @@ function VolumeBox({ dim }: { dim: Dimension3D }) {
         <edgesGeometry args={[new THREE.BoxGeometry(...boxData.size)]} />
         <lineBasicMaterial color="#ef4444" />
       </lineSegments>
-      <mesh position={[dim.p1.x, dim.p1.y, dim.p1.z]}>
-        <sphereGeometry args={[0.02, 8, 8]} />
-        <meshStandardMaterial color="#ef4444" emissive="#ef4444" emissiveIntensity={0.3} />
-      </mesh>
-      <mesh position={[dim.p2.x, dim.p2.y, dim.p2.z]}>
-        <sphereGeometry args={[0.02, 8, 8]} />
-        <meshStandardMaterial color="#ef4444" emissive="#ef4444" emissiveIntensity={0.3} />
-      </mesh>
+      <NumberedPoint position={[dim.p1.x, dim.p1.y, dim.p1.z]} index={1} color="#ef4444" />
+      <NumberedPoint position={[dim.p2.x, dim.p2.y, dim.p2.z]} index={2} color="#ef4444" />
       <DimensionLabel position={boxData.position} text={text} color="#ef4444" />
     </group>
   )
@@ -282,12 +267,15 @@ function VolumeBox({ dim }: { dim: Dimension3D }) {
 // Pending Points Preview (while creating)
 // ============================================================================
 
-function PendingPointsPreview({ points }: { points: Point3D[] }) {
+function PendingPointsPreview({ points, measurementType }: { points: Point3D[]; measurementType?: MeasurementType }) {
   if (points.length === 0) return null
 
   const linePoints = useMemo(() => {
     return points.map((p) => [p.x, p.y, p.z] as [number, number, number])
   }, [points])
+
+  // Can close polygon? (area mode with 3+ points)
+  const canClose = measurementType === 'area' && points.length >= 3
 
   return (
     <group userData={{ isDimensionHelper: true }}>
@@ -295,10 +283,14 @@ function PendingPointsPreview({ points }: { points: Point3D[] }) {
         <Line points={linePoints} color="#6366f1" lineWidth={1.5} dashed dashSize={0.05} gapSize={0.03} />
       )}
       {points.map((p, i) => (
-        <mesh key={i} position={[p.x, p.y, p.z]}>
-          <sphereGeometry args={[0.025, 12, 12]} />
-          <meshStandardMaterial color="#6366f1" emissive="#6366f1" emissiveIntensity={0.5} />
-        </mesh>
+        <NumberedPoint
+          key={i}
+          position={[p.x, p.y, p.z]}
+          index={i + 1}
+          color="#6366f1"
+          pending
+          isCloseTarget={canClose && i === 0}
+        />
       ))}
     </group>
   )
@@ -307,6 +299,136 @@ function PendingPointsPreview({ points }: { points: Point3D[] }) {
 // ============================================================================
 // Shared label component
 // ============================================================================
+
+// ============================================================================
+// Numbered Point Marker (replaces plain spheres)
+// ============================================================================
+
+function NumberedPoint({
+  position,
+  index,
+  color,
+  pending,
+  isCloseTarget,
+}: {
+  position: [number, number, number]
+  index: number
+  color: string
+  pending?: boolean
+  isCloseTarget?: boolean
+}) {
+  const groupRef = useRef<THREE.Group>(null)
+  const ringRef = useRef<THREE.Mesh>(null)
+
+  // Pulse animation for close-target (point 1 when area can close)
+  useFrame(({ clock }) => {
+    if (isCloseTarget && ringRef.current) {
+      const s = 1 + Math.sin(clock.getElapsedTime() * 3) * 0.35
+      ringRef.current.scale.setScalar(s)
+    }
+  })
+
+  return (
+    <group ref={groupRef} position={position} userData={{ isDimensionHelper: true }}>
+      {/* Outer ring — precise, non-occluding */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[0.008, 0.014, 20]} />
+        <meshStandardMaterial
+          color={color}
+          emissive={color}
+          emissiveIntensity={0.5}
+          side={THREE.DoubleSide}
+          depthTest={false}
+        />
+      </mesh>
+
+      {/* Center dot — tiny, precise */}
+      <mesh>
+        <sphereGeometry args={[0.004, 8, 8]} />
+        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.8} depthTest={false} />
+      </mesh>
+
+      {/* Cross-hair lines for precision */}
+      <Line
+        points={[[-0.018, 0, 0], [0.018, 0, 0]]}
+        color={color}
+        lineWidth={1}
+        userData={{ isDimensionHelper: true }}
+      />
+      <Line
+        points={[[0, 0, -0.018], [0, 0, 0.018]]}
+        color={color}
+        lineWidth={1}
+        userData={{ isDimensionHelper: true }}
+      />
+
+      {/* Close-target ring (pulsing green ring around point 1 in area mode) */}
+      {isCloseTarget && (
+        <mesh ref={ringRef} rotation={[-Math.PI / 2, 0, 0]}>
+          <ringGeometry args={[0.025, 0.035, 24]} />
+          <meshStandardMaterial
+            color="#22c55e"
+            emissive="#22c55e"
+            emissiveIntensity={0.7}
+            transparent
+            opacity={0.8}
+            side={THREE.DoubleSide}
+            depthTest={false}
+          />
+        </mesh>
+      )}
+
+      {/* Number label */}
+      <Html
+        position={[0.022, 0.022, 0]}
+        center
+        distanceFactor={2}
+        style={{ pointerEvents: 'none' }}
+      >
+        <div
+          style={{
+            background: pending ? '#6366f1' : color,
+            color: '#fff',
+            width: '16px',
+            height: '16px',
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '9px',
+            fontWeight: 700,
+            fontFamily: 'monospace',
+            border: isCloseTarget ? '2px solid #22c55e' : '1px solid rgba(255,255,255,0.3)',
+            boxShadow: isCloseTarget ? '0 0 8px #22c55e' : '0 1px 3px rgba(0,0,0,0.5)',
+            lineHeight: 1,
+          }}
+        >
+          {index}
+        </div>
+        {isCloseTarget && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '-18px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              whiteSpace: 'nowrap',
+              fontSize: '9px',
+              fontWeight: 600,
+              color: '#22c55e',
+              background: 'rgba(0,0,0,0.8)',
+              padding: '1px 5px',
+              borderRadius: '3px',
+              border: '1px solid #22c55e40',
+            }}
+          >
+            Cerrar
+          </div>
+        )}
+      </Html>
+    </group>
+  )
+}
 
 function DimensionLabel({ position, text, color }: { position: [number, number, number]; text: string; color: string }) {
   return (
@@ -342,14 +464,14 @@ function DimensionRenderer({ dim }: { dim: Dimension3D }) {
   }
 }
 
-export function DimensionsTool({ dimensions, pendingPoints }: DimensionsToolProps) {
+export function DimensionsTool({ dimensions, pendingPoints, measurementType }: DimensionsToolProps) {
   return (
     <group>
       {dimensions.map((dim) => (
         <DimensionRenderer key={dim.id} dim={dim} />
       ))}
       {pendingPoints && pendingPoints.length > 0 && (
-        <PendingPointsPreview points={pendingPoints} />
+        <PendingPointsPreview points={pendingPoints} measurementType={measurementType} />
       )}
     </group>
   )

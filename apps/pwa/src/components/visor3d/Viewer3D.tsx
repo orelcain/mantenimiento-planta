@@ -40,6 +40,10 @@ interface Viewer3DProps {
   pendingPoint?: Point3D | null
   /** Puntos pendientes para mediciones multi-punto */
   pendingPoints?: Point3D[]
+  /** Tipo de medición activa */
+  measurementType?: import('@/types/models3d').MeasurementType
+  /** Callback para cerrar polígono automáticamente (al hacer click en punto 1) */
+  onClosePolygon?: () => void
   /** Pintura: modo activo + color seleccionado */
   paintMode?: boolean
   paintColor?: string | null
@@ -446,7 +450,12 @@ function computeSnap(
 // Click Handler con Snap (cotas)
 // ============================================================================
 
-function ClickHandler({ onPointClick }: { onPointClick: (point: Point3D) => void }) {
+function ClickHandler({ onPointClick, pendingPoints, measurementType, onClosePolygon }: {
+  onPointClick: (point: Point3D) => void
+  pendingPoints?: Point3D[]
+  measurementType?: import('@/types/models3d').MeasurementType
+  onClosePolygon?: () => void
+}) {
   const { camera, scene, gl } = useThree()
   const raycaster = useRef(new THREE.Raycaster())
   const mouse = useRef(new THREE.Vector2())
@@ -455,6 +464,20 @@ function ClickHandler({ onPointClick }: { onPointClick: (point: Point3D) => void
   const snapIndicatorRef = useRef<THREE.Group>(null!)
   const snapSphereRef = useRef<THREE.Mesh>(null!)
   const currentSnap = useRef<SnapResult | null>(null)
+  const nearFirstPoint = useRef(false)
+
+  // Check if mouse is near the first pending point (for closing polygons)
+  const checkNearFirstPoint = useCallback((mouseNdc: THREE.Vector2): boolean => {
+    if (!pendingPoints || pendingPoints.length < 3 || measurementType !== 'area') return false
+    const p0 = pendingPoints[0]!
+    const worldPos = new THREE.Vector3(p0.x, p0.y, p0.z)
+    const screenPos = worldPos.clone().project(camera)
+    const dx = screenPos.x - mouseNdc.x
+    const dy = screenPos.y - mouseNdc.y
+    const dist = Math.sqrt(dx * dx + dy * dy)
+    // Threshold in NDC: ~0.04 (~20px on a 1000px viewport)
+    return dist < 0.06
+  }, [pendingPoints, measurementType, camera])
 
   // Perform raycast + snap on mouse move → show indicator
   const handleMove = useCallback((event: MouseEvent) => {
@@ -474,6 +497,9 @@ function ClickHandler({ onPointClick }: { onPointClick: (point: Point3D) => void
     if (hit && hit.object instanceof THREE.Mesh) {
       const snap = computeSnap(hit.point, hit.object, camera)
       currentSnap.current = snap
+
+      // Check proximity to first point for polygon closing
+      nearFirstPoint.current = checkNearFirstPoint(mouse.current)
 
       // Update indicator
       if (snapSphereRef.current) {
@@ -501,6 +527,7 @@ function ClickHandler({ onPointClick }: { onPointClick: (point: Point3D) => void
       }
     } else {
       currentSnap.current = null
+      nearFirstPoint.current = false
       if (snapSphereRef.current) {
         snapSphereRef.current.visible = false
       }
@@ -508,6 +535,16 @@ function ClickHandler({ onPointClick }: { onPointClick: (point: Point3D) => void
   }, [camera, scene, gl])
 
   const handleClick = useCallback((event: MouseEvent) => {
+    // Check if clicking near first point to close polygon
+    const rect = gl.domElement.getBoundingClientRect()
+    mouse.current.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
+    mouse.current.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
+
+    if (checkNearFirstPoint(mouse.current) && onClosePolygon) {
+      onClosePolygon()
+      return
+    }
+
     // Si tenemos snap, usar ese punto
     if (currentSnap.current) {
       const p = currentSnap.current.point
@@ -516,9 +553,6 @@ function ClickHandler({ onPointClick }: { onPointClick: (point: Point3D) => void
     }
 
     // Fallback: raycast directo
-    const rect = gl.domElement.getBoundingClientRect()
-    mouse.current.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
-    mouse.current.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
     raycaster.current.setFromCamera(mouse.current, camera)
     const intersects = raycaster.current.intersectObjects(scene.children, true)
     const hit = intersects.find((i) =>
@@ -527,7 +561,7 @@ function ClickHandler({ onPointClick }: { onPointClick: (point: Point3D) => void
     if (hit) {
       onPointClick({ x: hit.point.x, y: hit.point.y, z: hit.point.z })
     }
-  }, [camera, scene, gl, onPointClick])
+  }, [camera, scene, gl, onPointClick, checkNearFirstPoint, onClosePolygon])
 
   useEffect(() => {
     gl.domElement.addEventListener('click', handleClick)
@@ -654,25 +688,6 @@ function PaintClickHandler({ paintColor, paintErase, onMeshPainted }: {
 }
 
 // ============================================================================
-// Pending Point Marker
-// ============================================================================
-
-function PendingPointMarker({ point }: { point: Point3D }) {
-  const meshRef = useRef<THREE.Mesh>(null)
-  useFrame(({ clock }) => {
-    if (meshRef.current) {
-      meshRef.current.scale.setScalar(1 + Math.sin(clock.getElapsedTime() * 4) * 0.3)
-    }
-  })
-  return (
-    <mesh ref={meshRef} position={[point.x, point.y, point.z]} userData={{ isDimensionHelper: true }}>
-      <sphereGeometry args={[0.03, 16, 16]} />
-      <meshStandardMaterial color="#3b82f6" emissive="#3b82f6" emissiveIntensity={0.5} />
-    </mesh>
-  )
-}
-
-// ============================================================================
 // In-Canvas Loader
 // ============================================================================
 
@@ -709,7 +724,7 @@ class ErrorBoundary3D extends Component<{ children: ReactNode; onError: (msg: st
 // ============================================================================
 
 function SceneContent(props: Viewer3DProps) {
-  const { url, format, resetKey, onPointClick, pendingPoint, pendingPoints, paintMode, paintColor, paintErase, materialOverrides, onMeshPainted, children } = props
+  const { url, format, resetKey, onPointClick, pendingPoints, measurementType, onClosePolygon, paintMode, paintColor, paintErase, materialOverrides, onMeshPainted, children } = props
   const [modelInfo, setModelInfo] = useState<ModelInfo | null>(null)
   const [hasError, setHasError] = useState(false)
 
@@ -751,11 +766,17 @@ function SceneContent(props: Viewer3DProps) {
       <AutoFitCamera modelInfo={modelInfo} resetKey={resetKey ?? 0} />
 
       {/* Click handlers */}
-      {onPointClick && !paintMode && <ClickHandler onPointClick={onPointClick} />}
+      {onPointClick && !paintMode && (
+        <ClickHandler
+          onPointClick={onPointClick}
+          pendingPoints={pendingPoints}
+          measurementType={measurementType}
+          onClosePolygon={onClosePolygon}
+        />
+      )}
       {paintMode && onMeshPainted && <PaintClickHandler paintColor={paintColor ?? null} paintErase={paintErase ?? false} onMeshPainted={onMeshPainted} />}
 
-      {pendingPoint && !pendingPoints?.length && <PendingPointMarker point={pendingPoint} />}
-      {pendingPoints && pendingPoints.map((p, i) => <PendingPointMarker key={i} point={p} />)}
+      {/* Pending points are now rendered inside DimensionsTool via pendingPoints prop */}
 
       {/* Model */}
       <Suspense fallback={<InCanvasLoader />}>
