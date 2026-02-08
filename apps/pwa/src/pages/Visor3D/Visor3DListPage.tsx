@@ -104,7 +104,7 @@ export function Visor3DListPage() {
 
   // Generar URL del modelo
   const getModelUrl = (modelId: string) =>
-    `${window.location.origin}/mantenimiento-planta/visor-3d/${modelId}`
+    `${window.location.origin}/mantenimiento-planta/v/${modelId}`
 
   return (
     <div className="space-y-6">

@@ -486,14 +486,15 @@ service cloud.firestore {
     // MODELOS 3D - Visor 3D
     // ============================================
     match /models3d/{modelId} {
-      allow read: if isAuthenticated();
+      // Lectura pública (QR sin login)
+      allow read: if true;
       allow create: if isAdmin();
       allow update: if isAdmin();
       allow delete: if isAdmin();
 
       // Subcolección de cotas/dimensiones
       match /dimensions/{dimensionId} {
-        allow read: if isAuthenticated();
+        allow read: if true;
         allow create: if isAdmin();
         allow update: if isAdmin();
         allow delete: if isAdmin();
@@ -501,7 +502,7 @@ service cloud.firestore {
 
       // Subcolección de overrides de material (colores de pintura)
       match /materialOverrides/{overrideId} {
-        allow read: if isAuthenticated();
+        allow read: if true;
         allow create: if isAdmin();
         allow update: if isAdmin();
         allow delete: if isAdmin();

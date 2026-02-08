@@ -1,14 +1,15 @@
 /**
- * Visor3DPublicPage - Vista pública aislada para acceso directo por QR
+ * Visor3DPublicPage - Vista 100% pública para acceso directo por QR
  *
- * - Sin sidebar ni navegación a otras partes de la app
- * - Requiere autenticación (redirige a login con redirect)
+ * - NO requiere autenticación
+ * - Sin sidebar, sin navegación, sin acceso a otras partes de la app
  * - Solo muestra el visor 3D del modelo específico
- * - Controles mínimos: orbit, zoom, fullscreen, cotas (solo ver)
+ * - Controles mínimos: orbit, zoom, pan, fullscreen, cotas (solo ver)
+ * - Ruta: /v/:modelId
  */
 
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import {
   Maximize,
   Minimize,
@@ -17,7 +18,6 @@ import {
   AlertCircle,
   Box,
   Loader2,
-  LogOut,
 } from 'lucide-react'
 import {
   Button,
@@ -25,19 +25,15 @@ import {
   CardContent,
   Badge,
 } from '@/components/ui'
-import { useAuthStore } from '@/store'
 import { getModel3DById } from '@/services/models3d'
 import { subscribeToDimensions } from '@/services/dimensions'
 import { subscribeToMaterialOverrides } from '@/services/materials3d'
-import { signOut } from '@/services/auth'
 import { Viewer3D } from '@/components/visor3d/Viewer3D'
 import { DimensionsTool } from '@/components/visor3d/DimensionsTool'
 import type { Model3D, MaterialOverride, Dimension3D } from '@/types/models3d'
 
 export function Visor3DPublicPage() {
   const { modelId } = useParams<{ modelId: string }>()
-  const navigate = useNavigate()
-  const { user, isAuthenticated, isLoading: authLoading } = useAuthStore()
 
   const [model, setModel] = useState<Model3D | null>(null)
   const [loading, setLoading] = useState(true)
@@ -49,16 +45,9 @@ export function Visor3DPublicPage() {
   const [resetKey, setResetKey] = useState(0)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  // Redirect to login if not authenticated
+  // Cargar modelo (sin auth)
   useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      navigate(`/login?redirect=/v/${modelId}`, { replace: true })
-    }
-  }, [authLoading, isAuthenticated, modelId, navigate])
-
-  // Cargar modelo
-  useEffect(() => {
-    if (!modelId || !isAuthenticated) return
+    if (!modelId) return
     setLoading(true)
     setError(null)
     getModel3DById(modelId)
@@ -66,23 +55,23 @@ export function Visor3DPublicPage() {
         if (!m) setError('Modelo no encontrado')
         else setModel(m)
       })
-      .catch((err) => setError(`Error: ${(err as Error).message}`))
+      .catch((err) => setError(`Error cargando modelo: ${(err as Error).message}`))
       .finally(() => setLoading(false))
-  }, [modelId, isAuthenticated])
+  }, [modelId])
 
-  // Suscribirse a cotas
+  // Suscribirse a cotas (sin auth)
   useEffect(() => {
-    if (!modelId || !isAuthenticated) return
+    if (!modelId) return
     const unsub = subscribeToDimensions(modelId, setDimensions)
     return () => unsub()
-  }, [modelId, isAuthenticated])
+  }, [modelId])
 
-  // Suscribirse a material overrides
+  // Suscribirse a material overrides (sin auth)
   useEffect(() => {
-    if (!modelId || !isAuthenticated) return
+    if (!modelId) return
     const unsub = subscribeToMaterialOverrides(modelId, setMaterialOverrides)
     return () => unsub()
-  }, [modelId, isAuthenticated])
+  }, [modelId])
 
   // Fullscreen
   const toggleFullscreen = useCallback(() => {
@@ -100,25 +89,7 @@ export function Visor3DPublicPage() {
     return () => document.removeEventListener('fullscreenchange', handler)
   }, [])
 
-  // Logout
-  const handleLogout = useCallback(async () => {
-    await signOut()
-    navigate(`/login?redirect=/v/${modelId}`, { replace: true })
-  }, [modelId, navigate])
-
-  // Still loading auth
-  if (authLoading) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    )
-  }
-
-  // Not authenticated (redirect already triggered)
-  if (!isAuthenticated) return null
-
-  // Loading model
+  // Loading
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen bg-background">
@@ -163,16 +134,18 @@ export function Visor3DPublicPage() {
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0">
-          <Button
-            variant={showDimensions ? 'default' : 'outline'}
-            size="sm"
-            className="gap-1 h-7 text-xs"
-            onClick={() => setShowDimensions(!showDimensions)}
-          >
-            <Ruler className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Cotas ({dimensions.length})</span>
-            <span className="sm:hidden">{dimensions.length}</span>
-          </Button>
+          {dimensions.length > 0 && (
+            <Button
+              variant={showDimensions ? 'default' : 'outline'}
+              size="sm"
+              className="gap-1 h-7 text-xs"
+              onClick={() => setShowDimensions(!showDimensions)}
+            >
+              <Ruler className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Cotas ({dimensions.length})</span>
+              <span className="sm:hidden">{dimensions.length}</span>
+            </Button>
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -191,19 +164,10 @@ export function Visor3DPublicPage() {
           >
             {isFullscreen ? <Minimize className="h-3.5 w-3.5" /> : <Maximize className="h-3.5 w-3.5" />}
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 w-7 p-0 text-muted-foreground"
-            onClick={handleLogout}
-            title="Cerrar sesión"
-          >
-            <LogOut className="h-3.5 w-3.5" />
-          </Button>
         </div>
       </div>
 
-      {/* Viewer */}
+      {/* Viewer - toma todo el espacio disponible */}
       <div className="flex-1 relative">
         <Viewer3D
           url={model.downloadURL}
@@ -213,6 +177,13 @@ export function Visor3DPublicPage() {
         >
           {showDimensions && <DimensionsTool dimensions={dimensions} />}
         </Viewer3D>
+      </div>
+
+      {/* Footer branding mínimo */}
+      <div className="px-3 py-1 border-t bg-card text-center shrink-0">
+        <p className="text-[10px] text-muted-foreground">
+          Mantenimiento Industrial — Visor 3D
+        </p>
       </div>
     </div>
   )
