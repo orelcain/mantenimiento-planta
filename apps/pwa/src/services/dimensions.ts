@@ -135,12 +135,18 @@ export function subscribeToDimensions(
     collection(db, PARENT_COLLECTION, modelId, SUB_COLLECTION),
     orderBy('createdAt', 'desc')
   )
-  return onSnapshot(q, (snapshot) => {
-    const dims = snapshot.docs.map((d) =>
-      parseDimensionDoc(d as unknown as { id: string; data: () => Record<string, unknown> })
-    )
-    callback(dims)
-  })
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const dims = snapshot.docs.map((d) =>
+        parseDimensionDoc(d as unknown as { id: string; data: () => Record<string, unknown> })
+      )
+      callback(dims)
+    },
+    (error) => {
+      console.warn('Error en suscripción dimensions:', error.message)
+    }
+  )
 }
 
 /**

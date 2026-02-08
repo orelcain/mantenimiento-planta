@@ -62,11 +62,12 @@ export function Visor3DListPage() {
 
   // Suscripción en tiempo real
   useEffect(() => {
-    const unsub = subscribeToModels3D((list) => {
-      setModels(list)
-    })
+    const unsub = subscribeToModels3D(
+      (list) => setModels(list),
+      (err) => setError(`Error de permisos: ${err.message}. Verifique que las reglas de Firestore estén desplegadas.`)
+    )
     return () => unsub()
-  }, [setModels])
+  }, [setModels, setError])
 
   // Filtrar por búsqueda
   const filteredModels = useMemo(() => {

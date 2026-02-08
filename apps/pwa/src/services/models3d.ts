@@ -162,14 +162,24 @@ export async function getModels3D(): Promise<Model3D[]> {
 /**
  * Suscripción en tiempo real a la lista de modelos
  */
-export function subscribeToModels3D(callback: (models: Model3D[]) => void): () => void {
+export function subscribeToModels3D(
+  callback: (models: Model3D[]) => void,
+  onError?: (error: Error) => void
+): () => void {
   const q = query(collection(db, COLLECTION), orderBy('createdAt', 'desc'))
-  return onSnapshot(q, (snapshot) => {
-    const models = snapshot.docs.map((d) =>
-      parseModelDoc(d as unknown as { id: string; data: () => Record<string, unknown> })
-    )
-    callback(models)
-  })
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const models = snapshot.docs.map((d) =>
+        parseModelDoc(d as unknown as { id: string; data: () => Record<string, unknown> })
+      )
+      callback(models)
+    },
+    (error) => {
+      console.warn('Error en suscripción models3d:', error.message)
+      onError?.(error)
+    }
+  )
 }
 
 /**
