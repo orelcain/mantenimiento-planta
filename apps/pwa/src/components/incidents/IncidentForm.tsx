@@ -339,7 +339,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
         zoneId: formData.zoneId,
         hierarchyNodeId: formData.hierarchyNodeId,
         prioridad: formData.prioridad,
-        status: 'pendiente' as const,
+        status: assignToSelf ? 'en_proceso' as const : 'pendiente' as const,
         fotos: [],
         reportadoPor: user.id,
         ...(assignToSelf && { asignadoA: user.id }),
@@ -382,11 +382,11 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
         zoneId: formData.zoneId,
         hierarchyNodeId: formData.hierarchyNodeId || undefined,
         prioridad: formData.prioridad,
-        status: 'pendiente',
+        status: assignToSelf ? 'en_proceso' : 'pendiente',
         fotos: [],
         reportadoPor: user.id,
         creadoPor: user.id,
-        ...(assignToSelf && { asignadoA: user.id }),
+        ...(assignToSelf && { asignadoA: user.id, assignedBy: user.id }),
         requiresValidation: true,
         // Datos de ubicación en mapa físico
         ...(mapLocation && {
