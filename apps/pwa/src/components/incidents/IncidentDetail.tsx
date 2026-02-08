@@ -955,8 +955,8 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
               </Button>
             )}
 
-            {/* Auto-asignación para el creador */}
-            {user?.id === incident.reportadoPor && incident.status === 'confirmada' && !incident.asignadoA && (
+            {/* Auto-asignación para el creador (pendiente o confirmada sin asignar) */}
+            {user?.id === incident.reportadoPor && ['pendiente', 'confirmada'].includes(incident.status) && !incident.asignadoA && (
               <Button 
                 onClick={handleSelfAssign} 
                 disabled={isLoading}
