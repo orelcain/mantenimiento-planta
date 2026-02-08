@@ -182,7 +182,9 @@ export async function assignTechnician(
 export async function resolveIncident(
   id: string,
   resolucion: string,
-  repuestosUsados?: { repuestoId: string; cantidad: number }[]
+  repuestosUsados?: { repuestoId: string; cantidad: number }[],
+  resolvedBy?: string,
+  resolvedByName?: string
 ): Promise<void> {
   const incident = await getIncidentById(id)
   if (!incident) throw new Error('Incidencia no encontrada')
@@ -196,6 +198,8 @@ export async function resolveIncident(
     status: 'resuelta',
     resolucion,
     resolvedAt: now,
+    resolvedBy: resolvedBy || '',
+    resolvedByName: resolvedByName || '',
     tiempoResolucionMinutos: tiempoResolucion,
   }
 

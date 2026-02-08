@@ -359,7 +359,13 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
     }
     setIsLoading(true)
     try {
-      await resolveIncident(incident.id, resolution)
+      await resolveIncident(
+        incident.id,
+        resolution,
+        undefined,
+        user?.id,
+        user ? `${user.nombre} ${user.apellido}` : ''
+      )
       logger.info('Incident resolved', { incidentId: incident.id })
       toast({ title: 'Incidencia resuelta', description: 'Se ha notificado al supervisor para su validación.' })
       onClose()
@@ -688,12 +694,27 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
             )}
 
             {/* Resolución */}
-            {incident.status === 'cerrada' && incident.resolucion && (
+            {(incident.status === 'resuelta' || incident.status === 'cerrada') && incident.resolucion && (
               <div className="p-4 bg-success/10 rounded-lg border border-success/20">
-                <h4 className="font-medium text-success mb-2">Resolución</h4>
+                <h4 className="font-medium text-success mb-2">
+                  {incident.status === 'resuelta' ? 'Resolución (Por Validar)' : 'Resolución'}
+                </h4>
                 <p className="text-sm">{incident.resolucion}</p>
-                {incident.tiempoResolucionMinutos && (
+                {/* Quién resolvió */}
+                {incident.resolvedBy && (
                   <p className="text-xs text-muted-foreground mt-2">
+                    Resuelta por: {assignedUser && incident.resolvedBy === assignedUser.id
+                      ? `${assignedUser.nombre} ${assignedUser.apellido}`
+                      : incident.resolvedByName || incident.resolvedBy}
+                  </p>
+                )}
+                {incident.resolvedAt && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Fecha resolución: {incident.resolvedAt.toLocaleDateString('es-CL')} {incident.resolvedAt.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                )}
+                {incident.tiempoResolucionMinutos != null && incident.tiempoResolucionMinutos > 0 && (
+                  <p className="text-xs text-muted-foreground mt-1">
                     Tiempo de resolución: {Math.round(incident.tiempoResolucionMinutos / 60)}h {incident.tiempoResolucionMinutos % 60}min
                   </p>
                 )}
@@ -947,8 +968,8 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
               </Button>
             )}
 
-            {/* Resolver (Técnico) */}
-            {(user?.id === incident.asignadoA || permissions.isAdmin) && incident.status === 'en_proceso' && (
+            {/* Resolver (Técnico) - se oculta cuando el formulario está abierto */}
+            {(user?.id === incident.asignadoA || permissions.isAdmin) && incident.status === 'en_proceso' && !showResolveForm && (
               <Button 
                 onClick={() => setShowResolveForm(true)}
                 className="bg-green-600 hover:bg-green-700 w-full sm:w-auto"

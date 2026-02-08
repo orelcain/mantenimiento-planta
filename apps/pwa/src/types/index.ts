@@ -157,6 +157,8 @@ export interface Incident {
   updatedAt: Date
   confirmedAt?: Date
   resolvedAt?: Date
+  resolvedBy?: string // userId de quien resolvió
+  resolvedByName?: string // Nombre de quien resolvió
   closedAt?: Date
   // Resolución
   resolucion?: string

@@ -130,7 +130,8 @@ export function IncidentsPage() {
     if (activeFilter === 'confirmadas') return incident.status === 'confirmada'
     if (activeFilter === 'confirmadas-asignadas') return !!incident.asignadoA && ['en_proceso', 'resuelta'].includes(incident.status)
     if (activeFilter === 'confirmadas-sin-asignar') return incident.status === 'confirmada' && !incident.asignadoA
-    if (activeFilter === 'mis-asignadas') return !!user?.id && incident.asignadoA === user.id && ['en_proceso', 'resuelta'].includes(incident.status)
+    if (activeFilter === 'mis-asignadas') return !!user?.id && incident.asignadoA === user.id && incident.status === 'en_proceso'
+    if (activeFilter === 'mis-resueltas') return !!user?.id && (incident.asignadoA === user.id || incident.resolvedBy === user.id) && incident.status === 'resuelta'
     if (activeFilter === 'mis-creadas') return !!user?.id && (incident.reportadoPor === user.id || incident.creadoPor === user.id)
     if (activeFilter === 'en-proceso') return incident.status === 'en_proceso'
     if (activeFilter === 'por-validar') return incident.status === 'resuelta'
@@ -149,7 +150,10 @@ export function IncidentsPage() {
     confirmadas_asignadas: visibleIncidents.filter((i) => !!i.asignadoA && ['en_proceso', 'resuelta'].includes(i.status)).length,
     confirmadas_sin_asignar: visibleIncidents.filter((i) => i.status === 'confirmada' && !i.asignadoA).length,
     mis_asignadas: user?.id
-      ? visibleIncidents.filter((i) => i.asignadoA === user.id && ['en_proceso', 'resuelta'].includes(i.status)).length
+      ? visibleIncidents.filter((i) => i.asignadoA === user.id && i.status === 'en_proceso').length
+      : 0,
+    mis_resueltas: user?.id
+      ? visibleIncidents.filter((i) => (i.asignadoA === user.id || i.resolvedBy === user.id) && i.status === 'resuelta').length
       : 0,
     por_validar: visibleIncidents.filter((i) => i.status === 'resuelta').length,
     mis_creadas: user?.id
@@ -271,6 +275,17 @@ export function IncidentsPage() {
           <CardContent className="p-4">
             <div className="text-2xl font-bold text-violet-600">{stats.mis_asignadas}</div>
             <div className="text-xs text-muted-foreground">Mis asignadas</div>
+          </CardContent>
+        </Card>
+
+        {/* Mis Resueltas */}
+        <Card
+          className={`cursor-pointer transition-all hover:border-green-400/50 ${activeFilter === 'mis-resueltas' ? 'border-green-400 bg-green-400/10' : ''}`}
+          onClick={() => setActiveFilter('mis-resueltas')}
+        >
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold text-green-600">{stats.mis_resueltas}</div>
+            <div className="text-xs text-muted-foreground">Mis resueltas</div>
           </CardContent>
         </Card>
 
