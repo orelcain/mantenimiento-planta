@@ -365,7 +365,10 @@ export function Visor3DViewerPage() {
               {pendingPoint ? 'Haz clic en el segundo punto' : 'Haz clic en el primer punto del modelo'}
             </p>
             <p className="text-xs text-muted-foreground">
-              Unidad: {selectedUnit} —{' '}
+              Snap: <span className="text-green-400">●</span> vértice &nbsp;
+              <span className="text-blue-400">●</span> arista &nbsp;
+              <span className="text-gray-400">●</span> superficie
+              &nbsp;— Unidad: {selectedUnit} —{' '}
               <button className="underline ml-1" onClick={() => setSelectedUnit('mm')}>mm</button>{' | '}
               <button className="underline" onClick={() => setSelectedUnit('cm')}>cm</button>{' | '}
               <button className="underline" onClick={() => setSelectedUnit('m')}>m</button>

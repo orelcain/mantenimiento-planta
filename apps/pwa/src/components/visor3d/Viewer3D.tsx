@@ -9,7 +9,7 @@
  * - Doble cara en materiales (esencial para SketchUp)
  * - Modo pintura: click en mallas para aplicar color mate
  * - Highlight de malla al hover en modo pintura
- * - Click handler para cotas
+ * - Click handler para cotas con SNAP a vértices y aristas
  * - Grid helper + ContactShadows
  */
 
@@ -264,7 +264,183 @@ function ModelLoader({ url, format, overrides, onLoaded }: { url: string; format
 }
 
 // ============================================================================
-// Click Handler (cotas)
+// Snap Helpers — busca vértices y aristas cercanas al punto de raycast
+// ============================================================================
+
+/** Resultado de snap: tipo + posición corregida */
+interface SnapResult {
+  type: 'vertex' | 'edge' | 'face'
+  point: THREE.Vector3
+  /** Distancia en screen-space (NDC) al snap — menor = más cerca */
+  screenDist: number
+}
+
+/**
+ * Busca el vértice más cercano al punto de intersección dentro de un radio en pantalla.
+ * Devuelve la posición en world-space del vértice si está dentro del umbral.
+ */
+function findNearestVertex(
+  hitPoint: THREE.Vector3,
+  mesh: THREE.Mesh,
+  camera: THREE.Camera,
+  screenThreshold: number // en píxeles normalizados (0-1 range)
+): SnapResult | null {
+  const geom = mesh.geometry
+  const posAttr = geom.attributes.position
+  if (!posAttr) return null
+
+  const matrixWorld = mesh.matrixWorld
+  const tmpVec = new THREE.Vector3()
+  const hitScreen = hitPoint.clone().project(camera)
+
+  let bestDist = Infinity
+  let bestPoint: THREE.Vector3 | null = null
+
+  // Iterar por vértices (muestrear si hay demasiados para no bloquear)
+  const stride = posAttr.count > 10000 ? Math.ceil(posAttr.count / 5000) : 1
+
+  for (let i = 0; i < posAttr.count; i += stride) {
+    tmpVec.fromBufferAttribute(posAttr, i)
+    tmpVec.applyMatrix4(matrixWorld)
+
+    // Proyectar a screen space
+    const vertScreen = tmpVec.clone().project(camera)
+    const dx = vertScreen.x - hitScreen.x
+    const dy = vertScreen.y - hitScreen.y
+    const dist = Math.sqrt(dx * dx + dy * dy)
+
+    if (dist < screenThreshold && dist < bestDist) {
+      bestDist = dist
+      bestPoint = tmpVec.clone()
+    }
+  }
+
+  if (bestPoint) {
+    return { type: 'vertex', point: bestPoint, screenDist: bestDist }
+  }
+  return null
+}
+
+/**
+ * Busca la arista más cercana al punto de intersección.
+ * Proyecta el hit point sobre cada arista y busca la más cercana en screen-space.
+ */
+function findNearestEdge(
+  hitPoint: THREE.Vector3,
+  mesh: THREE.Mesh,
+  camera: THREE.Camera,
+  screenThreshold: number
+): SnapResult | null {
+  const geom = mesh.geometry
+  const posAttr = geom.attributes.position
+  if (!posAttr) return null
+
+  const matrixWorld = mesh.matrixWorld
+  const hitScreen = hitPoint.clone().project(camera)
+  const a = new THREE.Vector3()
+  const b = new THREE.Vector3()
+
+  let bestDist = Infinity
+  let bestPoint: THREE.Vector3 | null = null
+
+  const index = geom.index
+
+  if (index) {
+    // Indexed geometry – recorrer triángulos
+    const stride = index.count > 30000 ? Math.ceil(index.count / 15000) * 3 : 3
+    for (let i = 0; i < index.count; i += stride) {
+      const base = i - (i % 3) // alinear a triángulo
+      if (base + 2 >= index.count) continue
+      const i0 = index.getX(base)
+      const i1 = index.getX(base + 1)
+      const i2 = index.getX(base + 2)
+      const edges = [[i0, i1], [i1, i2], [i2, i0]]
+
+      for (const [ea, eb] of edges) {
+        a.fromBufferAttribute(posAttr, ea).applyMatrix4(matrixWorld)
+        b.fromBufferAttribute(posAttr, eb).applyMatrix4(matrixWorld)
+
+        // Punto más cercano en el segmento
+        const closest = closestPointOnSegment(hitPoint, a, b)
+        const closestScreen = closest.clone().project(camera)
+        const dx = closestScreen.x - hitScreen.x
+        const dy = closestScreen.y - hitScreen.y
+        const dist = Math.sqrt(dx * dx + dy * dy)
+
+        if (dist < screenThreshold && dist < bestDist) {
+          bestDist = dist
+          bestPoint = closest
+        }
+      }
+    }
+  } else {
+    // Non-indexed – triángulos secuenciales
+    const stride = posAttr.count > 30000 ? Math.ceil(posAttr.count / 15000) * 3 : 3
+    for (let i = 0; i + 2 < posAttr.count; i += stride) {
+      const base = i - (i % 3)
+      if (base + 2 >= posAttr.count) continue
+      const edges = [[base, base + 1], [base + 1, base + 2], [base + 2, base]]
+
+      for (const [ea, eb] of edges) {
+        a.fromBufferAttribute(posAttr, ea).applyMatrix4(matrixWorld)
+        b.fromBufferAttribute(posAttr, eb).applyMatrix4(matrixWorld)
+
+        const closest = closestPointOnSegment(hitPoint, a, b)
+        const closestScreen = closest.clone().project(camera)
+        const dx = closestScreen.x - hitScreen.x
+        const dy = closestScreen.y - hitScreen.y
+        const dist = Math.sqrt(dx * dx + dy * dy)
+
+        if (dist < screenThreshold && dist < bestDist) {
+          bestDist = dist
+          bestPoint = closest
+        }
+      }
+    }
+  }
+
+  if (bestPoint) {
+    return { type: 'edge', point: bestPoint, screenDist: bestDist }
+  }
+  return null
+}
+
+/** Punto más cercano en un segmento A–B al punto P */
+function closestPointOnSegment(p: THREE.Vector3, a: THREE.Vector3, b: THREE.Vector3): THREE.Vector3 {
+  const ab = b.clone().sub(a)
+  const ap = p.clone().sub(a)
+  const lenSq = ab.lengthSq()
+  if (lenSq === 0) return a.clone()
+  let t = ap.dot(ab) / lenSq
+  t = Math.max(0, Math.min(1, t))
+  return a.clone().add(ab.multiplyScalar(t))
+}
+
+/**
+ * Ejecuta snap: primero busca vértice (prioridad), luego arista.
+ * Si no hay snap, devuelve el punto original de la superficie.
+ */
+function computeSnap(
+  hitPoint: THREE.Vector3,
+  mesh: THREE.Mesh,
+  camera: THREE.Camera,
+): SnapResult {
+  // Umbral en NDC (~40px en una pantalla 1920px ≈ 0.04)
+  const VERTEX_THRESHOLD = 0.05
+  const EDGE_THRESHOLD = 0.04
+
+  // Prioridad: vértice > arista > superficie
+  const vertSnap = findNearestVertex(hitPoint, mesh, camera, VERTEX_THRESHOLD)
+  if (vertSnap) return vertSnap
+
+  const edgeSnap = findNearestEdge(hitPoint, mesh, camera, EDGE_THRESHOLD)
+  if (edgeSnap) return edgeSnap
+
+  return { type: 'face', point: hitPoint, screenDist: 0 }
+}
+
+// ============================================================================
+// Click Handler con Snap (cotas)
 // ============================================================================
 
 function ClickHandler({ onPointClick }: { onPointClick: (point: Point3D) => void }) {
@@ -272,14 +448,79 @@ function ClickHandler({ onPointClick }: { onPointClick: (point: Point3D) => void
   const raycaster = useRef(new THREE.Raycaster())
   const mouse = useRef(new THREE.Vector2())
 
-  const handleClick = useCallback((event: MouseEvent) => {
+  // Snap indicator state
+  const snapIndicatorRef = useRef<THREE.Group>(null!)
+  const snapSphereRef = useRef<THREE.Mesh>(null!)
+  const snapLineRef = useRef<THREE.Line>(null!)
+  const currentSnap = useRef<SnapResult | null>(null)
+
+  // Perform raycast + snap on mouse move → show indicator
+  const handleMove = useCallback((event: MouseEvent) => {
     const rect = gl.domElement.getBoundingClientRect()
     mouse.current.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
     mouse.current.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
     raycaster.current.setFromCamera(mouse.current, camera)
     const intersects = raycaster.current.intersectObjects(scene.children, true)
     const hit = intersects.find((i) =>
-      i.object.type === 'Mesh' && !i.object.userData.isDimensionHelper && !i.object.userData.isGrid && !i.object.userData.isHighlight
+      i.object instanceof THREE.Mesh &&
+      !i.object.userData.isDimensionHelper &&
+      !i.object.userData.isGrid &&
+      !i.object.userData.isHighlight &&
+      !i.object.userData.isSnapIndicator
+    )
+
+    if (hit && hit.object instanceof THREE.Mesh) {
+      const snap = computeSnap(hit.point, hit.object, camera)
+      currentSnap.current = snap
+
+      // Update indicator
+      if (snapSphereRef.current) {
+        snapSphereRef.current.position.copy(snap.point)
+        snapSphereRef.current.visible = true
+
+        // Color: verde para vértice, azul para arista, gris para superficie
+        const mat = snapSphereRef.current.material as THREE.MeshStandardMaterial
+        if (snap.type === 'vertex') {
+          mat.color.setHex(0x22c55e) // green
+          mat.emissive.setHex(0x22c55e)
+          snapSphereRef.current.scale.setScalar(1.3)
+          gl.domElement.style.cursor = 'crosshair'
+        } else if (snap.type === 'edge') {
+          mat.color.setHex(0x3b82f6) // blue
+          mat.emissive.setHex(0x3b82f6)
+          snapSphereRef.current.scale.setScalar(1)
+          gl.domElement.style.cursor = 'crosshair'
+        } else {
+          mat.color.setHex(0x94a3b8) // gray
+          mat.emissive.setHex(0x94a3b8)
+          snapSphereRef.current.scale.setScalar(0.7)
+          gl.domElement.style.cursor = 'crosshair'
+        }
+      }
+    } else {
+      currentSnap.current = null
+      if (snapSphereRef.current) {
+        snapSphereRef.current.visible = false
+      }
+    }
+  }, [camera, scene, gl])
+
+  const handleClick = useCallback((event: MouseEvent) => {
+    // Si tenemos snap, usar ese punto
+    if (currentSnap.current) {
+      const p = currentSnap.current.point
+      onPointClick({ x: p.x, y: p.y, z: p.z })
+      return
+    }
+
+    // Fallback: raycast directo
+    const rect = gl.domElement.getBoundingClientRect()
+    mouse.current.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
+    mouse.current.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
+    raycaster.current.setFromCamera(mouse.current, camera)
+    const intersects = raycaster.current.intersectObjects(scene.children, true)
+    const hit = intersects.find((i) =>
+      i.object.type === 'Mesh' && !i.object.userData.isDimensionHelper && !i.object.userData.isGrid && !i.object.userData.isHighlight && !i.object.userData.isSnapIndicator
     )
     if (hit) {
       onPointClick({ x: hit.point.x, y: hit.point.y, z: hit.point.z })
@@ -288,10 +529,32 @@ function ClickHandler({ onPointClick }: { onPointClick: (point: Point3D) => void
 
   useEffect(() => {
     gl.domElement.addEventListener('click', handleClick)
-    return () => gl.domElement.removeEventListener('click', handleClick)
-  }, [gl, handleClick])
+    gl.domElement.addEventListener('mousemove', handleMove)
+    gl.domElement.style.cursor = 'crosshair'
+    return () => {
+      gl.domElement.removeEventListener('click', handleClick)
+      gl.domElement.removeEventListener('mousemove', handleMove)
+      gl.domElement.style.cursor = 'default'
+    }
+  }, [gl, handleClick, handleMove])
 
-  return null
+  return (
+    <group ref={snapIndicatorRef} userData={{ isSnapIndicator: true }}>
+      {/* Snap point indicator — esfera que aparece en el vértice/arista detectado */}
+      <mesh ref={snapSphereRef} visible={false} userData={{ isSnapIndicator: true }}>
+        <sphereGeometry args={[0.025, 16, 16]} />
+        <meshStandardMaterial
+          color="#22c55e"
+          emissive="#22c55e"
+          emissiveIntensity={0.6}
+          transparent
+          opacity={0.85}
+          depthTest={false}
+          depthWrite={false}
+        />
+      </mesh>
+    </group>
+  )
 }
 
 // ============================================================================

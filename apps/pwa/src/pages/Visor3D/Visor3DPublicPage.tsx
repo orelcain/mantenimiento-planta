@@ -312,9 +312,16 @@ export function Visor3DPublicPage() {
       {creatingDimension && (
         <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-500/10 border-b border-blue-500/30 shrink-0">
           <Ruler className="h-4 w-4 text-blue-400 shrink-0" />
-          <p className="text-xs font-medium text-blue-400 flex-1">
-            {pendingPoint ? 'Clic en el 2do punto' : 'Clic en el 1er punto del modelo'}
-          </p>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-medium text-blue-400">
+              {pendingPoint ? 'Clic en el 2do punto' : 'Clic en el 1er punto del modelo'}
+            </p>
+            <p className="text-[10px] text-muted-foreground">
+              <span className="text-green-400">●</span> vértice &nbsp;
+              <span className="text-blue-400">●</span> arista &nbsp;
+              <span className="text-gray-400">●</span> superficie
+            </p>
+          </div>
           <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
             {(['mm', 'cm', 'm'] as DimensionUnit[]).map((u) => (
               <button
