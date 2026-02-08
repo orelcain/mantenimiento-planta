@@ -27,6 +27,7 @@ import {
   Circle,
   SquareDashed,
   PenTool,
+  MapPin,
 } from 'lucide-react'
 import {
   Button,
@@ -50,10 +51,12 @@ import {
   formatMeasurement,
 } from '@/services/dimensions'
 import { subscribeToMaterialOverrides, setMaterialOverride, deleteMaterialOverride, deleteAllMaterialOverrides } from '@/services/materials3d'
+import { subscribeToAnnotations } from '@/services/annotations3d'
 import { Viewer3D } from '@/components/visor3d/Viewer3D'
 import { DimensionsTool } from '@/components/visor3d/DimensionsTool'
 import { ColorPalette } from '@/components/visor3d/ColorPalette'
-import type { Model3D, MaterialOverride, Dimension3D, DimensionUnit, Point3D, MeasurementType } from '@/types/models3d'
+import { ImageLightbox } from '@/components/ui/ImageLightbox'
+import type { Model3D, MaterialOverride, Annotation3D, Dimension3D, DimensionUnit, Point3D, MeasurementType } from '@/types/models3d'
 import { getUnitSuffix } from '@/types/models3d'
 
 /** ID anónimo para vista pública */
@@ -79,6 +82,14 @@ export function Visor3DPublicPage() {
   const [paintColor, setPaintColor] = useState<string | null>(null)
   const [paintErase, setPaintErase] = useState(false)
   const [materialOverrides, setMaterialOverrides] = useState<MaterialOverride[]>([])
+
+  // Annotations state (read-only in public view)
+  const [annotations, setAnnotations] = useState<Annotation3D[]>([])
+  const [showAnnotations, setShowAnnotations] = useState(true)
+
+  // Lightbox state
+  const [lightboxPhotos, setLightboxPhotos] = useState<string[] | null>(null)
+  const [lightboxIndex, setLightboxIndex] = useState(0)
 
   // UI state
   const [isFullscreen, setIsFullscreen] = useState(false)
@@ -110,6 +121,13 @@ export function Visor3DPublicPage() {
   useEffect(() => {
     if (!modelId) return
     const unsub = subscribeToMaterialOverrides(modelId, setMaterialOverrides)
+    return () => unsub()
+  }, [modelId])
+
+  // Suscribirse a anotaciones (sin auth, solo lectura)
+  useEffect(() => {
+    if (!modelId) return
+    const unsub = subscribeToAnnotations(modelId, setAnnotations)
     return () => unsub()
   }, [modelId])
 
@@ -358,6 +376,18 @@ export function Visor3DPublicPage() {
             </Button>
           )}
 
+          {/* Anotaciones toggle */}
+          <Button
+            variant={showAnnotations ? 'default' : 'outline'}
+            size="sm"
+            className="gap-1 h-7 text-xs"
+            onClick={() => setShowAnnotations(!showAnnotations)}
+          >
+            <MapPin className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Notas ({annotations.length})</span>
+            <span className="sm:hidden">{annotations.length}</span>
+          </Button>
+
           {/* Pintar */}
           {!creatingDimension && (
             <Button
@@ -485,6 +515,11 @@ export function Visor3DPublicPage() {
           paintErase={paintErase}
           materialOverrides={materialOverrides}
           onMeshPainted={handleMeshPainted}
+          annotations={showAnnotations ? annotations : undefined}
+          onPhotoClick={(photos, idx) => {
+            setLightboxPhotos(photos)
+            setLightboxIndex(idx)
+          }}
         >
           {showDimensions && <DimensionsTool dimensions={dimensions} pendingPoints={pendingPoints} measurementType={measurementType} />}
         </Viewer3D>
@@ -553,6 +588,15 @@ export function Visor3DPublicPage() {
           Mantenimiento Industrial — Visor 3D
         </p>
       </div>
+
+      {/* Image Lightbox (zoom + pan viewer) */}
+      {lightboxPhotos && (
+        <ImageLightbox
+          photos={lightboxPhotos}
+          initialIndex={lightboxIndex}
+          onClose={() => setLightboxPhotos(null)}
+        />
+      )}
     </div>
   )
 }
