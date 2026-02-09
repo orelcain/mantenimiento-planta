@@ -16,7 +16,7 @@ import {
   onSnapshot,
   serverTimestamp,
   Unsubscribe,
-} from 'firebase/firestore'
+} from '@/services/firestoreTracked'
 import { db } from './firebase'
 import { logger } from '@/lib/logger'
 import type {

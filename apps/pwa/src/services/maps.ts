@@ -16,7 +16,7 @@ import {
   serverTimestamp,
   Timestamp,
   limit,
-} from 'firebase/firestore'
+} from '@/services/firestoreTracked'
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage'
 import { db, storage } from '@/services/firebase'
 import { generateId } from '@/lib/utils'

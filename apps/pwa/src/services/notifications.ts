@@ -6,7 +6,7 @@
 import { getToken, onMessage, deleteToken, MessagePayload } from 'firebase/messaging'
 import { getMessagingInstance } from './firebase'
 import { db } from './firebase'
-import { doc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore'
+import { doc, setDoc, deleteDoc, serverTimestamp } from '@/services/firestoreTracked'
 import { logger } from '@/lib/logger'
 
 /**

@@ -17,7 +17,7 @@ import {
   limit,
   Timestamp,
   QueryConstraint,
-} from 'firebase/firestore'
+} from '@/services/firestoreTracked'
 import { db } from '@/services/firebase'
 import type { ETT, ETTAdjunto } from '@/types'
 import { logger } from '@/lib/logger'

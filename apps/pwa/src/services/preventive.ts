@@ -11,7 +11,7 @@ import {
   orderBy,
   Timestamp,
   serverTimestamp,
-} from 'firebase/firestore'
+} from '@/services/firestoreTracked'
 import { db } from '@/services/firebase'
 import type { PreventiveTask, PreventiveExecution } from '@/types'
 

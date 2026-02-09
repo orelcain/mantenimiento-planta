@@ -4,7 +4,7 @@ import {
   query,
   where,
   documentId,
-} from 'firebase/firestore'
+} from '@/services/firestoreTracked'
 import { db } from './firebase'
 import type { User } from '@/types'
 

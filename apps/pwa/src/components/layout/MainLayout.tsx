@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard,
@@ -25,6 +25,7 @@ import {
 } from 'lucide-react'
 import { Avatar, AvatarFallback, Button } from '@/components/ui'
 import { useAuthStore, useIsAdmin, useAppStore } from '@/store'
+import { useSyncStore } from '@/store/syncStore'
 import { getZones } from '@/services/zones'
 import { getEquipments } from '@/services/equipment'
 import { subscribeToIncidents } from '@/services/incidents'
@@ -33,6 +34,7 @@ import { cn } from '@/lib/utils'
 import { HelpButton, HelpModal, WelcomeModal } from '@/components/help'
 import { APP_VERSION } from '@/constants/version'
 import { useAppVersion } from '@/hooks/useAppVersion'
+import { useToast } from '@/hooks/useToast'
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
@@ -63,6 +65,11 @@ export function MainLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [isOnline, setIsOnline] = useState(navigator.onLine)
+  const pendingWrites = useSyncStore((state) => state.pendingWrites)
+  const lastSyncError = useSyncStore((state) => state.lastSyncError)
+  const setSyncError = useSyncStore((state) => state.setSyncError)
+  const { toast } = useToast()
+  const prevPendingRef = useRef(pendingWrites)
   const { hasUpdate, newVersion, reload } = useAppVersion()
   const { setZones, setEquipment, setIncidents } = useAppStore()
 
@@ -90,6 +97,27 @@ export function MainLayout() {
       window.removeEventListener('offline', handleOffline)
     }
   }, [])
+
+  useEffect(() => {
+    if (!lastSyncError) return
+    toast({
+      title: 'Error al sincronizar',
+      description: lastSyncError,
+      variant: 'destructive',
+    })
+    setSyncError(null)
+  }, [lastSyncError, setSyncError, toast])
+
+  useEffect(() => {
+    const prev = prevPendingRef.current
+    if (prev > 0 && pendingWrites === 0 && isOnline) {
+      toast({
+        title: 'Sincronizado',
+        description: 'Tus cambios se guardaron correctamente',
+      })
+    }
+    prevPendingRef.current = pendingWrites
+  }, [pendingWrites, isOnline, toast])
 
   const allNavigation = isAdmin
     ? [...navigation, ...adminNavigation]
@@ -262,6 +290,12 @@ export function MainLayout() {
 
           {/* Desktop user menu */}
           <div className="hidden lg:flex items-center gap-3">
+            {pendingWrites > 0 && (
+              <div className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-300 px-2 py-1 bg-amber-500/10 rounded border border-amber-500/20">
+                <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                <span>{pendingWrites} pendiente{pendingWrites > 1 ? 's' : ''}</span>
+              </div>
+            )}
             {/* Version badge */}
             <div className="flex items-center gap-2 text-xs text-muted-foreground px-2 py-1 bg-muted/50 rounded">
               <span>v{APP_VERSION}</span>
@@ -291,7 +325,7 @@ export function MainLayout() {
 
         {/* Offline banner */}
         {!isOnline && (
-          <div className="mx-4 mt-4 lg:mx-6 bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-200 px-4 py-3 rounded-lg flex items-center gap-3">
+          <div className="mx-4 mt-4 lg:mx-6 bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-200 px-4 py-3 rounded-lg flex items-center justify-between gap-3">
             <AlertTriangle className="h-5 w-5" />
             <div>
               <span className="font-medium block">Sin conexion a internet</span>
@@ -299,6 +333,11 @@ export function MainLayout() {
                 Puedes navegar datos en cache. Los cambios se sincronizaran al reconectar.
               </span>
             </div>
+            {pendingWrites > 0 && (
+              <div className="ml-auto text-xs font-medium bg-amber-500/20 text-amber-900 dark:text-amber-100 px-2 py-1 rounded">
+                {pendingWrites} pendiente{pendingWrites > 1 ? 's' : ''}
+              </div>
+            )}
           </div>
         )}
 

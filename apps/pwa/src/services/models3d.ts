@@ -17,7 +17,7 @@ import {
   serverTimestamp,
   onSnapshot,
   Timestamp,
-} from 'firebase/firestore'
+} from '@/services/firestoreTracked'
 import {
   ref,
   uploadBytesResumable,

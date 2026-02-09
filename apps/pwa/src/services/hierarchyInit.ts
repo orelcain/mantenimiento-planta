@@ -4,7 +4,7 @@
  * Versión 2.0.0 - Diciembre 2025
  */
 
-import { doc, Timestamp, writeBatch, getDoc } from 'firebase/firestore'
+import { doc, Timestamp, writeBatch, getDoc } from '@/services/firestoreTracked'
 import { db } from './firebase'
 import { HierarchyNode, HierarchyLevel } from '../types/hierarchy'
 import { logger } from '../lib/logger'

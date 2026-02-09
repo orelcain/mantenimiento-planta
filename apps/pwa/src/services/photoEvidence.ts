@@ -14,7 +14,7 @@ import {
   serverTimestamp,
   Timestamp,
   QueryConstraint,
-} from 'firebase/firestore'
+} from '@/services/firestoreTracked'
 import {
   ref,
   uploadBytes,

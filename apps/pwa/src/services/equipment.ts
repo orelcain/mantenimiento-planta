@@ -13,7 +13,7 @@ import {
   Timestamp,
   arrayUnion,
   arrayRemove,
-} from 'firebase/firestore'
+} from '@/services/firestoreTracked'
 import { db } from './firebase'
 import type { Equipment } from '@/types'
 import { generateId } from '@/lib/utils'
@@ -123,7 +123,7 @@ export async function setEquipmentStatus(
 }
 
 // Helper para parsear documentos
-import type { DocumentSnapshot, QueryDocumentSnapshot } from 'firebase/firestore'
+import type { DocumentSnapshot, QueryDocumentSnapshot } from '@/services/firestoreTracked'
 
 function parseEquipmentDoc(doc: DocumentSnapshot | QueryDocumentSnapshot): Equipment {
   const data = doc.data()

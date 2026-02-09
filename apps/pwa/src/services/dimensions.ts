@@ -16,7 +16,7 @@ import {
   serverTimestamp,
   onSnapshot,
   Timestamp,
-} from 'firebase/firestore'
+} from '@/services/firestoreTracked'
 import { db } from './firebase'
 import { generateId } from '@/lib/utils'
 import type { Dimension3D, CreateDimensionData, DimensionUnit, Point3D, MeasurementType } from '@/types/models3d'

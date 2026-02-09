@@ -11,7 +11,7 @@ import {
   serverTimestamp,
   onSnapshot,
   Timestamp,
-} from 'firebase/firestore'
+} from '@/services/firestoreTracked'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { db } from './firebase'
 import { storage } from './firebase'

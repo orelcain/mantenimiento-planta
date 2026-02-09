@@ -5,7 +5,7 @@ import {
   orderBy,
   query,
   where,
-} from 'firebase/firestore'
+} from '@/services/firestoreTracked'
 import { db } from './firebase'
 import { createIncident } from './incidents'
 import type {

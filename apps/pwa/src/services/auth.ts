@@ -22,7 +22,7 @@ import {
   getDocs,
   serverTimestamp,
   increment,
-} from 'firebase/firestore'
+} from '@/services/firestoreTracked'
 import { auth, db } from './firebase'
 import type { User, UserRole, InviteCode } from '@/types'
 

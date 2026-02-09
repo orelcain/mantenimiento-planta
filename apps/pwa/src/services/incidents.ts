@@ -14,7 +14,7 @@ import {
   serverTimestamp,
   Timestamp,
   QueryConstraint,
-} from 'firebase/firestore'
+} from '@/services/firestoreTracked'
 import { db } from './firebase'
 import type { Incident, IncidentStatus, IncidentPriority, MaintenanceType } from '@/types'
 import { generateId } from '@/lib/utils'
@@ -272,7 +272,7 @@ export function subscribeToIncidents(
 }
 
 // Helper para parsear documentos
-import type { DocumentSnapshot, QueryDocumentSnapshot } from 'firebase/firestore'
+import type { DocumentSnapshot, QueryDocumentSnapshot } from '@/services/firestoreTracked'
 
 function parseIncidentDoc(doc: DocumentSnapshot | QueryDocumentSnapshot): Incident {
   const data = doc.data()

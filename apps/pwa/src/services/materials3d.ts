@@ -13,7 +13,7 @@ import {
   onSnapshot,
   serverTimestamp,
   Timestamp,
-} from 'firebase/firestore'
+} from '@/services/firestoreTracked'
 import { db } from './firebase'
 import type { MaterialOverride, CreateMaterialOverrideData } from '@/types/models3d'
 

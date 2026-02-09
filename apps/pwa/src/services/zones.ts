@@ -10,7 +10,7 @@ import {
   where,
   serverTimestamp,
   Timestamp,
-} from 'firebase/firestore'
+} from '@/services/firestoreTracked'
 import { db } from './firebase'
 import type { Zone } from '@/types'
 
@@ -102,7 +102,7 @@ export async function deleteZone(id: string): Promise<void> {
 }
 
 // Helper para parsear documentos
-import type { DocumentSnapshot, QueryDocumentSnapshot } from 'firebase/firestore'
+import type { DocumentSnapshot, QueryDocumentSnapshot } from '@/services/firestoreTracked'
 
 function parseZoneDoc(doc: DocumentSnapshot | QueryDocumentSnapshot): Zone {
   const data = doc.data()

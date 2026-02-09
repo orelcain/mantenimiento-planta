@@ -1,4 +1,4 @@
-import { collection, getDocs, query, orderBy } from 'firebase/firestore'
+import { collection, getDocs, query, orderBy } from '@/services/firestoreTracked'
 import { db } from '@/services/firebase'
 
 export interface HistorialCambio {
