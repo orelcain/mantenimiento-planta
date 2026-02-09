@@ -489,6 +489,8 @@ export interface AIGraderOutput {
 export interface GraderSession {
   id: string;
   deviceId?: string;
+  shiftId?: string;          // turno: "Turno noche", "Turno día", etc.
+  sessionDate?: string;      // YYYY-MM-DD — fecha de producción (de los datos)
   startAt?: string;
   endAt?: string;
   uploadedFilesMeta: UploadedMatrixFile[];

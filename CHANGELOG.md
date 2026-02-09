@@ -7,6 +7,20 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.2] - 2026-02-09
+
+### 🔧 Persistencia de Sesiones y Clasificación por Día
+
+#### Correcciones
+- **Fix Firestore `setDoc` con `undefined`**: Corregido error `Unsupported field value: undefined (found in field deviceId)` al guardar sesiones. Ahora se filtran todos los valores `undefined` antes de escribir a Firestore (misma técnica usada en `saveGatesTemplate`).
+- **Errores visibles al guardar**: El botón "Guardar Sesión" ahora muestra el error en la UI en vez de silenciarlo.
+
+#### Añadido
+- **Campos `shiftId` y `sessionDate`**: La sesión ahora persiste el turno y la fecha de producción (derivada de los datos) como campos de primer nivel, facilitando clasificación y búsqueda.
+- **Sesiones agrupadas por día**: La lista de sesiones guardadas agrupa automáticamente por fecha de producción con resumen de piezas totales y P0% promedio por día.
+- **Turnos visibles**: Cada sesión muestra su turno asignado y rango horario (HH:MM — HH:MM).
+- **Días colapsables**: Click en el encabezado de cada día para expandir/colapsar sus sesiones.
+
 ## [2.47.1] - 2026-02-09
 
 ### 🤖 IA Real (Groq) para Análisis Grader

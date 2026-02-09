@@ -29,6 +29,8 @@ const COLLECTION = 'graderAnalysisSessions'
 
 export async function saveGraderSession(params: {
   deviceId?: string
+  shiftId?: string
+  sessionDate?: string
   startAt?: string
   endAt?: string
   uploadedFilesMeta: UploadedMatrixFile[]
@@ -42,6 +44,8 @@ export async function saveGraderSession(params: {
   const session: GraderSession = {
     id,
     deviceId: params.deviceId,
+    shiftId: params.shiftId,
+    sessionDate: params.sessionDate,
     startAt: params.startAt,
     endAt: params.endAt,
     uploadedFilesMeta: params.uploadedFilesMeta,
@@ -53,11 +57,12 @@ export async function saveGraderSession(params: {
     createdAt: new Date().toISOString(),
   }
 
-  await setDoc(doc(db, COLLECTION, id), {
-    ...session,
-    _createdAt: serverTimestamp(),
-    _updatedAt: serverTimestamp(),
-  })
+  // Filter out undefined values — Firestore rejects them
+  const firestoreData = Object.fromEntries(
+    Object.entries({ ...session, _createdAt: serverTimestamp(), _updatedAt: serverTimestamp() })
+      .filter(([, v]) => v !== undefined),
+  )
+  await setDoc(doc(db, COLLECTION, id), firestoreData)
 
   return session
 }

@@ -184,12 +184,20 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
   }
 
   // ——— SAVE SESSION ———
+  const [saveError, setSaveError] = useState<string | null>(null)
   const handleSave = async () => {
     if (!user) return
     setSaving(true)
+    setSaveError(null)
     try {
+      // Derive sessionDate from startAt (production date from data)
+      const sessionDate = analytics.config.startAt
+        ? analytics.config.startAt.slice(0, 10) // YYYY-MM-DD
+        : new Date().toISOString().slice(0, 10)
       await saveGraderSession({
         deviceId: config.deviceId,
+        shiftId: config.shiftId,
+        sessionDate,
         startAt: analytics.config.startAt,
         endAt: analytics.config.endAt,
         uploadedFilesMeta: parsedData.files,
@@ -200,8 +208,10 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
         createdBy: user.id,
       })
       setSaved(true)
-    } catch {
-      // silent
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      console.error('[Guardar Sesión] Error:', msg)
+      setSaveError(msg)
     } finally {
       setSaving(false)
     }
@@ -708,6 +718,12 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
             {saved ? 'Guardado' : 'Guardar Sesión'}
           </Button>
         </div>
+        {saveError && (
+          <div className="text-xs text-destructive bg-destructive/10 border border-destructive/30 rounded px-3 py-2 flex items-start gap-2">
+            <XCircle className="h-4 w-4 shrink-0 mt-0.5" />
+            <span>Error al guardar: {saveError}</span>
+          </div>
+        )}
       </div>
 
       {/* Data notes */}
