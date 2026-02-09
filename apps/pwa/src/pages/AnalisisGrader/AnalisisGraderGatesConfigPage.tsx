@@ -21,6 +21,7 @@ import type {
   GraderQuality,
   CalibreRange,
 } from '@/services/grader/types'
+import { CALIBRE_WEIGHT_RANGES } from '@/services/grader/graderAnalytics'
 
 interface Props {
   gates: GateAssignment[]
@@ -32,6 +33,12 @@ interface Props {
 
 const QUALITIES: GraderQuality[] = ['Premium', 'Grado', 'Industrial', 'D', 'Unknown']
 const CALIBRES: CalibreRange[] = ['0-2 lb', '2-4 lb', '4-6 lb', '6-8 lb', '8-10 lb', '10-12 lb', 'Other']
+
+/** Lookup rango peso por calibre */
+function calibreRange(calibre: string): string {
+  const r = CALIBRE_WEIGHT_RANGES.find((w) => w.calibre === calibre)
+  return r ? `${r.minGrams.toLocaleString()}–${r.maxGrams.toLocaleString()} g` : '—'
+}
 
 export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: initialConfig, parsedData, onComplete, onBack }: Props) {
   const [gates, setGates] = useState<GateAssignment[]>(initialGates)
@@ -259,6 +266,7 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                 <tr className="border-b text-left">
                   <th className="py-2 px-2 w-16">Gate</th>
                   <th className="py-2 px-2">Calibre</th>
+                  <th className="py-2 px-2 text-center">Rango (g)</th>
                   <th className="py-2 px-2">Calidad</th>
                   <th className="py-2 px-2 w-20 text-center">Activo</th>
                   <th className="py-2 px-2">Nota</th>
@@ -284,6 +292,11 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                           ))}
                         </SelectContent>
                       </Select>
+                    </td>
+                    <td className="py-2 px-2 text-center">
+                      <span className="text-xs text-muted-foreground font-mono">
+                        {calibreRange(gate.assignedCalibre)}
+                      </span>
                     </td>
                     <td className="py-2 px-2">
                       <Select

@@ -10,7 +10,7 @@ import { Navigate, useNavigate } from 'react-router-dom'
 import { Card, CardContent, Badge, Button } from '@/components/ui'
 import { Upload, Settings2, BarChart3, ChevronRight, FolderOpen } from 'lucide-react'
 import { usePermissionsStore } from '@/store'
-import { AnalisisGraderUploadPage } from './AnalisisGraderUploadPage'
+import { AnalisisGraderUploadPage, type FileParsed } from './AnalisisGraderUploadPage'
 import { AnalisisGraderGatesConfigPage } from './AnalisisGraderGatesConfigPage'
 import { AnalisisGraderDashboardPage } from './AnalisisGraderDashboardPage'
 import type { ParsedMatrixData, GateAssignment, GraderAnalysisConfig } from '@/services/grader/types'
@@ -28,6 +28,7 @@ export function AnalisisGraderWizardPage() {
   const navigate = useNavigate()
   const [currentStep, setCurrentStep] = useState<StepId>('upload')
   const [parsedData, setParsedData] = useState<ParsedMatrixData | null>(null)
+  const [uploadedFiles, setUploadedFiles] = useState<FileParsed[]>([])
   const [gates, setGates] = useState<GateAssignment[]>(getDefaultGates())
   const [config, setConfig] = useState<GraderAnalysisConfig>({
     intervalMinutes: 15,
@@ -123,7 +124,11 @@ export function AnalisisGraderWizardPage() {
 
       {/* Step Content */}
       {currentStep === 'upload' && (
-        <AnalisisGraderUploadPage onComplete={handleUploadComplete} />
+        <AnalisisGraderUploadPage
+          onComplete={handleUploadComplete}
+          initialFiles={uploadedFiles}
+          onFilesChange={setUploadedFiles}
+        />
       )}
 
       {currentStep === 'gates' && parsedData && (

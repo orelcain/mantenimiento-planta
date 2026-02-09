@@ -129,18 +129,61 @@ function classifyError(error: string): PointZeroCause {
  * Construye la clasificación completa del 100% del Punto Cero.
  * Agrupa Gate0Records por causa estandarizada y, para "fuera_de_rango"
  * con datos de peso, calcula a qué calibre pertenecerían.
+ *
+ * v2.46.1 — Re-clasifica errores inferidos tomando en cuenta los gates
+ * activos: si no hay gate activo para un calibre, la pieza se considera
+ * "Fuera de Rango" en vez de "Fuera de límites".
  */
 function computePointZeroClassification(
   g0Records: Array<Gate0Record | (Gate0Record & { error: string })>,
   totalPieces: number,
   pointZeroPieces: number,
+  activeGates?: GateAssignment[],
 ): PointZeroClassification {
-  // Agrupar por causa
+  // Calibres con al menos un gate activo
+  const activeCalibres = new Set<string>(
+    (activeGates || [])
+      .filter((g) => g.active)
+      .map((g) => g.assignedCalibre),
+  )
+
+  // Agrupar por causa — con re-clasificación inteligente usando gates activos
   const causeMap = new Map<PointZeroCause, { pieces: number; weightKg: number; records: typeof g0Records }>()
 
   for (const r of g0Records) {
     const errorStr = 'error' in r ? r.error : 'Desconocido'
-    const cause = classifyError(errorStr)
+    let cause = classifyError(errorStr)
+
+    // Re-clasificar "fuera_de_limites" si no hay gate activo para su calibre
+    // Esto solo aplica cuando la causa fue inferida (no desde columna Error explícita)
+    if (cause === 'fuera_de_limites' && activeCalibres.size > 0) {
+      // Determinar calibre real por peso
+      let perPieceG = ('weightPerPieceGrams' in r) ? (r as any).weightPerPieceGrams : undefined
+      if (!perPieceG && r.weightKg && r.pieces > 0) {
+        perPieceG = (r.weightKg / r.pieces) * 1000
+      }
+      if (perPieceG && perPieceG > 0) {
+        const matchedRange = CALIBRE_WEIGHT_RANGES.find(
+          (rng) => perPieceG >= rng.minGrams && perPieceG < rng.maxGrams,
+        )
+        if (matchedRange && !activeCalibres.has(matchedRange.calibre)) {
+          // Peso cae en un calibre sin gate activo → es "fuera de rango" del configurado
+          cause = 'fuera_de_rango'
+        }
+      }
+    }
+
+    // Re-clasificar piezas sin peso como "no leído por fotocélula"
+    if (cause === 'otro' || cause === 'fuera_de_limites') {
+      let perPieceG = ('weightPerPieceGrams' in r) ? (r as any).weightPerPieceGrams : undefined
+      if (!perPieceG && r.weightKg && r.pieces > 0) {
+        perPieceG = (r.weightKg / r.pieces) * 1000
+      }
+      if (!perPieceG || perPieceG <= 0) {
+        cause = 'no_leido_fotocelula'
+      }
+    }
+
     const cur = causeMap.get(cause) || { pieces: 0, weightKg: 0, records: [] }
     cur.pieces += r.pieces
     cur.weightKg += r.weightKg ?? 0
@@ -228,16 +271,31 @@ function computePointZeroClassification(
 
   for (const r of g0Records) {
     const errorStr = 'error' in r ? r.error : 'Desconocido'
-    const cause = classifyError(errorStr)
+    let cause = classifyError(errorStr)
+
+    // Re-clasificar igual que arriba para coherencia
+    let perPieceG = ('weightPerPieceGrams' in r) ? (r as any).weightPerPieceGrams : undefined
+    if (!perPieceG && r.weightKg && r.pieces > 0) {
+      perPieceG = (r.weightKg / r.pieces) * 1000
+    }
+
+    if (cause === 'fuera_de_limites' && activeCalibres.size > 0 && perPieceG && perPieceG > 0) {
+      const matchedRange = CALIBRE_WEIGHT_RANGES.find(
+        (rng) => perPieceG >= rng.minGrams && perPieceG < rng.maxGrams,
+      )
+      if (matchedRange && !activeCalibres.has(matchedRange.calibre)) {
+        cause = 'fuera_de_rango'
+      }
+    }
+    if ((cause === 'otro' || cause === 'fuera_de_limites') && (!perPieceG || perPieceG <= 0)) {
+      cause = 'no_leido_fotocelula'
+    }
+
     const meta = CAUSE_META[cause]
     const quality = r.quality || 'Unknown'
 
     // Determine display calibre: use per-piece weight to compute actual calibre
     let displayCalibre: string
-    let perPieceG = ('weightPerPieceGrams' in r) ? (r as any).weightPerPieceGrams : undefined
-    if (!perPieceG && r.weightKg && r.pieces > 0) {
-      perPieceG = (r.weightKg / r.pieces) * 1000
-    }
 
     if (perPieceG && perPieceG > 0) {
       const matchedRange = CALIBRE_WEIGHT_RANGES.find(
@@ -396,6 +454,7 @@ export function computeAnalytics(
     g0Source as Gate0Record[],
     totalPieces,
     pointZeroPieces,
+    gates,
   )
 
   // ——————— DISTRIBUCIÓN POR CALIBRE ———————

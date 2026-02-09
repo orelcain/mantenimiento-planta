@@ -26,9 +26,13 @@ import type {
 
 interface Props {
   onComplete: (data: ParsedMatrixData) => void
+  /** Archivos previamente parseados (para no perder al navegar atrás) */
+  initialFiles?: FileParsed[]
+  /** Callback para sincronizar archivos con el padre */
+  onFilesChange?: (files: FileParsed[]) => void
 }
 
-interface FileParsed {
+export interface FileParsed {
   fileMeta: UploadedMatrixFile
   partialData: Partial<ParsedMatrixData>
   file: File
@@ -59,12 +63,21 @@ interface ChecklistItem {
   found: boolean
 }
 
-export function AnalisisGraderUploadPage({ onComplete }: Props) {
-  const [files, setFiles] = useState<FileParsed[]>([])
+export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChange }: Props) {
+  const [files, setFiles] = useState<FileParsed[]>(initialFiles || [])
   const [parsing, setParsing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [dragOver, setDragOver] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  // Sincronizar con el padre cuando cambian los archivos
+  const updateFiles = useCallback((updater: (prev: FileParsed[]) => FileParsed[]) => {
+    setFiles((prev) => {
+      const next = updater(prev)
+      onFilesChange?.(next)
+      return next
+    })
+  }, [onFilesChange])
 
   const checklist: ChecklistItem[] = [
     { kind: 'PIEZA_PIEZA', label: 'Pieza-Pieza (base principal)', required: true, found: files.some((f) => f.fileMeta.kind === 'PIEZA_PIEZA') },
@@ -96,13 +109,13 @@ export function AnalisisGraderUploadPage({ onComplete }: Props) {
         const result = await parseFile(file)
         parsed.push({ ...result, file })
       }
-      setFiles((prev) => [...prev, ...parsed])
+      updateFiles((prev) => [...prev, ...parsed])
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al parsear archivo')
     } finally {
       setParsing(false)
     }
-  }, [])
+  }, [updateFiles])
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
@@ -114,7 +127,7 @@ export function AnalisisGraderUploadPage({ onComplete }: Props) {
   )
 
   const handleRemoveFile = (id: string) => {
-    setFiles((prev) => prev.filter((f) => f.fileMeta.id !== id))
+    updateFiles((prev) => prev.filter((f) => f.fileMeta.id !== id))
   }
 
   const handleContinue = () => {
