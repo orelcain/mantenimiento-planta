@@ -49,6 +49,20 @@ export interface PointZeroCauseBreakdown {
   pctOfPointZero: number; // % respecto al total punto cero (suman 100%)
   pctOfTotal: number;     // % respecto al total producción
   weightKg?: number;
+  /** Registros individuales para drill-down */
+  records?: PointZeroDrillRecord[];
+}
+
+/** Registro individual para drill-down en P0 */
+export interface PointZeroDrillRecord {
+  ts: string;
+  pieces: number;
+  weightKg?: number;
+  weightPerPieceGrams?: number;
+  error: string;
+  quality?: string;
+  calibre?: string;
+  lot?: string;
 }
 
 /** Detalle de piezas fuera de rango por distribución de peso */
@@ -130,6 +144,8 @@ export interface GraderAnalysisConfig {
     outOfLimitsPctWarn: number;    // e.g., 3
     pointZeroPctWarn: number;      // e.g., 2
   };
+  /** Rangos de peso por calibre personalizados (sobreescriben los default) */
+  customWeightRanges?: CalibreWeightRange[];
 }
 
 // ============================================================================

@@ -1,10 +1,12 @@
 /**
- * P1) Carga de archivos Excel
+ * P1) Carga de archivos Excel Pieza-Pieza
  *
- * Drag&Drop múltiples xlsx, detección de tipo, validación, checklist.
+ * Drag&Drop múltiples xlsx pieza-pieza. Se pueden agregar varios archivos
+ * durante el turno; el sistema los fusiona automáticamente y muestra
+ * el rango de tiempo (turno) detectado.
  */
 
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge } from '@/components/ui'
 import {
   Upload,
@@ -15,6 +17,8 @@ import {
   Loader2,
   Info,
   ChevronRight,
+  Clock,
+  Plus,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { parseFile, mergeParsedData } from '@/services/grader/graderExcelParser'
@@ -56,13 +60,6 @@ const KIND_COLORS: Record<MatrixFileKind, string> = {
   UNKNOWN: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
 }
 
-interface ChecklistItem {
-  kind: MatrixFileKind
-  label: string
-  required: boolean
-  found: boolean
-}
-
 export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChange }: Props) {
   const [files, setFiles] = useState<FileParsed[]>(initialFiles || [])
   const [parsing, setParsing] = useState(false)
@@ -79,15 +76,43 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
     })
   }, [onFilesChange])
 
-  const checklist: ChecklistItem[] = [
-    { kind: 'PIEZA_PIEZA', label: 'Pieza-Pieza (base principal)', required: true, found: files.some((f) => f.fileMeta.kind === 'PIEZA_PIEZA') },
-    { kind: 'PUERTA_0', label: 'Puerta 0 / Punto Cero', required: false, found: files.some((f) => f.fileMeta.kind === 'PUERTA_0') },
-    { kind: 'PORC_CALIDAD', label: '% Calidad', required: false, found: files.some((f) => f.fileMeta.kind === 'PORC_CALIDAD') },
-    { kind: 'TOTALES_PRODUCCION', label: 'Totales Producción', required: false, found: files.some((f) => f.fileMeta.kind === 'TOTALES_PRODUCCION') },
-    { kind: 'TOTAL_PIEZAS_POR_FOLIO', label: 'Total Piezas por Folio', required: false, found: files.some((f) => f.fileMeta.kind === 'TOTAL_PIEZAS_POR_FOLIO') },
-  ]
+  const hasPiezaPieza = files.some((f) => f.fileMeta.kind === 'PIEZA_PIEZA')
+  const piezaPiezaCount = files.filter((f) => f.fileMeta.kind === 'PIEZA_PIEZA').length
+  const canContinue = hasPiezaPieza
 
-  const canContinue = files.length > 0 && files.some((f) => f.fileMeta.kind !== 'UNKNOWN')
+  // Detectar rango de turno a partir de todos los pieza-pieza cargados
+  const turnoRange = useMemo(() => {
+    const piezas = files.filter((f) => f.fileMeta.kind === 'PIEZA_PIEZA')
+    if (piezas.length === 0) return null
+
+    let minTs: string | undefined
+    let maxTs: string | undefined
+    let totalPieces = 0
+
+    for (const p of piezas) {
+      const records = p.partialData.pieceRecords || []
+      for (const r of records) {
+        totalPieces += r.pieces
+        if (!minTs || r.ts < minTs) minTs = r.ts
+        if (!maxTs || r.ts > maxTs) maxTs = r.ts
+      }
+    }
+
+    if (!minTs || !maxTs) return null
+
+    const startDate = new Date(minTs)
+    const endDate = new Date(maxTs)
+    const fmt = (d: Date) => d.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })
+    const fmtDate = (d: Date) => d.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric' })
+
+    return {
+      start: fmt(startDate),
+      end: fmt(endDate),
+      date: fmtDate(startDate),
+      durationMin: Math.round((endDate.getTime() - startDate.getTime()) / 60000),
+      totalPieces,
+    }
+  }, [files])
 
   const handleFiles = useCallback(async (newFiles: FileList | File[]) => {
     setParsing(true)
@@ -107,6 +132,12 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
       const parsed: FileParsed[] = []
       for (const file of fileArray) {
         const result = await parseFile(file)
+        // Aceptar solo pieza-pieza; advertir si se carga otro tipo
+        if (result.fileMeta.kind !== 'PIEZA_PIEZA') {
+          result.fileMeta.warnings.push(
+            `Tipo "${KIND_LABELS[result.fileMeta.kind]}" detectado — solo se requiere Pieza-Pieza`,
+          )
+        }
         parsed.push({ ...result, file })
       }
       updateFiles((prev) => [...prev, ...parsed])
@@ -137,12 +168,30 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
 
   return (
     <div className="space-y-4">
+      {/* Info banner */}
+      <Card className="border-blue-200 dark:border-blue-800/50 bg-blue-50/50 dark:bg-blue-950/20">
+        <CardContent className="pt-4 pb-3">
+          <div className="flex items-start gap-2">
+            <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
+            <div className="text-sm text-blue-800 dark:text-blue-300">
+              <p className="font-medium">Solo archivos Pieza-Pieza</p>
+              <p className="text-xs mt-0.5 text-blue-600 dark:text-blue-400">
+                Puedes agregar varios archivos pieza-pieza durante el turno.
+                Se fusionan automáticamente para dar una visión completa del período.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Drop zone */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <Upload className="h-5 w-5" />
-            Cargar Archivos Excel de Matrix
+            {files.length === 0
+              ? 'Cargar Archivo Pieza-Pieza'
+              : 'Agregar más Archivos Pieza-Pieza'}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -158,12 +207,18 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
                 : 'border-muted-foreground/25 hover:border-primary/50',
             )}
           >
-            <FileSpreadsheet className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
+            {files.length === 0 ? (
+              <FileSpreadsheet className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
+            ) : (
+              <Plus className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+            )}
             <p className="text-sm font-medium">
-              Arrastra archivos Excel aquí o haz clic para seleccionar
+              {files.length === 0
+                ? 'Arrastra el archivo Pieza-Pieza aquí o haz clic para seleccionar'
+                : 'Agregar otro archivo Pieza-Pieza del turno'}
             </p>
             <p className="text-xs text-muted-foreground mt-1">
-              Archivos .xlsx exportados desde Matrix (1 o múltiples)
+              Archivos .xlsx exportados desde Matrix
             </p>
             {parsing && (
               <div className="flex items-center justify-center gap-2 mt-3">
@@ -189,6 +244,34 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
         </CardContent>
       </Card>
 
+      {/* Turno range info */}
+      {turnoRange && (
+        <Card className="border-green-200 dark:border-green-800/50">
+          <CardContent className="pt-4 pb-3">
+            <div className="flex items-center gap-3 flex-wrap">
+              <Clock className="h-5 w-5 text-green-600 dark:text-green-400" />
+              <div className="flex-1">
+                <p className="text-sm font-medium">
+                  Turno detectado: {turnoRange.date}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {turnoRange.start} – {turnoRange.end}
+                  {' · '}
+                  {turnoRange.durationMin} min
+                  {' · '}
+                  {turnoRange.totalPieces.toLocaleString()} piezas totales
+                </p>
+              </div>
+              {piezaPiezaCount > 1 && (
+                <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
+                  {piezaPiezaCount} archivos fusionados
+                </Badge>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Files list */}
       {files.length > 0 && (
         <Card>
@@ -201,7 +284,12 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
             {files.map((f) => (
               <div
                 key={f.fileMeta.id}
-                className="flex items-center gap-3 p-3 rounded-lg bg-muted/50"
+                className={cn(
+                  'flex items-center gap-3 p-3 rounded-lg',
+                  f.fileMeta.kind === 'PIEZA_PIEZA'
+                    ? 'bg-muted/50'
+                    : 'bg-amber-50/50 dark:bg-amber-950/10 border border-amber-200 dark:border-amber-800/30',
+                )}
               >
                 <FileSpreadsheet className="h-5 w-5 text-green-600 shrink-0" />
                 <div className="flex-1 min-w-0">
@@ -213,6 +301,11 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
                     <span className="text-xs text-muted-foreground">
                       {(f.fileMeta.sizeBytes / 1024).toFixed(0)} KB
                     </span>
+                    {f.fileMeta.kind === 'PIEZA_PIEZA' && f.partialData.pieceRecords && (
+                      <span className="text-xs text-muted-foreground">
+                        · {f.partialData.pieceRecords.length.toLocaleString()} registros
+                      </span>
+                    )}
                     {f.fileMeta.warnings.length > 0 && (
                       <span className="text-xs text-amber-600 flex items-center gap-1">
                         <AlertCircle className="h-3 w-3" />
@@ -237,53 +330,29 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
                 </Button>
               </div>
             ))}
+
+            {/* Hint: not pieza-pieza files */}
+            {files.some((f) => f.fileMeta.kind !== 'PIEZA_PIEZA') && (
+              <p className="text-xs text-amber-600 mt-2 flex items-center gap-1">
+                <AlertCircle className="h-3 w-3" />
+                Los archivos que no son Pieza-Pieza serán ignorados en el análisis.
+              </p>
+            )}
           </CardContent>
         </Card>
       )}
 
-      {/* Checklist */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Info className="h-4 w-4" />
-            Checklist de Archivos Recomendados
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {checklist.map((item) => (
-            <div
-              key={item.kind}
-              className="flex items-center gap-2 text-sm"
-            >
-              {item.found ? (
-                <CheckCircle className="h-4 w-4 text-green-500" />
-              ) : (
-                <div
-                  className={cn(
-                    'h-4 w-4 rounded border-2',
-                    item.required
-                      ? 'border-amber-400'
-                      : 'border-muted-foreground/30',
-                  )}
-                />
-              )}
-              <span className={item.found ? 'text-foreground' : 'text-muted-foreground'}>
-                {item.label}
-              </span>
-              {item.required && !item.found && (
-                <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-400">
-                  Recomendado
-                </Badge>
-              )}
+      {/* Status: waiting for file */}
+      {!hasPiezaPieza && files.length === 0 && (
+        <Card>
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <CheckCircle className="h-4 w-4 opacity-30" />
+              <span>Carga al menos un archivo Pieza-Pieza para continuar</span>
             </div>
-          ))}
-          {checklist[0] && !checklist[0].found && files.length > 0 && (
-            <p className="text-xs text-amber-600 mt-2">
-              Sin archivo pieza-pieza, el dashboard mostrará métricas parciales.
-            </p>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Continue button */}
       <div className="flex justify-end">

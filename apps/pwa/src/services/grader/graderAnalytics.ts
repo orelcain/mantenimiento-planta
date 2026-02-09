@@ -23,6 +23,7 @@ import type {
   CalibreWeightRange,
   OutOfRangeWeightDetail,
   Gate0Record,
+  PointZeroDrillRecord,
   LotAnalysis,
   WeightTrendBucket,
   MatrixQCEnhanced,
@@ -139,6 +140,7 @@ function computePointZeroClassification(
   totalPieces: number,
   pointZeroPieces: number,
   activeGates?: GateAssignment[],
+  weightRanges: CalibreWeightRange[] = CALIBRE_WEIGHT_RANGES,
 ): PointZeroClassification {
   // Calibres con al menos un gate activo
   const activeCalibres = new Set<string>(
@@ -163,7 +165,7 @@ function computePointZeroClassification(
         perPieceG = (r.weightKg / r.pieces) * 1000
       }
       if (perPieceG && perPieceG > 0) {
-        const matchedRange = CALIBRE_WEIGHT_RANGES.find(
+        const matchedRange = weightRanges.find(
           (rng) => perPieceG >= rng.minGrams && perPieceG < rng.maxGrams,
         )
         if (matchedRange && !activeCalibres.has(matchedRange.calibre)) {
@@ -201,6 +203,19 @@ function computePointZeroClassification(
     .map((cause) => {
       const data = causeMap.get(cause)
       const meta = CAUSE_META[cause]
+
+      // Build drill-down records from raw gate0 records
+      const drillRecords: PointZeroDrillRecord[] = (data?.records ?? []).map((r) => ({
+        ts: r.ts,
+        pieces: r.pieces,
+        weightKg: r.weightKg,
+        weightPerPieceGrams: ('weightPerPieceGrams' in r) ? (r as any).weightPerPieceGrams : undefined,
+        error: 'error' in r ? (r as any).error : 'Desconocido',
+        quality: r.quality,
+        calibre: r.calibre,
+        lot: r.lot,
+      }))
+
       return {
         cause,
         label: meta.label,
@@ -209,9 +224,9 @@ function computePointZeroClassification(
         pctOfPointZero: pointZeroPieces > 0 ? pct(data?.pieces ?? 0, pointZeroPieces) : 0,
         pctOfTotal: totalPieces > 0 ? pct(data?.pieces ?? 0, totalPieces) : 0,
         weightKg: data?.weightKg || undefined,
+        records: drillRecords.length > 0 ? drillRecords : undefined,
       }
     })
-    .filter((c) => c.pieces > 0) // Solo mostrar causas con piezas
     .sort((a, b) => b.pieces - a.pieces)
 
   // Desglose de "fuera de rango" por peso → calibre
@@ -235,7 +250,7 @@ function computePointZeroClassification(
       } else {
         // Peso por pieza en gramos
         const perPieceG = perPieceGCandidate
-        const matched = CALIBRE_WEIGHT_RANGES.find(
+        const matched = weightRanges.find(
           (rng) => perPieceG >= rng.minGrams && perPieceG < rng.maxGrams,
         )
         if (matched) {
@@ -280,7 +295,7 @@ function computePointZeroClassification(
     }
 
     if (cause === 'fuera_de_limites' && activeCalibres.size > 0 && perPieceG && perPieceG > 0) {
-      const matchedRange = CALIBRE_WEIGHT_RANGES.find(
+      const matchedRange = weightRanges.find(
         (rng) => perPieceG >= rng.minGrams && perPieceG < rng.maxGrams,
       )
       if (matchedRange && !activeCalibres.has(matchedRange.calibre)) {
@@ -298,7 +313,7 @@ function computePointZeroClassification(
     let displayCalibre: string
 
     if (perPieceG && perPieceG > 0) {
-      const matchedRange = CALIBRE_WEIGHT_RANGES.find(
+      const matchedRange = weightRanges.find(
         (rng) => perPieceG >= rng.minGrams && perPieceG < rng.maxGrams,
       )
       if (matchedRange) {
@@ -348,7 +363,7 @@ function computePointZeroClassification(
     causes,
     hierarchy,
     outOfRangeByWeight,
-    calibreWeightRanges: CALIBRE_WEIGHT_RANGES,
+    calibreWeightRanges: weightRanges,
   }
 }
 
@@ -363,6 +378,11 @@ export function computeAnalytics(
 ): GraderAnalyticsResult {
   const notes: string[] = []
   const interval = config.intervalMinutes ?? 15
+
+  // Rangos de peso: custom (editados por usuario) o default
+  const weightRanges = config.customWeightRanges && config.customWeightRanges.length > 0
+    ? config.customWeightRanges
+    : CALIBRE_WEIGHT_RANGES
 
   // ——————— TOTALES ———————
   const hasPiece = data.pieceRecords.length > 0
@@ -455,6 +475,7 @@ export function computeAnalytics(
     totalPieces,
     pointZeroPieces,
     gates,
+    weightRanges,
   )
 
   // ——————— DISTRIBUCIÓN POR CALIBRE ———————

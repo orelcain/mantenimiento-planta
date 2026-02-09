@@ -4,9 +4,9 @@
  * Tabla editable, guardar/cargar plantillas, configuración del análisis.
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Switch, Label } from '@/components/ui'
-import { Settings2, Save, FolderOpen, ChevronRight, ChevronLeft, Trash2 } from 'lucide-react'
+import { Settings2, Save, FolderOpen, ChevronRight, ChevronLeft, Trash2, ChevronDown, RotateCcw } from 'lucide-react'
 import { useAuthStore, useIsAdmin } from '@/store'
 import {
   saveGatesTemplate,
@@ -20,6 +20,7 @@ import type {
   ParsedMatrixData,
   GraderQuality,
   CalibreRange,
+  CalibreWeightRange,
 } from '@/services/grader/types'
 import { CALIBRE_WEIGHT_RANGES } from '@/services/grader/graderAnalytics'
 
@@ -34,9 +35,9 @@ interface Props {
 const QUALITIES: GraderQuality[] = ['Premium', 'Grado', 'Industrial', 'D', 'Unknown']
 const CALIBRES: CalibreRange[] = ['0-2 lb', '2-4 lb', '4-6 lb', '6-8 lb', '8-10 lb', '10-12 lb', 'Other']
 
-/** Lookup rango peso por calibre */
-function calibreRange(calibre: string): string {
-  const r = CALIBRE_WEIGHT_RANGES.find((w) => w.calibre === calibre)
+/** Lookup rango peso por calibre — usa custom ranges si existen */
+function calibreRangeLookup(calibre: string, ranges: CalibreWeightRange[]): string {
+  const r = ranges.find((w) => w.calibre === calibre)
   return r ? `${r.minGrams.toLocaleString()}–${r.maxGrams.toLocaleString()} g` : '—'
 }
 
@@ -46,8 +47,29 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
   const [templates, setTemplates] = useState<GatesTemplate[]>([])
   const [templateName, setTemplateName] = useState('')
   const [showTemplates, setShowTemplates] = useState(false)
+  const [showWeightRanges, setShowWeightRanges] = useState(false)
   const user = useAuthStore((s) => s.user)
   const isAdmin = useIsAdmin()
+
+  // Active weight ranges: custom or default
+  const activeRanges = useMemo<CalibreWeightRange[]>(() => {
+    return config.customWeightRanges && config.customWeightRanges.length > 0
+      ? config.customWeightRanges
+      : CALIBRE_WEIGHT_RANGES
+  }, [config.customWeightRanges])
+
+  const isCustomRanges = !!(config.customWeightRanges && config.customWeightRanges.length > 0)
+
+  const updateWeightRange = (idx: number, field: 'minGrams' | 'maxGrams', value: number) => {
+    const ranges: CalibreWeightRange[] = activeRanges.map((r, i) =>
+      i === idx ? { ...r, [field]: value } as CalibreWeightRange : r,
+    )
+    setConfig((c) => ({ ...c, customWeightRanges: ranges }))
+  }
+
+  const resetWeightRanges = () => {
+    setConfig((c) => ({ ...c, customWeightRanges: undefined }))
+  }
 
   useEffect(() => {
     listGatesTemplates().then(setTemplates).catch(() => {})
@@ -295,7 +317,7 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                     </td>
                     <td className="py-2 px-2 text-center">
                       <span className="text-xs text-muted-foreground font-mono">
-                        {calibreRange(gate.assignedCalibre)}
+                        {calibreRangeLookup(gate.assignedCalibre, activeRanges)}
                       </span>
                     </td>
                     <td className="py-2 px-2">
@@ -333,6 +355,78 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
             </table>
           </div>
         </CardContent>
+      </Card>
+
+      {/* Editable Weight Ranges */}
+      <Card>
+        <CardHeader
+          className="cursor-pointer select-none"
+          onClick={() => setShowWeightRanges(!showWeightRanges)}
+        >
+          <CardTitle className="text-base flex items-center gap-2">
+            <ChevronDown className={`h-4 w-4 transition-transform ${showWeightRanges ? '' : '-rotate-90'}`} />
+            Rangos de Peso por Calibre
+            {isCustomRanges && (
+              <Badge className="text-[10px] bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+                Personalizado
+              </Badge>
+            )}
+          </CardTitle>
+        </CardHeader>
+        {showWeightRanges && (
+          <CardContent>
+            <p className="text-xs text-muted-foreground mb-3">
+              Define los rangos de peso (en gramos) para cada calibre.
+              El análisis usará estos valores para clasificar piezas.
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left">
+                    <th className="py-2 px-2">Calibre</th>
+                    <th className="py-2 px-2">Mín (g)</th>
+                    <th className="py-2 px-2">Máx (g)</th>
+                    <th className="py-2 px-2">Rango (lb)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {activeRanges.map((r, idx) => (
+                    <tr key={r.calibre} className="border-b hover:bg-muted/30">
+                      <td className="py-2 px-2 font-medium text-xs">{r.label}</td>
+                      <td className="py-2 px-2">
+                        <Input
+                          type="number"
+                          value={r.minGrams}
+                          onChange={(e) => updateWeightRange(idx, 'minGrams', Number(e.target.value))}
+                          className="h-8 text-xs w-24 font-mono"
+                          step="1"
+                        />
+                      </td>
+                      <td className="py-2 px-2">
+                        <Input
+                          type="number"
+                          value={r.maxGrams}
+                          onChange={(e) => updateWeightRange(idx, 'maxGrams', Number(e.target.value))}
+                          className="h-8 text-xs w-24 font-mono"
+                          step="1"
+                        />
+                      </td>
+                      <td className="py-2 px-2 text-xs text-muted-foreground">{r.calibre}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {isCustomRanges && (
+              <div className="mt-3 flex justify-end">
+                <Button variant="outline" size="sm" onClick={resetWeightRanges}>
+                  <RotateCcw className="h-3 w-3 mr-1" />
+                  Restaurar valores originales
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        )}
       </Card>
 
       {/* Navigation */}

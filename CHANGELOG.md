@@ -64,6 +64,25 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
   - Incluye opción para personalizar el nombre de la nueva inspección.
   - Mantiene la asignación del mapa original.
 
+## [2.47.0] - 2026-02-09
+
+### ✨ Nuevas Funcionalidades
+
+#### Análisis Grader
+- **Upload simplificado**: Solo archivos Pieza-Pieza necesarios, eliminado checklist de otros tipos de Excel.
+- **Multi-upload por turno**: Agregar varios archivos pieza-pieza durante el día; detección automática del rango de turno (hora inicio-fin, duración, piezas totales).
+- **Rangos de peso editables**: Nueva sección colapsable en Config. Gates para personalizar min/max gramos por cada calibre (0-2lb, 2-4lb, etc).
+- **Drill-down Punto Cero**: Click en cualquier fila de causa en tabla P0 para expandir y ver registros individuales pieza-pieza (hora, error, peso, calidad, calibre, lote).
+- **Todas las causas P0 visibles**: Las 6 categorías siempre aparecen incluyendo "No leído por fotocélula" (0 piezas si no hay datos).
+
+### 🔧 Correcciones
+
+#### Firebase
+- **Firestore Rules**: Eliminada validación `isValidDocSize()` (usaba `request.resource.size()` no válido en Firestore) de reglas de `graderGatesTemplates` y `graderAnalysisSessions`. Las plantillas ahora se pueden guardar correctamente.
+
+#### Técnico
+- **Custom Weight Ranges**: Motor de análisis parametrizado para usar rangos de peso personalizados cuando están configurados.
+
 ## [2.46.1] - 2026-02-01
 
 ### 🐛 Bug Fixes

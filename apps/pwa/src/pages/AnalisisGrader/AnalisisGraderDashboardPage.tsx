@@ -8,7 +8,7 @@
  * v2.46.1 — P0 inteligente, rangos de peso, persistencia archivos, tooltips ricos, modo día/noche
  */
 
-import { useState, useMemo, useRef } from 'react'
+import { useState, useMemo, useRef, Fragment } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge, Tabs, TabsContent, TabsList, TabsTrigger, InfoTooltip } from '@/components/ui'
 import {
   ChevronLeft,
@@ -36,6 +36,8 @@ import {
   Scale,
   Sun,
   Moon,
+  ChevronDown,
+  Eye,
 } from 'lucide-react'
 import { Bar, Doughnut, Line } from 'react-chartjs-2'
 import {
@@ -95,6 +97,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
   const [aiError, setAiError] = useState<string | null>(null)
   const [aiRawText, setAiRawText] = useState<string | null>(null)
   const [reportMode, setReportMode] = useState<'light' | 'dark'>('dark')
+  const [expandedCause, setExpandedCause] = useState<string | null>(null)
   const dashRef = useRef<HTMLDivElement>(null)
 
   // Compute analytics
@@ -857,6 +860,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b text-left">
+                          <th className="py-2 px-2 w-6"></th>
                           <th className="py-2 px-2">Causa</th>
                           <th className="py-2 px-2 text-right">Piezas</th>
                           <th className="py-2 px-2 text-right">% P.Cero</th>
@@ -865,30 +869,92 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                         </tr>
                       </thead>
                       <tbody>
-                        {analytics.pointZeroClassification.causes.map((c, i) => (
-                          <tr key={i} className="border-b hover:bg-muted/30">
-                            <td className="py-2 px-2">
-                              <div>
-                                <span className="font-medium">{c.label}</span>
-                                <p className="text-[10px] text-muted-foreground">{c.description}</p>
-                              </div>
-                            </td>
-                            <td className="py-2 px-2 text-right font-medium">{c.pieces.toLocaleString()}</td>
-                            <td className="py-2 px-2 text-right">
-                              <span className={cn(
-                                'font-medium',
-                                c.pctOfPointZero >= 50 && 'text-red-600',
-                                c.pctOfPointZero >= 10 && c.pctOfPointZero < 50 && 'text-amber-600',
-                              )}>
-                                {c.pctOfPointZero}%
-                              </span>
-                            </td>
-                            <td className="py-2 px-2 text-right text-muted-foreground">{c.pctOfTotal}%</td>
-                            <td className="py-2 px-2 text-right">{c.weightKg ? c.weightKg.toLocaleString() : '—'}</td>
-                          </tr>
-                        ))}
+                        {analytics.pointZeroClassification.causes.map((c, i) => {
+                          const isExpanded = expandedCause === c.cause
+                          const hasRecords = c.records && c.records.length > 0
+                          return (
+                            <Fragment key={i}>
+                              <tr
+                                className={cn(
+                                  'border-b hover:bg-muted/30',
+                                  hasRecords && 'cursor-pointer',
+                                  isExpanded && 'bg-muted/20',
+                                )}
+                                onClick={() => hasRecords && setExpandedCause(isExpanded ? null : c.cause)}
+                              >
+                                <td className="py-2 px-1 text-center">
+                                  {hasRecords && (
+                                    <ChevronDown className={cn('h-3.5 w-3.5 text-muted-foreground transition-transform', isExpanded && 'rotate-180')} />
+                                  )}
+                                </td>
+                                <td className="py-2 px-2">
+                                  <div>
+                                    <span className="font-medium">{c.label}</span>
+                                    <p className="text-[10px] text-muted-foreground">{c.description}</p>
+                                  </div>
+                                </td>
+                                <td className="py-2 px-2 text-right font-medium">{c.pieces.toLocaleString()}</td>
+                                <td className="py-2 px-2 text-right">
+                                  <span className={cn(
+                                    'font-medium',
+                                    c.pctOfPointZero >= 50 && 'text-red-600',
+                                    c.pctOfPointZero >= 10 && c.pctOfPointZero < 50 && 'text-amber-600',
+                                  )}>
+                                    {c.pctOfPointZero}%
+                                  </span>
+                                </td>
+                                <td className="py-2 px-2 text-right text-muted-foreground">{c.pctOfTotal}%</td>
+                                <td className="py-2 px-2 text-right">{c.weightKg ? c.weightKg.toLocaleString() : '—'}</td>
+                              </tr>
+                              {/* Drill-down rows */}
+                              {isExpanded && c.records && (
+                                <tr>
+                                  <td colSpan={6} className="p-0">
+                                    <div className="bg-muted/10 border-l-4 border-primary/30 px-3 py-2 max-h-[300px] overflow-y-auto">
+                                      <p className="text-xs font-medium mb-2 flex items-center gap-1">
+                                        <Eye className="h-3 w-3" />
+                                        Detalle pieza-pieza ({c.records.length} registros)
+                                      </p>
+                                      <table className="w-full text-xs">
+                                        <thead>
+                                          <tr className="border-b text-left text-muted-foreground">
+                                            <th className="py-1 px-1">Hora</th>
+                                            <th className="py-1 px-1">Error</th>
+                                            <th className="py-1 px-1 text-right">Pzas</th>
+                                            <th className="py-1 px-1 text-right">Peso/pza (g)</th>
+                                            <th className="py-1 px-1">Calidad</th>
+                                            <th className="py-1 px-1">Calibre</th>
+                                            <th className="py-1 px-1">Lote</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {c.records.map((r, j) => (
+                                            <tr key={j} className="border-b border-muted/30 hover:bg-muted/20">
+                                              <td className="py-0.5 px-1 font-mono text-muted-foreground">
+                                                {new Date(r.ts).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                                              </td>
+                                              <td className="py-0.5 px-1">{r.error}</td>
+                                              <td className="py-0.5 px-1 text-right">{r.pieces}</td>
+                                              <td className="py-0.5 px-1 text-right font-mono">
+                                                {r.weightPerPieceGrams ? r.weightPerPieceGrams.toFixed(0) : '—'}
+                                              </td>
+                                              <td className="py-0.5 px-1">{r.quality || '—'}</td>
+                                              <td className="py-0.5 px-1">{r.calibre || '—'}</td>
+                                              <td className="py-0.5 px-1 text-muted-foreground">{r.lot || '—'}</td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  </td>
+                                </tr>
+                              )}
+                            </Fragment>
+                          )
+                        })}
                         {/* Total row */}
                         <tr className="border-t-2 font-bold bg-muted/50">
+                          <td className="py-2 px-1"></td>
                           <td className="py-2 px-2">TOTAL</td>
                           <td className="py-2 px-2 text-right">{analytics.pointZeroClassification.totalPointZeroPieces.toLocaleString()}</td>
                           <td className="py-2 px-2 text-right">100%</td>

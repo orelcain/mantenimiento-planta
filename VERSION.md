@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.46.1**
+## Versión Actual: **v2.47.0**
 
 **Fecha de lanzamiento**: 09 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,15 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.47.0 - Upload pieza-pieza simplificado + Rangos editables + Drill-down P0 (09/02/2026)
+- 📤 **Upload simplificado**: Solo archivos Pieza-Pieza requeridos, eliminado checklist de otros tipos
+- 🔄 **Multi-upload por turno**: Agrega varios archivos pieza-pieza durante el día; detección automática del rango de turno
+- ⚖️ **Rangos de peso editables**: Sección colapsable en Gates Config para personalizar min/max gramos por calibre
+- 🔍 **Custom weight ranges en motor**: El motor de análisis usa rangos personalizados cuando están configurados
+- 📊 **Drill-down P0**: Click en cualquier causa del Punto Cero para ver registros individuales pieza-pieza
+- 🔧 **Todas las causas P0 visibles**: Las 6 categorías de causa siempre aparecen (incluyendo "No leído por fotocélula")
+- 🔐 **Firebase rules fix**: Corregido `isValidDocSize()` para plantillas de gates y sesiones de análisis
 
 ### v2.46.1 - Clasificación P0 inteligente + Rangos de peso + Persistencia de archivos (09/02/2026)
 - 🎯 **Clasificación P0 inteligente**: Re-clasifica "Fuera de límites" → "Fuera de rango" cuando no hay gate activo para el calibre
