@@ -39,6 +39,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
 
+      - name: Type check
+        working-directory: apps/pwa
+        run: pnpm exec tsc --noEmit
+
+      - name: Lint
+        working-directory: apps/pwa
+        run: pnpm lint
+
       - name: Build PWA
         working-directory: apps/pwa
         env: 

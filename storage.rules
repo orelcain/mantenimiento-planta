@@ -6,55 +6,74 @@ service firebase.storage {
       allow read: if request.auth != null;
     }
     
-    // Fotos de incidencias
+    // Fotos de incidencias (max 10MB, solo imágenes)
     match /incidents/{incidentId}/{fileName} {
-      allow write: if request.auth != null;
+      allow write: if request.auth != null
+        && request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
     }
     
     // Fotos de evidencias fotográficas (before/after)
     match /evidence/{evidenceId}/{type}/{fileName} {
-      allow write: if request.auth != null;
+      allow write: if request.auth != null
+        && request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
     }
     
     // Fotos de equipos
     match /equipment/{equipmentId}/{fileName} {
-      allow write: if request.auth != null;
+      allow write: if request.auth != null
+        && request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
     }
     
     // Repuestos en maquinas
     match /machines/{machineId}/repuestos/{repuestoId}/{type}/{fileName} {
-      allow write: if request.auth != null;
+      allow write: if request.auth != null
+        && request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
     }
 
     // Repuestos legacy (Baader 200)
     match /repuestos/{repuestoId}/{type}/{fileName} {
-      allow write: if request.auth != null;
+      allow write: if request.auth != null
+        && request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
     }
 
     // Fotos de usuarios
     match /users/{userId}/{fileName} {
-      allow write: if request.auth != null && request.auth.uid == userId;
+      allow write: if request.auth != null && request.auth.uid == userId
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
     }
     
     // Planos de planta (solo admin) - subcarpetas por ubicación
     match /maps/{locationId}/{fileName} {
-      allow write: if request.auth != null;
+      allow write: if request.auth != null
+        && request.resource.size < 20 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
     }
     
     // Fotos de inspecciones (items de inspección)
     match /inspections/{inspectionId}/{itemId}/{fileName} {
-      allow write: if request.auth != null;
+      allow write: if request.auth != null
+        && request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
     }
     
     // Firmas digitales
     match /incidents/{incidentId}/signatures/{fileName} {
-      allow write: if request.auth != null;
+      allow write: if request.auth != null
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
     }
 
-    // Modelos 3D (lectura pública para QR, escribir autenticados)
+    // Modelos 3D (lectura pública para QR, escribir autenticados, max 50MB)
     match /models3d/{allPaths=**} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow write: if request.auth != null
+        && request.resource.size < 50 * 1024 * 1024;
     }
   }
 }

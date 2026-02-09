@@ -493,35 +493,40 @@ service cloud.firestore {
       allow delete: if isAdmin();
 
       // Subcolección de cotas/dimensiones
-      // Escritura pública para que usuarios QR puedan medir
+      // Lectura pública (QR), escritura solo autenticados
       match /dimensions/{dimensionId} {
         allow read: if true;
-        allow create: if true;
-        allow update: if true;
-        allow delete: if true;
+        allow create, update: if request.auth != null;
+        allow delete: if request.auth != null;
       }
 
       // Subcolección de overrides de material (colores de pintura)
-      // Escritura pública para que usuarios QR puedan pintar
+      // Lectura pública (QR), escritura solo autenticados
       match /materialOverrides/{overrideId} {
         allow read: if true;
-        allow create: if true;
-        allow update: if true;
-        allow delete: if true;
+        allow create, update: if request.auth != null;
+        allow delete: if request.auth != null;
       }
 
       // Subcolección de anotaciones (Pines de interés)
       match /annotations/{annotationId} {
         allow read: if true;
-        allow create: if true;
-        allow update: if true;
-        allow delete: if true;
+        allow create, update: if request.auth != null;
+        allow delete: if request.auth != null;
       }
     }
 
     // ============================================
     // ANÁLISIS GRADER - Sesiones de análisis
     // ============================================
+
+    // Error logs (solo escritura desde cliente, lectura admin)
+    match /errorLogs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated() && isValidDocSize();
+      allow update, delete: if isAdmin();
+    }
+
     match /graderAnalysisSessions/{sessionId} {
       allow read: if isAuthenticated();
       allow create: if isSupervisor()

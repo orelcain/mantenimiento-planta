@@ -1,45 +1,61 @@
 /**
  * Servicios de IA para mejora de ETT
- * Utiliza Groq para generar textos más técnicos y profesionales
+ * Utiliza el proxy centralizado de Groq (Cloud Function o directo)
  */
 
 import { logger } from '@/lib/logger'
 import type { ETTSugerenciaIA } from '@/types'
 
-const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY || ''
-const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions'
-const MODEL = 'llama-3.3-70b-versatile'
-
-/**
- * Llamada genérica a la API de Groq
- */
+// Re-usar la infraestructura centralizada de ai.ts
+// Import dinámico para evitar dependencias circulares
 async function callGroqAPI(prompt: string, temperature = 0.7): Promise<string> {
-  if (!GROQ_API_KEY) {
-    logger.warn('GROQ_API_KEY no configurada, devolviendo texto original')
-    return prompt
-  }
-
   try {
-    const response = await fetch(GROQ_API_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${GROQ_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        messages: [{ role: 'user', content: prompt }],
-        temperature,
-        max_tokens: 1000,
-      }),
-    })
-
-    if (!response.ok) {
-      throw new Error(`Groq API error: ${response.status}`)
+    // Importar dinámicamente callGroq de ai.ts
+    const { isAIConfigured } = await import('./ai')
+    if (!isAIConfigured()) {
+      logger.warn('IA no configurada, devolviendo texto original')
+      return prompt
     }
 
-    const data = await response.json()
-    return data.choices[0]?.message?.content || ''
+    // Usar httpsCallable directamente o fallback
+    const { httpsCallable } = await import('firebase/functions')
+    const { getFunctions } = await import('firebase/functions')
+    const firebaseApp = (await import('@/services/firebase')).default
+
+    try {
+      const functions = getFunctions(firebaseApp)
+      const groqProxy = httpsCallable(functions, 'groqProxy')
+      const result = await groqProxy({
+        messages: [{ role: 'user', content: prompt }],
+        model: 'llama-3.3-70b-versatile',
+        temperature,
+        max_tokens: 1000,
+      })
+      const data = result.data as { content: string }
+      return data.content || ''
+    } catch {
+      // Fallback: llamada directa
+      const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY || ''
+      if (!GROQ_API_KEY) throw new Error('IA no configurada')
+
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${GROQ_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'llama-3.3-70b-versatile',
+          messages: [{ role: 'user', content: prompt }],
+          temperature,
+          max_tokens: 1000,
+        }),
+      })
+
+      if (!response.ok) throw new Error(`Groq API error: ${response.status}`)
+      const data = await response.json()
+      return data.choices?.[0]?.message?.content || ''
+    }
   } catch (error) {
     logger.error('Error calling Groq API', error instanceof Error ? error : new Error(String(error)))
     throw error

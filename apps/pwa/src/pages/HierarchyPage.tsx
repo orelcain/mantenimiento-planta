@@ -29,7 +29,7 @@ import {
   Sparkles,
   Clock,
 } from 'lucide-react'
-import { debounce } from 'lodash'
+import { debounce } from '@/lib/rate-limit'
 import {
   Card,
   CardContent,

@@ -2,6 +2,8 @@
  * Servicio centralizado de logging y manejo de errores
  */
 
+import { collection, addDoc, Timestamp } from 'firebase/firestore'
+
 export type LogLevel = 'info' | 'warn' | 'error' | 'debug'
 
 interface LogEntry {
@@ -16,6 +18,8 @@ class Logger {
   private isDevelopment = import.meta.env.DEV
   private logs: LogEntry[] = []
   private maxLogs = 100
+  private errorQueue: Array<{ message: string; stack?: string; context?: Record<string, unknown>; timestamp: Date }> = []
+  private flushTimer: ReturnType<typeof setTimeout> | null = null
 
   private log(level: LogLevel, message: string, context?: Record<string, unknown>, error?: Error) {
     const entry: LogEntry = {
@@ -52,10 +56,52 @@ class Logger {
       }
     }
 
-    // En producción, podrías enviar a un servicio como Sentry
+    // En producción, enviar errores a Firestore (batch con debounce)
     if (!this.isDevelopment && level === 'error') {
-      // TODO: Integrar con servicio de tracking de errores
-      // Sentry.captureException(error || new Error(message), { extra: context })
+      this.errorQueue.push({
+        message,
+        stack: error?.stack,
+        context,
+        timestamp: entry.timestamp,
+      })
+      this.scheduleFlush()
+    }
+  }
+
+  /**
+   * Enviar errores acumulados a Firestore en batch (max 5, debounce 3s)
+   */
+  private scheduleFlush() {
+    if (this.flushTimer) return
+    this.flushTimer = setTimeout(() => {
+      this.flushTimer = null
+      this.flushErrors()
+    }, 3000)
+  }
+
+  private async flushErrors() {
+    if (this.errorQueue.length === 0) return
+    const batch = this.errorQueue.splice(0, 5)
+
+    try {
+      // Dynamic import para no bloquear el bundle inicial
+      const { db } = await import('@/services/firebase')
+      const errorLogsRef = collection(db, 'errorLogs')
+
+      for (const err of batch) {
+        await addDoc(errorLogsRef, {
+          message: err.message,
+          stack: err.stack || null,
+          context: err.context || null,
+          timestamp: Timestamp.fromDate(err.timestamp),
+          userAgent: navigator.userAgent,
+          url: window.location.href,
+        }).catch(() => {
+          // Silenciar errores de logging para evitar bucles
+        })
+      }
+    } catch {
+      // No propagar errores del logger
     }
   }
 

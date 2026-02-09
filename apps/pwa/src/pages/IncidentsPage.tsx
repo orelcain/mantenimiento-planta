@@ -20,7 +20,7 @@ import type { MapLocation } from '@/types/maps'
 import { formatRelativeTime } from '@/lib/utils'
 import { IncidentForm } from '@/components/incidents/IncidentForm'
 import { IncidentDetail } from '@/components/incidents/IncidentDetail'
-import { debounce } from '@/lib/utils'
+import { debounce } from '@/lib/rate-limit'
 import { getUserDisplayNameMap, getUserInfoLabelMap } from '@/services/userDisplay'
 
 const getStatusIcon = (status: IncidentStatus) => {

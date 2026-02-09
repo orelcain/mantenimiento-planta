@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app'
 import { getAuth } from 'firebase/auth'
-import { getFirestore, enableIndexedDbPersistence } from 'firebase/firestore'
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore'
 import { getStorage } from 'firebase/storage'
 import { getDatabase } from 'firebase/database'
 import { getMessaging, isSupported } from 'firebase/messaging'
@@ -21,26 +21,17 @@ const app = initializeApp(firebaseConfig)
 
 // Servicios básicos
 export const auth = getAuth(app)
-export const db = getFirestore(app)
+
+// Firestore con persistencia offline moderna (soporta multi-tab)
+export const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({
+    tabManager: persistentMultipleTabManager(),
+  }),
+})
+console.log('✅ Firestore initialized with persistent multi-tab cache')
+
 export const storage = getStorage(app)
 export const rtdb = getDatabase(app)
-
-// Enable offline persistence for Firestore
-enableIndexedDbPersistence(db)
-  .then(() => {
-    console.log('✅ Firestore offline persistence enabled')
-  })
-  .catch((error: { code?: string }) => {
-    if (error?.code === 'failed-precondition') {
-      console.warn('⚠️ Firestore persistence disabled: multiple tabs open')
-      return
-    }
-    if (error?.code === 'unimplemented') {
-      console.warn('⚠️ Firestore persistence not supported in this browser')
-      return
-    }
-    console.warn('⚠️ Firestore persistence error:', error)
-  })
 
 // Messaging - inicializar solo cuando se solicite
 let messaging: ReturnType<typeof getMessaging> | null = null

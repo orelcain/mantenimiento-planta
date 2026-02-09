@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { logger } from '@/lib/logger'
-import { debounce } from '@/lib/utils'
+import { debounce } from '@/lib/rate-limit'
 import {
   createPreventiveTaskSchema,
   updatePreventiveTaskSchema,

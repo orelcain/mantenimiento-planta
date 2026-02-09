@@ -511,3 +511,67 @@ exports.onPreventiveExecutionCreated = onDocumentCreated('preventiveExecutions/{
   })
 })
 
+// ==================== GROQ AI PROXY ====================
+
+/**
+ * Proxy seguro para llamadas a Groq AI
+ * La API key se almacena como secret de Firebase Functions (no en el cliente)
+ * Configurar: firebase functions:secrets:set GROQ_API_KEY
+ */
+exports.groqProxy = onCall(
+  {
+    secrets: ['GROQ_API_KEY'],
+    enforceAppCheck: false,
+    maxInstances: 10,
+  },
+  async (request) => {
+    // Verificar autenticación
+    if (!request.auth) {
+      throw new Error('Se requiere autenticación para usar la IA')
+    }
+
+    const { messages, model, temperature, max_tokens } = request.data
+
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
+      throw new Error('Se requiere al menos un mensaje')
+    }
+
+    const apiKey = process.env.GROQ_API_KEY
+    if (!apiKey) {
+      logger.error('GROQ_API_KEY not configured in Firebase secrets')
+      throw new Error('Servicio de IA no configurado')
+    }
+
+    try {
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: model || 'llama-3.3-70b-versatile',
+          messages,
+          temperature: temperature ?? 0.3,
+          max_tokens: max_tokens || 2048,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        logger.error('Groq API error', { status: response.status, body: errorText })
+        throw new Error(`Error del servicio de IA (${response.status})`)
+      }
+
+      const data = await response.json()
+      return {
+        content: data.choices?.[0]?.message?.content || '',
+        usage: data.usage,
+      }
+    } catch (error) {
+      logger.error('Groq proxy error:', error)
+      throw new Error('Error al procesar la solicitud de IA')
+    }
+  }
+)
+

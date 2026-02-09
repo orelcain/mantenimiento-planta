@@ -10,14 +10,9 @@ import { MachineProvider } from '@/contexts/MachineContext'
 import { initializeHierarchySystem, isHierarchyInitialized } from '@/services/hierarchyInit'
 import { Toaster } from '@/components/ui/toaster'
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
-import {
-  LoginPage,
-  DashboardPage,
-  IncidentsPage,
-  EquipmentPage,
-  PredictivePage,
-  RepuestosDashboard,
-} from '@/pages'
+
+// Todas las páginas con lazy loading para reducir bundle inicial
+const LoginPage = lazy(() => import('@/pages/LoginPage').then((mod) => ({ default: mod.LoginPage })))
 
 // Helper para recargar chunks automáticamente en caso de error de versión (deploy nuevo)
 const lazyWithReload = (fn: () => Promise<any>) =>
@@ -50,6 +45,11 @@ const lazyWithReload = (fn: () => Promise<any>) =>
   )
 
 // Code Splitting con autorecarga
+const DashboardPage = lazyWithReload(() => import('@/pages/DashboardPage').then((mod) => ({ default: mod.DashboardPage })))
+const IncidentsPage = lazyWithReload(() => import('@/pages/IncidentsPage').then((mod) => ({ default: mod.IncidentsPage })))
+const EquipmentPage = lazyWithReload(() => import('@/pages/EquipmentPage').then((mod) => ({ default: mod.EquipmentPage })))
+const PredictivePage = lazyWithReload(() => import('@/pages/PredictivePage').then((mod) => ({ default: mod.PredictivePage })))
+const RepuestosDashboard = lazyWithReload(() => import('@/pages/repuestos/Dashboard').then((mod) => ({ default: mod.RepuestosDashboard })))
 const MapPage = lazyWithReload(() => import('@/pages/MapPage').then((mod) => ({ default: mod.MapPage })))
 const PreventivePage = lazyWithReload(() => import('@/pages/PreventivePage').then((mod) => ({ default: mod.PreventivePage })))
 const SettingsPage = lazyWithReload(() => import('@/pages/SettingsPage').then((mod) => ({ default: mod.SettingsPage })))

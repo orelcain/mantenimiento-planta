@@ -12,7 +12,7 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src')
     }
   },
-  base: '/mantenimiento-planta/',
+  base: process.env.VITE_BASE_URL || '/mantenimiento-planta/',
   build: {
     outDir: 'dist',
     sourcemap: false,
@@ -22,7 +22,7 @@ export default defineConfig({
           vendor: ['react', 'react-dom', 'react-router-dom'],
           firebase: ['firebase/app', 'firebase/auth', 'firebase/firestore', 'firebase/storage'],
           ui: ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-select'],
-          three: ['three', '@react-three/fiber', '@react-three/drei'],
+          // Three.js se carga dinámicamente via lazy import de Visor3D (~1MB)
         }
       }
     }

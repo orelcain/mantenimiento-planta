@@ -1,4 +1,5 @@
 import { logger } from '@/lib/logger'
+import { httpsCallable } from 'firebase/functions'
 import type { Incident, Equipment, AIAnalysis, PredictiveThresholds } from '@/types'
 import type { SensorReading, SensorSummaryNode } from '@/services/sensorsRtdb'
 
@@ -6,7 +7,80 @@ const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY || ''
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions'
 const MODEL = 'llama-3.3-70b-versatile' // Gratis, 14,400 req/día
 
-export const isAIConfigured = () => !!GROQ_API_KEY;
+export const isAIConfigured = () => !!GROQ_API_KEY || useCloudProxy;
+
+// Intentar usar Cloud Function proxy (más seguro, key no expuesta)
+let useCloudProxy = true
+let groqProxyFn: ReturnType<typeof httpsCallable> | null = null
+
+async function getGroqProxy() {
+  if (groqProxyFn) return groqProxyFn
+  try {
+    const { getFunctions } = await import('firebase/functions')
+    const { default: app } = await import('@/services/firebase')
+    const functions = getFunctions(app)
+    groqProxyFn = httpsCallable(functions, 'groqProxy')
+    return groqProxyFn
+  } catch {
+    useCloudProxy = false
+    return null
+  }
+}
+
+/**
+ * Llamada centralizada a Groq: primero intenta Cloud Function, luego directo
+ */
+async function callGroq(messages: Array<{ role: string; content: string }>, opts?: { temperature?: number; max_tokens?: number }): Promise<{ content: string; tokens: number }> {
+  // Intentar Cloud Function proxy (API key segura en server)
+  if (useCloudProxy) {
+    try {
+      const proxy = await getGroqProxy()
+      if (proxy) {
+        const result = await proxy({ messages, model: MODEL, temperature: opts?.temperature ?? 0.3, max_tokens: opts?.max_tokens || 2048 })
+        const data = result.data as { content: string; usage?: { total_tokens?: number } }
+        return { content: data.content, tokens: data.usage?.total_tokens || 0 }
+      }
+    } catch (err: unknown) {
+      // Si falla (Cloud Function no deployada), fallback a llamada directa
+      const errorMsg = err instanceof Error ? err.message : String(err)
+      if (errorMsg.includes('not-found') || errorMsg.includes('NOT_FOUND') || errorMsg.includes('not found')) {
+        useCloudProxy = false
+        logger.info('Cloud Function groqProxy no disponible, usando llamada directa')
+      } else {
+        throw err
+      }
+    }
+  }
+
+  // Fallback: llamada directa (API key en cliente)
+  if (!GROQ_API_KEY) {
+    throw new Error('IA no configurada: ni Cloud Function ni API key disponible')
+  }
+
+  const response = await fetch(GROQ_API_URL, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${GROQ_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      messages,
+      temperature: opts?.temperature ?? 0.3,
+      max_tokens: opts?.max_tokens || 2048,
+    }),
+  })
+
+  if (!response.ok) {
+    throw new Error(`Groq API error: ${response.status}`)
+  }
+
+  const data = await response.json()
+  return {
+    content: data.choices?.[0]?.message?.content || '',
+    tokens: data.usage?.total_tokens || 0,
+  }
+}
 
 export type SensorForecast = {
   riesgo: 'bajo' | 'medio' | 'alto' | 'critico'
@@ -20,8 +94,8 @@ export type ThresholdSuggestion = PredictiveThresholds
 // ===== GENERACIÓN DE SÍNTOMAS CONTEXTUALES =====
 
 export async function generateSymptoms(equipment: Equipment): Promise<string[]> {
-  if (!GROQ_API_KEY) {
-    logger.warn('GROQ_API_KEY no configurada, usando síntomas estáticos')
+  if (!isAIConfigured()) {
+    logger.warn('IA no configurada, usando síntomas estáticos')
     return [
       'Vibración anormal',
       'Ruido inusual',
@@ -43,28 +117,12 @@ Modelo: ${equipment.modelo || 'N/A'}
 Responde SOLO con una lista JSON de strings, sin explicación adicional.
 Ejemplo: ["Vibración excesiva", "Ruido anormal", ...]`
 
-    const response = await fetch(GROQ_API_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${GROQ_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.3,
-        max_tokens: 500,
-      }),
-    })
-
-    if (!response.ok) {
-      throw new Error(`Groq API error: ${response.status}`)
-    }
-
-    const data = await response.json()
-    const content = data.choices[0]?.message?.content || '[]'
+    const { content, tokens } = await callGroq(
+      [{ role: 'user', content: prompt }],
+      { temperature: 0.3, max_tokens: 500 }
+    )
     
-    const symptoms = JSON.parse(content)
+    const symptoms = JSON.parse(content || '[]')
     symptoms.push('Otro') // Siempre agregar opción "Otro"
 
     // Guardar análisis
@@ -75,7 +133,7 @@ Ejemplo: ["Vibración excesiva", "Ruido anormal", ...]`
       output: symptoms,
       confidence: 0.9,
       model: MODEL,
-      tokens: data.usage?.total_tokens || 0,
+      tokens,
       createdAt: new Date(),
     })
 
@@ -104,7 +162,7 @@ export async function analyzeRecurrentIssues(incidents: Incident[]): Promise<{
   }>
   confidence: number
 }> {
-  if (!GROQ_API_KEY || incidents.length < 5) {
+  if (!isAIConfigured() || incidents.length < 5) {
     return { patterns: [], confidence: 0 }
   }
 
@@ -139,24 +197,11 @@ Responde SOLO con JSON:
   "confidence": 0.0-1.0
 }`
 
-    const response = await fetch(GROQ_API_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${GROQ_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.2,
-        max_tokens: 1500,
-      }),
-    })
-
-    if (!response.ok) throw new Error(`Groq API error: ${response.status}`)
-
-    const data = await response.json()
-    const result = JSON.parse(data.choices[0]?.message?.content || '{}')
+    const { content, tokens } = await callGroq(
+      [{ role: 'user', content: prompt }],
+      { temperature: 0.2, max_tokens: 1500 }
+    )
+    const result = JSON.parse(content || '{}')
 
     await saveAIAnalysis({
       analysisType: 'pattern_detection',
@@ -164,7 +209,7 @@ Responde SOLO con JSON:
       output: result,
       confidence: result.confidence || 0,
       model: MODEL,
-      tokens: data.usage?.total_tokens || 0,
+      tokens,
       createdAt: new Date(),
     })
 
@@ -182,7 +227,7 @@ export async function predictSensorForecast(params: {
   summary: SensorSummaryNode | null
   readings: SensorReading[]
 }): Promise<SensorForecast | null> {
-  if (!GROQ_API_KEY) return null
+  if (!isAIConfigured()) return null
   if (!params.readings || params.readings.length < 5) return null
 
   try {
@@ -214,26 +259,11 @@ Responde SOLO con JSON:
   "recomendacion": "Acción sugerida"
 }`
 
-    const response = await fetch(GROQ_API_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${GROQ_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.2,
-        max_tokens: 600,
-      }),
-    })
-
-    if (!response.ok) {
-      throw new Error(`Groq API error: ${response.status}`)
-    }
-
-    const data = await response.json()
-    const result = JSON.parse(data.choices[0]?.message?.content || '{}') as SensorForecast
+    const { content, tokens } = await callGroq(
+      [{ role: 'user', content: prompt }],
+      { temperature: 0.2, max_tokens: 600 }
+    )
+    const result = JSON.parse(content || '{}') as SensorForecast
 
     await saveAIAnalysis({
       equipmentId: params.equipment.id,
@@ -242,7 +272,7 @@ Responde SOLO con JSON:
       output: result,
       confidence: result.confianza || 0,
       model: MODEL,
-      tokens: data.usage?.total_tokens || 0,
+      tokens,
       createdAt: new Date(),
     })
 
@@ -259,7 +289,7 @@ export async function suggestPredictiveThresholds(params: {
   equipment: Equipment
   readings: SensorReading[]
 }): Promise<ThresholdSuggestion | null> {
-  if (!GROQ_API_KEY) return null
+  if (!isAIConfigured()) return null
   if (!params.readings || params.readings.length < 10) return null
 
   try {
@@ -294,24 +324,11 @@ Responde SOLO con JSON:
   "offlineMs": number
 }`
 
-    const response = await fetch(GROQ_API_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${GROQ_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.2,
-        max_tokens: 700,
-      }),
-    })
-
-    if (!response.ok) throw new Error(`Groq API error: ${response.status}`)
-
-    const data = await response.json()
-    const result = JSON.parse(data.choices[0]?.message?.content || '{}') as ThresholdSuggestion
+    const { content, tokens } = await callGroq(
+      [{ role: 'user', content: prompt }],
+      { temperature: 0.2, max_tokens: 700 }
+    )
+    const result = JSON.parse(content || '{}') as ThresholdSuggestion
 
     await saveAIAnalysis({
       equipmentId: params.equipment.id,
@@ -320,7 +337,7 @@ Responde SOLO con JSON:
       output: result,
       confidence: 0.7,
       model: MODEL,
-      tokens: data.usage?.total_tokens || 0,
+      tokens,
       createdAt: new Date(),
     })
 
@@ -342,7 +359,7 @@ export async function predictNextFailure(
   confidence: number
   recommendation: string
 } | null> {
-  if (!GROQ_API_KEY || historicalData.length < 3) return null
+  if (!isAIConfigured() || historicalData.length < 3) return null
 
   try {
     const prompt = `Analiza este histórico de mantenimiento y predice cuándo podría ocurrir la próxima falla:
@@ -357,24 +374,11 @@ Responde SOLO con JSON:
   "recommendation": "Acción recomendada"
 }`
 
-    const response = await fetch(GROQ_API_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${GROQ_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.1,
-        max_tokens: 800,
-      }),
-    })
-
-    if (!response.ok) throw new Error(`Groq API error: ${response.status}`)
-
-    const data = await response.json()
-    const result = JSON.parse(data.choices[0]?.message?.content || 'null')
+    const { content, tokens } = await callGroq(
+      [{ role: 'user', content: prompt }],
+      { temperature: 0.1, max_tokens: 800 }
+    )
+    const result = JSON.parse(content || 'null')
 
     await saveAIAnalysis({
       equipmentId,
@@ -383,7 +387,7 @@ Responde SOLO con JSON:
       output: result,
       confidence: result.confidence || 0,
       model: MODEL,
-      tokens: data.usage?.total_tokens || 0,
+      tokens,
       createdAt: new Date(),
     })
 
@@ -403,7 +407,7 @@ export async function analyzeRootCause(incidents: Incident[]): Promise<{
   estimatedSavings: number
   confidence: number
 }> {
-  if (!GROQ_API_KEY || incidents.length < 3) {
+  if (!isAIConfigured() || incidents.length < 3) {
     return {
       rootCause: 'Datos insuficientes para análisis',
       solution: 'Recopilar más información',
@@ -441,24 +445,11 @@ Responde SOLO con JSON:
   "confidence": 0.0-1.0
 }`
 
-    const response = await fetch(GROQ_API_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${GROQ_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.2,
-        max_tokens: 1200,
-      }),
-    })
-
-    if (!response.ok) throw new Error(`Groq API error: ${response.status}`)
-
-    const data = await response.json()
-    const result = JSON.parse(data.choices[0]?.message?.content || '{}')
+    const { content, tokens } = await callGroq(
+      [{ role: 'user', content: prompt }],
+      { temperature: 0.2, max_tokens: 1200 }
+    )
+    const result = JSON.parse(content || '{}')
 
     await saveAIAnalysis({
       analysisType: 'root_cause',
@@ -466,7 +457,7 @@ Responde SOLO con JSON:
       output: result,
       confidence: result.confidence || 0,
       model: MODEL,
-      tokens: data.usage?.total_tokens || 0,
+      tokens,
       createdAt: new Date(),
     })
 
@@ -498,8 +489,8 @@ async function saveAIAnalysis(analysis: Omit<AIAnalysis, 'id'>): Promise<void> {
 
 // Extender refineText para soportar contexto de transcripción
 export async function refineText(text: string, isTranscriptionCleanup = false): Promise<string> {
-  if (!GROQ_API_KEY) {
-    logger.warn('GROQ_API_KEY faltante en refineText.')
+  if (!isAIConfigured()) {
+    logger.warn('IA no configurada para refineText.')
     return text
   }
   if (!text || text.length < 3) {
@@ -531,26 +522,11 @@ Texto base: "${text}"
 
 Responde SOLO con el texto técnico mejorado. Sin comillas ni puntos finales.`
 
-    const response = await fetch(GROQ_API_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${GROQ_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.1, // Más determinista para correcciones técnicas
-        max_tokens: 300,
-      }),
-    })
-
-    if (!response.ok) {
-      throw new Error(`Groq API error: ${response.status}`)
-    }
-
-    const data = await response.json()
-    let refined = data.choices[0]?.message?.content?.trim() || text
+    const { content } = await callGroq(
+      [{ role: 'user', content: prompt }],
+      { temperature: 0.1, max_tokens: 300 }
+    )
+    let refined = content?.trim() || text
     // Limpieza extra
     refined = refined.replace(/^"|"$/g, '').replace(/\.$/, '')
     
@@ -575,7 +551,7 @@ export async function extractSymptomsFromDescription(
     locationName?: string
   }
 ): Promise<string[]> {
-  if (!GROQ_API_KEY) {
+  if (!isAIConfigured()) {
     return []
   }
 
@@ -607,29 +583,13 @@ ${knownSymptoms ? JSON.stringify(knownSymptoms) : 'Ninguno'}
 
 Ejemplo Salida: ["Fuga de refrigerante", "Sobrecalentamiento motor"]`
 
-    const response = await fetch(GROQ_API_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${GROQ_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.1,
-        max_tokens: 300,
-      }),
-    })
-
-    if (!response.ok) {
-      throw new Error(`Groq API error: ${response.status}`)
-    }
-
-    const data = await response.json()
-    const content = data.choices[0]?.message?.content || '[]'
+    const { content } = await callGroq(
+      [{ role: 'user', content: prompt }],
+      { temperature: 0.1, max_tokens: 300 }
+    )
     
     // Limpieza básica por si el modelo incluye markdown
-    const jsonStr = content.replace(/```json/g, '').replace(/```/g, '').trim()
+    const jsonStr = (content || '[]').replace(/```json/g, '').replace(/```/g, '').trim()
     
     return JSON.parse(jsonStr)
 

@@ -223,16 +223,25 @@ export function MainLayout() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Skip to content - accesibilidad */}
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:z-[100] focus:top-4 focus:left-4 focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-md">
+        Ir al contenido principal
+      </a>
+
       {/* Mobile sidebar backdrop */}
       {sidebarOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/50 lg:hidden"
           onClick={() => setSidebarOpen(false)}
+          aria-hidden="true"
         />
       )}
 
       {/* Sidebar */}
       <aside
+        role="navigation"
+        aria-label="Menú principal"
+        aria-expanded={sidebarOpen}
         className={cn(
           'fixed inset-y-0 left-0 z-50 w-64 bg-card border-r transform transition-transform duration-200 ease-in-out lg:translate-x-0',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
@@ -250,6 +259,7 @@ export function MainLayout() {
             <button
               onClick={() => setSidebarOpen(false)}
               className="lg:hidden p-1 hover:bg-muted rounded"
+              aria-label="Cerrar menú"
             >
               <X className="h-5 w-5" />
             </button>
@@ -355,6 +365,8 @@ export function MainLayout() {
           <button
             onClick={() => setSidebarOpen(true)}
             className="lg:hidden p-2 -ml-2 hover:bg-muted rounded-lg"
+            aria-label="Abrir menú"
+            aria-expanded={sidebarOpen}
           >
             <Menu className="h-5 w-5" />
           </button>
@@ -606,6 +618,7 @@ export function MainLayout() {
 
         {/* Page content */}
         <main
+          id="main-content"
           className={`p-3 lg:p-6 w-full max-w-[100vw] overflow-x-hidden ${
             isReadOnly ? 'pointer-events-none opacity-70' : ''
           }`}
