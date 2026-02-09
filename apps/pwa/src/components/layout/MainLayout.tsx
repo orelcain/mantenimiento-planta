@@ -98,6 +98,39 @@ export function MainLayout() {
     .join(', ')
   const lastSyncLabel = lastSyncAt ? new Date(lastSyncAt).toLocaleString() : null
 
+  const exportSyncEntries = (format: 'json' | 'csv') => {
+    if (pendingEntries.length === 0) return
+    const rows = pendingEntries.map((entry) => ({
+      id: entry.id,
+      context: entry.context,
+      status: entry.status,
+      createdAt: new Date(entry.createdAt).toISOString(),
+      error: entry.error ?? '',
+    }))
+    let content = ''
+    let mime = ''
+    if (format === 'json') {
+      content = JSON.stringify(rows, null, 2)
+      mime = 'application/json'
+    } else {
+      const header = 'id,context,status,createdAt,error'
+      const csvRows = rows.map((r) => {
+        const esc = (v: string) => `"${v.replace(/"/g, '""')}"`
+        return [r.id, r.context, r.status, r.createdAt, r.error].map(esc).join(',')
+      })
+      content = [header, ...csvRows].join('\n')
+      mime = 'text/csv'
+    }
+    const blob = new Blob([content], { type: mime })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    const ts = new Date().toISOString().replace(/[:.]/g, '-')
+    a.href = url
+    a.download = `sync-log-${ts}.${format}`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   useEffect(() => {
     const handleOnline = () => setIsOnline(true)
     const handleOffline = () => setIsOnline(false)
@@ -387,12 +420,26 @@ export function MainLayout() {
                   <p className="text-xs text-muted-foreground">Ultimo sync: {lastSyncLabel}</p>
                 )}
               </div>
-              <button
-                className="text-xs text-muted-foreground hover:text-foreground"
-                onClick={() => setShowSyncPanel(false)}
-              >
-                Cerrar
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  className="text-xs text-muted-foreground hover:text-foreground"
+                  onClick={() => exportSyncEntries('json')}
+                >
+                  Exportar JSON
+                </button>
+                <button
+                  className="text-xs text-muted-foreground hover:text-foreground"
+                  onClick={() => exportSyncEntries('csv')}
+                >
+                  Exportar CSV
+                </button>
+                <button
+                  className="text-xs text-muted-foreground hover:text-foreground"
+                  onClick={() => setShowSyncPanel(false)}
+                >
+                  Cerrar
+                </button>
+              </div>
             </div>
             <div className="mt-3 space-y-2 max-h-48 overflow-y-auto">
               {pendingEntries.slice(0, 10).map((entry) => (
