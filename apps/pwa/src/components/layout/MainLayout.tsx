@@ -22,6 +22,7 @@ import {
   Route,
   Mail,
   Box,
+  BarChart3,
 } from 'lucide-react'
 import { Avatar, AvatarFallback, Button } from '@/components/ui'
 import { useAuthStore, useIsAdmin, useAppStore } from '@/store'
@@ -50,6 +51,7 @@ const navigation = [
   { name: 'Equipos', href: '/equipment', icon: Wrench },
   { name: 'Repuestos', href: '/repuestos', icon: Package },
   { name: 'Visor 3D', href: '/visor-3d', icon: Box },
+  { name: 'Análisis Grader', href: '/analisis-grader', icon: BarChart3 },
   { name: 'Configuración', href: '/settings', icon: Settings },
 ]
 

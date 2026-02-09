@@ -30,6 +30,7 @@ export const APP_MODULES = [
   'configuracion',
   'usuarios',
   'reportes',
+  'analisisGrader',
 ] as const
 
 export type AppModule = typeof APP_MODULES[number]
@@ -244,6 +245,13 @@ export const MODULES_CONFIG: ModuleConfig[] = [
     icono: 'BarChart',
     accionesDisponibles: ['ver', 'exportar'],
   },
+  {
+    id: 'analisisGrader',
+    nombre: 'Análisis Grader',
+    descripcion: 'Análisis de datos de clasificadora de salmones',
+    icono: 'BarChart3',
+    accionesDisponibles: ['ver', 'crear', 'editar', 'exportar', 'configurar'],
+  },
 ]
 
 // ============================================================================
@@ -281,6 +289,7 @@ const SUPERVISOR_PERMISSIONS: PermissionsMap = {
   configuracion: { visible: false, actions: [] },
   usuarios: { visible: false, actions: [] },
   reportes: { visible: true, actions: ['ver', 'exportar'] },
+  analisisGrader: { visible: true, actions: ['ver', 'crear', 'editar', 'exportar', 'configurar'] },
 }
 
 /**
@@ -304,6 +313,7 @@ const TECNICO_PERMISSIONS: PermissionsMap = {
   configuracion: { visible: false, actions: [] },
   usuarios: { visible: false, actions: [] },
   reportes: { visible: true, actions: ['ver'] },
+  analisisGrader: { visible: true, actions: ['ver'] },
 }
 
 /**
@@ -327,6 +337,7 @@ const USUARIO_PERMISSIONS: PermissionsMap = {
   configuracion: { visible: false, actions: [] },
   usuarios: { visible: false, actions: [] },
   reportes: { visible: false, actions: [] },
+  analisisGrader: { visible: false, actions: [] },
 }
 
 export const DEFAULT_ROLE_PERMISSIONS: Record<string, PermissionsMap> = {
