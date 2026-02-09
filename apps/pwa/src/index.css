@@ -134,4 +134,144 @@
   .priority-baja {
     @apply bg-muted text-muted-foreground;
   }
+
+  /* ─── Modo Día para módulo Grader ──────────────── */
+  .grader-light-mode {
+    --grader-bg: #f8fafc;
+    --grader-fg: #1a1a2e;
+    --grader-card: #ffffff;
+    --grader-card-fg: #1a1a2e;
+    --grader-muted: #f1f5f9;
+    --grader-muted-fg: #64748b;
+    --grader-border: #e2e8f0;
+    --grader-popover: #ffffff;
+    --grader-popover-fg: #1a1a2e;
+  }
+
+  .grader-light-mode,
+  .grader-light-mode * {
+    color: var(--grader-fg);
+  }
+
+  .grader-light-mode {
+    background-color: var(--grader-bg);
+    border-radius: 0.75rem;
+    padding: 1rem;
+  }
+
+  /* Cards */
+  .grader-light-mode [class*="rounded-lg"][class*="border"] ,
+  .grader-light-mode [class*="rounded-xl"][class*="border"] {
+    background-color: var(--grader-card) !important;
+    border-color: var(--grader-border) !important;
+    box-shadow: 0 1px 3px rgb(0 0 0 / 0.05), 0 1px 2px -1px rgb(0 0 0 / 0.05);
+  }
+
+  /* Muted text */
+  .grader-light-mode [class*="text-muted-foreground"] {
+    color: var(--grader-muted-fg) !important;
+  }
+
+  /* Bg muted */
+  .grader-light-mode [class*="bg-muted"] {
+    background-color: var(--grader-muted) !important;
+  }
+
+  /* Tabs */
+  .grader-light-mode [role="tablist"] {
+    background-color: var(--grader-muted) !important;
+  }
+
+  .grader-light-mode [role="tab"][data-state="active"] {
+    background-color: var(--grader-card) !important;
+    color: var(--grader-fg) !important;
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.06);
+  }
+
+  /* Borders */
+  .grader-light-mode table,
+  .grader-light-mode th,
+  .grader-light-mode td,
+  .grader-light-mode tr {
+    border-color: var(--grader-border) !important;
+  }
+
+  .grader-light-mode thead {
+    background-color: var(--grader-muted) !important;
+  }
+
+  /* Hover */
+  .grader-light-mode tr:hover {
+    background-color: #f1f5f9 !important;
+  }
+
+  /* Buttons */
+  .grader-light-mode button[class*="outline"] {
+    border-color: var(--grader-border) !important;
+    color: var(--grader-fg) !important;
+  }
+
+  .grader-light-mode button[class*="outline"]:hover {
+    background-color: var(--grader-muted) !important;
+  }
+
+  /* Badges */
+  .grader-light-mode [class*="bg-red-900"] {
+    background-color: #fee2e2 !important;
+    color: #991b1b !important;
+  }
+
+  .grader-light-mode [class*="bg-amber-900"] {
+    background-color: #fef3c7 !important;
+    color: #92400e !important;
+  }
+
+  .grader-light-mode [class*="bg-green-900"] {
+    background-color: #dcfce7 !important;
+    color: #166534 !important;
+  }
+
+  .grader-light-mode [class*="bg-blue-900"] {
+    background-color: #dbeafe !important;
+    color: #1e40af !important;
+  }
+
+  /* Note cards */
+  .grader-light-mode [class*="bg-amber-50"] {
+    background-color: #fffbeb !important;
+  }
+
+  .grader-light-mode [class*="border-amber-300"] {
+    border-color: #fcd34d !important;
+  }
+
+  .grader-light-mode [class*="border-red-200"] {
+    border-color: #fca5a5 !important;
+  }
+
+  .grader-light-mode [class*="border-red-300"] {
+    border-color: #fca5a5 !important;
+  }
+
+  /* Severity colors on value text */
+  .grader-light-mode .text-red-600 { color: #dc2626 !important; }
+  .grader-light-mode .text-amber-600 { color: #d97706 !important; }
+  .grader-light-mode .text-green-500 { color: #22c55e !important; }
+  .grader-light-mode .text-red-500 { color: #ef4444 !important; }
+  .grader-light-mode .text-blue-500 { color: #3b82f6 !important; }
+
+  /* Tooltip popover in light mode */
+  .grader-light-mode [class*="bg-popover"] {
+    background-color: var(--grader-popover) !important;
+    color: var(--grader-popover-fg) !important;
+    border-color: var(--grader-border) !important;
+  }
+
+  /* Scrollbar light mode */
+  .grader-light-mode::-webkit-scrollbar-track {
+    background: var(--grader-bg);
+  }
+  .grader-light-mode::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+  }
 }

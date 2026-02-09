@@ -5,7 +5,7 @@
  * balance de gates (enhanced), lotes, tendencia de peso,
  * insights, panel IA, exportación y guardado de sesión.
  *
- * v2.45.0 — Tooltips, estadística avanzada, tabs Lotes + Tendencia Peso
+ * v2.46.0 — Tooltips ricos con fórmulas, modo día/noche, UI refinada
  */
 
 import { useState, useMemo, useRef } from 'react'
@@ -34,6 +34,8 @@ import {
   Activity,
   ArrowRightLeft,
   Scale,
+  Sun,
+  Moon,
 } from 'lucide-react'
 import { Bar, Doughnut, Line } from 'react-chartjs-2'
 import {
@@ -58,7 +60,7 @@ import { computeAnalytics } from '@/services/grader/graderAnalytics'
 import { computeDeterministicInsights, computePointZeroTrend } from '@/services/grader/graderInsights'
 import { analyzeGrader, parseAIResponse } from '@/services/ai/aiProvider'
 import { saveGraderSession } from '@/services/grader/graderSession.service'
-import { getTooltip } from '@/services/grader/graderTooltips'
+import { getTooltip, getTooltipProps } from '@/services/grader/graderTooltips'
 import type {
   ParsedMatrixData,
   GateAssignment,
@@ -92,6 +94,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
   const [aiOutput, setAiOutput] = useState<AIGraderOutput | null>(null)
   const [aiError, setAiError] = useState<string | null>(null)
   const [aiRawText, setAiRawText] = useState<string | null>(null)
+  const [reportMode, setReportMode] = useState<'light' | 'dark'>('dark')
   const dashRef = useRef<HTMLDivElement>(null)
 
   // Compute analytics
@@ -612,17 +615,6 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
     ],
   }
 
-  const pointZeroErrorData = {
-    labels: analytics.pointZeroByError.map((d) => d.error),
-    datasets: [
-      {
-        label: 'Piezas Punto Cero',
-        data: analytics.pointZeroByError.map((d) => d.pieces),
-        backgroundColor: 'rgba(239,68,68,0.7)',
-      },
-    ],
-  }
-
   // Classification donut for Punto Cero
   const classificationColors = [
     'rgba(239,68,68,0.8)',   // fuera_de_rango (red)
@@ -671,7 +663,10 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
   const matrixCalibres = Array.from(matrixCalibresSet)
 
   return (
-    <div ref={dashRef} className="space-y-4">
+    <div
+      ref={dashRef}
+      className={cn('space-y-4', reportMode === 'light' && 'grader-light-mode')}
+    >
       {/* Top actions */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <Button variant="outline" size="sm" onClick={onBack}>
@@ -679,6 +674,14 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
           Volver a Config
         </Button>
         <div className="flex gap-2 flex-wrap">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setReportMode(reportMode === 'dark' ? 'light' : 'dark')}
+            title={reportMode === 'dark' ? 'Cambiar a modo día' : 'Cambiar a modo noche'}
+          >
+            {reportMode === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </Button>
           <Button variant="outline" size="sm" onClick={handleExport}>
             <Download className="h-4 w-4 mr-1" />
             JSON
@@ -816,7 +819,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                 <CardTitle className="text-sm flex items-center gap-2">
                   <Target className="h-4 w-4 text-red-500" />
                   Clasificación Punto Cero — 100%
-                  <InfoTooltip text={getTooltip('pz.clasificacion') || ''} />
+                  <InfoTooltip {...getTooltipProps('pz.clasificacion')} />
                 </CardTitle>
                 <p className="text-xs text-muted-foreground">
                   {analytics.pointZeroClassification.totalPointZeroPieces.toLocaleString()} piezas totales en Punto Cero
@@ -907,7 +910,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                 <CardTitle className="text-sm flex items-center gap-2">
                   <Table2 className="h-4 w-4 text-purple-500" />
                   Pivote Error × Calidad × Calibre
-                  <InfoTooltip text={getTooltip('pz.pivote') || ''} />
+                  <InfoTooltip {...getTooltipProps('pz.pivote')} />
                 </CardTitle>
                 <p className="text-xs text-muted-foreground">
                   Desglose jerárquico: Error → Calidad → Calibre (como tabla pivote Marelec)
@@ -1000,7 +1003,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                 <CardTitle className="text-sm flex items-center gap-2">
                   <AlertTriangle className="h-4 w-4 text-amber-500" />
                   Fuera de Rango — Distribución por Peso
-                  <InfoTooltip text={getTooltip('pz.fueraRango') || ''} />
+                  <InfoTooltip {...getTooltipProps('pz.fueraRango')} />
                 </CardTitle>
                 <p className="text-xs text-muted-foreground">
                   Piezas clasificadas como &quot;fuera de rango&quot; agrupadas por el calibre al que pertenecerían según su peso
@@ -1076,83 +1079,30 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
             </Card>
           )}
 
-          {/* Punto Cero por Causa (original) + Serie temporal */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <Card>
-              <CardHeader><CardTitle className="text-sm">Punto Cero por Error (detalle)</CardTitle></CardHeader>
-              <CardContent>
-                {analytics.pointZeroByError.length > 0 ? (
-                  <Bar
-                    data={pointZeroErrorData}
-                    options={{
-                      indexAxis: 'y',
-                      responsive: true,
-                      plugins: { legend: { display: false } },
-                      scales: { x: { beginAtZero: true } },
-                    }}
-                  />
-                ) : (
-                  <p className="text-sm text-muted-foreground text-center py-8">Sin datos de Punto Cero</p>
-                )}
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader><CardTitle className="text-sm">Punto Cero en el Tiempo</CardTitle></CardHeader>
-              <CardContent>
-                {analytics.timeSeriesPointZero.length > 0 ? (
-                  <Line
-                    data={timeSeriesData}
-                    options={{
-                      responsive: true,
-                      plugins: { legend: { display: false } },
-                      scales: {
-                        x: {
-                          type: 'time',
-                          time: { unit: config.intervalMinutes === 60 ? 'hour' : 'minute' },
-                        },
-                        y: { beginAtZero: true },
+          {/* Serie temporal Punto Cero */}
+          <Card>
+            <CardHeader><CardTitle className="text-sm">Punto Cero en el Tiempo</CardTitle></CardHeader>
+            <CardContent>
+              {analytics.timeSeriesPointZero.length > 0 ? (
+                <Line
+                  data={timeSeriesData}
+                  options={{
+                    responsive: true,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                      x: {
+                        type: 'time',
+                        time: { unit: config.intervalMinutes === 60 ? 'hour' : 'minute' },
                       },
-                    }}
-                  />
-                ) : (
-                  <p className="text-sm text-muted-foreground text-center py-8">Sin serie temporal</p>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Punto Zero table */}
-          {analytics.pointZeroByError.length > 0 && (
-            <Card>
-              <CardHeader><CardTitle className="text-sm">Desglose por Error Original</CardTitle></CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b text-left">
-                        <th className="py-2 px-2">Error</th>
-                        <th className="py-2 px-2 text-right">Piezas</th>
-                        <th className="py-2 px-2 text-right">%</th>
-                        <th className="py-2 px-2 text-right">Peso (kg)</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {analytics.pointZeroByError.map((e, i) => (
-                        <tr key={i} className="border-b hover:bg-muted/30">
-                          <td className="py-2 px-2">{e.error}</td>
-                          <td className="py-2 px-2 text-right">{e.pieces.toLocaleString()}</td>
-                          <td className="py-2 px-2 text-right">{e.pct}%</td>
-                          <td className="py-2 px-2 text-right">
-                            {e.weightKg ? e.weightKg.toLocaleString() : '—'}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+                      y: { beginAtZero: true },
+                    },
+                  }}
+                />
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-8">Sin serie temporal</p>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* DISTRIBUCIONES */}
@@ -1185,56 +1135,6 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
               </CardContent>
             </Card>
           </div>
-
-          {/* Distribution tables */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <Card>
-              <CardHeader><CardTitle className="text-sm">Tabla Calibre</CardTitle></CardHeader>
-              <CardContent>
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b text-left">
-                      <th className="py-1 px-2">Calibre</th>
-                      <th className="py-1 px-2 text-right">Piezas</th>
-                      <th className="py-1 px-2 text-right">%</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {analytics.distributionByCalibre.map((d, i) => (
-                      <tr key={i} className="border-b">
-                        <td className="py-1 px-2">{d.key}</td>
-                        <td className="py-1 px-2 text-right">{d.pieces.toLocaleString()}</td>
-                        <td className="py-1 px-2 text-right">{d.pct}%</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader><CardTitle className="text-sm">Tabla Calidad</CardTitle></CardHeader>
-              <CardContent>
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b text-left">
-                      <th className="py-1 px-2">Calidad</th>
-                      <th className="py-1 px-2 text-right">Piezas</th>
-                      <th className="py-1 px-2 text-right">%</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {analytics.distributionByQuality.map((d, i) => (
-                      <tr key={i} className="border-b">
-                        <td className="py-1 px-2">{d.key}</td>
-                        <td className="py-1 px-2 text-right">{d.pieces.toLocaleString()}</td>
-                        <td className="py-1 px-2 text-right">{d.pct}%</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </CardContent>
-            </Card>
-          </div>
         </TabsContent>
 
         {/* LOTES */}
@@ -1246,7 +1146,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                   <CardTitle className="text-sm flex items-center gap-2">
                     <Layers className="h-4 w-4 text-blue-500" />
                     Análisis por Lote
-                    <InfoTooltip text={getTooltip('lot.analysis') || ''} />
+                    <InfoTooltip {...getTooltipProps('lot.analysis')} />
                   </CardTitle>
                   <p className="text-xs text-muted-foreground">
                     {analytics.lotAnalysis.length} lote(s) detectados en pieza-pieza
@@ -1296,26 +1196,26 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                           <th className="py-2 px-2 text-right">
                             <span className="flex items-center justify-end gap-1">
                               Peso Prom. (g)
-                              <InfoTooltip text={getTooltip('lot.avgWeight') || ''} iconSize={12} />
+                              <InfoTooltip {...getTooltipProps('lot.avgWeight')} iconSize={12} />
                             </span>
                           </th>
                           <th className="py-2 px-2 text-right">
                             <span className="flex items-center justify-end gap-1">
                               Mediana (g)
-                              <InfoTooltip text={getTooltip('lot.medianWeight') || ''} iconSize={12} />
+                              <InfoTooltip {...getTooltipProps('lot.medianWeight')} iconSize={12} />
                             </span>
                           </th>
                           <th className="py-2 px-2 text-right">
                             <span className="flex items-center justify-end gap-1">
                               σ (g)
-                              <InfoTooltip text={getTooltip('lot.stdDev') || ''} iconSize={12} />
+                              <InfoTooltip {...getTooltipProps('lot.stdDev')} iconSize={12} />
                             </span>
                           </th>
                           <th className="py-2 px-2 text-right">Peso (kg)</th>
                           <th className="py-2 px-2 text-right">
                             <span className="flex items-center justify-end gap-1">
                               P0 %
-                              <InfoTooltip text={getTooltip('lot.p0pct') || ''} iconSize={12} />
+                              <InfoTooltip {...getTooltipProps('lot.p0pct')} iconSize={12} />
                             </span>
                           </th>
                           <th className="py-2 px-2">Calibre Top</th>
@@ -1405,7 +1305,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                   <CardTitle className="text-sm flex items-center gap-2">
                     <Activity className="h-4 w-4 text-purple-500" />
                     Tendencia de Peso en el Tiempo
-                    <InfoTooltip text={getTooltip('wt.trend') || ''} />
+                    <InfoTooltip {...getTooltipProps('wt.trend')} />
                   </CardTitle>
                   <p className="text-xs text-muted-foreground">
                     Peso promedio por pieza a lo largo del turno con media móvil
@@ -1502,19 +1402,19 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                           <th className="py-2 px-2 text-right">
                             <span className="flex items-center justify-end gap-1">
                               σ (g)
-                              <InfoTooltip text={getTooltip('wt.stdDev') || ''} iconSize={12} />
+                              <InfoTooltip {...getTooltipProps('wt.stdDev')} iconSize={12} />
                             </span>
                           </th>
                           <th className="py-2 px-2 text-right">
                             <span className="flex items-center justify-end gap-1">
                               MA(5) (g)
-                              <InfoTooltip text={getTooltip('wt.movingAvg') || ''} iconSize={12} />
+                              <InfoTooltip {...getTooltipProps('wt.movingAvg')} iconSize={12} />
                             </span>
                           </th>
                           <th className="py-2 px-2">
                             <span className="flex items-center gap-1">
                               Lote
-                              <InfoTooltip text={getTooltip('wt.dominantLot') || ''} iconSize={12} />
+                              <InfoTooltip {...getTooltipProps('wt.dominantLot')} iconSize={12} />
                             </span>
                           </th>
                         </tr>
@@ -1557,13 +1457,13 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
               <CardTitle className="text-sm flex items-center gap-2">
                 <Table2 className="h-4 w-4" />
                 Matriz Calidad × Calibre
-                <InfoTooltip text={getTooltip('matrix.qc') || ''} />
+                <InfoTooltip {...getTooltipProps('matrix.qc')} />
               </CardTitle>
               {analytics.matrixEnhanced.globalHHI > 0 && (
                 <div className="flex flex-wrap gap-2 mt-1">
                   <Badge variant="outline" className="text-[10px]">
                     HHI Global: {analytics.matrixEnhanced.globalHHI.toFixed(3)}
-                    <InfoTooltip text={getTooltip('matrix.hhi') || ''} iconSize={11} className="ml-1" />
+                    <InfoTooltip {...getTooltipProps('matrix.hhi')} iconSize={11} className="ml-1" />
                   </Badge>
                   <Badge variant="outline" className={cn(
                     'text-[10px]',
@@ -1571,12 +1471,12 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                     analytics.matrixEnhanced.imbalanceScore > 0.3 && analytics.matrixEnhanced.imbalanceScore <= 0.6 && 'text-amber-600 border-amber-300',
                   )}>
                     Desbalance: {(analytics.matrixEnhanced.imbalanceScore * 100).toFixed(1)}%
-                    <InfoTooltip text={getTooltip('matrix.imbalance') || ''} iconSize={11} className="ml-1" />
+                    <InfoTooltip {...getTooltipProps('matrix.imbalance')} iconSize={11} className="ml-1" />
                   </Badge>
                   {analytics.matrixEnhanced.maxCell && (
                     <Badge variant="outline" className="text-[10px]">
                       Celda Max: {analytics.matrixEnhanced.maxCell.quality}×{analytics.matrixEnhanced.maxCell.calibre} ({analytics.matrixEnhanced.maxCell.pct}%)
-                      <InfoTooltip text={getTooltip('matrix.maxCell') || ''} iconSize={11} className="ml-1" />
+                      <InfoTooltip {...getTooltipProps('matrix.maxCell')} iconSize={11} className="ml-1" />
                     </Badge>
                   )}
                 </div>
@@ -1595,7 +1495,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                         <th className="py-2 px-2 text-center">
                           <span className="flex items-center justify-center gap-1">
                             HHI
-                            <InfoTooltip text={getTooltip('matrix.hhiQuality') || ''} iconSize={11} />
+                            <InfoTooltip {...getTooltipProps('matrix.hhiQuality')} iconSize={11} />
                           </span>
                         </th>
                       </tr>
@@ -1649,7 +1549,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                           <td className="py-2 px-2 font-medium text-xs">
                             <span className="flex items-center gap-1">
                               HHI
-                              <InfoTooltip text={getTooltip('matrix.hhiCalibre') || ''} iconSize={11} />
+                              <InfoTooltip {...getTooltipProps('matrix.hhiCalibre')} iconSize={11} />
                             </span>
                           </td>
                           {matrixCalibres.map(c => {
@@ -1691,7 +1591,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
               <CardTitle className="text-sm flex items-center gap-2">
                 <Zap className="h-4 w-4" />
                 Balance Demanda vs Gates Asignados
-                <InfoTooltip text={getTooltip('gate.balance') || ''} />
+                <InfoTooltip {...getTooltipProps('gate.balance')} />
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -1769,7 +1669,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                 <CardTitle className="text-sm flex items-center gap-2">
                   <BarChart3 className="h-4 w-4 text-blue-500" />
                   Estadísticas por Compuerta
-                  <InfoTooltip text={getTooltip('gate.stats') || ''} />
+                  <InfoTooltip {...getTooltipProps('gate.stats')} />
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -1782,32 +1682,32 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                         <th className="py-2 px-2 text-right">
                           <span className="flex items-center justify-end gap-1">
                             Prom. (g)
-                            <InfoTooltip text={getTooltip('gate.avgWeight') || ''} iconSize={11} />
+                            <InfoTooltip {...getTooltipProps('gate.avgWeight')} iconSize={11} />
                           </span>
                         </th>
                         <th className="py-2 px-2 text-right">
                           <span className="flex items-center justify-end gap-1">
                             σ (g)
-                            <InfoTooltip text={getTooltip('gate.stdDev') || ''} iconSize={11} />
+                            <InfoTooltip {...getTooltipProps('gate.stdDev')} iconSize={11} />
                           </span>
                         </th>
                         <th className="py-2 px-2 text-right">
                           <span className="flex items-center justify-end gap-1">
                             CV
-                            <InfoTooltip text={getTooltip('gate.cv') || ''} iconSize={11} />
+                            <InfoTooltip {...getTooltipProps('gate.cv')} iconSize={11} />
                           </span>
                         </th>
                         <th className="py-2 px-2 text-right">
                           <span className="flex items-center justify-end gap-1">
                             Utiliz.
-                            <InfoTooltip text={getTooltip('gate.utilization') || ''} iconSize={11} />
+                            <InfoTooltip {...getTooltipProps('gate.utilization')} iconSize={11} />
                           </span>
                         </th>
                         <th className="py-2 px-2">Asignado</th>
                         <th className="py-2 px-2 text-right">
                           <span className="flex items-center justify-end gap-1">
                             Mismatch
-                            <InfoTooltip text={getTooltip('gate.mismatch') || ''} iconSize={11} />
+                            <InfoTooltip {...getTooltipProps('gate.mismatch')} iconSize={11} />
                           </span>
                         </th>
                       </tr>
@@ -1887,7 +1787,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                 <CardTitle className="text-sm flex items-center gap-2">
                   <ArrowRightLeft className="h-4 w-4 text-purple-500" />
                   Sugerencias de Reasignación
-                  <InfoTooltip text={getTooltip('gate.swap') || ''} />
+                  <InfoTooltip {...getTooltipProps('gate.swap')} />
                 </CardTitle>
                 <p className="text-xs text-muted-foreground">
                   Basadas en estadísticas de uso real vs configuración
@@ -1910,7 +1810,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
               <CardTitle className="text-sm flex items-center gap-2">
                 <Zap className="h-4 w-4" />
                 Insights Determinísticos ({insights.length})
-                <InfoTooltip text={getTooltip('insights.deterministic') || ''} />
+                <InfoTooltip {...getTooltipProps('insights.deterministic')} />
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -1931,7 +1831,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
               <CardTitle className="text-sm flex items-center gap-2">
                 <Brain className="h-4 w-4" />
                 Diagnóstico IA
-                <InfoTooltip text={getTooltip('insights.ai') || ''} />
+                <InfoTooltip {...getTooltipProps('insights.ai')} />
               </CardTitle>
               <Button
                 size="sm"
