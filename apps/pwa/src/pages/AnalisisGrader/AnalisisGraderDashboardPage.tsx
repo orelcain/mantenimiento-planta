@@ -1,12 +1,15 @@
 /**
  * P3) Dashboard de Análisis Grader
  *
- * KPIs, Punto Cero, distribuciones, matriz, balance de gates,
+ * KPIs, Punto Cero, distribuciones, matriz Q×C (enhanced),
+ * balance de gates (enhanced), lotes, tendencia de peso,
  * insights, panel IA, exportación y guardado de sesión.
+ *
+ * v2.45.0 — Tooltips, estadística avanzada, tabs Lotes + Tendencia Peso
  */
 
 import { useState, useMemo, useRef } from 'react'
-import { Card, CardContent, CardHeader, CardTitle, Button, Badge, Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui'
+import { Card, CardContent, CardHeader, CardTitle, Button, Badge, Tabs, TabsContent, TabsList, TabsTrigger, InfoTooltip } from '@/components/ui'
 import {
   ChevronLeft,
   Download,
@@ -27,6 +30,10 @@ import {
   XCircle,
   FileSpreadsheet,
   FileText,
+  Layers,
+  Activity,
+  ArrowRightLeft,
+  Scale,
 } from 'lucide-react'
 import { Bar, Doughnut, Line } from 'react-chartjs-2'
 import {
@@ -51,6 +58,7 @@ import { computeAnalytics } from '@/services/grader/graderAnalytics'
 import { computeDeterministicInsights, computePointZeroTrend } from '@/services/grader/graderInsights'
 import { analyzeGrader, parseAIResponse } from '@/services/ai/aiProvider'
 import { saveGraderSession } from '@/services/grader/graderSession.service'
+import { getTooltip } from '@/services/grader/graderTooltips'
 import type {
   ParsedMatrixData,
   GateAssignment,
@@ -59,6 +67,7 @@ import type {
   DeterministicInsight,
   AIGraderInput,
   AIGraderOutput,
+  GateSwapSuggestion,
 } from '@/services/grader/types'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, ArcElement, Title, Tooltip, Legend, TimeScale, Filler)
@@ -123,6 +132,23 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
       timeSeriesPointZero: analytics.timeSeriesPointZero,
       gateAssignments: gates,
       gateBalance: analytics.gateBalance,
+      // Enhanced data for AI
+      lotAnalysis: analytics.lotAnalysis.length > 0 ? analytics.lotAnalysis.map(l => ({
+        lot: l.lot, pieces: l.pieces, avgWeightGrams: l.avgWeightGrams,
+        stdDevWeightGrams: l.stdDevWeightGrams, pointZeroPct: l.pointZeroPct,
+      })) : undefined,
+      matrixEnhanced: analytics.matrixEnhanced.globalHHI > 0 ? {
+        globalHHI: analytics.matrixEnhanced.globalHHI,
+        imbalanceScore: analytics.matrixEnhanced.imbalanceScore,
+        maxCell: analytics.matrixEnhanced.maxCell,
+      } : undefined,
+      gateAdvancedStats: analytics.gateAdvancedStats.length > 0 ? analytics.gateAdvancedStats.map(g => ({
+        gateNumber: g.gateNumber, pieces: g.pieces, cv: g.cv,
+        utilizationPct: g.utilizationPct, mismatchPct: g.mismatchPct,
+      })) : undefined,
+      gateSwapSuggestions: analytics.gateSwapSuggestions.length > 0
+        ? analytics.gateSwapSuggestions.slice(0, 5)
+        : undefined,
       dataCompleteness: {
         hasPieceRecords: parsedData.pieceRecords.length > 0,
         hasGate0Records: parsedData.gate0Records.length > 0,
@@ -201,6 +227,10 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
       ['Punto Cero %', kpis.pointZeroPct],
       ['Calibre Dominante', kpis.dominantCalibre ? `${kpis.dominantCalibre.calibre} (${kpis.dominantCalibre.pct}%)` : 'N/D'],
       ['Calidad Dominante', kpis.dominantQuality ? `${kpis.dominantQuality.quality} (${kpis.dominantQuality.pct}%)` : 'N/D'],
+      ['Peso Promedio (g)', kpis.avgWeightGrams ?? 'N/D'],
+      ['Peso Mediana (g)', kpis.medianWeightGrams ?? 'N/D'],
+      ['Lotes Procesados', kpis.uniqueLots ?? 'N/D'],
+      ['Piezas/Hora', kpis.productionRatePerHour ?? 'N/D'],
     ]
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(kpiRows), 'KPIs')
 
@@ -300,6 +330,42 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(gbRows), 'Balance Gates')
     }
 
+    // Lot Analysis
+    if (analytics.lotAnalysis.length > 0) {
+      const lotRows = [
+        ['Lote', 'Piezas', 'Peso (kg)', 'Prom. (g)', 'Mediana (g)', 'σ (g)', 'P0 Piezas', 'P0 %'],
+        ...analytics.lotAnalysis.map(l => [l.lot, l.pieces, l.weightKg, l.avgWeightGrams, l.medianWeightGrams, l.stdDevWeightGrams, l.pointZeroPieces, l.pointZeroPct]),
+      ]
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(lotRows), 'Lotes')
+    }
+
+    // Weight Trend
+    if (analytics.weightTrendSeries.length > 0) {
+      const wtRows = [
+        ['Hora', 'Piezas', 'Prom. (g)', 'Mediana (g)', 'σ (g)', 'MA(5) (g)', 'Lote'],
+        ...analytics.weightTrendSeries.map(b => [b.bucketStart, b.pieces, b.avgWeightGrams, b.medianWeightGrams, b.stdDevWeightGrams, b.movingAvg5 ?? '', b.dominantLot ?? '']),
+      ]
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(wtRows), 'Tendencia Peso')
+    }
+
+    // Gate Advanced Stats
+    if (analytics.gateAdvancedStats.length > 0) {
+      const gsRows = [
+        ['Gate', 'Piezas', 'Peso (kg)', 'Prom. (g)', 'σ (g)', 'CV', 'Utiliz. %', 'Calibre Asignado', 'Mismatch %'],
+        ...analytics.gateAdvancedStats.map(g => [g.gateNumber, g.pieces, g.weightKg, g.avgWeightGrams, g.stdDevWeightGrams, (g.cv * 100).toFixed(1) + '%', g.utilizationPct.toFixed(1), g.assignedCalibre, g.mismatchPct.toFixed(1) + '%']),
+      ]
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(gsRows), 'Stats Gates')
+    }
+
+    // Swap Suggestions
+    if (analytics.gateSwapSuggestions.length > 0) {
+      const swapRows = [
+        ['Tipo', 'Gate', 'Calibre Actual', 'Calibre Sugerido', 'Razón', 'Impacto', 'Evidencia'],
+        ...analytics.gateSwapSuggestions.map(s => [s.type, s.gateNumber, s.currentCalibre, s.suggestedCalibre, s.reason, s.impactScore, s.evidence.join('; ')]),
+      ]
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(swapRows), 'Sugerencias Swap')
+    }
+
     // Insights
     if (insights.length > 0) {
       const insRows = [['Severidad', 'Título', 'Evidencia', 'Recomendaciones'], ...insights.map(i => [i.severity, i.title, i.evidence.join('; '), i.recommendations.join('; ')])]
@@ -339,6 +405,10 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
         ['Punto Cero %', `${kpis.pointZeroPct}%`],
         ['Calibre Dominante', kpis.dominantCalibre ? `${kpis.dominantCalibre.calibre} (${kpis.dominantCalibre.pct}%)` : 'N/D'],
         ['Calidad Dominante', kpis.dominantQuality ? `${kpis.dominantQuality.quality} (${kpis.dominantQuality.pct}%)` : 'N/D'],
+        ['Peso Promedio (g)', kpis.avgWeightGrams?.toLocaleString() ?? 'N/D'],
+        ['Peso Mediana (g)', kpis.medianWeightGrams?.toLocaleString() ?? 'N/D'],
+        ['Lotes Procesados', kpis.uniqueLots?.toString() ?? 'N/D'],
+        ['Piezas/Hora', kpis.productionRatePerHour?.toLocaleString() ?? 'N/D'],
       ],
       theme: 'grid',
       styles: { fontSize: 8 },
@@ -652,24 +722,45 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
 
       {/* ——— KPIs ——— */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <KPICard label="Total Piezas" value={kpis.totalPieces.toLocaleString()} icon={BarChart3} />
+        <KPICard label="Total Piezas" value={kpis.totalPieces.toLocaleString()} icon={BarChart3} tooltip={getTooltip('kpi.totalPieces')} />
         <KPICard
           label="Punto Cero"
           value={`${kpis.pointZeroPieces.toLocaleString()} (${kpis.pointZeroPct}%)`}
           icon={Target}
           severity={kpis.pointZeroPct > 3 ? 'critical' : kpis.pointZeroPct > 1.5 ? 'warn' : 'ok'}
+          tooltip={getTooltip('kpi.pointZero')}
         />
         <KPICard
           label="Calibre Dominante"
           value={kpis.dominantCalibre ? `${kpis.dominantCalibre.calibre} (${kpis.dominantCalibre.pct}%)` : 'N/D'}
           icon={BarChart3}
+          tooltip={getTooltip('kpi.calibreDominante')}
         />
         <KPICard
           label="Calidad Dominante"
           value={kpis.dominantQuality ? `${kpis.dominantQuality.quality} (${kpis.dominantQuality.pct}%)` : 'N/D'}
           icon={PieChart}
+          tooltip={getTooltip('kpi.calidadDominante')}
         />
       </div>
+
+      {/* KPIs extendidos (peso, lotes, tasa) */}
+      {(kpis.avgWeightGrams != null || kpis.uniqueLots != null) && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {kpis.avgWeightGrams != null && (
+            <KPICard label="Peso Promedio" value={`${kpis.avgWeightGrams.toLocaleString()} g`} icon={Scale} tooltip={getTooltip('kpi.avgWeight')} />
+          )}
+          {kpis.medianWeightGrams != null && (
+            <KPICard label="Peso Mediana" value={`${kpis.medianWeightGrams.toLocaleString()} g`} icon={Scale} tooltip={getTooltip('kpi.medianWeight')} />
+          )}
+          {kpis.uniqueLots != null && kpis.uniqueLots > 0 && (
+            <KPICard label="Lotes Procesados" value={kpis.uniqueLots.toString()} icon={Layers} tooltip={getTooltip('kpi.uniqueLots')} />
+          )}
+          {kpis.productionRatePerHour != null && kpis.productionRatePerHour > 0 && (
+            <KPICard label="Piezas/Hora" value={kpis.productionRatePerHour.toLocaleString()} icon={Activity} tooltip={getTooltip('kpi.productionRate')} />
+          )}
+        </div>
+      )}
 
       {/* Trend summary */}
       {analytics.timeSeriesPointZero.length >= 3 && (
@@ -706,9 +797,11 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
 
       {/* ——— TABS ——— */}
       <Tabs defaultValue="punto-cero" className="w-full">
-        <TabsList className="grid grid-cols-5 w-full">
+        <TabsList className="grid grid-cols-4 lg:grid-cols-7 w-full">
           <TabsTrigger value="punto-cero" className="text-xs">Punto Cero</TabsTrigger>
           <TabsTrigger value="distribuciones" className="text-xs">Distribuciones</TabsTrigger>
+          <TabsTrigger value="lotes" className="text-xs">Lotes</TabsTrigger>
+          <TabsTrigger value="tendencia" className="text-xs">Tendencia</TabsTrigger>
           <TabsTrigger value="matriz" className="text-xs">Matriz Q×C</TabsTrigger>
           <TabsTrigger value="balance" className="text-xs">Balance Gates</TabsTrigger>
           <TabsTrigger value="insights" className="text-xs">Insights</TabsTrigger>
@@ -723,6 +816,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                 <CardTitle className="text-sm flex items-center gap-2">
                   <Target className="h-4 w-4 text-red-500" />
                   Clasificación Punto Cero — 100%
+                  <InfoTooltip text={getTooltip('pz.clasificacion') || ''} />
                 </CardTitle>
                 <p className="text-xs text-muted-foreground">
                   {analytics.pointZeroClassification.totalPointZeroPieces.toLocaleString()} piezas totales en Punto Cero
@@ -813,6 +907,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                 <CardTitle className="text-sm flex items-center gap-2">
                   <Table2 className="h-4 w-4 text-purple-500" />
                   Pivote Error × Calidad × Calibre
+                  <InfoTooltip text={getTooltip('pz.pivote') || ''} />
                 </CardTitle>
                 <p className="text-xs text-muted-foreground">
                   Desglose jerárquico: Error → Calidad → Calibre (como tabla pivote Marelec)
@@ -905,6 +1000,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                 <CardTitle className="text-sm flex items-center gap-2">
                   <AlertTriangle className="h-4 w-4 text-amber-500" />
                   Fuera de Rango — Distribución por Peso
+                  <InfoTooltip text={getTooltip('pz.fueraRango') || ''} />
                 </CardTitle>
                 <p className="text-xs text-muted-foreground">
                   Piezas clasificadas como &quot;fuera de rango&quot; agrupadas por el calibre al que pertenecerían según su peso
@@ -1141,14 +1237,350 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
           </div>
         </TabsContent>
 
+        {/* LOTES */}
+        <TabsContent value="lotes" className="space-y-4">
+          {analytics.lotAnalysis.length > 0 ? (
+            <>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Layers className="h-4 w-4 text-blue-500" />
+                    Análisis por Lote
+                    <InfoTooltip text={getTooltip('lot.analysis') || ''} />
+                  </CardTitle>
+                  <p className="text-xs text-muted-foreground">
+                    {analytics.lotAnalysis.length} lote(s) detectados en pieza-pieza
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  {/* Bar chart: avg weight per lot */}
+                  <Bar
+                    data={{
+                      labels: analytics.lotAnalysis.map(l => l.lot),
+                      datasets: [
+                        {
+                          label: 'Peso Promedio (g)',
+                          data: analytics.lotAnalysis.map(l => l.avgWeightGrams),
+                          backgroundColor: 'rgba(59,130,246,0.7)',
+                        },
+                        {
+                          label: 'Mediana (g)',
+                          data: analytics.lotAnalysis.map(l => l.medianWeightGrams),
+                          backgroundColor: 'rgba(16,185,129,0.6)',
+                        },
+                      ],
+                    }}
+                    options={{
+                      responsive: true,
+                      plugins: { legend: { position: 'bottom' } },
+                      scales: { y: { beginAtZero: false, title: { display: true, text: 'Peso (g)' } } },
+                    }}
+                  />
+                </CardContent>
+              </Card>
+
+              {/* Lot comparison table */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm">Comparativa de Lotes</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b text-left">
+                          <th className="py-2 px-2">Lote</th>
+                          <th className="py-2 px-2 text-right">
+                            Piezas
+                          </th>
+                          <th className="py-2 px-2 text-right">
+                            <span className="flex items-center justify-end gap-1">
+                              Peso Prom. (g)
+                              <InfoTooltip text={getTooltip('lot.avgWeight') || ''} iconSize={12} />
+                            </span>
+                          </th>
+                          <th className="py-2 px-2 text-right">
+                            <span className="flex items-center justify-end gap-1">
+                              Mediana (g)
+                              <InfoTooltip text={getTooltip('lot.medianWeight') || ''} iconSize={12} />
+                            </span>
+                          </th>
+                          <th className="py-2 px-2 text-right">
+                            <span className="flex items-center justify-end gap-1">
+                              σ (g)
+                              <InfoTooltip text={getTooltip('lot.stdDev') || ''} iconSize={12} />
+                            </span>
+                          </th>
+                          <th className="py-2 px-2 text-right">Peso (kg)</th>
+                          <th className="py-2 px-2 text-right">
+                            <span className="flex items-center justify-end gap-1">
+                              P0 %
+                              <InfoTooltip text={getTooltip('lot.p0pct') || ''} iconSize={12} />
+                            </span>
+                          </th>
+                          <th className="py-2 px-2">Calibre Top</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {analytics.lotAnalysis.map((lot, i) => {
+                          const topCalibre = lot.calibreDistribution.length > 0
+                            ? lot.calibreDistribution.reduce((a, b) => a.pieces > b.pieces ? a : b)
+                            : null
+                          return (
+                            <tr key={i} className="border-b hover:bg-muted/30">
+                              <td className="py-2 px-2 font-medium">{lot.lot}</td>
+                              <td className="py-2 px-2 text-right">{lot.pieces.toLocaleString()}</td>
+                              <td className="py-2 px-2 text-right">{lot.avgWeightGrams.toLocaleString()}</td>
+                              <td className="py-2 px-2 text-right">{lot.medianWeightGrams.toLocaleString()}</td>
+                              <td className="py-2 px-2 text-right">{lot.stdDevWeightGrams.toLocaleString()}</td>
+                              <td className="py-2 px-2 text-right">{lot.weightKg.toLocaleString()}</td>
+                              <td className="py-2 px-2 text-right">
+                                <span className={cn(
+                                  'font-medium',
+                                  lot.pointZeroPct > 5 && 'text-red-600',
+                                  lot.pointZeroPct > 2 && lot.pointZeroPct <= 5 && 'text-amber-600',
+                                )}>
+                                  {lot.pointZeroPct}%
+                                </span>
+                              </td>
+                              <td className="py-2 px-2">
+                                {topCalibre ? `${topCalibre.key} (${topCalibre.pct}%)` : '—'}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Point Zero per lot */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm">Punto Cero por Lote</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Bar
+                    data={{
+                      labels: analytics.lotAnalysis.map(l => l.lot),
+                      datasets: [
+                        {
+                          label: 'P0 %',
+                          data: analytics.lotAnalysis.map(l => l.pointZeroPct),
+                          backgroundColor: analytics.lotAnalysis.map(l =>
+                            l.pointZeroPct > 5 ? 'rgba(239,68,68,0.7)' :
+                            l.pointZeroPct > 2 ? 'rgba(245,158,11,0.7)' :
+                            'rgba(16,185,129,0.7)'
+                          ),
+                        },
+                      ],
+                    }}
+                    options={{
+                      responsive: true,
+                      plugins: { legend: { display: false } },
+                      scales: { y: { beginAtZero: true, title: { display: true, text: 'Punto Cero %' } } },
+                    }}
+                  />
+                </CardContent>
+              </Card>
+            </>
+          ) : (
+            <Card>
+              <CardContent className="py-8">
+                <p className="text-sm text-muted-foreground text-center">
+                  Sin datos de lotes. Cargue un archivo pieza-pieza con columna de lote.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        {/* TENDENCIA DE PESO */}
+        <TabsContent value="tendencia" className="space-y-4">
+          {analytics.weightTrendSeries.length > 0 ? (
+            <>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Activity className="h-4 w-4 text-purple-500" />
+                    Tendencia de Peso en el Tiempo
+                    <InfoTooltip text={getTooltip('wt.trend') || ''} />
+                  </CardTitle>
+                  <p className="text-xs text-muted-foreground">
+                    Peso promedio por pieza a lo largo del turno con media móvil
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  <Line
+                    data={{
+                      labels: analytics.weightTrendSeries.map(b => b.bucketStart),
+                      datasets: [
+                        {
+                          label: 'Peso Promedio (g)',
+                          data: analytics.weightTrendSeries.map(b => b.avgWeightGrams),
+                          borderColor: 'rgba(59,130,246,0.9)',
+                          backgroundColor: 'rgba(59,130,246,0.05)',
+                          fill: false,
+                          tension: 0.3,
+                          pointRadius: 3,
+                        },
+                        {
+                          label: 'Media Móvil 5',
+                          data: analytics.weightTrendSeries.map(b => b.movingAvg5 ?? null),
+                          borderColor: 'rgba(139,92,246,0.8)',
+                          borderDash: [6, 3],
+                          fill: false,
+                          tension: 0.4,
+                          pointRadius: 0,
+                        },
+                        {
+                          label: '+1σ',
+                          data: analytics.weightTrendSeries.map(b => b.avgWeightGrams + b.stdDevWeightGrams),
+                          borderColor: 'rgba(16,185,129,0.3)',
+                          backgroundColor: 'rgba(16,185,129,0.05)',
+                          fill: '+1',
+                          tension: 0.3,
+                          pointRadius: 0,
+                          borderWidth: 1,
+                        },
+                        {
+                          label: '−1σ',
+                          data: analytics.weightTrendSeries.map(b => Math.max(0, b.avgWeightGrams - b.stdDevWeightGrams)),
+                          borderColor: 'rgba(16,185,129,0.3)',
+                          fill: false,
+                          tension: 0.3,
+                          pointRadius: 0,
+                          borderWidth: 1,
+                        },
+                      ],
+                    }}
+                    options={{
+                      responsive: true,
+                      plugins: {
+                        legend: { position: 'bottom', labels: { font: { size: 11 } } },
+                        tooltip: {
+                          callbacks: {
+                            afterBody: (items) => {
+                              const idx = items[0]?.dataIndex
+                              if (idx == null) return ''
+                              const bucket = analytics.weightTrendSeries[idx]
+                              if (!bucket) return ''
+                              const lines = [`Mediana: ${bucket.medianWeightGrams.toLocaleString()} g`, `σ: ${bucket.stdDevWeightGrams.toLocaleString()} g`, `Piezas: ${bucket.pieces.toLocaleString()}`]
+                              if (bucket.dominantLot) lines.push(`Lote: ${bucket.dominantLot}`)
+                              return lines
+                            },
+                          },
+                        },
+                      },
+                      scales: {
+                        x: {
+                          type: 'time',
+                          time: { unit: config.intervalMinutes === 60 ? 'hour' : 'minute' },
+                        },
+                        y: { beginAtZero: false, title: { display: true, text: 'Peso (g)' } },
+                      },
+                    }}
+                  />
+                </CardContent>
+              </Card>
+
+              {/* Weight trend table */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm">Detalle por Intervalo</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
+                    <table className="w-full text-sm">
+                      <thead className="sticky top-0 bg-background">
+                        <tr className="border-b text-left">
+                          <th className="py-2 px-2">Hora</th>
+                          <th className="py-2 px-2 text-right">Piezas</th>
+                          <th className="py-2 px-2 text-right">Promedio (g)</th>
+                          <th className="py-2 px-2 text-right">Mediana (g)</th>
+                          <th className="py-2 px-2 text-right">
+                            <span className="flex items-center justify-end gap-1">
+                              σ (g)
+                              <InfoTooltip text={getTooltip('wt.stdDev') || ''} iconSize={12} />
+                            </span>
+                          </th>
+                          <th className="py-2 px-2 text-right">
+                            <span className="flex items-center justify-end gap-1">
+                              MA(5) (g)
+                              <InfoTooltip text={getTooltip('wt.movingAvg') || ''} iconSize={12} />
+                            </span>
+                          </th>
+                          <th className="py-2 px-2">
+                            <span className="flex items-center gap-1">
+                              Lote
+                              <InfoTooltip text={getTooltip('wt.dominantLot') || ''} iconSize={12} />
+                            </span>
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {analytics.weightTrendSeries.map((b, i) => (
+                          <tr key={i} className="border-b hover:bg-muted/30">
+                            <td className="py-1.5 px-2 text-xs">{new Date(b.bucketStart).toLocaleTimeString()}</td>
+                            <td className="py-1.5 px-2 text-right">{b.pieces.toLocaleString()}</td>
+                            <td className="py-1.5 px-2 text-right font-medium">{b.avgWeightGrams.toLocaleString()}</td>
+                            <td className="py-1.5 px-2 text-right">{b.medianWeightGrams.toLocaleString()}</td>
+                            <td className="py-1.5 px-2 text-right">{b.stdDevWeightGrams.toLocaleString()}</td>
+                            <td className="py-1.5 px-2 text-right text-purple-600">
+                              {b.movingAvg5 != null ? b.movingAvg5.toLocaleString() : '—'}
+                            </td>
+                            <td className="py-1.5 px-2 text-xs">{b.dominantLot || '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          ) : (
+            <Card>
+              <CardContent className="py-8">
+                <p className="text-sm text-muted-foreground text-center">
+                  Sin datos de peso por pieza. Cargue un archivo pieza-pieza con columna &quot;peso en Gr&quot;.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
         {/* MATRIZ Q×C */}
-        <TabsContent value="matriz">
+        <TabsContent value="matriz" className="space-y-4">
           <Card>
             <CardHeader>
               <CardTitle className="text-sm flex items-center gap-2">
                 <Table2 className="h-4 w-4" />
                 Matriz Calidad × Calibre
+                <InfoTooltip text={getTooltip('matrix.qc') || ''} />
               </CardTitle>
+              {analytics.matrixEnhanced.globalHHI > 0 && (
+                <div className="flex flex-wrap gap-2 mt-1">
+                  <Badge variant="outline" className="text-[10px]">
+                    HHI Global: {analytics.matrixEnhanced.globalHHI.toFixed(3)}
+                    <InfoTooltip text={getTooltip('matrix.hhi') || ''} iconSize={11} className="ml-1" />
+                  </Badge>
+                  <Badge variant="outline" className={cn(
+                    'text-[10px]',
+                    analytics.matrixEnhanced.imbalanceScore > 0.6 && 'text-red-600 border-red-300',
+                    analytics.matrixEnhanced.imbalanceScore > 0.3 && analytics.matrixEnhanced.imbalanceScore <= 0.6 && 'text-amber-600 border-amber-300',
+                  )}>
+                    Desbalance: {(analytics.matrixEnhanced.imbalanceScore * 100).toFixed(1)}%
+                    <InfoTooltip text={getTooltip('matrix.imbalance') || ''} iconSize={11} className="ml-1" />
+                  </Badge>
+                  {analytics.matrixEnhanced.maxCell && (
+                    <Badge variant="outline" className="text-[10px]">
+                      Celda Max: {analytics.matrixEnhanced.maxCell.quality}×{analytics.matrixEnhanced.maxCell.calibre} ({analytics.matrixEnhanced.maxCell.pct}%)
+                      <InfoTooltip text={getTooltip('matrix.maxCell') || ''} iconSize={11} className="ml-1" />
+                    </Badge>
+                  )}
+                </div>
+              )}
             </CardHeader>
             <CardContent>
               {matrixQualities.length > 0 && matrixCalibres.length > 0 ? (
@@ -1160,29 +1592,86 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                         {matrixCalibres.map((c) => (
                           <th key={c} className="py-2 px-2 text-center">{c}</th>
                         ))}
+                        <th className="py-2 px-2 text-center">
+                          <span className="flex items-center justify-center gap-1">
+                            HHI
+                            <InfoTooltip text={getTooltip('matrix.hhiQuality') || ''} iconSize={11} />
+                          </span>
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
-                      {matrixQualities.map((q) => (
-                        <tr key={q} className="border-b hover:bg-muted/30">
-                          <td className="py-2 px-2 font-medium">{q}</td>
-                          {matrixCalibres.map((c) => {
-                            const cell = analytics.matrixQualityCalibre[q]?.[c]
+                      {matrixQualities.map((q) => {
+                        const hhiRow = analytics.matrixEnhanced.hhiByQuality.find(h => h.quality === q)
+                        return (
+                          <tr key={q} className="border-b hover:bg-muted/30">
+                            <td className="py-2 px-2 font-medium">{q}</td>
+                            {matrixCalibres.map((c) => {
+                              const cell = analytics.matrixQualityCalibre[q]?.[c]
+                              const isMax = analytics.matrixEnhanced.maxCell?.quality === q && analytics.matrixEnhanced.maxCell?.calibre === c
+                              const avgW = analytics.matrixEnhanced.avgWeightByCell[q]?.[c]
+                              return (
+                                <td key={c} className={cn(
+                                  'py-2 px-2 text-center',
+                                  isMax && 'bg-blue-50 dark:bg-blue-900/20 ring-1 ring-blue-300',
+                                  cell && cell.pct >= 20 && !isMax && 'bg-blue-50/50 dark:bg-blue-900/10',
+                                )}>
+                                  {cell ? (
+                                    <div>
+                                      <span className="font-medium">{cell.pieces.toLocaleString()}</span>
+                                      <span className="text-muted-foreground text-xs ml-1">({cell.pct}%)</span>
+                                      {avgW != null && (
+                                        <p className="text-[10px] text-muted-foreground">{avgW.toLocaleString()}g</p>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <span className="text-muted-foreground">—</span>
+                                  )}
+                                </td>
+                              )
+                            })}
+                            <td className="py-2 px-2 text-center text-xs">
+                              {hhiRow ? (
+                                <span className={cn(
+                                  hhiRow.hhi > 0.5 && 'text-red-600 font-medium',
+                                  hhiRow.hhi > 0.25 && hhiRow.hhi <= 0.5 && 'text-amber-600',
+                                )}>
+                                  {hhiRow.hhi.toFixed(3)}
+                                </span>
+                              ) : '—'}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                      {/* HHI by calibre row */}
+                      {analytics.matrixEnhanced.hhiByCalibre.length > 0 && (
+                        <tr className="border-t-2 bg-muted/30">
+                          <td className="py-2 px-2 font-medium text-xs">
+                            <span className="flex items-center gap-1">
+                              HHI
+                              <InfoTooltip text={getTooltip('matrix.hhiCalibre') || ''} iconSize={11} />
+                            </span>
+                          </td>
+                          {matrixCalibres.map(c => {
+                            const hhiCol = analytics.matrixEnhanced.hhiByCalibre.find(h => h.calibre === c)
                             return (
-                              <td key={c} className="py-2 px-2 text-center">
-                                {cell ? (
-                                  <div>
-                                    <span className="font-medium">{cell.pieces.toLocaleString()}</span>
-                                    <span className="text-muted-foreground text-xs ml-1">({cell.pct}%)</span>
-                                  </div>
-                                ) : (
-                                  <span className="text-muted-foreground">—</span>
-                                )}
+                              <td key={c} className="py-2 px-2 text-center text-xs">
+                                {hhiCol ? (
+                                  <span className={cn(
+                                    hhiCol.hhi > 0.5 && 'text-red-600 font-medium',
+                                    hhiCol.hhi > 0.25 && hhiCol.hhi <= 0.5 && 'text-amber-600',
+                                  )}>
+                                    {hhiCol.hhi.toFixed(3)}
+                                  </span>
+                                ) : '—'}
                               </td>
                             )
                           })}
+                          <td className="py-2 px-2 text-center text-xs font-bold">
+                            {analytics.matrixEnhanced.globalHHI.toFixed(3)}
+                          </td>
                         </tr>
-                      ))}
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -1196,12 +1685,13 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
         </TabsContent>
 
         {/* BALANCE GATES */}
-        <TabsContent value="balance">
+        <TabsContent value="balance" className="space-y-4">
           <Card>
             <CardHeader>
               <CardTitle className="text-sm flex items-center gap-2">
                 <Zap className="h-4 w-4" />
                 Balance Demanda vs Gates Asignados
+                <InfoTooltip text={getTooltip('gate.balance') || ''} />
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -1271,6 +1761,145 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
               )}
             </CardContent>
           </Card>
+
+          {/* Gate Advanced Stats Table */}
+          {analytics.gateAdvancedStats.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4 text-blue-500" />
+                  Estadísticas por Compuerta
+                  <InfoTooltip text={getTooltip('gate.stats') || ''} />
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b text-left">
+                        <th className="py-2 px-2">Gate</th>
+                        <th className="py-2 px-2 text-right">Piezas</th>
+                        <th className="py-2 px-2 text-right">
+                          <span className="flex items-center justify-end gap-1">
+                            Prom. (g)
+                            <InfoTooltip text={getTooltip('gate.avgWeight') || ''} iconSize={11} />
+                          </span>
+                        </th>
+                        <th className="py-2 px-2 text-right">
+                          <span className="flex items-center justify-end gap-1">
+                            σ (g)
+                            <InfoTooltip text={getTooltip('gate.stdDev') || ''} iconSize={11} />
+                          </span>
+                        </th>
+                        <th className="py-2 px-2 text-right">
+                          <span className="flex items-center justify-end gap-1">
+                            CV
+                            <InfoTooltip text={getTooltip('gate.cv') || ''} iconSize={11} />
+                          </span>
+                        </th>
+                        <th className="py-2 px-2 text-right">
+                          <span className="flex items-center justify-end gap-1">
+                            Utiliz.
+                            <InfoTooltip text={getTooltip('gate.utilization') || ''} iconSize={11} />
+                          </span>
+                        </th>
+                        <th className="py-2 px-2">Asignado</th>
+                        <th className="py-2 px-2 text-right">
+                          <span className="flex items-center justify-end gap-1">
+                            Mismatch
+                            <InfoTooltip text={getTooltip('gate.mismatch') || ''} iconSize={11} />
+                          </span>
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {analytics.gateAdvancedStats.map((gs) => (
+                        <tr key={gs.gateNumber} className={cn(
+                          'border-b hover:bg-muted/30',
+                          gs.cv > 0.15 && 'bg-amber-50/50 dark:bg-amber-900/5',
+                          gs.mismatchPct > 30 && 'bg-red-50/50 dark:bg-red-900/5',
+                        )}>
+                          <td className="py-2 px-2 font-medium">Gate {gs.gateNumber}</td>
+                          <td className="py-2 px-2 text-right">{gs.pieces.toLocaleString()}</td>
+                          <td className="py-2 px-2 text-right">{gs.avgWeightGrams.toLocaleString()}</td>
+                          <td className="py-2 px-2 text-right">{gs.stdDevWeightGrams.toLocaleString()}</td>
+                          <td className="py-2 px-2 text-right">
+                            <span className={cn(
+                              'font-medium',
+                              gs.cv > 0.2 && 'text-red-600',
+                              gs.cv > 0.15 && gs.cv <= 0.2 && 'text-amber-600',
+                            )}>
+                              {(gs.cv * 100).toFixed(1)}%
+                            </span>
+                          </td>
+                          <td className="py-2 px-2 text-right">{gs.utilizationPct.toFixed(1)}%</td>
+                          <td className="py-2 px-2">
+                            <Badge variant="outline" className="text-[10px]">
+                              {gs.assignedCalibre}
+                            </Badge>
+                          </td>
+                          <td className="py-2 px-2 text-right">
+                            <span className={cn(
+                              'font-medium',
+                              gs.mismatchPct > 30 && 'text-red-600',
+                              gs.mismatchPct > 15 && gs.mismatchPct <= 30 && 'text-amber-600',
+                            )}>
+                              {gs.mismatchPct.toFixed(1)}%
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* CV comparison chart */}
+                <div className="mt-4">
+                  <p className="text-xs font-medium mb-2">Coeficiente de Variación por Gate</p>
+                  <Bar
+                    data={{
+                      labels: analytics.gateAdvancedStats.map(g => `Gate ${g.gateNumber}`),
+                      datasets: [{
+                        label: 'CV (%)',
+                        data: analytics.gateAdvancedStats.map(g => g.cv * 100),
+                        backgroundColor: analytics.gateAdvancedStats.map(g =>
+                          g.cv > 0.2 ? 'rgba(239,68,68,0.7)' :
+                          g.cv > 0.15 ? 'rgba(245,158,11,0.7)' :
+                          'rgba(16,185,129,0.7)'
+                        ),
+                      }],
+                    }}
+                    options={{
+                      responsive: true,
+                      plugins: { legend: { display: false } },
+                      scales: { y: { beginAtZero: true, title: { display: true, text: 'CV (%)' } } },
+                    }}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Gate Swap Suggestions */}
+          {analytics.gateSwapSuggestions.length > 0 && (
+            <Card className="border-purple-200">
+              <CardHeader>
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <ArrowRightLeft className="h-4 w-4 text-purple-500" />
+                  Sugerencias de Reasignación
+                  <InfoTooltip text={getTooltip('gate.swap') || ''} />
+                </CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  Basadas en estadísticas de uso real vs configuración
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {analytics.gateSwapSuggestions.map((s, i) => (
+                  <SwapSuggestionCard key={i} suggestion={s} />
+                ))}
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         {/* INSIGHTS */}
@@ -1281,6 +1910,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
               <CardTitle className="text-sm flex items-center gap-2">
                 <Zap className="h-4 w-4" />
                 Insights Determinísticos ({insights.length})
+                <InfoTooltip text={getTooltip('insights.deterministic') || ''} />
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -1301,6 +1931,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
               <CardTitle className="text-sm flex items-center gap-2">
                 <Brain className="h-4 w-4" />
                 Diagnóstico IA
+                <InfoTooltip text={getTooltip('insights.ai') || ''} />
               </CardTitle>
               <Button
                 size="sm"
@@ -1355,11 +1986,13 @@ function KPICard({
   value,
   icon: Icon,
   severity,
+  tooltip,
 }: {
   label: string
   value: string
   icon: React.ElementType
   severity?: 'ok' | 'warn' | 'critical'
+  tooltip?: string
 }) {
   return (
     <Card
@@ -1372,6 +2005,7 @@ function KPICard({
         <div className="flex items-center gap-2 mb-1">
           <Icon className="h-4 w-4 text-muted-foreground" />
           <span className="text-xs text-muted-foreground">{label}</span>
+          {tooltip && <InfoTooltip text={tooltip} iconSize={12} />}
         </div>
         <p
           className={cn(
@@ -1526,6 +2160,48 @@ function AIOutputPanel({ output }: { output: AIGraderOutput }) {
           <p className="text-xs font-medium text-amber-700 mb-1">Advertencias:</p>
           {output.disclaimers.map((d, i) => (
             <p key={i} className="text-xs text-amber-600">{d}</p>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function SwapSuggestionCard({ suggestion }: { suggestion: GateSwapSuggestion }) {
+  const typeLabels: Record<string, string> = {
+    swap: 'Intercambiar',
+    reassign: 'Reasignar',
+    add: 'Agregar',
+  }
+  const typeColors: Record<string, string> = {
+    swap: 'text-purple-600 border-purple-300',
+    reassign: 'text-blue-600 border-blue-300',
+    add: 'text-green-600 border-green-300',
+  }
+
+  return (
+    <div className={cn(
+      'p-3 rounded-lg border',
+      suggestion.impactScore >= 70 ? 'border-red-200 bg-red-50/50 dark:bg-red-900/5' :
+      suggestion.impactScore >= 40 ? 'border-amber-200 bg-amber-50/50 dark:bg-amber-900/5' :
+      'border-muted bg-muted/20',
+    )}>
+      <div className="flex items-center gap-2 flex-wrap">
+        <Badge variant="outline" className={cn('text-[10px]', typeColors[suggestion.type])}>
+          {typeLabels[suggestion.type] || suggestion.type}
+        </Badge>
+        <span className="text-sm font-medium">
+          Gate {suggestion.gateNumber}: {suggestion.currentCalibre} → {suggestion.suggestedCalibre}
+        </span>
+        <Badge variant={suggestion.impactScore >= 70 ? 'destructive' : 'outline'} className="text-[10px] ml-auto">
+          Impacto: {suggestion.impactScore}
+        </Badge>
+      </div>
+      <p className="text-xs text-muted-foreground mt-1">{suggestion.reason}</p>
+      {suggestion.evidence.length > 0 && (
+        <div className="mt-1.5 space-y-0.5">
+          {suggestion.evidence.map((e, i) => (
+            <p key={i} className="text-[11px] text-muted-foreground">📊 {e}</p>
           ))}
         </div>
       )}

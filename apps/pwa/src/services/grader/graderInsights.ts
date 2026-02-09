@@ -198,6 +198,118 @@ export function computeDeterministicInsights(
     })
   }
 
+  // ——— 9. Cambio de lote con diferencia significativa de peso ———
+  if (result.lotAnalysis && result.lotAnalysis.length > 1) {
+    const lots = result.lotAnalysis.filter((l) => l.avgWeightGrams > 0)
+    for (let i = 1; i < lots.length; i++) {
+      const prev = lots[i - 1]!
+      const curr = lots[i]!
+      const diff = Math.abs(curr.avgWeightGrams - prev.avgWeightGrams)
+      const diffPct = prev.avgWeightGrams > 0 ? (diff / prev.avgWeightGrams) * 100 : 0
+      if (diffPct >= 15) {
+        insights.push({
+          id: nextId(),
+          severity: diffPct >= 30 ? 'critical' : 'warn',
+          title: `Cambio significativo de peso entre lotes`,
+          evidence: [
+            `Lote "${prev.lot}": peso prom. ${prev.avgWeightGrams}g (${prev.pieces} pz)`,
+            `Lote "${curr.lot}": peso prom. ${curr.avgWeightGrams}g (${curr.pieces} pz)`,
+            `Diferencia: ${diff.toFixed(0)}g (${diffPct.toFixed(1)}%)`,
+          ],
+          recommendations: [
+            'Al cambiar de lote, el peso promedio cambió significativamente.',
+            'Considere agregar o reasignar compuertas para el nuevo rango de calibre.',
+            'Verificar si la especie o tipo de producto cambió entre lotes.',
+          ],
+        })
+      }
+    }
+  }
+
+  // ——— 10. Tendencia de peso creciente/decreciente ———
+  if (result.weightTrendSeries && result.weightTrendSeries.length >= 5) {
+    const ws = result.weightTrendSeries
+    const midpoint = Math.floor(ws.length / 2)
+    const avgFirst = ws.slice(0, midpoint).reduce((s, w) => s + w.avgWeightGrams, 0) / midpoint
+    const avgSecond = ws.slice(midpoint).reduce((s, w) => s + w.avgWeightGrams, 0) / (ws.length - midpoint)
+    const diff = avgSecond - avgFirst
+    const diffPct = avgFirst > 0 ? Math.abs(diff / avgFirst) * 100 : 0
+
+    if (diffPct >= 5) {
+      insights.push({
+        id: nextId(),
+        severity: diffPct >= 15 ? 'warn' : 'info',
+        title: diff > 0 ? 'Peso promedio creciente en el turno' : 'Peso promedio decreciente en el turno',
+        evidence: [
+          `Primera mitad: ${avgFirst.toFixed(0)}g promedio`,
+          `Segunda mitad: ${avgSecond.toFixed(0)}g promedio`,
+          `Cambio: ${diff > 0 ? '+' : ''}${diff.toFixed(0)}g (${diffPct.toFixed(1)}%)`,
+        ],
+        recommendations: [
+          'El peso promedio del producto está cambiando durante la producción.',
+          'Posible cambio de materia prima o lote de origen.',
+          'Evaluar si la distribución de gates sigue siendo óptima para el nuevo peso.',
+        ],
+      })
+    }
+  }
+
+  // ——— 11. Gate con alta variabilidad ———
+  if (result.gateAdvancedStats && result.gateAdvancedStats.length > 0) {
+    const cvValues = result.gateAdvancedStats.map((g) => g.cv).filter((c) => c > 0)
+    const avgCV = cvValues.length > 0 ? cvValues.reduce((s, c) => s + c, 0) / cvValues.length : 0
+    for (const gs of result.gateAdvancedStats) {
+      if (gs.cv > avgCV * 2 && gs.cv > 0.15) {
+        insights.push({
+          id: nextId(),
+          severity: gs.cv > avgCV * 3 ? 'warn' : 'info',
+          title: `Gate ${gs.gateNumber}: alta variabilidad de peso`,
+          evidence: [
+            `CV: ${(gs.cv * 100).toFixed(1)}% (promedio: ${(avgCV * 100).toFixed(1)}%)`,
+            `Peso promedio: ${gs.avgWeightGrams}g ± ${gs.stdDevWeightGrams}g`,
+            `Mismatch calibre: ${gs.mismatchPct}%`,
+          ],
+          recommendations: [
+            `Gate ${gs.gateNumber} recibe piezas de pesos muy variables.`,
+            'Verificar calibración de la compuerta o si está recibiendo múltiples calibres.',
+          ],
+        })
+      }
+    }
+  }
+
+  // ——— 12. Concentración Q×C alta ———
+  if (result.matrixEnhanced && result.matrixEnhanced.globalHHI > 0.4) {
+    insights.push({
+      id: nextId(),
+      severity: result.matrixEnhanced.globalHHI > 0.6 ? 'warn' : 'info',
+      title: 'Alta concentración en Matriz Calidad×Calibre',
+      evidence: [
+        `HHI global: ${result.matrixEnhanced.globalHHI} (1 = completamente concentrado)`,
+        result.matrixEnhanced.maxCell
+          ? `Celda dominante: ${result.matrixEnhanced.maxCell.quality} × ${result.matrixEnhanced.maxCell.calibre} (${result.matrixEnhanced.maxCell.pct}%)`
+          : '',
+      ].filter(Boolean),
+      recommendations: [
+        'La producción está muy concentrada en pocas combinaciones calidad-calibre.',
+        'Esto es normal si el lote es uniforme, pero puede indicar baja diversificación.',
+      ],
+    })
+  }
+
+  // ——— 13. Sugerencias de swap como insights ———
+  if (result.gateSwapSuggestions && result.gateSwapSuggestions.length > 0) {
+    for (const swap of result.gateSwapSuggestions.slice(0, 3)) {
+      insights.push({
+        id: nextId(),
+        severity: swap.impactScore >= 50 ? 'warn' : 'info',
+        title: `Sugerencia: reasignar Gate ${swap.gateNumber}`,
+        evidence: swap.evidence,
+        recommendations: [swap.reason],
+      })
+    }
+  }
+
   return insights
 }
 

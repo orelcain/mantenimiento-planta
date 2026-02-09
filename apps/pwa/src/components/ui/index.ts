@@ -33,3 +33,4 @@ export {
 } from './dropdown-menu'
 export { SpeechTextarea } from './SpeechTextarea'
 export { SpeechInput } from './SpeechInput'
+export { InfoTooltip } from './InfoTooltip'

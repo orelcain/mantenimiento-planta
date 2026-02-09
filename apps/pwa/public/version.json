@@ -1,7 +1,7 @@
 {
-  "version": "2.44.3",
+  "version": "2.44.4",
   "buildDate": "2026-02-09",
-  "buildTimestamp": 1770660000000,
+  "buildTimestamp": 1770652633729,
   "features": [
     "Tabla pivote Error×Calidad×Calibre (3 niveles jerárquicos)",
     "Parser pieza-pieza autosuficiente: lee columna Error + infiere causa",

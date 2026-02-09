@@ -224,6 +224,14 @@ export interface KPIBlock {
   topPointZeroErrors: Array<{ error: string; pieces: number; pct: number }>;
   dominantCalibre?: { calibre: CalibreRange; pct: number; pieces: number };
   dominantQuality?: { quality: GraderQuality; pct: number; pieces: number };
+  /** Peso promedio por pieza en gramos (productivos, gate > 0) */
+  avgWeightGrams?: number;
+  /** Mediana de peso por pieza en gramos */
+  medianWeightGrams?: number;
+  /** Cantidad de lotes únicos procesados */
+  uniqueLots?: number;
+  /** Tasa de producción: piezas/hora */
+  productionRatePerHour?: number;
 }
 
 export interface DistributionRow {
@@ -248,6 +256,96 @@ export interface GateBalanceInsight {
   message: string;
 }
 
+// ============================================================================
+// ANÁLISIS POR LOTE
+// ============================================================================
+
+/** Análisis detallado por lote extraído del pieza-pieza */
+export interface LotAnalysis {
+  lot: string;
+  firstSeen: string;       // ISO
+  lastSeen: string;        // ISO
+  pieces: number;
+  weightKg: number;
+  avgWeightGrams: number;
+  medianWeightGrams: number;
+  stdDevWeightGrams: number;
+  pointZeroPieces: number;
+  pointZeroPct: number;
+  calibreDistribution: DistributionRow[];
+  qualityDistribution: DistributionRow[];
+}
+
+// ============================================================================
+// TENDENCIA DE PESO EN EL TIEMPO
+// ============================================================================
+
+/** Bucket temporal con estadísticas de peso */
+export interface WeightTrendBucket {
+  bucketStart: string;        // ISO
+  avgWeightGrams: number;
+  medianWeightGrams: number;
+  stdDevWeightGrams: number;
+  movingAvg5?: number;        // media móvil de 5 buckets
+  pieces: number;
+  dominantLot?: string;       // lote con más piezas en este bucket
+}
+
+// ============================================================================
+// MATRIZ Q×C ENRIQUECIDA
+// ============================================================================
+
+/** Índices de concentración para la matriz Calidad×Calibre */
+export interface MatrixQCEnhanced {
+  /** Índice HHI por fila de calidad (nombre → HHI 0-1) */
+  hhiByQuality: Array<{ quality: string; hhi: number; pieces: number }>;
+  /** Índice HHI por columna de calibre (nombre → HHI 0-1) */
+  hhiByCalibre: Array<{ calibre: string; hhi: number; pieces: number }>;
+  /** HHI global de la matriz completa */
+  globalHHI: number;
+  /** Celda con mayor concentración */
+  maxCell?: { quality: string; calibre: string; pieces: number; pct: number };
+  /** Score de desbalance: 0=perfectamente equilibrado, 1=todo concentrado */
+  imbalanceScore: number;
+  /** Peso promedio por celda Q×C */
+  avgWeightByCell: Record<string, Record<string, number>>;
+}
+
+// ============================================================================
+// ESTADÍSTICAS AVANZADAS POR GATE
+// ============================================================================
+
+/** Estadísticas detalladas por gate individual */
+export interface GateAdvancedStats {
+  gateNumber: number;
+  pieces: number;
+  weightKg: number;
+  avgWeightGrams: number;
+  stdDevWeightGrams: number;
+  cv: number;                 // coeficiente de variación
+  utilizationPct: number;     // % del total productivo
+  assignedCalibre: CalibreRange;
+  assignedQuality: GraderQuality;
+  /** % de piezas que NO coinciden con el calibre asignado */
+  mismatchPct: number;
+  calibreBreakdown: Record<string, number>;
+}
+
+/** Sugerencia de reasignación de gate */
+export interface GateSwapSuggestion {
+  type: 'swap' | 'reassign' | 'add';
+  gateNumber: number;
+  currentCalibre: CalibreRange;
+  suggestedCalibre: CalibreRange;
+  reason: string;
+  impactScore: number;        // 0-100, mayor = más urgente
+  evidence: string[];
+}
+
+// ============================================================================
+// RESULTADO COMPLETO (extendido)
+// ============================================================================
+
 export interface GraderAnalyticsResult {
   config: GraderAnalysisConfig;
   gates: GateAssignment[];
@@ -260,6 +358,16 @@ export interface GraderAnalyticsResult {
   matrixQualityCalibre: Record<string, Record<string, { pieces: number; pct: number }>>;
   timeSeriesPointZero: TimeSeriesPoint[];
   gateBalance: GateBalanceInsight[];
+  /** Análisis por lote extraído desde pieza-pieza */
+  lotAnalysis: LotAnalysis[];
+  /** Tendencia de peso en el tiempo */
+  weightTrendSeries: WeightTrendBucket[];
+  /** Matriz Q×C enriquecida con índices de concentración */
+  matrixEnhanced: MatrixQCEnhanced;
+  /** Estadísticas avanzadas por gate */
+  gateAdvancedStats: GateAdvancedStats[];
+  /** Sugerencias de reasignación de gates */
+  gateSwapSuggestions: GateSwapSuggestion[];
   notes: string[];
 }
 
@@ -298,6 +406,30 @@ export interface AIGraderInput {
   timeSeriesPointZero: TimeSeriesPoint[];
   gateAssignments: GateAssignment[];
   gateBalance: GateBalanceInsight[];
+  /** Resumen estadístico por lote (opcional, para enriquecer el análisis IA) */
+  lotAnalysis?: Array<{
+    lot: string;
+    pieces: number;
+    avgWeightGrams: number;
+    stdDevWeightGrams: number;
+    pointZeroPct: number;
+  }>;
+  /** Índices de concentración de la matriz Q×C */
+  matrixEnhanced?: {
+    globalHHI: number;
+    imbalanceScore: number;
+    maxCell?: { quality: string; calibre: string; pieces: number; pct: number };
+  };
+  /** Estadísticas avanzadas por gate (resumen) */
+  gateAdvancedStats?: Array<{
+    gateNumber: number;
+    pieces: number;
+    cv: number;
+    utilizationPct: number;
+    mismatchPct: number;
+  }>;
+  /** Sugerencias de reasignación de gates */
+  gateSwapSuggestions?: GateSwapSuggestion[];
   dataCompleteness: {
     hasPieceRecords: boolean;
     hasGate0Records: boolean;

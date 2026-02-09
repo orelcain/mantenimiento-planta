@@ -23,7 +23,22 @@ import type {
   CalibreWeightRange,
   OutOfRangeWeightDetail,
   Gate0Record,
+  LotAnalysis,
+  WeightTrendBucket,
+  MatrixQCEnhanced,
+  GateAdvancedStats,
+  GateSwapSuggestion,
 } from './types'
+
+import {
+  median as calcMedian,
+  stdDev as calcStdDev,
+  mean as calcMean,
+  movingAverage,
+  herfindahlIndex,
+  coefficientOfVariation,
+  round,
+} from './graderStats'
 
 // ============================================================================
 // CONSTANTES — RANGOS DE CALIBRE POR PESO
@@ -568,6 +583,326 @@ export function computeAnalytics(
     gateBalance.push({ calibre, demandPct: dist.pct, gatesAssigned: assigned, severity, message })
   }
 
+  // ——————— ANÁLISIS POR LOTE ———————
+  const lotAnalysis: LotAnalysis[] = []
+  if (hasPiece) {
+    const lotMap = new Map<string, { pieces: number; g0Pieces: number; weightKg: number; weights: number[]; timestamps: string[]; calibres: Map<string, number>; qualities: Map<string, number> }>()
+
+    for (const r of data.pieceRecords) {
+      const lotKey = r.lot || 'Sin lote'
+      const cur = lotMap.get(lotKey) || { pieces: 0, g0Pieces: 0, weightKg: 0, weights: [], timestamps: [], calibres: new Map(), qualities: new Map() }
+      cur.pieces += r.pieces
+      if (r.gate === 0) cur.g0Pieces += r.pieces
+      cur.weightKg += r.weightKg ?? 0
+      cur.timestamps.push(r.ts)
+
+      // Collect per-piece weights for statistics
+      const wpg = r.weightPerPieceGrams ?? (r.weightKg && r.pieces > 0 ? (r.weightKg / r.pieces) * 1000 : undefined)
+      if (wpg && wpg > 0) {
+        for (let i = 0; i < r.pieces; i++) cur.weights.push(wpg)
+      }
+
+      if (r.gate !== 0) {
+        const cKey = r.calibre || 'Other'
+        cur.calibres.set(cKey, (cur.calibres.get(cKey) || 0) + r.pieces)
+        const qKey = r.quality || 'Unknown'
+        cur.qualities.set(qKey, (cur.qualities.get(qKey) || 0) + r.pieces)
+      }
+      lotMap.set(lotKey, cur)
+    }
+
+    for (const [lot, d] of lotMap) {
+      const prodPieces = d.pieces - d.g0Pieces
+      const tsSorted = [...d.timestamps].sort()
+      const calDist: DistributionRow[] = Array.from(d.calibres.entries())
+        .map(([key, p]) => ({ key, pieces: p, pct: pct(p, prodPieces || d.pieces) }))
+        .sort((a, b) => b.pieces - a.pieces)
+      const qualDist: DistributionRow[] = Array.from(d.qualities.entries())
+        .map(([key, p]) => ({ key, pieces: p, pct: pct(p, prodPieces || d.pieces) }))
+        .sort((a, b) => b.pieces - a.pieces)
+
+      lotAnalysis.push({
+        lot,
+        firstSeen: tsSorted[0] || '',
+        lastSeen: tsSorted[tsSorted.length - 1] || '',
+        pieces: d.pieces,
+        weightKg: d.weightKg,
+        avgWeightGrams: d.weights.length > 0 ? round(calcMean(d.weights)) : 0,
+        medianWeightGrams: d.weights.length > 0 ? round(calcMedian(d.weights)) : 0,
+        stdDevWeightGrams: d.weights.length > 1 ? round(calcStdDev(d.weights)) : 0,
+        pointZeroPieces: d.g0Pieces,
+        pointZeroPct: pct(d.g0Pieces, d.pieces),
+        calibreDistribution: calDist,
+        qualityDistribution: qualDist,
+      })
+    }
+    lotAnalysis.sort((a, b) => a.firstSeen.localeCompare(b.firstSeen))
+  }
+
+  // ——————— TENDENCIA DE PESO EN EL TIEMPO ———————
+  const weightTrendSeries: WeightTrendBucket[] = []
+  if (hasPiece) {
+    const wtBuckets = new Map<string, { weights: number[]; pieces: number; lots: Map<string, number> }>()
+
+    for (const r of data.pieceRecords) {
+      if (r.gate === 0) continue
+      const bk = bucketKey(r.ts, interval)
+      const cur = wtBuckets.get(bk) || { weights: [], pieces: 0, lots: new Map() }
+      cur.pieces += r.pieces
+      const wpg = r.weightPerPieceGrams ?? (r.weightKg && r.pieces > 0 ? (r.weightKg / r.pieces) * 1000 : undefined)
+      if (wpg && wpg > 0) {
+        for (let i = 0; i < r.pieces; i++) cur.weights.push(wpg)
+      }
+      const lotKey = r.lot || 'Sin lote'
+      cur.lots.set(lotKey, (cur.lots.get(lotKey) || 0) + r.pieces)
+      wtBuckets.set(bk, cur)
+    }
+
+    const sortedKeys = Array.from(wtBuckets.keys()).sort()
+    const avgValues: number[] = []
+
+    for (const bk of sortedKeys) {
+      const d = wtBuckets.get(bk)!
+      if (d.weights.length === 0) continue
+      const avg = round(calcMean(d.weights))
+      avgValues.push(avg)
+      // Find dominant lot
+      let domLot: string | undefined
+      let maxLotPieces = 0
+      for (const [l, p] of d.lots) {
+        if (p > maxLotPieces) { maxLotPieces = p; domLot = l }
+      }
+      weightTrendSeries.push({
+        bucketStart: bk,
+        avgWeightGrams: avg,
+        medianWeightGrams: round(calcMedian(d.weights)),
+        stdDevWeightGrams: round(calcStdDev(d.weights)),
+        pieces: d.pieces,
+        dominantLot: domLot,
+      })
+    }
+
+    // Apply moving average
+    if (avgValues.length >= 5) {
+      const ma = movingAverage(avgValues, 5)
+      for (let i = 0; i < weightTrendSeries.length; i++) {
+        if (ma[i] != null) weightTrendSeries[i]!.movingAvg5 = round(ma[i]!)
+      }
+    }
+  }
+
+  // ——————— MATRIZ Q×C ENRIQUECIDA ———————
+  const hhiByQuality: MatrixQCEnhanced['hhiByQuality'] = []
+  const hhiByCalibre: MatrixQCEnhanced['hhiByCalibre'] = []
+  const avgWeightByCell: Record<string, Record<string, number>> = {}
+  let maxCell: MatrixQCEnhanced['maxCell']
+
+  // HHI by quality row
+  for (const q of Object.keys(matrix)) {
+    const row = matrix[q]
+    if (!row) continue
+    const rowPieces = Object.values(row).reduce((s, c) => s + c.pieces, 0)
+    const shares = Object.values(row).map((c) => c.pieces / (rowPieces || 1))
+    hhiByQuality.push({ quality: q, hhi: round(herfindahlIndex(shares), 3), pieces: rowPieces })
+  }
+
+  // HHI by calibre column
+  const allCalibresInMatrix = new Set<string>()
+  for (const row of Object.values(matrix)) {
+    if (row) for (const c of Object.keys(row)) allCalibresInMatrix.add(c)
+  }
+  for (const c of allCalibresInMatrix) {
+    const colPieces: number[] = []
+    let total = 0
+    for (const q of Object.keys(matrix)) {
+      const cell = matrix[q]?.[c]
+      if (cell) { colPieces.push(cell.pieces); total += cell.pieces }
+    }
+    const shares = colPieces.map((p) => p / (total || 1))
+    hhiByCalibre.push({ calibre: c, hhi: round(herfindahlIndex(shares), 3), pieces: total })
+  }
+
+  // Global HHI and max cell
+  const allCellPieces: number[] = []
+  let maxP = 0
+  for (const q of Object.keys(matrix)) {
+    const row = matrix[q]
+    if (!row) continue
+    for (const c of Object.keys(row)) {
+      const cell = row[c]
+      if (cell) {
+        allCellPieces.push(cell.pieces)
+        if (cell.pieces > maxP) {
+          maxP = cell.pieces
+          maxCell = { quality: q, calibre: c, pieces: cell.pieces, pct: cell.pct }
+        }
+      }
+    }
+  }
+  const globalShares = allCellPieces.map((p) => p / (matrixTotal || 1))
+  const globalHHI = round(herfindahlIndex(globalShares), 3)
+
+  // Avg weight per Q×C cell
+  if (hasPiece) {
+    const cellWeights = new Map<string, number[]>()
+    for (const r of data.pieceRecords) {
+      if (r.gate === 0) continue
+      const q = r.quality || 'Unknown'
+      const c = r.calibre || 'Other'
+      const key = `${q}|${c}`
+      const wpg = r.weightPerPieceGrams ?? (r.weightKg && r.pieces > 0 ? (r.weightKg / r.pieces) * 1000 : undefined)
+      if (wpg && wpg > 0) {
+        const arr = cellWeights.get(key) || []
+        arr.push(wpg)
+        cellWeights.set(key, arr)
+      }
+    }
+    for (const [key, ws] of cellWeights) {
+      const [q, c] = key.split('|')
+      if (!q || !c) continue
+      if (!avgWeightByCell[q]) avgWeightByCell[q] = {}
+      avgWeightByCell[q]![c] = round(calcMean(ws))
+    }
+  }
+
+  // Imbalance score: difference between max HHI and ideal uniform distribution
+  const idealHHI = matrixTotal > 0 ? 1 / allCellPieces.length : 0
+  const imbalanceScore = round(Math.min(1, (globalHHI - idealHHI) / (1 - idealHHI + 0.001)), 3)
+
+  const matrixEnhanced: MatrixQCEnhanced = {
+    hhiByQuality,
+    hhiByCalibre,
+    globalHHI,
+    maxCell,
+    imbalanceScore: isNaN(imbalanceScore) ? 0 : imbalanceScore,
+    avgWeightByCell,
+  }
+
+  // ——————— ESTADÍSTICAS AVANZADAS POR GATE ———————
+  const gateAdvancedStats: GateAdvancedStats[] = []
+  if (hasPiece && gates.length > 0) {
+    const gateDataMap = new Map<number, { pieces: number; weightKg: number; weights: number[]; calibres: Map<string, number> }>()
+
+    for (const r of data.pieceRecords) {
+      if (r.gate === 0) continue
+      const cur = gateDataMap.get(r.gate) || { pieces: 0, weightKg: 0, weights: [], calibres: new Map() }
+      cur.pieces += r.pieces
+      cur.weightKg += r.weightKg ?? 0
+      const wpg = r.weightPerPieceGrams ?? (r.weightKg && r.pieces > 0 ? (r.weightKg / r.pieces) * 1000 : undefined)
+      if (wpg && wpg > 0) cur.weights.push(wpg)
+      const cKey = r.calibre || 'Other'
+      cur.calibres.set(cKey, (cur.calibres.get(cKey) || 0) + r.pieces)
+      gateDataMap.set(r.gate, cur)
+    }
+
+    for (const g of gates) {
+      const d = gateDataMap.get(g.gateNumber)
+      if (!d) continue
+      const calibreBreakdown: Record<string, number> = {}
+      for (const [c, p] of d.calibres) calibreBreakdown[c] = p
+      const matchPieces = d.calibres.get(g.assignedCalibre) || 0
+      const mismatchPct = d.pieces > 0 ? round(((d.pieces - matchPieces) / d.pieces) * 100) : 0
+
+      gateAdvancedStats.push({
+        gateNumber: g.gateNumber,
+        pieces: d.pieces,
+        weightKg: d.weightKg,
+        avgWeightGrams: d.weights.length > 0 ? round(calcMean(d.weights)) : 0,
+        stdDevWeightGrams: d.weights.length > 1 ? round(calcStdDev(d.weights)) : 0,
+        cv: d.weights.length > 1 ? round(coefficientOfVariation(d.weights), 3) : 0,
+        utilizationPct: round(pct(d.pieces, productivePieces)),
+        assignedCalibre: g.assignedCalibre,
+        assignedQuality: g.assignedQuality,
+        mismatchPct,
+        calibreBreakdown,
+      })
+    }
+    gateAdvancedStats.sort((a, b) => b.pieces - a.pieces)
+  }
+
+  // ——————— SUGERENCIAS DE REASIGNACIÓN DE GATES ———————
+  const gateSwapSuggestions: GateSwapSuggestion[] = []
+
+  if (gateAdvancedStats.length > 0 && distributionByCalibre.length > 0) {
+    const globalAvgCV = gateAdvancedStats.length > 0
+      ? calcMean(gateAdvancedStats.map((g) => g.cv))
+      : 0
+
+    for (const gs of gateAdvancedStats) {
+      // 1. Alta variabilidad: CV del gate > 2× promedio global
+      if (gs.cv > globalAvgCV * 2 && gs.cv > 0.15) {
+        gateSwapSuggestions.push({
+          type: 'reassign',
+          gateNumber: gs.gateNumber,
+          currentCalibre: gs.assignedCalibre,
+          suggestedCalibre: gs.assignedCalibre,
+          reason: `Gate ${gs.gateNumber} tiene alta variabilidad de peso (CV=${gs.cv}). Podría estar recibiendo piezas de calibres mixtos.`,
+          impactScore: round(Math.min(100, gs.cv * 200)),
+          evidence: [
+            `CV: ${gs.cv} (promedio global: ${round(globalAvgCV, 3)})`,
+            `StdDev: ${gs.stdDevWeightGrams}g, Avg: ${gs.avgWeightGrams}g`,
+          ],
+        })
+      }
+
+      // 2. Alto mismatch: >30% de piezas no coinciden con calibre asignado
+      if (gs.mismatchPct > 30) {
+        // Find what calibre actually dominates this gate
+        let topCal = gs.assignedCalibre as string
+        let topCalPieces = 0
+        for (const [c, p] of Object.entries(gs.calibreBreakdown)) {
+          if (p > topCalPieces) { topCalPieces = p; topCal = c }
+        }
+        if (topCal !== gs.assignedCalibre) {
+          gateSwapSuggestions.push({
+            type: 'reassign',
+            gateNumber: gs.gateNumber,
+            currentCalibre: gs.assignedCalibre,
+            suggestedCalibre: topCal as CalibreRange,
+            reason: `Gate ${gs.gateNumber} está asignado a ${gs.assignedCalibre} pero el ${round(100 - gs.mismatchPct)}% de sus piezas son ${topCal}. Considere reasignar.`,
+            impactScore: round(gs.mismatchPct),
+            evidence: [
+              `Mismatch: ${gs.mismatchPct}% de piezas no coinciden`,
+              `Calibre real dominante: ${topCal} (${topCalPieces} pz)`,
+              `Piezas totales en gate: ${gs.pieces}`,
+            ],
+          })
+        }
+      }
+    }
+
+    // 3. Calibres con mucha demanda pero pocos gates vs calibres con poca demanda y muchos gates
+    for (const gb of gateBalance) {
+      if (gb.severity === 'critical' && gb.gatesAssigned < 2) {
+        // Find a gate with low demand that could be redirected
+        const lowDemand = gateBalance.find(
+          (g) => g.calibre !== gb.calibre && g.demandPct < 10 && g.gatesAssigned > 1,
+        )
+        if (lowDemand) {
+          const donorGate = gateAdvancedStats.find(
+            (g) => g.assignedCalibre === lowDemand.calibre,
+          )
+          if (donorGate) {
+            gateSwapSuggestions.push({
+              type: 'swap',
+              gateNumber: donorGate.gateNumber,
+              currentCalibre: lowDemand.calibre,
+              suggestedCalibre: gb.calibre,
+              reason: `Reasignar gate ${donorGate.gateNumber} de ${lowDemand.calibre} (${lowDemand.demandPct}% demanda) a ${gb.calibre} (${gb.demandPct}% demanda) para reducir congestión.`,
+              impactScore: round(Math.min(100, gb.demandPct - lowDemand.demandPct)),
+              evidence: [
+                `${gb.calibre}: ${gb.demandPct}% demanda con ${gb.gatesAssigned} gate(s)`,
+                `${lowDemand.calibre}: ${lowDemand.demandPct}% demanda con ${lowDemand.gatesAssigned} gate(s)`,
+              ],
+            })
+          }
+        }
+      }
+    }
+
+    gateSwapSuggestions.sort((a, b) => b.impactScore - a.impactScore)
+  }
+
   // ——————— DATA COMPLETENESS NOTES ———————
   if (!hasPiece) notes.push('No se cargó archivo pieza-pieza: KPIs y gráficos pueden estar incompletos.')
   if (!hasG0 && pointZeroPieces === 0) notes.push('No se detectaron datos de Punto Cero (Gate 0).')
@@ -575,10 +910,33 @@ export function computeAnalytics(
     notes.push('Falta archivo % Calidad: distribución por calidad no disponible.')
   if (data.productionSummary.length === 0 && !hasPiece)
     notes.push('Falta archivo Totales Producción.')
-  if (data.folioRecords.length === 0) notes.push('Falta archivo Total Piezas por Folio.')
+  if (data.folioRecords.length === 0 && lotAnalysis.length === 0)
+    notes.push('Falta archivo Total Piezas por Folio (datos de lotes extraídos desde pieza-pieza).')
   if (gates.length === 0) notes.push('No hay configuración de gates: balance no calculado.')
+  if (lotAnalysis.length > 0)
+    notes.push(`Datos de ${lotAnalysis.length} lote(s) extraídos desde archivo pieza-pieza.`)
 
-  // ——————— KPI BLOCK ———————
+  // ——————— KPI BLOCK (extended) ———————
+  // Compute aggregate weight stats from productive pieces
+  const allProductiveWeights: number[] = []
+  if (hasPiece) {
+    for (const r of data.pieceRecords) {
+      if (r.gate === 0) continue
+      const wpg = r.weightPerPieceGrams ?? (r.weightKg && r.pieces > 0 ? (r.weightKg / r.pieces) * 1000 : undefined)
+      if (wpg && wpg > 0) allProductiveWeights.push(wpg)
+    }
+  }
+  const uniqueLots = lotAnalysis.length > 0 ? lotAnalysis.filter((l) => l.lot !== 'Sin lote').length : undefined
+
+  // Production rate: pieces per hour
+  let productionRatePerHour: number | undefined
+  const startTs = config.startAt || data.inferred.startAt
+  const endTs = config.endAt || data.inferred.endAt
+  if (startTs && endTs) {
+    const durationHours = (new Date(endTs).getTime() - new Date(startTs).getTime()) / 3600000
+    if (durationHours > 0) productionRatePerHour = round(totalPieces / durationHours, 0)
+  }
+
   const kpis: KPIBlock = {
     totalPieces,
     totalWeightKg: totalWeightKg || undefined,
@@ -587,6 +945,10 @@ export function computeAnalytics(
     topPointZeroErrors,
     dominantCalibre,
     dominantQuality,
+    avgWeightGrams: allProductiveWeights.length > 0 ? round(calcMean(allProductiveWeights)) : undefined,
+    medianWeightGrams: allProductiveWeights.length > 0 ? round(calcMedian(allProductiveWeights)) : undefined,
+    uniqueLots,
+    productionRatePerHour,
   }
 
   return {
@@ -604,6 +966,11 @@ export function computeAnalytics(
     matrixQualityCalibre: matrix,
     timeSeriesPointZero,
     gateBalance,
+    lotAnalysis,
+    weightTrendSeries,
+    matrixEnhanced,
+    gateAdvancedStats,
+    gateSwapSuggestions,
     notes,
   }
 }
