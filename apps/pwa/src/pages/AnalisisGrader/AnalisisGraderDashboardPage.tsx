@@ -5,7 +5,7 @@
  * balance de gates (enhanced), lotes, tendencia de peso,
  * insights, panel IA, exportación y guardado de sesión.
  *
- * v2.46.0 — Tooltips ricos con fórmulas, modo día/noche, UI refinada
+ * v2.46.1 — P0 inteligente, rangos de peso, persistencia archivos, tooltips ricos, modo día/noche
  */
 
 import { useState, useMemo, useRef } from 'react'

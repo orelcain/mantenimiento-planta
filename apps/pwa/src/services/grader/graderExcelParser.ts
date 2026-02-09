@@ -7,6 +7,7 @@
 
 import * as XLSX from 'xlsx'
 import { generateId } from '@/lib/utils'
+import { CALIBRE_WEIGHT_RANGES } from './graderAnalytics'
 import type {
   MatrixFileKind,
   UploadedMatrixFile,
@@ -20,20 +21,6 @@ import type {
   CalibreRange,
   CalibreWeightRange,
 } from './types'
-
-// ============================================================================
-// CONSTANTES — RANGOS DE CALIBRE POR PESO (para inferencia gate 0)
-// ============================================================================
-
-/** Rangos de peso en gramos usados para inferir calibre y clasificar gate 0 */
-const CALIBRE_WEIGHT_RANGES: CalibreWeightRange[] = [
-  { calibre: '0-2 lb',   label: '0-2 lb (0–916 g)',       minGrams: 0,    maxGrams: 916  },
-  { calibre: '2-4 lb',   label: '2-4 lb (916–1833 g)',    minGrams: 916,  maxGrams: 1833 },
-  { calibre: '4-6 lb',   label: '4-6 lb (1833–2749 g)',   minGrams: 1833, maxGrams: 2749 },
-  { calibre: '6-8 lb',   label: '6-8 lb (2749–3665 g)',   minGrams: 2749, maxGrams: 3665 },
-  { calibre: '8-10 lb',  label: '8-10 lb (3665–4581 g)',  minGrams: 3665, maxGrams: 4581 },
-  { calibre: '10-12 lb', label: '10+ lb (4581–9163 g)',   minGrams: 4581, maxGrams: 9163 },
-]
 
 // ============================================================================
 // NORMALIZACIÓN

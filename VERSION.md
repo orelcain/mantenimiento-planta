@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.44.4**
+## Versión Actual: **v2.46.1**
 
 **Fecha de lanzamiento**: 09 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,34 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.46.1 - Clasificación P0 inteligente + Rangos de peso + Persistencia de archivos (09/02/2026)
+- 🎯 **Clasificación P0 inteligente**: Re-clasifica "Fuera de límites" → "Fuera de rango" cuando no hay gate activo para el calibre
+- 🔍 **No leído por fotocélula**: Piezas sin peso detectadas como "No leído por fotocélula" en vez de "Fuera de límites"
+- ⚖️ **Rangos de peso en Gates**: Nueva columna "Rango (g)" muestra min–max gramos por calibre en configuración de gates
+- 🔄 **Persistencia de archivos**: Los archivos Excel cargados persisten al navegar entre pasos del wizard sin necesidad de recargar
+- 🐛 **Fix tabla pivote**: Lógica P0 consistente en tabla jerárquica Error×Calidad×Calibre
+
+### v2.46.0 - Tooltips ricos + Modo día/noche + UI refinada (09/02/2026)
+- 💡 **InfoTooltip v2**: Tooltips con título, fórmula estadística y ejemplo contextual
+- 📐 **18 tooltips enriquecidos**: Fórmulas completas para Mediana, σ, CV, HHI, IQR, Sesgo, Curtosis, etc.
+- 🌗 **Modo día/noche**: Toggle Sol/Luna en header del dashboard Grader con CSS `.grader-light-mode`
+- 🧹 **UI limpia**: Eliminados gráfico de barras P0 redundante, tabla "Desglose por Error Original" y tablas de distribución duplicadas
+- 🎨 **getTooltipProps()**: Función spread-ready para props de tooltips en cualquier componente
+
+### v2.45.0 - Motor estadístico avanzado + Dashboard 7 tabs (09/02/2026)
+- 📊 **graderStats.ts**: Motor estadístico completo (Mediana, σ, CV%, Sesgo, Curtosis, IQR, HHI, cuartiles)
+- 💡 **graderTooltips.ts**: Diccionario de tooltips con ayuda contextual por indicador
+- 🏗️ **InfoTooltip**: Componente flotante con icono ⓘ para ayuda contextual
+- 📈 **7 tabs en dashboard**: Resumen, Gates, Distribución Calibre, Distribución Peso, Calidad, Punto Cero, Insights
+- 🔍 **Insights automáticos**: Detección de concentración (HHI), alertas de Punto Cero, variabilidad de peso
+- 📊 **Gráficos ChartJS**: Doughnut distribución, barras por gate, línea de pesos, stacked calidad
+- 🧮 **Tipos extendidos**: GraderStats, CalibrationInsight, DistributionAnalysis, QualityAnalysis
+- 📥 **Export mejorado**: Estadísticas avanzadas incluidas en Excel y PDF
+
+### v2.44.4 - Fix TypeScript never[] inference (09/02/2026)
+- 🐛 **Fix compilación**: Corregido error `never[]` en inferencia TypeScript en graderAnalytics.ts
+- 🔧 **Tipos explícitos**: Añadidos tipos explícitos a arrays inicializados vacíos
 
 ### v2.44.3 - Pivote Error×Calidad×Calibre + fix Suspense (09/02/2026)
 - 📊 **Tabla pivote Error×Calidad×Calibre**: Desglose jerárquico 3 niveles como pivot table Marelec
