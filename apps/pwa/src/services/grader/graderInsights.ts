@@ -29,6 +29,11 @@ export function computeDeterministicInsights(
 
   // ——— 1. Punto Cero general ———
   if (result.kpis.pointZeroPct >= thresholds.pointZeroPctWarn) {
+    // Add classification breakdown to evidence
+    const classEvidence = result.pointZeroClassification.causes
+      .filter((c) => c.pctOfPointZero >= 1)
+      .map((c) => `  → ${c.label}: ${c.pieces.toLocaleString()} pz (${c.pctOfPointZero}% del P.Cero)`)
+
     insights.push({
       id: nextId(),
       severity: result.kpis.pointZeroPct >= thresholds.pointZeroPctWarn * 2 ? 'critical' : 'warn',
@@ -36,6 +41,7 @@ export function computeDeterministicInsights(
       evidence: [
         `Punto Cero: ${result.kpis.pointZeroPieces} piezas (${result.kpis.pointZeroPct}%)`,
         `Umbral configurado: ${thresholds.pointZeroPctWarn}%`,
+        ...classEvidence,
       ],
       recommendations: [
         'Revisar las causas principales de Punto Cero.',
@@ -45,20 +51,15 @@ export function computeDeterministicInsights(
     })
   }
 
-  // ——— 2. "No leído por fotocélula" ———
-  const photocellErr = result.pointZeroByError.find((e) =>
-    e.error.toLowerCase().includes('fotoc') ||
-    e.error.toLowerCase().includes('photocell') ||
-    e.error.toLowerCase().includes('no leido') ||
-    e.error.toLowerCase().includes('not read'),
-  )
-  if (photocellErr && photocellErr.pct >= thresholds.photocellPctWarn) {
+  // ——— 2. "No leído por fotocélula" (usando clasificación estandarizada) ———
+  const photocellCause = result.pointZeroClassification.causes.find((c) => c.cause === 'no_leido_fotocelula')
+  if (photocellCause && photocellCause.pctOfTotal >= thresholds.photocellPctWarn) {
     insights.push({
       id: nextId(),
-      severity: photocellErr.pct >= thresholds.photocellPctWarn * 2 ? 'critical' : 'warn',
+      severity: photocellCause.pctOfTotal >= thresholds.photocellPctWarn * 2 ? 'critical' : 'warn',
       title: 'Error de fotocélula alto',
       evidence: [
-        `"${photocellErr.error}": ${photocellErr.pieces} piezas (${photocellErr.pct}%)`,
+        `${photocellCause.label}: ${photocellCause.pieces.toLocaleString()} piezas (${photocellCause.pctOfPointZero}% del P.Cero, ${photocellCause.pctOfTotal}% del total)`,
         `Umbral: ${thresholds.photocellPctWarn}%`,
       ],
       recommendations: [
@@ -69,21 +70,26 @@ export function computeDeterministicInsights(
     })
   }
 
-  // ——— 3. "Fuera de límites" ———
-  const oobErr = result.pointZeroByError.find((e) =>
-    e.error.toLowerCase().includes('fuera de lim') ||
-    e.error.toLowerCase().includes('out of limit') ||
-    e.error.toLowerCase().includes('fuera de rango'),
-  )
-  if (oobErr && oobErr.pct >= thresholds.outOfLimitsPctWarn) {
+  // ——— 3. "Fuera de límites" + "Fuera de rango" (usando clasificación) ———
+  const fueraLimitesCause = result.pointZeroClassification.causes.find((c) => c.cause === 'fuera_de_limites')
+  const fueraRangoCause = result.pointZeroClassification.causes.find((c) => c.cause === 'fuera_de_rango')
+  const combinedOOBPct = (fueraLimitesCause?.pctOfTotal ?? 0) + (fueraRangoCause?.pctOfTotal ?? 0)
+
+  if (combinedOOBPct >= thresholds.outOfLimitsPctWarn) {
+    const evidence: string[] = []
+    if (fueraRangoCause) {
+      evidence.push(`Fuera de rango: ${fueraRangoCause.pieces.toLocaleString()} pz (${fueraRangoCause.pctOfPointZero}% del P.Cero)`)
+    }
+    if (fueraLimitesCause) {
+      evidence.push(`Fuera de límites: ${fueraLimitesCause.pieces.toLocaleString()} pz (${fueraLimitesCause.pctOfPointZero}% del P.Cero)`)
+    }
+    evidence.push(`Umbral combinado: ${thresholds.outOfLimitsPctWarn}%`)
+
     insights.push({
       id: nextId(),
-      severity: oobErr.pct >= thresholds.outOfLimitsPctWarn * 2 ? 'critical' : 'warn',
-      title: '"Fuera de límites" alto',
-      evidence: [
-        `"${oobErr.error}": ${oobErr.pieces} piezas (${oobErr.pct}%)`,
-        `Umbral: ${thresholds.outOfLimitsPctWarn}%`,
-      ],
+      severity: combinedOOBPct >= thresholds.outOfLimitsPctWarn * 2 ? 'critical' : 'warn',
+      title: 'Fuera de rango/límites elevado',
+      evidence,
       recommendations: [
         'Revisar rangos de parametrización en Matrix.',
         'Verificar condiciones físicas del producto (tamaño/forma inusuales).',
@@ -143,20 +149,15 @@ export function computeDeterministicInsights(
     }
   }
 
-  // ——— 6. "Too close / too long" ———
-  const tooCloseErr = result.pointZeroByError.find((e) =>
-    e.error.toLowerCase().includes('too close') ||
-    e.error.toLowerCase().includes('too long') ||
-    e.error.toLowerCase().includes('muy cerca') ||
-    e.error.toLowerCase().includes('muy largo'),
-  )
-  if (tooCloseErr && tooCloseErr.pct >= 0.5) {
+  // ——— 6. "Too close / too long" (usando clasificación) ———
+  const tooCloseCause = result.pointZeroClassification.causes.find((c) => c.cause === 'too_close_too_long')
+  if (tooCloseCause && tooCloseCause.pctOfTotal >= 0.5) {
     insights.push({
       id: nextId(),
-      severity: tooCloseErr.pct >= 2 ? 'warn' : 'info',
+      severity: tooCloseCause.pctOfTotal >= 2 ? 'warn' : 'info',
       title: 'Piezas "too close/too long"',
       evidence: [
-        `"${tooCloseErr.error}": ${tooCloseErr.pieces} piezas (${tooCloseErr.pct}%)`,
+        `${tooCloseCause.label}: ${tooCloseCause.pieces.toLocaleString()} piezas (${tooCloseCause.pctOfPointZero}% del P.Cero, ${tooCloseCause.pctOfTotal}% del total)`,
       ],
       recommendations: [
         'Verificar velocidad del alimentador y separación entre piezas.',
@@ -165,19 +166,15 @@ export function computeDeterministicInsights(
     })
   }
 
-  // ——— 7. "Puerta no preparada" ———
-  const doorNotReady = result.pointZeroByError.find((e) =>
-    e.error.toLowerCase().includes('puerta no preparada') ||
-    e.error.toLowerCase().includes('door not ready') ||
-    e.error.toLowerCase().includes('gate not ready'),
-  )
-  if (doorNotReady && doorNotReady.pct >= 0.5) {
+  // ——— 7. "Puerta no preparada" (usando clasificación) ———
+  const doorCause = result.pointZeroClassification.causes.find((c) => c.cause === 'puerta_no_preparada')
+  if (doorCause && doorCause.pctOfTotal >= 0.5) {
     insights.push({
       id: nextId(),
-      severity: doorNotReady.pct >= 2 ? 'warn' : 'info',
+      severity: doorCause.pctOfTotal >= 2 ? 'warn' : 'info',
       title: 'Puerta no preparada frecuente',
       evidence: [
-        `"${doorNotReady.error}": ${doorNotReady.pieces} piezas (${doorNotReady.pct}%)`,
+        `${doorCause.label}: ${doorCause.pieces.toLocaleString()} piezas (${doorCause.pctOfPointZero}% del P.Cero, ${doorCause.pctOfTotal}% del total)`,
       ],
       recommendations: [
         'Verificar el mecanismo de actuación de las compuertas.',

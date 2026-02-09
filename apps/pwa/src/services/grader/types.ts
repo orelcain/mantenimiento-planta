@@ -12,12 +12,62 @@
 export type GraderQuality = 'D' | 'Industrial' | 'Grado' | 'Premium' | 'Unknown';
 
 export type CalibreRange =
+  | '0-2 lb'
   | '2-4 lb'
   | '4-6 lb'
   | '6-8 lb'
   | '8-10 lb'
   | '10-12 lb'
   | 'Other';
+
+/**
+ * Causas estandarizadas de Punto Cero.
+ * Cada registro Gate 0 se clasifica en exactamente una de estas causas.
+ */
+export type PointZeroCause =
+  | 'fuera_de_rango'
+  | 'fuera_de_limites'
+  | 'no_leido_fotocelula'
+  | 'too_close_too_long'
+  | 'puerta_no_preparada'
+  | 'otro';
+
+/** Rango de peso en gramos para cada calibre */
+export interface CalibreWeightRange {
+  calibre: string;
+  label: string;
+  minGrams: number;
+  maxGrams: number;
+}
+
+/** Desglose de una causa de Punto Cero */
+export interface PointZeroCauseBreakdown {
+  cause: PointZeroCause;
+  label: string;
+  description: string;
+  pieces: number;
+  pctOfPointZero: number; // % respecto al total punto cero (suman 100%)
+  pctOfTotal: number;     // % respecto al total producción
+  weightKg?: number;
+}
+
+/** Detalle de piezas fuera de rango por distribución de peso */
+export interface OutOfRangeWeightDetail {
+  rangeLabel: string;  // e.g. "Bajo rango (< 0g)", "0-2 lb", "10+ lb (> 9163g)"
+  pieces: number;
+  pct: number;         // % del fuera de rango
+  weightKg?: number;
+}
+
+/** Clasificación completa del 100% de Punto Cero */
+export interface PointZeroClassification {
+  totalPointZeroPieces: number;
+  causes: PointZeroCauseBreakdown[];
+  /** Para ítems "fuera_de_rango" con peso, desglose por rango de calibre */
+  outOfRangeByWeight: OutOfRangeWeightDetail[];
+  /** Rangos de referencia usados */
+  calibreWeightRanges: CalibreWeightRange[];
+}
 
 export type MatrixFileKind =
   | 'PIEZA_PIEZA'
@@ -186,6 +236,8 @@ export interface GraderAnalyticsResult {
   distributionByCalibre: DistributionRow[];
   distributionByQuality: DistributionRow[];
   pointZeroByError: Array<{ error: string; pieces: number; pct: number; weightKg?: number }>;
+  /** Clasificación estandarizada del 100% de Punto Cero */
+  pointZeroClassification: PointZeroClassification;
   matrixQualityCalibre: Record<string, Record<string, { pieces: number; pct: number }>>;
   timeSeriesPointZero: TimeSeriesPoint[];
   gateBalance: GateBalanceInsight[];

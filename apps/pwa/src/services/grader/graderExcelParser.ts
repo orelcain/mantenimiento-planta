@@ -114,11 +114,13 @@ function normalizeQuality(v: unknown): GraderQuality {
 function normalizeCalibre(v: unknown): CalibreRange {
   const s = norm(v).replace(/\s+/g, '').replace('–', '-').replace('—', '-')
   if (!s) return 'Other'
+  // Handle "10-UP", "10-up", "10+", etc.
+  if (/10\s*[-]?\s*(up|mas|\+)/i.test(s) || /10\s*-\s*12/.test(s)) return '10-12 lb'
   // E.g. "6-8", "6-8 lb", "6-8lb"
   const m = s.match(/(\d+)\s*-\s*(\d+)/)
   if (m) {
     const lb = `${m[1]}-${m[2]} lb`
-    const valid: CalibreRange[] = ['2-4 lb', '4-6 lb', '6-8 lb', '8-10 lb', '10-12 lb']
+    const valid: CalibreRange[] = ['0-2 lb', '2-4 lb', '4-6 lb', '6-8 lb', '8-10 lb', '10-12 lb']
     return valid.includes(lb as CalibreRange) ? (lb as CalibreRange) : 'Other'
   }
   return 'Other'

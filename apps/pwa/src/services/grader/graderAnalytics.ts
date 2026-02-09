@@ -16,7 +16,37 @@ import type {
   GateBalanceInsight,
   CalibreRange,
   GraderQuality,
+  PointZeroCause,
+  PointZeroCauseBreakdown,
+  PointZeroClassification,
+  CalibreWeightRange,
+  OutOfRangeWeightDetail,
+  Gate0Record,
 } from './types'
+
+// ============================================================================
+// CONSTANTES — RANGOS DE CALIBRE POR PESO
+// ============================================================================
+
+/** Rangos de peso en gramos para cada calibre (datos de la tabla de calibración) */
+export const CALIBRE_WEIGHT_RANGES: CalibreWeightRange[] = [
+  { calibre: '0-2 lb',   label: '0-2 lb (0–916 g)',       minGrams: 0,    maxGrams: 916  },
+  { calibre: '2-4 lb',   label: '2-4 lb (916–1833 g)',    minGrams: 916,  maxGrams: 1833 },
+  { calibre: '4-6 lb',   label: '4-6 lb (1833–2749 g)',   minGrams: 1833, maxGrams: 2749 },
+  { calibre: '6-8 lb',   label: '6-8 lb (2749–3665 g)',   minGrams: 2749, maxGrams: 3665 },
+  { calibre: '8-10 lb',  label: '8-10 lb (3665–4581 g)',  minGrams: 3665, maxGrams: 4581 },
+  { calibre: '10-12 lb', label: '10+ lb (4581–9163 g)',   minGrams: 4581, maxGrams: 9163 },
+]
+
+/** Causas estandarizadas con labels y descripciones */
+const CAUSE_META: Record<PointZeroCause, { label: string; description: string }> = {
+  fuera_de_rango:       { label: 'Fuera de rango',          description: 'Pieza con peso fuera de los rangos de calibre definidos' },
+  fuera_de_limites:     { label: 'Fuera de límites',        description: 'Pieza fuera de dimensiones o parámetros del sistema' },
+  no_leido_fotocelula:  { label: 'No leído por fotocélula', description: 'Sensor óptico no detectó correctamente la pieza' },
+  too_close_too_long:   { label: 'Too close or too long',   description: 'Piezas demasiado cerca entre sí o longitud fuera de rango' },
+  puerta_no_preparada:  { label: 'Puerta no preparada',     description: 'Compuerta no estaba lista al momento de operar' },
+  otro:                 { label: 'Otro / Desconocido',      description: 'Causa no clasificada en las categorías estándar' },
+}
 
 // ============================================================================
 // HELPERS
@@ -34,6 +64,150 @@ function bucketKey(isoTs: string, intervalMinutes: number): string {
   const bucketed = new Date(d)
   bucketed.setMinutes(Math.floor(mins / intervalMinutes) * intervalMinutes, 0, 0)
   return bucketed.toISOString()
+}
+
+// ============================================================================
+// CLASIFICACIÓN PUNTO CERO
+// ============================================================================
+
+/** Clasifica un string de error en una causa estandarizada */
+function classifyError(error: string): PointZeroCause {
+  const s = error.toLowerCase().trim()
+
+  // Fuera de rango / Out of range
+  if (s.includes('fuera de rango') || s.includes('out of range') || s.includes('fuera de rangos')
+    || s.includes('fuera rango') || s.includes('out range')) {
+    return 'fuera_de_rango'
+  }
+
+  // Fuera de límites / Out of limits
+  if (s.includes('fuera de limite') || s.includes('fuera de límite') || s.includes('out of limit')
+    || s.includes('fuera limites') || s.includes('fuera límites')) {
+    return 'fuera_de_limites'
+  }
+
+  // No leído por fotocélula / Not read by photocell
+  if (s.includes('fotoc') || s.includes('photocell') || s.includes('no leido')
+    || s.includes('no leído') || s.includes('not read') || s.includes('fotocelula')
+    || s.includes('fotocélula')) {
+    return 'no_leido_fotocelula'
+  }
+
+  // Too close or too long
+  if (s.includes('too close') || s.includes('too long') || s.includes('demasiado cerca')
+    || s.includes('demasiado largo') || s.includes('close or') || s.includes('too short')) {
+    return 'too_close_too_long'
+  }
+
+  // Puerta no preparada / Door not ready / Gate not ready
+  if (s.includes('puerta no preparada') || s.includes('puerta no lista')
+    || s.includes('door not ready') || s.includes('gate not ready')
+    || s.includes('not ready') || s.includes('no preparada')) {
+    return 'puerta_no_preparada'
+  }
+
+  return 'otro'
+}
+
+/**
+ * Construye la clasificación completa del 100% del Punto Cero.
+ * Agrupa Gate0Records por causa estandarizada y, para "fuera_de_rango"
+ * con datos de peso, calcula a qué calibre pertenecerían.
+ */
+function computePointZeroClassification(
+  g0Records: Array<Gate0Record | (Gate0Record & { error: string })>,
+  totalPieces: number,
+  pointZeroPieces: number,
+): PointZeroClassification {
+  // Agrupar por causa
+  const causeMap = new Map<PointZeroCause, { pieces: number; weightKg: number; records: typeof g0Records }>()
+
+  for (const r of g0Records) {
+    const errorStr = 'error' in r ? r.error : 'Desconocido'
+    const cause = classifyError(errorStr)
+    const cur = causeMap.get(cause) || { pieces: 0, weightKg: 0, records: [] }
+    cur.pieces += r.pieces
+    cur.weightKg += r.weightKg ?? 0
+    cur.records.push(r)
+    causeMap.set(cause, cur)
+  }
+
+  // Construir breakdown ordenado por piezas desc
+  const allCauses: PointZeroCause[] = [
+    'fuera_de_rango', 'fuera_de_limites', 'no_leido_fotocelula',
+    'too_close_too_long', 'puerta_no_preparada', 'otro',
+  ]
+
+  const causes: PointZeroCauseBreakdown[] = allCauses
+    .map((cause) => {
+      const data = causeMap.get(cause)
+      const meta = CAUSE_META[cause]
+      return {
+        cause,
+        label: meta.label,
+        description: meta.description,
+        pieces: data?.pieces ?? 0,
+        pctOfPointZero: pointZeroPieces > 0 ? pct(data?.pieces ?? 0, pointZeroPieces) : 0,
+        pctOfTotal: totalPieces > 0 ? pct(data?.pieces ?? 0, totalPieces) : 0,
+        weightKg: data?.weightKg || undefined,
+      }
+    })
+    .filter((c) => c.pieces > 0) // Solo mostrar causas con piezas
+    .sort((a, b) => b.pieces - a.pieces)
+
+  // Desglose de "fuera de rango" por peso → calibre
+  const outOfRangeByWeight: OutOfRangeWeightDetail[] = []
+  const fueraDeRangoData = causeMap.get('fuera_de_rango')
+
+  if (fueraDeRangoData && fueraDeRangoData.records.length > 0) {
+    const weightBuckets = new Map<string, { pieces: number; weightKg: number }>()
+
+    for (const r of fueraDeRangoData.records) {
+      const piecesW = r.pieces
+
+      let rangeLabel: string
+      if (!r.weightKg || r.weightKg <= 0) {
+        rangeLabel = 'Sin dato de peso'
+      } else {
+        // Peso por pieza en gramos
+        const perPieceG = (r.weightKg / r.pieces) * 1000
+        const matched = CALIBRE_WEIGHT_RANGES.find(
+          (rng) => perPieceG >= rng.minGrams && perPieceG < rng.maxGrams,
+        )
+        if (matched) {
+          rangeLabel = matched.label
+        } else if (perPieceG < 0) {
+          rangeLabel = 'Peso negativo (error)'
+        } else if (perPieceG >= 9163) {
+          rangeLabel = 'Sobre 10+ lb (> 9163 g)'
+        } else {
+          rangeLabel = 'Sin clasificar'
+        }
+      }
+
+      const cur = weightBuckets.get(rangeLabel) || { pieces: 0, weightKg: 0 }
+      cur.pieces += piecesW
+      cur.weightKg += r.weightKg ?? 0
+      weightBuckets.set(rangeLabel, cur)
+    }
+
+    const fueraTotal = fueraDeRangoData.pieces
+    for (const [rangeLabel, v] of Array.from(weightBuckets.entries()).sort((a, b) => b[1].pieces - a[1].pieces)) {
+      outOfRangeByWeight.push({
+        rangeLabel,
+        pieces: v.pieces,
+        pct: pct(v.pieces, fueraTotal),
+        weightKg: v.weightKg || undefined,
+      })
+    }
+  }
+
+  return {
+    totalPointZeroPieces: pointZeroPieces,
+    causes,
+    outOfRangeByWeight,
+    calibreWeightRanges: CALIBRE_WEIGHT_RANGES,
+  }
 }
 
 // ============================================================================
@@ -132,6 +306,13 @@ export function computeAnalytics(
     pieces,
     pct: p,
   }))
+
+  // ——————— CLASIFICACIÓN PUNTO CERO (100%) ———————
+  const pointZeroClassification = computePointZeroClassification(
+    g0Source as Gate0Record[],
+    totalPieces,
+    pointZeroPieces,
+  )
 
   // ——————— DISTRIBUCIÓN POR CALIBRE ———————
   const calibreMap = new Map<string, { pieces: number; weightKg: number }>()
@@ -350,6 +531,7 @@ export function computeAnalytics(
     distributionByCalibre,
     distributionByQuality,
     pointZeroByError,
+    pointZeroClassification,
     matrixQualityCalibre: matrix,
     timeSeriesPointZero,
     gateBalance,

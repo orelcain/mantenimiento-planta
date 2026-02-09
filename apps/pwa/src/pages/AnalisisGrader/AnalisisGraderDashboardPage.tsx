@@ -217,6 +217,32 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(p0Rows), 'Punto Cero')
     }
 
+    // Clasificación Punto Cero (100%)
+    if (analytics.pointZeroClassification.causes.length > 0) {
+      const classRows = [
+        ['Causa', 'Piezas', '% Punto Cero', '% Total', 'Peso (kg)'],
+        ...analytics.pointZeroClassification.causes.map(c => [c.label, c.pieces, c.pctOfPointZero, c.pctOfTotal, c.weightKg ?? '']),
+        ['TOTAL', analytics.pointZeroClassification.totalPointZeroPieces, 100, kpis.pointZeroPct, ''],
+      ]
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(classRows), 'Clasif. Pto Cero')
+    }
+
+    // Fuera de Rango por peso
+    if (analytics.pointZeroClassification.outOfRangeByWeight.length > 0) {
+      const orRows = [
+        ['Rango Peso', 'Piezas', '%'],
+        ...analytics.pointZeroClassification.outOfRangeByWeight.map(d => [d.rangeLabel, d.pieces, d.pct]),
+      ]
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(orRows), 'Fuera de Rango')
+    }
+
+    // Rangos de Calibre (referencia)
+    const rangeRows = [
+      ['Calibre', 'Mín (g)', 'Máx (g)'],
+      ...analytics.pointZeroClassification.calibreWeightRanges.map(r => [r.calibre, r.minGrams, r.maxGrams]),
+    ]
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rangeRows), 'Rangos Calibre')
+
     // Matrix Q×C
     if (matrixQualities.length > 0 && matrixCalibres.length > 0) {
       const header = ['Calidad \\ Calibre', ...matrixCalibres]
@@ -317,6 +343,43 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
       y = (pdfDoc as any).lastAutoTable.finalY + 8
     }
 
+    // Clasificación Punto Cero 100%
+    if (analytics.pointZeroClassification.causes.length > 0) {
+      if (y > 150) { pdfDoc.addPage(); y = 15 }
+      pdfDoc.setFontSize(12)
+      pdfDoc.text('Clasificación Punto Cero — 100%', 14, y)
+      y += 2
+      autoTable(pdfDoc, {
+        startY: y,
+        head: [['Causa', 'Piezas', '% P.Cero', '% Total']],
+        body: [
+          ...analytics.pointZeroClassification.causes.map(c => [c.label, c.pieces.toLocaleString(), `${c.pctOfPointZero}%`, `${c.pctOfTotal}%`]),
+          ['TOTAL', analytics.pointZeroClassification.totalPointZeroPieces.toLocaleString(), '100%', `${kpis.pointZeroPct}%`],
+        ],
+        theme: 'grid',
+        styles: { fontSize: 8 },
+        margin: { left: 14 },
+      })
+      y = (pdfDoc as any).lastAutoTable.finalY + 8
+    }
+
+    // Fuera de Rango por peso
+    if (analytics.pointZeroClassification.outOfRangeByWeight.length > 0) {
+      if (y > 160) { pdfDoc.addPage(); y = 15 }
+      pdfDoc.setFontSize(12)
+      pdfDoc.text('Fuera de Rango — Distribución por Peso', 14, y)
+      y += 2
+      autoTable(pdfDoc, {
+        startY: y,
+        head: [['Rango Peso', 'Piezas', '%']],
+        body: analytics.pointZeroClassification.outOfRangeByWeight.map(d => [d.rangeLabel, d.pieces.toLocaleString(), `${d.pct}%`]),
+        theme: 'striped',
+        styles: { fontSize: 8 },
+        margin: { left: 14 },
+      })
+      y = (pdfDoc as any).lastAutoTable.finalY + 8
+    }
+
     // Matrix Q×C
     if (matrixQualities.length > 0 && matrixCalibres.length > 0) {
       if (y > 140) { pdfDoc.addPage(); y = 15 }
@@ -406,6 +469,26 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
         label: 'Piezas Punto Cero',
         data: analytics.pointZeroByError.map((d) => d.pieces),
         backgroundColor: 'rgba(239,68,68,0.7)',
+      },
+    ],
+  }
+
+  // Classification donut for Punto Cero
+  const classificationColors = [
+    'rgba(239,68,68,0.8)',   // fuera_de_rango (red)
+    'rgba(245,158,11,0.8)',  // fuera_de_limites (amber)
+    'rgba(139,92,246,0.8)',  // no_leido_fotocelula (purple)
+    'rgba(59,130,246,0.8)',  // too_close_too_long (blue)
+    'rgba(16,185,129,0.8)',  // puerta_no_preparada (green)
+    'rgba(107,114,128,0.8)', // otro (gray)
+  ]
+
+  const classificationChartData = {
+    labels: analytics.pointZeroClassification.causes.map((c) => c.label),
+    datasets: [
+      {
+        data: analytics.pointZeroClassification.causes.map((c) => c.pieces),
+        backgroundColor: analytics.pointZeroClassification.causes.map((_, i) => classificationColors[i % classificationColors.length]),
       },
     ],
   }
@@ -553,9 +636,182 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
 
         {/* PUNTO CERO */}
         <TabsContent value="punto-cero" className="space-y-4">
+          {/* Clasificación 100% Punto Cero */}
+          {analytics.pointZeroClassification.causes.length > 0 && (
+            <Card className="border-red-200">
+              <CardHeader>
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Target className="h-4 w-4 text-red-500" />
+                  Clasificación Punto Cero — 100%
+                </CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  {analytics.pointZeroClassification.totalPointZeroPieces.toLocaleString()} piezas totales en Punto Cero
+                </p>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Donut chart */}
+                  <div className="flex items-center justify-center">
+                    <div className="w-full max-w-[280px]">
+                      <Doughnut
+                        data={classificationChartData}
+                        options={{
+                          responsive: true,
+                          plugins: {
+                            legend: { position: 'bottom', labels: { font: { size: 11 } } },
+                            tooltip: {
+                              callbacks: {
+                                label: (ctx) => {
+                                  const cause = analytics.pointZeroClassification.causes[ctx.dataIndex]
+                                  return cause
+                                    ? `${cause.label}: ${cause.pieces.toLocaleString()} pz (${cause.pctOfPointZero}%)`
+                                    : ''
+                                },
+                              },
+                            },
+                          },
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Table */}
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b text-left">
+                          <th className="py-2 px-2">Causa</th>
+                          <th className="py-2 px-2 text-right">Piezas</th>
+                          <th className="py-2 px-2 text-right">% P.Cero</th>
+                          <th className="py-2 px-2 text-right">% Total</th>
+                          <th className="py-2 px-2 text-right">Peso (kg)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {analytics.pointZeroClassification.causes.map((c, i) => (
+                          <tr key={i} className="border-b hover:bg-muted/30">
+                            <td className="py-2 px-2">
+                              <div>
+                                <span className="font-medium">{c.label}</span>
+                                <p className="text-[10px] text-muted-foreground">{c.description}</p>
+                              </div>
+                            </td>
+                            <td className="py-2 px-2 text-right font-medium">{c.pieces.toLocaleString()}</td>
+                            <td className="py-2 px-2 text-right">
+                              <span className={cn(
+                                'font-medium',
+                                c.pctOfPointZero >= 50 && 'text-red-600',
+                                c.pctOfPointZero >= 10 && c.pctOfPointZero < 50 && 'text-amber-600',
+                              )}>
+                                {c.pctOfPointZero}%
+                              </span>
+                            </td>
+                            <td className="py-2 px-2 text-right text-muted-foreground">{c.pctOfTotal}%</td>
+                            <td className="py-2 px-2 text-right">{c.weightKg ? c.weightKg.toLocaleString() : '—'}</td>
+                          </tr>
+                        ))}
+                        {/* Total row */}
+                        <tr className="border-t-2 font-bold bg-muted/50">
+                          <td className="py-2 px-2">TOTAL</td>
+                          <td className="py-2 px-2 text-right">{analytics.pointZeroClassification.totalPointZeroPieces.toLocaleString()}</td>
+                          <td className="py-2 px-2 text-right">100%</td>
+                          <td className="py-2 px-2 text-right">{kpis.pointZeroPct}%</td>
+                          <td className="py-2 px-2 text-right">—</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Fuera de Rango — Distribución por Peso */}
+          {analytics.pointZeroClassification.outOfRangeByWeight.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-amber-500" />
+                  Fuera de Rango — Distribución por Peso
+                </CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  Piezas clasificadas como &quot;fuera de rango&quot; agrupadas por el calibre al que pertenecerían según su peso
+                </p>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {/* Bar chart */}
+                  <Bar
+                    data={{
+                      labels: analytics.pointZeroClassification.outOfRangeByWeight.map((d) => d.rangeLabel),
+                      datasets: [
+                        {
+                          label: 'Piezas fuera de rango',
+                          data: analytics.pointZeroClassification.outOfRangeByWeight.map((d) => d.pieces),
+                          backgroundColor: 'rgba(245,158,11,0.7)',
+                        },
+                      ],
+                    }}
+                    options={{
+                      indexAxis: 'y',
+                      responsive: true,
+                      plugins: { legend: { display: false } },
+                      scales: { x: { beginAtZero: true } },
+                    }}
+                  />
+
+                  {/* Weight ranges reference table */}
+                  <div>
+                    <p className="text-xs font-medium mb-2">Rangos de Calibre (referencia)</p>
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="py-1 px-2 text-left">Calibre</th>
+                          <th className="py-1 px-2 text-right">Mín (g)</th>
+                          <th className="py-1 px-2 text-right">Máx (g)</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {analytics.pointZeroClassification.calibreWeightRanges.map((r, i) => (
+                          <tr key={i} className="border-b">
+                            <td className="py-1 px-2">{r.calibre}</td>
+                            <td className="py-1 px-2 text-right">{r.minGrams.toLocaleString()}</td>
+                            <td className="py-1 px-2 text-right">{r.maxGrams.toLocaleString()}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+
+                    {/* Out of range detail table */}
+                    <p className="text-xs font-medium mt-4 mb-2">Desglose Fuera de Rango</p>
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="py-1 px-2 text-left">Rango</th>
+                          <th className="py-1 px-2 text-right">Piezas</th>
+                          <th className="py-1 px-2 text-right">%</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {analytics.pointZeroClassification.outOfRangeByWeight.map((d, i) => (
+                          <tr key={i} className="border-b">
+                            <td className="py-1 px-2">{d.rangeLabel}</td>
+                            <td className="py-1 px-2 text-right">{d.pieces.toLocaleString()}</td>
+                            <td className="py-1 px-2 text-right">{d.pct}%</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Punto Cero por Causa (original) + Serie temporal */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <Card>
-              <CardHeader><CardTitle className="text-sm">Punto Cero por Causa</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="text-sm">Punto Cero por Error (detalle)</CardTitle></CardHeader>
               <CardContent>
                 {analytics.pointZeroByError.length > 0 ? (
                   <Bar
@@ -600,7 +856,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
           {/* Punto Zero table */}
           {analytics.pointZeroByError.length > 0 && (
             <Card>
-              <CardHeader><CardTitle className="text-sm">Desglose Punto Cero</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="text-sm">Desglose por Error Original</CardTitle></CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
