@@ -1076,69 +1076,100 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                 </p>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  {/* Bar chart */}
-                  <Bar
-                    data={{
-                      labels: analytics.pointZeroClassification.outOfRangeByWeight.map((d) => d.rangeLabel),
-                      datasets: [
-                        {
-                          label: 'Piezas fuera de rango',
-                          data: analytics.pointZeroClassification.outOfRangeByWeight.map((d) => d.pieces),
-                          backgroundColor: 'rgba(245,158,11,0.7)',
+                <div className="space-y-6">
+                  {/* Bar chart — horizontal, contained height */}
+                  <div className="w-full" style={{ maxHeight: 220 }}>
+                    <Bar
+                      data={{
+                        labels: analytics.pointZeroClassification.outOfRangeByWeight.map((d) => d.rangeLabel),
+                        datasets: [
+                          {
+                            label: 'Piezas fuera de rango',
+                            data: analytics.pointZeroClassification.outOfRangeByWeight.map((d) => d.pieces),
+                            backgroundColor: analytics.pointZeroClassification.outOfRangeByWeight.map((_, i, arr) => {
+                              // Gradiente de color por posición
+                              const t = arr.length > 1 ? i / (arr.length - 1) : 0
+                              const r = Math.round(239 + (245 - 239) * t)
+                              const g = Math.round(68 + (158 - 68) * t)
+                              const b = Math.round(68 + (11 - 68) * t)
+                              return `rgba(${r},${g},${b},0.75)`
+                            }),
+                            borderRadius: 4,
+                            barThickness: 24,
+                          },
+                        ],
+                      }}
+                      options={{
+                        indexAxis: 'y',
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                          legend: { display: false },
+                          tooltip: {
+                            callbacks: {
+                              label: (ctx) => {
+                                const d = analytics.pointZeroClassification.outOfRangeByWeight[ctx.dataIndex]
+                                return d ? `${d.pieces.toLocaleString()} piezas (${d.pct}%)` : ''
+                              },
+                            },
+                          },
                         },
-                      ],
-                    }}
-                    options={{
-                      indexAxis: 'y',
-                      responsive: true,
-                      plugins: { legend: { display: false } },
-                      scales: { x: { beginAtZero: true } },
-                    }}
-                  />
+                        scales: {
+                          x: { beginAtZero: true, grid: { color: 'rgba(128,128,128,0.1)' } },
+                          y: { ticks: { font: { size: 11 } } },
+                        },
+                      }}
+                      height={Math.max(80, analytics.pointZeroClassification.outOfRangeByWeight.length * 40)}
+                    />
+                  </div>
 
-                  {/* Weight ranges reference table */}
-                  <div>
-                    <p className="text-xs font-medium mb-2">Rangos de Calibre (referencia)</p>
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="border-b">
-                          <th className="py-1 px-2 text-left">Calibre</th>
-                          <th className="py-1 px-2 text-right">Mín (g)</th>
-                          <th className="py-1 px-2 text-right">Máx (g)</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {analytics.pointZeroClassification.calibreWeightRanges.map((r, i) => (
-                          <tr key={i} className="border-b">
-                            <td className="py-1 px-2">{r.calibre}</td>
-                            <td className="py-1 px-2 text-right">{r.minGrams.toLocaleString()}</td>
-                            <td className="py-1 px-2 text-right">{r.maxGrams.toLocaleString()}</td>
+                  {/* Tables side by side */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Weight ranges reference table */}
+                    <div>
+                      <p className="text-xs font-medium mb-2">Rangos de Calibre (referencia)</p>
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="py-1 px-2 text-left">Calibre</th>
+                            <th className="py-1 px-2 text-right">Mín (g)</th>
+                            <th className="py-1 px-2 text-right">Máx (g)</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          {analytics.pointZeroClassification.calibreWeightRanges.map((r, i) => (
+                            <tr key={i} className="border-b">
+                              <td className="py-1 px-2">{r.calibre}</td>
+                              <td className="py-1 px-2 text-right font-mono">{r.minGrams.toLocaleString()}</td>
+                              <td className="py-1 px-2 text-right font-mono">{r.maxGrams.toLocaleString()}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
 
                     {/* Out of range detail table */}
-                    <p className="text-xs font-medium mt-4 mb-2">Desglose Fuera de Rango</p>
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="border-b">
-                          <th className="py-1 px-2 text-left">Rango</th>
-                          <th className="py-1 px-2 text-right">Piezas</th>
-                          <th className="py-1 px-2 text-right">%</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {analytics.pointZeroClassification.outOfRangeByWeight.map((d, i) => (
-                          <tr key={i} className="border-b">
-                            <td className="py-1 px-2">{d.rangeLabel}</td>
-                            <td className="py-1 px-2 text-right">{d.pieces.toLocaleString()}</td>
-                            <td className="py-1 px-2 text-right">{d.pct}%</td>
+                    <div>
+                      <p className="text-xs font-medium mb-2">Desglose Fuera de Rango</p>
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="py-1 px-2 text-left">Rango</th>
+                            <th className="py-1 px-2 text-right">Piezas</th>
+                            <th className="py-1 px-2 text-right">%</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody>
+                          {analytics.pointZeroClassification.outOfRangeByWeight.map((d, i) => (
+                            <tr key={i} className="border-b hover:bg-muted/30">
+                              <td className="py-1 px-2">{d.rangeLabel}</td>
+                              <td className="py-1 px-2 text-right font-medium">{d.pieces.toLocaleString()}</td>
+                              <td className="py-1 px-2 text-right">{d.pct}%</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 </div>
               </CardContent>
