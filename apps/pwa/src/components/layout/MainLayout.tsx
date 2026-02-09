@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Outlet, NavLink, useNavigate } from 'react-router-dom'
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard,
   AlertTriangle,
@@ -35,6 +35,8 @@ import { HelpButton, HelpModal, WelcomeModal } from '@/components/help'
 import { APP_VERSION } from '@/constants/version'
 import { useAppVersion } from '@/hooks/useAppVersion'
 import { useToast } from '@/hooks/useToast'
+import { initUploadQueue } from '@/services/offlineUploadQueue'
+import { useUploadQueueStore } from '@/store/uploadQueueStore'
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
@@ -59,6 +61,7 @@ const adminNavigation = [
 
 export function MainLayout() {
   const navigate = useNavigate()
+  const location = useLocation()
   const user = useAuthStore((state) => state.user)
   const logout = useAuthStore((state) => state.logout)
   const isAdmin = useIsAdmin()
@@ -66,6 +69,7 @@ export function MainLayout() {
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [isOnline, setIsOnline] = useState(navigator.onLine)
   const [showSyncPanel, setShowSyncPanel] = useState(false)
+  const [syncFilter, setSyncFilter] = useState('all')
   const pendingWrites = useSyncStore((state) => state.pendingWrites)
   const pendingByContext = useSyncStore((state) => state.pendingByContext)
   const pendingEntries = useSyncStore((state) => state.pendingEntries)
@@ -73,6 +77,7 @@ export function MainLayout() {
   const lastSyncError = useSyncStore((state) => state.lastSyncError)
   const setSyncError = useSyncStore((state) => state.setSyncError)
   const setLastSyncAt = useSyncStore((state) => state.setLastSyncAt)
+  const uploadItems = useUploadQueueStore((state) => state.items)
   const { toast } = useToast()
   const prevPendingRef = useRef(pendingWrites)
   const { hasUpdate, newVersion, reload } = useAppVersion()
@@ -97,6 +102,10 @@ export function MainLayout() {
     .map(([key, count]) => `${key}: ${count}`)
     .join(', ')
   const lastSyncLabel = lastSyncAt ? new Date(lastSyncAt).toLocaleString() : null
+  const syncModules = Array.from(new Set(pendingEntries.map((entry) => entry.context.split(':')[0]))).sort()
+  const filteredEntries = syncFilter === 'all'
+    ? pendingEntries
+    : pendingEntries.filter((entry) => entry.context.startsWith(`${syncFilter}:`))
 
   const exportSyncEntries = (format: 'json' | 'csv') => {
     if (pendingEntries.length === 0) return
@@ -143,6 +152,10 @@ export function MainLayout() {
   }, [])
 
   useEffect(() => {
+    initUploadQueue()
+  }, [])
+
+  useEffect(() => {
     if (!lastSyncError) return
     toast({
       title: 'Error al sincronizar',
@@ -167,6 +180,9 @@ export function MainLayout() {
   const allNavigation = isAdmin
     ? [...navigation, ...adminNavigation]
     : navigation
+
+  const readOnlyPrefixes = ['/settings', '/admin', '/hierarchy']
+  const isReadOnly = !isOnline && readOnlyPrefixes.some((p) => location.pathname.startsWith(p))
 
   // Carga inicial de datos para el Dashboard (incidencias, equipos, zonas)
   useEffect(() => {
@@ -411,7 +427,7 @@ export function MainLayout() {
           </div>
         )}
 
-        {showSyncPanel && (pendingEntries.length > 0 || lastSyncLabel) && (
+        {showSyncPanel && (pendingEntries.length > 0 || uploadItems.length > 0 || lastSyncLabel) && (
           <div className="mx-4 mt-4 lg:mx-6 bg-card border rounded-lg shadow-sm p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -421,6 +437,19 @@ export function MainLayout() {
                 )}
               </div>
               <div className="flex items-center gap-2">
+                <label className="text-xs text-muted-foreground">
+                  <span className="sr-only">Filtro</span>
+                  <select
+                    className="text-xs bg-transparent border rounded px-2 py-1"
+                    value={syncFilter}
+                    onChange={(e) => setSyncFilter(e.target.value)}
+                  >
+                    <option value="all">Todos</option>
+                    {syncModules.map((module) => (
+                      <option key={module} value={module}>{module}</option>
+                    ))}
+                  </select>
+                </label>
                 <button
                   className="text-xs text-muted-foreground hover:text-foreground"
                   onClick={() => exportSyncEntries('json')}
@@ -442,38 +471,98 @@ export function MainLayout() {
               </div>
             </div>
             <div className="mt-3 space-y-2 max-h-48 overflow-y-auto">
-              {pendingEntries.slice(0, 10).map((entry) => (
+              {filteredEntries.slice(0, 10).map((entry) => (
                 <div key={entry.id} className="flex items-start justify-between text-xs">
-                  <div>
-                    <div className="font-medium">{entry.context}</div>
+                  <div className="min-w-0">
+                    <div className="font-medium truncate">{entry.context}</div>
                     <div className="text-muted-foreground">
                       {new Date(entry.createdAt).toLocaleTimeString()}
+                      {entry.refPath ? ` · ${entry.refPath}` : ''}
                     </div>
+                    {entry.payload && (
+                      <div className="text-muted-foreground mt-1 truncate">
+                        {entry.payload}
+                      </div>
+                    )}
                     {entry.error && (
                       <div className="text-destructive mt-1">{entry.error}</div>
                     )}
+                    {entry.status === 'conflict' && (
+                      <div className="text-amber-700 mt-1">Conflicto detectado</div>
+                    )}
                   </div>
-                  <span
-                    className={
-                      entry.status === 'synced'
-                        ? 'text-emerald-600'
+                  <div className="flex items-center gap-2">
+                    {(entry.status === 'error' || entry.status === 'conflict') && entry.retryable && entry.retry && (
+                      <button
+                        className="text-xs text-primary hover:underline"
+                        onClick={() => entry.retry?.()}
+                      >
+                        Reintentar
+                      </button>
+                    )}
+                    <span
+                      className={
+                        entry.status === 'synced'
+                          ? 'text-emerald-600'
+                          : entry.status === 'error'
+                            ? 'text-destructive'
+                            : entry.status === 'conflict'
+                              ? 'text-amber-700'
+                              : 'text-amber-600'
+                      }
+                    >
+                      {entry.status === 'synced'
+                        ? 'Sincronizado'
                         : entry.status === 'error'
-                          ? 'text-destructive'
-                          : 'text-amber-600'
-                    }
-                  >
-                    {entry.status === 'synced'
-                      ? 'Sincronizado'
-                      : entry.status === 'error'
-                        ? 'Error'
-                        : 'Pendiente'}
-                  </span>
+                          ? 'Error'
+                          : entry.status === 'conflict'
+                            ? 'Conflicto'
+                            : 'Pendiente'}
+                    </span>
+                  </div>
                 </div>
               ))}
-              {pendingEntries.length === 0 && (
-                <p className="text-xs text-muted-foreground">No hay operaciones pendientes.</p>
+              {filteredEntries.length === 0 && (
+                <p className="text-xs text-muted-foreground">No hay operaciones para este filtro.</p>
               )}
             </div>
+
+            {uploadItems.length > 0 && (
+              <div className="mt-4 border-t pt-3">
+                <h4 className="text-xs font-medium">Uploads pendientes</h4>
+                <div className="mt-2 space-y-2 max-h-40 overflow-y-auto">
+                  {uploadItems.slice(0, 10).map((item) => (
+                    <div key={item.id} className="flex items-center justify-between text-xs">
+                      <div className="min-w-0">
+                        <div className="font-medium truncate">
+                          {item.fileName}
+                        </div>
+                        <div className="text-muted-foreground">
+                          {item.type} · {Math.round(item.size / 1024)} KB
+                        </div>
+                        {item.error && (
+                          <div className="text-destructive mt-1">{item.error}</div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground">{item.progress}%</span>
+                        <span
+                          className={
+                            item.status === 'done'
+                              ? 'text-emerald-600'
+                              : item.status === 'error'
+                                ? 'text-destructive'
+                                : 'text-amber-600'
+                          }
+                        >
+                          {item.status}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -504,9 +593,32 @@ export function MainLayout() {
         )}
 
         {/* Page content */}
-        <main className="p-3 lg:p-6 w-full max-w-[100vw] overflow-x-hidden">
+        <main
+          className={`p-3 lg:p-6 w-full max-w-[100vw] overflow-x-hidden ${
+            isReadOnly ? 'pointer-events-none opacity-70' : ''
+          }`}
+        >
           <Outlet />
         </main>
+
+        {isReadOnly && (
+          <div className="fixed inset-0 z-40 flex items-start justify-center pt-24 pointer-events-none">
+            <div className="pointer-events-auto bg-amber-500/95 text-amber-950 px-4 py-3 rounded-lg shadow-lg border border-amber-600/30 max-w-md">
+              <div className="font-medium">Modo solo lectura</div>
+              <div className="text-sm opacity-90">
+                Estas en una seccion critica sin conexion. Conectate para editar o vuelve al inicio.
+              </div>
+              <div className="mt-2 flex gap-2">
+                <button
+                  className="text-xs px-2 py-1 rounded bg-white/70 hover:bg-white"
+                  onClick={() => navigate('/')}
+                >
+                  Ir al inicio
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Help System Modals */}

@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-type SyncStatus = 'pending' | 'synced' | 'error'
+type SyncStatus = 'pending' | 'synced' | 'error' | 'conflict'
 
 interface SyncEntry {
   id: string
@@ -8,6 +8,10 @@ interface SyncEntry {
   status: SyncStatus
   createdAt: number
   error?: string
+  refPath?: string
+  payload?: string
+  retryable?: boolean
+  retry?: () => Promise<void>
 }
 
 interface SyncState {
@@ -16,10 +20,13 @@ interface SyncState {
   pendingEntries: SyncEntry[]
   lastSyncError: string | null
   lastSyncAt: number | null
-  incrementPending: (context?: string) => string
+  incrementPending: (
+    context?: string,
+    meta?: { refPath?: string; payload?: string; retryable?: boolean; retry?: () => Promise<void> }
+  ) => string
   decrementPending: (context?: string) => void
   markEntrySynced: (id: string) => void
-  markEntryError: (id: string, message: string) => void
+  markEntryError: (id: string, message: string, conflict?: boolean) => void
   setSyncError: (message: string | null) => void
   setLastSyncAt: (timestamp: number | null) => void
 }
@@ -38,7 +45,7 @@ export const useSyncStore = create<SyncState>((set) => ({
   pendingEntries: [],
   lastSyncError: null,
   lastSyncAt: null,
-  incrementPending: (context) =>
+  incrementPending: (context, meta) =>
     set((state) => {
       const id = genEntryId()
       const entry: SyncEntry = {
@@ -46,6 +53,10 @@ export const useSyncStore = create<SyncState>((set) => ({
         context: context ?? 'write',
         status: 'pending',
         createdAt: Date.now(),
+        refPath: meta?.refPath,
+        payload: meta?.payload,
+        retryable: meta?.retryable,
+        retry: meta?.retry,
       }
       const next = { ...state.pendingByContext }
       if (context) {
@@ -72,18 +83,23 @@ export const useSyncStore = create<SyncState>((set) => ({
         entry.id === id ? { ...entry, status: 'synced' } : entry
       ),
     })),
-  markEntryError: (id, message) =>
+  markEntryError: (id, message, conflict) =>
     set((state) => ({
       pendingEntries: state.pendingEntries.map((entry) =>
-        entry.id === id ? { ...entry, status: 'error', error: message } : entry
+        entry.id === id
+          ? { ...entry, status: conflict ? 'conflict' : 'error', error: message }
+          : entry
       ),
     })),
   setSyncError: (message) => set({ lastSyncError: message }),
   setLastSyncAt: (timestamp) => set({ lastSyncAt: timestamp }),
 }))
 
-export function incrementPendingWrites(context?: string) {
-  return useSyncStore.getState().incrementPending(context)
+export function incrementPendingWrites(
+  context?: string,
+  meta?: { refPath?: string; payload?: string; retryable?: boolean; retry?: () => Promise<void> }
+) {
+  return useSyncStore.getState().incrementPending(context, meta)
 }
 
 export function decrementPendingWrites(context?: string) {
@@ -94,8 +110,8 @@ export function markEntrySynced(id: string) {
   useSyncStore.getState().markEntrySynced(id)
 }
 
-export function markEntryError(id: string, message: string) {
-  useSyncStore.getState().markEntryError(id, message)
+export function markEntryError(id: string, message: string, conflict?: boolean) {
+  useSyncStore.getState().markEntryError(id, message, conflict)
 }
 
 export function setSyncError(message: string | null) {

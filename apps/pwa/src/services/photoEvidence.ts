@@ -26,6 +26,7 @@ import type { PhotoEvidence, PhotoItem, PhotoEvidenceStatus, PhotoComparison, Ph
 import { generateId } from '@/lib/utils'
 import { compressImage } from './storage'
 import { logger } from '@/lib/logger'
+import { enqueueEvidenceUpload } from '@/services/offlineUploadQueue'
 
 const COLLECTION = 'photoEvidence'
 
@@ -95,6 +96,14 @@ export async function uploadEvidencePhoto(
   logger.info('Uploading evidence photo', { evidenceId, type, fileSize: file.size })
 
   try {
+    const photoId = generateId()
+
+    if (!navigator.onLine) {
+      await enqueueEvidenceUpload(evidenceId, file, type, photoId)
+      logger.warn('Offline upload queued', { evidenceId, photoId, type })
+      return { id: photoId, url: `pending:${photoId}` }
+    }
+
     // Comprimir imagen si es mayor a 1MB
     const fileToUpload = file.size > 1024 * 1024
       ? await compressImage(file, 1920, 0.8, true)
@@ -144,6 +153,10 @@ export async function deleteEvidencePhoto(
   url: string
 ): Promise<void> {
   try {
+    if (url.startsWith('pending:')) {
+      logger.warn('Skipping delete for pending upload', { evidenceId, photoId, type })
+      return
+    }
     const storageRef = ref(storage, url)
     await deleteObject(storageRef)
     logger.info('Evidence photo deleted', { evidenceId, photoId, type })

@@ -32,6 +32,10 @@ function getBaseUrl() {
 
 const baseUrl = getBaseUrl()
 
+// Cache for heavy assets (models, images)
+const CACHE_NAME = 'assets-cache-v1'
+const HEAVY_ASSET_RE = /\.(glb|gltf|bin|jpg|jpeg|png|webp|svg)$/i
+
 // Manejar mensajes en background
 messaging.onBackgroundMessage((payload) => {
   console.log('[firebase-messaging-sw.js] Received background message:', payload)
@@ -72,6 +76,40 @@ self.addEventListener('notificationclick', (event) => {
       if (clients.openWindow) {
         return clients.openWindow(urlToOpen)
       }
+    })
+  )
+})
+
+// Cache heavy assets for offline use
+self.addEventListener('fetch', (event) => {
+  const request = event.request
+  if (request.method !== 'GET') return
+  const url = new URL(request.url)
+
+  // Only cache same-origin and storage assets
+  const isSameOrigin = url.origin === self.location.origin
+  const isStorage = url.hostname.includes('firebasestorage')
+  if (!isSameOrigin && !isStorage) return
+
+  if (!HEAVY_ASSET_RE.test(url.pathname)) return
+
+  event.respondWith(
+    caches.open(CACHE_NAME).then(async (cache) => {
+      const cached = await cache.match(request)
+      if (cached) {
+        // Update in background
+        event.waitUntil(
+          fetch(request).then((res) => {
+            if (res && res.ok) cache.put(request, res.clone())
+          }).catch(() => undefined)
+        )
+        return cached
+      }
+      const response = await fetch(request)
+      if (response && response.ok) {
+        cache.put(request, response.clone())
+      }
+      return response
     })
   )
 })

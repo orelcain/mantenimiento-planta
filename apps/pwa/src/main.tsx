@@ -8,3 +8,14 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <App />
   </React.StrictMode>
 )
+
+if ('serviceWorker' in navigator) {
+  const swUrl = `${import.meta.env.BASE_URL}firebase-messaging-sw.js`
+  navigator.serviceWorker.register(swUrl, { scope: import.meta.env.BASE_URL })
+    .then(() => {
+      console.log('✅ Service worker registered')
+    })
+    .catch((error) => {
+      console.warn('⚠️ Service worker registration failed', error)
+    })
+}
