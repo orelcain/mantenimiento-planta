@@ -1,14 +1,22 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.44.2**
+## Versión Actual: **v2.44.3**
 
-**Fecha de lanzamiento**: 08 de febrero de 2026  \
+**Fecha de lanzamiento**: 09 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
 **Build**: ✅ Stable
 
 ---
 
 ## 📋 Información de la Versión
+
+### v2.44.3 - Pivote Error×Calidad×Calibre + fix Suspense (09/02/2026)
+- 📊 **Tabla pivote Error×Calidad×Calibre**: Desglose jerárquico 3 niveles como pivot table Marelec
+- 🔧 **Parser pieza-pieza autosuficiente**: Columna Error + inferencia inteligente de causa
+- 🏷️ **Calibres HG**: Manejo prefijo HG (HG 2-4, HG 6-8) y "Fuera de Rango" como calibre
+- 📥 **Export Excel**: Nueva hoja "Pivote Error×Cal×Calibre" jerárquica con subtotales
+- 📄 **Export PDF**: Tabla pivote completa en reporte
+- 🐛 **Fix React error #426**: Suspense boundary global + en MainLayout Outlet
 
 ### v2.43.1 - FIX: Permisos Firebase y estabilidad (08/02/2026)
 - 🔐 **Firebase Rules verificadas**: Permisos públicos para annotations, dimensions y materialOverrides confirmados.

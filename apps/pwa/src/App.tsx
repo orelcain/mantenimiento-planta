@@ -174,6 +174,7 @@ export function App() {
         <BrowserRouter basename={import.meta.env.BASE_URL}>
           <Toaster />
           <ErrorBoundary>
+            <Suspense fallback={<LoadingScreen />}>
             <Routes>
               {/* Public routes */}
           <Route
@@ -315,6 +316,7 @@ export function App() {
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
+            </Suspense>
           </ErrorBoundary>
         </BrowserRouter>
       </HelpProvider>

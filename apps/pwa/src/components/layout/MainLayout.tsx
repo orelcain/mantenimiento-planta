@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
+import { Suspense } from 'react'
 import {
   LayoutDashboard,
   AlertTriangle,
@@ -623,7 +624,13 @@ export function MainLayout() {
             isReadOnly ? 'pointer-events-none opacity-70' : ''
           }`}
         >
-          <Outlet />
+          <Suspense fallback={
+            <div className="flex items-center justify-center py-20">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+            </div>
+          }>
+            <Outlet />
+          </Suspense>
         </main>
 
         {isReadOnly && (
