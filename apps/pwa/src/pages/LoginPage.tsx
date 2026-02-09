@@ -74,12 +74,12 @@ export function LoginPage() {
     }
 
     // Esperar a que el script de Google cargue
-    // @ts-ignore
+    // @ts-expect-error google is loaded via external script
     if (typeof google !== 'undefined') {
       initGoogle()
     } else {
       const checkGoogle = setInterval(() => {
-        // @ts-ignore
+        // @ts-expect-error google is loaded via external script
         if (typeof google !== 'undefined') {
           clearInterval(checkGoogle)
           initGoogle()

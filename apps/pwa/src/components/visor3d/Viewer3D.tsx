@@ -79,7 +79,7 @@ function assignStableMeshIds(object: THREE.Object3D): Map<THREE.Mesh, string> {
   object.traverse((child) => {
     if (child instanceof THREE.Mesh) {
       const base = child.name && child.name.length > 0
-        ? child.name.replace(/[\/\.#\[\]]/g, '_')
+        ? child.name.replace(/[/.#[\]]/g, '_')
         : `mesh_${index}`
       let finalId = base
       let suffix = 1

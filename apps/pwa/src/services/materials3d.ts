@@ -44,7 +44,7 @@ export async function setMaterialOverride(
   modelId: string,
   data: CreateMaterialOverrideData
 ): Promise<MaterialOverride> {
-  const docId = data.meshId.replace(/[\/\.#\[\]]/g, '_') // Sanitize for Firestore doc ID
+  const docId = data.meshId.replace(/[/.#[\]]/g, '_') // Sanitize for Firestore doc ID
   const docRef = doc(db, PARENT_COLLECTION, modelId, SUB_COLLECTION, docId)
   
   await setDoc(docRef, {

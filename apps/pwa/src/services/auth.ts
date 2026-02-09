@@ -62,7 +62,7 @@ export function initGoogleSignIn(onSuccess: (user: User) => void, onError: (erro
     return
   }
 
-  // @ts-ignore
+  // @ts-expect-error - Google Identity Services global
   google.accounts.id.initialize({
     client_id: GOOGLE_CLIENT_ID,
     callback: async (response: { credential: string }) => {
@@ -84,20 +84,20 @@ export function initGoogleSignIn(onSuccess: (user: User) => void, onError: (erro
 
 // Mostrar el prompt de Google (One Tap)
 export function promptGoogleSignIn(): void {
-  // @ts-ignore
+  // @ts-expect-error - Google Identity Services global
   if (typeof google !== 'undefined') {
-    // @ts-ignore
+    // @ts-expect-error - Google Identity Services global
     google.accounts.id.prompt()
   }
 }
 
 // Renderizar botón de Google en un elemento
 export function renderGoogleButton(elementId: string): void {
-  // @ts-ignore
+  // @ts-expect-error - Google Identity Services global
   if (typeof google !== 'undefined') {
     const element = document.getElementById(elementId)
     if (element) {
-      // @ts-ignore
+      // @ts-expect-error - Google Identity Services global
       google.accounts.id.renderButton(element, {
         type: 'standard',
         theme: 'filled_black',

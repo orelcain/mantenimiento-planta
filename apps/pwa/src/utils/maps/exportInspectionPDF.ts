@@ -19,6 +19,7 @@ function sanitizeText(text: string): string {
     .replace(/ú/g, 'u').replace(/Ú/g, 'U')
     .replace(/ñ/g, 'n').replace(/Ñ/g, 'N')
     .replace(/ü/g, 'u').replace(/Ü/g, 'U')
+    // eslint-disable-next-line no-control-regex
     .replace(/[^\x00-\x7F]/g, '') // Eliminar cualquier otro caracter no-ASCII
 }
 
