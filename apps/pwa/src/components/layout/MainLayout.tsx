@@ -62,6 +62,7 @@ export function MainLayout() {
   const isAdmin = useIsAdmin()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [isOnline, setIsOnline] = useState(navigator.onLine)
   const { hasUpdate, newVersion, reload } = useAppVersion()
   const { setZones, setEquipment, setIncidents } = useAppStore()
 
@@ -78,6 +79,17 @@ export function MainLayout() {
   const displayName = user
     ? (user.rol === 'admin' ? 'Admin' : `${user.nombre} ${user.apellido}`)
     : ''
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true)
+    const handleOffline = () => setIsOnline(false)
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+    }
+  }, [])
 
   const allNavigation = isAdmin
     ? [...navigation, ...adminNavigation]
@@ -276,6 +288,19 @@ export function MainLayout() {
             </Avatar>
           </div>
         </header>
+
+        {/* Offline banner */}
+        {!isOnline && (
+          <div className="mx-4 mt-4 lg:mx-6 bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-200 px-4 py-3 rounded-lg flex items-center gap-3">
+            <AlertTriangle className="h-5 w-5" />
+            <div>
+              <span className="font-medium block">Sin conexion a internet</span>
+              <span className="text-sm opacity-80">
+                Puedes navegar datos en cache. Los cambios se sincronizaran al reconectar.
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* Banner de actualización disponible */}
         {hasUpdate && (

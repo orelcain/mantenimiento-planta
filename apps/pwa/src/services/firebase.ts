@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app'
 import { getAuth } from 'firebase/auth'
-import { getFirestore } from 'firebase/firestore'
+import { getFirestore, enableIndexedDbPersistence } from 'firebase/firestore'
 import { getStorage } from 'firebase/storage'
 import { getDatabase } from 'firebase/database'
 import { getMessaging, isSupported } from 'firebase/messaging'
@@ -24,6 +24,23 @@ export const auth = getAuth(app)
 export const db = getFirestore(app)
 export const storage = getStorage(app)
 export const rtdb = getDatabase(app)
+
+// Enable offline persistence for Firestore
+enableIndexedDbPersistence(db)
+  .then(() => {
+    console.log('✅ Firestore offline persistence enabled')
+  })
+  .catch((error: { code?: string }) => {
+    if (error?.code === 'failed-precondition') {
+      console.warn('⚠️ Firestore persistence disabled: multiple tabs open')
+      return
+    }
+    if (error?.code === 'unimplemented') {
+      console.warn('⚠️ Firestore persistence not supported in this browser')
+      return
+    }
+    console.warn('⚠️ Firestore persistence error:', error)
+  })
 
 // Messaging - inicializar solo cuando se solicite
 let messaging: ReturnType<typeof getMessaging> | null = null
