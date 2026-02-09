@@ -19,7 +19,6 @@ import type {
   ProductionSummaryRow,
   GraderQuality,
   CalibreRange,
-  CalibreWeightRange,
 } from './types'
 
 // ============================================================================
