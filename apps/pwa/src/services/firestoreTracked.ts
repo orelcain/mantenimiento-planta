@@ -9,6 +9,11 @@ import {
   waitForPendingWrites,
   writeBatch as _writeBatch,
   type WriteBatch,
+  type DocumentReference,
+  type FieldPath,
+  type SetOptions,
+  type UpdateData,
+  type WithFieldValue,
 } from 'firebase/firestore'
 import { db } from '@/services/firebase'
 import {
@@ -54,12 +59,36 @@ export async function addDoc(...args: Parameters<typeof _addDoc>) {
   return trackWrite(() => _addDoc(...args), 'addDoc')
 }
 
-export async function setDoc(...args: Parameters<typeof _setDoc>) {
-  return trackWrite(() => _setDoc(...args), 'setDoc')
+export async function setDoc<T>(
+  reference: DocumentReference<T>,
+  data: WithFieldValue<T>,
+  options?: SetOptions
+): Promise<void> {
+  return trackWrite(
+    () => (options ? _setDoc(reference, data, options) : _setDoc(reference, data)),
+    'setDoc'
+  )
 }
 
-export async function updateDoc(...args: Parameters<typeof _updateDoc>) {
-  return trackWrite(() => _updateDoc(...args), 'updateDoc')
+export async function updateDoc<T>(
+  reference: DocumentReference<T>,
+  data: UpdateData<T>
+): Promise<void>
+export async function updateDoc(
+  reference: DocumentReference,
+  field: string | FieldPath,
+  value: unknown,
+  ...moreFieldsAndValues: unknown[]
+): Promise<void>
+export async function updateDoc(
+  reference: DocumentReference,
+  dataOrField: UpdateData<unknown> | string | FieldPath,
+  ...rest: unknown[]
+): Promise<void> {
+  return trackWrite(
+    () => (_updateDoc as any)(reference, dataOrField, ...rest),
+    'updateDoc'
+  )
 }
 
 export async function deleteDoc(...args: Parameters<typeof _deleteDoc>) {
