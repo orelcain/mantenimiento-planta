@@ -66,6 +66,7 @@ export function MainLayout() {
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [isOnline, setIsOnline] = useState(navigator.onLine)
   const pendingWrites = useSyncStore((state) => state.pendingWrites)
+  const pendingByContext = useSyncStore((state) => state.pendingByContext)
   const lastSyncError = useSyncStore((state) => state.lastSyncError)
   const setSyncError = useSyncStore((state) => state.setSyncError)
   const { toast } = useToast()
@@ -86,6 +87,11 @@ export function MainLayout() {
   const displayName = user
     ? (user.rol === 'admin' ? 'Admin' : `${user.nombre} ${user.apellido}`)
     : ''
+
+  const pendingSummary = Object.entries(pendingByContext)
+    .filter(([, count]) => count > 0)
+    .map(([key, count]) => `${key}: ${count}`)
+    .join(', ')
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true)
@@ -291,7 +297,10 @@ export function MainLayout() {
           {/* Desktop user menu */}
           <div className="hidden lg:flex items-center gap-3">
             {pendingWrites > 0 && (
-              <div className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-300 px-2 py-1 bg-amber-500/10 rounded border border-amber-500/20">
+              <div
+                className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-300 px-2 py-1 bg-amber-500/10 rounded border border-amber-500/20"
+                title={pendingSummary || undefined}
+              >
                 <RefreshCw className="h-3.5 w-3.5 animate-spin" />
                 <span>{pendingWrites} pendiente{pendingWrites > 1 ? 's' : ''}</span>
               </div>
@@ -323,6 +332,19 @@ export function MainLayout() {
           </div>
         </header>
 
+        {/* Syncing banner (mobile) */}
+        {isOnline && pendingWrites > 0 && (
+          <div className="mx-4 mt-4 lg:mx-6 lg:hidden bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-200 px-4 py-2 rounded-lg flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-sm">
+              <RefreshCw className="h-4 w-4 animate-spin" />
+              <span>Sincronizando...</span>
+            </div>
+            <span className="text-xs font-medium">
+              {pendingWrites} pendiente{pendingWrites > 1 ? 's' : ''}
+            </span>
+          </div>
+        )}
+
         {/* Offline banner */}
         {!isOnline && (
           <div className="mx-4 mt-4 lg:mx-6 bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-200 px-4 py-3 rounded-lg flex items-center justify-between gap-3">
@@ -332,6 +354,11 @@ export function MainLayout() {
               <span className="text-sm opacity-80">
                 Puedes navegar datos en cache. Los cambios se sincronizaran al reconectar.
               </span>
+              {pendingSummary && (
+                <span className="text-xs opacity-80 block mt-1">
+                  Pendientes: {pendingSummary}
+                </span>
+              )}
             </div>
             {pendingWrites > 0 && (
               <div className="ml-auto text-xs font-medium bg-amber-500/20 text-amber-900 dark:text-amber-100 px-2 py-1 rounded">
