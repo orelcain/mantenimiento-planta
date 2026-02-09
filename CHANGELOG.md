@@ -7,6 +7,27 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.1] - 2026-02-09
+
+### 🤖 IA Real (Groq) para Análisis Grader
+
+#### Añadido
+- **GroqAIProvider**: Integración real con Groq API (Llama 3.3 70B) para diagnóstico de grader. Reemplaza el provider mock anterior.
+  - Sistema de prompt profesional como analista de datos estadístico de máquinas clasificadoras de salmón.
+  - Envía KPIs, distribuciones, balance de gates, estadísticas, sugerencias de swap, análisis de lotes, matriz y series temporales.
+  - Respuesta JSON estructurada con resumen ejecutivo, hallazgos, causa raíz y plan de acción.
+  - Fallback automático a MockAIProvider si Groq no está disponible (con advertencia en consola).
+- **Algoritmo de swaps v2**: 3 categorías de sugerencias (CORRECCIÓN, OPTIMIZACIÓN, INVESTIGACIÓN) usando asignación ideal por método de Largest Remainder.
+  - `allocationScore`: Nuevo KPI que mide cuán cerca está la distribución real del ideal.
+  - `idealGates` y `gap` en cada gate balance insight.
+- **Pestaña "Diagnóstico"**: Renombrada desde "Insights" con secciones en español:
+  - "Alertas Automáticas": Alertas generadas por reglas estadísticas (13 reglas determinísticas).
+  - "Diagnóstico IA (Groq)": Análisis profundo con IA — causas raíz, correlaciones y plan de acción.
+- **Tooltips enriquecidos**: Descripciones detalladas con ejemplos para alertas automáticas y diagnóstico IA.
+
+#### Correcciones
+- **Swap suggestions lógicas**: Corregido algoritmo que sugería swaps contraproducentes (mover gates de rango con alta demanda a baja demanda).
+
 ## [2.42.0] - 2026-02-08
 
 ### 🚀 Nuevas Funcionalidades
@@ -53,9 +74,9 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 - Actualizados parsers de Firestore para soportar nuevos campos.
 - Modal de edición de punto expandido con sección de checklist.
 
-## [2.47.0] - 2026-02-01
+## [2.47.0] - 2026-02-09
 
-### 🚀 Nuevas Funcionalidades
+### ✨ Nuevas Funcionalidades
 
 #### Gestión de Inspecciones
 - **Duplicar Inspección**: Nueva funcionalidad para copiar rutas de inspección existentes.
@@ -63,10 +84,6 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
   - Genera una copia limpia de los puntos de inspección (sin fotos ni estados completados).
   - Incluye opción para personalizar el nombre de la nueva inspección.
   - Mantiene la asignación del mapa original.
-
-## [2.47.0] - 2026-02-09
-
-### ✨ Nuevas Funcionalidades
 
 #### Análisis Grader
 - **Upload simplificado**: Solo archivos Pieza-Pieza necesarios, eliminado checklist de otros tipos de Excel.

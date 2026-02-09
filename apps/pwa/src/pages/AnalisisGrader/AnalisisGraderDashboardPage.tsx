@@ -564,7 +564,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
     if (insights.length > 0) {
       if (y > 150) { pdfDoc.addPage(); y = 15 }
       pdfDoc.setFontSize(12)
-      pdfDoc.text('Insights Determinísticos', 14, y)
+      pdfDoc.text('Alertas Automáticas', 14, y)
       y += 2
       autoTable(pdfDoc, {
         startY: y,
@@ -810,7 +810,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
           <TabsTrigger value="tendencia" className="text-xs">Tendencia</TabsTrigger>
           <TabsTrigger value="matriz" className="text-xs">Matriz Q×C</TabsTrigger>
           <TabsTrigger value="balance" className="text-xs">Balance Gates</TabsTrigger>
-          <TabsTrigger value="insights" className="text-xs">Insights</TabsTrigger>
+          <TabsTrigger value="insights" className="text-xs">Diagnóstico</TabsTrigger>
         </TabsList>
 
         {/* PUNTO CERO */}
@@ -1933,16 +1933,19 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
           )}
         </TabsContent>
 
-        {/* INSIGHTS */}
+        {/* DIAGNÓSTICO */}
         <TabsContent value="insights" className="space-y-4">
           {/* Deterministic insights */}
           <Card>
             <CardHeader>
               <CardTitle className="text-sm flex items-center gap-2">
                 <Zap className="h-4 w-4" />
-                Insights Determinísticos ({insights.length})
+                Alertas Automáticas ({insights.length})
                 <InfoTooltip {...getTooltipProps('insights.deterministic')} />
               </CardTitle>
+              <p className="text-xs text-muted-foreground">
+                Alertas generadas por reglas estadísticas sobre los datos cargados
+              </p>
             </CardHeader>
             <CardContent className="space-y-3">
               {insights.length === 0 && (
@@ -1959,11 +1962,16 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
           {/* AI Panel */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Brain className="h-4 w-4" />
-                Diagnóstico IA
-                <InfoTooltip {...getTooltipProps('insights.ai')} />
-              </CardTitle>
+              <div>
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Brain className="h-4 w-4" />
+                  Diagnóstico IA (Groq)
+                  <InfoTooltip {...getTooltipProps('insights.ai')} />
+                </CardTitle>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Análisis profundo con inteligencia artificial: causas raíz, correlaciones y plan de acción
+                </p>
+              </div>
               <Button
                 size="sm"
                 onClick={handleAnalyzeAI}

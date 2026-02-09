@@ -167,9 +167,13 @@ export const GRADER_TOOLTIPS: Record<string, TooltipEntry> = {
     example: 'Si 6-8lb tiene 53% demanda y 5 gates (ideal: 6), busca un calibre con superávit para donar 1 gate.',
   },
 
-  // ─── Insights ──────────────────────────────────────────────
-  'insights.deterministic': 'Alertas generadas automáticamente por reglas estadísticas. No requieren IA.',
-  'insights.ai': 'Diagnóstico generado por inteligencia artificial (Grok) analizando todos los datos cargados.',
+  // ─── Diagnóstico ──────────────────────────────────────────
+  'insights.deterministic': 'Alertas automáticas generadas por reglas estadísticas: Punto Cero alto, mismatch, variabilidad, cambios de lote, etc. No requieren IA.',
+  'insights.ai': {
+    title: 'Diagnóstico IA (Groq)',
+    text: 'Análisis profundo con inteligencia artificial (Llama 3.3 70B vía Groq). Envía todos los datos del turno al modelo y obtiene: causas raíz, correlaciones entre variables, y plan de acción priorizado.',
+    example: 'El modelo analiza patrones que las reglas simples no capturan, como correlaciones entre lotes/gates/tiempo.',
+  },
 }
 
 /** Props listos para InfoTooltip: extrae text, title, formula, example. */
