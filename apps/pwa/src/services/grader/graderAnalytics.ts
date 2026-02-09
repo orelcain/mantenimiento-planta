@@ -19,6 +19,7 @@ import type {
   PointZeroCause,
   PointZeroCauseBreakdown,
   PointZeroClassification,
+  PointZeroHierarchyRow,
   CalibreWeightRange,
   OutOfRangeWeightDetail,
   Gate0Record,
@@ -202,9 +203,56 @@ function computePointZeroClassification(
     }
   }
 
+  // ——————— TABLA PIVOTE: Error × Calidad × Calibre ———————
+  const hierarchyMap = new Map<string, { cause: PointZeroCause; causeLabel: string; quality: string; calibre: string; pieces: number; weightKg: number }>()
+
+  for (const r of g0Records) {
+    const errorStr = 'error' in r ? r.error : 'Desconocido'
+    const cause = classifyError(errorStr)
+    const meta = CAUSE_META[cause]
+    const quality = r.quality || 'Unknown'
+
+    // Use raw calibre for display if available, otherwise use normalized calibre
+    let displayCalibre: string
+    const rawCalibre = r.raw?.rawCalibre as string | undefined
+    if (rawCalibre && rawCalibre !== 'Sin dato') {
+      // Normalize "HG 6-8" → "HG 6-8", "Fuera de Rango" → "Fuera de Rango"
+      displayCalibre = rawCalibre
+    } else if (r.calibre && r.calibre !== 'Other') {
+      displayCalibre = `HG ${r.calibre.replace(' lb', '')}`
+    } else {
+      displayCalibre = 'Fuera de Rango'
+    }
+
+    const key = `${cause}|${quality}|${displayCalibre}`
+    const cur = hierarchyMap.get(key) || { cause, causeLabel: meta.label, quality, calibre: displayCalibre, pieces: 0, weightKg: 0 }
+    cur.pieces += r.pieces
+    cur.weightKg += r.weightKg ?? 0
+    hierarchyMap.set(key, cur)
+  }
+
+  const hierarchy: PointZeroHierarchyRow[] = Array.from(hierarchyMap.values())
+    .map((v) => ({
+      error: v.causeLabel,
+      errorCause: v.cause,
+      quality: v.quality,
+      calibre: v.calibre,
+      pieces: v.pieces,
+      pctOfPointZero: pct(v.pieces, pointZeroPieces),
+      pctOfTotal: pct(v.pieces, totalPieces),
+      weightKg: v.weightKg || undefined,
+    }))
+    .sort((a, b) => {
+      // Sort by error label, then quality, then calibre
+      if (a.error !== b.error) return a.error.localeCompare(b.error)
+      if (a.quality !== b.quality) return a.quality.localeCompare(b.quality)
+      return b.pieces - a.pieces
+    })
+
   return {
     totalPointZeroPieces: pointZeroPieces,
     causes,
+    hierarchy,
     outOfRangeByWeight,
     calibreWeightRanges: CALIBRE_WEIGHT_RANGES,
   }

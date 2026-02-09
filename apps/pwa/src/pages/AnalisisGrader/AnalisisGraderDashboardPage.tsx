@@ -63,6 +63,11 @@ import type {
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, ArcElement, Title, Tooltip, Legend, TimeScale, Filler)
 
+/** Helper: porcentaje con 2 decimales */
+function pctCalc(part: number, total: number): number {
+  return total === 0 ? 0 : Math.round((part / total) * 10000) / 100
+}
+
 interface Props {
   parsedData: ParsedMatrixData
   gates: GateAssignment[]
@@ -236,6 +241,38 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(orRows), 'Fuera de Rango')
     }
 
+    // Pivote Error × Calidad × Calibre (jerárquico)
+    if (analytics.pointZeroClassification.hierarchy.length > 0) {
+      const pivotRows: (string | number)[][] = [['Etiquetas de fila', 'Piezas', '% P.Cero', '% Total']]
+      const rows = analytics.pointZeroClassification.hierarchy
+      // Group by error then quality
+      const errorGroups = new Map<string, { rows: typeof rows; total: number }>()
+      for (const r of rows) {
+        const g = errorGroups.get(r.error) || { rows: [], total: 0 }
+        g.rows.push(r)
+        g.total += r.pieces
+        errorGroups.set(r.error, g)
+      }
+      for (const [errorLabel, eg] of Array.from(errorGroups.entries())) {
+        pivotRows.push([errorLabel, eg.total, pctCalc(eg.total, analytics.pointZeroClassification.totalPointZeroPieces), pctCalc(eg.total, kpis.totalPieces)])
+        const qualityGroups = new Map<string, { rows: typeof rows; total: number }>()
+        for (const r of eg.rows) {
+          const qg = qualityGroups.get(r.quality) || { rows: [], total: 0 }
+          qg.rows.push(r)
+          qg.total += r.pieces
+          qualityGroups.set(r.quality, qg)
+        }
+        for (const [qualLabel, qg] of Array.from(qualityGroups.entries())) {
+          pivotRows.push([`  ${qualLabel}`, qg.total, pctCalc(qg.total, analytics.pointZeroClassification.totalPointZeroPieces), pctCalc(qg.total, kpis.totalPieces)])
+          for (const r of qg.rows.sort((a, b) => b.pieces - a.pieces)) {
+            pivotRows.push([`    ${r.calibre}`, r.pieces, r.pctOfPointZero, r.pctOfTotal])
+          }
+        }
+      }
+      pivotRows.push(['Total general', analytics.pointZeroClassification.totalPointZeroPieces, 100, kpis.pointZeroPct])
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(pivotRows), 'Pivote Error×Cal×Calibre')
+    }
+
     // Rangos de Calibre (referencia)
     const rangeRows = [
       ['Calibre', 'Mín (g)', 'Máx (g)'],
@@ -375,6 +412,49 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
         body: analytics.pointZeroClassification.outOfRangeByWeight.map(d => [d.rangeLabel, d.pieces.toLocaleString(), `${d.pct}%`]),
         theme: 'striped',
         styles: { fontSize: 8 },
+        margin: { left: 14 },
+      })
+      y = (pdfDoc as any).lastAutoTable.finalY + 8
+    }
+
+    // Pivote Error × Calidad × Calibre
+    if (analytics.pointZeroClassification.hierarchy.length > 0) {
+      if (y > 140) { pdfDoc.addPage(); y = 15 }
+      pdfDoc.setFontSize(12)
+      pdfDoc.text('Pivote Error × Calidad × Calibre', 14, y)
+      y += 2
+      const pivotBody: string[][] = []
+      const hRows = analytics.pointZeroClassification.hierarchy
+      const eGroups = new Map<string, { rows: typeof hRows; total: number }>()
+      for (const r of hRows) {
+        const g = eGroups.get(r.error) || { rows: [], total: 0 }
+        g.rows.push(r)
+        g.total += r.pieces
+        eGroups.set(r.error, g)
+      }
+      for (const [eLabel, eg] of Array.from(eGroups.entries())) {
+        pivotBody.push([eLabel, eg.total.toLocaleString(), `${pctCalc(eg.total, analytics.pointZeroClassification.totalPointZeroPieces)}%`, `${pctCalc(eg.total, kpis.totalPieces)}%`])
+        const qGroups = new Map<string, { rows: typeof hRows; total: number }>()
+        for (const r of eg.rows) {
+          const qg = qGroups.get(r.quality) || { rows: [], total: 0 }
+          qg.rows.push(r)
+          qg.total += r.pieces
+          qGroups.set(r.quality, qg)
+        }
+        for (const [qLabel, qg] of Array.from(qGroups.entries())) {
+          pivotBody.push([`  ${qLabel}`, qg.total.toLocaleString(), `${pctCalc(qg.total, analytics.pointZeroClassification.totalPointZeroPieces)}%`, `${pctCalc(qg.total, kpis.totalPieces)}%`])
+          for (const r of qg.rows.sort((a, b) => b.pieces - a.pieces)) {
+            pivotBody.push([`    ${r.calibre}`, r.pieces.toLocaleString(), `${r.pctOfPointZero}%`, `${r.pctOfTotal}%`])
+          }
+        }
+      }
+      pivotBody.push(['Total general', analytics.pointZeroClassification.totalPointZeroPieces.toLocaleString(), '100%', `${kpis.pointZeroPct}%`])
+      autoTable(pdfDoc, {
+        startY: y,
+        head: [['Etiquetas de fila', 'Piezas', '% P.Cero', '% Total']],
+        body: pivotBody,
+        theme: 'grid',
+        styles: { fontSize: 7 },
         margin: { left: 14 },
       })
       y = (pdfDoc as any).lastAutoTable.finalY + 8
@@ -721,6 +801,98 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                       </tbody>
                     </table>
                   </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Tabla Pivote: Error × Calidad × Calibre */}
+          {analytics.pointZeroClassification.hierarchy.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Table2 className="h-4 w-4 text-purple-500" />
+                  Pivote Error × Calidad × Calibre
+                </CardTitle>
+                <p className="text-xs text-muted-foreground">
+                  Desglose jerárquico: Error → Calidad → Calibre (como tabla pivote Marelec)
+                </p>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b text-left">
+                        <th className="py-2 px-2">Etiquetas de fila</th>
+                        <th className="py-2 px-2 text-right">Piezas</th>
+                        <th className="py-2 px-2 text-right">% P.Cero</th>
+                        <th className="py-2 px-2 text-right">% Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(() => {
+                        const rows = analytics.pointZeroClassification.hierarchy
+                        // Group by error then quality
+                        const errorGroups = new Map<string, { cause: string; rows: typeof rows; total: number }>()
+                        for (const r of rows) {
+                          const g = errorGroups.get(r.error) || { cause: r.error, rows: [], total: 0 }
+                          g.rows.push(r)
+                          g.total += r.pieces
+                          errorGroups.set(r.error, g)
+                        }
+                        const elements: React.ReactNode[] = []
+                        for (const [errorLabel, eg] of Array.from(errorGroups.entries())) {
+                          // Error header row
+                          elements.push(
+                            <tr key={`e-${errorLabel}`} className="bg-muted/60 font-bold border-b">
+                              <td className="py-2 px-2">{errorLabel}</td>
+                              <td className="py-2 px-2 text-right">{eg.total.toLocaleString()}</td>
+                              <td className="py-2 px-2 text-right">{pctCalc(eg.total, analytics.pointZeroClassification.totalPointZeroPieces)}%</td>
+                              <td className="py-2 px-2 text-right text-muted-foreground">{pctCalc(eg.total, analytics.kpis.totalPieces)}%</td>
+                            </tr>
+                          )
+                          // Group by quality within this error
+                          const qualityGroups = new Map<string, { rows: typeof rows; total: number }>()
+                          for (const r of eg.rows) {
+                            const qg = qualityGroups.get(r.quality) || { rows: [], total: 0 }
+                            qg.rows.push(r)
+                            qg.total += r.pieces
+                            qualityGroups.set(r.quality, qg)
+                          }
+                          for (const [qualLabel, qg] of Array.from(qualityGroups.entries())) {
+                            // Quality sub-header row
+                            elements.push(
+                              <tr key={`q-${errorLabel}-${qualLabel}`} className="font-semibold border-b hover:bg-muted/20">
+                                <td className="py-1.5 px-2 pl-6">{qualLabel}</td>
+                                <td className="py-1.5 px-2 text-right">{qg.total.toLocaleString()}</td>
+                                <td className="py-1.5 px-2 text-right">{pctCalc(qg.total, analytics.pointZeroClassification.totalPointZeroPieces)}%</td>
+                                <td className="py-1.5 px-2 text-right text-muted-foreground">{pctCalc(qg.total, analytics.kpis.totalPieces)}%</td>
+                              </tr>
+                            )
+                            // Calibre detail rows
+                            for (const r of qg.rows.sort((a, b) => b.pieces - a.pieces)) {
+                              elements.push(
+                                <tr key={`c-${errorLabel}-${qualLabel}-${r.calibre}`} className="border-b hover:bg-muted/10 text-muted-foreground">
+                                  <td className="py-1 px-2 pl-12">{r.calibre}</td>
+                                  <td className="py-1 px-2 text-right">{r.pieces.toLocaleString()}</td>
+                                  <td className="py-1 px-2 text-right">{r.pctOfPointZero}%</td>
+                                  <td className="py-1 px-2 text-right">{r.pctOfTotal}%</td>
+                                </tr>
+                              )
+                            }
+                          }
+                        }
+                        return elements
+                      })()}
+                      {/* Grand total */}
+                      <tr className="border-t-2 font-bold bg-muted/50">
+                        <td className="py-2 px-2">Total general</td>
+                        <td className="py-2 px-2 text-right">{analytics.pointZeroClassification.totalPointZeroPieces.toLocaleString()}</td>
+                        <td className="py-2 px-2 text-right">100%</td>
+                        <td className="py-2 px-2 text-right">{kpis.pointZeroPct}%</td>
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
               </CardContent>
             </Card>

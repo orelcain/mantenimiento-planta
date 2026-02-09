@@ -59,10 +59,24 @@ export interface OutOfRangeWeightDetail {
   weightKg?: number;
 }
 
+/** Fila de la tabla pivote jerárquica Error × Calidad × Calibre */
+export interface PointZeroHierarchyRow {
+  error: string;         // Causa estandarizada (label)
+  errorCause: PointZeroCause;
+  quality: string;       // GraderQuality
+  calibre: string;       // CalibreRange o 'Fuera de Rango'
+  pieces: number;
+  pctOfPointZero: number;
+  pctOfTotal: number;
+  weightKg?: number;
+}
+
 /** Clasificación completa del 100% de Punto Cero */
 export interface PointZeroClassification {
   totalPointZeroPieces: number;
   causes: PointZeroCauseBreakdown[];
+  /** Tabla pivote jerárquica Error × Calidad × Calibre */
+  hierarchy: PointZeroHierarchyRow[];
   /** Para ítems "fuera_de_rango" con peso, desglose por rango de calibre */
   outOfRangeByWeight: OutOfRangeWeightDetail[];
   /** Rangos de referencia usados */
@@ -129,6 +143,7 @@ export interface PieceRecord {
   weightKg?: number;
   quality?: GraderQuality;
   calibre?: CalibreRange;
+  error?: string; // available for gate 0 records (from pieza-pieza or Puerta 0)
   lot?: string;
   product?: string;
   raw?: Record<string, unknown>;

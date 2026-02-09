@@ -110,20 +110,39 @@ function normalizeQuality(v: unknown): GraderQuality {
   return 'Unknown'
 }
 
-/** Normaliza calibre a CalibreRange */
+/** Normaliza calibre a CalibreRange.
+ * Soporta formatos: "6-8", "6-8 lb", "HG 6-8", "HG6-8",
+ * "10-UP", "Fuera de Rango", "fuera rango", etc.
+ */
 function normalizeCalibre(v: unknown): CalibreRange {
-  const s = norm(v).replace(/\s+/g, '').replace('–', '-').replace('—', '-')
-  if (!s) return 'Other'
-  // Handle "10-UP", "10-up", "10+", etc.
-  if (/10\s*[-]?\s*(up|mas|\+)/i.test(s) || /10\s*-\s*12/.test(s)) return '10-12 lb'
+  const raw = norm(v)
+  if (!raw) return 'Other'
+
+  // "Fuera de Rango" / "Out of Range" → Other (special value kept in raw)
+  if (raw.includes('fuera') && raw.includes('rango')) return 'Other'
+  if (raw.includes('out') && raw.includes('range')) return 'Other'
+
+  const s = raw.replace(/\s+/g, '').replace('–', '-').replace('—', '-')
+  // Strip "HG" / "hg" prefix (e.g. "HG 6-8" → "6-8")
+  const stripped = s.replace(/^hg/i, '')
+
+  // Handle "10-UP", "10-up", "10+", "10-mas"
+  if (/10\s*[-]?\s*(up|mas|\+)/i.test(stripped) || /10\s*-\s*12/.test(stripped)) return '10-12 lb'
   // E.g. "6-8", "6-8 lb", "6-8lb"
-  const m = s.match(/(\d+)\s*-\s*(\d+)/)
+  const m = stripped.match(/(\d+)\s*-\s*(\d+)/)
   if (m) {
     const lb = `${m[1]}-${m[2]} lb`
     const valid: CalibreRange[] = ['0-2 lb', '2-4 lb', '4-6 lb', '6-8 lb', '8-10 lb', '10-12 lb']
     return valid.includes(lb as CalibreRange) ? (lb as CalibreRange) : 'Other'
   }
   return 'Other'
+}
+
+/** Extrae el calibre original ("HG 6-8", "Fuera de Rango") para mostrar en reportes */
+function extractRawCalibre(v: unknown): string {
+  if (v == null) return 'Sin dato'
+  const s = String(v).trim()
+  return s || 'Sin dato'
 }
 
 // ============================================================================
@@ -300,6 +319,7 @@ function parsePiezaPieza(rows: unknown[][], headerIdx: number, colMap: ColumnMap
   const iWeight = col(colMap, 'peso de las piezas', 'peso piezas', 'peso', 'weight')
   const iQuality = col(colMap, 'calidad', 'quality')
   const iCalibre = col(colMap, 'calibre', 'size', 'tamano')
+  const iError = col(colMap, 'error', 'motivo', 'causa', 'reason')
   const iDate = col(colMap, 'fecha', 'date')
   const iTime = col(colMap, 'hora', 'time')
   const iLot = col(colMap, 'lote', 'lot', 'folio')
@@ -314,6 +334,15 @@ function parsePiezaPieza(rows: unknown[][], headerIdx: number, colMap: ColumnMap
 
     const gate = parseNum(iGate != null ? row[iGate] : undefined) ?? 0
 
+    // For gate 0 records, read error column if available
+    let errorStr: string | undefined
+    if (Math.round(gate) === 0 && iError != null && row[iError] != null) {
+      errorStr = String(row[iError]).trim() || undefined
+    }
+
+    // Keep raw calibre label for gate 0 display (e.g. "HG 6-8", "Fuera de Rango")
+    const rawCalibreStr = iCalibre != null ? extractRawCalibre(row[iCalibre]) : undefined
+
     const rec: PieceRecord = {
       ts: parseDatetime(
         iDate != null ? row[iDate] : undefined,
@@ -324,8 +353,10 @@ function parsePiezaPieza(rows: unknown[][], headerIdx: number, colMap: ColumnMap
       weightKg: iWeight != null ? parseNum(row[iWeight]) : undefined,
       quality: iQuality != null ? normalizeQuality(row[iQuality]) : undefined,
       calibre: iCalibre != null ? normalizeCalibre(row[iCalibre]) : undefined,
+      error: errorStr,
       lot: iLot != null ? (row[iLot] != null ? String(row[iLot]).trim() : undefined) : undefined,
       product: iProduct != null ? (row[iProduct] != null ? String(row[iProduct]).trim() : undefined) : undefined,
+      raw: rawCalibreStr ? { rawCalibre: rawCalibreStr } : undefined,
     }
     records.push(rec)
   }
@@ -498,16 +529,32 @@ export async function parseFile(file: File): Promise<{
         // Also extract gate 0 records from pieceRecords
         const g0 = records.filter((r) => r.gate === 0)
         if (g0.length > 0) {
-          partial.gate0Records = g0.map((r) => ({
-            ts: r.ts,
-            gate: 0 as const,
-            pieces: r.pieces,
-            weightKg: r.weightKg,
-            error: 'Inferido desde pieza-pieza',
-            quality: r.quality,
-            calibre: r.calibre,
-            lot: r.lot,
-          }))
+          partial.gate0Records = g0.map((r) => {
+            // Use explicit error column if available, otherwise infer from calibre/weight
+            let error = r.error || ''
+            if (!error) {
+              const rawCalibre = (r.raw?.rawCalibre as string) || ''
+              const isFueraDeRango = rawCalibre.toLowerCase().includes('fuera') && rawCalibre.toLowerCase().includes('rango')
+              if (isFueraDeRango) {
+                error = 'Fuera de Rango'
+              } else if (r.calibre && r.calibre !== 'Other') {
+                error = 'Fuera de limites'
+              } else {
+                error = 'Sin clasificar (inferido)'
+              }
+            }
+            return {
+              ts: r.ts,
+              gate: 0 as const,
+              pieces: r.pieces,
+              weightKg: r.weightKg,
+              error,
+              quality: r.quality,
+              calibre: r.calibre,
+              lot: r.lot,
+              raw: r.raw,
+            }
+          })
           warnings.push(`Se encontraron ${g0.length} registros Gate 0 en archivo pieza-pieza.`)
         }
         break
