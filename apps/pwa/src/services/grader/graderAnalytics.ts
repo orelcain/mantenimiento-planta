@@ -167,11 +167,16 @@ function computePointZeroClassification(
       const piecesW = r.pieces
 
       let rangeLabel: string
-      if (!r.weightKg || r.weightKg <= 0) {
+      // Prefer per-piece weight in grams if available
+      let perPieceGCandidate = ('weightPerPieceGrams' in r) ? (r as any).weightPerPieceGrams : undefined
+      if (!perPieceGCandidate && r.weightKg && r.pieces > 0) {
+        perPieceGCandidate = (r.weightKg / r.pieces) * 1000
+      }
+      if (!perPieceGCandidate || perPieceGCandidate <= 0) {
         rangeLabel = 'Sin dato de peso'
       } else {
         // Peso por pieza en gramos
-        const perPieceG = (r.weightKg / r.pieces) * 1000
+        const perPieceG = perPieceGCandidate
         const matched = CALIBRE_WEIGHT_RANGES.find(
           (rng) => perPieceG >= rng.minGrams && perPieceG < rng.maxGrams,
         )
@@ -212,16 +217,32 @@ function computePointZeroClassification(
     const meta = CAUSE_META[cause]
     const quality = r.quality || 'Unknown'
 
-    // Use raw calibre for display if available, otherwise use normalized calibre
+    // Determine display calibre: use per-piece weight to compute actual calibre
     let displayCalibre: string
-    const rawCalibre = r.raw?.rawCalibre as string | undefined
-    if (rawCalibre && rawCalibre !== 'Sin dato') {
-      // Normalize "HG 6-8" → "HG 6-8", "Fuera de Rango" → "Fuera de Rango"
-      displayCalibre = rawCalibre
-    } else if (r.calibre && r.calibre !== 'Other') {
-      displayCalibre = `HG ${r.calibre.replace(' lb', '')}`
+    let perPieceG = ('weightPerPieceGrams' in r) ? (r as any).weightPerPieceGrams : undefined
+    if (!perPieceG && r.weightKg && r.pieces > 0) {
+      perPieceG = (r.weightKg / r.pieces) * 1000
+    }
+
+    if (perPieceG && perPieceG > 0) {
+      const matchedRange = CALIBRE_WEIGHT_RANGES.find(
+        (rng) => perPieceG >= rng.minGrams && perPieceG < rng.maxGrams,
+      )
+      if (matchedRange) {
+        displayCalibre = `HG ${matchedRange.calibre.replace(' lb', '')}`
+      } else {
+        displayCalibre = 'Fuera de Rango'
+      }
     } else {
-      displayCalibre = 'Fuera de Rango'
+      // Fallback to raw calibre from Excel
+      const rawCalibre = r.raw?.rawCalibre as string | undefined
+      if (rawCalibre && rawCalibre !== 'Sin dato') {
+        displayCalibre = rawCalibre
+      } else if (r.calibre && r.calibre !== 'Other') {
+        displayCalibre = `HG ${r.calibre.replace(' lb', '')}`
+      } else {
+        displayCalibre = 'Sin dato'
+      }
     }
 
     const key = `${cause}|${quality}|${displayCalibre}`

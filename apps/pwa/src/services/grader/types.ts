@@ -141,6 +141,8 @@ export interface PieceRecord {
   gate: number; // 0..12
   pieces: number;
   weightKg?: number;
+  /** Peso por pieza en gramos (columna "peso en Gr" del Excel) */
+  weightPerPieceGrams?: number;
   quality?: GraderQuality;
   calibre?: CalibreRange;
   error?: string; // available for gate 0 records (from pieza-pieza or Puerta 0)
@@ -154,6 +156,8 @@ export interface Gate0Record {
   gate: 0;
   pieces: number;
   weightKg?: number;
+  /** Peso por pieza en gramos (columna "peso en Gr" del Excel) */
+  weightPerPieceGrams?: number;
   error: string; // normalized error label
   quality?: GraderQuality;
   calibre?: CalibreRange;

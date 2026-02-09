@@ -18,7 +18,22 @@ import type {
   ProductionSummaryRow,
   GraderQuality,
   CalibreRange,
+  CalibreWeightRange,
 } from './types'
+
+// ============================================================================
+// CONSTANTES — RANGOS DE CALIBRE POR PESO (para inferencia gate 0)
+// ============================================================================
+
+/** Rangos de peso en gramos usados para inferir calibre y clasificar gate 0 */
+const CALIBRE_WEIGHT_RANGES: CalibreWeightRange[] = [
+  { calibre: '0-2 lb',   label: '0-2 lb (0–916 g)',       minGrams: 0,    maxGrams: 916  },
+  { calibre: '2-4 lb',   label: '2-4 lb (916–1833 g)',    minGrams: 916,  maxGrams: 1833 },
+  { calibre: '4-6 lb',   label: '4-6 lb (1833–2749 g)',   minGrams: 1833, maxGrams: 2749 },
+  { calibre: '6-8 lb',   label: '6-8 lb (2749–3665 g)',   minGrams: 2749, maxGrams: 3665 },
+  { calibre: '8-10 lb',  label: '8-10 lb (3665–4581 g)',  minGrams: 3665, maxGrams: 4581 },
+  { calibre: '10-12 lb', label: '10+ lb (4581–9163 g)',   minGrams: 4581, maxGrams: 9163 },
+]
 
 // ============================================================================
 // NORMALIZACIÓN
@@ -295,14 +310,26 @@ function buildColumnMap(headers: string[]): ColumnMap {
   return map
 }
 
-/** Busca primer match de variantes en el column map */
+/** Busca primer match de variantes en el column map.
+ * Primero intenta exact match, luego partial (solo key.includes(v), NO al revés
+ * para evitar falsos positivos con variantes cortas como 'peso').
+ */
 function col(map: ColumnMap, ...variants: string[]): number | undefined {
+  // Pass 1: exact match
   for (const v of variants) {
-    // Exact match
     if (map[v] !== undefined) return map[v]
-    // Partial match
+  }
+  // Pass 2: key includes variant (e.g. "peso de las piezas" includes "peso piezas")
+  for (const v of variants) {
+    if (v.length < 4) continue // skip very short variants to avoid false matches
     for (const key of Object.keys(map)) {
-      if (key.includes(v) || v.includes(key)) return map[key]
+      if (key.includes(v)) return map[key]
+    }
+  }
+  // Pass 3: variant includes key (for backward compat, but only for longer keys)
+  for (const v of variants) {
+    for (const key of Object.keys(map)) {
+      if (key.length >= 4 && v.includes(key)) return map[key]
     }
   }
   return undefined
@@ -316,7 +343,8 @@ function parsePiezaPieza(rows: unknown[][], headerIdx: number, colMap: ColumnMap
   const records: PieceRecord[] = []
   const iGate = col(colMap, 'gate', 'compuerta', 'puerta')
   const iPieces = col(colMap, 'cantidad de piezas', 'cant. piezas', 'piezas', 'qty', 'cantidad')
-  const iWeight = col(colMap, 'peso de las piezas', 'peso piezas', 'peso', 'weight')
+  const iWeight = col(colMap, 'peso de las piezas', 'peso piezas', 'weight')
+  const iWeightGrams = col(colMap, 'peso en gr', 'peso en gramos', 'weight gr', 'weight grams')
   const iQuality = col(colMap, 'calidad', 'quality')
   const iCalibre = col(colMap, 'calibre', 'size', 'tamano')
   const iError = col(colMap, 'error', 'motivo', 'causa', 'reason')
@@ -340,8 +368,17 @@ function parsePiezaPieza(rows: unknown[][], headerIdx: number, colMap: ColumnMap
       errorStr = String(row[iError]).trim() || undefined
     }
 
+    // Per-piece weight in grams (column "peso en Gr")
+    const weightPerPieceGrams = iWeightGrams != null ? parseNum(row[iWeightGrams]) : undefined
+
     // Keep raw calibre label for gate 0 display (e.g. "HG 6-8", "Fuera de Rango")
     const rawCalibreStr = iCalibre != null ? extractRawCalibre(row[iCalibre]) : undefined
+
+    // Weight in Kg: prefer "peso de las piezas", fallback to computing from grams
+    let weightKg = iWeight != null ? parseNum(row[iWeight]) : undefined
+    if (weightKg == null && weightPerPieceGrams != null && weightPerPieceGrams > 0) {
+      weightKg = (weightPerPieceGrams * pieces) / 1000
+    }
 
     const rec: PieceRecord = {
       ts: parseDatetime(
@@ -350,7 +387,8 @@ function parsePiezaPieza(rows: unknown[][], headerIdx: number, colMap: ColumnMap
       ) || new Date().toISOString(),
       gate: Math.round(gate),
       pieces,
-      weightKg: iWeight != null ? parseNum(row[iWeight]) : undefined,
+      weightKg,
+      weightPerPieceGrams,
       quality: iQuality != null ? normalizeQuality(row[iQuality]) : undefined,
       calibre: iCalibre != null ? normalizeCalibre(row[iCalibre]) : undefined,
       error: errorStr,
@@ -367,7 +405,8 @@ function parsePuerta0(rows: unknown[][], headerIdx: number, colMap: ColumnMap): 
   const records: Gate0Record[] = []
   const iError = col(colMap, 'error', 'motivo', 'causa', 'reason')
   const iPieces = col(colMap, 'cantidad de piezas', 'cant. piezas', 'piezas', 'qty', 'cantidad')
-  const iWeight = col(colMap, 'peso de las piezas', 'peso piezas', 'peso', 'weight')
+  const iWeight = col(colMap, 'peso de las piezas', 'peso piezas', 'weight')
+  const iWeightGrams = col(colMap, 'peso en gr', 'peso en gramos', 'weight gr', 'weight grams')
   const iDate = col(colMap, 'fecha', 'date')
   const iTime = col(colMap, 'hora', 'time')
   const iQuality = col(colMap, 'calidad', 'quality')
@@ -382,6 +421,12 @@ function parsePuerta0(rows: unknown[][], headerIdx: number, colMap: ColumnMap): 
     if (pieces == null || pieces <= 0) continue
 
     const errorStr = iError != null && row[iError] != null ? String(row[iError]).trim() : 'Desconocido'
+    const weightPerPieceGrams = iWeightGrams != null ? parseNum(row[iWeightGrams]) : undefined
+    let weightKg = iWeight != null ? parseNum(row[iWeight]) : undefined
+    if (weightKg == null && weightPerPieceGrams != null && weightPerPieceGrams > 0) {
+      weightKg = (weightPerPieceGrams * pieces) / 1000
+    }
+    const rawCalibreStr = iCalibre != null ? extractRawCalibre(row[iCalibre]) : undefined
 
     const rec: Gate0Record = {
       ts: parseDatetime(
@@ -390,11 +435,13 @@ function parsePuerta0(rows: unknown[][], headerIdx: number, colMap: ColumnMap): 
       ) || new Date().toISOString(),
       gate: 0,
       pieces,
-      weightKg: iWeight != null ? parseNum(row[iWeight]) : undefined,
+      weightKg,
+      weightPerPieceGrams,
       error: errorStr,
       quality: iQuality != null ? normalizeQuality(row[iQuality]) : undefined,
       calibre: iCalibre != null ? normalizeCalibre(row[iCalibre]) : undefined,
       lot: iLot != null ? (row[iLot] != null ? String(row[iLot]).trim() : undefined) : undefined,
+      raw: rawCalibreStr ? { rawCalibre: rawCalibreStr } : undefined,
     }
     records.push(rec)
   }
@@ -530,29 +577,71 @@ export async function parseFile(file: File): Promise<{
         const g0 = records.filter((r) => r.gate === 0)
         if (g0.length > 0) {
           partial.gate0Records = g0.map((r) => {
-            // Use explicit error column if available, otherwise infer from calibre/weight
+            // Use explicit error column if available, otherwise SMART inference
             let error = r.error || ''
             if (!error) {
-              const rawCalibre = (r.raw?.rawCalibre as string) || ''
-              const isFueraDeRango = rawCalibre.toLowerCase().includes('fuera') && rawCalibre.toLowerCase().includes('rango')
-              if (isFueraDeRango) {
-                error = 'Fuera de Rango'
-              } else if (r.calibre && r.calibre !== 'Other') {
-                error = 'Fuera de limites'
+              // Get per-piece weight in grams
+              let perPieceG = r.weightPerPieceGrams
+              if (!perPieceG && r.weightKg && r.pieces > 0) {
+                perPieceG = (r.weightKg / r.pieces) * 1000
+              }
+
+              if (!perPieceG || perPieceG <= 0) {
+                // No weight data → photocell didn't read it
+                error = 'No leido por fotocelula'
               } else {
-                error = 'Sin clasificar (inferido)'
+                // Check raw calibre for "Fuera de Rango"
+                const rawCalibre = (r.raw?.rawCalibre as string) || ''
+                const isFueraDeRango = rawCalibre.toLowerCase().includes('fuera') && rawCalibre.toLowerCase().includes('rango')
+                if (isFueraDeRango) {
+                  error = 'Fuera de Rango'
+                } else {
+                  // Check if weight falls within any calibre range
+                  const matchedRange = CALIBRE_WEIGHT_RANGES.find(
+                    (rng) => perPieceG! >= rng.minGrams && perPieceG! < rng.maxGrams,
+                  )
+                  if (matchedRange) {
+                    // Weight is within a valid range but piece went to gate 0
+                    error = 'Fuera de limites'
+                  } else {
+                    // Weight is outside ALL defined ranges → truly out of range
+                    error = 'Fuera de Rango'
+                  }
+                }
               }
             }
+
+            // Determine actual calibre from weight (more accurate than Excel default for gate 0)
+            let actualCalibre = r.calibre
+            let actualRawCalibre = r.raw?.rawCalibre as string | undefined
+            let perPieceG = r.weightPerPieceGrams
+            if (!perPieceG && r.weightKg && r.pieces > 0) {
+              perPieceG = (r.weightKg / r.pieces) * 1000
+            }
+            if (perPieceG && perPieceG > 0) {
+              const matchedRange = CALIBRE_WEIGHT_RANGES.find(
+                (rng) => perPieceG! >= rng.minGrams && perPieceG! < rng.maxGrams,
+              )
+              if (matchedRange) {
+                actualCalibre = matchedRange.calibre as CalibreRange
+                actualRawCalibre = `HG ${matchedRange.calibre.replace(' lb', '')}`
+              } else {
+                actualCalibre = 'Other'
+                actualRawCalibre = 'Fuera de Rango'
+              }
+            }
+
             return {
               ts: r.ts,
               gate: 0 as const,
               pieces: r.pieces,
               weightKg: r.weightKg,
+              weightPerPieceGrams: r.weightPerPieceGrams,
               error,
               quality: r.quality,
-              calibre: r.calibre,
+              calibre: actualCalibre,
               lot: r.lot,
-              raw: r.raw,
+              raw: { ...(r.raw || {}), rawCalibre: actualRawCalibre || (r.raw?.rawCalibre) },
             }
           })
           warnings.push(`Se encontraron ${g0.length} registros Gate 0 en archivo pieza-pieza.`)

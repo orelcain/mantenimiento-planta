@@ -107,16 +107,17 @@ export async function saveGatesTemplate(params: {
   const tmpl: GatesTemplate = {
     id,
     name: params.name,
-    deviceId: params.deviceId,
+    ...(params.deviceId != null && { deviceId: params.deviceId }),
     gates: params.gates,
     createdBy: params.createdBy,
     createdAt: new Date().toISOString(),
   }
 
-  await setDoc(doc(db, GATES_TEMPLATES_COLLECTION, id), {
-    ...tmpl,
-    _createdAt: serverTimestamp(),
-  })
+  // Filter out any remaining undefined values before writing to Firestore
+  const firestoreData = Object.fromEntries(
+    Object.entries({ ...tmpl, _createdAt: serverTimestamp() }).filter(([, v]) => v !== undefined),
+  )
+  await setDoc(doc(db, GATES_TEMPLATES_COLLECTION, id), firestoreData)
 
   return tmpl
 }
