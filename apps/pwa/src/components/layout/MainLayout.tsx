@@ -65,10 +65,14 @@ export function MainLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [isOnline, setIsOnline] = useState(navigator.onLine)
+  const [showSyncPanel, setShowSyncPanel] = useState(false)
   const pendingWrites = useSyncStore((state) => state.pendingWrites)
   const pendingByContext = useSyncStore((state) => state.pendingByContext)
+  const pendingEntries = useSyncStore((state) => state.pendingEntries)
+  const lastSyncAt = useSyncStore((state) => state.lastSyncAt)
   const lastSyncError = useSyncStore((state) => state.lastSyncError)
   const setSyncError = useSyncStore((state) => state.setSyncError)
+  const setLastSyncAt = useSyncStore((state) => state.setLastSyncAt)
   const { toast } = useToast()
   const prevPendingRef = useRef(pendingWrites)
   const { hasUpdate, newVersion, reload } = useAppVersion()
@@ -92,6 +96,7 @@ export function MainLayout() {
     .filter(([, count]) => count > 0)
     .map(([key, count]) => `${key}: ${count}`)
     .join(', ')
+  const lastSyncLabel = lastSyncAt ? new Date(lastSyncAt).toLocaleString() : null
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true)
@@ -121,9 +126,10 @@ export function MainLayout() {
         title: 'Sincronizado',
         description: 'Tus cambios se guardaron correctamente',
       })
+      setLastSyncAt(Date.now())
     }
     prevPendingRef.current = pendingWrites
-  }, [pendingWrites, isOnline, toast])
+  }, [pendingWrites, isOnline, setLastSyncAt, toast])
 
   const allNavigation = isAdmin
     ? [...navigation, ...adminNavigation]
@@ -296,14 +302,15 @@ export function MainLayout() {
 
           {/* Desktop user menu */}
           <div className="hidden lg:flex items-center gap-3">
-            {pendingWrites > 0 && (
-              <div
-                className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-300 px-2 py-1 bg-amber-500/10 rounded border border-amber-500/20"
-                title={pendingSummary || undefined}
+            {(pendingWrites > 0 || lastSyncLabel) && (
+              <button
+                className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-300 px-2 py-1 bg-amber-500/10 rounded border border-amber-500/20 hover:bg-amber-500/20 transition-colors"
+                title={pendingSummary || lastSyncLabel || undefined}
+                onClick={() => setShowSyncPanel((prev) => !prev)}
               >
                 <RefreshCw className="h-3.5 w-3.5 animate-spin" />
                 <span>{pendingWrites} pendiente{pendingWrites > 1 ? 's' : ''}</span>
-              </div>
+              </button>
             )}
             {/* Version badge */}
             <div className="flex items-center gap-2 text-xs text-muted-foreground px-2 py-1 bg-muted/50 rounded">
@@ -339,9 +346,12 @@ export function MainLayout() {
               <RefreshCw className="h-4 w-4 animate-spin" />
               <span>Sincronizando...</span>
             </div>
-            <span className="text-xs font-medium">
+            <button
+              className="text-xs font-medium underline"
+              onClick={() => setShowSyncPanel((prev) => !prev)}
+            >
               {pendingWrites} pendiente{pendingWrites > 1 ? 's' : ''}
-            </span>
+            </button>
           </div>
         )}
 
@@ -365,6 +375,58 @@ export function MainLayout() {
                 {pendingWrites} pendiente{pendingWrites > 1 ? 's' : ''}
               </div>
             )}
+          </div>
+        )}
+
+        {showSyncPanel && (pendingEntries.length > 0 || lastSyncLabel) && (
+          <div className="mx-4 mt-4 lg:mx-6 bg-card border rounded-lg shadow-sm p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-medium">Sincronizacion</h3>
+                {lastSyncLabel && (
+                  <p className="text-xs text-muted-foreground">Ultimo sync: {lastSyncLabel}</p>
+                )}
+              </div>
+              <button
+                className="text-xs text-muted-foreground hover:text-foreground"
+                onClick={() => setShowSyncPanel(false)}
+              >
+                Cerrar
+              </button>
+            </div>
+            <div className="mt-3 space-y-2 max-h-48 overflow-y-auto">
+              {pendingEntries.slice(0, 10).map((entry) => (
+                <div key={entry.id} className="flex items-start justify-between text-xs">
+                  <div>
+                    <div className="font-medium">{entry.context}</div>
+                    <div className="text-muted-foreground">
+                      {new Date(entry.createdAt).toLocaleTimeString()}
+                    </div>
+                    {entry.error && (
+                      <div className="text-destructive mt-1">{entry.error}</div>
+                    )}
+                  </div>
+                  <span
+                    className={
+                      entry.status === 'synced'
+                        ? 'text-emerald-600'
+                        : entry.status === 'error'
+                          ? 'text-destructive'
+                          : 'text-amber-600'
+                    }
+                  >
+                    {entry.status === 'synced'
+                      ? 'Sincronizado'
+                      : entry.status === 'error'
+                        ? 'Error'
+                        : 'Pendiente'}
+                  </span>
+                </div>
+              ))}
+              {pendingEntries.length === 0 && (
+                <p className="text-xs text-muted-foreground">No hay operaciones pendientes.</p>
+              )}
+            </div>
           </div>
         )}
 

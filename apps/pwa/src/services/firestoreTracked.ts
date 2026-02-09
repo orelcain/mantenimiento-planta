@@ -11,16 +11,23 @@ import {
   type WriteBatch,
 } from 'firebase/firestore'
 import { db } from '@/services/firebase'
-import { decrementPendingWrites, incrementPendingWrites, setSyncError } from '@/store/syncStore'
+import {
+  decrementPendingWrites,
+  incrementPendingWrites,
+  markEntryError,
+  markEntrySynced,
+  setSyncError,
+} from '@/store/syncStore'
 
 async function trackWrite<T>(op: () => Promise<T>, context: string): Promise<T> {
-  incrementPendingWrites(context)
+  const entryId = incrementPendingWrites(context)
   let done = false
 
   const finish = () => {
     if (done) return
     done = true
     decrementPendingWrites(context)
+    markEntrySynced(entryId)
   }
 
   try {
@@ -28,12 +35,16 @@ async function trackWrite<T>(op: () => Promise<T>, context: string): Promise<T> 
     waitForPendingWrites(db)
       .then(() => finish())
       .catch((error) => {
-        setSyncError(`[${context}] ${error?.message ?? String(error)}`)
+        const message = `[${context}] ${error?.message ?? String(error)}`
+        setSyncError(message)
+        markEntryError(entryId, message)
         finish()
       })
     return result
   } catch (error: any) {
-    setSyncError(`[${context}] ${error?.message ?? String(error)}`)
+    const message = `[${context}] ${error?.message ?? String(error)}`
+    setSyncError(message)
+    markEntryError(entryId, message)
     finish()
     throw error
   }
