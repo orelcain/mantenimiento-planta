@@ -590,7 +590,7 @@ export function computeAnalytics(
 
     for (const r of data.pieceRecords) {
       const lotKey = r.lot || 'Sin lote'
-      const cur = lotMap.get(lotKey) || { pieces: 0, g0Pieces: 0, weightKg: 0, weights: [], timestamps: [], calibres: new Map(), qualities: new Map() }
+      const cur = lotMap.get(lotKey) || { pieces: 0, g0Pieces: 0, weightKg: 0, weights: [] as number[], timestamps: [] as string[], calibres: new Map<string, number>(), qualities: new Map<string, number>() }
       cur.pieces += r.pieces
       if (r.gate === 0) cur.g0Pieces += r.pieces
       cur.weightKg += r.weightKg ?? 0
@@ -647,7 +647,7 @@ export function computeAnalytics(
     for (const r of data.pieceRecords) {
       if (r.gate === 0) continue
       const bk = bucketKey(r.ts, interval)
-      const cur = wtBuckets.get(bk) || { weights: [], pieces: 0, lots: new Map() }
+      const cur = wtBuckets.get(bk) || { weights: [] as number[], pieces: 0, lots: new Map<string, number>() }
       cur.pieces += r.pieces
       const wpg = r.weightPerPieceGrams ?? (r.weightKg && r.pieces > 0 ? (r.weightKg / r.pieces) * 1000 : undefined)
       if (wpg && wpg > 0) {
@@ -785,7 +785,7 @@ export function computeAnalytics(
 
     for (const r of data.pieceRecords) {
       if (r.gate === 0) continue
-      const cur = gateDataMap.get(r.gate) || { pieces: 0, weightKg: 0, weights: [], calibres: new Map() }
+      const cur = gateDataMap.get(r.gate) || { pieces: 0, weightKg: 0, weights: [] as number[], calibres: new Map<string, number>() }
       cur.pieces += r.pieces
       cur.weightKg += r.weightKg ?? 0
       const wpg = r.weightPerPieceGrams ?? (r.weightKg && r.pieces > 0 ? (r.weightKg / r.pieces) * 1000 : undefined)
