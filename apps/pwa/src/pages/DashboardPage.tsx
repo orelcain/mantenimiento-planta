@@ -7,7 +7,6 @@ import {
   MapPin,
   TrendingUp,
   Plus,
-  X,
   ChevronRight,
 } from 'lucide-react'
 import {
@@ -80,7 +79,7 @@ export function DashboardPage() {
     const ids = new Set<string>()
     for (const incident of recentIncidents) {
       if (isLikelyUserId(incident.reportadoPor)) ids.add(incident.reportadoPor)
-      if (isLikelyUserId(incident.asignadoA)) ids.add(incident.asignadoA)
+      if (isLikelyUserId(incident.asignadoA)) ids.add(incident.asignadoA!)
     }
     return Array.from(ids)
   }, [recentIncidents])
@@ -115,7 +114,6 @@ export function DashboardPage() {
 
   useEffect(() => {
     const load = async () => {
-      const thresholds = DEFAULT_PREDICTIVE_THRESHOLDS
       for (const eqId of visibleEquipmentIds) {
         if (iotDetails[eqId]) continue
         try {
@@ -123,7 +121,7 @@ export function DashboardPage() {
             fetchSensorSummaryOnce(eqId),
             fetchLastSensorReadings(eqId, 15),
           ])
-          const last = readings[readings.length - 1]
+          const last = readings.length > 0 ? readings[readings.length - 1]! : undefined
           const avgTemp = readings.length ? readings.reduce((s, r) => s + (r.temperature || 0), 0) / readings.length : undefined
           const avgHum = readings.length ? readings.reduce((s, r) => s + (r.humidity || 0), 0) / readings.length : undefined
           const source = last?.source ?? summary?.temperatura?.source ?? summary?.humedad?.source
@@ -223,21 +221,21 @@ export function DashboardPage() {
                   </div>
                   {incident.equipmentId && iotDetails[incident.equipmentId] && (
                     <div className="pl-6 text-xs text-muted-foreground space-y-1">
-                      {iotDetails[incident.equipmentId].source === 'simulated' && (
+                      {iotDetails[incident.equipmentId]?.source === 'simulated' && (
                         <div className="text-[11px] uppercase tracking-wide text-amber-600">Dato simulado</div>
                       )}
-                      {iotDetails[incident.equipmentId].temp && (
+                      {iotDetails[incident.equipmentId]?.temp && (
                         <div>
-                          Temp: {iotDetails[incident.equipmentId].temp!.current.toFixed(1)}{iotDetails[incident.equipmentId].temp!.unit} 
-                          (prom {iotDetails[incident.equipmentId].temp!.avg.toFixed(1)}{iotDetails[incident.equipmentId].temp!.unit}, 
+                          Temp: {iotDetails[incident.equipmentId]!.temp!.current.toFixed(1)}{iotDetails[incident.equipmentId]!.temp!.unit} 
+                          (prom {iotDetails[incident.equipmentId]!.temp!.avg.toFixed(1)}{iotDetails[incident.equipmentId]!.temp!.unit}, 
                           warn {DEFAULT_PREDICTIVE_THRESHOLDS.tempWarnLow}-{DEFAULT_PREDICTIVE_THRESHOLDS.tempWarnHigh}, 
                           crit {DEFAULT_PREDICTIVE_THRESHOLDS.tempCritLow}-{DEFAULT_PREDICTIVE_THRESHOLDS.tempCritHigh})
                         </div>
                       )}
-                      {iotDetails[incident.equipmentId].hum && (
+                      {iotDetails[incident.equipmentId]?.hum && (
                         <div>
-                          Hum: {iotDetails[incident.equipmentId].hum!.current.toFixed(1)}{iotDetails[incident.equipmentId].hum!.unit} 
-                          (prom {iotDetails[incident.equipmentId].hum!.avg.toFixed(1)}{iotDetails[incident.equipmentId].hum!.unit}, 
+                          Hum: {iotDetails[incident.equipmentId]!.hum!.current.toFixed(1)}{iotDetails[incident.equipmentId]!.hum!.unit} 
+                          (prom {iotDetails[incident.equipmentId]!.hum!.avg.toFixed(1)}{iotDetails[incident.equipmentId]!.hum!.unit}, 
                           warn {DEFAULT_PREDICTIVE_THRESHOLDS.humWarnLow}-{DEFAULT_PREDICTIVE_THRESHOLDS.humWarnHigh}, 
                           crit {DEFAULT_PREDICTIVE_THRESHOLDS.humCritLow}-{DEFAULT_PREDICTIVE_THRESHOLDS.humCritHigh})
                         </div>
@@ -405,19 +403,19 @@ export function DashboardPage() {
                       </div>
                       {incident.equipmentId && iotDetails[incident.equipmentId] && (
                         <div className="mt-1 text-xs text-muted-foreground space-y-0.5">
-                          {iotDetails[incident.equipmentId].source === 'simulated' && (
+                          {iotDetails[incident.equipmentId]?.source === 'simulated' && (
                             <div className="text-[11px] uppercase tracking-wide text-amber-600">Dato simulado</div>
                           )}
-                          {iotDetails[incident.equipmentId].temp && (
+                          {iotDetails[incident.equipmentId]?.temp && (
                             <div>
-                              Temp: {iotDetails[incident.equipmentId].temp!.current.toFixed(1)}{iotDetails[incident.equipmentId].temp!.unit} 
-                              (prom {iotDetails[incident.equipmentId].temp!.avg.toFixed(1)}{iotDetails[incident.equipmentId].temp!.unit})
+                              Temp: {iotDetails[incident.equipmentId]!.temp!.current.toFixed(1)}{iotDetails[incident.equipmentId]!.temp!.unit} 
+                              (prom {iotDetails[incident.equipmentId]!.temp!.avg.toFixed(1)}{iotDetails[incident.equipmentId]!.temp!.unit})
                             </div>
                           )}
-                          {iotDetails[incident.equipmentId].hum && (
+                          {iotDetails[incident.equipmentId]?.hum && (
                             <div>
-                              Hum: {iotDetails[incident.equipmentId].hum!.current.toFixed(1)}{iotDetails[incident.equipmentId].hum!.unit} 
-                              (prom {iotDetails[incident.equipmentId].hum!.avg.toFixed(1)}{iotDetails[incident.equipmentId].hum!.unit})
+                              Hum: {iotDetails[incident.equipmentId]!.hum!.current.toFixed(1)}{iotDetails[incident.equipmentId]!.hum!.unit} 
+                              (prom {iotDetails[incident.equipmentId]!.hum!.avg.toFixed(1)}{iotDetails[incident.equipmentId]!.hum!.unit})
                             </div>
                           )}
                         </div>

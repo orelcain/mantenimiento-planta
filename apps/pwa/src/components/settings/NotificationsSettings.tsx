@@ -54,7 +54,7 @@ export function NotificationsSettings() {
       
       alert(mensaje)
     } catch (error) {
-      logger.error('❌ Error sending test notification:', error)
+      logger.error('❌ Error sending test notification:', error instanceof Error ? error : new Error(String(error)))
       alert('❌ Error al enviar notificación de prueba. Verifica la consola para más detalles.')
     } finally {
       setIsSendingTest(false)

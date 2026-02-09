@@ -82,7 +82,7 @@ function AreaPolygon({ dim }: { dim: Dimension3D }) {
   }, [pts])
 
   const fillGeom = useMemo(() => {
-    if (pts.length < 3) return null
+    if (pts.length < 3) return undefined
     const geom = new THREE.BufferGeometry()
     const vertices: number[] = []
     const c = centroid

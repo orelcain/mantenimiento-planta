@@ -15,7 +15,7 @@ interface ExportReportModalProps {
   onClose: () => void
   repuestos: Repuesto[]
   filteredRepuestos?: Repuesto[] 
-  categories: { id: string, nombre: string, parentId?: string }[]
+  categories: { id: string, nombre: string, parentId?: string | null }[]
   machineName?: string
 }
 
@@ -76,7 +76,7 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
             label: cat.nombre,
             type: cat.parentId ? 'subcategory' : 'category',
             children: [],
-            parentId: cat.parentId
+            parentId: cat.parentId ?? undefined
         })
     })
 

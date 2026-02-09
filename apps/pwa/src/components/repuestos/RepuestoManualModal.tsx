@@ -9,7 +9,6 @@ import {
   Button,
   Card,
   CardContent,
-  CardDescription,
 } from '@/components/ui'
 
 interface RepuestoManualModalProps {
@@ -52,20 +51,20 @@ export function RepuestoManualModal({
                     <div className="flex-1">
                       <h4 className="font-medium flex items-center gap-2">
                         <Link className="h-4 w-4 text-primary" />
-                        {manual.nombre || `Documento ${idx + 1}`}
+                        {manual.descripcion || `Documento ${idx + 1}`}
                       </h4>
                       {manual.descripcion && (
                         <p className="text-sm text-muted-foreground">{manual.descripcion}</p>
                       )}
-                      {manual.url && (
+                      {manual.manualUrl && (
                         <p className="text-xs text-muted-foreground truncate mt-1">
-                          {manual.url}
+                          {manual.manualUrl}
                         </p>
                       )}
                     </div>
-                    {manual.url && (
+                    {manual.manualUrl && (
                       <Button
-                        onClick={() => handleOpenLink(manual.url!)}
+                        onClick={() => handleOpenLink(manual.manualUrl!)}
                         size="sm"
                         className="ml-4"
                       >

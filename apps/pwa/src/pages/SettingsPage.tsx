@@ -131,7 +131,7 @@ export function SettingsPage() {
 
 // Configuración General
 function GeneralSettings() {
-  const { theme, toggleTheme, isDark } = useTheme()
+  const { toggleTheme, isDark } = useTheme()
   const [requireValidation, setRequireValidation] = useState(true)
   const [autoAssign, setAutoAssign] = useState(false)
   const [saving, setSaving] = useState(false)

@@ -126,7 +126,7 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
     if (!showAssignForm) return
     if (selectedTechnician) return
     if (technicians.length === 0) return
-    setSelectedTechnician(technicians[0].id)
+    setSelectedTechnician(technicians[0]!.id)
   }, [showAssignForm, selectedTechnician, technicians])
 
   // Cargar información del usuario asignado

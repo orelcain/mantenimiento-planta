@@ -31,6 +31,11 @@ import type { User } from '@/types'
 // Alias con tipo correcto para evitar errores de undefined
 const DEFAULT_PERMS: Record<string, PermissionsMap> = DEFAULT_ROLE_PERMISSIONS as Record<string, PermissionsMap>
 
+/** Safe accessor that always returns a valid PermissionsMap */
+function getDefaultPerms(rolId: string): PermissionsMap {
+  return DEFAULT_PERMS[rolId] ?? DEFAULT_PERMS['usuario']!
+}
+
 // ============================================================================
 // PERMISOS POR ROL
 // ============================================================================
@@ -52,10 +57,10 @@ export async function getRolePermissions(rolId: string): Promise<PermissionsMap>
     
     // Retornar defaults si no existe en Firestore
     logger.info('Usando permisos default para rol', { rolId })
-    return DEFAULT_PERMS[rolId] || DEFAULT_PERMS['usuario']
+    return getDefaultPerms(rolId)
   } catch (error) {
     logger.error('Error obteniendo permisos de rol', error instanceof Error ? error : new Error(String(error)))
-    return DEFAULT_PERMS[rolId] || DEFAULT_PERMS['usuario']
+    return getDefaultPerms(rolId)
   }
 }
 
@@ -227,7 +232,7 @@ export async function resolveUserPermissions(user: User): Promise<ResolvedPermis
     return {
       userId: user.id,
       rol: user.rol,
-      permisos: DEFAULT_PERMS[user.rol] || DEFAULT_PERMS['usuario'],
+      permisos: getDefaultPerms(user.rol),
       tieneOverride: false,
       cargadoDesde: 'default',
     }
@@ -252,11 +257,11 @@ export function subscribeToRolePermissions(
       const data = doc.data() as RolePermissions
       callback(data.permisos)
     } else {
-      callback(DEFAULT_PERMS[rolId] || DEFAULT_PERMS['usuario'])
+      callback(getDefaultPerms(rolId))
     }
   }, (error) => {
     logger.error('Error en listener de permisos de rol', error)
-    callback(DEFAULT_PERMS[rolId] || DEFAULT_PERMS['usuario'])
+    callback(getDefaultPerms(rolId))
   })
 }
 
@@ -293,7 +298,7 @@ export function subscribeToUserPermissions(
     callback({
       userId,
       rol: userRol,
-      permisos: DEFAULT_PERMS[userRol] || DEFAULT_PERMS['usuario'],
+      permisos: getDefaultPerms(userRol),
       tieneOverride: false,
       cargadoDesde: 'default',
     })
@@ -315,7 +320,7 @@ export async function initializeDefaultRoles(adminUserId: string): Promise<void>
     const docSnap = await getDoc(docRef)
     
     if (!docSnap.exists()) {
-      await saveRolePermissions(rolId, DEFAULT_PERMS[rolId], adminUserId)
+      await saveRolePermissions(rolId, getDefaultPerms(rolId), adminUserId)
       logger.info('Rol inicializado', { rolId })
     }
   }

@@ -19,12 +19,12 @@ export function RepuestosFilters({
   searchQuery,
   onSearchChange,
   selectedTags,
-  onTagsChange,
+  onTagsChange: _onTagsChange,
   stockFilter,
-  onStockFilterChange,
+  onStockFilterChange: _onStockFilterChange,
   solicitudFilter,
-  onSolicitudFilterChange,
-  availableTags,
+  onSolicitudFilterChange: _onSolicitudFilterChange,
+  availableTags: _availableTags,
   onClearFilters,
 }: RepuestosFiltersProps) {
   const hasActiveFilters = 

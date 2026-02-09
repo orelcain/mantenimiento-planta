@@ -1,5 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react'
-import { Plus, Trash2 } from 'lucide-react'
+import { FormEvent, useEffect, useState } from 'react'
 import type { Repuesto, RepuestoFormData } from '@/types/repuestos'
 import type { TagAsignado, TagGlobal } from '@/types/tags'
 import { isTagAsignado } from '@/types/tags'
@@ -62,8 +61,6 @@ export function RepuestoFormModal({
   loading = false,
 }: RepuestoFormModalProps) {
   const [form, setForm] = useState<RepuestoFormData>(defaultForm)
-  const [tagName, setTagName] = useState('')
-  const [tagCantidad, setTagCantidad] = useState('0')
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -85,44 +82,6 @@ export function RepuestoFormModal({
       }
     }
   }, [open, initialData, availableTags])
-
-  const tagOptions = useMemo(() => availableTags.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es')), [availableTags])
-
-  const handleAddTag = () => {
-    if (!tagName) return
-    const cantidad = Number(tagCantidad)
-    if (!Number.isFinite(cantidad) || cantidad < 0) return
-
-    const tipo = availableTags.find((t) => t.nombre === tagName)?.tipo ?? 'solicitud'
-    setForm((prev) => {
-      const existing = (prev.tags || []).find(
-        (t) => isTagAsignado(t) && t.nombre === tagName && t.tipo === tipo
-      ) as TagAsignado | undefined
-
-      const nextTags = Array.isArray(prev.tags) ? [...prev.tags] : []
-      if (existing) {
-        return {
-          ...prev,
-          tags: nextTags.map((t) =>
-            isTagAsignado(t) && t.nombre === tagName && t.tipo === tipo
-              ? { ...t, cantidad }
-              : t
-          ),
-        }
-      }
-
-      const nuevo: TagAsignado = { nombre: tagName, tipo, cantidad, fecha: new Date() }
-      return { ...prev, tags: [...nextTags, nuevo] }
-    })
-    setTagCantidad('0')
-  }
-
-  const handleRemoveTag = (name: string, tipo: TagAsignado['tipo']) => {
-    setForm((prev) => ({
-      ...prev,
-      tags: (prev.tags || []).filter((t) => !(isTagAsignado(t) && t.nombre === name && t.tipo === tipo)),
-    }))
-  }
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()

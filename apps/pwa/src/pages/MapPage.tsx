@@ -8,9 +8,6 @@ import {
   Settings,
   Eye,
   X,
-  Clock,
-  User,
-  Camera,
   ChevronRight,
 } from 'lucide-react'
 import {
@@ -49,6 +46,7 @@ const STATUS_CONFIG: Record<IncidentStatus, { label: string; variant: string }> 
   confirmada: { label: 'Confirmada', variant: 'default' },
   rechazada: { label: 'Rechazada', variant: 'destructive' },
   en_proceso: { label: 'En proceso', variant: 'secondary' },
+  resuelta: { label: 'Resuelta', variant: 'success' },
   cerrada: { label: 'Cerrada', variant: 'outline' },
 }
 

@@ -45,9 +45,9 @@ export const useSyncStore = create<SyncState>((set) => ({
   pendingEntries: [],
   lastSyncError: null,
   lastSyncAt: null,
-  incrementPending: (context, meta) =>
+  incrementPending: (context, meta) => {
+    const id = genEntryId()
     set((state) => {
-      const id = genEntryId()
       const entry: SyncEntry = {
         id,
         context: context ?? 'write',
@@ -67,7 +67,9 @@ export const useSyncStore = create<SyncState>((set) => ({
         pendingByContext: next,
         pendingEntries: [entry, ...state.pendingEntries].slice(0, MAX_ENTRIES),
       }
-    }),
+    })
+    return id
+  },
   decrementPending: (context) =>
     set((state) => {
       const next = { ...state.pendingByContext }

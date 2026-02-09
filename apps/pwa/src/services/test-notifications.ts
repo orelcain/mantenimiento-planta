@@ -24,10 +24,10 @@ export async function sendTestNotification(): Promise<{
     const sendTest = httpsCallable(functions, 'sendTestNotification')
     const result = await sendTest({})
 
-    logger.info('✅ Test notification result:', result.data)
+    logger.info('✅ Test notification result', { data: result.data as Record<string, unknown> })
     return result.data as any
   } catch (error) {
-    logger.error('❌ Error sending test notification:', error instanceof Error ? error.message : String(error))
+    logger.error('❌ Error sending test notification', error instanceof Error ? error : new Error(String(error)))
     throw error
   }
 }

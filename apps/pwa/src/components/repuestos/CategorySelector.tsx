@@ -11,8 +11,7 @@
  */
 
 import { useState } from 'react';
-import { MoreVertical, Plus, Pencil, Trash2, Check, GripVertical } from 'lucide-react';
-import * as LucideIcons from 'lucide-react';
+import { Check, GripVertical } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -35,11 +34,6 @@ import { useAuthStore } from '@/store';
 import type { MachineCategory } from '@/types/repuestos';
 import {
   Button,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
   Dialog,
   DialogContent,
   DialogHeader,
@@ -63,14 +57,12 @@ function SortableTab({
   count,
   isAdmin,
   onClick,
-  renderIcon,
 }: {
   category: MachineCategory;
   isActive: boolean;
   count: number;
   isAdmin: boolean;
   onClick: () => void;
-  renderIcon: (iconName: string) => JSX.Element;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: category.id,
@@ -125,7 +117,7 @@ export function CategorySelector({
   machineCountsByCategory = {},
   className = '',
 }: CategorySelectorProps) {
-  const { categories, loading, createCategory, updateCategory, deleteCategory, reorderCategories } =
+  const { categories, loading, createCategory, updateCategory, reorderCategories } =
     useMachineCategories();
   const { user } = useAuthStore();
   const isAdmin = user?.rol === 'admin';
@@ -142,9 +134,6 @@ export function CategorySelector({
   // Solo mostrar categorías raíz (sin parentId) en las pestañas principales
   const activeCategories = categories.filter((c) => c.activa && c.visible !== false && !c.parentId);
   const hasMainCategory = activeCategories.some((c) => c.id === 'maquinas-principales');
-
-  // Total de todas las máquinas
-  const totalMachines = Object.values(machineCountsByCategory).reduce((sum, count) => sum + count, 0);
 
   // Sensores para drag & drop
   const sensors = useSensors(
@@ -173,15 +162,6 @@ export function CategorySelector({
     }
   };
 
-  // Renderizar ícono dinámico desde lucide-react
-  const renderIcon = (iconName: string) => {
-    const IconComponent = (LucideIcons as any)[iconName];
-    if (!IconComponent) {
-      return <LucideIcons.Folder className="h-5 w-5" />;
-    }
-    return <IconComponent className="h-5 w-5" />;
-  };
-
   // Crear categoría
   const handleCreate = async () => {
     try {
@@ -191,6 +171,7 @@ export function CategorySelector({
         icono: formData.icono,
         orden: 0,
         activa: true,
+        visible: true,
       });
       setShowCreateDialog(false);
       setFormData({ nombre: '', descripcion: '', icono: 'Folder' });
@@ -217,32 +198,6 @@ export function CategorySelector({
       console.error('Error updating category:', error);
       alert('Error al actualizar la categoría');
     }
-  };
-
-  // Eliminar categoría
-  const handleDelete = async (categoryId: string, categoryName: string) => {
-    if (!confirm(`¿Eliminar la categoría "${categoryName}"?`)) return;
-
-    try {
-      await deleteCategory(categoryId);
-    } catch (error) {
-      console.error('Error deleting category:', error);
-      alert('Error al eliminar la categoría');
-    }
-  };
-
-  // Abrir diálogo de edición
-  const openEditDialog = (categoryId: string) => {
-    const category = categories.find((c) => c.id === categoryId);
-    if (!category) return;
-
-    setEditingCategoryId(categoryId);
-    setFormData({
-      nombre: category.nombre,
-      descripcion: category.descripcion || '',
-      icono: category.icono,
-    });
-    setShowEditDialog(true);
   };
 
   if (loading) {
@@ -299,7 +254,6 @@ export function CategorySelector({
                         count={count}
                         isAdmin={isAdmin}
                         onClick={() => onSelectCategory(category.id)}
-                        renderIcon={renderIcon}
                       />
                     );
                   })}

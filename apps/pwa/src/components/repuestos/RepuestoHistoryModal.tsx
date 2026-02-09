@@ -1,5 +1,5 @@
-import { useMemo, useState, useEffect } from 'react'
-import { Clock, User } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Clock } from 'lucide-react'
 import { getHistorial } from '@/services/repuestos'
 import type { Repuesto } from '@/types/repuestos'
 import {

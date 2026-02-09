@@ -510,20 +510,6 @@ function getStatusLabel(status: string): string {
 }
 
 /**
- * Etiqueta de prioridad
- */
-function getPriorityLabel(priority?: string): string {
-  if (!priority) return '-'
-  const labels: Record<string, string> = {
-    critica: 'Crítica',
-    alta: 'Alta',
-    media: 'Media',
-    baja: 'Baja'
-  }
-  return labels[priority] || priority
-}
-
-/**
  * Exportar vista de mapa con todos los marcadores
  */
 export async function exportMapViewToPDF(

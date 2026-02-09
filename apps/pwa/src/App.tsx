@@ -66,6 +66,7 @@ const Visor3DViewerPage = lazyWithReload(() => import('@/pages/Visor3D/Visor3DVi
 const Visor3DPublicPage = lazyWithReload(() => import('@/pages/Visor3D/Visor3DPublicPage').then((mod) => ({ default: mod.Visor3DPublicPage })))
 const AnalisisGraderWizardPage = lazyWithReload(() => import('@/pages/AnalisisGrader/AnalisisGraderWizardPage').then((mod) => ({ default: mod.AnalisisGraderWizardPage })))
 const AnalisisGraderSessionPage = lazyWithReload(() => import('@/pages/AnalisisGrader/AnalisisGraderSessionPage').then((mod) => ({ default: mod.AnalisisGraderSessionPage })))
+const AnalisisGraderSessionsListPage = lazyWithReload(() => import('@/pages/AnalisisGrader/AnalisisGraderSessionsListPage').then((mod) => ({ default: mod.AnalisisGraderSessionsListPage })))
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuthStore()
@@ -297,6 +298,11 @@ export function App() {
             <Route path="analisis-grader" element={
               <Suspense fallback={<LoadingScreen />}>
                 <AnalisisGraderWizardPage />
+              </Suspense>
+            } />
+            <Route path="analisis-grader/sesiones" element={
+              <Suspense fallback={<LoadingScreen />}>
+                <AnalisisGraderSessionsListPage />
               </Suspense>
             } />
             <Route path="analisis-grader/sesion/:sessionId" element={

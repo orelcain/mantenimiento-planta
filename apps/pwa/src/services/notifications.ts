@@ -64,7 +64,7 @@ export async function requestNotificationPermission(userId: string): Promise<str
         logger.info('✅ Token saved to Firestore and localStorage')
         return token
       } catch (error) {
-        logger.error('❌ Error getting token (already granted):', error instanceof Error ? error.message : String(error))
+        logger.error('❌ Error getting token (already granted)', error instanceof Error ? error : new Error(String(error)))
         return null
       }
     }
@@ -93,7 +93,7 @@ export async function requestNotificationPermission(userId: string): Promise<str
         logger.info('✅ SW registered successfully on attempt', { attempt })
         break
       } catch (swError) {
-        logger.warn(`⚠️ SW registration attempt ${attempt} failed:`, swError instanceof Error ? swError.message : String(swError))
+        logger.warn(`⚠️ SW registration attempt ${attempt} failed`, { error: swError instanceof Error ? swError.message : String(swError) })
         if (attempt < 3) {
           await new Promise(r => setTimeout(r, 500 * attempt))
         }
@@ -162,18 +162,17 @@ export async function requestNotificationPermission(userId: string): Promise<str
       
       return token
     } catch (tokenError) {
-      logger.error('❌ Failed to get token:', tokenError instanceof Error ? tokenError.message : String(tokenError))
+      logger.error('❌ Failed to get token', tokenError instanceof Error ? tokenError : new Error(String(tokenError)))
       if (tokenError instanceof Error) {
-        logger.error('❌ Token error stack:', tokenError.stack)
-        logger.error('❌ Token error name:', tokenError.name)
+        logger.error('❌ Token error details', tokenError, { name: tokenError.name, stack: tokenError.stack })
       }
-      logger.error('❌ Full error object:', tokenError)
+      logger.error('❌ Full error object', tokenError instanceof Error ? tokenError : new Error(String(tokenError)))
       return null
     }
   } catch (error) {
-    logger.error('❌ Unexpected error in requestNotificationPermission:', error instanceof Error ? error.message : String(error))
+    logger.error('❌ Unexpected error in requestNotificationPermission', error instanceof Error ? error : new Error(String(error)))
     if (error instanceof Error) {
-      logger.error('❌ Error details:', { name: error.name, stack: error.stack })
+      logger.error('❌ Error details', error, { name: error.name, stack: error.stack })
     }
     return null
   }
@@ -207,7 +206,7 @@ export function getNotificationPermission(): NotificationPermission {
 /**
  * Eliminar token FCM del usuario
  */
-export async function revokeNotificationPermission(userId: string): Promise<void> {
+export async function revokeNotificationPermission(_userId: string): Promise<void> {
   try {
     const messaging = await getMessagingInstance()
     
@@ -348,7 +347,7 @@ export function getNotificationConfig(type: NotificationType, data: any): { titl
  * Reset notificaciones después de un update/unregister
  * Limpia tokens y prepara para re-registrase
  */
-export async function resetNotifications(userId: string): Promise<void> {
+export async function resetNotifications(_userId: string): Promise<void> {
   try {
     logger.info('🔄 Resetting notifications...')
     
@@ -371,6 +370,6 @@ export async function resetNotifications(userId: string): Promise<void> {
     
     logger.info('✅ Notifications reset complete')
   } catch (error) {
-    logger.error('❌ Error resetting notifications:', error)
+    logger.error('❌ Error resetting notifications', error instanceof Error ? error : new Error(String(error)))
   }
 }

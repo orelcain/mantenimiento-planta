@@ -38,7 +38,7 @@ import {
 import { useToast } from '@/hooks/useToast'
 
 export function PermissionsPage({ isEmbedded = false }: { isEmbedded?: boolean }) {
-  const [users, setUsers] = useState<User[]>([])
+  const [_users, setUsers] = useState<User[]>([])
   const [filteredUsers, setFilteredUsers] = useState<User[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [isLoading, setIsLoading] = useState(true)

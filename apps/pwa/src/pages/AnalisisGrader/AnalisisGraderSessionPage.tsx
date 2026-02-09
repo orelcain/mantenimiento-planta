@@ -4,14 +4,16 @@
  */
 
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, Navigate } from 'react-router-dom'
 import { Card, CardContent, Button, Badge } from '@/components/ui'
 import { ArrowLeft, Loader2, AlertCircle, BarChart3 } from 'lucide-react'
+import { usePermissionsStore } from '@/store'
 import { getGraderSession } from '@/services/grader/graderSession.service'
 import { AnalisisGraderDashboardPage } from './AnalisisGraderDashboardPage'
 import type { GraderSession, ParsedMatrixData } from '@/services/grader/types'
 
 export function AnalisisGraderSessionPage() {
+  const { canSee } = usePermissionsStore()
   const { sessionId } = useParams<{ sessionId: string }>()
   const navigate = useNavigate()
   const [session, setSession] = useState<GraderSession | null>(null)
@@ -32,6 +34,10 @@ export function AnalisisGraderSessionPage() {
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false))
   }, [sessionId])
+
+  if (!canSee('analisisGrader')) {
+    return <Navigate to="/" replace />
+  }
 
   if (loading) {
     return (

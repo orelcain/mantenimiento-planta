@@ -6,8 +6,10 @@
  */
 
 import { useState, useCallback } from 'react'
-import { Card, CardContent, Badge } from '@/components/ui'
-import { Upload, Settings2, BarChart3, ChevronRight } from 'lucide-react'
+import { Navigate, useNavigate } from 'react-router-dom'
+import { Card, CardContent, Badge, Button } from '@/components/ui'
+import { Upload, Settings2, BarChart3, ChevronRight, FolderOpen } from 'lucide-react'
+import { usePermissionsStore } from '@/store'
 import { AnalisisGraderUploadPage } from './AnalisisGraderUploadPage'
 import { AnalisisGraderGatesConfigPage } from './AnalisisGraderGatesConfigPage'
 import { AnalisisGraderDashboardPage } from './AnalisisGraderDashboardPage'
@@ -22,6 +24,8 @@ const STEPS = [
 type StepId = typeof STEPS[number]['id']
 
 export function AnalisisGraderWizardPage() {
+  const { canSee } = usePermissionsStore()
+  const navigate = useNavigate()
   const [currentStep, setCurrentStep] = useState<StepId>('upload')
   const [parsedData, setParsedData] = useState<ParsedMatrixData | null>(null)
   const [gates, setGates] = useState<GateAssignment[]>(getDefaultGates())
@@ -56,6 +60,11 @@ export function AnalisisGraderWizardPage() {
     [],
   )
 
+  // Permission gate: redirect if user cannot see this module
+  if (!canSee('analisisGrader')) {
+    return <Navigate to="/" replace />
+  }
+
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -69,6 +78,10 @@ export function AnalisisGraderWizardPage() {
             Análisis de datos de clasificadora de salmones
           </p>
         </div>
+        <Button variant="outline" size="sm" onClick={() => navigate('/analisis-grader/sesiones')}>
+          <FolderOpen className="h-4 w-4 mr-1" />
+          Sesiones Guardadas
+        </Button>
       </div>
 
       {/* Stepper */}

@@ -150,9 +150,9 @@ export function RepuestoPhotosModal({
             )}
 
             {/* Nombre/descripción */}
-            {selectedPhoto.nombre && (
+            {selectedPhoto.descripcion && (
               <div className="absolute bottom-4 left-4 text-white text-sm bg-black/50 px-3 py-2 rounded">
-                {selectedPhoto.nombre}
+                {selectedPhoto.descripcion}
               </div>
             )}
           </div>

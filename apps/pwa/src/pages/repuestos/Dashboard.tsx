@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, Plus, FileText, Upload, FolderTree, ClipboardList } from 'lucide-react'
+import { AlertTriangle, Plus, FileText, Upload, FolderTree } from 'lucide-react'
 import { RepuestosTable } from '@/components/repuestos/RepuestosTable'
 import { RepuestoFormModal } from '@/components/repuestos/RepuestoForm'
 import { RepuestosFilters } from '@/components/repuestos/RepuestosFilters'
@@ -220,7 +220,7 @@ export function RepuestosDashboard() {
 
     // Seleccionar la primera máquina de la categoría
     if (machinesInCategory.length > 0) {
-      setCurrentMachine(machinesInCategory[0].id)
+      setCurrentMachine(machinesInCategory[0]!.id)
     }
   }, [selectedCategoryId, machines, subcategoryIds, setCurrentMachine])
 

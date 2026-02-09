@@ -67,7 +67,7 @@ import {
   getInspectionItems,
   getMapLocations,
   getLatestMapVersion,
-  getMapVersionById,
+  // getMapVersionById,
   uploadInspectionItemPhoto,
   uploadInspectionItemPhotos,
   updateInspectionItem,
@@ -110,7 +110,7 @@ export function InspectionsPage() {
   // Estados principales
   const [inspections, setInspections] = useState<Inspection[]>([])
   const [locations, setLocations] = useState<MapLocation[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const [_isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   
   // Modal de nueva inspección
@@ -369,8 +369,8 @@ export function InspectionsPage() {
             const parts = itemTitle.split(':')
             
             // Si hay separador y la primera parte parece un equipo (no es muy larga y está en mayúsculas preferiblemente, o simplemente tiene estructura de título)
-            if (parts.length > 1 && parts[0].length < 50) {
-               equipo = parts[0].trim()
+            if (parts.length > 1 && (parts[0]?.length ?? 0) < 50) {
+               equipo = parts[0]?.trim()
                title = parts.slice(1).join(':').trim()
             }
 
@@ -387,7 +387,7 @@ export function InspectionsPage() {
         }
       } else if (excelItems.length > 0) {
         for (let i = 0; i < excelItems.length; i++) {
-          const excelItem = excelItems[i]
+          const excelItem = excelItems[i]!
           const itemData: CreateInspectionItemDTO = {
             inspectionId: inspection.id,
             title: excelItem.actividad,
@@ -402,7 +402,7 @@ export function InspectionsPage() {
         const lines = inspectionListText.split('\n').filter(line => line.trim().length > 0)
         
         for (let i = 0; i < lines.length; i++) {
-          const line = lines[i].trim()
+          const line = lines[i]!.trim()
           // Limpiar prefijos (1. , - , * )
           const cleanTitle = line.replace(/^([0-9]+\.|-|•|\*)\s+/, '')
           
@@ -531,7 +531,7 @@ export function InspectionsPage() {
     const newPhotos = newItemPhotos.filter((_, i) => i !== index)
     setNewItemPhotos(newPhotos)
     
-    URL.revokeObjectURL(photoPreviewUrls[index])
+    URL.revokeObjectURL(photoPreviewUrls[index] ?? '')
     setPhotoPreviewUrls(prev => prev.filter((_, i) => i !== index))
   }
   
@@ -699,8 +699,8 @@ export function InspectionsPage() {
     try {
       const newInspection = await duplicateInspection(
         duplicateSourceId,
-        user.uid,
-        user.displayName || 'Usuario',
+        user.id,
+        user.nombre || 'Usuario',
         undefined,
         duplicateNewName.trim()
       )
@@ -740,7 +740,7 @@ export function InspectionsPage() {
     setEditItemCumple(item.cumple || false)
     setEditItemNoCumple(item.noCumple || false)
     setEditItemObservacion(item.observacion || '')
-    setEditItemFechaReparacion(item.fechaReparacion ? item.fechaReparacion.toISOString().split('T')[0] : '')
+    setEditItemFechaReparacion(item.fechaReparacion ? item.fechaReparacion.toISOString().split('T')[0] ?? '' : '')
     setEditItemHoraInicio(item.horaInicioItem || '')
     setEditItemHoraTermino(item.horaTerminoItem || '')
   }
@@ -767,7 +767,7 @@ export function InspectionsPage() {
   
   // Eliminar foto nueva (no guardada)
   const handleRemoveNewItemPhoto = (index: number) => {
-    URL.revokeObjectURL(newPhotosPreviewItem[index])
+    URL.revokeObjectURL(newPhotosPreviewItem[index] ?? '')
     setNewPhotosForItem(prev => prev.filter((_, i) => i !== index))
     setNewPhotosPreviewItem(prev => prev.filter((_, i) => i !== index))
   }
@@ -855,8 +855,8 @@ export function InspectionsPage() {
         cumple: item.cumple || false,
         noCumple: item.noCumple || false,
         observacion: item.observacion || '',
-        fechaInspeccion: item.fechaInspeccion ? item.fechaInspeccion.toISOString().split('T')[0] : '',
-        fechaReparacion: item.fechaReparacion ? item.fechaReparacion.toISOString().split('T')[0] : '',
+        fechaInspeccion: item.fechaInspeccion ? item.fechaInspeccion.toISOString().split('T')[0] ?? '' : '',
+        fechaReparacion: item.fechaReparacion ? item.fechaReparacion.toISOString().split('T')[0] ?? '' : '',
         horaInicioItem: item.horaInicioItem || '',
         horaTerminoItem: item.horaTerminoItem || ''
       }
@@ -880,27 +880,37 @@ export function InspectionsPage() {
     const today = now.toISOString().split('T')[0]
     const timeNow = now.toTimeString().slice(0, 5)
 
-    setDailyFormValues((prev) => ({
+    setDailyFormValues((prev) => {
+      const current: DailyFormValues = prev[itemId] ?? {
+        cumple: false,
+        noCumple: false,
+        observacion: '',
+        fechaInspeccion: '',
+        fechaReparacion: '',
+        horaInicioItem: '',
+        horaTerminoItem: '',
+      }
+      return {
       ...prev,
       [itemId]: {
-        ...prev[itemId],
+        ...current,
         [field]: value,
         ...(field === 'cumple' && value === true
           ? {
-              fechaInspeccion: prev[itemId]?.fechaInspeccion || today,
-              horaInicioItem: prev[itemId]?.horaInicioItem || timeNow,
-              horaTerminoItem: prev[itemId]?.horaTerminoItem || timeNow
+              fechaInspeccion: current.fechaInspeccion || today,
+              horaInicioItem: current.horaInicioItem || timeNow,
+              horaTerminoItem: current.horaTerminoItem || timeNow
             }
           : {}),
         ...(field === 'noCumple' && value === true
           ? {
-              fechaInspeccion: prev[itemId]?.fechaInspeccion || today,
-              horaInicioItem: prev[itemId]?.horaInicioItem || timeNow,
-              horaTerminoItem: prev[itemId]?.horaTerminoItem || timeNow
+              fechaInspeccion: current.fechaInspeccion || today,
+              horaInicioItem: current.horaInicioItem || timeNow,
+              horaTerminoItem: current.horaTerminoItem || timeNow
             }
           : {})
       }
-    }))
+    }})
   }
 
   const handleSaveDailyForm = async () => {
@@ -1638,12 +1648,12 @@ export function InspectionsPage() {
                   <div className="flex items-center justify-between mb-4">
                     <div>
                       <h3 className="font-semibold text-lg text-primary">{sortedAreas[activeTab]}</h3>
-                      <p className="text-sm text-muted-foreground">{groupedItems[sortedAreas[activeTab]].length} puntos de control</p>
+                      <p className="text-sm text-muted-foreground">{groupedItems[sortedAreas[activeTab]!]?.length ?? 0} puntos de control</p>
                     </div>
                   </div>
 
                   <div className="space-y-3">
-                    {groupedItems[sortedAreas[activeTab]].map((item, itemIdx) => {
+                    {groupedItems[sortedAreas[activeTab]!]?.map((item, itemIdx) => {
                       const values = dailyFormValues[item.id]
                       
                       // Lógica de visualización: separar Equipo vs Actividad
@@ -1653,8 +1663,8 @@ export function InspectionsPage() {
                       // Fallback para datos antiguos o estructurados como string único
                       if (!displayEquipo && displayTitle.includes(':')) {
                          const parts = displayTitle.split(':')
-                         if (parts.length > 1 && parts[0].length < 60) {
-                            displayEquipo = parts[0].trim()
+                         if (parts.length > 1 && (parts[0]?.length ?? 0) < 60) {
+                            displayEquipo = parts[0]?.trim()
                             displayTitle = parts.slice(1).join(':').trim()
                          }
                       }

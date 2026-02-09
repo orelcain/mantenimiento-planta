@@ -25,7 +25,7 @@ import {
   BarChart3,
 } from 'lucide-react'
 import { Avatar, AvatarFallback, Button } from '@/components/ui'
-import { useAuthStore, useIsAdmin, useAppStore } from '@/store'
+import { useAuthStore, useIsAdmin, useAppStore, usePermissionsStore } from '@/store'
 import { useSyncStore } from '@/store/syncStore'
 import { getZones } from '@/services/zones'
 import { getEquipments } from '@/services/equipment'
@@ -39,20 +39,22 @@ import { useToast } from '@/hooks/useToast'
 import { initUploadQueue } from '@/services/offlineUploadQueue'
 import { useUploadQueueStore } from '@/store/uploadQueueStore'
 
-const navigation = [
-  { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-  { name: 'Incidencias', href: '/incidents', icon: AlertTriangle },
-  { name: 'Evidencias', href: '/photo-evidence', icon: Camera },
-  { name: 'Inspecciones', href: '/inspections', icon: Route },
-  { name: 'Preventivo', href: '/preventive', icon: CalendarClock },
+import type { AppModule } from '@/types/permissions'
+
+const navigation: Array<{ name: string; href: string; icon: React.ElementType; module?: AppModule }> = [
+  { name: 'Dashboard', href: '/', icon: LayoutDashboard, module: 'dashboard' },
+  { name: 'Incidencias', href: '/incidents', icon: AlertTriangle, module: 'incidencias' },
+  { name: 'Evidencias', href: '/photo-evidence', icon: Camera, module: 'fotoevidencia' },
+  { name: 'Inspecciones', href: '/inspections', icon: Route, module: 'inspecciones' },
+  { name: 'Preventivo', href: '/preventive', icon: CalendarClock, module: 'preventivo' },
   { name: 'Predictivo', href: '/predictive', icon: Activity },
-  { name: 'Sensores', href: '/sensors', icon: Cpu },
-  { name: 'Visor de Mapas', href: '/map', icon: Map },
-  { name: 'Equipos', href: '/equipment', icon: Wrench },
-  { name: 'Repuestos', href: '/repuestos', icon: Package },
+  { name: 'Sensores', href: '/sensors', icon: Cpu, module: 'sensores' },
+  { name: 'Visor de Mapas', href: '/map', icon: Map, module: 'mapa' },
+  { name: 'Equipos', href: '/equipment', icon: Wrench, module: 'equipos' },
+  { name: 'Repuestos', href: '/repuestos', icon: Package, module: 'repuestos' },
   { name: 'Visor 3D', href: '/visor-3d', icon: Box },
-  { name: 'Análisis Grader', href: '/analisis-grader', icon: BarChart3 },
-  { name: 'Configuración', href: '/settings', icon: Settings },
+  { name: 'Análisis Grader', href: '/analisis-grader', icon: BarChart3, module: 'analisisGrader' },
+  { name: 'Configuración', href: '/settings', icon: Settings, module: 'configuracion' },
 ]
 
 const adminNavigation = [
@@ -179,9 +181,17 @@ export function MainLayout() {
     prevPendingRef.current = pendingWrites
   }, [pendingWrites, isOnline, setLastSyncAt, toast])
 
+  const { canSee } = usePermissionsStore()
+
+  // Filter navigation by module visibility permissions
+  const filteredNavigation = navigation.filter((item) => {
+    if (!item.module) return true // no module mapping = always visible
+    return canSee(item.module)
+  })
+
   const allNavigation = isAdmin
-    ? [...navigation, ...adminNavigation]
-    : navigation
+    ? [...filteredNavigation, ...adminNavigation]
+    : filteredNavigation
 
   const readOnlyPrefixes = ['/settings', '/admin', '/hierarchy']
   const isReadOnly = !isOnline && readOnlyPrefixes.some((p) => location.pathname.startsWith(p))
@@ -303,7 +313,7 @@ export function MainLayout() {
                       {displayName}
                     </p>
                     {user?.authProvider === 'google' && (
-                      <Mail className="h-3.5 w-3.5 text-muted-foreground" title="Cuenta Google" />
+                      <Mail className="h-3.5 w-3.5 text-muted-foreground" aria-label="Cuenta Google" />
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground">

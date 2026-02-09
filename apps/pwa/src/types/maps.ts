@@ -167,6 +167,9 @@ export interface CreateInspectionDTO {
   mapVersionId: string
   motivoInspeccion?: string
   inspectorNames?: string
+  horaInicio?: string
+  horaTermino?: string
+  folio?: string
   createdBy: string
   createdByName?: string
 }

@@ -277,8 +277,8 @@ export const MapViewer = forwardRef<MapViewerHandle, MapViewerProps>(({
   // --- TOUCH EVENTS ---
   const getTouchDistance = (touches: React.TouchList) => {
     if (touches.length < 2) return null
-    const dx = touches[0].clientX - touches[1].clientX
-    const dy = touches[0].clientY - touches[1].clientY
+    const dx = touches[0]!.clientX - touches[1]!.clientX
+    const dy = touches[0]!.clientY - touches[1]!.clientY
     return Math.sqrt(dx * dx + dy * dy)
   }
 
@@ -288,8 +288,8 @@ export const MapViewer = forwardRef<MapViewerHandle, MapViewerProps>(({
       setIsPanning(true)
       setHasMoved(false)
       setPanStart({ 
-        x: e.touches[0].clientX, 
-        y: e.touches[0].clientY, 
+        x: e.touches[0]!.clientX, 
+        y: e.touches[0]!.clientY, 
         panX: pan.x, 
         panY: pan.y 
       })
@@ -304,8 +304,8 @@ export const MapViewer = forwardRef<MapViewerHandle, MapViewerProps>(({
     
     if (e.touches.length === 1 && isPanning) {
       // Single touch - pan
-      const dx = e.touches[0].clientX - panStart.x
-      const dy = e.touches[0].clientY - panStart.y
+      const dx = e.touches[0]!.clientX - panStart.x
+      const dy = e.touches[0]!.clientY - panStart.y
       
       if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
         setHasMoved(true)
@@ -330,7 +330,7 @@ export const MapViewer = forwardRef<MapViewerHandle, MapViewerProps>(({
     if (e.touches.length === 0) {
       // All fingers lifted
       if (isPanning && !hasMoved && editable && onPositionSelect && e.changedTouches.length > 0) {
-        const touch = e.changedTouches[0]
+        const touch = e.changedTouches[0]!
         const position = getClickPosition(touch.clientX, touch.clientY)
         if (position) {
           console.log('📍 Marcador colocado (touch):', position) // DEBUG
@@ -342,8 +342,8 @@ export const MapViewer = forwardRef<MapViewerHandle, MapViewerProps>(({
     } else if (e.touches.length === 1) {
       // One finger remaining - continue pan from new position
       setPanStart({ 
-        x: e.touches[0].clientX, 
-        y: e.touches[0].clientY, 
+        x: e.touches[0]!.clientX, 
+        y: e.touches[0]!.clientY, 
         panX: pan.x, 
         panY: pan.y 
       })

@@ -518,5 +518,31 @@ service cloud.firestore {
         allow delete: if true;
       }
     }
+
+    // ============================================
+    // ANÁLISIS GRADER - Sesiones de análisis
+    // ============================================
+    match /graderAnalysisSessions/{sessionId} {
+      allow read: if isAuthenticated();
+      allow create: if isSupervisor()
+        && isValidDocSize()
+        && request.resource.data.createdBy == request.auth.uid;
+      allow update: if isSupervisor()
+        && isValidDocSize();
+      allow delete: if isAdmin();
+    }
+
+    // ============================================
+    // ANÁLISIS GRADER - Plantillas de Gates
+    // ============================================
+    match /graderGatesTemplates/{templateId} {
+      allow read: if isAuthenticated();
+      allow create: if isSupervisor()
+        && isValidDocSize()
+        && request.resource.data.createdBy == request.auth.uid;
+      allow update: if isSupervisor()
+        && isValidDocSize();
+      allow delete: if isAdmin() || (isSupervisor() && resource.data.createdBy == request.auth.uid);
+    }
   }
 }

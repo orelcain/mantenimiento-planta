@@ -109,7 +109,6 @@ export async function uploadEvidencePhoto(
       ? await compressImage(file, 1920, 0.8, true)
       : file
 
-    const photoId = generateId()
     const fileExtension =
       fileToUpload.name.split('.').pop() ||
       (fileToUpload.type === 'image/webp' ? 'webp' : 'jpg')

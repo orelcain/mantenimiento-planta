@@ -24,7 +24,7 @@ import {
 } from '@react-three/drei'
 import * as THREE from 'three'
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js'
-import type { Model3DFormat, Point3D, MaterialOverride, Annotation3D, AnnotationStatus } from '@/types/models3d'
+import type { Model3DFormat, Point3D, MaterialOverride, Annotation3D } from '@/types/models3d'
 import { AnnotationsTool } from './AnnotationsTool'
 
 // ============================================================================

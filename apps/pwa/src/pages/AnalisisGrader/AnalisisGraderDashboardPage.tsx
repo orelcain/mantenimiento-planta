@@ -25,6 +25,8 @@ import {
   Loader2,
   CheckCircle,
   XCircle,
+  FileSpreadsheet,
+  FileText,
 } from 'lucide-react'
 import { Bar, Doughnut, Line } from 'react-chartjs-2'
 import {
@@ -168,7 +170,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
     }
   }
 
-  // ——— EXPORT ———
+  // ——— EXPORT JSON ———
   const handleExport = () => {
     const blob = new Blob(
       [JSON.stringify({ analytics, insights, aiOutput, trend }, null, 2)],
@@ -178,6 +180,185 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
     a.href = URL.createObjectURL(blob)
     a.download = `grader-analysis-${new Date().toISOString().slice(0, 10)}.json`
     a.click()
+  }
+
+  // ——— EXPORT EXCEL ———
+  const handleExportExcel = async () => {
+    const XLSX = await import('xlsx')
+    const wb = XLSX.utils.book_new()
+
+    // KPIs sheet
+    const kpiRows = [
+      ['Métrica', 'Valor'],
+      ['Total Piezas', kpis.totalPieces],
+      ['Peso Total (kg)', kpis.totalWeightKg],
+      ['Punto Cero Piezas', kpis.pointZeroPieces],
+      ['Punto Cero %', kpis.pointZeroPct],
+      ['Calibre Dominante', kpis.dominantCalibre ? `${kpis.dominantCalibre.calibre} (${kpis.dominantCalibre.pct}%)` : 'N/D'],
+      ['Calidad Dominante', kpis.dominantQuality ? `${kpis.dominantQuality.quality} (${kpis.dominantQuality.pct}%)` : 'N/D'],
+    ]
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(kpiRows), 'KPIs')
+
+    // Distribution by calibre
+    if (analytics.distributionByCalibre.length > 0) {
+      const calRows = [['Calibre', 'Piezas', '%', 'Peso (kg)'], ...analytics.distributionByCalibre.map(d => [d.key, d.pieces, d.pct, d.weightKg ?? ''])]
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(calRows), 'Dist. Calibre')
+    }
+
+    // Distribution by quality
+    if (analytics.distributionByQuality.length > 0) {
+      const qualRows = [['Calidad', 'Piezas', '%', 'Peso (kg)'], ...analytics.distributionByQuality.map(d => [d.key, d.pieces, d.pct, d.weightKg ?? ''])]
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(qualRows), 'Dist. Calidad')
+    }
+
+    // Punto Cero by error
+    if (analytics.pointZeroByError.length > 0) {
+      const p0Rows = [['Error', 'Piezas', '%', 'Peso (kg)'], ...analytics.pointZeroByError.map(e => [e.error, e.pieces, e.pct, e.weightKg ?? ''])]
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(p0Rows), 'Punto Cero')
+    }
+
+    // Matrix Q×C
+    if (matrixQualities.length > 0 && matrixCalibres.length > 0) {
+      const header = ['Calidad \\ Calibre', ...matrixCalibres]
+      const matRows = matrixQualities.map(q => {
+        const row: (string | number)[] = [q]
+        matrixCalibres.forEach(c => {
+          const cell = analytics.matrixQualityCalibre[q]?.[c]
+          row.push(cell ? cell.pieces : 0)
+        })
+        return row
+      })
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([header, ...matRows]), 'Matriz QxC')
+    }
+
+    // Gate Balance
+    if (analytics.gateBalance.length > 0) {
+      const gbRows = [['Calibre', 'Demanda %', 'Gates Asignados', 'Severidad', 'Mensaje'], ...analytics.gateBalance.map(g => [g.calibre, g.demandPct, g.gatesAssigned, g.severity, g.message])]
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(gbRows), 'Balance Gates')
+    }
+
+    // Insights
+    if (insights.length > 0) {
+      const insRows = [['Severidad', 'Título', 'Evidencia', 'Recomendaciones'], ...insights.map(i => [i.severity, i.title, i.evidence.join('; '), i.recommendations.join('; ')])]
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(insRows), 'Insights')
+    }
+
+    XLSX.writeFile(wb, `grader-analysis-${new Date().toISOString().slice(0, 10)}.xlsx`)
+  }
+
+  // ——— EXPORT PDF ———
+  const handleExportPDF = async () => {
+    const { default: jsPDF } = await import('jspdf')
+    const { default: autoTable } = await import('jspdf-autotable')
+    const pdfDoc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
+    const pageW = pdfDoc.internal.pageSize.getWidth()
+    let y = 15
+
+    // Title
+    pdfDoc.setFontSize(16)
+    pdfDoc.text('Análisis Grader — Reporte', pageW / 2, y, { align: 'center' })
+    y += 8
+    pdfDoc.setFontSize(9)
+    pdfDoc.text(`Generado: ${new Date().toLocaleString()} | Dispositivo: ${config.deviceId || 'N/D'} | Período: ${analytics.config.startAt || '?'} — ${analytics.config.endAt || '?'}`, pageW / 2, y, { align: 'center' })
+    y += 10
+
+    // KPI table
+    pdfDoc.setFontSize(12)
+    pdfDoc.text('KPIs', 14, y)
+    y += 2
+    autoTable(pdfDoc, {
+      startY: y,
+      head: [['Métrica', 'Valor']],
+      body: [
+        ['Total Piezas', kpis.totalPieces.toLocaleString()],
+        ['Peso Total (kg)', kpis.totalWeightKg?.toLocaleString() ?? 'N/D'],
+        ['Punto Cero Piezas', kpis.pointZeroPieces.toLocaleString()],
+        ['Punto Cero %', `${kpis.pointZeroPct}%`],
+        ['Calibre Dominante', kpis.dominantCalibre ? `${kpis.dominantCalibre.calibre} (${kpis.dominantCalibre.pct}%)` : 'N/D'],
+        ['Calidad Dominante', kpis.dominantQuality ? `${kpis.dominantQuality.quality} (${kpis.dominantQuality.pct}%)` : 'N/D'],
+      ],
+      theme: 'grid',
+      styles: { fontSize: 8 },
+      margin: { left: 14 },
+    })
+    y = (pdfDoc as any).lastAutoTable.finalY + 8
+
+    // Distribution tables
+    if (analytics.distributionByCalibre.length > 0) {
+      if (y > 170) { pdfDoc.addPage(); y = 15 }
+      pdfDoc.setFontSize(12)
+      pdfDoc.text('Distribución por Calibre', 14, y)
+      y += 2
+      autoTable(pdfDoc, {
+        startY: y,
+        head: [['Calibre', 'Piezas', '%']],
+        body: analytics.distributionByCalibre.map(d => [d.key, d.pieces.toLocaleString(), `${d.pct}%`]),
+        theme: 'striped',
+        styles: { fontSize: 8 },
+        margin: { left: 14 },
+      })
+      y = (pdfDoc as any).lastAutoTable.finalY + 8
+    }
+
+    // Punto Cero
+    if (analytics.pointZeroByError.length > 0) {
+      if (y > 170) { pdfDoc.addPage(); y = 15 }
+      pdfDoc.setFontSize(12)
+      pdfDoc.text('Punto Cero por Causa', 14, y)
+      y += 2
+      autoTable(pdfDoc, {
+        startY: y,
+        head: [['Error', 'Piezas', '%']],
+        body: analytics.pointZeroByError.map(e => [e.error, e.pieces.toLocaleString(), `${e.pct}%`]),
+        theme: 'striped',
+        styles: { fontSize: 8 },
+        margin: { left: 14 },
+      })
+      y = (pdfDoc as any).lastAutoTable.finalY + 8
+    }
+
+    // Matrix Q×C
+    if (matrixQualities.length > 0 && matrixCalibres.length > 0) {
+      if (y > 140) { pdfDoc.addPage(); y = 15 }
+      pdfDoc.setFontSize(12)
+      pdfDoc.text('Matriz Calidad × Calibre', 14, y)
+      y += 2
+      autoTable(pdfDoc, {
+        startY: y,
+        head: [['Calidad', ...matrixCalibres]],
+        body: matrixQualities.map(q => {
+          const cells: string[] = [q]
+          matrixCalibres.forEach(c => {
+            const cell = analytics.matrixQualityCalibre[q]?.[c]
+            cells.push(cell ? `${cell.pieces} (${cell.pct}%)` : '—')
+          })
+          return cells
+        }),
+        theme: 'grid',
+        styles: { fontSize: 7 },
+        margin: { left: 14 },
+      })
+      y = (pdfDoc as any).lastAutoTable.finalY + 8
+    }
+
+    // Insights
+    if (insights.length > 0) {
+      if (y > 150) { pdfDoc.addPage(); y = 15 }
+      pdfDoc.setFontSize(12)
+      pdfDoc.text('Insights Determinísticos', 14, y)
+      y += 2
+      autoTable(pdfDoc, {
+        startY: y,
+        head: [['Severidad', 'Título', 'Evidencia', 'Recomendaciones']],
+        body: insights.map(i => [i.severity.toUpperCase(), i.title, i.evidence.join('; '), i.recommendations.join('; ')]),
+        theme: 'striped',
+        styles: { fontSize: 7, cellWidth: 'wrap' },
+        columnStyles: { 2: { cellWidth: 80 }, 3: { cellWidth: 80 } },
+        margin: { left: 14 },
+      })
+    }
+
+    pdfDoc.save(`grader-analysis-${new Date().toISOString().slice(0, 10)}.pdf`)
   }
 
   const { kpis } = analytics
@@ -264,10 +445,18 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
           <ChevronLeft className="h-4 w-4 mr-1" />
           Volver a Config
         </Button>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Button variant="outline" size="sm" onClick={handleExport}>
             <Download className="h-4 w-4 mr-1" />
-            Exportar JSON
+            JSON
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleExportExcel}>
+            <FileSpreadsheet className="h-4 w-4 mr-1" />
+            Excel
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleExportPDF}>
+            <FileText className="h-4 w-4 mr-1" />
+            PDF
           </Button>
           <Button size="sm" onClick={handleSave} disabled={saving || saved}>
             {saving ? (

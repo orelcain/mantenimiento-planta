@@ -517,7 +517,7 @@ function UserPermissionsTab() {
       tecnico: { label: 'Técnico', className: 'bg-primary' },
       usuario: { label: 'Usuario', className: 'bg-muted' },
     }
-    const roleConfig = config[rol] ?? config['usuario']
+    const roleConfig = config[rol] ?? config['usuario']!
     return <Badge className={roleConfig.className}>{roleConfig.label}</Badge>
   }
 

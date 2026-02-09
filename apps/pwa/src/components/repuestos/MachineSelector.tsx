@@ -10,10 +10,10 @@
  */
 
 import { useState, useMemo, useEffect } from 'react';
-import { ChevronDown } from 'lucide-react';
+// ChevronDown removed — unused
 import { useCurrentMachine, useActiveMachines, useMachineContext } from '@/contexts/MachineContext';
 import { useMachineCategories } from '@/hooks/repuestos/useMachineCategories';
-import type { Machine } from '@/types/repuestos';
+// Machine type removed — unused
 
 interface MachineSelectorProps {
   repuestosCounts?: Record<string, number>;
@@ -39,12 +39,6 @@ export function MachineSelector({
     if (!selectedCategoryId) return [];
     return categories.filter(c => c.parentId === selectedCategoryId && c.activa);
   }, [categories, selectedCategoryId]);
-
-  // IDs de subcategorías
-  const subcategoryIds = useMemo(() => 
-    subcategories.map(sc => sc.id), 
-    [subcategories]
-  );
 
   // Máquinas de la categoría principal (sin subcategoría)
   const directMachines = useMemo(() => {
@@ -78,7 +72,7 @@ export function MachineSelector({
     if (machinesToShow.length === 0) return;
     const inList = currentMachine && machinesToShow.some((m) => m.id === currentMachine.id);
     if (!inList) {
-      setCurrentMachine(machinesToShow[0].id);
+      setCurrentMachine(machinesToShow[0]!.id);
     }
   }, [machinesToShow, currentMachine, setCurrentMachine]);
 
