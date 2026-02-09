@@ -638,29 +638,62 @@ export function computeAnalytics(
       totalPieces: v.total || undefined,
     }))
 
-  // ——————— BALANCE DE GATES ———————
+  // ——————— BALANCE DE GATES (con asignación ideal) ———————
   const activeGates = gates.filter((g) => g.active)
+  const totalActive = activeGates.length
   const gateBalance: GateBalanceInsight[] = []
+
+  // Largest-remainder method para asignación ideal proporcional a demanda
+  const idealRaw = distributionByCalibre.map((d) => ({
+    calibre: d.key as CalibreRange,
+    demandPct: d.pct,
+    exact: (d.pct / 100) * totalActive,
+    floor: Math.floor((d.pct / 100) * totalActive),
+    remainder: ((d.pct / 100) * totalActive) % 1,
+  }))
+  let totalFloor = idealRaw.reduce((s, r) => s + r.floor, 0)
+  const sorted = [...idealRaw].sort((a, b) => b.remainder - a.remainder)
+  for (const r of sorted) {
+    if (totalFloor >= totalActive) break
+    r.floor += 1
+    totalFloor += 1
+  }
+  const idealMap = new Map(idealRaw.map((r) => [r.calibre, r.floor]))
 
   for (const dist of distributionByCalibre) {
     const calibre = dist.key as CalibreRange
     const assigned = activeGates.filter((g) => g.assignedCalibre === calibre).length
+    const ideal = idealMap.get(calibre) ?? 0
+    const gap = ideal - assigned // positivo = déficit
 
     let severity: 'info' | 'warn' | 'critical' = 'info'
-    let message = `Calibre ${calibre}: ${dist.pct}% demanda, ${assigned} gate(s) asignados.`
+    let message = `Calibre ${calibre}: ${dist.pct}% demanda, ${assigned}/${ideal} gate(s).`
 
-    if (dist.pct >= 40 && assigned < 3) {
+    if (gap >= 2) {
       severity = 'critical'
-      message = `Demanda ${dist.pct}% con solo ${assigned} gate(s) asignados: alto riesgo de congestión y Punto Cero.`
-    } else if (dist.pct >= 25 && assigned < 2) {
+      message = `Déficit de ${gap} gate(s): demanda ${dist.pct}% necesita ~${ideal} pero tiene ${assigned}. Alto riesgo de congestión.`
+    } else if (gap === 1 && dist.pct >= 15) {
       severity = 'warn'
-      message = `Demanda ${dist.pct}% con solo ${assigned} gate(s): considere reasignar para reducir esperas.`
-    } else if (dist.pct < 10 && assigned > 2) {
+      message = `Falta 1 gate: demanda ${dist.pct}% necesita ~${ideal} pero tiene ${assigned}. Esperas potenciales.`
+    } else if (gap <= -2) {
       severity = 'info'
-      message = `Calibre ${calibre} solo ${dist.pct}% demanda pero ${assigned} gates: podría liberar gates.`
+      message = `Superávit de ${-gap} gate(s): demanda ${dist.pct}% necesita ~${ideal} pero tiene ${assigned}. Podría liberar gates.`
+    } else if (gap === -1 && dist.pct < 10) {
+      severity = 'info'
+      message = `Calibre ${calibre} solo ${dist.pct}% demanda pero ${assigned} gates (ideal: ${ideal}): podría liberar 1 gate.`
     }
 
-    gateBalance.push({ calibre, demandPct: dist.pct, gatesAssigned: assigned, severity, message })
+    gateBalance.push({ calibre, demandPct: dist.pct, gatesAssigned: assigned, idealGates: ideal, gap, severity, message })
+  }
+
+  // Allocation quality score (100 = perfect proportional match)
+  let allocationScore = 100
+  if (totalActive > 0) {
+    const totalDeviation = gateBalance.reduce((sum, gb) => {
+      const currentPct = (gb.gatesAssigned / totalActive) * 100
+      return sum + Math.abs(currentPct - gb.demandPct)
+    }, 0)
+    allocationScore = round(Math.max(0, 100 - totalDeviation / 2))
   }
 
   // ——————— ANÁLISIS POR LOTE ———————
@@ -900,83 +933,156 @@ export function computeAnalytics(
     gateAdvancedStats.sort((a, b) => b.pieces - a.pieces)
   }
 
-  // ——————— SUGERENCIAS DE REASIGNACIÓN DE GATES ———————
+  // ——————— SUGERENCIAS DE REASIGNACIÓN DE GATES (v2 — robust) ———————
+  // Tres categorías:
+  //  1. CORRECTION: Etiqueta del sistema ≠ comportamiento real de la máquina
+  //  2. OPTIMIZATION: Redistribuir gates según demanda (déficit↔superávit)
+  //  3. INVESTIGATE: Anomalías (alta variabilidad) que requieren verificación
   const gateSwapSuggestions: GateSwapSuggestion[] = []
 
   if (gateAdvancedStats.length > 0 && distributionByCalibre.length > 0) {
+    // Pre-compute lookup de balance
+    const balanceMap = new Map(gateBalance.map((gb) => [gb.calibre, gb]))
+
+    // Track gates already suggested to avoid duplicates
+    const suggestedGates = new Set<number>()
+
+    // ——— 1. CORRECTIONS: mismatch de etiqueta ———
+    for (const gs of gateAdvancedStats) {
+      if (gs.mismatchPct <= 50) continue // solo sugerir si >50% de piezas no coinciden
+
+      // Encontrar calibre real dominante
+      let topCal = gs.assignedCalibre as string
+      let topCalPieces = 0
+      for (const [c, p] of Object.entries(gs.calibreBreakdown)) {
+        if (p > topCalPieces) { topCalPieces = p; topCal = c }
+      }
+      if (topCal === gs.assignedCalibre) continue // no hay conflicto
+
+      const currentBal = balanceMap.get(gs.assignedCalibre)
+      const targetBal = balanceMap.get(topCal as CalibreRange)
+
+      // Evaluar si cambiar la etiqueta mejora la asignación
+      const currentCalHasSurplus = currentBal ? currentBal.gap < 0 : false
+      const targetCalHasDeficit = targetBal ? targetBal.gap > 0 : false
+
+      let reason: string
+      let impactScore: number
+      const evidence: string[] = [
+        `Mismatch: ${gs.mismatchPct}% de piezas no son ${gs.assignedCalibre}`,
+        `Calibre real dominante: ${topCal} (${topCalPieces} pz de ${gs.pieces})`,
+      ]
+
+      if (currentCalHasSurplus && targetCalHasDeficit) {
+        // Caso ideal: corregir etiqueta Y mejora el balance
+        reason = `Gate ${gs.gateNumber} etiquetado como ${gs.assignedCalibre} pero la máquina envía ${topCal} (${round(100 - gs.mismatchPct)}% coinciden). `
+          + `Corregir la etiqueta beneficia el balance: ${gs.assignedCalibre} tiene superávit y ${topCal} tiene déficit.`
+        impactScore = round(Math.min(100, gs.mismatchPct * 0.8 + 20))
+        evidence.push(
+          `${gs.assignedCalibre}: ${currentBal?.gatesAssigned}/${currentBal?.idealGates} gates (superávit)`,
+          `${topCal}: ${targetBal?.gatesAssigned}/${targetBal?.idealGates} gates (déficit)`,
+        )
+      } else if (currentBal && currentBal.gap > 0) {
+        // Eliminar un gate de un calibre con DÉFICIT → peligroso
+        reason = `⚠️ Gate ${gs.gateNumber} etiquetado como ${gs.assignedCalibre} pero recibe ${topCal}. `
+          + `Sin embargo, ${gs.assignedCalibre} tiene DÉFICIT de gates (${currentBal.gatesAssigned}/${currentBal.idealGates}). `
+          + `Verifique la configuración de la máquina: puede que el gate deba recibir ${gs.assignedCalibre} y no lo está haciendo.`
+        impactScore = round(Math.min(100, gs.mismatchPct * 0.6))
+        evidence.push(
+          `⚠ ${gs.assignedCalibre}: demanda ${currentBal.demandPct}% con ${currentBal.gatesAssigned} gates (necesita ${currentBal.idealGates})`,
+          `Acción recomendada: revisar por qué la máquina no envía ${gs.assignedCalibre} a este gate`,
+        )
+      } else {
+        // Caso neutral: la corrección no empeora pero tampoco optimiza
+        reason = `Gate ${gs.gateNumber} etiquetado como ${gs.assignedCalibre} pero la máquina envía ${topCal} (${round(100 - gs.mismatchPct)}%). `
+          + `Corrija la etiqueta en el sistema o verifique la configuración de la máquina.`
+        impactScore = round(Math.min(80, gs.mismatchPct * 0.5))
+      }
+
+      gateSwapSuggestions.push({
+        type: 'correction',
+        gateNumber: gs.gateNumber,
+        currentCalibre: gs.assignedCalibre,
+        suggestedCalibre: topCal as CalibreRange,
+        reason,
+        impactScore,
+        evidence,
+      })
+      suggestedGates.add(gs.gateNumber)
+    }
+
+    // ——— 2. OPTIMIZATION: redistribuir según demanda ———
+    // Solo sugerir mover gates de calibres con superávit a calibres con déficit
+    const deficitCals = gateBalance
+      .filter((gb) => gb.gap > 0)
+      .sort((a, b) => b.gap - a.gap || b.demandPct - a.demandPct)
+
+    const surplusCals = gateBalance
+      .filter((gb) => gb.gap < 0)
+      .sort((a, b) => a.gap - b.gap) // mayor superávit primero (gap más negativo)
+
+    for (const deficit of deficitCals) {
+      if (deficit.gap <= 0) continue
+
+      for (const surplus of surplusCals) {
+        if (surplus.gap >= 0) continue // ya fue donado todo el superávit
+
+        // Buscar el gate candidato en el calibre con superávit:
+        // preferir gate con menor utilización (menos impacto al moverlo)
+        const candidates = gateAdvancedStats
+          .filter((g) => g.assignedCalibre === surplus.calibre && !suggestedGates.has(g.gateNumber))
+          .sort((a, b) => a.utilizationPct - b.utilizationPct)
+
+        const donor = candidates[0]
+        if (!donor) continue
+
+        const diffDemand = deficit.demandPct - surplus.demandPct
+
+        gateSwapSuggestions.push({
+          type: 'optimization',
+          gateNumber: donor.gateNumber,
+          currentCalibre: surplus.calibre,
+          suggestedCalibre: deficit.calibre,
+          reason: `Reasignar Gate ${donor.gateNumber} de ${surplus.calibre} a ${deficit.calibre}: `
+            + `${deficit.calibre} tiene ${deficit.demandPct}% demanda con ${deficit.gatesAssigned} gates (necesita ${deficit.idealGates}), `
+            + `${surplus.calibre} tiene ${surplus.demandPct}% demanda con ${surplus.gatesAssigned} gates (necesita ${surplus.idealGates}).`,
+          impactScore: round(Math.min(100, Math.max(10, diffDemand * 1.5))),
+          evidence: [
+            `Déficit ${deficit.calibre}: ${deficit.gatesAssigned}/${deficit.idealGates} gates (${deficit.demandPct}% demanda)`,
+            `Superávit ${surplus.calibre}: ${surplus.gatesAssigned}/${surplus.idealGates} gates (${surplus.demandPct}% demanda)`,
+            `Gate ${donor.gateNumber}: utilización ${donor.utilizationPct}% (menor impacto al reasignar)`,
+          ],
+        })
+        suggestedGates.add(donor.gateNumber)
+        // Ajustar contadores virtuales para no sugerir de más
+        surplus.gap += 1
+        deficit.gap -= 1
+        if (deficit.gap <= 0) break
+      }
+    }
+
+    // ——— 3. INVESTIGATE: alta variabilidad ———
     const globalAvgCV = gateAdvancedStats.length > 0
       ? calcMean(gateAdvancedStats.map((g) => g.cv))
       : 0
 
     for (const gs of gateAdvancedStats) {
-      // 1. Alta variabilidad: CV del gate > 2× promedio global
+      if (suggestedGates.has(gs.gateNumber)) continue
       if (gs.cv > globalAvgCV * 2 && gs.cv > 0.15) {
         gateSwapSuggestions.push({
-          type: 'reassign',
+          type: 'investigate',
           gateNumber: gs.gateNumber,
           currentCalibre: gs.assignedCalibre,
-          suggestedCalibre: gs.assignedCalibre,
-          reason: `Gate ${gs.gateNumber} tiene alta variabilidad de peso (CV=${gs.cv}). Podría estar recibiendo piezas de calibres mixtos.`,
-          impactScore: round(Math.min(100, gs.cv * 200)),
+          suggestedCalibre: gs.assignedCalibre, // no sugiere cambio, solo investigación
+          reason: `Gate ${gs.gateNumber} tiene variabilidad de peso anormalmente alta (CV=${(gs.cv * 100).toFixed(1)}%). `
+            + `Puede estar recibiendo piezas de calibres mixtos o tener un problema mecánico.`,
+          impactScore: round(Math.min(60, gs.cv * 150)),
           evidence: [
-            `CV: ${gs.cv} (promedio global: ${round(globalAvgCV, 3)})`,
+            `CV: ${(gs.cv * 100).toFixed(1)}% (promedio global: ${(globalAvgCV * 100).toFixed(1)}%)`,
             `StdDev: ${gs.stdDevWeightGrams}g, Avg: ${gs.avgWeightGrams}g`,
+            `Acción: verificar sensores y calibración de este gate`,
           ],
         })
-      }
-
-      // 2. Alto mismatch: >30% de piezas no coinciden con calibre asignado
-      if (gs.mismatchPct > 30) {
-        // Find what calibre actually dominates this gate
-        let topCal = gs.assignedCalibre as string
-        let topCalPieces = 0
-        for (const [c, p] of Object.entries(gs.calibreBreakdown)) {
-          if (p > topCalPieces) { topCalPieces = p; topCal = c }
-        }
-        if (topCal !== gs.assignedCalibre) {
-          gateSwapSuggestions.push({
-            type: 'reassign',
-            gateNumber: gs.gateNumber,
-            currentCalibre: gs.assignedCalibre,
-            suggestedCalibre: topCal as CalibreRange,
-            reason: `Gate ${gs.gateNumber} está asignado a ${gs.assignedCalibre} pero el ${round(100 - gs.mismatchPct)}% de sus piezas son ${topCal}. Considere reasignar.`,
-            impactScore: round(gs.mismatchPct),
-            evidence: [
-              `Mismatch: ${gs.mismatchPct}% de piezas no coinciden`,
-              `Calibre real dominante: ${topCal} (${topCalPieces} pz)`,
-              `Piezas totales en gate: ${gs.pieces}`,
-            ],
-          })
-        }
-      }
-    }
-
-    // 3. Calibres con mucha demanda pero pocos gates vs calibres con poca demanda y muchos gates
-    for (const gb of gateBalance) {
-      if (gb.severity === 'critical' && gb.gatesAssigned < 2) {
-        // Find a gate with low demand that could be redirected
-        const lowDemand = gateBalance.find(
-          (g) => g.calibre !== gb.calibre && g.demandPct < 10 && g.gatesAssigned > 1,
-        )
-        if (lowDemand) {
-          const donorGate = gateAdvancedStats.find(
-            (g) => g.assignedCalibre === lowDemand.calibre,
-          )
-          if (donorGate) {
-            gateSwapSuggestions.push({
-              type: 'swap',
-              gateNumber: donorGate.gateNumber,
-              currentCalibre: lowDemand.calibre,
-              suggestedCalibre: gb.calibre,
-              reason: `Reasignar gate ${donorGate.gateNumber} de ${lowDemand.calibre} (${lowDemand.demandPct}% demanda) a ${gb.calibre} (${gb.demandPct}% demanda) para reducir congestión.`,
-              impactScore: round(Math.min(100, gb.demandPct - lowDemand.demandPct)),
-              evidence: [
-                `${gb.calibre}: ${gb.demandPct}% demanda con ${gb.gatesAssigned} gate(s)`,
-                `${lowDemand.calibre}: ${lowDemand.demandPct}% demanda con ${lowDemand.gatesAssigned} gate(s)`,
-              ],
-            })
-          }
-        }
       }
     }
 
@@ -1051,6 +1157,7 @@ export function computeAnalytics(
     matrixEnhanced,
     gateAdvancedStats,
     gateSwapSuggestions,
+    allocationScore,
     notes,
   }
 }

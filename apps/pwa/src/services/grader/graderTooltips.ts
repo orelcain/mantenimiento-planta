@@ -123,7 +123,12 @@ export const GRADER_TOOLTIPS: Record<string, TooltipEntry> = {
   'matrix.maxCell': 'Celda con mayor cantidad de piezas. Define la combinación Q×C dominante de la producción.',
 
   // ─── Balance Gates ─────────────────────────────────────────
-  'gate.balance': 'Compara la demanda por calibre (% de piezas productivas) con la cantidad de gates asignados a cada calibre.',
+  'gate.balance': {
+    title: 'Balance Demanda vs Gates',
+    text: 'Compara la demanda real por calibre con la asignación de gates. Calcula la asignación ideal proporcional a demanda (método largest-remainder).',
+    formula: 'Ideal(c) = round(demanda_c% × N_gates / 100)',
+    example: 'Si 6-8lb = 53% demanda y hay 12 gates → ideal = 6 gates',
+  },
   'gate.demandPct': 'Porcentaje de piezas productivas de este calibre respecto al total productivo.',
   'gate.gatesAssigned': 'Cantidad de compuertas (de las 12) configuradas para recibir este calibre.',
   'gate.stats': 'Estadísticas detalladas por compuerta: peso promedio, variabilidad, utilización y match con calibre asignado.',
@@ -154,7 +159,13 @@ export const GRADER_TOOLTIPS: Record<string, TooltipEntry> = {
     text: 'Porcentaje de piezas cuyo peso NO corresponde al calibre asignado a esta compuerta. Alto mismatch = mala clasificación.',
     example: 'Gate asignado a 200-300g pero recibe piezas de 150g → mismatch',
   },
-  'gate.swap': 'Sugerencias automáticas de reasignación basadas en estadísticas de uso real vs configuración.',
+  'gate.swap': {
+    title: 'Sugerencias de Reasignación',
+    text: 'Tres tipos: (1) Corrección — la etiqueta del sistema no coincide con lo que la máquina envía al gate. '
+      + '(2) Optimización — redistribuir gates de calibres con superávit a calibres con déficit. '
+      + '(3) Investigación — anomalías de variabilidad que requieren verificación.',
+    example: 'Si 6-8lb tiene 53% demanda y 5 gates (ideal: 6), busca un calibre con superávit para donar 1 gate.',
+  },
 
   // ─── Insights ──────────────────────────────────────────────
   'insights.deterministic': 'Alertas generadas automáticamente por reglas estadísticas. No requieren IA.',

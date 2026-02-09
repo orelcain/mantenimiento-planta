@@ -268,6 +268,10 @@ export interface GateBalanceInsight {
   calibre: CalibreRange;
   demandPct: number; // 0..100
   gatesAssigned: number;
+  /** Asignación ideal proporcional a demanda (largest-remainder) */
+  idealGates: number;
+  /** idealGates - gatesAssigned: positivo = déficit, negativo = superávit */
+  gap: number;
   severity: 'info' | 'warn' | 'critical';
   message: string;
 }
@@ -349,7 +353,10 @@ export interface GateAdvancedStats {
 
 /** Sugerencia de reasignación de gate */
 export interface GateSwapSuggestion {
-  type: 'swap' | 'reassign' | 'add';
+  /** correction: etiqueta del sistema no coincide con la máquina;
+   *  optimization: redistribuir gates según demanda;
+   *  investigate: anomalía que requiere verificación */
+  type: 'correction' | 'optimization' | 'investigate' | 'swap' | 'reassign' | 'add';
   gateNumber: number;
   currentCalibre: CalibreRange;
   suggestedCalibre: CalibreRange;
@@ -384,6 +391,8 @@ export interface GraderAnalyticsResult {
   gateAdvancedStats: GateAdvancedStats[];
   /** Sugerencias de reasignación de gates */
   gateSwapSuggestions: GateSwapSuggestion[];
+  /** Score de calidad de asignación 0-100 (100 = asignación perfecta proporcional a demanda) */
+  allocationScore: number;
   notes: string[];
 }
 

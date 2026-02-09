@@ -1683,6 +1683,25 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
 
         {/* BALANCE GATES */}
         <TabsContent value="balance" className="space-y-4">
+          {/* Allocation Score KPI */}
+          <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30">
+            <div className={cn(
+              'text-2xl font-bold',
+              analytics.allocationScore >= 80 ? 'text-emerald-600' :
+              analytics.allocationScore >= 60 ? 'text-amber-600' : 'text-red-600',
+            )}>
+              {analytics.allocationScore ?? '—'}
+            </div>
+            <div>
+              <p className="text-sm font-medium">Score de Asignación</p>
+              <p className="text-xs text-muted-foreground">
+                {(analytics.allocationScore ?? 0) >= 80 ? 'Buena distribución de gates relativa a demanda' :
+                 (analytics.allocationScore ?? 0) >= 60 ? 'Distribución mejorable — revisar sugerencias' :
+                 'Distribución muy desbalanceada — acción recomendada'}
+              </p>
+            </div>
+          </div>
+
           <Card>
             <CardHeader>
               <CardTitle className="text-sm flex items-center gap-2">
@@ -1713,12 +1732,20 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                       ) : (
                         <Info className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
                       )}
-                      <div>
+                      <div className="flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <Badge variant="outline" className="text-xs">{gb.calibre}</Badge>
                           <span className="text-sm font-medium">
-                            Demanda {gb.demandPct}% — {gb.gatesAssigned} gate(s)
+                            Demanda {gb.demandPct}% — {gb.gatesAssigned}/{gb.idealGates} gate(s)
                           </span>
+                          {gb.gap > 0 && (
+                            <Badge variant="destructive" className="text-[10px]">-{gb.gap} gate(s)</Badge>
+                          )}
+                          {gb.gap < 0 && (
+                            <Badge variant="outline" className="text-[10px] text-emerald-600 border-emerald-300">
+                              +{-gb.gap} extra
+                            </Badge>
+                          )}
                         </div>
                         <p className="text-xs text-muted-foreground mt-1">{gb.message}</p>
                       </div>
@@ -1740,6 +1767,13 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                             label: 'Gates Asignados',
                             data: analytics.gateBalance.map((g) => g.gatesAssigned),
                             backgroundColor: 'rgba(16,185,129,0.7)',
+                          },
+                          {
+                            label: 'Gates Ideal',
+                            data: analytics.gateBalance.map((g) => g.idealGates),
+                            backgroundColor: 'rgba(168,85,247,0.4)',
+                            borderColor: 'rgba(168,85,247,0.8)',
+                            borderWidth: 1,
                           },
                         ],
                       }}
@@ -1887,7 +1921,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                   <InfoTooltip {...getTooltipProps('gate.swap')} />
                 </CardTitle>
                 <p className="text-xs text-muted-foreground">
-                  Basadas en estadísticas de uso real vs configuración
+                  Basadas en asignación ideal proporcional a demanda, mismatch real vs etiqueta, y variabilidad
                 </p>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -2166,15 +2200,31 @@ function AIOutputPanel({ output }: { output: AIGraderOutput }) {
 
 function SwapSuggestionCard({ suggestion }: { suggestion: GateSwapSuggestion }) {
   const typeLabels: Record<string, string> = {
+    correction: 'Corrección',
+    optimization: 'Optimización',
+    investigate: 'Investigar',
     swap: 'Intercambiar',
     reassign: 'Reasignar',
     add: 'Agregar',
   }
   const typeColors: Record<string, string> = {
+    correction: 'text-amber-600 border-amber-300',
+    optimization: 'text-purple-600 border-purple-300',
+    investigate: 'text-sky-600 border-sky-300',
     swap: 'text-purple-600 border-purple-300',
     reassign: 'text-blue-600 border-blue-300',
     add: 'text-green-600 border-green-300',
   }
+  const typeIcons: Record<string, string> = {
+    correction: '🏷️',
+    optimization: '⚡',
+    investigate: '🔍',
+    swap: '🔄',
+    reassign: '🔹',
+    add: '➕',
+  }
+
+  const showArrow = suggestion.type !== 'investigate' && suggestion.currentCalibre !== suggestion.suggestedCalibre
 
   return (
     <div className={cn(
@@ -2185,10 +2235,11 @@ function SwapSuggestionCard({ suggestion }: { suggestion: GateSwapSuggestion }) 
     )}>
       <div className="flex items-center gap-2 flex-wrap">
         <Badge variant="outline" className={cn('text-[10px]', typeColors[suggestion.type])}>
-          {typeLabels[suggestion.type] || suggestion.type}
+          {typeIcons[suggestion.type] || ''} {typeLabels[suggestion.type] || suggestion.type}
         </Badge>
         <span className="text-sm font-medium">
-          Gate {suggestion.gateNumber}: {suggestion.currentCalibre} → {suggestion.suggestedCalibre}
+          Gate {suggestion.gateNumber}: {suggestion.currentCalibre}
+          {showArrow && <> → {suggestion.suggestedCalibre}</>}
         </span>
         <Badge variant={suggestion.impactScore >= 70 ? 'destructive' : 'outline'} className="text-[10px] ml-auto">
           Impacto: {suggestion.impactScore}
@@ -2198,7 +2249,9 @@ function SwapSuggestionCard({ suggestion }: { suggestion: GateSwapSuggestion }) 
       {suggestion.evidence.length > 0 && (
         <div className="mt-1.5 space-y-0.5">
           {suggestion.evidence.map((e, i) => (
-            <p key={i} className="text-[11px] text-muted-foreground">📊 {e}</p>
+            <p key={i} className="text-[11px] text-muted-foreground">
+              {e.startsWith('⚠') ? e : `📊 ${e}`}
+            </p>
           ))}
         </div>
       )}
