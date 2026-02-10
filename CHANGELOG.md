@@ -7,6 +7,15 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.19] - 2026-02-10
+
+### 📊 Filtro por tipo de error en P0
+
+#### Mejoras
+- **P0 Pivote**: Filtros por tipo de error (Fuera de límites, Fuera de rango, No leído por fotocélula, Puerta no preparada, etc.) como slicers de Excel.
+- **Gráfico barras apiladas**: Barras Error × Calidad por Calibre con stacks por tipo de error y colores por calidad.
+- **Tabla pivote filtrable**: Tabla y totales se actualizan según el filtro seleccionado.
+
 ## [2.47.18] - 2026-02-10
 
 ### ⏰ Turnos con hora y minuto

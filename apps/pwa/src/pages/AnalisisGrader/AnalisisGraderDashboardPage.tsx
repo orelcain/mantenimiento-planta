@@ -98,6 +98,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
   const [aiRawText, setAiRawText] = useState<string | null>(null)
   const [reportMode, setReportMode] = useState<'light' | 'dark'>('dark')
   const [expandedCause, setExpandedCause] = useState<string | null>(null)
+  const [p0ErrorFilter, setP0ErrorFilter] = useState<string | null>(null)
   const dashRef = useRef<HTMLDivElement>(null)
 
   // Compute analytics
@@ -986,7 +987,90 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
           )}
 
           {/* Tabla Pivote: Error × Calidad × Calibre */}
-          {analytics.pointZeroClassification.hierarchy.length > 0 && (
+          {analytics.pointZeroClassification.hierarchy.length > 0 && (() => {
+            const allRows = analytics.pointZeroClassification.hierarchy
+            const filteredRows = p0ErrorFilter
+              ? allRows.filter((r) => r.error === p0ErrorFilter)
+              : allRows
+
+            // Unique error labels for filter chips
+            const uniqueErrors = Array.from(new Set(allRows.map((r) => r.error)))
+
+            // Filtered total
+            const filteredTotal = filteredRows.reduce((sum, r) => sum + r.pieces, 0)
+
+            // Build grouped bar chart data: Error × Calidad × Calibre
+            const errorGroupsForChart = new Map<string, Map<string, Map<string, number>>>()
+            for (const r of filteredRows) {
+              if (!errorGroupsForChart.has(r.error)) errorGroupsForChart.set(r.error, new Map())
+              const qMap = errorGroupsForChart.get(r.error)!
+              if (!qMap.has(r.quality)) qMap.set(r.quality, new Map())
+              const cMap = qMap.get(r.quality)!
+              cMap.set(r.calibre, (cMap.get(r.calibre) || 0) + r.pieces)
+            }
+
+            // Build labels: "Calibre\nCalidad\nError"
+            const barLabels: string[] = []
+            const barValues: number[] = []
+            const barColors: string[] = []
+            const errorColorMap: Record<string, string> = {
+              'Fuera de rango': 'rgba(239,68,68,0.75)',
+              'Fuera de límites': 'rgba(245,158,11,0.75)',
+              'No leído por fotocélula': 'rgba(139,92,246,0.75)',
+              'Too close or too long': 'rgba(59,130,246,0.75)',
+              'Puerta no preparada': 'rgba(16,185,129,0.75)',
+              'Otro / Desconocido': 'rgba(107,114,128,0.75)',
+            }
+
+            for (const [errorLabel, qMap] of errorGroupsForChart) {
+              for (const [, cMap] of qMap) {
+                for (const [calibre, pieces] of Array.from(cMap.entries()).sort((a, b) => b[1] - a[1])) {
+                  barLabels.push(`${calibre}`)
+                  barValues.push(pieces)
+                  barColors.push(errorColorMap[errorLabel] || 'rgba(107,114,128,0.75)')
+                }
+              }
+            }
+
+            // Better chart: datasets per error group (stacked within quality)
+            // Group data for multi-axis bar: one dataset per Error+Quality
+            const chartGroups: { error: string; quality: string; calibre: string; pieces: number }[] = []
+            for (const r of filteredRows) {
+              chartGroups.push({ error: r.error, quality: r.quality, calibre: r.calibre, pieces: r.pieces })
+            }
+
+            // Unique calibres for x-axis labels
+            const allCalibres = Array.from(new Set(filteredRows.map((r) => r.calibre))).sort()
+
+            // Dataset per (error, quality) combination
+            const dsKeys = Array.from(new Set(filteredRows.map((r) => `${r.error}|${r.quality}`)))
+            const qualityColorMap: Record<string, string> = {
+              'Premium': 'rgba(16,185,129,0.8)',
+              'Industrial': 'rgba(59,130,246,0.8)',
+              'Grado': 'rgba(245,158,11,0.8)',
+              'D': 'rgba(239,68,68,0.8)',
+              'Unknown': 'rgba(107,114,128,0.8)',
+            }
+
+            const pivotBarDatasets = dsKeys.map((key) => {
+              const parts = key.split('|')
+              const error = parts[0] ?? ''
+              const quality = parts[1] ?? ''
+              const data = allCalibres.map((cal) => {
+                const match = filteredRows.find((r) => r.error === error && r.quality === quality && r.calibre === cal)
+                return match ? match.pieces : 0
+              })
+              return {
+                label: `${error} — ${quality}`,
+                data,
+                backgroundColor: qualityColorMap[quality] || 'rgba(107,114,128,0.6)',
+                borderColor: errorColorMap[error] || 'rgba(107,114,128,1)',
+                borderWidth: 1,
+                stack: error,
+              }
+            })
+
+            return (
             <Card>
               <CardHeader>
                 <CardTitle className="text-sm flex items-center gap-2">
@@ -995,10 +1079,77 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                   <InfoTooltip {...getTooltipProps('pz.pivote')} />
                 </CardTitle>
                 <p className="text-xs text-muted-foreground">
-                  Desglose jerárquico: Error → Calidad → Calibre (como tabla pivote Marelec)
+                  Desglose jerárquico: Error → Calidad → Calibre. Filtra por tipo de error.
                 </p>
+                {/* Filtros por tipo de error */}
+                <div className="flex flex-wrap gap-2 mt-2">
+                  <Badge
+                    variant={p0ErrorFilter === null ? 'default' : 'outline'}
+                    className="cursor-pointer text-xs"
+                    onClick={() => setP0ErrorFilter(null)}
+                  >
+                    Todos ({analytics.pointZeroClassification.totalPointZeroPieces.toLocaleString()})
+                  </Badge>
+                  {uniqueErrors.map((errorLabel) => {
+                    const errorTotal = allRows.filter((r) => r.error === errorLabel).reduce((s, r) => s + r.pieces, 0)
+                    return (
+                      <Badge
+                        key={errorLabel}
+                        variant={p0ErrorFilter === errorLabel ? 'default' : 'outline'}
+                        className="cursor-pointer text-xs"
+                        onClick={() => setP0ErrorFilter(p0ErrorFilter === errorLabel ? null : errorLabel)}
+                      >
+                        {errorLabel} ({errorTotal.toLocaleString()})
+                      </Badge>
+                    )
+                  })}
+                </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-6">
+                {/* Gráfico de barras agrupadas */}
+                {allCalibres.length > 0 && pivotBarDatasets.length > 0 && (
+                  <div className="w-full" style={{ minHeight: 250 }}>
+                    <Bar
+                      data={{ labels: allCalibres, datasets: pivotBarDatasets }}
+                      options={{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: { mode: 'index', intersect: false },
+                        plugins: {
+                          legend: {
+                            position: 'bottom',
+                            labels: { font: { size: 10 }, boxWidth: 14 },
+                          },
+                          tooltip: {
+                            callbacks: {
+                              label: (ctx) => {
+                                const v = ctx.parsed.y
+                                if (!v) return ''
+                                const pct = filteredTotal > 0 ? ((v / filteredTotal) * 100).toFixed(1) : '0'
+                                return `${ctx.dataset.label}: ${v.toLocaleString()} pz (${pct}%)`
+                              },
+                            },
+                          },
+                        },
+                        scales: {
+                          x: {
+                            stacked: true,
+                            ticks: { font: { size: 10 } },
+                            grid: { color: 'rgba(128,128,128,0.1)' },
+                          },
+                          y: {
+                            stacked: true,
+                            beginAtZero: true,
+                            grid: { color: 'rgba(128,128,128,0.1)' },
+                          },
+                        },
+                      }}
+                      height={280}
+                    />
+                  </div>
+                )}
+
+                {/* Tabla pivote */}
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
@@ -1011,10 +1162,9 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                     </thead>
                     <tbody>
                       {(() => {
-                        const rows = analytics.pointZeroClassification.hierarchy
                         // Group by error then quality
-                        const errorGroups = new Map<string, { cause: string; rows: typeof rows; total: number }>()
-                        for (const r of rows) {
+                        const errorGroups = new Map<string, { cause: string; rows: typeof filteredRows; total: number }>()
+                        for (const r of filteredRows) {
                           const g = errorGroups.get(r.error) || { cause: r.error, rows: [], total: 0 }
                           g.rows.push(r)
                           g.total += r.pieces
@@ -1032,7 +1182,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                             </tr>
                           )
                           // Group by quality within this error
-                          const qualityGroups = new Map<string, { rows: typeof rows; total: number }>()
+                          const qualityGroups = new Map<string, { rows: typeof filteredRows; total: number }>()
                           for (const r of eg.rows) {
                             const qg = qualityGroups.get(r.quality) || { rows: [], total: 0 }
                             qg.rows.push(r)
@@ -1066,17 +1216,18 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                       })()}
                       {/* Grand total */}
                       <tr className="border-t-2 font-bold bg-muted/50">
-                        <td className="py-2 px-2">Total general</td>
-                        <td className="py-2 px-2 text-right">{analytics.pointZeroClassification.totalPointZeroPieces.toLocaleString()}</td>
-                        <td className="py-2 px-2 text-right">100%</td>
-                        <td className="py-2 px-2 text-right">{kpis.pointZeroPct}%</td>
+                        <td className="py-2 px-2">{p0ErrorFilter ? `Total ${p0ErrorFilter}` : 'Total general'}</td>
+                        <td className="py-2 px-2 text-right">{filteredTotal.toLocaleString()}</td>
+                        <td className="py-2 px-2 text-right">{pctCalc(filteredTotal, analytics.pointZeroClassification.totalPointZeroPieces)}%</td>
+                        <td className="py-2 px-2 text-right">{pctCalc(filteredTotal, analytics.kpis.totalPieces)}%</td>
                       </tr>
                     </tbody>
                   </table>
                 </div>
               </CardContent>
             </Card>
-          )}
+            )
+          })()}
 
           {/* Fuera de Rango — Distribución por Peso */}
           {analytics.pointZeroClassification.outOfRangeByWeight.length > 0 && (
