@@ -79,10 +79,6 @@ export function AnalisisGraderSessionsListPage() {
     loadSessions()
   }, [])
 
-  if (!canSee('analisisGrader')) {
-    return <Navigate to="/" replace />
-  }
-
   async function loadSessions() {
     setLoading(true)
     setError(null)
@@ -134,6 +130,10 @@ export function AnalisisGraderSessionsListPage() {
       }
     })
   }, [sessions])
+
+  if (!canSee('analisisGrader')) {
+    return <Navigate to="/" replace />
+  }
 
   function toggleDay(dateKey: string) {
     setCollapsedDays((prev) => {
