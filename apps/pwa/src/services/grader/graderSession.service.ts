@@ -28,6 +28,28 @@ import type {
 
 const COLLECTION = 'graderAnalysisSessions'
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  if (Object.prototype.toString.call(value) !== '[object Object]') return false
+  const proto = Object.getPrototypeOf(value)
+  return proto === Object.prototype || proto === null
+}
+
+function deepCleanUndefined<T>(value: T): T {
+  if (value === undefined) return value
+  if (Array.isArray(value)) {
+    return value
+      .map((v) => deepCleanUndefined(v))
+      .filter((v) => v !== undefined) as T
+  }
+  if (isPlainObject(value)) {
+    const entries = Object.entries(value)
+      .map(([k, v]) => [k, deepCleanUndefined(v)] as const)
+      .filter(([, v]) => v !== undefined)
+    return Object.fromEntries(entries) as T
+  }
+  return value
+}
+
 export async function saveGraderSession(params: {
   deviceId?: string
   shiftId?: string
@@ -58,11 +80,12 @@ export async function saveGraderSession(params: {
     createdAt: new Date().toISOString(),
   }
 
-  // Filter out undefined values — Firestore rejects them
-  const firestoreData = Object.fromEntries(
-    Object.entries({ ...session, _createdAt: serverTimestamp(), _updatedAt: serverTimestamp() })
-      .filter(([, v]) => v !== undefined),
-  )
+  // Filter out undefined values — Firestore rejects them (even nested)
+  const firestoreData = deepCleanUndefined({
+    ...session,
+    _createdAt: serverTimestamp(),
+    _updatedAt: serverTimestamp(),
+  })
   await setDoc(doc(db, COLLECTION, id), firestoreData)
 
   return session
