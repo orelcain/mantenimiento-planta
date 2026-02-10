@@ -7,6 +7,13 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.17] - 2026-02-10
+
+### 🧯 Fix tsc --noEmit CI
+
+#### Correcciones
+- **useToast**: Tipo `Action` con discriminantes literales para narrowing correcto en `tsc --noEmit`.
+
 ## [2.47.16] - 2026-02-10
 
 ### 🧯 Fix Deploy
