@@ -94,10 +94,6 @@ export function AnalisisGraderCalendarPage() {
       .finally(() => setLoading(false))
   }, [])
 
-  if (!canSee('analisisGrader')) {
-    return <Navigate to="/" replace />
-  }
-
   const days = getDaysInMonth(currentMonth)
 
   const uploadsByDate = useMemo(() => {
@@ -122,6 +118,10 @@ export function AnalisisGraderCalendarPage() {
     }
     return map
   }, [selectedUploads])
+
+  if (!canSee('analisisGrader')) {
+    return <Navigate to="/" replace />
+  }
 
   const handlePrevMonth = () => {
     setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1))
