@@ -6,7 +6,7 @@
  * el rango de tiempo (turno) detectado.
  */
 
-import { useState, useCallback, useRef, useMemo } from 'react'
+import { useState, useCallback, useRef, useMemo, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge } from '@/components/ui'
 import {
   Upload,
@@ -21,11 +21,14 @@ import {
   Plus,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useAuthStore } from '@/store'
 import { parseFile, mergeParsedData } from '@/services/grader/graderExcelParser'
+import { listGraderUploads, saveGraderUpload, updateGraderUpload } from '@/services/grader/graderUpload.service'
 import type {
   ParsedMatrixData,
   UploadedMatrixFile,
   MatrixFileKind,
+  GraderUpload,
 } from '@/services/grader/types'
 
 interface Props {
@@ -60,12 +63,29 @@ const KIND_COLORS: Record<MatrixFileKind, string> = {
   UNKNOWN: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
 }
 
+function inferShiftId(startAt?: string): string {
+  if (!startAt) return 'Turno noche'
+  const d = new Date(startAt)
+  const hour = d.getHours()
+  return hour >= 7 && hour < 19 ? 'Turno día' : 'Turno noche'
+}
+
+function toDateKey(iso?: string): string {
+  if (!iso) return new Date().toISOString().slice(0, 10)
+  return iso.slice(0, 10)
+}
+
 export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChange }: Props) {
   const [files, setFiles] = useState<FileParsed[]>(initialFiles || [])
   const [parsing, setParsing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [dragOver, setDragOver] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const [uploads, setUploads] = useState<GraderUpload[]>([])
+  const [currentTurnoDate, setCurrentTurnoDate] = useState<string | null>(null)
+  const [currentTurnoShift, setCurrentTurnoShift] = useState<string>('Turno noche')
   const inputRef = useRef<HTMLInputElement>(null)
+  const user = useAuthStore((s) => s.user)
 
   // Sincronizar con el padre cuando cambian los archivos
   const updateFiles = useCallback((updater: (prev: FileParsed[]) => FileParsed[]) => {
@@ -79,6 +99,10 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
   const hasPiezaPieza = files.some((f) => f.fileMeta.kind === 'PIEZA_PIEZA')
   const piezaPiezaCount = files.filter((f) => f.fileMeta.kind === 'PIEZA_PIEZA').length
   const canContinue = hasPiezaPieza
+
+  useEffect(() => {
+    listGraderUploads().then(setUploads).catch(() => {})
+  }, [])
 
   // Detectar rango de turno a partir de todos los pieza-pieza cargados
   const turnoRange = useMemo(() => {
@@ -117,6 +141,7 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
   const handleFiles = useCallback(async (newFiles: FileList | File[]) => {
     setParsing(true)
     setError(null)
+    setUploadError(null)
 
     const fileArray = Array.from(newFiles).filter(
       (f) => f.name.endsWith('.xlsx') || f.name.endsWith('.xls'),
@@ -132,21 +157,43 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
       const parsed: FileParsed[] = []
       for (const file of fileArray) {
         const result = await parseFile(file)
+        const inferred = result.partialData.inferred
+        const sessionDate = toDateKey(inferred?.startAt)
+        const shiftId = inferShiftId(inferred?.startAt)
         // Aceptar solo pieza-pieza; advertir si se carga otro tipo
         if (result.fileMeta.kind !== 'PIEZA_PIEZA') {
           result.fileMeta.warnings.push(
             `Tipo "${KIND_LABELS[result.fileMeta.kind]}" detectado — solo se requiere Pieza-Pieza`,
           )
         }
+        // Persistir upload para calendario (si hay usuario)
+        if (user) {
+          const upload = await saveGraderUpload({
+            id: result.fileMeta.id,
+            fileMeta: result.fileMeta,
+            inferred,
+            sessionDate,
+            shiftId,
+            createdBy: user.id,
+          })
+          setUploads((prev) => [upload, ...prev])
+        }
+        if (!currentTurnoDate) setCurrentTurnoDate(sessionDate)
+        if (!currentTurnoShift) setCurrentTurnoShift(shiftId)
         parsed.push({ ...result, file })
       }
       updateFiles((prev) => [...prev, ...parsed])
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al parsear archivo')
+      if (!user) {
+        setUploadError('No se pudo guardar el archivo en calendario: usuario no autenticado.')
+      } else {
+        setUploadError('No se pudo guardar el archivo en calendario.')
+      }
     } finally {
       setParsing(false)
     }
-  }, [updateFiles])
+  }, [updateFiles, user])
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
@@ -161,8 +208,35 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
     updateFiles((prev) => prev.filter((f) => f.fileMeta.id !== id))
   }
 
+  const uploadsById = useMemo(() => {
+    const map = new Map<string, GraderUpload>()
+    for (const u of uploads) map.set(u.id, u)
+    return map
+  }, [uploads])
+
+  const handleUpdateUpload = async (id: string, patch: Partial<GraderUpload>) => {
+    try {
+      await updateGraderUpload(id, patch)
+      setUploads((prev) => prev.map((u) => (u.id === id ? { ...u, ...patch } : u)))
+    } catch {
+      setUploadError('No se pudo actualizar el calendario.')
+    }
+  }
+
   const handleContinue = () => {
-    const merged = mergeParsedData(files)
+    const filtered = files.filter((f) => {
+      const inferred = f.partialData.inferred
+      const upload = uploadsById.get(f.fileMeta.id)
+      const sessionDate = upload?.sessionDate || toDateKey(inferred?.startAt)
+      const shiftId = upload?.shiftId || inferShiftId(inferred?.startAt)
+      if (!currentTurnoDate || !currentTurnoShift) return true
+      return sessionDate === currentTurnoDate && shiftId === currentTurnoShift
+    })
+    if (filtered.length === 0) {
+      setError('No hay archivos para el turno seleccionado.')
+      return
+    }
+    const merged = mergeParsedData(filtered)
     onComplete(merged)
   }
 
@@ -241,6 +315,12 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
               {error}
             </div>
           )}
+          {uploadError && (
+            <div className="mt-2 flex items-center gap-2 text-xs text-amber-700">
+              <AlertCircle className="h-3.5 w-3.5" />
+              {uploadError}
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -272,6 +352,35 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
         </Card>
       )}
 
+      {/* Turno objetivo (para agrupar archivos) */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Turno objetivo</CardTitle>
+        </CardHeader>
+        <CardContent className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">Fecha</span>
+            <input
+              type="date"
+              value={currentTurnoDate || ''}
+              onChange={(e) => setCurrentTurnoDate(e.target.value)}
+              className="h-8 text-xs rounded border border-muted-foreground/30 bg-background px-2"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">Turno</span>
+            <input
+              value={currentTurnoShift}
+              onChange={(e) => setCurrentTurnoShift(e.target.value)}
+              className="h-8 text-xs rounded border border-muted-foreground/30 bg-background px-2 w-32"
+            />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Los archivos del mismo día y turno se agruparán aunque el horario no coincida.
+          </p>
+        </CardContent>
+      </Card>
+
       {/* Files list */}
       {files.length > 0 && (
         <Card>
@@ -282,6 +391,15 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
           </CardHeader>
           <CardContent className="space-y-2">
             {files.map((f) => (
+              (() => {
+                const upload = uploadsById.get(f.fileMeta.id)
+                const inferred = upload?.inferred || f.partialData.inferred
+                const sessionDate = upload?.sessionDate || toDateKey(inferred?.startAt)
+                const shiftId = upload?.shiftId || inferShiftId(inferred?.startAt)
+                const timeRange = inferred?.startAt && inferred?.endAt
+                  ? `${new Date(inferred.startAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })} – ${new Date(inferred.endAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}`
+                  : '—'
+                return (
               <div
                 key={f.fileMeta.id}
                 className={cn(
@@ -313,6 +431,28 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
                       </span>
                     )}
                   </div>
+                  <div className="mt-2 flex items-center gap-2 flex-wrap text-xs text-muted-foreground">
+                    <span>Horario: {timeRange}</span>
+                  </div>
+                  <div className="mt-2 flex items-center gap-2 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">Fecha</span>
+                      <input
+                        type="date"
+                        value={sessionDate}
+                        onChange={(e) => handleUpdateUpload(f.fileMeta.id, { sessionDate: e.target.value })}
+                        className="h-7 text-xs rounded border border-muted-foreground/30 bg-background px-2"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">Turno</span>
+                      <input
+                        value={shiftId}
+                        onChange={(e) => handleUpdateUpload(f.fileMeta.id, { shiftId: e.target.value })}
+                        className="h-7 text-xs rounded border border-muted-foreground/30 bg-background px-2 w-28"
+                      />
+                    </div>
+                  </div>
                   {f.fileMeta.warnings.length > 0 && (
                     <div className="mt-1 space-y-0.5">
                       {f.fileMeta.warnings.map((w, i) => (
@@ -329,6 +469,8 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
                   <X className="h-4 w-4" />
                 </Button>
               </div>
+                )
+              })()
             ))}
 
             {/* Hint: not pieza-pieza files */}
@@ -361,6 +503,40 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
           <ChevronRight className="h-4 w-4 ml-1" />
         </Button>
       </div>
+
+      {/* Calendario de uploads */}
+      {uploads.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Calendario de Archivos</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {[...new Map(uploads.map((u) => [u.sessionDate || toDateKey(u.inferred?.startAt), u])).keys()]
+              .sort((a, b) => b.localeCompare(a))
+              .map((dateKey) => {
+                const dayUploads = uploads.filter((u) => (u.sessionDate || toDateKey(u.inferred?.startAt)) === dateKey)
+                return (
+                  <div key={dateKey} className="border border-muted/60 rounded-lg p-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium">{dateKey}</p>
+                      <Badge variant="outline" className="text-[10px]">
+                        {dayUploads.length} archivo(s)
+                      </Badge>
+                    </div>
+                    <div className="mt-2 space-y-1">
+                      {dayUploads.map((u) => (
+                        <div key={u.id} className="text-xs text-muted-foreground flex items-center justify-between">
+                          <span className="truncate">{u.fileMeta.name}</span>
+                          <span>{u.shiftId || 'Turno'}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

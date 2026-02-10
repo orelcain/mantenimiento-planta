@@ -535,6 +535,16 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // ANÁLISIS GRADER - Uploads (calendario)
+    match /graderUploads/{uploadId} {
+      allow read: if isAuthenticated();
+      allow create: if isSupervisor()
+        && request.resource.data.createdBy == request.auth.uid;
+      allow update: if isSupervisor()
+        && resource.data.createdBy == request.auth.uid;
+      allow delete: if isAdmin();
+    }
+
     // ============================================
     // ANÁLISIS GRADER - Plantillas de Gates
     // ============================================

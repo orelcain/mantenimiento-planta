@@ -114,6 +114,25 @@ export interface UploadedMatrixFile {
 }
 
 // ============================================================================
+// UPLOADS PERSISTIDOS (CALENDARIO)
+// ============================================================================
+
+export interface GraderUpload {
+  id: string;
+  fileMeta: UploadedMatrixFile;
+  inferred?: {
+    startAt?: string;
+    endAt?: string;
+  };
+  sessionDate: string; // YYYY-MM-DD
+  shiftId?: string;
+  deviceId?: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+// ============================================================================
 // CONFIGURACIÓN DE GATES
 // ============================================================================
 

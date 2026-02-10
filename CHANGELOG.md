@@ -7,6 +7,21 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.5] - 2026-02-10
+
+### 📅 Calendario de Uploads + Turnos
+
+#### Añadido
+- **Uploads persistidos**: Cada archivo se guarda automáticamente en Firestore al subirlo.
+- **Calendario de archivos**: Vista agrupada por fecha con conteo de archivos.
+- **Turno automático editable**: Se infiere por hora (día/noche) y puede modificarse manualmente.
+- **Turno objetivo**: Permite agrupar archivos por día+turno aunque los tiempos no coincidan.
+
+#### Cambios
+- **Pasos independientes**: Se puede navegar entre Carga, Config. Gates y Dashboard sin bloqueo.
+- **Guardar rangos**: Botón para guardar rangos personalizados en plantillas.
+- **Reglas Firestore**: Nueva colección `graderUploads` habilitada.
+
 ## [2.47.4] - 2026-02-10
 
 ### ⚙️ Calibres Personalizados

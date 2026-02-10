@@ -53,6 +53,8 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
   const [templateName, setTemplateName] = useState('')
   const [showTemplates, setShowTemplates] = useState(false)
   const [showWeightRanges, setShowWeightRanges] = useState(false)
+  const [savingRanges, setSavingRanges] = useState(false)
+  const [rangesError, setRangesError] = useState<string | null>(null)
   const user = useAuthStore((s) => s.user)
   const isAdmin = useIsAdmin()
 
@@ -142,6 +144,29 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
   const handleDeleteTemplate = async (id: string) => {
     await deleteGatesTemplate(id)
     setTemplates((prev) => prev.filter((t) => t.id !== id))
+  }
+
+  const handleQuickSaveRanges = async () => {
+    if (!user) return
+    if (!config.customWeightRanges || config.customWeightRanges.length === 0) return
+    setSavingRanges(true)
+    setRangesError(null)
+    try {
+      const name = `Rangos ${config.deviceId || 'General'} ${new Date().toLocaleDateString('es-CL')}`
+      const tmpl = await saveGatesTemplate({
+        name,
+        deviceId: config.deviceId,
+        gates,
+        customWeightRanges: config.customWeightRanges,
+        createdBy: user.id,
+      })
+      setTemplates((prev) => [tmpl, ...prev])
+      setShowTemplates(true)
+    } catch {
+      setRangesError('No se pudo guardar los rangos.')
+    } finally {
+      setSavingRanges(false)
+    }
   }
 
   return (
@@ -484,11 +509,25 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                 </tbody>
               </table>
             </div>
-            <div className="mt-3 flex items-center justify-between">
-              <Button variant="outline" size="sm" onClick={addWeightRange}>
-                <Plus className="h-3 w-3 mr-1" />
-                Agregar calibre
-              </Button>
+            <div className="mt-3 flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={addWeightRange}>
+                  <Plus className="h-3 w-3 mr-1" />
+                  Agregar calibre
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleQuickSaveRanges}
+                  disabled={!isCustomRanges || savingRanges}
+                >
+                  <Save className="h-3 w-3 mr-1" />
+                  Guardar rangos
+                </Button>
+              </div>
+              {rangesError && (
+                <span className="text-xs text-destructive">{rangesError}</span>
+              )}
               {isCustomRanges && (
                 <Button variant="outline" size="sm" onClick={resetWeightRanges}>
                   <RotateCcw className="h-3 w-3 mr-1" />

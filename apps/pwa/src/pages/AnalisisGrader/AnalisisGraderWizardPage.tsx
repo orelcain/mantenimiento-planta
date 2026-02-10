@@ -7,7 +7,7 @@
 
 import { useState, useCallback } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
-import { Card, CardContent, Badge, Button } from '@/components/ui'
+import { Card, CardContent, Button } from '@/components/ui'
 import { Upload, Settings2, BarChart3, ChevronRight, FolderOpen } from 'lucide-react'
 import { usePermissionsStore } from '@/store'
 import { AnalisisGraderUploadPage, type FileParsed } from './AnalisisGraderUploadPage'
@@ -39,7 +39,15 @@ export function AnalisisGraderWizardPage() {
     },
   })
 
-  const stepIndex = STEPS.findIndex((s) => s.id === currentStep)
+  const fallbackParsedData: ParsedMatrixData = parsedData || {
+    files: [],
+    pieceRecords: [],
+    gate0Records: [],
+    folioRecords: [],
+    qualitySummary: [],
+    productionSummary: [],
+    inferred: {},
+  }
 
   const handleUploadComplete = useCallback((data: ParsedMatrixData) => {
     setParsedData(data)
@@ -92,8 +100,7 @@ export function AnalisisGraderWizardPage() {
             {STEPS.map((step, idx) => {
               const Icon = step.icon
               const isActive = step.id === currentStep
-              const isDone = idx < stepIndex
-              const isClickable = isDone || (idx === stepIndex)
+              const isClickable = true
 
               return (
                 <div key={step.id} className="flex items-center gap-1 sm:gap-2">
@@ -103,14 +110,11 @@ export function AnalisisGraderWizardPage() {
                     className={`flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors ${
                       isActive
                         ? 'bg-primary text-primary-foreground'
-                        : isDone
-                        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 cursor-pointer'
                         : 'bg-muted text-muted-foreground'
                     }`}
                   >
                     <Icon className="h-4 w-4" />
                     <span className="hidden sm:inline">{step.label}</span>
-                    {isDone && <Badge variant="outline" className="ml-1 text-[10px] px-1">✓</Badge>}
                   </button>
                   {idx < STEPS.length - 1 && (
                     <ChevronRight className="h-4 w-4 text-muted-foreground" />
@@ -131,19 +135,19 @@ export function AnalisisGraderWizardPage() {
         />
       )}
 
-      {currentStep === 'gates' && parsedData && (
+      {currentStep === 'gates' && (
         <AnalisisGraderGatesConfigPage
           gates={gates}
           config={config}
-          parsedData={parsedData}
+          parsedData={fallbackParsedData}
           onComplete={handleGatesComplete}
           onBack={() => setCurrentStep('upload')}
         />
       )}
 
-      {currentStep === 'dashboard' && parsedData && (
+      {currentStep === 'dashboard' && (
         <AnalisisGraderDashboardPage
-          parsedData={parsedData}
+          parsedData={fallbackParsedData}
           gates={gates}
           config={config}
           onBack={() => setCurrentStep('gates')}
