@@ -17,8 +17,6 @@ import {
   Package,
   AlertCircle,
   Clock,
-  Sun,
-  Moon,
   ChevronDown,
   ChevronRight,
 } from 'lucide-react'
