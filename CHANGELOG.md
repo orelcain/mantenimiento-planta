@@ -7,6 +7,14 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.3] - 2026-02-10
+
+### ⚙️ Rangos de Peso Persistentes
+
+#### Añadido
+- **Plantillas con rangos personalizados**: Las plantillas de gates ahora guardan y restauran los rangos de peso editados.
+- **Indicador en plantillas**: Se muestra la etiqueta "Rangos" cuando una plantilla incluye rangos personalizados.
+
 ## [2.47.2] - 2026-02-09
 
 ### 🔧 Persistencia de Sesiones y Clasificación por Día

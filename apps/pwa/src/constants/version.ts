@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.47.2' as const
+export const APP_VERSION = '2.47.3' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -11,12 +11,12 @@ export const APP_VERSION = '2.47.2' as const
 /**
  * Fecha de la versión actual
  */
-export const VERSION_DATE = '2026-02-09' as const
+export const VERSION_DATE = '2026-02-10' as const
 
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Persistencia sesiones + Agrupacion por dia + Fix Firestore' as const
+export const VERSION_NAME = 'Rangos de peso persistentes + Plantillas' as const
 
 /**
  * Nota:

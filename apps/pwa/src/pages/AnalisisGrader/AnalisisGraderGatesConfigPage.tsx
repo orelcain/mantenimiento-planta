@@ -85,6 +85,7 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
       name: templateName.trim(),
       deviceId: config.deviceId,
       gates,
+      customWeightRanges: config.customWeightRanges,
       createdBy: user.id,
     })
     setTemplates((prev) => [tmpl, ...prev])
@@ -94,6 +95,11 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
   const handleLoadTemplate = (tmpl: GatesTemplate) => {
     setGates(tmpl.gates)
     if (tmpl.deviceId) setConfig((c) => ({ ...c, deviceId: tmpl.deviceId }))
+    if (tmpl.customWeightRanges) {
+      setConfig((c) => ({ ...c, customWeightRanges: tmpl.customWeightRanges }))
+    } else {
+      setConfig((c) => ({ ...c, customWeightRanges: undefined }))
+    }
     setShowTemplates(false)
   }
 
@@ -249,6 +255,11 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                     {t.deviceId && (
                       <Badge variant="outline" className="ml-2 text-[10px]">
                         {t.deviceId}
+                      </Badge>
+                    )}
+                    {t.customWeightRanges && (
+                      <Badge variant="secondary" className="ml-2 text-[10px]">
+                        Rangos
                       </Badge>
                     )}
                   </div>
