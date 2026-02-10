@@ -7,6 +7,18 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.7] - 2026-02-10
+
+### 📅 Calendario Grader + Resumen Diario
+
+#### Añadido
+- **Calendario dedicado**: Vista mensual para uploads Grader con conteo por dia y turnos.
+- **Resumen por turno**: Boton para calcular piezas y P0% desde archivos del turno.
+- **Carga directa al analisis**: Boton "Cargar" lleva al analisis con fecha+turno preseleccionados.
+
+#### Cambios
+- **Auto-carga por URL**: El analisis puede cargar un turno directamente con `?date=YYYY-MM-DD&shift=...&autoload=1`.
+
 ## [2.47.6] - 2026-02-10
 
 ### 📂 Calendario con Storage + Rangos por Dispositivo

@@ -7,6 +7,7 @@
  */
 
 import { useState, useCallback, useRef, useMemo, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge } from '@/components/ui'
 import {
   Upload,
@@ -86,6 +87,8 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
   const [currentTurnoShift, setCurrentTurnoShift] = useState<string>('Turno noche')
   const [loadingTurno, setLoadingTurno] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const [searchParams] = useSearchParams()
+  const autoLoadRef = useRef(false)
   const user = useAuthStore((s) => s.user)
 
   // Sincronizar con el padre cuando cambian los archivos
@@ -104,6 +107,15 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
   useEffect(() => {
     listGraderUploads().then(setUploads).catch(() => {})
   }, [])
+
+  useEffect(() => {
+    const dateParam = searchParams.get('date')
+    const shiftParam = searchParams.get('shift')
+    const auto = searchParams.get('autoload') === '1'
+    if (dateParam) setCurrentTurnoDate(dateParam)
+    if (shiftParam) setCurrentTurnoShift(decodeURIComponent(shiftParam))
+    if (auto) autoLoadRef.current = true
+  }, [searchParams])
 
   // Detectar rango de turno a partir de todos los pieza-pieza cargados
   const turnoRange = useMemo(() => {
@@ -303,6 +315,15 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
       setLoadingTurno(false)
     }
   }
+
+  useEffect(() => {
+    if (!autoLoadRef.current) return
+    if (!currentTurnoDate || !currentTurnoShift) return
+    if (uploads.length === 0) return
+    if (loadingTurno) return
+    autoLoadRef.current = false
+    handleLoadTurno()
+  }, [uploads, currentTurnoDate, currentTurnoShift, loadingTurno])
 
   return (
     <div className="space-y-4">

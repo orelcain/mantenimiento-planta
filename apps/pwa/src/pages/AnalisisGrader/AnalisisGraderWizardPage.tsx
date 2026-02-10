@@ -8,7 +8,7 @@
 import { useState, useCallback } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { Card, CardContent, Button } from '@/components/ui'
-import { Upload, Settings2, BarChart3, ChevronRight, FolderOpen } from 'lucide-react'
+import { Upload, Settings2, BarChart3, ChevronRight, FolderOpen, Calendar } from 'lucide-react'
 import { usePermissionsStore } from '@/store'
 import { AnalisisGraderUploadPage, type FileParsed } from './AnalisisGraderUploadPage'
 import { AnalisisGraderGatesConfigPage } from './AnalisisGraderGatesConfigPage'
@@ -87,10 +87,16 @@ export function AnalisisGraderWizardPage() {
             Análisis de datos de clasificadora de salmones
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => navigate('/analisis-grader/sesiones')}>
-          <FolderOpen className="h-4 w-4 mr-1" />
-          Sesiones Guardadas
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => navigate('/analisis-grader/calendario')}>
+            <Calendar className="h-4 w-4 mr-1" />
+            Calendario
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => navigate('/analisis-grader/sesiones')}>
+            <FolderOpen className="h-4 w-4 mr-1" />
+            Sesiones Guardadas
+          </Button>
+        </div>
       </div>
 
       {/* Stepper */}
