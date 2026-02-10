@@ -88,7 +88,7 @@ export function LoginPage() {
       // Timeout después de 5 segundos
       setTimeout(() => clearInterval(checkGoogle), 5000)
     }
-  }, [navigate, setUser])
+  }, [navigate, setUser, redirectTo])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

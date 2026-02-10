@@ -559,6 +559,13 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // ANÁLISIS GRADER - Resumenes diarios
+    match /graderDailySummaries/{summaryId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isSupervisor();
+      allow delete: if isSupervisor();
+    }
+
     // ============================================
     // ANÁLISIS GRADER - Plantillas de Gates
     // ============================================

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -47,7 +47,7 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
   }, [isOpen, filteredRepuestos, repuestos.length])
 
   // Helper to determine category for a repuesto since it doesn't have a direct categoryId
-  const getRepuestoCategoryId = (rep: Repuesto): string | undefined => {
+    const getRepuestoCategoryId = useCallback((rep: Repuesto): string | undefined => {
       // 1. Try to find a tag that exactly matches a category ID
       for (const tag of rep.tags) {
           const tagStr = typeof tag === 'string' ? tag : tag.nombre
@@ -62,7 +62,7 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
           if (catByName) return catByName.id
       }
       return undefined
-  }
+    }, [categories])
 
   const treeData = useMemo(() => {
     const sourceList = filterMode === 'filtered' && filteredRepuestos ? filteredRepuestos : repuestos
@@ -124,7 +124,7 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
     if (hasUnassigned) prunedRoots.push(unassignedNode)
 
     return prunedRoots
-  }, [repuestos, filteredRepuestos, categories, filterMode])
+    }, [repuestos, filteredRepuestos, categories, filterMode, getRepuestoCategoryId])
 
   const getNodeItemIds = (node: TreeNode): string[] => {
       if (node.type === 'item') return [node.id]

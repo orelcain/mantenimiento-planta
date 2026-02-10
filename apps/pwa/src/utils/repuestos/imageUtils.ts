@@ -172,7 +172,7 @@ export async function downloadImage(url: string, filename: string): Promise<void
     
     // Liberar memoria
     URL.revokeObjectURL(objectUrl)
-  } catch (error) {
+  } catch (_error) {
     throw new Error('Error al descargar la imagen')
   }
 }

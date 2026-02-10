@@ -7,6 +7,65 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.15] - 2026-02-10
+
+### ✅ Lint Limpio
+
+#### Correcciones
+- **Hooks**: Dependencias estabilizadas y funciones memoizadas.
+- **Utilidades**: Ajustes menores de tipado/JSX.
+
+## [2.47.14] - 2026-02-10
+
+### 🧹 Ajustes de Hooks
+
+#### Correcciones
+- **Calendario/Upload**: Dependencias de hooks estabilizadas y memo de carga de turnos.
+
+## [2.47.13] - 2026-02-10
+
+### 🧩 Fix VS Code
+
+#### Correcciones
+- **Calendario**: Reparado JSX y hooks movidos fuera del render.
+- **Horarios de turnos**: Ajustes de tipado y null checks en configuracion.
+
+## [2.47.12] - 2026-02-10
+
+### 🗓️ Horarios Configurables + Cache Correcto
+
+#### Añadido
+- **Horarios de turnos**: Configuracion global de rangos por turno (dia/tarde/noche).
+- **Auto-seleccion**: El calendario preselecciona el ultimo dia con uploads.
+
+#### Cambios
+- **Resumen diario limpio**: Si se actualiza un archivo del turno, se invalida el resumen guardado.
+
+#### Seguridad
+- **Reglas Firestore**: Supervisores pueden invalidar `graderDailySummaries`.
+
+## [2.47.11] - 2026-02-10
+
+### 🕒 Turno Tarde + Reemplazo de Uploads
+
+#### Añadido
+- **Turno tarde**: Disponible en carga, calendario y configuración de análisis.
+- **Reemplazo por turno**: Si se carga un archivo nuevo para el mismo día y turno, se actualiza el último.
+
+#### Cambios
+- **Calendario sin duplicados**: Se muestran solo los últimos archivos por día/turno.
+
+## [2.47.10] - 2026-02-10
+
+### 📊 Resumen Diario Persistido
+
+#### Añadido
+- **KPIs persistidos**: El calendario guarda resúmenes diarios por turno para evitar recalculo.
+- **Estado visible**: Indicador "Guardado/Calculado" para distinguir cache vs. nuevo calculo.
+
+#### Seguridad
+- **Reglas Firestore**: Nueva colección `graderDailySummaries` habilitada.
+
 ## [2.47.9] - 2026-02-10
 
 ### 🧭 Rangos Globales del Modulo

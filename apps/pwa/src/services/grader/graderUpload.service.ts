@@ -60,6 +60,7 @@ export async function saveGraderUpload(params: {
     deviceId: params.deviceId,
     createdBy: params.createdBy,
     createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   }
 
   const firestoreData = deepCleanUndefined({
@@ -86,6 +87,7 @@ export async function uploadGraderFile(file: File, uploadId: string): Promise<{ 
 export async function updateGraderUpload(id: string, patch: Partial<GraderUpload>): Promise<void> {
   const firestoreData = deepCleanUndefined({
     ...patch,
+    updatedAt: new Date().toISOString(),
     _updatedAt: serverTimestamp(),
   })
   await setDoc(doc(db, COLLECTION, id), firestoreData, { merge: true })

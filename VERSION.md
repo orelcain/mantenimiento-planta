@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.47.9**
+## Versión Actual: **v2.47.15**
 
 **Fecha de lanzamiento**: 10 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,33 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.47.15 - Lint limpio (10/02/2026)
+- ✅ **Hooks**: Dependencias estabilizadas y funciones memoizadas.
+- 🧰 **Utilidades**: Ajustes menores de tipado/JSX.
+
+### v2.47.14 - Ajustes de Hooks (10/02/2026)
+- 🧹 **Calendario/Upload**: Dependencias de hooks estabilizadas y memo de carga de turnos.
+
+### v2.47.13 - Fix VS Code (10/02/2026)
+- 🧩 **Calendario**: Reparado JSX y hooks fuera del render.
+- 🧭 **Horarios**: Ajustes de tipado y null checks en configuracion.
+
+### v2.47.12 - Horarios configurables + cache correcto (10/02/2026)
+- 🗓️ **Horarios de turnos**: Configuracion global de rangos por turno (dia/tarde/noche).
+- 🔁 **Resumen diario limpio**: Al actualizar un archivo se invalida el resumen guardado.
+- 🎯 **Auto-seleccion**: El calendario preselecciona el ultimo dia con uploads.
+- 🔐 **Reglas Firestore**: Supervisores pueden invalidar `graderDailySummaries`.
+
+### v2.47.11 - Turno tarde + reemplazo de uploads (10/02/2026)
+- 🕒 **Turno tarde**: Disponible en carga, calendario y configuración de análisis.
+- 🔁 **Reemplazo por turno**: Un nuevo archivo del mismo día/turno actualiza el último.
+- 🧹 **Calendario limpio**: Se muestran solo los últimos archivos por día/turno.
+
+### v2.47.10 - Resumen diario persistido (10/02/2026)
+- 📊 **KPIs persistidos**: Resumen diario por turno guardado para evitar recalculo en calendario.
+- 🟢 **Estado visible**: Indicador "Guardado/Calculado" para distinguir cache vs. nuevo calculo.
+- 🔐 **Reglas Firestore**: Nueva colección `graderDailySummaries` habilitada.
 
 ### v2.47.0 - Upload pieza-pieza simplificado + Rangos editables + Drill-down P0 (09/02/2026)
 - 📤 **Upload simplificado**: Solo archivos Pieza-Pieza requeridos, eliminado checklist de otros tipos

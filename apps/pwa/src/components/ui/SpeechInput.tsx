@@ -36,6 +36,20 @@ const SpeechInput = React.forwardRef<HTMLInputElement, SpeechInputProps>(
     // Sincronizar ref externa
     React.useImperativeHandle(ref, () => innerRef.current!)
 
+    const handleTranscript = React.useCallback((text: string) => {
+      const currentValue = String(value || '')
+      const newValue = currentValue.trim()
+        ? `${currentValue} ${text}`
+        : text
+
+      const event = {
+        target: { value: newValue, name: props.name },
+        currentTarget: { value: newValue, name: props.name }
+      } as React.ChangeEvent<HTMLInputElement>
+
+      onChange?.(event)
+    }, [value, onChange, props.name])
+
     React.useEffect(() => {
       if (typeof window === 'undefined') return
 
@@ -78,21 +92,7 @@ const SpeechInput = React.forwardRef<HTMLInputElement, SpeechInputProps>(
       }
 
       recognitionRef.current = recognition
-    }, [])
-
-    const handleTranscript = (text: string) => {
-      const currentValue = String(value || '')
-      const newValue = currentValue.trim() 
-        ? `${currentValue} ${text}` 
-        : text
-      
-      const event = {
-        target: { value: newValue, name: props.name },
-        currentTarget: { value: newValue, name: props.name }
-      } as React.ChangeEvent<HTMLInputElement>
-
-      onChange?.(event)
-    }
+    }, [handleTranscript])
 
     const toggleListening = (e: React.MouseEvent) => {
       e.preventDefault()
@@ -101,7 +101,9 @@ const SpeechInput = React.forwardRef<HTMLInputElement, SpeechInputProps>(
       if (isListening) {
         try {
           recognitionRef.current.stop()
-        } catch (e) { }
+        } catch {
+          // Ignorar si ya estaba detenido
+        }
         setIsListening(false)
       } else {
         try {

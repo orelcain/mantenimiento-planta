@@ -3,7 +3,7 @@
  * Módulo administrativo con IA integrada
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Wand2, Mic, Plus, Trash2, Eye, Save, AlertCircle, Check, Download } from 'lucide-react'
 import {
   Button,
@@ -114,14 +114,7 @@ export function ETTPage() {
   const [procedimientoForm, setProcedimientoForm] = useState<Partial<ETProcedimiento>>({})
   const [riesgoForm, setRiesgoForm] = useState<Partial<ETTRiesgo>>({})
 
-  // Cargar lista
-  useEffect(() => {
-    if (view === 'lista') {
-      loadETTList()
-    }
-  }, [view])
-
-  const loadETTList = async () => {
+  const loadETTList = useCallback(async () => {
     setLoading(true)
     try {
       // Admin ve todas las ETT, usuarios normales solo las suyas
@@ -133,7 +126,14 @@ export function ETTPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [toast])
+
+  // Cargar lista
+  useEffect(() => {
+    if (view === 'lista') {
+      loadETTList()
+    }
+  }, [view, loadETTList])
 
   const handleNewETT = () => {
     setIsNew(true)

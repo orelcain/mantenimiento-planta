@@ -307,7 +307,7 @@ export function PredictivePage() {
     setThresholdsDirty(false)
     setThresholdsError(null)
     setThresholdsOk(null)
-  }, [selectedEquipment?.id])
+  }, [selectedEquipment])
 
   useEffect(() => {
     if (testMode) return

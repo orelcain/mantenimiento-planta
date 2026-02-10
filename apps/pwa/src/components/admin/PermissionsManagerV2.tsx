@@ -8,7 +8,7 @@
  * Los permisos se guardan en Firestore y se aplican en tiempo real.
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { 
   Shield, 
   Save, 
@@ -155,12 +155,7 @@ function RolePermissionsTab() {
   const [isSaving, setIsSaving] = useState(false)
   const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set())
 
-  // Cargar permisos del rol seleccionado
-  useEffect(() => {
-    loadRolePermissions()
-  }, [selectedRole])
-
-  const loadRolePermissions = async () => {
+  const loadRolePermissions = useCallback(async () => {
     setIsLoading(true)
     try {
       const roles = await getAllRolePermissions()
@@ -180,7 +175,12 @@ function RolePermissionsTab() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [selectedRole])
+
+  // Cargar permisos del rol seleccionado
+  useEffect(() => {
+    loadRolePermissions()
+  }, [loadRolePermissions])
 
   const hasChanges = JSON.stringify(permissions) !== JSON.stringify(originalPermissions)
 

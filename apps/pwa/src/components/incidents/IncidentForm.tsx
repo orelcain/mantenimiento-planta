@@ -160,7 +160,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
      return () => {
          if (symptomsDebounceRef.current) clearTimeout(symptomsDebounceRef.current)
      }
-  }, [formData.titulo, formData.descripcion, formData.prioridad, selectedEquipment, formData.hierarchyNodeId])
+  }, [formData.titulo, formData.descripcion, formData.prioridad, selectedEquipment, formData.hierarchyNodeId, aiSymptoms])
 
 
   // Refinar título con IA (Corrección y Resumen)

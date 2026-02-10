@@ -607,7 +607,7 @@ function ClickHandler({ onPointClick, pendingPoints, measurementType, onClosePol
         snapSphereRef.current.visible = false
       }
     }
-  }, [camera, scene, gl])
+  }, [camera, scene, gl, checkNearFirstPoint])
 
   const handleClick = useCallback((event: MouseEvent) => {
     // Check if clicking near first point to close polygon

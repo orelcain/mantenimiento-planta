@@ -28,36 +28,6 @@ export function useUsbDetection() {
     }
   }, [])
 
-  // Detectar dispositivos ya conectados
-  const detectExistingDevices = useCallback(async () => {
-    if (!navigator.serial) return
-
-    try {
-      const ports = await navigator.serial.getPorts()
-      const devices: SerialDevice[] = []
-
-      for (const port of ports) {
-        const info = port.getInfo()
-        const deviceId = await getDeviceIdFromPort(port)
-        
-        if (deviceId) {
-          devices.push({
-            port,
-            deviceId,
-            productName: info.usbProductId?.toString(),
-            manufacturer: info.usbVendorId?.toString(),
-          })
-          portsRef.current.set(port, deviceId)
-        }
-      }
-
-      setConnectedDevices(devices)
-    } catch (err) {
-      console.error('Error detectando dispositivos:', err)
-      setError(err instanceof Error ? err.message : 'Error desconocido')
-    }
-  }, [])
-
   // Obtener MAC del ESP32 via Serial
   const getDeviceIdFromPort = useCallback(async (port: SerialPort): Promise<string | null> => {
     try {
@@ -114,6 +84,36 @@ export function useUsbDetection() {
       return null
     }
   }, [])
+
+  // Detectar dispositivos ya conectados
+  const detectExistingDevices = useCallback(async () => {
+    if (!navigator.serial) return
+
+    try {
+      const ports = await navigator.serial.getPorts()
+      const devices: SerialDevice[] = []
+
+      for (const port of ports) {
+        const info = port.getInfo()
+        const deviceId = await getDeviceIdFromPort(port)
+        
+        if (deviceId) {
+          devices.push({
+            port,
+            deviceId,
+            productName: info.usbProductId?.toString(),
+            manufacturer: info.usbVendorId?.toString(),
+          })
+          portsRef.current.set(port, deviceId)
+        }
+      }
+
+      setConnectedDevices(devices)
+    } catch (err) {
+      console.error('Error detectando dispositivos:', err)
+      setError(err instanceof Error ? err.message : 'Error desconocido')
+    }
+  }, [getDeviceIdFromPort])
 
   // Solicitar permiso y conectar nuevo dispositivo
   const requestDevice = useCallback(async () => {

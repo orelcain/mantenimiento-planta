@@ -5,7 +5,7 @@
  * e inspecciones. Permite filtrar por fecha, inspección y tipo.
  */
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { 
   MapPin, 
   Filter, 
@@ -90,20 +90,7 @@ export function MapViewPage() {
   // Marcador seleccionado para popup
   const [selectedMarker, setSelectedMarker] = useState<ExtendedMarker | null>(null)
   
-  // Cargar ubicaciones al montar
-  useEffect(() => {
-    loadLocations()
-  }, [])
-  
-  // Cargar datos cuando se selecciona una ubicación
-  useEffect(() => {
-    if (selectedLocationId) {
-      loadLocationData(selectedLocationId)
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedLocationId])
-  
-  const loadLocations = async () => {
+  const loadLocations = useCallback(async () => {
     try {
       const data = await getMapLocations()
       setLocations(data)
@@ -118,12 +105,10 @@ export function MapViewPage() {
         description: 'No se pudieron cargar las ubicaciones',
         variant: 'destructive'
       })
-    } finally {
-      setIsLoading(false)
     }
-  }
-  
-  const loadLocationData = async (locationId: string) => {
+  }, [toast])
+
+  const loadLocationData = useCallback(async (locationId: string) => {
     setIsLoading(true)
     try {
       // Cargar mapa, marcadores e inspecciones en paralelo
@@ -158,7 +143,19 @@ export function MapViewPage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [toast])
+
+  // Cargar ubicaciones al montar
+  useEffect(() => {
+    loadLocations()
+  }, [loadLocations])
+  
+  // Cargar datos cuando se selecciona una ubicación
+  useEffect(() => {
+    if (selectedLocationId) {
+      loadLocationData(selectedLocationId)
+    }
+  }, [selectedLocationId, loadLocationData])
   
   // Convertir marcadores a formato extendido con info de inspección
   const extendedMarkers = useMemo((): ExtendedMarker[] => {

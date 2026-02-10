@@ -2,15 +2,19 @@
  * Calendario de uploads Grader con resumen diario y por turno.
  */
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, Navigate } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge } from '@/components/ui'
 import { Calendar, ChevronLeft, ChevronRight, Loader2, ArrowLeft, Clock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { usePermissionsStore } from '@/store'
 import { listGraderUploads } from '@/services/grader/graderUpload.service'
+import { getModuleRanges } from '@/services/grader/graderModuleConfig.service'
+import { getDailySummary, saveDailySummary } from '@/services/grader/graderDailySummary.service'
 import { parseFile, mergeParsedData } from '@/services/grader/graderExcelParser'
+import { DEFAULT_SHIFT_SCHEDULE, inferShiftIdFromSchedule, normalizeShiftSchedule } from '@/services/grader/graderShiftSchedule'
 import type { GraderUpload } from '@/services/grader/types'
+import { useAuthStore } from '@/store'
 
 interface TurnoSummary {
   totalPieces: number
@@ -24,6 +28,7 @@ interface SummaryState {
   loading: boolean
   error: string | null
   data?: TurnoSummary
+  source?: 'cached' | 'computed'
 }
 
 const monthNames = [
@@ -38,11 +43,28 @@ function toDateKey(iso?: string): string {
   return iso.slice(0, 10)
 }
 
-function inferShiftId(startAt?: string): string {
-  if (!startAt) return 'Turno noche'
-  const d = new Date(startAt)
-  const hour = d.getHours()
-  return hour >= 7 && hour < 19 ? 'Turno dia' : 'Turno noche'
+function getUploadTimestamp(upload: GraderUpload): number {
+  const ts = upload.updatedAt || upload.createdAt || upload.fileMeta.parsedAt
+  return ts ? new Date(ts).getTime() : 0
+}
+
+function getUploadKey(upload: GraderUpload, schedule: Parameters<typeof inferShiftIdFromSchedule>[1]): string {
+  const dateKey = upload.sessionDate || toDateKey(upload.inferred?.startAt)
+  const shiftId = upload.shiftId || inferShiftIdFromSchedule(upload.inferred?.startAt, schedule)
+  const shiftKey = shiftId === 'Turno día' ? 'dia' : shiftId === 'Turno tarde' ? 'tarde' : 'noche'
+  return `${dateKey}__${shiftKey}__${upload.fileMeta.kind}`
+}
+
+function normalizeUploads(list: GraderUpload[], schedule: Parameters<typeof inferShiftIdFromSchedule>[1]): GraderUpload[] {
+  const map = new Map<string, GraderUpload>()
+  for (const u of list) {
+    const key = getUploadKey(u, schedule)
+    const existing = map.get(key)
+    if (!existing || getUploadTimestamp(u) >= getUploadTimestamp(existing)) {
+      map.set(key, u)
+    }
+  }
+  return Array.from(map.values())
 }
 
 function isToday(date: Date): boolean {
@@ -77,6 +99,7 @@ function getDaysInMonth(date: Date): (Date | null)[] {
 
 export function AnalisisGraderCalendarPage() {
   const { canSee } = usePermissionsStore()
+  const user = useAuthStore((s) => s.user)
   const navigate = useNavigate()
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date())
@@ -84,15 +107,49 @@ export function AnalisisGraderCalendarPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [summaries, setSummaries] = useState<Record<string, SummaryState>>({})
+  const [shiftSchedule, setShiftSchedule] = useState(DEFAULT_SHIFT_SCHEDULE)
+  const autoSelectedRef = useRef(false)
 
   useEffect(() => {
     setLoading(true)
     setError(null)
     listGraderUploads()
-      .then(setUploads)
+      .then((list) => setUploads(normalizeUploads(list, DEFAULT_SHIFT_SCHEDULE)))
       .catch((err) => setError(err instanceof Error ? err.message : 'Error al cargar uploads'))
       .finally(() => setLoading(false))
   }, [])
+
+  useEffect(() => {
+    getModuleRanges()
+      .then((cfg) => {
+        const schedule = normalizeShiftSchedule(cfg?.shiftSchedule)
+        setShiftSchedule(schedule)
+      })
+      .catch(() => {
+        setShiftSchedule(DEFAULT_SHIFT_SCHEDULE)
+      })
+  }, [])
+
+  useEffect(() => {
+    if (uploads.length === 0) return
+    setUploads((prev) => normalizeUploads(prev, shiftSchedule))
+  }, [shiftSchedule, uploads.length])
+
+  useEffect(() => {
+    if (autoSelectedRef.current) return
+    if (uploads.length === 0) return
+    const latest = uploads
+      .map((u) => u.sessionDate || toDateKey(u.inferred?.startAt))
+      .filter(Boolean)
+      .sort()
+      .slice(-1)[0]
+    if (latest) {
+      const latestDate = new Date(`${latest}T00:00:00`)
+      setSelectedDate(latestDate)
+      setCurrentMonth(new Date(latestDate.getFullYear(), latestDate.getMonth(), 1))
+      autoSelectedRef.current = true
+    }
+  }, [uploads])
 
   const days = getDaysInMonth(currentMonth)
 
@@ -107,17 +164,51 @@ export function AnalisisGraderCalendarPage() {
   }, [uploads])
 
   const selectedKey = selectedDate ? selectedDate.toISOString().slice(0, 10) : null
-  const selectedUploads = selectedKey ? uploadsByDate.get(selectedKey) || [] : []
+  const selectedUploads = useMemo(() => {
+    if (!selectedKey) return []
+    return uploadsByDate.get(selectedKey) || []
+  }, [selectedKey, uploadsByDate])
 
   const turnos = useMemo(() => {
     const map = new Map<string, GraderUpload[]>()
     for (const u of selectedUploads) {
-      const shift = u.shiftId || inferShiftId(u.inferred?.startAt)
+      const shift = u.shiftId || inferShiftIdFromSchedule(u.inferred?.startAt, shiftSchedule)
       if (!map.has(shift)) map.set(shift, [])
       map.get(shift)!.push(u)
     }
     return map
-  }, [selectedUploads])
+  }, [selectedUploads, shiftSchedule])
+
+  useEffect(() => {
+    if (!selectedKey) return
+    const shifts = Array.from(turnos.keys())
+    if (shifts.length === 0) return
+
+    Promise.all(
+      shifts.map(async (shiftId) => {
+        const key = `${selectedKey}::${shiftId}`
+        if (summaries[key]?.data) return
+        const cached = await getDailySummary(selectedKey, shiftId)
+        if (cached) {
+          setSummaries((prev) => ({
+            ...prev,
+            [key]: {
+              loading: false,
+              error: null,
+              source: 'cached',
+              data: {
+                totalPieces: cached.totalPieces,
+                pointZeroPieces: cached.pointZeroPieces,
+                pointZeroPct: cached.pointZeroPct,
+                startAt: cached.startAt,
+                endAt: cached.endAt,
+              },
+            },
+          }))
+        }
+      }),
+    ).catch(() => {})
+  }, [selectedKey, turnos, summaries])
 
   if (!canSee('analisisGrader')) {
     return <Navigate to="/" replace />
@@ -139,6 +230,26 @@ export function AnalisisGraderCalendarPage() {
     const key = `${dateKey}::${shiftId}`
     if (summaries[key]?.loading) return
 
+    const cached = await getDailySummary(dateKey, shiftId)
+    if (cached) {
+      setSummaries((prev) => ({
+        ...prev,
+        [key]: {
+          loading: false,
+          error: null,
+          source: 'cached',
+          data: {
+            totalPieces: cached.totalPieces,
+            pointZeroPieces: cached.pointZeroPieces,
+            pointZeroPct: cached.pointZeroPct,
+            startAt: cached.startAt,
+            endAt: cached.endAt,
+          },
+        },
+      }))
+      return
+    }
+
     setSummaries((prev) => ({
       ...prev,
       [key]: { loading: true, error: null },
@@ -146,7 +257,7 @@ export function AnalisisGraderCalendarPage() {
 
     try {
       const turnoUploads = (uploadsByDate.get(dateKey) || []).filter((u) => {
-        const shift = u.shiftId || inferShiftId(u.inferred?.startAt)
+        const shift = u.shiftId || inferShiftIdFromSchedule(u.inferred?.startAt, shiftSchedule)
         return shift === shiftId
       })
 
@@ -175,11 +286,25 @@ export function AnalisisGraderCalendarPage() {
       const pointZeroPieces = merged.gate0Records.reduce((sum, r) => sum + r.pieces, 0)
       const pointZeroPct = totalPieces > 0 ? Math.round((pointZeroPieces / totalPieces) * 10000) / 100 : 0
 
+      if (user) {
+        await saveDailySummary({
+          dateKey,
+          shiftId,
+          totalPieces,
+          pointZeroPieces,
+          pointZeroPct,
+          startAt: merged.inferred.startAt,
+          endAt: merged.inferred.endAt,
+          updatedBy: user.id,
+        })
+      }
+
       setSummaries((prev) => ({
         ...prev,
         [key]: {
           loading: false,
           error: null,
+          source: 'computed',
           data: {
             totalPieces,
             pointZeroPieces,
@@ -261,7 +386,7 @@ export function AnalisisGraderCalendarPage() {
 
                   const dayKey = day.toISOString().slice(0, 10)
                   const dayUploads = uploadsByDate.get(dayKey) || []
-                  const turnosCount = new Set(dayUploads.map((u) => u.shiftId || inferShiftId(u.inferred?.startAt))).size
+                  const turnosCount = new Set(dayUploads.map((u) => u.shiftId || inferShiftIdFromSchedule(u.inferred?.startAt, shiftSchedule))).size
 
                   return (
                     <button
@@ -330,6 +455,11 @@ export function AnalisisGraderCalendarPage() {
                             </p>
                           </div>
                           <div className="flex items-center gap-2">
+                            {summary?.source && (
+                              <Badge variant="secondary" className="text-[10px]">
+                                {summary.source === 'cached' ? 'Guardado' : 'Calculado'}
+                              </Badge>
+                            )}
                             <Button size="sm" variant="outline" onClick={() => handleLoadTurno(selectedKey!, shiftId)}>
                               Cargar
                             </Button>

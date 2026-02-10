@@ -151,6 +151,30 @@ export interface GraderDeviceConfig {
 export interface GraderModuleConfig {
   id: 'global';
   customWeightRanges: CalibreWeightRange[];
+  shiftSchedule?: GraderShiftSchedule[];
+  updatedBy: string;
+  updatedAt: string;
+}
+
+export interface GraderShiftSchedule {
+  shiftId: 'Turno día' | 'Turno tarde' | 'Turno noche';
+  startHour: number; // 0-23
+  endHour: number;   // 0-23 (puede ser menor si cruza medianoche)
+}
+
+// ============================================================================
+// RESUMENES DIARIOS (KPIs PERSISTIDOS)
+// ============================================================================
+
+export interface GraderDailySummary {
+  id: string; // `${dateKey}__${shiftId}`
+  dateKey: string; // YYYY-MM-DD
+  shiftId: string;
+  totalPieces: number;
+  pointZeroPieces: number;
+  pointZeroPct: number;
+  startAt?: string;
+  endAt?: string;
   updatedBy: string;
   updatedAt: string;
 }

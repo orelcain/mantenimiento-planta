@@ -152,7 +152,7 @@ export function PolygonZoneEditor() {
       }
     }
     loadLocations()
-  }, [])
+  }, [selectedLocationId])
 
   // Cargar versión del mapa cuando cambia la ubicación
   useEffect(() => {

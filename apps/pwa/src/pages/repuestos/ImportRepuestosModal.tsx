@@ -124,7 +124,7 @@ export function ImportRepuestosModal({
 
       if (mode === 'catalogo') {
         await importCatalogoDesdeExcel({
-          rows: mapped.map(({ cantidad, ...rest }) => rest),
+          rows: mapped.map(({ cantidad: _cantidad, ...rest }) => rest),
         })
         onSuccess('Catálogo importado (sin cantidades)')
       } else {

@@ -24,7 +24,10 @@ import {
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store'
 import { parseFile, mergeParsedData } from '@/services/grader/graderExcelParser'
+import { getModuleRanges } from '@/services/grader/graderModuleConfig.service'
+import { deleteDailySummary } from '@/services/grader/graderDailySummary.service'
 import { listGraderUploads, saveGraderUpload, updateGraderUpload, uploadGraderFile } from '@/services/grader/graderUpload.service'
+import { DEFAULT_SHIFT_SCHEDULE, inferShiftIdFromSchedule, normalizeShiftSchedule, shiftIdToKey } from '@/services/grader/graderShiftSchedule'
 import type {
   ParsedMatrixData,
   UploadedMatrixFile,
@@ -64,14 +67,31 @@ const KIND_COLORS: Record<MatrixFileKind, string> = {
   UNKNOWN: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
 }
 
-function inferShiftId(startAt?: string): string {
-  if (!startAt) return 'Turno noche'
-  const d = new Date(startAt)
-  const hour = d.getHours()
-  return hour >= 7 && hour < 19 ? 'Turno día' : 'Turno noche'
+const SHIFT_OPTIONS = ['Turno día', 'Turno tarde', 'Turno noche'] as const
+
+function buildUploadId(sessionDate: string, shiftId: string | undefined, kind: MatrixFileKind): string {
+  const shiftKey = shiftIdToKey(shiftId)
+  return `${sessionDate}__${shiftKey}__${kind}`
 }
 
-const SHIFT_OPTIONS = ['Turno día', 'Turno noche'] as const
+function getUploadTimestamp(upload: GraderUpload): number {
+  const ts = upload.updatedAt || upload.createdAt || upload.fileMeta.parsedAt
+  return ts ? new Date(ts).getTime() : 0
+}
+
+function normalizeUploads(list: GraderUpload[], schedule: Parameters<typeof inferShiftIdFromSchedule>[1]): GraderUpload[] {
+  const map = new Map<string, GraderUpload>()
+  for (const u of list) {
+    const dateKey = u.sessionDate || toDateKey(u.inferred?.startAt)
+    const shift = u.shiftId || inferShiftIdFromSchedule(u.inferred?.startAt, schedule)
+    const key = buildUploadId(dateKey, shift, u.fileMeta.kind)
+    const existing = map.get(key)
+    if (!existing || getUploadTimestamp(u) >= getUploadTimestamp(existing)) {
+      map.set(key, u)
+    }
+  }
+  return Array.from(map.values())
+}
 
 function toDateKey(iso?: string): string {
   if (!iso) return new Date().toISOString().slice(0, 10)
@@ -88,6 +108,7 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
   const [currentTurnoDate, setCurrentTurnoDate] = useState<string | null>(null)
   const [currentTurnoShift, setCurrentTurnoShift] = useState<string>('Turno noche')
   const [loadingTurno, setLoadingTurno] = useState(false)
+  const [shiftSchedule, setShiftSchedule] = useState(DEFAULT_SHIFT_SCHEDULE)
   const inputRef = useRef<HTMLInputElement>(null)
   const [searchParams] = useSearchParams()
   const autoLoadRef = useRef(false)
@@ -107,8 +128,24 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
   const canContinue = hasPiezaPieza
 
   useEffect(() => {
-    listGraderUploads().then(setUploads).catch(() => {})
+    listGraderUploads().then((list) => setUploads(normalizeUploads(list, DEFAULT_SHIFT_SCHEDULE))).catch(() => {})
   }, [])
+
+  useEffect(() => {
+    getModuleRanges()
+      .then((cfg) => {
+        const schedule = normalizeShiftSchedule(cfg?.shiftSchedule)
+        setShiftSchedule(schedule)
+      })
+      .catch(() => {
+        setShiftSchedule(DEFAULT_SHIFT_SCHEDULE)
+      })
+  }, [])
+
+  useEffect(() => {
+    if (uploads.length === 0) return
+    setUploads((prev) => normalizeUploads(prev, shiftSchedule))
+  }, [shiftSchedule, uploads.length])
 
   useEffect(() => {
     const dateParam = searchParams.get('date')
@@ -173,8 +210,12 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
       for (const file of fileArray) {
         const result = await parseFile(file)
         const inferred = result.partialData.inferred
-        const sessionDate = toDateKey(inferred?.startAt)
-        const shiftId = inferShiftId(inferred?.startAt)
+        const inferredDate = toDateKey(inferred?.startAt)
+        const inferredShift = inferShiftIdFromSchedule(inferred?.startAt, shiftSchedule)
+        const sessionDate = currentTurnoDate || inferredDate
+        const shiftId = currentTurnoDate ? currentTurnoShift : inferredShift
+        const uploadId = buildUploadId(sessionDate, shiftId, result.fileMeta.kind)
+        result.fileMeta.id = uploadId
         // Aceptar solo pieza-pieza; advertir si se carga otro tipo
         if (result.fileMeta.kind !== 'PIEZA_PIEZA') {
           result.fileMeta.warnings.push(
@@ -184,7 +225,7 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
         // Persistir upload para calendario (si hay usuario)
         if (user) {
           const upload = await saveGraderUpload({
-            id: result.fileMeta.id,
+            id: uploadId,
             fileMeta: result.fileMeta,
             inferred,
             sessionDate,
@@ -206,13 +247,25 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
           } catch {
             setUploadError('No se pudo subir el archivo a Storage.')
           }
-          setUploads((prev) => [upload, ...prev])
+          setUploads((prev) => normalizeUploads([upload, ...prev], shiftSchedule))
+          if (result.fileMeta.kind === 'PIEZA_PIEZA') {
+            try {
+              await deleteDailySummary(sessionDate, shiftId)
+            } catch {
+              // Evitar bloquear carga si no hay permisos para invalidar el resumen.
+            }
+          }
         }
         if (!currentTurnoDate) setCurrentTurnoDate(sessionDate)
         if (!currentTurnoShift) setCurrentTurnoShift(shiftId)
         parsed.push({ ...result, file })
       }
-      updateFiles((prev) => [...prev, ...parsed])
+      updateFiles((prev) => {
+        const map = new Map<string, FileParsed>()
+        for (const item of prev) map.set(item.fileMeta.id, item)
+        for (const item of parsed) map.set(item.fileMeta.id, item)
+        return Array.from(map.values())
+      })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al parsear archivo')
       if (!user) {
@@ -223,7 +276,7 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
     } finally {
       setParsing(false)
     }
-  }, [updateFiles, user])
+  }, [updateFiles, user, shiftSchedule, currentTurnoDate, currentTurnoShift])
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
@@ -246,8 +299,26 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
 
   const handleUpdateUpload = async (id: string, patch: Partial<GraderUpload>) => {
     try {
+      const previous = uploadsById.get(id)
       await updateGraderUpload(id, patch)
-      setUploads((prev) => prev.map((u) => (u.id === id ? { ...u, ...patch } : u)))
+      if (previous?.fileMeta.kind === 'PIEZA_PIEZA') {
+        const previousDate = previous.sessionDate || toDateKey(previous.inferred?.startAt)
+        const previousShift = previous.shiftId || inferShiftIdFromSchedule(previous.inferred?.startAt, shiftSchedule)
+        const nextDate = patch.sessionDate || previousDate
+        const nextShift = patch.shiftId || previousShift
+        try {
+          await deleteDailySummary(previousDate, previousShift)
+          if (nextDate !== previousDate || nextShift !== previousShift) {
+            await deleteDailySummary(nextDate, nextShift)
+          }
+        } catch {
+          // Evitar bloquear actualizacion si no hay permisos para invalidar el resumen.
+        }
+      }
+      setUploads((prev) => {
+        const next = prev.map((u) => (u.id === id ? { ...u, ...patch } : u))
+        return normalizeUploads(next, shiftSchedule)
+      })
     } catch {
       setUploadError('No se pudo actualizar el calendario.')
     }
@@ -258,7 +329,7 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
       const inferred = f.partialData.inferred
       const upload = uploadsById.get(f.fileMeta.id)
       const sessionDate = upload?.sessionDate || toDateKey(inferred?.startAt)
-      const shiftId = upload?.shiftId || inferShiftId(inferred?.startAt)
+      const shiftId = upload?.shiftId || inferShiftIdFromSchedule(inferred?.startAt, shiftSchedule)
       if (!currentTurnoDate || !currentTurnoShift) return true
       return sessionDate === currentTurnoDate && shiftId === currentTurnoShift
     })
@@ -270,14 +341,14 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
     onComplete(merged)
   }
 
-  const handleLoadTurno = async () => {
+  const handleLoadTurno = useCallback(async () => {
     if (!currentTurnoDate || !currentTurnoShift) return
     setLoadingTurno(true)
     setUploadError(null)
     try {
       const turnoUploads = uploads.filter((u) => {
         const dateKey = u.sessionDate || toDateKey(u.inferred?.startAt)
-        const shift = u.shiftId || inferShiftId(u.inferred?.startAt)
+        const shift = u.shiftId || inferShiftIdFromSchedule(u.inferred?.startAt, shiftSchedule)
         return dateKey === currentTurnoDate && shift === currentTurnoShift
       })
 
@@ -316,7 +387,7 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
     } finally {
       setLoadingTurno(false)
     }
-  }
+  }, [currentTurnoDate, currentTurnoShift, uploads, shiftSchedule, updateFiles, onComplete])
 
   useEffect(() => {
     if (!autoLoadRef.current) return
@@ -325,7 +396,7 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
     if (loadingTurno) return
     autoLoadRef.current = false
     handleLoadTurno()
-  }, [uploads, currentTurnoDate, currentTurnoShift, loadingTurno])
+  }, [uploads.length, currentTurnoDate, currentTurnoShift, loadingTurno, handleLoadTurno])
 
   return (
     <div className="space-y-4">
@@ -496,7 +567,7 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
                 const upload = uploadsById.get(f.fileMeta.id)
                 const inferred = upload?.inferred || f.partialData.inferred
                 const sessionDate = upload?.sessionDate || toDateKey(inferred?.startAt)
-                const shiftId = upload?.shiftId || inferShiftId(inferred?.startAt)
+                const shiftId = upload?.shiftId || inferShiftIdFromSchedule(inferred?.startAt, shiftSchedule)
                 const timeRange = inferred?.startAt && inferred?.endAt
                   ? `${new Date(inferred.startAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })} – ${new Date(inferred.endAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}`
                   : '—'

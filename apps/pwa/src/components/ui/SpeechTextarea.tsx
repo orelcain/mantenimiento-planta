@@ -45,6 +45,22 @@ const SpeechTextarea = React.forwardRef<HTMLTextAreaElement, SpeechTextareaProps
       }
     }, [value])
 
+    const handleTranscript = React.useCallback((text: string) => {
+      const currentValue = String(value || '')
+      // Concatenar con un espacio si no está vacío
+      const newValue = currentValue.trim()
+        ? `${currentValue} ${text}`
+        : text
+
+      // Crear evento sintético compatible con React
+      const event = {
+        target: { value: newValue, name: props.name },
+        currentTarget: { value: newValue, name: props.name }
+      } as React.ChangeEvent<HTMLTextAreaElement>
+
+      onChange?.(event)
+    }, [value, onChange, props.name])
+
     React.useEffect(() => {
       if (typeof window === 'undefined') return
 
@@ -87,23 +103,7 @@ const SpeechTextarea = React.forwardRef<HTMLTextAreaElement, SpeechTextareaProps
       }
 
       recognitionRef.current = recognition
-    }, [])
-
-    const handleTranscript = (text: string) => {
-      const currentValue = String(value || '')
-      // Concatenar con un espacio si no está vacío
-      const newValue = currentValue.trim() 
-        ? `${currentValue} ${text}` 
-        : text
-      
-      // Crear evento sintético compatible con React
-      const event = {
-        target: { value: newValue, name: props.name },
-        currentTarget: { value: newValue, name: props.name }
-      } as React.ChangeEvent<HTMLTextAreaElement>
-
-      onChange?.(event)
-    }
+    }, [handleTranscript])
 
     const toggleListening = (e: React.MouseEvent) => {
       e.preventDefault() // Evitar submit del form
@@ -112,7 +112,7 @@ const SpeechTextarea = React.forwardRef<HTMLTextAreaElement, SpeechTextareaProps
       if (isListening) {
         try {
           recognitionRef.current.stop()
-        } catch (e) {
+        } catch {
           // Ignorar error si ya estaba detenido
         }
         setIsListening(false)

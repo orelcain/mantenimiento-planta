@@ -14,7 +14,8 @@ import {
   deleteGatesTemplate,
   type GatesTemplate,
 } from '@/services/grader/graderSession.service'
-import { getModuleRanges, saveModuleRanges } from '@/services/grader/graderModuleConfig.service'
+import { getModuleRanges, saveModuleRanges, saveModuleShiftSchedule } from '@/services/grader/graderModuleConfig.service'
+import { DEFAULT_SHIFT_SCHEDULE, normalizeShiftSchedule } from '@/services/grader/graderShiftSchedule'
 import type {
   GateAssignment,
   GraderAnalysisConfig,
@@ -35,7 +36,7 @@ interface Props {
 
 const QUALITIES: GraderQuality[] = ['Premium', 'Grado', 'Industrial', 'D', 'Unknown']
 const DEFAULT_CALIBRES: CalibreRange[] = ['0-2 lb', '2-4 lb', '4-6 lb', '6-8 lb', '8-10 lb', '10-12 lb', 'Other']
-const SHIFT_OPTIONS = ['Turno día', 'Turno noche'] as const
+const SHIFT_OPTIONS = ['Turno día', 'Turno tarde', 'Turno noche'] as const
 
 function buildRangeLabel(calibre: string, minGrams: number, maxGrams: number): string {
   return `${calibre} (${minGrams.toLocaleString()}-${maxGrams.toLocaleString()} g)`
@@ -57,6 +58,9 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
   const [showWeightRanges, setShowWeightRanges] = useState(false)
   const [savingRanges, setSavingRanges] = useState(false)
   const [rangesError, setRangesError] = useState<string | null>(null)
+  const [shiftSchedule, setShiftSchedule] = useState(DEFAULT_SHIFT_SCHEDULE)
+  const [savingSchedule, setSavingSchedule] = useState(false)
+  const [scheduleError, setScheduleError] = useState<string | null>(null)
   const user = useAuthStore((s) => s.user)
   const isAdmin = useIsAdmin()
 
@@ -111,6 +115,39 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
     setConfig((c) => ({ ...c, customWeightRanges: undefined }))
   }
 
+  const clampHour = (value: number) => Math.min(23, Math.max(0, Math.round(value)))
+
+  const updateShiftSchedule = (idx: number, patch: Partial<typeof shiftSchedule[number]>) => {
+    setShiftSchedule((prev) => {
+      const next = [...prev]
+      const current = next[idx]
+      if (!current) return prev
+      next[idx] = {
+        shiftId: current.shiftId,
+        ...patch,
+        startHour: patch.startHour !== undefined ? clampHour(patch.startHour) : current.startHour,
+        endHour: patch.endHour !== undefined ? clampHour(patch.endHour) : current.endHour,
+      }
+      return next
+    })
+  }
+
+  const handleSaveShiftSchedule = async () => {
+    if (!user) return
+    setSavingSchedule(true)
+    setScheduleError(null)
+    try {
+      await saveModuleShiftSchedule({
+        schedule: shiftSchedule,
+        updatedBy: user.id,
+      })
+    } catch {
+      setScheduleError('No se pudo guardar el horario de turnos.')
+    } finally {
+      setSavingSchedule(false)
+    }
+  }
+
   useEffect(() => {
     listGatesTemplates().then(setTemplates).catch(() => {})
   }, [])
@@ -122,6 +159,7 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
         if (cfg?.customWeightRanges && cfg.customWeightRanges.length > 0) {
           setConfig((c) => ({ ...c, customWeightRanges: cfg.customWeightRanges }))
         }
+        setShiftSchedule(normalizeShiftSchedule(cfg?.shiftSchedule))
       })
       .catch(() => {})
   }, [])
@@ -298,6 +336,56 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                 className="mt-1"
               />
             </div>
+          </div>
+
+          <div className="mt-6">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <Label className="text-sm">Horarios de turnos</Label>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleSaveShiftSchedule}
+                disabled={savingSchedule || !user}
+              >
+                <Save className="h-4 w-4 mr-1" />
+                {savingSchedule ? 'Guardando...' : 'Guardar horarios'}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Formato 0-23. El turno noche puede cruzar medianoche (fin menor que inicio).
+            </p>
+            <div className="mt-3 grid gap-2">
+              {shiftSchedule.map((shift, idx) => (
+                <div key={shift.shiftId} className="flex items-center gap-3 flex-wrap">
+                  <Badge variant="outline" className="text-xs">{shift.shiftId}</Badge>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">Inicio</span>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={23}
+                      value={shift.startHour}
+                      onChange={(e) => updateShiftSchedule(idx, { startHour: Number(e.target.value) })}
+                      className="h-8 w-20 text-xs"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">Fin</span>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={23}
+                      value={shift.endHour}
+                      onChange={(e) => updateShiftSchedule(idx, { endHour: Number(e.target.value) })}
+                      className="h-8 w-20 text-xs"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+            {scheduleError && (
+              <div className="mt-2 text-xs text-destructive">{scheduleError}</div>
+            )}
           </div>
 
           {/* Period inferred */}

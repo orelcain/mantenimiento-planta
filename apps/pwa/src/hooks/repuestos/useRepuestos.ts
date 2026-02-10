@@ -16,75 +16,19 @@ import { db } from '@/services/firebase';
 import type { 
   Repuesto, 
   HistorialCambio, 
-  RepuestoFormData, 
+  RepuestoFormData,
+  ImportCantidadRow,
 } from '@/types/repuestos';
 import type { TagAsignado } from '@/types/tags';
 import { isTagAsignado, computeTotalFromTags, getTagNombre } from '@/types/tags';
 
-export interface ImportCantidadRow {
-  codigoSAP?: string;
-  codigoBaader?: string;
-  cantidad: number;
-  valorUnitario?: number;
-  textoBreve?: string;
-  descripcion?: string;
-  forceOverride?: {
-    codigoSAP?: boolean;
-    codigoBaader?: boolean;
-    textoBreve?: boolean;
-    descripcion?: boolean;
-    valorUnitario?: boolean;
-  };
-}
-
-const hasAnyStockFromTags = (tags: unknown) => {
-  if (!Array.isArray(tags)) return false;
-  return tags.some(tag => isTagAsignado(tag) && tag.tipo === 'stock' && (tag.cantidad || 0) > 0);
-};
-
-const normalizeKey = (value: string) => value.trim().toUpperCase();
-
-const upsertTagAsignado = (
-  tags: (string | TagAsignado)[] | undefined,
-  tagName: string,
-  tipo: 'solicitud' | 'stock',
-  cantidad: number
-) => {
-  const safeTags: (string | TagAsignado)[] = Array.isArray(tags) ? tags : [];
-  const found = safeTags.some(t => isTagAsignado(t) && t.nombre === tagName && t.tipo === tipo);
-
-  if (found) {
-    return safeTags.map((t) => {
-      if (isTagAsignado(t) && t.nombre === tagName && t.tipo === tipo) {
-        return { ...t, cantidad };
-      }
-      return t;
-    });
-  }
-
-  return [
-    ...safeTags,
-    {
-      nombre: tagName,
-      tipo,
-      cantidad,
-      fecha: new Date()
-    }
-  ];
-};
-
-const toFiniteNumber = (value: unknown, defaultValue: number): number => {
-  const num = Number(value);
-  return Number.isFinite(num) ? num : defaultValue;
-};
-
-const chunk = <T,>(arr: T[], size: number): T[][] => {
+function chunk<T>(arr: T[], size: number): T[][] {
   const result: T[][] = [];
   for (let i = 0; i < arr.length; i += size) {
     result.push(arr.slice(i, i + size));
   }
   return result;
-};
+}
 
 // Rutas de colecciones para compatibilidad con máquinas existentes y nuevas
 const getCollectionPath = (machineId: string) => {
@@ -142,7 +86,7 @@ export function useRepuestos(machineId: string | null) {
   }, [machineId]);
 
   // Agregar historial de cambios
-  const addHistorial = async (
+  const addHistorial = useCallback(async (
     repuestoId: string, 
     campo: string, 
     valorAnterior: string | number | null | undefined, 
@@ -165,7 +109,7 @@ export function useRepuestos(machineId: string | null) {
     } catch (err) {
       console.error('Error adding historial:', err);
     }
-  };
+  }, [machineId]);
 
   // Crear repuesto
   const createRepuesto = useCallback(async (data: RepuestoFormData): Promise<string> => {
@@ -206,7 +150,7 @@ export function useRepuestos(machineId: string | null) {
       console.error('Error creating repuesto:', err);
       throw err;
     }
-  }, [machineId]);
+  }, [machineId, addHistorial]);
 
   // Actualizar repuesto
   const updateRepuesto = useCallback(async (
@@ -247,7 +191,6 @@ export function useRepuestos(machineId: string | null) {
         }
       }
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await updateDoc(doc(db, collectionPath, id), updateData as any);
 
       // Registrar cambios en historial
@@ -267,7 +210,7 @@ export function useRepuestos(machineId: string | null) {
       console.error('Error updating repuesto:', err);
       throw err;
     }
-  }, [machineId]);
+  }, [machineId, addHistorial]);
 
   // Eliminar repuesto
   const deleteRepuesto = useCallback(async (id: string) => {
@@ -771,7 +714,7 @@ export function useRepuestos(machineId: string | null) {
               }
             }
           }
-        } catch (err) {
+        } catch (_err) {
           errors.push(repuesto.codigoSAP);
         }
       }
