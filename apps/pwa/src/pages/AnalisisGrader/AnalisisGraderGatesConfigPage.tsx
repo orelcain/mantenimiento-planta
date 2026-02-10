@@ -15,7 +15,7 @@ import {
   type GatesTemplate,
 } from '@/services/grader/graderSession.service'
 import { getModuleRanges, saveModuleRanges, saveModuleShiftSchedule } from '@/services/grader/graderModuleConfig.service'
-import { DEFAULT_SHIFT_SCHEDULE, normalizeShiftSchedule } from '@/services/grader/graderShiftSchedule'
+import { DEFAULT_SHIFT_SCHEDULE, formatShiftTime, normalizeShiftSchedule, parseShiftTime } from '@/services/grader/graderShiftSchedule'
 import type {
   GateAssignment,
   GraderAnalysisConfig,
@@ -115,19 +115,12 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
     setConfig((c) => ({ ...c, customWeightRanges: undefined }))
   }
 
-  const clampHour = (value: number) => Math.min(23, Math.max(0, Math.round(value)))
-
   const updateShiftSchedule = (idx: number, patch: Partial<typeof shiftSchedule[number]>) => {
     setShiftSchedule((prev) => {
       const next = [...prev]
       const current = next[idx]
       if (!current) return prev
-      next[idx] = {
-        shiftId: current.shiftId,
-        ...patch,
-        startHour: patch.startHour !== undefined ? clampHour(patch.startHour) : current.startHour,
-        endHour: patch.endHour !== undefined ? clampHour(patch.endHour) : current.endHour,
-      }
+      next[idx] = { ...current, ...patch }
       return next
     })
   }
@@ -352,7 +345,7 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
               </Button>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              Formato 0-23. El turno noche puede cruzar medianoche (fin menor que inicio).
+              Formato HH:MM. El turno noche puede cruzar medianoche (fin menor que inicio).
             </p>
             <div className="mt-3 grid gap-2">
               {shiftSchedule.map((shift, idx) => (
@@ -361,23 +354,25 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-muted-foreground">Inicio</span>
                     <Input
-                      type="number"
-                      min={0}
-                      max={23}
-                      value={shift.startHour}
-                      onChange={(e) => updateShiftSchedule(idx, { startHour: Number(e.target.value) })}
-                      className="h-8 w-20 text-xs"
+                      type="time"
+                      value={formatShiftTime(shift.startHour, shift.startMinute)}
+                      onChange={(e) => {
+                        const { hour, minute } = parseShiftTime(e.target.value)
+                        updateShiftSchedule(idx, { startHour: hour, startMinute: minute })
+                      }}
+                      className="h-8 w-28 text-xs"
                     />
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-muted-foreground">Fin</span>
                     <Input
-                      type="number"
-                      min={0}
-                      max={23}
-                      value={shift.endHour}
-                      onChange={(e) => updateShiftSchedule(idx, { endHour: Number(e.target.value) })}
-                      className="h-8 w-20 text-xs"
+                      type="time"
+                      value={formatShiftTime(shift.endHour, shift.endMinute)}
+                      onChange={(e) => {
+                        const { hour, minute } = parseShiftTime(e.target.value)
+                        updateShiftSchedule(idx, { endHour: hour, endMinute: minute })
+                      }}
+                      className="h-8 w-28 text-xs"
                     />
                   </div>
                 </div>

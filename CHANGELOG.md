@@ -7,6 +7,16 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.18] - 2026-02-10
+
+### ⏰ Turnos con hora y minuto
+
+#### Mejoras
+- **Turnos**: Horarios de turnos ahora soportan hora:minuto (HH:MM) en vez de solo hora entera.
+- **UI**: Inputs de tipo `time` para inicio/fin de cada turno.
+- **Inferencia**: Clasificación de turno por hora+minuto precisa.
+- **Backward compatible**: Datos existentes sin minutos defaultean a :00.
+
 ## [2.47.17] - 2026-02-10
 
 ### 🧯 Fix tsc --noEmit CI
