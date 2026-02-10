@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.47.7' as const
+export const APP_VERSION = '2.47.8' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-02-10' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Calendario dedicado + Resumen diario' as const
+export const VERSION_NAME = 'Turnos fijos en UI' as const
 
 /**
  * Nota:

@@ -8,7 +8,7 @@
 
 import { useState, useCallback, useRef, useMemo, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Card, CardContent, CardHeader, CardTitle, Button, Badge } from '@/components/ui'
+import { Card, CardContent, CardHeader, CardTitle, Button, Badge, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui'
 import {
   Upload,
   FileSpreadsheet,
@@ -70,6 +70,8 @@ function inferShiftId(startAt?: string): string {
   const hour = d.getHours()
   return hour >= 7 && hour < 19 ? 'Turno día' : 'Turno noche'
 }
+
+const SHIFT_OPTIONS = ['Turno día', 'Turno noche'] as const
 
 function toDateKey(iso?: string): string {
   if (!iso) return new Date().toISOString().slice(0, 10)
@@ -454,11 +456,16 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground">Turno</span>
-            <input
-              value={currentTurnoShift}
-              onChange={(e) => setCurrentTurnoShift(e.target.value)}
-              className="h-8 text-xs rounded border border-muted-foreground/30 bg-background px-2 w-32"
-            />
+            <Select value={currentTurnoShift} onValueChange={setCurrentTurnoShift}>
+              <SelectTrigger className="h-8 w-32 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {SHIFT_OPTIONS.map((opt) => (
+                  <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <p className="text-xs text-muted-foreground">
             Los archivos del mismo día y turno se agruparán aunque el horario no coincida.
@@ -540,11 +547,16 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-muted-foreground">Turno</span>
-                      <input
-                        value={shiftId}
-                        onChange={(e) => handleUpdateUpload(f.fileMeta.id, { shiftId: e.target.value })}
-                        className="h-7 text-xs rounded border border-muted-foreground/30 bg-background px-2 w-28"
-                      />
+                      <Select value={shiftId} onValueChange={(v) => handleUpdateUpload(f.fileMeta.id, { shiftId: v })}>
+                        <SelectTrigger className="h-7 w-28 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {SHIFT_OPTIONS.map((opt) => (
+                            <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
                   {f.fileMeta.warnings.length > 0 && (

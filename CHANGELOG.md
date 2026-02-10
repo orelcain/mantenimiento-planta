@@ -7,6 +7,13 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.8] - 2026-02-10
+
+### 🔒 Turnos Fijos
+
+#### Cambios
+- **Turnos predefinidos**: En carga de archivos y configuración de análisis, el turno ahora se elige desde una lista fija (sin texto libre).
+
 ## [2.47.7] - 2026-02-10
 
 ### 📅 Calendario Grader + Resumen Diario

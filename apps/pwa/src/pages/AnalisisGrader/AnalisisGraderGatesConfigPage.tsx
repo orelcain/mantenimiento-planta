@@ -35,6 +35,7 @@ interface Props {
 
 const QUALITIES: GraderQuality[] = ['Premium', 'Grado', 'Industrial', 'D', 'Unknown']
 const DEFAULT_CALIBRES: CalibreRange[] = ['0-2 lb', '2-4 lb', '4-6 lb', '6-8 lb', '8-10 lb', '10-12 lb', 'Other']
+const SHIFT_OPTIONS = ['Turno día', 'Turno noche'] as const
 
 function buildRangeLabel(calibre: string, minGrams: number, maxGrams: number): string {
   return `${calibre} (${minGrams.toLocaleString()}-${maxGrams.toLocaleString()} g)`
@@ -227,12 +228,19 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
             </div>
             <div>
               <Label className="text-xs">Turno / Shift ID</Label>
-              <Input
-                value={config.shiftId || ''}
-                onChange={(e) => setConfig((c) => ({ ...c, shiftId: e.target.value }))}
-                placeholder="Turno noche"
-                className="mt-1"
-              />
+              <Select
+                value={config.shiftId || 'Turno noche'}
+                onValueChange={(v) => setConfig((c) => ({ ...c, shiftId: v }))}
+              >
+                <SelectTrigger className="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {SHIFT_OPTIONS.map((opt) => (
+                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label className="text-xs">Intervalo Serie Temporal</Label>
