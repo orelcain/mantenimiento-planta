@@ -11,14 +11,7 @@
 
 export type GraderQuality = 'D' | 'Industrial' | 'Grado' | 'Premium' | 'Unknown';
 
-export type CalibreRange =
-  | '0-2 lb'
-  | '2-4 lb'
-  | '4-6 lb'
-  | '6-8 lb'
-  | '8-10 lb'
-  | '10-12 lb'
-  | 'Other';
+export type CalibreRange = string;
 
 /**
  * Causas estandarizadas de Punto Cero.

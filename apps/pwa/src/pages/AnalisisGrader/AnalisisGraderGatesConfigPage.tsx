@@ -6,7 +6,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Switch, Label } from '@/components/ui'
-import { Settings2, Save, FolderOpen, ChevronRight, ChevronLeft, Trash2, ChevronDown, RotateCcw } from 'lucide-react'
+import { Settings2, Save, FolderOpen, ChevronRight, ChevronLeft, Trash2, ChevronDown, RotateCcw, Plus } from 'lucide-react'
 import { useAuthStore, useIsAdmin } from '@/store'
 import {
   saveGatesTemplate,
@@ -33,12 +33,17 @@ interface Props {
 }
 
 const QUALITIES: GraderQuality[] = ['Premium', 'Grado', 'Industrial', 'D', 'Unknown']
-const CALIBRES: CalibreRange[] = ['0-2 lb', '2-4 lb', '4-6 lb', '6-8 lb', '8-10 lb', '10-12 lb', 'Other']
+const DEFAULT_CALIBRES: CalibreRange[] = ['0-2 lb', '2-4 lb', '4-6 lb', '6-8 lb', '8-10 lb', '10-12 lb', 'Other']
+
+function buildRangeLabel(calibre: string, minGrams: number, maxGrams: number): string {
+  return `${calibre} (${minGrams.toLocaleString()}-${maxGrams.toLocaleString()} g)`
+}
 
 /** Lookup rango peso por calibre — usa custom ranges si existen */
 function calibreRangeLookup(calibre: string, ranges: CalibreWeightRange[]): string {
   const r = ranges.find((w) => w.calibre === calibre)
-  return r ? `${r.minGrams.toLocaleString()}–${r.maxGrams.toLocaleString()} g` : '—'
+  if (!r) return '—'
+  return r.label || buildRangeLabel(r.calibre, r.minGrams, r.maxGrams)
 }
 
 export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: initialConfig, parsedData, onComplete, onBack }: Props) {
@@ -51,19 +56,50 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
   const user = useAuthStore((s) => s.user)
   const isAdmin = useIsAdmin()
 
+  const sortRanges = (ranges: CalibreWeightRange[]) =>
+    [...ranges].sort((a, b) => a.minGrams - b.minGrams)
+
   // Active weight ranges: custom or default
   const activeRanges = useMemo<CalibreWeightRange[]>(() => {
-    return config.customWeightRanges && config.customWeightRanges.length > 0
+    const base = config.customWeightRanges && config.customWeightRanges.length > 0
       ? config.customWeightRanges
       : CALIBRE_WEIGHT_RANGES
+    return sortRanges(base)
   }, [config.customWeightRanges])
+
+  const availableCalibres = useMemo<CalibreRange[]>(() => {
+    const fromRanges = activeRanges.map((r) => r.calibre).filter(Boolean)
+    const merged = [...fromRanges, ...DEFAULT_CALIBRES]
+    return Array.from(new Set(merged))
+  }, [activeRanges])
 
   const isCustomRanges = !!(config.customWeightRanges && config.customWeightRanges.length > 0)
 
-  const updateWeightRange = (idx: number, field: 'minGrams' | 'maxGrams', value: number) => {
-    const ranges: CalibreWeightRange[] = activeRanges.map((r, i) =>
-      i === idx ? { ...r, [field]: value } as CalibreWeightRange : r,
-    )
+  const updateWeightRange = (idx: number, patch: Partial<CalibreWeightRange>) => {
+    const ranges: CalibreWeightRange[] = activeRanges.map((r, i) => {
+      if (i !== idx) return r
+      const next = { ...r, ...patch }
+      return {
+        ...next,
+        label: buildRangeLabel(next.calibre, next.minGrams, next.maxGrams),
+      }
+    })
+    setConfig((c) => ({ ...c, customWeightRanges: sortRanges(ranges) }))
+  }
+
+  const addWeightRange = () => {
+    const newRange: CalibreWeightRange = {
+      calibre: 'Nuevo calibre',
+      label: buildRangeLabel('Nuevo calibre', 0, 0),
+      minGrams: 0,
+      maxGrams: 0,
+    }
+    const ranges = sortRanges([...activeRanges, newRange])
+    setConfig((c) => ({ ...c, customWeightRanges: ranges }))
+  }
+
+  const removeWeightRange = (idx: number) => {
+    const ranges = activeRanges.filter((_, i) => i !== idx)
     setConfig((c) => ({ ...c, customWeightRanges: ranges }))
   }
 
@@ -320,7 +356,7 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {CALIBRES.map((c) => (
+                          {availableCalibres.map((c) => (
                             <SelectItem key={c} value={c}>{c}</SelectItem>
                           ))}
                         </SelectContent>
@@ -397,18 +433,26 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                     <th className="py-2 px-2">Calibre</th>
                     <th className="py-2 px-2">Mín (g)</th>
                     <th className="py-2 px-2">Máx (g)</th>
-                    <th className="py-2 px-2">Rango (lb)</th>
+                    <th className="py-2 px-2">Vista</th>
+                    <th className="py-2 px-2"></th>
                   </tr>
                 </thead>
                 <tbody>
                   {activeRanges.map((r, idx) => (
-                    <tr key={r.calibre} className="border-b hover:bg-muted/30">
-                      <td className="py-2 px-2 font-medium text-xs">{r.label}</td>
+                    <tr key={idx} className="border-b hover:bg-muted/30">
+                      <td className="py-2 px-2">
+                        <Input
+                          value={r.calibre}
+                          onChange={(e) => updateWeightRange(idx, { calibre: e.target.value })}
+                          className="h-8 text-xs w-28"
+                          placeholder="0-2 lb"
+                        />
+                      </td>
                       <td className="py-2 px-2">
                         <Input
                           type="number"
                           value={r.minGrams}
-                          onChange={(e) => updateWeightRange(idx, 'minGrams', Number(e.target.value))}
+                          onChange={(e) => updateWeightRange(idx, { minGrams: Number(e.target.value) })}
                           className="h-8 text-xs w-24 font-mono"
                           step="1"
                         />
@@ -417,25 +461,41 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                         <Input
                           type="number"
                           value={r.maxGrams}
-                          onChange={(e) => updateWeightRange(idx, 'maxGrams', Number(e.target.value))}
+                          onChange={(e) => updateWeightRange(idx, { maxGrams: Number(e.target.value) })}
                           className="h-8 text-xs w-24 font-mono"
                           step="1"
                         />
                       </td>
-                      <td className="py-2 px-2 text-xs text-muted-foreground">{r.calibre}</td>
+                      <td className="py-2 px-2 text-xs text-muted-foreground">
+                        {r.label || buildRangeLabel(r.calibre, r.minGrams, r.maxGrams)}
+                      </td>
+                      <td className="py-2 px-2 text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeWeightRange(idx)}
+                          title="Eliminar calibre"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            {isCustomRanges && (
-              <div className="mt-3 flex justify-end">
+            <div className="mt-3 flex items-center justify-between">
+              <Button variant="outline" size="sm" onClick={addWeightRange}>
+                <Plus className="h-3 w-3 mr-1" />
+                Agregar calibre
+              </Button>
+              {isCustomRanges && (
                 <Button variant="outline" size="sm" onClick={resetWeightRanges}>
                   <RotateCcw className="h-3 w-3 mr-1" />
                   Restaurar valores originales
                 </Button>
-              </div>
-            )}
+              )}
+            </div>
           </CardContent>
         )}
       </Card>

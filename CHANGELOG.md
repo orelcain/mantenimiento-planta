@@ -7,6 +7,16 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.4] - 2026-02-10
+
+### ⚙️ Calibres Personalizados
+
+#### Añadido
+- **Agregar calibres**: Ahora puedes crear nuevos calibres en “Rangos de Peso por Calibre” con sus gramos min/max.
+- **Editar calibre**: El nombre del calibre es editable y se usa en el selector de gates.
+- **Eliminar calibre**: Cada rango puede eliminarse si ya no se utiliza.
+- **Orden por gramos**: Los rangos se ordenan automaticamente por min gramos (ascendente).
+
 ## [2.47.3] - 2026-02-10
 
 ### ⚙️ Rangos de Peso Persistentes
