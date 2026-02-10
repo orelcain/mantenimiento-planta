@@ -12,7 +12,8 @@ import {
   limit,
   serverTimestamp,
 } from '@/services/firestoreTracked'
-import { db } from '../firebase'
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
+import { db, storage } from '../firebase'
 import { generateId } from '@/lib/utils'
 import type { GraderUpload, UploadedMatrixFile } from './types'
 
@@ -69,6 +70,17 @@ export async function saveGraderUpload(params: {
 
   await setDoc(doc(db, COLLECTION, id), firestoreData)
   return upload
+}
+
+export async function uploadGraderFile(file: File, uploadId: string): Promise<{ storagePath: string; downloadURL: string }> {
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+  const storagePath = `graderUploads/${uploadId}/${Date.now()}_${safeName}`
+  const storageRef = ref(storage, storagePath)
+  await uploadBytes(storageRef, file, {
+    contentType: file.type || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  })
+  const downloadURL = await getDownloadURL(storageRef)
+  return { storagePath, downloadURL }
 }
 
 export async function updateGraderUpload(id: string, patch: Partial<GraderUpload>): Promise<void> {

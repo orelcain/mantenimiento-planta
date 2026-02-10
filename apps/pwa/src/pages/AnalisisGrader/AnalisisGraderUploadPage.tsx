@@ -23,7 +23,7 @@ import {
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store'
 import { parseFile, mergeParsedData } from '@/services/grader/graderExcelParser'
-import { listGraderUploads, saveGraderUpload, updateGraderUpload } from '@/services/grader/graderUpload.service'
+import { listGraderUploads, saveGraderUpload, updateGraderUpload, uploadGraderFile } from '@/services/grader/graderUpload.service'
 import type {
   ParsedMatrixData,
   UploadedMatrixFile,
@@ -84,6 +84,7 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
   const [uploads, setUploads] = useState<GraderUpload[]>([])
   const [currentTurnoDate, setCurrentTurnoDate] = useState<string | null>(null)
   const [currentTurnoShift, setCurrentTurnoShift] = useState<string>('Turno noche')
+  const [loadingTurno, setLoadingTurno] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const user = useAuthStore((s) => s.user)
 
@@ -176,6 +177,21 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
             shiftId,
             createdBy: user.id,
           })
+          // Subir archivo a Storage
+          try {
+            const storageInfo = await uploadGraderFile(file, upload.id)
+            await updateGraderUpload(upload.id, {
+              fileMeta: {
+                ...upload.fileMeta,
+                storagePath: storageInfo.storagePath,
+                downloadURL: storageInfo.downloadURL,
+              },
+            })
+            upload.fileMeta.storagePath = storageInfo.storagePath
+            upload.fileMeta.downloadURL = storageInfo.downloadURL
+          } catch {
+            setUploadError('No se pudo subir el archivo a Storage.')
+          }
           setUploads((prev) => [upload, ...prev])
         }
         if (!currentTurnoDate) setCurrentTurnoDate(sessionDate)
@@ -238,6 +254,54 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
     }
     const merged = mergeParsedData(filtered)
     onComplete(merged)
+  }
+
+  const handleLoadTurno = async () => {
+    if (!currentTurnoDate || !currentTurnoShift) return
+    setLoadingTurno(true)
+    setUploadError(null)
+    try {
+      const turnoUploads = uploads.filter((u) => {
+        const dateKey = u.sessionDate || toDateKey(u.inferred?.startAt)
+        const shift = u.shiftId || inferShiftId(u.inferred?.startAt)
+        return dateKey === currentTurnoDate && shift === currentTurnoShift
+      })
+
+      if (turnoUploads.length === 0) {
+        setUploadError('No hay archivos en el calendario para ese turno.')
+        return
+      }
+
+      const parsed: FileParsed[] = []
+      for (const u of turnoUploads) {
+        if (!u.fileMeta.downloadURL) continue
+        const res = await fetch(u.fileMeta.downloadURL)
+        const blob = await res.blob()
+        const file = new File([blob], u.fileMeta.name, {
+          type: blob.type || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        })
+        const result = await parseFile(file)
+        result.fileMeta.id = u.id
+        result.fileMeta.name = u.fileMeta.name
+        result.fileMeta.sizeBytes = u.fileMeta.sizeBytes
+        result.fileMeta.storagePath = u.fileMeta.storagePath
+        result.fileMeta.downloadURL = u.fileMeta.downloadURL
+        parsed.push({ ...result, file })
+      }
+
+      if (parsed.length === 0) {
+        setUploadError('No se pudieron cargar archivos del calendario (sin URL).')
+        return
+      }
+
+      updateFiles(() => parsed)
+      const merged = mergeParsedData(parsed)
+      onComplete(merged)
+    } catch {
+      setUploadError('Error al cargar archivos del calendario.')
+    } finally {
+      setLoadingTurno(false)
+    }
   }
 
   return (
@@ -378,6 +442,15 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
           <p className="text-xs text-muted-foreground">
             Los archivos del mismo día y turno se agruparán aunque el horario no coincida.
           </p>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleLoadTurno}
+            disabled={loadingTurno || !currentTurnoDate || !currentTurnoShift}
+          >
+            {loadingTurno ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+            Cargar turno desde calendario
+          </Button>
         </CardContent>
       </Card>
 

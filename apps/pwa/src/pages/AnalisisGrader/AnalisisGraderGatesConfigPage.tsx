@@ -14,6 +14,7 @@ import {
   deleteGatesTemplate,
   type GatesTemplate,
 } from '@/services/grader/graderSession.service'
+import { getDeviceRanges, saveDeviceRanges } from '@/services/grader/graderDeviceConfig.service'
 import type {
   GateAssignment,
   GraderAnalysisConfig,
@@ -55,6 +56,7 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
   const [showWeightRanges, setShowWeightRanges] = useState(false)
   const [savingRanges, setSavingRanges] = useState(false)
   const [rangesError, setRangesError] = useState<string | null>(null)
+  const [lastDeviceLoaded, setLastDeviceLoaded] = useState<string | null>(null)
   const user = useAuthStore((s) => s.user)
   const isAdmin = useIsAdmin()
 
@@ -112,6 +114,39 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
   useEffect(() => {
     listGatesTemplates().then(setTemplates).catch(() => {})
   }, [])
+
+  // Cargar rangos por dispositivo
+  useEffect(() => {
+    const deviceId = config.deviceId?.trim()
+    if (!deviceId || deviceId === lastDeviceLoaded) return
+    getDeviceRanges(deviceId)
+      .then((cfg) => {
+        if (cfg?.customWeightRanges && cfg.customWeightRanges.length > 0) {
+          setConfig((c) => ({ ...c, customWeightRanges: cfg.customWeightRanges }))
+        }
+        setLastDeviceLoaded(deviceId)
+      })
+      .catch(() => {})
+  }, [config.deviceId, lastDeviceLoaded])
+
+  // Autosave rangos por dispositivo (debounce)
+  useEffect(() => {
+    const deviceId = config.deviceId?.trim()
+    if (!user || !deviceId) return
+    if (!config.customWeightRanges || config.customWeightRanges.length === 0) return
+
+    const timer = setTimeout(() => {
+      saveDeviceRanges({
+        deviceId,
+        ranges: config.customWeightRanges || [],
+        updatedBy: user.id,
+      }).catch(() => {
+        setRangesError('No se pudo guardar rangos por dispositivo.')
+      })
+    }, 800)
+
+    return () => clearTimeout(timer)
+  }, [config.deviceId, config.customWeightRanges, user])
 
   const updateGate = (idx: number, patch: Partial<GateAssignment>) => {
     setGates((prev) => prev.map((g, i) => (i === idx ? { ...g, ...patch } : g)))

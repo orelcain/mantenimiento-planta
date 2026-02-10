@@ -133,6 +133,18 @@ export interface GraderUpload {
 }
 
 // ============================================================================
+// CONFIGURACION POR DISPOSITIVO (RANGOS PERSISTENTES)
+// ============================================================================
+
+export interface GraderDeviceConfig {
+  id: string; // deviceId
+  deviceId: string;
+  customWeightRanges: CalibreWeightRange[];
+  updatedBy: string;
+  updatedAt: string;
+}
+
+// ============================================================================
 // CONFIGURACIÓN DE GATES
 // ============================================================================
 

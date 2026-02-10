@@ -545,6 +545,13 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // ANÁLISIS GRADER - Configuracion por dispositivo
+    match /graderDeviceConfigs/{deviceId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isSupervisor();
+      allow delete: if isAdmin();
+    }
+
     // ============================================
     // ANÁLISIS GRADER - Plantillas de Gates
     // ============================================

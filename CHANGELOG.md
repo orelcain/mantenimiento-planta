@@ -7,6 +7,19 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.6] - 2026-02-10
+
+### 📂 Calendario con Storage + Rangos por Dispositivo
+
+#### Añadido
+- **Uploads con Storage**: Cada archivo subido se guarda en Firebase Storage y queda referenciado en el calendario.
+- **Cargar turno desde calendario**: Selecciona fecha+turno y carga automáticamente los archivos guardados para análisis.
+- **Rangos por dispositivo**: Los rangos personalizados se guardan automáticamente por `deviceId` y se recargan al abrir.
+
+#### Seguridad
+- **Reglas Firestore**: Nueva colección `graderDeviceConfigs`.
+- **Reglas Storage**: Nueva ruta `graderUploads/**` para Excel.
+
 ## [2.47.5] - 2026-02-10
 
 ### 📅 Calendario de Uploads + Turnos
