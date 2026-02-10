@@ -7,6 +7,15 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.9] - 2026-02-10
+
+### 🧭 Rangos Globales del Modulo
+
+#### Cambios
+- **Rangos globales**: Los rangos de peso por calibre ahora se guardan a nivel del modulo y aplican a todas las plantillas.
+- **Plantillas limpias**: Las plantillas solo guardan gates (ya no arrastran rangos).
+- **Guardar rangos globales**: Boton "Guardar rangos" ahora persiste globalmente.
+
 ## [2.47.8] - 2026-02-10
 
 ### 🔒 Turnos Fijos

@@ -14,7 +14,7 @@ import {
   deleteGatesTemplate,
   type GatesTemplate,
 } from '@/services/grader/graderSession.service'
-import { getDeviceRanges, saveDeviceRanges } from '@/services/grader/graderDeviceConfig.service'
+import { getModuleRanges, saveModuleRanges } from '@/services/grader/graderModuleConfig.service'
 import type {
   GateAssignment,
   GraderAnalysisConfig,
@@ -57,7 +57,6 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
   const [showWeightRanges, setShowWeightRanges] = useState(false)
   const [savingRanges, setSavingRanges] = useState(false)
   const [rangesError, setRangesError] = useState<string | null>(null)
-  const [lastDeviceLoaded, setLastDeviceLoaded] = useState<string | null>(null)
   const user = useAuthStore((s) => s.user)
   const isAdmin = useIsAdmin()
 
@@ -116,38 +115,33 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
     listGatesTemplates().then(setTemplates).catch(() => {})
   }, [])
 
-  // Cargar rangos por dispositivo
+  // Cargar rangos globales del modulo
   useEffect(() => {
-    const deviceId = config.deviceId?.trim()
-    if (!deviceId || deviceId === lastDeviceLoaded) return
-    getDeviceRanges(deviceId)
+    getModuleRanges()
       .then((cfg) => {
         if (cfg?.customWeightRanges && cfg.customWeightRanges.length > 0) {
           setConfig((c) => ({ ...c, customWeightRanges: cfg.customWeightRanges }))
         }
-        setLastDeviceLoaded(deviceId)
       })
       .catch(() => {})
-  }, [config.deviceId, lastDeviceLoaded])
+  }, [])
 
-  // Autosave rangos por dispositivo (debounce)
+  // Autosave rangos globales (debounce)
   useEffect(() => {
-    const deviceId = config.deviceId?.trim()
-    if (!user || !deviceId) return
+    if (!user) return
     if (!config.customWeightRanges || config.customWeightRanges.length === 0) return
 
     const timer = setTimeout(() => {
-      saveDeviceRanges({
-        deviceId,
+      saveModuleRanges({
         ranges: config.customWeightRanges || [],
         updatedBy: user.id,
       }).catch(() => {
-        setRangesError('No se pudo guardar rangos por dispositivo.')
+        setRangesError('No se pudo guardar rangos del modulo.')
       })
     }, 800)
 
     return () => clearTimeout(timer)
-  }, [config.deviceId, config.customWeightRanges, user])
+  }, [config.customWeightRanges, user])
 
   const updateGate = (idx: number, patch: Partial<GateAssignment>) => {
     setGates((prev) => prev.map((g, i) => (i === idx ? { ...g, ...patch } : g)))
@@ -159,7 +153,6 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
       name: templateName.trim(),
       deviceId: config.deviceId,
       gates,
-      customWeightRanges: config.customWeightRanges,
       createdBy: user.id,
     })
     setTemplates((prev) => [tmpl, ...prev])
@@ -169,11 +162,6 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
   const handleLoadTemplate = (tmpl: GatesTemplate) => {
     setGates(tmpl.gates)
     if (tmpl.deviceId) setConfig((c) => ({ ...c, deviceId: tmpl.deviceId }))
-    if (tmpl.customWeightRanges) {
-      setConfig((c) => ({ ...c, customWeightRanges: tmpl.customWeightRanges }))
-    } else {
-      setConfig((c) => ({ ...c, customWeightRanges: undefined }))
-    }
     setShowTemplates(false)
   }
 
@@ -188,18 +176,12 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
     setSavingRanges(true)
     setRangesError(null)
     try {
-      const name = `Rangos ${config.deviceId || 'General'} ${new Date().toLocaleDateString('es-CL')}`
-      const tmpl = await saveGatesTemplate({
-        name,
-        deviceId: config.deviceId,
-        gates,
-        customWeightRanges: config.customWeightRanges,
-        createdBy: user.id,
+      await saveModuleRanges({
+        ranges: config.customWeightRanges,
+        updatedBy: user.id,
       })
-      setTemplates((prev) => [tmpl, ...prev])
-      setShowTemplates(true)
     } catch {
-      setRangesError('No se pudo guardar los rangos.')
+      setRangesError('No se pudo guardar los rangos del modulo.')
     } finally {
       setSavingRanges(false)
     }
@@ -359,11 +341,6 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                     {t.deviceId && (
                       <Badge variant="outline" className="ml-2 text-[10px]">
                         {t.deviceId}
-                      </Badge>
-                    )}
-                    {t.customWeightRanges && (
-                      <Badge variant="secondary" className="ml-2 text-[10px]">
-                        Rangos
                       </Badge>
                     )}
                   </div>

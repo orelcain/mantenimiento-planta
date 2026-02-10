@@ -145,6 +145,17 @@ export interface GraderDeviceConfig {
 }
 
 // ============================================================================
+// CONFIGURACION GLOBAL DEL MODULO
+// ============================================================================
+
+export interface GraderModuleConfig {
+  id: 'global';
+  customWeightRanges: CalibreWeightRange[];
+  updatedBy: string;
+  updatedAt: string;
+}
+
+// ============================================================================
 // CONFIGURACIÓN DE GATES
 // ============================================================================
 

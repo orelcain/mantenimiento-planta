@@ -552,6 +552,13 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // ANÁLISIS GRADER - Configuracion global del modulo
+    match /graderModuleConfigs/{configId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isSupervisor();
+      allow delete: if isAdmin();
+    }
+
     // ============================================
     // ANÁLISIS GRADER - Plantillas de Gates
     // ============================================

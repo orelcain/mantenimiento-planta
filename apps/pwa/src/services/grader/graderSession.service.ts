@@ -23,7 +23,6 @@ import type {
   AIGraderOutput,
   UploadedMatrixFile,
   GateAssignment,
-  CalibreWeightRange,
 } from './types'
 
 const COLLECTION = 'graderAnalysisSessions'
@@ -122,7 +121,6 @@ export interface GatesTemplate {
   name: string
   deviceId?: string
   gates: GateAssignment[]
-  customWeightRanges?: CalibreWeightRange[]
   createdBy: string
   createdAt: string
 }
@@ -131,7 +129,6 @@ export async function saveGatesTemplate(params: {
   name: string
   deviceId?: string
   gates: GateAssignment[]
-  customWeightRanges?: CalibreWeightRange[]
   createdBy: string
 }): Promise<GatesTemplate> {
   const id = generateId()
@@ -140,7 +137,6 @@ export async function saveGatesTemplate(params: {
     name: params.name,
     ...(params.deviceId != null && { deviceId: params.deviceId }),
     gates: params.gates,
-    ...(params.customWeightRanges && { customWeightRanges: params.customWeightRanges }),
     createdBy: params.createdBy,
     createdAt: new Date().toISOString(),
   }

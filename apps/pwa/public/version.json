@@ -1,7 +1,7 @@
 {
-  "version": "2.47.8",
+  "version": "2.47.9",
   "buildDate": "2026-02-10",
-  "buildTimestamp": 1770700746581,
+  "buildTimestamp": 1770701184881,
   "features": [
     "Clasificación P0 inteligente: Fuera de límites → Fuera de rango / No leído por fotocélula",
     "Rangos de peso en configuración de Gates (columna Rango g)",
