@@ -192,12 +192,19 @@ export interface ExportData {
  * Fila del Excel de importación
  */
 export interface ImportCantidadRow {
-  codigoSAP: string;
-  codigoBaader: string;
+  codigoSAP?: string;
+  codigoBaader?: string;
   textoBreve?: string;
   descripcion?: string;
   cantidad: number;
-  valorUnitario: number;
+  valorUnitario?: number;
+  forceOverride?: {
+    codigoSAP?: boolean;
+    codigoBaader?: boolean;
+    textoBreve?: boolean;
+    descripcion?: boolean;
+    valorUnitario?: boolean;
+  };
 }
 
 // === MAPAS DE PLANTA ===

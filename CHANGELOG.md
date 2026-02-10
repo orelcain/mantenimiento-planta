@@ -7,6 +7,13 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.16] - 2026-02-10
+
+### 🧯 Fix Deploy
+
+#### Correcciones
+- **Repuestos**: Restaurados helpers y tipos para build en CI.
+
 ## [2.47.15] - 2026-02-10
 
 ### ✅ Lint Limpio

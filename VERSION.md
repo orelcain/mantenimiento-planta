@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.47.15**
+## Versión Actual: **v2.47.16**
 
 **Fecha de lanzamiento**: 10 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,9 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.47.16 - Fix deploy (10/02/2026)
+- 🧯 **Repuestos**: Helpers y tipos restaurados para build en CI.
 
 ### v2.47.15 - Lint limpio (10/02/2026)
 - ✅ **Hooks**: Dependencias estabilizadas y funciones memoizadas.

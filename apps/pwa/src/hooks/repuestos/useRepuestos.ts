@@ -22,6 +22,47 @@ import type {
 import type { TagAsignado } from '@/types/tags';
 import { isTagAsignado, computeTotalFromTags, getTagNombre } from '@/types/tags';
 
+const hasAnyStockFromTags = (tags: unknown) => {
+  if (!Array.isArray(tags)) return false;
+  return tags.some(tag => isTagAsignado(tag) && tag.tipo === 'stock' && (tag.cantidad || 0) > 0);
+};
+
+const normalizeKey = (value: string) => value.trim().toUpperCase();
+
+const upsertTagAsignado = (
+  tags: (string | TagAsignado)[] | undefined,
+  tagName: string,
+  tipo: 'solicitud' | 'stock',
+  cantidad: number
+) => {
+  const safeTags: (string | TagAsignado)[] = Array.isArray(tags) ? tags : [];
+  const found = safeTags.some(t => isTagAsignado(t) && t.nombre === tagName && t.tipo === tipo);
+
+  if (found) {
+    return safeTags.map((t) => {
+      if (isTagAsignado(t) && t.nombre === tagName && t.tipo === tipo) {
+        return { ...t, cantidad };
+      }
+      return t;
+    });
+  }
+
+  return [
+    ...safeTags,
+    {
+      nombre: tagName,
+      tipo,
+      cantidad,
+      fecha: new Date()
+    }
+  ];
+};
+
+const toFiniteNumber = (value: unknown, defaultValue: number): number => {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : defaultValue;
+};
+
 function chunk<T>(arr: T[], size: number): T[][] {
   const result: T[][] = [];
   for (let i = 0; i < arr.length; i += size) {
