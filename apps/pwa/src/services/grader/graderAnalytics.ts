@@ -176,12 +176,13 @@ function computePointZeroClassification(
     }
 
     // Re-clasificar piezas sin peso como "no leído por fotocélula"
-    if (cause === 'otro' || cause === 'fuera_de_limites') {
+    // Umbral: peso por pieza < 10g se considera sin lectura (error de sensor)
+    if (cause === 'otro' || cause === 'fuera_de_limites' || cause === 'fuera_de_rango') {
       let perPieceG = ('weightPerPieceGrams' in r) ? (r as any).weightPerPieceGrams : undefined
       if (!perPieceG && r.weightKg && r.pieces > 0) {
         perPieceG = (r.weightKg / r.pieces) * 1000
       }
-      if (!perPieceG || perPieceG <= 0) {
+      if (perPieceG == null || perPieceG < 10) {
         cause = 'no_leido_fotocelula'
       }
     }
@@ -302,7 +303,7 @@ function computePointZeroClassification(
         cause = 'fuera_de_rango'
       }
     }
-    if ((cause === 'otro' || cause === 'fuera_de_limites') && (!perPieceG || perPieceG <= 0)) {
+    if ((cause === 'otro' || cause === 'fuera_de_limites' || cause === 'fuera_de_rango') && (perPieceG == null || perPieceG < 10)) {
       cause = 'no_leido_fotocelula'
     }
 

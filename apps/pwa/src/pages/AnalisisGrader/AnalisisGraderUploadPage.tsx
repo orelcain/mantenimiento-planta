@@ -68,6 +68,8 @@ const KIND_COLORS: Record<MatrixFileKind, string> = {
   UNKNOWN: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
 }
 
+const ACCEPTED_KINDS: MatrixFileKind[] = ['PIEZA_PIEZA', 'PUERTA_0']
+
 const SHIFT_OPTIONS = ['Turno día', 'Turno noche'] as const
 
 function buildUploadId(sessionDate: string, shiftId: string | undefined, kind: MatrixFileKind): string {
@@ -464,10 +466,10 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
         const shiftId = currentTurnoDate ? currentTurnoShift : inferredShift
         const uploadId = buildUploadId(sessionDate, shiftId, result.fileMeta.kind)
         result.fileMeta.id = uploadId
-        // Aceptar solo pieza-pieza; advertir si se carga otro tipo
-        if (result.fileMeta.kind !== 'PIEZA_PIEZA') {
+        // Aceptar pieza-pieza y puerta 0; advertir si se carga otro tipo
+        if (!ACCEPTED_KINDS.includes(result.fileMeta.kind)) {
           result.fileMeta.warnings.push(
-            `Tipo "${KIND_LABELS[result.fileMeta.kind]}" detectado — solo se requiere Pieza-Pieza`,
+            `Tipo "${KIND_LABELS[result.fileMeta.kind]}" detectado — solo se requiere Pieza-Pieza y Puerta 0`,
           )
         }
         // Persistir upload para calendario (si hay usuario)
@@ -496,7 +498,7 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
             setUploadError('No se pudo subir el archivo a Storage.')
           }
           setUploads((prev) => normalizeUploads([upload, ...prev], shiftSchedule))
-          if (result.fileMeta.kind === 'PIEZA_PIEZA') {
+          if (result.fileMeta.kind === 'PIEZA_PIEZA' || result.fileMeta.kind === 'PUERTA_0') {
             try {
               await deleteDailySummary(sessionDate, shiftId)
             } catch {
@@ -654,7 +656,7 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
           <div className="flex items-start gap-2 text-xs text-blue-600 dark:text-blue-400">
             <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
             <span>
-              Solo archivos Pieza-Pieza. Puedes agregar varios durante el turno; se fusionan automáticamente.
+              Carga archivos <strong>Pieza-Pieza</strong> y opcionalmente <strong>Puerta 0</strong> del mismo turno. Se fusionan automáticamente.
             </span>
           </div>
           <div
@@ -678,8 +680,8 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
               <div className="text-left">
                 <p className="text-sm font-medium">
                   {files.length === 0
-                    ? 'Arrastra el archivo Pieza-Pieza aquí o haz clic para seleccionar'
-                    : 'Agregar otro archivo Pieza-Pieza del turno'}
+                    ? 'Arrastra archivos Pieza-Pieza o Puerta 0 aquí, o haz clic para seleccionar'
+                    : 'Agregar otro archivo del turno'}
                 </p>
                 <p className="text-xs text-muted-foreground">
                   Archivos .xlsx exportados desde Matrix
@@ -811,7 +813,7 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
                 key={f.fileMeta.id}
                 className={cn(
                   'flex items-center gap-3 p-3 rounded-lg',
-                  f.fileMeta.kind === 'PIEZA_PIEZA'
+                  ACCEPTED_KINDS.includes(f.fileMeta.kind)
                     ? 'bg-muted/50'
                     : 'bg-amber-50/50 dark:bg-amber-950/10 border border-amber-200 dark:border-amber-800/30',
                 )}
@@ -829,6 +831,11 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
                     {f.fileMeta.kind === 'PIEZA_PIEZA' && f.partialData.pieceRecords && (
                       <span className="text-xs text-muted-foreground">
                         · {f.partialData.pieceRecords.length.toLocaleString()} registros
+                      </span>
+                    )}
+                    {f.fileMeta.kind === 'PUERTA_0' && f.partialData.gate0Records && (
+                      <span className="text-xs text-muted-foreground">
+                        · {f.partialData.gate0Records.length.toLocaleString()} registros P0
                       </span>
                     )}
                     {f.fileMeta.warnings.length > 0 && (
@@ -885,11 +892,11 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
               })()
             ))}
 
-            {/* Hint: not pieza-pieza files */}
-            {files.some((f) => f.fileMeta.kind !== 'PIEZA_PIEZA') && (
+            {/* Hint: unrecognized file types */}
+            {files.some((f) => !ACCEPTED_KINDS.includes(f.fileMeta.kind)) && (
               <p className="text-xs text-amber-600 mt-2 flex items-center gap-1">
                 <AlertCircle className="h-3 w-3" />
-                Los archivos que no son Pieza-Pieza serán ignorados en el análisis.
+                Los archivos que no son Pieza-Pieza o Puerta 0 serán ignorados en el análisis.
               </p>
             )}
           </CardContent>

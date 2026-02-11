@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.47.20**
+## Versión Actual: **v2.47.22**
 
 **Fecha de lanzamiento**: 11 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,12 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.47.22 - Soporte Puerta 0 en carga Grader (11/02/2026)
+- 🚨 **Archivos Puerta 0**: Ahora se pueden cargar archivos "Puerta 0" junto con Pieza-Pieza.
+- 🔍 **Datos P0 reales**: Los registros de Punto Cero provienen del archivo dedicado con errores reales (No leído por fotocélula, Fuera de límites, etc.).
+- 🎨 **UI actualizada**: Textos, banners y validaciones adaptados para aceptar ambos tipos de archivo.
+- 📊 **Conteo P0**: Se muestra cantidad de registros P0 en la lista de archivos cargados.
 
 ### v2.47.20 - Calendario inline + UI compacta Grader (11/02/2026)
 - 📅 **Calendario inline**: Calendario visual con cuadrícula mensual integrado en la página de carga de archivos.

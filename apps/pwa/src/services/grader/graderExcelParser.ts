@@ -572,8 +572,8 @@ export async function parseFile(file: File): Promise<{
                 perPieceG = (r.weightKg / r.pieces) * 1000
               }
 
-              if (!perPieceG || perPieceG <= 0) {
-                // No weight data → photocell didn't read it
+              if (!perPieceG || perPieceG < 10) {
+                // No weight data or negligible → photocell didn't read it
                 error = 'No leido por fotocelula'
               } else {
                 // Check raw calibre for "Fuera de Rango"

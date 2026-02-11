@@ -679,7 +679,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
   return (
     <div
       ref={dashRef}
-      className={cn('space-y-4', reportMode === 'light' && 'grader-light-mode')}
+      className={cn('space-y-4 max-w-screen-xl mx-auto', reportMode === 'light' && 'grader-light-mode')}
     >
       {/* Top actions */}
       <div className="flex items-center justify-between flex-wrap gap-2">
@@ -999,20 +999,9 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
             // Filtered total
             const filteredTotal = filteredRows.reduce((sum, r) => sum + r.pieces, 0)
 
-            // Build grouped bar chart data: Error × Calidad × Calibre
-            const errorGroupsForChart = new Map<string, Map<string, Map<string, number>>>()
-            for (const r of filteredRows) {
-              if (!errorGroupsForChart.has(r.error)) errorGroupsForChart.set(r.error, new Map())
-              const qMap = errorGroupsForChart.get(r.error)!
-              if (!qMap.has(r.quality)) qMap.set(r.quality, new Map())
-              const cMap = qMap.get(r.quality)!
-              cMap.set(r.calibre, (cMap.get(r.calibre) || 0) + r.pieces)
-            }
+            // Build grouped bar chart: one dataset per error type, grouped by calibre
+            const allCalibres = Array.from(new Set(filteredRows.map((r) => r.calibre))).sort()
 
-            // Build labels: "Calibre\nCalidad\nError"
-            const barLabels: string[] = []
-            const barValues: number[] = []
-            const barColors: string[] = []
             const errorColorMap: Record<string, string> = {
               'Fuera de rango': 'rgba(239,68,68,0.75)',
               'Fuera de límites': 'rgba(245,158,11,0.75)',
@@ -1022,51 +1011,19 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
               'Otro / Desconocido': 'rgba(107,114,128,0.75)',
             }
 
-            for (const [errorLabel, qMap] of errorGroupsForChart) {
-              for (const [, cMap] of qMap) {
-                for (const [calibre, pieces] of Array.from(cMap.entries()).sort((a, b) => b[1] - a[1])) {
-                  barLabels.push(`${calibre}`)
-                  barValues.push(pieces)
-                  barColors.push(errorColorMap[errorLabel] || 'rgba(107,114,128,0.75)')
-                }
-              }
-            }
-
-            // Better chart: datasets per error group (stacked within quality)
-            // Group data for multi-axis bar: one dataset per Error+Quality
-            const chartGroups: { error: string; quality: string; calibre: string; pieces: number }[] = []
-            for (const r of filteredRows) {
-              chartGroups.push({ error: r.error, quality: r.quality, calibre: r.calibre, pieces: r.pieces })
-            }
-
-            // Unique calibres for x-axis labels
-            const allCalibres = Array.from(new Set(filteredRows.map((r) => r.calibre))).sort()
-
-            // Dataset per (error, quality) combination
-            const dsKeys = Array.from(new Set(filteredRows.map((r) => `${r.error}|${r.quality}`)))
-            const qualityColorMap: Record<string, string> = {
-              'Premium': 'rgba(16,185,129,0.8)',
-              'Industrial': 'rgba(59,130,246,0.8)',
-              'Grado': 'rgba(245,158,11,0.8)',
-              'D': 'rgba(239,68,68,0.8)',
-              'Unknown': 'rgba(107,114,128,0.8)',
-            }
-
-            const pivotBarDatasets = dsKeys.map((key) => {
-              const parts = key.split('|')
-              const error = parts[0] ?? ''
-              const quality = parts[1] ?? ''
+            // One dataset per error label
+            const pivotBarDatasets = uniqueErrors.map((errorLabel) => {
               const data = allCalibres.map((cal) => {
-                const match = filteredRows.find((r) => r.error === error && r.quality === quality && r.calibre === cal)
-                return match ? match.pieces : 0
+                return filteredRows
+                  .filter((r) => r.error === errorLabel && r.calibre === cal)
+                  .reduce((sum, r) => sum + r.pieces, 0)
               })
               return {
-                label: `${error} — ${quality}`,
+                label: errorLabel,
                 data,
-                backgroundColor: qualityColorMap[quality] || 'rgba(107,114,128,0.6)',
-                borderColor: errorColorMap[error] || 'rgba(107,114,128,1)',
+                backgroundColor: errorColorMap[errorLabel] || 'rgba(107,114,128,0.6)',
+                borderColor: errorColorMap[errorLabel]?.replace('0.75', '1') || 'rgba(107,114,128,1)',
                 borderWidth: 1,
-                stack: error,
               }
             })
 
@@ -1133,12 +1090,10 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                         },
                         scales: {
                           x: {
-                            stacked: true,
                             ticks: { font: { size: 10 } },
                             grid: { color: 'rgba(128,128,128,0.1)' },
                           },
                           y: {
-                            stacked: true,
                             beginAtZero: true,
                             grid: { color: 'rgba(128,128,128,0.1)' },
                           },
