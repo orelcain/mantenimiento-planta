@@ -36,7 +36,7 @@ interface Props {
 
 const QUALITIES: GraderQuality[] = ['Premium', 'Grado', 'Industrial', 'D', 'Unknown']
 const DEFAULT_CALIBRES: CalibreRange[] = ['0-2 lb', '2-4 lb', '4-6 lb', '6-8 lb', '8-10 lb', '10-12 lb', 'Other']
-const SHIFT_OPTIONS = ['Turno día', 'Turno tarde', 'Turno noche'] as const
+const SHIFT_OPTIONS = ['Turno día', 'Turno noche'] as const
 
 function buildRangeLabel(calibre: string, minGrams: number, maxGrams: number): string {
   return `${calibre} (${minGrams.toLocaleString()}-${maxGrams.toLocaleString()} g)`

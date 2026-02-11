@@ -1,14 +1,20 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.47.16**
+## Versión Actual: **v2.47.20**
 
-**Fecha de lanzamiento**: 10 de febrero de 2026  \
+**Fecha de lanzamiento**: 11 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
 **Build**: ✅ Stable
 
 ---
 
 ## 📋 Información de la Versión
+
+### v2.47.20 - Calendario inline + UI compacta Grader (11/02/2026)
+- 📅 **Calendario inline**: Calendario visual con cuadrícula mensual integrado en la página de carga de archivos.
+- 🎨 **UI compacta**: Zona de carga reducida, banner informativo inline, sección turno objetivo más limpia.
+- 🔧 **Solo 2 turnos**: Eliminado "Turno tarde" — solo Turno día y Turno noche para Grader.
+- 📐 **Layout mejorado**: Botón continuar y estado en una fila, espaciado reducido.
 
 ### v2.47.16 - Fix deploy (10/02/2026)
 - 🧯 **Repuestos**: Helpers y tipos restaurados para build en CI.
