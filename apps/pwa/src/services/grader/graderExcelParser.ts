@@ -560,6 +560,7 @@ export async function parseFile(file: File): Promise<{
   const rows: unknown[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null })
 
   const kind = detectFileKind(rows, file.name)
+  console.info(`[grader parse] "${file.name}" → detectado como ${kind}`)
   if (kind === 'UNKNOWN') {
     warnings.push('No se pudo detectar el tipo de archivo. Verifique las columnas.')
   }
@@ -701,7 +702,7 @@ export function mergeParsedData(
   parts: Array<{ fileMeta: UploadedMatrixFile; partialData: Partial<ParsedMatrixData> }>,
 ): ParsedMatrixData {
   const merged: ParsedMatrixData = {
-    files: parts.map((p) => p.fileMeta),
+    files: parts.map((p) => ({ ...p.fileMeta })), // copia para poder mutar kind
     pieceRecords: [],
     gate0Records: [],
     folioRecords: [],
@@ -711,13 +712,40 @@ export function mergeParsedData(
   }
 
   // Separar gate0 por fuente: archivos PUERTA_0 vs inferidos de PIEZA_PIEZA
+  // HEURÍSTICA CLAVE: si TODOS los pieceRecords de un archivo tienen gate=0,
+  // es un archivo Puerta 0 mal clasificado como Pieza-Pieza.
+  // Un archivo PP normal tiene miles de registros con gates 1-12; solo un
+  // subconjunto pequeño es gate=0. Un archivo P0 tiene TODOS sus registros
+  // con gate=0.
   const gate0FromPuerta0: typeof merged.gate0Records = []
   const gate0FromPiezaPieza: typeof merged.gate0Records = []
 
   for (const { fileMeta, partialData } of parts) {
-    if (partialData.pieceRecords) merged.pieceRecords.push(...partialData.pieceRecords)
+    // ── Detectar P0 mal clasificado como PP ──
+    const allPiecesAreGate0 = partialData.pieceRecords != null
+      && partialData.pieceRecords.length > 0
+      && partialData.pieceRecords.every((r) => r.gate === 0)
+
+    const effectiveKind = allPiecesAreGate0 ? 'PUERTA_0' as const : fileMeta.kind
+
+    if (allPiecesAreGate0 && fileMeta.kind !== 'PUERTA_0') {
+      console.warn(
+        `[grader merge] "${fileMeta.name}" tiene ${partialData.pieceRecords!.length} registros, ` +
+        `TODOS gate=0 → reclasificando de ${fileMeta.kind} a PUERTA_0`,
+      )
+      // Actualizar fileMeta en merged.files para que computeKPIs detecte hasRealP0Data
+      const metaInMerged = merged.files.find((f) => f.id === fileMeta.id || f.name === fileMeta.name)
+      if (metaInMerged) metaInMerged.kind = 'PUERTA_0'
+    }
+
+    // Solo agregar pieceRecords de archivos que NO son P0.
+    // Los registros de un archivo P0 ya están representados en gate0Records.
+    if (partialData.pieceRecords && effectiveKind !== 'PUERTA_0') {
+      merged.pieceRecords.push(...partialData.pieceRecords)
+    }
+
     if (partialData.gate0Records) {
-      if (fileMeta.kind === 'PUERTA_0') {
+      if (effectiveKind === 'PUERTA_0') {
         gate0FromPuerta0.push(...partialData.gate0Records)
       } else {
         gate0FromPiezaPieza.push(...partialData.gate0Records)
@@ -729,15 +757,12 @@ export function mergeParsedData(
   }
 
   // ─── Fusión de gate0 ───
-  // Los registros gate=0 del archivo PP y del P0 representan las MISMAS
-  // piezas físicas. El archivo P0 tiene la columna "Error" real de la máquina.
-  // El PP solo infiere errores heurísticamente.
-  //
-  // REGLA SIMPLE:
-  //   • Si hay archivo P0 → usar EXCLUSIVAMENTE gate0 del P0
-  //   • Si NO hay archivo P0 → usar gate0 inferidos del PP
-  //   • SIEMPRE eliminar gate=0 de pieceRecords por NÚMERO de gate
-  //     (no por timestamp, que puede diferir entre archivos)
+  // Si hay datos reales de P0 → usar exclusivamente esos
+  // Si no → usar gate0 inferidos del PP
+  console.info(
+    `[grader merge] gate0 fuentes: Puerta0=${gate0FromPuerta0.length}, PiezaPieza=${gate0FromPiezaPieza.length}, ` +
+    `pieceRecords=${merged.pieceRecords.length}`,
+  )
   if (gate0FromPuerta0.length > 0) {
     merged.gate0Records = gate0FromPuerta0
   } else {
