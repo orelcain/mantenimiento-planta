@@ -140,7 +140,7 @@ interface InlineCalendarProps {
   currentTurnoShift: string
   onSelectTurno: (date: string, shift: string) => void
   onLoadTurno: () => void
-  onDeleteUpload: (upload: GraderUpload) => void
+  onDeleteUpload: (upload: GraderUpload) => Promise<void>
   loadingTurno: boolean
 }
 
@@ -150,6 +150,21 @@ function GraderInlineCalendar({ uploads, shiftSchedule, currentTurnoDate, curren
     return new Date()
   })
   const [selectedDate, setSelectedDate] = useState<string | null>(currentTurnoDate)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  // Sincronizar selectedDate y mes del calendario cuando cambia currentTurnoDate
+  useEffect(() => {
+    if (currentTurnoDate) {
+      setSelectedDate(currentTurnoDate)
+      const d = new Date(currentTurnoDate + 'T00:00:00')
+      setCurrentMonth((prev) => {
+        if (prev.getMonth() !== d.getMonth() || prev.getFullYear() !== d.getFullYear()) {
+          return d
+        }
+        return prev
+      })
+    }
+  }, [currentTurnoDate])
 
   const days = getDaysInMonth(currentMonth)
 
@@ -350,11 +365,22 @@ function GraderInlineCalendar({ uploads, shiftSchedule, currentTurnoDate, curren
                             </Badge>
                             <button
                               type="button"
-                              className="text-muted-foreground hover:text-destructive transition-colors shrink-0"
+                              className="text-muted-foreground hover:text-destructive transition-colors shrink-0 disabled:opacity-40"
                               title="Eliminar archivo"
-                              onClick={(e) => { e.stopPropagation(); onDeleteUpload(u) }}
+                              disabled={deletingId === u.id}
+                              onClick={async (e) => {
+                                e.stopPropagation()
+                                setDeletingId(u.id)
+                                try {
+                                  await onDeleteUpload(u)
+                                } finally {
+                                  setDeletingId(null)
+                                }
+                              }}
                             >
-                              <Trash2 className="h-3 w-3" />
+                              {deletingId === u.id
+                                ? <Loader2 className="h-3 w-3 animate-spin" />
+                                : <Trash2 className="h-3 w-3" />}
                             </button>
                           </div>
                         ))}

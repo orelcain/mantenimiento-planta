@@ -12,6 +12,7 @@ import {
   orderBy,
   limit,
   serverTimestamp,
+  waitForPendingWrites,
 } from '@/services/firestoreTracked'
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage'
 import { db, storage } from '../firebase'
@@ -107,6 +108,8 @@ export async function listGraderUploads(max = 200): Promise<GraderUpload[]> {
 export async function deleteGraderUpload(upload: GraderUpload): Promise<void> {
   // Eliminar doc de Firestore
   await deleteDoc(doc(db, COLLECTION, upload.id))
+  // Esperar confirmación del servidor antes de continuar
+  await waitForPendingWrites(db)
   // Eliminar archivo de Storage si existe
   if (upload.fileMeta.storagePath) {
     try {
