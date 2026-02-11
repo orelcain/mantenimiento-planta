@@ -397,7 +397,7 @@ export function computeAnalytics(
   let pointZeroWeightKg = 0
 
   // ─── Piezas normales (gate != 0) desde pieceRecords ───
-  // Nota: mergeParsedData ya eliminó los gate=0 duplicados por timestamp,
+  // Nota: mergeParsedData ya eliminó todos los gate=0 de pieceRecords,
   // pero como medida de seguridad ignoramos gate=0 aquí también.
   if (hasPiece) {
     for (const r of data.pieceRecords) {

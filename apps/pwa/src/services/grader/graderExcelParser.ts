@@ -728,37 +728,25 @@ export function mergeParsedData(
     if (partialData.productionSummary) merged.productionSummary.push(...partialData.productionSummary)
   }
 
-  // ─── Fusión de gate0 (deduplicación por timestamp) ───
+  // ─── Fusión de gate0 ───
   // Los registros gate=0 del archivo PP y del P0 representan las MISMAS
-  // piezas físicas. Deduplicamos comparando timestamp+piezas+lote.
-  // Siempre preferimos los datos del archivo P0 (columna Error real)
-  // sobre los inferidos del PP.
-  const gate0ByKey = new Map<string, (typeof merged.gate0Records)[number]>()
+  // piezas físicas. El archivo P0 tiene la columna "Error" real de la máquina.
+  // El PP solo infiere errores heurísticamente.
+  //
+  // REGLA SIMPLE:
+  //   • Si hay archivo P0 → usar EXCLUSIVAMENTE gate0 del P0
+  //   • Si NO hay archivo P0 → usar gate0 inferidos del PP
+  //   • SIEMPRE eliminar gate=0 de pieceRecords por NÚMERO de gate
+  //     (no por timestamp, que puede diferir entre archivos)
+  if (gate0FromPuerta0.length > 0) {
+    merged.gate0Records = gate0FromPuerta0
+  } else {
+    merged.gate0Records = gate0FromPiezaPieza
+  }
 
-  // 1. Insertar gate0 del PP primero (serán sobrescritos por P0)
-  for (const r of gate0FromPiezaPieza) {
-    const key = `${r.ts}|${r.pieces}|${r.lot || ''}`
-    gate0ByKey.set(key, r)
-  }
-  // 2. Insertar gate0 del P0 (sobrescribe PP para mismas keys = dedup)
-  for (const r of gate0FromPuerta0) {
-    const key = `${r.ts}|${r.pieces}|${r.lot || ''}`
-    gate0ByKey.set(key, r)
-  }
-  merged.gate0Records = Array.from(gate0ByKey.values())
-
-  // 3. Eliminar de pieceRecords cualquier registro duplicado respecto a gate0Records.
-  //    Comparamos por timestamp+piezas+lote: si coincide, es la misma pieza
-  //    ya contada en gate0Records.
-  if (merged.gate0Records.length > 0) {
-    const gate0Keys = new Set(
-      merged.gate0Records.map((r) => `${r.ts}|${r.pieces}|${r.lot || ''}`),
-    )
-    merged.pieceRecords = merged.pieceRecords.filter((r) => {
-      const key = `${r.ts}|${r.pieces}|${r.lot || ''}`
-      return !gate0Keys.has(key)
-    })
-  }
+  // Eliminar TODOS los registros con gate===0 de pieceRecords.
+  // Estos ya están representados en gate0Records.
+  merged.pieceRecords = merged.pieceRecords.filter((r) => r.gate !== 0)
 
   // Infer overall period
   const allTs: string[] = [
