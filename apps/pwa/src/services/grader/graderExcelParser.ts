@@ -730,10 +730,23 @@ export function mergeParsedData(
     if (partialData.productionSummary) merged.productionSummary.push(...partialData.productionSummary)
   }
 
-  // Preferir datos reales de PUERTA_0 sobre los inferidos del pieza-pieza
-  merged.gate0Records = gate0FromPuerta0.length > 0
-    ? gate0FromPuerta0
-    : gate0FromPiezaPieza
+  // ─── Fusión de gate0 ───
+  // Los registros gate=0 del archivo PP y del archivo P0 representan las
+  // MISMAS piezas. El archivo P0 tiene la columna "Error" con datos reales
+  // de la máquina (Fuera de limites, No leído por fotocélula, etc.).
+  // El PP infiere errores de forma heurística. Siempre preferir los datos
+  // reales del P0 cuando están disponibles.
+  if (gate0FromPuerta0.length > 0) {
+    merged.gate0Records = gate0FromPuerta0
+  } else {
+    merged.gate0Records = gate0FromPiezaPieza
+  }
+
+  // Filtrar registros gate=0 de pieceRecords para evitar doble conteo
+  // en el dashboard (el gate 0 ya está en gate0Records)
+  if (merged.gate0Records.length > 0) {
+    merged.pieceRecords = merged.pieceRecords.filter((r) => r.gate !== 0)
+  }
 
   // Infer overall period
   const allTs: string[] = [

@@ -1,8 +1,14 @@
 {
-  "version": "2.47.27",
+  "version": "2.47.28",
   "buildDate": "2026-02-11",
   "buildTimestamp": 1770701184881,
   "features": [
+    "Fix P0: datos reales del archivo Puerta 0 (columna Error) priorizados sobre inferencia heurística del PP",
+    "Clasificación P0 precisa: 'Fuera de limites' y 'No leído por fotocélula' leídos directamente de la máquina",
+    "Sin re-clasificación heurística cuando hay archivo P0 real (respeta datos de Marelec)",
+    "Fix crítico: duplicación P0 eliminada — gate=0 filtrado de pieceRecords al tener gate0Records",
+    "Merge inteligente: registros PP gate=0 (con error clasificado) priorizados sobre P0 sin columna error",
+    "Conteo total correcto: P0 se suma al total solo 1 vez (no duplicado entre PP y P0)",
     "Fix parser: archivos Puerta 0 detectados correctamente por nombre de archivo (ya no se clasifican como PP)",
     "Fix delete persistencia: eliminar archivo en zona de carga también borra de Firestore/Storage",
     "Gates config siempre visible debajo del calendario (no requiere paso intermedio)",

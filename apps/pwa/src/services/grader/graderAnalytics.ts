@@ -141,6 +141,7 @@ function computePointZeroClassification(
   pointZeroPieces: number,
   activeGates?: GateAssignment[],
   weightRanges: CalibreWeightRange[] = CALIBRE_WEIGHT_RANGES,
+  hasRealP0Data = false,
 ): PointZeroClassification {
   // Calibres con al menos un gate activo
   const activeCalibres = new Set<string>(
@@ -157,8 +158,8 @@ function computePointZeroClassification(
     let cause = classifyError(errorStr)
 
     // Re-clasificar "fuera_de_limites" si no hay gate activo para su calibre
-    // Esto solo aplica cuando la causa fue inferida (no desde columna Error explícita)
-    if (cause === 'fuera_de_limites' && activeCalibres.size > 0) {
+    // Solo para datos inferidos — cuando hay P0 real, confiamos en la columna Error
+    if (!hasRealP0Data && cause === 'fuera_de_limites' && activeCalibres.size > 0) {
       // Determinar calibre real por peso
       let perPieceG = ('weightPerPieceGrams' in r) ? (r as any).weightPerPieceGrams : undefined
       if (!perPieceG && r.weightKg && r.pieces > 0) {
@@ -176,8 +177,8 @@ function computePointZeroClassification(
     }
 
     // Re-clasificar piezas sin peso como "no leído por fotocélula"
-    // Umbral: peso por pieza < 10g se considera sin lectura (error de sensor)
-    if (cause === 'otro' || cause === 'fuera_de_limites' || cause === 'fuera_de_rango') {
+    // Solo para datos inferidos — cuando hay P0 real, respetar columna Error
+    if (!hasRealP0Data && (cause === 'otro' || cause === 'fuera_de_limites' || cause === 'fuera_de_rango')) {
       let perPieceG = ('weightPerPieceGrams' in r) ? (r as any).weightPerPieceGrams : undefined
       if (!perPieceG && r.weightKg && r.pieces > 0) {
         perPieceG = (r.weightKg / r.pieces) * 1000
@@ -295,7 +296,7 @@ function computePointZeroClassification(
       perPieceG = (r.weightKg / r.pieces) * 1000
     }
 
-    if (cause === 'fuera_de_limites' && activeCalibres.size > 0 && perPieceG && perPieceG > 0) {
+    if (!hasRealP0Data && cause === 'fuera_de_limites' && activeCalibres.size > 0 && perPieceG && perPieceG > 0) {
       const matchedRange = weightRanges.find(
         (rng) => perPieceG >= rng.minGrams && perPieceG < rng.maxGrams,
       )
@@ -303,7 +304,7 @@ function computePointZeroClassification(
         cause = 'fuera_de_rango'
       }
     }
-    if ((cause === 'otro' || cause === 'fuera_de_limites' || cause === 'fuera_de_rango') && (perPieceG == null || perPieceG < 10)) {
+    if (!hasRealP0Data && (cause === 'otro' || cause === 'fuera_de_limites' || cause === 'fuera_de_rango') && (perPieceG == null || perPieceG < 10)) {
       cause = 'no_leido_fotocelula'
     }
 
@@ -419,23 +420,16 @@ export function computeAnalytics(
   }
 
   // Gate 0 from explicit gate0Records (preferred)
+  // Nota: en mergeParsedData, los registros gate=0 ya fueron filtrados de
+  // pieceRecords, así que NO hay doble conteo. Solo sumamos gate0Records.
   if (hasG0) {
-    // If we already counted g0 from pieceRecords, reset and use dedicated file
-    if (hasPiece) {
-      // Subtract inferred g0 from pieceRecords, add from gate0Records
-      const g0FromPiece = data.pieceRecords.filter((r) => r.gate === 0).reduce((s, r) => s + r.pieces, 0)
-      pointZeroPieces = pointZeroPieces - g0FromPiece
-      pointZeroWeightKg = 0
-    }
     for (const r of data.gate0Records) {
       pointZeroPieces += r.pieces
       pointZeroWeightKg += r.weightKg ?? 0
     }
-    // Add g0 pieces to total if not already from pieceRecords
-    if (!hasPiece) {
-      totalPieces += pointZeroPieces
-      totalWeightKg += pointZeroWeightKg
-    }
+    // Sumar al total ya que no están en pieceRecords
+    totalPieces += pointZeroPieces
+    totalWeightKg += pointZeroWeightKg
   }
 
   // ——————— PUNTO CERO POR ERROR ———————
@@ -470,6 +464,9 @@ export function computeAnalytics(
     pct: p,
   }))
 
+  // Detectar si los datos P0 vienen de un archivo real (con columna Error)
+  const hasRealP0Data = data.files.some((f) => f.kind === 'PUERTA_0')
+
   // ——————— CLASIFICACIÓN PUNTO CERO (100%) ———————
   const pointZeroClassification = computePointZeroClassification(
     g0Source as Gate0Record[],
@@ -477,6 +474,7 @@ export function computeAnalytics(
     pointZeroPieces,
     gates,
     weightRanges,
+    hasRealP0Data,
   )
 
   // ——————— DISTRIBUCIÓN POR CALIBRE ———————
