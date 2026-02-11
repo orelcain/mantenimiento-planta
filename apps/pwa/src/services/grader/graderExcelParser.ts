@@ -272,15 +272,13 @@ export function detectFileKind(sheetRows: unknown[][], filename?: string): Matri
   }
 
   // Check each kind (order matters: more specific first)
-  // PUERTA_0 has "error" column - very distinctive
+  // PUERTA_0 has "error" column - very distinctive.
+  // La columna "Error" es exclusiva del archivo Puerta 0 de la máquina Marelec.
+  // Si el archivo tiene "Error" + "Cantidad de piezas", es PUERTA_0 sin importar
+  // que también tenga "Calidad" u otras columnas.
   const hasPuerta0 = DETECTION_SCHEMAS.PUERTA_0.required.every(matchesGroup)
   if (hasPuerta0) {
-    // Make sure it's not just pieza-pieza with error column
-    const hasQuality = headers.some((h) => h.includes('calidad') || h.includes('quality'))
-    const hasGate = headers.some((h) => h.includes('gate') || h.includes('compuerta') || h.includes('puerta'))
-    if (!hasQuality && hasGate) return 'PUERTA_0'
-    // If it has error AND quality AND gate, it could be either; check if gate values suggest gate 0
-    if (!hasQuality) return 'PUERTA_0'
+    return 'PUERTA_0'
   }
 
   // PIEZA_PIEZA: has gate + pieces + usually quality/calibre
@@ -730,22 +728,36 @@ export function mergeParsedData(
     if (partialData.productionSummary) merged.productionSummary.push(...partialData.productionSummary)
   }
 
-  // ─── Fusión de gate0 ───
-  // Los registros gate=0 del archivo PP y del archivo P0 representan las
-  // MISMAS piezas. El archivo P0 tiene la columna "Error" con datos reales
-  // de la máquina (Fuera de limites, No leído por fotocélula, etc.).
-  // El PP infiere errores de forma heurística. Siempre preferir los datos
-  // reales del P0 cuando están disponibles.
-  if (gate0FromPuerta0.length > 0) {
-    merged.gate0Records = gate0FromPuerta0
-  } else {
-    merged.gate0Records = gate0FromPiezaPieza
-  }
+  // ─── Fusión de gate0 (deduplicación por timestamp) ───
+  // Los registros gate=0 del archivo PP y del P0 representan las MISMAS
+  // piezas físicas. Deduplicamos comparando timestamp+piezas+lote.
+  // Siempre preferimos los datos del archivo P0 (columna Error real)
+  // sobre los inferidos del PP.
+  const gate0ByKey = new Map<string, (typeof merged.gate0Records)[number]>()
 
-  // Filtrar registros gate=0 de pieceRecords para evitar doble conteo
-  // en el dashboard (el gate 0 ya está en gate0Records)
+  // 1. Insertar gate0 del PP primero (serán sobrescritos por P0)
+  for (const r of gate0FromPiezaPieza) {
+    const key = `${r.ts}|${r.pieces}|${r.lot || ''}`
+    gate0ByKey.set(key, r)
+  }
+  // 2. Insertar gate0 del P0 (sobrescribe PP para mismas keys = dedup)
+  for (const r of gate0FromPuerta0) {
+    const key = `${r.ts}|${r.pieces}|${r.lot || ''}`
+    gate0ByKey.set(key, r)
+  }
+  merged.gate0Records = Array.from(gate0ByKey.values())
+
+  // 3. Eliminar de pieceRecords cualquier registro duplicado respecto a gate0Records.
+  //    Comparamos por timestamp+piezas+lote: si coincide, es la misma pieza
+  //    ya contada en gate0Records.
   if (merged.gate0Records.length > 0) {
-    merged.pieceRecords = merged.pieceRecords.filter((r) => r.gate !== 0)
+    const gate0Keys = new Set(
+      merged.gate0Records.map((r) => `${r.ts}|${r.pieces}|${r.lot || ''}`),
+    )
+    merged.pieceRecords = merged.pieceRecords.filter((r) => {
+      const key = `${r.ts}|${r.pieces}|${r.lot || ''}`
+      return !gate0Keys.has(key)
+    })
   }
 
   // Infer overall period

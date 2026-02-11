@@ -396,14 +396,14 @@ export function computeAnalytics(
   let pointZeroPieces = 0
   let pointZeroWeightKg = 0
 
+  // ─── Piezas normales (gate != 0) desde pieceRecords ───
+  // Nota: mergeParsedData ya eliminó los gate=0 duplicados por timestamp,
+  // pero como medida de seguridad ignoramos gate=0 aquí también.
   if (hasPiece) {
     for (const r of data.pieceRecords) {
+      if (r.gate === 0) continue // ya contados en gate0Records
       totalPieces += r.pieces
       totalWeightKg += r.weightKg ?? 0
-      if (r.gate === 0) {
-        pointZeroPieces += r.pieces
-        pointZeroWeightKg += r.weightKg ?? 0
-      }
     }
   } else if (hasProdSummary) {
     for (const r of data.productionSummary) {
@@ -419,15 +419,12 @@ export function computeAnalytics(
     notes.push('Totales calculados desde registros por folio.')
   }
 
-  // Gate 0 from explicit gate0Records (preferred)
-  // Nota: en mergeParsedData, los registros gate=0 ya fueron filtrados de
-  // pieceRecords, así que NO hay doble conteo. Solo sumamos gate0Records.
+  // ─── Gate 0 desde gate0Records (deduplicados en merge) ───
   if (hasG0) {
     for (const r of data.gate0Records) {
       pointZeroPieces += r.pieces
       pointZeroWeightKg += r.weightKg ?? 0
     }
-    // Sumar al total ya que no están en pieceRecords
     totalPieces += pointZeroPieces
     totalWeightKg += pointZeroWeightKg
   }
