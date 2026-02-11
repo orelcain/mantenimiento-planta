@@ -10,7 +10,6 @@ import { useState, useCallback, useRef, useMemo, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui'
 import {
-  Upload,
   FileSpreadsheet,
   CheckCircle,
   AlertCircle,
@@ -179,8 +178,9 @@ function GraderInlineCalendar({ uploads, shiftSchedule, currentTurnoDate, curren
     setSelectedDate(dayKey)
     // Auto-select first available turno
     const dayUploads = uploadsByDate.get(dayKey) || []
-    if (dayUploads.length > 0) {
-      const shift = dayUploads[0].shiftId || inferShiftIdFromSchedule(dayUploads[0].inferred?.startAt, shiftSchedule)
+    const first = dayUploads[0]
+    if (first) {
+      const shift = first.shiftId || inferShiftIdFromSchedule(first.inferred?.startAt, shiftSchedule)
       onSelectTurno(dayKey, shift)
     }
   }
