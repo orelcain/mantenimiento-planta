@@ -1,8 +1,14 @@
 {
-  "version": "2.47.24",
+  "version": "2.47.25",
   "buildDate": "2026-02-11",
   "buildTimestamp": 1770701184881,
   "features": [
+    "Zonas de carga separadas: Pieza-Pieza y Puerta 0 con drag & drop independiente",
+    "Flujo calendario: seleccionar día/turno → cargar datos → configurar gates",
+    "Plantilla 1 cargada por defecto al entrar en configuración de gates",
+    "Auto-nombre de plantillas: {fecha}_{turno}_v{n} con versionado incremental",
+    "Indicador de plantilla activa en listado (badge + resaltado)",
+    "Restauración automática de última sesión analizada al recargar la página",
     "Fix deduplicación gate0Records: al cargar Pieza-Pieza + Puerta 0 se prefieren datos reales P0",
     "Calendario de archivos: muestra archivos individuales por turno con nombre y tipo",
     "Eliminar archivos desde el calendario (Firestore + Storage)",

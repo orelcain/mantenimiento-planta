@@ -8,7 +8,7 @@
 
 import { useState, useCallback, useRef, useMemo, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Card, CardContent, CardHeader, CardTitle, Button, Badge, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui'
+import { Card, CardContent, CardHeader, CardTitle, Button, Badge } from '@/components/ui'
 import {
   FileSpreadsheet,
   CheckCircle,
@@ -19,7 +19,6 @@ import {
   ChevronRight,
   ChevronLeft,
   Clock,
-  Plus,
   Calendar,
   Trash2,
 } from 'lucide-react'
@@ -70,8 +69,6 @@ const KIND_COLORS: Record<MatrixFileKind, string> = {
 }
 
 const ACCEPTED_KINDS: MatrixFileKind[] = ['PIEZA_PIEZA', 'PUERTA_0']
-
-const SHIFT_OPTIONS = ['Turno día', 'Turno noche'] as const
 
 function buildUploadId(sessionDate: string, shiftId: string | undefined, kind: MatrixFileKind): string {
   const shiftKey = shiftIdToKey(shiftId)
@@ -404,6 +401,7 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
   const [parsing, setParsing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [dragOver, setDragOver] = useState(false)
+  const [dragOverP0, setDragOverP0] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [uploads, setUploads] = useState<GraderUpload[]>([])
   const [currentTurnoDate, setCurrentTurnoDate] = useState<string | null>(null)
@@ -411,6 +409,7 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
   const [loadingTurno, setLoadingTurno] = useState(false)
   const [shiftSchedule, setShiftSchedule] = useState(DEFAULT_SHIFT_SCHEDULE)
   const inputRef = useRef<HTMLInputElement>(null)
+  const inputRefP0 = useRef<HTMLInputElement>(null)
   const [searchParams] = useSearchParams()
   const autoLoadRef = useRef(false)
   const user = useAuthStore((s) => s.user)
@@ -425,8 +424,6 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
   }, [onFilesChange])
 
   const hasPiezaPieza = files.some((f) => f.fileMeta.kind === 'PIEZA_PIEZA')
-  const piezaPiezaCount = files.filter((f) => f.fileMeta.kind === 'PIEZA_PIEZA').length
-  const canContinue = hasPiezaPieza
 
   useEffect(() => {
     listGraderUploads().then((list) => setUploads(normalizeUploads(list, DEFAULT_SHIFT_SCHEDULE))).catch(() => {})
@@ -579,67 +576,8 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
     }
   }, [updateFiles, user, shiftSchedule, currentTurnoDate, currentTurnoShift])
 
-  const handleDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault()
-      setDragOver(false)
-      handleFiles(e.dataTransfer.files)
-    },
-    [handleFiles],
-  )
-
   const handleRemoveFile = (id: string) => {
     updateFiles((prev) => prev.filter((f) => f.fileMeta.id !== id))
-  }
-
-  const uploadsById = useMemo(() => {
-    const map = new Map<string, GraderUpload>()
-    for (const u of uploads) map.set(u.id, u)
-    return map
-  }, [uploads])
-
-  const handleUpdateUpload = async (id: string, patch: Partial<GraderUpload>) => {
-    try {
-      const previous = uploadsById.get(id)
-      await updateGraderUpload(id, patch)
-      if (previous?.fileMeta.kind === 'PIEZA_PIEZA') {
-        const previousDate = previous.sessionDate || toDateKey(previous.inferred?.startAt)
-        const previousShift = previous.shiftId || inferShiftIdFromSchedule(previous.inferred?.startAt, shiftSchedule)
-        const nextDate = patch.sessionDate || previousDate
-        const nextShift = patch.shiftId || previousShift
-        try {
-          await deleteDailySummary(previousDate, previousShift)
-          if (nextDate !== previousDate || nextShift !== previousShift) {
-            await deleteDailySummary(nextDate, nextShift)
-          }
-        } catch {
-          // Evitar bloquear actualizacion si no hay permisos para invalidar el resumen.
-        }
-      }
-      setUploads((prev) => {
-        const next = prev.map((u) => (u.id === id ? { ...u, ...patch } : u))
-        return normalizeUploads(next, shiftSchedule)
-      })
-    } catch {
-      setUploadError('No se pudo actualizar el calendario.')
-    }
-  }
-
-  const handleContinue = () => {
-    const filtered = files.filter((f) => {
-      const inferred = f.partialData.inferred
-      const upload = uploadsById.get(f.fileMeta.id)
-      const sessionDate = upload?.sessionDate || toDateKey(inferred?.startAt)
-      const shiftId = upload?.shiftId || inferShiftIdFromSchedule(inferred?.startAt, shiftSchedule)
-      if (!currentTurnoDate || !currentTurnoShift) return true
-      return sessionDate === currentTurnoDate && shiftId === currentTurnoShift
-    })
-    if (filtered.length === 0) {
-      setError('No hay archivos para el turno seleccionado.')
-      return
-    }
-    const merged = mergeParsedData(filtered)
-    onComplete(merged)
   }
 
   const handleDeleteUpload = useCallback(async (upload: GraderUpload) => {
@@ -701,6 +639,13 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
 
       updateFiles(() => parsed)
       const merged = mergeParsedData(parsed)
+      // Guardar último turno analizado para restaurar al recargar
+      try {
+        localStorage.setItem('grader_last_session', JSON.stringify({
+          date: currentTurnoDate,
+          shiftId: currentTurnoShift,
+        }))
+      } catch { /* localStorage no disponible */ }
       onComplete(merged)
     } catch {
       setUploadError('Error al cargar archivos del calendario.')
@@ -720,289 +665,142 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
 
   return (
     <div className="space-y-3">
-      {/* Info banner + Drop zone compacto */}
-      <Card>
-        <CardContent className="pt-4 pb-4 space-y-3">
-          <div className="flex items-start gap-2 text-xs text-blue-600 dark:text-blue-400">
-            <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-            <span>
-              Carga archivos <strong>Pieza-Pieza</strong> y opcionalmente <strong>Puerta 0</strong> del mismo turno. Se fusionan automáticamente.
-            </span>
-          </div>
-          <div
-            onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
-            onDragLeave={() => setDragOver(false)}
-            onDrop={handleDrop}
-            onClick={() => inputRef.current?.click()}
-            className={cn(
-              'border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-colors',
-              dragOver
-                ? 'border-primary bg-primary/5'
-                : 'border-muted-foreground/25 hover:border-primary/50',
-            )}
-          >
-            <div className="flex items-center justify-center gap-3">
-              {files.length === 0 ? (
-                <FileSpreadsheet className="h-8 w-8 text-muted-foreground shrink-0" />
-              ) : (
-                <Plus className="h-7 w-7 text-muted-foreground shrink-0" />
+      {/* Zonas de carga separadas */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {/* Drop zone Pieza-Pieza */}
+        <Card>
+          <CardContent className="pt-4 pb-4 space-y-2">
+            <div className="flex items-center gap-2">
+              <Badge className={cn('text-xs', KIND_COLORS.PIEZA_PIEZA)}>Pieza-Pieza</Badge>
+              <span className="text-xs text-muted-foreground">Obligatorio</span>
+            </div>
+            <div
+              onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files) }}
+              onClick={() => inputRef.current?.click()}
+              className={cn(
+                'border-2 border-dashed rounded-lg p-3 text-center cursor-pointer transition-colors',
+                dragOver ? 'border-primary bg-primary/5' : 'border-muted-foreground/25 hover:border-primary/50',
               )}
-              <div className="text-left">
-                <p className="text-sm font-medium">
-                  {files.length === 0
-                    ? 'Arrastra archivos Pieza-Pieza o Puerta 0 aquí, o haz clic para seleccionar'
-                    : 'Agregar otro archivo del turno'}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Archivos .xlsx exportados desde Matrix
-                </p>
+            >
+              <div className="flex items-center gap-2 justify-center">
+                <FileSpreadsheet className="h-5 w-5 text-blue-500 shrink-0" />
+                <p className="text-xs">Arrastra o haz clic para cargar</p>
               </div>
-            </div>
-            {parsing && (
-              <div className="flex items-center justify-center gap-2 mt-3">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span className="text-sm">Parseando archivos...</span>
-              </div>
-            )}
-          </div>
-          <input
-            ref={inputRef}
-            type="file"
-            multiple
-            accept=".xlsx,.xls"
-            className="hidden"
-            onChange={(e) => e.target.files && handleFiles(e.target.files)}
-          />
-          {error && (
-            <div className="mt-3 flex items-center gap-2 text-sm text-destructive">
-              <AlertCircle className="h-4 w-4" />
-              {error}
-            </div>
-          )}
-          {uploadError && (
-            <div className="mt-2 flex items-center gap-2 text-xs text-amber-700">
-              <AlertCircle className="h-3.5 w-3.5" />
-              {uploadError}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Turno range info */}
-      {turnoRange && (
-        <Card className="border-green-200 dark:border-green-800/50">
-          <CardContent className="pt-4 pb-3">
-            <div className="flex items-center gap-3 flex-wrap">
-              <Clock className="h-5 w-5 text-green-600 dark:text-green-400" />
-              <div className="flex-1">
-                <p className="text-sm font-medium">
-                  Turno detectado: {turnoRange.date}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {turnoRange.start} – {turnoRange.end}
-                  {' · '}
-                  {turnoRange.durationMin} min
-                  {' · '}
-                  {turnoRange.totalPieces.toLocaleString()} piezas totales
-                </p>
-              </div>
-              {piezaPiezaCount > 1 && (
-                <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
-                  {piezaPiezaCount} archivos fusionados
-                </Badge>
+              {parsing && (
+                <div className="flex items-center justify-center gap-2 mt-2">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  <span className="text-xs">Parseando...</span>
+                </div>
               )}
             </div>
+            <input ref={inputRef} type="file" multiple accept=".xlsx,.xls" className="hidden"
+              onChange={(e) => e.target.files && handleFiles(e.target.files)} />
+            {/* Archivos PP cargados */}
+            {files.filter((f) => f.fileMeta.kind === 'PIEZA_PIEZA').map((f) => (
+              <div key={f.fileMeta.id} className="flex items-center gap-2 bg-muted/50 rounded px-2 py-1.5 text-xs">
+                <CheckCircle className="h-3.5 w-3.5 text-green-500 shrink-0" />
+                <span className="truncate flex-1">{f.fileMeta.name}</span>
+                <span className="text-muted-foreground shrink-0">
+                  {f.partialData.pieceRecords?.length.toLocaleString()} reg
+                </span>
+                <button type="button" onClick={() => handleRemoveFile(f.fileMeta.id)}
+                  className="text-muted-foreground hover:text-destructive shrink-0">
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ))}
           </CardContent>
         </Card>
-      )}
 
-      {/* Turno objetivo (para agrupar archivos) */}
-      <Card>
-        <CardContent className="pt-4 pb-4">
-          <div className="flex items-center gap-3 flex-wrap">
-            <span className="text-sm font-medium">Turno objetivo</span>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">Fecha</span>
-              <input
-                type="date"
-                value={currentTurnoDate || ''}
-                onChange={(e) => setCurrentTurnoDate(e.target.value)}
-                className="h-7 text-xs rounded border border-muted-foreground/30 bg-background px-2"
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">Turno</span>
-              <Select value={currentTurnoShift} onValueChange={setCurrentTurnoShift}>
-                <SelectTrigger className="h-7 w-32 text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {SHIFT_OPTIONS.map((opt) => (
-                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <p className="text-[11px] text-muted-foreground">
-              Los archivos del mismo día y turno se agrupan automáticamente.
-            </p>
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-7 text-xs"
-              onClick={handleLoadTurno}
-              disabled={loadingTurno || !currentTurnoDate || !currentTurnoShift}
-            >
-              {loadingTurno ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : null}
-              Cargar turno
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Files list */}
-      {files.length > 0 && (
+        {/* Drop zone Puerta 0 */}
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base">
-              Archivos Cargados ({files.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {files.map((f) => (
-              (() => {
-                const upload = uploadsById.get(f.fileMeta.id)
-                const inferred = upload?.inferred || f.partialData.inferred
-                const sessionDate = upload?.sessionDate || toDateKey(inferred?.startAt)
-                const shiftId = upload?.shiftId || inferShiftIdFromSchedule(inferred?.startAt, shiftSchedule)
-                const timeRange = inferred?.startAt && inferred?.endAt
-                  ? `${new Date(inferred.startAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })} – ${new Date(inferred.endAt).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}`
-                  : '—'
-                return (
-              <div
-                key={f.fileMeta.id}
-                className={cn(
-                  'flex items-center gap-3 p-3 rounded-lg',
-                  ACCEPTED_KINDS.includes(f.fileMeta.kind)
-                    ? 'bg-muted/50'
-                    : 'bg-amber-50/50 dark:bg-amber-950/10 border border-amber-200 dark:border-amber-800/30',
-                )}
-              >
-                <FileSpreadsheet className="h-5 w-5 text-green-600 shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{f.fileMeta.name}</p>
-                  <div className="flex items-center gap-2 mt-1 flex-wrap">
-                    <Badge className={cn('text-xs', KIND_COLORS[f.fileMeta.kind])}>
-                      {KIND_LABELS[f.fileMeta.kind]}
-                    </Badge>
-                    <span className="text-xs text-muted-foreground">
-                      {(f.fileMeta.sizeBytes / 1024).toFixed(0)} KB
-                    </span>
-                    {f.fileMeta.kind === 'PIEZA_PIEZA' && f.partialData.pieceRecords && (
-                      <span className="text-xs text-muted-foreground">
-                        · {f.partialData.pieceRecords.length.toLocaleString()} registros
-                      </span>
-                    )}
-                    {f.fileMeta.kind === 'PUERTA_0' && f.partialData.gate0Records && (
-                      <span className="text-xs text-muted-foreground">
-                        · {f.partialData.gate0Records.length.toLocaleString()} registros P0
-                      </span>
-                    )}
-                    {f.fileMeta.warnings.length > 0 && (
-                      <span className="text-xs text-amber-600 flex items-center gap-1">
-                        <AlertCircle className="h-3 w-3" />
-                        {f.fileMeta.warnings.length} aviso(s)
-                      </span>
-                    )}
-                  </div>
-                  <div className="mt-2 flex items-center gap-2 flex-wrap text-xs text-muted-foreground">
-                    <span>Horario: {timeRange}</span>
-                  </div>
-                  <div className="mt-2 flex items-center gap-2 flex-wrap">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">Fecha</span>
-                      <input
-                        type="date"
-                        value={sessionDate}
-                        onChange={(e) => handleUpdateUpload(f.fileMeta.id, { sessionDate: e.target.value })}
-                        className="h-7 text-xs rounded border border-muted-foreground/30 bg-background px-2"
-                      />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">Turno</span>
-                      <Select value={shiftId} onValueChange={(v) => handleUpdateUpload(f.fileMeta.id, { shiftId: v })}>
-                        <SelectTrigger className="h-7 w-28 text-xs">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {SHIFT_OPTIONS.map((opt) => (
-                            <SelectItem key={opt} value={opt}>{opt}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  {f.fileMeta.warnings.length > 0 && (
-                    <div className="mt-1 space-y-0.5">
-                      {f.fileMeta.warnings.map((w, i) => (
-                        <p key={i} className="text-xs text-amber-600">{w}</p>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleRemoveFile(f.fileMeta.id)}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
+          <CardContent className="pt-4 pb-4 space-y-2">
+            <div className="flex items-center gap-2">
+              <Badge className={cn('text-xs', KIND_COLORS.PUERTA_0)}>Puerta 0</Badge>
+              <span className="text-xs text-muted-foreground">Recomendado</span>
+            </div>
+            <div
+              onDragOver={(e) => { e.preventDefault(); setDragOverP0(true) }}
+              onDragLeave={() => setDragOverP0(false)}
+              onDrop={(e) => { e.preventDefault(); setDragOverP0(false); handleFiles(e.dataTransfer.files) }}
+              onClick={() => inputRefP0.current?.click()}
+              className={cn(
+                'border-2 border-dashed rounded-lg p-3 text-center cursor-pointer transition-colors',
+                dragOverP0 ? 'border-primary bg-primary/5' : 'border-muted-foreground/25 hover:border-primary/50',
+              )}
+            >
+              <div className="flex items-center gap-2 justify-center">
+                <FileSpreadsheet className="h-5 w-5 text-red-500 shrink-0" />
+                <p className="text-xs">Arrastra o haz clic para cargar</p>
               </div>
-                )
-              })()
+            </div>
+            <input ref={inputRefP0} type="file" multiple accept=".xlsx,.xls" className="hidden"
+              onChange={(e) => e.target.files && handleFiles(e.target.files)} />
+            {/* Archivos P0 cargados */}
+            {files.filter((f) => f.fileMeta.kind === 'PUERTA_0').map((f) => (
+              <div key={f.fileMeta.id} className="flex items-center gap-2 bg-muted/50 rounded px-2 py-1.5 text-xs">
+                <CheckCircle className="h-3.5 w-3.5 text-green-500 shrink-0" />
+                <span className="truncate flex-1">{f.fileMeta.name}</span>
+                <span className="text-muted-foreground shrink-0">
+                  {f.partialData.gate0Records?.length.toLocaleString()} reg P0
+                </span>
+                <button type="button" onClick={() => handleRemoveFile(f.fileMeta.id)}
+                  className="text-muted-foreground hover:text-destructive shrink-0">
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
             ))}
-
-            {/* Hint: unrecognized file types */}
-            {files.some((f) => !ACCEPTED_KINDS.includes(f.fileMeta.kind)) && (
-              <p className="text-xs text-amber-600 mt-2 flex items-center gap-1">
-                <AlertCircle className="h-3 w-3" />
-                Los archivos que no son Pieza-Pieza o Puerta 0 serán ignorados en el análisis.
+            {files.filter((f) => f.fileMeta.kind === 'PUERTA_0').length === 0 && hasPiezaPieza && (
+              <p className="text-[11px] text-amber-600 flex items-center gap-1">
+                <Info className="h-3 w-3" />
+                Carga el archivo Puerta 0 para datos completos de punto cero
               </p>
             )}
           </CardContent>
         </Card>
-      )}
-
-      {/* Status + Continue */}
-      <div className="flex items-center justify-between">
-        {!hasPiezaPieza && files.length === 0 ? (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <CheckCircle className="h-4 w-4 opacity-30" />
-            <span>Carga al menos un archivo Pieza-Pieza para continuar</span>
-          </div>
-        ) : <div />}
-        <Button onClick={handleContinue} disabled={!canContinue} size="sm">
-          Continuar a Configuración de Gates
-          <ChevronRight className="h-4 w-4 ml-1" />
-        </Button>
       </div>
 
-      {/* Calendario visual de uploads */}
-      {uploads.length > 0 && (
-        <GraderInlineCalendar
-          uploads={uploads}
-          shiftSchedule={shiftSchedule}
-          currentTurnoDate={currentTurnoDate}
-          currentTurnoShift={currentTurnoShift}
-          onSelectTurno={(date, shift) => {
-            setCurrentTurnoDate(date)
-            setCurrentTurnoShift(shift)
-          }}
-          onLoadTurno={handleLoadTurno}
-          onDeleteUpload={handleDeleteUpload}
-          loadingTurno={loadingTurno}
-        />
+      {/* Errores */}
+      {error && (
+        <div className="flex items-center gap-2 text-sm text-destructive">
+          <AlertCircle className="h-4 w-4" />
+          {error}
+        </div>
       )}
+      {uploadError && (
+        <div className="flex items-center gap-2 text-xs text-amber-700">
+          <AlertCircle className="h-3.5 w-3.5" />
+          {uploadError}
+        </div>
+      )}
+
+      {/* Turno detectado compacto */}
+      {turnoRange && (
+        <div className="flex items-center gap-3 flex-wrap text-xs px-1">
+          <Clock className="h-4 w-4 text-green-600 dark:text-green-400" />
+          <span className="font-medium">Turno detectado: {turnoRange.date}</span>
+          <span className="text-muted-foreground">
+            {turnoRange.start} – {turnoRange.end} · {turnoRange.durationMin} min · {turnoRange.totalPieces.toLocaleString()} piezas
+          </span>
+        </div>
+      )}
+
+      {/* Calendario visual de uploads */}
+      <GraderInlineCalendar
+        uploads={uploads}
+        shiftSchedule={shiftSchedule}
+        currentTurnoDate={currentTurnoDate}
+        currentTurnoShift={currentTurnoShift}
+        onSelectTurno={(date, shift) => {
+          setCurrentTurnoDate(date)
+          setCurrentTurnoShift(shift)
+        }}
+        onLoadTurno={handleLoadTurno}
+        onDeleteUpload={handleDeleteUpload}
+        loadingTurno={loadingTurno}
+      />
     </div>
   )
 }

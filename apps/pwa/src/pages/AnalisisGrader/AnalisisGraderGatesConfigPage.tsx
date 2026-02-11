@@ -7,6 +7,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Switch, Label } from '@/components/ui'
 import { Settings2, Save, FolderOpen, ChevronRight, ChevronLeft, Trash2, ChevronDown, RotateCcw, Plus } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { useAuthStore, useIsAdmin } from '@/store'
 import {
   saveGatesTemplate,
@@ -54,6 +55,7 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
   const [config, setConfig] = useState<GraderAnalysisConfig>(initialConfig)
   const [templates, setTemplates] = useState<GatesTemplate[]>([])
   const [templateName, setTemplateName] = useState('')
+  const [activeTemplateName, setActiveTemplateName] = useState<string | null>(null)
   const [showTemplates, setShowTemplates] = useState(false)
   const [showWeightRanges, setShowWeightRanges] = useState(false)
   const [savingRanges, setSavingRanges] = useState(false)
@@ -142,8 +144,17 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
   }
 
   useEffect(() => {
-    listGatesTemplates().then(setTemplates).catch(() => {})
-  }, [])
+    listGatesTemplates().then((list) => {
+      setTemplates(list)
+      // Auto-cargar "Plantilla 1" como base por defecto
+      const plantilla1 = list.find((t) => t.name === 'Plantilla 1') || list[0]
+      if (plantilla1 && !activeTemplateName) {
+        setGates(plantilla1.gates)
+        if (plantilla1.deviceId) setConfig((c) => ({ ...c, deviceId: plantilla1.deviceId }))
+        setActiveTemplateName(plantilla1.name)
+      }
+    }).catch(() => {})
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Cargar rangos globales del modulo
   useEffect(() => {
@@ -178,21 +189,46 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
     setGates((prev) => prev.map((g, i) => (i === idx ? { ...g, ...patch } : g)))
   }
 
+  // Genera nombre de plantilla basado en fecha y turno con auto-versionado
+  const autoTemplateName = useMemo(() => {
+    const dateStr = parsedData.inferred.startAt
+      ? new Date(parsedData.inferred.startAt).toISOString().slice(0, 10)
+      : new Date().toISOString().slice(0, 10)
+    const shift = config.shiftId || 'Turno noche'
+    const base = `${dateStr}_${shift}`
+    // Contar versiones existentes con el mismo base
+    const existing = templates.filter((t) => t.name.startsWith(base))
+    if (existing.length === 0) return base
+    return `${base}_v${existing.length + 1}`
+  }, [parsedData.inferred.startAt, config.shiftId, templates])
+
   const handleSaveTemplate = async () => {
-    if (!templateName.trim() || !user) return
+    const name = templateName.trim() || autoTemplateName
+    if (!name || !user) return
     const tmpl = await saveGatesTemplate({
-      name: templateName.trim(),
+      name,
       deviceId: config.deviceId,
       gates,
       createdBy: user.id,
     })
     setTemplates((prev) => [tmpl, ...prev])
     setTemplateName('')
+    setActiveTemplateName(name)
+    // Guardar referencia como última plantilla usada
+    try {
+      localStorage.setItem('grader_last_template', JSON.stringify({
+        templateId: tmpl.id,
+        templateName: name,
+        date: parsedData.inferred.startAt ? new Date(parsedData.inferred.startAt).toISOString().slice(0, 10) : null,
+        shiftId: config.shiftId,
+      }))
+    } catch { /* localStorage no disponible */ }
   }
 
   const handleLoadTemplate = (tmpl: GatesTemplate) => {
     setGates(tmpl.gates)
     if (tmpl.deviceId) setConfig((c) => ({ ...c, deviceId: tmpl.deviceId }))
+    setActiveTemplateName(tmpl.name)
     setShowTemplates(false)
   }
 
@@ -396,9 +432,16 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
       {/* Gates Table */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-base">
-            Configuración de 12 Gates
-          </CardTitle>
+          <div className="flex items-center gap-2">
+            <CardTitle className="text-base">
+              Configuración de 12 Gates
+            </CardTitle>
+            {activeTemplateName && (
+              <Badge variant="outline" className="text-[10px]">
+                {activeTemplateName}
+              </Badge>
+            )}
+          </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={() => setShowTemplates(!showTemplates)}>
               <FolderOpen className="h-4 w-4 mr-1" />
@@ -417,10 +460,18 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
               {templates.map((t) => (
                 <div
                   key={t.id}
-                  className="flex items-center justify-between p-2 rounded bg-background"
+                  className={cn(
+                    'flex items-center justify-between p-2 rounded bg-background',
+                    activeTemplateName === t.name && 'ring-2 ring-primary/50',
+                  )}
                 >
                   <div>
                     <span className="text-sm font-medium">{t.name}</span>
+                    {activeTemplateName === t.name && (
+                      <Badge className="ml-2 text-[10px] bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
+                        Activa
+                      </Badge>
+                    )}
                     {t.deviceId && (
                       <Badge variant="outline" className="ml-2 text-[10px]">
                         {t.deviceId}
@@ -444,10 +495,10 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                   <Input
                     value={templateName}
                     onChange={(e) => setTemplateName(e.target.value)}
-                    placeholder="Nombre de plantilla..."
+                    placeholder={autoTemplateName}
                     className="text-sm"
                   />
-                  <Button size="sm" onClick={handleSaveTemplate} disabled={!templateName.trim()}>
+                  <Button size="sm" onClick={handleSaveTemplate}>
                     <Save className="h-4 w-4 mr-1" />
                     Guardar
                   </Button>

@@ -5,8 +5,8 @@
  *  P3) Dashboard
  */
 
-import { useState, useCallback } from 'react'
-import { Navigate, useNavigate } from 'react-router-dom'
+import { useState, useCallback, useEffect } from 'react'
+import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { Card, CardContent, Button } from '@/components/ui'
 import { Upload, Settings2, BarChart3, ChevronRight, FolderOpen, Calendar } from 'lucide-react'
 import { usePermissionsStore } from '@/store'
@@ -26,6 +26,7 @@ type StepId = typeof STEPS[number]['id']
 export function AnalisisGraderWizardPage() {
   const { canSee } = usePermissionsStore()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [currentStep, setCurrentStep] = useState<StepId>('upload')
   const [parsedData, setParsedData] = useState<ParsedMatrixData | null>(null)
   const [uploadedFiles, setUploadedFiles] = useState<FileParsed[]>([])
@@ -38,6 +39,26 @@ export function AnalisisGraderWizardPage() {
       pointZeroPctWarn: 2,
     },
   })
+
+  // Restaurar último turno desde localStorage al iniciar
+  useEffect(() => {
+    // Si hay params en URL, no restaurar
+    if (searchParams.get('date') || searchParams.get('autoload')) return
+    try {
+      const saved = localStorage.getItem('grader_last_session')
+      if (saved) {
+        const { date, shiftId } = JSON.parse(saved)
+        if (date && shiftId) {
+          // Inyectar en URL para que UploadPage los use
+          const newParams = new URLSearchParams(searchParams)
+          newParams.set('date', date)
+          newParams.set('shift', shiftId)
+          newParams.set('autoload', '1')
+          navigate(`?${newParams.toString()}`, { replace: true })
+        }
+      }
+    } catch { /* localStorage no disponible */ }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const fallbackParsedData: ParsedMatrixData = parsedData || {
     files: [],
