@@ -1,8 +1,11 @@
 {
-  "version": "2.47.25",
+  "version": "2.47.26",
   "buildDate": "2026-02-11",
   "buildTimestamp": 1770701184881,
   "features": [
+    "Wizard 2 pasos: Configuración (carga + calendario + gates) y Dashboard en una sola vista",
+    "Fix calendario: ambos archivos (PP + P0) visibles por turno (IDs únicos por nombre de archivo)",
+    "Config Gates embebida debajo del calendario, scroll automático al cargar datos",
     "Zonas de carga separadas: Pieza-Pieza y Puerta 0 con drag & drop independiente",
     "Flujo calendario: seleccionar día/turno → cargar datos → configurar gates",
     "Plantilla 1 cargada por defecto al entrar en configuración de gates",

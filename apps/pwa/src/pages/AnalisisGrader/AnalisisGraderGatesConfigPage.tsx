@@ -32,7 +32,7 @@ interface Props {
   config: GraderAnalysisConfig
   parsedData: ParsedMatrixData
   onComplete: (gates: GateAssignment[], config: GraderAnalysisConfig) => void
-  onBack: () => void
+  onBack?: () => void
 }
 
 const QUALITIES: GraderQuality[] = ['Premium', 'Grado', 'Industrial', 'D', 'Unknown']
@@ -694,11 +694,13 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
       </Card>
 
       {/* Navigation */}
-      <div className="flex justify-between">
-        <Button variant="outline" onClick={onBack}>
-          <ChevronLeft className="h-4 w-4 mr-1" />
-          Volver
-        </Button>
+      <div className={onBack ? 'flex justify-between' : 'flex justify-end'}>
+        {onBack && (
+          <Button variant="outline" onClick={onBack}>
+            <ChevronLeft className="h-4 w-4 mr-1" />
+            Volver
+          </Button>
+        )}
         <Button onClick={() => onComplete(gates, config)}>
           Ver Dashboard
           <ChevronRight className="h-4 w-4 ml-1" />

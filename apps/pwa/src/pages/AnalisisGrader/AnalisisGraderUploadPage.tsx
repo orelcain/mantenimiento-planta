@@ -70,8 +70,14 @@ const KIND_COLORS: Record<MatrixFileKind, string> = {
 
 const ACCEPTED_KINDS: MatrixFileKind[] = ['PIEZA_PIEZA', 'PUERTA_0']
 
-function buildUploadId(sessionDate: string, shiftId: string | undefined, kind: MatrixFileKind): string {
+function buildUploadId(sessionDate: string, shiftId: string | undefined, kind: MatrixFileKind, filename?: string): string {
   const shiftKey = shiftIdToKey(shiftId)
+  // Incluir nombre de archivo sanitizado para evitar colisiones cuando
+  // se cargan 2 archivos del mismo kind (o cuando el parser los clasifica igual)
+  if (filename) {
+    const safeName = filename.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9]/g, '_').slice(0, 50)
+    return `${sessionDate}__${shiftKey}__${kind}__${safeName}`
+  }
   return `${sessionDate}__${shiftKey}__${kind}`
 }
 
@@ -512,7 +518,7 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
         const inferredShift = inferShiftIdFromSchedule(inferred?.startAt, shiftSchedule)
         const sessionDate = currentTurnoDate || inferredDate
         const shiftId = currentTurnoDate ? currentTurnoShift : inferredShift
-        const uploadId = buildUploadId(sessionDate, shiftId, result.fileMeta.kind)
+        const uploadId = buildUploadId(sessionDate, shiftId, result.fileMeta.kind, file.name)
         result.fileMeta.id = uploadId
         // Aceptar pieza-pieza y puerta 0; advertir si se carga otro tipo
         if (!ACCEPTED_KINDS.includes(result.fileMeta.kind)) {

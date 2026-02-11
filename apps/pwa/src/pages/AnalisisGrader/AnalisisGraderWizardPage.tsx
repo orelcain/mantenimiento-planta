@@ -1,14 +1,13 @@
 /**
- * Wizard principal de Análisis Grader (3 pasos):
- *  P1) Carga de archivos Excel
- *  P2) Configuración de Gates
- *  P3) Dashboard
+ * Wizard principal de Análisis Grader (2 pasos):
+ *  P1) Configuración: Carga de archivos + Calendario + Config Gates
+ *  P2) Dashboard
  */
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { Card, CardContent, Button } from '@/components/ui'
-import { Upload, Settings2, BarChart3, ChevronRight, FolderOpen, Calendar } from 'lucide-react'
+import { Settings2, BarChart3, ChevronRight, FolderOpen, Calendar } from 'lucide-react'
 import { usePermissionsStore } from '@/store'
 import { AnalisisGraderUploadPage, type FileParsed } from './AnalisisGraderUploadPage'
 import { AnalisisGraderGatesConfigPage } from './AnalisisGraderGatesConfigPage'
@@ -16,8 +15,7 @@ import { AnalisisGraderDashboardPage } from './AnalisisGraderDashboardPage'
 import type { ParsedMatrixData, GateAssignment, GraderAnalysisConfig } from '@/services/grader/types'
 
 const STEPS = [
-  { id: 'upload', label: 'Carga de Archivos', icon: Upload },
-  { id: 'gates', label: 'Config. Gates', icon: Settings2 },
+  { id: 'config', label: 'Configuración', icon: Settings2 },
   { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
 ] as const
 
@@ -27,7 +25,7 @@ export function AnalisisGraderWizardPage() {
   const { canSee } = usePermissionsStore()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const [currentStep, setCurrentStep] = useState<StepId>('upload')
+  const [currentStep, setCurrentStep] = useState<StepId>('config')
   const [parsedData, setParsedData] = useState<ParsedMatrixData | null>(null)
   const [uploadedFiles, setUploadedFiles] = useState<FileParsed[]>([])
   const [gates, setGates] = useState<GateAssignment[]>(getDefaultGates())
@@ -39,6 +37,7 @@ export function AnalisisGraderWizardPage() {
       pointZeroPctWarn: 2,
     },
   })
+  const gatesRef = useRef<HTMLDivElement>(null)
 
   // Restaurar último turno desde localStorage al iniciar
   useEffect(() => {
@@ -78,7 +77,10 @@ export function AnalisisGraderWizardPage() {
       startAt: data.inferred.startAt || prev.startAt,
       endAt: data.inferred.endAt || prev.endAt,
     }))
-    setCurrentStep('gates')
+    // Scroll hacia la configuración de gates
+    setTimeout(() => {
+      gatesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 100)
   }, [])
 
   const handleGatesComplete = useCallback(
@@ -127,13 +129,11 @@ export function AnalisisGraderWizardPage() {
             {STEPS.map((step, idx) => {
               const Icon = step.icon
               const isActive = step.id === currentStep
-              const isClickable = true
 
               return (
                 <div key={step.id} className="flex items-center gap-1 sm:gap-2">
                   <button
-                    onClick={() => isClickable && setCurrentStep(step.id)}
-                    disabled={!isClickable}
+                    onClick={() => setCurrentStep(step.id)}
                     className={`flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors ${
                       isActive
                         ? 'bg-primary text-primary-foreground'
@@ -154,22 +154,27 @@ export function AnalisisGraderWizardPage() {
       </Card>
 
       {/* Step Content */}
-      {currentStep === 'upload' && (
-        <AnalisisGraderUploadPage
-          onComplete={handleUploadComplete}
-          initialFiles={uploadedFiles}
-          onFilesChange={setUploadedFiles}
-        />
-      )}
+      {currentStep === 'config' && (
+        <>
+          {/* Carga de archivos + calendario */}
+          <AnalisisGraderUploadPage
+            onComplete={handleUploadComplete}
+            initialFiles={uploadedFiles}
+            onFilesChange={setUploadedFiles}
+          />
 
-      {currentStep === 'gates' && (
-        <AnalisisGraderGatesConfigPage
-          gates={gates}
-          config={config}
-          parsedData={fallbackParsedData}
-          onComplete={handleGatesComplete}
-          onBack={() => setCurrentStep('upload')}
-        />
+          {/* Configuración de Gates — aparece al cargar archivos */}
+          {parsedData && (
+            <div ref={gatesRef}>
+              <AnalisisGraderGatesConfigPage
+                gates={gates}
+                config={config}
+                parsedData={fallbackParsedData}
+                onComplete={handleGatesComplete}
+              />
+            </div>
+          )}
+        </>
       )}
 
       {currentStep === 'dashboard' && (
@@ -177,7 +182,7 @@ export function AnalisisGraderWizardPage() {
           parsedData={fallbackParsedData}
           gates={gates}
           config={config}
-          onBack={() => setCurrentStep('gates')}
+          onBack={() => setCurrentStep('config')}
         />
       )}
     </div>
