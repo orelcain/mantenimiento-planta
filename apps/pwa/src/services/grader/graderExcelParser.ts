@@ -692,13 +692,28 @@ export function mergeParsedData(
     inferred: {},
   }
 
-  for (const { partialData } of parts) {
+  // Separar gate0 por fuente: archivos PUERTA_0 vs inferidos de PIEZA_PIEZA
+  const gate0FromPuerta0: typeof merged.gate0Records = []
+  const gate0FromPiezaPieza: typeof merged.gate0Records = []
+
+  for (const { fileMeta, partialData } of parts) {
     if (partialData.pieceRecords) merged.pieceRecords.push(...partialData.pieceRecords)
-    if (partialData.gate0Records) merged.gate0Records.push(...partialData.gate0Records)
+    if (partialData.gate0Records) {
+      if (fileMeta.kind === 'PUERTA_0') {
+        gate0FromPuerta0.push(...partialData.gate0Records)
+      } else {
+        gate0FromPiezaPieza.push(...partialData.gate0Records)
+      }
+    }
     if (partialData.folioRecords) merged.folioRecords.push(...partialData.folioRecords)
     if (partialData.qualitySummary) merged.qualitySummary.push(...partialData.qualitySummary)
     if (partialData.productionSummary) merged.productionSummary.push(...partialData.productionSummary)
   }
+
+  // Preferir datos reales de PUERTA_0 sobre los inferidos del pieza-pieza
+  merged.gate0Records = gate0FromPuerta0.length > 0
+    ? gate0FromPuerta0
+    : gate0FromPiezaPieza
 
   // Infer overall period
   const allTs: string[] = [

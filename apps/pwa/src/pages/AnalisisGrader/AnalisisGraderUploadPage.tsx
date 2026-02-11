@@ -21,13 +21,14 @@ import {
   Clock,
   Plus,
   Calendar,
+  Trash2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/store'
 import { parseFile, mergeParsedData } from '@/services/grader/graderExcelParser'
 import { getModuleRanges } from '@/services/grader/graderModuleConfig.service'
 import { deleteDailySummary } from '@/services/grader/graderDailySummary.service'
-import { listGraderUploads, saveGraderUpload, updateGraderUpload, uploadGraderFile } from '@/services/grader/graderUpload.service'
+import { listGraderUploads, saveGraderUpload, updateGraderUpload, uploadGraderFile, deleteGraderUpload } from '@/services/grader/graderUpload.service'
 import { DEFAULT_SHIFT_SCHEDULE, inferShiftIdFromSchedule, normalizeShiftSchedule, shiftIdToKey } from '@/services/grader/graderShiftSchedule'
 import type {
   ParsedMatrixData,
@@ -139,10 +140,11 @@ interface InlineCalendarProps {
   currentTurnoShift: string
   onSelectTurno: (date: string, shift: string) => void
   onLoadTurno: () => void
+  onDeleteUpload: (upload: GraderUpload) => void
   loadingTurno: boolean
 }
 
-function GraderInlineCalendar({ uploads, shiftSchedule, currentTurnoDate, currentTurnoShift, onSelectTurno, onLoadTurno, loadingTurno }: InlineCalendarProps) {
+function GraderInlineCalendar({ uploads, shiftSchedule, currentTurnoDate, currentTurnoShift, onSelectTurno, onLoadTurno, onDeleteUpload, loadingTurno }: InlineCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(() => {
     if (currentTurnoDate) return new Date(currentTurnoDate + 'T00:00:00')
     return new Date()
@@ -333,6 +335,29 @@ function GraderInlineCalendar({ uploads, shiftSchedule, currentTurnoDate, curren
                         {minStart && maxEnd
                           ? `${new Date(minStart).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })} - ${new Date(maxEnd).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}`
                           : 'Horario no detectado'}
+                      </div>
+                      {/* Lista de archivos individuales */}
+                      <div className="space-y-1 mt-1">
+                        {items.map((u) => (
+                          <div
+                            key={u.id}
+                            className="flex items-center gap-2 text-[11px] bg-muted/40 rounded px-2 py-1"
+                          >
+                            <FileSpreadsheet className="h-3 w-3 shrink-0 text-muted-foreground" />
+                            <span className="truncate flex-1">{u.fileMeta.name}</span>
+                            <Badge className={cn('text-[9px] h-4 px-1 shrink-0', KIND_COLORS[u.fileMeta.kind])}>
+                              {KIND_LABELS[u.fileMeta.kind]}
+                            </Badge>
+                            <button
+                              type="button"
+                              className="text-muted-foreground hover:text-destructive transition-colors shrink-0"
+                              title="Eliminar archivo"
+                              onClick={(e) => { e.stopPropagation(); onDeleteUpload(u) }}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   )
@@ -590,6 +615,25 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
     const merged = mergeParsedData(filtered)
     onComplete(merged)
   }
+
+  const handleDeleteUpload = useCallback(async (upload: GraderUpload) => {
+    try {
+      await deleteGraderUpload(upload)
+      setUploads((prev) => prev.filter((u) => u.id !== upload.id))
+      // Quitar de archivos locales si coincide
+      updateFiles((prev) => prev.filter((f) => f.fileMeta.id !== upload.id))
+      // Invalidar resumen diario
+      const dateKey = upload.sessionDate || toDateKey(upload.inferred?.startAt)
+      const shiftId = upload.shiftId || inferShiftIdFromSchedule(upload.inferred?.startAt, shiftSchedule)
+      try {
+        await deleteDailySummary(dateKey, shiftId)
+      } catch {
+        // No bloquear si falla la invalidación
+      }
+    } catch {
+      setUploadError('No se pudo eliminar el archivo.')
+    }
+  }, [shiftSchedule, updateFiles])
 
   const handleLoadTurno = useCallback(async () => {
     if (!currentTurnoDate || !currentTurnoShift) return
@@ -929,6 +973,7 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
             setCurrentTurnoShift(shift)
           }}
           onLoadTurno={handleLoadTurno}
+          onDeleteUpload={handleDeleteUpload}
           loadingTurno={loadingTurno}
         />
       )}

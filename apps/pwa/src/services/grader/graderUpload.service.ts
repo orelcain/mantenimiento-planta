@@ -7,12 +7,13 @@ import {
   doc,
   getDocs,
   setDoc,
+  deleteDoc,
   query,
   orderBy,
   limit,
   serverTimestamp,
 } from '@/services/firestoreTracked'
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage'
 import { db, storage } from '../firebase'
 import { generateId } from '@/lib/utils'
 import type { GraderUpload, UploadedMatrixFile } from './types'
@@ -101,4 +102,18 @@ export async function listGraderUploads(max = 200): Promise<GraderUpload[]> {
   )
   const snap = await getDocs(q)
   return snap.docs.map((d) => d.data() as GraderUpload)
+}
+
+export async function deleteGraderUpload(upload: GraderUpload): Promise<void> {
+  // Eliminar doc de Firestore
+  await deleteDoc(doc(db, COLLECTION, upload.id))
+  // Eliminar archivo de Storage si existe
+  if (upload.fileMeta.storagePath) {
+    try {
+      const storageRef = ref(storage, upload.fileMeta.storagePath)
+      await deleteObject(storageRef)
+    } catch {
+      // Si falla la eliminación del Storage, no bloqueamos
+    }
+  }
 }

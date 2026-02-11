@@ -1,9 +1,11 @@
 {
-  "version": "2.47.22",
+  "version": "2.47.23",
   "buildDate": "2026-02-11",
   "buildTimestamp": 1770701184881,
   "features": [
-    "Clasificación P0 inteligente: Fuera de límites → Fuera de rango / No leído por fotocélula",
+    "Fix deduplicación gate0Records: al cargar Pieza-Pieza + Puerta 0 se prefieren datos reales P0",
+    "Calendario de archivos: muestra archivos individuales por turno con nombre y tipo",
+    "Eliminar archivos desde el calendario (Firestore + Storage)",
     "Rangos de peso en configuración de Gates (columna Rango g)",
     "Persistencia de archivos Excel entre pasos del wizard",
     "Motor estadístico avanzado: Mediana, σ, CV%, Sesgo, Curtosis, IQR, HHI",
