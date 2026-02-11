@@ -242,15 +242,33 @@ function findHeaderRow(rows: unknown[][]): { rowIndex: number; headers: string[]
   return null
 }
 
-/** Detecta el tipo de Excel por sus columnas */
-export function detectFileKind(sheetRows: unknown[][]): MatrixFileKind {
+/** Detecta el tipo de Excel por sus columnas y opcionalmente el nombre de archivo */
+export function detectFileKind(sheetRows: unknown[][], filename?: string): MatrixFileKind {
+  // Filename-based hint: if filename clearly indicates Puerta 0 / Punto Cero
+  const nameLower = (filename || '').toLowerCase()
+  const filenameHintP0 = nameLower.includes('puerta 0') || nameLower.includes('puerta0')
+    || nameLower.includes('punto cero') || nameLower.includes('puntocero')
+    || /\bp\.?0\b/.test(nameLower)
+  const filenameHintPP = nameLower.includes('pieza') || nameLower.includes('piece')
+
   const headerInfo = findHeaderRow(sheetRows)
-  if (!headerInfo) return 'UNKNOWN'
+  if (!headerInfo) {
+    // Sin cabecera: usar pista del nombre
+    if (filenameHintP0) return 'PUERTA_0'
+    if (filenameHintPP) return 'PIEZA_PIEZA'
+    return 'UNKNOWN'
+  }
 
   const { headers } = headerInfo
 
   function matchesGroup(group: string[]): boolean {
     return group.some((variant) => headers.some((h) => h.includes(variant)))
+  }
+
+  // Si el nombre indica claramente Puerta 0 y las columnas son compatibles
+  if (filenameHintP0) {
+    const hasPieces = matchesGroup(['cantidad de piezas', 'cant. piezas', 'piezas', 'qty', 'cantidad'])
+    if (hasPieces) return 'PUERTA_0'
   }
 
   // Check each kind (order matters: more specific first)
@@ -272,6 +290,8 @@ export function detectFileKind(sheetRows: unknown[][]): MatrixFileKind {
     if (hasQuality || hasCalibre) return 'PIEZA_PIEZA'
     // If no quality/calibre but has error, it's PUERTA_0
     if (hasPuerta0) return 'PUERTA_0'
+    // Filename hint as tiebreaker
+    if (filenameHintP0) return 'PUERTA_0'
     return 'PIEZA_PIEZA' // default if has gate + pieces
   }
 
@@ -541,7 +561,7 @@ export async function parseFile(file: File): Promise<{
   const sheet = workbook.Sheets[sheetName]!
   const rows: unknown[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null })
 
-  const kind = detectFileKind(rows)
+  const kind = detectFileKind(rows, file.name)
   if (kind === 'UNKNOWN') {
     warnings.push('No se pudo detectar el tipo de archivo. Verifique las columnas.')
   }

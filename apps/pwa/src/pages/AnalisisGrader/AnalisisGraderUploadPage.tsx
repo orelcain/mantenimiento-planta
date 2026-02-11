@@ -582,9 +582,19 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
     }
   }, [updateFiles, user, shiftSchedule, currentTurnoDate, currentTurnoShift])
 
-  const handleRemoveFile = (id: string) => {
+  const handleRemoveFile = useCallback(async (id: string) => {
+    // Eliminar de Firestore + Storage si existe en uploads
+    const upload = uploads.find((u) => u.id === id)
+    if (upload) {
+      try {
+        await deleteGraderUpload(upload)
+        setUploads((prev) => prev.filter((u) => u.id !== id))
+      } catch {
+        setUploadError('No se pudo eliminar el archivo del servidor.')
+      }
+    }
     updateFiles((prev) => prev.filter((f) => f.fileMeta.id !== id))
-  }
+  }, [uploads, updateFiles])
 
   const handleDeleteUpload = useCallback(async (upload: GraderUpload) => {
     try {
@@ -790,6 +800,31 @@ export function AnalisisGraderUploadPage({ onComplete, initialFiles, onFilesChan
           <span className="text-muted-foreground">
             {turnoRange.start} – {turnoRange.end} · {turnoRange.durationMin} min · {turnoRange.totalPieces.toLocaleString()} piezas
           </span>
+        </div>
+      )}
+
+      {/* Auto-merge: cuando hay archivos cargados, notificar al padre */}
+      {files.length > 0 && hasPiezaPieza && (
+        <div className="flex justify-end">
+          <Button
+            size="sm"
+            onClick={() => {
+              const merged = mergeParsedData(files)
+              // Guardar sesión
+              if (currentTurnoDate && currentTurnoShift) {
+                try {
+                  localStorage.setItem('grader_last_session', JSON.stringify({
+                    date: currentTurnoDate,
+                    shiftId: currentTurnoShift,
+                  }))
+                } catch { /* */ }
+              }
+              onComplete(merged)
+            }}
+          >
+            <ChevronRight className="h-4 w-4 mr-1" />
+            Usar archivos cargados
+          </Button>
         </div>
       )}
 

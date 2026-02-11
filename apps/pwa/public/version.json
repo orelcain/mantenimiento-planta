@@ -1,8 +1,12 @@
 {
-  "version": "2.47.26",
+  "version": "2.47.27",
   "buildDate": "2026-02-11",
   "buildTimestamp": 1770701184881,
   "features": [
+    "Fix parser: archivos Puerta 0 detectados correctamente por nombre de archivo (ya no se clasifican como PP)",
+    "Fix delete persistencia: eliminar archivo en zona de carga también borra de Firestore/Storage",
+    "Gates config siempre visible debajo del calendario (no requiere paso intermedio)",
+    "Bot\u00f3n 'Usar archivos cargados' para pasar directamente a config sin calendario",
     "Wizard 2 pasos: Configuración (carga + calendario + gates) y Dashboard en una sola vista",
     "Fix calendario: ambos archivos (PP + P0) visibles por turno (IDs únicos por nombre de archivo)",
     "Config Gates embebida debajo del calendario, scroll automático al cargar datos",

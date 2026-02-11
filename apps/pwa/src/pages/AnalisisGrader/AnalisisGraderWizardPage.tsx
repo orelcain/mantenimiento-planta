@@ -163,17 +163,15 @@ export function AnalisisGraderWizardPage() {
             onFilesChange={setUploadedFiles}
           />
 
-          {/* Configuración de Gates — aparece al cargar archivos */}
-          {parsedData && (
-            <div ref={gatesRef}>
-              <AnalisisGraderGatesConfigPage
-                gates={gates}
-                config={config}
-                parsedData={fallbackParsedData}
-                onComplete={handleGatesComplete}
-              />
-            </div>
-          )}
+          {/* Configuración de Gates — siempre visible debajo */}
+          <div ref={gatesRef}>
+            <AnalisisGraderGatesConfigPage
+              gates={gates}
+              config={config}
+              parsedData={fallbackParsedData}
+              onComplete={handleGatesComplete}
+            />
+          </div>
         </>
       )}
 
