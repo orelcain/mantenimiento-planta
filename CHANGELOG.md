@@ -7,6 +7,17 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.43] - 2026-02-12
+
+### 📌 Comparación visual fija en patrón por intervalo
+
+#### Mejoras
+- **Click para fijar puntos**: En el gráfico de patrón por intervalo, al hacer click en un punto se crea una tarjeta fija con su detalle de piezas, calibre y calidad.
+- **Comparación múltiple**: Se pueden fijar varios puntos simultáneamente para comparar intervalos a simple vista.
+- **Tarjetas arrastrables**: Cada tarjeta se puede mover libremente para acomodar la visualización.
+- **Conector al dato origen**: Cada tarjeta mantiene una línea visual hacia su punto específico del gráfico.
+- **Cierre individual**: Cada comparación fija incluye botón `X` para quitarla sin afectar las demás.
+
 ## [2.47.42] - 2026-02-12
 
 ### 🧩 Tooltip enriquecido en patrón por intervalo

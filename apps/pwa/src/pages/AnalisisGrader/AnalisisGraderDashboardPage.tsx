@@ -8,7 +8,7 @@
  * v2.46.1 — P0 inteligente, rangos de peso, persistencia archivos, tooltips ricos, modo día/noche
  */
 
-import { useState, useMemo, useRef, Fragment } from 'react'
+import { useState, useMemo, useRef, Fragment, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge, Tabs, TabsContent, TabsList, TabsTrigger, InfoTooltip } from '@/components/ui'
 import {
   ChevronLeft,
@@ -134,6 +134,18 @@ interface Props {
   onBack: () => void
 }
 
+interface PinnedPatternPoint {
+  id: string
+  label: string
+  dataIndex: number
+  pieces: number
+  pct: number
+  calibres: Array<{ key: string; pieces: number }>
+  qualities: Array<{ key: string; pieces: number }>
+  x: number
+  y: number
+}
+
 export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack }: Props) {
   const user = useAuthStore((s) => s.user)
   const [saving, setSaving] = useState(false)
@@ -149,7 +161,12 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
   const [timeFilterFrom, setTimeFilterFrom] = useState<string>('')
   const [timeFilterTo, setTimeFilterTo] = useState<string>('')
   const [patternIntervalMinutes, setPatternIntervalMinutes] = useState<number>(60)
+  const [pinnedPatternPoints, setPinnedPatternPoints] = useState<PinnedPatternPoint[]>([])
+  const [draggingPinnedId, setDraggingPinnedId] = useState<string | null>(null)
   const dashRef = useRef<HTMLDivElement>(null)
+  const patternLineChartRef = useRef<ChartJS<'line'> | null>(null)
+  const patternChartContainerRef = useRef<HTMLDivElement>(null)
+  const draggingPinnedOffsetRef = useRef<{ id: string; offsetX: number; offsetY: number } | null>(null)
 
   // Compute analytics
   const analytics = useMemo<GraderAnalyticsResult>(
@@ -328,6 +345,114 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
       },
     ],
   }
+
+  const getPatternPointPixels = (dataIndex: number): { x: number; y: number } | null => {
+    const chart = patternLineChartRef.current
+    if (!chart) return null
+    const meta = chart.getDatasetMeta(0)
+    const pointEl = meta?.data?.[dataIndex]
+    if (!pointEl) return null
+    const point = pointEl.getProps(['x', 'y'], true)
+    if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) return null
+    return { x: point.x, y: point.y }
+  }
+
+  const handlePinPatternPoint = (dataIndex: number) => {
+    const bucket = patternByHour[dataIndex]
+    if (!bucket) return
+
+    const detail = patternIntervalDetailsByLabel.get(bucket.hour)
+    const pointPixels = getPatternPointPixels(dataIndex)
+
+    setPinnedPatternPoints((prev) => {
+      const existingIdx = prev.findIndex((p) => p.label === bucket.hour)
+      const existingPin = existingIdx >= 0 ? prev[existingIdx] : null
+      const defaultX = pointPixels ? pointPixels.x + 14 : 16
+      const defaultY = pointPixels ? Math.max(8, pointPixels.y - 12) : 16
+      const nextPin: PinnedPatternPoint = {
+        id: existingPin ? existingPin.id : `${bucket.hour}-${dataIndex}`,
+        label: bucket.hour,
+        dataIndex,
+        pieces: bucket.pieces,
+        pct: bucket.pct,
+        calibres: detail?.calibres ?? [],
+        qualities: detail?.qualities ?? [],
+        x: existingPin ? existingPin.x : defaultX,
+        y: existingPin ? existingPin.y : defaultY,
+      }
+
+      if (existingIdx >= 0) {
+        const copy = [...prev]
+        copy[existingIdx] = nextPin
+        return copy
+      }
+
+      return [...prev, nextPin]
+    })
+  }
+
+  const removePinnedPatternPoint = (id: string) => {
+    setPinnedPatternPoints((prev) => prev.filter((pin) => pin.id !== id))
+  }
+
+  const startDraggingPinnedPoint = (event: React.MouseEvent<HTMLDivElement>, pinId: string) => {
+    const target = event.currentTarget
+    const rect = target.getBoundingClientRect()
+    draggingPinnedOffsetRef.current = {
+      id: pinId,
+      offsetX: event.clientX - rect.left,
+      offsetY: event.clientY - rect.top,
+    }
+    setDraggingPinnedId(pinId)
+  }
+
+  useEffect(() => {
+    if (!draggingPinnedId) return
+
+    const onMouseMove = (event: MouseEvent) => {
+      const dragInfo = draggingPinnedOffsetRef.current
+      const container = patternChartContainerRef.current
+      if (!dragInfo || !container || dragInfo.id !== draggingPinnedId) return
+
+      const containerRect = container.getBoundingClientRect()
+      const rawX = event.clientX - containerRect.left - dragInfo.offsetX
+      const rawY = event.clientY - containerRect.top - dragInfo.offsetY
+
+      setPinnedPatternPoints((prev) => prev.map((pin) => (pin.id === draggingPinnedId ? { ...pin, x: rawX, y: rawY } : pin)))
+    }
+
+    const onMouseUp = () => {
+      draggingPinnedOffsetRef.current = null
+      setDraggingPinnedId(null)
+    }
+
+    window.addEventListener('mousemove', onMouseMove)
+    window.addEventListener('mouseup', onMouseUp)
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove)
+      window.removeEventListener('mouseup', onMouseUp)
+    }
+  }, [draggingPinnedId])
+
+  useEffect(() => {
+    setPinnedPatternPoints((prev) => {
+      return prev.flatMap((pin) => {
+        const newIndex = patternByHour.findIndex((bucket) => bucket.hour === pin.label)
+        if (newIndex < 0) return []
+        const bucket = patternByHour[newIndex]
+        if (!bucket) return []
+        const detail = patternIntervalDetailsByLabel.get(bucket.hour)
+        return [{
+          ...pin,
+          dataIndex: newIndex,
+          pieces: bucket.pieces,
+          pct: bucket.pct,
+          calibres: detail?.calibres ?? [],
+          qualities: detail?.qualities ?? [],
+        }]
+      })
+    })
+  }, [patternByHour, patternIntervalDetailsByLabel])
 
   // ——— AI ———
   const handleAnalyzeAI = async () => {
@@ -1355,6 +1480,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                     setTimeFilterFrom('')
                     setTimeFilterTo('')
                     setPatternIntervalMinutes(60)
+                    setPinnedPatternPoints([])
                   }}
                 >
                   Limpiar filtros
@@ -1427,13 +1553,22 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                   </div>
 
                   <div className="border rounded p-3">
-                    <p className="text-xs font-medium mb-2">Patrón por intervalo ({patternIntervalMinutes} min)</p>
-                    <div className="w-full" style={{ height: 220 }}>
+                    <div className="flex items-center justify-between mb-2 gap-2">
+                      <p className="text-xs font-medium">Patrón por intervalo ({patternIntervalMinutes} min)</p>
+                      <p className="text-[10px] text-muted-foreground">Click para fijar, arrastra para comparar, X para quitar</p>
+                    </div>
+                    <div ref={patternChartContainerRef} className="w-full relative" style={{ height: 220 }}>
                       <Line
+                        ref={patternLineChartRef}
                         data={patternHourChartData}
                         options={{
                           responsive: true,
                           maintainAspectRatio: false,
+                          onClick: (_event, elements) => {
+                            const first = elements?.[0]
+                            if (!first) return
+                            handlePinPatternPoint(first.index)
+                          },
                           plugins: {
                             legend: { display: false },
                             tooltip: {
@@ -1470,6 +1605,73 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                           },
                         }}
                       />
+
+                      <svg className="absolute inset-0 pointer-events-none text-muted-foreground" width="100%" height="100%">
+                        {pinnedPatternPoints.map((pin) => {
+                          const point = getPatternPointPixels(pin.dataIndex)
+                          if (!point) return null
+                          const lineEndX = pin.x > point.x ? pin.x : pin.x + 224
+                          const lineEndY = pin.y + 18
+                          return (
+                            <line
+                              key={`line-${pin.id}`}
+                              x1={point.x}
+                              y1={point.y}
+                              x2={lineEndX}
+                              y2={lineEndY}
+                              stroke="currentColor"
+                              strokeOpacity="0.65"
+                              strokeWidth="1.5"
+                              strokeDasharray="4 3"
+                            />
+                          )
+                        })}
+                      </svg>
+
+                      {pinnedPatternPoints.map((pin) => (
+                        <div
+                          key={pin.id}
+                          className={cn(
+                            'absolute z-20 w-56 rounded border bg-card/95 shadow-sm p-2 text-[11px] cursor-move select-none',
+                            draggingPinnedId === pin.id && 'ring-1 ring-primary/60',
+                          )}
+                          style={{ left: pin.x, top: pin.y }}
+                          onMouseDown={(event) => startDraggingPinnedPoint(event, pin.id)}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <p className="font-semibold">{pin.label}</p>
+                              <p className="text-muted-foreground">{pin.pieces.toLocaleString()} pz ({pin.pct}%)</p>
+                            </div>
+                            <button
+                              type="button"
+                              className="text-muted-foreground hover:text-foreground leading-none"
+                              onMouseDown={(event) => event.stopPropagation()}
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                removePinnedPatternPoint(pin.id)
+                              }}
+                              aria-label={`Quitar comparación ${pin.label}`}
+                            >
+                              ✕
+                            </button>
+                          </div>
+
+                          <div className="mt-1">
+                            <p className="font-medium">Calibre</p>
+                            {pin.calibres.map((row) => (
+                              <p key={`${pin.id}-c-${row.key}`} className="text-muted-foreground">- {row.key}: {row.pieces.toLocaleString()} pz</p>
+                            ))}
+                          </div>
+
+                          <div className="mt-1">
+                            <p className="font-medium">Calidad</p>
+                            {pin.qualities.map((row) => (
+                              <p key={`${pin.id}-q-${row.key}`} className="text-muted-foreground">- {row.key}: {row.pieces.toLocaleString()} pz</p>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
 
