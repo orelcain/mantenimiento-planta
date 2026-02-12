@@ -7,6 +7,16 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.39] - 2026-02-12
+
+### 🔧 Calibre por peso en detalle y exportes
+
+#### Mejoras
+- **Punto Cero (pieza a pieza)**: En el detalle de registros, cuando `Calibre` llega vacío o con `-`, ahora se muestra el calibre calculado según `Peso/pza (g)`.
+- **Export JSON**: Se normaliza el calibre en los registros de `pointZeroClassification.causes[].records` usando el mismo cálculo por peso.
+- **Export Excel**: Se agrega hoja **P0 Detalle Piezas** con calibre resuelto por peso para cada registro.
+- **Export PDF**: Se agrega sección **Detalle Pieza-Pieza Punto Cero** con calibre calculado por peso.
+
 ## [2.47.38] - 2026-02-12
 
 ### 📊 Telemetría operativa + mantenimiento de calidad

@@ -90,6 +90,14 @@ function getCalibreByWeightGrams(weightGrams?: number | null): string {
   return 'Fuera de rango'
 }
 
+function resolveCalibreLabel(rawCalibre?: string | null, weightGrams?: number | null): string {
+  const normalizedCalibre = (rawCalibre ?? '').trim()
+  if (normalizedCalibre && normalizedCalibre !== '-' && normalizedCalibre !== '—') {
+    return normalizedCalibre
+  }
+  return getCalibreByWeightGrams(weightGrams)
+}
+
 interface Props {
   parsedData: ParsedMatrixData
   gates: GateAssignment[]
@@ -124,6 +132,21 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
   const trend = useMemo(() => computePointZeroTrend(analytics), [analytics])
   const avgWeightCalibre = useMemo(() => getCalibreByWeightGrams(analytics.kpis.avgWeightGrams), [analytics.kpis.avgWeightGrams])
   const medianWeightCalibre = useMemo(() => getCalibreByWeightGrams(analytics.kpis.medianWeightGrams), [analytics.kpis.medianWeightGrams])
+  const pointZeroDetailRecords = useMemo(() => {
+    return analytics.pointZeroClassification.causes.flatMap((cause) => {
+      const rows = cause.records ?? []
+      return rows.map((record) => ({
+        causeLabel: cause.label,
+        ts: record.ts,
+        error: record.error,
+        pieces: record.pieces,
+        weightPerPieceGrams: record.weightPerPieceGrams,
+        quality: record.quality,
+        calibre: resolveCalibreLabel(record.calibre, record.weightPerPieceGrams),
+        lot: record.lot,
+      }))
+    })
+  }, [analytics.pointZeroClassification.causes])
 
   // ——— AI ———
   const handleAnalyzeAI = async () => {
@@ -231,8 +254,21 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
 
   // ——— EXPORT JSON ———
   const handleExport = () => {
+    const analyticsForExport = {
+      ...analytics,
+      pointZeroClassification: {
+        ...analytics.pointZeroClassification,
+        causes: analytics.pointZeroClassification.causes.map((cause) => ({
+          ...cause,
+          records: (cause.records ?? []).map((record) => ({
+            ...record,
+            calibre: resolveCalibreLabel(record.calibre, record.weightPerPieceGrams),
+          })),
+        })),
+      },
+    }
     const blob = new Blob(
-      [JSON.stringify({ analytics, insights, aiOutput, trend }, null, 2)],
+      [JSON.stringify({ analytics: analyticsForExport, insights, aiOutput, trend }, null, 2)],
       { type: 'application/json' },
     )
     const a = document.createElement('a')
@@ -288,6 +324,24 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
         ['TOTAL', analytics.pointZeroClassification.totalPointZeroPieces, 100, kpis.pointZeroPct, ''],
       ]
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(classRows), 'Clasif. Pto Cero')
+    }
+
+    // Detalle pieza-pieza Punto Cero
+    if (pointZeroDetailRecords.length > 0) {
+      const detailRows = [
+        ['Hora', 'Causa', 'Error', 'Pzas', 'Peso/pza (g)', 'Calidad', 'Calibre', 'Lote'],
+        ...pointZeroDetailRecords.map((r) => [
+          new Date(r.ts).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+          r.causeLabel,
+          r.error,
+          r.pieces,
+          r.weightPerPieceGrams != null ? Number(r.weightPerPieceGrams.toFixed(0)) : '',
+          r.quality ?? '',
+          r.calibre,
+          r.lot ?? '',
+        ]),
+      ]
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(detailRows), 'P0 Detalle Piezas')
     }
 
     // Fuera de Rango por peso
@@ -493,6 +547,32 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
         ],
         theme: 'grid',
         styles: { fontSize: 8 },
+        margin: { left: 14 },
+      })
+      y = (pdfDoc as any).lastAutoTable.finalY + 8
+    }
+
+    // Detalle pieza-pieza Punto Cero
+    if (pointZeroDetailRecords.length > 0) {
+      if (y > 130) { pdfDoc.addPage(); y = 15 }
+      pdfDoc.setFontSize(12)
+      pdfDoc.text('Detalle Pieza-Pieza Punto Cero', 14, y)
+      y += 2
+      autoTable(pdfDoc, {
+        startY: y,
+        head: [['Hora', 'Causa', 'Error', 'Pzas', 'Peso/pza (g)', 'Calidad', 'Calibre', 'Lote']],
+        body: pointZeroDetailRecords.map((r) => [
+          new Date(r.ts).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+          r.causeLabel,
+          r.error,
+          r.pieces.toLocaleString(),
+          r.weightPerPieceGrams != null ? r.weightPerPieceGrams.toFixed(0) : '—',
+          r.quality || '—',
+          r.calibre,
+          r.lot || '—',
+        ]),
+        theme: 'striped',
+        styles: { fontSize: 6 },
         margin: { left: 14 },
       })
       y = (pdfDoc as any).lastAutoTable.finalY + 8
@@ -973,7 +1053,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                                                 {r.weightPerPieceGrams ? r.weightPerPieceGrams.toFixed(0) : '—'}
                                               </td>
                                               <td className="py-0.5 px-1">{r.quality || '—'}</td>
-                                              <td className="py-0.5 px-1">{r.calibre || '—'}</td>
+                                              <td className="py-0.5 px-1">{resolveCalibreLabel(r.calibre, r.weightPerPieceGrams)}</td>
                                               <td className="py-0.5 px-1 text-muted-foreground">{r.lot || '—'}</td>
                                             </tr>
                                           ))}
