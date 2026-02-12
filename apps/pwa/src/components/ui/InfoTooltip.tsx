@@ -110,7 +110,7 @@ export function InfoTooltip({
       <span
         ref={tooltipRef}
         className={cn(
-          'absolute z-[100]',
+          'absolute z-[9999]',
           'rounded-lg shadow-2xl',
           // Force high-contrast regardless of light/dark mode
           'bg-slate-800 text-slate-100',

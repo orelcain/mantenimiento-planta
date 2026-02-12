@@ -820,14 +820,14 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
 
       {/* ——— TABS ——— */}
       <Tabs defaultValue="punto-cero" className="w-full">
-        <TabsList className="grid grid-cols-4 lg:grid-cols-7 w-full">
-          <TabsTrigger value="punto-cero" className="text-xs">Punto Cero</TabsTrigger>
-          <TabsTrigger value="distribuciones" className="text-xs">Distribuciones</TabsTrigger>
-          <TabsTrigger value="lotes" className="text-xs">Lotes</TabsTrigger>
-          <TabsTrigger value="tendencia" className="text-xs">Tendencia</TabsTrigger>
-          <TabsTrigger value="matriz" className="text-xs">Matriz Q×C</TabsTrigger>
-          <TabsTrigger value="balance" className="text-xs">Balance Gates</TabsTrigger>
-          <TabsTrigger value="insights" className="text-xs">Diagnóstico</TabsTrigger>
+        <TabsList className="w-full flex gap-1 overflow-x-auto whitespace-nowrap">
+          <TabsTrigger value="punto-cero" className="text-xs shrink-0">Punto Cero</TabsTrigger>
+          <TabsTrigger value="distribuciones" className="text-xs shrink-0">Distribuciones</TabsTrigger>
+          <TabsTrigger value="lotes" className="text-xs shrink-0">Lotes</TabsTrigger>
+          <TabsTrigger value="tendencia" className="text-xs shrink-0">Tendencia</TabsTrigger>
+          <TabsTrigger value="matriz" className="text-xs shrink-0">Matriz Q×C</TabsTrigger>
+          <TabsTrigger value="balance" className="text-xs shrink-0">Balance Gates</TabsTrigger>
+          <TabsTrigger value="insights" className="text-xs shrink-0">Diagnóstico</TabsTrigger>
         </TabsList>
 
         {/* PUNTO CERO */}
@@ -873,7 +873,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                   </div>
 
                   {/* Table */}
-                  <div className="overflow-x-auto">
+                  <div className="overflow-x-auto overflow-y-visible">
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b text-left">
@@ -1303,20 +1303,24 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
             <CardHeader><CardTitle className="text-sm">Punto Cero en el Tiempo</CardTitle></CardHeader>
             <CardContent>
               {analytics.timeSeriesPointZero.length > 0 ? (
-                <Line
-                  data={timeSeriesData}
-                  options={{
-                    responsive: true,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                      x: {
-                        type: 'time',
-                        time: { unit: config.intervalMinutes === 60 ? 'hour' : 'minute' },
+                <div className="w-full h-[260px] sm:h-[320px]">
+                  <Line
+                    data={timeSeriesData}
+                    options={{
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      plugins: { legend: { display: false } },
+                      scales: {
+                        x: {
+                          type: 'time',
+                          time: { unit: config.intervalMinutes === 60 ? 'hour' : 'minute' },
+                          ticks: { maxRotation: 0, autoSkip: true },
+                        },
+                        y: { beginAtZero: true },
                       },
-                      y: { beginAtZero: true },
-                    },
-                  }}
-                />
+                    }}
+                  />
+                </div>
               ) : (
                 <p className="text-sm text-muted-foreground text-center py-8">Sin serie temporal</p>
               )}
@@ -1331,10 +1335,16 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
               <CardHeader><CardTitle className="text-sm">Distribución por Calibre</CardTitle></CardHeader>
               <CardContent>
                 {analytics.distributionByCalibre.length > 0 ? (
-                  <Doughnut
-                    data={calibreChartData}
-                    options={{ responsive: true, plugins: { legend: { position: 'bottom' } } }}
-                  />
+                  <div className="w-full h-[260px] sm:h-[320px]">
+                    <Doughnut
+                      data={calibreChartData}
+                      options={{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } },
+                      }}
+                    />
+                  </div>
                 ) : (
                   <p className="text-sm text-muted-foreground text-center py-8">Sin datos</p>
                 )}
@@ -1344,10 +1354,16 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
               <CardHeader><CardTitle className="text-sm">Distribución por Calidad</CardTitle></CardHeader>
               <CardContent>
                 {analytics.distributionByQuality.length > 0 ? (
-                  <Doughnut
-                    data={qualityChartData}
-                    options={{ responsive: true, plugins: { legend: { position: 'bottom' } } }}
-                  />
+                  <div className="w-full h-[260px] sm:h-[320px]">
+                    <Doughnut
+                      data={qualityChartData}
+                      options={{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } },
+                      }}
+                    />
+                  </div>
                 ) : (
                   <p className="text-sm text-muted-foreground text-center py-8">Sin datos</p>
                 )}
@@ -1404,7 +1420,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                   <CardTitle className="text-sm">Comparativa de Lotes</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="overflow-x-auto">
+                  <div className="overflow-x-auto overflow-y-visible">
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b text-left">

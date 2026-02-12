@@ -361,6 +361,13 @@ function parsePiezaPieza(rows: unknown[][], headerIdx: number, colMap: ColumnMap
     const row = rows[r]
     if (!row || !Array.isArray(row)) continue
 
+    const ts = parseDatetime(
+      iDate != null ? row[iDate] : undefined,
+      iTime != null ? row[iTime] : undefined,
+    )
+    // Evitar contar filas resumen/total sin timestamp (si no hay fecha válida, no es un registro de evento)
+    if (!ts) continue
+
     const pieces = parseNum(iPieces != null ? row[iPieces] : undefined)
     if (pieces == null || pieces <= 0) continue
 
@@ -385,10 +392,7 @@ function parsePiezaPieza(rows: unknown[][], headerIdx: number, colMap: ColumnMap
     }
 
     const rec: PieceRecord = {
-      ts: parseDatetime(
-        iDate != null ? row[iDate] : undefined,
-        iTime != null ? row[iTime] : undefined,
-      ) || new Date().toISOString(),
+      ts,
       gate: Math.round(gate),
       pieces,
       weightKg,
@@ -421,22 +425,39 @@ function parsePuerta0(rows: unknown[][], headerIdx: number, colMap: ColumnMap): 
     const row = rows[r]
     if (!row || !Array.isArray(row)) continue
 
+    const ts = parseDatetime(
+      iDate != null ? row[iDate] : undefined,
+      iTime != null ? row[iTime] : undefined,
+    )
+    // El archivo P0 a veces incluye filas resumen (totales) sin fecha/hora.
+    // No son eventos reales → si no hay timestamp válido, se descarta.
+    if (!ts) continue
+
     const pieces = parseNum(iPieces != null ? row[iPieces] : undefined)
     if (pieces == null || pieces <= 0) continue
 
-    const errorStr = iError != null && row[iError] != null ? String(row[iError]).trim() : 'Desconocido'
+    const errorStrRaw = iError != null && row[iError] != null ? String(row[iError]).trim() : ''
+    // Ignorar filas resumen tipo "TOTAL" en la columna Error
+    const errorNorm = norm(errorStrRaw)
+    if (errorNorm === 'total' || errorNorm.startsWith('total ')
+      || errorNorm === 'subtotal' || errorNorm.startsWith('subtotal ')) {
+      continue
+    }
+    const errorStr = errorStrRaw || 'Desconocido'
     const weightPerPieceGrams = iWeightGrams != null ? parseNum(row[iWeightGrams]) : undefined
     let weightKg = iWeight != null ? parseNum(row[iWeight]) : undefined
+    // Algunos reportes P0 traen "Peso de las piezas" en gramos (no kg).
+    // Heurística: si el número es enorme, asumir gramos y convertir a kg.
+    if (weightKg != null && weightKg > 5000) {
+      weightKg = weightKg / 1000
+    }
     if (weightKg == null && weightPerPieceGrams != null && weightPerPieceGrams > 0) {
       weightKg = (weightPerPieceGrams * pieces) / 1000
     }
     const rawCalibreStr = iCalibre != null ? extractRawCalibre(row[iCalibre]) : undefined
 
     const rec: Gate0Record = {
-      ts: parseDatetime(
-        iDate != null ? row[iDate] : undefined,
-        iTime != null ? row[iTime] : undefined,
-      ) || new Date().toISOString(),
+      ts,
       gate: 0,
       pieces,
       weightKg,

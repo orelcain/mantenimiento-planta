@@ -153,9 +153,32 @@ function computePointZeroClassification(
   // Agrupar por causa — con re-clasificación inteligente usando gates activos
   const causeMap = new Map<PointZeroCause, { pieces: number; weightKg: number; records: typeof g0Records }>()
 
+  function inferCauseFromWeight(r: Gate0Record | (Gate0Record & { error: string })): PointZeroCause {
+    let perPieceG = ('weightPerPieceGrams' in r) ? (r as any).weightPerPieceGrams : undefined
+    if (!perPieceG && r.weightKg && r.pieces > 0) {
+      perPieceG = (r.weightKg / r.pieces) * 1000
+    }
+    if (perPieceG == null || perPieceG < 10) return 'no_leido_fotocelula'
+
+    const matchedRange = weightRanges.find(
+      (rng) => perPieceG >= rng.minGrams && perPieceG < rng.maxGrams,
+    )
+    if (!matchedRange) return 'fuera_de_rango'
+    // Si hay gates activos configurados, usar eso como referencia
+    if (activeCalibres.size > 0 && !activeCalibres.has(matchedRange.calibre)) return 'fuera_de_rango'
+    return 'fuera_de_limites'
+  }
+
   for (const r of g0Records) {
     const errorStr = 'error' in r ? r.error : 'Desconocido'
     let cause = classifyError(errorStr)
+
+    // Reglas de clasificación estricta: no dejar "otro".
+    // Si el error viene vacío/desconocido o no calza en categorías estándar,
+    // inferir por peso/rangos para que el desglose sea 100% siempre.
+    if (cause === 'otro') {
+      cause = inferCauseFromWeight(r)
+    }
 
     // Re-clasificar "fuera_de_limites" si no hay gate activo para su calibre
     // Solo para datos inferidos — cuando hay P0 real, confiamos en la columna Error
@@ -609,16 +632,7 @@ export function computeAnalytics(
       tsBuckets.set(bk, cur)
     }
   }
-
-  // Also add gate0Records to buckets if piece data already exists
-  if (hasG0 && hasPiece) {
-    for (const r of data.gate0Records) {
-      const bk = bucketKey(r.ts, interval)
-      const cur = tsBuckets.get(bk) || { g0: 0, total: 0 }
-      cur.g0 += r.pieces
-      tsBuckets.set(bk, cur)
-    }
-  }
+  // Si hay pieceRecords (PP), NO sumar gate0Records: representan las mismas piezas.
 
   const timeSeriesPointZero: TimeSeriesPoint[] = Array.from(tsBuckets.entries())
     .sort(([a], [b]) => a.localeCompare(b))
