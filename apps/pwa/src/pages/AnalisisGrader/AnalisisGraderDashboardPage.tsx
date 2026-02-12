@@ -8,7 +8,7 @@
  * v2.46.1 — P0 inteligente, rangos de peso, persistencia archivos, tooltips ricos, modo día/noche
  */
 
-import { useState, useMemo, useRef, Fragment, useEffect, useCallback } from 'react'
+import { useState, useMemo, useRef, Fragment, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge, Tabs, TabsContent, TabsList, TabsTrigger, InfoTooltip } from '@/components/ui'
 import {
   ChevronLeft,
@@ -136,7 +136,9 @@ interface Props {
 
 interface PinnedPatternPoint {
   id: string
+  bucketKey: string
   label: string
+  rangeLabel: string
   dataIndex: number
   pieces: number
   pct: number
@@ -148,7 +150,6 @@ interface PinnedPatternPoint {
 
 const PIN_CARD_WIDTH = 224
 const PIN_CARD_PADDING = 8
-const PIN_SNAP_STEP = 12
 
 export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack }: Props) {
   const user = useAuthStore((s) => s.user)
@@ -166,7 +167,6 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
   const [timeFilterTo, setTimeFilterTo] = useState<string>('')
   const [patternIntervalMinutes, setPatternIntervalMinutes] = useState<number>(60)
   const [pinnedPatternPoints, setPinnedPatternPoints] = useState<PinnedPatternPoint[]>([])
-  const [snapPinnedCardsEnabled, setSnapPinnedCardsEnabled] = useState<boolean>(true)
   const [draggingPinnedId, setDraggingPinnedId] = useState<string | null>(null)
   const dashRef = useRef<HTMLDivElement>(null)
   const patternLineChartRef = useRef<ChartJS<'line'> | null>(null)
@@ -258,16 +258,22 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
       const dt = new Date(r.ts)
       if (!Number.isFinite(dt.getTime())) continue
       const minuteOfDay = dt.getHours() * 60 + dt.getMinutes()
-      const bucketMinute = Math.floor(minuteOfDay / safeInterval) * safeInterval
-      map.set(bucketMinute, (map.get(bucketMinute) ?? 0) + r.pieces)
+      const rawEndMinute = Math.ceil(minuteOfDay / safeInterval) * safeInterval
+      const endMinute = ((rawEndMinute % 1440) + 1440) % 1440
+      map.set(endMinute, (map.get(endMinute) ?? 0) + r.pieces)
     }
     return Array.from(map.entries())
       .sort((a, b) => a[0] - b[0])
-      .map(([bucketMinute, pieces]) => ({
-        hour: formatMinuteOfDayLabel(bucketMinute),
+      .map(([endMinute, pieces]) => {
+        const startMinute = endMinute - safeInterval
+        return {
+          key: String(endMinute),
+          hour: formatMinuteOfDayLabel(endMinute),
+          rangeLabel: `${formatMinuteOfDayLabel(startMinute)} - ${formatMinuteOfDayLabel(endMinute)}`,
         pieces,
         pct: patternTotalPieces > 0 ? Math.round((pieces / patternTotalPieces) * 10000) / 100 : 0,
-      }))
+        }
+      })
   }, [filteredPatternRecords, patternIntervalMinutes, patternTotalPieces])
 
   const patternIntervalDetailsByLabel = useMemo(() => {
@@ -278,10 +284,11 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
       const dt = new Date(r.ts)
       if (!Number.isFinite(dt.getTime())) continue
       const minuteOfDay = dt.getHours() * 60 + dt.getMinutes()
-      const bucketMinute = Math.floor(minuteOfDay / safeInterval) * safeInterval
-      const label = formatMinuteOfDayLabel(bucketMinute)
+      const rawEndMinute = Math.ceil(minuteOfDay / safeInterval) * safeInterval
+      const endMinute = ((rawEndMinute % 1440) + 1440) % 1440
+      const bucketKey = String(endMinute)
 
-      const bucket = bucketMap.get(label) || { totalPieces: 0, calibreMap: new Map<string, number>(), qualityMap: new Map<string, number>() }
+      const bucket = bucketMap.get(bucketKey) || { totalPieces: 0, calibreMap: new Map<string, number>(), qualityMap: new Map<string, number>() }
       bucket.totalPieces += r.pieces
 
       const calibreKey = r.calibre || 'N/D'
@@ -290,7 +297,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
       const qualityKey = r.quality || 'Unknown'
       bucket.qualityMap.set(qualityKey, (bucket.qualityMap.get(qualityKey) ?? 0) + r.pieces)
 
-      bucketMap.set(label, bucket)
+      bucketMap.set(bucketKey, bucket)
     }
 
     const detailMap = new Map<string, { totalPieces: number; calibres: Array<{ key: string; pieces: number }>; qualities: Array<{ key: string; pieces: number }> }>()
@@ -308,7 +315,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
 
   const topPatternCalibre = patternByCalibre[0]
   const topPatternQuality = patternByQuality[0]
-  const peakPatternHour = patternByHour.reduce<{ hour: string; pieces: number; pct: number } | null>(
+  const peakPatternHour = patternByHour.reduce<{ hour: string; rangeLabel: string; pieces: number; pct: number } | null>(
     (acc, cur) => (acc == null || cur.pieces > acc.pieces ? cur : acc),
     null,
   )
@@ -362,87 +369,29 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
     return { x: point.x, y: point.y }
   }
 
-  const estimatePinnedCardHeight = useCallback((pin: Pick<PinnedPatternPoint, 'calibres' | 'qualities'>): number => {
+  const estimatePinnedCardHeight = (pin: Pick<PinnedPatternPoint, 'calibres' | 'qualities'>): number => {
     const calibreRows = pin.calibres.length
     const qualityRows = pin.qualities.length
     return 86 + (calibreRows + qualityRows) * 14
-  }, [])
-
-  const normalizePinnedCardsLayout = useCallback((pins: PinnedPatternPoint[]): PinnedPatternPoint[] => {
-    const container = patternChartContainerRef.current
-    if (!container || pins.length === 0) return pins
-
-    const containerWidth = container.clientWidth
-    const containerHeight = container.clientHeight
-    if (containerWidth <= 0 || containerHeight <= 0) return pins
-
-    const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value))
-    const overlap = (
-      ax: number,
-      ay: number,
-      aw: number,
-      ah: number,
-      bx: number,
-      by: number,
-      bw: number,
-      bh: number,
-    ) => {
-      return !(ax + aw + PIN_CARD_PADDING <= bx || bx + bw + PIN_CARD_PADDING <= ax || ay + ah + PIN_CARD_PADDING <= by || by + bh + PIN_CARD_PADDING <= ay)
-    }
-
-    const placed: Array<{ id: string; x: number; y: number; w: number; h: number }> = []
-    const ordered = [...pins].sort((a, b) => (a.y - b.y) || (a.x - b.x))
-    const positioned = ordered.map((pin) => {
-      const cardHeight = estimatePinnedCardHeight(pin)
-      const maxX = Math.max(PIN_CARD_PADDING, containerWidth - PIN_CARD_WIDTH - PIN_CARD_PADDING)
-      const maxY = Math.max(PIN_CARD_PADDING, containerHeight - cardHeight - PIN_CARD_PADDING)
-
-      let x = clamp(pin.x, PIN_CARD_PADDING, maxX)
-      let y = clamp(pin.y, PIN_CARD_PADDING, maxY)
-
-      if (snapPinnedCardsEnabled) {
-        x = clamp(Math.round(x / PIN_SNAP_STEP) * PIN_SNAP_STEP, PIN_CARD_PADDING, maxX)
-        y = clamp(Math.round(y / PIN_SNAP_STEP) * PIN_SNAP_STEP, PIN_CARD_PADDING, maxY)
-      }
-
-      let guard = 0
-      while (
-        placed.some((p) => overlap(x, y, PIN_CARD_WIDTH, cardHeight, p.x, p.y, p.w, p.h))
-        && guard < 240
-      ) {
-        y += snapPinnedCardsEnabled ? PIN_SNAP_STEP : PIN_CARD_PADDING
-        if (y > maxY) {
-          y = PIN_CARD_PADDING
-          x += PIN_CARD_WIDTH + PIN_CARD_PADDING
-          if (x > maxX) x = PIN_CARD_PADDING
-          if (snapPinnedCardsEnabled) x = clamp(Math.round(x / PIN_SNAP_STEP) * PIN_SNAP_STEP, PIN_CARD_PADDING, maxX)
-        }
-        guard += 1
-      }
-
-      placed.push({ id: pin.id, x, y, w: PIN_CARD_WIDTH, h: cardHeight })
-      return { ...pin, x, y }
-    })
-
-    const byId = new Map(positioned.map((p) => [p.id, p]))
-    return pins.map((pin) => byId.get(pin.id) ?? pin)
-  }, [estimatePinnedCardHeight, snapPinnedCardsEnabled])
+  }
 
   const handlePinPatternPoint = (dataIndex: number) => {
     const bucket = patternByHour[dataIndex]
     if (!bucket) return
 
-    const detail = patternIntervalDetailsByLabel.get(bucket.hour)
+    const detail = patternIntervalDetailsByLabel.get(bucket.key)
     const pointPixels = getPatternPointPixels(dataIndex)
 
     setPinnedPatternPoints((prev) => {
-      const existingIdx = prev.findIndex((p) => p.label === bucket.hour)
+      const existingIdx = prev.findIndex((p) => p.bucketKey === bucket.key)
       const existingPin = existingIdx >= 0 ? prev[existingIdx] : null
       const defaultX = pointPixels ? pointPixels.x + 14 : 16
       const defaultY = pointPixels ? Math.max(8, pointPixels.y - 12) : 16
       const nextPin: PinnedPatternPoint = {
-        id: existingPin ? existingPin.id : `${bucket.hour}-${dataIndex}`,
+        id: existingPin ? existingPin.id : `${bucket.key}-${dataIndex}`,
+        bucketKey: bucket.key,
         label: bucket.hour,
+        rangeLabel: bucket.rangeLabel,
         dataIndex,
         pieces: bucket.pieces,
         pct: bucket.pct,
@@ -455,11 +404,10 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
       if (existingIdx >= 0) {
         const copy = [...prev]
         copy[existingIdx] = nextPin
-        return snapPinnedCardsEnabled ? normalizePinnedCardsLayout(copy) : copy
+        return copy
       }
 
-      const next = [...prev, nextPin]
-      return snapPinnedCardsEnabled ? normalizePinnedCardsLayout(next) : next
+      return [...prev, nextPin]
     })
   }
 
@@ -506,9 +454,6 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
     const onMouseUp = () => {
       draggingPinnedOffsetRef.current = null
       setDraggingPinnedId(null)
-      if (snapPinnedCardsEnabled) {
-        setPinnedPatternPoints((prev) => normalizePinnedCardsLayout(prev))
-      }
     }
 
     window.addEventListener('mousemove', onMouseMove)
@@ -517,33 +462,30 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
       window.removeEventListener('mousemove', onMouseMove)
       window.removeEventListener('mouseup', onMouseUp)
     }
-  }, [draggingPinnedId, snapPinnedCardsEnabled, estimatePinnedCardHeight, normalizePinnedCardsLayout])
-
-  useEffect(() => {
-    if (!snapPinnedCardsEnabled) return
-    setPinnedPatternPoints((prev) => normalizePinnedCardsLayout(prev))
-  }, [snapPinnedCardsEnabled, normalizePinnedCardsLayout])
+  }, [draggingPinnedId])
 
   useEffect(() => {
     setPinnedPatternPoints((prev) => {
-      const next = prev.flatMap((pin) => {
-        const newIndex = patternByHour.findIndex((bucket) => bucket.hour === pin.label)
+      return prev.flatMap((pin) => {
+        const newIndex = patternByHour.findIndex((bucket) => bucket.key === pin.bucketKey)
         if (newIndex < 0) return []
         const bucket = patternByHour[newIndex]
         if (!bucket) return []
-        const detail = patternIntervalDetailsByLabel.get(bucket.hour)
+        const detail = patternIntervalDetailsByLabel.get(bucket.key)
         return [{
           ...pin,
+          bucketKey: bucket.key,
           dataIndex: newIndex,
+          label: bucket.hour,
+          rangeLabel: bucket.rangeLabel,
           pieces: bucket.pieces,
           pct: bucket.pct,
           calibres: detail?.calibres ?? [],
           qualities: detail?.qualities ?? [],
         }]
       })
-      return snapPinnedCardsEnabled ? normalizePinnedCardsLayout(next) : next
     })
-  }, [patternByHour, patternIntervalDetailsByLabel, snapPinnedCardsEnabled, normalizePinnedCardsLayout])
+  }, [patternByHour, patternIntervalDetailsByLabel])
 
   // ——— AI ———
   const handleAnalyzeAI = async () => {
@@ -1560,7 +1502,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                 <Badge variant="outline" className="text-[11px]">Piezas filtradas: {patternTotalPieces.toLocaleString()}</Badge>
                 {topPatternCalibre && <Badge variant="secondary" className="text-[11px]">Top calibre: {topPatternCalibre.key} ({topPatternCalibre.pct}%)</Badge>}
                 {topPatternQuality && <Badge variant="secondary" className="text-[11px]">Top calidad: {topPatternQuality.key} ({topPatternQuality.pct}%)</Badge>}
-                {peakPatternHour && <Badge variant="secondary" className="text-[11px]">Hora pico: {peakPatternHour.hour} ({peakPatternHour.pct}%)</Badge>}
+                {peakPatternHour && <Badge variant="secondary" className="text-[11px]">Ventana pico: {peakPatternHour.rangeLabel} ({peakPatternHour.pct}%)</Badge>}
                 <Button
                   type="button"
                   variant="ghost"
@@ -1646,19 +1588,11 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                   <div className="border rounded p-3">
                     <div className="flex items-center justify-between mb-2 gap-2">
                       <p className="text-xs font-medium">Patrón por intervalo ({patternIntervalMinutes} min)</p>
-                      <div className="flex items-center gap-2">
-                        <p className="text-[10px] text-muted-foreground">Click fija · arrastra compara · X quita</p>
-                        <Button
-                          type="button"
-                          variant={snapPinnedCardsEnabled ? 'default' : 'outline'}
-                          size="sm"
-                          className="h-6 px-2 text-[10px]"
-                          onClick={() => setSnapPinnedCardsEnabled((v) => !v)}
-                        >
-                          Snap {snapPinnedCardsEnabled ? 'ON' : 'OFF'}
-                        </Button>
-                      </div>
+                      <p className="text-[10px] text-muted-foreground">Click fija · arrastra compara · X quita</p>
                     </div>
+                    <p className="text-[10px] text-muted-foreground mb-2">
+                      Cada punto resume un rango de {patternIntervalMinutes} min (ejemplo: 22:00 = 21:00 - 22:00).
+                    </p>
                     <div ref={patternChartContainerRef} className="w-full relative" style={{ height: 220 }}>
                       <Line
                         ref={patternLineChartRef}
@@ -1675,6 +1609,12 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                             legend: { display: false },
                             tooltip: {
                               callbacks: {
+                                title: (items) => {
+                                  const first = items?.[0]
+                                  if (!first) return ''
+                                  const bucket = patternByHour[first.dataIndex]
+                                  return bucket ? `Ventana: ${bucket.rangeLabel}` : ''
+                                },
                                 label: (ctx) => {
                                   const bucket = patternByHour[ctx.dataIndex]
                                   return bucket ? `Piezas: ${bucket.pieces.toLocaleString()} (${bucket.pct}%)` : ''
@@ -1682,7 +1622,9 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                                 afterBody: (items) => {
                                   const first = items?.[0]
                                   if (!first) return []
-                                  const detail = patternIntervalDetailsByLabel.get(String(first.label))
+                                  const bucket = patternByHour[first.dataIndex]
+                                  if (!bucket) return []
+                                  const detail = patternIntervalDetailsByLabel.get(bucket.key)
                                   if (!detail) return []
 
                                   const lines: string[] = []
@@ -1743,6 +1685,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                           <div className="flex items-start justify-between gap-2">
                             <div>
                               <p className="font-semibold">{pin.label}</p>
+                              <p className="text-muted-foreground">{pin.rangeLabel}</p>
                               <p className="text-muted-foreground">{pin.pieces.toLocaleString()} pz ({pin.pct}%)</p>
                             </div>
                             <button

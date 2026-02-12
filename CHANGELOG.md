@@ -7,6 +7,17 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.45] - 2026-02-12
+
+### 🕒 Claridad temporal por intervalo + ajuste de interacción
+
+#### Mejoras
+- **Snap removido**: Se elimina el comportamiento de alineación automática de tarjetas para mantener arrastre libre y predecible.
+- **Semántica temporal visible**: En patrón por intervalo se expone claramente que cada punto representa una **ventana de tiempo** según el intervalo activo.
+- **Ejemplo operativo en UI**: Se agrega guía explícita (p. ej. 22:00 = 21:00 - 22:00 cuando el intervalo es 60 min).
+- **Tooltip con ventana**: El tooltip ahora muestra la ventana completa del punto (`desde - hasta`) además de piezas y desglose calibre/calidad.
+- **Tarjetas fijadas con rango**: Cada tarjeta comparativa fija incluye el rango temporal del punto para comparación directa entre ventanas.
+
 ## [2.47.44] - 2026-02-12
 
 ### 🧲 Snap opcional en comparaciones del patrón temporal
