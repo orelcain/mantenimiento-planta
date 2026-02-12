@@ -85,7 +85,8 @@ function getCalibreByWeightGrams(weightGrams?: number | null): string {
   if (weightGrams == null || !Number.isFinite(weightGrams) || weightGrams <= 0) return 'N/D'
   const match = CALIBRE_WEIGHT_RANGES.find((rng) => weightGrams >= rng.minGrams && weightGrams < rng.maxGrams)
   if (match) return match.calibre
-  if (weightGrams >= CALIBRE_WEIGHT_RANGES[CALIBRE_WEIGHT_RANGES.length - 1].maxGrams) return 'Sobre rango'
+  const lastRange = CALIBRE_WEIGHT_RANGES[CALIBRE_WEIGHT_RANGES.length - 1]
+  if (lastRange && weightGrams >= lastRange.maxGrams) return 'Sobre rango'
   return 'Fuera de rango'
 }
 
@@ -1491,14 +1492,10 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                           borderRadius: 6,
                         },
                         {
-                          type: 'line',
                           label: 'Mediana (g)',
                           data: analytics.lotAnalysis.map(l => l.medianWeightGrams),
-                          borderColor: 'rgba(16,185,129,0.9)',
-                          backgroundColor: 'rgba(16,185,129,0.2)',
-                          pointBackgroundColor: 'rgba(16,185,129,0.9)',
-                          pointRadius: 3,
-                          tension: 0.25,
+                          backgroundColor: 'rgba(16,185,129,0.5)',
+                          borderRadius: 6,
                         },
                       ],
                     }}

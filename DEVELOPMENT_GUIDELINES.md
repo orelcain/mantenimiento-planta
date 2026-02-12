@@ -36,6 +36,21 @@ Tareas:
 □ Commit y push a main
 ```
 
+### Paso 2.1: Comando Único de Finalización (OBLIGATORIO)
+Al terminar cada mejora en PWA, ejecutar:
+
+```bash
+pnpm run release:pwa:finalize
+```
+
+Este comando valida automáticamente:
+- Sincronización de versión (`package.json`, `constants/version.ts`, `public/version.json`, `VERSION.md`, `CHANGELOG.md`)
+- Typecheck (`tsc --noEmit`)
+- Lint
+- Build productiva
+
+Si falla cualquiera de esos pasos, no se debe hacer commit/push.
+
 ### Paso 3: Determinación de Versión
 Usar **Semantic Versioning (MAJOR.MINOR.PATCH)**:
 
@@ -119,6 +134,9 @@ Al terminar exitosamente, usar este flujo:
 ```bash
 # 1. Validar
 get_errors() en archivos críticos
+
+# 1.1 Validación automática PWA (obligatoria)
+pnpm run release:pwa:finalize
 
 # 2. Versionado
 - Bump version en package.json

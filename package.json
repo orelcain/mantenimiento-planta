@@ -10,6 +10,8 @@
     "preview": "turbo run preview",
     "clean": "turbo run clean && rm -rf node_modules",
     "sync:version:pwa": "node scripts/sync-pwa-version.mjs",
+    "release:pwa:verify": "node scripts/verify-pwa-release-sync.mjs",
+    "release:pwa:finalize": "pnpm -C apps/pwa run sync:version && pnpm run release:pwa:verify && pnpm -C apps/pwa exec tsc --noEmit && pnpm -C apps/pwa lint && pnpm -C apps/pwa build",
     "deploy": "node scripts/deploy.mjs",
     "seed:user": "node scripts/seed_user_profile.js",
     "seed:user:help": "node scripts/seed_user_profile.js --help",
