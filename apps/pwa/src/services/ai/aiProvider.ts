@@ -192,6 +192,9 @@ function buildPrompt(p: AIGraderInput): string {
     if (p.patternFocus.timeRange?.from || p.patternFocus.timeRange?.to) {
       lines.push('  Rango horario: ' + (p.patternFocus.timeRange?.from || '00:00') + ' - ' + (p.patternFocus.timeRange?.to || '23:59'))
     }
+    if (p.patternFocus.intervalMinutes) {
+      lines.push('  Intervalo temporal: ' + p.patternFocus.intervalMinutes + ' min')
+    }
     lines.push('  Piezas en foco: ' + p.patternFocus.filteredTotalPieces.toLocaleString())
 
     if (p.patternFocus.distributionByCalibre.length > 0) {

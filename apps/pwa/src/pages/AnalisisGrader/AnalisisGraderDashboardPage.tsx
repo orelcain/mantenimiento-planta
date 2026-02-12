@@ -120,6 +120,13 @@ function isMinuteWithinRange(minuteOfDay: number, fromMinute: number | null, toM
   return minuteOfDay <= (toMinute as number)
 }
 
+function formatMinuteOfDayLabel(minuteOfDay: number): string {
+  const normalized = ((minuteOfDay % 1440) + 1440) % 1440
+  const hh = Math.floor(normalized / 60)
+  const mm = normalized % 60
+  return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`
+}
+
 interface Props {
   parsedData: ParsedMatrixData
   gates: GateAssignment[]
@@ -141,6 +148,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
   const [selectedCauseLabel, setSelectedCauseLabel] = useState<string | null>(null)
   const [timeFilterFrom, setTimeFilterFrom] = useState<string>('')
   const [timeFilterTo, setTimeFilterTo] = useState<string>('')
+  const [patternIntervalMinutes, setPatternIntervalMinutes] = useState<number>(60)
   const dashRef = useRef<HTMLDivElement>(null)
 
   // Compute analytics
@@ -222,21 +230,23 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
   }, [filteredPatternRecords, patternTotalPieces])
 
   const patternByHour = useMemo(() => {
+    const safeInterval = Math.min(60, Math.max(1, Math.round(patternIntervalMinutes || 60)))
     const map = new Map<number, number>()
     for (const r of filteredPatternRecords) {
       const dt = new Date(r.ts)
       if (!Number.isFinite(dt.getTime())) continue
-      const hour = dt.getHours()
-      map.set(hour, (map.get(hour) ?? 0) + r.pieces)
+      const minuteOfDay = dt.getHours() * 60 + dt.getMinutes()
+      const bucketMinute = Math.floor(minuteOfDay / safeInterval) * safeInterval
+      map.set(bucketMinute, (map.get(bucketMinute) ?? 0) + r.pieces)
     }
     return Array.from(map.entries())
       .sort((a, b) => a[0] - b[0])
-      .map(([hour, pieces]) => ({
-        hour: `${String(hour).padStart(2, '0')}:00`,
+      .map(([bucketMinute, pieces]) => ({
+        hour: formatMinuteOfDayLabel(bucketMinute),
         pieces,
         pct: patternTotalPieces > 0 ? Math.round((pieces / patternTotalPieces) * 10000) / 100 : 0,
       }))
-  }, [filteredPatternRecords, patternTotalPieces])
+  }, [filteredPatternRecords, patternIntervalMinutes, patternTotalPieces])
 
   const topPatternCalibre = patternByCalibre[0]
   const topPatternQuality = patternByQuality[0]
@@ -343,6 +353,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
         distributionByCalibre: patternByCalibre,
         distributionByQuality: patternByQuality,
         hourlyDistribution: patternByHour,
+        intervalMinutes: patternIntervalMinutes,
       },
     }
 
@@ -1243,7 +1254,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
               <p className="text-xs text-muted-foreground">
                 Filtra por causa y rango horario para identificar concentraciones por calibre, calidad y hora.
               </p>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mt-2">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mt-2">
                 <div className="md:col-span-2">
                   <label className="text-[11px] text-muted-foreground block mb-1">Causa</label>
                   <select
@@ -1279,6 +1290,19 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                     onChange={(e) => setTimeFilterTo(e.target.value)}
                   />
                 </div>
+                <div>
+                  <label className="text-[11px] text-muted-foreground block mb-1">Intervalo (min)</label>
+                  <input
+                    type="range"
+                    min={1}
+                    max={60}
+                    step={1}
+                    className="w-full"
+                    value={patternIntervalMinutes}
+                    onChange={(e) => setPatternIntervalMinutes(Math.min(60, Math.max(1, Number(e.target.value) || 60)))}
+                  />
+                  <div className="text-[10px] text-muted-foreground mt-1">{patternIntervalMinutes} min</div>
+                </div>
               </div>
               <div className="flex items-center gap-2 mt-2">
                 <Badge variant="outline" className="text-[11px]">Piezas filtradas: {patternTotalPieces.toLocaleString()}</Badge>
@@ -1294,6 +1318,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                     setSelectedCauseLabel(null)
                     setTimeFilterFrom('')
                     setTimeFilterTo('')
+                    setPatternIntervalMinutes(60)
                   }}
                 >
                   Limpiar filtros
@@ -1366,7 +1391,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                   </div>
 
                   <div className="border rounded p-3">
-                    <p className="text-xs font-medium mb-2">Patrón por hora (piezas)</p>
+                    <p className="text-xs font-medium mb-2">Patrón por intervalo ({patternIntervalMinutes} min)</p>
                     <div className="w-full" style={{ height: 220 }}>
                       <Line
                         data={patternHourChartData}

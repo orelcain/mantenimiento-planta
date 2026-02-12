@@ -7,6 +7,15 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.41] - 2026-02-12
+
+### ⏱️ Intervalo configurable en patrón temporal P0
+
+#### Mejoras
+- **Patrón temporal flexible**: El gráfico de patrón en Punto Cero ahora permite ajustar granularidad desde **1 minuto hasta 60 minutos**.
+- **Control rápido en UI**: Se agrega selector directo de intervalo (min) para cambiar resolución sin recargar análisis.
+- **IA contextual**: El intervalo seleccionado se incorpora al contexto de `patternFocus` enviado al análisis IA para diagnósticos más precisos en ventanas temporales.
+
 ## [2.47.40] - 2026-02-12
 
 ### 📊 Patrones Punto Cero por causa, horario e IA

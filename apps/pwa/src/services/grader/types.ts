@@ -528,6 +528,7 @@ export interface AIGraderInput {
   patternFocus?: {
     selectedCauseLabel?: string;
     timeRange?: { from?: string; to?: string };
+    intervalMinutes?: number;
     filteredTotalPieces: number;
     distributionByCalibre: Array<{ key: string; pieces: number; pct: number }>;
     distributionByQuality: Array<{ key: string; pieces: number; pct: number }>;
