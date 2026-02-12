@@ -138,11 +138,11 @@
   /* ─── Modo Día para módulo Grader ──────────────── */
   .grader-light-mode {
     --grader-bg: #f8fafc;
-    --grader-fg: #1a1a2e;
+    --grader-fg: #0f172a;
     --grader-card: #ffffff;
     --grader-card-fg: #1a1a2e;
     --grader-muted: #f1f5f9;
-    --grader-muted-fg: #64748b;
+    --grader-muted-fg: #475569;
     --grader-border: #e2e8f0;
     --grader-popover: #ffffff;
     --grader-popover-fg: #1a1a2e;
@@ -174,6 +174,31 @@
   /* Muted text */
   .grader-light-mode [class*="text-muted-foreground"] {
     color: var(--grader-muted-fg) !important;
+  }
+
+  /* Muted text con opacidad (ej: text-muted-foreground/60) → evitar que quede ilegible */
+  .grader-light-mode [class*="text-muted-foreground/"] {
+    color: var(--grader-muted-fg) !important;
+    opacity: 1 !important;
+  }
+
+  /* Muchos componentes en modo oscuro usan colores de texto muy claros (blanco / slate-200).
+     En modo claro, forzarlos a texto legible. */
+  .grader-light-mode [class*="text-white"],
+  .grader-light-mode [class*="text-slate-100"],
+  .grader-light-mode [class*="text-slate-200"],
+  .grader-light-mode [class*="text-slate-300"],
+  .grader-light-mode [class*="text-slate-400"],
+  .grader-light-mode [class*="text-zinc-100"],
+  .grader-light-mode [class*="text-zinc-200"],
+  .grader-light-mode [class*="text-zinc-300"],
+  .grader-light-mode [class*="text-neutral-100"],
+  .grader-light-mode [class*="text-neutral-200"],
+  .grader-light-mode [class*="text-neutral-300"],
+  .grader-light-mode [class*="text-gray-100"],
+  .grader-light-mode [class*="text-gray-200"],
+  .grader-light-mode [class*="text-gray-300"] {
+    color: var(--grader-fg) !important;
   }
 
   /* Bg muted */
