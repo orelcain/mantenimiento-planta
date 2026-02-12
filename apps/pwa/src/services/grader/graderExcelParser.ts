@@ -695,19 +695,18 @@ function inferGate0FromPieceRecords(records: PieceRecord[]): Gate0Record[] {
 /**
  * Combina datos parciales de múltiples archivos en un ParsedMatrixData completo.
  *
- * LÓGICA CLAVE (explicada por el usuario):
- * ─ PP (Pieza-Pieza) = registro COMPLETO de TODO lo que pasa por la máquina
- *   en un turno. Incluye gates 1-12 y gate 0.
- * ─ P0 (Puerta 0) = SUBCONJUNTO del PP. Son las MISMAS piezas que fueron
- *   a gate 0 pero con el detalle del error (columna Error de la máquina).
+ * LÓGICA CLAVE:
+ * ─ PP (Pieza-Pieza) = registro COMPLETO de TODO lo que pasa por la máquina.
+ *   Incluye gates 1-12 y gate 0. El total del PP ES el total real.
+ * ─ P0 (Puerta 0) = DETALLE de las piezas que fueron a gate 0.
+ *   Son las MISMAS piezas que ya están en PP, pero con la columna Error.
  *
  * Algoritmo:
- * 1. Tomar todos los pieceRecords del PP
- * 2. Separar los que fueron a gate=0
- * 3. Si hay archivo P0 → REEMPLAZAR los gate=0 del PP con los datos del P0
- *    (que tienen el error real: Fuera de limites, No leido por fotocelula, etc.)
- * 4. Si NO hay P0 → inferir errores para los gate=0 del PP (heurística por peso)
- * 5. Total = pieceRecords(gate≠0) + gate0Records. SIN DUPLICADOS.
+ * 1. pieceRecords = TODOS los registros del PP (incluyendo gate=0).
+ *    Esto es la fuente de verdad para CONTEO y TOTALES.
+ * 2. gate0Records = datos del P0 (o inferidos) para CLASIFICACIÓN de errores.
+ *    NO se usan para conteo. Solo para saber POR QUÉ fueron a gate 0.
+ * 3. Total = sum(pieceRecords). NUNCA se suma gate0Records al total.
  */
 export function mergeParsedData(
   parts: Array<{ fileMeta: UploadedMatrixFile; partialData: Partial<ParsedMatrixData> }>,
@@ -723,14 +722,12 @@ export function mergeParsedData(
   }
 
   // ─── Paso 1: Recopilar datos de todos los archivos ───
-  // gate0 viene SOLO de archivos detectados como PUERTA_0 (o P0 mal detectado)
   const realGate0Records: Gate0Record[] = []
   let hasP0File = false
 
   for (const { fileMeta, partialData } of parts) {
     // Detectar P0 mal clasificado como PP:
     // Un archivo donde TODOS los pieceRecords tienen gate=0 es un P0.
-    // Un PP normal tiene miles de registros con gates 1-12.
     const allPiecesAreGate0 = partialData.pieceRecords != null
       && partialData.pieceRecords.length > 0
       && partialData.pieceRecords.every((r) => r.gate === 0)
@@ -739,44 +736,32 @@ export function mergeParsedData(
 
     if (isP0) {
       hasP0File = true
-      // Actualizar kind en merged.files
       const metaInMerged = merged.files.find((f) => f.id === fileMeta.id || f.name === fileMeta.name)
       if (metaInMerged) metaInMerged.kind = 'PUERTA_0'
 
-      // Tomar gate0Records si los tiene (parsePuerta0 los genera)
+      // Tomar gate0Records del P0 (para clasificación de errores)
       if (partialData.gate0Records && partialData.gate0Records.length > 0) {
         realGate0Records.push(...partialData.gate0Records)
       }
-      // Si P0 fue parseado como PP (tiene pieceRecords con gate=0 pero NO gate0Records),
-      // convertir los pieceRecords a gate0Records
+      // Si P0 fue parseado como PP, convertir pieceRecords a gate0Records
       if (partialData.pieceRecords && partialData.pieceRecords.length > 0
         && (!partialData.gate0Records || partialData.gate0Records.length === 0)) {
-        // Estos records vienen del P0 parseado con parsePiezaPieza.
-        // Tienen el Error real porque parsePiezaPieza lee la columna Error.
-        const g0FromPP = partialData.pieceRecords.filter((r) => r.gate === 0)
-        for (const r of g0FromPP) {
+        for (const r of partialData.pieceRecords.filter((r) => r.gate === 0)) {
           realGate0Records.push({
-            ts: r.ts,
-            gate: 0,
-            pieces: r.pieces,
-            weightKg: r.weightKg,
-            weightPerPieceGrams: r.weightPerPieceGrams,
+            ts: r.ts, gate: 0, pieces: r.pieces,
+            weightKg: r.weightKg, weightPerPieceGrams: r.weightPerPieceGrams,
             error: r.error || 'Desconocido',
-            quality: r.quality,
-            calibre: r.calibre,
-            lot: r.lot,
-            raw: r.raw,
+            quality: r.quality, calibre: r.calibre, lot: r.lot, raw: r.raw,
           })
         }
       }
-      // NO agregar pieceRecords del P0 al merged (son las mismas piezas del PP)
-      console.info(`[grader merge] "${fileMeta.name}" → P0 (${realGate0Records.length} gate0Records)`)
+      // NO agregar pieceRecords del P0 (ya están en el PP como gate=0)
+      console.info(`[grader merge] "${fileMeta.name}" → P0 (${realGate0Records.length} registros para clasificación)`)
     } else {
-      // Archivo PP normal → agregar todos sus pieceRecords
+      // PP: agregar TODOS los pieceRecords (incluyendo gate=0)
       if (partialData.pieceRecords) {
         merged.pieceRecords.push(...partialData.pieceRecords)
       }
-      // PP ya NO genera gate0Records (eliminado del parser)
       console.info(`[grader merge] "${fileMeta.name}" → PP (${partialData.pieceRecords?.length ?? 0} pieceRecords)`)
     }
 
@@ -785,30 +770,25 @@ export function mergeParsedData(
     if (partialData.productionSummary) merged.productionSummary.push(...partialData.productionSummary)
   }
 
-  // ─── Paso 2: Separar gate=0 del PP ───
+  // ─── Paso 2: gate0Records para CLASIFICACIÓN de errores (NO para conteo) ───
   const ppGate0 = merged.pieceRecords.filter((r) => r.gate === 0)
-  merged.pieceRecords = merged.pieceRecords.filter((r) => r.gate !== 0)
 
-  // ─── Paso 3: Asignar gate0Records ───
   if (hasP0File && realGate0Records.length > 0) {
-    // Hay archivo P0 → usar datos REALES (con error de la máquina)
-    // Los gate=0 del PP se descartan (son las mismas piezas, pero sin detalle)
+    // P0 tiene datos reales con columna Error de la máquina
     merged.gate0Records = realGate0Records
-    console.info(
-      `[grader merge] Usando ${realGate0Records.length} registros REALES de P0. ` +
-      `Descartados ${ppGate0.length} gate=0 inferidos del PP.`,
-    )
+    console.info(`[grader merge] Clasificación P0: ${realGate0Records.length} registros REALES`)
   } else {
-    // NO hay archivo P0 → inferir errores desde los gate=0 del PP
+    // Inferir errores desde gate=0 del PP
     merged.gate0Records = inferGate0FromPieceRecords(ppGate0)
-    console.info(
-      `[grader merge] Sin archivo P0. Inferidos ${ppGate0.length} gate0Records desde PP.`,
-    )
+    console.info(`[grader merge] Clasificación P0: ${ppGate0.length} registros INFERIDOS del PP`)
   }
 
+  // pieceRecords NO se modifica — conserva gate=0. ES la fuente de verdad.
+  const totalFromPP = merged.pieceRecords.reduce((s, r) => s + r.pieces, 0)
+  const gate0FromPP = ppGate0.reduce((s, r) => s + r.pieces, 0)
   console.info(
-    `[grader merge] RESULTADO: pieceRecords=${merged.pieceRecords.length} (gate≠0) + ` +
-    `gate0Records=${merged.gate0Records.length} = ${merged.pieceRecords.length + merged.gate0Records.length} total`,
+    `[grader merge] TOTAL PP: ${totalFromPP} piezas (${gate0FromPP} gate=0). ` +
+    `gate0Records: ${merged.gate0Records.length} (solo para clasificación de errores).`,
   )
 
   // Infer overall period

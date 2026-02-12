@@ -387,6 +387,10 @@ export function computeAnalytics(
     : CALIBRE_WEIGHT_RANGES
 
   // ——————— TOTALES ———————
+  // PP (pieceRecords) = FUENTE DE VERDAD para TODOS los conteos.
+  // Incluye gates 1-12 y gate 0. El total del PP ES el total real de la máquina.
+  // gate0Records = SOLO para clasificación de errores (por qué fueron a gate 0).
+  // NUNCA se suman al total (ya están contados en pieceRecords).
   const hasPiece = data.pieceRecords.length > 0
   const hasG0 = data.gate0Records.length > 0
   const hasProdSummary = data.productionSummary.length > 0
@@ -396,14 +400,15 @@ export function computeAnalytics(
   let pointZeroPieces = 0
   let pointZeroWeightKg = 0
 
-  // ─── Piezas normales (gate != 0) desde pieceRecords ───
-  // Nota: mergeParsedData ya eliminó todos los gate=0 de pieceRecords,
-  // pero como medida de seguridad ignoramos gate=0 aquí también.
   if (hasPiece) {
     for (const r of data.pieceRecords) {
-      if (r.gate === 0) continue // ya contados en gate0Records
       totalPieces += r.pieces
       totalWeightKg += r.weightKg ?? 0
+      // Contar gate=0 para el porcentaje de punto cero
+      if (r.gate === 0) {
+        pointZeroPieces += r.pieces
+        pointZeroWeightKg += r.weightKg ?? 0
+      }
     }
   } else if (hasProdSummary) {
     for (const r of data.productionSummary) {
@@ -419,17 +424,7 @@ export function computeAnalytics(
     notes.push('Totales calculados desde registros por folio.')
   }
 
-  // ─── Gate 0 desde gate0Records (deduplicados en merge) ───
-  if (hasG0) {
-    for (const r of data.gate0Records) {
-      pointZeroPieces += r.pieces
-      pointZeroWeightKg += r.weightKg ?? 0
-    }
-    totalPieces += pointZeroPieces
-    totalWeightKg += pointZeroWeightKg
-  }
-
-  // ——————— PUNTO CERO POR ERROR ———————
+  // gate0Records NO se suma al total — solo es para clasificación de errores
   const errorMap = new Map<string, { pieces: number; weightKg: number }>()
 
   const g0Source = hasG0
