@@ -575,81 +575,13 @@ export async function parseFile(file: File): Promise<{
 
     switch (kind) {
       case 'PIEZA_PIEZA': {
+        // PP produce SOLO pieceRecords (todos los gates, incluyendo gate=0).
+        // NUNCA produce gate0Records — eso lo hace mergeParsedData.
         const records = parsePiezaPieza(rows, headerInfo.rowIndex, colMap)
         partial.pieceRecords = records
-
-        // Also extract gate 0 records from pieceRecords
-        const g0 = records.filter((r) => r.gate === 0)
-        if (g0.length > 0) {
-          partial.gate0Records = g0.map((r) => {
-            // Use explicit error column if available, otherwise SMART inference
-            let error = r.error || ''
-            if (!error) {
-              // Get per-piece weight in grams
-              let perPieceG = r.weightPerPieceGrams
-              if (!perPieceG && r.weightKg && r.pieces > 0) {
-                perPieceG = (r.weightKg / r.pieces) * 1000
-              }
-
-              if (!perPieceG || perPieceG < 10) {
-                // No weight data or negligible → photocell didn't read it
-                error = 'No leido por fotocelula'
-              } else {
-                // Check raw calibre for "Fuera de Rango"
-                const rawCalibre = (r.raw?.rawCalibre as string) || ''
-                const isFueraDeRango = rawCalibre.toLowerCase().includes('fuera') && rawCalibre.toLowerCase().includes('rango')
-                if (isFueraDeRango) {
-                  error = 'Fuera de Rango'
-                } else {
-                  // Check if weight falls within any calibre range
-                  const matchedRange = CALIBRE_WEIGHT_RANGES.find(
-                    (rng) => perPieceG! >= rng.minGrams && perPieceG! < rng.maxGrams,
-                  )
-                  if (matchedRange) {
-                    // Weight is within a valid range but piece went to gate 0
-                    error = 'Fuera de limites'
-                  } else {
-                    // Weight is outside ALL defined ranges → truly out of range
-                    error = 'Fuera de Rango'
-                  }
-                }
-              }
-            }
-
-            // Determine actual calibre from weight (more accurate than Excel default for gate 0)
-            let actualCalibre = r.calibre
-            let actualRawCalibre = r.raw?.rawCalibre as string | undefined
-            let perPieceG = r.weightPerPieceGrams
-            if (!perPieceG && r.weightKg && r.pieces > 0) {
-              perPieceG = (r.weightKg / r.pieces) * 1000
-            }
-            if (perPieceG && perPieceG > 0) {
-              const matchedRange = CALIBRE_WEIGHT_RANGES.find(
-                (rng) => perPieceG! >= rng.minGrams && perPieceG! < rng.maxGrams,
-              )
-              if (matchedRange) {
-                actualCalibre = matchedRange.calibre as CalibreRange
-                actualRawCalibre = `HG ${matchedRange.calibre.replace(' lb', '')}`
-              } else {
-                actualCalibre = 'Other'
-                actualRawCalibre = 'Fuera de Rango'
-              }
-            }
-
-            return {
-              ts: r.ts,
-              gate: 0 as const,
-              pieces: r.pieces,
-              weightKg: r.weightKg,
-              weightPerPieceGrams: r.weightPerPieceGrams,
-              error,
-              quality: r.quality,
-              calibre: actualCalibre,
-              lot: r.lot,
-              raw: { ...(r.raw || {}), rawCalibre: actualRawCalibre || (r.raw?.rawCalibre) },
-            }
-          })
-          warnings.push(`Se encontraron ${g0.length} registros Gate 0 en archivo pieza-pieza.`)
+        const g0Count = records.filter((r) => r.gate === 0).length
+        if (g0Count > 0) {
+          warnings.push(`Se encontraron ${g0Count} registros Gate 0 en archivo pieza-pieza.`)
         }
         break
       }
@@ -696,13 +628,92 @@ export async function parseFile(file: File): Promise<{
 }
 
 /**
+ * Convierte PieceRecords con gate=0 (del PP) a Gate0Records con error inferido.
+ * Solo se usa cuando NO hay archivo Puerta 0.
+ */
+function inferGate0FromPieceRecords(records: PieceRecord[]): Gate0Record[] {
+  return records.map((r) => {
+    // Inferir error según peso y calibre
+    let error = r.error || ''
+    if (!error) {
+      let perPieceG = r.weightPerPieceGrams
+      if (!perPieceG && r.weightKg && r.pieces > 0) {
+        perPieceG = (r.weightKg / r.pieces) * 1000
+      }
+
+      if (!perPieceG || perPieceG < 10) {
+        error = 'No leido por fotocelula'
+      } else {
+        const rawCalibre = (r.raw?.rawCalibre as string) || ''
+        const isFueraDeRango = rawCalibre.toLowerCase().includes('fuera') && rawCalibre.toLowerCase().includes('rango')
+        if (isFueraDeRango) {
+          error = 'Fuera de Rango'
+        } else {
+          const matchedRange = CALIBRE_WEIGHT_RANGES.find(
+            (rng) => perPieceG! >= rng.minGrams && perPieceG! < rng.maxGrams,
+          )
+          error = matchedRange ? 'Fuera de limites' : 'Fuera de Rango'
+        }
+      }
+    }
+
+    // Calibre real basado en peso
+    let actualCalibre = r.calibre
+    let actualRawCalibre = r.raw?.rawCalibre as string | undefined
+    let perPieceG = r.weightPerPieceGrams
+    if (!perPieceG && r.weightKg && r.pieces > 0) {
+      perPieceG = (r.weightKg / r.pieces) * 1000
+    }
+    if (perPieceG && perPieceG > 0) {
+      const matchedRange = CALIBRE_WEIGHT_RANGES.find(
+        (rng) => perPieceG! >= rng.minGrams && perPieceG! < rng.maxGrams,
+      )
+      if (matchedRange) {
+        actualCalibre = matchedRange.calibre as CalibreRange
+        actualRawCalibre = `HG ${matchedRange.calibre.replace(' lb', '')}`
+      } else {
+        actualCalibre = 'Other'
+        actualRawCalibre = 'Fuera de Rango'
+      }
+    }
+
+    return {
+      ts: r.ts,
+      gate: 0 as const,
+      pieces: r.pieces,
+      weightKg: r.weightKg,
+      weightPerPieceGrams: r.weightPerPieceGrams,
+      error,
+      quality: r.quality,
+      calibre: actualCalibre,
+      lot: r.lot,
+      raw: { ...(r.raw || {}), rawCalibre: actualRawCalibre || (r.raw?.rawCalibre) },
+    }
+  })
+}
+
+/**
  * Combina datos parciales de múltiples archivos en un ParsedMatrixData completo.
+ *
+ * LÓGICA CLAVE (explicada por el usuario):
+ * ─ PP (Pieza-Pieza) = registro COMPLETO de TODO lo que pasa por la máquina
+ *   en un turno. Incluye gates 1-12 y gate 0.
+ * ─ P0 (Puerta 0) = SUBCONJUNTO del PP. Son las MISMAS piezas que fueron
+ *   a gate 0 pero con el detalle del error (columna Error de la máquina).
+ *
+ * Algoritmo:
+ * 1. Tomar todos los pieceRecords del PP
+ * 2. Separar los que fueron a gate=0
+ * 3. Si hay archivo P0 → REEMPLAZAR los gate=0 del PP con los datos del P0
+ *    (que tienen el error real: Fuera de limites, No leido por fotocelula, etc.)
+ * 4. Si NO hay P0 → inferir errores para los gate=0 del PP (heurística por peso)
+ * 5. Total = pieceRecords(gate≠0) + gate0Records. SIN DUPLICADOS.
  */
 export function mergeParsedData(
   parts: Array<{ fileMeta: UploadedMatrixFile; partialData: Partial<ParsedMatrixData> }>,
 ): ParsedMatrixData {
   const merged: ParsedMatrixData = {
-    files: parts.map((p) => ({ ...p.fileMeta })), // copia para poder mutar kind
+    files: parts.map((p) => ({ ...p.fileMeta })),
     pieceRecords: [],
     gate0Records: [],
     folioRecords: [],
@@ -711,67 +722,94 @@ export function mergeParsedData(
     inferred: {},
   }
 
-  // Separar gate0 por fuente: archivos PUERTA_0 vs inferidos de PIEZA_PIEZA
-  // HEURÍSTICA CLAVE: si TODOS los pieceRecords de un archivo tienen gate=0,
-  // es un archivo Puerta 0 mal clasificado como Pieza-Pieza.
-  // Un archivo PP normal tiene miles de registros con gates 1-12; solo un
-  // subconjunto pequeño es gate=0. Un archivo P0 tiene TODOS sus registros
-  // con gate=0.
-  const gate0FromPuerta0: typeof merged.gate0Records = []
-  const gate0FromPiezaPieza: typeof merged.gate0Records = []
+  // ─── Paso 1: Recopilar datos de todos los archivos ───
+  // gate0 viene SOLO de archivos detectados como PUERTA_0 (o P0 mal detectado)
+  const realGate0Records: Gate0Record[] = []
+  let hasP0File = false
 
   for (const { fileMeta, partialData } of parts) {
-    // ── Detectar P0 mal clasificado como PP ──
+    // Detectar P0 mal clasificado como PP:
+    // Un archivo donde TODOS los pieceRecords tienen gate=0 es un P0.
+    // Un PP normal tiene miles de registros con gates 1-12.
     const allPiecesAreGate0 = partialData.pieceRecords != null
       && partialData.pieceRecords.length > 0
       && partialData.pieceRecords.every((r) => r.gate === 0)
 
-    const effectiveKind = allPiecesAreGate0 ? 'PUERTA_0' as const : fileMeta.kind
+    const isP0 = fileMeta.kind === 'PUERTA_0' || allPiecesAreGate0
 
-    if (allPiecesAreGate0 && fileMeta.kind !== 'PUERTA_0') {
-      console.warn(
-        `[grader merge] "${fileMeta.name}" tiene ${partialData.pieceRecords!.length} registros, ` +
-        `TODOS gate=0 → reclasificando de ${fileMeta.kind} a PUERTA_0`,
-      )
-      // Actualizar fileMeta en merged.files para que computeKPIs detecte hasRealP0Data
+    if (isP0) {
+      hasP0File = true
+      // Actualizar kind en merged.files
       const metaInMerged = merged.files.find((f) => f.id === fileMeta.id || f.name === fileMeta.name)
       if (metaInMerged) metaInMerged.kind = 'PUERTA_0'
-    }
 
-    // Solo agregar pieceRecords de archivos que NO son P0.
-    // Los registros de un archivo P0 ya están representados en gate0Records.
-    if (partialData.pieceRecords && effectiveKind !== 'PUERTA_0') {
-      merged.pieceRecords.push(...partialData.pieceRecords)
-    }
-
-    if (partialData.gate0Records) {
-      if (effectiveKind === 'PUERTA_0') {
-        gate0FromPuerta0.push(...partialData.gate0Records)
-      } else {
-        gate0FromPiezaPieza.push(...partialData.gate0Records)
+      // Tomar gate0Records si los tiene (parsePuerta0 los genera)
+      if (partialData.gate0Records && partialData.gate0Records.length > 0) {
+        realGate0Records.push(...partialData.gate0Records)
       }
+      // Si P0 fue parseado como PP (tiene pieceRecords con gate=0 pero NO gate0Records),
+      // convertir los pieceRecords a gate0Records
+      if (partialData.pieceRecords && partialData.pieceRecords.length > 0
+        && (!partialData.gate0Records || partialData.gate0Records.length === 0)) {
+        // Estos records vienen del P0 parseado con parsePiezaPieza.
+        // Tienen el Error real porque parsePiezaPieza lee la columna Error.
+        const g0FromPP = partialData.pieceRecords.filter((r) => r.gate === 0)
+        for (const r of g0FromPP) {
+          realGate0Records.push({
+            ts: r.ts,
+            gate: 0,
+            pieces: r.pieces,
+            weightKg: r.weightKg,
+            weightPerPieceGrams: r.weightPerPieceGrams,
+            error: r.error || 'Desconocido',
+            quality: r.quality,
+            calibre: r.calibre,
+            lot: r.lot,
+            raw: r.raw,
+          })
+        }
+      }
+      // NO agregar pieceRecords del P0 al merged (son las mismas piezas del PP)
+      console.info(`[grader merge] "${fileMeta.name}" → P0 (${realGate0Records.length} gate0Records)`)
+    } else {
+      // Archivo PP normal → agregar todos sus pieceRecords
+      if (partialData.pieceRecords) {
+        merged.pieceRecords.push(...partialData.pieceRecords)
+      }
+      // PP ya NO genera gate0Records (eliminado del parser)
+      console.info(`[grader merge] "${fileMeta.name}" → PP (${partialData.pieceRecords?.length ?? 0} pieceRecords)`)
     }
+
     if (partialData.folioRecords) merged.folioRecords.push(...partialData.folioRecords)
     if (partialData.qualitySummary) merged.qualitySummary.push(...partialData.qualitySummary)
     if (partialData.productionSummary) merged.productionSummary.push(...partialData.productionSummary)
   }
 
-  // ─── Fusión de gate0 ───
-  // Si hay datos reales de P0 → usar exclusivamente esos
-  // Si no → usar gate0 inferidos del PP
-  console.info(
-    `[grader merge] gate0 fuentes: Puerta0=${gate0FromPuerta0.length}, PiezaPieza=${gate0FromPiezaPieza.length}, ` +
-    `pieceRecords=${merged.pieceRecords.length}`,
-  )
-  if (gate0FromPuerta0.length > 0) {
-    merged.gate0Records = gate0FromPuerta0
+  // ─── Paso 2: Separar gate=0 del PP ───
+  const ppGate0 = merged.pieceRecords.filter((r) => r.gate === 0)
+  merged.pieceRecords = merged.pieceRecords.filter((r) => r.gate !== 0)
+
+  // ─── Paso 3: Asignar gate0Records ───
+  if (hasP0File && realGate0Records.length > 0) {
+    // Hay archivo P0 → usar datos REALES (con error de la máquina)
+    // Los gate=0 del PP se descartan (son las mismas piezas, pero sin detalle)
+    merged.gate0Records = realGate0Records
+    console.info(
+      `[grader merge] Usando ${realGate0Records.length} registros REALES de P0. ` +
+      `Descartados ${ppGate0.length} gate=0 inferidos del PP.`,
+    )
   } else {
-    merged.gate0Records = gate0FromPiezaPieza
+    // NO hay archivo P0 → inferir errores desde los gate=0 del PP
+    merged.gate0Records = inferGate0FromPieceRecords(ppGate0)
+    console.info(
+      `[grader merge] Sin archivo P0. Inferidos ${ppGate0.length} gate0Records desde PP.`,
+    )
   }
 
-  // Eliminar TODOS los registros con gate===0 de pieceRecords.
-  // Estos ya están representados en gate0Records.
-  merged.pieceRecords = merged.pieceRecords.filter((r) => r.gate !== 0)
+  console.info(
+    `[grader merge] RESULTADO: pieceRecords=${merged.pieceRecords.length} (gate≠0) + ` +
+    `gate0Records=${merged.gate0Records.length} = ${merged.pieceRecords.length + merged.gate0Records.length} total`,
+  )
 
   // Infer overall period
   const allTs: string[] = [
