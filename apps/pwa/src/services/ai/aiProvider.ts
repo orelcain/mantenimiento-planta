@@ -183,6 +183,39 @@ function buildPrompt(p: AIGraderInput): string {
     }
   }
 
+  if (p.patternFocus && p.patternFocus.filteredTotalPieces > 0) {
+    lines.push('')
+    lines.push('=== FOCO DE PATRÓN (PUNTO CERO FILTRADO) ===')
+    if (p.patternFocus.selectedCauseLabel) {
+      lines.push('  Causa seleccionada: ' + p.patternFocus.selectedCauseLabel)
+    }
+    if (p.patternFocus.timeRange?.from || p.patternFocus.timeRange?.to) {
+      lines.push('  Rango horario: ' + (p.patternFocus.timeRange?.from || '00:00') + ' - ' + (p.patternFocus.timeRange?.to || '23:59'))
+    }
+    lines.push('  Piezas en foco: ' + p.patternFocus.filteredTotalPieces.toLocaleString())
+
+    if (p.patternFocus.distributionByCalibre.length > 0) {
+      lines.push('  Distribución por calibre (foco):')
+      for (const c of p.patternFocus.distributionByCalibre) {
+        lines.push('    - ' + c.key + ': ' + c.pieces + ' pz (' + c.pct + '%)')
+      }
+    }
+
+    if (p.patternFocus.distributionByQuality.length > 0) {
+      lines.push('  Distribución por calidad (foco):')
+      for (const q of p.patternFocus.distributionByQuality) {
+        lines.push('    - ' + q.key + ': ' + q.pieces + ' pz (' + q.pct + '%)')
+      }
+    }
+
+    if (p.patternFocus.hourlyDistribution && p.patternFocus.hourlyDistribution.length > 0) {
+      lines.push('  Distribución horaria (foco):')
+      for (const h of p.patternFocus.hourlyDistribution) {
+        lines.push('    - ' + h.hour + ': ' + h.pieces + ' pz (' + h.pct + '%)')
+      }
+    }
+  }
+
   lines.push('')
   lines.push('=== COMPLETITUD DE DATOS ===')
   lines.push('  Pieza-pieza: ' + (p.dataCompleteness.hasPieceRecords ? 'SÍ' : 'NO'))

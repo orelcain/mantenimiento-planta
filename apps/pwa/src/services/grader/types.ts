@@ -524,6 +524,15 @@ export interface AIGraderInput {
     hasFolioRecords: boolean;
     notes: string[];
   };
+  /** Foco opcional de patrones en Punto Cero (filtro por causa/horario) */
+  patternFocus?: {
+    selectedCauseLabel?: string;
+    timeRange?: { from?: string; to?: string };
+    filteredTotalPieces: number;
+    distributionByCalibre: Array<{ key: string; pieces: number; pct: number }>;
+    distributionByQuality: Array<{ key: string; pieces: number; pct: number }>;
+    hourlyDistribution?: Array<{ hour: string; pieces: number; pct: number }>;
+  };
 }
 
 export interface AIGraderOutput {

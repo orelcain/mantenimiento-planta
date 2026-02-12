@@ -98,6 +98,28 @@ function resolveCalibreLabel(rawCalibre?: string | null, weightGrams?: number | 
   return getCalibreByWeightGrams(weightGrams)
 }
 
+function parseTimeHHMMToMinutes(value?: string): number | null {
+  if (!value) return null
+  const m = value.match(/^(\d{2}):(\d{2})$/)
+  if (!m) return null
+  const hh = Number(m[1])
+  const mm = Number(m[2])
+  if (!Number.isFinite(hh) || !Number.isFinite(mm) || hh < 0 || hh > 23 || mm < 0 || mm > 59) return null
+  return (hh * 60) + mm
+}
+
+function isMinuteWithinRange(minuteOfDay: number, fromMinute: number | null, toMinute: number | null): boolean {
+  if (fromMinute == null && toMinute == null) return true
+  if (fromMinute != null && toMinute != null) {
+    if (fromMinute <= toMinute) {
+      return minuteOfDay >= fromMinute && minuteOfDay <= toMinute
+    }
+    return minuteOfDay >= fromMinute || minuteOfDay <= toMinute
+  }
+  if (fromMinute != null) return minuteOfDay >= fromMinute
+  return minuteOfDay <= (toMinute as number)
+}
+
 interface Props {
   parsedData: ParsedMatrixData
   gates: GateAssignment[]
@@ -116,6 +138,9 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
   const [reportMode, setReportMode] = useState<'light' | 'dark'>('dark')
   const [expandedCause, setExpandedCause] = useState<string | null>(null)
   const [p0ErrorFilter, setP0ErrorFilter] = useState<string | null>(null)
+  const [selectedCauseLabel, setSelectedCauseLabel] = useState<string | null>(null)
+  const [timeFilterFrom, setTimeFilterFrom] = useState<string>('')
+  const [timeFilterTo, setTimeFilterTo] = useState<string>('')
   const dashRef = useRef<HTMLDivElement>(null)
 
   // Compute analytics
@@ -147,6 +172,116 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
       }))
     })
   }, [analytics.pointZeroClassification.causes])
+
+  const filteredPatternRecords = useMemo(() => {
+    const fromMinute = parseTimeHHMMToMinutes(timeFilterFrom)
+    const toMinute = parseTimeHHMMToMinutes(timeFilterTo)
+
+    return pointZeroDetailRecords.filter((record) => {
+      if (selectedCauseLabel && record.causeLabel !== selectedCauseLabel) return false
+      const dt = new Date(record.ts)
+      if (!Number.isFinite(dt.getTime())) return false
+      const minuteOfDay = dt.getHours() * 60 + dt.getMinutes()
+      return isMinuteWithinRange(minuteOfDay, fromMinute, toMinute)
+    })
+  }, [pointZeroDetailRecords, selectedCauseLabel, timeFilterFrom, timeFilterTo])
+
+  const patternTotalPieces = useMemo(
+    () => filteredPatternRecords.reduce((sum, r) => sum + r.pieces, 0),
+    [filteredPatternRecords],
+  )
+
+  const patternByCalibre = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const r of filteredPatternRecords) {
+      const key = r.calibre || 'N/D'
+      map.set(key, (map.get(key) ?? 0) + r.pieces)
+    }
+    return Array.from(map.entries())
+      .map(([key, pieces]) => ({
+        key,
+        pieces,
+        pct: patternTotalPieces > 0 ? Math.round((pieces / patternTotalPieces) * 10000) / 100 : 0,
+      }))
+      .sort((a, b) => b.pieces - a.pieces)
+  }, [filteredPatternRecords, patternTotalPieces])
+
+  const patternByQuality = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const r of filteredPatternRecords) {
+      const key = r.quality || 'Unknown'
+      map.set(key, (map.get(key) ?? 0) + r.pieces)
+    }
+    return Array.from(map.entries())
+      .map(([key, pieces]) => ({
+        key,
+        pieces,
+        pct: patternTotalPieces > 0 ? Math.round((pieces / patternTotalPieces) * 10000) / 100 : 0,
+      }))
+      .sort((a, b) => b.pieces - a.pieces)
+  }, [filteredPatternRecords, patternTotalPieces])
+
+  const patternByHour = useMemo(() => {
+    const map = new Map<number, number>()
+    for (const r of filteredPatternRecords) {
+      const dt = new Date(r.ts)
+      if (!Number.isFinite(dt.getTime())) continue
+      const hour = dt.getHours()
+      map.set(hour, (map.get(hour) ?? 0) + r.pieces)
+    }
+    return Array.from(map.entries())
+      .sort((a, b) => a[0] - b[0])
+      .map(([hour, pieces]) => ({
+        hour: `${String(hour).padStart(2, '0')}:00`,
+        pieces,
+        pct: patternTotalPieces > 0 ? Math.round((pieces / patternTotalPieces) * 10000) / 100 : 0,
+      }))
+  }, [filteredPatternRecords, patternTotalPieces])
+
+  const topPatternCalibre = patternByCalibre[0]
+  const topPatternQuality = patternByQuality[0]
+  const peakPatternHour = patternByHour.reduce<{ hour: string; pieces: number; pct: number } | null>(
+    (acc, cur) => (acc == null || cur.pieces > acc.pieces ? cur : acc),
+    null,
+  )
+
+  const patternCalibreChartData = {
+    labels: patternByCalibre.map((d) => d.key),
+    datasets: [
+      {
+        label: '% por calibre',
+        data: patternByCalibre.map((d) => d.pct),
+        backgroundColor: 'rgba(59,130,246,0.75)',
+        borderRadius: 6,
+      },
+    ],
+  }
+
+  const patternQualityChartData = {
+    labels: patternByQuality.map((d) => d.key),
+    datasets: [
+      {
+        label: '% por calidad',
+        data: patternByQuality.map((d) => d.pct),
+        backgroundColor: 'rgba(16,185,129,0.75)',
+        borderRadius: 6,
+      },
+    ],
+  }
+
+  const patternHourChartData = {
+    labels: patternByHour.map((d) => d.hour),
+    datasets: [
+      {
+        label: 'Piezas',
+        data: patternByHour.map((d) => d.pieces),
+        borderColor: 'rgba(239,68,68,0.9)',
+        backgroundColor: 'rgba(239,68,68,0.2)',
+        fill: true,
+        tension: 0.3,
+      },
+    ],
+  }
 
   // ——— AI ———
   const handleAnalyzeAI = async () => {
@@ -197,6 +332,17 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
         hasProductionSummary: parsedData.productionSummary.length > 0,
         hasFolioRecords: parsedData.folioRecords.length > 0,
         notes: analytics.notes,
+      },
+      patternFocus: {
+        selectedCauseLabel: selectedCauseLabel ?? undefined,
+        timeRange: {
+          from: timeFilterFrom || undefined,
+          to: timeFilterTo || undefined,
+        },
+        filteredTotalPieces: patternTotalPieces,
+        distributionByCalibre: patternByCalibre,
+        distributionByQuality: patternByQuality,
+        hourlyDistribution: patternByHour,
       },
     }
 
@@ -994,7 +1140,11 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                                   hasRecords && 'cursor-pointer',
                                   isExpanded && 'bg-muted/20',
                                 )}
-                                onClick={() => hasRecords && setExpandedCause(isExpanded ? null : c.cause)}
+                                onClick={() => {
+                                  if (!hasRecords) return
+                                  setExpandedCause(isExpanded ? null : c.cause)
+                                  setSelectedCauseLabel((prev) => (prev === c.label ? null : c.label))
+                                }}
                               >
                                 <td className="py-2 px-1 text-center">
                                   {hasRecords && (
@@ -1082,6 +1232,204 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
               </CardContent>
             </Card>
           )}
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Activity className="h-4 w-4 text-cyan-500" />
+                Patrones Punto Cero (Causa + Horario)
+                <InfoTooltip {...getTooltipProps('pz.pivote')} />
+              </CardTitle>
+              <p className="text-xs text-muted-foreground">
+                Filtra por causa y rango horario para identificar concentraciones por calibre, calidad y hora.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mt-2">
+                <div className="md:col-span-2">
+                  <label className="text-[11px] text-muted-foreground block mb-1">Causa</label>
+                  <select
+                    className="w-full bg-background border rounded px-2 py-1.5 text-xs"
+                    value={selectedCauseLabel ?? ''}
+                    onChange={(e) => setSelectedCauseLabel(e.target.value || null)}
+                  >
+                    <option value="">Todas</option>
+                    {analytics.pointZeroClassification.causes
+                      .filter((c) => (c.records?.length ?? 0) > 0)
+                      .map((c) => (
+                        <option key={c.label} value={c.label}>
+                          {c.label}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[11px] text-muted-foreground block mb-1">Desde</label>
+                  <input
+                    type="time"
+                    className="w-full bg-background border rounded px-2 py-1.5 text-xs"
+                    value={timeFilterFrom}
+                    onChange={(e) => setTimeFilterFrom(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] text-muted-foreground block mb-1">Hasta</label>
+                  <input
+                    type="time"
+                    className="w-full bg-background border rounded px-2 py-1.5 text-xs"
+                    value={timeFilterTo}
+                    onChange={(e) => setTimeFilterTo(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="flex items-center gap-2 mt-2">
+                <Badge variant="outline" className="text-[11px]">Piezas filtradas: {patternTotalPieces.toLocaleString()}</Badge>
+                {topPatternCalibre && <Badge variant="secondary" className="text-[11px]">Top calibre: {topPatternCalibre.key} ({topPatternCalibre.pct}%)</Badge>}
+                {topPatternQuality && <Badge variant="secondary" className="text-[11px]">Top calidad: {topPatternQuality.key} ({topPatternQuality.pct}%)</Badge>}
+                {peakPatternHour && <Badge variant="secondary" className="text-[11px]">Hora pico: {peakPatternHour.hour} ({peakPatternHour.pct}%)</Badge>}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs ml-auto"
+                  onClick={() => {
+                    setSelectedCauseLabel(null)
+                    setTimeFilterFrom('')
+                    setTimeFilterTo('')
+                  }}
+                >
+                  Limpiar filtros
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              {patternTotalPieces === 0 ? (
+                <p className="text-xs text-muted-foreground">No hay registros para el filtro seleccionado.</p>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div className="border rounded p-3">
+                      <p className="text-xs font-medium mb-2">% por calibre</p>
+                      <div className="w-full" style={{ height: Math.max(180, patternByCalibre.length * 34) }}>
+                        <Bar
+                          data={patternCalibreChartData}
+                          options={{
+                            indexAxis: 'y',
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                              legend: { display: false },
+                              tooltip: {
+                                callbacks: {
+                                  label: (ctx) => {
+                                    const d = patternByCalibre[ctx.dataIndex]
+                                    return d ? `${d.pieces.toLocaleString()} pz (${d.pct}%)` : ''
+                                  },
+                                },
+                              },
+                            },
+                            scales: {
+                              x: { beginAtZero: true, max: 100 },
+                              y: { grid: { display: false } },
+                            },
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="border rounded p-3">
+                      <p className="text-xs font-medium mb-2">% por calidad</p>
+                      <div className="w-full" style={{ height: Math.max(180, patternByQuality.length * 34) }}>
+                        <Bar
+                          data={patternQualityChartData}
+                          options={{
+                            indexAxis: 'y',
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                              legend: { display: false },
+                              tooltip: {
+                                callbacks: {
+                                  label: (ctx) => {
+                                    const d = patternByQuality[ctx.dataIndex]
+                                    return d ? `${d.pieces.toLocaleString()} pz (${d.pct}%)` : ''
+                                  },
+                                },
+                              },
+                            },
+                            scales: {
+                              x: { beginAtZero: true, max: 100 },
+                              y: { grid: { display: false } },
+                            },
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="border rounded p-3">
+                    <p className="text-xs font-medium mb-2">Patrón por hora (piezas)</p>
+                    <div className="w-full" style={{ height: 220 }}>
+                      <Line
+                        data={patternHourChartData}
+                        options={{
+                          responsive: true,
+                          maintainAspectRatio: false,
+                          plugins: { legend: { display: false } },
+                          scales: {
+                            y: { beginAtZero: true },
+                            x: { grid: { color: 'rgba(128,128,128,0.1)' } },
+                          },
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="py-1.5 px-2 text-left">Calibre</th>
+                            <th className="py-1.5 px-2 text-right">Piezas</th>
+                            <th className="py-1.5 px-2 text-right">%</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {patternByCalibre.map((row) => (
+                            <tr key={row.key} className="border-b">
+                              <td className="py-1 px-2">{row.key}</td>
+                              <td className="py-1 px-2 text-right">{row.pieces.toLocaleString()}</td>
+                              <td className="py-1 px-2 text-right">{row.pct}%</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="py-1.5 px-2 text-left">Calidad</th>
+                            <th className="py-1.5 px-2 text-right">Piezas</th>
+                            <th className="py-1.5 px-2 text-right">%</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {patternByQuality.map((row) => (
+                            <tr key={row.key} className="border-b">
+                              <td className="py-1 px-2">{row.key}</td>
+                              <td className="py-1 px-2 text-right">{row.pieces.toLocaleString()}</td>
+                              <td className="py-1 px-2 text-right">{row.pct}%</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Tabla Pivote: Error × Calidad × Calibre */}
           {analytics.pointZeroClassification.hierarchy.length > 0 && (() => {

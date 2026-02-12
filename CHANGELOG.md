@@ -7,6 +7,16 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.40] - 2026-02-12
+
+### 📊 Patrones Punto Cero por causa, horario e IA
+
+#### Mejoras
+- **Filtro por causa + horario**: En `Análisis Grader > Punto Cero` se incorpora filtro interactivo por causa y rango horario.
+- **Patrones por calibre y calidad**: Al filtrar, se recalculan automáticamente porcentajes y piezas por calibre y calidad para identificar concentraciones.
+- **Patrón temporal**: Se añade visualización por hora para detectar ventanas con eventos significativos.
+- **IA contextual (Groq)**: El análisis IA ahora recibe el foco filtrado (causa/horario/distribuciones) para diagnóstico orientado a patrones operacionales.
+
 ## [2.47.39] - 2026-02-12
 
 ### 🔧 Calibre por peso en detalle y exportes
