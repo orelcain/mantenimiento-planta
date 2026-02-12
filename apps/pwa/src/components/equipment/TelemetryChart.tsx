@@ -16,7 +16,7 @@ import {
 import 'chartjs-adapter-date-fns'
 import { es } from 'date-fns/locale'
 import { Card, CardContent, CardHeader, CardTitle, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui'
-import { fetchSensorHistory } from '@/services/sensorsRtdb'
+import { fetchSensorHistory, type SensorReading } from '@/services/sensorsRtdb'
 import { Loader2 } from 'lucide-react'
 
 ChartJS.register(
@@ -39,7 +39,7 @@ type TimeRange = '1h' | '6h' | '24h' | '7d'
 export function TelemetryChart({ equipmentId }: TelemetryChartProps) {
   const [timeRange, setTimeRange] = useState<TimeRange>('24h')
   const [loading, setLoading] = useState(false)
-  const [data, setData] = useState<any[]>([])
+  const [data, setData] = useState<SensorReading[]>([])
 
   useEffect(() => {
     let isActive = true
@@ -96,6 +96,32 @@ export function TelemetryChart({ equipmentId }: TelemetryChartProps) {
           }
         ]
       }
+  }, [data])
+
+  const visibleStats = useMemo(() => {
+    if (data.length === 0) return null
+
+    const temperatures = data.map((point) => point.temperature)
+    const humidities = data.map((point) => point.humidity)
+    const latest = data[data.length - 1]
+
+    const avg = (values: number[]) => values.reduce((acc, n) => acc + n, 0) / values.length
+
+    return {
+      latestAt: latest.timestamp,
+      temp: {
+        latest: latest.temperature,
+        avg: avg(temperatures),
+        min: Math.min(...temperatures),
+        max: Math.max(...temperatures),
+      },
+      hum: {
+        latest: latest.humidity,
+        avg: avg(humidities),
+        min: Math.min(...humidities),
+        max: Math.max(...humidities),
+      },
+    }
   }, [data])
 
   const options: any = {
@@ -184,6 +210,35 @@ export function TelemetryChart({ equipmentId }: TelemetryChartProps) {
         </Select>
       </CardHeader>
       <CardContent className="flex-1 min-h-[300px] relative">
+        {visibleStats && (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-3">
+            <div className="rounded-md border p-2 bg-card/40">
+              <div className="text-[10px] text-muted-foreground">Temperatura actual</div>
+              <div className="text-sm font-semibold">{visibleStats.temp.latest.toFixed(1)} °C</div>
+            </div>
+            <div className="rounded-md border p-2 bg-card/40">
+              <div className="text-[10px] text-muted-foreground">Humedad actual</div>
+              <div className="text-sm font-semibold">{visibleStats.hum.latest.toFixed(1)} %</div>
+            </div>
+            <div className="rounded-md border p-2 bg-card/40">
+              <div className="text-[10px] text-muted-foreground">Temp promedio / min-max</div>
+              <div className="text-sm font-semibold">
+                {visibleStats.temp.avg.toFixed(1)} °C
+                <span className="text-xs text-muted-foreground"> · {visibleStats.temp.min.toFixed(1)}-{visibleStats.temp.max.toFixed(1)}</span>
+              </div>
+            </div>
+            <div className="rounded-md border p-2 bg-card/40">
+              <div className="text-[10px] text-muted-foreground">Hum promedio / min-max</div>
+              <div className="text-sm font-semibold">
+                {visibleStats.hum.avg.toFixed(1)} %
+                <span className="text-xs text-muted-foreground"> · {visibleStats.hum.min.toFixed(1)}-{visibleStats.hum.max.toFixed(1)}</span>
+              </div>
+            </div>
+            <div className="col-span-2 lg:col-span-4 text-[10px] text-muted-foreground">
+              Última lectura: {new Date(visibleStats.latestAt).toLocaleString('es-CL')}
+            </div>
+          </div>
+        )}
         {loading && (
             <div className="absolute inset-0 flex items-center justify-center bg-background/50 z-10">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />

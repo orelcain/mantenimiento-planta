@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.47.36' as const
+export const APP_VERSION = '2.47.38' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-02-12' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Punto Cero: detección fotocélula + gráfico mejorado' as const
+export const VERSION_NAME = 'Telemetría: últimas 5 lecturas visibles + limpieza lint' as const
 
 /**
  * Nota:

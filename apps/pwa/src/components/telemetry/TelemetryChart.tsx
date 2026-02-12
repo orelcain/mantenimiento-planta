@@ -80,6 +80,37 @@ export function TelemetryChart({ data, type, height = 300 }: TelemetryChartProps
     type === 'candlestick' ||
     type === 'mixed'
 
+  const visibleSummary = useMemo(() => {
+    if (data.length === 0) return null
+
+    const latest = data[data.length - 1]
+    const temps = data.map((point) => point.temperatura)
+    const hums = data.map((point) => point.humedad)
+    const average = (values: number[]) => values.reduce((acc, n) => acc + n, 0) / values.length
+
+    return {
+      points: data.length,
+      latestAt: latest.timestamp,
+      temp: {
+        latest: latest.temperatura,
+        avg: average(temps),
+        min: Math.min(...temps),
+        max: Math.max(...temps),
+      },
+      hum: {
+        latest: latest.humedad,
+        avg: average(hums),
+        min: Math.min(...hums),
+        max: Math.max(...hums),
+      },
+    }
+  }, [data])
+
+  const recentReadings = useMemo(() => {
+    if (data.length === 0) return []
+    return [...data].slice(-5).reverse()
+  }, [data])
+
   const zoomToNow = () => {
     const chart = chartRef.current as any
     if (!chart) return
@@ -734,29 +765,90 @@ export function TelemetryChart({ data, type, height = 300 }: TelemetryChartProps
     return <Line ref={chartRef as any} data={chartData as any} options={options as any} />
   })()
 
+  const chartHeight = Math.max(220, visibleSummary ? height - 130 : height)
+
   return (
-    <div style={{ height: `${height}px` }} className="relative">
-      {supportsRealtimeZoom && (
-        <div className="absolute right-2 top-2 z-10 flex gap-2">
-          <button
-            type="button"
-            onClick={zoomToNow}
-            className="px-2 py-1 text-xs rounded-md border border-gray-200 bg-white/90 shadow-sm hover:bg-white dark:border-gray-700 dark:bg-gray-900/80 dark:hover:bg-gray-900"
-            title="Zoom al tiempo actual"
-          >
-            Ahora
-          </button>
-          <button
-            type="button"
-            onClick={resetZoom}
-            className="px-2 py-1 text-xs rounded-md border border-gray-200 bg-white/90 shadow-sm hover:bg-white dark:border-gray-700 dark:bg-gray-900/80 dark:hover:bg-gray-900"
-            title="Restablecer zoom"
-          >
-            Reset
-          </button>
+    <div className="space-y-3">
+      {visibleSummary && (
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">
+          <div className="rounded-md border p-2 bg-card/40">
+            <div className="text-[10px] text-muted-foreground">Temperatura actual</div>
+            <div className="text-sm font-semibold">{visibleSummary.temp.latest.toFixed(1)} °C</div>
+          </div>
+          <div className="rounded-md border p-2 bg-card/40">
+            <div className="text-[10px] text-muted-foreground">Humedad actual</div>
+            <div className="text-sm font-semibold">{visibleSummary.hum.latest.toFixed(1)} %</div>
+          </div>
+          <div className="rounded-md border p-2 bg-card/40">
+            <div className="text-[10px] text-muted-foreground">Temp prom. / min-max</div>
+            <div className="text-sm font-semibold">
+              {visibleSummary.temp.avg.toFixed(1)}
+              <span className="text-xs text-muted-foreground"> °C · {visibleSummary.temp.min.toFixed(1)}-{visibleSummary.temp.max.toFixed(1)}</span>
+            </div>
+          </div>
+          <div className="rounded-md border p-2 bg-card/40">
+            <div className="text-[10px] text-muted-foreground">Hum prom. / min-max</div>
+            <div className="text-sm font-semibold">
+              {visibleSummary.hum.avg.toFixed(1)}
+              <span className="text-xs text-muted-foreground"> % · {visibleSummary.hum.min.toFixed(1)}-{visibleSummary.hum.max.toFixed(1)}</span>
+            </div>
+          </div>
+          <div className="rounded-md border p-2 bg-card/40">
+            <div className="text-[10px] text-muted-foreground">Lecturas visibles</div>
+            <div className="text-sm font-semibold">{visibleSummary.points.toLocaleString()}</div>
+          </div>
+          <div className="col-span-2 lg:col-span-5 text-[10px] text-muted-foreground">
+            Última lectura: {visibleSummary.latestAt.toLocaleString('es-CL')}
+          </div>
         </div>
       )}
-      {chartElement}
+
+      <div style={{ height: `${chartHeight}px` }} className="relative">
+        {supportsRealtimeZoom && (
+          <div className="absolute right-2 top-2 z-10 flex gap-2">
+            <button
+              type="button"
+              onClick={zoomToNow}
+              className="px-2 py-1 text-xs rounded-md border border-gray-200 bg-white/90 shadow-sm hover:bg-white dark:border-gray-700 dark:bg-gray-900/80 dark:hover:bg-gray-900"
+              title="Zoom al tiempo actual"
+            >
+              Ahora
+            </button>
+            <button
+              type="button"
+              onClick={resetZoom}
+              className="px-2 py-1 text-xs rounded-md border border-gray-200 bg-white/90 shadow-sm hover:bg-white dark:border-gray-700 dark:bg-gray-900/80 dark:hover:bg-gray-900"
+              title="Restablecer zoom"
+            >
+              Reset
+            </button>
+          </div>
+        )}
+        {chartElement}
+      </div>
+
+      {recentReadings.length > 0 && (
+        <div className="rounded-md border overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b bg-muted/30">
+                <th className="py-1.5 px-2 text-left">Hora</th>
+                <th className="py-1.5 px-2 text-right">Temperatura</th>
+                <th className="py-1.5 px-2 text-right">Humedad</th>
+              </tr>
+            </thead>
+            <tbody>
+              {recentReadings.map((reading, index) => (
+                <tr key={`${reading.timestamp.getTime()}-${index}`} className="border-b last:border-b-0 hover:bg-muted/20">
+                  <td className="py-1.5 px-2 text-muted-foreground">{reading.timestamp.toLocaleString('es-CL')}</td>
+                  <td className="py-1.5 px-2 text-right font-medium">{reading.temperatura.toFixed(1)} °C</td>
+                  <td className="py-1.5 px-2 text-right font-medium">{reading.humedad.toFixed(1)} %</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   )
 }

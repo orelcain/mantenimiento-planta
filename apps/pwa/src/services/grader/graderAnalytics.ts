@@ -421,7 +421,6 @@ export function computeAnalytics(
   let totalPieces = 0
   let totalWeightKg = 0
   let pointZeroPieces = 0
-  let pointZeroWeightKg = 0
 
   if (hasPiece) {
     for (const r of data.pieceRecords) {
@@ -430,7 +429,6 @@ export function computeAnalytics(
       // Contar gate=0 para el porcentaje de punto cero
       if (r.gate === 0) {
         pointZeroPieces += r.pieces
-        pointZeroWeightKg += r.weightKg ?? 0
       }
     }
   } else if (hasProdSummary) {

@@ -7,6 +7,28 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.38] - 2026-02-12
+
+### 📊 Telemetría operativa + mantenimiento de calidad
+
+#### Mejoras
+- **Telemetría Sensores**: Se añade mini tabla visible con las últimas 5 lecturas (hora, temperatura, humedad) debajo del gráfico histórico.
+- **Dato visible primero**: Se refuerza el patrón de lectura rápida en paneles de telemetría para operación en planta.
+
+#### Correcciones
+- **Lint Grader**: Eliminada variable no utilizada en analítica para mantener higiene de warnings en VS Code.
+
+## [2.47.37] - 2026-02-12
+
+### 📈 Gráficos con dato visible primero (Grader + Telemetría)
+
+#### Mejoras
+- **Grader Dashboard**: Se expone correspondencia de calibre según peso en KPIs y tablas (promedio/mediana → calibre).
+- **Distribuciones Grader**: Gráficos modernizados con tablas visibles de apoyo (piezas, porcentaje, peso), reduciendo dependencia de hover.
+- **Telemetría Equipos**: Gráfico de historial ahora muestra métricas visibles (actual, promedio, min-max, última lectura).
+- **Telemetría Sensores**: Componente de gráficos agrega panel de métricas resumidas (temperatura/humedad, rango y cantidad de lecturas) para lectura rápida.
+- **UX Operación**: Hover se mantiene como soporte, pero la información crítica queda expuesta por defecto para uso en planta.
+
 ## [2.47.19] - 2026-02-10
 
 ### 📊 Filtro por tipo de error en P0

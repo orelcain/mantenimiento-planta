@@ -58,7 +58,7 @@ import 'chartjs-adapter-date-fns'
 
 import { useAuthStore } from '@/store'
 import { cn } from '@/lib/utils'
-import { computeAnalytics } from '@/services/grader/graderAnalytics'
+import { CALIBRE_WEIGHT_RANGES, computeAnalytics } from '@/services/grader/graderAnalytics'
 import { computeDeterministicInsights, computePointZeroTrend } from '@/services/grader/graderInsights'
 import { analyzeGrader, parseAIResponse } from '@/services/ai/aiProvider'
 import { saveGraderSession } from '@/services/grader/graderSession.service'
@@ -79,6 +79,14 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineEleme
 /** Helper: porcentaje con 2 decimales */
 function pctCalc(part: number, total: number): number {
   return total === 0 ? 0 : Math.round((part / total) * 10000) / 100
+}
+
+function getCalibreByWeightGrams(weightGrams?: number | null): string {
+  if (weightGrams == null || !Number.isFinite(weightGrams) || weightGrams <= 0) return 'N/D'
+  const match = CALIBRE_WEIGHT_RANGES.find((rng) => weightGrams >= rng.minGrams && weightGrams < rng.maxGrams)
+  if (match) return match.calibre
+  if (weightGrams >= CALIBRE_WEIGHT_RANGES[CALIBRE_WEIGHT_RANGES.length - 1].maxGrams) return 'Sobre rango'
+  return 'Fuera de rango'
 }
 
 interface Props {
@@ -113,6 +121,8 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
   )
 
   const trend = useMemo(() => computePointZeroTrend(analytics), [analytics])
+  const avgWeightCalibre = useMemo(() => getCalibreByWeightGrams(analytics.kpis.avgWeightGrams), [analytics.kpis.avgWeightGrams])
+  const medianWeightCalibre = useMemo(() => getCalibreByWeightGrams(analytics.kpis.medianWeightGrams), [analytics.kpis.medianWeightGrams])
 
   // ——— AI ———
   const handleAnalyzeAI = async () => {
@@ -773,8 +783,14 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
           {kpis.avgWeightGrams != null && (
             <KPICard label="Peso Promedio" value={`${kpis.avgWeightGrams.toLocaleString()} g`} icon={Scale} tooltip={getTooltip('kpi.avgWeight')} />
           )}
+          {kpis.avgWeightGrams != null && (
+            <KPICard label="Calibre por Peso Prom." value={avgWeightCalibre} icon={Scale} tooltip="Calibre equivalente según rango de peso promedio." />
+          )}
           {kpis.medianWeightGrams != null && (
             <KPICard label="Peso Mediana" value={`${kpis.medianWeightGrams.toLocaleString()} g`} icon={Scale} tooltip={getTooltip('kpi.medianWeight')} />
+          )}
+          {kpis.medianWeightGrams != null && (
+            <KPICard label="Calibre por Peso Med." value={medianWeightCalibre} icon={Scale} tooltip="Calibre equivalente según rango de peso mediana." />
           )}
           {kpis.uniqueLots != null && kpis.uniqueLots > 0 && (
             <KPICard label="Lotes Procesados" value={kpis.uniqueLots.toString()} icon={Layers} tooltip={getTooltip('kpi.uniqueLots')} />
@@ -1330,20 +1346,60 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
 
         {/* DISTRIBUCIONES */}
         <TabsContent value="distribuciones" className="space-y-4">
+          <Card className="border-primary/20">
+            <CardContent className="pt-4 text-xs text-muted-foreground">
+              Vista optimizada para lectura rápida: se prioriza dato expuesto (tablas y porcentajes visibles) y el hover queda como apoyo.
+            </CardContent>
+          </Card>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <Card>
               <CardHeader><CardTitle className="text-sm">Distribución por Calibre</CardTitle></CardHeader>
               <CardContent>
                 {analytics.distributionByCalibre.length > 0 ? (
-                  <div className="w-full h-[260px] sm:h-[320px]">
-                    <Doughnut
-                      data={calibreChartData}
-                      options={{
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } },
-                      }}
-                    />
+                  <div className="space-y-4">
+                    <div className="w-full h-[260px] sm:h-[320px]">
+                      <Doughnut
+                        data={calibreChartData}
+                        options={{
+                          responsive: true,
+                          maintainAspectRatio: false,
+                          plugins: {
+                            legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } },
+                            tooltip: {
+                              callbacks: {
+                                label: (ctx) => {
+                                  const row = analytics.distributionByCalibre[ctx.dataIndex]
+                                  if (!row) return ''
+                                  return `${row.key}: ${row.pieces.toLocaleString()} pz (${row.pct}%)`
+                                },
+                              },
+                            },
+                          },
+                        }}
+                      />
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="py-1 px-2 text-left">Calibre</th>
+                            <th className="py-1 px-2 text-right">Piezas</th>
+                            <th className="py-1 px-2 text-right">%</th>
+                            <th className="py-1 px-2 text-right">Peso (kg)</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {analytics.distributionByCalibre.map((d) => (
+                            <tr key={d.key} className="border-b hover:bg-muted/30">
+                              <td className="py-1 px-2">{d.key}</td>
+                              <td className="py-1 px-2 text-right font-medium">{d.pieces.toLocaleString()}</td>
+                              <td className="py-1 px-2 text-right">{d.pct}%</td>
+                              <td className="py-1 px-2 text-right">{d.weightKg != null ? d.weightKg.toLocaleString() : '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 ) : (
                   <p className="text-sm text-muted-foreground text-center py-8">Sin datos</p>
@@ -1354,15 +1410,50 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
               <CardHeader><CardTitle className="text-sm">Distribución por Calidad</CardTitle></CardHeader>
               <CardContent>
                 {analytics.distributionByQuality.length > 0 ? (
-                  <div className="w-full h-[260px] sm:h-[320px]">
-                    <Doughnut
-                      data={qualityChartData}
-                      options={{
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } },
-                      }}
-                    />
+                  <div className="space-y-4">
+                    <div className="w-full h-[260px] sm:h-[320px]">
+                      <Doughnut
+                        data={qualityChartData}
+                        options={{
+                          responsive: true,
+                          maintainAspectRatio: false,
+                          plugins: {
+                            legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } },
+                            tooltip: {
+                              callbacks: {
+                                label: (ctx) => {
+                                  const row = analytics.distributionByQuality[ctx.dataIndex]
+                                  if (!row) return ''
+                                  return `${row.key}: ${row.pieces.toLocaleString()} pz (${row.pct}%)`
+                                },
+                              },
+                            },
+                          },
+                        }}
+                      />
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="py-1 px-2 text-left">Calidad</th>
+                            <th className="py-1 px-2 text-right">Piezas</th>
+                            <th className="py-1 px-2 text-right">%</th>
+                            <th className="py-1 px-2 text-right">Peso (kg)</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {analytics.distributionByQuality.map((d) => (
+                            <tr key={d.key} className="border-b hover:bg-muted/30">
+                              <td className="py-1 px-2">{d.key}</td>
+                              <td className="py-1 px-2 text-right font-medium">{d.pieces.toLocaleString()}</td>
+                              <td className="py-1 px-2 text-right">{d.pct}%</td>
+                              <td className="py-1 px-2 text-right">{d.weightKg != null ? d.weightKg.toLocaleString() : '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 ) : (
                   <p className="text-sm text-muted-foreground text-center py-8">Sin datos</p>
@@ -1397,17 +1488,39 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                           label: 'Peso Promedio (g)',
                           data: analytics.lotAnalysis.map(l => l.avgWeightGrams),
                           backgroundColor: 'rgba(59,130,246,0.7)',
+                          borderRadius: 6,
                         },
                         {
+                          type: 'line',
                           label: 'Mediana (g)',
                           data: analytics.lotAnalysis.map(l => l.medianWeightGrams),
-                          backgroundColor: 'rgba(16,185,129,0.6)',
+                          borderColor: 'rgba(16,185,129,0.9)',
+                          backgroundColor: 'rgba(16,185,129,0.2)',
+                          pointBackgroundColor: 'rgba(16,185,129,0.9)',
+                          pointRadius: 3,
+                          tension: 0.25,
                         },
                       ],
                     }}
                     options={{
                       responsive: true,
-                      plugins: { legend: { position: 'bottom' } },
+                      plugins: {
+                        legend: { position: 'bottom' },
+                        tooltip: {
+                          callbacks: {
+                            afterBody: (items) => {
+                              const idx = items[0]?.dataIndex
+                              if (idx == null) return ''
+                              const lot = analytics.lotAnalysis[idx]
+                              if (!lot) return ''
+                              return [
+                                `Calibre prom.: ${getCalibreByWeightGrams(lot.avgWeightGrams)}`,
+                                `Calibre med.: ${getCalibreByWeightGrams(lot.medianWeightGrams)}`,
+                              ]
+                            },
+                          },
+                        },
+                      },
                       scales: { y: { beginAtZero: false, title: { display: true, text: 'Peso (g)' } } },
                     }}
                   />
@@ -1447,6 +1560,8 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                             </span>
                           </th>
                           <th className="py-2 px-2 text-right">Peso (kg)</th>
+                          <th className="py-2 px-2 text-right">Calibre (Prom)</th>
+                          <th className="py-2 px-2 text-right">Calibre (Med)</th>
                           <th className="py-2 px-2 text-right">
                             <span className="flex items-center justify-end gap-1">
                               P0 %
@@ -1469,6 +1584,8 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                               <td className="py-2 px-2 text-right">{lot.medianWeightGrams.toLocaleString()}</td>
                               <td className="py-2 px-2 text-right">{lot.stdDevWeightGrams.toLocaleString()}</td>
                               <td className="py-2 px-2 text-right">{lot.weightKg.toLocaleString()}</td>
+                              <td className="py-2 px-2 text-right">{getCalibreByWeightGrams(lot.avgWeightGrams)}</td>
+                              <td className="py-2 px-2 text-right">{getCalibreByWeightGrams(lot.medianWeightGrams)}</td>
                               <td className="py-2 px-2 text-right">
                                 <span className={cn(
                                   'font-medium',
