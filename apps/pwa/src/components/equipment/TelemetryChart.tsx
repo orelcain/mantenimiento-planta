@@ -101,9 +101,10 @@ export function TelemetryChart({ equipmentId }: TelemetryChartProps) {
   const visibleStats = useMemo(() => {
     if (data.length === 0) return null
 
+    const latest = data[data.length - 1]
+    if (!latest) return null
     const temperatures = data.map((point) => point.temperature)
     const humidities = data.map((point) => point.humidity)
-    const latest = data[data.length - 1]
 
     const avg = (values: number[]) => values.reduce((acc, n) => acc + n, 0) / values.length
 

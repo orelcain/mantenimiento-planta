@@ -84,6 +84,7 @@ export function TelemetryChart({ data, type, height = 300 }: TelemetryChartProps
     if (data.length === 0) return null
 
     const latest = data[data.length - 1]
+    if (!latest) return null
     const temps = data.map((point) => point.temperatura)
     const hums = data.map((point) => point.humedad)
     const average = (values: number[]) => values.reduce((acc, n) => acc + n, 0) / values.length
