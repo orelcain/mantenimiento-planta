@@ -8,7 +8,7 @@
  * v2.46.1 — P0 inteligente, rangos de peso, persistencia archivos, tooltips ricos, modo día/noche
  */
 
-import { useState, useMemo, useRef, Fragment, useEffect } from 'react'
+import { useState, useMemo, useRef, Fragment, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge, Tabs, TabsContent, TabsList, TabsTrigger, InfoTooltip } from '@/components/ui'
 import {
   ChevronLeft,
@@ -146,6 +146,10 @@ interface PinnedPatternPoint {
   y: number
 }
 
+const PIN_CARD_WIDTH = 224
+const PIN_CARD_PADDING = 8
+const PIN_SNAP_STEP = 12
+
 export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack }: Props) {
   const user = useAuthStore((s) => s.user)
   const [saving, setSaving] = useState(false)
@@ -162,6 +166,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
   const [timeFilterTo, setTimeFilterTo] = useState<string>('')
   const [patternIntervalMinutes, setPatternIntervalMinutes] = useState<number>(60)
   const [pinnedPatternPoints, setPinnedPatternPoints] = useState<PinnedPatternPoint[]>([])
+  const [snapPinnedCardsEnabled, setSnapPinnedCardsEnabled] = useState<boolean>(true)
   const [draggingPinnedId, setDraggingPinnedId] = useState<string | null>(null)
   const dashRef = useRef<HTMLDivElement>(null)
   const patternLineChartRef = useRef<ChartJS<'line'> | null>(null)
@@ -357,6 +362,72 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
     return { x: point.x, y: point.y }
   }
 
+  const estimatePinnedCardHeight = useCallback((pin: Pick<PinnedPatternPoint, 'calibres' | 'qualities'>): number => {
+    const calibreRows = pin.calibres.length
+    const qualityRows = pin.qualities.length
+    return 86 + (calibreRows + qualityRows) * 14
+  }, [])
+
+  const normalizePinnedCardsLayout = useCallback((pins: PinnedPatternPoint[]): PinnedPatternPoint[] => {
+    const container = patternChartContainerRef.current
+    if (!container || pins.length === 0) return pins
+
+    const containerWidth = container.clientWidth
+    const containerHeight = container.clientHeight
+    if (containerWidth <= 0 || containerHeight <= 0) return pins
+
+    const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value))
+    const overlap = (
+      ax: number,
+      ay: number,
+      aw: number,
+      ah: number,
+      bx: number,
+      by: number,
+      bw: number,
+      bh: number,
+    ) => {
+      return !(ax + aw + PIN_CARD_PADDING <= bx || bx + bw + PIN_CARD_PADDING <= ax || ay + ah + PIN_CARD_PADDING <= by || by + bh + PIN_CARD_PADDING <= ay)
+    }
+
+    const placed: Array<{ id: string; x: number; y: number; w: number; h: number }> = []
+    const ordered = [...pins].sort((a, b) => (a.y - b.y) || (a.x - b.x))
+    const positioned = ordered.map((pin) => {
+      const cardHeight = estimatePinnedCardHeight(pin)
+      const maxX = Math.max(PIN_CARD_PADDING, containerWidth - PIN_CARD_WIDTH - PIN_CARD_PADDING)
+      const maxY = Math.max(PIN_CARD_PADDING, containerHeight - cardHeight - PIN_CARD_PADDING)
+
+      let x = clamp(pin.x, PIN_CARD_PADDING, maxX)
+      let y = clamp(pin.y, PIN_CARD_PADDING, maxY)
+
+      if (snapPinnedCardsEnabled) {
+        x = clamp(Math.round(x / PIN_SNAP_STEP) * PIN_SNAP_STEP, PIN_CARD_PADDING, maxX)
+        y = clamp(Math.round(y / PIN_SNAP_STEP) * PIN_SNAP_STEP, PIN_CARD_PADDING, maxY)
+      }
+
+      let guard = 0
+      while (
+        placed.some((p) => overlap(x, y, PIN_CARD_WIDTH, cardHeight, p.x, p.y, p.w, p.h))
+        && guard < 240
+      ) {
+        y += snapPinnedCardsEnabled ? PIN_SNAP_STEP : PIN_CARD_PADDING
+        if (y > maxY) {
+          y = PIN_CARD_PADDING
+          x += PIN_CARD_WIDTH + PIN_CARD_PADDING
+          if (x > maxX) x = PIN_CARD_PADDING
+          if (snapPinnedCardsEnabled) x = clamp(Math.round(x / PIN_SNAP_STEP) * PIN_SNAP_STEP, PIN_CARD_PADDING, maxX)
+        }
+        guard += 1
+      }
+
+      placed.push({ id: pin.id, x, y, w: PIN_CARD_WIDTH, h: cardHeight })
+      return { ...pin, x, y }
+    })
+
+    const byId = new Map(positioned.map((p) => [p.id, p]))
+    return pins.map((pin) => byId.get(pin.id) ?? pin)
+  }, [estimatePinnedCardHeight, snapPinnedCardsEnabled])
+
   const handlePinPatternPoint = (dataIndex: number) => {
     const bucket = patternByHour[dataIndex]
     if (!bucket) return
@@ -384,10 +455,11 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
       if (existingIdx >= 0) {
         const copy = [...prev]
         copy[existingIdx] = nextPin
-        return copy
+        return snapPinnedCardsEnabled ? normalizePinnedCardsLayout(copy) : copy
       }
 
-      return [...prev, nextPin]
+      const next = [...prev, nextPin]
+      return snapPinnedCardsEnabled ? normalizePinnedCardsLayout(next) : next
     })
   }
 
@@ -418,12 +490,25 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
       const rawX = event.clientX - containerRect.left - dragInfo.offsetX
       const rawY = event.clientY - containerRect.top - dragInfo.offsetY
 
-      setPinnedPatternPoints((prev) => prev.map((pin) => (pin.id === draggingPinnedId ? { ...pin, x: rawX, y: rawY } : pin)))
+      setPinnedPatternPoints((prev) => prev.map((pin) => {
+        if (pin.id !== draggingPinnedId) return pin
+        const cardHeight = estimatePinnedCardHeight(pin)
+        const maxX = Math.max(PIN_CARD_PADDING, containerRect.width - PIN_CARD_WIDTH - PIN_CARD_PADDING)
+        const maxY = Math.max(PIN_CARD_PADDING, containerRect.height - cardHeight - PIN_CARD_PADDING)
+        return {
+          ...pin,
+          x: Math.min(maxX, Math.max(PIN_CARD_PADDING, rawX)),
+          y: Math.min(maxY, Math.max(PIN_CARD_PADDING, rawY)),
+        }
+      }))
     }
 
     const onMouseUp = () => {
       draggingPinnedOffsetRef.current = null
       setDraggingPinnedId(null)
+      if (snapPinnedCardsEnabled) {
+        setPinnedPatternPoints((prev) => normalizePinnedCardsLayout(prev))
+      }
     }
 
     window.addEventListener('mousemove', onMouseMove)
@@ -432,11 +517,16 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
       window.removeEventListener('mousemove', onMouseMove)
       window.removeEventListener('mouseup', onMouseUp)
     }
-  }, [draggingPinnedId])
+  }, [draggingPinnedId, snapPinnedCardsEnabled, estimatePinnedCardHeight, normalizePinnedCardsLayout])
+
+  useEffect(() => {
+    if (!snapPinnedCardsEnabled) return
+    setPinnedPatternPoints((prev) => normalizePinnedCardsLayout(prev))
+  }, [snapPinnedCardsEnabled, normalizePinnedCardsLayout])
 
   useEffect(() => {
     setPinnedPatternPoints((prev) => {
-      return prev.flatMap((pin) => {
+      const next = prev.flatMap((pin) => {
         const newIndex = patternByHour.findIndex((bucket) => bucket.hour === pin.label)
         if (newIndex < 0) return []
         const bucket = patternByHour[newIndex]
@@ -451,8 +541,9 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
           qualities: detail?.qualities ?? [],
         }]
       })
+      return snapPinnedCardsEnabled ? normalizePinnedCardsLayout(next) : next
     })
-  }, [patternByHour, patternIntervalDetailsByLabel])
+  }, [patternByHour, patternIntervalDetailsByLabel, snapPinnedCardsEnabled, normalizePinnedCardsLayout])
 
   // ——— AI ———
   const handleAnalyzeAI = async () => {
@@ -1555,7 +1646,18 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                   <div className="border rounded p-3">
                     <div className="flex items-center justify-between mb-2 gap-2">
                       <p className="text-xs font-medium">Patrón por intervalo ({patternIntervalMinutes} min)</p>
-                      <p className="text-[10px] text-muted-foreground">Click para fijar, arrastra para comparar, X para quitar</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-[10px] text-muted-foreground">Click fija · arrastra compara · X quita</p>
+                        <Button
+                          type="button"
+                          variant={snapPinnedCardsEnabled ? 'default' : 'outline'}
+                          size="sm"
+                          className="h-6 px-2 text-[10px]"
+                          onClick={() => setSnapPinnedCardsEnabled((v) => !v)}
+                        >
+                          Snap {snapPinnedCardsEnabled ? 'ON' : 'OFF'}
+                        </Button>
+                      </div>
                     </div>
                     <div ref={patternChartContainerRef} className="w-full relative" style={{ height: 220 }}>
                       <Line
@@ -1610,7 +1712,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                         {pinnedPatternPoints.map((pin) => {
                           const point = getPatternPointPixels(pin.dataIndex)
                           if (!point) return null
-                          const lineEndX = pin.x > point.x ? pin.x : pin.x + 224
+                          const lineEndX = pin.x > point.x ? pin.x : pin.x + PIN_CARD_WIDTH
                           const lineEndY = pin.y + 18
                           return (
                             <line

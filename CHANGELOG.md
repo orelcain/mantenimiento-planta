@@ -7,6 +7,16 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.44] - 2026-02-12
+
+### 🧲 Snap opcional en comparaciones del patrón temporal
+
+#### Mejoras
+- **Snap ON/OFF**: Se agrega control para activar o desactivar ajuste automático de tarjetas comparativas.
+- **Anti-solape**: Con snap activo, las tarjetas se reacomodan en grilla para evitar que se monten entre sí.
+- **Ajuste al soltar**: Al terminar de arrastrar, la tarjeta se normaliza visualmente y conserva conexión al punto origen.
+- **Límites del gráfico**: El movimiento queda acotado al área del chart para mantener la comparación visible.
+
 ## [2.47.43] - 2026-02-12
 
 ### 📌 Comparación visual fija en patrón por intervalo
