@@ -148,15 +148,19 @@
     --grader-popover-fg: #1a1a2e;
   }
 
-  .grader-light-mode,
-  .grader-light-mode * {
-    color: var(--grader-fg);
-  }
-
   .grader-light-mode {
+    color-scheme: light;
+    color: var(--grader-fg);
     background-color: var(--grader-bg);
     border-radius: 0.75rem;
     padding: 1rem;
+  }
+
+  @media (max-width: 640px) {
+    .grader-light-mode {
+      padding: 0.75rem;
+      border-radius: 0.5rem;
+    }
   }
 
   /* Cards */
@@ -180,12 +184,19 @@
   /* Tabs */
   .grader-light-mode [role="tablist"] {
     background-color: var(--grader-muted) !important;
+    border: 1px solid var(--grader-border) !important;
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.7);
   }
 
   .grader-light-mode [role="tab"][data-state="active"] {
     background-color: var(--grader-card) !important;
     color: var(--grader-fg) !important;
+    border: 1px solid var(--grader-border) !important;
     box-shadow: 0 1px 2px rgb(0 0 0 / 0.06);
+  }
+
+  .grader-light-mode [role="tab"] {
+    color: var(--grader-muted-fg) !important;
   }
 
   /* Borders */
@@ -209,10 +220,16 @@
   .grader-light-mode button[class*="outline"] {
     border-color: var(--grader-border) !important;
     color: var(--grader-fg) !important;
+    background-color: var(--grader-card) !important;
   }
 
   .grader-light-mode button[class*="outline"]:hover {
     background-color: var(--grader-muted) !important;
+  }
+
+  /* Primary buttons (solid) should keep contrast in light mode */
+  .grader-light-mode button:not([class*="outline"]) {
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.06);
   }
 
   /* Badges */
