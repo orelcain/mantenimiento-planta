@@ -248,6 +248,42 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
       }))
   }, [filteredPatternRecords, patternIntervalMinutes, patternTotalPieces])
 
+  const patternIntervalDetailsByLabel = useMemo(() => {
+    const safeInterval = Math.min(60, Math.max(1, Math.round(patternIntervalMinutes || 60)))
+    const bucketMap = new Map<string, { totalPieces: number; calibreMap: Map<string, number>; qualityMap: Map<string, number> }>()
+
+    for (const r of filteredPatternRecords) {
+      const dt = new Date(r.ts)
+      if (!Number.isFinite(dt.getTime())) continue
+      const minuteOfDay = dt.getHours() * 60 + dt.getMinutes()
+      const bucketMinute = Math.floor(minuteOfDay / safeInterval) * safeInterval
+      const label = formatMinuteOfDayLabel(bucketMinute)
+
+      const bucket = bucketMap.get(label) || { totalPieces: 0, calibreMap: new Map<string, number>(), qualityMap: new Map<string, number>() }
+      bucket.totalPieces += r.pieces
+
+      const calibreKey = r.calibre || 'N/D'
+      bucket.calibreMap.set(calibreKey, (bucket.calibreMap.get(calibreKey) ?? 0) + r.pieces)
+
+      const qualityKey = r.quality || 'Unknown'
+      bucket.qualityMap.set(qualityKey, (bucket.qualityMap.get(qualityKey) ?? 0) + r.pieces)
+
+      bucketMap.set(label, bucket)
+    }
+
+    const detailMap = new Map<string, { totalPieces: number; calibres: Array<{ key: string; pieces: number }>; qualities: Array<{ key: string; pieces: number }> }>()
+    for (const [label, bucket] of bucketMap.entries()) {
+      const calibres = Array.from(bucket.calibreMap.entries())
+        .map(([key, pieces]) => ({ key, pieces }))
+        .sort((a, b) => b.pieces - a.pieces)
+      const qualities = Array.from(bucket.qualityMap.entries())
+        .map(([key, pieces]) => ({ key, pieces }))
+        .sort((a, b) => b.pieces - a.pieces)
+      detailMap.set(label, { totalPieces: bucket.totalPieces, calibres, qualities })
+    }
+    return detailMap
+  }, [filteredPatternRecords, patternIntervalMinutes])
+
   const topPatternCalibre = patternByCalibre[0]
   const topPatternQuality = patternByQuality[0]
   const peakPatternHour = patternByHour.reduce<{ hour: string; pieces: number; pct: number } | null>(
@@ -1398,7 +1434,36 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                         options={{
                           responsive: true,
                           maintainAspectRatio: false,
-                          plugins: { legend: { display: false } },
+                          plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                              callbacks: {
+                                label: (ctx) => {
+                                  const bucket = patternByHour[ctx.dataIndex]
+                                  return bucket ? `Piezas: ${bucket.pieces.toLocaleString()} (${bucket.pct}%)` : ''
+                                },
+                                afterBody: (items) => {
+                                  const first = items?.[0]
+                                  if (!first) return []
+                                  const detail = patternIntervalDetailsByLabel.get(String(first.label))
+                                  if (!detail) return []
+
+                                  const lines: string[] = []
+                                  lines.push('')
+                                  lines.push('Calibre:')
+                                  for (const c of detail.calibres) {
+                                    lines.push(`- ${c.key}: ${c.pieces.toLocaleString()} pz`)
+                                  }
+                                  lines.push('')
+                                  lines.push('Calidad:')
+                                  for (const q of detail.qualities) {
+                                    lines.push(`- ${q.key}: ${q.pieces.toLocaleString()} pz`)
+                                  }
+                                  return lines
+                                },
+                              },
+                            },
+                          },
                           scales: {
                             y: { beginAtZero: true },
                             x: { grid: { color: 'rgba(128,128,128,0.1)' } },

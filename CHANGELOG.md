@@ -7,6 +7,14 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.42] - 2026-02-12
+
+### 🧩 Tooltip enriquecido en patrón por intervalo
+
+#### Mejoras
+- **Hover con detalle operativo**: En el gráfico de patrón temporal (intervalo configurable), el tooltip ahora muestra desglose de piezas por **calibre** y por **calidad** para cada punto/intervalo.
+- **Lectura de causa más rápida**: Permite identificar en el instante si un evento horario está concentrado en un calibre o calidad específica.
+
 ## [2.47.41] - 2026-02-12
 
 ### ⏱️ Intervalo configurable en patrón temporal P0
