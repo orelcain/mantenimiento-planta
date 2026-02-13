@@ -7,6 +7,15 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.55] - 2026-02-12
+
+### 🚦 Semáforo CV en tooltips de desviación estándar
+
+#### Mejoras
+- **Semáforo visible en hover**: Tooltips de `σ` en `Lotes` y `Tendencia` ahora muestran estado por `CV%` con `🟢🟡🟠🔴`.
+- **Umbrales explícitos**: Se agrega guía directa en tooltip (`🟢 <8%`, `🟡 8-11.9%`, `🟠 12-19.9%`, `🔴 ≥20%`).
+- **Lectura más accionable**: Los ejemplos dinámicos ahora incluyen etiqueta de dispersión según semáforo para entender rápidamente severidad.
+
 ## [2.47.54] - 2026-02-12
 
 ### 📈 Tooltip σ contextual en tendencia por intervalo
@@ -62,9 +71,6 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 ## [2.47.49] - 2026-02-12
 
 ### 🎨 Mejora visual: Clasificación Punto Cero
-
-#### Mejoras
-- **Gráfico más grande**: Donut ampliado para aprovechar mejor el espacio libre del panel.
 - **Paleta consistente por causa**: Colores fijos por tipo de causa para evitar ambigüedad entre vista y tabla.
 - **Leyenda renovada**: Se agrega leyenda visual compacta con color, piezas, `% P.Cero` y `% Total` por causa.
 - **Tabla sincronizada con colores**: Cada fila de causa muestra indicador cromático del mismo color del donut.

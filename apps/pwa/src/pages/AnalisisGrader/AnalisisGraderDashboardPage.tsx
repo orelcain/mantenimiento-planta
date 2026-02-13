@@ -1291,20 +1291,22 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
     const highestSigmaLot = [...lotAnalysisView].sort((a, b) => b.stdDevWeightGrams - a.stdDevWeightGrams)[0]
     if (!mainLot) return base
 
+    const getCvSignal = (cv: number) => {
+      if (cv >= 20) return { emoji: '🔴', label: 'alta' }
+      if (cv >= 12) return { emoji: '🟠', label: 'media-alta' }
+      if (cv >= 8) return { emoji: '🟡', label: 'media' }
+      return { emoji: '🟢', label: 'baja' }
+    }
+
     const makeExample = (lot: typeof lotAnalysisView[number]) => {
       const avg = lot.avgWeightGrams
       const sigma = lot.stdDevWeightGrams
       const minBand = Math.max(0, avg - sigma)
       const maxBand = avg + sigma
       const cv = avg > 0 ? (sigma / avg) * 100 : 0
+      const signal = getCvSignal(cv)
 
-      const variabilityLabel =
-        cv >= 20 ? 'muy alta dispersión' :
-        cv >= 12 ? 'dispersión media-alta' :
-        cv >= 8 ? 'dispersión media' :
-        'dispersión baja'
-
-      return `Lote ${lot.lot}: x̄=${avg.toLocaleString('es-CL', { maximumFractionDigits: 2 })}g, σ=${sigma.toLocaleString('es-CL', { maximumFractionDigits: 2 })}g. Aproximadamente muchas piezas caen entre ${minBand.toLocaleString('es-CL', { maximumFractionDigits: 0 })}g y ${maxBand.toLocaleString('es-CL', { maximumFractionDigits: 0 })}g (CV≈${cv.toLocaleString('es-CL', { maximumFractionDigits: 1 })}%, ${variabilityLabel}).`
+      return `Lote ${lot.lot}: x̄=${avg.toLocaleString('es-CL', { maximumFractionDigits: 2 })}g, σ=${sigma.toLocaleString('es-CL', { maximumFractionDigits: 2 })}g. Aproximadamente muchas piezas caen entre ${minBand.toLocaleString('es-CL', { maximumFractionDigits: 0 })}g y ${maxBand.toLocaleString('es-CL', { maximumFractionDigits: 0 })}g (CV≈${cv.toLocaleString('es-CL', { maximumFractionDigits: 1 })}%, ${signal.emoji} dispersión ${signal.label}).`
     }
 
     const mainExample = makeExample(mainLot)
@@ -1315,7 +1317,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
 
     return {
       ...base,
-      text: 'Mide cuánto se dispersan los pesos respecto a la media. En esta tabla se calcula con todos los pesos de cada lote; por eso cada fila tiene un σ distinto.',
+      text: 'Mide cuánto se dispersan los pesos respecto a la media. En esta tabla se calcula con todos los pesos de cada lote; por eso cada fila tiene un σ distinto. Semáforo por CV: 🟢 <8%, 🟡 8-11.9%, 🟠 12-19.9%, 🔴 ≥20%.',
       example: `${mainExample}${secondExample}`,
     }
   }, [lotAnalysisView])
@@ -1335,20 +1337,22 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
       minute: '2-digit',
     })
 
+    const getCvSignal = (cv: number) => {
+      if (cv >= 20) return { emoji: '🔴', label: 'alta' }
+      if (cv >= 12) return { emoji: '🟠', label: 'media-alta' }
+      if (cv >= 8) return { emoji: '🟡', label: 'media' }
+      return { emoji: '🟢', label: 'baja' }
+    }
+
     const makeExample = (item: typeof series[number]) => {
       const avg = item.avgWeightGrams
       const sigma = item.stdDevWeightGrams
       const minBand = Math.max(0, avg - sigma)
       const maxBand = avg + sigma
       const cv = avg > 0 ? (sigma / avg) * 100 : 0
+      const signal = getCvSignal(cv)
 
-      const variabilityLabel =
-        cv >= 20 ? 'muy alta dispersión' :
-        cv >= 12 ? 'dispersión media-alta' :
-        cv >= 8 ? 'dispersión media' :
-        'dispersión baja'
-
-      return `${intervalLabel(item.bucketStart)}: x̄=${avg.toLocaleString('es-CL', { maximumFractionDigits: 2 })}g, σ=${sigma.toLocaleString('es-CL', { maximumFractionDigits: 2 })}g, piezas=${item.pieces.toLocaleString('es-CL')}. Aproximadamente muchas piezas caen entre ${minBand.toLocaleString('es-CL', { maximumFractionDigits: 0 })}g y ${maxBand.toLocaleString('es-CL', { maximumFractionDigits: 0 })}g (CV≈${cv.toLocaleString('es-CL', { maximumFractionDigits: 1 })}%, ${variabilityLabel}).`
+      return `${intervalLabel(item.bucketStart)}: x̄=${avg.toLocaleString('es-CL', { maximumFractionDigits: 2 })}g, σ=${sigma.toLocaleString('es-CL', { maximumFractionDigits: 2 })}g, piezas=${item.pieces.toLocaleString('es-CL')}. Aproximadamente muchas piezas caen entre ${minBand.toLocaleString('es-CL', { maximumFractionDigits: 0 })}g y ${maxBand.toLocaleString('es-CL', { maximumFractionDigits: 0 })}g (CV≈${cv.toLocaleString('es-CL', { maximumFractionDigits: 1 })}%, ${signal.emoji} dispersión ${signal.label}).`
     }
 
     const mainExample = makeExample(mainInterval)
@@ -1359,7 +1363,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
 
     return {
       ...base,
-      text: 'Mide la variabilidad del peso en cada intervalo de tiempo. Se calcula con todas las piezas del intervalo, por eso el σ cambia fila a fila.',
+      text: 'Mide la variabilidad del peso en cada intervalo de tiempo. Se calcula con todas las piezas del intervalo, por eso el σ cambia fila a fila. Semáforo por CV: 🟢 <8%, 🟡 8-11.9%, 🟠 12-19.9%, 🔴 ≥20%.',
       example: `${mainExample}${secondExample}`,
     }
   }, [analytics.weightTrendSeries])
