@@ -43,6 +43,7 @@ const STATUS_OPTIONS: Array<GanttTask['status']> = ['planificada', 'en_progreso'
 const PRIORITY_OPTIONS: IncidentPriority[] = ['critica', 'alta', 'media', 'baja']
 const DEPENDENCY_TYPES: Array<'FS' | 'SS' | 'FF' | 'SF'> = ['FS', 'SS', 'FF', 'SF']
 const PAGE_SIZE_OPTIONS = ['10', '25', '50', '100'] as const
+const DAY_MS = 24 * 60 * 60 * 1000
 
 interface ImportedTaskDraft {
   sourceRow: number
@@ -214,6 +215,7 @@ export function GanttPlannerPage() {
   const [listPage, setListPage] = useState(1)
   const [timelinePageSize, setTimelinePageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>('25')
   const [listPageSize, setListPageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>('25')
+  const [timelineZoom, setTimelineZoom] = useState<'day' | 'week' | 'month'>('week')
   const [assignmentFilter, setAssignmentFilter] = useState<'all' | 'mine' | 'unassigned'>('all')
   const [technicians, setTechnicians] = useState<User[]>([])
 
@@ -369,11 +371,34 @@ export function GanttPlannerPage() {
   const metrics = useMemo(() => buildGanttMetrics(filteredTasks), [filteredTasks])
 
   const timeline = useMemo(() => {
-    if (filteredTasks.length === 0) return { minStart: 0, maxEnd: 0 }
-    const minStart = Math.min(...filteredTasks.map((task) => task.startDate.getTime()))
-    const maxEnd = Math.max(...filteredTasks.map((task) => task.endDate.getTime()))
-    return { minStart, maxEnd }
-  }, [filteredTasks])
+    if (filteredTasks.length === 0) {
+      return {
+        minStart: 0,
+        maxEnd: 0,
+        widthPx: 0,
+        todayLeftPx: 0,
+        showTodayLine: false,
+      }
+    }
+
+    const minStart = Math.min(...filteredTasks.map((task) => (task.baselineStartDate ?? task.startDate).getTime()))
+    const maxEnd = Math.max(...filteredTasks.map((task) => (task.baselineEndDate ?? task.endDate).getTime()))
+    const paddedStart = minStart - DAY_MS
+    const paddedEnd = maxEnd + DAY_MS
+    const totalDays = Math.max(2, Math.ceil((paddedEnd - paddedStart) / DAY_MS))
+    const pixelsPerDay = timelineZoom === 'day' ? 120 : timelineZoom === 'week' ? 40 : 14
+    const widthPx = Math.max(700, totalDays * pixelsPerDay)
+    const now = Date.now()
+    const todayLeftPx = ((now - paddedStart) / (paddedEnd - paddedStart)) * widthPx
+
+    return {
+      minStart: paddedStart,
+      maxEnd: paddedEnd,
+      widthPx,
+      todayLeftPx,
+      showTodayLine: now >= paddedStart && now <= paddedEnd,
+    }
+  }, [filteredTasks, timelineZoom])
 
   const delayedCriticalTasks = useMemo(() => {
     const now = Date.now()
@@ -527,6 +552,8 @@ export function GanttPlannerPage() {
       prioridad: priority,
       startDate: start,
       endDate: end,
+      baselineStartDate: start,
+      baselineEndDate: end,
       progress: 0,
       estimatedHours: Math.max(1, (end.getTime() - start.getTime()) / (1000 * 60 * 60)),
       dependencies: [],
@@ -873,6 +900,8 @@ export function GanttPlannerPage() {
           prioridad: task.prioridad,
           startDate: task.startDate,
           endDate: task.endDate,
+          baselineStartDate: task.startDate,
+          baselineEndDate: task.endDate,
           progress: task.progress,
           estimatedHours: Math.max(1, (task.endDate.getTime() - task.startDate.getTime()) / (1000 * 60 * 60)),
           dependencies: [],
@@ -944,14 +973,32 @@ export function GanttPlannerPage() {
         </CardHeader>
         {!timelineCollapsed && (
           <CardContent className="space-y-3">
-            <div className="flex items-center justify-between gap-2">
-              <Label className="text-xs text-muted-foreground">Tareas por página (timeline)</Label>
-              <Select value={timelinePageSize} onValueChange={(value) => setTimelinePageSize(value as (typeof PAGE_SIZE_OPTIONS)[number])}>
-                <SelectTrigger className="w-24 h-8"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {PAGE_SIZE_OPTIONS.map((size) => <SelectItem key={`timeline-size-${size}`} value={size}>{size}</SelectItem>)}
-                </SelectContent>
-              </Select>
+            <div className="grid gap-2 md:grid-cols-3">
+              <div>
+                <Label className="text-xs text-muted-foreground">Tareas por página (timeline)</Label>
+                <Select value={timelinePageSize} onValueChange={(value) => setTimelinePageSize(value as (typeof PAGE_SIZE_OPTIONS)[number])}>
+                  <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {PAGE_SIZE_OPTIONS.map((size) => <SelectItem key={`timeline-size-${size}`} value={size}>{size}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Escala timeline</Label>
+                <Select value={timelineZoom} onValueChange={(value) => setTimelineZoom(value as 'day' | 'week' | 'month')}>
+                  <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="day">Día</SelectItem>
+                    <SelectItem value="week">Semana</SelectItem>
+                    <SelectItem value="month">Mes</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="text-xs text-muted-foreground flex items-end gap-3 pb-1">
+                <span className="inline-flex items-center gap-1"><span className="h-2 w-4 rounded bg-muted-foreground/40" /> Baseline</span>
+                <span className="inline-flex items-center gap-1"><span className="h-2 w-4 rounded bg-primary" /> Real</span>
+                <span className="inline-flex items-center gap-1"><span className="h-3 w-[2px] bg-red-500" /> Hoy</span>
+              </div>
             </div>
 
             {sortedTasks.length === 0 && (
@@ -960,8 +1007,12 @@ export function GanttPlannerPage() {
 
             {pagedTimelineTasks.map((task) => {
               const total = Math.max(1, timeline.maxEnd - timeline.minStart)
-              const left = ((task.startDate.getTime() - timeline.minStart) / total) * 100
-              const width = Math.max(2, ((task.endDate.getTime() - task.startDate.getTime()) / total) * 100)
+              const baselineStart = (task.baselineStartDate ?? task.startDate).getTime()
+              const baselineEnd = (task.baselineEndDate ?? task.endDate).getTime()
+              const left = ((task.startDate.getTime() - timeline.minStart) / total) * timeline.widthPx
+              const width = Math.max(4, ((task.endDate.getTime() - task.startDate.getTime()) / total) * timeline.widthPx)
+              const baselineLeft = ((baselineStart - timeline.minStart) / total) * timeline.widthPx
+              const baselineWidth = Math.max(4, ((baselineEnd - baselineStart) / total) * timeline.widthPx)
               const isCritical = cpm.criticalPath.includes(task.id)
 
               return (
@@ -970,11 +1021,27 @@ export function GanttPlannerPage() {
                     <span className="font-medium">{task.titulo}</span>
                     <span className="text-muted-foreground">{task.dependencies.length} dep.</span>
                   </div>
-                  <div className="h-3 w-full rounded bg-muted/60 relative overflow-hidden">
+                  <div className="relative overflow-x-auto rounded border bg-muted/20">
                     <div
-                      className={`absolute top-0 h-3 rounded ${isCritical ? 'bg-red-500' : 'bg-primary'}`}
-                      style={{ left: `${left}%`, width: `${width}%` }}
-                    />
+                      className="relative h-8"
+                      style={{ width: `${timeline.widthPx}px` }}
+                    >
+                      {timeline.showTodayLine && (
+                        <div
+                          className="absolute top-0 h-8 w-[2px] bg-red-500/80"
+                          style={{ left: `${timeline.todayLeftPx}px` }}
+                          title="Hoy"
+                        />
+                      )}
+                      <div
+                        className="absolute top-[11px] h-2 rounded bg-muted-foreground/40"
+                        style={{ left: `${baselineLeft}px`, width: `${baselineWidth}px` }}
+                      />
+                      <div
+                        className={`absolute top-[6px] h-4 rounded ${isCritical ? 'bg-red-500' : 'bg-primary'}`}
+                        style={{ left: `${left}px`, width: `${width}px` }}
+                      />
+                    </div>
                   </div>
                 </div>
               )

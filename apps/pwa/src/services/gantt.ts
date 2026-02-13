@@ -140,6 +140,8 @@ export async function getGanttTasks(filters?: {
       id: snap.id,
       startDate: asDate(data.startDate),
       endDate: asDate(data.endDate),
+      baselineStartDate: data.baselineStartDate ? asDate(data.baselineStartDate) : undefined,
+      baselineEndDate: data.baselineEndDate ? asDate(data.baselineEndDate) : undefined,
       createdAt: asDate(data.createdAt),
       updatedAt: asDate(data.updatedAt),
     } as GanttTask)
@@ -167,6 +169,8 @@ export async function createGanttTask(
     ...persistable,
     startDate: Timestamp.fromDate(normalized.startDate),
     endDate: Timestamp.fromDate(normalized.endDate),
+    baselineStartDate: normalized.baselineStartDate ? Timestamp.fromDate(normalized.baselineStartDate) : undefined,
+    baselineEndDate: normalized.baselineEndDate ? Timestamp.fromDate(normalized.baselineEndDate) : undefined,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   })
@@ -186,6 +190,8 @@ export async function updateGanttTask(id: string, patch: Partial<GanttTask>): Pr
 
   if (patch.startDate) payload.startDate = Timestamp.fromDate(patch.startDate)
   if (patch.endDate) payload.endDate = Timestamp.fromDate(patch.endDate)
+  if (patch.baselineStartDate) payload.baselineStartDate = Timestamp.fromDate(patch.baselineStartDate)
+  if (patch.baselineEndDate) payload.baselineEndDate = Timestamp.fromDate(patch.baselineEndDate)
 
   await updateDoc(doc(db, GANTT_TASKS_COLLECTION, id), payload)
 }

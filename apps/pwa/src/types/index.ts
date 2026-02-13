@@ -543,6 +543,8 @@ export interface GanttTask {
   prioridad: IncidentPriority
   startDate: Date
   endDate: Date
+  baselineStartDate?: Date
+  baselineEndDate?: Date
   progress: number
   estimatedHours: number
   dependencies: GanttTaskDependency[]

@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.47.77**
+## Versión Actual: **v2.47.78**
 
 **Fecha de lanzamiento**: 13 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,12 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.47.78 - Timeline Gantt profesional (13/02/2026)
+- 📏 **Escala de timeline**: Selector `Día / Semana / Mes` para adaptar la densidad de planificación.
+- 📍 **Línea de hoy**: Marcador vertical para ubicar el estado actual del proyecto en la línea temporal.
+- 🧭 **Baseline vs Real**: Cada tarea muestra barra base planificada y barra de ejecución real superpuesta.
+- 💾 **Baseline persistente**: Nuevos campos `baselineStartDate` y `baselineEndDate` guardados desde creación/importación.
 
 ### v2.47.77 - Gantt técnico con avance IA y evidencia (13/02/2026)
 - 👷 **Avance por técnico**: El responsable asignado ahora puede actualizar directamente el `%` real de resolución de cada tarea.

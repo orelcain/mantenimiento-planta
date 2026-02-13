@@ -7,6 +7,16 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.78] - 2026-02-13
+
+### 📏 Timeline Gantt más profesional (zoom + hoy + baseline)
+
+#### Mejoras
+- **Escala temporal configurable**: Timeline con selector `Día / Semana / Mes` para ajustar nivel de detalle.
+- **Marcador de hoy**: Se agrega línea vertical de referencia temporal para detectar atrasos rápidamente.
+- **Plan vs ejecución**: Nueva visualización `Baseline` (planificado) sobrepuesta con barra `Real` por tarea.
+- **Base temporal persistente**: Las tareas guardan `baselineStartDate` y `baselineEndDate` para comparativa histórica.
+
 ## [2.47.77] - 2026-02-13
 
 ### 👷 Gantt técnico: avance operativo + IA + evidencia fotográfica

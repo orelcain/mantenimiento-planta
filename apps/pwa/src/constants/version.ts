@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.47.77' as const
+export const APP_VERSION = '2.47.78' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-02-13' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Gantt técnico: avance por % + IA + fotos en comentarios' as const
+export const VERSION_NAME = 'Gantt timeline pro: zoom + línea hoy + baseline' as const
 
 /**
  * Nota:
