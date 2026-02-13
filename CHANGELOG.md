@@ -7,6 +7,18 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.74] - 2026-02-13
+
+### 🧯 Fix importación Gantt desde Excel simplificado
+
+#### Fixes
+- **Firestore `addDoc/updateDoc` robusto**: Se limpian automáticamente campos `undefined` (incluyendo estructuras anidadas) antes de persistir tareas Gantt.
+- **Error corregido en importación**: Eliminado `Unsupported field value: undefined` al importar tareas desde Excel.
+
+#### Mejoras
+- **Compatibilidad de columna**: El parser de importación acepta `descipacion` como alias de descripción.
+- **Carga simplificada estable**: Funciona correctamente con archivos mínimos tipo `Area / Equipo / Tarea`.
+
 ## [2.47.73] - 2026-02-13
 
 ### 🔐 Gantt operativo en cloud + carga masiva desde Excel

@@ -460,7 +460,7 @@ export function GanttPlannerPage() {
           getRowValue(row, ['responsable', 'asignado', 'owner', 'encargado'])
         )
         const descripcion = normalizeText(
-          getRowValue(row, ['descripcion', 'descripción', 'detalle'])
+          getRowValue(row, ['descripcion', 'descripción', 'descipacion', 'detalle'])
         )
 
         const start = parseExcelDate(getRowValue(row, ['inicio', 'fechainicio', 'start', 'inicioreal'])) ?? new Date()
@@ -524,7 +524,7 @@ export function GanttPlannerPage() {
       for (const task of importPreview) {
         await createGanttTask({
           titulo: task.titulo,
-          descripcion: task.descripcion,
+          descripcion: task.descripcion ?? '',
           equipmentId: task.equipmentId,
           equipmentNombre: task.equipmentNombre,
           hierarchyNodeId: task.hierarchyNodeId,

@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.47.73**
+## Versión Actual: **v2.47.74**
 
 **Fecha de lanzamiento**: 13 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.47.74 - Fix importación Gantt (13/02/2026)
+- 🛡️ **Firestore-safe**: `createGanttTask` y `updateGanttTask` limpian campos `undefined` (incluye objetos/anidados) antes de guardar.
+- 📥 **Import Excel robusta**: Soporte de alias `descipacion` en parser y fallback de descripción segura en carga masiva.
+- ✅ **Error resuelto**: elimina fallo `Function addDoc() called with invalid data` al importar lista simplificada (`Area/Equipo/Tarea`).
 
 ### v2.47.73 - Fix permisos Gantt + importación Excel (13/02/2026)
 - 🔐 **Permisos Gantt**: Nuevas reglas Firestore para `ganttTasks` y `ganttTaskComments` (lectura/escritura para usuarios activos según rol/propiedad).

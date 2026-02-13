@@ -52,6 +52,28 @@ function normalizeTask(task: GanttTask): GanttTask {
   }
 }
 
+function stripUndefinedDeep<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => stripUndefinedDeep(item))
+      .filter((item) => item !== undefined) as T
+  }
+
+  if (value && typeof value === 'object') {
+    const result: Record<string, unknown> = {}
+    Object.entries(value as Record<string, unknown>).forEach(([key, nestedValue]) => {
+      if (nestedValue === undefined) return
+      const cleaned = stripUndefinedDeep(nestedValue)
+      if (cleaned !== undefined) {
+        result[key] = cleaned
+      }
+    })
+    return result as T
+  }
+
+  return value
+}
+
 function topologicalSort(tasks: GanttTask[]): string[] {
   const ids = new Set(tasks.map((task) => task.id))
   const inDegree = new Map<string, number>(tasks.map((task) => [task.id, 0]))
@@ -134,7 +156,7 @@ export async function createGanttTask(
     updatedAt: new Date(),
   })
 
-  const ref = await addDoc(collection(db, GANTT_TASKS_COLLECTION), {
+  const payload = stripUndefinedDeep({
     ...normalized,
     startDate: Timestamp.fromDate(normalized.startDate),
     endDate: Timestamp.fromDate(normalized.endDate),
@@ -142,14 +164,16 @@ export async function createGanttTask(
     updatedAt: serverTimestamp(),
   })
 
+  const ref = await addDoc(collection(db, GANTT_TASKS_COLLECTION), payload)
+
   return ref.id
 }
 
 export async function updateGanttTask(id: string, patch: Partial<GanttTask>): Promise<void> {
-  const payload: Record<string, unknown> = {
+  const payload: Record<string, unknown> = stripUndefinedDeep({
     ...patch,
     updatedAt: serverTimestamp(),
-  }
+  })
 
   if (patch.startDate) payload.startDate = Timestamp.fromDate(patch.startDate)
   if (patch.endDate) payload.endDate = Timestamp.fromDate(patch.endDate)
