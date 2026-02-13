@@ -7,6 +7,16 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.56] - 2026-02-12
+
+### 🧾 σ ordenado por fila + semáforo en celdas
+
+#### Mejoras
+- **Tooltip de cabecera simplificado**: Se eliminan ejemplos largos en `σ` para reducir ruido visual.
+- **Explicación por cada valor**: Cada celda `σ` en `Comparativa de Lotes` y `Detalle por Intervalo` incluye tooltip propio con explicación puntual del valor mostrado.
+- **Semáforo directo en tabla**: Valores `σ` ahora muestran color + emoji según `CV%` (`🟢🟡🟠🔴`) para lectura inmediata.
+- **Contexto real por fila**: El hover de cada `σ` muestra `x̄`, `σ`, `N`, banda `x̄±σ` y `CV%` de esa fila, explicando por qué aparece ese número.
+
 ## [2.47.55] - 2026-02-12
 
 ### 🚦 Semáforo CV en tooltips de desviación estándar

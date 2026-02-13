@@ -1284,89 +1284,21 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
 
   const lotStdDevTooltipProps = useMemo(() => {
     const base = getTooltipProps('lot.stdDev')
-    if (lotAnalysisView.length === 0) return base
-
-    const byPieces = [...lotAnalysisView].sort((a, b) => b.pieces - a.pieces)
-    const mainLot = byPieces[0]
-    const highestSigmaLot = [...lotAnalysisView].sort((a, b) => b.stdDevWeightGrams - a.stdDevWeightGrams)[0]
-    if (!mainLot) return base
-
-    const getCvSignal = (cv: number) => {
-      if (cv >= 20) return { emoji: '🔴', label: 'alta' }
-      if (cv >= 12) return { emoji: '🟠', label: 'media-alta' }
-      if (cv >= 8) return { emoji: '🟡', label: 'media' }
-      return { emoji: '🟢', label: 'baja' }
-    }
-
-    const makeExample = (lot: typeof lotAnalysisView[number]) => {
-      const avg = lot.avgWeightGrams
-      const sigma = lot.stdDevWeightGrams
-      const minBand = Math.max(0, avg - sigma)
-      const maxBand = avg + sigma
-      const cv = avg > 0 ? (sigma / avg) * 100 : 0
-      const signal = getCvSignal(cv)
-
-      return `Lote ${lot.lot}: x̄=${avg.toLocaleString('es-CL', { maximumFractionDigits: 2 })}g, σ=${sigma.toLocaleString('es-CL', { maximumFractionDigits: 2 })}g. Aproximadamente muchas piezas caen entre ${minBand.toLocaleString('es-CL', { maximumFractionDigits: 0 })}g y ${maxBand.toLocaleString('es-CL', { maximumFractionDigits: 0 })}g (CV≈${cv.toLocaleString('es-CL', { maximumFractionDigits: 1 })}%, ${signal.emoji} dispersión ${signal.label}).`
-    }
-
-    const mainExample = makeExample(mainLot)
-    const secondExample =
-      highestSigmaLot && highestSigmaLot.lot !== mainLot.lot
-        ? ` Caso más disperso: ${makeExample(highestSigmaLot)}`
-        : ''
-
     return {
       ...base,
       text: 'Mide cuánto se dispersan los pesos respecto a la media. En esta tabla se calcula con todos los pesos de cada lote; por eso cada fila tiene un σ distinto. Semáforo por CV: 🟢 <8%, 🟡 8-11.9%, 🟠 12-19.9%, 🔴 ≥20%.',
-      example: `${mainExample}${secondExample}`,
+      example: 'Pase el mouse sobre cada valor σ de la fila para ver su explicación exacta con datos reales de ese lote.',
     }
-  }, [lotAnalysisView])
+  }, [])
 
   const wtStdDevTooltipProps = useMemo(() => {
     const base = getTooltipProps('wt.stdDev')
-    const series = analytics.weightTrendSeries
-    if (series.length === 0) return base
-
-    const byPieces = [...series].sort((a, b) => b.pieces - a.pieces)
-    const mainInterval = byPieces[0]
-    const highestSigmaInterval = [...series].sort((a, b) => b.stdDevWeightGrams - a.stdDevWeightGrams)[0]
-    if (!mainInterval) return base
-
-    const intervalLabel = (iso: string) => new Date(iso).toLocaleTimeString('es-CL', {
-      hour: '2-digit',
-      minute: '2-digit',
-    })
-
-    const getCvSignal = (cv: number) => {
-      if (cv >= 20) return { emoji: '🔴', label: 'alta' }
-      if (cv >= 12) return { emoji: '🟠', label: 'media-alta' }
-      if (cv >= 8) return { emoji: '🟡', label: 'media' }
-      return { emoji: '🟢', label: 'baja' }
-    }
-
-    const makeExample = (item: typeof series[number]) => {
-      const avg = item.avgWeightGrams
-      const sigma = item.stdDevWeightGrams
-      const minBand = Math.max(0, avg - sigma)
-      const maxBand = avg + sigma
-      const cv = avg > 0 ? (sigma / avg) * 100 : 0
-      const signal = getCvSignal(cv)
-
-      return `${intervalLabel(item.bucketStart)}: x̄=${avg.toLocaleString('es-CL', { maximumFractionDigits: 2 })}g, σ=${sigma.toLocaleString('es-CL', { maximumFractionDigits: 2 })}g, piezas=${item.pieces.toLocaleString('es-CL')}. Aproximadamente muchas piezas caen entre ${minBand.toLocaleString('es-CL', { maximumFractionDigits: 0 })}g y ${maxBand.toLocaleString('es-CL', { maximumFractionDigits: 0 })}g (CV≈${cv.toLocaleString('es-CL', { maximumFractionDigits: 1 })}%, ${signal.emoji} dispersión ${signal.label}).`
-    }
-
-    const mainExample = makeExample(mainInterval)
-    const secondExample =
-      highestSigmaInterval && highestSigmaInterval.bucketStart !== mainInterval.bucketStart
-        ? ` Intervalo más variable: ${makeExample(highestSigmaInterval)}`
-        : ''
-
     return {
       ...base,
       text: 'Mide la variabilidad del peso en cada intervalo de tiempo. Se calcula con todas las piezas del intervalo, por eso el σ cambia fila a fila. Semáforo por CV: 🟢 <8%, 🟡 8-11.9%, 🟠 12-19.9%, 🔴 ≥20%.',
-      example: `${mainExample}${secondExample}`,
+      example: 'Pase el mouse sobre cada valor σ del intervalo para ver su explicación exacta con datos reales de esa fila.',
     }
-  }, [analytics.weightTrendSeries])
+  }, [])
 
   return (
     <div
@@ -2671,7 +2603,35 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                               <td className="py-2 px-2 text-right">{lot.pieces.toLocaleString()}</td>
                               <td className="py-2 px-2 text-right">{lot.avgWeightGrams.toLocaleString()}</td>
                               <td className="py-2 px-2 text-right">{lot.medianWeightGrams.toLocaleString()}</td>
-                              <td className="py-2 px-2 text-right">{lot.stdDevWeightGrams.toLocaleString()}</td>
+                              <td className="py-2 px-2 text-right">
+                                {(() => {
+                                  const cv = lot.avgWeightGrams > 0 ? (lot.stdDevWeightGrams / lot.avgWeightGrams) * 100 : 0
+                                  const signal = cv >= 20
+                                    ? { emoji: '🔴', label: 'alta', cls: 'text-red-600' }
+                                    : cv >= 12
+                                      ? { emoji: '🟠', label: 'media-alta', cls: 'text-amber-600' }
+                                      : cv >= 8
+                                        ? { emoji: '🟡', label: 'media', cls: 'text-yellow-500' }
+                                        : { emoji: '🟢', label: 'baja', cls: 'text-emerald-600' }
+                                  const minBand = Math.max(0, lot.avgWeightGrams - lot.stdDevWeightGrams)
+                                  const maxBand = lot.avgWeightGrams + lot.stdDevWeightGrams
+                                  return (
+                                    <span className="inline-flex items-center justify-end gap-1">
+                                      <span className={cn('font-medium tabular-nums', signal.cls)}>
+                                        {lot.stdDevWeightGrams.toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                      </span>
+                                      <span aria-hidden>{signal.emoji}</span>
+                                      <InfoTooltip
+                                        iconSize={11}
+                                        title={`σ del lote ${lot.lot}`}
+                                        text="Este valor sale al medir qué tan alejados están los pesos individuales de la media del lote."
+                                        formula="σ = √[ Σ(xᵢ − x̄)² / N ]"
+                                        example={`x̄=${lot.avgWeightGrams.toLocaleString('es-CL', { maximumFractionDigits: 2 })}g, σ=${lot.stdDevWeightGrams.toLocaleString('es-CL', { maximumFractionDigits: 2 })}g, N=${lot.pieces.toLocaleString('es-CL')}. Rango típico aprox.: ${minBand.toLocaleString('es-CL', { maximumFractionDigits: 0 })}g a ${maxBand.toLocaleString('es-CL', { maximumFractionDigits: 0 })}g. CV≈${cv.toLocaleString('es-CL', { maximumFractionDigits: 1 })}% (${signal.emoji} dispersión ${signal.label}).`}
+                                      />
+                                    </span>
+                                  )
+                                })()}
+                              </td>
                               <td className="py-2 px-2 text-right">{lot.weightKg.toLocaleString()}</td>
                               <td className="py-2 px-2 text-right">{getCalibreByWeightGrams(lot.avgWeightGrams)}</td>
                               <td className="py-2 px-2 text-right">{getCalibreByWeightGrams(lot.medianWeightGrams)}</td>
@@ -2882,7 +2842,35 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                             <td className="py-1.5 px-2 text-right">{b.pieces.toLocaleString()}</td>
                             <td className="py-1.5 px-2 text-right font-medium">{b.avgWeightGrams.toLocaleString()}</td>
                             <td className="py-1.5 px-2 text-right">{b.medianWeightGrams.toLocaleString()}</td>
-                            <td className="py-1.5 px-2 text-right">{b.stdDevWeightGrams.toLocaleString()}</td>
+                            <td className="py-1.5 px-2 text-right">
+                              {(() => {
+                                const cv = b.avgWeightGrams > 0 ? (b.stdDevWeightGrams / b.avgWeightGrams) * 100 : 0
+                                const signal = cv >= 20
+                                  ? { emoji: '🔴', label: 'alta', cls: 'text-red-600' }
+                                  : cv >= 12
+                                    ? { emoji: '🟠', label: 'media-alta', cls: 'text-amber-600' }
+                                    : cv >= 8
+                                      ? { emoji: '🟡', label: 'media', cls: 'text-yellow-500' }
+                                      : { emoji: '🟢', label: 'baja', cls: 'text-emerald-600' }
+                                const minBand = Math.max(0, b.avgWeightGrams - b.stdDevWeightGrams)
+                                const maxBand = b.avgWeightGrams + b.stdDevWeightGrams
+                                return (
+                                  <span className="inline-flex items-center justify-end gap-1">
+                                    <span className={cn('font-medium tabular-nums', signal.cls)}>
+                                      {b.stdDevWeightGrams.toLocaleString('es-CL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </span>
+                                    <span aria-hidden>{signal.emoji}</span>
+                                    <InfoTooltip
+                                      iconSize={11}
+                                      title={`σ intervalo ${new Date(b.bucketStart).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}`}
+                                      text="Este valor sale al medir qué tan alejados están los pesos del intervalo respecto a su media."
+                                      formula="σ = √[ Σ(xᵢ − x̄)² / N ]"
+                                      example={`x̄=${b.avgWeightGrams.toLocaleString('es-CL', { maximumFractionDigits: 2 })}g, σ=${b.stdDevWeightGrams.toLocaleString('es-CL', { maximumFractionDigits: 2 })}g, N=${b.pieces.toLocaleString('es-CL')}. Rango típico aprox.: ${minBand.toLocaleString('es-CL', { maximumFractionDigits: 0 })}g a ${maxBand.toLocaleString('es-CL', { maximumFractionDigits: 0 })}g. CV≈${cv.toLocaleString('es-CL', { maximumFractionDigits: 1 })}% (${signal.emoji} dispersión ${signal.label}).`}
+                                    />
+                                  </span>
+                                )
+                              })()}
+                            </td>
                             <td className="py-1.5 px-2 text-right text-purple-600">
                               {b.movingAvg5 != null ? b.movingAvg5.toLocaleString() : '—'}
                             </td>
