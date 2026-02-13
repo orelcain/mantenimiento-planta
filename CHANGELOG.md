@@ -7,6 +7,16 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.58] - 2026-02-12
+
+### 📊 Dispersión CV por lote + tooltips estadísticos pedagógicos
+
+#### Mejoras
+- **Nuevo gráfico `Dispersión por Lote (CV%)`**: Visualiza homogeneidad por lote con semáforo (`🟢🟡🟠🔴`) y tooltip con `x̄`, `σ` y `N`.
+- **Sugerencias operativas**: Se agrega lectura accionable bajo el gráfico (lote más variable + recomendación de ajuste y vínculo con sugerencias de gates existentes).
+- **Columna `CV %` en tablas**: `Comparativa de Lotes` y `Detalle por Intervalo` ahora muestran `CV` visible y coloreado.
+- **Tooltips para no expertos**: Se añaden leyendas explicativas para `CV`, `Promedio`, `Mediana` y métricas de tendencia para facilitar adopción por usuarios operativos.
+
 ## [2.47.57] - 2026-02-12
 
 ### 📍 UX: Ver Dashboard visible + leyenda CV fija

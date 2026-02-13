@@ -1,7 +1,7 @@
 {
-  "version": "2.47.57",
+  "version": "2.47.58",
   "buildDate": "2026-02-12",
-  "buildTimestamp": 1770947976388,
+  "buildTimestamp": 1770948886850,
   "features": [
     "Fix P0: datos reales del archivo Puerta 0 (columna Error) priorizados sobre inferencia heurística del PP",
     "Clasificación P0 precisa: 'Fuera de limites' y 'No leído por fotocélula' leídos directamente de la máquina",

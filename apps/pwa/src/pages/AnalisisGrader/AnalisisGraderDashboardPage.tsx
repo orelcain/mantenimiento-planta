@@ -8,7 +8,7 @@
  * v2.46.1 — P0 inteligente, rangos de peso, persistencia archivos, tooltips ricos, modo día/noche
  */
 
-import { useState, useMemo, useRef, Fragment, useEffect } from 'react'
+import { useState, useMemo, useRef, Fragment, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge, Tabs, TabsContent, TabsList, TabsTrigger, InfoTooltip } from '@/components/ui'
 import {
   ChevronLeft,
@@ -1281,6 +1281,31 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
       pointZeroPctChecked: lot.pieces > 0 ? Math.round((lot.pointZeroPieces / lot.pieces) * 10000) / 100 : 0,
     }))
   }, [analytics.lotAnalysis])
+
+  const getCvSignal = useCallback((cv: number) => {
+    if (cv >= 20) return { emoji: '🔴', label: 'alta', cls: 'text-red-600', bar: 'rgba(239,68,68,0.75)' }
+    if (cv >= 12) return { emoji: '🟠', label: 'media-alta', cls: 'text-amber-600', bar: 'rgba(245,158,11,0.75)' }
+    if (cv >= 8) return { emoji: '🟡', label: 'media', cls: 'text-yellow-500', bar: 'rgba(234,179,8,0.75)' }
+    return { emoji: '🟢', label: 'baja', cls: 'text-emerald-600', bar: 'rgba(16,185,129,0.75)' }
+  }, [])
+
+  const lotDispersionView = useMemo(() => {
+    return lotAnalysisView.map((lot) => {
+      const cvPct = lot.avgWeightGrams > 0 ? Math.round((lot.stdDevWeightGrams / lot.avgWeightGrams) * 10000) / 100 : 0
+      return {
+        ...lot,
+        cvPct,
+        cvSignal: getCvSignal(cvPct),
+      }
+    })
+  }, [lotAnalysisView, getCvSignal])
+
+  const lotDispersionSummary = useMemo(() => {
+    const high = lotDispersionView.filter((lot) => lot.cvPct >= 20)
+    const mostVariable = [...lotDispersionView].sort((a, b) => b.cvPct - a.cvPct)[0]
+    const topSwapSuggestions = analytics.gateSwapSuggestions.slice(0, 2)
+    return { high, mostVariable, topSwapSuggestions }
+  }, [lotDispersionView, analytics.gateSwapSuggestions])
 
   const lotStdDevTooltipProps = useMemo(() => {
     const base = getTooltipProps('lot.stdDev')
@@ -2587,6 +2612,12 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                               <InfoTooltip {...lotStdDevTooltipProps} iconSize={12} />
                             </span>
                           </th>
+                          <th className="py-2 px-2 text-right">
+                            <span className="flex items-center justify-end gap-1">
+                              CV %
+                              <InfoTooltip {...getTooltipProps('lot.cv')} iconSize={12} />
+                            </span>
+                          </th>
                           <th className="py-2 px-2 text-right">Peso (kg)</th>
                           <th className="py-2 px-2 text-right">Calibre (Prom)</th>
                           <th className="py-2 px-2 text-right">Calibre (Med)</th>
@@ -2613,13 +2644,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                               <td className="py-2 px-2 text-right">
                                 {(() => {
                                   const cv = lot.avgWeightGrams > 0 ? (lot.stdDevWeightGrams / lot.avgWeightGrams) * 100 : 0
-                                  const signal = cv >= 20
-                                    ? { emoji: '🔴', label: 'alta', cls: 'text-red-600' }
-                                    : cv >= 12
-                                      ? { emoji: '🟠', label: 'media-alta', cls: 'text-amber-600' }
-                                      : cv >= 8
-                                        ? { emoji: '🟡', label: 'media', cls: 'text-yellow-500' }
-                                        : { emoji: '🟢', label: 'baja', cls: 'text-emerald-600' }
+                                  const signal = getCvSignal(cv)
                                   const minBand = Math.max(0, lot.avgWeightGrams - lot.stdDevWeightGrams)
                                   const maxBand = lot.avgWeightGrams + lot.stdDevWeightGrams
                                   return (
@@ -2634,6 +2659,23 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                                         text="Este valor sale al medir qué tan alejados están los pesos individuales de la media del lote."
                                         formula="σ = √[ Σ(xᵢ − x̄)² / N ]"
                                         example={`x̄=${lot.avgWeightGrams.toLocaleString('es-CL', { maximumFractionDigits: 2 })}g, σ=${lot.stdDevWeightGrams.toLocaleString('es-CL', { maximumFractionDigits: 2 })}g, N=${lot.pieces.toLocaleString('es-CL')}. Rango típico aprox.: ${minBand.toLocaleString('es-CL', { maximumFractionDigits: 0 })}g a ${maxBand.toLocaleString('es-CL', { maximumFractionDigits: 0 })}g. CV≈${cv.toLocaleString('es-CL', { maximumFractionDigits: 1 })}% (${signal.emoji} dispersión ${signal.label}).`}
+                                      />
+                                    </span>
+                                  )
+                                })()}
+                              </td>
+                              <td className="py-2 px-2 text-right">
+                                {(() => {
+                                  const cv = lot.avgWeightGrams > 0 ? (lot.stdDevWeightGrams / lot.avgWeightGrams) * 100 : 0
+                                  const signal = getCvSignal(cv)
+                                  return (
+                                    <span className={cn('inline-flex items-center justify-end gap-1 font-medium tabular-nums', signal.cls)}>
+                                      {cv.toLocaleString('es-CL', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%
+                                      <span aria-hidden>{signal.emoji}</span>
+                                      <InfoTooltip
+                                        iconSize={11}
+                                        {...getTooltipProps('lot.cv')}
+                                        example={`CV=${cv.toLocaleString('es-CL', { maximumFractionDigits: 1 })}% en lote ${lot.lot}: ${signal.emoji} dispersión ${signal.label}. Se calcula como σ/x̄.`}
                                       />
                                     </span>
                                   )
@@ -2659,6 +2701,88 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                         })}
                       </tbody>
                     </table>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="relative overflow-visible z-10">
+                <CardHeader>
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    Dispersión por Lote (CV%)
+                    <InfoTooltip {...getTooltipProps('lot.cvChart')} />
+                  </CardTitle>
+                  <p className="text-[11px] text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <span className="font-medium">Semáforo CV:</span>
+                    <span>🟢 &lt;8%</span>
+                    <span>🟡 8-11.9%</span>
+                    <span>🟠 12-19.9%</span>
+                    <span>🔴 ≥20%</span>
+                  </p>
+                </CardHeader>
+                <CardContent className="overflow-visible space-y-3">
+                  <div className="overflow-visible" style={{ minHeight: 260 }}>
+                    <Bar
+                      data={{
+                        labels: lotDispersionView.map((lot) => lot.lot),
+                        datasets: [
+                          {
+                            label: 'CV %',
+                            data: lotDispersionView.map((lot) => lot.cvPct),
+                            backgroundColor: lotDispersionView.map((lot) => lot.cvSignal.bar),
+                            borderRadius: 6,
+                          },
+                        ],
+                      }}
+                      options={{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                          legend: { display: false },
+                          tooltip: {
+                            callbacks: {
+                              label: (ctx) => {
+                                const lot = lotDispersionView[ctx.dataIndex]
+                                if (!lot) return ''
+                                return `CV: ${lot.cvPct.toLocaleString('es-CL', { maximumFractionDigits: 1 })}% (${lot.cvSignal.emoji} ${lot.cvSignal.label})`
+                              },
+                              afterBody: (items) => {
+                                const idx = items[0]?.dataIndex
+                                if (idx == null) return ''
+                                const lot = lotDispersionView[idx]
+                                if (!lot) return ''
+                                return [
+                                  `x̄: ${lot.avgWeightGrams.toLocaleString('es-CL')} g`,
+                                  `σ: ${lot.stdDevWeightGrams.toLocaleString('es-CL')} g`,
+                                  `Piezas: ${lot.pieces.toLocaleString('es-CL')}`,
+                                ]
+                              },
+                            },
+                          },
+                        },
+                        scales: {
+                          y: { beginAtZero: true, title: { display: true, text: 'CV %' } },
+                        },
+                      }}
+                    />
+                  </div>
+
+                  <div className="text-xs space-y-1.5 text-muted-foreground">
+                    {lotDispersionSummary.mostVariable && (
+                      <p>
+                        Lote más variable: <span className="font-medium text-foreground">{lotDispersionSummary.mostVariable.lot}</span> con
+                        {' '}<span className={cn('font-semibold', lotDispersionSummary.mostVariable.cvSignal.cls)}>{lotDispersionSummary.mostVariable.cvPct.toLocaleString('es-CL', { maximumFractionDigits: 1 })}%</span>.
+                      </p>
+                    )}
+                    {lotDispersionSummary.high.length > 0 && (
+                      <p>
+                        Recomendación: hay {lotDispersionSummary.high.length} lote(s) en zona roja. Evalúe separar operación por lote y priorizar ajuste de gates para el calibre dominante.
+                      </p>
+                    )}
+                    {lotDispersionSummary.topSwapSuggestions.length > 0 && (
+                      <p>
+                        Sugerencia gates: {lotDispersionSummary.topSwapSuggestions[0]?.reason}
+                      </p>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -2827,12 +2951,28 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                         <tr className="border-b text-left">
                           <th className="py-2 px-2">Hora</th>
                           <th className="py-2 px-2 text-right">Piezas</th>
-                          <th className="py-2 px-2 text-right">Promedio (g)</th>
-                          <th className="py-2 px-2 text-right">Mediana (g)</th>
+                          <th className="py-2 px-2 text-right">
+                            <span className="flex items-center justify-end gap-1">
+                              Promedio (g)
+                              <InfoTooltip {...getTooltipProps('wt.avgWeight')} iconSize={12} />
+                            </span>
+                          </th>
+                          <th className="py-2 px-2 text-right">
+                            <span className="flex items-center justify-end gap-1">
+                              Mediana (g)
+                              <InfoTooltip {...getTooltipProps('wt.medianWeight')} iconSize={12} />
+                            </span>
+                          </th>
                           <th className="py-2 px-2 text-right">
                             <span className="flex items-center justify-end gap-1">
                               σ (g)
                               <InfoTooltip {...wtStdDevTooltipProps} iconSize={12} />
+                            </span>
+                          </th>
+                          <th className="py-2 px-2 text-right">
+                            <span className="flex items-center justify-end gap-1">
+                              CV %
+                              <InfoTooltip {...getTooltipProps('wt.cv')} iconSize={12} />
                             </span>
                           </th>
                           <th className="py-2 px-2 text-right">
@@ -2859,13 +2999,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                             <td className="py-1.5 px-2 text-right">
                               {(() => {
                                 const cv = b.avgWeightGrams > 0 ? (b.stdDevWeightGrams / b.avgWeightGrams) * 100 : 0
-                                const signal = cv >= 20
-                                  ? { emoji: '🔴', label: 'alta', cls: 'text-red-600' }
-                                  : cv >= 12
-                                    ? { emoji: '🟠', label: 'media-alta', cls: 'text-amber-600' }
-                                    : cv >= 8
-                                      ? { emoji: '🟡', label: 'media', cls: 'text-yellow-500' }
-                                      : { emoji: '🟢', label: 'baja', cls: 'text-emerald-600' }
+                                const signal = getCvSignal(cv)
                                 const minBand = Math.max(0, b.avgWeightGrams - b.stdDevWeightGrams)
                                 const maxBand = b.avgWeightGrams + b.stdDevWeightGrams
                                 return (
@@ -2881,6 +3015,18 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                                       formula="σ = √[ Σ(xᵢ − x̄)² / N ]"
                                       example={`x̄=${b.avgWeightGrams.toLocaleString('es-CL', { maximumFractionDigits: 2 })}g, σ=${b.stdDevWeightGrams.toLocaleString('es-CL', { maximumFractionDigits: 2 })}g, N=${b.pieces.toLocaleString('es-CL')}. Rango típico aprox.: ${minBand.toLocaleString('es-CL', { maximumFractionDigits: 0 })}g a ${maxBand.toLocaleString('es-CL', { maximumFractionDigits: 0 })}g. CV≈${cv.toLocaleString('es-CL', { maximumFractionDigits: 1 })}% (${signal.emoji} dispersión ${signal.label}).`}
                                     />
+                                  </span>
+                                )
+                              })()}
+                            </td>
+                            <td className="py-1.5 px-2 text-right">
+                              {(() => {
+                                const cv = b.avgWeightGrams > 0 ? (b.stdDevWeightGrams / b.avgWeightGrams) * 100 : 0
+                                const signal = getCvSignal(cv)
+                                return (
+                                  <span className={cn('inline-flex items-center justify-end gap-1 font-medium tabular-nums', signal.cls)}>
+                                    {cv.toLocaleString('es-CL', { maximumFractionDigits: 1 })}%
+                                    <span aria-hidden>{signal.emoji}</span>
                                   </span>
                                 )
                               })()}

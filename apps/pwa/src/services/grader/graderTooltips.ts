@@ -75,6 +75,18 @@ export const GRADER_TOOLTIPS: Record<string, TooltipEntry> = {
     formula: 'σ = √[ Σ(xᵢ − x̄)² / N ]',
     example: 'σ = 15g → la mayoría de piezas están entre x̄±15g',
   },
+  'lot.cv': {
+    title: 'Coeficiente de variación (CV)',
+    text: 'Mide la dispersión relativa del lote: compara σ contra el peso promedio. Permite comparar lotes con distintos promedios.',
+    formula: 'CV = (σ / x̄) × 100%',
+    example: 'Si x̄=3.000g y σ=300g → CV=10% (dispersión moderada).',
+  },
+  'lot.cvChart': {
+    title: 'Dispersión por lote (CV%)',
+    text: 'Gráfico de homogeneidad de peso por lote. Valores altos indican mezcla de calibres y mayor riesgo de desajuste en gates.',
+    formula: 'CV_lote = (σ_lote / x̄_lote) × 100%',
+    example: 'CV>20% sugiere revisar asignación de compuertas y estrategia de separación.',
+  },
   'lot.p0pct': 'Porcentaje de piezas del lote que fueron Punto Cero. Lotes con alto P0 necesitan atención.',
 
   // ─── Tendencia de peso ─────────────────────────────────────
@@ -93,6 +105,22 @@ export const GRADER_TOOLTIPS: Record<string, TooltipEntry> = {
     title: 'Desviación estándar (σ)',
     text: 'Desviación estándar del peso en cada intervalo de tiempo. Alta variabilidad indica piezas heterogéneas.',
     formula: 'σ = √[ Σ(xᵢ − x̄)² / N ]',
+  },
+  'wt.avgWeight': {
+    title: 'Promedio por intervalo',
+    text: 'Peso promedio de las piezas procesadas dentro de este intervalo de tiempo.',
+    formula: 'x̄_intervalo = Σxᵢ / N',
+  },
+  'wt.medianWeight': {
+    title: 'Mediana por intervalo',
+    text: 'Peso central del intervalo al ordenar las piezas. Es más estable que el promedio ante outliers.',
+    formula: 'Me = valor central de pesos ordenados',
+  },
+  'wt.cv': {
+    title: 'CV por intervalo',
+    text: 'Dispersión relativa en cada intervalo. Ayuda a detectar momentos del turno con mezcla de tamaños más alta.',
+    formula: 'CV = (σ / x̄) × 100%',
+    example: 'CV alto en una hora puntual puede justificar ajuste temporal de compuertas.',
   },
   'wt.dominantLot': 'Lote con más piezas en este intervalo de tiempo.',
 
