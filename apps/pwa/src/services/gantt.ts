@@ -216,11 +216,13 @@ export async function addTaskComment(
   taskId: string,
   comment: Omit<GanttTaskComment, 'id' | 'taskId' | 'createdAt'>
 ): Promise<string> {
-  const ref = await addDoc(collection(db, GANTT_COMMENTS_COLLECTION), {
+  const payload = stripUndefinedDeep({
     taskId,
     ...comment,
     createdAt: serverTimestamp(),
   })
+
+  const ref = await addDoc(collection(db, GANTT_COMMENTS_COLLECTION), payload)
 
   return ref.id
 }

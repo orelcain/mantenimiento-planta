@@ -1,8 +1,13 @@
 {
-  "version": "2.47.76",
+  "version": "2.47.77",
   "buildDate": "2026-02-13",
   "buildTimestamp": 1771005600000,
   "features": [
+    "Gantt técnico: el responsable ahora puede reportar avance manual por porcentaje directamente en detalle de tarea",
+    "Comentarios Gantt con evidencia fotográfica: adjunto de imágenes en seguimiento operativo",
+    "Sugerencia IA de avance (Grok) basada en comentarios técnicos recientes, con opción de aplicar porcentaje",
+    "Persistencia de sugerencia IA por tarea (`aiSuggestedProgress`) para trazabilidad de avance",
+    "Reglas Storage ampliadas para ruta de fotos Gantt (`gantt/{taskId}/comments/{commentDraftId}`)",
     "Fix P0: datos reales del archivo Puerta 0 (columna Error) priorizados sobre inferencia heurística del PP",
     "Clasificación P0 precisa: 'Fuera de limites' y 'No leído por fotocélula' leídos directamente de la máquina",
     "Sin re-clasificación heurística cuando hay archivo P0 real (respeta datos de Marelec)",

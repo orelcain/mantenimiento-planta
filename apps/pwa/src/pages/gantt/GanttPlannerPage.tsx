@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, Bell, CalendarClock, ChevronDown, ChevronUp, FileSpreadsheet, GitBranchPlus, Link2Off, Plus, Trash2, Upload } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
+import { AlertTriangle, Bell, CalendarClock, Camera, ChevronDown, ChevronUp, FileSpreadsheet, GitBranchPlus, Link2Off, Plus, Sparkles, Trash2, Upload } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import {
   Badge,
@@ -18,8 +18,12 @@ import {
 } from '@/components/ui'
 import { useAuthStore, useCan } from '@/store'
 import { getEquipments } from '@/services/equipment'
+import { getTechnicians } from '@/services/auth'
 import { areNotificationsEnabled, showLocalNotification } from '@/services/notifications'
 import { sendGanttAlert } from '@/services/ganttNotifications'
+import { uploadGanttCommentPhoto } from '@/services/storage'
+import { estimateGanttProgressFromComments } from '@/services/ganttAi'
+import { generateId } from '@/lib/utils'
 import {
   addTaskComment,
   buildGanttMetrics,
@@ -32,7 +36,7 @@ import {
   updateGanttTask,
 } from '@/services/gantt'
 import { useHierarchyTree } from '@/hooks/useHierarchy'
-import type { Equipment, GanttTask, GanttTaskComment, IncidentPriority } from '@/types'
+import type { Equipment, GanttTask, GanttTaskComment, IncidentPriority, User } from '@/types'
 import { HierarchyLevel, type HierarchyNode, type HierarchyNodeWithChildren } from '@/types/hierarchy'
 
 const STATUS_OPTIONS: Array<GanttTask['status']> = ['planificada', 'en_progreso', 'bloqueada', 'completada']
@@ -210,6 +214,8 @@ export function GanttPlannerPage() {
   const [listPage, setListPage] = useState(1)
   const [timelinePageSize, setTimelinePageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>('25')
   const [listPageSize, setListPageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>('25')
+  const [assignmentFilter, setAssignmentFilter] = useState<'all' | 'mine' | 'unassigned'>('all')
+  const [technicians, setTechnicians] = useState<User[]>([])
 
   const [title, setTitle] = useState('')
   const [areaId, setAreaId] = useState<string>('none')
@@ -218,6 +224,7 @@ export function GanttPlannerPage() {
   const [startDate, setStartDate] = useState(toInputDate(new Date()))
   const [endDate, setEndDate] = useState(toInputDate(new Date(Date.now() + 8 * 60 * 60 * 1000)))
   const [sparePartIdsText, setSparePartIdsText] = useState('')
+  const [createResponsibleId, setCreateResponsibleId] = useState<string>('self')
 
   const [selectedTaskId, setSelectedTaskId] = useState<string>('none')
   const [dependencyTaskId, setDependencyTaskId] = useState<string>('none')
@@ -230,6 +237,13 @@ export function GanttPlannerPage() {
 
   const [comments, setComments] = useState<GanttTaskComment[]>([])
   const [newComment, setNewComment] = useState('')
+  const [reportedProgressInput, setReportedProgressInput] = useState('')
+  const [commentPhotos, setCommentPhotos] = useState<File[]>([])
+  const [commentPhotoPreviews, setCommentPhotoPreviews] = useState<string[]>([])
+  const [commentBusy, setCommentBusy] = useState(false)
+  const [progressBusy, setProgressBusy] = useState(false)
+  const [aiProgressSuggestion, setAiProgressSuggestion] = useState<number | null>(null)
+  const [aiProgressReason, setAiProgressReason] = useState('')
   const [importFile, setImportFile] = useState<File | null>(null)
   const [importPreview, setImportPreview] = useState<ImportedTaskDraft[]>([])
   const [importErrors, setImportErrors] = useState<string[]>([])
@@ -259,16 +273,29 @@ export function GanttPlannerPage() {
     return equipment.filter((item) => normalizeKey(item.hierarchyPath ?? '').includes(areaName))
   }, [areaId, equipment, selectedArea?.nombre])
 
+  const technicianLookupByName = useMemo(() => {
+    const map = new Map<string, User>()
+    technicians.forEach((tech) => {
+      map.set(normalizeKey(`${tech.nombre} ${tech.apellido}`), tech)
+      map.set(normalizeKey(tech.nombre), tech)
+      map.set(normalizeKey(tech.apellido), tech)
+      map.set(normalizeKey(tech.email), tech)
+    })
+    return map
+  }, [technicians])
+
   async function load() {
     setLoading(true)
     setError(null)
     try {
-      const [rows, eq] = await Promise.all([
+      const [rows, eq, techs] = await Promise.all([
         getGanttTasks(),
         getEquipments().catch(() => [] as Equipment[]),
+        getTechnicians().catch(() => [] as User[]),
       ])
       setTasks(rows)
       setEquipment(eq)
+      setTechnicians(techs)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error cargando planificador')
     } finally {
@@ -291,6 +318,10 @@ export function GanttPlannerPage() {
       }
       if (equipmentFilter !== 'all' && task.equipmentId !== equipmentFilter) return false
       if (statusFilter !== 'all' && task.status !== statusFilter) return false
+      if (assignmentFilter === 'mine') {
+        if (!user?.id || task.responsibleUserId !== user.id) return false
+      }
+      if (assignmentFilter === 'unassigned' && task.responsibleUserId) return false
       if (query) {
         const haystack = [
           task.titulo,
@@ -303,7 +334,7 @@ export function GanttPlannerPage() {
       }
       return true
     })
-  }, [areaFilter, equipmentFilter, searchText, selectedAreaFilter?.nombre, statusFilter, tasks])
+  }, [areaFilter, assignmentFilter, equipmentFilter, searchText, selectedAreaFilter?.nombre, statusFilter, tasks, user?.id])
 
   const sortedTasks = useMemo(() => {
     const rows = [...filteredTasks]
@@ -367,10 +398,20 @@ export function GanttPlannerPage() {
     return sortedTasks.slice(start, start + listPageSizeNum)
   }, [safeListPage, sortedTasks, listPageSizeNum])
 
+  const selectedTask = useMemo(
+    () => (selectedTaskId === 'none' ? null : tasks.find((task) => task.id === selectedTaskId) ?? null),
+    [selectedTaskId, tasks]
+  )
+
+  const canOperateTask = (task: GanttTask) => {
+    if (!user?.id) return false
+    return canEdit || task.responsibleUserId === user.id
+  }
+
   useEffect(() => {
     setTimelinePage(1)
     setListPage(1)
-  }, [areaFilter, equipmentFilter, statusFilter, sortMode, searchText, timelinePageSize, listPageSize])
+  }, [areaFilter, assignmentFilter, equipmentFilter, statusFilter, sortMode, searchText, timelinePageSize, listPageSize])
 
   useEffect(() => {
     if (timelinePage > totalTimelinePages) {
@@ -385,12 +426,31 @@ export function GanttPlannerPage() {
   }, [listPage, totalListPages])
 
   useEffect(() => {
+    if (!selectedTask) {
+      setReportedProgressInput('')
+      return
+    }
+    setReportedProgressInput(String(selectedTask.progress))
+    if (typeof selectedTask.aiSuggestedProgress === 'number') {
+      setAiProgressSuggestion(selectedTask.aiSuggestedProgress)
+    }
+  }, [selectedTask])
+
+  useEffect(() => {
     if (selectedTaskId === 'none') {
       setComments([])
+      setAiProgressSuggestion(null)
+      setAiProgressReason('')
       return
     }
     getTaskComments(selectedTaskId).then(setComments).catch(() => setComments([]))
   }, [selectedTaskId])
+
+  useEffect(() => {
+    return () => {
+      commentPhotoPreviews.forEach((url) => URL.revokeObjectURL(url))
+    }
+  }, [commentPhotoPreviews])
 
   useEffect(() => {
     if (!areNotificationsEnabled()) return
@@ -436,6 +496,21 @@ export function GanttPlannerPage() {
     }
 
     const selectedEquipment = equipment.find((item) => item.id === equipmentId)
+    const selectedTechnician = createResponsibleId !== 'self' && createResponsibleId !== 'none'
+      ? technicians.find((tech) => tech.id === createResponsibleId)
+      : undefined
+    const responsibleUserId = createResponsibleId === 'none'
+      ? undefined
+      : createResponsibleId === 'self'
+        ? user.id
+        : selectedTechnician?.id
+    const responsibleName = createResponsibleId === 'none'
+      ? undefined
+      : createResponsibleId === 'self'
+        ? `${user.nombre} ${user.apellido}`
+        : selectedTechnician
+          ? `${selectedTechnician.nombre} ${selectedTechnician.apellido}`
+          : undefined
     const sparePartIds = sparePartIdsText
       .split(',')
       .map((value) => value.trim())
@@ -458,18 +533,19 @@ export function GanttPlannerPage() {
       sparePartIds,
       predictiveRiskLevel: suggestedRiskForEquipmentStatus(selectedEquipment?.estado),
       createdBy: user.id,
-      responsibleUserId: user.id,
-      responsibleName: `${user.nombre} ${user.apellido}`,
+      responsibleUserId,
+      responsibleName,
     })
 
     setTitle('')
     setSparePartIdsText('')
     setEquipmentId('none')
+    setCreateResponsibleId('self')
     await load()
   }
 
   async function handleAdvance(task: GanttTask) {
-    if (!canEdit) return
+    if (!canOperateTask(task)) return
 
     const nextStatus: GanttTask['status'] = task.status === 'planificada'
       ? 'en_progreso'
@@ -486,11 +562,88 @@ export function GanttPlannerPage() {
     await load()
   }
 
+  async function handleUpdateTaskProgress(task: GanttTask, progress: number) {
+    if (!canOperateTask(task)) return
+    const nextProgress = Math.max(0, Math.min(100, Math.round(progress)))
+    const nextStatus: GanttTask['status'] = nextProgress >= 100
+      ? 'completada'
+      : nextProgress > 0 && task.status === 'planificada'
+        ? 'en_progreso'
+        : task.status
+
+    setProgressBusy(true)
+    try {
+      await updateGanttTask(task.id, {
+        progress: nextProgress,
+        status: nextStatus,
+      })
+      await load()
+      setReportedProgressInput(String(nextProgress))
+    } finally {
+      setProgressBusy(false)
+    }
+  }
+
   async function handleDelete(taskId: string) {
     if (!canDelete) return
     await deleteGanttTask(taskId)
     if (selectedTaskId === taskId) setSelectedTaskId('none')
     await load()
+  }
+
+  async function handleAssignResponsible(task: GanttTask, technicianId: string) {
+    if (!canEdit || technicianId === 'none') return
+    const technician = technicians.find((row) => row.id === technicianId)
+    if (!technician) return
+
+    await updateGanttTask(task.id, {
+      responsibleUserId: technician.id,
+      responsibleName: `${technician.nombre} ${technician.apellido}`,
+    })
+    await load()
+  }
+
+  async function handleEstimateProgressWithAI(baseComments?: GanttTaskComment[]) {
+    if (!selectedTask) return
+
+    const sourceComments = (baseComments ?? comments).slice(0, 12)
+    const result = await estimateGanttProgressFromComments({
+      taskTitle: selectedTask.titulo,
+      taskDescription: selectedTask.descripcion,
+      currentProgress: selectedTask.progress,
+      comments: sourceComments.map((comment) => ({
+        content: comment.content,
+        reportedProgress: comment.reportedProgress,
+        createdByName: comment.createdByName,
+        createdAt: comment.createdAt,
+      })),
+    })
+
+    setAiProgressSuggestion(result.suggestedProgress)
+    setAiProgressReason(result.rationale)
+
+    await updateGanttTask(selectedTask.id, {
+      aiSuggestedProgress: result.suggestedProgress,
+    })
+  }
+
+  async function handleApplyAISuggestion() {
+    if (!selectedTask || aiProgressSuggestion === null) return
+    await handleUpdateTaskProgress(selectedTask, aiProgressSuggestion)
+  }
+
+  function handleSelectCommentPhotos(event: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files ?? [])
+    if (files.length === 0) return
+
+    const limited = [...commentPhotos, ...files].slice(0, 5)
+    setCommentPhotos(limited)
+
+    commentPhotoPreviews.forEach((url) => URL.revokeObjectURL(url))
+    const previews = limited.map((file) => URL.createObjectURL(file))
+    setCommentPhotoPreviews(previews)
+
+    event.target.value = ''
   }
 
   async function handleAddDependency() {
@@ -535,15 +688,56 @@ export function GanttPlannerPage() {
   }
 
   async function handleAddComment() {
-    if (!user?.id || selectedTaskId === 'none' || !newComment.trim()) return
-    await addTaskComment(selectedTaskId, {
-      content: newComment.trim(),
-      createdBy: user.id,
-      createdByName: `${user.nombre} ${user.apellido}`,
-    })
-    setNewComment('')
-    const rows = await getTaskComments(selectedTaskId)
-    setComments(rows)
+    if (!user?.id || selectedTaskId === 'none' || !selectedTask || !newComment.trim()) return
+    if (!canOperateTask(selectedTask)) {
+      setError('Solo el técnico asignado o un usuario con permisos de edición puede reportar avance')
+      return
+    }
+
+    const parsedProgress = reportedProgressInput.trim().length > 0
+      ? Number(reportedProgressInput.replace(',', '.'))
+      : null
+
+    const reportedProgress = parsedProgress !== null && Number.isFinite(parsedProgress)
+      ? Math.max(0, Math.min(100, Math.round(parsedProgress)))
+      : undefined
+
+    setCommentBusy(true)
+    setError(null)
+    try {
+      const draftId = generateId()
+      let photos: string[] | undefined
+
+      if (commentPhotos.length > 0) {
+        photos = await Promise.all(
+          commentPhotos.map((file) => uploadGanttCommentPhoto(selectedTaskId, draftId, file))
+        )
+      }
+
+      await addTaskComment(selectedTaskId, {
+        content: newComment.trim(),
+        createdBy: user.id,
+        createdByName: `${user.nombre} ${user.apellido}`,
+        reportedProgress,
+        photos,
+      })
+
+      if (typeof reportedProgress === 'number') {
+        await handleUpdateTaskProgress(selectedTask, reportedProgress)
+      }
+
+      setNewComment('')
+      setReportedProgressInput('')
+      setCommentPhotos([])
+      commentPhotoPreviews.forEach((url) => URL.revokeObjectURL(url))
+      setCommentPhotoPreviews([])
+
+      const rows = await getTaskComments(selectedTaskId)
+      setComments(rows)
+      await handleEstimateProgressWithAI(rows)
+    } finally {
+      setCommentBusy(false)
+    }
   }
 
   async function handleParseImportFile() {
@@ -664,6 +858,10 @@ export function GanttPlannerPage() {
     setError(null)
     try {
       for (const task of importPreview) {
+        const matchedResponsible = task.responsibleName
+          ? technicianLookupByName.get(normalizeKey(task.responsibleName))
+          : undefined
+
         await createGanttTask({
           titulo: task.titulo,
           descripcion: task.descripcion ?? '',
@@ -680,8 +878,10 @@ export function GanttPlannerPage() {
           dependencies: [],
           sparePartIds: task.sparePartIds,
           createdBy: user.id,
-          responsibleUserId: user.id,
-          responsibleName: task.responsibleName ?? `${user.nombre} ${user.apellido}`,
+          responsibleUserId: matchedResponsible?.id,
+          responsibleName: matchedResponsible
+            ? `${matchedResponsible.nombre} ${matchedResponsible.apellido}`
+            : task.responsibleName,
         })
       }
 
@@ -807,7 +1007,7 @@ export function GanttPlannerPage() {
         )}
       </Card>
 
-            <div className="grid gap-3 md:grid-cols-6">
+      <div className="grid gap-3 md:grid-cols-6">
         <Card className="lg:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <CardTitle>Listado de tareas</CardTitle>
@@ -816,16 +1016,6 @@ export function GanttPlannerPage() {
               {listCollapsed ? 'Expandir' : 'Colapsar'}
             </Button>
           </CardHeader>
-              <div>
-                <Label>Filtro área</Label>
-                <Select value={areaFilter} onValueChange={setAreaFilter}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas</SelectItem>
-                    {areaNodes.map((node) => <SelectItem key={`area-filter-${node.id}`} value={node.id}>{node.nombre}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
           {!listCollapsed && (
           <CardContent className="space-y-4">
             <div className="grid gap-3 md:grid-cols-4">
@@ -836,6 +1026,16 @@ export function GanttPlannerPage() {
                   onChange={(event) => setSearchText(event.target.value)}
                   placeholder="Título, equipo, área, responsable..."
                 />
+              </div>
+              <div>
+                <Label>Filtro área</Label>
+                <Select value={areaFilter} onValueChange={setAreaFilter}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas</SelectItem>
+                    {areaNodes.map((node) => <SelectItem key={`area-filter-${node.id}`} value={node.id}>{node.nombre}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Label>Filtro equipo</Label>
@@ -854,6 +1054,17 @@ export function GanttPlannerPage() {
                   <SelectContent>
                     <SelectItem value="all">Todos</SelectItem>
                     {STATUS_OPTIONS.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Asignación</Label>
+                <Select value={assignmentFilter} onValueChange={(value) => setAssignmentFilter(value as 'all' | 'mine' | 'unassigned')}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas</SelectItem>
+                    <SelectItem value="mine">Mis tareas</SelectItem>
+                    <SelectItem value="unassigned">Sin cuenta asociada</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -894,15 +1105,36 @@ export function GanttPlannerPage() {
                       <div className="flex items-center gap-2">
                         {row?.isCritical && <Badge variant="destructive">Crítica</Badge>}
                         {task.predictiveRiskLevel && <Badge variant="warning">Riesgo {task.predictiveRiskLevel}</Badge>}
+                        {typeof task.aiSuggestedProgress === 'number' && <Badge variant="secondary">IA {task.aiSuggestedProgress}%</Badge>}
                         <Badge variant="outline">{task.status}</Badge>
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
                       <span>Avance: {task.progress}%</span>
+                      <span>Responsable: {task.responsibleName ?? 'Sin asignar'}</span>
                       <span>Holgura: {row?.slack ?? 0}h</span>
                       <span>Dependencias: {task.dependencies.length}</span>
                       <span>Repuestos: {task.sparePartIds?.length ?? 0}</span>
                     </div>
+                    {canEdit && (
+                      <div>
+                        <Label className="text-xs">Asignar técnico (cuenta)</Label>
+                        <Select
+                          value={task.responsibleUserId ?? 'none'}
+                          onValueChange={(value) => handleAssignResponsible(task, value)}
+                        >
+                          <SelectTrigger className="h-8"><SelectValue placeholder="Seleccionar técnico" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">Seleccionar técnico</SelectItem>
+                            {technicians.map((tech) => (
+                              <SelectItem key={`task-tech-${task.id}-${tech.id}`} value={tech.id}>
+                                {tech.nombre} {tech.apellido}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                     {task.dependencies.length > 0 && (
                       <div className="text-xs text-muted-foreground rounded border p-2 space-y-1">
                         {task.dependencies.map((dep, index) => {
@@ -925,7 +1157,8 @@ export function GanttPlannerPage() {
                       </div>
                     )}
                     <div className="flex gap-2">
-                      {canEdit && task.status !== 'completada' && (
+                      <Button size="sm" variant="outline" onClick={() => setSelectedTaskId(task.id)}>Detalle</Button>
+                      {canOperateTask(task) && task.status !== 'completada' && (
                         <Button size="sm" variant="secondary" onClick={() => handleAdvance(task)}>
                           <CalendarClock className="h-4 w-4 mr-1" /> Avanzar
                         </Button>
@@ -1073,6 +1306,23 @@ export function GanttPlannerPage() {
                 </Select>
               </div>
               <div>
+                <Label>Asignar a</Label>
+                <Select value={createResponsibleId} onValueChange={setCreateResponsibleId}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="self">Yo ({user?.nombre} {user?.apellido})</SelectItem>
+                    <SelectItem value="none">Sin asignar</SelectItem>
+                    {technicians
+                      .filter((tech) => tech.id !== user?.id)
+                      .map((tech) => (
+                        <SelectItem key={`create-tech-${tech.id}`} value={tech.id}>
+                          {tech.nombre} {tech.apellido}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
                 <Label>Inicio</Label>
                 <Input type="datetime-local" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
               </div>
@@ -1087,6 +1337,93 @@ export function GanttPlannerPage() {
               <Button className="w-full" onClick={handleCreateTask} disabled={!canCreate || !title.trim()}>
                 <Plus className="h-4 w-4 mr-1" /> Crear
               </Button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle>Detalle de tarea</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              {!selectedTask && <p className="text-sm text-muted-foreground">Selecciona una tarea en el listado para ver detalle y avance.</p>}
+              {selectedTask && (
+                <>
+                  <div>
+                    <p className="font-medium">{selectedTask.titulo}</p>
+                    <p className="text-xs text-muted-foreground">{selectedTask.descripcion?.trim() || 'Sin descripción'}</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="rounded border p-2">Estado: {selectedTask.status}</div>
+                    <div className="rounded border p-2">Avance: {selectedTask.progress}%</div>
+                    <div className="rounded border p-2">Área: {selectedTask.hierarchyPath ?? 'Sin área'}</div>
+                    <div className="rounded border p-2">Equipo: {selectedTask.equipmentNombre ?? 'Sin equipo'}</div>
+                    <div className="rounded border p-2 col-span-2">Responsable: {selectedTask.responsibleName ?? 'Sin asignar'}</div>
+                    <div className="rounded border p-2 col-span-2">
+                      Fechas: {selectedTask.startDate.toLocaleString()} → {selectedTask.endDate.toLocaleString()}
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Avanzar mueve la tarea de planificada → en progreso → completada y ajusta el avance mínimo automáticamente.
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label className="text-xs">% avance técnico</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={reportedProgressInput}
+                        onChange={(event) => setReportedProgressInput(event.target.value)}
+                        placeholder={String(selectedTask.progress)}
+                      />
+                    </div>
+                    <div className="flex items-end">
+                      <Button
+                        className="w-full"
+                        variant="outline"
+                        disabled={progressBusy || reportedProgressInput.trim().length === 0 || !canOperateTask(selectedTask)}
+                        onClick={() => {
+                          const value = Number(reportedProgressInput.replace(',', '.'))
+                          if (!Number.isFinite(value)) return
+                          void handleUpdateTaskProgress(selectedTask, value)
+                        }}
+                      >
+                        Guardar %
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="rounded border p-2 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs text-muted-foreground">Sugerencia IA (Grok)</p>
+                      <Button size="sm" variant="outline" onClick={() => handleEstimateProgressWithAI()}>
+                        <Sparkles className="h-3.5 w-3.5 mr-1" /> Estimar
+                      </Button>
+                    </div>
+                    {aiProgressSuggestion !== null ? (
+                      <>
+                        <p className="text-sm font-medium">{aiProgressSuggestion}% sugerido</p>
+                        {aiProgressReason && <p className="text-xs text-muted-foreground">{aiProgressReason}</p>}
+                        <Button
+                          size="sm"
+                          className="w-full"
+                          variant="secondary"
+                          disabled={!canOperateTask(selectedTask)}
+                          onClick={handleApplyAISuggestion}
+                        >
+                          Aplicar sugerencia IA
+                        </Button>
+                      </>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">Aún sin estimación IA para esta tarea.</p>
+                    )}
+                  </div>
+
+                  {canOperateTask(selectedTask) && selectedTask.status !== 'completada' && (
+                    <Button variant="secondary" className="w-full" onClick={() => handleAdvance(selectedTask)}>
+                      <CalendarClock className="h-4 w-4 mr-1" /> Avanzar estado
+                    </Button>
+                  )}
+                </>
+              )}
             </CardContent>
           </Card>
 
@@ -1162,14 +1499,50 @@ export function GanttPlannerPage() {
           <Card>
             <CardHeader><CardTitle>Comentarios de tarea</CardTitle></CardHeader>
             <CardContent className="space-y-3">
-              <Input value={newComment} onChange={(event) => setNewComment(event.target.value)} placeholder="Comentario operativo" />
-              <Button variant="outline" className="w-full" onClick={handleAddComment} disabled={selectedTaskId === 'none' || !newComment.trim()}>
-                Agregar comentario
+              <Input value={newComment} onChange={(event) => setNewComment(event.target.value)} placeholder="Comentario operativo para seguimiento" />
+              <Input
+                type="number"
+                min={0}
+                max={100}
+                value={reportedProgressInput}
+                onChange={(event) => setReportedProgressInput(event.target.value)}
+                placeholder="% avance reportado por técnico (opcional)"
+              />
+              <div className="space-y-2">
+                <Label className="text-xs">Fotos de evidencia (máx. 5)</Label>
+                <Input type="file" accept="image/*" multiple onChange={handleSelectCommentPhotos} />
+                {commentPhotoPreviews.length > 0 && (
+                  <div className="grid grid-cols-5 gap-2">
+                    {commentPhotoPreviews.map((preview, index) => (
+                      <img key={`comment-preview-${index}`} src={preview} alt={`evidencia ${index + 1}`} className="h-16 w-full rounded border object-cover" />
+                    ))}
+                  </div>
+                )}
+              </div>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={handleAddComment}
+                disabled={selectedTaskId === 'none' || !newComment.trim() || commentBusy || !selectedTask || !canOperateTask(selectedTask)}
+              >
+                <Camera className="h-4 w-4 mr-1" /> {commentBusy ? 'Guardando...' : 'Agregar comentario + evidencia'}
               </Button>
               <div className="space-y-2 max-h-44 overflow-auto">
                 {comments.map((comment) => (
                   <div key={comment.id} className="rounded border p-2 text-xs">
                     <p>{comment.content}</p>
+                    {typeof comment.reportedProgress === 'number' && (
+                      <p className="text-muted-foreground mt-1">Reporte técnico: {comment.reportedProgress}%</p>
+                    )}
+                    {comment.photos && comment.photos.length > 0 && (
+                      <div className="mt-2 grid grid-cols-4 gap-2">
+                        {comment.photos.map((photo, index) => (
+                          <a key={`${comment.id}-photo-${index}`} href={photo} target="_blank" rel="noreferrer">
+                            <img src={photo} alt={`foto comentario ${index + 1}`} className="h-16 w-full rounded border object-cover" />
+                          </a>
+                        ))}
+                      </div>
+                    )}
                     <p className="text-muted-foreground mt-1">{comment.createdByName ?? comment.createdBy} · {comment.createdAt.toLocaleString()}</p>
                   </div>
                 ))}

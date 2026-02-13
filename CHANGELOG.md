@@ -7,6 +7,19 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.77] - 2026-02-13
+
+### 👷 Gantt técnico: avance operativo + IA + evidencia fotográfica
+
+#### Mejoras
+- **Avance manual por responsable**: El técnico asignado (o editor) puede actualizar `%` real de progreso desde el detalle de tarea.
+- **Comentarios con evidencia**: Cada comentario de Gantt ahora permite adjuntar fotos de terreno para trazabilidad.
+- **Estimación IA de progreso**: Integración con Grok para sugerir `%` de avance según comentarios recientes; se puede aplicar a la tarea.
+- **Persistencia analítica**: Se guarda `aiSuggestedProgress` en tarea y `% reportado`/fotos en comentarios.
+
+#### Infraestructura
+- **Storage rules**: Se incorpora ruta `gantt/{taskId}/comments/{commentDraftId}/{fileName}` para subida segura de imágenes de comentarios.
+
 ## [2.47.76] - 2026-02-13
 
 ### 🧭 Gantt alineado a jerarquía de planta (Área/Equipo)

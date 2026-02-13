@@ -95,6 +95,39 @@ export async function uploadEquipmentPhoto(
   }
 }
 
+export async function uploadGanttCommentPhoto(
+  taskId: string,
+  commentDraftId: string,
+  file: File
+): Promise<string> {
+  const validation = validateFile(file)
+  if (!validation.valid) {
+    throw new Error(validation.error)
+  }
+
+  logger.info('Uploading gantt comment photo', {
+    taskId,
+    commentDraftId,
+    fileSize: file.size,
+    fileType: file.type,
+  })
+
+  try {
+    const fileToUpload = await compressImage(file, 1920, 0.88, true)
+    const fileName = `${generateId()}.webp`
+    const storageRef = ref(storage, `gantt/${taskId}/comments/${commentDraftId}/${fileName}`)
+
+    await uploadBytes(storageRef, fileToUpload, {
+      contentType: 'image/webp',
+    })
+
+    return await getDownloadURL(storageRef)
+  } catch (error) {
+    logger.error('Error uploading gantt comment photo', error as Error, { taskId, commentDraftId })
+    throw error
+  }
+}
+
 // Subir foto de usuario
 export async function uploadUserPhoto(
   userId: string,

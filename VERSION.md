@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.47.76**
+## Versión Actual: **v2.47.77**
 
 **Fecha de lanzamiento**: 13 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,13 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.47.77 - Gantt técnico con avance IA y evidencia (13/02/2026)
+- 👷 **Avance por técnico**: El responsable asignado ahora puede actualizar directamente el `%` real de resolución de cada tarea.
+- 🤖 **Sugerencia IA (Grok)**: Se estima `%` sugerido a partir de comentarios operativos recientes y puede aplicarse con un clic.
+- 📸 **Comentarios con fotos**: Seguimiento por tarea admite evidencia gráfica (imágenes) junto al comentario.
+- 🧾 **Trazabilidad de avance**: Se guarda `aiSuggestedProgress` en tarea y `% reportado` en comentarios para auditoría operativa.
+- 🔐 **Storage preparado**: Ruta dedicada para fotos de comentarios Gantt incorporada en reglas de Storage.
 
 ### v2.47.76 - Gantt por área/equipo jerárquicos (13/02/2026)
 - 🧭 **Área + Equipo visibles**: El listado muestra `Área · Equipo · Fechas` para cada tarea.

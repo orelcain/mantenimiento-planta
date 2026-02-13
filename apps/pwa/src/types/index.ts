@@ -548,6 +548,7 @@ export interface GanttTask {
   dependencies: GanttTaskDependency[]
   sparePartIds?: string[]
   predictiveRiskLevel?: FailurePrediction['nivelRiesgo']
+  aiSuggestedProgress?: number
   predictiveSourceId?: string
   commentsCount?: number
   createdBy: string
@@ -559,6 +560,9 @@ export interface GanttTaskComment {
   id: string
   taskId: string
   content: string
+  reportedProgress?: number
+  aiSuggestedProgress?: number
+  photos?: string[]
   createdBy: string
   createdByName?: string
   createdAt: Date
