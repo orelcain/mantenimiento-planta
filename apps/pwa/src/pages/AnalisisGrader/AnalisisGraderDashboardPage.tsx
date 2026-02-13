@@ -1588,6 +1588,47 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
     }
   }, [analytics.kpis.pointZeroPieces, analytics.kpis.totalPieces, analytics.weightTrendSeries, config])
 
+  const trendAutoRecommendations = useMemo(() => {
+    if (!trendForecastView) return [] as Array<{
+      gateNumber: number
+      suggestedCalibre: string
+      suggestedQuality: string
+      text: string
+      canApply: boolean
+      isApplied: boolean
+      urgency: 'high' | 'medium' | 'low'
+    }>
+
+    const urgency: 'high' | 'medium' | 'low' = trendForecastView.projectedPointZeroPct >= 3
+      ? 'high'
+      : trendForecastView.projectedPointZeroPct >= 2
+      ? 'medium'
+      : 'low'
+
+    const prefix = urgency === 'high'
+      ? 'Prioridad alta'
+      : urgency === 'medium'
+      ? 'Prioridad media'
+      : 'Prioridad preventiva'
+
+    return directGateActions
+      .filter((action) => action.canApply)
+      .slice(0, 2)
+      .map((action) => ({
+        ...action,
+        urgency,
+        text: `${prefix}: ${action.text} (proyección cierre P0 ${trendForecastView.projectedPointZeroPct.toFixed(2)}%).`,
+      }))
+  }, [directGateActions, trendForecastView])
+
+  const trendAIRecommendations = useMemo(() => {
+    if (!aiOutput) return [] as string[]
+    return aiOutput.recommendedActions.slice(0, 2).map((action) => {
+      const pr = action.priority === 'high' ? 'alta' : action.priority === 'medium' ? 'media' : 'baja'
+      return `Prioridad ${pr}: ${action.action} — ${action.why}`
+    })
+  }, [aiOutput])
+
   return (
     <div
       ref={dashRef}
@@ -3131,6 +3172,63 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
         <TabsContent value="tendencia" className="space-y-4">
           {analytics.weightTrendSeries.length > 0 ? (
             <>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4 text-emerald-500" />
+                    Reacción temprana (automática + IA)
+                  </CardTitle>
+                  <p className="text-xs text-muted-foreground">
+                    Sugerencias para ajustar gates anticipadamente usando la proyección de turno en curso.
+                  </p>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-medium">Automática (proyección)</p>
+                    {trendAutoRecommendations.length > 0 ? trendAutoRecommendations.map((action) => (
+                      <div key={`trend-auto-${action.gateNumber}`} className="flex items-start justify-between gap-2 text-xs">
+                        <p>• {action.text}</p>
+                        {action.isApplied ? (
+                          <Badge variant="outline" className="text-[11px] border-emerald-500/40 text-emerald-600">
+                            Aplicada
+                          </Badge>
+                        ) : (
+                          onApplyGateSuggestion && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleApplyGateAction(action)}
+                              className="h-7 px-2 text-[11px]"
+                            >
+                              Aplicar
+                            </Button>
+                          )
+                        )}
+                      </div>
+                    )) : (
+                      <p className="text-xs text-muted-foreground">Sin acciones automáticas por ahora.</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <p className="text-xs font-medium">IA (Grok)</p>
+                    {trendAIRecommendations.length > 0 ? (
+                      trendAIRecommendations.map((text, idx) => (
+                        <p key={`trend-ai-${idx}`} className="text-xs">• {text}</p>
+                      ))
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs text-muted-foreground">Aún no hay recomendación IA para este turno.</p>
+                        <Button size="sm" variant="outline" onClick={handleAnalyzeAI} disabled={aiLoading} className="h-7 px-2 text-[11px]">
+                          {aiLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Brain className="h-3.5 w-3.5 mr-1" />}
+                          Analizar ahora
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
               <Card>
                 <CardHeader>
                   <CardTitle className="text-sm flex items-center gap-2">

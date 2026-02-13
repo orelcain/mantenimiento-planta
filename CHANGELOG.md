@@ -7,6 +7,15 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.63] - 2026-02-13
+
+### ⚡ Tendencia: recomendaciones duales para reacción temprana
+
+#### Mejoras
+- **Automática por proyección**: En la pestaña `Tendencia` se muestran sugerencias directas de gates usando la proyección de cierre del turno.
+- **IA visible en la misma pestaña**: Se muestran recomendaciones de IA (Grok) dentro de `Tendencia`; si aún no existen, se puede ejecutar `Analizar ahora` desde ahí.
+- **Acción inmediata**: Las recomendaciones automáticas permiten `Aplicar` o muestran badge `Aplicada` cuando ya están ejecutadas.
+
 ## [2.47.62] - 2026-02-13
 
 ### 🔮 Tendencia de turno completo con proyección temprana
