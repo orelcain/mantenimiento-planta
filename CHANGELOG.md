@@ -7,6 +7,16 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.79] - 2026-02-13
+
+### 🖱️ Timeline Gantt editable (drag + resize + propagación FS)
+
+#### Mejoras
+- **Drag en barra**: Las tareas del timeline se pueden mover horizontalmente para ajustar fechas rápidamente.
+- **Resize lateral**: Se agregan handles en inicio/fin para cambiar duración desde la misma vista temporal.
+- **Propagación automática FS**: Al actualizar una tarea, se recalculan sucesoras con dependencia `FS` respetando lag en horas.
+- **Edición con permisos**: Interacción habilitada para responsable asignado o usuarios con permiso de edición.
+
 ## [2.47.78] - 2026-02-13
 
 ### 📏 Timeline Gantt más profesional (zoom + hoy + baseline)

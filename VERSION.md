@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.47.78**
+## Versión Actual: **v2.47.79**
 
 **Fecha de lanzamiento**: 13 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,12 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.47.79 - Timeline editable con drag/resize (13/02/2026)
+- 🖱️ **Drag de tareas**: En timeline puedes arrastrar barras para mover inicio/fin manteniendo duración.
+- ↔️ **Resize por handles**: Ajuste de inicio/fin con tiradores laterales para redefinir duración de tarea.
+- 🔗 **Dependencias FS vivas**: Al cambiar una tarea, se propagan automáticamente sucesoras `FS` para conservar secuencia.
+- 📐 **Edición visual operativa**: Planificación más natural sin entrar a formularios para cada ajuste de fechas.
 
 ### v2.47.78 - Timeline Gantt profesional (13/02/2026)
 - 📏 **Escala de timeline**: Selector `Día / Semana / Mes` para adaptar la densidad de planificación.

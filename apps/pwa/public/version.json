@@ -1,8 +1,11 @@
 {
-  "version": "2.47.78",
+  "version": "2.47.79",
   "buildDate": "2026-02-13",
   "buildTimestamp": 1771005600000,
   "features": [
+    "Timeline Gantt editable con drag para mover fechas de tarea directamente sobre la barra",
+    "Resize de barra con handles de inicio/fin para ajustar duración visualmente",
+    "Propagación automática de tareas sucesoras por dependencias FS al mover o redimensionar",
     "Timeline Gantt con escala seleccionable: Día / Semana / Mes para lectura operativa",
     "Línea vertical de Hoy en la vista temporal para control de atraso en tiempo real",
     "Comparación visual Baseline vs barra real por tarea (plan original vs ejecución)",

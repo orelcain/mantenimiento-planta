@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
 import { AlertTriangle, Bell, CalendarClock, Camera, ChevronDown, ChevronUp, FileSpreadsheet, GitBranchPlus, Link2Off, Plus, Sparkles, Trash2, Upload } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import {
@@ -44,6 +44,9 @@ const PRIORITY_OPTIONS: IncidentPriority[] = ['critica', 'alta', 'media', 'baja'
 const DEPENDENCY_TYPES: Array<'FS' | 'SS' | 'FF' | 'SF'> = ['FS', 'SS', 'FF', 'SF']
 const PAGE_SIZE_OPTIONS = ['10', '25', '50', '100'] as const
 const DAY_MS = 24 * 60 * 60 * 1000
+const HOUR_MS = 60 * 60 * 1000
+
+type TimelineDragMode = 'move' | 'resize-start' | 'resize-end'
 
 interface ImportedTaskDraft {
   sourceRow: number
@@ -251,6 +254,15 @@ export function GanttPlannerPage() {
   const [importErrors, setImportErrors] = useState<string[]>([])
   const [importBusy, setImportBusy] = useState(false)
   const [importMessage, setImportMessage] = useState<string | null>(null)
+  const [timelineDrag, setTimelineDrag] = useState<{
+    taskId: string
+    mode: TimelineDragMode
+    originClientX: number
+    originStartMs: number
+    originEndMs: number
+    previewStartMs: number
+    previewEndMs: number
+  } | null>(null)
   const notifiedDelayedCriticalRef = useRef<Set<string>>(new Set())
   const remoteAlertSentRef = useRef<Set<string>>(new Set())
   const { tree: hierarchyTree } = useHierarchyTree()
@@ -428,9 +440,125 @@ export function GanttPlannerPage() {
     [selectedTaskId, tasks]
   )
 
-  const canOperateTask = (task: GanttTask) => {
+  const canOperateTask = useCallback((task: GanttTask) => {
     if (!user?.id) return false
     return canEdit || task.responsibleUserId === user.id
+  }, [canEdit, user?.id])
+
+  const getTimelineSnapMs = useCallback(() => {
+    if (timelineZoom === 'day') return HOUR_MS
+    if (timelineZoom === 'week') return 6 * HOUR_MS
+    return 12 * HOUR_MS
+  }, [timelineZoom])
+
+  const alignTimelineMs = useCallback((ms: number) => {
+    const snap = getTimelineSnapMs()
+    return Math.round(ms / snap) * snap
+  }, [getTimelineSnapMs])
+
+  const updateTimelineDragPreview = useCallback((clientX: number) => {
+    setTimelineDrag((current) => {
+      if (!current) return current
+      const totalMs = Math.max(1, timeline.maxEnd - timeline.minStart)
+      const deltaMsRaw = ((clientX - current.originClientX) / Math.max(1, timeline.widthPx)) * totalMs
+      const deltaMs = alignTimelineMs(deltaMsRaw)
+
+      if (current.mode === 'move') {
+        const duration = current.originEndMs - current.originStartMs
+        const nextStart = alignTimelineMs(current.originStartMs + deltaMs)
+        const nextEnd = nextStart + duration
+        return { ...current, previewStartMs: nextStart, previewEndMs: nextEnd }
+      }
+
+      if (current.mode === 'resize-start') {
+        const proposedStart = alignTimelineMs(current.originStartMs + deltaMs)
+        const nextStart = Math.min(proposedStart, current.previewEndMs - HOUR_MS)
+        return { ...current, previewStartMs: nextStart }
+      }
+
+      const proposedEnd = alignTimelineMs(current.originEndMs + deltaMs)
+      const nextEnd = Math.max(proposedEnd, current.previewStartMs + HOUR_MS)
+      return { ...current, previewEndMs: nextEnd }
+    })
+  }, [alignTimelineMs, timeline.maxEnd, timeline.minStart, timeline.widthPx])
+
+  const handleUpdateTaskDates = useCallback(async (task: GanttTask, startDate: Date, endDate: Date) => {
+    if (!canOperateTask(task)) return
+
+    const byId = new Map(tasks.map((row) => [row.id, row]))
+    const updates = new Map<string, { startDate: Date; endDate: Date }>()
+    updates.set(task.id, { startDate, endDate })
+
+    const queue: string[] = [task.id]
+    let guard = 0
+
+    while (queue.length > 0 && guard < 500) {
+      guard += 1
+      const currentId = queue.shift() as string
+      const currentTask = byId.get(currentId)
+      const currentWindow = updates.get(currentId)
+      if (!currentTask || !currentWindow) continue
+
+      tasks.forEach((candidate) => {
+        const fsDependencies = candidate.dependencies.filter(
+          (dependency) => dependency.type === 'FS' && dependency.predecessorId === currentId
+        )
+        if (fsDependencies.length === 0) return
+
+        const candidateWindow = updates.get(candidate.id) ?? {
+          startDate: candidate.startDate,
+          endDate: candidate.endDate,
+        }
+
+        const requiredStarts = candidate.dependencies
+          .filter((dependency) => dependency.type === 'FS')
+          .map((dependency) => {
+            const predecessorWindow = updates.get(dependency.predecessorId)
+              ?? (() => {
+                const predecessor = byId.get(dependency.predecessorId)
+                if (!predecessor) return null
+                return { startDate: predecessor.startDate, endDate: predecessor.endDate }
+              })()
+            if (!predecessorWindow) return candidateWindow.startDate.getTime()
+            const lagMs = (dependency.lagHours ?? 0) * HOUR_MS
+            return predecessorWindow.endDate.getTime() + lagMs
+          })
+
+        const requiredStartMs = Math.max(...requiredStarts)
+        if (candidateWindow.startDate.getTime() >= requiredStartMs) return
+
+        const durationMs = Math.max(HOUR_MS, candidateWindow.endDate.getTime() - candidateWindow.startDate.getTime())
+        const nextStart = new Date(alignTimelineMs(requiredStartMs))
+        const nextEnd = new Date(nextStart.getTime() + durationMs)
+
+        updates.set(candidate.id, { startDate: nextStart, endDate: nextEnd })
+        queue.push(candidate.id)
+      })
+    }
+
+    await Promise.all(
+      Array.from(updates.entries()).map(([taskId, window]) =>
+        updateGanttTask(taskId, {
+          startDate: window.startDate,
+          endDate: window.endDate,
+        })
+      )
+    )
+
+    await load()
+  }, [alignTimelineMs, canOperateTask, tasks])
+
+  function handleTimelineDragStart(task: GanttTask, mode: TimelineDragMode, clientX: number) {
+    if (!canOperateTask(task)) return
+    setTimelineDrag({
+      taskId: task.id,
+      mode,
+      originClientX: clientX,
+      originStartMs: task.startDate.getTime(),
+      originEndMs: task.endDate.getTime(),
+      previewStartMs: task.startDate.getTime(),
+      previewEndMs: task.endDate.getTime(),
+    })
   }
 
   useEffect(() => {
@@ -509,6 +637,42 @@ export function GanttPlannerPage() {
       })
     })
   }, [delayedCriticalTasks, user?.id])
+
+  useEffect(() => {
+    if (!timelineDrag) return
+
+    const handleMouseMove = (event: MouseEvent) => {
+      event.preventDefault()
+      updateTimelineDragPreview(event.clientX)
+    }
+
+    const handleMouseUp = () => {
+      const draft = timelineDrag
+      setTimelineDrag(null)
+      const task = tasks.find((row) => row.id === draft.taskId)
+      if (!task) return
+
+      const nextStart = new Date(draft.previewStartMs)
+      const nextEnd = new Date(Math.max(draft.previewEndMs, draft.previewStartMs + HOUR_MS))
+
+      if (
+        Math.abs(nextStart.getTime() - task.startDate.getTime()) < HOUR_MS
+        && Math.abs(nextEnd.getTime() - task.endDate.getTime()) < HOUR_MS
+      ) {
+        return
+      }
+
+      void handleUpdateTaskDates(task, nextStart, nextEnd)
+    }
+
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseup', handleMouseUp, { once: true })
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [handleUpdateTaskDates, tasks, timeline.maxEnd, timeline.minStart, timeline.widthPx, timelineDrag, updateTimelineDragPreview])
 
   async function handleCreateTask() {
     if (!user?.id || !title.trim()) return
@@ -1009,11 +1173,14 @@ export function GanttPlannerPage() {
               const total = Math.max(1, timeline.maxEnd - timeline.minStart)
               const baselineStart = (task.baselineStartDate ?? task.startDate).getTime()
               const baselineEnd = (task.baselineEndDate ?? task.endDate).getTime()
-              const left = ((task.startDate.getTime() - timeline.minStart) / total) * timeline.widthPx
-              const width = Math.max(4, ((task.endDate.getTime() - task.startDate.getTime()) / total) * timeline.widthPx)
+              const previewStartMs = timelineDrag?.taskId === task.id ? timelineDrag.previewStartMs : task.startDate.getTime()
+              const previewEndMs = timelineDrag?.taskId === task.id ? timelineDrag.previewEndMs : task.endDate.getTime()
+              const left = ((previewStartMs - timeline.minStart) / total) * timeline.widthPx
+              const width = Math.max(4, ((previewEndMs - previewStartMs) / total) * timeline.widthPx)
               const baselineLeft = ((baselineStart - timeline.minStart) / total) * timeline.widthPx
               const baselineWidth = Math.max(4, ((baselineEnd - baselineStart) / total) * timeline.widthPx)
               const isCritical = cpm.criticalPath.includes(task.id)
+              const interactive = canOperateTask(task)
 
               return (
                 <div key={`timeline-${task.id}`} className="space-y-1">
@@ -1040,7 +1207,37 @@ export function GanttPlannerPage() {
                       <div
                         className={`absolute top-[6px] h-4 rounded ${isCritical ? 'bg-red-500' : 'bg-primary'}`}
                         style={{ left: `${left}px`, width: `${width}px` }}
+                        onMouseDown={(event) => {
+                          if (!interactive) return
+                          event.preventDefault()
+                          handleTimelineDragStart(task, 'move', event.clientX)
+                        }}
+                        title={interactive ? 'Arrastrar para mover fechas' : 'Sin permisos para mover'}
                       />
+                      {interactive && (
+                        <>
+                          <div
+                            className="absolute top-[6px] h-4 w-2 rounded bg-background border cursor-ew-resize"
+                            style={{ left: `${Math.max(0, left - 1)}px` }}
+                            onMouseDown={(event) => {
+                              event.preventDefault()
+                              event.stopPropagation()
+                              handleTimelineDragStart(task, 'resize-start', event.clientX)
+                            }}
+                            title="Ajustar inicio"
+                          />
+                          <div
+                            className="absolute top-[6px] h-4 w-2 rounded bg-background border cursor-ew-resize"
+                            style={{ left: `${left + width - 1}px` }}
+                            onMouseDown={(event) => {
+                              event.preventDefault()
+                              event.stopPropagation()
+                              handleTimelineDragStart(task, 'resize-end', event.clientX)
+                            }}
+                            title="Ajustar fin"
+                          />
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
