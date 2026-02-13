@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.47.74**
+## Versión Actual: **v2.47.75**
 
 **Fecha de lanzamiento**: 13 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.47.75 - Hotfix crash Gantt SelectItem (13/02/2026)
+- 🧯 **Crash crítico resuelto**: Se corrige el error Radix `A <Select.Item /> must have a value prop that is not an empty string`.
+- 🆔 **ID de tareas robusto**: En lectura Gantt se prioriza `doc.id` sobre cualquier campo `id` persistido en documento.
+- 🧹 **Persistencia limpia**: En creación/actualización de tareas Gantt ya no se persiste `id` en payload.
 
 ### v2.47.74 - Fix importación Gantt (13/02/2026)
 - 🛡️ **Firestore-safe**: `createGanttTask` y `updateGanttTask` limpian campos `undefined` (incluye objetos/anidados) antes de guardar.

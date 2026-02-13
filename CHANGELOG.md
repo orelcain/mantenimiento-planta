@@ -7,6 +7,15 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.75] - 2026-02-13
+
+### 🚑 Hotfix crítico: pantallazo en Gantt
+
+#### Fixes
+- **ErrorBoundary / render crash**: Corregido fallo `A <Select.Item /> must have a value prop that is not an empty string` detectado tras carga masiva en Gantt.
+- **Fuente del bug**: Se evitó que `id: ""` almacenado en documentos sobrescriba el `doc.id` real al leer tareas.
+- **Persistencia segura**: `createGanttTask` excluye `id` del payload y `updateGanttTask` ignora campo `id` si llega por patch.
+
 ## [2.47.74] - 2026-02-13
 
 ### 🧯 Fix importación Gantt desde Excel simplificado

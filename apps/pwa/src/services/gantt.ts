@@ -136,8 +136,8 @@ export async function getGanttTasks(filters?: {
   return snapshot.docs.map((snap) => {
     const data = snap.data()
     return normalizeTask({
-      id: snap.id,
       ...data,
+      id: snap.id,
       startDate: asDate(data.startDate),
       endDate: asDate(data.endDate),
       createdAt: asDate(data.createdAt),
@@ -156,8 +156,15 @@ export async function createGanttTask(
     updatedAt: new Date(),
   })
 
+  const {
+    id: _ignoredId,
+    createdAt: _ignoredCreatedAt,
+    updatedAt: _ignoredUpdatedAt,
+    ...persistable
+  } = normalized
+
   const payload = stripUndefinedDeep({
-    ...normalized,
+    ...persistable,
     startDate: Timestamp.fromDate(normalized.startDate),
     endDate: Timestamp.fromDate(normalized.endDate),
     createdAt: serverTimestamp(),
@@ -174,6 +181,8 @@ export async function updateGanttTask(id: string, patch: Partial<GanttTask>): Pr
     ...patch,
     updatedAt: serverTimestamp(),
   })
+
+  if ('id' in payload) delete payload.id
 
   if (patch.startDate) payload.startDate = Timestamp.fromDate(patch.startDate)
   if (patch.endDate) payload.endDate = Timestamp.fromDate(patch.endDate)
