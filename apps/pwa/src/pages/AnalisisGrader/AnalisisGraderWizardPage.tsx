@@ -92,6 +92,21 @@ export function AnalisisGraderWizardPage() {
     [],
   )
 
+  const handleApplyGateSuggestion = useCallback((payload: { gateNumber: number; calibre: string; quality: string }) => {
+    setGates((prev) => prev.map((gate) => {
+      if (gate.gateNumber !== payload.gateNumber) return gate
+      return {
+        ...gate,
+        assignedCalibre: payload.calibre,
+        assignedQuality: payload.quality as GateAssignment['assignedQuality'],
+      }
+    }))
+    setCurrentStep('config')
+    setTimeout(() => {
+      gatesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 50)
+  }, [])
+
   // Permission gate: redirect if user cannot see this module
   if (!canSee('analisisGrader')) {
     return <Navigate to="/" replace />
@@ -181,6 +196,7 @@ export function AnalisisGraderWizardPage() {
           gates={gates}
           config={config}
           onBack={() => setCurrentStep('config')}
+          onApplyGateSuggestion={handleApplyGateSuggestion}
         />
       )}
     </div>

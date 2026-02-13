@@ -131,6 +131,7 @@ interface Props {
   gates: GateAssignment[]
   config: GraderAnalysisConfig
   onBack: () => void
+  onApplyGateSuggestion?: (payload: { gateNumber: number; calibre: string; quality: string }) => void
 }
 
 interface PinnedPatternPoint {
@@ -150,7 +151,7 @@ interface PinnedPatternPoint {
 const PIN_CARD_WIDTH = 224
 const PIN_CARD_PADDING = 8
 
-export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack }: Props) {
+export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack, onApplyGateSuggestion }: Props) {
   const user = useAuthStore((s) => s.user)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -1332,6 +1333,9 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
       if (suggestion.type === 'investigate') {
         return {
           gateNumber: suggestion.gateNumber,
+          suggestedCalibre: suggestion.currentCalibre,
+          suggestedQuality: currentQuality,
+          canApply: false,
           text: `Gate ${suggestion.gateNumber}: mantener calibre ${suggestion.currentCalibre} y calidad ${currentQuality}; revisar variabilidad/mismatch (${suggestion.impactScore}%).`,
         }
       }
@@ -1342,10 +1346,22 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
 
       return {
         gateNumber: suggestion.gateNumber,
+        suggestedCalibre: suggestion.suggestedCalibre,
+        suggestedQuality: targetQuality,
+        canApply: true,
         text: `Gate ${suggestion.gateNumber}: cambiar calibre ${suggestion.currentCalibre} → ${suggestion.suggestedCalibre} y calidad ${qualityText}.`,
       }
     })
   }, [analytics.gateSwapSuggestions, gates, suggestedQualityByCalibre])
+
+  const handleApplyGateAction = (action: { gateNumber: number; suggestedCalibre: string; suggestedQuality: string; canApply: boolean }) => {
+    if (!action.canApply || !onApplyGateSuggestion) return
+    onApplyGateSuggestion({
+      gateNumber: action.gateNumber,
+      calibre: action.suggestedCalibre,
+      quality: action.suggestedQuality,
+    })
+  }
 
   const lotStdDevTooltipProps = useMemo(() => {
     const base = getTooltipProps('lot.stdDev')
@@ -2822,7 +2838,19 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                       <div className="space-y-1">
                         <p className="font-medium text-foreground">Cambios sugeridos (configuración actual):</p>
                         {directGateActions.map((action) => (
-                          <p key={action.gateNumber}>• {action.text}</p>
+                          <div key={action.gateNumber} className="flex items-start justify-between gap-2">
+                            <p>• {action.text}</p>
+                            {action.canApply && onApplyGateSuggestion && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleApplyGateAction(action)}
+                                className="h-7 px-2 text-[11px]"
+                              >
+                                Aplicar
+                              </Button>
+                            )}
+                          </div>
                         ))}
                         <p className="text-[11px]">Estas sugerencias se recalculan automáticamente cuando modifica gates en Configuración y vuelve al Dashboard.</p>
                       </div>

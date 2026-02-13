@@ -7,6 +7,16 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.60] - 2026-02-12
+
+### ⚡ Acción rápida: aplicar sugerencia de gate
+
+#### Mejoras
+- **Botón `Aplicar` por sugerencia**: En `Dispersión por Lote`, cada acción de cambio de gate ahora permite aplicar directamente calibre/calidad sugeridos.
+- **Actualización inmediata de configuración**: Al aplicar, la gate se actualiza en el estado actual del análisis.
+- **Navegación automática a Configuración**: Después de aplicar, la vista vuelve a Configuración de Gates para validar/ajustar visualmente el cambio.
+- **Recalculo continuo de sugerencias**: Al regresar al dashboard, las recomendaciones se generan nuevamente según la configuración ya modificada.
+
 ## [2.47.59] - 2026-02-12
 
 ### 🎯 Sugerencias directas de cambio por gate
