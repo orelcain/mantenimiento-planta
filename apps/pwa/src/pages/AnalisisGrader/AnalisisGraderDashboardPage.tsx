@@ -1275,6 +1275,13 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
   }
   const matrixCalibres = Array.from(matrixCalibresSet)
 
+  const lotAnalysisView = useMemo(() => {
+    return analytics.lotAnalysis.map((lot) => ({
+      ...lot,
+      pointZeroPctChecked: lot.pieces > 0 ? Math.round((lot.pointZeroPieces / lot.pieces) * 10000) / 100 : 0,
+    }))
+  }, [analytics.lotAnalysis])
+
   return (
     <div
       ref={dashRef}
@@ -2459,10 +2466,10 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
         </TabsContent>
 
         {/* LOTES */}
-        <TabsContent value="lotes" className="space-y-4">
-          {analytics.lotAnalysis.length > 0 ? (
+        <TabsContent value="lotes" className="space-y-4 relative z-10">
+          {lotAnalysisView.length > 0 ? (
             <>
-              <Card>
+              <Card className="relative overflow-visible z-10">
                 <CardHeader>
                   <CardTitle className="text-sm flex items-center gap-2">
                     <Layers className="h-4 w-4 text-blue-500" />
@@ -2470,51 +2477,56 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                     <InfoTooltip {...getTooltipProps('lot.analysis')} />
                   </CardTitle>
                   <p className="text-xs text-muted-foreground">
-                    {analytics.lotAnalysis.length} lote(s) detectados en pieza-pieza
+                    {lotAnalysisView.length} lote(s) detectados en pieza-pieza
                   </p>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="overflow-visible">
                   {/* Bar chart: avg weight per lot */}
-                  <Bar
-                    data={{
-                      labels: analytics.lotAnalysis.map(l => l.lot),
-                      datasets: [
-                        {
-                          label: 'Peso Promedio (g)',
-                          data: analytics.lotAnalysis.map(l => l.avgWeightGrams),
-                          backgroundColor: 'rgba(59,130,246,0.7)',
-                          borderRadius: 6,
-                        },
-                        {
-                          label: 'Mediana (g)',
-                          data: analytics.lotAnalysis.map(l => l.medianWeightGrams),
-                          backgroundColor: 'rgba(16,185,129,0.5)',
-                          borderRadius: 6,
-                        },
-                      ],
-                    }}
-                    options={{
-                      responsive: true,
-                      plugins: {
-                        legend: { position: 'bottom' },
-                        tooltip: {
-                          callbacks: {
-                            afterBody: (items) => {
-                              const idx = items[0]?.dataIndex
-                              if (idx == null) return ''
-                              const lot = analytics.lotAnalysis[idx]
-                              if (!lot) return ''
-                              return [
-                                `Calibre prom.: ${getCalibreByWeightGrams(lot.avgWeightGrams)}`,
-                                `Calibre med.: ${getCalibreByWeightGrams(lot.medianWeightGrams)}`,
-                              ]
+                  <div className="overflow-visible" style={{ minHeight: 300 }}>
+                    <Bar
+                      data={{
+                        labels: lotAnalysisView.map(l => l.lot),
+                        datasets: [
+                          {
+                            label: 'Peso Promedio (g)',
+                            data: lotAnalysisView.map(l => l.avgWeightGrams),
+                            backgroundColor: 'rgba(59,130,246,0.7)',
+                            borderRadius: 6,
+                          },
+                          {
+                            label: 'Mediana (g)',
+                            data: lotAnalysisView.map(l => l.medianWeightGrams),
+                            backgroundColor: 'rgba(16,185,129,0.5)',
+                            borderRadius: 6,
+                          },
+                        ],
+                      }}
+                      options={{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: { mode: 'index', intersect: false },
+                        plugins: {
+                          legend: { position: 'bottom' },
+                          tooltip: {
+                            callbacks: {
+                              afterBody: (items) => {
+                                const idx = items[0]?.dataIndex
+                                if (idx == null) return ''
+                                const lot = lotAnalysisView[idx]
+                                if (!lot) return ''
+                                return [
+                                  `Calibre prom.: ${getCalibreByWeightGrams(lot.avgWeightGrams)}`,
+                                  `Calibre med.: ${getCalibreByWeightGrams(lot.medianWeightGrams)}`,
+                                  `P0: ${lot.pointZeroPieces.toLocaleString()} / ${lot.pieces.toLocaleString()} (${lot.pointZeroPctChecked}%)`,
+                                ]
+                              },
                             },
                           },
                         },
-                      },
-                      scales: { y: { beginAtZero: false, title: { display: true, text: 'Peso (g)' } } },
-                    }}
-                  />
+                        scales: { y: { beginAtZero: false, title: { display: true, text: 'Peso (g)' } } },
+                      }}
+                    />
+                  </div>
                 </CardContent>
               </Card>
 
@@ -2563,7 +2575,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                         </tr>
                       </thead>
                       <tbody>
-                        {analytics.lotAnalysis.map((lot, i) => {
+                        {lotAnalysisView.map((lot, i) => {
                           const topCalibre = lot.calibreDistribution.length > 0
                             ? lot.calibreDistribution.reduce((a, b) => a.pieces > b.pieces ? a : b)
                             : null
@@ -2580,10 +2592,10 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                               <td className="py-2 px-2 text-right">
                                 <span className={cn(
                                   'font-medium',
-                                  lot.pointZeroPct > 5 && 'text-red-600',
-                                  lot.pointZeroPct > 2 && lot.pointZeroPct <= 5 && 'text-amber-600',
+                                  lot.pointZeroPctChecked > 5 && 'text-red-600',
+                                  lot.pointZeroPctChecked > 2 && lot.pointZeroPctChecked <= 5 && 'text-amber-600',
                                 )}>
-                                  {lot.pointZeroPct}%
+                                  {lot.pointZeroPctChecked}%
                                 </span>
                               </td>
                               <td className="py-2 px-2">
@@ -2599,32 +2611,47 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
               </Card>
 
               {/* Point Zero per lot */}
-              <Card>
+              <Card className="relative overflow-visible z-10">
                 <CardHeader>
                   <CardTitle className="text-sm">Punto Cero por Lote</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <Bar
-                    data={{
-                      labels: analytics.lotAnalysis.map(l => l.lot),
-                      datasets: [
-                        {
-                          label: 'P0 %',
-                          data: analytics.lotAnalysis.map(l => l.pointZeroPct),
-                          backgroundColor: analytics.lotAnalysis.map(l =>
-                            l.pointZeroPct > 5 ? 'rgba(239,68,68,0.7)' :
-                            l.pointZeroPct > 2 ? 'rgba(245,158,11,0.7)' :
-                            'rgba(16,185,129,0.7)'
-                          ),
+                <CardContent className="overflow-visible">
+                  <div className="overflow-visible" style={{ minHeight: 260 }}>
+                    <Bar
+                      data={{
+                        labels: lotAnalysisView.map(l => l.lot),
+                        datasets: [
+                          {
+                            label: 'P0 %',
+                            data: lotAnalysisView.map(l => l.pointZeroPctChecked),
+                            backgroundColor: lotAnalysisView.map(l =>
+                              l.pointZeroPctChecked > 5 ? 'rgba(239,68,68,0.7)' :
+                              l.pointZeroPctChecked > 2 ? 'rgba(245,158,11,0.7)' :
+                              'rgba(16,185,129,0.7)'
+                            ),
+                            borderRadius: 6,
+                          },
+                        ],
+                      }}
+                      options={{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                          legend: { display: false },
+                          tooltip: {
+                            callbacks: {
+                              label: (ctx) => {
+                                const lot = lotAnalysisView[ctx.dataIndex]
+                                if (!lot) return ''
+                                return `P0: ${lot.pointZeroPctChecked}% (${lot.pointZeroPieces.toLocaleString()} / ${lot.pieces.toLocaleString()} pz)`
+                              },
+                            },
+                          },
                         },
-                      ],
-                    }}
-                    options={{
-                      responsive: true,
-                      plugins: { legend: { display: false } },
-                      scales: { y: { beginAtZero: true, title: { display: true, text: 'Punto Cero %' } } },
-                    }}
-                  />
+                        scales: { y: { beginAtZero: true, title: { display: true, text: 'Punto Cero %' } } },
+                      }}
+                    />
+                  </div>
                 </CardContent>
               </Card>
             </>

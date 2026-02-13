@@ -7,6 +7,17 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.51] - 2026-02-12
+
+### 🧩 Lotes: hover visible y validación explícita de % P0
+
+#### Mejoras
+- **Hover más visible en gráficos**: Se ajusta el contenedor de charts en `Lotes` con `overflow-visible` y layout estable para evitar ocultamiento visual del tooltip.
+- **Interacción más consistente**: Se habilita `interaction: index` con `intersect: false` para facilitar lectura al pasar el mouse por barras densas.
+- **% P0 recalculado en UI**: El valor mostrado usa fórmula explícita `pointZeroPieces / pieces * 100` con redondeo a 2 decimales.
+- **Trazabilidad en tooltip**: Se muestra fracción completa `P0/Total` junto al porcentaje para validar rápidamente el cálculo por lote.
+- **Tabla y gráfico sincronizados**: El `% P0` mostrado en comparativa y en barra de Punto Cero usa la misma métrica validada.
+
 ## [2.47.50] - 2026-02-12
 
 ### 🧼 Refinamiento visual anti-ruido en tabla de Clasificación P0
