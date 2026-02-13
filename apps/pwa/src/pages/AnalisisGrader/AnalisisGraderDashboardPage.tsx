@@ -2552,6 +2552,13 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
               <Card>
                 <CardHeader>
                   <CardTitle className="text-sm">Comparativa de Lotes</CardTitle>
+                  <p className="text-[11px] text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <span className="font-medium">Semáforo CV:</span>
+                    <span>🟢 &lt;8%</span>
+                    <span>🟡 8-11.9%</span>
+                    <span>🟠 12-19.9%</span>
+                    <span>🔴 ≥20%</span>
+                  </p>
                 </CardHeader>
                 <CardContent>
                   <div className="overflow-x-auto overflow-y-visible">
@@ -2805,6 +2812,13 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
               <Card>
                 <CardHeader>
                   <CardTitle className="text-sm">Detalle por Intervalo</CardTitle>
+                  <p className="text-[11px] text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <span className="font-medium">Semáforo CV:</span>
+                    <span>🟢 &lt;8%</span>
+                    <span>🟡 8-11.9%</span>
+                    <span>🟠 12-19.9%</span>
+                    <span>🔴 ≥20%</span>
+                  </p>
                 </CardHeader>
                 <CardContent>
                   <div className="overflow-x-auto max-h-[400px] overflow-y-auto">

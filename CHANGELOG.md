@@ -7,6 +7,16 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.57] - 2026-02-12
+
+### 📍 UX: Ver Dashboard visible + leyenda CV fija
+
+#### Mejoras
+- **Botón `Ver Dashboard` más arriba**: Se agrega barra rápida sticky en Configuración de Gates para acceder al dashboard sin bajar al final de la página.
+- **Acceso más claro al cargar datos**: Mensaje contextual indica que ya se puede abrir el dashboard en cualquier momento.
+- **Leyenda fija de semáforo CV**: En `Comparativa de Lotes` y `Detalle por Intervalo` se muestra guía visible (`🟢🟡🟠🔴`) sin depender de hover.
+- **Lectura operativa más rápida**: El equipo visualiza umbrales de dispersión directamente en pantalla mientras revisa los valores `σ`.
+
 ## [2.47.56] - 2026-02-12
 
 ### 🧾 σ ordenado por fila + semáforo en celdas

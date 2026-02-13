@@ -429,6 +429,19 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
         </CardContent>
       </Card>
 
+      {/* Quick navigation visible */}
+      <div className="sticky top-14 z-20">
+        <Card className="border-primary/30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+          <CardContent className="py-2 px-3 flex items-center justify-between gap-2">
+            <p className="text-xs text-muted-foreground">Datos cargados: puede ir al dashboard en cualquier momento.</p>
+            <Button size="sm" onClick={() => onComplete(gates, config)}>
+              Ver Dashboard
+              <ChevronRight className="h-4 w-4 ml-1" />
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Gates Table */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
