@@ -1761,16 +1761,22 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
       {(kpis.avgWeightGrams != null || kpis.uniqueLots != null) && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {kpis.avgWeightGrams != null && (
-            <KPICard label="Peso Promedio" value={`${kpis.avgWeightGrams.toLocaleString()} g`} icon={Scale} tooltip={getTooltip('kpi.avgWeight')} />
-          )}
-          {kpis.avgWeightGrams != null && (
-            <KPICard label="Calibre por Peso Prom." value={avgWeightCalibre} icon={Scale} tooltip="Calibre equivalente según rango de peso promedio." />
+            <KPICard
+              label="Peso Promedio"
+              value={`${kpis.avgWeightGrams.toLocaleString()} g`}
+              secondaryText={`Calibre eq.: ${avgWeightCalibre}`}
+              icon={Scale}
+              tooltip={getTooltip('kpi.avgWeight')}
+            />
           )}
           {kpis.medianWeightGrams != null && (
-            <KPICard label="Peso Mediana" value={`${kpis.medianWeightGrams.toLocaleString()} g`} icon={Scale} tooltip={getTooltip('kpi.medianWeight')} />
-          )}
-          {kpis.medianWeightGrams != null && (
-            <KPICard label="Calibre por Peso Med." value={medianWeightCalibre} icon={Scale} tooltip="Calibre equivalente según rango de peso mediana." />
+            <KPICard
+              label="Peso Mediana"
+              value={`${kpis.medianWeightGrams.toLocaleString()} g`}
+              secondaryText={`Calibre eq.: ${medianWeightCalibre}`}
+              icon={Scale}
+              tooltip={getTooltip('kpi.medianWeight')}
+            />
           )}
           {kpis.uniqueLots != null && kpis.uniqueLots > 0 && (
             <KPICard label="Lotes Procesados" value={kpis.uniqueLots.toString()} icon={Layers} tooltip={getTooltip('kpi.uniqueLots')} />
@@ -4062,12 +4068,14 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
 function KPICard({
   label,
   value,
+  secondaryText,
   icon: Icon,
   severity,
   tooltip,
 }: {
   label: string
   value: string
+  secondaryText?: string
   icon: React.ElementType
   severity?: 'ok' | 'warn' | 'critical'
   tooltip?: string
@@ -4094,6 +4102,9 @@ function KPICard({
         >
           {value}
         </p>
+        {secondaryText && (
+          <p className="text-[11px] text-muted-foreground mt-0.5">{secondaryText}</p>
+        )}
       </CardContent>
     </Card>
   )

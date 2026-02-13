@@ -7,6 +7,15 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.69] - 2026-02-13
+
+### 🎯 KPI de peso simplificado (sin duplicados)
+
+#### Mejoras
+- **Integración de calibre en peso**: `Calibre por Peso Prom.` y `Calibre por Peso Med.` se integran dentro de las tarjetas `Peso Promedio` y `Peso Mediana`.
+- **Menos ruido visual**: Se eliminan dos boxes duplicados y se mantiene la información completa en un solo bloque por métrica.
+- **Lectura más rápida**: El operador ve valor de peso + calibre equivalente en la misma tarjeta.
+
 ## [2.47.68] - 2026-02-13
 
 ### 🧩 Unificación de severidad P0 en dashboard
