@@ -7,6 +7,15 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.64] - 2026-02-13
+
+### 🎛️ Prioridad de reacción alineada a umbrales de planta
+
+#### Mejoras
+- **Prioridad dinámica en Tendencia**: Las recomendaciones automáticas ya no usan cortes fijos; ahora usan `pointZeroPctWarn` configurado en el módulo.
+- **Escalado crítico consistente**: El estado crítico se calcula sobre el umbral operativo (no hardcodeado), para reflejar mejor la realidad de cada planta.
+- **Trazabilidad visible**: Cada recomendación muestra P0 proyectado y umbrales usados (`warn`/`crítico`) para facilitar decisión en turno.
+
 ## [2.47.63] - 2026-02-13
 
 ### ⚡ Tendencia: recomendaciones duales para reacción temprana

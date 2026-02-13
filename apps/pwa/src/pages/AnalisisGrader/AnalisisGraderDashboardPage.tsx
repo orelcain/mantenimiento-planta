@@ -1599,9 +1599,11 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
       urgency: 'high' | 'medium' | 'low'
     }>
 
-    const urgency: 'high' | 'medium' | 'low' = trendForecastView.projectedPointZeroPct >= 3
+    const warnThreshold = config.errorThresholds?.pointZeroPctWarn ?? 2
+    const criticalThreshold = round2(Math.max(warnThreshold + 0.5, warnThreshold * 1.5))
+    const urgency: 'high' | 'medium' | 'low' = trendForecastView.projectedPointZeroPct >= criticalThreshold
       ? 'high'
-      : trendForecastView.projectedPointZeroPct >= 2
+      : trendForecastView.projectedPointZeroPct >= warnThreshold
       ? 'medium'
       : 'low'
 
@@ -1617,9 +1619,9 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
       .map((action) => ({
         ...action,
         urgency,
-        text: `${prefix}: ${action.text} (proyección cierre P0 ${trendForecastView.projectedPointZeroPct.toFixed(2)}%).`,
+        text: `${prefix}: ${action.text} (proyección cierre P0 ${trendForecastView.projectedPointZeroPct.toFixed(2)}%, umbral ${warnThreshold.toFixed(2)}%, crítico ${criticalThreshold.toFixed(2)}%).`,
       }))
-  }, [directGateActions, trendForecastView])
+  }, [config.errorThresholds?.pointZeroPctWarn, directGateActions, trendForecastView])
 
   const trendAIRecommendations = useMemo(() => {
     if (!aiOutput) return [] as string[]
