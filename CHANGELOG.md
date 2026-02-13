@@ -7,6 +7,15 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.61] - 2026-02-12
+
+### ✅ Estado visual de sugerencias aplicadas
+
+#### Mejoras
+- **Badge `Aplicada`**: Las sugerencias de gate ahora muestran estado visual cuando la configuración actual ya coincide con el cambio recomendado.
+- **Acción limpia**: El botón `Aplicar` solo aparece para sugerencias pendientes; en las ya aplicadas se muestra el badge en verde.
+- **Seguimiento operativo**: Facilita saber qué acciones ya fueron ejecutadas sin revisar manualmente cada compuerta.
+
 ## [2.47.60] - 2026-02-12
 
 ### ⚡ Acción rápida: aplicar sugerencia de gate

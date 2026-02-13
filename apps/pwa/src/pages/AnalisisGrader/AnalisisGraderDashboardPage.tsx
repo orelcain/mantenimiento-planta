@@ -1336,6 +1336,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
           suggestedCalibre: suggestion.currentCalibre,
           suggestedQuality: currentQuality,
           canApply: false,
+          isApplied: false,
           text: `Gate ${suggestion.gateNumber}: mantener calibre ${suggestion.currentCalibre} y calidad ${currentQuality}; revisar variabilidad/mismatch (${suggestion.impactScore}%).`,
         }
       }
@@ -1344,18 +1345,22 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
         ? `${currentQuality} → ${targetQuality}`
         : `${currentQuality} (mantener)`
 
+      const isApplied = (gateCfg?.assignedCalibre === suggestion.suggestedCalibre)
+        && (gateCfg?.assignedQuality === targetQuality)
+
       return {
         gateNumber: suggestion.gateNumber,
         suggestedCalibre: suggestion.suggestedCalibre,
         suggestedQuality: targetQuality,
         canApply: true,
+        isApplied,
         text: `Gate ${suggestion.gateNumber}: cambiar calibre ${suggestion.currentCalibre} → ${suggestion.suggestedCalibre} y calidad ${qualityText}.`,
       }
     })
   }, [analytics.gateSwapSuggestions, gates, suggestedQualityByCalibre])
 
-  const handleApplyGateAction = (action: { gateNumber: number; suggestedCalibre: string; suggestedQuality: string; canApply: boolean }) => {
-    if (!action.canApply || !onApplyGateSuggestion) return
+  const handleApplyGateAction = (action: { gateNumber: number; suggestedCalibre: string; suggestedQuality: string; canApply: boolean; isApplied?: boolean }) => {
+    if (!action.canApply || action.isApplied || !onApplyGateSuggestion) return
     onApplyGateSuggestion({
       gateNumber: action.gateNumber,
       calibre: action.suggestedCalibre,
@@ -2840,7 +2845,12 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
                         {directGateActions.map((action) => (
                           <div key={action.gateNumber} className="flex items-start justify-between gap-2">
                             <p>• {action.text}</p>
-                            {action.canApply && onApplyGateSuggestion && (
+                            {action.canApply && action.isApplied && (
+                              <Badge variant="outline" className="text-[11px] border-emerald-500/40 text-emerald-600">
+                                Aplicada
+                              </Badge>
+                            )}
+                            {action.canApply && !action.isApplied && onApplyGateSuggestion && (
                               <Button
                                 size="sm"
                                 variant="outline"
