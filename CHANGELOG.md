@@ -7,6 +7,16 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.53] - 2026-02-12
+
+### 📐 Tooltip σ con ejemplo real por lote
+
+#### Mejoras
+- **Explicación contextual en hover**: El tooltip de `σ (g)` en `Comparativa de Lotes` ahora explica que cada valor se calcula con los pesos reales del lote.
+- **Ejemplo directo con datos mostrados**: Se incluye ejemplo dinámico usando `x̄` y `σ` del lote visible, con banda aproximada `x̄ ± σ`.
+- **Lectura operativa**: Se agrega interpretación con `CV%` y nivel de dispersión (baja/media/alta) para entender por qué aparece ese valor.
+- **Caso más disperso**: Si aplica, el tooltip añade un segundo ejemplo del lote con mayor σ para contraste rápido.
+
 ## [2.47.52] - 2026-02-12
 
 ### 🪟 Fix: hover de tooltips visible sobre tablas/cards

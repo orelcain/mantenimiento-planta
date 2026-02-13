@@ -1282,6 +1282,44 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
     }))
   }, [analytics.lotAnalysis])
 
+  const lotStdDevTooltipProps = useMemo(() => {
+    const base = getTooltipProps('lot.stdDev')
+    if (lotAnalysisView.length === 0) return base
+
+    const byPieces = [...lotAnalysisView].sort((a, b) => b.pieces - a.pieces)
+    const mainLot = byPieces[0]
+    const highestSigmaLot = [...lotAnalysisView].sort((a, b) => b.stdDevWeightGrams - a.stdDevWeightGrams)[0]
+    if (!mainLot) return base
+
+    const makeExample = (lot: typeof lotAnalysisView[number]) => {
+      const avg = lot.avgWeightGrams
+      const sigma = lot.stdDevWeightGrams
+      const minBand = Math.max(0, avg - sigma)
+      const maxBand = avg + sigma
+      const cv = avg > 0 ? (sigma / avg) * 100 : 0
+
+      const variabilityLabel =
+        cv >= 20 ? 'muy alta dispersión' :
+        cv >= 12 ? 'dispersión media-alta' :
+        cv >= 8 ? 'dispersión media' :
+        'dispersión baja'
+
+      return `Lote ${lot.lot}: x̄=${avg.toLocaleString('es-CL', { maximumFractionDigits: 2 })}g, σ=${sigma.toLocaleString('es-CL', { maximumFractionDigits: 2 })}g. Aproximadamente muchas piezas caen entre ${minBand.toLocaleString('es-CL', { maximumFractionDigits: 0 })}g y ${maxBand.toLocaleString('es-CL', { maximumFractionDigits: 0 })}g (CV≈${cv.toLocaleString('es-CL', { maximumFractionDigits: 1 })}%, ${variabilityLabel}).`
+    }
+
+    const mainExample = makeExample(mainLot)
+    const secondExample =
+      highestSigmaLot && highestSigmaLot.lot !== mainLot.lot
+        ? ` Caso más disperso: ${makeExample(highestSigmaLot)}`
+        : ''
+
+    return {
+      ...base,
+      text: 'Mide cuánto se dispersan los pesos respecto a la media. En esta tabla se calcula con todos los pesos de cada lote; por eso cada fila tiene un σ distinto.',
+      example: `${mainExample}${secondExample}`,
+    }
+  }, [lotAnalysisView])
+
   return (
     <div
       ref={dashRef}
@@ -2559,7 +2597,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                           <th className="py-2 px-2 text-right">
                             <span className="flex items-center justify-end gap-1">
                               σ (g)
-                              <InfoTooltip {...getTooltipProps('lot.stdDev')} iconSize={12} />
+                              <InfoTooltip {...lotStdDevTooltipProps} iconSize={12} />
                             </span>
                           </th>
                           <th className="py-2 px-2 text-right">Peso (kg)</th>
