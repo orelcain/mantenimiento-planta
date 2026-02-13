@@ -242,6 +242,29 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
     setTrendCriticalThreshold(Math.max(critical, round2(warn + 0.1)))
   }, [config.errorThresholds?.pointZeroPctCritical, config.errorThresholds?.pointZeroPctWarn])
 
+  const pointZeroWarnThreshold = trendWarnThreshold
+  const pointZeroCriticalThreshold = Math.max(trendCriticalThreshold, round2(pointZeroWarnThreshold + 0.1))
+
+  const getPointZeroSeverity = useCallback((pct: number): 'critical' | 'warn' | 'ok' => {
+    if (pct >= pointZeroCriticalThreshold) return 'critical'
+    if (pct >= pointZeroWarnThreshold) return 'warn'
+    return 'ok'
+  }, [pointZeroCriticalThreshold, pointZeroWarnThreshold])
+
+  const getPointZeroTextClass = useCallback((pct: number): string => {
+    const severity = getPointZeroSeverity(pct)
+    if (severity === 'critical') return 'text-red-600'
+    if (severity === 'warn') return 'text-amber-600'
+    return 'text-emerald-600'
+  }, [getPointZeroSeverity])
+
+  const getPointZeroBarColor = useCallback((pct: number): string => {
+    const severity = getPointZeroSeverity(pct)
+    if (severity === 'critical') return 'rgba(239,68,68,0.7)'
+    if (severity === 'warn') return 'rgba(245,158,11,0.7)'
+    return 'rgba(16,185,129,0.7)'
+  }, [getPointZeroSeverity])
+
   // Compute analytics
   const analytics = useMemo<GraderAnalyticsResult>(
     () => computeAnalytics(parsedData, config, gates),
@@ -1610,11 +1633,12 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
       urgency: 'high' | 'medium' | 'low'
     }>
 
-    const warnThreshold = trendWarnThreshold
-    const criticalThreshold = Math.max(trendCriticalThreshold, round2(warnThreshold + 0.1))
-    const urgency: 'high' | 'medium' | 'low' = trendForecastView.projectedPointZeroPct >= criticalThreshold
+    const warnThreshold = pointZeroWarnThreshold
+    const criticalThreshold = pointZeroCriticalThreshold
+    const severity = getPointZeroSeverity(trendForecastView.projectedPointZeroPct)
+    const urgency: 'high' | 'medium' | 'low' = severity === 'critical'
       ? 'high'
-      : trendForecastView.projectedPointZeroPct >= warnThreshold
+      : severity === 'warn'
       ? 'medium'
       : 'low'
 
@@ -1632,7 +1656,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
         urgency,
         text: `${prefix}: ${action.text} (proyección cierre P0 ${trendForecastView.projectedPointZeroPct.toFixed(2)}%, umbral ${warnThreshold.toFixed(2)}%, crítico ${criticalThreshold.toFixed(2)}%).`,
       }))
-  }, [directGateActions, trendCriticalThreshold, trendForecastView, trendWarnThreshold])
+  }, [directGateActions, getPointZeroSeverity, pointZeroCriticalThreshold, pointZeroWarnThreshold, trendForecastView])
 
   const trendAIRecommendations = useMemo(() => {
     if (!aiOutput) return [] as string[]
@@ -1716,7 +1740,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
           label="Punto Cero"
           value={`${kpis.pointZeroPieces.toLocaleString()} (${kpis.pointZeroPct}%)`}
           icon={Target}
-          severity={kpis.pointZeroPct > 3 ? 'critical' : kpis.pointZeroPct > 1.5 ? 'warn' : 'ok'}
+          severity={getPointZeroSeverity(kpis.pointZeroPct)}
           tooltip={getTooltip('kpi.pointZero')}
         />
         <KPICard
@@ -3002,11 +3026,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
                               <td className="py-2 px-2 text-right">{getCalibreByWeightGrams(lot.avgWeightGrams)}</td>
                               <td className="py-2 px-2 text-right">{getCalibreByWeightGrams(lot.medianWeightGrams)}</td>
                               <td className="py-2 px-2 text-right">
-                                <span className={cn(
-                                  'font-medium',
-                                  lot.pointZeroPctChecked > 5 && 'text-red-600',
-                                  lot.pointZeroPctChecked > 2 && lot.pointZeroPctChecked <= 5 && 'text-amber-600',
-                                )}>
+                                <span className={cn('font-medium', getPointZeroTextClass(lot.pointZeroPctChecked))}>
                                   {lot.pointZeroPctChecked}%
                                 </span>
                               </td>
@@ -3139,11 +3159,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
                           {
                             label: 'P0 %',
                             data: lotAnalysisView.map(l => l.pointZeroPctChecked),
-                            backgroundColor: lotAnalysisView.map(l =>
-                              l.pointZeroPctChecked > 5 ? 'rgba(239,68,68,0.7)' :
-                              l.pointZeroPctChecked > 2 ? 'rgba(245,158,11,0.7)' :
-                              'rgba(16,185,129,0.7)'
-                            ),
+                            backgroundColor: lotAnalysisView.map((l) => getPointZeroBarColor(l.pointZeroPctChecked)),
                             borderRadius: 6,
                           },
                         ],

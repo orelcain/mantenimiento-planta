@@ -7,6 +7,16 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.68] - 2026-02-13
+
+### 🧩 Unificación de severidad P0 en dashboard
+
+#### Mejoras
+- **KPI principal unificado**: El KPI `Punto Cero` ahora usa los mismos umbrales configurados (`warn/crítico`) en lugar de cortes fijos.
+- **P0 por lote alineado**: Tabla y gráfico de `Punto Cero por Lote` usan la misma regla de severidad para color/estado.
+- **Recomendación temprana consistente**: La prioridad de acciones en `Tendencia` reutiliza el mismo evaluador de severidad P0.
+- **Menos contradicciones visuales**: KPI, lotes, tendencia e insights quedan bajo un único criterio operativo.
+
 ## [2.47.67] - 2026-02-13
 
 ### 🧠 Insights alineados con umbral crítico de P0
