@@ -7,6 +7,17 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.49] - 2026-02-12
+
+### 🎨 Mejora visual: Clasificación Punto Cero
+
+#### Mejoras
+- **Gráfico más grande**: Donut ampliado para aprovechar mejor el espacio libre del panel.
+- **Paleta consistente por causa**: Colores fijos por tipo de causa para evitar ambigüedad entre vista y tabla.
+- **Leyenda renovada**: Se agrega leyenda visual compacta con color, piezas, `% P.Cero` y `% Total` por causa.
+- **Tabla sincronizada con colores**: Cada fila de causa muestra indicador cromático del mismo color del donut.
+- **Tooltip más informativo**: Incluye `P.Cero` y `% Total` para lectura rápida en hover.
+
 ## [2.47.48] - 2026-02-12
 
 ### 📉 Corrección: % por causa acumulado desde inicio de turno

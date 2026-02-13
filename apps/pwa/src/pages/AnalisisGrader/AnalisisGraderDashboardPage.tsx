@@ -1224,21 +1224,26 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
   }
 
   // Classification donut for Punto Cero
-  const classificationColors = [
-    'rgba(239,68,68,0.8)',   // fuera_de_rango (red)
-    'rgba(245,158,11,0.8)',  // fuera_de_limites (amber)
-    'rgba(139,92,246,0.8)',  // no_leido_fotocelula (purple)
-    'rgba(59,130,246,0.8)',  // too_close_too_long (blue)
-    'rgba(16,185,129,0.8)',  // puerta_no_preparada (green)
-    'rgba(107,114,128,0.8)', // otro (gray)
-  ]
+  const causeColorMap: Record<string, string> = {
+    fuera_de_limites: 'rgba(239,68,68,0.92)',
+    no_leido_fotocelula: 'rgba(245,158,11,0.92)',
+    puerta_no_preparada: 'rgba(16,185,129,0.92)',
+    fuera_de_rango: 'rgba(59,130,246,0.92)',
+    too_close_too_long: 'rgba(139,92,246,0.92)',
+    otro: 'rgba(107,114,128,0.92)',
+  }
+
+  const getCauseColor = (cause: string): string => causeColorMap[cause] ?? 'rgba(107,114,128,0.92)'
 
   const classificationChartData = {
     labels: analytics.pointZeroClassification.causes.map((c) => c.label),
     datasets: [
       {
         data: analytics.pointZeroClassification.causes.map((c) => c.pieces),
-        backgroundColor: analytics.pointZeroClassification.causes.map((_, i) => classificationColors[i % classificationColors.length]),
+        backgroundColor: analytics.pointZeroClassification.causes.map((c) => getCauseColor(c.cause)),
+        borderColor: 'rgba(255,255,255,0.92)',
+        borderWidth: 2,
+        hoverOffset: 8,
       },
     ],
   }
@@ -1446,22 +1451,24 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                 </p>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 xl:grid-cols-[minmax(360px,440px)_minmax(0,1fr)] gap-8 items-start">
                   {/* Donut chart */}
-                  <div className="flex items-center justify-center">
-                    <div className="w-full max-w-[280px]">
+                  <div className="space-y-3">
+                    <div className="mx-auto w-full max-w-[420px]" style={{ height: 360 }}>
                       <Doughnut
                         data={classificationChartData}
                         options={{
                           responsive: true,
+                          maintainAspectRatio: false,
+                          cutout: '56%',
                           plugins: {
-                            legend: { position: 'bottom', labels: { font: { size: 11 } } },
+                            legend: { display: false },
                             tooltip: {
                               callbacks: {
                                 label: (ctx) => {
                                   const cause = analytics.pointZeroClassification.causes[ctx.dataIndex]
                                   return cause
-                                    ? `${cause.label}: ${cause.pieces.toLocaleString()} pz (${cause.pctOfPointZero}%)`
+                                    ? `${cause.label}: ${cause.pieces.toLocaleString()} pz (${cause.pctOfPointZero}% P.Cero | ${cause.pctOfTotal}% Total)`
                                     : ''
                                 },
                               },
@@ -1469,6 +1476,23 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                           },
                         }}
                       />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {analytics.pointZeroClassification.causes.map((c) => (
+                        <div key={`legend-${c.cause}`} className="rounded border bg-muted/20 px-2 py-1.5 text-xs">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: getCauseColor(c.cause) }} />
+                              <span className="truncate font-medium">{c.label}</span>
+                            </div>
+                            <span className="text-muted-foreground">{c.pctOfPointZero}%</span>
+                          </div>
+                          <div className="text-[10px] text-muted-foreground mt-0.5">
+                            {c.pieces.toLocaleString()} pz · {c.pctOfTotal}% total
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
 
@@ -1510,7 +1534,10 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                                 </td>
                                 <td className="py-2 px-2">
                                   <div>
-                                    <span className="font-medium">{c.label}</span>
+                                    <div className="flex items-center gap-2">
+                                      <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: getCauseColor(c.cause) }} />
+                                      <span className="font-medium">{c.label}</span>
+                                    </div>
                                     <p className="text-[10px] text-muted-foreground">{c.description}</p>
                                   </div>
                                 </td>
