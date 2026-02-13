@@ -375,6 +375,114 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
     ],
   }
 
+  const patternCauseTrend = useMemo(() => {
+    const safeInterval = Math.min(60, Math.max(1, Math.round(patternIntervalMinutes || 60)))
+    const intervalMs = safeInterval * 60_000
+    const fromMinute = parseTimeHHMMToMinutes(timeFilterFrom)
+    const toMinute = parseTimeHHMMToMinutes(timeFilterTo)
+
+    const pieceRecordsInRange = parsedData.pieceRecords.filter((record) => {
+      const dt = new Date(record.ts)
+      if (!Number.isFinite(dt.getTime())) return false
+      const minuteOfDay = dt.getHours() * 60 + dt.getMinutes()
+      return isMinuteWithinRange(minuteOfDay, fromMinute, toMinute)
+    })
+
+    if (pieceRecordsInRange.length === 0) {
+      return {
+        labels: [] as string[],
+        ranges: [] as string[],
+        bucketKeys: [] as number[],
+        totals: [] as number[],
+        series: [] as Array<{ label: string; pct: number[]; pieces: number[] }>,
+      }
+    }
+
+    const anchorMs = Math.min(...pieceRecordsInRange.map((record) => new Date(record.ts).getTime()))
+    const totalByBucket = new Map<number, number>()
+    for (const record of pieceRecordsInRange) {
+      const ts = new Date(record.ts).getTime()
+      if (!Number.isFinite(ts)) continue
+      const bucketIndex = Math.floor((ts - anchorMs) / intervalMs)
+      const bucketStartMs = anchorMs + (bucketIndex * intervalMs)
+      totalByBucket.set(bucketStartMs, (totalByBucket.get(bucketStartMs) ?? 0) + record.pieces)
+    }
+
+    const causeRecordsInRange = pointZeroDetailRecords.filter((record) => {
+      const dt = new Date(record.ts)
+      if (!Number.isFinite(dt.getTime())) return false
+      const minuteOfDay = dt.getHours() * 60 + dt.getMinutes()
+      return isMinuteWithinRange(minuteOfDay, fromMinute, toMinute)
+    })
+
+    const causeByBucket = new Map<string, Map<number, number>>()
+    for (const record of causeRecordsInRange) {
+      const ts = new Date(record.ts).getTime()
+      if (!Number.isFinite(ts)) continue
+      const bucketIndex = Math.floor((ts - anchorMs) / intervalMs)
+      const bucketStartMs = anchorMs + (bucketIndex * intervalMs)
+      const row = causeByBucket.get(record.causeLabel) ?? new Map<number, number>()
+      row.set(bucketStartMs, (row.get(bucketStartMs) ?? 0) + record.pieces)
+      causeByBucket.set(record.causeLabel, row)
+    }
+
+    const bucketKeys = Array.from(totalByBucket.keys()).sort((a, b) => a - b)
+    const labels = bucketKeys.map((bucketStartMs) => formatDateToHHMM(new Date(bucketStartMs + intervalMs)))
+    const ranges = bucketKeys.map((bucketStartMs) => {
+      const start = formatDateToHHMM(new Date(bucketStartMs))
+      const end = formatDateToHHMM(new Date(bucketStartMs + intervalMs))
+      return `${start} - ${end}`
+    })
+    const totals = bucketKeys.map((bucketStartMs) => totalByBucket.get(bucketStartMs) ?? 0)
+
+    const series = analytics.pointZeroClassification.causes
+      .map((cause) => cause.label)
+      .filter((label) => (causeByBucket.get(label)?.size ?? 0) > 0)
+      .map((label) => {
+        const piecesByBucket = causeByBucket.get(label) ?? new Map<number, number>()
+        const pieces = bucketKeys.map((bucketStartMs) => piecesByBucket.get(bucketStartMs) ?? 0)
+        const pct = pieces.map((p, idx) => {
+          const total = totals[idx] ?? 0
+          return total > 0 ? Math.round((p / total) * 10000) / 100 : 0
+        })
+        return { label, pct, pieces }
+      })
+
+    return { labels, ranges, bucketKeys, totals, series }
+  }, [analytics.pointZeroClassification.causes, parsedData.pieceRecords, patternIntervalMinutes, pointZeroDetailRecords, timeFilterFrom, timeFilterTo])
+
+  const patternCauseTrendChartData = {
+    labels: patternCauseTrend.labels,
+    datasets: patternCauseTrend.series.map((cause, idx) => {
+      const lc = cause.label.toLowerCase()
+      const palette = [
+        { border: 'rgba(239,68,68,0.95)', bg: 'rgba(239,68,68,0.15)' },
+        { border: 'rgba(245,158,11,0.95)', bg: 'rgba(245,158,11,0.15)' },
+        { border: 'rgba(139,92,246,0.95)', bg: 'rgba(139,92,246,0.15)' },
+        { border: 'rgba(16,185,129,0.95)', bg: 'rgba(16,185,129,0.15)' },
+        { border: 'rgba(59,130,246,0.95)', bg: 'rgba(59,130,246,0.15)' },
+      ]
+
+      let color = palette[idx % palette.length] ?? { border: 'rgba(239,68,68,0.95)', bg: 'rgba(239,68,68,0.15)' }
+      if (lc.includes('no leído') || lc.includes('fotoc')) color = { border: 'rgba(234,179,8,0.95)', bg: 'rgba(234,179,8,0.15)' }
+      else if (lc.includes('fuera de límites')) color = { border: 'rgba(239,68,68,0.95)', bg: 'rgba(239,68,68,0.15)' }
+      else if (lc.includes('puerta no preparada')) color = { border: 'rgba(16,185,129,0.95)', bg: 'rgba(16,185,129,0.15)' }
+      else if (lc.includes('fuera de rango')) color = { border: 'rgba(59,130,246,0.95)', bg: 'rgba(59,130,246,0.15)' }
+
+      return {
+        label: cause.label,
+        data: cause.pct,
+        borderColor: color.border,
+        backgroundColor: color.bg,
+        pointRadius: 2,
+        pointHoverRadius: 4,
+        borderWidth: 2,
+        tension: 0.25,
+        fill: false,
+      }
+    }),
+  }
+
   const getPatternPointPixels = (dataIndex: number): { x: number; y: number } | null => {
     const chart = patternLineChartRef.current
     if (!chart) return null
@@ -1734,6 +1842,52 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                           </div>
                         </div>
                       ))}
+                    </div>
+                  </div>
+
+                  <div className="border rounded p-3">
+                    <p className="text-xs font-medium mb-1">Evolución % por causa (sobre total del intervalo)</p>
+                    <p className="text-[10px] text-muted-foreground mb-2">
+                      Muestra cómo sube o baja cada causa en el tiempo del turno (No leído por fotocélula, Fuera de límites, etc.).
+                    </p>
+                    <div className="w-full" style={{ height: 240 }}>
+                      <Line
+                        data={patternCauseTrendChartData}
+                        options={{
+                          responsive: true,
+                          maintainAspectRatio: false,
+                          plugins: {
+                            legend: { display: true, position: 'bottom', labels: { boxWidth: 10, usePointStyle: true } },
+                            tooltip: {
+                              callbacks: {
+                                title: (items) => {
+                                  const first = items?.[0]
+                                  if (!first) return ''
+                                  const range = patternCauseTrend.ranges[first.dataIndex]
+                                  return range ? `Ventana: ${range}` : ''
+                                },
+                                label: (ctx) => {
+                                  const cause = patternCauseTrend.series.find((s) => s.label === ctx.dataset.label)
+                                  if (!cause) return ''
+                                  const idx = ctx.dataIndex
+                                  const pieces = cause.pieces[idx] ?? 0
+                                  const total = patternCauseTrend.totals[idx] ?? 0
+                                  const pct = cause.pct[idx] ?? 0
+                                  return `${cause.label}: ${pct}% (${pieces.toLocaleString()} / ${total.toLocaleString()} pz)`
+                                },
+                              },
+                            },
+                          },
+                          scales: {
+                            y: {
+                              beginAtZero: true,
+                              ticks: { callback: (v) => `${v}%` },
+                              title: { display: true, text: '% del total del intervalo' },
+                            },
+                            x: { grid: { color: 'rgba(128,128,128,0.1)' } },
+                          },
+                        }}
+                      />
                     </div>
                   </div>
 

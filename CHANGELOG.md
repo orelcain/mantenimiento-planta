@@ -7,6 +7,17 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.47] - 2026-02-12
+
+### 📈 Evolución temporal de % por causa en Punto Cero
+
+#### Mejoras
+- **Nuevo gráfico de tendencia por causa**: Se añade línea temporal de porcentaje para cada causa (No leído por fotocélula, Fuera de límites, Puerta no preparada, etc.).
+- **Base porcentual clara**: Cada punto se calcula como `% de la causa sobre el total de piezas del intervalo`.
+- **Lectura operacional de turno**: Permite ver si cada causa sube, baja o se mantiene durante el análisis.
+- **Tooltip detallado**: Muestra ventana temporal y relación `piezas causa / piezas totales del intervalo`.
+- **Mismo anclaje temporal real**: Usa la misma lógica de intervalos anclados al primer registro del turno para consistencia visual.
+
 ## [2.47.46] - 2026-02-12
 
 ### ⏱️ Patrón por intervalo anclado al primer registro real
