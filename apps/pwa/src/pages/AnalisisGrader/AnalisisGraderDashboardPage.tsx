@@ -120,11 +120,10 @@ function isMinuteWithinRange(minuteOfDay: number, fromMinute: number | null, toM
   return minuteOfDay <= (toMinute as number)
 }
 
-function formatMinuteOfDayLabel(minuteOfDay: number): string {
-  const normalized = ((minuteOfDay % 1440) + 1440) % 1440
-  const hh = Math.floor(normalized / 60)
-  const mm = normalized % 60
-  return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`
+function formatDateToHHMM(value: Date): string {
+  const hh = String(value.getHours()).padStart(2, '0')
+  const mm = String(value.getMinutes()).padStart(2, '0')
+  return `${hh}:${mm}`
 }
 
 interface Props {
@@ -253,23 +252,33 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
 
   const patternByHour = useMemo(() => {
     const safeInterval = Math.min(60, Math.max(1, Math.round(patternIntervalMinutes || 60)))
+    const intervalMs = safeInterval * 60_000
+    const validTimestamps = filteredPatternRecords
+      .map((record) => new Date(record.ts).getTime())
+      .filter((value) => Number.isFinite(value))
+
+    if (validTimestamps.length === 0) return []
+
+    const anchorMs = Math.min(...validTimestamps)
     const map = new Map<number, number>()
     for (const r of filteredPatternRecords) {
       const dt = new Date(r.ts)
-      if (!Number.isFinite(dt.getTime())) continue
-      const minuteOfDay = dt.getHours() * 60 + dt.getMinutes()
-      const rawEndMinute = Math.ceil(minuteOfDay / safeInterval) * safeInterval
-      const endMinute = ((rawEndMinute % 1440) + 1440) % 1440
-      map.set(endMinute, (map.get(endMinute) ?? 0) + r.pieces)
+      const ts = dt.getTime()
+      if (!Number.isFinite(ts)) continue
+      const bucketIndex = Math.floor((ts - anchorMs) / intervalMs)
+      const bucketStartMs = anchorMs + (bucketIndex * intervalMs)
+      map.set(bucketStartMs, (map.get(bucketStartMs) ?? 0) + r.pieces)
     }
     return Array.from(map.entries())
       .sort((a, b) => a[0] - b[0])
-      .map(([endMinute, pieces]) => {
-        const startMinute = endMinute - safeInterval
+      .map(([bucketStartMs, pieces]) => {
+        const bucketEndMs = bucketStartMs + intervalMs
+        const startDate = new Date(bucketStartMs)
+        const endDate = new Date(bucketEndMs)
         return {
-          key: String(endMinute),
-          hour: formatMinuteOfDayLabel(endMinute),
-          rangeLabel: `${formatMinuteOfDayLabel(startMinute)} - ${formatMinuteOfDayLabel(endMinute)}`,
+          key: String(bucketStartMs),
+          hour: formatDateToHHMM(endDate),
+          rangeLabel: `${formatDateToHHMM(startDate)} - ${formatDateToHHMM(endDate)}`,
         pieces,
         pct: patternTotalPieces > 0 ? Math.round((pieces / patternTotalPieces) * 10000) / 100 : 0,
         }
@@ -278,15 +287,23 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
 
   const patternIntervalDetailsByLabel = useMemo(() => {
     const safeInterval = Math.min(60, Math.max(1, Math.round(patternIntervalMinutes || 60)))
+    const intervalMs = safeInterval * 60_000
+    const validTimestamps = filteredPatternRecords
+      .map((record) => new Date(record.ts).getTime())
+      .filter((value) => Number.isFinite(value))
+
+    if (validTimestamps.length === 0) return new Map<string, { totalPieces: number; calibres: Array<{ key: string; pieces: number }>; qualities: Array<{ key: string; pieces: number }> }>()
+
+    const anchorMs = Math.min(...validTimestamps)
     const bucketMap = new Map<string, { totalPieces: number; calibreMap: Map<string, number>; qualityMap: Map<string, number> }>()
 
     for (const r of filteredPatternRecords) {
       const dt = new Date(r.ts)
-      if (!Number.isFinite(dt.getTime())) continue
-      const minuteOfDay = dt.getHours() * 60 + dt.getMinutes()
-      const rawEndMinute = Math.ceil(minuteOfDay / safeInterval) * safeInterval
-      const endMinute = ((rawEndMinute % 1440) + 1440) % 1440
-      const bucketKey = String(endMinute)
+      const ts = dt.getTime()
+      if (!Number.isFinite(ts)) continue
+      const bucketIndex = Math.floor((ts - anchorMs) / intervalMs)
+      const bucketStartMs = anchorMs + (bucketIndex * intervalMs)
+      const bucketKey = String(bucketStartMs)
 
       const bucket = bucketMap.get(bucketKey) || { totalPieces: 0, calibreMap: new Map<string, number>(), qualityMap: new Map<string, number>() }
       bucket.totalPieces += r.pieces

@@ -7,6 +7,16 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.46] - 2026-02-12
+
+### ⏱️ Patrón por intervalo anclado al primer registro real
+
+#### Mejoras
+- **Inicio temporal corregido**: El gráfico de patrón por intervalos ya no ordena por reloj del día (`00:00..23:00`) cuando el turno cruza medianoche.
+- **Anclaje por datos reales**: La primera ventana del patrón ahora inicia en el timestamp del **primer registro filtrado** del archivo pieza-a-pieza.
+- **Secuencia cronológica real**: Los buckets se construyen en cadena desde ese primer registro, manteniendo continuidad temporal operativa.
+- **Rangos consistentes**: Tooltip y tarjetas comparativas usan la misma lógica de ventanas (`desde - hasta`) basada en ese anclaje.
+
 ## [2.47.45] - 2026-02-12
 
 ### 🕒 Claridad temporal por intervalo + ajuste de interacción
