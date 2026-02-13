@@ -7,6 +7,15 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.65] - 2026-02-13
+
+### 🧭 Umbrales visibles y ajustables en Tendencia
+
+#### Mejoras
+- **Edición directa en dashboard**: La tarjeta `Reacción temprana` en `Tendencia` ahora permite ajustar `Umbral P0 Warn (%)` y `Umbral P0 Crítico (%)` sin volver a Configuración.
+- **Recomendaciones en vivo**: Al cambiar umbrales, la prioridad (`alta/media/baja`) y textos de acciones se recalculan inmediatamente.
+- **Persistencia de umbral warn**: El valor `warn` se sincroniza con la configuración del wizard para mantener coherencia operativa dentro de la sesión.
+
 ## [2.47.64] - 2026-02-13
 
 ### 🎛️ Prioridad de reacción alineada a umbrales de planta

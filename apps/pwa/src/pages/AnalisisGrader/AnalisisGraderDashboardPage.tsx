@@ -9,7 +9,7 @@
  */
 
 import { useState, useMemo, useRef, Fragment, useEffect, useCallback } from 'react'
-import { Card, CardContent, CardHeader, CardTitle, Button, Badge, Tabs, TabsContent, TabsList, TabsTrigger, InfoTooltip } from '@/components/ui'
+import { Card, CardContent, CardHeader, CardTitle, Button, Badge, Tabs, TabsContent, TabsList, TabsTrigger, InfoTooltip, Input } from '@/components/ui'
 import {
   ChevronLeft,
   Download,
@@ -190,6 +190,7 @@ interface Props {
   config: GraderAnalysisConfig
   onBack: () => void
   onApplyGateSuggestion?: (payload: { gateNumber: number; calibre: string; quality: string }) => void
+  onUpdatePointZeroWarnThreshold?: (value: number) => void
 }
 
 interface PinnedPatternPoint {
@@ -209,7 +210,7 @@ interface PinnedPatternPoint {
 const PIN_CARD_WIDTH = 224
 const PIN_CARD_PADDING = 8
 
-export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack, onApplyGateSuggestion }: Props) {
+export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack, onApplyGateSuggestion, onUpdatePointZeroWarnThreshold }: Props) {
   const user = useAuthStore((s) => s.user)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -224,12 +225,23 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
   const [timeFilterFrom, setTimeFilterFrom] = useState<string>('')
   const [timeFilterTo, setTimeFilterTo] = useState<string>('')
   const [patternIntervalMinutes, setPatternIntervalMinutes] = useState<number>(60)
+  const [trendWarnThreshold, setTrendWarnThreshold] = useState<number>(config.errorThresholds?.pointZeroPctWarn ?? 2)
+  const [trendCriticalThreshold, setTrendCriticalThreshold] = useState<number>(round2(Math.max((config.errorThresholds?.pointZeroPctWarn ?? 2) + 0.5, (config.errorThresholds?.pointZeroPctWarn ?? 2) * 1.5)))
   const [pinnedPatternPoints, setPinnedPatternPoints] = useState<PinnedPatternPoint[]>([])
   const [draggingPinnedId, setDraggingPinnedId] = useState<string | null>(null)
   const dashRef = useRef<HTMLDivElement>(null)
   const patternLineChartRef = useRef<ChartJS<'line'> | null>(null)
   const patternChartContainerRef = useRef<HTMLDivElement>(null)
   const draggingPinnedOffsetRef = useRef<{ id: string; offsetX: number; offsetY: number } | null>(null)
+
+  useEffect(() => {
+    const warn = config.errorThresholds?.pointZeroPctWarn ?? 2
+    setTrendWarnThreshold(warn)
+    setTrendCriticalThreshold((prev) => {
+      const fallback = round2(Math.max(warn + 0.5, warn * 1.5))
+      return prev <= warn ? fallback : prev
+    })
+  }, [config.errorThresholds?.pointZeroPctWarn])
 
   // Compute analytics
   const analytics = useMemo<GraderAnalyticsResult>(
@@ -1599,8 +1611,8 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
       urgency: 'high' | 'medium' | 'low'
     }>
 
-    const warnThreshold = config.errorThresholds?.pointZeroPctWarn ?? 2
-    const criticalThreshold = round2(Math.max(warnThreshold + 0.5, warnThreshold * 1.5))
+    const warnThreshold = trendWarnThreshold
+    const criticalThreshold = Math.max(trendCriticalThreshold, round2(warnThreshold + 0.1))
     const urgency: 'high' | 'medium' | 'low' = trendForecastView.projectedPointZeroPct >= criticalThreshold
       ? 'high'
       : trendForecastView.projectedPointZeroPct >= warnThreshold
@@ -1621,7 +1633,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
         urgency,
         text: `${prefix}: ${action.text} (proyección cierre P0 ${trendForecastView.projectedPointZeroPct.toFixed(2)}%, umbral ${warnThreshold.toFixed(2)}%, crítico ${criticalThreshold.toFixed(2)}%).`,
       }))
-  }, [config.errorThresholds?.pointZeroPctWarn, directGateActions, trendForecastView])
+  }, [directGateActions, trendCriticalThreshold, trendForecastView, trendWarnThreshold])
 
   const trendAIRecommendations = useMemo(() => {
     if (!aiOutput) return [] as string[]
@@ -3185,6 +3197,44 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
                   </p>
                 </CardHeader>
                 <CardContent className="space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-2 rounded-md border bg-muted/20">
+                    <div>
+                      <label className="text-[11px] text-muted-foreground">Umbral P0 Warn (%)</label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={100}
+                        step={0.1}
+                        value={trendWarnThreshold}
+                        onChange={(e) => {
+                          const next = Number(e.target.value)
+                          if (!Number.isFinite(next)) return
+                          const clamped = round2(Math.min(100, Math.max(0, next)))
+                          setTrendWarnThreshold(clamped)
+                          onUpdatePointZeroWarnThreshold?.(clamped)
+                        }}
+                        className="h-8 text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] text-muted-foreground">Umbral P0 Crítico (%)</label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={100}
+                        step={0.1}
+                        value={trendCriticalThreshold}
+                        onChange={(e) => {
+                          const next = Number(e.target.value)
+                          if (!Number.isFinite(next)) return
+                          const clamped = round2(Math.min(100, Math.max(0, next)))
+                          setTrendCriticalThreshold(clamped)
+                        }}
+                        className="h-8 text-xs"
+                      />
+                    </div>
+                  </div>
+
                   <div className="space-y-1.5">
                     <p className="text-xs font-medium">Automática (proyección)</p>
                     {trendAutoRecommendations.length > 0 ? trendAutoRecommendations.map((action) => (

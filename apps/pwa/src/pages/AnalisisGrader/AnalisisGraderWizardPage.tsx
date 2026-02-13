@@ -107,6 +107,17 @@ export function AnalisisGraderWizardPage() {
     }, 50)
   }, [])
 
+  const handleUpdatePointZeroWarnThreshold = useCallback((value: number) => {
+    setConfig((prev) => ({
+      ...prev,
+      errorThresholds: {
+        photocellPctWarn: prev.errorThresholds?.photocellPctWarn ?? 1,
+        outOfLimitsPctWarn: prev.errorThresholds?.outOfLimitsPctWarn ?? 3,
+        pointZeroPctWarn: value,
+      },
+    }))
+  }, [])
+
   // Permission gate: redirect if user cannot see this module
   if (!canSee('analisisGrader')) {
     return <Navigate to="/" replace />
@@ -197,6 +208,7 @@ export function AnalisisGraderWizardPage() {
           config={config}
           onBack={() => setCurrentStep('config')}
           onApplyGateSuggestion={handleApplyGateSuggestion}
+          onUpdatePointZeroWarnThreshold={handleUpdatePointZeroWarnThreshold}
         />
       )}
     </div>
