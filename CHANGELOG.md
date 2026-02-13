@@ -7,6 +7,15 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.67] - 2026-02-13
+
+### 🧠 Insights alineados con umbral crítico de P0
+
+#### Mejoras
+- **Severidad consistente**: El insight `Punto Cero elevado` ahora usa `pointZeroPctCritical` para marcar `critical`.
+- **Sin lógica heredada ambigua**: Se elimina la dependencia de `warn * 2` para este caso.
+- **Transparencia en evidencia**: El insight muestra tanto umbral `warn` como umbral `crítico` usados en la evaluación.
+
 ## [2.47.66] - 2026-02-13
 
 ### 📌 Persistencia de umbral crítico de Punto Cero

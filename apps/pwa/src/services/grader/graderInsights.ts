@@ -26,6 +26,8 @@ export function computeDeterministicInsights(
     outOfLimitsPctWarn: 3,
     pointZeroPctWarn: 2,
   }
+  const pointZeroCriticalThreshold = thresholds.pointZeroPctCritical
+    ?? (thresholds.pointZeroPctWarn * 2)
 
   // ——— 1. Punto Cero general ———
   if (result.kpis.pointZeroPct >= thresholds.pointZeroPctWarn) {
@@ -36,11 +38,12 @@ export function computeDeterministicInsights(
 
     insights.push({
       id: nextId(),
-      severity: result.kpis.pointZeroPct >= thresholds.pointZeroPctWarn * 2 ? 'critical' : 'warn',
+      severity: result.kpis.pointZeroPct >= pointZeroCriticalThreshold ? 'critical' : 'warn',
       title: 'Punto Cero elevado',
       evidence: [
         `Punto Cero: ${result.kpis.pointZeroPieces} piezas (${result.kpis.pointZeroPct}%)`,
         `Umbral configurado: ${thresholds.pointZeroPctWarn}%`,
+        `Umbral crítico: ${pointZeroCriticalThreshold}%`,
         ...classEvidence,
       ],
       recommendations: [
