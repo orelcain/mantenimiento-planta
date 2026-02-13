@@ -205,7 +205,10 @@ export function GanttPlannerPage() {
     setLoading(true)
     setError(null)
     try {
-      const [rows, eq] = await Promise.all([getGanttTasks(), getEquipments()])
+      const [rows, eq] = await Promise.all([
+        getGanttTasks(),
+        getEquipments().catch(() => [] as Equipment[]),
+      ])
       setTasks(rows)
       setEquipment(eq)
     } catch (e) {
