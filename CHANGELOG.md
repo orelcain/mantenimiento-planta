@@ -7,6 +7,16 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.66] - 2026-02-13
+
+### 📌 Persistencia de umbral crítico de Punto Cero
+
+#### Mejoras
+- **Crítico persistente**: `pointZeroPctCritical` ahora forma parte de `errorThresholds` del análisis.
+- **Edición en ambas vistas**: Se puede ajustar en `Tendencia` y también en `Configuración del análisis`.
+- **Sincronización completa**: Cambiar el umbral crítico en `Tendencia` actualiza la configuración activa del wizard, igual que el `warn`.
+- **Coherencia operativa**: Recomendaciones de reacción temprana usan umbrales persistidos (`warn` + `crítico`) en toda la sesión.
+
 ## [2.47.65] - 2026-02-13
 
 ### 🧭 Umbrales visibles y ajustables en Tendencia

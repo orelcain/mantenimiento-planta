@@ -204,6 +204,7 @@ export interface GraderAnalysisConfig {
     photocellPctWarn: number;      // e.g., 1
     outOfLimitsPctWarn: number;    // e.g., 3
     pointZeroPctWarn: number;      // e.g., 2
+    pointZeroPctCritical?: number; // e.g., 3.5
   };
   /** Rangos de peso por calibre personalizados (sobreescriben los default) */
   customWeightRanges?: CalibreWeightRange[];

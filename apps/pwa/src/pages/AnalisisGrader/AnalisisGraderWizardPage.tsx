@@ -35,6 +35,7 @@ export function AnalisisGraderWizardPage() {
       photocellPctWarn: 1,
       outOfLimitsPctWarn: 3,
       pointZeroPctWarn: 2,
+      pointZeroPctCritical: 3.5,
     },
   })
   const gatesRef = useRef<HTMLDivElement>(null)
@@ -114,6 +115,19 @@ export function AnalisisGraderWizardPage() {
         photocellPctWarn: prev.errorThresholds?.photocellPctWarn ?? 1,
         outOfLimitsPctWarn: prev.errorThresholds?.outOfLimitsPctWarn ?? 3,
         pointZeroPctWarn: value,
+        pointZeroPctCritical: prev.errorThresholds?.pointZeroPctCritical ?? Math.max(value + 0.5, value * 1.5),
+      },
+    }))
+  }, [])
+
+  const handleUpdatePointZeroCriticalThreshold = useCallback((value: number) => {
+    setConfig((prev) => ({
+      ...prev,
+      errorThresholds: {
+        photocellPctWarn: prev.errorThresholds?.photocellPctWarn ?? 1,
+        outOfLimitsPctWarn: prev.errorThresholds?.outOfLimitsPctWarn ?? 3,
+        pointZeroPctWarn: prev.errorThresholds?.pointZeroPctWarn ?? 2,
+        pointZeroPctCritical: value,
       },
     }))
   }, [])
@@ -209,6 +223,7 @@ export function AnalisisGraderWizardPage() {
           onBack={() => setCurrentStep('config')}
           onApplyGateSuggestion={handleApplyGateSuggestion}
           onUpdatePointZeroWarnThreshold={handleUpdatePointZeroWarnThreshold}
+          onUpdatePointZeroCriticalThreshold={handleUpdatePointZeroCriticalThreshold}
         />
       )}
     </div>

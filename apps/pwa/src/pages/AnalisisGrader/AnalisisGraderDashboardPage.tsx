@@ -191,6 +191,7 @@ interface Props {
   onBack: () => void
   onApplyGateSuggestion?: (payload: { gateNumber: number; calibre: string; quality: string }) => void
   onUpdatePointZeroWarnThreshold?: (value: number) => void
+  onUpdatePointZeroCriticalThreshold?: (value: number) => void
 }
 
 interface PinnedPatternPoint {
@@ -210,7 +211,7 @@ interface PinnedPatternPoint {
 const PIN_CARD_WIDTH = 224
 const PIN_CARD_PADDING = 8
 
-export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack, onApplyGateSuggestion, onUpdatePointZeroWarnThreshold }: Props) {
+export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack, onApplyGateSuggestion, onUpdatePointZeroWarnThreshold, onUpdatePointZeroCriticalThreshold }: Props) {
   const user = useAuthStore((s) => s.user)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -226,7 +227,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
   const [timeFilterTo, setTimeFilterTo] = useState<string>('')
   const [patternIntervalMinutes, setPatternIntervalMinutes] = useState<number>(60)
   const [trendWarnThreshold, setTrendWarnThreshold] = useState<number>(config.errorThresholds?.pointZeroPctWarn ?? 2)
-  const [trendCriticalThreshold, setTrendCriticalThreshold] = useState<number>(round2(Math.max((config.errorThresholds?.pointZeroPctWarn ?? 2) + 0.5, (config.errorThresholds?.pointZeroPctWarn ?? 2) * 1.5)))
+  const [trendCriticalThreshold, setTrendCriticalThreshold] = useState<number>(config.errorThresholds?.pointZeroPctCritical ?? round2(Math.max((config.errorThresholds?.pointZeroPctWarn ?? 2) + 0.5, (config.errorThresholds?.pointZeroPctWarn ?? 2) * 1.5)))
   const [pinnedPatternPoints, setPinnedPatternPoints] = useState<PinnedPatternPoint[]>([])
   const [draggingPinnedId, setDraggingPinnedId] = useState<string | null>(null)
   const dashRef = useRef<HTMLDivElement>(null)
@@ -236,12 +237,10 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
 
   useEffect(() => {
     const warn = config.errorThresholds?.pointZeroPctWarn ?? 2
+    const critical = config.errorThresholds?.pointZeroPctCritical ?? round2(Math.max(warn + 0.5, warn * 1.5))
     setTrendWarnThreshold(warn)
-    setTrendCriticalThreshold((prev) => {
-      const fallback = round2(Math.max(warn + 0.5, warn * 1.5))
-      return prev <= warn ? fallback : prev
-    })
-  }, [config.errorThresholds?.pointZeroPctWarn])
+    setTrendCriticalThreshold(Math.max(critical, round2(warn + 0.1)))
+  }, [config.errorThresholds?.pointZeroPctCritical, config.errorThresholds?.pointZeroPctWarn])
 
   // Compute analytics
   const analytics = useMemo<GraderAnalyticsResult>(
@@ -3229,6 +3228,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
                           if (!Number.isFinite(next)) return
                           const clamped = round2(Math.min(100, Math.max(0, next)))
                           setTrendCriticalThreshold(clamped)
+                          onUpdatePointZeroCriticalThreshold?.(clamped)
                         }}
                         className="h-8 text-xs"
                       />

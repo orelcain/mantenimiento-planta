@@ -319,7 +319,7 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
           </div>
 
           {/* Thresholds */}
-          <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="mt-4 grid grid-cols-1 sm:grid-cols-4 gap-4">
             <div>
               <Label className="text-xs">Umbral Fotocélula (%)</Label>
               <Input
@@ -360,6 +360,21 @@ export function AnalisisGraderGatesConfigPage({ gates: initialGates, config: ini
                   setConfig((c) => ({
                     ...c,
                     errorThresholds: { ...c.errorThresholds!, pointZeroPctWarn: Number(e.target.value) },
+                  }))
+                }
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Umbral Punto Cero Crítico (%)</Label>
+              <Input
+                type="number"
+                step="0.5"
+                value={config.errorThresholds?.pointZeroPctCritical ?? Math.max((config.errorThresholds?.pointZeroPctWarn ?? 2) + 0.5, (config.errorThresholds?.pointZeroPctWarn ?? 2) * 1.5)}
+                onChange={(e) =>
+                  setConfig((c) => ({
+                    ...c,
+                    errorThresholds: { ...c.errorThresholds!, pointZeroPctCritical: Number(e.target.value) },
                   }))
                 }
                 className="mt-1"
