@@ -7,6 +7,16 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.52] - 2026-02-12
+
+### 🪟 Fix: hover de tooltips visible sobre tablas/cards
+
+#### Correcciones
+- **InfoTooltip en portal**: El tooltip ahora se renderiza en `document.body` para evitar que quede bajo elementos con `overflow`.
+- **Posición robusta en viewport**: Se calcula en `fixed` y se reubica automáticamente en resize/scroll.
+- **Comparativa de Lotes corregida**: Tooltips de encabezados (`Peso Prom.`, `Mediana`, `σ`, `P0 %`) quedan totalmente visibles.
+- **Fix transversal**: El ajuste aplica a todos los `InfoTooltip` del dashboard y demás vistas que usan el componente.
+
 ## [2.47.51] - 2026-02-12
 
 ### 🧩 Lotes: hover visible y validación explícita de % P0
