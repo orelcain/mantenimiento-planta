@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, Bell, CalendarClock, FileSpreadsheet, GitBranchPlus, Link2Off, Plus, Trash2, Upload } from 'lucide-react'
+import { AlertTriangle, Bell, CalendarClock, ChevronDown, ChevronUp, FileSpreadsheet, GitBranchPlus, Link2Off, Plus, Trash2, Upload } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import {
   Badge,
@@ -36,6 +36,7 @@ import type { Equipment, GanttTask, GanttTaskComment, IncidentPriority } from '@
 const STATUS_OPTIONS: Array<GanttTask['status']> = ['planificada', 'en_progreso', 'bloqueada', 'completada']
 const PRIORITY_OPTIONS: IncidentPriority[] = ['critica', 'alta', 'media', 'baja']
 const DEPENDENCY_TYPES: Array<'FS' | 'SS' | 'FF' | 'SF'> = ['FS', 'SS', 'FF', 'SF']
+const GANTT_PAGE_SIZE = 25
 
 interface ImportedTaskDraft {
   sourceRow: number
@@ -174,6 +175,10 @@ export function GanttPlannerPage() {
 
   const [equipmentFilter, setEquipmentFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [sortMode, setSortMode] = useState<'jerarquia' | 'fecha' | 'titulo'>('jerarquia')
+  const [timelineCollapsed, setTimelineCollapsed] = useState(false)
+  const [timelinePage, setTimelinePage] = useState(1)
+  const [listPage, setListPage] = useState(1)
 
   const [title, setTitle] = useState('')
   const [equipmentId, setEquipmentId] = useState<string>('none')
@@ -230,6 +235,34 @@ export function GanttPlannerPage() {
     })
   }, [equipmentFilter, statusFilter, tasks])
 
+  const sortedTasks = useMemo(() => {
+    const rows = [...filteredTasks]
+    rows.sort((left, right) => {
+      if (sortMode === 'titulo') {
+        return left.titulo.localeCompare(right.titulo, 'es')
+      }
+
+      if (sortMode === 'fecha') {
+        const byStart = left.startDate.getTime() - right.startDate.getTime()
+        if (byStart !== 0) return byStart
+        return left.titulo.localeCompare(right.titulo, 'es')
+      }
+
+      const leftHierarchy = (left.hierarchyPath ?? '').trim()
+      const rightHierarchy = (right.hierarchyPath ?? '').trim()
+      const byHierarchy = leftHierarchy.localeCompare(rightHierarchy, 'es')
+      if (byHierarchy !== 0) return byHierarchy
+
+      const leftEquipment = (left.equipmentNombre ?? '').trim()
+      const rightEquipment = (right.equipmentNombre ?? '').trim()
+      const byEquipment = leftEquipment.localeCompare(rightEquipment, 'es')
+      if (byEquipment !== 0) return byEquipment
+
+      return left.titulo.localeCompare(right.titulo, 'es')
+    })
+    return rows
+  }, [filteredTasks, sortMode])
+
   const cpm = useMemo(() => calculateCPM(filteredTasks), [filteredTasks])
   const cpmMap = useMemo(() => new Map(cpm.tasks.map((row) => [row.taskId, row])), [cpm.tasks])
   const metrics = useMemo(() => buildGanttMetrics(filteredTasks), [filteredTasks])
@@ -246,6 +279,38 @@ export function GanttPlannerPage() {
     const critical = new Set(cpm.criticalPath)
     return filteredTasks.filter((task) => critical.has(task.id) && task.status !== 'completada' && task.endDate.getTime() < now)
   }, [cpm.criticalPath, filteredTasks])
+
+  const totalTimelinePages = Math.max(1, Math.ceil(sortedTasks.length / GANTT_PAGE_SIZE))
+  const totalListPages = Math.max(1, Math.ceil(sortedTasks.length / GANTT_PAGE_SIZE))
+  const safeTimelinePage = Math.min(timelinePage, totalTimelinePages)
+  const safeListPage = Math.min(listPage, totalListPages)
+
+  const pagedTimelineTasks = useMemo(() => {
+    const start = (safeTimelinePage - 1) * GANTT_PAGE_SIZE
+    return sortedTasks.slice(start, start + GANTT_PAGE_SIZE)
+  }, [safeTimelinePage, sortedTasks])
+
+  const pagedListTasks = useMemo(() => {
+    const start = (safeListPage - 1) * GANTT_PAGE_SIZE
+    return sortedTasks.slice(start, start + GANTT_PAGE_SIZE)
+  }, [safeListPage, sortedTasks])
+
+  useEffect(() => {
+    setTimelinePage(1)
+    setListPage(1)
+  }, [equipmentFilter, statusFilter, sortMode])
+
+  useEffect(() => {
+    if (timelinePage > totalTimelinePages) {
+      setTimelinePage(totalTimelinePages)
+    }
+  }, [timelinePage, totalTimelinePages])
+
+  useEffect(() => {
+    if (listPage > totalListPages) {
+      setListPage(totalListPages)
+    }
+  }, [listPage, totalListPages])
 
   useEffect(() => {
     if (selectedTaskId === 'none') {
@@ -596,36 +661,66 @@ export function GanttPlannerPage() {
       </div>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <CardTitle>Vista temporal y dependencias</CardTitle>
+          <Button size="sm" variant="outline" onClick={() => setTimelineCollapsed((prev) => !prev)}>
+            {timelineCollapsed ? <ChevronDown className="h-4 w-4 mr-1" /> : <ChevronUp className="h-4 w-4 mr-1" />}
+            {timelineCollapsed ? 'Expandir' : 'Colapsar'}
+          </Button>
         </CardHeader>
-        <CardContent className="space-y-3">
-          {filteredTasks.length === 0 && (
-            <p className="text-sm text-muted-foreground">Sin tareas para visualizar.</p>
-          )}
+        {!timelineCollapsed && (
+          <CardContent className="space-y-3">
+            {sortedTasks.length === 0 && (
+              <p className="text-sm text-muted-foreground">Sin tareas para visualizar.</p>
+            )}
 
-          {filteredTasks.map((task) => {
-            const total = Math.max(1, timeline.maxEnd - timeline.minStart)
-            const left = ((task.startDate.getTime() - timeline.minStart) / total) * 100
-            const width = Math.max(2, ((task.endDate.getTime() - task.startDate.getTime()) / total) * 100)
-            const isCritical = cpm.criticalPath.includes(task.id)
+            {pagedTimelineTasks.map((task) => {
+              const total = Math.max(1, timeline.maxEnd - timeline.minStart)
+              const left = ((task.startDate.getTime() - timeline.minStart) / total) * 100
+              const width = Math.max(2, ((task.endDate.getTime() - task.startDate.getTime()) / total) * 100)
+              const isCritical = cpm.criticalPath.includes(task.id)
 
-            return (
-              <div key={`timeline-${task.id}`} className="space-y-1">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-medium">{task.titulo}</span>
-                  <span className="text-muted-foreground">{task.dependencies.length} dep.</span>
+              return (
+                <div key={`timeline-${task.id}`} className="space-y-1">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-medium">{task.titulo}</span>
+                    <span className="text-muted-foreground">{task.dependencies.length} dep.</span>
+                  </div>
+                  <div className="h-3 w-full rounded bg-muted/60 relative overflow-hidden">
+                    <div
+                      className={`absolute top-0 h-3 rounded ${isCritical ? 'bg-red-500' : 'bg-primary'}`}
+                      style={{ left: `${left}%`, width: `${width}%` }}
+                    />
+                  </div>
                 </div>
-                <div className="h-3 w-full rounded bg-muted/60 relative overflow-hidden">
-                  <div
-                    className={`absolute top-0 h-3 rounded ${isCritical ? 'bg-red-500' : 'bg-primary'}`}
-                    style={{ left: `${left}%`, width: `${width}%` }}
-                  />
+              )
+            })}
+
+            {sortedTasks.length > 0 && (
+              <div className="flex items-center justify-between pt-1">
+                <p className="text-xs text-muted-foreground">Página {safeTimelinePage} de {totalTimelinePages} · {sortedTasks.length} tareas</p>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setTimelinePage((prev) => Math.max(1, prev - 1))}
+                    disabled={safeTimelinePage <= 1}
+                  >
+                    Anterior
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setTimelinePage((prev) => Math.min(totalTimelinePages, prev + 1))}
+                    disabled={safeTimelinePage >= totalTimelinePages}
+                  >
+                    Siguiente
+                  </Button>
                 </div>
               </div>
-            )
-          })}
-        </CardContent>
+            )}
+          </CardContent>
+        )}
       </Card>
 
       <div className="grid gap-4 lg:grid-cols-3">
@@ -634,7 +729,7 @@ export function GanttPlannerPage() {
             <CardTitle>Listado de tareas</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid gap-3 md:grid-cols-2">
+            <div className="grid gap-3 md:grid-cols-3">
               <div>
                 <Label>Filtro equipo</Label>
                 <Select value={equipmentFilter} onValueChange={setEquipmentFilter}>
@@ -655,12 +750,23 @@ export function GanttPlannerPage() {
                   </SelectContent>
                 </Select>
               </div>
+              <div>
+                <Label>Orden</Label>
+                <Select value={sortMode} onValueChange={(value) => setSortMode(value as 'jerarquia' | 'fecha' | 'titulo')}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="jerarquia">Jerarquía</SelectItem>
+                    <SelectItem value="fecha">Fecha inicio</SelectItem>
+                    <SelectItem value="titulo">Título</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             <div className="space-y-2">
               {loading && <p className="text-sm text-muted-foreground">Cargando tareas...</p>}
-              {!loading && filteredTasks.length === 0 && <p className="text-sm text-muted-foreground">Sin tareas para los filtros seleccionados.</p>}
-              {filteredTasks.map((task) => {
+              {!loading && sortedTasks.length === 0 && <p className="text-sm text-muted-foreground">Sin tareas para los filtros seleccionados.</p>}
+              {pagedListTasks.map((task) => {
                 const row = cpmMap.get(task.id)
                 return (
                   <div key={task.id} className="rounded-lg border p-3 space-y-2">
@@ -718,6 +824,30 @@ export function GanttPlannerPage() {
                   </div>
                 )
               })}
+
+              {sortedTasks.length > 0 && (
+                <div className="flex items-center justify-between pt-1">
+                  <p className="text-xs text-muted-foreground">Página {safeListPage} de {totalListPages} · {sortedTasks.length} tareas</p>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setListPage((prev) => Math.max(1, prev - 1))}
+                      disabled={safeListPage <= 1}
+                    >
+                      Anterior
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setListPage((prev) => Math.min(totalListPages, prev + 1))}
+                      disabled={safeListPage >= totalListPages}
+                    >
+                      Siguiente
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
