@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.47.75**
+## Versión Actual: **v2.47.76**
 
 **Fecha de lanzamiento**: 13 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,12 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.47.76 - Gantt por área/equipo jerárquicos (13/02/2026)
+- 🧭 **Área + Equipo visibles**: El listado muestra `Área · Equipo · Fechas` para cada tarea.
+- 🗂️ **Filtro por área**: Nuevo filtro en Gantt para ordenar y navegar tareas por jerarquía real de planta.
+- 🛠️ **Creación guiada**: Formulario con selector de `Área` (jerarquía) y `Equipo` filtrado por área.
+- 📥 **Importación Excel mejorada**: Mapea columna `Area` al nodo jerárquico oficial si no encuentra match directo de equipo.
 
 ### v2.47.75 - Hotfix crash Gantt SelectItem (13/02/2026)
 - 🧯 **Crash crítico resuelto**: Se corrige el error Radix `A <Select.Item /> must have a value prop that is not an empty string`.

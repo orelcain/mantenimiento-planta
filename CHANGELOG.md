@@ -7,6 +7,16 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.76] - 2026-02-13
+
+### 🧭 Gantt alineado a jerarquía de planta (Área/Equipo)
+
+#### Mejoras
+- **Filtro por área**: Se agrega filtro jerárquico de área en el listado de tareas Gantt.
+- **Contexto visible por tarea**: Cada fila ahora muestra `Área · Equipo · rango de fechas`.
+- **Creación más ordenada**: Formulario incorpora selector de `Área` y limita equipos por área seleccionada.
+- **Importación Excel consistente**: La columna `Area` se mapea al nodo de jerarquía oficial cuando no hay match exacto de equipo.
+
 ## [2.47.75] - 2026-02-13
 
 ### 🚑 Hotfix crítico: pantallazo en Gantt

@@ -31,7 +31,9 @@ import {
   simulateDelay,
   updateGanttTask,
 } from '@/services/gantt'
+import { useHierarchyTree } from '@/hooks/useHierarchy'
 import type { Equipment, GanttTask, GanttTaskComment, IncidentPriority } from '@/types'
+import { HierarchyLevel, type HierarchyNode, type HierarchyNodeWithChildren } from '@/types/hierarchy'
 
 const STATUS_OPTIONS: Array<GanttTask['status']> = ['planificada', 'en_progreso', 'bloqueada', 'completada']
 const PRIORITY_OPTIONS: IncidentPriority[] = ['critica', 'alta', 'media', 'baja']
@@ -53,6 +55,20 @@ interface ImportedTaskDraft {
   startDate: Date
   endDate: Date
   sparePartIds: string[]
+}
+
+function flattenHierarchyTree(nodes: HierarchyNodeWithChildren[]): HierarchyNode[] {
+  const flat: HierarchyNode[] = []
+  const walk = (rows: HierarchyNodeWithChildren[]) => {
+    rows.forEach((row) => {
+      flat.push(row)
+      if (row.children?.length) {
+        walk(row.children)
+      }
+    })
+  }
+  walk(nodes)
+  return flat
 }
 
 function normalizeText(value: unknown): string {
@@ -151,6 +167,16 @@ function resolveEquipmentByExcel(equipment: Equipment[], equipmentLabel: string,
   return candidates.find((item) => normalizeKey(item.hierarchyPath ?? '').includes(area)) ?? candidates[0]
 }
 
+function resolveAreaNodeByExcel(areaNodes: HierarchyNode[], areaLabel: string): HierarchyNode | undefined {
+  const area = normalizeKey(areaLabel)
+  if (!area) return undefined
+  return areaNodes.find((node) => {
+    const name = normalizeKey(node.nombre)
+    const code = normalizeKey(node.codigo)
+    return name === area || code === area || name.includes(area) || area.includes(name)
+  })
+}
+
 function toInputDate(date: Date) {
   const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
   return local.toISOString().slice(0, 16)
@@ -174,6 +200,7 @@ export function GanttPlannerPage() {
   const [error, setError] = useState<string | null>(null)
 
   const [equipmentFilter, setEquipmentFilter] = useState<string>('all')
+  const [areaFilter, setAreaFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [searchText, setSearchText] = useState('')
   const [sortMode, setSortMode] = useState<'jerarquia' | 'fecha' | 'titulo'>('jerarquia')
@@ -185,6 +212,7 @@ export function GanttPlannerPage() {
   const [listPageSize, setListPageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>('25')
 
   const [title, setTitle] = useState('')
+  const [areaId, setAreaId] = useState<string>('none')
   const [equipmentId, setEquipmentId] = useState<string>('none')
   const [priority, setPriority] = useState<IncidentPriority>('media')
   const [startDate, setStartDate] = useState(toInputDate(new Date()))
@@ -209,6 +237,27 @@ export function GanttPlannerPage() {
   const [importMessage, setImportMessage] = useState<string | null>(null)
   const notifiedDelayedCriticalRef = useRef<Set<string>>(new Set())
   const remoteAlertSentRef = useRef<Set<string>>(new Set())
+  const { tree: hierarchyTree } = useHierarchyTree()
+
+  const hierarchyNodes = useMemo(() => flattenHierarchyTree(hierarchyTree), [hierarchyTree])
+  const areaNodes = useMemo(
+    () => hierarchyNodes.filter((node) => node.nivel === HierarchyLevel.AREA && node.activo),
+    [hierarchyNodes]
+  )
+  const selectedArea = useMemo(
+    () => areaNodes.find((node) => node.id === areaId),
+    [areaId, areaNodes]
+  )
+  const selectedAreaFilter = useMemo(
+    () => areaNodes.find((node) => node.id === areaFilter),
+    [areaFilter, areaNodes]
+  )
+
+  const equipmentForSelectedArea = useMemo(() => {
+    if (areaId === 'none') return equipment
+    const areaName = normalizeKey(selectedArea?.nombre ?? '')
+    return equipment.filter((item) => normalizeKey(item.hierarchyPath ?? '').includes(areaName))
+  }, [areaId, equipment, selectedArea?.nombre])
 
   async function load() {
     setLoading(true)
@@ -234,6 +283,12 @@ export function GanttPlannerPage() {
   const filteredTasks = useMemo(() => {
     const query = searchText.trim().toLowerCase()
     return tasks.filter((task) => {
+      if (areaFilter !== 'all') {
+        const areaName = normalizeKey(selectedAreaFilter?.nombre ?? '')
+        const matchById = task.hierarchyNodeId === areaFilter
+        const matchByPath = areaName.length > 0 && normalizeKey(task.hierarchyPath ?? '').includes(areaName)
+        if (!matchById && !matchByPath) return false
+      }
       if (equipmentFilter !== 'all' && task.equipmentId !== equipmentFilter) return false
       if (statusFilter !== 'all' && task.status !== statusFilter) return false
       if (query) {
@@ -248,7 +303,7 @@ export function GanttPlannerPage() {
       }
       return true
     })
-  }, [equipmentFilter, searchText, statusFilter, tasks])
+  }, [areaFilter, equipmentFilter, searchText, selectedAreaFilter?.nombre, statusFilter, tasks])
 
   const sortedTasks = useMemo(() => {
     const rows = [...filteredTasks]
@@ -315,7 +370,7 @@ export function GanttPlannerPage() {
   useEffect(() => {
     setTimelinePage(1)
     setListPage(1)
-  }, [equipmentFilter, statusFilter, sortMode, searchText, timelinePageSize, listPageSize])
+  }, [areaFilter, equipmentFilter, statusFilter, sortMode, searchText, timelinePageSize, listPageSize])
 
   useEffect(() => {
     if (timelinePage > totalTimelinePages) {
@@ -391,8 +446,8 @@ export function GanttPlannerPage() {
       descripcion: '',
       equipmentId: equipmentId === 'none' ? undefined : equipmentId,
       equipmentNombre: selectedEquipment?.nombre,
-      hierarchyNodeId: selectedEquipment?.hierarchyNodeId,
-      hierarchyPath: selectedEquipment?.hierarchyPath,
+      hierarchyNodeId: selectedEquipment?.hierarchyNodeId ?? (areaId === 'none' ? undefined : areaId),
+      hierarchyPath: selectedEquipment?.hierarchyPath ?? selectedArea?.nombre,
       status: 'planificada',
       prioridad: priority,
       startDate: start,
@@ -409,6 +464,7 @@ export function GanttPlannerPage() {
 
     setTitle('')
     setSparePartIdsText('')
+    setEquipmentId('none')
     await load()
   }
 
@@ -568,6 +624,7 @@ export function GanttPlannerPage() {
           .filter(Boolean)
 
         const matchedEquipment = resolveEquipmentByExcel(equipment, equipmentLabel, areaLabel)
+        const matchedArea = resolveAreaNodeByExcel(areaNodes, areaLabel)
 
         drafts.push({
           sourceRow,
@@ -575,8 +632,8 @@ export function GanttPlannerPage() {
           descripcion: descripcion || undefined,
           equipmentId: matchedEquipment?.id,
           equipmentNombre: matchedEquipment?.nombre ?? (equipmentLabel || undefined),
-          hierarchyNodeId: matchedEquipment?.hierarchyNodeId,
-          hierarchyPath: matchedEquipment?.hierarchyPath ?? (areaLabel || undefined),
+          hierarchyNodeId: matchedEquipment?.hierarchyNodeId ?? matchedArea?.id,
+          hierarchyPath: matchedEquipment?.hierarchyPath ?? matchedArea?.nombre ?? (areaLabel || undefined),
           responsibleName: responsibleName || undefined,
           prioridad,
           status,
@@ -750,7 +807,7 @@ export function GanttPlannerPage() {
         )}
       </Card>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+            <div className="grid gap-3 md:grid-cols-6">
         <Card className="lg:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <CardTitle>Listado de tareas</CardTitle>
@@ -759,6 +816,16 @@ export function GanttPlannerPage() {
               {listCollapsed ? 'Expandir' : 'Colapsar'}
             </Button>
           </CardHeader>
+              <div>
+                <Label>Filtro área</Label>
+                <Select value={areaFilter} onValueChange={setAreaFilter}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas</SelectItem>
+                    {areaNodes.map((node) => <SelectItem key={`area-filter-${node.id}`} value={node.id}>{node.nombre}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
           {!listCollapsed && (
           <CardContent className="space-y-4">
             <div className="grid gap-3 md:grid-cols-4">
@@ -822,7 +889,7 @@ export function GanttPlannerPage() {
                     <div className="flex items-center justify-between gap-2">
                       <div>
                         <p className="font-medium">{task.titulo}</p>
-                        <p className="text-xs text-muted-foreground">{task.equipmentNombre ?? 'Sin equipo'} · {task.startDate.toLocaleString()} → {task.endDate.toLocaleString()}</p>
+                        <p className="text-xs text-muted-foreground">{task.hierarchyPath ?? 'Sin área'} · {task.equipmentNombre ?? 'Sin equipo'} · {task.startDate.toLocaleString()} → {task.endDate.toLocaleString()}</p>
                       </div>
                       <div className="flex items-center gap-2">
                         {row?.isCritical && <Badge variant="destructive">Crítica</Badge>}
@@ -974,12 +1041,25 @@ export function GanttPlannerPage() {
                 <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Cambio de rodamiento" />
               </div>
               <div>
+                <Label>Área</Label>
+                <Select value={areaId} onValueChange={(value) => {
+                  setAreaId(value)
+                  setEquipmentId('none')
+                }}>
+                  <SelectTrigger><SelectValue placeholder="Opcional" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sin área</SelectItem>
+                    {areaNodes.map((node) => <SelectItem key={`area-create-${node.id}`} value={node.id}>{node.nombre}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
                 <Label>Equipo</Label>
                 <Select value={equipmentId} onValueChange={setEquipmentId}>
                   <SelectTrigger><SelectValue placeholder="Opcional" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">Sin equipo</SelectItem>
-                    {equipment.map((item) => <SelectItem key={item.id} value={item.id}>{item.nombre}</SelectItem>)}
+                    {equipmentForSelectedArea.map((item) => <SelectItem key={item.id} value={item.id}>{item.nombre}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
