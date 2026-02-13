@@ -110,14 +110,15 @@ export function AnalisisGraderWizardPage() {
         setGates(parsed.gates)
       }
       if (parsed.config && typeof parsed.config === 'object') {
+        const parsedConfig = parsed.config
         setConfig((prev) => ({
           ...prev,
-          ...parsed.config,
+          ...parsedConfig,
           errorThresholds: {
-            photocellPctWarn: parsed.config.errorThresholds?.photocellPctWarn ?? prev.errorThresholds?.photocellPctWarn ?? 1,
-            outOfLimitsPctWarn: parsed.config.errorThresholds?.outOfLimitsPctWarn ?? prev.errorThresholds?.outOfLimitsPctWarn ?? 3,
-            pointZeroPctWarn: parsed.config.errorThresholds?.pointZeroPctWarn ?? prev.errorThresholds?.pointZeroPctWarn ?? 2,
-            pointZeroPctCritical: parsed.config.errorThresholds?.pointZeroPctCritical ?? prev.errorThresholds?.pointZeroPctCritical ?? 3.5,
+            photocellPctWarn: parsedConfig.errorThresholds?.photocellPctWarn ?? prev.errorThresholds?.photocellPctWarn ?? 1,
+            outOfLimitsPctWarn: parsedConfig.errorThresholds?.outOfLimitsPctWarn ?? prev.errorThresholds?.outOfLimitsPctWarn ?? 3,
+            pointZeroPctWarn: parsedConfig.errorThresholds?.pointZeroPctWarn ?? prev.errorThresholds?.pointZeroPctWarn ?? 2,
+            pointZeroPctCritical: parsedConfig.errorThresholds?.pointZeroPctCritical ?? prev.errorThresholds?.pointZeroPctCritical ?? 3.5,
           },
         }))
       }
