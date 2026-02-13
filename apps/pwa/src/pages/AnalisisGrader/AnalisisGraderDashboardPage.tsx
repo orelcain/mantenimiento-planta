@@ -891,12 +891,13 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
       const msg = err instanceof Error ? err.message : String(err)
       // Try to parse as raw text
       const parsed = parseAIResponse(msg)
-      if (parsed.parsed) {
-        setAiOutput(parsed.parsed)
+      const parsedOutput = parsed.parsed
+      if (parsedOutput) {
+        setAiOutput(parsedOutput)
         setAiTrendRuns((prev) => [{
           id: crypto.randomUUID(),
           createdAtIso: new Date().toISOString(),
-          output: parsed.parsed,
+          output: parsedOutput,
         }, ...prev].slice(0, 5))
       } else {
         setAiError(parsed.error || msg)
