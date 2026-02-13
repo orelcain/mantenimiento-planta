@@ -393,8 +393,9 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
         labels: [] as string[],
         ranges: [] as string[],
         bucketKeys: [] as number[],
-        totals: [] as number[],
-        series: [] as Array<{ label: string; pct: number[]; pieces: number[] }>,
+        intervalTotals: [] as number[],
+        cumulativeTotals: [] as number[],
+        series: [] as Array<{ label: string; pctCumulative: number[]; piecesInterval: number[]; piecesCumulative: number[] }>,
       }
     }
 
@@ -427,28 +428,54 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
     }
 
     const bucketKeys = Array.from(totalByBucket.keys()).sort((a, b) => a - b)
-    const labels = bucketKeys.map((bucketStartMs) => formatDateToHHMM(new Date(bucketStartMs + intervalMs)))
-    const ranges = bucketKeys.map((bucketStartMs) => {
+    const intervalLabels = bucketKeys.map((bucketStartMs) => formatDateToHHMM(new Date(bucketStartMs + intervalMs)))
+    const intervalRanges = bucketKeys.map((bucketStartMs) => {
       const start = formatDateToHHMM(new Date(bucketStartMs))
       const end = formatDateToHHMM(new Date(bucketStartMs + intervalMs))
       return `${start} - ${end}`
     })
     const totals = bucketKeys.map((bucketStartMs) => totalByBucket.get(bucketStartMs) ?? 0)
 
+    const cumulativeTotals: number[] = []
+    let runningTotal = 0
+    for (const total of totals) {
+      runningTotal += total
+      cumulativeTotals.push(runningTotal)
+    }
+
+    const labels = [formatDateToHHMM(new Date(anchorMs)), ...intervalLabels]
+    const ranges = ['Inicio turno', ...intervalRanges]
+    const intervalTotals = [0, ...totals]
+    const cumulativeTotalsWithStart = [0, ...cumulativeTotals]
+
     const series = analytics.pointZeroClassification.causes
       .map((cause) => cause.label)
       .filter((label) => (causeByBucket.get(label)?.size ?? 0) > 0)
       .map((label) => {
         const piecesByBucket = causeByBucket.get(label) ?? new Map<number, number>()
-        const pieces = bucketKeys.map((bucketStartMs) => piecesByBucket.get(bucketStartMs) ?? 0)
-        const pct = pieces.map((p, idx) => {
-          const total = totals[idx] ?? 0
+        const piecesInterval = bucketKeys.map((bucketStartMs) => piecesByBucket.get(bucketStartMs) ?? 0)
+
+        const piecesCumulativeRaw: number[] = []
+        let runningCause = 0
+        for (const pieces of piecesInterval) {
+          runningCause += pieces
+          piecesCumulativeRaw.push(runningCause)
+        }
+
+        const pctCumulativeRaw = piecesCumulativeRaw.map((p, idx) => {
+          const total = cumulativeTotals[idx] ?? 0
           return total > 0 ? Math.round((p / total) * 10000) / 100 : 0
         })
-        return { label, pct, pieces }
+
+        return {
+          label,
+          piecesInterval: [0, ...piecesInterval],
+          piecesCumulative: [0, ...piecesCumulativeRaw],
+          pctCumulative: [0, ...pctCumulativeRaw],
+        }
       })
 
-    return { labels, ranges, bucketKeys, totals, series }
+    return { labels, ranges, bucketKeys, intervalTotals, cumulativeTotals: cumulativeTotalsWithStart, series }
   }, [analytics.pointZeroClassification.causes, parsedData.pieceRecords, patternIntervalMinutes, pointZeroDetailRecords, timeFilterFrom, timeFilterTo])
 
   const patternCauseTrendChartData = {
@@ -471,7 +498,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
 
       return {
         label: cause.label,
-        data: cause.pct,
+        data: cause.pctCumulative,
         borderColor: color.border,
         backgroundColor: color.bg,
         pointRadius: 2,
@@ -1846,9 +1873,9 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                   </div>
 
                   <div className="border rounded p-3">
-                    <p className="text-xs font-medium mb-1">Evolución % por causa (sobre total del intervalo)</p>
+                    <p className="text-xs font-medium mb-1">Evolución % acumulado por causa (sobre total del turno)</p>
                     <p className="text-[10px] text-muted-foreground mb-2">
-                      Muestra cómo sube o baja cada causa en el tiempo del turno (No leído por fotocélula, Fuera de límites, etc.).
+                      Inicia en 0% y muestra cómo evoluciona cada causa en el turno. El último punto debe cuadrar con el % total final.
                     </p>
                     <div className="w-full" style={{ height: 240 }}>
                       <Line
@@ -1864,16 +1891,19 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                                   const first = items?.[0]
                                   if (!first) return ''
                                   const range = patternCauseTrend.ranges[first.dataIndex]
-                                  return range ? `Ventana: ${range}` : ''
+                                  return range ? (first.dataIndex === 0 ? `${range}` : `Ventana: ${range}`) : ''
                                 },
                                 label: (ctx) => {
                                   const cause = patternCauseTrend.series.find((s) => s.label === ctx.dataset.label)
                                   if (!cause) return ''
                                   const idx = ctx.dataIndex
-                                  const pieces = cause.pieces[idx] ?? 0
-                                  const total = patternCauseTrend.totals[idx] ?? 0
-                                  const pct = cause.pct[idx] ?? 0
-                                  return `${cause.label}: ${pct}% (${pieces.toLocaleString()} / ${total.toLocaleString()} pz)`
+                                  const intervalPieces = cause.piecesInterval[idx] ?? 0
+                                  const intervalTotal = patternCauseTrend.intervalTotals[idx] ?? 0
+                                  const cumulativePieces = cause.piecesCumulative[idx] ?? 0
+                                  const cumulativeTotal = patternCauseTrend.cumulativeTotals[idx] ?? 0
+                                  const pct = cause.pctCumulative[idx] ?? 0
+                                  if (idx === 0) return `${cause.label}: 0% (inicio)`
+                                  return `${cause.label}: ${pct}% acum. (${cumulativePieces.toLocaleString()} / ${cumulativeTotal.toLocaleString()} pz) · int: ${intervalPieces.toLocaleString()} / ${intervalTotal.toLocaleString()}`
                                 },
                               },
                             },
@@ -1882,7 +1912,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                             y: {
                               beginAtZero: true,
                               ticks: { callback: (v) => `${v}%` },
-                              title: { display: true, text: '% del total del intervalo' },
+                              title: { display: true, text: '% acumulado del total del turno' },
                             },
                             x: { grid: { color: 'rgba(128,128,128,0.1)' } },
                           },

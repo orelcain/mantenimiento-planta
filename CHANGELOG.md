@@ -7,6 +7,17 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.48] - 2026-02-12
+
+### 📉 Corrección: % por causa acumulado desde inicio de turno
+
+#### Mejoras
+- **Lógica corregida**: El gráfico de evolución por causa deja de usar `% por intervalo` y pasa a `% acumulado del turno`.
+- **Inicio en 0%**: Se agrega punto base de inicio para cada causa (`0%` al arranque del turno).
+- **Cierre consistente**: El último punto ahora debe cuadrar con el `% total` final de cada causa en el resumen.
+- **Tooltip ampliado**: Muestra `% acumulado` y también contexto del intervalo (`causa intervalo / total intervalo`).
+- **Rotulado claro**: Título y eje Y actualizados para reflejar que es métrica acumulada del turno.
+
 ## [2.47.47] - 2026-02-12
 
 ### 📈 Evolución temporal de % por causa en Punto Cero
