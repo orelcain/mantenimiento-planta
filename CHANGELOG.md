@@ -7,6 +7,20 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.72] - 2026-02-13
+
+### 🧭 Gantt fase 2 + estabilidad de despliegue y autosave
+
+#### Mejoras
+- **Módulo único `Gantt`**: Integración ordenada como un módulo más del sistema (menú lateral + permisos), con sub-vistas internas `Planificador`, `Ejecutivo` y `Móvil`.
+- **Planificación fase 2**: Dependencias FS/SS/FF/SF con lag, vista temporal, CPM/ruta crítica, simulación de retraso y comentarios por tarea.
+- **Dashboard ejecutivo**: Métricas de avance, tareas críticas/atrasadas, carga por responsable y alertas de sobrecarga para operación.
+- **Alertas Gantt**: Notificaciones locales y remotas (Cloud Function `sendGanttAlert`) para tareas críticas atrasadas.
+
+#### Fixes
+- **CI / GitHub Pages**: Corregidos errores de TypeScript en `AnalisisGrader` que bloqueaban el workflow de deploy.
+- **Autosave Grader cloud**: Reglas Firestore actualizadas para permitir `graderAnalysisDrafts` (se elimina error `Missing or insufficient permissions` al autoguardar).
+
 ## [2.47.71] - 2026-02-13
 
 ### 💾 Sesiones confiables + autosave híbrido costo/operación
