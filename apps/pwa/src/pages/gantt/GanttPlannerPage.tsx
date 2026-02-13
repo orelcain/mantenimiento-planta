@@ -36,7 +36,7 @@ import type { Equipment, GanttTask, GanttTaskComment, IncidentPriority } from '@
 const STATUS_OPTIONS: Array<GanttTask['status']> = ['planificada', 'en_progreso', 'bloqueada', 'completada']
 const PRIORITY_OPTIONS: IncidentPriority[] = ['critica', 'alta', 'media', 'baja']
 const DEPENDENCY_TYPES: Array<'FS' | 'SS' | 'FF' | 'SF'> = ['FS', 'SS', 'FF', 'SF']
-const GANTT_PAGE_SIZE = 25
+const PAGE_SIZE_OPTIONS = ['10', '25', '50', '100'] as const
 
 interface ImportedTaskDraft {
   sourceRow: number
@@ -175,10 +175,14 @@ export function GanttPlannerPage() {
 
   const [equipmentFilter, setEquipmentFilter] = useState<string>('all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [searchText, setSearchText] = useState('')
   const [sortMode, setSortMode] = useState<'jerarquia' | 'fecha' | 'titulo'>('jerarquia')
   const [timelineCollapsed, setTimelineCollapsed] = useState(false)
+  const [listCollapsed, setListCollapsed] = useState(false)
   const [timelinePage, setTimelinePage] = useState(1)
   const [listPage, setListPage] = useState(1)
+  const [timelinePageSize, setTimelinePageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>('25')
+  const [listPageSize, setListPageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>('25')
 
   const [title, setTitle] = useState('')
   const [equipmentId, setEquipmentId] = useState<string>('none')
@@ -228,12 +232,23 @@ export function GanttPlannerPage() {
   }, [])
 
   const filteredTasks = useMemo(() => {
+    const query = searchText.trim().toLowerCase()
     return tasks.filter((task) => {
       if (equipmentFilter !== 'all' && task.equipmentId !== equipmentFilter) return false
       if (statusFilter !== 'all' && task.status !== statusFilter) return false
+      if (query) {
+        const haystack = [
+          task.titulo,
+          task.descripcion ?? '',
+          task.equipmentNombre ?? '',
+          task.hierarchyPath ?? '',
+          task.responsibleName ?? '',
+        ].join(' ').toLowerCase()
+        if (!haystack.includes(query)) return false
+      }
       return true
     })
-  }, [equipmentFilter, statusFilter, tasks])
+  }, [equipmentFilter, searchText, statusFilter, tasks])
 
   const sortedTasks = useMemo(() => {
     const rows = [...filteredTasks]
@@ -280,25 +295,27 @@ export function GanttPlannerPage() {
     return filteredTasks.filter((task) => critical.has(task.id) && task.status !== 'completada' && task.endDate.getTime() < now)
   }, [cpm.criticalPath, filteredTasks])
 
-  const totalTimelinePages = Math.max(1, Math.ceil(sortedTasks.length / GANTT_PAGE_SIZE))
-  const totalListPages = Math.max(1, Math.ceil(sortedTasks.length / GANTT_PAGE_SIZE))
+  const timelinePageSizeNum = Number(timelinePageSize)
+  const listPageSizeNum = Number(listPageSize)
+  const totalTimelinePages = Math.max(1, Math.ceil(sortedTasks.length / timelinePageSizeNum))
+  const totalListPages = Math.max(1, Math.ceil(sortedTasks.length / listPageSizeNum))
   const safeTimelinePage = Math.min(timelinePage, totalTimelinePages)
   const safeListPage = Math.min(listPage, totalListPages)
 
   const pagedTimelineTasks = useMemo(() => {
-    const start = (safeTimelinePage - 1) * GANTT_PAGE_SIZE
-    return sortedTasks.slice(start, start + GANTT_PAGE_SIZE)
-  }, [safeTimelinePage, sortedTasks])
+    const start = (safeTimelinePage - 1) * timelinePageSizeNum
+    return sortedTasks.slice(start, start + timelinePageSizeNum)
+  }, [safeTimelinePage, sortedTasks, timelinePageSizeNum])
 
   const pagedListTasks = useMemo(() => {
-    const start = (safeListPage - 1) * GANTT_PAGE_SIZE
-    return sortedTasks.slice(start, start + GANTT_PAGE_SIZE)
-  }, [safeListPage, sortedTasks])
+    const start = (safeListPage - 1) * listPageSizeNum
+    return sortedTasks.slice(start, start + listPageSizeNum)
+  }, [safeListPage, sortedTasks, listPageSizeNum])
 
   useEffect(() => {
     setTimelinePage(1)
     setListPage(1)
-  }, [equipmentFilter, statusFilter, sortMode])
+  }, [equipmentFilter, statusFilter, sortMode, searchText, timelinePageSize, listPageSize])
 
   useEffect(() => {
     if (timelinePage > totalTimelinePages) {
@@ -670,6 +687,16 @@ export function GanttPlannerPage() {
         </CardHeader>
         {!timelineCollapsed && (
           <CardContent className="space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <Label className="text-xs text-muted-foreground">Tareas por página (timeline)</Label>
+              <Select value={timelinePageSize} onValueChange={(value) => setTimelinePageSize(value as (typeof PAGE_SIZE_OPTIONS)[number])}>
+                <SelectTrigger className="w-24 h-8"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {PAGE_SIZE_OPTIONS.map((size) => <SelectItem key={`timeline-size-${size}`} value={size}>{size}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+
             {sortedTasks.length === 0 && (
               <p className="text-sm text-muted-foreground">Sin tareas para visualizar.</p>
             )}
@@ -725,11 +752,24 @@ export function GanttPlannerPage() {
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <CardTitle>Listado de tareas</CardTitle>
+            <Button size="sm" variant="outline" onClick={() => setListCollapsed((prev) => !prev)}>
+              {listCollapsed ? <ChevronDown className="h-4 w-4 mr-1" /> : <ChevronUp className="h-4 w-4 mr-1" />}
+              {listCollapsed ? 'Expandir' : 'Colapsar'}
+            </Button>
           </CardHeader>
+          {!listCollapsed && (
           <CardContent className="space-y-4">
-            <div className="grid gap-3 md:grid-cols-3">
+            <div className="grid gap-3 md:grid-cols-4">
+              <div>
+                <Label>Buscar tarea</Label>
+                <Input
+                  value={searchText}
+                  onChange={(event) => setSearchText(event.target.value)}
+                  placeholder="Título, equipo, área, responsable..."
+                />
+              </div>
               <div>
                 <Label>Filtro equipo</Label>
                 <Select value={equipmentFilter} onValueChange={setEquipmentFilter}>
@@ -758,6 +798,15 @@ export function GanttPlannerPage() {
                     <SelectItem value="jerarquia">Jerarquía</SelectItem>
                     <SelectItem value="fecha">Fecha inicio</SelectItem>
                     <SelectItem value="titulo">Título</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Tareas por página</Label>
+                <Select value={listPageSize} onValueChange={(value) => setListPageSize(value as (typeof PAGE_SIZE_OPTIONS)[number])}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {PAGE_SIZE_OPTIONS.map((size) => <SelectItem key={`list-size-${size}`} value={size}>{size}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -850,6 +899,7 @@ export function GanttPlannerPage() {
               )}
             </div>
           </CardContent>
+          )}
         </Card>
 
         <div className="space-y-4">
