@@ -7,6 +7,16 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.62] - 2026-02-13
+
+### 🔮 Tendencia de turno completo con proyección temprana
+
+#### Mejoras
+- **Eje temporal completo del turno**: La pestaña `Tendencia` ahora mantiene visible todo el horario del turno (inicio→fin), aunque solo haya 1-2 horas cargadas.
+- **Datos observados + tramo proyectado**: Se dibuja la serie real y una serie punteada de tendencia probable para el resto del turno.
+- **Proyección de piezas y Punto Cero al cierre**: Se agrega gráfico de piezas por intervalo con estimación de cierre para reaccionar antes ante desvíos.
+- **Contexto IA enriquecido**: El análisis IA recibe la cobertura temporal y proyección de cierre para sugerir acciones de gates de forma más anticipada con data parcial.
+
 ## [2.47.61] - 2026-02-12
 
 ### ✅ Estado visual de sugerencias aplicadas

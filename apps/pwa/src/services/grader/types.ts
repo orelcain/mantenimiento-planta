@@ -534,6 +534,18 @@ export interface AIGraderInput {
     distributionByQuality: Array<{ key: string; pieces: number; pct: number }>;
     hourlyDistribution?: Array<{ hour: string; pieces: number; pct: number }>;
   };
+  /** Proyección opcional de cierre de turno basada en datos parciales */
+  trendForecast?: {
+    shiftStart: string;
+    shiftEnd: string;
+    completionPct: number;
+    observedBuckets: number;
+    totalBuckets: number;
+    observedPieces: number;
+    projectedTotalPieces: number;
+    projectedPointZeroPct: number;
+    projectedPointZeroPieces: number;
+  };
 }
 
 export interface AIGraderOutput {

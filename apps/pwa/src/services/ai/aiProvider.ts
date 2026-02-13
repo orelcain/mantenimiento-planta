@@ -219,6 +219,17 @@ function buildPrompt(p: AIGraderInput): string {
     }
   }
 
+  if (p.trendForecast) {
+    lines.push('')
+    lines.push('=== PROYECCIÓN DE CIERRE DE TURNO (datos parciales) ===')
+    lines.push('  Turno planificado: ' + p.trendForecast.shiftStart + ' a ' + p.trendForecast.shiftEnd)
+    lines.push('  Avance observado: ' + p.trendForecast.completionPct + '% (' + p.trendForecast.observedBuckets + '/' + p.trendForecast.totalBuckets + ' intervalos)')
+    lines.push('  Piezas observadas: ' + p.trendForecast.observedPieces.toLocaleString())
+    lines.push('  Piezas proyectadas al cierre: ' + p.trendForecast.projectedTotalPieces.toLocaleString())
+    lines.push('  Punto Cero proyectado al cierre: ' + p.trendForecast.projectedPointZeroPieces.toLocaleString() + ' pz (' + p.trendForecast.projectedPointZeroPct + '%)')
+    lines.push('  Usa esta proyección para priorizar acciones tempranas de gates.')
+  }
+
   lines.push('')
   lines.push('=== COMPLETITUD DE DATOS ===')
   lines.push('  Pieza-pieza: ' + (p.dataCompleteness.hasPieceRecords ? 'SÍ' : 'NO'))

@@ -60,6 +60,7 @@ import { useAuthStore } from '@/store'
 import { cn } from '@/lib/utils'
 import { CALIBRE_WEIGHT_RANGES, computeAnalytics } from '@/services/grader/graderAnalytics'
 import { computeDeterministicInsights, computePointZeroTrend } from '@/services/grader/graderInsights'
+import { DEFAULT_SHIFT_SCHEDULE } from '@/services/grader/graderShiftSchedule'
 import { analyzeGrader, parseAIResponse } from '@/services/ai/aiProvider'
 import { saveGraderSession } from '@/services/grader/graderSession.service'
 import { getTooltip, getTooltipProps } from '@/services/grader/graderTooltips'
@@ -124,6 +125,63 @@ function formatDateToHHMM(value: Date): string {
   const hh = String(value.getHours()).padStart(2, '0')
   const mm = String(value.getMinutes()).padStart(2, '0')
   return `${hh}:${mm}`
+}
+
+function round2(value: number): number {
+  return Math.round(value * 100) / 100
+}
+
+function buildShiftWindow(config: GraderAnalysisConfig, fallbackStartIso?: string): { start: Date; end: Date } | null {
+  const refIso = config.startAt || fallbackStartIso
+  if (!refIso) return null
+
+  const ref = new Date(refIso)
+  if (!Number.isFinite(ref.getTime())) return null
+
+  const schedule = DEFAULT_SHIFT_SCHEDULE.find((item) => item.shiftId === (config.shiftId || 'Turno noche'))
+  if (!schedule) {
+    const start = new Date(ref)
+    const end = new Date(start.getTime() + (8 * 60 * 60 * 1000))
+    return { start, end }
+  }
+
+  const start = new Date(ref)
+  start.setHours(schedule.startHour, schedule.startMinute, 0, 0)
+
+  const end = new Date(ref)
+  end.setHours(schedule.endHour, schedule.endMinute, 0, 0)
+
+  const crossesMidnight = schedule.endHour < schedule.startHour
+    || (schedule.endHour === schedule.startHour && schedule.endMinute < schedule.startMinute)
+
+  if (end.getTime() <= start.getTime()) {
+    end.setDate(end.getDate() + 1)
+  }
+
+  if (crossesMidnight && ref.getTime() < start.getTime()) {
+    start.setDate(start.getDate() - 1)
+    end.setDate(end.getDate() - 1)
+  }
+
+  return { start, end }
+}
+
+function linearRegressionPredict(points: Array<{ x: number; y: number }>, x: number): number {
+  if (points.length === 0) return 0
+  if (points.length === 1) return points[0]?.y ?? 0
+
+  const n = points.length
+  const sumX = points.reduce((s, p) => s + p.x, 0)
+  const sumY = points.reduce((s, p) => s + p.y, 0)
+  const sumXY = points.reduce((s, p) => s + (p.x * p.y), 0)
+  const sumXX = points.reduce((s, p) => s + (p.x * p.x), 0)
+
+  const denominator = (n * sumXX) - (sumX * sumX)
+  if (denominator === 0) return points[n - 1]?.y ?? 0
+
+  const slope = ((n * sumXY) - (sumX * sumY)) / denominator
+  const intercept = (sumY - (slope * sumX)) / n
+  return intercept + (slope * x)
 }
 
 interface Props {
@@ -702,6 +760,19 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
         hourlyDistribution: patternByHour,
         intervalMinutes: patternIntervalMinutes,
       },
+      trendForecast: trendForecastView
+        ? {
+            shiftStart: trendForecastView.shiftStartIso,
+            shiftEnd: trendForecastView.shiftEndIso,
+            completionPct: trendForecastView.completionPct,
+            observedBuckets: trendForecastView.observedBuckets,
+            totalBuckets: trendForecastView.totalBuckets,
+            observedPieces: trendForecastView.observedPieces,
+            projectedTotalPieces: trendForecastView.projectedTotalPieces,
+            projectedPointZeroPct: trendForecastView.projectedPointZeroPct,
+            projectedPointZeroPieces: trendForecastView.projectedPointZeroPieces,
+          }
+        : undefined,
     }
 
     try {
@@ -1385,6 +1456,137 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
       example: 'Pase el mouse sobre cada valor σ del intervalo para ver su explicación exacta con datos reales de esa fila.',
     }
   }, [])
+
+  const weightTrendByTs = useMemo(
+    () => new Map(
+      analytics.weightTrendSeries
+        .map((bucket) => [new Date(bucket.bucketStart).getTime(), bucket] as const)
+        .filter(([ts]) => Number.isFinite(ts)),
+    ),
+    [analytics.weightTrendSeries],
+  )
+
+  const trendForecastView = useMemo(() => {
+    const series = analytics.weightTrendSeries
+    if (series.length === 0) return null
+
+    const intervalMinutes = config.intervalMinutes ?? 15
+    const firstBucket = series[0]?.bucketStart
+    const shiftWindow = buildShiftWindow(config, firstBucket)
+    if (!shiftWindow) return null
+
+    const shiftStartMs = shiftWindow.start.getTime()
+    const shiftEndMs = shiftWindow.end.getTime()
+    if (!Number.isFinite(shiftStartMs) || !Number.isFinite(shiftEndMs) || shiftEndMs <= shiftStartMs) return null
+
+    const intervalMs = intervalMinutes * 60_000
+    const labels: string[] = []
+    for (let ts = shiftStartMs; ts <= shiftEndMs; ts += intervalMs) {
+      labels.push(new Date(ts).toISOString())
+    }
+    if (labels.length === 0) return null
+
+    const valuesByTs = new Map<number, { avgWeightGrams: number; stdDevWeightGrams: number; movingAvg5?: number; pieces: number }>()
+    for (const bucket of series) {
+      const ts = new Date(bucket.bucketStart).getTime()
+      if (!Number.isFinite(ts)) continue
+      valuesByTs.set(ts, {
+        avgWeightGrams: bucket.avgWeightGrams,
+        stdDevWeightGrams: bucket.stdDevWeightGrams,
+        movingAvg5: bucket.movingAvg5,
+        pieces: bucket.pieces,
+      })
+    }
+
+    const allPoints = labels.map((iso, idx) => ({ idx, ts: new Date(iso).getTime(), iso }))
+    const observedIdx = allPoints.filter((pt) => valuesByTs.has(pt.ts)).map((pt) => pt.idx)
+    const observedBuckets = observedIdx.length
+    const totalBuckets = allPoints.length
+    if (observedBuckets === 0) return null
+
+    const lastObservedIdx = observedIdx[observedIdx.length - 1] ?? 0
+
+    const observedAvgPoints: Array<{ x: number; y: number }> = []
+    const observedPiecePoints: Array<{ x: number; y: number }> = []
+    for (const idx of observedIdx) {
+      const point = allPoints[idx]
+      if (!point) continue
+      const source = valuesByTs.get(point.ts)
+      if (!source) continue
+      observedAvgPoints.push({ x: idx, y: source.avgWeightGrams })
+      observedPiecePoints.push({ x: idx, y: source.pieces })
+    }
+
+    const realAvgData: Array<number | null> = labels.map((iso) => {
+      const source = valuesByTs.get(new Date(iso).getTime())
+      return source ? source.avgWeightGrams : null
+    })
+    const realPiecesData: Array<number | null> = labels.map((iso) => {
+      const source = valuesByTs.get(new Date(iso).getTime())
+      return source ? source.pieces : null
+    })
+    const realMovingAvgData: Array<number | null> = labels.map((iso) => {
+      const source = valuesByTs.get(new Date(iso).getTime())
+      return source?.movingAvg5 ?? null
+    })
+
+    const projectedAvgData: Array<number | null> = labels.map((_, idx) => {
+      if (idx <= lastObservedIdx) return null
+      const predicted = linearRegressionPredict(observedAvgPoints, idx)
+      return round2(Math.max(0, predicted))
+    })
+    const projectedPiecesData: Array<number | null> = labels.map((_, idx) => {
+      if (idx <= lastObservedIdx) return null
+      const predicted = linearRegressionPredict(observedPiecePoints, idx)
+      return Math.max(0, Math.round(predicted))
+    })
+
+    const observedPieces = observedPiecePoints.reduce((sum, p) => sum + p.y, 0)
+    const projectedFuturePieces = projectedPiecesData.reduce<number>((sum, value) => sum + (value ?? 0), 0)
+    const projectedTotalPieces = Math.round(observedPieces + projectedFuturePieces)
+
+    const pointZeroRate = analytics.kpis.totalPieces > 0
+      ? analytics.kpis.pointZeroPieces / analytics.kpis.totalPieces
+      : 0
+    const projectedPointZeroPieces = Math.round(projectedTotalPieces * pointZeroRate)
+    const projectedPointZeroPct = projectedTotalPieces > 0
+      ? round2((projectedPointZeroPieces / projectedTotalPieces) * 100)
+      : 0
+
+    const completionPct = round2((observedBuckets / totalBuckets) * 100)
+
+    const realUpperBand: Array<number | null> = labels.map((iso) => {
+      const source = valuesByTs.get(new Date(iso).getTime())
+      return source ? source.avgWeightGrams + source.stdDevWeightGrams : null
+    })
+    const realLowerBand: Array<number | null> = labels.map((iso) => {
+      const source = valuesByTs.get(new Date(iso).getTime())
+      return source ? Math.max(0, source.avgWeightGrams - source.stdDevWeightGrams) : null
+    })
+
+    return {
+      labels,
+      realAvgData,
+      projectedAvgData,
+      realPiecesData,
+      realMovingAvgData,
+      projectedPiecesData,
+      realUpperBand,
+      realLowerBand,
+      completionPct,
+      observedBuckets,
+      totalBuckets,
+      observedPieces,
+      projectedTotalPieces,
+      projectedPointZeroPct,
+      projectedPointZeroPieces,
+      hasProjection: projectedPiecesData.some((v) => v != null),
+      shiftStartLabel: formatDateToHHMM(shiftWindow.start),
+      shiftEndLabel: formatDateToHHMM(shiftWindow.end),
+      shiftStartIso: shiftWindow.start.toISOString(),
+      shiftEndIso: shiftWindow.end.toISOString(),
+    }
+  }, [analytics.kpis.pointZeroPieces, analytics.kpis.totalPieces, analytics.weightTrendSeries, config])
 
   return (
     <div
@@ -2937,26 +3139,50 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
                     <InfoTooltip {...getTooltipProps('wt.trend')} />
                   </CardTitle>
                   <p className="text-xs text-muted-foreground">
-                    Peso promedio por pieza a lo largo del turno con media móvil
+                    Turno completo: datos observados + tendencia probable con datos parciales
                   </p>
+                  {trendForecastView && (
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      <Badge variant="outline" className="text-[10px]">
+                        Cobertura: {trendForecastView.completionPct.toFixed(1)}% ({trendForecastView.observedBuckets}/{trendForecastView.totalBuckets} intervalos)
+                      </Badge>
+                      <Badge variant="outline" className="text-[10px]">
+                        Turno: {trendForecastView.shiftStartLabel} → {trendForecastView.shiftEndLabel}
+                      </Badge>
+                      <Badge variant="outline" className="text-[10px]">
+                        Piezas proyectadas cierre: {trendForecastView.projectedTotalPieces.toLocaleString('es-CL')}
+                      </Badge>
+                    </div>
+                  )}
                 </CardHeader>
                 <CardContent>
                   <Line
                     data={{
-                      labels: analytics.weightTrendSeries.map(b => b.bucketStart),
+                      labels: trendForecastView?.labels ?? analytics.weightTrendSeries.map((b) => b.bucketStart),
                       datasets: [
                         {
-                          label: 'Peso Promedio (g)',
-                          data: analytics.weightTrendSeries.map(b => b.avgWeightGrams),
+                          label: 'Peso observado (g)',
+                          data: trendForecastView?.realAvgData ?? analytics.weightTrendSeries.map((b) => b.avgWeightGrams),
                           borderColor: 'rgba(59,130,246,0.9)',
                           backgroundColor: 'rgba(59,130,246,0.05)',
                           fill: false,
                           tension: 0.3,
                           pointRadius: 3,
                         },
+                        ...(trendForecastView?.hasProjection
+                          ? [{
+                              label: 'Peso proyectado (g)',
+                              data: trendForecastView.projectedAvgData,
+                              borderColor: 'rgba(168,85,247,0.95)',
+                              borderDash: [6, 4],
+                              fill: false,
+                              tension: 0.25,
+                              pointRadius: 2,
+                            }]
+                          : []),
                         {
                           label: 'Media Móvil 5',
-                          data: analytics.weightTrendSeries.map(b => b.movingAvg5 ?? null),
+                          data: trendForecastView?.realMovingAvgData ?? analytics.weightTrendSeries.map((b) => b.movingAvg5 ?? null),
                           borderColor: 'rgba(139,92,246,0.8)',
                           borderDash: [6, 3],
                           fill: false,
@@ -2965,7 +3191,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
                         },
                         {
                           label: '+1σ',
-                          data: analytics.weightTrendSeries.map(b => b.avgWeightGrams + b.stdDevWeightGrams),
+                          data: trendForecastView?.realUpperBand ?? analytics.weightTrendSeries.map((b) => b.avgWeightGrams + b.stdDevWeightGrams),
                           borderColor: 'rgba(16,185,129,0.3)',
                           backgroundColor: 'rgba(16,185,129,0.05)',
                           fill: '+1',
@@ -2975,7 +3201,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
                         },
                         {
                           label: '−1σ',
-                          data: analytics.weightTrendSeries.map(b => Math.max(0, b.avgWeightGrams - b.stdDevWeightGrams)),
+                          data: trendForecastView?.realLowerBand ?? analytics.weightTrendSeries.map((b) => Math.max(0, b.avgWeightGrams - b.stdDevWeightGrams)),
                           borderColor: 'rgba(16,185,129,0.3)',
                           fill: false,
                           tension: 0.3,
@@ -2993,7 +3219,9 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
                             afterBody: (items) => {
                               const idx = items[0]?.dataIndex
                               if (idx == null) return ''
-                              const bucket = analytics.weightTrendSeries[idx]
+                              const bucketKey = trendForecastView?.labels?.[idx] ?? analytics.weightTrendSeries[idx]?.bucketStart
+                              const bucketTs = bucketKey ? new Date(bucketKey).getTime() : NaN
+                              const bucket = Number.isFinite(bucketTs) ? weightTrendByTs.get(bucketTs) : undefined
                               if (!bucket) return ''
                               const lines = [`Mediana: ${bucket.medianWeightGrams.toLocaleString()} g`, `σ: ${bucket.stdDevWeightGrams.toLocaleString()} g`, `Piezas: ${bucket.pieces.toLocaleString()}`]
                               if (bucket.dominantLot) lines.push(`Lote: ${bucket.dominantLot}`)
@@ -3011,8 +3239,64 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
                       },
                     }}
                   />
+                  {trendForecastView?.hasProjection && (
+                    <p className="text-[11px] text-muted-foreground mt-2">
+                      La línea punteada muestra tendencia probable del resto del turno usando el comportamiento observado hasta ahora.
+                    </p>
+                  )}
                 </CardContent>
               </Card>
+
+              {trendForecastView && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm">Proyección de Piezas por Intervalo</CardTitle>
+                    <p className="text-xs text-muted-foreground">
+                      Si cargó 1-2 horas, se mantiene el eje completo del turno y se proyecta el tramo faltante.
+                    </p>
+                  </CardHeader>
+                  <CardContent>
+                    <Line
+                      data={{
+                        labels: trendForecastView.labels,
+                        datasets: [
+                          {
+                            label: 'Piezas observadas',
+                            data: trendForecastView.realPiecesData,
+                            borderColor: 'rgba(37,99,235,0.95)',
+                            backgroundColor: 'rgba(37,99,235,0.12)',
+                            fill: false,
+                            tension: 0.25,
+                            pointRadius: 2,
+                          },
+                          {
+                            label: 'Piezas proyectadas',
+                            data: trendForecastView.projectedPiecesData,
+                            borderColor: 'rgba(217,70,239,0.95)',
+                            borderDash: [6, 4],
+                            fill: false,
+                            tension: 0.2,
+                            pointRadius: 2,
+                          },
+                        ],
+                      }}
+                      options={{
+                        responsive: true,
+                        plugins: {
+                          legend: { position: 'bottom', labels: { font: { size: 11 } } },
+                        },
+                        scales: {
+                          x: { type: 'time', time: { unit: config.intervalMinutes === 60 ? 'hour' : 'minute' } },
+                          y: { beginAtZero: true, title: { display: true, text: 'Piezas / intervalo' } },
+                        },
+                      }}
+                    />
+                    <p className="text-[11px] text-muted-foreground mt-2">
+                      Proyección Punto Cero cierre: {trendForecastView.projectedPointZeroPieces.toLocaleString('es-CL')} piezas ({trendForecastView.projectedPointZeroPct.toFixed(2)}%).
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Weight trend table */}
               <Card>
