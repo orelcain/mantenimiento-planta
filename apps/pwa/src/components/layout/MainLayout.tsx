@@ -112,6 +112,14 @@ export function MainLayout() {
   const filteredEntries = syncFilter === 'all'
     ? pendingEntries
     : pendingEntries.filter((entry) => entry.context.startsWith(`${syncFilter}:`))
+  const syncPendingCount = filteredEntries.filter((entry) => entry.status === 'pending').length
+  const syncErrorCount = filteredEntries.filter((entry) => entry.status === 'error' || entry.status === 'conflict').length
+  const syncDoneCount = filteredEntries.filter((entry) => entry.status === 'synced').length
+  const syncTotalCount = filteredEntries.length
+  const syncProcessedCount = syncDoneCount + syncErrorCount
+  const syncProgress = syncTotalCount > 0
+    ? Math.min(100, Math.round((syncProcessedCount / syncTotalCount) * 100))
+    : 0
 
   const exportSyncEntries = (format: 'json' | 'csv') => {
     if (pendingEntries.length === 0) return
@@ -496,6 +504,26 @@ export function MainLayout() {
                 </button>
               </div>
             </div>
+
+            {syncTotalCount > 0 && (
+              <div className="mt-3 rounded-md border p-2">
+                <div className="flex items-center justify-between text-xs mb-1">
+                  <span className="text-muted-foreground">
+                    Progreso: {syncProcessedCount}/{syncTotalCount} ({syncProgress}%)
+                  </span>
+                  <span className="text-muted-foreground">
+                    Pendientes: {syncPendingCount} · Errores: {syncErrorCount}
+                  </span>
+                </div>
+                <div className="h-2 w-full rounded bg-muted overflow-hidden">
+                  <div
+                    className="h-2 bg-primary transition-all"
+                    style={{ width: `${syncProgress}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
             <div className="mt-3 space-y-2 max-h-48 overflow-y-auto">
               {filteredEntries.slice(0, 10).map((entry) => (
                 <div key={entry.id} className="flex items-start justify-between text-xs">
