@@ -600,9 +600,9 @@ service cloud.firestore {
     // GANTT - Planificación de mantenimiento
     // ============================================
     match /ganttTasks/{taskId} {
-      allow read: if isActiveUser();
+      allow read: if isAuthenticated();
 
-      allow create: if isActiveUser()
+      allow create: if isAuthenticated()
         && request.resource.data.titulo is string
         && request.resource.data.titulo.size() >= 2
         && request.resource.data.status in ['planificada', 'en_progreso', 'bloqueada', 'completada']
@@ -611,14 +611,14 @@ service cloud.firestore {
         && request.resource.data.endDate is timestamp
         && request.resource.data.createdBy == request.auth.uid;
 
-      allow update: if isActiveUser()
+      allow update: if isAuthenticated()
         && (
           isSupervisor()
           || resource.data.createdBy == request.auth.uid
           || (resource.data.responsibleUserId is string && resource.data.responsibleUserId == request.auth.uid)
         );
 
-      allow delete: if isActiveUser()
+      allow delete: if isAuthenticated()
         && (
           isSupervisor()
           || resource.data.createdBy == request.auth.uid
@@ -626,21 +626,21 @@ service cloud.firestore {
     }
 
     match /ganttTaskComments/{commentId} {
-      allow read: if isActiveUser();
+      allow read: if isAuthenticated();
 
-      allow create: if isActiveUser()
+      allow create: if isAuthenticated()
         && request.resource.data.taskId is string
         && request.resource.data.content is string
         && request.resource.data.content.size() > 0
         && request.resource.data.createdBy == request.auth.uid;
 
-      allow update: if isActiveUser()
+      allow update: if isAuthenticated()
         && (
           isSupervisor()
           || resource.data.createdBy == request.auth.uid
         );
 
-      allow delete: if isActiveUser()
+      allow delete: if isAuthenticated()
         && (
           isSupervisor()
           || resource.data.createdBy == request.auth.uid
