@@ -1765,6 +1765,13 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
               label="Peso Promedio"
               value={`${kpis.avgWeightGrams.toLocaleString()} g`}
               secondaryText={`Calibre eq.: ${avgWeightCalibre}`}
+              statusBadge={
+                getPointZeroSeverity(kpis.pointZeroPct) === 'critical'
+                  ? { label: 'CRÍTICO', severity: 'critical' }
+                  : getPointZeroSeverity(kpis.pointZeroPct) === 'warn'
+                  ? { label: 'WARN', severity: 'warn' }
+                  : { label: 'OK', severity: 'ok' }
+              }
               icon={Scale}
               tooltip={getTooltip('kpi.avgWeight')}
             />
@@ -1774,6 +1781,13 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
               label="Peso Mediana"
               value={`${kpis.medianWeightGrams.toLocaleString()} g`}
               secondaryText={`Calibre eq.: ${medianWeightCalibre}`}
+              statusBadge={
+                getPointZeroSeverity(kpis.pointZeroPct) === 'critical'
+                  ? { label: 'CRÍTICO', severity: 'critical' }
+                  : getPointZeroSeverity(kpis.pointZeroPct) === 'warn'
+                  ? { label: 'WARN', severity: 'warn' }
+                  : { label: 'OK', severity: 'ok' }
+              }
               icon={Scale}
               tooltip={getTooltip('kpi.medianWeight')}
             />
@@ -4069,6 +4083,7 @@ function KPICard({
   label,
   value,
   secondaryText,
+  statusBadge,
   icon: Icon,
   severity,
   tooltip,
@@ -4076,6 +4091,7 @@ function KPICard({
   label: string
   value: string
   secondaryText?: string
+  statusBadge?: { label: string; severity: 'ok' | 'warn' | 'critical' }
   icon: React.ElementType
   severity?: 'ok' | 'warn' | 'critical'
   tooltip?: string
@@ -4092,6 +4108,19 @@ function KPICard({
           <Icon className="h-4 w-4 text-muted-foreground" />
           <span className="text-xs text-muted-foreground">{label}</span>
           {tooltip && <InfoTooltip text={tooltip} iconSize={12} />}
+          {statusBadge && (
+            <Badge
+              variant="outline"
+              className={cn(
+                'text-[9px] px-1.5 py-0 h-4 ml-auto',
+                statusBadge.severity === 'critical' && 'text-red-600 border-red-300',
+                statusBadge.severity === 'warn' && 'text-amber-600 border-amber-300',
+                statusBadge.severity === 'ok' && 'text-emerald-600 border-emerald-300',
+              )}
+            >
+              {statusBadge.label}
+            </Badge>
+          )}
         </div>
         <p
           className={cn(

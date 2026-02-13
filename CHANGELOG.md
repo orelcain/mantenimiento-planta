@@ -7,6 +7,15 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.70] - 2026-02-13
+
+### 🏷️ Etiqueta de estado en KPIs de peso
+
+#### Mejoras
+- **Mini badge en `Peso Promedio` y `Peso Mediana`**: Se agrega estado `OK / WARN / CRÍTICO` visible en ambas tarjetas.
+- **Criterio unificado**: El badge usa la misma severidad de umbrales P0 configurados en el módulo.
+- **Lectura operativa rápida**: Peso, calibre equivalente y estado del turno quedan juntos en el mismo box.
+
 ## [2.47.69] - 2026-02-13
 
 ### 🎯 KPI de peso simplificado (sin duplicados)
