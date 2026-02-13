@@ -68,6 +68,7 @@ const AnalisisGraderWizardPage = lazyWithReload(() => import('@/pages/AnalisisGr
 const AnalisisGraderSessionPage = lazyWithReload(() => import('@/pages/AnalisisGrader/AnalisisGraderSessionPage').then((mod) => ({ default: mod.AnalisisGraderSessionPage })))
 const AnalisisGraderSessionsListPage = lazyWithReload(() => import('@/pages/AnalisisGrader/AnalisisGraderSessionsListPage').then((mod) => ({ default: mod.AnalisisGraderSessionsListPage })))
 const AnalisisGraderCalendarPage = lazyWithReload(() => import('@/pages/AnalisisGrader/AnalisisGraderCalendarPage').then((mod) => ({ default: mod.AnalisisGraderCalendarPage })))
+const GanttModulePage = lazyWithReload(() => import('@/pages/gantt/GanttModulePage').then((mod) => ({ default: mod.GanttModulePage })))
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuthStore()
@@ -317,6 +318,13 @@ export function App() {
                 <AnalisisGraderSessionPage />
               </Suspense>
             } />
+            <Route path="gantt" element={
+              <Suspense fallback={<LoadingScreen />}>
+                <GanttModulePage />
+              </Suspense>
+            } />
+            <Route path="gantt/dashboard" element={<Navigate to="/gantt?tab=ejecutivo" replace />} />
+            <Route path="gantt/mobile" element={<Navigate to="/gantt?tab=movil" replace />} />
           </Route>
 
           {/* Fallback */}

@@ -31,6 +31,7 @@ export const APP_MODULES = [
   'usuarios',
   'reportes',
   'analisisGrader',
+  'gantt',
 ] as const
 
 export type AppModule = typeof APP_MODULES[number]
@@ -252,6 +253,13 @@ export const MODULES_CONFIG: ModuleConfig[] = [
     icono: 'BarChart3',
     accionesDisponibles: ['ver', 'crear', 'editar', 'exportar', 'configurar'],
   },
+  {
+    id: 'gantt',
+    nombre: 'Planificador Gantt',
+    descripcion: 'Planificación integrada de mantenimiento y temporada baja',
+    icono: 'CalendarClock',
+    accionesDisponibles: ['ver', 'crear', 'editar', 'eliminar', 'asignar', 'exportar'],
+  },
 ]
 
 // ============================================================================
@@ -290,6 +298,7 @@ const SUPERVISOR_PERMISSIONS: PermissionsMap = {
   usuarios: { visible: false, actions: [] },
   reportes: { visible: true, actions: ['ver', 'exportar'] },
   analisisGrader: { visible: true, actions: ['ver', 'crear', 'editar', 'exportar', 'configurar'] },
+  gantt: { visible: true, actions: ['ver', 'crear', 'editar', 'eliminar', 'asignar', 'exportar'] },
 }
 
 /**
@@ -314,6 +323,7 @@ const TECNICO_PERMISSIONS: PermissionsMap = {
   usuarios: { visible: false, actions: [] },
   reportes: { visible: true, actions: ['ver'] },
   analisisGrader: { visible: true, actions: ['ver'] },
+  gantt: { visible: true, actions: ['ver', 'editar', 'asignar'] },
 }
 
 /**
@@ -338,6 +348,7 @@ const USUARIO_PERMISSIONS: PermissionsMap = {
   usuarios: { visible: false, actions: [] },
   reportes: { visible: false, actions: [] },
   analisisGrader: { visible: false, actions: [] },
+  gantt: { visible: false, actions: [] },
 }
 
 export const DEFAULT_ROLE_PERMISSIONS: Record<string, PermissionsMap> = {

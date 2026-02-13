@@ -48,6 +48,7 @@ const navigation: Array<{ name: string; href: string; icon: React.ElementType; m
   { name: 'Evidencias', href: '/photo-evidence', icon: Camera, module: 'fotoevidencia' },
   { name: 'Inspecciones', href: '/inspections', icon: Route, module: 'inspecciones' },
   { name: 'Preventivo', href: '/preventive', icon: CalendarClock, module: 'preventivo' },
+  { name: 'Planificador Gantt', href: '/gantt', icon: CalendarClock, module: 'gantt' },
   { name: 'Predictivo', href: '/predictive', icon: Activity },
   { name: 'Sensores', href: '/sensors', icon: Cpu, module: 'sensores' },
   { name: 'Visor de Mapas', href: '/map', icon: Map, module: 'mapa' },

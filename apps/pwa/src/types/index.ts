@@ -519,3 +519,84 @@ export type {
   ETTSugerenciaIA,
   ETTCambio
 } from './ett'
+
+export type GanttTaskStatus = 'planificada' | 'en_progreso' | 'bloqueada' | 'completada'
+export type GanttDependencyType = 'FS' | 'SS' | 'FF' | 'SF'
+
+export interface GanttTaskDependency {
+  predecessorId: string
+  type: GanttDependencyType
+  lagHours?: number
+}
+
+export interface GanttTask {
+  id: string
+  titulo: string
+  descripcion?: string
+  hierarchyNodeId?: string
+  hierarchyPath?: string
+  equipmentId?: string
+  equipmentNombre?: string
+  responsibleUserId?: string
+  responsibleName?: string
+  status: GanttTaskStatus
+  prioridad: IncidentPriority
+  startDate: Date
+  endDate: Date
+  progress: number
+  estimatedHours: number
+  dependencies: GanttTaskDependency[]
+  sparePartIds?: string[]
+  predictiveRiskLevel?: FailurePrediction['nivelRiesgo']
+  predictiveSourceId?: string
+  commentsCount?: number
+  createdBy: string
+  createdAt: Date
+  updatedAt: Date
+}
+
+export interface GanttTaskComment {
+  id: string
+  taskId: string
+  content: string
+  createdBy: string
+  createdByName?: string
+  createdAt: Date
+}
+
+export interface GanttScheduleMetrics {
+  totalTasks: number
+  completedTasks: number
+  delayedTasks: number
+  criticalTasks: number
+  averageProgress: number
+  estimatedDurationHours: number
+}
+
+export interface GanttCPMTask {
+  taskId: string
+  earliestStart: number
+  earliestFinish: number
+  latestStart: number
+  latestFinish: number
+  slack: number
+  isCritical: boolean
+}
+
+export interface GanttCPMResult {
+  tasks: GanttCPMTask[]
+  criticalPath: string[]
+  projectDurationHours: number
+}
+
+export interface GanttDelaySimulationInput {
+  taskId: string
+  extraHours: number
+}
+
+export interface GanttDelaySimulationResult {
+  baseDurationHours: number
+  simulatedDurationHours: number
+  impactHours: number
+  impactedTaskIds: string[]
+}

@@ -102,6 +102,95 @@ async function sendNotification(tokens, title, body, data = {}) {
   }
 }
 
+exports.sendGanttAlert = onCall({ region: 'us-central1' }, async (request) => {
+  const callerId = request.auth?.uid
+  if (!callerId) {
+    throw new Error('User not authenticated')
+  }
+
+  const {
+    taskId,
+    title,
+    body,
+    responsibleUserId,
+    url,
+    severity = 'critical_delay',
+  } = request.data || {}
+
+  if (!taskId || !title || !body) {
+    throw new Error('Missing required fields: taskId, title, body')
+  }
+
+  const logId = `${taskId}_${severity}`
+  const logRef = db.collection('ganttNotificationLog').doc(logId)
+  const logSnap = await logRef.get()
+
+  const now = Date.now()
+  if (logSnap.exists) {
+    const lastSentAt = logSnap.data()?.lastSentAt?.toMillis?.() || 0
+    const elapsed = now - lastSentAt
+    const minIntervalMs = 2 * 60 * 60 * 1000
+    if (elapsed < minIntervalMs) {
+      return {
+        success: true,
+        skipped: true,
+        reason: 'throttled',
+        sent: 0,
+      }
+    }
+  }
+
+  const supervisors = await getSupervisorsAndAdmins()
+  const recipients = new Set(supervisors)
+  if (responsibleUserId) {
+    recipients.add(responsibleUserId)
+  }
+
+  const tokens = await getTokensForUsers(Array.from(recipients))
+  if (tokens.length === 0) {
+    await logRef.set({
+      taskId,
+      severity,
+      lastSentAt: new Date(),
+      lastSentBy: callerId,
+      sent: 0,
+      recipients: Array.from(recipients),
+      skippedNoTokens: true,
+    }, { merge: true })
+
+    return {
+      success: true,
+      skipped: true,
+      reason: 'no_tokens',
+      sent: 0,
+    }
+  }
+
+  const response = await sendNotification(tokens, title, body, {
+    type: 'GANTT_ALERT',
+    taskId,
+    severity,
+    url: url || '/mantenimiento-planta/gantt?tab=planificador',
+  })
+
+  await logRef.set({
+    taskId,
+    severity,
+    lastSentAt: new Date(),
+    lastSentBy: callerId,
+    sent: response?.successCount || 0,
+    failed: response?.failureCount || 0,
+    recipients: Array.from(recipients),
+  }, { merge: true })
+
+  return {
+    success: true,
+    skipped: false,
+    sent: response?.successCount || 0,
+    failed: response?.failureCount || 0,
+  }
+})
+
 // ==================== TRIGGERS ====================
 
 /**

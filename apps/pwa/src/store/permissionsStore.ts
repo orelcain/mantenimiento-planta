@@ -171,8 +171,13 @@ export const usePermissionsStore = create<PermissionsState>()(
         
         // Admin siempre puede todo
         if (userRol === 'admin') return true
-        
-        return hasPermission(permisos, modulo, accion)
+
+        const fallback = userRol
+          ? (DEFAULT_ROLE_PERMISSIONS[userRol] || DEFAULT_ROLE_PERMISSIONS['usuario'])
+          : DEFAULT_ROLE_PERMISSIONS['usuario']
+        const effective = permisos[modulo] ? permisos : { ...fallback, ...permisos }
+
+        return hasPermission(effective, modulo, accion)
       },
       
       // Verificar si puede ver un módulo
@@ -181,8 +186,13 @@ export const usePermissionsStore = create<PermissionsState>()(
         
         // Admin siempre puede ver todo
         if (userRol === 'admin') return true
-        
-        return isModuleVisible(permisos, modulo)
+
+        const fallback = userRol
+          ? (DEFAULT_ROLE_PERMISSIONS[userRol] || DEFAULT_ROLE_PERMISSIONS['usuario'])
+          : DEFAULT_ROLE_PERMISSIONS['usuario']
+        const effective = permisos[modulo] ? permisos : { ...fallback, ...permisos }
+
+        return isModuleVisible(effective, modulo)
       },
       
       // Internal: setter para unsubscribe
