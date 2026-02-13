@@ -7,6 +7,17 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.50] - 2026-02-12
+
+### 🧼 Refinamiento visual anti-ruido en tabla de Clasificación P0
+
+#### Mejoras
+- **Jerarquía tipográfica mejorada**: Causa principal más clara y descripción secundaria más suave.
+- **Ruido reducido en filas**: Bordes y fondos suavizados para facilitar escaneo horizontal.
+- **Lectura numérica más limpia**: Columnas de métricas con `tabular-nums` para mejor alineación visual.
+- **Encabezados más legibles**: Estilo compacto en mayúsculas con contraste controlado.
+- **Detalle expandido más discreto**: Bloque drill-down con menor agresividad visual y mejor continuidad.
+
 ## [2.47.49] - 2026-02-12
 
 ### 🎨 Mejora visual: Clasificación Punto Cero

@@ -1500,7 +1500,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                   <div className="overflow-x-auto overflow-y-visible">
                     <table className="w-full text-sm">
                       <thead>
-                        <tr className="border-b text-left">
+                        <tr className="border-b border-muted/40 text-left text-[11px] uppercase tracking-wide text-muted-foreground/90">
                           <th className="py-2 px-2 w-6"></th>
                           <th className="py-2 px-2">Causa</th>
                           <th className="py-2 px-2 text-right">Piezas</th>
@@ -1517,7 +1517,8 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                             <Fragment key={i}>
                               <tr
                                 className={cn(
-                                  'border-b hover:bg-muted/30',
+                                  'border-b border-muted/30 hover:bg-muted/20',
+                                  i % 2 === 0 && 'bg-muted/[0.08]',
                                   hasRecords && 'cursor-pointer',
                                   isExpanded && 'bg-muted/20',
                                 )}
@@ -1533,39 +1534,39 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                                   )}
                                 </td>
                                 <td className="py-2 px-2">
-                                  <div>
+                                  <div className="space-y-0.5">
                                     <div className="flex items-center gap-2">
                                       <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: getCauseColor(c.cause) }} />
-                                      <span className="font-medium">{c.label}</span>
+                                      <span className="font-semibold text-sm leading-tight">{c.label}</span>
                                     </div>
-                                    <p className="text-[10px] text-muted-foreground">{c.description}</p>
+                                    <p className="text-[11px] text-muted-foreground leading-snug max-w-[38ch]">{c.description}</p>
                                   </div>
                                 </td>
-                                <td className="py-2 px-2 text-right font-medium">{c.pieces.toLocaleString()}</td>
-                                <td className="py-2 px-2 text-right">
+                                <td className="py-2 px-2 text-right font-medium tabular-nums">{c.pieces.toLocaleString()}</td>
+                                <td className="py-2 px-2 text-right tabular-nums">
                                   <span className={cn(
-                                    'font-medium',
+                                    'font-semibold',
                                     c.pctOfPointZero >= 50 && 'text-red-600',
                                     c.pctOfPointZero >= 10 && c.pctOfPointZero < 50 && 'text-amber-600',
                                   )}>
                                     {c.pctOfPointZero}%
                                   </span>
                                 </td>
-                                <td className="py-2 px-2 text-right text-muted-foreground">{c.pctOfTotal}%</td>
-                                <td className="py-2 px-2 text-right">{c.weightKg ? c.weightKg.toLocaleString() : '—'}</td>
+                                <td className="py-2 px-2 text-right text-muted-foreground tabular-nums">{c.pctOfTotal}%</td>
+                                <td className="py-2 px-2 text-right tabular-nums">{c.weightKg ? c.weightKg.toLocaleString() : '—'}</td>
                               </tr>
                               {/* Drill-down rows */}
                               {isExpanded && c.records && (
                                 <tr>
                                   <td colSpan={6} className="p-0">
-                                    <div className="bg-muted/10 border-l-4 border-primary/30 px-3 py-2 max-h-[300px] overflow-y-auto">
+                                    <div className="bg-muted/[0.10] border-l-2 border-primary/30 px-3 py-2 max-h-[300px] overflow-y-auto">
                                       <p className="text-xs font-medium mb-2 flex items-center gap-1">
                                         <Eye className="h-3 w-3" />
                                         Detalle pieza-pieza ({c.records.length} registros)
                                       </p>
                                       <table className="w-full text-xs">
                                         <thead>
-                                          <tr className="border-b text-left text-muted-foreground">
+                                          <tr className="border-b border-muted/30 text-left text-muted-foreground">
                                             <th className="py-1 px-1">Hora</th>
                                             <th className="py-1 px-1">Error</th>
                                             <th className="py-1 px-1 text-right">Pzas</th>
@@ -1577,7 +1578,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                                         </thead>
                                         <tbody>
                                           {c.records.map((r, j) => (
-                                            <tr key={j} className="border-b border-muted/30 hover:bg-muted/20">
+                                            <tr key={j} className="border-b border-muted/25 hover:bg-muted/20">
                                               <td className="py-0.5 px-1 font-mono text-muted-foreground">
                                                 {new Date(r.ts).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                                               </td>
@@ -1601,12 +1602,12 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                           )
                         })}
                         {/* Total row */}
-                        <tr className="border-t-2 font-bold bg-muted/50">
+                        <tr className="border-t-2 border-muted/60 font-bold bg-muted/40">
                           <td className="py-2 px-1"></td>
                           <td className="py-2 px-2">TOTAL</td>
-                          <td className="py-2 px-2 text-right">{analytics.pointZeroClassification.totalPointZeroPieces.toLocaleString()}</td>
-                          <td className="py-2 px-2 text-right">100%</td>
-                          <td className="py-2 px-2 text-right">{kpis.pointZeroPct}%</td>
+                          <td className="py-2 px-2 text-right tabular-nums">{analytics.pointZeroClassification.totalPointZeroPieces.toLocaleString()}</td>
+                          <td className="py-2 px-2 text-right tabular-nums">100%</td>
+                          <td className="py-2 px-2 text-right tabular-nums">{kpis.pointZeroPct}%</td>
                           <td className="py-2 px-2 text-right">—</td>
                         </tr>
                       </tbody>
