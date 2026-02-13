@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.47.72' as const
+export const APP_VERSION = '2.47.73' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-02-13' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Gantt fase 2 + fixes CI/Firestore autosave Grader' as const
+export const VERSION_NAME = 'Fix permisos Gantt + importación Excel de tareas' as const
 
 /**
  * Nota:

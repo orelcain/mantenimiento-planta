@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.47.72**
+## Versión Actual: **v2.47.73**
 
 **Fecha de lanzamiento**: 13 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.47.73 - Fix permisos Gantt + importación Excel (13/02/2026)
+- 🔐 **Permisos Gantt**: Nuevas reglas Firestore para `ganttTasks` y `ganttTaskComments` (lectura/escritura para usuarios activos según rol/propiedad).
+- 📤 **Importación Excel en Gantt**: Nuevo bloque en Planificador para cargar `.xlsx/.xlsm/.xls`, previsualizar filas válidas/errores e importar tareas en lote.
+- 🧭 **Mapeo jerárquico**: La importación intenta vincular tarea a equipo por nombre/código y usar `hierarchyPath`/área para mejorar asignación en timeline.
 
 ### v2.47.22 - Soporte Puerta 0 en carga Grader (11/02/2026)
 - 🚨 **Archivos Puerta 0**: Ahora se pueden cargar archivos "Puerta 0" junto con Pieza-Pieza.

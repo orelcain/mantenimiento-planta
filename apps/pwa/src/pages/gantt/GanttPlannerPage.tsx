@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, Bell, CalendarClock, GitBranchPlus, Link2Off, Plus, Trash2 } from 'lucide-react'
+import { AlertTriangle, Bell, CalendarClock, FileSpreadsheet, GitBranchPlus, Link2Off, Plus, Trash2, Upload } from 'lucide-react'
+import * as XLSX from 'xlsx'
 import {
   Badge,
   Button,
@@ -35,6 +36,119 @@ import type { Equipment, GanttTask, GanttTaskComment, IncidentPriority } from '@
 const STATUS_OPTIONS: Array<GanttTask['status']> = ['planificada', 'en_progreso', 'bloqueada', 'completada']
 const PRIORITY_OPTIONS: IncidentPriority[] = ['critica', 'alta', 'media', 'baja']
 const DEPENDENCY_TYPES: Array<'FS' | 'SS' | 'FF' | 'SF'> = ['FS', 'SS', 'FF', 'SF']
+
+interface ImportedTaskDraft {
+  sourceRow: number
+  titulo: string
+  descripcion?: string
+  equipmentId?: string
+  equipmentNombre?: string
+  hierarchyNodeId?: string
+  hierarchyPath?: string
+  responsibleName?: string
+  prioridad: IncidentPriority
+  status: GanttTask['status']
+  progress: number
+  startDate: Date
+  endDate: Date
+  sparePartIds: string[]
+}
+
+function normalizeText(value: unknown): string {
+  if (value === null || value === undefined) return ''
+  return String(value).trim()
+}
+
+function normalizeKey(key: string): string {
+  return key
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[\s_\-./%()]/g, '')
+}
+
+function getRowValue(row: Record<string, unknown>, candidates: string[]): unknown {
+  const normalizedEntries = Object.entries(row).map(([key, value]) => [normalizeKey(key), value] as const)
+  const byKey = new Map(normalizedEntries)
+
+  for (const candidate of candidates.map(normalizeKey)) {
+    if (byKey.has(candidate)) return byKey.get(candidate)
+  }
+
+  return ''
+}
+
+function parseExcelDate(value: unknown): Date | null {
+  if (!value && value !== 0) return null
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return value
+
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    const excelDate = XLSX.SSF.parse_date_code(value)
+    if (excelDate) {
+      const parsed = new Date(
+        excelDate.y,
+        Math.max(0, excelDate.m - 1),
+        excelDate.d,
+        excelDate.H || 0,
+        excelDate.M || 0,
+        excelDate.S || 0
+      )
+      if (!Number.isNaN(parsed.getTime())) return parsed
+    }
+  }
+
+  const parsed = new Date(String(value))
+  if (Number.isNaN(parsed.getTime())) return null
+  return parsed
+}
+
+function parseProgress(value: unknown): number {
+  const raw = normalizeText(value).replace('%', '').replace(',', '.').trim()
+  const n = Number(raw)
+  if (!Number.isFinite(n)) return 0
+  const normalized = n <= 1 ? n * 100 : n
+  return Math.max(0, Math.min(100, Math.round(normalized)))
+}
+
+function parseHours(value: unknown): number {
+  const raw = normalizeText(value).replace(',', '.').trim()
+  const n = Number(raw)
+  if (!Number.isFinite(n)) return 0
+  return Math.max(0, n)
+}
+
+function mapStatus(value: unknown): GanttTask['status'] {
+  const raw = normalizeText(value).toLowerCase()
+  if (raw.includes('complet') || raw.includes('finaliz') || raw.includes('done')) return 'completada'
+  if (raw.includes('progreso') || raw.includes('curso') || raw.includes('ejec')) return 'en_progreso'
+  if (raw.includes('bloque') || raw.includes('deten')) return 'bloqueada'
+  return 'planificada'
+}
+
+function mapPriority(value: unknown): IncidentPriority {
+  const raw = normalizeText(value).toLowerCase()
+  if (raw.includes('crit')) return 'critica'
+  if (raw.includes('alt')) return 'alta'
+  if (raw.includes('baj')) return 'baja'
+  return 'media'
+}
+
+function resolveEquipmentByExcel(equipment: Equipment[], equipmentLabel: string, areaLabel: string): Equipment | undefined {
+  const eqLabel = normalizeKey(equipmentLabel)
+  const area = normalizeKey(areaLabel)
+
+  const candidates = equipment.filter((item) => {
+    if (!eqLabel) return false
+    const name = normalizeKey(item.nombre)
+    const code = normalizeKey(item.codigo)
+    return name === eqLabel || code === eqLabel || name.includes(eqLabel) || eqLabel.includes(name)
+  })
+
+  if (candidates.length === 0) return undefined
+  if (!area) return candidates[0]
+
+  return candidates.find((item) => normalizeKey(item.hierarchyPath ?? '').includes(area)) ?? candidates[0]
+}
 
 function toInputDate(date: Date) {
   const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
@@ -79,6 +193,11 @@ export function GanttPlannerPage() {
 
   const [comments, setComments] = useState<GanttTaskComment[]>([])
   const [newComment, setNewComment] = useState('')
+  const [importFile, setImportFile] = useState<File | null>(null)
+  const [importPreview, setImportPreview] = useState<ImportedTaskDraft[]>([])
+  const [importErrors, setImportErrors] = useState<string[]>([])
+  const [importBusy, setImportBusy] = useState(false)
+  const [importMessage, setImportMessage] = useState<string | null>(null)
   const notifiedDelayedCriticalRef = useRef<Set<string>>(new Set())
   const remoteAlertSentRef = useRef<Set<string>>(new Set())
 
@@ -286,6 +405,155 @@ export function GanttPlannerPage() {
     setComments(rows)
   }
 
+  async function handleParseImportFile() {
+    if (!importFile) return
+
+    setImportBusy(true)
+    setImportMessage(null)
+    setImportErrors([])
+    try {
+      const buffer = await importFile.arrayBuffer()
+      const workbook = XLSX.read(buffer, { type: 'array', cellDates: false })
+      const tareasSheetName = workbook.SheetNames.find((name) => normalizeKey(name).includes('tareas')) ?? workbook.SheetNames[0]
+
+      if (!tareasSheetName) {
+        setImportPreview([])
+        setImportErrors(['El archivo no contiene hojas para importar.'])
+        return
+      }
+
+      const sheet = workbook.Sheets[tareasSheetName]
+      if (!sheet) {
+        setImportPreview([])
+        setImportErrors(['No se pudo leer la hoja de tareas del archivo.'])
+        return
+      }
+
+      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' })
+      if (rows.length === 0) {
+        setImportPreview([])
+        setImportErrors(['La hoja de tareas está vacía.'])
+        return
+      }
+
+      const drafts: ImportedTaskDraft[] = []
+      const parseErrors: string[] = []
+
+      rows.forEach((row, index) => {
+        const sourceRow = index + 2
+        const titulo = normalizeText(
+          getRowValue(row, ['tarea', 'titulo', 'title', 'actividad', 'nombre'])
+        )
+
+        if (!titulo) {
+          parseErrors.push(`Fila ${sourceRow}: falta título/tarea`)
+          return
+        }
+
+        const equipmentLabel = normalizeText(
+          getRowValue(row, ['equipo', 'maquina', 'asset', 'equipment'])
+        )
+        const areaLabel = normalizeText(
+          getRowValue(row, ['area', 'área', 'linea', 'línea', 'seccion', 'sección'])
+        )
+        const responsibleName = normalizeText(
+          getRowValue(row, ['responsable', 'asignado', 'owner', 'encargado'])
+        )
+        const descripcion = normalizeText(
+          getRowValue(row, ['descripcion', 'descripción', 'detalle'])
+        )
+
+        const start = parseExcelDate(getRowValue(row, ['inicio', 'fechainicio', 'start', 'inicioreal'])) ?? new Date()
+        let end = parseExcelDate(getRowValue(row, ['fin', 'fechafin', 'end', 'termino', 'final']))
+        const durationHours = parseHours(getRowValue(row, ['duracion', 'duración', 'horas', 'durationhours']))
+
+        if (!end && durationHours > 0) {
+          end = new Date(start.getTime() + durationHours * 60 * 60 * 1000)
+        }
+        if (!end || end <= start) {
+          end = new Date(start.getTime() + 60 * 60 * 1000)
+        }
+
+        const status = mapStatus(getRowValue(row, ['estado', 'status']))
+        const progress = parseProgress(getRowValue(row, ['avance', 'porcentajeavance', 'progress', '%avance']))
+        const prioridad = mapPriority(getRowValue(row, ['prioridad', 'priority']))
+        const sparePartIds = normalizeText(getRowValue(row, ['repuestos', 'repuestosids', 'spares', 'spareparts']))
+          .split(',')
+          .map((value) => value.trim())
+          .filter(Boolean)
+
+        const matchedEquipment = resolveEquipmentByExcel(equipment, equipmentLabel, areaLabel)
+
+        drafts.push({
+          sourceRow,
+          titulo,
+          descripcion: descripcion || undefined,
+          equipmentId: matchedEquipment?.id,
+          equipmentNombre: matchedEquipment?.nombre ?? (equipmentLabel || undefined),
+          hierarchyNodeId: matchedEquipment?.hierarchyNodeId,
+          hierarchyPath: matchedEquipment?.hierarchyPath ?? (areaLabel || undefined),
+          responsibleName: responsibleName || undefined,
+          prioridad,
+          status,
+          progress,
+          startDate: start,
+          endDate: end,
+          sparePartIds,
+        })
+      })
+
+      setImportPreview(drafts)
+      setImportErrors(parseErrors)
+      setImportMessage(`Pre-carga lista: ${drafts.length} tarea(s) válida(s), ${parseErrors.length} fila(s) descartada(s).`)
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'No se pudo procesar el archivo'
+      setImportPreview([])
+      setImportErrors([message])
+    } finally {
+      setImportBusy(false)
+    }
+  }
+
+  async function handleImportPreviewTasks() {
+    if (!user?.id || !canCreate || importPreview.length === 0) return
+
+    setImportBusy(true)
+    setImportMessage(null)
+    setError(null)
+    try {
+      for (const task of importPreview) {
+        await createGanttTask({
+          titulo: task.titulo,
+          descripcion: task.descripcion,
+          equipmentId: task.equipmentId,
+          equipmentNombre: task.equipmentNombre,
+          hierarchyNodeId: task.hierarchyNodeId,
+          hierarchyPath: task.hierarchyPath,
+          status: task.status,
+          prioridad: task.prioridad,
+          startDate: task.startDate,
+          endDate: task.endDate,
+          progress: task.progress,
+          estimatedHours: Math.max(1, (task.endDate.getTime() - task.startDate.getTime()) / (1000 * 60 * 60)),
+          dependencies: [],
+          sparePartIds: task.sparePartIds,
+          createdBy: user.id,
+          responsibleUserId: user.id,
+          responsibleName: task.responsibleName ?? `${user.nombre} ${user.apellido}`,
+        })
+      }
+
+      setImportMessage(`Importación completada: ${importPreview.length} tarea(s) creadas.`)
+      setImportPreview([])
+      setImportFile(null)
+      await load()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo importar la pre-carga')
+    } finally {
+      setImportBusy(false)
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2">
@@ -452,6 +720,69 @@ export function GanttPlannerPage() {
         </Card>
 
         <div className="space-y-4">
+          <Card>
+            <CardHeader><CardTitle>Cargar tareas desde Excel</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              <div>
+                <Label>Archivo (.xlsx, .xls, .xlsm)</Label>
+                <Input
+                  type="file"
+                  accept=".xlsx,.xls,.xlsm"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0] ?? null
+                    setImportFile(file)
+                    setImportPreview([])
+                    setImportErrors([])
+                    setImportMessage(null)
+                  }}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Hoja esperada: <strong>Tareas</strong>. Se intentan mapear columnas de tarea, equipo, área, estado, prioridad, fechas y avance.
+                </p>
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={handleParseImportFile}
+                  disabled={!importFile || importBusy}
+                >
+                  <FileSpreadsheet className="h-4 w-4 mr-1" /> Previsualizar
+                </Button>
+                <Button
+                  className="flex-1"
+                  onClick={handleImportPreviewTasks}
+                  disabled={!canCreate || importPreview.length === 0 || importBusy}
+                >
+                  <Upload className="h-4 w-4 mr-1" /> Importar
+                </Button>
+              </div>
+
+              {importMessage && <p className="text-xs text-muted-foreground">{importMessage}</p>}
+
+              {importPreview.length > 0 && (
+                <div className="rounded border p-2 max-h-36 overflow-auto text-xs space-y-1">
+                  {importPreview.slice(0, 8).map((item) => (
+                    <p key={`import-preview-${item.sourceRow}`}>
+                      Fila {item.sourceRow}: {item.titulo} · {item.equipmentNombre ?? item.hierarchyPath ?? 'Sin equipo/área'}
+                    </p>
+                  ))}
+                  {importPreview.length > 8 && (
+                    <p className="text-muted-foreground">+{importPreview.length - 8} tareas más en pre-carga</p>
+                  )}
+                </div>
+              )}
+
+              {importErrors.length > 0 && (
+                <div className="rounded border border-destructive/40 p-2 max-h-32 overflow-auto text-xs text-destructive space-y-1">
+                  {importErrors.slice(0, 8).map((item, index) => <p key={`import-error-${index}`}>{item}</p>)}
+                  {importErrors.length > 8 && <p>+{importErrors.length - 8} errores más</p>}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader><CardTitle>Crear tarea</CardTitle></CardHeader>
             <CardContent className="space-y-3">

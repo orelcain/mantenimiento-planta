@@ -7,6 +7,18 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.73] - 2026-02-13
+
+### 🔐 Gantt operativo en cloud + carga masiva desde Excel
+
+#### Fixes
+- **Permisos Firestore Gantt**: Se agregan reglas para `ganttTasks` y `ganttTaskComments`, corrigiendo el error runtime `Missing or insufficient permissions` en el módulo.
+- **Despliegue de reglas**: Reglas publicadas en el proyecto Firebase activo (`mantenimiento-planta-771a3`).
+
+#### Mejoras
+- **Importación de tareas desde Excel**: Nuevo apartado en `Planificador` para cargar archivos `.xlsx/.xls/.xlsm`, previsualizar resultados e importar tareas en lote.
+- **Mapeo operativo y jerárquico**: La pre-carga identifica título/estado/prioridad/avance/fechas y vincula equipo por nombre/código; cuando aplica, conserva contexto de área en `hierarchyPath` para timeline.
+
 ## [2.47.72] - 2026-02-13
 
 ### 🧭 Gantt fase 2 + estabilidad de despliegue y autosave

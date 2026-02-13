@@ -595,5 +595,56 @@ service cloud.firestore {
       allow update: if isSupervisor();
       allow delete: if isAdmin() || (isSupervisor() && resource.data.createdBy == request.auth.uid);
     }
+
+    // ============================================
+    // GANTT - Planificación de mantenimiento
+    // ============================================
+    match /ganttTasks/{taskId} {
+      allow read: if isActiveUser();
+
+      allow create: if isActiveUser()
+        && request.resource.data.titulo is string
+        && request.resource.data.titulo.size() >= 2
+        && request.resource.data.status in ['planificada', 'en_progreso', 'bloqueada', 'completada']
+        && request.resource.data.prioridad in ['critica', 'alta', 'media', 'baja']
+        && request.resource.data.startDate is timestamp
+        && request.resource.data.endDate is timestamp
+        && request.resource.data.createdBy == request.auth.uid;
+
+      allow update: if isActiveUser()
+        && (
+          isSupervisor()
+          || resource.data.createdBy == request.auth.uid
+          || (resource.data.responsibleUserId is string && resource.data.responsibleUserId == request.auth.uid)
+        );
+
+      allow delete: if isActiveUser()
+        && (
+          isSupervisor()
+          || resource.data.createdBy == request.auth.uid
+        );
+    }
+
+    match /ganttTaskComments/{commentId} {
+      allow read: if isActiveUser();
+
+      allow create: if isActiveUser()
+        && request.resource.data.taskId is string
+        && request.resource.data.content is string
+        && request.resource.data.content.size() > 0
+        && request.resource.data.createdBy == request.auth.uid;
+
+      allow update: if isActiveUser()
+        && (
+          isSupervisor()
+          || resource.data.createdBy == request.auth.uid
+        );
+
+      allow delete: if isActiveUser()
+        && (
+          isSupervisor()
+          || resource.data.createdBy == request.auth.uid
+        );
+    }
   }
 }
