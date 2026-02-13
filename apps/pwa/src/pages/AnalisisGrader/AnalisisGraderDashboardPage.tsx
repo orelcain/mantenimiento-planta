@@ -1320,6 +1320,50 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
     }
   }, [lotAnalysisView])
 
+  const wtStdDevTooltipProps = useMemo(() => {
+    const base = getTooltipProps('wt.stdDev')
+    const series = analytics.weightTrendSeries
+    if (series.length === 0) return base
+
+    const byPieces = [...series].sort((a, b) => b.pieces - a.pieces)
+    const mainInterval = byPieces[0]
+    const highestSigmaInterval = [...series].sort((a, b) => b.stdDevWeightGrams - a.stdDevWeightGrams)[0]
+    if (!mainInterval) return base
+
+    const intervalLabel = (iso: string) => new Date(iso).toLocaleTimeString('es-CL', {
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+
+    const makeExample = (item: typeof series[number]) => {
+      const avg = item.avgWeightGrams
+      const sigma = item.stdDevWeightGrams
+      const minBand = Math.max(0, avg - sigma)
+      const maxBand = avg + sigma
+      const cv = avg > 0 ? (sigma / avg) * 100 : 0
+
+      const variabilityLabel =
+        cv >= 20 ? 'muy alta dispersión' :
+        cv >= 12 ? 'dispersión media-alta' :
+        cv >= 8 ? 'dispersión media' :
+        'dispersión baja'
+
+      return `${intervalLabel(item.bucketStart)}: x̄=${avg.toLocaleString('es-CL', { maximumFractionDigits: 2 })}g, σ=${sigma.toLocaleString('es-CL', { maximumFractionDigits: 2 })}g, piezas=${item.pieces.toLocaleString('es-CL')}. Aproximadamente muchas piezas caen entre ${minBand.toLocaleString('es-CL', { maximumFractionDigits: 0 })}g y ${maxBand.toLocaleString('es-CL', { maximumFractionDigits: 0 })}g (CV≈${cv.toLocaleString('es-CL', { maximumFractionDigits: 1 })}%, ${variabilityLabel}).`
+    }
+
+    const mainExample = makeExample(mainInterval)
+    const secondExample =
+      highestSigmaInterval && highestSigmaInterval.bucketStart !== mainInterval.bucketStart
+        ? ` Intervalo más variable: ${makeExample(highestSigmaInterval)}`
+        : ''
+
+    return {
+      ...base,
+      text: 'Mide la variabilidad del peso en cada intervalo de tiempo. Se calcula con todas las piezas del intervalo, por eso el σ cambia fila a fila.',
+      example: `${mainExample}${secondExample}`,
+    }
+  }, [analytics.weightTrendSeries])
+
   return (
     <div
       ref={dashRef}
@@ -2810,7 +2854,7 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                           <th className="py-2 px-2 text-right">
                             <span className="flex items-center justify-end gap-1">
                               σ (g)
-                              <InfoTooltip {...getTooltipProps('wt.stdDev')} iconSize={12} />
+                              <InfoTooltip {...wtStdDevTooltipProps} iconSize={12} />
                             </span>
                           </th>
                           <th className="py-2 px-2 text-right">

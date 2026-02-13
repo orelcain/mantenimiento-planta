@@ -7,6 +7,16 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.54] - 2026-02-12
+
+### 📈 Tooltip σ contextual en tendencia por intervalo
+
+#### Mejoras
+- **Tooltip dinámico en `wt.stdDev`**: El hover de `σ (g)` en `Detalle por Intervalo` ahora usa datos reales de la serie de tendencia.
+- **Ejemplo explicativo con valores visibles**: Muestra `x̄`, `σ`, piezas del intervalo y banda aproximada `x̄ ± σ` para entender por qué aparece ese valor.
+- **Interpretación operativa**: Agrega `CV%` con etiqueta de dispersión (baja/media/alta) para facilitar lectura en planta.
+- **Comparativo automático**: Incluye también un ejemplo del intervalo más variable para contraste rápido.
+
 ## [2.47.53] - 2026-02-12
 
 ### 📐 Tooltip σ con ejemplo real por lote
