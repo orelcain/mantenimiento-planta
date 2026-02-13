@@ -1303,9 +1303,49 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
   const lotDispersionSummary = useMemo(() => {
     const high = lotDispersionView.filter((lot) => lot.cvPct >= 20)
     const mostVariable = [...lotDispersionView].sort((a, b) => b.cvPct - a.cvPct)[0]
-    const topSwapSuggestions = analytics.gateSwapSuggestions.slice(0, 2)
-    return { high, mostVariable, topSwapSuggestions }
-  }, [lotDispersionView, analytics.gateSwapSuggestions])
+    return { high, mostVariable }
+  }, [lotDispersionView])
+
+  const suggestedQualityByCalibre = useMemo(() => {
+    const qualityCountByCalibre = new Map<string, Map<string, number>>()
+    for (const gate of gates) {
+      if (!gate.active) continue
+      const byQuality = qualityCountByCalibre.get(gate.assignedCalibre) ?? new Map<string, number>()
+      byQuality.set(gate.assignedQuality, (byQuality.get(gate.assignedQuality) ?? 0) + 1)
+      qualityCountByCalibre.set(gate.assignedCalibre, byQuality)
+    }
+
+    const suggested = new Map<string, string>()
+    for (const [calibre, qualityMap] of qualityCountByCalibre.entries()) {
+      const best = Array.from(qualityMap.entries()).sort((a, b) => b[1] - a[1])[0]
+      if (best) suggested.set(calibre, best[0])
+    }
+    return suggested
+  }, [gates])
+
+  const directGateActions = useMemo(() => {
+    return analytics.gateSwapSuggestions.slice(0, 3).map((suggestion) => {
+      const gateCfg = gates.find((gate) => gate.gateNumber === suggestion.gateNumber)
+      const currentQuality = gateCfg?.assignedQuality ?? 'Unknown'
+      const targetQuality = (suggestedQualityByCalibre.get(suggestion.suggestedCalibre) ?? currentQuality) as string
+
+      if (suggestion.type === 'investigate') {
+        return {
+          gateNumber: suggestion.gateNumber,
+          text: `Gate ${suggestion.gateNumber}: mantener calibre ${suggestion.currentCalibre} y calidad ${currentQuality}; revisar variabilidad/mismatch (${suggestion.impactScore}%).`,
+        }
+      }
+
+      const qualityText = targetQuality !== currentQuality
+        ? `${currentQuality} → ${targetQuality}`
+        : `${currentQuality} (mantener)`
+
+      return {
+        gateNumber: suggestion.gateNumber,
+        text: `Gate ${suggestion.gateNumber}: cambiar calibre ${suggestion.currentCalibre} → ${suggestion.suggestedCalibre} y calidad ${qualityText}.`,
+      }
+    })
+  }, [analytics.gateSwapSuggestions, gates, suggestedQualityByCalibre])
 
   const lotStdDevTooltipProps = useMemo(() => {
     const base = getTooltipProps('lot.stdDev')
@@ -2775,13 +2815,17 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack 
                     )}
                     {lotDispersionSummary.high.length > 0 && (
                       <p>
-                        Recomendación: hay {lotDispersionSummary.high.length} lote(s) en zona roja. Evalúe separar operación por lote y priorizar ajuste de gates para el calibre dominante.
+                        Recomendación directa: hay {lotDispersionSummary.high.length} lote(s) en zona roja. Aplique primero los cambios de gates sugeridos abajo.
                       </p>
                     )}
-                    {lotDispersionSummary.topSwapSuggestions.length > 0 && (
-                      <p>
-                        Sugerencia gates: {lotDispersionSummary.topSwapSuggestions[0]?.reason}
-                      </p>
+                    {directGateActions.length > 0 && (
+                      <div className="space-y-1">
+                        <p className="font-medium text-foreground">Cambios sugeridos (configuración actual):</p>
+                        {directGateActions.map((action) => (
+                          <p key={action.gateNumber}>• {action.text}</p>
+                        ))}
+                        <p className="text-[11px]">Estas sugerencias se recalculan automáticamente cuando modifica gates en Configuración y vuelve al Dashboard.</p>
+                      </div>
                     )}
                   </div>
                 </CardContent>

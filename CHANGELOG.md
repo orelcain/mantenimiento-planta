@@ -7,6 +7,16 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.59] - 2026-02-12
+
+### 🎯 Sugerencias directas de cambio por gate
+
+#### Mejoras
+- **Acción explícita por compuerta**: En dispersión por lote, las recomendaciones ahora se muestran en formato directo: `Gate X: cambiar calibre A → B y calidad ...`.
+- **Calidad incluida en la instrucción**: Cada sugerencia indica calidad actual y calidad sugerida/mantenida para ejecutar ajuste operativo completo.
+- **Top acciones priorizadas**: Se muestran hasta 3 cambios con mayor impacto para facilitar ejecución rápida en planta.
+- **Recálculo con configuración actual**: Al cambiar gates en Configuración y volver al Dashboard, las sugerencias se regeneran automáticamente con los nuevos valores.
+
 ## [2.47.58] - 2026-02-12
 
 ### 📊 Dispersión CV por lote + tooltips estadísticos pedagógicos
