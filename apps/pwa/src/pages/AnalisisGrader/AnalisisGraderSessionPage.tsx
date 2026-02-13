@@ -101,6 +101,9 @@ export function AnalisisGraderSessionPage() {
         gates={session.gatesConfigSnapshot}
         config={session.aggregates.config}
         onBack={() => navigate('/analisis-grader')}
+        analyticsOverride={session.aggregates}
+        insightsOverride={session.insights}
+        initialAIOutput={session.aiOutput ?? null}
       />
     </div>
   )

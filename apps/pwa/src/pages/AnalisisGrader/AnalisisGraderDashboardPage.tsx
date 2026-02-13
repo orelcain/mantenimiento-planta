@@ -184,6 +184,62 @@ function linearRegressionPredict(points: Array<{ x: number; y: number }>, x: num
   return intercept + (slope * x)
 }
 
+function normalizeRecommendationText(value: string): string {
+  return value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function buildRecommendationTokenSet(actions: AIGraderOutput['recommendedActions']): Set<string> {
+  const tokenSet = new Set<string>()
+  actions.forEach((action) => {
+    normalizeRecommendationText(`${action.action} ${action.why}`)
+      .split(' ')
+      .filter((token) => token.length > 3)
+      .forEach((token) => tokenSet.add(token))
+  })
+  return tokenSet
+}
+
+function computeRecommendationConsistency(
+  latest?: AIGraderOutput,
+  previous?: AIGraderOutput,
+): { score: number; level: 'alta' | 'media' | 'baja'; note: string } | null {
+  if (!latest || !previous) return null
+  const latestSet = buildRecommendationTokenSet(latest.recommendedActions.slice(0, 4))
+  const previousSet = buildRecommendationTokenSet(previous.recommendedActions.slice(0, 4))
+  const union = new Set([...latestSet, ...previousSet])
+  if (union.size === 0) {
+    return { score: 100, level: 'alta', note: 'Las corridas no traen acciones comparables todavía.' }
+  }
+  let intersectionCount = 0
+  for (const token of latestSet) {
+    if (previousSet.has(token)) intersectionCount += 1
+  }
+  const score = round2((intersectionCount / union.size) * 100)
+  if (score >= 70) {
+    return { score, level: 'alta', note: 'Las recomendaciones se mantienen estables entre corridas.' }
+  }
+  if (score >= 40) {
+    return { score, level: 'media', note: 'Hay cambios parciales; conviene validar en terreno antes de aplicar.' }
+  }
+  return { score, level: 'baja', note: 'Cambió mucho entre corridas; tomar como hipótesis y corroborar con datos de planta.' }
+}
+
+function hasExplicitSourceInWhy(why: string): boolean {
+  return /(fuente|origen|dato|datos|m[eé]trica|mismatch|cv|proyecci[oó]n|gate|punto cero|serie temporal|evidencia)/i.test(why)
+}
+
+interface AITrendRun {
+  id: string
+  createdAtIso: string
+  output: AIGraderOutput
+}
+
 interface Props {
   parsedData: ParsedMatrixData
   gates: GateAssignment[]
@@ -192,6 +248,9 @@ interface Props {
   onApplyGateSuggestion?: (payload: { gateNumber: number; calibre: string; quality: string }) => void
   onUpdatePointZeroWarnThreshold?: (value: number) => void
   onUpdatePointZeroCriticalThreshold?: (value: number) => void
+  analyticsOverride?: GraderAnalyticsResult
+  insightsOverride?: DeterministicInsight[]
+  initialAIOutput?: AIGraderOutput | null
 }
 
 interface PinnedPatternPoint {
@@ -211,12 +270,13 @@ interface PinnedPatternPoint {
 const PIN_CARD_WIDTH = 224
 const PIN_CARD_PADDING = 8
 
-export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack, onApplyGateSuggestion, onUpdatePointZeroWarnThreshold, onUpdatePointZeroCriticalThreshold }: Props) {
+export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack, onApplyGateSuggestion, onUpdatePointZeroWarnThreshold, onUpdatePointZeroCriticalThreshold, analyticsOverride, insightsOverride, initialAIOutput }: Props) {
   const user = useAuthStore((s) => s.user)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [aiLoading, setAiLoading] = useState(false)
-  const [aiOutput, setAiOutput] = useState<AIGraderOutput | null>(null)
+  const [aiOutput, setAiOutput] = useState<AIGraderOutput | null>(initialAIOutput ?? null)
+  const [aiTrendRuns, setAiTrendRuns] = useState<AITrendRun[]>([])
   const [aiError, setAiError] = useState<string | null>(null)
   const [aiRawText, setAiRawText] = useState<string | null>(null)
   const [reportMode, setReportMode] = useState<'light' | 'dark'>('dark')
@@ -266,15 +326,25 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
   }, [getPointZeroSeverity])
 
   // Compute analytics
-  const analytics = useMemo<GraderAnalyticsResult>(
+  const computedAnalytics = useMemo<GraderAnalyticsResult>(
     () => computeAnalytics(parsedData, config, gates),
     [parsedData, config, gates],
   )
 
-  const insights = useMemo<DeterministicInsight[]>(
+  const analytics = analyticsOverride ?? computedAnalytics
+
+  const computedInsights = useMemo<DeterministicInsight[]>(
     () => computeDeterministicInsights(analytics),
     [analytics],
   )
+
+  const insights = insightsOverride ?? computedInsights
+
+  useEffect(() => {
+    if (initialAIOutput) {
+      setAiOutput(initialAIOutput)
+    }
+  }, [initialAIOutput])
 
   const trend = useMemo(() => computePointZeroTrend(analytics), [analytics])
   const avgWeightCalibre = useMemo(() => getCalibreByWeightGrams(analytics.kpis.avgWeightGrams), [analytics.kpis.avgWeightGrams])
@@ -812,12 +882,22 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
     try {
       const result = await analyzeGrader(payload)
       setAiOutput(result)
+      setAiTrendRuns((prev) => [{
+        id: crypto.randomUUID(),
+        createdAtIso: new Date().toISOString(),
+        output: result,
+      }, ...prev].slice(0, 5))
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       // Try to parse as raw text
       const parsed = parseAIResponse(msg)
       if (parsed.parsed) {
         setAiOutput(parsed.parsed)
+        setAiTrendRuns((prev) => [{
+          id: crypto.randomUUID(),
+          createdAtIso: new Date().toISOString(),
+          output: parsed.parsed,
+        }, ...prev].slice(0, 5))
       } else {
         setAiError(parsed.error || msg)
         setAiRawText(parsed.rawText || null)
@@ -1658,13 +1738,73 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
       }))
   }, [directGateActions, getPointZeroSeverity, pointZeroCriticalThreshold, pointZeroWarnThreshold, trendForecastView])
 
-  const trendAIRecommendations = useMemo(() => {
-    if (!aiOutput) return [] as string[]
-    return aiOutput.recommendedActions.slice(0, 2).map((action) => {
-      const pr = action.priority === 'high' ? 'alta' : action.priority === 'medium' ? 'media' : 'baja'
-      return `Prioridad ${pr}: ${action.action} — ${action.why}`
+  const trendAIRuns = useMemo(() => {
+    return aiTrendRuns.slice(0, 3).map((run, index) => ({
+      ...run,
+      runLabel: `Corrida ${aiTrendRuns.length - index}`,
+      recommendations: run.output.recommendedActions.slice(0, 3),
+    }))
+  }, [aiTrendRuns])
+
+  const trendAIConsistency = useMemo(() => {
+    const latest = aiTrendRuns[0]?.output
+    const previous = aiTrendRuns[1]?.output
+    return computeRecommendationConsistency(latest, previous)
+  }, [aiTrendRuns])
+
+  const trendAIDiffRows = useMemo(() => {
+    if (aiTrendRuns.length < 2) return [] as Array<{
+      slot: string
+      prevAction: string
+      newAction: string
+      prevWhy: string
+      newWhy: string
+      changeType: 'igual' | 'ajustada' | 'nueva' | 'eliminada'
+    }>
+
+    const latest = aiTrendRuns[0]?.output.recommendedActions ?? []
+    const previous = aiTrendRuns[1]?.output.recommendedActions ?? []
+    const maxItems = Math.min(3, Math.max(latest.length, previous.length))
+
+    const rows = Array.from({ length: maxItems }).map((_, idx) => {
+      const prev = previous[idx]
+      const next = latest[idx]
+
+      const prevActionText = prev
+        ? `(${prev.priority}) ${prev.action}`
+        : '—'
+      const newActionText = next
+        ? `(${next.priority}) ${next.action}`
+        : '—'
+
+      const prevWhyText = prev?.why ?? '—'
+      const newWhyText = next?.why ?? '—'
+
+      let changeType: 'igual' | 'ajustada' | 'nueva' | 'eliminada' = 'igual'
+      if (!prev && next) {
+        changeType = 'nueva'
+      } else if (prev && !next) {
+        changeType = 'eliminada'
+      } else {
+        const actionChanged = normalizeRecommendationText(prev?.action ?? '') !== normalizeRecommendationText(next?.action ?? '')
+        const whyChanged = normalizeRecommendationText(prev?.why ?? '') !== normalizeRecommendationText(next?.why ?? '')
+        if (actionChanged || whyChanged) {
+          changeType = 'ajustada'
+        }
+      }
+
+      return {
+        slot: `Acción ${idx + 1}`,
+        prevAction: prevActionText,
+        newAction: newActionText,
+        prevWhy: prevWhyText,
+        newWhy: newWhyText,
+        changeType,
+      }
     })
-  }, [aiOutput])
+
+    return rows
+  }, [aiTrendRuns])
 
   return (
     <div
@@ -3299,19 +3439,109 @@ export function AnalisisGraderDashboardPage({ parsedData, gates, config, onBack,
                   </div>
 
                   <div className="space-y-1.5">
-                    <p className="text-xs font-medium">IA (Grok)</p>
-                    {trendAIRecommendations.length > 0 ? (
-                      trendAIRecommendations.map((text, idx) => (
-                        <p key={`trend-ai-${idx}`} className="text-xs">• {text}</p>
-                      ))
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <p className="text-xs text-muted-foreground">Aún no hay recomendación IA para este turno.</p>
-                        <Button size="sm" variant="outline" onClick={handleAnalyzeAI} disabled={aiLoading} className="h-7 px-2 text-[11px]">
-                          {aiLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Brain className="h-3.5 w-3.5 mr-1" />}
-                          Analizar ahora
-                        </Button>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-medium">IA (Grok)</p>
+                      <Button size="sm" variant="outline" onClick={handleAnalyzeAI} disabled={aiLoading} className="h-7 px-2 text-[11px]">
+                        {aiLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Brain className="h-3.5 w-3.5 mr-1" />}
+                        {trendAIRuns.length > 0 ? 'Analizar otra vez' : 'Analizar ahora'}
+                      </Button>
+                    </div>
+
+                    {trendAIConsistency && (
+                      <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/20 px-2 py-1.5">
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            'text-[10px]',
+                            trendAIConsistency.level === 'alta' && 'border-emerald-500/40 text-emerald-600',
+                            trendAIConsistency.level === 'media' && 'border-amber-500/40 text-amber-600',
+                            trendAIConsistency.level === 'baja' && 'border-red-500/40 text-red-600',
+                          )}
+                        >
+                          Consistencia IA: {trendAIConsistency.level.toUpperCase()} ({trendAIConsistency.score}%)
+                        </Badge>
+                        <p className="text-[11px] text-muted-foreground">{trendAIConsistency.note}</p>
                       </div>
+                    )}
+
+                    {trendAIDiffRows.length > 0 && (
+                      <div className="rounded-md border bg-muted/20 p-2">
+                        <p className="text-[11px] font-medium mb-1">Comparación corrida anterior vs actual</p>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-[11px]">
+                            <thead>
+                              <tr className="border-b text-left text-muted-foreground">
+                                <th className="py-1 px-1.5">Ítem</th>
+                                <th className="py-1 px-1.5">Anterior</th>
+                                <th className="py-1 px-1.5">Actual</th>
+                                <th className="py-1 px-1.5">Cambio</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {trendAIDiffRows.map((row) => (
+                                <tr key={row.slot} className="border-b align-top">
+                                  <td className="py-1 px-1.5 font-medium whitespace-nowrap">{row.slot}</td>
+                                  <td className="py-1 px-1.5">
+                                    <p>{row.prevAction}</p>
+                                    <p className="text-muted-foreground">{row.prevWhy}</p>
+                                  </td>
+                                  <td className="py-1 px-1.5">
+                                    <p>{row.newAction}</p>
+                                    <p className="text-muted-foreground">{row.newWhy}</p>
+                                  </td>
+                                  <td className="py-1 px-1.5">
+                                    <Badge
+                                      variant="outline"
+                                      className={cn(
+                                        'text-[10px]',
+                                        row.changeType === 'igual' && 'border-emerald-500/40 text-emerald-600',
+                                        row.changeType === 'ajustada' && 'border-amber-500/40 text-amber-600',
+                                        row.changeType === 'nueva' && 'border-sky-500/40 text-sky-600',
+                                        row.changeType === 'eliminada' && 'border-red-500/40 text-red-600',
+                                      )}
+                                    >
+                                      {row.changeType}
+                                    </Badge>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+
+                    {trendAIRuns.length > 0 ? (
+                      <div className="space-y-2">
+                        {trendAIRuns.map((run) => (
+                          <div key={run.id} className="rounded-md border bg-muted/20 p-2 space-y-1.5">
+                            <p className="text-[11px] text-muted-foreground">
+                              {run.runLabel} · {new Date(run.createdAtIso).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                            {run.recommendations.length > 0 ? (
+                              run.recommendations.map((action, idx) => {
+                                const pr = action.priority === 'high' ? 'alta' : action.priority === 'medium' ? 'media' : 'baja'
+                                const hasSource = hasExplicitSourceInWhy(action.why)
+                                return (
+                                  <div key={`${run.id}-${idx}`} className="text-xs space-y-0.5">
+                                    <p>• Prioridad {pr}: {action.action}</p>
+                                    <p className="text-muted-foreground">{action.why}</p>
+                                    {!hasSource && (
+                                      <p className="text-[11px] text-amber-600">
+                                        ⚠ Falta fuente explícita de datos en la justificación; vuelva a analizar si necesita mayor trazabilidad.
+                                      </p>
+                                    )}
+                                  </div>
+                                )
+                              })
+                            ) : (
+                              <p className="text-xs text-muted-foreground">Sin acciones sugeridas en esta corrida.</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">Aún no hay recomendación IA para este turno.</p>
                     )}
                   </div>
                 </CardContent>

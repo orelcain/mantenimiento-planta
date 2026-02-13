@@ -51,7 +51,7 @@ const SYSTEM_PROMPT = [
   '    {',
   '      "action": "acción concreta",',
   '      "priority": "low|medium|high",',
-  '      "why": "justificación con datos"',
+  '      "why": "justificación con datos, SIEMPRE indicando fuente/origen de la métrica usada"',
   '    }',
   '  ],',
   '  "whatToCheckNext": ["verificación 1", "verificación 2"],',
@@ -60,6 +60,9 @@ const SYSTEM_PROMPT = [
   '',
   'REGLAS ESTRICTAS:',
   '- SIEMPRE incluir datos numéricos en evidence y why.',
+  '- SIEMPRE explicar de dónde sale cada número clave (ej: Gate 4 mismatch=18.2% en ESTADÍSTICAS POR GATE; Punto Cero proyectado=3.8% en PROYECCIÓN DE CIERRE).',
+  '- Si mencionas "impacto" o un score (ej: 50, 60), DEBES explicar qué significa, escala y fuente (ej: impactScore 0-100 de SUGERENCIAS DE REASIGNACIÓN).',
+  '- NO uses números sin contexto o sin unidad (% , pz, score 0-100).',
   '- NO inventar datos que no estén en el input.',
   '- Priorizar causas raíz sobre síntomas.',
   '- Si la data es incompleta, mencionarlo explícitamente.',
@@ -142,6 +145,7 @@ function buildPrompt(p: AIGraderInput): string {
   if (p.gateSwapSuggestions && p.gateSwapSuggestions.length > 0) {
     lines.push('')
     lines.push('=== SUGERENCIAS DE REASIGNACIÓN (automáticas) ===')
+    lines.push('  Nota: impactScore es un score heurístico de urgencia/beneficio de 0 a 100 (mayor = mayor impacto esperado).')
     for (const s of p.gateSwapSuggestions) {
       lines.push('  [' + s.type + '] Gate ' + s.gateNumber + ': ' + s.currentCalibre + ' -> ' + s.suggestedCalibre + ' (impacto: ' + s.impactScore + ')')
       lines.push('    Razón: ' + s.reason)
@@ -240,7 +244,7 @@ function buildPrompt(p: AIGraderInput): string {
   }
 
   lines.push('')
-  lines.push('Analiza estos datos como analista estadístico senior. Responde SOLO JSON.')
+  lines.push('Analiza estos datos como analista estadístico senior. En cada acción recomendada, deja trazabilidad explícita (métrica + valor + sección origen). Responde SOLO JSON.')
   return lines.join('\n')
 }
 

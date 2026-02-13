@@ -10,6 +10,7 @@ import {
   setDoc,
   deleteDoc,
   query,
+  where,
   orderBy,
   limit,
   serverTimestamp,
@@ -23,9 +24,11 @@ import type {
   AIGraderOutput,
   UploadedMatrixFile,
   GateAssignment,
+  GraderAnalysisConfig,
 } from './types'
 
 const COLLECTION = 'graderAnalysisSessions'
+const DRAFTS_COLLECTION = 'graderAnalysisDrafts'
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   if (Object.prototype.toString.call(value) !== '[object Object]') return false
@@ -108,6 +111,82 @@ export async function listGraderSessions(max = 50): Promise<GraderSession[]> {
 
 export async function deleteGraderSession(sessionId: string): Promise<void> {
   await deleteDoc(doc(db, COLLECTION, sessionId))
+}
+
+// ============================================================================
+// CLOUD AUTOSAVE DRAFTS
+// ============================================================================
+
+export interface GraderAutosaveDraft {
+  id: string
+  createdBy: string
+  deviceId?: string
+  shiftId?: string
+  sessionDate?: string
+  config: GraderAnalysisConfig
+  gatesConfigSnapshot: GateAssignment[]
+  currentStep?: 'config' | 'dashboard'
+  updatedAt: string
+}
+
+function sanitizeIdPart(value?: string): string {
+  if (!value) return 'na'
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 64) || 'na'
+}
+
+function buildDraftId(params: { createdBy: string; deviceId?: string; shiftId?: string; sessionDate?: string }): string {
+  const user = sanitizeIdPart(params.createdBy)
+  const device = sanitizeIdPart(params.deviceId)
+  const shift = sanitizeIdPart(params.shiftId)
+  const date = sanitizeIdPart(params.sessionDate)
+  return `${user}__${device}__${shift}__${date}`
+}
+
+export async function saveGraderAutosaveDraft(params: {
+  createdBy: string
+  deviceId?: string
+  shiftId?: string
+  sessionDate?: string
+  config: GraderAnalysisConfig
+  gatesConfigSnapshot: GateAssignment[]
+  currentStep?: 'config' | 'dashboard'
+}): Promise<GraderAutosaveDraft> {
+  const id = buildDraftId(params)
+  const draft: GraderAutosaveDraft = {
+    id,
+    createdBy: params.createdBy,
+    deviceId: params.deviceId,
+    shiftId: params.shiftId,
+    sessionDate: params.sessionDate,
+    config: params.config,
+    gatesConfigSnapshot: params.gatesConfigSnapshot,
+    currentStep: params.currentStep,
+    updatedAt: new Date().toISOString(),
+  }
+
+  const firestoreData = deepCleanUndefined({
+    ...draft,
+    _updatedAt: serverTimestamp(),
+  })
+  await setDoc(doc(db, DRAFTS_COLLECTION, id), firestoreData)
+  return draft
+}
+
+export async function getLatestGraderAutosaveDraft(createdBy: string): Promise<GraderAutosaveDraft | null> {
+  const q = query(
+    collection(db, DRAFTS_COLLECTION),
+    where('createdBy', '==', createdBy),
+    orderBy('_updatedAt', 'desc'),
+    limit(1),
+  )
+  const snap = await getDocs(q)
+  if (snap.empty) return null
+  return snap.docs[0]?.data() as GraderAutosaveDraft
 }
 
 // ============================================================================

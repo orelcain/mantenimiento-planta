@@ -7,6 +7,22 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.71] - 2026-02-13
+
+### 💾 Sesiones confiables + autosave híbrido costo/operación
+
+#### Mejoras
+- **Sesión guardada consistente**: La vista `Sesión Guardada` ahora reutiliza `aggregates/insights/aiOutput` persistidos, evitando recálculos con data vacía al recargar.
+- **Persistencia automática de trabajo**: Gates y configuración del wizard se restauran automáticamente (respaldo local + borrador cloud).
+- **IA en Tendencia más auditable**: Se permite re-ejecutar IA múltiples veces, guardar corridas recientes, ver consistencia entre corridas y comparar `anterior vs actual`.
+- **Trazabilidad IA reforzada**: El prompt exige explicar origen de métricas y significado de `impacto/score` en cada recomendación.
+- **Modo de autoguardado configurable**: Nuevo selector `Modo normal` / `Modo ahorro` en cabecera con preferencia persistida.
+- **Control de costo explícito**: Tooltip del modo incluye tiempos de política y estimación de `writes/hora` para decisión operativa.
+
+#### Cost/UX
+- **Default inteligente por entorno**: Producción inicia en `modo normal`; desarrollo/emulador inicia en `modo ahorro`.
+- **Flujo híbrido operativo**: Guardado cloud forzado al pasar de `Config` a `Dashboard`, con throttling/debounce para reducir writes sin perder continuidad.
+
 ## [2.47.70] - 2026-02-13
 
 ### 🏷️ Etiqueta de estado en KPIs de peso
