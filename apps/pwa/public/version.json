@@ -1,8 +1,12 @@
 {
-  "version": "2.47.88",
+  "version": "2.47.89",
   "buildDate": "2026-02-14",
-  "buildTimestamp": 1771079400000,
+  "buildTimestamp": 1771083000000,
   "features": [
+    "Auto-scheduling extendido en timeline para dependencias FS/SS/FF/SF con lag horario",
+    "Calendario laboral básico en timeline: opción Solo días hábiles (L-V) para planificación operativa",
+    "Snapping configurable de arrastre (auto, 1h, 6h, 12h, 1 día) para edición fina o gruesa",
+    "Tooltip en drag/resize con rango temporal y duración para feedback inmediato tipo GanttPRO",
     "Asignación rápida de duración en timeline por unidad (horas o días) desde modal PWA",
     "Reporte técnico de tiempo real (horas) en comentarios de tarea para trazabilidad operativa",
     "Auto-extensión de barra cuando el tiempo real reportado supera la duración planificada",

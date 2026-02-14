@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.47.88**
+## Versión Actual: **v2.47.89**
 
 **Fecha de lanzamiento**: 14 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,12 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.47.89 - Dependencias avanzadas + calendario hábil + snap (14/02/2026)
+- 🔗 **Auto-scheduling completo**: Propagación con dependencias `FS/SS/FF/SF` y `lag` en horas.
+- 📅 **Calendario laboral básico**: opción de trabajar en modo `Solo días hábiles (L-V)`.
+- 🧲 **Snap configurable**: control de precisión del drag (`auto`, `1h`, `6h`, `12h`, `1 día`).
+- 🧾 **Tooltip de arrastre**: visualización en vivo de inicio/fin y duración para ajustes más seguros.
 
 ### v2.47.88 - Duración planificada y tiempo real técnico (14/02/2026)
 - ⏱️ **Duración por horas o días**: el modal rápido permite aplicar duración usando unidad de tiempo según necesidad operativa.

@@ -7,6 +7,16 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.89] - 2026-02-14
+
+### 🧭 Evolución GanttPRO: dependencia, calendario y snap
+
+#### Mejoras
+- **Dependencias avanzadas**: auto-scheduling ahora considera `FS`, `SS`, `FF` y `SF` con `lagHours`.
+- **Calendario hábil**: nuevo modo `Solo días hábiles (L-V)` para planificar sin caer en fin de semana.
+- **Snap configurable**: arrastre/redimensión con granularidad `auto`, `1h`, `6h`, `12h` o `1 día`.
+- **Feedback de drag**: tooltip temporal sobre la barra mostrando rango y duración mientras se mueve.
+
 ## [2.47.88] - 2026-02-14
 
 ### ⏱️ Duración plan vs real en Timeline

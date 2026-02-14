@@ -202,6 +202,42 @@ function toInputDate(date: Date) {
   return local.toISOString().slice(0, 16)
 }
 
+function isWeekend(date: Date) {
+  const day = date.getDay()
+  return day === 0 || day === 6
+}
+
+function moveToWorkingDay(ms: number, direction: 1 | -1 = 1) {
+  const next = new Date(ms)
+  while (isWeekend(next)) {
+    next.setDate(next.getDate() + direction)
+  }
+  return next.getTime()
+}
+
+function addWorkingDays(startMs: number, workDays: number) {
+  const cursor = new Date(startMs)
+  let remaining = Math.max(0, Math.floor(workDays))
+
+  while (remaining > 0) {
+    cursor.setDate(cursor.getDate() + 1)
+    if (isWeekend(cursor)) continue
+    remaining -= 1
+  }
+
+  return cursor.getTime()
+}
+
+function formatTimelineDragDate(date: Date) {
+  return date.toLocaleString('es-CL', {
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+}
+
 function suggestedRiskForEquipmentStatus(estado?: Equipment['estado']): GanttTask['predictiveRiskLevel'] {
   if (estado === 'fuera_servicio') return 'critico'
   if (estado === 'en_mantenimiento') return 'alto'
@@ -236,6 +272,8 @@ export function GanttPlannerPage() {
   const [timelineEquipmentSearch, setTimelineEquipmentSearch] = useState('')
   const [timelineTaskSearch, setTimelineTaskSearch] = useState('')
   const [timelineZoom, setTimelineZoom] = useState<'day' | 'week' | 'month'>('week')
+  const [timelineWorkCalendar, setTimelineWorkCalendar] = useState<'all' | 'workdays'>('all')
+  const [timelineSnapHours, setTimelineSnapHours] = useState<'auto' | '1' | '6' | '12' | '24'>('auto')
   const [assignmentFilter, setAssignmentFilter] = useState<'all' | 'mine' | 'unassigned'>('all')
   const [technicians, setTechnicians] = useState<User[]>([])
 
@@ -590,28 +628,38 @@ export function GanttPlannerPage() {
 
   const timelineDependencyLines = useMemo(() => {
     const byId = new Map(timelineRows.map((row) => [row.task.id, row]))
-    const lines: Array<{ key: string; left: number; top: number; width: number; height: number }> = []
+    const lines: Array<{ key: string; left: number; top: number; width: number; height: number; depType: 'FS' | 'SS' | 'FF' | 'SF' }> = []
 
     timelineRows.forEach((row) => {
       row.task.dependencies
-        .filter((dependency) => dependency.type === 'FS')
         .forEach((dependency, index) => {
           const predecessor = byId.get(dependency.predecessorId)
           if (!predecessor) return
 
-          const fromX = predecessor.left + predecessor.width
-          const toX = row.left
+          const predecessorStartX = predecessor.left
+          const predecessorEndX = predecessor.left + predecessor.width
+          const successorStartX = row.left
+          const successorEndX = row.left + row.width
+
+          const fromX = dependency.type === 'FS' || dependency.type === 'FF'
+            ? predecessorEndX
+            : predecessorStartX
+          const toX = dependency.type === 'FS' || dependency.type === 'SS'
+            ? successorStartX
+            : successorEndX
+
           const top = Math.min(predecessor.rowIndex, row.rowIndex) * 44 + 22
           const height = Math.abs(row.rowIndex - predecessor.rowIndex) * 44
           const width = Math.max(8, Math.abs(toX - fromX))
           const left = Math.min(fromX, toX)
 
           lines.push({
-            key: `${row.task.id}-${dependency.predecessorId}-${index}`,
+            key: `${row.task.id}-${dependency.predecessorId}-${dependency.type}-${index}`,
             left,
             top,
             width,
             height,
+            depType: dependency.type,
           })
         })
     })
@@ -625,15 +673,22 @@ export function GanttPlannerPage() {
   }, [selectedTask, selectedTaskId, timelineFilteredTasks])
 
   const getTimelineSnapMs = useCallback(() => {
+    if (timelineSnapHours !== 'auto') {
+      return Number(timelineSnapHours) * HOUR_MS
+    }
     if (timelineZoom === 'day') return HOUR_MS
     if (timelineZoom === 'week') return 6 * HOUR_MS
     return 12 * HOUR_MS
-  }, [timelineZoom])
+  }, [timelineSnapHours, timelineZoom])
 
   const alignTimelineMs = useCallback((ms: number) => {
     const snap = getTimelineSnapMs()
-    return Math.round(ms / snap) * snap
-  }, [getTimelineSnapMs])
+    const snapped = Math.round(ms / snap) * snap
+    if (timelineWorkCalendar === 'workdays') {
+      return moveToWorkingDay(snapped, 1)
+    }
+    return snapped
+  }, [getTimelineSnapMs, timelineWorkCalendar])
 
   const updateTimelineDragPreview = useCallback((clientX: number) => {
     setTimelineDrag((current) => {
@@ -679,18 +734,19 @@ export function GanttPlannerPage() {
       if (!currentTask || !currentWindow) continue
 
       tasks.forEach((candidate) => {
-        const fsDependencies = candidate.dependencies.filter(
-          (dependency) => dependency.type === 'FS' && dependency.predecessorId === currentId
+        const linkedDependencies = candidate.dependencies.filter(
+          (dependency) => dependency.predecessorId === currentId
         )
-        if (fsDependencies.length === 0) return
+        if (linkedDependencies.length === 0) return
 
         const candidateWindow = updates.get(candidate.id) ?? {
           startDate: candidate.startDate,
           endDate: candidate.endDate,
         }
 
+        const durationMs = Math.max(HOUR_MS, candidateWindow.endDate.getTime() - candidateWindow.startDate.getTime())
+
         const requiredStarts = candidate.dependencies
-          .filter((dependency) => dependency.type === 'FS')
           .map((dependency) => {
             const predecessorWindow = updates.get(dependency.predecessorId)
               ?? (() => {
@@ -699,15 +755,31 @@ export function GanttPlannerPage() {
                 return { startDate: predecessor.startDate, endDate: predecessor.endDate }
               })()
             if (!predecessorWindow) return candidateWindow.startDate.getTime()
+
             const lagMs = (dependency.lagHours ?? 0) * HOUR_MS
+
+            if (dependency.type === 'SS') {
+              return predecessorWindow.startDate.getTime() + lagMs
+            }
+
+            if (dependency.type === 'FF') {
+              return predecessorWindow.endDate.getTime() + lagMs - durationMs
+            }
+
+            if (dependency.type === 'SF') {
+              return predecessorWindow.startDate.getTime() + lagMs - durationMs
+            }
+
             return predecessorWindow.endDate.getTime() + lagMs
           })
 
         const requiredStartMs = Math.max(...requiredStarts)
-        if (candidateWindow.startDate.getTime() >= requiredStartMs) return
+        const alignedStartMs = timelineWorkCalendar === 'workdays'
+          ? moveToWorkingDay(alignTimelineMs(requiredStartMs), 1)
+          : alignTimelineMs(requiredStartMs)
+        if (candidateWindow.startDate.getTime() >= alignedStartMs) return
 
-        const durationMs = Math.max(HOUR_MS, candidateWindow.endDate.getTime() - candidateWindow.startDate.getTime())
-        const nextStart = new Date(alignTimelineMs(requiredStartMs))
+        const nextStart = new Date(alignedStartMs)
         const nextEnd = new Date(nextStart.getTime() + durationMs)
 
         updates.set(candidate.id, { startDate: nextStart, endDate: nextEnd })
@@ -729,7 +801,7 @@ export function GanttPlannerPage() {
     )
 
     await load()
-  }, [alignTimelineMs, canOperateTask, tasks])
+  }, [alignTimelineMs, canOperateTask, tasks, timelineWorkCalendar])
 
   function handleTimelineDragStart(task: GanttTask, mode: TimelineDragMode, clientX: number) {
     if (!canOperateTask(task)) return
@@ -796,12 +868,16 @@ export function GanttPlannerPage() {
       return
     }
 
-    const nextEnd = new Date(nextStart.getTime() + hours * HOUR_MS)
+    const daysFromInput = Number(timelineQuickDays.replace(',', '.'))
+    const usesWorkingDays = timelineWorkCalendar === 'workdays' && timelineQuickDurationUnit === 'days' && Number.isFinite(daysFromInput) && daysFromInput > 0
+    const nextEnd = usesWorkingDays
+      ? new Date(addWorkingDays(nextStart.getTime(), Math.max(1, Math.round(daysFromInput))))
+      : new Date(nextStart.getTime() + hours * HOUR_MS)
     setTimelineQuickEnd(toInputDate(nextEnd))
     setTimelineQuickHours(String(Math.max(1, Math.round(hours))))
     setTimelineQuickDays(String(Math.max(1, Math.ceil(hours / 24))))
     await handleUpdateTaskDates(selectedTimelineTask, nextStart, nextEnd)
-  }, [handleUpdateTaskDates, selectedTimelineTask, timelineQuickDays, timelineQuickDurationUnit, timelineQuickHours, timelineQuickStart])
+  }, [handleUpdateTaskDates, selectedTimelineTask, timelineQuickDays, timelineQuickDurationUnit, timelineQuickHours, timelineQuickStart, timelineWorkCalendar])
 
   async function handleTimelineQuickAssignUser() {
     if (!selectedTimelineTask) return
@@ -1504,8 +1580,34 @@ export function GanttPlannerPage() {
                 <Button size="sm" variant={timelineZoom === 'week' ? 'default' : 'outline'} onClick={() => setTimelineZoom('week')}>Semana</Button>
                 <Button size="sm" variant={timelineZoom === 'month' ? 'default' : 'outline'} onClick={() => setTimelineZoom('month')}>Mes</Button>
               </div>
-              <Badge variant="outline">⚡ Auto-scheduling FS</Badge>
+              <Badge variant="outline">⚡ Auto-scheduling FS/SS/FF/SF</Badge>
               <Badge variant="outline">📍 Línea de hoy + Baseline</Badge>
+            </div>
+
+            <div className="grid gap-2 md:grid-cols-2">
+              <div>
+                <Label className="text-xs text-muted-foreground">Calendario</Label>
+                <Select value={timelineWorkCalendar} onValueChange={(value) => setTimelineWorkCalendar(value as 'all' | 'workdays')}>
+                  <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los días</SelectItem>
+                    <SelectItem value="workdays">Solo días hábiles (L-V)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Snap de arrastre</Label>
+                <Select value={timelineSnapHours} onValueChange={(value) => setTimelineSnapHours(value as 'auto' | '1' | '6' | '12' | '24')}>
+                  <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="auto">Auto por zoom</SelectItem>
+                    <SelectItem value="1">1 hora</SelectItem>
+                    <SelectItem value="6">6 horas</SelectItem>
+                    <SelectItem value="12">12 horas</SelectItem>
+                    <SelectItem value="24">1 día</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             <div className="grid gap-2 md:grid-cols-[160px_1fr_auto] md:items-end">
@@ -1521,7 +1623,7 @@ export function GanttPlannerPage() {
               <div className="text-xs text-muted-foreground flex items-center gap-3 pb-1">
                 <span className="inline-flex items-center gap-1"><span className="h-2 w-4 rounded bg-primary" /> Barra real</span>
                 <span className="inline-flex items-center gap-1"><span className="h-2 w-4 rounded bg-muted-foreground/60" /> Baseline</span>
-                <span className="inline-flex items-center gap-1"><span className="h-2 w-4 rounded bg-primary/60" /> Dependencia FS</span>
+                <span className="inline-flex items-center gap-1"><span className="h-2 w-4 rounded bg-primary/60" /> Dependencias FS/SS/FF/SF</span>
                 <span className="inline-flex items-center gap-1"><span className="h-3 w-[2px] bg-red-500" /> Hoy</span>
               </div>
               <Button size="sm" variant="outline" onClick={() => setTimelineCollapsed((prev) => !prev)}>
@@ -1673,9 +1775,16 @@ export function GanttPlannerPage() {
 
                       {timelineDependencyLines.map((line) => (
                         <div key={`dep-${line.key}`} className="pointer-events-none">
-                          <div className="absolute h-[2px] bg-primary/60" style={{ left: `${line.left}px`, top: `${line.top}px`, width: `${line.width}px` }} />
+                          <div
+                            className={`absolute ${line.depType === 'FS' ? 'h-[2px] bg-primary/60' : 'h-[1px] bg-primary/40'}`}
+                            style={{ left: `${line.left}px`, top: `${line.top}px`, width: `${line.width}px` }}
+                            title={`Dependencia ${line.depType}`}
+                          />
                           {line.height > 0 && (
-                            <div className="absolute w-[2px] bg-primary/60" style={{ left: `${line.left + line.width}px`, top: `${line.top}px`, height: `${line.height}px` }} />
+                            <div
+                              className={`absolute ${line.depType === 'FS' ? 'w-[2px] bg-primary/60' : 'w-[1px] bg-primary/40'}`}
+                              style={{ left: `${line.left + line.width}px`, top: `${line.top}px`, height: `${line.height}px` }}
+                            />
                           )}
                         </div>
                       ))}
@@ -1706,6 +1815,16 @@ export function GanttPlannerPage() {
                             }}
                             title={row.interactive ? 'Arrastrar para mover fechas' : 'Sin permisos para mover'}
                           />
+                          {timelineDrag?.taskId === row.task.id && (
+                            <div
+                              className="absolute z-20 -translate-x-1/2 rounded border bg-background px-2 py-1 text-[10px] text-foreground shadow"
+                              style={{ left: `${row.left + row.width / 2}px`, top: `${Math.max(0, row.rowIndex * 44 - 8)}px` }}
+                            >
+                              {formatTimelineDragDate(new Date(timelineDrag.previewStartMs))} → {formatTimelineDragDate(new Date(timelineDrag.previewEndMs))}
+                              {' · '}
+                              {Math.max(1, Math.round((timelineDrag.previewEndMs - timelineDrag.previewStartMs) / HOUR_MS))}h
+                            </div>
+                          )}
                           {row.interactive && (
                             <>
                               <div
