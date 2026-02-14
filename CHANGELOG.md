@@ -7,6 +7,15 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.00] - 2026-02-14
+
+### 🧭 Dependencias visuales tipo GanttPRO (flecha + codo)
+
+#### Mejoras
+- **Dirección clara origen→destino**: líneas de dependencia ahora muestran punta de flecha para lectura inmediata del flujo.
+- **Trazado en codo/curva**: dependencias persistidas y preview de arrastre se renderizan con camino más legible en lugar de segmento recto simple.
+- **UX alineada al demo**: mejora visual de conexiones entre barras para acercarse al estilo validado en referencia.
+
 ## [2.47.99] - 2026-02-14
 
 ### 🧯 Hotfix deploy: Type check Gantt

@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.47.99' as const
+export const APP_VERSION = '2.48.00' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-02-14' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Hotfix deploy: Type check Gantt + vista compacta Tareas' as const
+export const VERSION_NAME = 'GanttPRO UX: flechas y codos en dependencias visuales' as const
 
 /**
  * Nota:

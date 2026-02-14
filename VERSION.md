@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.47.99**
+## Versión Actual: **v2.48.00**
 
 **Fecha de lanzamiento**: 14 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.48.00 - Dependencias visuales con flecha y codo (14/02/2026)
+- 🧭 **Dirección explícita**: flecha visible en líneas de dependencia para entender rápidamente de dónde sale y a dónde llega.
+- ↪️ **Ruta más legible**: trazado en codo/curva para dependencias guardadas y en preview de arrastre.
+- 🎯 **Más parecido al demo**: conexión visual entre barras alineada con referencia tipo GanttPRO.
 
 ### v2.47.99 - Hotfix deploy: Type check Gantt (14/02/2026)
 - 🧯 **Fix TypeScript en CI**: corregidos errores de tipado en `GanttPlannerPage` detectados por `tsc --noEmit`.

@@ -1,8 +1,10 @@
 {
-  "version": "2.47.99",
+  "version": "2.48.00",
   "buildDate": "2026-02-14",
-  "buildTimestamp": 1771090800000,
+  "buildTimestamp": 1771091400000,
   "features": [
+    "Líneas de dependencia renderizadas con codos/curvas y punta de flecha para lectura de origen→destino",
+    "Preview de dependencia en drag con trazado en codo + flecha, alineado al estilo visual tipo GanttPRO",
     "Hotfix CI/deploy: corrección de errores TypeScript en Gantt detectados por etapa Type check",
     "Fix de deploy GitHub Pages: corrección de dependencia de hook que generaba warning de lint en CI",
     "Pestaña Tareas con modo de vista compacta ON/OFF para mostrar más tarjetas por pantalla",

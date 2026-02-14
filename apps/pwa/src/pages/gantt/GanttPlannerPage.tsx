@@ -2109,36 +2109,80 @@ export function GanttPlannerPage() {
                         />
                       ))}
 
-                      {timelineDependencyLines.map((line) => (
-                        <div key={`dep-${line.key}`} className="pointer-events-none">
-                          <div
-                            className={`absolute ${line.depType === 'FS' ? 'h-[2px] bg-primary/60' : 'h-[1px] bg-primary/40'}`}
-                            style={{ left: `${line.left}px`, top: `${line.top}px`, width: `${line.width}px` }}
-                            title={line.infoTitle}
-                          />
-                          {line.height > 0 && (
-                            <div
-                              className={`absolute ${line.depType === 'FS' ? 'w-[2px] bg-primary/60' : 'w-[1px] bg-primary/40'}`}
-                              style={{ left: `${line.left + line.width}px`, top: `${line.top}px`, height: `${line.height}px` }}
-                              title={line.infoTitle}
-                            />
-                          )}
-                        </div>
-                      ))}
+                      {timelineDependencyLines.length > 0 && (
+                        <svg className="pointer-events-none absolute inset-0 z-[9]" style={{ width: `${timeline.widthPx}px`, height: `${timelineRows.length * 44}px` }}>
+                          <defs>
+                            <marker id="timeline-dep-arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                              <path d="M 0 0 L 8 4 L 0 8 z" fill="currentColor" />
+                            </marker>
+                          </defs>
+                          {timelineDependencyLines.map((line) => {
+                            const strokeWidth = line.depType === 'FS' ? 2 : 1.5
+                            const endX = line.left + line.width
+                            const endY = line.top + line.height
+                            const absHeight = Math.abs(line.height)
+                            const direction = line.height >= 0 ? 1 : -1
+                            const cornerRadius = Math.min(8, Math.max(0, line.width / 2), Math.max(0, absHeight / 2))
+                            const bendStartX = endX - cornerRadius
+                            const bendEndY = line.top + direction * cornerRadius
+                            const verticalEndY = endY - direction * cornerRadius
+                            const pathData = absHeight > 0 && cornerRadius > 0
+                              ? `M ${line.left} ${line.top} H ${bendStartX} Q ${endX} ${line.top} ${endX} ${bendEndY} V ${verticalEndY} Q ${endX} ${endY} ${endX} ${endY}`
+                              : `M ${line.left} ${line.top} H ${endX} ${absHeight > 0 ? `V ${endY}` : ''}`
+
+                            return (
+                              <path
+                                key={`dep-path-${line.key}`}
+                                d={pathData}
+                                fill="none"
+                                stroke="currentColor"
+                                strokeOpacity={line.depType === 'FS' ? 0.7 : 0.5}
+                                strokeWidth={strokeWidth}
+                                markerEnd="url(#timeline-dep-arrow)"
+                              >
+                                <title>{line.infoTitle}</title>
+                              </path>
+                            )
+                          })}
+                        </svg>
+                      )}
 
                       {timelineLinkPreview && (
                         <>
                           <svg className="pointer-events-none absolute inset-0 z-20" style={{ width: `${timeline.widthPx}px`, height: `${timelineRows.length * 44}px` }}>
-                            <line
-                              x1={timelineLinkPreview.sourceX}
-                              y1={timelineLinkPreview.sourceY}
-                              x2={timelineLinkPreview.targetX}
-                              y2={timelineLinkPreview.targetY}
-                              stroke="currentColor"
-                              strokeOpacity="0.7"
-                              strokeWidth="2"
-                              strokeDasharray="4 3"
-                            />
+                            <defs>
+                              <marker id="timeline-preview-arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                                <path d="M 0 0 L 8 4 L 0 8 z" fill="currentColor" />
+                              </marker>
+                            </defs>
+                            {(() => {
+                              const startX = timelineLinkPreview.sourceX
+                              const startY = timelineLinkPreview.sourceY
+                              const endX = timelineLinkPreview.targetX
+                              const endY = timelineLinkPreview.targetY
+                              const deltaX = endX - startX
+                              const deltaY = endY - startY
+                              const directionY = deltaY >= 0 ? 1 : -1
+                              const absY = Math.abs(deltaY)
+                              const radius = Math.min(8, Math.max(0, Math.abs(deltaX) / 3), Math.max(0, absY / 2))
+                              const elbowX = endX - Math.sign(deltaX || 1) * Math.max(14, Math.min(28, Math.abs(deltaX) / 2 || 14))
+                              const preBendY = endY - directionY * radius
+                              const pathData = absY > 0
+                                ? `M ${startX} ${startY} H ${elbowX - radius} Q ${elbowX} ${startY} ${elbowX} ${startY + directionY * radius} V ${preBendY} Q ${elbowX} ${endY} ${elbowX + Math.sign(deltaX || 1) * radius} ${endY} H ${endX}`
+                                : `M ${startX} ${startY} H ${endX}`
+
+                              return (
+                                <path
+                                  d={pathData}
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeOpacity="0.72"
+                                  strokeWidth="2"
+                                  strokeDasharray="4 3"
+                                  markerEnd="url(#timeline-preview-arrow)"
+                                />
+                              )
+                            })()}
                           </svg>
                           {timelineLinkPreview.type && (
                             <div
