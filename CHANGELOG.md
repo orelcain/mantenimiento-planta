@@ -7,6 +7,14 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.99] - 2026-02-14
+
+### 🧯 Hotfix deploy: Type check Gantt
+
+#### Fixes
+- **TypeScript en CI**: corregidos errores de tipado en `GanttPlannerPage` que hacían fallar la etapa `Type check` del workflow de GitHub Pages.
+- **Deploy pipeline**: validado localmente el flujo `tsc --noEmit` + `lint` + `build` para alinear comportamiento con Actions.
+
 ## [2.47.98] - 2026-02-14
 
 ### 🚑 Fix deploy + vista compacta en Tareas

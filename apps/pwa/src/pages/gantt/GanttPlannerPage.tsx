@@ -779,8 +779,8 @@ export function GanttPlannerPage() {
     })
 
     if (!best) return null
-    const bestMatch = best
-    return { taskId: bestMatch.taskId, anchor: bestMatch.anchor }
+    const resolved = best as { taskId: string; anchor: 'start' | 'end'; distance: number }
+    return { taskId: resolved.taskId, anchor: resolved.anchor }
   }, [timelineRows])
 
   const timelineLinkPreview = useMemo(() => {
@@ -2163,20 +2163,20 @@ export function GanttPlannerPage() {
                       )}
 
                       {timelineRows.map((row) => {
-                        const isLinking = Boolean(timelineLinkDraft)
-                        const canBeTarget = isLinking && timelineLinkDraft.sourceTaskId !== row.task.id
-                        const isSourceStart = isLinking
-                          && timelineLinkDraft.sourceTaskId === row.task.id
-                          && timelineLinkDraft.sourceAnchor === 'start'
-                        const isSourceEnd = isLinking
-                          && timelineLinkDraft.sourceTaskId === row.task.id
-                          && timelineLinkDraft.sourceAnchor === 'end'
-                        const isTargetStart = isLinking
-                          && timelineLinkDraft.targetTaskId === row.task.id
-                          && timelineLinkDraft.targetAnchor === 'start'
-                        const isTargetEnd = isLinking
-                          && timelineLinkDraft.targetTaskId === row.task.id
-                          && timelineLinkDraft.targetAnchor === 'end'
+                        const linkDraft = timelineLinkDraft
+                        const canBeTarget = !!linkDraft && linkDraft.sourceTaskId !== row.task.id
+                        const isSourceStart = !!linkDraft
+                          && linkDraft.sourceTaskId === row.task.id
+                          && linkDraft.sourceAnchor === 'start'
+                        const isSourceEnd = !!linkDraft
+                          && linkDraft.sourceTaskId === row.task.id
+                          && linkDraft.sourceAnchor === 'end'
+                        const isTargetStart = !!linkDraft
+                          && linkDraft.targetTaskId === row.task.id
+                          && linkDraft.targetAnchor === 'start'
+                        const isTargetEnd = !!linkDraft
+                          && linkDraft.targetTaskId === row.task.id
+                          && linkDraft.targetAnchor === 'end'
                         const startAnchorClass = isTargetStart
                           ? 'absolute h-4 w-4 rounded-full border-2 border-primary bg-primary/30 ring-2 ring-primary/40 cursor-crosshair'
                           : isSourceStart

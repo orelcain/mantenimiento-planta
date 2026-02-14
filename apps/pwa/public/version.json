@@ -1,8 +1,9 @@
 {
-  "version": "2.47.98",
+  "version": "2.47.99",
   "buildDate": "2026-02-14",
-  "buildTimestamp": 1771090200000,
+  "buildTimestamp": 1771090800000,
   "features": [
+    "Hotfix CI/deploy: corrección de errores TypeScript en Gantt detectados por etapa Type check",
     "Fix de deploy GitHub Pages: corrección de dependencia de hook que generaba warning de lint en CI",
     "Pestaña Tareas con modo de vista compacta ON/OFF para mostrar más tarjetas por pantalla",
     "Pestaña Tareas ordenada: filtros agrupados en bloque y encabezado operativo más claro",

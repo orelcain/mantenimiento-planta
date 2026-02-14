@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.47.98**
+## Versión Actual: **v2.47.99**
 
 **Fecha de lanzamiento**: 14 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.47.99 - Hotfix deploy: Type check Gantt (14/02/2026)
+- 🧯 **Fix TypeScript en CI**: corregidos errores de tipado en `GanttPlannerPage` detectados por `tsc --noEmit`.
+- ✅ **Pipeline validado**: comprobado localmente con `type-check + lint + build`.
+- 🚀 **Despliegue estabilizado**: este release apunta a destrabar los runs fallidos en GitHub Actions.
 
 ### v2.47.98 - Fix deploy + vista compacta en Tareas (14/02/2026)
 - 🚑 **Deploy estable**: corregido warning de hooks que afectaba la etapa `Lint` en GitHub Actions.
