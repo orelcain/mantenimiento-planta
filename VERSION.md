@@ -1,14 +1,20 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.47.87**
+## Versión Actual: **v2.47.88**
 
-**Fecha de lanzamiento**: 13 de febrero de 2026  \
+**Fecha de lanzamiento**: 14 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
 **Build**: ✅ Stable
 
 ---
 
 ## 📋 Información de la Versión
+
+### v2.47.88 - Duración planificada y tiempo real técnico (14/02/2026)
+- ⏱️ **Duración por horas o días**: el modal rápido permite aplicar duración usando unidad de tiempo según necesidad operativa.
+- 🧑‍🔧 **Tiempo real reportado**: cada comentario de tarea puede registrar cuántas horas se demoró realmente el técnico.
+- 📈 **Auto-extensión de barra**: si el tiempo real supera lo planificado, la tarea amplía su ventana temporal automáticamente.
+- 🗓️ **Mejor contraste diario**: timeline con demarcación diaria reforzada para leer avance día a día.
 
 ### v2.47.87 - Editor de tarea en modal PWA (14/02/2026)
 - 🪟 **Modal en vez de panel fijo**: la edición rápida ya no ocupa espacio permanente en pantalla.

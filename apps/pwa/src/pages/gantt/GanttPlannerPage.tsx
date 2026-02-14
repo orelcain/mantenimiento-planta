@@ -260,6 +260,7 @@ export function GanttPlannerPage() {
   const [comments, setComments] = useState<GanttTaskComment[]>([])
   const [newComment, setNewComment] = useState('')
   const [reportedProgressInput, setReportedProgressInput] = useState('')
+  const [reportedDurationInput, setReportedDurationInput] = useState('')
   const [commentPhotos, setCommentPhotos] = useState<File[]>([])
   const [commentPhotoPreviews, setCommentPhotoPreviews] = useState<string[]>([])
   const [commentBusy, setCommentBusy] = useState(false)
@@ -274,6 +275,8 @@ export function GanttPlannerPage() {
   const [timelineQuickStart, setTimelineQuickStart] = useState('')
   const [timelineQuickEnd, setTimelineQuickEnd] = useState('')
   const [timelineQuickHours, setTimelineQuickHours] = useState('')
+  const [timelineQuickDays, setTimelineQuickDays] = useState('')
+  const [timelineQuickDurationUnit, setTimelineQuickDurationUnit] = useState<'hours' | 'days'>('hours')
   const [timelineQuickResponsibleId, setTimelineQuickResponsibleId] = useState<string>('none')
   const [timelineQuickModalOpen, setTimelineQuickModalOpen] = useState(false)
   const [timelineDrag, setTimelineDrag] = useState<{
@@ -505,6 +508,38 @@ export function GanttPlannerPage() {
     return ticks
   }, [timeline.maxEnd, timeline.minStart, timeline.widthPx, timelineZoom])
 
+  const timelineDayBands = useMemo(() => {
+    const totalMs = timeline.maxEnd - timeline.minStart
+    if (timeline.widthPx <= 0 || totalMs <= 0) {
+      return [] as Array<{ leftPx: number; widthPx: number; major: boolean; shade: boolean }>
+    }
+
+    const alignedStart = Math.floor(timeline.minStart / DAY_MS) * DAY_MS
+    const bands: Array<{ leftPx: number; widthPx: number; major: boolean; shade: boolean }> = []
+
+    for (let index = 0, ms = alignedStart; ms < timeline.maxEnd + DAY_MS && index < 1200; index += 1, ms += DAY_MS) {
+      const nextMs = ms + DAY_MS
+      const leftRaw = ((ms - timeline.minStart) / totalMs) * timeline.widthPx
+      const rightRaw = ((nextMs - timeline.minStart) / totalMs) * timeline.widthPx
+
+      if (rightRaw <= 0 || leftRaw >= timeline.widthPx) continue
+
+      const leftPx = Math.max(0, leftRaw)
+      const rightPx = Math.min(timeline.widthPx, rightRaw)
+      const widthPx = Math.max(1, rightPx - leftPx)
+      const day = new Date(ms).getDay()
+
+      bands.push({
+        leftPx,
+        widthPx,
+        major: day === 1,
+        shade: index % 2 === 0,
+      })
+    }
+
+    return bands
+  }, [timeline.maxEnd, timeline.minStart, timeline.widthPx])
+
   const delayedCriticalTasks = useMemo(() => {
     const now = Date.now()
     const critical = new Set(cpm.criticalPath)
@@ -682,10 +717,14 @@ export function GanttPlannerPage() {
 
     await Promise.all(
       Array.from(updates.entries()).map(([taskId, window]) =>
-        updateGanttTask(taskId, {
-          startDate: window.startDate,
-          endDate: window.endDate,
-        })
+        {
+          const estimatedHours = Math.max(1, Math.round((window.endDate.getTime() - window.startDate.getTime()) / HOUR_MS))
+          return updateGanttTask(taskId, {
+            startDate: window.startDate,
+            endDate: window.endDate,
+            estimatedHours,
+          })
+        }
       )
     )
 
@@ -743,17 +782,26 @@ export function GanttPlannerPage() {
     if (!selectedTimelineTask) return
 
     const nextStart = new Date(timelineQuickStart)
-    const hours = Number(timelineQuickHours.replace(',', '.'))
+    if (Number.isNaN(nextStart.getTime())) {
+      setError('Fecha inicio inválida en edición rápida')
+      return
+    }
 
-    if (Number.isNaN(nextStart.getTime()) || !Number.isFinite(hours) || hours <= 0) {
-      setError('Horas inválidas en edición rápida')
+    const hours = timelineQuickDurationUnit === 'hours'
+      ? Number(timelineQuickHours.replace(',', '.'))
+      : Number(timelineQuickDays.replace(',', '.')) * 24
+
+    if (!Number.isFinite(hours) || hours <= 0) {
+      setError(timelineQuickDurationUnit === 'hours' ? 'Horas inválidas en edición rápida' : 'Días inválidos en edición rápida')
       return
     }
 
     const nextEnd = new Date(nextStart.getTime() + hours * HOUR_MS)
     setTimelineQuickEnd(toInputDate(nextEnd))
+    setTimelineQuickHours(String(Math.max(1, Math.round(hours))))
+    setTimelineQuickDays(String(Math.max(1, Math.ceil(hours / 24))))
     await handleUpdateTaskDates(selectedTimelineTask, nextStart, nextEnd)
-  }, [handleUpdateTaskDates, selectedTimelineTask, timelineQuickHours, timelineQuickStart])
+  }, [handleUpdateTaskDates, selectedTimelineTask, timelineQuickDays, timelineQuickDurationUnit, timelineQuickHours, timelineQuickStart])
 
   async function handleTimelineQuickAssignUser() {
     if (!selectedTimelineTask) return
@@ -825,9 +873,11 @@ export function GanttPlannerPage() {
   useEffect(() => {
     if (!selectedTask) {
       setReportedProgressInput('')
+      setReportedDurationInput('')
       return
     }
     setReportedProgressInput(String(selectedTask.progress))
+    setReportedDurationInput('')
     if (typeof selectedTask.aiSuggestedProgress === 'number') {
       setAiProgressSuggestion(selectedTask.aiSuggestedProgress)
     }
@@ -838,6 +888,8 @@ export function GanttPlannerPage() {
       setTimelineQuickStart('')
       setTimelineQuickEnd('')
       setTimelineQuickHours('')
+      setTimelineQuickDays('')
+      setTimelineQuickDurationUnit('hours')
       setTimelineQuickResponsibleId('none')
       setTimelineQuickModalOpen(false)
       return
@@ -847,6 +899,8 @@ export function GanttPlannerPage() {
     setTimelineQuickEnd(toInputDate(selectedTimelineTask.endDate))
     const hours = Math.max(1, Math.round((selectedTimelineTask.endDate.getTime() - selectedTimelineTask.startDate.getTime()) / HOUR_MS))
     setTimelineQuickHours(String(hours))
+    setTimelineQuickDays(String(Math.max(1, Math.ceil(hours / 24))))
+    setTimelineQuickDurationUnit(hours >= 24 && hours % 24 === 0 ? 'days' : 'hours')
     setTimelineQuickResponsibleId(selectedTimelineTask.responsibleUserId ?? 'none')
 
     if (timelineQuickFocusPendingRef.current) {
@@ -1162,6 +1216,14 @@ export function GanttPlannerPage() {
       ? Math.max(0, Math.min(100, Math.round(parsedProgress)))
       : undefined
 
+    const parsedDuration = reportedDurationInput.trim().length > 0
+      ? Number(reportedDurationInput.replace(',', '.'))
+      : null
+
+    const reportedDurationHours = parsedDuration !== null && Number.isFinite(parsedDuration) && parsedDuration > 0
+      ? Math.max(0.25, parsedDuration)
+      : undefined
+
     setCommentBusy(true)
     setError(null)
     try {
@@ -1179,6 +1241,7 @@ export function GanttPlannerPage() {
         createdBy: user.id,
         createdByName: `${user.nombre} ${user.apellido}`,
         reportedProgress,
+        reportedDurationHours,
         photos,
       })
 
@@ -1186,8 +1249,15 @@ export function GanttPlannerPage() {
         await handleUpdateTaskProgress(selectedTask, reportedProgress)
       }
 
+      const plannedHours = Math.max(1, Math.round((selectedTask.endDate.getTime() - selectedTask.startDate.getTime()) / HOUR_MS))
+      if (typeof reportedDurationHours === 'number' && reportedDurationHours > plannedHours) {
+        const nextEnd = new Date(selectedTask.startDate.getTime() + reportedDurationHours * HOUR_MS)
+        await handleUpdateTaskDates(selectedTask, selectedTask.startDate, nextEnd)
+      }
+
       setNewComment('')
       setReportedProgressInput('')
+      setReportedDurationInput('')
       setCommentPhotos([])
       commentPhotoPreviews.forEach((url) => URL.revokeObjectURL(url))
       setCommentPhotoPreviews([])
@@ -1559,6 +1629,13 @@ export function GanttPlannerPage() {
                 <div className="overflow-auto">
                   <div style={{ minWidth: `${timeline.widthPx}px` }}>
                     <div className="sticky top-0 z-10 h-8 border-y bg-background/95" style={{ width: `${timeline.widthPx}px` }}>
+                      {timelineDayBands.map((band, index) => (
+                        <div
+                          key={`day-head-${index}`}
+                          className={`absolute top-0 bottom-0 pointer-events-none ${band.shade ? 'bg-muted/25' : ''} ${band.major ? 'border-l border-border/70' : 'border-l border-border/35'}`}
+                          style={{ left: `${band.leftPx}px`, width: `${band.widthPx}px` }}
+                        />
+                      ))}
                       {timelineTicks.map((tick, index) => (
                         <div
                           key={`tick-head-${index}`}
@@ -1571,6 +1648,13 @@ export function GanttPlannerPage() {
                     </div>
 
                     <div className="relative" style={{ width: `${timeline.widthPx}px`, height: `${timelineRows.length * 44}px` }}>
+                      {timelineDayBands.map((band, index) => (
+                        <div
+                          key={`day-body-${index}`}
+                          className={`absolute top-0 bottom-0 pointer-events-none ${band.shade ? 'bg-muted/15' : ''} ${band.major ? 'border-l border-border/60' : 'border-l border-border/30'}`}
+                          style={{ left: `${band.leftPx}px`, width: `${band.widthPx}px` }}
+                        />
+                      ))}
                       {timelineTicks.map((tick, index) => (
                         <div
                           key={`tick-body-${index}`}
@@ -1712,10 +1796,32 @@ export function GanttPlannerPage() {
                   </div>
                 </div>
 
-                <div className="grid gap-2 sm:grid-cols-2">
+                <div className="grid gap-2 sm:grid-cols-3">
                   <div>
-                    <Label className="text-xs text-muted-foreground">Tiempo (horas)</Label>
-                    <Input type="number" min={1} value={timelineQuickHours} onChange={(event) => setTimelineQuickHours(event.target.value)} />
+                    <Label className="text-xs text-muted-foreground">Unidad de duración</Label>
+                    <Select value={timelineQuickDurationUnit} onValueChange={(value) => setTimelineQuickDurationUnit(value as 'hours' | 'days')}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="hours">Horas</SelectItem>
+                        <SelectItem value="days">Días</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">{timelineQuickDurationUnit === 'hours' ? 'Tiempo (horas)' : 'Tiempo (días)'}</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      step={timelineQuickDurationUnit === 'hours' ? 1 : 1}
+                      value={timelineQuickDurationUnit === 'hours' ? timelineQuickHours : timelineQuickDays}
+                      onChange={(event) => {
+                        if (timelineQuickDurationUnit === 'hours') {
+                          setTimelineQuickHours(event.target.value)
+                        } else {
+                          setTimelineQuickDays(event.target.value)
+                        }
+                      }}
+                    />
                   </div>
                   <div>
                     <Label className="text-xs text-muted-foreground">Usuario responsable</Label>
@@ -1738,7 +1844,7 @@ export function GanttPlannerPage() {
                     Guardar fechas
                   </Button>
                   <Button size="sm" variant="secondary" onClick={() => void handleTimelineQuickApplyHours()} disabled={!canOperateTask(selectedTimelineTask)}>
-                    Aplicar horas
+                    Aplicar duración
                   </Button>
                   <Button size="sm" variant="outline" onClick={() => void handleTimelineQuickAssignUser()} disabled={!canEdit}>
                     Guardar usuario
@@ -2267,6 +2373,14 @@ export function GanttPlannerPage() {
                 onChange={(event) => setReportedProgressInput(event.target.value)}
                 placeholder="% avance reportado por técnico (opcional)"
               />
+              <Input
+                type="number"
+                min={0}
+                step={0.25}
+                value={reportedDurationInput}
+                onChange={(event) => setReportedDurationInput(event.target.value)}
+                placeholder="Tiempo real reportado (horas, opcional)"
+              />
               <div className="space-y-2">
                 <Label className="text-xs">Fotos de evidencia (máx. 5)</Label>
                 <Input type="file" accept="image/*" multiple onChange={handleSelectCommentPhotos} />
@@ -2292,6 +2406,9 @@ export function GanttPlannerPage() {
                     <p>{comment.content}</p>
                     {typeof comment.reportedProgress === 'number' && (
                       <p className="text-muted-foreground mt-1">Reporte técnico: {comment.reportedProgress}%</p>
+                    )}
+                    {typeof comment.reportedDurationHours === 'number' && (
+                      <p className="text-muted-foreground mt-1">Tiempo real reportado: {comment.reportedDurationHours} h</p>
                     )}
                     {comment.photos && comment.photos.length > 0 && (
                       <div className="mt-2 grid grid-cols-4 gap-2">

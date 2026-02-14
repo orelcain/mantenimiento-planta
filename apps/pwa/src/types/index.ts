@@ -563,6 +563,7 @@ export interface GanttTaskComment {
   taskId: string
   content: string
   reportedProgress?: number
+  reportedDurationHours?: number
   aiSuggestedProgress?: number
   photos?: string[]
   createdBy: string

@@ -7,6 +7,16 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.88] - 2026-02-14
+
+### ⏱️ Duración plan vs real en Timeline
+
+#### Mejoras
+- **Duración rápida por unidad**: en el modal de edición de timeline ahora puedes aplicar duración por `horas` o `días`.
+- **Reporte técnico de tiempo real**: comentarios de tarea aceptan `tiempo real (horas)` además de `% de avance`.
+- **Auto-extensión por demora real**: si el tiempo real reportado supera lo planificado, la barra se amplía automáticamente.
+- **Lectura diaria reforzada**: timeline con bandas diarias alternadas y líneas semanales más visibles para distinguir días.
+
 ## [2.47.87] - 2026-02-14
 
 ### 🪟 Edición rápida en modal PWA

@@ -1,8 +1,12 @@
 {
-  "version": "2.47.87",
+  "version": "2.47.88",
   "buildDate": "2026-02-14",
-  "buildTimestamp": 1771078914000,
+  "buildTimestamp": 1771079400000,
   "features": [
+    "Asignación rápida de duración en timeline por unidad (horas o días) desde modal PWA",
+    "Reporte técnico de tiempo real (horas) en comentarios de tarea para trazabilidad operativa",
+    "Auto-extensión de barra cuando el tiempo real reportado supera la duración planificada",
+    "Mejor visibilidad entre días en timeline con bandas diarias alternadas y separadores semanales reforzados",
     "Vista Gantt reordenada: Área y Equipo se muestran antes del nombre de la Tarea",
     "Timeline con contexto operativo completo en cada fila (Área · Equipo · Tarea)",
     "Listado de tareas con encabezado Área/Equipo para lectura rápida por planta",
