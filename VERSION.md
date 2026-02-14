@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.47.93**
+## Versión Actual: **v2.47.94**
 
 **Fecha de lanzamiento**: 14 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.47.94 - Resaltado de anclas destino en drag de dependencias (14/02/2026)
+- 🎯 **Destino válido visible**: durante el arrastre se resaltan las anclas posibles de conexión.
+- 🧲 **Snap reforzado**: el target activo se marca con mayor contraste para confirmar el punto de enlace.
+- ✅ **Conexión más precisa**: reduce errores al crear dependencias en timelines con muchas tareas.
 
 ### v2.47.93 - Modo dependencia con tecla D (14/02/2026)
 - ⌨️ **Toggle rápido**: tecla `D` para activar/desactivar modo de creación de dependencias.

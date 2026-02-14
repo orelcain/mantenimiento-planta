@@ -1,8 +1,10 @@
 {
-  "version": "2.47.93",
+  "version": "2.47.94",
   "buildDate": "2026-02-14",
-  "buildTimestamp": 1771087200000,
+  "buildTimestamp": 1771087800000,
   "features": [
+    "Resaltado visual de anclas destino válidas durante drag de dependencias en timeline",
+    "Ancla objetivo activa con feedback reforzado (tamaño y halo) al detectar snap de enlace",
     "Modo dependencia en timeline con tecla D (toggle ON/OFF) para separar enlace de tareas vs drag/resize",
     "Botón visible de estado Dependencias (ON/OFF · D) en cabecera del timeline",
     "Anclas de enlace visibles solo en modo dependencia para reducir errores operativos",

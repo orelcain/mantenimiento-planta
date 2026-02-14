@@ -2136,90 +2136,121 @@ export function GanttPlannerPage() {
                         />
                       )}
 
-                      {timelineRows.map((row) => (
-                        <div key={`bar-${row.task.id}`}>
-                          <div
-                            className="absolute h-2 rounded bg-muted-foreground/60"
-                            style={{ left: `${row.baselineLeft}px`, top: `${row.rowIndex * 44 + 16}px`, width: `${row.baselineWidth}px` }}
-                          />
-                          <div
-                            className={`absolute h-3 rounded ${row.isCritical ? 'bg-red-500' : 'bg-primary'}`}
-                            style={{ left: `${row.left}px`, top: `${row.rowIndex * 44 + 14}px`, width: `${row.width}px` }}
-                            onClick={() => setSelectedTaskId(row.task.id)}
-                            onDoubleClick={() => openTimelineQuickEditor(row.task.id)}
-                            onMouseDown={(event) => {
-                              if (!row.interactive || timelineDependencyMode) return
-                              event.preventDefault()
-                              handleTimelineDragStart(row.task, 'move', event.clientX)
-                            }}
-                            title={!row.interactive
-                              ? 'Sin permisos para mover'
-                              : timelineDependencyMode
-                                ? 'Modo dependencia activo: usa anclas de inicio/fin para enlazar'
-                                : 'Arrastrar para mover fechas'}
-                          />
-                          {timelineDrag?.taskId === row.task.id && (
+                      {timelineRows.map((row) => {
+                        const isLinking = Boolean(timelineLinkDraft)
+                        const canBeTarget = isLinking && timelineLinkDraft.sourceTaskId !== row.task.id
+                        const isSourceStart = isLinking
+                          && timelineLinkDraft.sourceTaskId === row.task.id
+                          && timelineLinkDraft.sourceAnchor === 'start'
+                        const isSourceEnd = isLinking
+                          && timelineLinkDraft.sourceTaskId === row.task.id
+                          && timelineLinkDraft.sourceAnchor === 'end'
+                        const isTargetStart = isLinking
+                          && timelineLinkDraft.targetTaskId === row.task.id
+                          && timelineLinkDraft.targetAnchor === 'start'
+                        const isTargetEnd = isLinking
+                          && timelineLinkDraft.targetTaskId === row.task.id
+                          && timelineLinkDraft.targetAnchor === 'end'
+                        const startAnchorClass = isTargetStart
+                          ? 'absolute h-4 w-4 rounded-full border-2 border-primary bg-primary/30 ring-2 ring-primary/40 cursor-crosshair'
+                          : isSourceStart
+                            ? 'absolute h-3 w-3 rounded-full border-2 border-primary bg-primary/20 cursor-crosshair'
+                            : canBeTarget
+                              ? 'absolute h-3 w-3 rounded-full border border-primary/70 bg-primary/10 cursor-crosshair'
+                              : 'absolute h-3 w-3 rounded-full border bg-background cursor-crosshair'
+                        const endAnchorClass = isTargetEnd
+                          ? 'absolute h-4 w-4 rounded-full border-2 border-primary bg-primary/30 ring-2 ring-primary/40 cursor-crosshair'
+                          : isSourceEnd
+                            ? 'absolute h-3 w-3 rounded-full border-2 border-primary bg-primary/20 cursor-crosshair'
+                            : canBeTarget
+                              ? 'absolute h-3 w-3 rounded-full border border-primary/70 bg-primary/10 cursor-crosshair'
+                              : 'absolute h-3 w-3 rounded-full border bg-background cursor-crosshair'
+
+                        return (
+                          <div key={`bar-${row.task.id}`}>
                             <div
-                              className="absolute z-20 -translate-x-1/2 rounded border bg-background px-2 py-1 text-[10px] text-foreground shadow"
-                              style={{ left: `${row.left + row.width / 2}px`, top: `${Math.max(0, row.rowIndex * 44 - 8)}px` }}
-                            >
-                              {formatTimelineDragDate(new Date(timelineDrag.previewStartMs))} → {formatTimelineDragDate(new Date(timelineDrag.previewEndMs))}
-                              {' · '}
-                              {Math.max(1, Math.round((timelineDrag.previewEndMs - timelineDrag.previewStartMs) / HOUR_MS))}h
-                            </div>
-                          )}
-                          {row.interactive && (
-                            <>
-                              {timelineDependencyMode && (
-                                <>
-                                  <div
-                                    className="absolute h-3 w-3 rounded-full border bg-background cursor-crosshair"
-                                    style={{ left: `${Math.max(0, row.left - 5)}px`, top: `${row.rowIndex * 44 + 9}px` }}
-                                    onMouseDown={(event) => {
-                                      event.preventDefault()
-                                      event.stopPropagation()
-                                      handleTimelineLinkStart(row.task.id, 'start', event.clientX, event.clientY)
-                                    }}
-                                    title="Crear dependencia desde INICIO (arrastra hacia inicio/fin de otra tarea)"
-                                  />
-                                  <div
-                                    className="absolute h-3 w-3 rounded-full border bg-background cursor-crosshair"
-                                    style={{ left: `${row.left + row.width - 5}px`, top: `${row.rowIndex * 44 + 9}px` }}
-                                    onMouseDown={(event) => {
-                                      event.preventDefault()
-                                      event.stopPropagation()
-                                      handleTimelineLinkStart(row.task.id, 'end', event.clientX, event.clientY)
-                                    }}
-                                    title="Crear dependencia desde FIN (arrastra hacia inicio/fin de otra tarea)"
-                                  />
-                                </>
-                              )}
+                              className="absolute h-2 rounded bg-muted-foreground/60"
+                              style={{ left: `${row.baselineLeft}px`, top: `${row.rowIndex * 44 + 16}px`, width: `${row.baselineWidth}px` }}
+                            />
+                            <div
+                              className={`absolute h-3 rounded ${row.isCritical ? 'bg-red-500' : 'bg-primary'}`}
+                              style={{ left: `${row.left}px`, top: `${row.rowIndex * 44 + 14}px`, width: `${row.width}px` }}
+                              onClick={() => setSelectedTaskId(row.task.id)}
+                              onDoubleClick={() => openTimelineQuickEditor(row.task.id)}
+                              onMouseDown={(event) => {
+                                if (!row.interactive || timelineDependencyMode) return
+                                event.preventDefault()
+                                handleTimelineDragStart(row.task, 'move', event.clientX)
+                              }}
+                              title={!row.interactive
+                                ? 'Sin permisos para mover'
+                                : timelineDependencyMode
+                                  ? 'Modo dependencia activo: usa anclas de inicio/fin para enlazar'
+                                  : 'Arrastrar para mover fechas'}
+                            />
+                            {timelineDrag?.taskId === row.task.id && (
                               <div
-                                className="absolute h-3 w-2 rounded bg-background border cursor-ew-resize"
-                                style={{ left: `${Math.max(0, row.left - 1)}px`, top: `${row.rowIndex * 44 + 14}px` }}
-                                onMouseDown={(event) => {
-                                  if (timelineDependencyMode) return
-                                  event.preventDefault()
-                                  event.stopPropagation()
-                                  handleTimelineDragStart(row.task, 'resize-start', event.clientX)
-                                }}
-                                title={timelineDependencyMode ? 'Modo dependencia activo' : 'Ajustar inicio'}
-                              />
-                              <div
-                                className="absolute h-3 w-2 rounded bg-background border cursor-ew-resize"
-                                style={{ left: `${row.left + row.width - 1}px`, top: `${row.rowIndex * 44 + 14}px` }}
-                                onMouseDown={(event) => {
-                                  if (timelineDependencyMode) return
-                                  event.preventDefault()
-                                  event.stopPropagation()
-                                  handleTimelineDragStart(row.task, 'resize-end', event.clientX)
-                                }}
-                                title={timelineDependencyMode ? 'Modo dependencia activo' : 'Ajustar fin'}
-                              />
-                            </>
-                          )}
-                        </div>
-                      ))}
+                                className="absolute z-20 -translate-x-1/2 rounded border bg-background px-2 py-1 text-[10px] text-foreground shadow"
+                                style={{ left: `${row.left + row.width / 2}px`, top: `${Math.max(0, row.rowIndex * 44 - 8)}px` }}
+                              >
+                                {formatTimelineDragDate(new Date(timelineDrag.previewStartMs))} → {formatTimelineDragDate(new Date(timelineDrag.previewEndMs))}
+                                {' · '}
+                                {Math.max(1, Math.round((timelineDrag.previewEndMs - timelineDrag.previewStartMs) / HOUR_MS))}h
+                              </div>
+                            )}
+                            {row.interactive && (
+                              <>
+                                {timelineDependencyMode && (
+                                  <>
+                                    <div
+                                      className={startAnchorClass}
+                                      style={{ left: `${Math.max(0, row.left - (isTargetStart ? 6 : 5))}px`, top: `${row.rowIndex * 44 + (isTargetStart ? 8 : 9)}px` }}
+                                      onMouseDown={(event) => {
+                                        event.preventDefault()
+                                        event.stopPropagation()
+                                        handleTimelineLinkStart(row.task.id, 'start', event.clientX, event.clientY)
+                                      }}
+                                      title="Crear dependencia desde INICIO (arrastra hacia inicio/fin de otra tarea)"
+                                    />
+                                    <div
+                                      className={endAnchorClass}
+                                      style={{ left: `${row.left + row.width - (isTargetEnd ? 6 : 5)}px`, top: `${row.rowIndex * 44 + (isTargetEnd ? 8 : 9)}px` }}
+                                      onMouseDown={(event) => {
+                                        event.preventDefault()
+                                        event.stopPropagation()
+                                        handleTimelineLinkStart(row.task.id, 'end', event.clientX, event.clientY)
+                                      }}
+                                      title="Crear dependencia desde FIN (arrastra hacia inicio/fin de otra tarea)"
+                                    />
+                                  </>
+                                )}
+                                <div
+                                  className="absolute h-3 w-2 rounded bg-background border cursor-ew-resize"
+                                  style={{ left: `${Math.max(0, row.left - 1)}px`, top: `${row.rowIndex * 44 + 14}px` }}
+                                  onMouseDown={(event) => {
+                                    if (timelineDependencyMode) return
+                                    event.preventDefault()
+                                    event.stopPropagation()
+                                    handleTimelineDragStart(row.task, 'resize-start', event.clientX)
+                                  }}
+                                  title={timelineDependencyMode ? 'Modo dependencia activo' : 'Ajustar inicio'}
+                                />
+                                <div
+                                  className="absolute h-3 w-2 rounded bg-background border cursor-ew-resize"
+                                  style={{ left: `${row.left + row.width - 1}px`, top: `${row.rowIndex * 44 + 14}px` }}
+                                  onMouseDown={(event) => {
+                                    if (timelineDependencyMode) return
+                                    event.preventDefault()
+                                    event.stopPropagation()
+                                    handleTimelineDragStart(row.task, 'resize-end', event.clientX)
+                                  }}
+                                  title={timelineDependencyMode ? 'Modo dependencia activo' : 'Ajustar fin'}
+                                />
+                              </>
+                            )}
+                          </div>
+                        )
+                      })}
                     </div>
                   </div>
                 </div>

@@ -7,6 +7,15 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.94] - 2026-02-14
+
+### 🎯 Resaltado de anclas destino en dependencias
+
+#### Mejoras
+- **Destino válido visible**: al arrastrar una dependencia, las anclas destino posibles se muestran resaltadas.
+- **Snap más claro**: el punto objetivo activo se marca con énfasis visual para confirmar dónde se soltará el enlace.
+- **Menos errores operativos**: mejora la precisión al conectar tareas en escenarios densos de timeline.
+
 ## [2.47.93] - 2026-02-14
 
 ### ⌨️ Modo dependencia con tecla D
