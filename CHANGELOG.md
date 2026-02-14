@@ -7,6 +7,15 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.84] - 2026-02-14
+
+### 🎯 Modo enfoque para Gantt (solo módulo)
+
+#### Mejoras
+- **Modo enfoque en `/gantt`**: Botón en topbar para ocultar sidebar y maximizar área útil del timeline.
+- **Peek por hover**: En desktop, al acercar el mouse al borde izquierdo aparece temporalmente el menú lateral.
+- **Persistencia de preferencia**: El modo enfoque se recuerda entre sesiones para el módulo Gantt.
+
 ## [2.47.83] - 2026-02-14
 
 ### 🧩 Timeline más usable (interacción + legibilidad)

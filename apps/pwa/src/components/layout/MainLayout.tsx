@@ -72,6 +72,8 @@ export function MainLayout() {
   const logout = useAuthStore((state) => state.logout)
   const isAdmin = useIsAdmin()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [sidebarPeekOpen, setSidebarPeekOpen] = useState(false)
+  const [ganttFocusMode, setGanttFocusMode] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [isOnline, setIsOnline] = useState(navigator.onLine)
   const [showSyncPanel, setShowSyncPanel] = useState(false)
@@ -88,6 +90,8 @@ export function MainLayout() {
   const prevPendingRef = useRef(pendingWrites)
   const { hasUpdate, newVersion, reload } = useAppVersion()
   const { setZones, setEquipment, setIncidents } = useAppStore()
+  const isGanttRoute = location.pathname.startsWith('/gantt')
+  const shouldHideDesktopSidebar = isGanttRoute && ganttFocusMode && !sidebarPeekOpen
 
   const handleSignOut = async () => {
     await signOut()
@@ -164,6 +168,19 @@ export function MainLayout() {
       window.removeEventListener('offline', handleOffline)
     }
   }, [])
+
+  useEffect(() => {
+    const saved = localStorage.getItem('gantt_focus_mode')
+    if (saved === '1') {
+      setGanttFocusMode(true)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!isGanttRoute) {
+      setSidebarPeekOpen(false)
+    }
+  }, [isGanttRoute])
 
   useEffect(() => {
     initUploadQueue()
@@ -253,9 +270,15 @@ export function MainLayout() {
         aria-label="Menú principal"
         aria-expanded={sidebarOpen}
         className={cn(
-          'fixed inset-y-0 left-0 z-50 w-64 bg-card border-r transform transition-transform duration-200 ease-in-out lg:translate-x-0',
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+          'fixed inset-y-0 left-0 z-50 w-64 bg-card border-r transform transition-transform duration-200 ease-in-out',
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full',
+          shouldHideDesktopSidebar ? 'lg:-translate-x-full' : 'lg:translate-x-0'
         )}
+        onMouseLeave={() => {
+          if (isGanttRoute && ganttFocusMode) {
+            setSidebarPeekOpen(false)
+          }
+        }}
       >
         <div className="flex flex-col h-full">
           {/* Logo */}
@@ -281,7 +304,10 @@ export function MainLayout() {
               <NavLink
                 key={item.href}
                 to={item.href}
-                onClick={() => setSidebarOpen(false)}
+                onClick={() => {
+                  setSidebarOpen(false)
+                  setSidebarPeekOpen(false)
+                }}
                 className={({ isActive }) =>
                   cn(
                     'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
@@ -368,8 +394,18 @@ export function MainLayout() {
         </div>
       </aside>
 
+      {isGanttRoute && ganttFocusMode && (
+        <button
+          type="button"
+          className="hidden lg:block fixed left-0 top-24 z-40 h-[calc(100vh-6rem)] w-2 bg-transparent hover:bg-primary/10"
+          onMouseEnter={() => setSidebarPeekOpen(true)}
+          aria-label="Mostrar menú lateral"
+          title="Mostrar menú lateral"
+        />
+      )}
+
       {/* Main content */}
-      <div className="lg:pl-64">
+      <div className={cn(!shouldHideDesktopSidebar && 'lg:pl-64')}>
         {/* Top bar */}
         <header className="sticky top-0 z-30 flex items-center h-16 px-4 bg-background/80 backdrop-blur border-b">
           <button
@@ -382,6 +418,23 @@ export function MainLayout() {
           </button>
 
           <div className="flex-1" />
+
+          {isGanttRoute && (
+            <Button
+              size="sm"
+              variant={ganttFocusMode ? 'default' : 'outline'}
+              className="mr-2"
+              onClick={() => {
+                const next = !ganttFocusMode
+                setGanttFocusMode(next)
+                setSidebarPeekOpen(false)
+                setSidebarOpen(false)
+                localStorage.setItem('gantt_focus_mode', next ? '1' : '0')
+              }}
+            >
+              {ganttFocusMode ? 'Salir enfoque' : 'Modo enfoque'}
+            </Button>
+          )}
 
           {/* Desktop user menu */}
           <div className="hidden lg:flex items-center gap-3">

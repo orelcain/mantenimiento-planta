@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.47.83**
+## Versión Actual: **v2.47.84**
 
 **Fecha de lanzamiento**: 13 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.47.84 - Modo enfoque Gantt (14/02/2026)
+- 🎯 **Enfoque por módulo**: Nuevo botón para ocultar sidebar solo en `Gantt` y ganar ancho de trabajo.
+- 🧭 **Menú por proximidad**: Peek lateral al acercar mouse al borde izquierdo en escritorio.
+- 💾 **Preferencia persistente**: El estado del modo enfoque se mantiene entre sesiones.
 
 ### v2.47.83 - Interacción y legibilidad del timeline (14/02/2026)
 - 🧩 **Rango por página**: El timeline ahora se ajusta a la página visible para que las barras no queden comprimidas.
