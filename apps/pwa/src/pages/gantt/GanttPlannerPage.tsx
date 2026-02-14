@@ -1949,6 +1949,18 @@ export function GanttPlannerPage() {
               )}
             </div>
 
+            {timelineDependencyMode && (
+              <div className="rounded border p-3 text-xs space-y-2">
+                <p className="font-medium text-foreground">Guía rápida de dependencias (modo D activo)</p>
+                <div className="grid gap-1 sm:grid-cols-2 text-muted-foreground">
+                  <p><span className="font-semibold text-foreground">FS</span>: B inicia cuando A termina.</p>
+                  <p><span className="font-semibold text-foreground">SS</span>: B inicia cuando A inicia.</p>
+                  <p><span className="font-semibold text-foreground">FF</span>: B termina cuando A termina.</p>
+                  <p><span className="font-semibold text-foreground">SF</span>: B termina cuando A inicia.</p>
+                </div>
+              </div>
+            )}
+
             <div className="rounded border p-3">
               <p className="text-xs font-medium">Carga por técnico (tareas visibles)</p>
               <p className="text-[11px] text-muted-foreground mb-2">Histogramado por horas planificadas activas, útil para detectar sobrecarga.</p>

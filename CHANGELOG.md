@@ -7,6 +7,15 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.96] - 2026-02-14
+
+### 📘 Guía contextual de dependencias en modo D
+
+#### Mejoras
+- **Panel pedagógico contextual**: al activar modo dependencia (`D`) aparece una guía rápida con significado de `FS`, `SS`, `FF` y `SF`.
+- **Apoyo en operación**: permite decidir el tipo correcto sin salir del timeline.
+- **UX limpia**: la guía se oculta automáticamente al salir del modo dependencia.
+
 ## [2.47.95] - 2026-02-14
 
 ### 🏷️ Etiqueta flotante de tipo de dependencia

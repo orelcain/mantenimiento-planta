@@ -1,8 +1,9 @@
 {
-  "version": "2.47.95",
+  "version": "2.47.96",
   "buildDate": "2026-02-14",
-  "buildTimestamp": 1771088400000,
+  "buildTimestamp": 1771089000000,
   "features": [
+    "Panel contextual FS/SS/FF/SF visible solo con modo dependencia ON para guía rápida operativa",
     "Etiqueta flotante junto al cursor con tipo de dependencia detectado (FS/SS/FF/SF) durante el drag",
     "Resaltado visual de anclas destino válidas durante drag de dependencias en timeline",
     "Ancla objetivo activa con feedback reforzado (tamaño y halo) al detectar snap de enlace",

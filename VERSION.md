@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.47.95**
+## Versión Actual: **v2.47.96**
 
 **Fecha de lanzamiento**: 14 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.47.96 - Guía contextual FS/SS/FF/SF en modo dependencia (14/02/2026)
+- 📘 **Guía rápida visible**: al activar `D` se muestra el significado operativo de `FS`, `SS`, `FF` y `SF`.
+- 🧭 **Decisión más clara**: ayuda a elegir el tipo correcto sin cambiar de pantalla.
+- 🧼 **Contextual y limpia**: aparece solo en modo dependencia y se oculta al desactivarlo.
 
 ### v2.47.95 - Etiqueta flotante de tipo en drag de dependencia (14/02/2026)
 - 🏷️ **Tipo en vivo**: muestra `FS/SS/FF/SF` junto al cursor mientras arrastras la dependencia.
