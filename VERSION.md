@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.47.81**
+## Versión Actual: **v2.47.82**
 
 **Fecha de lanzamiento**: 13 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,10 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.47.82 - Forzar refresh cliente + timeline demo activo (14/02/2026)
+- 🔄 **Refresh de cliente**: Bump de versión para activar detección de actualización y recarga controlada en sesiones abiertas.
+- 🧭 **Timeline demo operativo**: Se conserva en productivo la vista de timeline alineada al mock aprobado.
 
 ### v2.47.81 - Pestañas en Planificador + preferencia persistente (14/02/2026)
 - 🗂️ **Navegación por pestañas**: Planificador dividido en `Configuración`, `Tareas` y `Timeline`.

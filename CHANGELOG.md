@@ -7,6 +7,14 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.82] - 2026-02-14
+
+### 🔄 Refresh forzado de cliente + timeline demo activo
+
+#### Mejoras
+- **Bump de versión**: Se incrementa a `2.47.82` para activar detección de actualización en clientes que quedaron en sesión previa.
+- **Timeline demo en productivo**: Se mantiene layout del planificador alineado a la propuesta visual (tabla izquierda + timeline profesional a la derecha).
+
 ## [2.47.81] - 2026-02-14
 
 ### 🗂️ Planificador Gantt con pestañas y preferencia persistente
