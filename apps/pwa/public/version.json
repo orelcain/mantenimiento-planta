@@ -1,8 +1,11 @@
 {
-  "version": "2.47.90",
+  "version": "2.47.91",
   "buildDate": "2026-02-14",
-  "buildTimestamp": 1771084200000,
+  "buildTimestamp": 1771085400000,
   "features": [
+    "Editor visual de dependencias en modal de timeline (predecesora, tipo FS/SS/FF/SF y lag)",
+    "Alta y eliminación de dependencias directamente desde edición rápida de tarea",
+    "Gestión de red de dependencias sin salir de timeline para operación más ágil tipo GanttPRO",
     "Histograma de carga por técnico en timeline (horas y cantidad de tareas activas visibles)",
     "Tabla timeline con columna de variación vs baseline (Δ Plan en horas) por tarea",
     "Lectura rápida de desvío plan-real para priorización operativa tipo GanttPRO",

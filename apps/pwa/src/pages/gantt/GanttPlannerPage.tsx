@@ -322,6 +322,9 @@ export function GanttPlannerPage() {
   const [timelineQuickDays, setTimelineQuickDays] = useState('')
   const [timelineQuickDurationUnit, setTimelineQuickDurationUnit] = useState<'hours' | 'days'>('hours')
   const [timelineQuickResponsibleId, setTimelineQuickResponsibleId] = useState<string>('none')
+  const [timelineQuickDependencyPredecessorId, setTimelineQuickDependencyPredecessorId] = useState<string>('none')
+  const [timelineQuickDependencyType, setTimelineQuickDependencyType] = useState<'FS' | 'SS' | 'FF' | 'SF'>('FS')
+  const [timelineQuickDependencyLag, setTimelineQuickDependencyLag] = useState<number>(0)
   const [timelineQuickModalOpen, setTimelineQuickModalOpen] = useState(false)
   const [timelineDrag, setTimelineDrag] = useState<{
     taskId: string
@@ -918,6 +921,39 @@ export function GanttPlannerPage() {
     await handleAssignResponsible(selectedTimelineTask, timelineQuickResponsibleId)
   }
 
+  async function handleTimelineQuickAddDependency() {
+    if (!canEdit || !selectedTimelineTask || timelineQuickDependencyPredecessorId === 'none') return
+    if (selectedTimelineTask.id === timelineQuickDependencyPredecessorId) {
+      setError('Una tarea no puede depender de sí misma')
+      return
+    }
+
+    const alreadyExists = selectedTimelineTask.dependencies.some(
+      (dependency) => dependency.predecessorId === timelineQuickDependencyPredecessorId && dependency.type === timelineQuickDependencyType
+    )
+    if (alreadyExists) return
+
+    const dependencies = [
+      ...selectedTimelineTask.dependencies,
+      {
+        predecessorId: timelineQuickDependencyPredecessorId,
+        type: timelineQuickDependencyType,
+        lagHours: timelineQuickDependencyLag,
+      },
+    ]
+
+    await updateGanttTask(selectedTimelineTask.id, { dependencies })
+    setTimelineQuickDependencyPredecessorId('none')
+    setTimelineQuickDependencyType('FS')
+    setTimelineQuickDependencyLag(0)
+    await load()
+  }
+
+  async function handleTimelineQuickRemoveDependency(predecessorId: string, type: 'FS' | 'SS' | 'FF' | 'SF') {
+    if (!canEdit || !selectedTimelineTask) return
+    await handleRemoveDependency(selectedTimelineTask, predecessorId, type)
+  }
+
   useEffect(() => {
     setTimelinePage(1)
     setListPage(1)
@@ -1001,6 +1037,9 @@ export function GanttPlannerPage() {
       setTimelineQuickDays('')
       setTimelineQuickDurationUnit('hours')
       setTimelineQuickResponsibleId('none')
+      setTimelineQuickDependencyPredecessorId('none')
+      setTimelineQuickDependencyType('FS')
+      setTimelineQuickDependencyLag(0)
       setTimelineQuickModalOpen(false)
       return
     }
@@ -1012,6 +1051,9 @@ export function GanttPlannerPage() {
     setTimelineQuickDays(String(Math.max(1, Math.ceil(hours / 24))))
     setTimelineQuickDurationUnit(hours >= 24 && hours % 24 === 0 ? 'days' : 'hours')
     setTimelineQuickResponsibleId(selectedTimelineTask.responsibleUserId ?? 'none')
+    setTimelineQuickDependencyPredecessorId('none')
+    setTimelineQuickDependencyType('FS')
+    setTimelineQuickDependencyLag(0)
 
     if (timelineQuickFocusPendingRef.current) {
       timelineQuickFocusPendingRef.current = false
@@ -2026,6 +2068,83 @@ export function GanttPlannerPage() {
                   <Button size="sm" variant="outline" onClick={() => void handleTimelineQuickAssignUser()} disabled={!canEdit}>
                     Guardar usuario
                   </Button>
+                </div>
+
+                <div className="rounded border p-3 space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs font-medium">Dependencias rápidas</p>
+                    <Badge variant="outline">FS / SS / FF / SF</Badge>
+                  </div>
+
+                  <div className="grid gap-2 sm:grid-cols-[1.4fr_.7fr_.6fr_auto] sm:items-end">
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Predecesora</Label>
+                      <Select value={timelineQuickDependencyPredecessorId} onValueChange={setTimelineQuickDependencyPredecessorId}>
+                        <SelectTrigger><SelectValue placeholder="Seleccionar tarea" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Sin selección</SelectItem>
+                          {tasks
+                            .filter((task) => task.id !== selectedTimelineTask.id)
+                            .map((task) => (
+                              <SelectItem key={`timeline-quick-dep-${task.id}`} value={task.id}>
+                                {task.titulo}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Tipo</Label>
+                      <Select value={timelineQuickDependencyType} onValueChange={(value) => setTimelineQuickDependencyType(value as 'FS' | 'SS' | 'FF' | 'SF')}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {DEPENDENCY_TYPES.map((dep) => <SelectItem key={`timeline-quick-dep-type-${dep}`} value={dep}>{dep}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Lag (h)</Label>
+                      <Input
+                        type="number"
+                        value={timelineQuickDependencyLag}
+                        onChange={(event) => setTimelineQuickDependencyLag(Number(event.target.value) || 0)}
+                      />
+                    </div>
+
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => void handleTimelineQuickAddDependency()}
+                      disabled={!canEdit || timelineQuickDependencyPredecessorId === 'none'}
+                    >
+                      <GitBranchPlus className="h-4 w-4 mr-1" />
+                      Agregar
+                    </Button>
+                  </div>
+
+                  {selectedTimelineTask.dependencies.length > 0 && (
+                    <div className="space-y-1 rounded border p-2 text-xs text-muted-foreground">
+                      {selectedTimelineTask.dependencies.map((dep, index) => {
+                        const predecessor = tasks.find((item) => item.id === dep.predecessorId)
+                        return (
+                          <div key={`timeline-quick-dep-row-${dep.predecessorId}-${dep.type}-${index}`} className="flex items-center justify-between gap-2">
+                            <span>{predecessor?.titulo ?? dep.predecessorId} → {selectedTimelineTask.titulo} ({dep.type}{dep.lagHours ? ` +${dep.lagHours}h` : ''})</span>
+                            {canEdit && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => void handleTimelineQuickRemoveDependency(dep.predecessorId, dep.type)}
+                              >
+                                <Link2Off className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
             )}

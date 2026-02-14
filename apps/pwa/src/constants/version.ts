@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.47.90' as const
+export const APP_VERSION = '2.47.91' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-02-14' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'GanttPRO UX: carga por técnico + delta baseline' as const
+export const VERSION_NAME = 'GanttPRO UX: editor visual de dependencias' as const
 
 /**
  * Nota:

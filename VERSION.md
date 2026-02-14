@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.47.90**
+## Versión Actual: **v2.47.91**
 
 **Fecha de lanzamiento**: 14 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.47.91 - Editor visual de dependencias (14/02/2026)
+- 🧩 **Dependencias en modal**: edición rápida de predecesora, tipo (`FS/SS/FF/SF`) y `lag`.
+- 🔁 **Alta/baja directa**: creación y eliminación de dependencias desde timeline sin cambiar de pantalla.
+- ⚙️ **Operación más ágil**: ajustes de secuencia en el mismo flujo de edición de fechas y responsable.
 
 ### v2.47.90 - Carga por técnico + variación baseline (14/02/2026)
 - 📊 **Histograma por responsable**: vista de carga de trabajo por técnico en tareas visibles del timeline.

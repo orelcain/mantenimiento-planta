@@ -7,6 +7,15 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.91] - 2026-02-14
+
+### 🧩 Editor visual de dependencias en Timeline
+
+#### Mejoras
+- **Dependencias en modal rápido**: desde edición de tarea puedes seleccionar predecesora, tipo `FS/SS/FF/SF` y `lag` en horas.
+- **Alta/baja inmediata**: agregar o quitar dependencias sin salir de la vista timeline.
+- **Flujo más GanttPRO**: gestión de lógica de secuencia directamente en el contexto operativo de la tarea.
+
 ## [2.47.90] - 2026-02-14
 
 ### 📊 GanttPRO UX: carga por técnico + variación baseline
