@@ -7,6 +7,16 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.87] - 2026-02-14
+
+### 🪟 Edición rápida en modal PWA
+
+#### Mejoras
+- **Sin panel fijo**: Se elimina el bloque de edición superior que ocupaba espacio de trabajo.
+- **Modal contextual**: La edición de tarea en timeline ahora se abre en diálogo adaptable a PWA.
+- **Apertura por interacción**: doble clic en fila/barra o botón `Editar seleccionada` para modificar solo cuando corresponda.
+- **Flujo compacto**: edición de fechas, horas y usuario en un único modal sin romper el layout del timeline.
+
 ## [2.47.86] - 2026-02-14
 
 ### ⚡ Acceso rápido a edición por doble clic

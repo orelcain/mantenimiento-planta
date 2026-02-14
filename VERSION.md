@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.47.86**
+## Versión Actual: **v2.47.87**
 
 **Fecha de lanzamiento**: 13 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.47.87 - Editor de tarea en modal PWA (14/02/2026)
+- 🪟 **Modal en vez de panel fijo**: la edición rápida ya no ocupa espacio permanente en pantalla.
+- 🖱️ **Apertura contextual**: doble clic en tarea/barra o acción explícita para editar cuando realmente se requiere.
+- 📱 **Mejor en PWA**: diálogo compacto y adaptable para operación en pantallas reducidas.
 
 ### v2.47.86 - Doble clic para edición rápida (14/02/2026)
 - ⚡ **Open rápido**: doble clic en fila/barra del timeline abre edición de la tarea.

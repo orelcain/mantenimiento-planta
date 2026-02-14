@@ -8,6 +8,11 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
   Input,
   Label,
   Select,
@@ -270,6 +275,7 @@ export function GanttPlannerPage() {
   const [timelineQuickEnd, setTimelineQuickEnd] = useState('')
   const [timelineQuickHours, setTimelineQuickHours] = useState('')
   const [timelineQuickResponsibleId, setTimelineQuickResponsibleId] = useState<string>('none')
+  const [timelineQuickModalOpen, setTimelineQuickModalOpen] = useState(false)
   const [timelineDrag, setTimelineDrag] = useState<{
     taskId: string
     mode: TimelineDragMode
@@ -711,6 +717,7 @@ export function GanttPlannerPage() {
     setPlannerTab('timeline')
     setTimelineCollapsed(false)
     setSelectedTaskId(taskId)
+    setTimelineQuickModalOpen(true)
   }, [])
 
   const handleTimelineQuickSaveDates = useCallback(async () => {
@@ -832,6 +839,7 @@ export function GanttPlannerPage() {
       setTimelineQuickEnd('')
       setTimelineQuickHours('')
       setTimelineQuickResponsibleId('none')
+      setTimelineQuickModalOpen(false)
       return
     }
 
@@ -1479,55 +1487,14 @@ export function GanttPlannerPage() {
               </div>
             </div>
 
-            {selectedTimelineTask && (
-              <div className="rounded border p-3 space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-sm font-medium truncate">Edición rápida: {selectedTimelineTask.hierarchyPath ?? 'Sin área'} · {selectedTimelineTask.equipmentNombre ?? 'Sin equipo'} · {selectedTimelineTask.titulo}</p>
-                  <Badge variant="outline">{selectedTimelineTask.status}</Badge>
-                </div>
-                <div className="grid gap-2 md:grid-cols-5">
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Inicio</Label>
-                    <Input ref={timelineQuickStartInputRef} type="datetime-local" value={timelineQuickStart} onChange={(event) => setTimelineQuickStart(event.target.value)} />
-                  </div>
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Fin</Label>
-                    <Input type="datetime-local" value={timelineQuickEnd} onChange={(event) => setTimelineQuickEnd(event.target.value)} />
-                  </div>
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Tiempo (horas)</Label>
-                    <Input type="number" min={1} value={timelineQuickHours} onChange={(event) => setTimelineQuickHours(event.target.value)} />
-                  </div>
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Usuario responsable</Label>
-                    <Select value={timelineQuickResponsibleId} onValueChange={setTimelineQuickResponsibleId}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Sin asignar</SelectItem>
-                        {technicians.map((tech) => (
-                          <SelectItem key={`timeline-quick-tech-${tech.id}`} value={tech.id}>
-                            {tech.nombre} {tech.apellido}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="flex items-end gap-2">
-                    <Button size="sm" className="w-full" variant="outline" onClick={() => void handleTimelineQuickSaveDates()} disabled={!canOperateTask(selectedTimelineTask)}>
-                      Guardar fechas
-                    </Button>
-                    <Button size="sm" className="w-full" variant="secondary" onClick={() => void handleTimelineQuickApplyHours()} disabled={!canOperateTask(selectedTimelineTask)}>
-                      Aplicar horas
-                    </Button>
-                  </div>
-                </div>
-                <div className="flex justify-end">
-                  <Button size="sm" variant="outline" onClick={() => void handleTimelineQuickAssignUser()} disabled={!canEdit}>
-                    Guardar usuario
-                  </Button>
-                </div>
-              </div>
-            )}
+            <div className="rounded border p-2 text-xs text-muted-foreground flex items-center justify-between gap-2">
+              <span>Doble clic en una fila o barra para editar tarea sin ocupar espacio del timeline.</span>
+              {selectedTimelineTask && (
+                <Button size="sm" variant="outline" onClick={() => openTimelineQuickEditor(selectedTimelineTask.id)}>
+                  Editar seleccionada
+                </Button>
+              )}
+            </div>
           </CardContent>
         </Card>
 
@@ -1720,6 +1687,67 @@ export function GanttPlannerPage() {
             </div>
           </div>
         )}
+
+        <Dialog open={timelineQuickModalOpen} onOpenChange={setTimelineQuickModalOpen}>
+          <DialogContent className="max-w-[95vw] sm:max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Editar tarea en timeline</DialogTitle>
+              <DialogDescription>
+                {selectedTimelineTask
+                  ? `${selectedTimelineTask.hierarchyPath ?? 'Sin área'} · ${selectedTimelineTask.equipmentNombre ?? 'Sin equipo'} · ${selectedTimelineTask.titulo}`
+                  : 'Selecciona una tarea para editar'}
+              </DialogDescription>
+            </DialogHeader>
+
+            {selectedTimelineTask && (
+              <div className="space-y-3">
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Inicio</Label>
+                    <Input ref={timelineQuickStartInputRef} type="datetime-local" value={timelineQuickStart} onChange={(event) => setTimelineQuickStart(event.target.value)} />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Fin</Label>
+                    <Input type="datetime-local" value={timelineQuickEnd} onChange={(event) => setTimelineQuickEnd(event.target.value)} />
+                  </div>
+                </div>
+
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Tiempo (horas)</Label>
+                    <Input type="number" min={1} value={timelineQuickHours} onChange={(event) => setTimelineQuickHours(event.target.value)} />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Usuario responsable</Label>
+                    <Select value={timelineQuickResponsibleId} onValueChange={setTimelineQuickResponsibleId}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Sin asignar</SelectItem>
+                        {technicians.map((tech) => (
+                          <SelectItem key={`timeline-quick-tech-${tech.id}`} value={tech.id}>
+                            {tech.nombre} {tech.apellido}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2 justify-end">
+                  <Button size="sm" variant="outline" onClick={() => void handleTimelineQuickSaveDates()} disabled={!canOperateTask(selectedTimelineTask)}>
+                    Guardar fechas
+                  </Button>
+                  <Button size="sm" variant="secondary" onClick={() => void handleTimelineQuickApplyHours()} disabled={!canOperateTask(selectedTimelineTask)}>
+                    Aplicar horas
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => void handleTimelineQuickAssignUser()} disabled={!canEdit}>
+                    Guardar usuario
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
       )}
 
