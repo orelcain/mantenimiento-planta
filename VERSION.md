@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.47.79**
+## Versión Actual: **v2.47.80**
 
 **Fecha de lanzamiento**: 13 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.47.80 - Ajuste UX Gantt: Área y Equipo primero (14/02/2026)
+- 🧭 **Orden operativo mejorado**: En timeline y listado ahora se muestra `Área · Equipo` antes de `Tarea`.
+- 👀 **Lectura por contexto de planta**: Facilita revisar bloques por zona/equipo sin abrir cada detalle.
+- ✅ **Demo alineada**: Propuesta HTML actualizada con columnas `Área`, `Equipo`, `Tarea` para validación visual.
 
 ### v2.47.79 - Timeline editable con drag/resize (13/02/2026)
 - 🖱️ **Drag de tareas**: En timeline puedes arrastrar barras para mover inicio/fin manteniendo duración.

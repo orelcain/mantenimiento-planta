@@ -1185,7 +1185,7 @@ export function GanttPlannerPage() {
               return (
                 <div key={`timeline-${task.id}`} className="space-y-1">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="font-medium">{task.titulo}</span>
+                    <span className="font-medium">{task.hierarchyPath ?? 'Sin área'} · {task.equipmentNombre ?? 'Sin equipo'} · {task.titulo}</span>
                     <span className="text-muted-foreground">{task.dependencies.length} dep.</span>
                   </div>
                   <div className="relative overflow-x-auto rounded border bg-muted/20">
@@ -1363,8 +1363,9 @@ export function GanttPlannerPage() {
                   <div key={task.id} className="rounded-lg border p-3 space-y-2">
                     <div className="flex items-center justify-between gap-2">
                       <div>
+                        <p className="text-xs text-muted-foreground">{task.hierarchyPath ?? 'Sin área'} · {task.equipmentNombre ?? 'Sin equipo'}</p>
                         <p className="font-medium">{task.titulo}</p>
-                        <p className="text-xs text-muted-foreground">{task.hierarchyPath ?? 'Sin área'} · {task.equipmentNombre ?? 'Sin equipo'} · {task.startDate.toLocaleString()} → {task.endDate.toLocaleString()}</p>
+                        <p className="text-xs text-muted-foreground">{task.startDate.toLocaleString()} → {task.endDate.toLocaleString()}</p>
                       </div>
                       <div className="flex items-center gap-2">
                         {row?.isCritical && <Badge variant="destructive">Crítica</Badge>}

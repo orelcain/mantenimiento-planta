@@ -7,6 +7,15 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.80] - 2026-02-14
+
+### 🧭 UX Gantt orientada a planta (Área/Equipo antes de Tarea)
+
+#### Mejoras
+- **Contexto primero**: En timeline se muestra `Área · Equipo · Tarea` para lectura más natural en operación.
+- **Listado más claro**: Cada tarjeta prioriza `Área · Equipo` y luego el título de la tarea.
+- **Propuesta visual alineada**: Demo HTML actualizada con columnas `Área`, `Equipo`, `Tarea`.
+
 ## [2.47.79] - 2026-02-13
 
 ### 🖱️ Timeline Gantt editable (drag + resize + propagación FS)

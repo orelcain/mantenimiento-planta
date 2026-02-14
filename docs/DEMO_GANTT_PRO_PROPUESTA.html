@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Propuesta Gantt Pro - Demo</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --panel: #111831;
+      --muted: #93a0c0;
+      --line: #26304e;
+      --text: #e8ecff;
+      --primary: #4f7cff;
+      --critical: #ff4d6d;
+      --baseline: #7a86ad;
+      --ok: #26c281;
+      --warn: #f5a623;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, Segoe UI, Arial, sans-serif;
+      background: linear-gradient(180deg, #0a0f1d 0%, #0f1730 100%);
+      color: var(--text);
+    }
+    .wrap { max-width: 1440px; margin: 0 auto; padding: 16px; }
+    .topbar {
+      display: grid;
+      grid-template-columns: 1fr auto auto auto;
+      gap: 10px;
+      align-items: center;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+    .title { font-size: 18px; font-weight: 700; }
+    .sub { color: var(--muted); font-size: 12px; }
+    .btns button, .chip {
+      border: 1px solid var(--line);
+      background: #162143;
+      color: var(--text);
+      border-radius: 8px;
+      padding: 7px 10px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .btns button.active { background: var(--primary); border-color: var(--primary); }
+    .chip { display: inline-flex; gap: 6px; align-items: center; }
+
+    .kpis {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(120px, 1fr));
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .kpi {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px;
+    }
+    .kpi .label { color: var(--muted); font-size: 12px; }
+    .kpi .value { font-size: 22px; font-weight: 700; margin-top: 4px; }
+
+    .board {
+      display: grid;
+      grid-template-columns: 420px 1fr;
+      gap: 10px;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .card-head {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .grid-head, .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1.4fr .8fr .7fr .6fr;
+      gap: 8px;
+      padding: 8px 12px;
+      font-size: 12px;
+      align-items: center;
+    }
+    .grid-head { color: var(--muted); border-bottom: 1px solid var(--line); }
+    .rows { max-height: 560px; overflow: auto; }
+    .row { border-bottom: 1px solid #1e2744; }
+    .badge {
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 11px;
+      border: 1px solid transparent;
+      justify-self: start;
+    }
+    .critical { background: rgba(255,77,109,.15); border-color: rgba(255,77,109,.4); color: #ff9bb0; }
+    .inprogress { background: rgba(79,124,255,.18); border-color: rgba(79,124,255,.4); color: #a7bdff; }
+    .delayed { color: #ffb4c3; }
+
+    .timeline-wrap { overflow: auto; position: relative; }
+    .time-head {
+      position: sticky;
+      top: 0;
+      z-index: 4;
+      background: #121a33;
+      border-bottom: 1px solid var(--line);
+      min-width: 1200px;
+    }
+    .time-scale {
+      display: grid;
+      grid-auto-flow: column;
+      grid-auto-columns: var(--col-width, 40px);
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .tick { padding: 6px 4px; border-right: 1px solid #2a3558; white-space: nowrap; }
+    .time-body {
+      position: relative;
+      min-width: 1200px;
+      background-image: repeating-linear-gradient(to right, transparent 0, transparent calc(var(--col-width, 40px) - 1px), #222d4a calc(var(--col-width, 40px) - 1px), #222d4a var(--col-width, 40px));
+    }
+    .lane {
+      position: relative;
+      height: 44px;
+      border-bottom: 1px solid #1e2744;
+    }
+    .bar, .baseline {
+      position: absolute;
+      border-radius: 7px;
+      height: 12px;
+      top: 16px;
+    }
+    .baseline { background: var(--baseline); opacity: .5; }
+    .bar { background: var(--primary); }
+    .bar.critical { background: var(--critical); }
+    .today {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: #ff5f5f;
+      z-index: 3;
+    }
+    .arrow {
+      position: absolute;
+      height: 2px;
+      background: #89a2ff;
+      opacity: .8;
+      z-index: 2;
+    }
+    .legend {
+      display: flex;
+      gap: 14px;
+      padding: 8px 12px;
+      border-top: 1px solid var(--line);
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .dot { width: 10px; height: 10px; border-radius: 2px; display: inline-block; margin-right: 5px; }
+
+    .footer-note {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div>
+        <div class="title">Propuesta visual de módulo Gantt (referencia GanttPRO)</div>
+        <div class="sub">Objetivo: validar UX de timeline profesional, no es copia literal del producto.</div>
+      </div>
+      <div class="btns" id="zoomBtns">
+        <button data-zoom="day">Día</button>
+        <button data-zoom="week" class="active">Semana</button>
+        <button data-zoom="month">Mes</button>
+      </div>
+      <span class="chip">⚡ Auto-scheduling FS</span>
+      <span class="chip">📍 Línea de hoy + Baseline</span>
+    </div>
+
+    <div class="kpis">
+      <div class="kpi"><div class="label">Total tareas</div><div class="value">42</div></div>
+      <div class="kpi"><div class="label">Críticas</div><div class="value">7</div></div>
+      <div class="kpi"><div class="label">Atrasadas</div><div class="value delayed">5</div></div>
+      <div class="kpi"><div class="label">Avance global</div><div class="value">63%</div></div>
+    </div>
+
+    <div class="board">
+      <section class="card">
+        <div class="card-head">Tabla de tareas (WBS/estado/owner)</div>
+        <div class="grid-head">
+          <div>Área</div><div>Equipo</div><div>Tarea</div><div>Responsable</div><div>Estado</div><div>Avance</div>
+        </div>
+        <div class="rows" id="gridRows"></div>
+      </section>
+
+      <section class="card">
+        <div class="card-head">Timeline profesional (baseline vs real + dependencias)</div>
+        <div class="timeline-wrap">
+          <div class="time-head"><div class="time-scale" id="ticks"></div></div>
+          <div class="time-body" id="timeBody"></div>
+        </div>
+        <div class="legend">
+          <span><i class="dot" style="background:#4f7cff"></i>Barra real</span>
+          <span><i class="dot" style="background:#7a86ad"></i>Baseline</span>
+          <span><i class="dot" style="background:#ff4d6d"></i>Crítica</span>
+          <span><i class="dot" style="background:#89a2ff"></i>Dependencia FS</span>
+          <span><i class="dot" style="background:#ff5f5f"></i>Hoy</span>
+        </div>
+      </section>
+    </div>
+
+    <div class="footer-note">
+      Esta propuesta concentra lo más “GanttPRO-like” para validar contigo: timeline potente, jerarquía visible, baseline, ruta crítica,
+      dependencias y legibilidad ejecutiva. Si te gusta, lo llevamos 1:1 al módulo productivo por fases.
+    </div>
+  </div>
+
+  <script>
+    const start = new Date('2026-02-01T00:00:00').getTime();
+    const tasks = [
+      { id:'t1', area:'Fileteado', equipo:'Desespinadora D-14', name:'Ingeniería de intervención', owner:'Carlos A.', status:'En progreso', progress:75, s:1, e:6, bs:1, be:5, critical:false },
+      { id:'t2', area:'Fileteado', equipo:'Desespinadora D-14', name:'Parada y bloqueo LOTO', owner:'Ana R.', status:'Abierto', progress:30, s:6, e:8, bs:5, be:7, critical:true, dep:'t1' },
+      { id:'t3', area:'Fileteado', equipo:'Desespinadora D-14', name:'Desmontaje componente', owner:'Luis P.', status:'En progreso', progress:45, s:8, e:13, bs:8, be:12, critical:true, dep:'t2' },
+      { id:'t4', area:'Fileteado', equipo:'Desespinadora D-14', name:'Montaje + alineación', owner:'Marta C.', status:'Abierto', progress:15, s:13, e:18, bs:12, be:16, critical:true, dep:'t3' },
+      { id:'t5', area:'Fileteado', equipo:'Desespinadora D-14', name:'Pruebas y liberación', owner:'Jefe Turno', status:'Abierto', progress:0, s:18, e:21, bs:17, be:20, critical:false, dep:'t4' },
+      { id:'t6', area:'Fileteado', equipo:'Desespinadora D-14', name:'Cierre técnico + informe', owner:'Planner', status:'Abierto', progress:0, s:21, e:23, bs:20, be:22, critical:false, dep:'t5' }
+    ];
+
+    const grid = document.getElementById('gridRows');
+    const body = document.getElementById('timeBody');
+    const ticks = document.getElementById('ticks');
+    const zoomBtns = document.getElementById('zoomBtns');
+    let colWidth = 40;
+
+    function statusClass(status){ return status === 'En progreso' ? 'inprogress' : 'critical'; }
+
+    function renderGrid(){
+      grid.innerHTML = '';
+      tasks.forEach(t => {
+        const row = document.createElement('div');
+        row.className = 'row';
+        row.innerHTML = `
+          <div>${t.area}</div>
+          <div>${t.equipo}</div>
+          <div>${t.critical ? '🔴 ' : ''}${t.name}</div>
+          <div>${t.owner}</div>
+          <div><span class="badge ${statusClass(t.status)}">${t.status}</span></div>
+          <div>${t.progress}%</div>
+        `;
+        grid.appendChild(row);
+      });
+    }
+
+    function renderTicks(days = 28){
+      ticks.style.setProperty('--col-width', colWidth + 'px');
+      ticks.innerHTML = '';
+      for(let i=0;i<days;i++){
+        const d = new Date(start + i*24*60*60*1000);
+        const el = document.createElement('div');
+        el.className = 'tick';
+        el.textContent = `${d.getDate()}/${d.getMonth()+1}`;
+        ticks.appendChild(el);
+      }
+    }
+
+    function px(day){ return day * colWidth; }
+
+    function renderTimeline(){
+      body.style.setProperty('--col-width', colWidth + 'px');
+      body.innerHTML = '';
+      body.style.minWidth = (28*colWidth) + 'px';
+
+      // hoy
+      const today = new Date();
+      const dayOffset = Math.floor((today.getTime() - start)/(24*60*60*1000));
+      if(dayOffset >= 0 && dayOffset <= 28){
+        const line = document.createElement('div');
+        line.className = 'today';
+        line.style.left = px(dayOffset) + 'px';
+        body.appendChild(line);
+      }
+
+      // lanes + barras
+      tasks.forEach((t, idx) => {
+        const lane = document.createElement('div');
+        lane.className = 'lane';
+
+        const base = document.createElement('div');
+        base.className = 'baseline';
+        base.style.left = px(t.bs) + 'px';
+        base.style.width = px(t.be - t.bs) + 'px';
+
+        const bar = document.createElement('div');
+        bar.className = 'bar ' + (t.critical ? 'critical' : '');
+        bar.style.left = px(t.s) + 'px';
+        bar.style.width = px(t.e - t.s) + 'px';
+        bar.title = `${t.name} (${t.progress}%)`;
+
+        lane.appendChild(base);
+        lane.appendChild(bar);
+        body.appendChild(lane);
+      });
+
+      // dependencias FS (líneas simples)
+      tasks.forEach((t, idx) => {
+        if(!t.dep) return;
+        const pred = tasks.find(x => x.id === t.dep);
+        if(!pred) return;
+        const predIndex = tasks.findIndex(x => x.id === pred.id);
+
+        const y1 = predIndex*44 + 22;
+        const y2 = idx*44 + 22;
+        const x1 = px(pred.e);
+        const x2 = px(t.s);
+
+        const h1 = document.createElement('div');
+        h1.className = 'arrow';
+        h1.style.left = x1 + 'px';
+        h1.style.top = y1 + 'px';
+        h1.style.width = Math.max(8, x2-x1) + 'px';
+        body.appendChild(h1);
+
+        const v = document.createElement('div');
+        v.className = 'arrow';
+        v.style.left = (x2-1) + 'px';
+        v.style.top = Math.min(y1,y2) + 'px';
+        v.style.width = '2px';
+        v.style.height = Math.abs(y2-y1) + 'px';
+        body.appendChild(v);
+      });
+    }
+
+    zoomBtns.addEventListener('click', (e) => {
+      const btn = e.target.closest('button');
+      if(!btn) return;
+      [...zoomBtns.querySelectorAll('button')].forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const z = btn.dataset.zoom;
+      colWidth = z === 'day' ? 80 : z === 'week' ? 40 : 18;
+      renderTicks();
+      renderTimeline();
+    });
+
+    renderGrid();
+    renderTicks();
+    renderTimeline();
+  </script>
+</body>
+</html>
