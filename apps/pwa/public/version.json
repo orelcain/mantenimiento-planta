@@ -1,8 +1,9 @@
 {
-  "version": "2.47.94",
+  "version": "2.47.95",
   "buildDate": "2026-02-14",
-  "buildTimestamp": 1771087800000,
+  "buildTimestamp": 1771088400000,
   "features": [
+    "Etiqueta flotante junto al cursor con tipo de dependencia detectado (FS/SS/FF/SF) durante el drag",
     "Resaltado visual de anclas destino válidas durante drag de dependencias en timeline",
     "Ancla objetivo activa con feedback reforzado (tamaño y halo) al detectar snap de enlace",
     "Modo dependencia en timeline con tecla D (toggle ON/OFF) para separar enlace de tareas vs drag/resize",

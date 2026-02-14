@@ -7,6 +7,15 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.95] - 2026-02-14
+
+### 🏷️ Etiqueta flotante de tipo de dependencia
+
+#### Mejoras
+- **Feedback inmediato**: durante el drag de enlace se muestra una etiqueta flotante con el tipo detectado (`FS`, `SS`, `FF`, `SF`).
+- **Confirmación visual rápida**: ayuda a verificar la lógica antes de soltar la conexión.
+- **Mejor usabilidad operativa**: reduce errores al construir secuencias complejas en timeline.
+
 ## [2.47.94] - 2026-02-14
 
 ### 🎯 Resaltado de anclas destino en dependencias

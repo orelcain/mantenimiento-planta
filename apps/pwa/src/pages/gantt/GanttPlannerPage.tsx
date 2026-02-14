@@ -2114,18 +2114,31 @@ export function GanttPlannerPage() {
                       ))}
 
                       {timelineLinkPreview && (
-                        <svg className="pointer-events-none absolute inset-0 z-20" style={{ width: `${timeline.widthPx}px`, height: `${timelineRows.length * 44}px` }}>
-                          <line
-                            x1={timelineLinkPreview.sourceX}
-                            y1={timelineLinkPreview.sourceY}
-                            x2={timelineLinkPreview.targetX}
-                            y2={timelineLinkPreview.targetY}
-                            stroke="currentColor"
-                            strokeOpacity="0.7"
-                            strokeWidth="2"
-                            strokeDasharray="4 3"
-                          />
-                        </svg>
+                        <>
+                          <svg className="pointer-events-none absolute inset-0 z-20" style={{ width: `${timeline.widthPx}px`, height: `${timelineRows.length * 44}px` }}>
+                            <line
+                              x1={timelineLinkPreview.sourceX}
+                              y1={timelineLinkPreview.sourceY}
+                              x2={timelineLinkPreview.targetX}
+                              y2={timelineLinkPreview.targetY}
+                              stroke="currentColor"
+                              strokeOpacity="0.7"
+                              strokeWidth="2"
+                              strokeDasharray="4 3"
+                            />
+                          </svg>
+                          {timelineLinkPreview.type && (
+                            <div
+                              className="pointer-events-none absolute z-30 rounded border bg-background/95 px-2 py-0.5 text-[10px] font-semibold text-foreground shadow"
+                              style={{
+                                left: `${Math.max(6, Math.min(timeline.widthPx - 84, timelineLinkPreview.targetX + 10))}px`,
+                                top: `${Math.max(2, timelineLinkPreview.targetY - 18)}px`,
+                              }}
+                            >
+                              Tipo: {timelineLinkPreview.type}
+                            </div>
+                          )}
+                        </>
                       )}
 
                       {timeline.showTodayLine && (

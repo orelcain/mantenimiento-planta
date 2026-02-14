@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.47.94**
+## Versión Actual: **v2.47.95**
 
 **Fecha de lanzamiento**: 14 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.47.95 - Etiqueta flotante de tipo en drag de dependencia (14/02/2026)
+- 🏷️ **Tipo en vivo**: muestra `FS/SS/FF/SF` junto al cursor mientras arrastras la dependencia.
+- 👁️ **Verificación previa**: permite confirmar la relación antes de soltar.
+- ⚡ **Menos fricción**: acelera creación de enlaces correctos en timelines con alta densidad.
 
 ### v2.47.94 - Resaltado de anclas destino en drag de dependencias (14/02/2026)
 - 🎯 **Destino válido visible**: durante el arrastre se resaltan las anclas posibles de conexión.
