@@ -7,6 +7,15 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.93] - 2026-02-14
+
+### ⌨️ Modo dependencia con tecla D
+
+#### Mejoras
+- **Toggle rápido por teclado**: `D` activa/desactiva modo dependencia sin salir del timeline.
+- **Operación más segura**: en modo dependencia se muestran anclas de enlace y se evita conflicto con mover/redimensionar barras.
+- **Estado visible**: botón `Dependencias (ON/OFF · D)` en cabecera para control explícito del modo.
+
 ## [2.47.92] - 2026-02-14
 
 ### 🖱️ Dependencias por mouse + hover explicativo

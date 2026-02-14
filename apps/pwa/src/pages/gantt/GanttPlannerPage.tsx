@@ -366,6 +366,7 @@ export function GanttPlannerPage() {
     targetTaskId?: string
     targetAnchor?: 'start' | 'end'
   } | null>(null)
+  const [timelineDependencyMode, setTimelineDependencyMode] = useState(false)
   const notifiedDelayedCriticalRef = useRef<Set<string>>(new Set())
   const remoteAlertSentRef = useRef<Set<string>>(new Set())
   const timelineSplitDragRef = useRef<{ startX: number; startWidth: number } | null>(null)
@@ -962,7 +963,7 @@ export function GanttPlannerPage() {
     clientX: number,
     clientY: number
   ) {
-    if (!canEdit) return
+    if (!canEdit || !timelineDependencyMode) return
     setTimelineLinkDraft({
       sourceTaskId,
       sourceAnchor,
@@ -1325,6 +1326,31 @@ export function GanttPlannerPage() {
       window.removeEventListener('mouseup', handleMouseUp)
     }
   }, [detectTimelineAnchor, load, tasks, timelineLinkDraft])
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.repeat) return
+      const target = event.target as HTMLElement | null
+      const tagName = target?.tagName?.toLowerCase()
+      const isTypingContext = target?.isContentEditable || tagName === 'input' || tagName === 'textarea' || tagName === 'select'
+      if (isTypingContext) return
+      if (event.key.toLowerCase() !== 'd') return
+
+      event.preventDefault()
+      setTimelineDependencyMode((current) => {
+        const next = !current
+        if (!next) {
+          setTimelineLinkDraft(null)
+        }
+        return next
+      })
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [])
 
   async function handleCreateTask() {
     if (!user?.id || !title.trim()) return
@@ -1913,7 +1939,9 @@ export function GanttPlannerPage() {
             </div>
 
             <div className="rounded border p-2 text-xs text-muted-foreground flex items-center justify-between gap-2">
-              <span>Doble clic en una fila o barra para editar tarea sin ocupar espacio del timeline.</span>
+              <span>
+                Doble clic para editar. Tecla D: {timelineDependencyMode ? 'modo dependencia ACTIVO' : 'modo dependencia inactivo'}.
+              </span>
               {selectedTimelineTask && (
                 <Button size="sm" variant="outline" onClick={() => openTimelineQuickEditor(selectedTimelineTask.id)}>
                   Editar seleccionada
@@ -2002,7 +2030,25 @@ export function GanttPlannerPage() {
 
             <Card className="xl:flex-1 xl:min-w-0">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Timeline profesional (baseline vs real + dependencias)</CardTitle>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <CardTitle className="text-sm">Timeline profesional (baseline vs real + dependencias)</CardTitle>
+                  <Button
+                    size="sm"
+                    variant={timelineDependencyMode ? 'default' : 'outline'}
+                    onClick={() => {
+                      setTimelineDependencyMode((current) => {
+                        const next = !current
+                        if (!next) {
+                          setTimelineLinkDraft(null)
+                        }
+                        return next
+                      })
+                    }}
+                  >
+                    <GitBranchPlus className="h-4 w-4 mr-1" />
+                    Dependencias ({timelineDependencyMode ? 'ON' : 'OFF'}) · D
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="p-0">
                 <div className="overflow-auto">
@@ -2102,11 +2148,15 @@ export function GanttPlannerPage() {
                             onClick={() => setSelectedTaskId(row.task.id)}
                             onDoubleClick={() => openTimelineQuickEditor(row.task.id)}
                             onMouseDown={(event) => {
-                              if (!row.interactive) return
+                              if (!row.interactive || timelineDependencyMode) return
                               event.preventDefault()
                               handleTimelineDragStart(row.task, 'move', event.clientX)
                             }}
-                            title={row.interactive ? 'Arrastrar para mover fechas' : 'Sin permisos para mover'}
+                            title={!row.interactive
+                              ? 'Sin permisos para mover'
+                              : timelineDependencyMode
+                                ? 'Modo dependencia activo: usa anclas de inicio/fin para enlazar'
+                                : 'Arrastrar para mover fechas'}
                           />
                           {timelineDrag?.taskId === row.task.id && (
                             <div
@@ -2120,45 +2170,51 @@ export function GanttPlannerPage() {
                           )}
                           {row.interactive && (
                             <>
-                              <div
-                                className="absolute h-3 w-3 rounded-full border bg-background cursor-crosshair"
-                                style={{ left: `${Math.max(0, row.left - 5)}px`, top: `${row.rowIndex * 44 + 9}px` }}
-                                onMouseDown={(event) => {
-                                  event.preventDefault()
-                                  event.stopPropagation()
-                                  handleTimelineLinkStart(row.task.id, 'start', event.clientX, event.clientY)
-                                }}
-                                title="Crear dependencia desde INICIO (arrastra hacia inicio/fin de otra tarea)"
-                              />
-                              <div
-                                className="absolute h-3 w-3 rounded-full border bg-background cursor-crosshair"
-                                style={{ left: `${row.left + row.width - 5}px`, top: `${row.rowIndex * 44 + 9}px` }}
-                                onMouseDown={(event) => {
-                                  event.preventDefault()
-                                  event.stopPropagation()
-                                  handleTimelineLinkStart(row.task.id, 'end', event.clientX, event.clientY)
-                                }}
-                                title="Crear dependencia desde FIN (arrastra hacia inicio/fin de otra tarea)"
-                              />
+                              {timelineDependencyMode && (
+                                <>
+                                  <div
+                                    className="absolute h-3 w-3 rounded-full border bg-background cursor-crosshair"
+                                    style={{ left: `${Math.max(0, row.left - 5)}px`, top: `${row.rowIndex * 44 + 9}px` }}
+                                    onMouseDown={(event) => {
+                                      event.preventDefault()
+                                      event.stopPropagation()
+                                      handleTimelineLinkStart(row.task.id, 'start', event.clientX, event.clientY)
+                                    }}
+                                    title="Crear dependencia desde INICIO (arrastra hacia inicio/fin de otra tarea)"
+                                  />
+                                  <div
+                                    className="absolute h-3 w-3 rounded-full border bg-background cursor-crosshair"
+                                    style={{ left: `${row.left + row.width - 5}px`, top: `${row.rowIndex * 44 + 9}px` }}
+                                    onMouseDown={(event) => {
+                                      event.preventDefault()
+                                      event.stopPropagation()
+                                      handleTimelineLinkStart(row.task.id, 'end', event.clientX, event.clientY)
+                                    }}
+                                    title="Crear dependencia desde FIN (arrastra hacia inicio/fin de otra tarea)"
+                                  />
+                                </>
+                              )}
                               <div
                                 className="absolute h-3 w-2 rounded bg-background border cursor-ew-resize"
                                 style={{ left: `${Math.max(0, row.left - 1)}px`, top: `${row.rowIndex * 44 + 14}px` }}
                                 onMouseDown={(event) => {
+                                  if (timelineDependencyMode) return
                                   event.preventDefault()
                                   event.stopPropagation()
                                   handleTimelineDragStart(row.task, 'resize-start', event.clientX)
                                 }}
-                                title="Ajustar inicio"
+                                title={timelineDependencyMode ? 'Modo dependencia activo' : 'Ajustar inicio'}
                               />
                               <div
                                 className="absolute h-3 w-2 rounded bg-background border cursor-ew-resize"
                                 style={{ left: `${row.left + row.width - 1}px`, top: `${row.rowIndex * 44 + 14}px` }}
                                 onMouseDown={(event) => {
+                                  if (timelineDependencyMode) return
                                   event.preventDefault()
                                   event.stopPropagation()
                                   handleTimelineDragStart(row.task, 'resize-end', event.clientX)
                                 }}
-                                title="Ajustar fin"
+                                title={timelineDependencyMode ? 'Modo dependencia activo' : 'Ajustar fin'}
                               />
                             </>
                           )}
@@ -2174,6 +2230,7 @@ export function GanttPlannerPage() {
                   <span className="inline-flex items-center gap-1"><span className="h-2 w-3 rounded bg-red-500" /> Crítica</span>
                   <span className="inline-flex items-center gap-1"><span className="h-2 w-3 rounded bg-primary/60" /> Dependencia FS</span>
                   <span className="inline-flex items-center gap-1"><span className="h-3 w-[2px] bg-red-500" /> Hoy</span>
+                  <span className="inline-flex items-center gap-1"><span className="h-3 w-3 rounded-full border" /> Modo dependencia: tecla D</span>
                 </div>
               </CardContent>
             </Card>

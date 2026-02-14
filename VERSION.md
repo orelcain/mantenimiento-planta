@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.47.92**
+## Versión Actual: **v2.47.93**
 
 **Fecha de lanzamiento**: 14 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.47.93 - Modo dependencia con tecla D (14/02/2026)
+- ⌨️ **Toggle rápido**: tecla `D` para activar/desactivar modo de creación de dependencias.
+- 🎯 **Menos errores de interacción**: anclas solo visibles en modo dependencia para evitar choques con drag/resize.
+- 👀 **Estado claro**: botón de cabecera `Dependencias (ON/OFF · D)` con feedback inmediato.
 
 ### v2.47.92 - Dependencias por mouse con hover explicativo (14/02/2026)
 - 🖱️ **Drag de dependencia**: conectar tareas arrastrando desde inicio/fin de una barra hacia inicio/fin de otra.

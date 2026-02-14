@@ -1,8 +1,12 @@
 {
-  "version": "2.47.92",
+  "version": "2.47.93",
   "buildDate": "2026-02-14",
-  "buildTimestamp": 1771086600000,
+  "buildTimestamp": 1771087200000,
   "features": [
+    "Modo dependencia en timeline con tecla D (toggle ON/OFF) para separar enlace de tareas vs drag/resize",
+    "Botón visible de estado Dependencias (ON/OFF · D) en cabecera del timeline",
+    "Anclas de enlace visibles solo en modo dependencia para reducir errores operativos",
+    "Bloqueo contextual de mover/redimensionar mientras modo dependencia está activo",
     "Creación de dependencias por mouse: arrastrar desde inicio/fin de una tarea hacia inicio/fin de otra",
     "Detección automática de tipo de dependencia según anclas (FS, SS, FF, SF)",
     "Hover informativo en líneas de dependencia con explicación en lenguaje natural y ejemplo A/B real",
