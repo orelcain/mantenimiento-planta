@@ -45,3 +45,4 @@ serviceAccountKey.json
 # Archivos locales de trabajo (Excel Gantt)
 gantt tareas.xlsx
 ~$gantt tareas.xlsx
+GANTT Mantencion temporada baja.xlsm
