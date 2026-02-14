@@ -40,6 +40,12 @@ import type { Equipment, GanttTask, GanttTaskComment, IncidentPriority, User } f
 import { HierarchyLevel, type HierarchyNode, type HierarchyNodeWithChildren } from '@/types/hierarchy'
 
 const STATUS_OPTIONS: Array<GanttTask['status']> = ['planificada', 'en_progreso', 'bloqueada', 'completada']
+const STATUS_META: Record<GanttTask['status'], { label: string; variant: 'outline' | 'secondary' | 'destructive' | 'warning' | 'success' }> = {
+  planificada: { label: 'Abierto', variant: 'outline' },
+  en_progreso: { label: 'En progreso', variant: 'secondary' },
+  bloqueada: { label: 'Bloqueada', variant: 'warning' },
+  completada: { label: 'Completada', variant: 'success' },
+}
 const PRIORITY_OPTIONS: IncidentPriority[] = ['critica', 'alta', 'media', 'baja']
 const DEPENDENCY_TYPES: Array<'FS' | 'SS' | 'FF' | 'SF'> = ['FS', 'SS', 'FF', 'SF']
 const PAGE_SIZE_OPTIONS = ['10', '25', '50', '100'] as const
@@ -415,6 +421,41 @@ export function GanttPlannerPage() {
     }
   }, [filteredTasks, timelineZoom])
 
+  const timelineTicks = useMemo(() => {
+    const totalMs = timeline.maxEnd - timeline.minStart
+    if (timeline.widthPx <= 0 || totalMs <= 0) return [] as Array<{ leftPx: number; label: string; major: boolean }>
+
+    const minorStepMs = timelineZoom === 'day' ? DAY_MS : timelineZoom === 'week' ? DAY_MS * 2 : DAY_MS * 7
+    const majorEvery = timelineZoom === 'day' ? 7 : timelineZoom === 'week' ? 3 : 4
+    const alignedStart = Math.floor(timeline.minStart / minorStepMs) * minorStepMs
+
+    const minorFormatter = new Intl.DateTimeFormat('es-CL', {
+      day: '2-digit',
+      month: timelineZoom === 'month' ? undefined : '2-digit',
+    })
+
+    const majorFormatter = new Intl.DateTimeFormat('es-CL', {
+      day: '2-digit',
+      month: '2-digit',
+    })
+
+    const ticks: Array<{ leftPx: number; label: string; major: boolean }> = []
+
+    for (let index = 0, ms = alignedStart; ms <= timeline.maxEnd + minorStepMs && index < 800; index += 1, ms += minorStepMs) {
+      const leftPx = ((ms - timeline.minStart) / totalMs) * timeline.widthPx
+      if (leftPx < 0 || leftPx > timeline.widthPx) continue
+
+      const major = index % majorEvery === 0
+      ticks.push({
+        leftPx,
+        major,
+        label: major ? majorFormatter.format(new Date(ms)) : minorFormatter.format(new Date(ms)),
+      })
+    }
+
+    return ticks
+  }, [timeline.maxEnd, timeline.minStart, timeline.widthPx, timelineZoom])
+
   const delayedCriticalTasks = useMemo(() => {
     const now = Date.now()
     const critical = new Set(cpm.criticalPath)
@@ -447,6 +488,63 @@ export function GanttPlannerPage() {
     if (!user?.id) return false
     return canEdit || task.responsibleUserId === user.id
   }, [canEdit, user?.id])
+
+  const timelineRows = useMemo(() => {
+    const total = Math.max(1, timeline.maxEnd - timeline.minStart)
+
+    return pagedTimelineTasks.map((task, rowIndex) => {
+      const baselineStart = (task.baselineStartDate ?? task.startDate).getTime()
+      const baselineEnd = (task.baselineEndDate ?? task.endDate).getTime()
+      const previewStartMs = timelineDrag?.taskId === task.id ? timelineDrag.previewStartMs : task.startDate.getTime()
+      const previewEndMs = timelineDrag?.taskId === task.id ? timelineDrag.previewEndMs : task.endDate.getTime()
+      const left = ((previewStartMs - timeline.minStart) / total) * timeline.widthPx
+      const width = Math.max(4, ((previewEndMs - previewStartMs) / total) * timeline.widthPx)
+      const baselineLeft = ((baselineStart - timeline.minStart) / total) * timeline.widthPx
+      const baselineWidth = Math.max(4, ((baselineEnd - baselineStart) / total) * timeline.widthPx)
+
+      return {
+        task,
+        rowIndex,
+        left,
+        width,
+        baselineLeft,
+        baselineWidth,
+        isCritical: cpm.criticalPath.includes(task.id),
+        interactive: canOperateTask(task),
+      }
+    })
+  }, [canOperateTask, cpm.criticalPath, pagedTimelineTasks, timeline.maxEnd, timeline.minStart, timeline.widthPx, timelineDrag])
+
+  const timelineDependencyLines = useMemo(() => {
+    const byId = new Map(timelineRows.map((row) => [row.task.id, row]))
+    const lines: Array<{ key: string; left: number; top: number; width: number; height: number }> = []
+
+    timelineRows.forEach((row) => {
+      row.task.dependencies
+        .filter((dependency) => dependency.type === 'FS')
+        .forEach((dependency, index) => {
+          const predecessor = byId.get(dependency.predecessorId)
+          if (!predecessor) return
+
+          const fromX = predecessor.left + predecessor.width
+          const toX = row.left
+          const top = Math.min(predecessor.rowIndex, row.rowIndex) * 44 + 22
+          const height = Math.abs(row.rowIndex - predecessor.rowIndex) * 44
+          const width = Math.max(8, Math.abs(toX - fromX))
+          const left = Math.min(fromX, toX)
+
+          lines.push({
+            key: `${row.task.id}-${dependency.predecessorId}-${index}`,
+            left,
+            top,
+            width,
+            height,
+          })
+        })
+    })
+
+    return lines
+  }, [timelineRows])
 
   const getTimelineSnapMs = useCallback(() => {
     if (timelineZoom === 'day') return HOUR_MS
@@ -1166,19 +1264,26 @@ export function GanttPlannerPage() {
       </div>
 
       {plannerTab === 'timeline' && (
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0">
-          <CardTitle>Vista temporal y dependencias</CardTitle>
-          <Button size="sm" variant="outline" onClick={() => setTimelineCollapsed((prev) => !prev)}>
-            {timelineCollapsed ? <ChevronDown className="h-4 w-4 mr-1" /> : <ChevronUp className="h-4 w-4 mr-1" />}
-            {timelineCollapsed ? 'Expandir' : 'Colapsar'}
-          </Button>
-        </CardHeader>
-        {!timelineCollapsed && (
-          <CardContent className="space-y-3">
-            <div className="grid gap-2 md:grid-cols-3">
+      <div className="space-y-3">
+        <Card>
+          <CardContent className="pt-4 space-y-3">
+            <div className="grid gap-2 xl:grid-cols-[1fr_auto_auto_auto] xl:items-center">
               <div>
-                <Label className="text-xs text-muted-foreground">Tareas por página (timeline)</Label>
+                <p className="text-base font-semibold">Propuesta visual de módulo Gantt (referencia GanttPRO)</p>
+                <p className="text-xs text-muted-foreground">Objetivo: validar UX de timeline profesional, no es copia literal del producto.</p>
+              </div>
+              <div className="flex items-center gap-1">
+                <Button size="sm" variant={timelineZoom === 'day' ? 'default' : 'outline'} onClick={() => setTimelineZoom('day')}>Día</Button>
+                <Button size="sm" variant={timelineZoom === 'week' ? 'default' : 'outline'} onClick={() => setTimelineZoom('week')}>Semana</Button>
+                <Button size="sm" variant={timelineZoom === 'month' ? 'default' : 'outline'} onClick={() => setTimelineZoom('month')}>Mes</Button>
+              </div>
+              <Badge variant="outline">⚡ Auto-scheduling FS</Badge>
+              <Badge variant="outline">📍 Línea de hoy + Baseline</Badge>
+            </div>
+
+            <div className="grid gap-2 md:grid-cols-[160px_1fr_auto] md:items-end">
+              <div>
+                <Label className="text-xs text-muted-foreground">Tareas por página</Label>
                 <Select value={timelinePageSize} onValueChange={(value) => setTimelinePageSize(value as (typeof PAGE_SIZE_OPTIONS)[number])}>
                   <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -1186,129 +1291,192 @@ export function GanttPlannerPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div>
-                <Label className="text-xs text-muted-foreground">Escala timeline</Label>
-                <Select value={timelineZoom} onValueChange={(value) => setTimelineZoom(value as 'day' | 'week' | 'month')}>
-                  <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="day">Día</SelectItem>
-                    <SelectItem value="week">Semana</SelectItem>
-                    <SelectItem value="month">Mes</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="text-xs text-muted-foreground flex items-end gap-3 pb-1">
-                <span className="inline-flex items-center gap-1"><span className="h-2 w-4 rounded bg-muted-foreground/40" /> Baseline</span>
-                <span className="inline-flex items-center gap-1"><span className="h-2 w-4 rounded bg-primary" /> Real</span>
+              <div className="text-xs text-muted-foreground flex items-center gap-3 pb-1">
+                <span className="inline-flex items-center gap-1"><span className="h-2 w-4 rounded bg-primary" /> Barra real</span>
+                <span className="inline-flex items-center gap-1"><span className="h-2 w-4 rounded bg-muted-foreground/60" /> Baseline</span>
+                <span className="inline-flex items-center gap-1"><span className="h-2 w-4 rounded bg-primary/60" /> Dependencia FS</span>
                 <span className="inline-flex items-center gap-1"><span className="h-3 w-[2px] bg-red-500" /> Hoy</span>
               </div>
+              <Button size="sm" variant="outline" onClick={() => setTimelineCollapsed((prev) => !prev)}>
+                {timelineCollapsed ? <ChevronDown className="h-4 w-4 mr-1" /> : <ChevronUp className="h-4 w-4 mr-1" />}
+                {timelineCollapsed ? 'Expandir' : 'Colapsar'}
+              </Button>
             </div>
+          </CardContent>
+        </Card>
 
-            {sortedTasks.length === 0 && (
-              <p className="text-sm text-muted-foreground">Sin tareas para visualizar.</p>
-            )}
+        {!timelineCollapsed && sortedTasks.length === 0 && (
+          <p className="text-sm text-muted-foreground">Sin tareas para visualizar.</p>
+        )}
 
-            {pagedTimelineTasks.map((task) => {
-              const total = Math.max(1, timeline.maxEnd - timeline.minStart)
-              const baselineStart = (task.baselineStartDate ?? task.startDate).getTime()
-              const baselineEnd = (task.baselineEndDate ?? task.endDate).getTime()
-              const previewStartMs = timelineDrag?.taskId === task.id ? timelineDrag.previewStartMs : task.startDate.getTime()
-              const previewEndMs = timelineDrag?.taskId === task.id ? timelineDrag.previewEndMs : task.endDate.getTime()
-              const left = ((previewStartMs - timeline.minStart) / total) * timeline.widthPx
-              const width = Math.max(4, ((previewEndMs - previewStartMs) / total) * timeline.widthPx)
-              const baselineLeft = ((baselineStart - timeline.minStart) / total) * timeline.widthPx
-              const baselineWidth = Math.max(4, ((baselineEnd - baselineStart) / total) * timeline.widthPx)
-              const isCritical = cpm.criticalPath.includes(task.id)
-              const interactive = canOperateTask(task)
+        {!timelineCollapsed && sortedTasks.length > 0 && (
+          <div className="grid gap-3 xl:grid-cols-[420px_1fr]">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Tabla de tareas (WBS/estado/owner)</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="grid grid-cols-[1fr_1fr_1.4fr_.8fr_.7fr_.6fr] gap-2 px-3 py-2 text-[11px] border-y text-muted-foreground">
+                  <span>Área</span>
+                  <span>Equipo</span>
+                  <span>Tarea</span>
+                  <span>Responsable</span>
+                  <span>Estado</span>
+                  <span>Avance</span>
+                </div>
+                <div className="max-h-[560px] overflow-auto">
+                  {timelineRows.map((row) => {
+                    const status = STATUS_META[row.task.status]
+                    return (
+                      <div key={`timeline-grid-${row.task.id}`} className="grid grid-cols-[1fr_1fr_1.4fr_.8fr_.7fr_.6fr] gap-2 px-3 py-2 text-xs border-b h-11 items-center">
+                        <span className="truncate">{row.task.hierarchyPath ?? 'Sin área'}</span>
+                        <span className="truncate">{row.task.equipmentNombre ?? 'Sin equipo'}</span>
+                        <span className="truncate">{row.isCritical ? '🔴 ' : ''}{row.task.titulo}</span>
+                        <span className="truncate">{row.task.responsibleName ?? 'Sin asignar'}</span>
+                        <Badge variant={status.variant}>{status.label}</Badge>
+                        <span>{row.task.progress}%</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </CardContent>
+            </Card>
 
-              return (
-                <div key={`timeline-${task.id}`} className="space-y-1">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-medium">{task.hierarchyPath ?? 'Sin área'} · {task.equipmentNombre ?? 'Sin equipo'} · {task.titulo}</span>
-                    <span className="text-muted-foreground">{task.dependencies.length} dep.</span>
-                  </div>
-                  <div className="relative overflow-x-auto rounded border bg-muted/20">
-                    <div
-                      className="relative h-8"
-                      style={{ width: `${timeline.widthPx}px` }}
-                    >
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm">Timeline profesional (baseline vs real + dependencias)</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="overflow-auto">
+                  <div style={{ minWidth: `${timeline.widthPx}px` }}>
+                    <div className="sticky top-0 z-10 h-8 border-y bg-background/95" style={{ width: `${timeline.widthPx}px` }}>
+                      {timelineTicks.map((tick, index) => (
+                        <div
+                          key={`tick-head-${index}`}
+                          className={`absolute top-0 bottom-0 ${tick.major ? 'border-l border-border/50' : 'border-l border-border/25'}`}
+                          style={{ left: `${tick.leftPx}px` }}
+                        >
+                          <span className="absolute left-1 top-1 text-[10px] text-muted-foreground whitespace-nowrap">{tick.label}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="relative" style={{ width: `${timeline.widthPx}px`, height: `${timelineRows.length * 44}px` }}>
+                      {timelineTicks.map((tick, index) => (
+                        <div
+                          key={`tick-body-${index}`}
+                          className={`absolute top-0 bottom-0 ${tick.major ? 'border-l border-border/40' : 'border-l border-border/20'}`}
+                          style={{ left: `${tick.leftPx}px` }}
+                        />
+                      ))}
+
+                      {timelineRows.map((row) => (
+                        <div
+                          key={`lane-${row.task.id}`}
+                          className="absolute left-0 right-0 border-b"
+                          style={{ top: `${row.rowIndex * 44 + 43}px` }}
+                        />
+                      ))}
+
+                      {timelineDependencyLines.map((line) => (
+                        <div key={`dep-${line.key}`}>
+                          <div className="absolute h-[2px] bg-primary/60" style={{ left: `${line.left}px`, top: `${line.top}px`, width: `${line.width}px` }} />
+                          {line.height > 0 && (
+                            <div className="absolute w-[2px] bg-primary/60" style={{ left: `${line.left + line.width}px`, top: `${line.top}px`, height: `${line.height}px` }} />
+                          )}
+                        </div>
+                      ))}
+
                       {timeline.showTodayLine && (
                         <div
-                          className="absolute top-0 h-8 w-[2px] bg-red-500/80"
+                          className="absolute top-0 bottom-0 w-[2px] bg-red-500/80 z-10"
                           style={{ left: `${timeline.todayLeftPx}px` }}
                           title="Hoy"
                         />
                       )}
-                      <div
-                        className="absolute top-[11px] h-2 rounded bg-muted-foreground/40"
-                        style={{ left: `${baselineLeft}px`, width: `${baselineWidth}px` }}
-                      />
-                      <div
-                        className={`absolute top-[6px] h-4 rounded ${isCritical ? 'bg-red-500' : 'bg-primary'}`}
-                        style={{ left: `${left}px`, width: `${width}px` }}
-                        onMouseDown={(event) => {
-                          if (!interactive) return
-                          event.preventDefault()
-                          handleTimelineDragStart(task, 'move', event.clientX)
-                        }}
-                        title={interactive ? 'Arrastrar para mover fechas' : 'Sin permisos para mover'}
-                      />
-                      {interactive && (
-                        <>
+
+                      {timelineRows.map((row) => (
+                        <div key={`bar-${row.task.id}`}>
                           <div
-                            className="absolute top-[6px] h-4 w-2 rounded bg-background border cursor-ew-resize"
-                            style={{ left: `${Math.max(0, left - 1)}px` }}
-                            onMouseDown={(event) => {
-                              event.preventDefault()
-                              event.stopPropagation()
-                              handleTimelineDragStart(task, 'resize-start', event.clientX)
-                            }}
-                            title="Ajustar inicio"
+                            className="absolute h-2 rounded bg-muted-foreground/60"
+                            style={{ left: `${row.baselineLeft}px`, top: `${row.rowIndex * 44 + 16}px`, width: `${row.baselineWidth}px` }}
                           />
                           <div
-                            className="absolute top-[6px] h-4 w-2 rounded bg-background border cursor-ew-resize"
-                            style={{ left: `${left + width - 1}px` }}
+                            className={`absolute h-3 rounded ${row.isCritical ? 'bg-red-500' : 'bg-primary'}`}
+                            style={{ left: `${row.left}px`, top: `${row.rowIndex * 44 + 14}px`, width: `${row.width}px` }}
                             onMouseDown={(event) => {
+                              if (!row.interactive) return
                               event.preventDefault()
-                              event.stopPropagation()
-                              handleTimelineDragStart(task, 'resize-end', event.clientX)
+                              handleTimelineDragStart(row.task, 'move', event.clientX)
                             }}
-                            title="Ajustar fin"
+                            title={row.interactive ? 'Arrastrar para mover fechas' : 'Sin permisos para mover'}
                           />
-                        </>
-                      )}
+                          {row.interactive && (
+                            <>
+                              <div
+                                className="absolute h-3 w-2 rounded bg-background border cursor-ew-resize"
+                                style={{ left: `${Math.max(0, row.left - 1)}px`, top: `${row.rowIndex * 44 + 14}px` }}
+                                onMouseDown={(event) => {
+                                  event.preventDefault()
+                                  event.stopPropagation()
+                                  handleTimelineDragStart(row.task, 'resize-start', event.clientX)
+                                }}
+                                title="Ajustar inicio"
+                              />
+                              <div
+                                className="absolute h-3 w-2 rounded bg-background border cursor-ew-resize"
+                                style={{ left: `${row.left + row.width - 1}px`, top: `${row.rowIndex * 44 + 14}px` }}
+                                onMouseDown={(event) => {
+                                  event.preventDefault()
+                                  event.stopPropagation()
+                                  handleTimelineDragStart(row.task, 'resize-end', event.clientX)
+                                }}
+                                title="Ajustar fin"
+                              />
+                            </>
+                          )}
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
-              )
-            })}
 
-            {sortedTasks.length > 0 && (
-              <div className="flex items-center justify-between pt-1">
-                <p className="text-xs text-muted-foreground">Página {safeTimelinePage} de {totalTimelinePages} · {sortedTasks.length} tareas</p>
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setTimelinePage((prev) => Math.max(1, prev - 1))}
-                    disabled={safeTimelinePage <= 1}
-                  >
-                    Anterior
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setTimelinePage((prev) => Math.min(totalTimelinePages, prev + 1))}
-                    disabled={safeTimelinePage >= totalTimelinePages}
-                  >
-                    Siguiente
-                  </Button>
+                <div className="flex flex-wrap gap-4 px-3 py-2 text-[11px] text-muted-foreground border-t">
+                  <span className="inline-flex items-center gap-1"><span className="h-2 w-3 rounded bg-primary" /> Barra real</span>
+                  <span className="inline-flex items-center gap-1"><span className="h-2 w-3 rounded bg-muted-foreground/60" /> Baseline</span>
+                  <span className="inline-flex items-center gap-1"><span className="h-2 w-3 rounded bg-red-500" /> Crítica</span>
+                  <span className="inline-flex items-center gap-1"><span className="h-2 w-3 rounded bg-primary/60" /> Dependencia FS</span>
+                  <span className="inline-flex items-center gap-1"><span className="h-3 w-[2px] bg-red-500" /> Hoy</span>
                 </div>
-              </div>
-            )}
-          </CardContent>
+              </CardContent>
+            </Card>
+          </div>
         )}
-      </Card>
+
+        {!timelineCollapsed && sortedTasks.length > 0 && (
+          <div className="flex items-center justify-between pt-1">
+            <p className="text-xs text-muted-foreground">Página {safeTimelinePage} de {totalTimelinePages} · {sortedTasks.length} tareas</p>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setTimelinePage((prev) => Math.max(1, prev - 1))}
+                disabled={safeTimelinePage <= 1}
+              >
+                Anterior
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setTimelinePage((prev) => Math.min(totalTimelinePages, prev + 1))}
+                disabled={safeTimelinePage >= totalTimelinePages}
+              >
+                Siguiente
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
       )}
 
       {plannerTab !== 'timeline' && (

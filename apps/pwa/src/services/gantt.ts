@@ -26,12 +26,20 @@ const GANTT_TASKS_COLLECTION = 'ganttTasks'
 const GANTT_COMMENTS_COLLECTION = 'ganttTaskComments'
 
 function asDate(value: unknown): Date {
-  if (!value) return new Date()
-  if (value instanceof Date) return value
-  if (typeof value === 'object' && value !== null && 'toDate' in value && typeof (value as { toDate: () => Date }).toDate === 'function') {
-    return (value as { toDate: () => Date }).toDate()
+  const now = new Date()
+  if (!value) return now
+
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? now : value
   }
-  return new Date(value as string)
+
+  if (typeof value === 'object' && value !== null && 'toDate' in value && typeof (value as { toDate: () => Date }).toDate === 'function') {
+    const converted = (value as { toDate: () => Date }).toDate()
+    return Number.isNaN(converted.getTime()) ? now : converted
+  }
+
+  const parsed = new Date(value as string)
+  return Number.isNaN(parsed.getTime()) ? now : parsed
 }
 
 function toHours(start: Date, end: Date): number {
@@ -135,11 +143,17 @@ export async function getGanttTasks(filters?: {
 
   return snapshot.docs.map((snap) => {
     const data = snap.data()
+    const startDate = asDate(data.startDate)
+    const parsedEndDate = asDate(data.endDate)
+    const endDate = parsedEndDate.getTime() >= startDate.getTime()
+      ? parsedEndDate
+      : new Date(startDate.getTime() + 8 * 60 * 60 * 1000)
+
     return normalizeTask({
       ...data,
       id: snap.id,
-      startDate: asDate(data.startDate),
-      endDate: asDate(data.endDate),
+      startDate,
+      endDate,
       baselineStartDate: data.baselineStartDate ? asDate(data.baselineStartDate) : undefined,
       baselineEndDate: data.baselineEndDate ? asDate(data.baselineEndDate) : undefined,
       createdAt: asDate(data.createdAt),
