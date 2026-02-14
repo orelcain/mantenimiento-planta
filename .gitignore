@@ -41,3 +41,7 @@ esp32-sensor/**/src/config.h
 
 # Firebase Admin SDK (credenciales sensibles)
 serviceAccountKey.json
+
+# Archivos locales de trabajo (Excel Gantt)
+gantt tareas.xlsx
+~$gantt tareas.xlsx
