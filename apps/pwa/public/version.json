@@ -1,8 +1,11 @@
 {
-  "version": "2.47.89",
+  "version": "2.47.90",
   "buildDate": "2026-02-14",
-  "buildTimestamp": 1771083000000,
+  "buildTimestamp": 1771084200000,
   "features": [
+    "Histograma de carga por técnico en timeline (horas y cantidad de tareas activas visibles)",
+    "Tabla timeline con columna de variación vs baseline (Δ Plan en horas) por tarea",
+    "Lectura rápida de desvío plan-real para priorización operativa tipo GanttPRO",
     "Auto-scheduling extendido en timeline para dependencias FS/SS/FF/SF con lag horario",
     "Calendario laboral básico en timeline: opción Solo días hábiles (L-V) para planificación operativa",
     "Snapping configurable de arrastre (auto, 1h, 6h, 12h, 1 día) para edición fina o gruesa",

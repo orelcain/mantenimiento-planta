@@ -238,6 +238,12 @@ function formatTimelineDragDate(date: Date) {
   })
 }
 
+function formatDeltaHours(deltaHours: number) {
+  const rounded = Math.round(deltaHours)
+  if (rounded === 0) return '0h'
+  return `${rounded > 0 ? '+' : ''}${rounded}h`
+}
+
 function suggestedRiskForEquipmentStatus(estado?: Equipment['estado']): GanttTask['predictiveRiskLevel'] {
   if (estado === 'fuera_servicio') return 'critico'
   if (estado === 'en_mantenimiento') return 'alto'
@@ -612,6 +618,9 @@ export function GanttPlannerPage() {
       const width = Number.isFinite(widthRaw) ? Math.max(4, Math.min(widthPx - left, widthRaw)) : 4
       const baselineLeft = Number.isFinite(baselineLeftRaw) ? Math.max(0, Math.min(widthPx - 4, baselineLeftRaw)) : 0
       const baselineWidth = Number.isFinite(baselineWidthRaw) ? Math.max(4, Math.min(widthPx - baselineLeft, baselineWidthRaw)) : 4
+      const baselineDurationHours = Math.max(1, Math.round((baselineEnd - baselineStart) / HOUR_MS))
+      const realDurationHours = Math.max(1, Math.round((previewEndMs - previewStartMs) / HOUR_MS))
+      const baselineDeltaHours = realDurationHours - baselineDurationHours
 
       return {
         task,
@@ -620,6 +629,7 @@ export function GanttPlannerPage() {
         width,
         baselineLeft,
         baselineWidth,
+        baselineDeltaHours,
         isCritical: cpm.criticalPath.includes(task.id),
         interactive: canOperateTask(task),
       }
@@ -671,6 +681,30 @@ export function GanttPlannerPage() {
     if (selectedTaskId === 'none') return null
     return timelineFilteredTasks.find((task) => task.id === selectedTaskId) ?? selectedTask
   }, [selectedTask, selectedTaskId, timelineFilteredTasks])
+
+  const timelineResourceLoad = useMemo(() => {
+    const totals = new Map<string, { name: string; hours: number; tasks: number }>()
+
+    timelineFilteredTasks
+      .filter((task) => task.status !== 'completada')
+      .forEach((task) => {
+        const key = task.responsibleUserId ?? 'unassigned'
+        const name = task.responsibleName ?? 'Sin asignar'
+        const row = totals.get(key) ?? { name, hours: 0, tasks: 0 }
+        const durationHours = Math.max(1, Math.round((task.endDate.getTime() - task.startDate.getTime()) / HOUR_MS))
+        row.hours += durationHours
+        row.tasks += 1
+        totals.set(key, row)
+      })
+
+    const rows = Array.from(totals.values()).sort((a, b) => b.hours - a.hours).slice(0, 8)
+    const maxHours = rows.reduce((acc, row) => Math.max(acc, row.hours), 1)
+
+    return rows.map((row) => ({
+      ...row,
+      pct: Math.max(6, Math.round((row.hours / maxHours) * 100)),
+    }))
+  }, [timelineFilteredTasks])
 
   const getTimelineSnapMs = useCallback(() => {
     if (timelineSnapHours !== 'auto') {
@@ -1667,6 +1701,26 @@ export function GanttPlannerPage() {
                 </Button>
               )}
             </div>
+
+            <div className="rounded border p-3">
+              <p className="text-xs font-medium">Carga por técnico (tareas visibles)</p>
+              <p className="text-[11px] text-muted-foreground mb-2">Histogramado por horas planificadas activas, útil para detectar sobrecarga.</p>
+              {timelineResourceLoad.length === 0 ? (
+                <p className="text-xs text-muted-foreground">Sin tareas activas asignadas para calcular carga.</p>
+              ) : (
+                <div className="space-y-2">
+                  {timelineResourceLoad.map((row) => (
+                    <div key={`load-${row.name}`} className="grid grid-cols-[140px_1fr_auto] items-center gap-2">
+                      <span className="truncate text-xs">{row.name}</span>
+                      <div className="h-2 rounded bg-muted overflow-hidden">
+                        <div className="h-full bg-primary/80" style={{ width: `${row.pct}%` }} />
+                      </div>
+                      <span className="text-[11px] text-muted-foreground">{row.hours}h · {row.tasks} tarea(s)</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
 
@@ -1681,13 +1735,14 @@ export function GanttPlannerPage() {
                 <CardTitle className="text-sm">Tabla de tareas (WBS/estado/owner)</CardTitle>
               </CardHeader>
               <CardContent className="p-0">
-                <div className="grid grid-cols-[1fr_1fr_1.4fr_.8fr_.7fr_.6fr] gap-2 px-3 py-2 text-[11px] border-y text-muted-foreground">
+                <div className="grid grid-cols-[1fr_1fr_1.4fr_.8fr_.7fr_.6fr_.6fr] gap-2 px-3 py-2 text-[11px] border-y text-muted-foreground">
                   <span>Área</span>
                   <span>Equipo</span>
                   <span>Tarea</span>
                   <span>Responsable</span>
                   <span>Estado</span>
                   <span>Avance</span>
+                  <span>Δ Plan</span>
                 </div>
                 <div className="max-h-[560px] overflow-auto">
                   {timelineRows.map((row) => {
@@ -1695,7 +1750,7 @@ export function GanttPlannerPage() {
                     return (
                       <div
                         key={`timeline-grid-${row.task.id}`}
-                        className={`grid grid-cols-[1fr_1fr_1.4fr_.8fr_.7fr_.6fr] gap-2 px-3 py-2 text-xs border-b h-11 items-center cursor-pointer ${selectedTaskId === row.task.id ? 'bg-primary/10' : ''}`}
+                        className={`grid grid-cols-[1fr_1fr_1.4fr_.8fr_.7fr_.6fr_.6fr] gap-2 px-3 py-2 text-xs border-b h-11 items-center cursor-pointer ${selectedTaskId === row.task.id ? 'bg-primary/10' : ''}`}
                         onClick={() => setSelectedTaskId(row.task.id)}
                         onDoubleClick={() => openTimelineQuickEditor(row.task.id)}
                       >
@@ -1705,6 +1760,9 @@ export function GanttPlannerPage() {
                         <span className="truncate">{row.task.responsibleName ?? 'Sin asignar'}</span>
                         <Badge variant={status.variant}>{status.label}</Badge>
                         <span>{row.task.progress}%</span>
+                        <span className={row.baselineDeltaHours > 0 ? 'text-destructive' : row.baselineDeltaHours < 0 ? 'text-foreground' : 'text-muted-foreground'}>
+                          {formatDeltaHours(row.baselineDeltaHours)}
+                        </span>
                       </div>
                     )
                   })}

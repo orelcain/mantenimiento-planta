@@ -7,6 +7,15 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.90] - 2026-02-14
+
+### 📊 GanttPRO UX: carga por técnico + variación baseline
+
+#### Mejoras
+- **Carga por técnico**: nuevo histograma en timeline con horas planificadas activas y cantidad de tareas visibles por responsable.
+- **Desvío por tarea**: nueva columna `Δ Plan` en la tabla timeline para comparar duración real vs baseline por fila.
+- **Lectura operativa más rápida**: detección de atraso/adelanto sin abrir detalle, mejorando priorización diaria.
+
 ## [2.47.89] - 2026-02-14
 
 ### 🧭 Evolución GanttPRO: dependencia, calendario y snap

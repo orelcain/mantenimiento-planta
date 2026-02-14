@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.47.89**
+## Versión Actual: **v2.47.90**
 
 **Fecha de lanzamiento**: 14 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.47.90 - Carga por técnico + variación baseline (14/02/2026)
+- 📊 **Histograma por responsable**: vista de carga de trabajo por técnico en tareas visibles del timeline.
+- 📐 **Columna Δ Plan**: comparación directa de duración real vs baseline en cada tarea.
+- ⚡ **Priorización más rápida**: señal de desvío sin abrir modales ni detalle adicional.
 
 ### v2.47.89 - Dependencias avanzadas + calendario hábil + snap (14/02/2026)
 - 🔗 **Auto-scheduling completo**: Propagación con dependencias `FS/SS/FF/SF` y `lag` en horas.
