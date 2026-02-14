@@ -349,6 +349,7 @@ export function GanttPlannerPage() {
   const [timelineQuickDependencyType, setTimelineQuickDependencyType] = useState<'FS' | 'SS' | 'FF' | 'SF'>('FS')
   const [timelineQuickDependencyLag, setTimelineQuickDependencyLag] = useState<number>(0)
   const [timelineQuickModalOpen, setTimelineQuickModalOpen] = useState(false)
+  const [tasksCompactView, setTasksCompactView] = useState(false)
   const [timelineDrag, setTimelineDrag] = useState<{
     taskId: string
     mode: TimelineDragMode
@@ -408,7 +409,7 @@ export function GanttPlannerPage() {
     return map
   }, [technicians])
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
@@ -425,11 +426,11 @@ export function GanttPlannerPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
   useEffect(() => {
-    load()
-  }, [])
+    void load()
+  }, [load])
 
   const filteredTasks = useMemo(() => {
     const query = searchText.trim().toLowerCase()
@@ -942,7 +943,7 @@ export function GanttPlannerPage() {
     )
 
     await load()
-  }, [alignTimelineMs, canOperateTask, tasks, timelineWorkCalendar])
+  }, [alignTimelineMs, canOperateTask, load, tasks, timelineWorkCalendar])
 
   function handleTimelineDragStart(task: GanttTask, mode: TimelineDragMode, clientX: number) {
     if (!canOperateTask(task)) return
@@ -2488,10 +2489,15 @@ export function GanttPlannerPage() {
               <CardTitle>Listado de tareas</CardTitle>
               <p className="text-xs text-muted-foreground mt-1">Vista operativa para filtrar, revisar estado y abrir detalle/comentarios.</p>
             </div>
-            <Button size="sm" variant="outline" onClick={() => setListCollapsed((prev) => !prev)}>
-              {listCollapsed ? <ChevronDown className="h-4 w-4 mr-1" /> : <ChevronUp className="h-4 w-4 mr-1" />}
-              {listCollapsed ? 'Expandir' : 'Colapsar'}
-            </Button>
+            <div className="flex gap-2">
+              <Button size="sm" variant={tasksCompactView ? 'default' : 'outline'} onClick={() => setTasksCompactView((prev) => !prev)}>
+                {tasksCompactView ? 'Vista compacta ON' : 'Vista compacta OFF'}
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setListCollapsed((prev) => !prev)}>
+                {listCollapsed ? <ChevronDown className="h-4 w-4 mr-1" /> : <ChevronUp className="h-4 w-4 mr-1" />}
+                {listCollapsed ? 'Expandir' : 'Colapsar'}
+              </Button>
+            </div>
           </CardHeader>
           {!listCollapsed && (
           <CardContent className="space-y-4">
@@ -2576,12 +2582,12 @@ export function GanttPlannerPage() {
               {pagedListTasks.map((task) => {
                 const row = cpmMap.get(task.id)
                 return (
-                  <div key={task.id} className="rounded-lg border p-3 space-y-2">
+                  <div key={task.id} className={`rounded-lg border ${tasksCompactView ? 'p-2 space-y-1.5' : 'p-3 space-y-2'}`}>
                     <div className="flex items-center justify-between gap-2">
                       <div>
                         <p className="text-xs text-muted-foreground">{task.hierarchyPath ?? 'Sin área'} · {task.equipmentNombre ?? 'Sin equipo'}</p>
-                        <p className="font-medium">{task.titulo}</p>
-                        <p className="text-xs text-muted-foreground">{task.startDate.toLocaleString()} → {task.endDate.toLocaleString()}</p>
+                        <p className={`${tasksCompactView ? 'text-sm font-medium' : 'font-medium'}`}>{task.titulo}</p>
+                        {!tasksCompactView && <p className="text-xs text-muted-foreground">{task.startDate.toLocaleString()} → {task.endDate.toLocaleString()}</p>}
                       </div>
                       <div className="flex items-center gap-2">
                         {row?.isCritical && <Badge variant="destructive">Crítica</Badge>}
@@ -2595,9 +2601,9 @@ export function GanttPlannerPage() {
                       <span>Responsable: {task.responsibleName ?? 'Sin asignar'}</span>
                       <span>Holgura: {row?.slack ?? 0}h</span>
                       <span>Dependencias: {task.dependencies.length}</span>
-                      <span>Repuestos: {task.sparePartIds?.length ?? 0}</span>
+                      {!tasksCompactView && <span>Repuestos: {task.sparePartIds?.length ?? 0}</span>}
                     </div>
-                    {canEdit && (
+                    {canEdit && (!tasksCompactView || selectedTaskId === task.id) && (
                       <div>
                         <Label className="text-xs">Asignar técnico (cuenta)</Label>
                         <Select
@@ -2616,7 +2622,7 @@ export function GanttPlannerPage() {
                         </Select>
                       </div>
                     )}
-                    {task.dependencies.length > 0 && (
+                    {task.dependencies.length > 0 && !tasksCompactView && (
                       <div className="text-xs text-muted-foreground rounded border p-2 space-y-1">
                         {task.dependencies.map((dep, index) => {
                           const predecessor = tasks.find((item) => item.id === dep.predecessorId)
@@ -2637,7 +2643,7 @@ export function GanttPlannerPage() {
                         })}
                       </div>
                     )}
-                    <div className="flex gap-2">
+                    <div className={`flex ${tasksCompactView ? 'gap-1.5 flex-wrap' : 'gap-2'}`}>
                       <Button size="sm" variant="outline" onClick={() => setSelectedTaskId(task.id)}>Detalle</Button>
                       {canOperateTask(task) && task.status !== 'completada' && (
                         <Button size="sm" variant="secondary" onClick={() => handleAdvance(task)}>

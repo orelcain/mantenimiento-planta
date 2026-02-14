@@ -7,6 +7,17 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.98] - 2026-02-14
+
+### 🚑 Fix deploy + vista compacta en Tareas
+
+#### Fixes
+- **Deploy GitHub Pages estabilizado**: corregida dependencia faltante de hook (`load`) que generaba warning de lint en CI y hacía fallar runs recientes.
+
+#### Mejoras
+- **Vista compacta en Tareas**: nuevo toggle ON/OFF para reducir altura de tarjetas y revisar más tareas por pantalla.
+- **Compactación inteligente**: en modo compacto se prioriza lectura rápida y se muestra edición expandida al seleccionar tarea.
+
 ## [2.47.97] - 2026-02-14
 
 ### 🧹 Orden y pulido de pestañas Configuración / Tareas

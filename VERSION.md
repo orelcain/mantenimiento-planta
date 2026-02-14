@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.47.97**
+## Versión Actual: **v2.47.98**
 
 **Fecha de lanzamiento**: 14 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.47.98 - Fix deploy + vista compacta en Tareas (14/02/2026)
+- 🚑 **Deploy estable**: corregido warning de hooks que afectaba la etapa `Lint` en GitHub Actions.
+- 🗂️ **Modo compacto en Tareas**: toggle ON/OFF para mostrar más tarjetas en la misma pantalla.
+- ⚡ **Operación más rápida**: se mantiene foco en información clave y se expande edición al seleccionar tarea.
 
 ### v2.47.97 - Orden visual de Configuración y Tareas (14/02/2026)
 - 🧹 **Filtros agrupados en Tareas**: bloque único más limpio para búsqueda, filtros y orden.

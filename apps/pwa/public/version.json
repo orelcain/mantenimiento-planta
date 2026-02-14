@@ -1,8 +1,10 @@
 {
-  "version": "2.47.97",
+  "version": "2.47.98",
   "buildDate": "2026-02-14",
-  "buildTimestamp": 1771089600000,
+  "buildTimestamp": 1771090200000,
   "features": [
+    "Fix de deploy GitHub Pages: corrección de dependencia de hook que generaba warning de lint en CI",
+    "Pestaña Tareas con modo de vista compacta ON/OFF para mostrar más tarjetas por pantalla",
     "Pestaña Tareas ordenada: filtros agrupados en bloque y encabezado operativo más claro",
     "Pestaña Configuración pulida: flujo sugerido visible y formularios de creación más estructurados",
     "Panel contextual FS/SS/FF/SF visible solo con modo dependencia ON para guía rápida operativa",
