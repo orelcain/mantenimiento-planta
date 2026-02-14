@@ -1,8 +1,11 @@
 {
-  "version": "2.47.91",
+  "version": "2.47.92",
   "buildDate": "2026-02-14",
-  "buildTimestamp": 1771085400000,
+  "buildTimestamp": 1771086600000,
   "features": [
+    "Creación de dependencias por mouse: arrastrar desde inicio/fin de una tarea hacia inicio/fin de otra",
+    "Detección automática de tipo de dependencia según anclas (FS, SS, FF, SF)",
+    "Hover informativo en líneas de dependencia con explicación en lenguaje natural y ejemplo A/B real",
     "Editor visual de dependencias en modal de timeline (predecesora, tipo FS/SS/FF/SF y lag)",
     "Alta y eliminación de dependencias directamente desde edición rápida de tarea",
     "Gestión de red de dependencias sin salir de timeline para operación más ágil tipo GanttPRO",

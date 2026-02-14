@@ -244,6 +244,29 @@ function formatDeltaHours(deltaHours: number) {
   return `${rounded > 0 ? '+' : ''}${rounded}h`
 }
 
+function resolveDependencyTypeFromAnchors(
+  sourceAnchor: 'start' | 'end',
+  targetAnchor: 'start' | 'end'
+): 'FS' | 'SS' | 'FF' | 'SF' {
+  if (sourceAnchor === 'end' && targetAnchor === 'start') return 'FS'
+  if (sourceAnchor === 'start' && targetAnchor === 'start') return 'SS'
+  if (sourceAnchor === 'end' && targetAnchor === 'end') return 'FF'
+  return 'SF'
+}
+
+function dependencyDescription(type: 'FS' | 'SS' | 'FF' | 'SF', taskA: string, taskB: string) {
+  if (type === 'FS') {
+    return `FS (Finish to Start): la tarea B empieza cuando la A termina.\nA: ${taskA}\nB: ${taskB}\nEjemplo aplicado: "${taskB}" inicia cuando finaliza "${taskA}".`
+  }
+  if (type === 'SS') {
+    return `SS (Start to Start): la tarea B empieza cuando la A empieza.\nA: ${taskA}\nB: ${taskB}\nEjemplo aplicado: "${taskB}" inicia cuando inicia "${taskA}".`
+  }
+  if (type === 'FF') {
+    return `FF (Finish to Finish): la tarea B termina cuando la A termina.\nA: ${taskA}\nB: ${taskB}\nEjemplo aplicado: "${taskB}" termina cuando termina "${taskA}".`
+  }
+  return `SF (Start to Finish): la tarea B termina cuando la A empieza.\nA: ${taskA}\nB: ${taskB}\nEjemplo aplicado: "${taskB}" finaliza cuando comienza "${taskA}".`
+}
+
 function suggestedRiskForEquipmentStatus(estado?: Equipment['estado']): GanttTask['predictiveRiskLevel'] {
   if (estado === 'fuera_servicio') return 'critico'
   if (estado === 'en_mantenimiento') return 'alto'
@@ -335,11 +358,20 @@ export function GanttPlannerPage() {
     previewStartMs: number
     previewEndMs: number
   } | null>(null)
+  const [timelineLinkDraft, setTimelineLinkDraft] = useState<{
+    sourceTaskId: string
+    sourceAnchor: 'start' | 'end'
+    currentClientX: number
+    currentClientY: number
+    targetTaskId?: string
+    targetAnchor?: 'start' | 'end'
+  } | null>(null)
   const notifiedDelayedCriticalRef = useRef<Set<string>>(new Set())
   const remoteAlertSentRef = useRef<Set<string>>(new Set())
   const timelineSplitDragRef = useRef<{ startX: number; startWidth: number } | null>(null)
   const timelineQuickStartInputRef = useRef<HTMLInputElement | null>(null)
   const timelineQuickFocusPendingRef = useRef(false)
+  const timelineCanvasRef = useRef<HTMLDivElement | null>(null)
   const { tree: hierarchyTree } = useHierarchyTree()
   const plannerTabStorageKey = useMemo(() => `gantt:plannerTab:${user?.id ?? 'anon'}`, [user?.id])
   const timelineTableWidthStorageKey = useMemo(() => `gantt:timelineTableWidth:${user?.id ?? 'anon'}`, [user?.id])
@@ -641,7 +673,15 @@ export function GanttPlannerPage() {
 
   const timelineDependencyLines = useMemo(() => {
     const byId = new Map(timelineRows.map((row) => [row.task.id, row]))
-    const lines: Array<{ key: string; left: number; top: number; width: number; height: number; depType: 'FS' | 'SS' | 'FF' | 'SF' }> = []
+    const lines: Array<{
+      key: string
+      left: number
+      top: number
+      width: number
+      height: number
+      depType: 'FS' | 'SS' | 'FF' | 'SF'
+      infoTitle: string
+    }> = []
 
     timelineRows.forEach((row) => {
       row.task.dependencies
@@ -673,6 +713,7 @@ export function GanttPlannerPage() {
             width,
             height,
             depType: dependency.type,
+            infoTitle: dependencyDescription(dependency.type, predecessor.task.titulo, row.task.titulo),
           })
         })
     })
@@ -708,6 +749,68 @@ export function GanttPlannerPage() {
       pct: Math.max(6, Math.round((row.hours / maxHours) * 100)),
     }))
   }, [timelineFilteredTasks])
+
+  const detectTimelineAnchor = useCallback((clientX: number, clientY: number, sourceTaskId: string) => {
+    const canvas = timelineCanvasRef.current
+    if (!canvas) return null
+
+    const rect = canvas.getBoundingClientRect()
+    const localX = clientX - rect.left
+    const localY = clientY - rect.top
+    let best: { taskId: string; anchor: 'start' | 'end'; distance: number } | null = null
+
+    timelineRows.forEach((row) => {
+      if (row.task.id === sourceTaskId) return
+      const y = row.rowIndex * 44 + 15
+      const anchors: Array<{ anchor: 'start' | 'end'; x: number }> = [
+        { anchor: 'start', x: row.left },
+        { anchor: 'end', x: row.left + row.width },
+      ]
+
+      anchors.forEach((candidate) => {
+        const distance = Math.hypot(localX - candidate.x, localY - y)
+        if (distance > 14) return
+        if (!best || distance < best.distance) {
+          best = { taskId: row.task.id, anchor: candidate.anchor, distance }
+        }
+      })
+    })
+
+    if (!best) return null
+    const bestMatch = best
+    return { taskId: bestMatch.taskId, anchor: bestMatch.anchor }
+  }, [timelineRows])
+
+  const timelineLinkPreview = useMemo(() => {
+    if (!timelineLinkDraft) return null
+    const canvas = timelineCanvasRef.current
+    const sourceRow = timelineRows.find((row) => row.task.id === timelineLinkDraft.sourceTaskId)
+    if (!canvas || !sourceRow) return null
+
+    const rect = canvas.getBoundingClientRect()
+    const sourceX = timelineLinkDraft.sourceAnchor === 'start' ? sourceRow.left : sourceRow.left + sourceRow.width
+    const sourceY = sourceRow.rowIndex * 44 + 15
+
+    const targetRow = timelineLinkDraft.targetTaskId
+      ? timelineRows.find((row) => row.task.id === timelineLinkDraft.targetTaskId)
+      : null
+    const targetX = targetRow
+      ? (timelineLinkDraft.targetAnchor === 'start' ? targetRow.left : targetRow.left + targetRow.width)
+      : timelineLinkDraft.currentClientX - rect.left
+    const targetY = targetRow
+      ? targetRow.rowIndex * 44 + 15
+      : timelineLinkDraft.currentClientY - rect.top
+
+    return {
+      sourceX,
+      sourceY,
+      targetX,
+      targetY,
+      type: timelineLinkDraft.targetAnchor
+        ? resolveDependencyTypeFromAnchors(timelineLinkDraft.sourceAnchor, timelineLinkDraft.targetAnchor)
+        : null,
+    }
+  }, [timelineLinkDraft, timelineRows])
 
   const getTimelineSnapMs = useCallback(() => {
     if (timelineSnapHours !== 'auto') {
@@ -850,6 +953,21 @@ export function GanttPlannerPage() {
       originEndMs: task.endDate.getTime(),
       previewStartMs: task.startDate.getTime(),
       previewEndMs: task.endDate.getTime(),
+    })
+  }
+
+  function handleTimelineLinkStart(
+    sourceTaskId: string,
+    sourceAnchor: 'start' | 'end',
+    clientX: number,
+    clientY: number
+  ) {
+    if (!canEdit) return
+    setTimelineLinkDraft({
+      sourceTaskId,
+      sourceAnchor,
+      currentClientX: clientX,
+      currentClientY: clientY,
     })
   }
 
@@ -1148,6 +1266,65 @@ export function GanttPlannerPage() {
       window.removeEventListener('mouseup', handleMouseUp)
     }
   }, [handleUpdateTaskDates, tasks, timeline.maxEnd, timeline.minStart, timeline.widthPx, timelineDrag, updateTimelineDragPreview])
+
+  useEffect(() => {
+    if (!timelineLinkDraft) return
+
+    const handleMouseMove = (event: MouseEvent) => {
+      event.preventDefault()
+      setTimelineLinkDraft((current) => {
+        if (!current) return current
+        const target = detectTimelineAnchor(event.clientX, event.clientY, current.sourceTaskId)
+        return {
+          ...current,
+          currentClientX: event.clientX,
+          currentClientY: event.clientY,
+          targetTaskId: target?.taskId,
+          targetAnchor: target?.anchor,
+        }
+      })
+    }
+
+    const handleMouseUp = () => {
+      const draft = timelineLinkDraft
+      setTimelineLinkDraft(null)
+
+      if (!draft.targetTaskId || !draft.targetAnchor || draft.targetTaskId === draft.sourceTaskId) {
+        return
+      }
+
+      const successorTask = tasks.find((row) => row.id === draft.targetTaskId)
+      if (!successorTask) return
+
+      const depType = resolveDependencyTypeFromAnchors(draft.sourceAnchor, draft.targetAnchor)
+      const alreadyExists = successorTask.dependencies.some(
+        (dependency) => dependency.predecessorId === draft.sourceTaskId && dependency.type === depType
+      )
+      if (alreadyExists) return
+
+      const dependencies = [
+        ...successorTask.dependencies,
+        {
+          predecessorId: draft.sourceTaskId,
+          type: depType,
+          lagHours: 0,
+        },
+      ]
+
+      void (async () => {
+        await updateGanttTask(successorTask.id, { dependencies })
+        await load()
+      })()
+    }
+
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseup', handleMouseUp, { once: true })
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [detectTimelineAnchor, load, tasks, timelineLinkDraft])
 
   async function handleCreateTask() {
     if (!user?.id || !title.trim()) return
@@ -1849,7 +2026,7 @@ export function GanttPlannerPage() {
                       ))}
                     </div>
 
-                    <div className="relative" style={{ width: `${timeline.widthPx}px`, height: `${timelineRows.length * 44}px` }}>
+                    <div ref={timelineCanvasRef} className="relative" style={{ width: `${timeline.widthPx}px`, height: `${timelineRows.length * 44}px` }}>
                       {timelineDayBands.map((band, index) => (
                         <div
                           key={`day-body-${index}`}
@@ -1878,16 +2055,32 @@ export function GanttPlannerPage() {
                           <div
                             className={`absolute ${line.depType === 'FS' ? 'h-[2px] bg-primary/60' : 'h-[1px] bg-primary/40'}`}
                             style={{ left: `${line.left}px`, top: `${line.top}px`, width: `${line.width}px` }}
-                            title={`Dependencia ${line.depType}`}
+                            title={line.infoTitle}
                           />
                           {line.height > 0 && (
                             <div
                               className={`absolute ${line.depType === 'FS' ? 'w-[2px] bg-primary/60' : 'w-[1px] bg-primary/40'}`}
                               style={{ left: `${line.left + line.width}px`, top: `${line.top}px`, height: `${line.height}px` }}
+                              title={line.infoTitle}
                             />
                           )}
                         </div>
                       ))}
+
+                      {timelineLinkPreview && (
+                        <svg className="pointer-events-none absolute inset-0 z-20" style={{ width: `${timeline.widthPx}px`, height: `${timelineRows.length * 44}px` }}>
+                          <line
+                            x1={timelineLinkPreview.sourceX}
+                            y1={timelineLinkPreview.sourceY}
+                            x2={timelineLinkPreview.targetX}
+                            y2={timelineLinkPreview.targetY}
+                            stroke="currentColor"
+                            strokeOpacity="0.7"
+                            strokeWidth="2"
+                            strokeDasharray="4 3"
+                          />
+                        </svg>
+                      )}
 
                       {timeline.showTodayLine && (
                         <div
@@ -1927,6 +2120,26 @@ export function GanttPlannerPage() {
                           )}
                           {row.interactive && (
                             <>
+                              <div
+                                className="absolute h-3 w-3 rounded-full border bg-background cursor-crosshair"
+                                style={{ left: `${Math.max(0, row.left - 5)}px`, top: `${row.rowIndex * 44 + 9}px` }}
+                                onMouseDown={(event) => {
+                                  event.preventDefault()
+                                  event.stopPropagation()
+                                  handleTimelineLinkStart(row.task.id, 'start', event.clientX, event.clientY)
+                                }}
+                                title="Crear dependencia desde INICIO (arrastra hacia inicio/fin de otra tarea)"
+                              />
+                              <div
+                                className="absolute h-3 w-3 rounded-full border bg-background cursor-crosshair"
+                                style={{ left: `${row.left + row.width - 5}px`, top: `${row.rowIndex * 44 + 9}px` }}
+                                onMouseDown={(event) => {
+                                  event.preventDefault()
+                                  event.stopPropagation()
+                                  handleTimelineLinkStart(row.task.id, 'end', event.clientX, event.clientY)
+                                }}
+                                title="Crear dependencia desde FIN (arrastra hacia inicio/fin de otra tarea)"
+                              />
                               <div
                                 className="absolute h-3 w-2 rounded bg-background border cursor-ew-resize"
                                 style={{ left: `${Math.max(0, row.left - 1)}px`, top: `${row.rowIndex * 44 + 14}px` }}

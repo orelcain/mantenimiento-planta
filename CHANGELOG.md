@@ -7,6 +7,15 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.92] - 2026-02-14
+
+### 🖱️ Dependencias por mouse + hover explicativo
+
+#### Mejoras
+- **Conexión directa en timeline**: ahora puedes arrastrar desde el inicio/fin de una tarea hacia inicio/fin de otra para crear dependencias.
+- **Tipo automático por ancla**: el sistema asigna `FS`, `SS`, `FF` o `SF` según la combinación origen/destino elegida.
+- **Hover educativo A/B**: cada línea de dependencia muestra explicación rápida y ejemplo real con nombres de tareas A y B.
+
 ## [2.47.91] - 2026-02-14
 
 ### 🧩 Editor visual de dependencias en Timeline

@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.47.91**
+## Versión Actual: **v2.47.92**
 
 **Fecha de lanzamiento**: 14 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.47.92 - Dependencias por mouse con hover explicativo (14/02/2026)
+- 🖱️ **Drag de dependencia**: conectar tareas arrastrando desde inicio/fin de una barra hacia inicio/fin de otra.
+- 🧠 **Tipo automático**: cálculo automático de `FS`, `SS`, `FF` o `SF` según anclas seleccionadas.
+- 💬 **Hover informativo**: explicación en lenguaje natural con ejemplo A/B usando nombres reales de tareas.
 
 ### v2.47.91 - Editor visual de dependencias (14/02/2026)
 - 🧩 **Dependencias en modal**: edición rápida de predecesora, tipo (`FS/SS/FF/SF`) y `lag`.
