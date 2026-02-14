@@ -226,6 +226,7 @@ export function GanttPlannerPage() {
   const [listPage, setListPage] = useState(1)
   const [timelinePageSize, setTimelinePageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>('25')
   const [listPageSize, setListPageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>('25')
+  const [timelineTableWidth, setTimelineTableWidth] = useState(420)
   const [timelineZoom, setTimelineZoom] = useState<'day' | 'week' | 'month'>('week')
   const [assignmentFilter, setAssignmentFilter] = useState<'all' | 'mine' | 'unassigned'>('all')
   const [technicians, setTechnicians] = useState<User[]>([])
@@ -273,8 +274,10 @@ export function GanttPlannerPage() {
   } | null>(null)
   const notifiedDelayedCriticalRef = useRef<Set<string>>(new Set())
   const remoteAlertSentRef = useRef<Set<string>>(new Set())
+  const timelineSplitDragRef = useRef<{ startX: number; startWidth: number } | null>(null)
   const { tree: hierarchyTree } = useHierarchyTree()
   const plannerTabStorageKey = useMemo(() => `gantt:plannerTab:${user?.id ?? 'anon'}`, [user?.id])
+  const timelineTableWidthStorageKey = useMemo(() => `gantt:timelineTableWidth:${user?.id ?? 'anon'}`, [user?.id])
 
   const hierarchyNodes = useMemo(() => flattenHierarchyTree(hierarchyTree), [hierarchyTree])
   const areaNodes = useMemo(
@@ -391,8 +394,26 @@ export function GanttPlannerPage() {
   const cpmMap = useMemo(() => new Map(cpm.tasks.map((row) => [row.taskId, row])), [cpm.tasks])
   const metrics = useMemo(() => buildGanttMetrics(filteredTasks), [filteredTasks])
 
+  const timelinePageSizeNum = Number(timelinePageSize)
+  const listPageSizeNum = Number(listPageSize)
+  const totalTimelinePages = Math.max(1, Math.ceil(sortedTasks.length / timelinePageSizeNum))
+  const totalListPages = Math.max(1, Math.ceil(sortedTasks.length / listPageSizeNum))
+  const safeTimelinePage = Math.min(timelinePage, totalTimelinePages)
+  const safeListPage = Math.min(listPage, totalListPages)
+
+  const pagedTimelineTasks = useMemo(() => {
+    const start = (safeTimelinePage - 1) * timelinePageSizeNum
+    return sortedTasks.slice(start, start + timelinePageSizeNum)
+  }, [safeTimelinePage, sortedTasks, timelinePageSizeNum])
+
+  const pagedListTasks = useMemo(() => {
+    const start = (safeListPage - 1) * listPageSizeNum
+    return sortedTasks.slice(start, start + listPageSizeNum)
+  }, [safeListPage, sortedTasks, listPageSizeNum])
+
   const timeline = useMemo(() => {
-    if (filteredTasks.length === 0) {
+    const timelineSourceTasks = pagedTimelineTasks.length > 0 ? pagedTimelineTasks : sortedTasks
+    if (timelineSourceTasks.length === 0) {
       return {
         minStart: 0,
         maxEnd: 0,
@@ -402,13 +423,13 @@ export function GanttPlannerPage() {
       }
     }
 
-    const minStart = Math.min(...filteredTasks.map((task) => (task.baselineStartDate ?? task.startDate).getTime()))
-    const maxEnd = Math.max(...filteredTasks.map((task) => (task.baselineEndDate ?? task.endDate).getTime()))
+    const minStart = Math.min(...timelineSourceTasks.map((task) => (task.baselineStartDate ?? task.startDate).getTime()))
+    const maxEnd = Math.max(...timelineSourceTasks.map((task) => (task.baselineEndDate ?? task.endDate).getTime()))
     const paddedStart = minStart - DAY_MS
     const paddedEnd = maxEnd + DAY_MS
     const totalDays = Math.max(2, Math.ceil((paddedEnd - paddedStart) / DAY_MS))
     const pixelsPerDay = timelineZoom === 'day' ? 120 : timelineZoom === 'week' ? 40 : 14
-    const widthPx = Math.max(700, totalDays * pixelsPerDay)
+    const widthPx = Math.max(900, totalDays * pixelsPerDay)
     const now = Date.now()
     const todayLeftPx = ((now - paddedStart) / (paddedEnd - paddedStart)) * widthPx
 
@@ -419,7 +440,7 @@ export function GanttPlannerPage() {
       todayLeftPx,
       showTodayLine: now >= paddedStart && now <= paddedEnd,
     }
-  }, [filteredTasks, timelineZoom])
+  }, [pagedTimelineTasks, sortedTasks, timelineZoom])
 
   const timelineTicks = useMemo(() => {
     const totalMs = timeline.maxEnd - timeline.minStart
@@ -462,23 +483,6 @@ export function GanttPlannerPage() {
     return filteredTasks.filter((task) => critical.has(task.id) && task.status !== 'completada' && task.endDate.getTime() < now)
   }, [cpm.criticalPath, filteredTasks])
 
-  const timelinePageSizeNum = Number(timelinePageSize)
-  const listPageSizeNum = Number(listPageSize)
-  const totalTimelinePages = Math.max(1, Math.ceil(sortedTasks.length / timelinePageSizeNum))
-  const totalListPages = Math.max(1, Math.ceil(sortedTasks.length / listPageSizeNum))
-  const safeTimelinePage = Math.min(timelinePage, totalTimelinePages)
-  const safeListPage = Math.min(listPage, totalListPages)
-
-  const pagedTimelineTasks = useMemo(() => {
-    const start = (safeTimelinePage - 1) * timelinePageSizeNum
-    return sortedTasks.slice(start, start + timelinePageSizeNum)
-  }, [safeTimelinePage, sortedTasks, timelinePageSizeNum])
-
-  const pagedListTasks = useMemo(() => {
-    const start = (safeListPage - 1) * listPageSizeNum
-    return sortedTasks.slice(start, start + listPageSizeNum)
-  }, [safeListPage, sortedTasks, listPageSizeNum])
-
   const selectedTask = useMemo(
     () => (selectedTaskId === 'none' ? null : tasks.find((task) => task.id === selectedTaskId) ?? null),
     [selectedTaskId, tasks]
@@ -491,16 +495,22 @@ export function GanttPlannerPage() {
 
   const timelineRows = useMemo(() => {
     const total = Math.max(1, timeline.maxEnd - timeline.minStart)
+    const widthPx = Math.max(1, timeline.widthPx)
 
     return pagedTimelineTasks.map((task, rowIndex) => {
       const baselineStart = (task.baselineStartDate ?? task.startDate).getTime()
       const baselineEnd = (task.baselineEndDate ?? task.endDate).getTime()
       const previewStartMs = timelineDrag?.taskId === task.id ? timelineDrag.previewStartMs : task.startDate.getTime()
       const previewEndMs = timelineDrag?.taskId === task.id ? timelineDrag.previewEndMs : task.endDate.getTime()
-      const left = ((previewStartMs - timeline.minStart) / total) * timeline.widthPx
-      const width = Math.max(4, ((previewEndMs - previewStartMs) / total) * timeline.widthPx)
-      const baselineLeft = ((baselineStart - timeline.minStart) / total) * timeline.widthPx
-      const baselineWidth = Math.max(4, ((baselineEnd - baselineStart) / total) * timeline.widthPx)
+      const leftRaw = ((previewStartMs - timeline.minStart) / total) * widthPx
+      const widthRaw = ((previewEndMs - previewStartMs) / total) * widthPx
+      const baselineLeftRaw = ((baselineStart - timeline.minStart) / total) * widthPx
+      const baselineWidthRaw = ((baselineEnd - baselineStart) / total) * widthPx
+
+      const left = Number.isFinite(leftRaw) ? Math.max(0, Math.min(widthPx - 4, leftRaw)) : 0
+      const width = Number.isFinite(widthRaw) ? Math.max(4, Math.min(widthPx - left, widthRaw)) : 4
+      const baselineLeft = Number.isFinite(baselineLeftRaw) ? Math.max(0, Math.min(widthPx - 4, baselineLeftRaw)) : 0
+      const baselineWidth = Number.isFinite(baselineWidthRaw) ? Math.max(4, Math.min(widthPx - baselineLeft, baselineWidthRaw)) : 4
 
       return {
         task,
@@ -662,6 +672,13 @@ export function GanttPlannerPage() {
     })
   }
 
+  const handleTimelineSplitDragStart = useCallback((clientX: number) => {
+    timelineSplitDragRef.current = {
+      startX: clientX,
+      startWidth: timelineTableWidth,
+    }
+  }, [timelineTableWidth])
+
   useEffect(() => {
     setTimelinePage(1)
     setListPage(1)
@@ -677,6 +694,40 @@ export function GanttPlannerPage() {
   useEffect(() => {
     window.localStorage.setItem(plannerTabStorageKey, plannerTab)
   }, [plannerTab, plannerTabStorageKey])
+
+  useEffect(() => {
+    const stored = window.localStorage.getItem(timelineTableWidthStorageKey)
+    if (!stored) return
+    const value = Number(stored)
+    if (Number.isFinite(value)) {
+      setTimelineTableWidth(Math.max(320, Math.min(760, value)))
+    }
+  }, [timelineTableWidthStorageKey])
+
+  useEffect(() => {
+    window.localStorage.setItem(timelineTableWidthStorageKey, String(timelineTableWidth))
+  }, [timelineTableWidth, timelineTableWidthStorageKey])
+
+  useEffect(() => {
+    const handleMouseMove = (event: MouseEvent) => {
+      const drag = timelineSplitDragRef.current
+      if (!drag) return
+      const next = drag.startWidth + (event.clientX - drag.startX)
+      setTimelineTableWidth(Math.max(320, Math.min(760, next)))
+    }
+
+    const handleMouseUp = () => {
+      timelineSplitDragRef.current = null
+    }
+
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseup', handleMouseUp)
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [])
 
   useEffect(() => {
     if (timelinePage > totalTimelinePages) {
@@ -1310,8 +1361,8 @@ export function GanttPlannerPage() {
         )}
 
         {!timelineCollapsed && sortedTasks.length > 0 && (
-          <div className="grid gap-3 xl:grid-cols-[420px_1fr]">
-            <Card>
+          <div className="space-y-3 xl:space-y-0 xl:flex xl:items-stretch xl:gap-2">
+            <Card className="xl:shrink-0" style={{ width: `min(100%, ${timelineTableWidth}px)` }}>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm">Tabla de tareas (WBS/estado/owner)</CardTitle>
               </CardHeader>
@@ -1342,7 +1393,18 @@ export function GanttPlannerPage() {
               </CardContent>
             </Card>
 
-            <Card>
+            <div
+              className="hidden xl:flex w-2 cursor-col-resize select-none items-center justify-center rounded border bg-muted/40 hover:bg-muted"
+              onMouseDown={(event) => {
+                event.preventDefault()
+                handleTimelineSplitDragStart(event.clientX)
+              }}
+              title="Arrastra para ajustar columnas"
+            >
+              <span className="h-10 w-[2px] rounded bg-border" />
+            </div>
+
+            <Card className="xl:flex-1 xl:min-w-0">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm">Timeline profesional (baseline vs real + dependencias)</CardTitle>
               </CardHeader>
@@ -1379,7 +1441,7 @@ export function GanttPlannerPage() {
                       ))}
 
                       {timelineDependencyLines.map((line) => (
-                        <div key={`dep-${line.key}`}>
+                        <div key={`dep-${line.key}`} className="pointer-events-none">
                           <div className="absolute h-[2px] bg-primary/60" style={{ left: `${line.left}px`, top: `${line.top}px`, width: `${line.width}px` }} />
                           {line.height > 0 && (
                             <div className="absolute w-[2px] bg-primary/60" style={{ left: `${line.left + line.width}px`, top: `${line.top}px`, height: `${line.height}px` }} />

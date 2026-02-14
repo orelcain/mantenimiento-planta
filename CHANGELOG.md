@@ -7,6 +7,16 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.83] - 2026-02-14
+
+### 🧩 Timeline más usable (interacción + legibilidad)
+
+#### Mejoras
+- **Rango temporal por página**: El timeline usa la ventana de fechas de la página actual para evitar compresión extrema por outliers.
+- **Barras robustas**: Se normalizan posiciones/ancho para mantener barras visibles e interactivas.
+- **Splitter arrastrable**: Nuevo divisor entre tabla de tareas y timeline para ajustar columnas según necesidad operativa.
+- **Eventos de mouse garantizados**: Las líneas de dependencia ya no bloquean interacción con drag/resize de barras.
+
 ## [2.47.82] - 2026-02-14
 
 ### 🔄 Refresh forzado de cliente + timeline demo activo

@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.47.82**
+## Versión Actual: **v2.47.83**
 
 **Fecha de lanzamiento**: 13 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.47.83 - Interacción y legibilidad del timeline (14/02/2026)
+- 🧩 **Rango por página**: El timeline ahora se ajusta a la página visible para que las barras no queden comprimidas.
+- ↔️ **Splitter horizontal**: Puedes arrastrar el divisor entre tabla y timeline para ver más detalle donde lo necesites.
+- 🖱️ **Interacción más estable**: Dependencias con `pointer-events` desactivados para no bloquear drag/resize de tareas.
 
 ### v2.47.82 - Forzar refresh cliente + timeline demo activo (14/02/2026)
 - 🔄 **Refresh de cliente**: Bump de versión para activar detección de actualización y recarga controlada en sesiones abiertas.
