@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.47.85**
+## Versión Actual: **v2.47.86**
 
 **Fecha de lanzamiento**: 13 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,10 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.47.86 - Doble clic para edición rápida (14/02/2026)
+- ⚡ **Open rápido**: doble clic en fila/barra del timeline abre edición de la tarea.
+- 🎯 **Foco inteligente**: el input de inicio toma foco automáticamente para editar fecha/hora sin pasos extra.
 
 ### v2.47.85 - Interacción por tarea en timeline (14/02/2026)
 - 🔎 **Búsqueda por contexto**: filtros por área/equipo/tarea en la vista timeline.

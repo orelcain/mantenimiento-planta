@@ -282,6 +282,8 @@ export function GanttPlannerPage() {
   const notifiedDelayedCriticalRef = useRef<Set<string>>(new Set())
   const remoteAlertSentRef = useRef<Set<string>>(new Set())
   const timelineSplitDragRef = useRef<{ startX: number; startWidth: number } | null>(null)
+  const timelineQuickStartInputRef = useRef<HTMLInputElement | null>(null)
+  const timelineQuickFocusPendingRef = useRef(false)
   const { tree: hierarchyTree } = useHierarchyTree()
   const plannerTabStorageKey = useMemo(() => `gantt:plannerTab:${user?.id ?? 'anon'}`, [user?.id])
   const timelineTableWidthStorageKey = useMemo(() => `gantt:timelineTableWidth:${user?.id ?? 'anon'}`, [user?.id])
@@ -704,6 +706,13 @@ export function GanttPlannerPage() {
     }
   }, [timelineTableWidth])
 
+  const openTimelineQuickEditor = useCallback((taskId: string) => {
+    timelineQuickFocusPendingRef.current = true
+    setPlannerTab('timeline')
+    setTimelineCollapsed(false)
+    setSelectedTaskId(taskId)
+  }, [])
+
   const handleTimelineQuickSaveDates = useCallback(async () => {
     if (!selectedTimelineTask) return
 
@@ -831,6 +840,14 @@ export function GanttPlannerPage() {
     const hours = Math.max(1, Math.round((selectedTimelineTask.endDate.getTime() - selectedTimelineTask.startDate.getTime()) / HOUR_MS))
     setTimelineQuickHours(String(hours))
     setTimelineQuickResponsibleId(selectedTimelineTask.responsibleUserId ?? 'none')
+
+    if (timelineQuickFocusPendingRef.current) {
+      timelineQuickFocusPendingRef.current = false
+      window.setTimeout(() => {
+        timelineQuickStartInputRef.current?.focus()
+        timelineQuickStartInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }, 0)
+    }
   }, [selectedTimelineTask])
 
   useEffect(() => {
@@ -1471,7 +1488,7 @@ export function GanttPlannerPage() {
                 <div className="grid gap-2 md:grid-cols-5">
                   <div>
                     <Label className="text-xs text-muted-foreground">Inicio</Label>
-                    <Input type="datetime-local" value={timelineQuickStart} onChange={(event) => setTimelineQuickStart(event.target.value)} />
+                    <Input ref={timelineQuickStartInputRef} type="datetime-local" value={timelineQuickStart} onChange={(event) => setTimelineQuickStart(event.target.value)} />
                   </div>
                   <div>
                     <Label className="text-xs text-muted-foreground">Fin</Label>
@@ -1541,6 +1558,7 @@ export function GanttPlannerPage() {
                         key={`timeline-grid-${row.task.id}`}
                         className={`grid grid-cols-[1fr_1fr_1.4fr_.8fr_.7fr_.6fr] gap-2 px-3 py-2 text-xs border-b h-11 items-center cursor-pointer ${selectedTaskId === row.task.id ? 'bg-primary/10' : ''}`}
                         onClick={() => setSelectedTaskId(row.task.id)}
+                        onDoubleClick={() => openTimelineQuickEditor(row.task.id)}
                       >
                         <span className="truncate">{row.task.hierarchyPath ?? 'Sin área'}</span>
                         <span className="truncate">{row.task.equipmentNombre ?? 'Sin equipo'}</span>
@@ -1629,6 +1647,7 @@ export function GanttPlannerPage() {
                             className={`absolute h-3 rounded ${row.isCritical ? 'bg-red-500' : 'bg-primary'}`}
                             style={{ left: `${row.left}px`, top: `${row.rowIndex * 44 + 14}px`, width: `${row.width}px` }}
                             onClick={() => setSelectedTaskId(row.task.id)}
+                            onDoubleClick={() => openTimelineQuickEditor(row.task.id)}
                             onMouseDown={(event) => {
                               if (!row.interactive) return
                               event.preventDefault()

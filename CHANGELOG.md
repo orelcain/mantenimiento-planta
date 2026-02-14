@@ -7,6 +7,15 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.86] - 2026-02-14
+
+### ⚡ Acceso rápido a edición por doble clic
+
+#### Mejoras
+- **Doble clic en fila/barra**: abre edición rápida de la tarea seleccionada directamente desde Timeline.
+- **Foco automático**: al abrir edición rápida, el cursor queda en `Inicio` para ajustar fecha/hora al instante.
+- **Navegación más fluida**: mantiene selección de tarea y acelera ajustes operativos masivos.
+
 ## [2.47.85] - 2026-02-14
 
 ### 🛠️ Interacción operativa por tarea en Timeline
