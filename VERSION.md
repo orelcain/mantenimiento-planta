@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.47.84**
+## Versión Actual: **v2.47.85**
 
 **Fecha de lanzamiento**: 13 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.47.85 - Interacción por tarea en timeline (14/02/2026)
+- 🔎 **Búsqueda por contexto**: filtros por área/equipo/tarea en la vista timeline.
+- 🧩 **Edición rápida**: cambio directo de fechas, horas y responsable para la tarea seleccionada.
+- 🖱️ **Selección simple**: clic en fila o barra para operar cada tarea más rápido.
 
 ### v2.47.84 - Modo enfoque Gantt (14/02/2026)
 - 🎯 **Enfoque por módulo**: Nuevo botón para ocultar sidebar solo en `Gantt` y ganar ancho de trabajo.

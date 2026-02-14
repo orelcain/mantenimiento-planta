@@ -7,6 +7,16 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.85] - 2026-02-14
+
+### 🛠️ Interacción operativa por tarea en Timeline
+
+#### Mejoras
+- **Buscador dedicado**: filtros directos por `Área`, `Equipo` y `Tarea` dentro del tab Timeline.
+- **Selección rápida de tarea**: clic en fila o barra para enfocar la tarea activa.
+- **Edición rápida en timeline**: ajuste de `fecha/hora inicio`, `fecha/hora fin`, `tiempo (horas)` y `usuario responsable` sin salir del panel.
+- **Ventana temporal por página**: la escala del timeline toma tareas visibles para mejorar legibilidad y manipulación.
+
 ## [2.47.84] - 2026-02-14
 
 ### 🎯 Modo enfoque para Gantt (solo módulo)

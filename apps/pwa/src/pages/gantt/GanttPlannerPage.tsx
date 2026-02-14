@@ -227,6 +227,9 @@ export function GanttPlannerPage() {
   const [timelinePageSize, setTimelinePageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>('25')
   const [listPageSize, setListPageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>('25')
   const [timelineTableWidth, setTimelineTableWidth] = useState(420)
+  const [timelineAreaSearch, setTimelineAreaSearch] = useState('')
+  const [timelineEquipmentSearch, setTimelineEquipmentSearch] = useState('')
+  const [timelineTaskSearch, setTimelineTaskSearch] = useState('')
   const [timelineZoom, setTimelineZoom] = useState<'day' | 'week' | 'month'>('week')
   const [assignmentFilter, setAssignmentFilter] = useState<'all' | 'mine' | 'unassigned'>('all')
   const [technicians, setTechnicians] = useState<User[]>([])
@@ -263,6 +266,10 @@ export function GanttPlannerPage() {
   const [importErrors, setImportErrors] = useState<string[]>([])
   const [importBusy, setImportBusy] = useState(false)
   const [importMessage, setImportMessage] = useState<string | null>(null)
+  const [timelineQuickStart, setTimelineQuickStart] = useState('')
+  const [timelineQuickEnd, setTimelineQuickEnd] = useState('')
+  const [timelineQuickHours, setTimelineQuickHours] = useState('')
+  const [timelineQuickResponsibleId, setTimelineQuickResponsibleId] = useState<string>('none')
   const [timelineDrag, setTimelineDrag] = useState<{
     taskId: string
     mode: TimelineDragMode
@@ -394,17 +401,30 @@ export function GanttPlannerPage() {
   const cpmMap = useMemo(() => new Map(cpm.tasks.map((row) => [row.taskId, row])), [cpm.tasks])
   const metrics = useMemo(() => buildGanttMetrics(filteredTasks), [filteredTasks])
 
+  const timelineFilteredTasks = useMemo(() => {
+    const areaQuery = normalizeKey(timelineAreaSearch)
+    const equipmentQuery = normalizeKey(timelineEquipmentSearch)
+    const taskQuery = normalizeKey(timelineTaskSearch)
+
+    return sortedTasks.filter((task) => {
+      if (areaQuery && !normalizeKey(task.hierarchyPath ?? '').includes(areaQuery)) return false
+      if (equipmentQuery && !normalizeKey(task.equipmentNombre ?? '').includes(equipmentQuery)) return false
+      if (taskQuery && !normalizeKey(task.titulo).includes(taskQuery)) return false
+      return true
+    })
+  }, [sortedTasks, timelineAreaSearch, timelineEquipmentSearch, timelineTaskSearch])
+
   const timelinePageSizeNum = Number(timelinePageSize)
   const listPageSizeNum = Number(listPageSize)
-  const totalTimelinePages = Math.max(1, Math.ceil(sortedTasks.length / timelinePageSizeNum))
+  const totalTimelinePages = Math.max(1, Math.ceil(timelineFilteredTasks.length / timelinePageSizeNum))
   const totalListPages = Math.max(1, Math.ceil(sortedTasks.length / listPageSizeNum))
   const safeTimelinePage = Math.min(timelinePage, totalTimelinePages)
   const safeListPage = Math.min(listPage, totalListPages)
 
   const pagedTimelineTasks = useMemo(() => {
     const start = (safeTimelinePage - 1) * timelinePageSizeNum
-    return sortedTasks.slice(start, start + timelinePageSizeNum)
-  }, [safeTimelinePage, sortedTasks, timelinePageSizeNum])
+    return timelineFilteredTasks.slice(start, start + timelinePageSizeNum)
+  }, [safeTimelinePage, timelineFilteredTasks, timelinePageSizeNum])
 
   const pagedListTasks = useMemo(() => {
     const start = (safeListPage - 1) * listPageSizeNum
@@ -556,6 +576,11 @@ export function GanttPlannerPage() {
     return lines
   }, [timelineRows])
 
+  const selectedTimelineTask = useMemo(() => {
+    if (selectedTaskId === 'none') return null
+    return timelineFilteredTasks.find((task) => task.id === selectedTaskId) ?? selectedTask
+  }, [selectedTask, selectedTaskId, timelineFilteredTasks])
+
   const getTimelineSnapMs = useCallback(() => {
     if (timelineZoom === 'day') return HOUR_MS
     if (timelineZoom === 'week') return 6 * HOUR_MS
@@ -679,6 +704,46 @@ export function GanttPlannerPage() {
     }
   }, [timelineTableWidth])
 
+  const handleTimelineQuickSaveDates = useCallback(async () => {
+    if (!selectedTimelineTask) return
+
+    const nextStart = new Date(timelineQuickStart)
+    const nextEnd = new Date(timelineQuickEnd)
+
+    if (Number.isNaN(nextStart.getTime()) || Number.isNaN(nextEnd.getTime())) {
+      setError('Fechas inválidas en edición rápida')
+      return
+    }
+
+    if (nextEnd.getTime() <= nextStart.getTime()) {
+      setError('La fecha fin debe ser mayor al inicio')
+      return
+    }
+
+    await handleUpdateTaskDates(selectedTimelineTask, nextStart, nextEnd)
+  }, [handleUpdateTaskDates, selectedTimelineTask, timelineQuickEnd, timelineQuickStart])
+
+  const handleTimelineQuickApplyHours = useCallback(async () => {
+    if (!selectedTimelineTask) return
+
+    const nextStart = new Date(timelineQuickStart)
+    const hours = Number(timelineQuickHours.replace(',', '.'))
+
+    if (Number.isNaN(nextStart.getTime()) || !Number.isFinite(hours) || hours <= 0) {
+      setError('Horas inválidas en edición rápida')
+      return
+    }
+
+    const nextEnd = new Date(nextStart.getTime() + hours * HOUR_MS)
+    setTimelineQuickEnd(toInputDate(nextEnd))
+    await handleUpdateTaskDates(selectedTimelineTask, nextStart, nextEnd)
+  }, [handleUpdateTaskDates, selectedTimelineTask, timelineQuickHours, timelineQuickStart])
+
+  async function handleTimelineQuickAssignUser() {
+    if (!selectedTimelineTask) return
+    await handleAssignResponsible(selectedTimelineTask, timelineQuickResponsibleId)
+  }
+
   useEffect(() => {
     setTimelinePage(1)
     setListPage(1)
@@ -751,6 +816,22 @@ export function GanttPlannerPage() {
       setAiProgressSuggestion(selectedTask.aiSuggestedProgress)
     }
   }, [selectedTask])
+
+  useEffect(() => {
+    if (!selectedTimelineTask) {
+      setTimelineQuickStart('')
+      setTimelineQuickEnd('')
+      setTimelineQuickHours('')
+      setTimelineQuickResponsibleId('none')
+      return
+    }
+
+    setTimelineQuickStart(toInputDate(selectedTimelineTask.startDate))
+    setTimelineQuickEnd(toInputDate(selectedTimelineTask.endDate))
+    const hours = Math.max(1, Math.round((selectedTimelineTask.endDate.getTime() - selectedTimelineTask.startDate.getTime()) / HOUR_MS))
+    setTimelineQuickHours(String(hours))
+    setTimelineQuickResponsibleId(selectedTimelineTask.responsibleUserId ?? 'none')
+  }, [selectedTimelineTask])
 
   useEffect(() => {
     if (selectedTaskId === 'none') {
@@ -1353,14 +1434,91 @@ export function GanttPlannerPage() {
                 {timelineCollapsed ? 'Expandir' : 'Colapsar'}
               </Button>
             </div>
+
+            <div className="grid gap-2 md:grid-cols-3">
+              <div>
+                <Label className="text-xs text-muted-foreground">Buscar por área</Label>
+                <Input
+                  value={timelineAreaSearch}
+                  onChange={(event) => setTimelineAreaSearch(event.target.value)}
+                  placeholder="Ej: Acopio"
+                />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Buscar por equipo</Label>
+                <Input
+                  value={timelineEquipmentSearch}
+                  onChange={(event) => setTimelineEquipmentSearch(event.target.value)}
+                  placeholder="Ej: Bomba"
+                />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Buscar por tarea</Label>
+                <Input
+                  value={timelineTaskSearch}
+                  onChange={(event) => setTimelineTaskSearch(event.target.value)}
+                  placeholder="Ej: mantenimiento"
+                />
+              </div>
+            </div>
+
+            {selectedTimelineTask && (
+              <div className="rounded border p-3 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-medium truncate">Edición rápida: {selectedTimelineTask.hierarchyPath ?? 'Sin área'} · {selectedTimelineTask.equipmentNombre ?? 'Sin equipo'} · {selectedTimelineTask.titulo}</p>
+                  <Badge variant="outline">{selectedTimelineTask.status}</Badge>
+                </div>
+                <div className="grid gap-2 md:grid-cols-5">
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Inicio</Label>
+                    <Input type="datetime-local" value={timelineQuickStart} onChange={(event) => setTimelineQuickStart(event.target.value)} />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Fin</Label>
+                    <Input type="datetime-local" value={timelineQuickEnd} onChange={(event) => setTimelineQuickEnd(event.target.value)} />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Tiempo (horas)</Label>
+                    <Input type="number" min={1} value={timelineQuickHours} onChange={(event) => setTimelineQuickHours(event.target.value)} />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Usuario responsable</Label>
+                    <Select value={timelineQuickResponsibleId} onValueChange={setTimelineQuickResponsibleId}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Sin asignar</SelectItem>
+                        {technicians.map((tech) => (
+                          <SelectItem key={`timeline-quick-tech-${tech.id}`} value={tech.id}>
+                            {tech.nombre} {tech.apellido}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-end gap-2">
+                    <Button size="sm" className="w-full" variant="outline" onClick={() => void handleTimelineQuickSaveDates()} disabled={!canOperateTask(selectedTimelineTask)}>
+                      Guardar fechas
+                    </Button>
+                    <Button size="sm" className="w-full" variant="secondary" onClick={() => void handleTimelineQuickApplyHours()} disabled={!canOperateTask(selectedTimelineTask)}>
+                      Aplicar horas
+                    </Button>
+                  </div>
+                </div>
+                <div className="flex justify-end">
+                  <Button size="sm" variant="outline" onClick={() => void handleTimelineQuickAssignUser()} disabled={!canEdit}>
+                    Guardar usuario
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
-        {!timelineCollapsed && sortedTasks.length === 0 && (
+        {!timelineCollapsed && timelineFilteredTasks.length === 0 && (
           <p className="text-sm text-muted-foreground">Sin tareas para visualizar.</p>
         )}
 
-        {!timelineCollapsed && sortedTasks.length > 0 && (
+        {!timelineCollapsed && timelineFilteredTasks.length > 0 && (
           <div className="space-y-3 xl:space-y-0 xl:flex xl:items-stretch xl:gap-2">
             <Card className="xl:shrink-0" style={{ width: `min(100%, ${timelineTableWidth}px)` }}>
               <CardHeader className="pb-2">
@@ -1379,7 +1537,11 @@ export function GanttPlannerPage() {
                   {timelineRows.map((row) => {
                     const status = STATUS_META[row.task.status]
                     return (
-                      <div key={`timeline-grid-${row.task.id}`} className="grid grid-cols-[1fr_1fr_1.4fr_.8fr_.7fr_.6fr] gap-2 px-3 py-2 text-xs border-b h-11 items-center">
+                      <div
+                        key={`timeline-grid-${row.task.id}`}
+                        className={`grid grid-cols-[1fr_1fr_1.4fr_.8fr_.7fr_.6fr] gap-2 px-3 py-2 text-xs border-b h-11 items-center cursor-pointer ${selectedTaskId === row.task.id ? 'bg-primary/10' : ''}`}
+                        onClick={() => setSelectedTaskId(row.task.id)}
+                      >
                         <span className="truncate">{row.task.hierarchyPath ?? 'Sin área'}</span>
                         <span className="truncate">{row.task.equipmentNombre ?? 'Sin equipo'}</span>
                         <span className="truncate">{row.isCritical ? '🔴 ' : ''}{row.task.titulo}</span>
@@ -1466,6 +1628,7 @@ export function GanttPlannerPage() {
                           <div
                             className={`absolute h-3 rounded ${row.isCritical ? 'bg-red-500' : 'bg-primary'}`}
                             style={{ left: `${row.left}px`, top: `${row.rowIndex * 44 + 14}px`, width: `${row.width}px` }}
+                            onClick={() => setSelectedTaskId(row.task.id)}
                             onMouseDown={(event) => {
                               if (!row.interactive) return
                               event.preventDefault()
@@ -1515,9 +1678,9 @@ export function GanttPlannerPage() {
           </div>
         )}
 
-        {!timelineCollapsed && sortedTasks.length > 0 && (
+        {!timelineCollapsed && timelineFilteredTasks.length > 0 && (
           <div className="flex items-center justify-between pt-1">
-            <p className="text-xs text-muted-foreground">Página {safeTimelinePage} de {totalTimelinePages} · {sortedTasks.length} tareas</p>
+            <p className="text-xs text-muted-foreground">Página {safeTimelinePage} de {totalTimelinePages} · {timelineFilteredTasks.length} tareas</p>
             <div className="flex gap-2">
               <Button
                 size="sm"
