@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.47.96**
+## Versión Actual: **v2.47.97**
 
 **Fecha de lanzamiento**: 14 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.47.97 - Orden visual de Configuración y Tareas (14/02/2026)
+- 🧹 **Filtros agrupados en Tareas**: bloque único más limpio para búsqueda, filtros y orden.
+- 🧭 **Configuración guiada**: flujo sugerido y subtítulos operativos para cada bloque.
+- 🧩 **Formulario de creación estructurado**: campos organizados en rejilla para lectura y carga más rápida.
 
 ### v2.47.96 - Guía contextual FS/SS/FF/SF en modo dependencia (14/02/2026)
 - 📘 **Guía rápida visible**: al activar `D` se muestra el significado operativo de `FS`, `SS`, `FF` y `SF`.

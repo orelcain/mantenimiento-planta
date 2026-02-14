@@ -1,8 +1,10 @@
 {
-  "version": "2.47.96",
+  "version": "2.47.97",
   "buildDate": "2026-02-14",
-  "buildTimestamp": 1771089000000,
+  "buildTimestamp": 1771089600000,
   "features": [
+    "Pestaña Tareas ordenada: filtros agrupados en bloque y encabezado operativo más claro",
+    "Pestaña Configuración pulida: flujo sugerido visible y formularios de creación más estructurados",
     "Panel contextual FS/SS/FF/SF visible solo con modo dependencia ON para guía rápida operativa",
     "Etiqueta flotante junto al cursor con tipo de dependencia detectado (FS/SS/FF/SF) durante el drag",
     "Resaltado visual de anclas destino válidas durante drag de dependencias en timeline",

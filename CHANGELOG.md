@@ -7,6 +7,15 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.97] - 2026-02-14
+
+### 🧹 Orden y pulido de pestañas Configuración / Tareas
+
+#### Mejoras
+- **Tareas más ordenada**: filtros agrupados en un bloque único con jerarquía visual más clara.
+- **Configuración más guiada**: se agrega flujo sugerido y mejor estructura de formularios.
+- **Lectura operativa mejorada**: textos de apoyo breves para orientar la acción sin saturar la pantalla.
+
 ## [2.47.96] - 2026-02-14
 
 ### 📘 Guía contextual de dependencias en modo D

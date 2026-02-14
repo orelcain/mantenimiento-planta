@@ -2484,7 +2484,10 @@ export function GanttPlannerPage() {
         {plannerTab === 'tareas' && (
         <Card className="lg:col-span-4">
           <CardHeader className="flex flex-row items-center justify-between space-y-0">
-            <CardTitle>Listado de tareas</CardTitle>
+            <div>
+              <CardTitle>Listado de tareas</CardTitle>
+              <p className="text-xs text-muted-foreground mt-1">Vista operativa para filtrar, revisar estado y abrir detalle/comentarios.</p>
+            </div>
             <Button size="sm" variant="outline" onClick={() => setListCollapsed((prev) => !prev)}>
               {listCollapsed ? <ChevronDown className="h-4 w-4 mr-1" /> : <ChevronUp className="h-4 w-4 mr-1" />}
               {listCollapsed ? 'Expandir' : 'Colapsar'}
@@ -2492,75 +2495,78 @@ export function GanttPlannerPage() {
           </CardHeader>
           {!listCollapsed && (
           <CardContent className="space-y-4">
-            <div className="grid gap-3 md:grid-cols-4">
-              <div>
-                <Label>Buscar tarea</Label>
-                <Input
-                  value={searchText}
-                  onChange={(event) => setSearchText(event.target.value)}
-                  placeholder="Título, equipo, área, responsable..."
-                />
-              </div>
-              <div>
-                <Label>Filtro área</Label>
-                <Select value={areaFilter} onValueChange={setAreaFilter}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas</SelectItem>
-                    {areaNodes.map((node) => <SelectItem key={`area-filter-${node.id}`} value={node.id}>{node.nombre}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Filtro equipo</Label>
-                <Select value={equipmentFilter} onValueChange={setEquipmentFilter}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    {equipment.map((item) => <SelectItem key={item.id} value={item.id}>{item.nombre}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Filtro estado</Label>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    {STATUS_OPTIONS.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Asignación</Label>
-                <Select value={assignmentFilter} onValueChange={(value) => setAssignmentFilter(value as 'all' | 'mine' | 'unassigned')}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas</SelectItem>
-                    <SelectItem value="mine">Mis tareas</SelectItem>
-                    <SelectItem value="unassigned">Sin cuenta asociada</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Orden</Label>
-                <Select value={sortMode} onValueChange={(value) => setSortMode(value as 'jerarquia' | 'fecha' | 'titulo')}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="jerarquia">Jerarquía</SelectItem>
-                    <SelectItem value="fecha">Fecha inicio</SelectItem>
-                    <SelectItem value="titulo">Título</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Tareas por página</Label>
-                <Select value={listPageSize} onValueChange={(value) => setListPageSize(value as (typeof PAGE_SIZE_OPTIONS)[number])}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {PAGE_SIZE_OPTIONS.map((size) => <SelectItem key={`list-size-${size}`} value={size}>{size}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+            <div className="rounded border p-3 space-y-3">
+              <p className="text-xs font-medium">Filtros y orden</p>
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <div className="xl:col-span-2">
+                  <Label>Buscar tarea</Label>
+                  <Input
+                    value={searchText}
+                    onChange={(event) => setSearchText(event.target.value)}
+                    placeholder="Título, equipo, área, responsable..."
+                  />
+                </div>
+                <div>
+                  <Label>Filtro área</Label>
+                  <Select value={areaFilter} onValueChange={setAreaFilter}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas</SelectItem>
+                      {areaNodes.map((node) => <SelectItem key={`area-filter-${node.id}`} value={node.id}>{node.nombre}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Filtro equipo</Label>
+                  <Select value={equipmentFilter} onValueChange={setEquipmentFilter}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos</SelectItem>
+                      {equipment.map((item) => <SelectItem key={item.id} value={item.id}>{item.nombre}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Filtro estado</Label>
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos</SelectItem>
+                      {STATUS_OPTIONS.map((option) => <SelectItem key={option} value={option}>{option}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Asignación</Label>
+                  <Select value={assignmentFilter} onValueChange={(value) => setAssignmentFilter(value as 'all' | 'mine' | 'unassigned')}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas</SelectItem>
+                      <SelectItem value="mine">Mis tareas</SelectItem>
+                      <SelectItem value="unassigned">Sin cuenta asociada</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Orden</Label>
+                  <Select value={sortMode} onValueChange={(value) => setSortMode(value as 'jerarquia' | 'fecha' | 'titulo')}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="jerarquia">Jerarquía</SelectItem>
+                      <SelectItem value="fecha">Fecha inicio</SelectItem>
+                      <SelectItem value="titulo">Título</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Tareas por página</Label>
+                  <Select value={listPageSize} onValueChange={(value) => setListPageSize(value as (typeof PAGE_SIZE_OPTIONS)[number])}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {PAGE_SIZE_OPTIONS.map((size) => <SelectItem key={`list-size-${size}`} value={size}>{size}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
 
@@ -2680,8 +2686,20 @@ export function GanttPlannerPage() {
 
         <div className={plannerTab === 'configuracion' ? 'md:col-span-6 grid gap-4 md:grid-cols-2' : 'lg:col-span-2 space-y-4'}>
           {plannerTab === 'configuracion' && (
+          <Card className="md:col-span-2">
+            <CardContent className="pt-4 text-xs text-muted-foreground flex flex-wrap items-center justify-between gap-2">
+              <span>Flujo sugerido: 1) Importar o crear tarea, 2) definir dependencias, 3) simular retraso para validar impacto.</span>
+              <Badge variant="outline">Configuración operativa</Badge>
+            </CardContent>
+          </Card>
+          )}
+
+          {plannerTab === 'configuracion' && (
           <Card>
-            <CardHeader><CardTitle>Cargar tareas desde Excel</CardTitle></CardHeader>
+            <CardHeader className="pb-2">
+              <CardTitle>Cargar tareas desde Excel</CardTitle>
+              <p className="text-xs text-muted-foreground">Importación masiva con previsualización antes de crear registros.</p>
+            </CardHeader>
             <CardContent className="space-y-3">
               <div>
                 <Label>Archivo (.xlsx, .xls, .xlsm)</Label>
@@ -2746,68 +2764,73 @@ export function GanttPlannerPage() {
 
           {plannerTab === 'configuracion' && (
           <Card>
-            <CardHeader><CardTitle>Crear tarea</CardTitle></CardHeader>
+            <CardHeader className="pb-2">
+              <CardTitle>Crear tarea</CardTitle>
+              <p className="text-xs text-muted-foreground">Alta manual rápida con contexto de área, equipo y responsable.</p>
+            </CardHeader>
             <CardContent className="space-y-3">
               <div>
                 <Label>Título</Label>
                 <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Cambio de rodamiento" />
               </div>
-              <div>
-                <Label>Área</Label>
-                <Select value={areaId} onValueChange={(value) => {
-                  setAreaId(value)
-                  setEquipmentId('none')
-                }}>
-                  <SelectTrigger><SelectValue placeholder="Opcional" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Sin área</SelectItem>
-                    {areaNodes.map((node) => <SelectItem key={`area-create-${node.id}`} value={node.id}>{node.nombre}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Equipo</Label>
-                <Select value={equipmentId} onValueChange={setEquipmentId}>
-                  <SelectTrigger><SelectValue placeholder="Opcional" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Sin equipo</SelectItem>
-                    {equipmentForSelectedArea.map((item) => <SelectItem key={item.id} value={item.id}>{item.nombre}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Prioridad</Label>
-                <Select value={priority} onValueChange={(value) => setPriority(value as IncidentPriority)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {PRIORITY_OPTIONS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Asignar a</Label>
-                <Select value={createResponsibleId} onValueChange={setCreateResponsibleId}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="self">Yo ({user?.nombre} {user?.apellido})</SelectItem>
-                    <SelectItem value="none">Sin asignar</SelectItem>
-                    {technicians
-                      .filter((tech) => tech.id !== user?.id)
-                      .map((tech) => (
-                        <SelectItem key={`create-tech-${tech.id}`} value={tech.id}>
-                          {tech.nombre} {tech.apellido}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Inicio</Label>
-                <Input type="datetime-local" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
-              </div>
-              <div>
-                <Label>Fin</Label>
-                <Input type="datetime-local" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <Label>Área</Label>
+                  <Select value={areaId} onValueChange={(value) => {
+                    setAreaId(value)
+                    setEquipmentId('none')
+                  }}>
+                    <SelectTrigger><SelectValue placeholder="Opcional" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Sin área</SelectItem>
+                      {areaNodes.map((node) => <SelectItem key={`area-create-${node.id}`} value={node.id}>{node.nombre}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Equipo</Label>
+                  <Select value={equipmentId} onValueChange={setEquipmentId}>
+                    <SelectTrigger><SelectValue placeholder="Opcional" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Sin equipo</SelectItem>
+                      {equipmentForSelectedArea.map((item) => <SelectItem key={item.id} value={item.id}>{item.nombre}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Prioridad</Label>
+                  <Select value={priority} onValueChange={(value) => setPriority(value as IncidentPriority)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {PRIORITY_OPTIONS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Asignar a</Label>
+                  <Select value={createResponsibleId} onValueChange={setCreateResponsibleId}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="self">Yo ({user?.nombre} {user?.apellido})</SelectItem>
+                      <SelectItem value="none">Sin asignar</SelectItem>
+                      {technicians
+                        .filter((tech) => tech.id !== user?.id)
+                        .map((tech) => (
+                          <SelectItem key={`create-tech-${tech.id}`} value={tech.id}>
+                            {tech.nombre} {tech.apellido}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Inicio</Label>
+                  <Input type="datetime-local" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
+                </div>
+                <div>
+                  <Label>Fin</Label>
+                  <Input type="datetime-local" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
+                </div>
               </div>
               <div>
                 <Label>Repuestos vinculados (IDs/códigos, separados por coma)</Label>
