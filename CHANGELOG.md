@@ -7,6 +7,15 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.47.81] - 2026-02-14
+
+### 🗂️ Planificador Gantt con pestañas y preferencia persistente
+
+#### Mejoras
+- **Tres pestañas operativas**: Se separa el planificador en `Configuración`, `Tareas` y `Timeline` para navegación más clara.
+- **Vista temporal por defecto**: El módulo abre inicialmente en `Timeline` para control inmediato de fechas y atraso.
+- **Preferencia recordada**: Se guarda la última pestaña usada por usuario y se restaura automáticamente al volver.
+
 ## [2.47.80] - 2026-02-14
 
 ### 🧭 UX Gantt orientada a planta (Área/Equipo antes de Tarea)

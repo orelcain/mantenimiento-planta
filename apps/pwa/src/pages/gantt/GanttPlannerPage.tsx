@@ -47,6 +47,7 @@ const DAY_MS = 24 * 60 * 60 * 1000
 const HOUR_MS = 60 * 60 * 1000
 
 type TimelineDragMode = 'move' | 'resize-start' | 'resize-end'
+type PlannerTab = 'configuracion' | 'tareas' | 'timeline'
 
 interface ImportedTaskDraft {
   sourceRow: number
@@ -212,6 +213,7 @@ export function GanttPlannerPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [searchText, setSearchText] = useState('')
   const [sortMode, setSortMode] = useState<'jerarquia' | 'fecha' | 'titulo'>('jerarquia')
+  const [plannerTab, setPlannerTab] = useState<PlannerTab>('timeline')
   const [timelineCollapsed, setTimelineCollapsed] = useState(false)
   const [listCollapsed, setListCollapsed] = useState(false)
   const [timelinePage, setTimelinePage] = useState(1)
@@ -266,6 +268,7 @@ export function GanttPlannerPage() {
   const notifiedDelayedCriticalRef = useRef<Set<string>>(new Set())
   const remoteAlertSentRef = useRef<Set<string>>(new Set())
   const { tree: hierarchyTree } = useHierarchyTree()
+  const plannerTabStorageKey = useMemo(() => `gantt:plannerTab:${user?.id ?? 'anon'}`, [user?.id])
 
   const hierarchyNodes = useMemo(() => flattenHierarchyTree(hierarchyTree), [hierarchyTree])
   const areaNodes = useMemo(
@@ -565,6 +568,17 @@ export function GanttPlannerPage() {
     setTimelinePage(1)
     setListPage(1)
   }, [areaFilter, assignmentFilter, equipmentFilter, statusFilter, sortMode, searchText, timelinePageSize, listPageSize])
+
+  useEffect(() => {
+    const savedTab = window.localStorage.getItem(plannerTabStorageKey)
+    if (savedTab === 'configuracion' || savedTab === 'tareas' || savedTab === 'timeline') {
+      setPlannerTab(savedTab)
+    }
+  }, [plannerTabStorageKey])
+
+  useEffect(() => {
+    window.localStorage.setItem(plannerTabStorageKey, plannerTab)
+  }, [plannerTab, plannerTabStorageKey])
 
   useEffect(() => {
     if (timelinePage > totalTimelinePages) {
@@ -1127,6 +1141,31 @@ export function GanttPlannerPage() {
         </Card>
       </div>
 
+      <div className="flex flex-wrap gap-2">
+        <Button
+          size="sm"
+          variant={plannerTab === 'configuracion' ? 'default' : 'outline'}
+          onClick={() => setPlannerTab('configuracion')}
+        >
+          Configuración
+        </Button>
+        <Button
+          size="sm"
+          variant={plannerTab === 'tareas' ? 'default' : 'outline'}
+          onClick={() => setPlannerTab('tareas')}
+        >
+          Tareas
+        </Button>
+        <Button
+          size="sm"
+          variant={plannerTab === 'timeline' ? 'default' : 'outline'}
+          onClick={() => setPlannerTab('timeline')}
+        >
+          Timeline
+        </Button>
+      </div>
+
+      {plannerTab === 'timeline' && (
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <CardTitle>Vista temporal y dependencias</CardTitle>
@@ -1270,9 +1309,12 @@ export function GanttPlannerPage() {
           </CardContent>
         )}
       </Card>
+      )}
 
+      {plannerTab !== 'timeline' && (
       <div className="grid gap-3 md:grid-cols-6">
-        <Card className="lg:col-span-2">
+        {plannerTab === 'tareas' && (
+        <Card className="lg:col-span-4">
           <CardHeader className="flex flex-row items-center justify-between space-y-0">
             <CardTitle>Listado de tareas</CardTitle>
             <Button size="sm" variant="outline" onClick={() => setListCollapsed((prev) => !prev)}>
@@ -1466,8 +1508,10 @@ export function GanttPlannerPage() {
           </CardContent>
           )}
         </Card>
+        )}
 
-        <div className="space-y-4">
+        <div className={plannerTab === 'configuracion' ? 'md:col-span-6 grid gap-4 md:grid-cols-2' : 'lg:col-span-2 space-y-4'}>
+          {plannerTab === 'configuracion' && (
           <Card>
             <CardHeader><CardTitle>Cargar tareas desde Excel</CardTitle></CardHeader>
             <CardContent className="space-y-3">
@@ -1530,7 +1574,9 @@ export function GanttPlannerPage() {
               )}
             </CardContent>
           </Card>
+          )}
 
+          {plannerTab === 'configuracion' && (
           <Card>
             <CardHeader><CardTitle>Crear tarea</CardTitle></CardHeader>
             <CardContent className="space-y-3">
@@ -1604,7 +1650,9 @@ export function GanttPlannerPage() {
               </Button>
             </CardContent>
           </Card>
+          )}
 
+          {plannerTab === 'tareas' && (
           <Card>
             <CardHeader><CardTitle>Detalle de tarea</CardTitle></CardHeader>
             <CardContent className="space-y-3">
@@ -1691,7 +1739,9 @@ export function GanttPlannerPage() {
               )}
             </CardContent>
           </Card>
+          )}
 
+          {plannerTab === 'configuracion' && (
           <Card>
             <CardHeader><CardTitle>Dependencias</CardTitle></CardHeader>
             <CardContent className="space-y-3">
@@ -1733,7 +1783,9 @@ export function GanttPlannerPage() {
               </Button>
             </CardContent>
           </Card>
+          )}
 
+          {plannerTab === 'configuracion' && (
           <Card>
             <CardHeader><CardTitle>Simulación de retraso</CardTitle></CardHeader>
             <CardContent className="space-y-3">
@@ -1760,7 +1812,9 @@ export function GanttPlannerPage() {
               )}
             </CardContent>
           </Card>
+          )}
 
+          {plannerTab === 'tareas' && (
           <Card>
             <CardHeader><CardTitle>Comentarios de tarea</CardTitle></CardHeader>
             <CardContent className="space-y-3">
@@ -1814,8 +1868,10 @@ export function GanttPlannerPage() {
               </div>
             </CardContent>
           </Card>
+          )}
         </div>
       </div>
+      )}
     </div>
   )
 }

@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.47.80**
+## Versión Actual: **v2.47.81**
 
 **Fecha de lanzamiento**: 13 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.47.81 - Pestañas en Planificador + preferencia persistente (14/02/2026)
+- 🗂️ **Navegación por pestañas**: Planificador dividido en `Configuración`, `Tareas` y `Timeline`.
+- 📍 **Timeline por defecto**: Apertura inicial en vista temporal para seguimiento inmediato.
+- 💾 **Preferencia por usuario**: Se recuerda la última pestaña abierta y se restaura al reingresar.
 
 ### v2.47.80 - Ajuste UX Gantt: Área y Equipo primero (14/02/2026)
 - 🧭 **Orden operativo mejorado**: En timeline y listado ahora se muestra `Área · Equipo` antes de `Tarea`.

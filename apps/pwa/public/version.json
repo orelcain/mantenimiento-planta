@@ -1,7 +1,7 @@
 {
-  "version": "2.47.80",
-  "buildDate": "2026-02-13",
-  "buildTimestamp": 1771005600000,
+  "version": "2.47.81",
+  "buildDate": "2026-02-14",
+  "buildTimestamp": 1771042802970,
   "features": [
     "Vista Gantt reordenada: Área y Equipo se muestran antes del nombre de la Tarea",
     "Timeline con contexto operativo completo en cada fila (Área · Equipo · Tarea)",
