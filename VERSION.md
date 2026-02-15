@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.48.09**
+## Versión Actual: **v2.48.10**
 
 **Fecha de lanzamiento**: 15 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.48.10 - Buscador único y borrado rápido admin (15/02/2026)
+- 🔎 **Un solo filtro timeline**: búsqueda global en área, equipo, tarea y responsable.
+- ❌ **Eliminar más fácil**: botón `X` rojo por fila al lado de `Δ Plan (h)` para admins/usuarios con permiso de eliminar.
+- ℹ️ **Columna aclarada**: `Δ Plan (h)` indica diferencia de horas respecto al baseline.
 
 ### v2.48.09 - Texto más legible y dependencias más claras (15/02/2026)
 - 🔤 **Mejor lectura de etiquetas**: `título · %` con tamaño mayor, mayor peso y sombra suave.

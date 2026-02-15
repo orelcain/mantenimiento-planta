@@ -368,9 +368,7 @@ export function GanttPlannerPage() {
   const [timelinePageSize, setTimelinePageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>('25')
   const [listPageSize, setListPageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>('25')
   const [timelineTableWidth, setTimelineTableWidth] = useState(420)
-  const [timelineAreaSearch, setTimelineAreaSearch] = useState('')
-  const [timelineEquipmentSearch, setTimelineEquipmentSearch] = useState('')
-  const [timelineTaskSearch, setTimelineTaskSearch] = useState('')
+  const [timelineSearch, setTimelineSearch] = useState('')
   const [timelineZoom, setTimelineZoom] = useState<'day' | 'week' | 'month'>('week')
   const [timelineWorkCalendar, setTimelineWorkCalendar] = useState<'all' | 'workdays'>('all')
   const [timelineSnapHours, setTimelineSnapHours] = useState<'auto' | '1' | '6' | '12' | '24'>('auto')
@@ -605,17 +603,21 @@ export function GanttPlannerPage() {
   const metrics = useMemo(() => buildGanttMetrics(filteredTasks), [filteredTasks])
 
   const timelineFilteredTasks = useMemo(() => {
-    const areaQuery = normalizeKey(timelineAreaSearch)
-    const equipmentQuery = normalizeKey(timelineEquipmentSearch)
-    const taskQuery = normalizeKey(timelineTaskSearch)
+    const query = normalizeKey(timelineSearch)
+    if (!query) return sortedTasks
 
     return sortedTasks.filter((task) => {
-      if (areaQuery && !normalizeKey(task.hierarchyPath ?? '').includes(areaQuery)) return false
-      if (equipmentQuery && !normalizeKey(task.equipmentNombre ?? '').includes(equipmentQuery)) return false
-      if (taskQuery && !normalizeKey(task.titulo).includes(taskQuery)) return false
-      return true
+      const haystack = normalizeKey([
+        task.hierarchyPath ?? '',
+        compactHierarchyPath(task.hierarchyPath),
+        task.equipmentNombre ?? '',
+        task.titulo,
+        task.descripcion ?? '',
+        task.responsibleName ?? '',
+      ].join(' '))
+      return haystack.includes(query)
     })
-  }, [sortedTasks, timelineAreaSearch, timelineEquipmentSearch, timelineTaskSearch])
+  }, [sortedTasks, timelineSearch])
 
   const timelinePageSizeNum = Number(timelinePageSize)
   const listPageSizeNum = Number(listPageSize)
@@ -1708,7 +1710,7 @@ export function GanttPlannerPage() {
   }
 
   async function handleDelete(taskId: string) {
-    if (!canDelete) return
+    if (!canDelete && user?.rol !== 'admin') return
     await deleteGanttTask(taskId)
     if (selectedTaskId === taskId) setSelectedTaskId('none')
     await load()
@@ -2169,29 +2171,13 @@ export function GanttPlannerPage() {
               </Button>
             </div>
 
-            <div className="grid gap-2 md:grid-cols-3">
+            <div className="grid gap-2 md:grid-cols-1">
               <div>
-                <Label className="text-xs text-muted-foreground">Buscar por área</Label>
+                <Label className="text-xs text-muted-foreground">Buscar en tareas (área, equipo, tarea, responsable)</Label>
                 <Input
-                  value={timelineAreaSearch}
-                  onChange={(event) => setTimelineAreaSearch(event.target.value)}
-                  placeholder="Ej: Acopio"
-                />
-              </div>
-              <div>
-                <Label className="text-xs text-muted-foreground">Buscar por equipo</Label>
-                <Input
-                  value={timelineEquipmentSearch}
-                  onChange={(event) => setTimelineEquipmentSearch(event.target.value)}
-                  placeholder="Ej: Bomba"
-                />
-              </div>
-              <div>
-                <Label className="text-xs text-muted-foreground">Buscar por tarea</Label>
-                <Input
-                  value={timelineTaskSearch}
-                  onChange={(event) => setTimelineTaskSearch(event.target.value)}
-                  placeholder="Ej: mantenimiento"
+                  value={timelineSearch}
+                  onChange={(event) => setTimelineSearch(event.target.value)}
+                  placeholder="Ej: Acopio, Bomba, cambio de celda, Danilo"
                 />
               </div>
             </div>
@@ -2238,14 +2224,15 @@ export function GanttPlannerPage() {
                 <CardTitle className="text-sm">Tabla de tareas (WBS/estado/owner)</CardTitle>
               </CardHeader>
               <CardContent className="p-0">
-                <div className="grid grid-cols-[1fr_1fr_1.4fr_.8fr_.7fr_.6fr_.6fr] gap-2 px-3 py-2 text-[11px] border-y text-muted-foreground">
+                <div className="grid grid-cols-[1fr_1fr_1.4fr_.8fr_.7fr_.6fr_.6fr_.42fr] gap-2 px-3 py-2 text-[11px] border-y text-muted-foreground">
                   <span>Área</span>
                   <span>Equipo</span>
                   <span>Tarea</span>
                   <span>Responsable</span>
                   <span>Estado</span>
                   <span>Avance</span>
-                  <span>Δ Plan</span>
+                  <span title="Diferencia en horas entre duración real y baseline">Δ Plan (h)</span>
+                  <span className="text-center">X</span>
                 </div>
                 <div className="max-h-[560px] overflow-auto">
                   {timelineRows.map((row) => {
@@ -2253,7 +2240,7 @@ export function GanttPlannerPage() {
                     return (
                       <div
                         key={`timeline-grid-${row.task.id}`}
-                        className={`grid grid-cols-[1fr_1fr_1.4fr_.8fr_.7fr_.6fr_.6fr] gap-2 px-3 py-2 text-xs border-b h-11 items-center cursor-pointer ${selectedTaskId === row.task.id ? 'bg-primary/10' : ''}`}
+                        className={`grid grid-cols-[1fr_1fr_1.4fr_.8fr_.7fr_.6fr_.6fr_.42fr] gap-2 px-3 py-2 text-xs border-b h-11 items-center cursor-pointer ${selectedTaskId === row.task.id ? 'bg-primary/10' : ''}`}
                         onClick={() => setSelectedTaskId(row.task.id)}
                         onDoubleClick={() => openTimelineQuickEditor(row.task.id)}
                       >
@@ -2266,6 +2253,22 @@ export function GanttPlannerPage() {
                         <span className={row.baselineDeltaHours > 0 ? 'text-destructive' : row.baselineDeltaHours < 0 ? 'text-foreground' : 'text-muted-foreground'}>
                           {formatDeltaHours(row.baselineDeltaHours)}
                         </span>
+                        {(canDelete || user?.rol === 'admin') ? (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-6 w-6 text-destructive hover:text-destructive"
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              void handleDelete(row.task.id)
+                            }}
+                            title="Eliminar tarea"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        ) : (
+                          <span />
+                        )}
                       </div>
                     )
                   })}

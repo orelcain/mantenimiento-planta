@@ -7,6 +7,15 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.10] - 2026-02-15
+
+### 🔎 Filtro único + eliminación rápida en tabla timeline
+
+#### Mejoras
+- **Buscador unificado**: se reemplazan los 3 buscadores (área/equipo/tarea) por un solo campo que filtra la lista completa de tareas visibles.
+- **Borrado rápido admin**: nueva `X` roja por fila en tabla timeline, al lado de `Δ Plan (h)`, para eliminar tareas sin entrar al detalle.
+- **Δ Plan más claro**: se explicita que la columna es diferencia en horas frente al baseline.
+
 ## [2.48.09] - 2026-02-15
 
 ### 🧭 Legibilidad de barras + dependencias más limpias
