@@ -1,9 +1,11 @@
 {
-  "version": "2.48.12",
+  "version": "2.48.13",
   "buildDate": "2026-02-15",
-  "buildTimestamp": 1771213800000,
+  "buildTimestamp": 1771217400000,
   "features": [
-    "Confirmación de borrado con Dialog UI (Cancelar / Eliminar) desde la X roja del timeline",
+    "Admin puede seleccionar múltiples tareas con checkbox en listado y aplicar una ubicación en lote",
+    "Nuevo bloque de Ubicación para múltiples tareas con jerarquía encadenada y guardado masivo",
+    "Confirmación de borrado con Dialog UI ahora protege anti doble clic (espera 1s antes de habilitar Eliminar)",
     "Timeline con buscador único para filtrar toda la lista por área/equipo/tarea/responsable",
     "Tabla de timeline incorpora borrado rápido con botón X rojo junto a Δ Plan (h) para admin/permiso eliminar",
     "Columna Δ Plan renombrada a Δ Plan (h) con ayuda contextual de su significado",

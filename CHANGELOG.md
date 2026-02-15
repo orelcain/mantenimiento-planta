@@ -7,6 +7,16 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.13] - 2026-02-15
+
+### 📌 Ubicación masiva por selección (admin)
+
+#### Mejoras
+- **Selección múltiple en listado**: admin puede marcar varias tareas con checkbox en la pestaña `Tareas`.
+- **Ubicación en lote**: nuevo flujo `Aplicar ubicación a seleccionadas` con selector jerárquico encadenado.
+- **Persistencia masiva**: la ubicación elegida se guarda en todas las tareas seleccionadas en una sola acción.
+- **Anti doble clic al eliminar**: en el diálogo de borrado, `Eliminar` se habilita tras 1s para reducir errores accidentales.
+
 ## [2.48.12] - 2026-02-15
 
 ### 🧩 Confirmación de borrado con Dialog UI

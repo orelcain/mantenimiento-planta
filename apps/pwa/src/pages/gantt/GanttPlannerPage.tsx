@@ -8,6 +8,7 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
+  Checkbox,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -348,6 +349,7 @@ export function GanttPlannerPage() {
   const canCreate = useCan('gantt', 'crear')
   const canEdit = useCan('gantt', 'editar')
   const canDelete = useCan('gantt', 'eliminar')
+  const isAdmin = user?.rol === 'admin'
   const canEditTaskIdentity = user?.rol === 'admin' || user?.rol === 'supervisor'
 
   const [tasks, setTasks] = useState<GanttTask[]>([])
@@ -423,6 +425,10 @@ export function GanttPlannerPage() {
   const [timelineQuickDependencyLag, setTimelineQuickDependencyLag] = useState<number>(0)
   const [timelineQuickModalOpen, setTimelineQuickModalOpen] = useState(false)
   const [timelineDeleteConfirmTaskId, setTimelineDeleteConfirmTaskId] = useState<string | null>(null)
+  const [timelineDeleteConfirmArmed, setTimelineDeleteConfirmArmed] = useState(false)
+  const [bulkLocationSelection, setBulkLocationSelection] = useState<HierarchySelectionMap>(() => createEmptyHierarchySelection())
+  const [bulkSelectedTaskIds, setBulkSelectedTaskIds] = useState<string[]>([])
+  const [bulkLocationBusy, setBulkLocationBusy] = useState(false)
   const [tasksCompactView, setTasksCompactView] = useState(false)
   const [timelineDrag, setTimelineDrag] = useState<{
     taskId: string
@@ -498,6 +504,26 @@ export function GanttPlannerPage() {
     })
     return result
   }, [createHierarchySelection, hierarchyOptionsByLevel])
+
+  const bulkSelectedHierarchyNode = useMemo(() => {
+    for (let index = TASK_LOCATION_LEVELS.length - 1; index >= 0; index -= 1) {
+      const level = TASK_LOCATION_LEVELS[index]
+      if (level === undefined) continue
+      const selectedId = bulkLocationSelection[level]
+      if (selectedId && selectedId !== 'none') {
+        return hierarchyNodeById.get(selectedId)
+      }
+    }
+    return undefined
+  }, [bulkLocationSelection, hierarchyNodeById])
+
+  const bulkLocationOptions = useMemo(() => {
+    const result = new Map<HierarchyLevel, HierarchyNode[]>()
+    TASK_LOCATION_LEVELS.forEach((level) => {
+      result.set(level, hierarchyOptionsByLevel(bulkLocationSelection, level))
+    })
+    return result
+  }, [bulkLocationSelection, hierarchyOptionsByLevel])
 
   const equipmentForSelectedHierarchy = useMemo(() => {
     if (!createSelectedHierarchyNode) return equipment
@@ -636,6 +662,13 @@ export function GanttPlannerPage() {
     const start = (safeListPage - 1) * listPageSizeNum
     return sortedTasks.slice(start, start + listPageSizeNum)
   }, [safeListPage, sortedTasks, listPageSizeNum])
+
+  useEffect(() => {
+    setBulkSelectedTaskIds((current) => {
+      const visibleIds = new Set(sortedTasks.map((task) => task.id))
+      return current.filter((taskId) => visibleIds.has(taskId))
+    })
+  }, [sortedTasks])
 
   const timeline = useMemo(() => {
     const timelineSourceTasks = pagedTimelineTasks.length > 0 ? pagedTimelineTasks : sortedTasks
@@ -1170,6 +1203,42 @@ export function GanttPlannerPage() {
     setTimelineQuickEquipmentId('none')
   }, [])
 
+  const handleBulkLocationLevelChange = useCallback((level: HierarchyLevel, value: string) => {
+    setBulkLocationSelection((current) => {
+      const next = { ...current, [level]: value }
+      let reset = false
+      TASK_LOCATION_LEVELS.forEach((candidate) => {
+        if (candidate === level) {
+          reset = true
+          return
+        }
+        if (reset) {
+          next[candidate] = 'none'
+        }
+      })
+      return next
+    })
+  }, [])
+
+  const handleToggleBulkTaskSelection = useCallback((taskId: string, checked: boolean) => {
+    setBulkSelectedTaskIds((current) => {
+      if (checked) {
+        if (current.includes(taskId)) return current
+        return [...current, taskId]
+      }
+      return current.filter((id) => id !== taskId)
+    })
+  }, [])
+
+  const handleSelectAllPagedTasks = useCallback(() => {
+    const pagedIds = pagedListTasks.map((task) => task.id)
+    setBulkSelectedTaskIds((current) => Array.from(new Set([...current, ...pagedIds])))
+  }, [pagedListTasks])
+
+  const handleClearBulkTaskSelection = useCallback(() => {
+    setBulkSelectedTaskIds([])
+  }, [])
+
   const openTimelineQuickEditor = useCallback((taskId: string) => {
     timelineQuickFocusPendingRef.current = true
     setPlannerTab('timeline')
@@ -1303,6 +1372,20 @@ export function GanttPlannerPage() {
   useEffect(() => {
     window.localStorage.setItem(plannerTabStorageKey, plannerTab)
   }, [plannerTab, plannerTabStorageKey])
+
+  useEffect(() => {
+    if (!timelineDeleteConfirmTaskId) {
+      setTimelineDeleteConfirmArmed(false)
+      return
+    }
+    setTimelineDeleteConfirmArmed(false)
+    const timer = window.setTimeout(() => {
+      setTimelineDeleteConfirmArmed(true)
+    }, 1000)
+    return () => {
+      window.clearTimeout(timer)
+    }
+  }, [timelineDeleteConfirmTaskId])
 
   useEffect(() => {
     const stored = window.localStorage.getItem(timelineTableWidthStorageKey)
@@ -1726,6 +1809,25 @@ export function GanttPlannerPage() {
     const taskId = timelineDeleteConfirmTaskId
     setTimelineDeleteConfirmTaskId(null)
     await handleDelete(taskId)
+  }
+
+  async function handleApplyLocationToSelectedTasks() {
+    if (!isAdmin) return
+    if (!bulkSelectedHierarchyNode || bulkSelectedTaskIds.length === 0) return
+
+    setBulkLocationBusy(true)
+    try {
+      await Promise.all(
+        bulkSelectedTaskIds.map((taskId) => updateGanttTask(taskId, {
+          hierarchyNodeId: bulkSelectedHierarchyNode.id,
+          hierarchyPath: bulkSelectedHierarchyNode.nombre,
+        }))
+      )
+      setBulkSelectedTaskIds([])
+      await load()
+    } finally {
+      setBulkLocationBusy(false)
+    }
   }
 
   async function handleAssignResponsible(task: GanttTask, technicianId: string) {
@@ -2916,9 +3018,10 @@ export function GanttPlannerPage() {
               </Button>
               <Button
                 variant="destructive"
+                disabled={!timelineDeleteConfirmArmed}
                 onClick={() => void confirmDeleteFromTimelineDialog()}
               >
-                Eliminar
+                {timelineDeleteConfirmArmed ? 'Eliminar' : 'Eliminar (espera 1s)'}
               </Button>
             </div>
           </DialogContent>
@@ -3048,6 +3151,58 @@ export function GanttPlannerPage() {
               </div>
             </div>
 
+            {isAdmin && (
+              <div className="rounded border p-3 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs font-medium">Ubicación para múltiples tareas</p>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" onClick={handleSelectAllPagedTasks}>Seleccionar página</Button>
+                    <Button size="sm" variant="outline" onClick={handleClearBulkTaskSelection}>Limpiar selección</Button>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">Seleccionadas: {bulkSelectedTaskIds.length}</p>
+
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {TASK_LOCATION_LEVELS.map((level) => {
+                    const options = bulkLocationOptions.get(level) ?? []
+                    const levelIndex = TASK_LOCATION_LEVELS.indexOf(level)
+                    const previousLevel = levelIndex > 0 ? TASK_LOCATION_LEVELS[levelIndex - 1] : null
+                    const isDisabled = !!previousLevel && bulkLocationSelection[previousLevel] === 'none'
+
+                    return (
+                      <div key={`bulk-level-${level}`}>
+                        <Label className="text-xs text-muted-foreground">{HIERARCHY_LEVEL_NAMES[level]}</Label>
+                        <Select
+                          value={bulkLocationSelection[level] ?? 'none'}
+                          onValueChange={(value) => handleBulkLocationLevelChange(level, value)}
+                          disabled={isDisabled}
+                        >
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">Sin selección</SelectItem>
+                            {options.map((node) => (
+                              <SelectItem key={`bulk-level-node-${level}-${node.id}`} value={node.id}>{node.nombre}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                <div className="flex justify-end">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={bulkLocationBusy || bulkSelectedTaskIds.length === 0 || !bulkSelectedHierarchyNode}
+                    onClick={() => void handleApplyLocationToSelectedTasks()}
+                  >
+                    {bulkLocationBusy ? 'Aplicando ubicación...' : 'Aplicar ubicación a seleccionadas'}
+                  </Button>
+                </div>
+              </div>
+            )}
+
             <div className="space-y-2">
               {loading && <p className="text-sm text-muted-foreground">Cargando tareas...</p>}
               {!loading && sortedTasks.length === 0 && <p className="text-sm text-muted-foreground">Sin tareas para los filtros seleccionados.</p>}
@@ -3056,10 +3211,19 @@ export function GanttPlannerPage() {
                 return (
                   <div key={task.id} className={`rounded-lg border ${tasksCompactView ? 'p-2 space-y-1.5' : 'p-3 space-y-2'}`}>
                     <div className="flex items-center justify-between gap-2">
-                      <div>
+                      <div className="flex items-start gap-2">
+                        {isAdmin && (
+                          <Checkbox
+                            checked={bulkSelectedTaskIds.includes(task.id)}
+                            onCheckedChange={(checked) => handleToggleBulkTaskSelection(task.id, checked === true)}
+                            aria-label={`Seleccionar tarea ${task.titulo}`}
+                          />
+                        )}
+                        <div>
                         <p className="text-xs text-muted-foreground" title={taskLocationSummary(task)}>{taskLocationSummary(task)}</p>
                         <p className={`${tasksCompactView ? 'text-sm font-medium' : 'font-medium'}`}>{task.titulo}</p>
                         {!tasksCompactView && <p className="text-xs text-muted-foreground">{task.startDate.toLocaleString()} → {task.endDate.toLocaleString()}</p>}
+                        </div>
                       </div>
                       <div className="flex items-center gap-2">
                         {row?.isCritical && <Badge variant="destructive">Crítica</Badge>}
