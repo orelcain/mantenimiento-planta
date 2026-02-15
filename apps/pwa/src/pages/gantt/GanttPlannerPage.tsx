@@ -57,10 +57,10 @@ const PAGE_SIZE_OPTIONS = ['10', '25', '50', '100'] as const
 const DAY_MS = 24 * 60 * 60 * 1000
 const HOUR_MS = 60 * 60 * 1000
 const TIMELINE_ROW_HEIGHT = 44
-const TIMELINE_BAR_TOP = 11
-const TIMELINE_BAR_HEIGHT_CLASS = 'h-4'
-const TIMELINE_BAR_CENTER_OFFSET = 19
-const TIMELINE_BASELINE_TOP = 17
+const TIMELINE_BAR_TOP = 10
+const TIMELINE_BAR_HEIGHT_CLASS = 'h-6'
+const TIMELINE_BAR_CENTER_OFFSET = 22
+const TIMELINE_BASELINE_TOP = 19
 const TIMELINE_BASELINE_HEIGHT_CLASS = 'h-2'
 const TIMELINE_ANCHOR_RADIUS = 16
 
@@ -2510,7 +2510,7 @@ export function GanttPlannerPage() {
                                 className={`absolute inset-y-0 left-0 ${barProgressClass}`}
                                 style={{ width: `${progressPct}%` }}
                               />
-                              <span className={`absolute inset-0 px-1 text-[11px] leading-4 font-medium ${barTextClass} truncate`}>
+                              <span className={`absolute inset-0 px-1 text-[11px] leading-6 font-medium ${barTextClass} truncate`}>
                                 {row.task.titulo} · {row.task.progress}%
                               </span>
                             </div>
@@ -2551,7 +2551,7 @@ export function GanttPlannerPage() {
                                   </>
                                 )}
                                 <div
-                                  className="absolute h-4 w-2 rounded bg-background border cursor-ew-resize"
+                                  className="absolute h-6 w-2 rounded bg-background border cursor-ew-resize"
                                   style={{ left: `${Math.max(0, row.left - 1)}px`, top: `${barTop}px` }}
                                   onMouseDown={(event) => {
                                     if (timelineDependencyMode) return
@@ -2562,7 +2562,7 @@ export function GanttPlannerPage() {
                                   title={timelineDependencyMode ? 'Modo dependencia activo' : 'Ajustar inicio'}
                                 />
                                 <div
-                                  className="absolute h-4 w-2 rounded bg-background border cursor-ew-resize"
+                                  className="absolute h-6 w-2 rounded bg-background border cursor-ew-resize"
                                   style={{ left: `${row.left + row.width - 1}px`, top: `${barTop}px` }}
                                   onMouseDown={(event) => {
                                     if (timelineDependencyMode) return

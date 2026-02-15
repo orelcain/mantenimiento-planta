@@ -7,6 +7,15 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.08] - 2026-02-15
+
+### 📏 Barras del timeline al doble de altura (2x)
+
+#### Mejoras
+- **Altura duplicada real en eje Y**: barra principal ajustada a `h-6` (doble respecto a la base `h-3`).
+- **Lectura más clara**: texto interno centrado verticalmente para aprovechar el nuevo alto.
+- **Interacción alineada**: handles de resize y líneas de dependencia recalibrados al nuevo centro de barra.
+
 ## [2.48.07] - 2026-02-15
 
 ### 🧱 Barras de timeline más legibles

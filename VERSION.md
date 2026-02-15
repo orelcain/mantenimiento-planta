@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.48.07**
+## Versión Actual: **v2.48.08**
 
 **Fecha de lanzamiento**: 15 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.48.08 - Barras al doble de alto en timeline (15/02/2026)
+- 📏 **Altura 2x en eje Y**: barra principal en `h-6` (doble de la base `h-3`).
+- 👀 **Mayor legibilidad real**: texto interno más visible al aprovechar el alto completo.
+- 🎯 **Geometría ajustada**: handles, anclas y centro de dependencias alineados al nuevo espesor.
 
 ### v2.48.07 - Barras más legibles en timeline (15/02/2026)
 - 🧱 **Mayor altura de barra**: mejor aprovechamiento del carril y lectura más cómoda.
