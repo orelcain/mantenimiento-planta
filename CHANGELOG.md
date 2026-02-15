@@ -7,6 +7,15 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.05] - 2026-02-15
+
+### 📊 Progreso visual en barras del timeline
+
+#### Mejoras
+- **Mini barra de avance**: cada tarea ahora renderiza relleno interno proporcional al `%` de progreso.
+- **Lectura inmediata**: se combina señal visual (relleno) con texto (`título · %`) para identificar estado sin abrir detalles.
+- **Leyenda ajustada**: se diferencia fondo de barra vs relleno para interpretación rápida en operación.
+
 ## [2.48.04] - 2026-02-15
 
 ### 🏹 Dependencias más precisas + barras más informativas

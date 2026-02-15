@@ -1,8 +1,10 @@
 {
-  "version": "2.48.04",
+  "version": "2.48.05",
   "buildDate": "2026-02-15",
-  "buildTimestamp": 1771185000000,
+  "buildTimestamp": 1771188600000,
   "features": [
+    "Mini barra de progreso visual dentro de cada barra de tarea (relleno según % de avance)",
+    "Combinación de texto y señal visual: se mantiene título + % sobre la barra para lectura rápida",
     "Flechas de dependencia con trazado ortogonal robusto cuando las tareas no coinciden en inicio/fin",
     "Conexiones más claras en dependencias hacia atrás: la línea se dobla y entra correctamente a la barra destino",
     "Texto operativo dentro de la barra: título de tarea y porcentaje de avance en la misma barra",

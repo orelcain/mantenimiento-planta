@@ -2453,6 +2453,9 @@ export function GanttPlannerPage() {
                             : canBeTarget
                               ? 'absolute h-3 w-3 rounded-full border border-primary/70 bg-primary/10 cursor-crosshair'
                               : 'absolute h-3 w-3 rounded-full border bg-background cursor-crosshair'
+                        const progressPct = Math.max(0, Math.min(100, row.task.progress))
+                        const barBaseClass = row.isCritical ? 'bg-red-500/35' : 'bg-primary/35'
+                        const barProgressClass = row.isCritical ? 'bg-red-500' : 'bg-primary'
 
                         return (
                           <div key={`bar-${row.task.id}`}>
@@ -2461,7 +2464,7 @@ export function GanttPlannerPage() {
                               style={{ left: `${row.baselineLeft}px`, top: `${row.rowIndex * 44 + 16}px`, width: `${row.baselineWidth}px` }}
                             />
                             <div
-                              className={`absolute h-3 rounded ${row.isCritical ? 'bg-red-500' : 'bg-primary'} overflow-hidden`}
+                              className={`absolute h-3 rounded ${barBaseClass} overflow-hidden border border-background/20`}
                               style={{ left: `${row.left}px`, top: `${row.rowIndex * 44 + 14}px`, width: `${row.width}px` }}
                               onClick={() => setSelectedTaskId(row.task.id)}
                               onDoubleClick={() => openTimelineQuickEditor(row.task.id)}
@@ -2484,6 +2487,10 @@ export function GanttPlannerPage() {
                                     `Dependencias: ${row.task.dependencies.length}`,
                                   ].join('\n')}
                             >
+                              <div
+                                className={`absolute inset-y-0 left-0 ${barProgressClass}`}
+                                style={{ width: `${progressPct}%` }}
+                              />
                               <span className="absolute inset-0 px-1 text-[10px] leading-3 text-white truncate">
                                 {row.task.titulo} · {row.task.progress}%
                               </span>
@@ -2557,6 +2564,7 @@ export function GanttPlannerPage() {
 
                 <div className="flex flex-wrap gap-4 px-3 py-2 text-[11px] text-muted-foreground border-t">
                   <span className="inline-flex items-center gap-1"><span className="h-2 w-3 rounded bg-primary" /> Barra real</span>
+                  <span className="inline-flex items-center gap-1"><span className="h-2 w-3 rounded bg-primary/35" /> Fondo barra</span>
                   <span className="inline-flex items-center gap-1"><span className="h-2 w-3 rounded bg-muted-foreground/60" /> Baseline</span>
                   <span className="inline-flex items-center gap-1"><span className="h-2 w-3 rounded bg-red-500" /> Crítica</span>
                   <span className="inline-flex items-center gap-1"><span className="h-2 w-3 rounded bg-primary/60" /> Dependencia FS</span>
