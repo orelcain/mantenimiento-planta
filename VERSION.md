@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.48.01**
+## Versión Actual: **v2.48.02**
 
 **Fecha de lanzamiento**: 15 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,12 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.48.02 - Convenciones oficiales de release y commit (15/02/2026)
+- 📏 **Estándar institucionalizado**: cada mejora cierra con versionado + validación + commit + push.
+- 🧾 **Formato único de commit release**: `release: vX.Y.Z <resumen-corto>`.
+- ✅ **Guías unificadas**: actualización de `VERSION_CHECKLIST.md` y `DEVELOPMENT_GUIDELINES.md` con el flujo oficial.
+- 🔁 **Recuperación documentada**: manejo de `non-fast-forward` con `pull --rebase` antes de reintentar publicación.
 
 ### v2.48.01 - Limpieza visual y edición por rol en Gantt (15/02/2026)
 - 🧼 **Menos ruido visual**: removido el bloque de texto introductorio en timeline para dejar foco en operación.

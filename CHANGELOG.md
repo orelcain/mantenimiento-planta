@@ -7,6 +7,16 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.02] - 2026-02-15
+
+### 📏 Convenciones oficiales de release y commit
+
+#### Mejoras
+- **Estandarización de cierre**: se define como obligatorio cerrar cada mejora con versionado, validación, commit y push.
+- **Formato único de commit release**: `release: vX.Y.Z <resumen-corto>` para trazabilidad consistente.
+- **Checklist alineado al flujo real**: documentación actualizada con archivos de versión correctos y comando de verificación oficial.
+- **Manejo explícito de non-fast-forward**: procedimiento de recuperación con `git pull --rebase` antes de reintentar `push`.
+
 ## [2.48.01] - 2026-02-15
 
 ### 🧼 Limpieza visual + edición por rol en Gantt

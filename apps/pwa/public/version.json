@@ -1,8 +1,11 @@
 {
-  "version": "2.48.01",
+  "version": "2.48.02",
   "buildDate": "2026-02-15",
   "buildTimestamp": 1771177800000,
   "features": [
+    "Estandarización oficial del flujo de cierre por mejora: versionado, validación, commit y push en main",
+    "Convención fija de commit de release: release: vX.Y.Z <resumen-corto>",
+    "Checklist de versiones actualizado con secuencia obligatoria y manejo de non-fast-forward con pull --rebase",
     "Timeline más limpio: se elimina bloque descriptivo redundante para reducir ruido visual",
     "Ubicación resumida en Gantt: muestra solo el tramo útil final del área y equipo (sin raíz completa)",
     "Editor rápido con permisos por rol: solo admin/supervisor pueden modificar título, área y equipo",
