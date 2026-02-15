@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.48.11**
+## Versión Actual: **v2.48.12**
 
 **Fecha de lanzamiento**: 15 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.48.12 - Confirmación con modal UI en eliminación (15/02/2026)
+- 🧩 **Dialog nativo**: la `X` roja usa modal del sistema con `Cancelar / Eliminar`.
+- 🏷️ **Tarea identificada**: se muestra el título de la tarea dentro del mensaje de confirmación.
+- ✅ **UX más consistente**: se evita `window.confirm` y se unifica el patrón visual con el resto de la app.
 
 ### v2.48.11 - Confirmación de borrado en X roja (15/02/2026)
 - 🛡️ **Confirmación previa**: la `X` roja del timeline solicita validación antes de eliminar.

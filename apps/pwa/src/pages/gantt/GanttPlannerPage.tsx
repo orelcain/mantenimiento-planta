@@ -422,6 +422,7 @@ export function GanttPlannerPage() {
   const [timelineQuickDependencyType, setTimelineQuickDependencyType] = useState<'FS' | 'SS' | 'FF' | 'SF'>('FS')
   const [timelineQuickDependencyLag, setTimelineQuickDependencyLag] = useState<number>(0)
   const [timelineQuickModalOpen, setTimelineQuickModalOpen] = useState(false)
+  const [timelineDeleteConfirmTaskId, setTimelineDeleteConfirmTaskId] = useState<string | null>(null)
   const [tasksCompactView, setTasksCompactView] = useState(false)
   const [timelineDrag, setTimelineDrag] = useState<{
     taskId: string
@@ -1716,10 +1717,15 @@ export function GanttPlannerPage() {
     await load()
   }
 
-  function confirmDeleteFromTimelineRow(task: GanttTask) {
-    const approved = window.confirm(`¿Eliminar tarea?\n\n${task.titulo}`)
-    if (!approved) return
-    void handleDelete(task.id)
+  function openTimelineDeleteConfirm(taskId: string) {
+    setTimelineDeleteConfirmTaskId(taskId)
+  }
+
+  async function confirmDeleteFromTimelineDialog() {
+    if (!timelineDeleteConfirmTaskId) return
+    const taskId = timelineDeleteConfirmTaskId
+    setTimelineDeleteConfirmTaskId(null)
+    await handleDelete(taskId)
   }
 
   async function handleAssignResponsible(task: GanttTask, technicianId: string) {
@@ -2266,7 +2272,7 @@ export function GanttPlannerPage() {
                             className="h-6 w-6 text-destructive hover:text-destructive"
                             onClick={(event) => {
                               event.stopPropagation()
-                              confirmDeleteFromTimelineRow(row.task)
+                              openTimelineDeleteConfirm(row.task.id)
                             }}
                             title="Eliminar tarea"
                           >
@@ -2879,6 +2885,42 @@ export function GanttPlannerPage() {
                 </div>
               </div>
             )}
+          </DialogContent>
+        </Dialog>
+
+        <Dialog
+          open={timelineDeleteConfirmTaskId !== null}
+          onOpenChange={(open) => {
+            if (!open) setTimelineDeleteConfirmTaskId(null)
+          }}
+        >
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Eliminar tarea</DialogTitle>
+              <DialogDescription>
+                {(() => {
+                  const task = timelineDeleteConfirmTaskId
+                    ? tasks.find((item) => item.id === timelineDeleteConfirmTaskId)
+                    : null
+                  if (!task) return '¿Seguro que deseas eliminar esta tarea? Esta acción no se puede deshacer.'
+                  return `¿Seguro que deseas eliminar "${task.titulo}"? Esta acción no se puede deshacer.`
+                })()}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setTimelineDeleteConfirmTaskId(null)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => void confirmDeleteFromTimelineDialog()}
+              >
+                Eliminar
+              </Button>
+            </div>
           </DialogContent>
         </Dialog>
       </div>

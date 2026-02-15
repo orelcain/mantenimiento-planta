@@ -1,9 +1,9 @@
 {
-  "version": "2.48.11",
+  "version": "2.48.12",
   "buildDate": "2026-02-15",
-  "buildTimestamp": 1771210200000,
+  "buildTimestamp": 1771213800000,
   "features": [
-    "Confirmación de borrado en la X roja de la tabla timeline para evitar eliminaciones accidentales",
+    "Confirmación de borrado con Dialog UI (Cancelar / Eliminar) desde la X roja del timeline",
     "Timeline con buscador único para filtrar toda la lista por área/equipo/tarea/responsable",
     "Tabla de timeline incorpora borrado rápido con botón X rojo junto a Δ Plan (h) para admin/permiso eliminar",
     "Columna Δ Plan renombrada a Δ Plan (h) con ayuda contextual de su significado",

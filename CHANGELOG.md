@@ -7,6 +7,15 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.12] - 2026-02-15
+
+### 🧩 Confirmación de borrado con Dialog UI
+
+#### Mejoras
+- **Confirmación visual estándar**: la `X` roja del timeline ahora abre modal UI con botones `Cancelar` y `Eliminar`.
+- **Más claridad antes de borrar**: el modal muestra el nombre de la tarea para confirmar exactamente qué se eliminará.
+- **Consistencia de interfaz**: se reemplaza `window.confirm` por componentes del sistema de diseño.
+
 ## [2.48.11] - 2026-02-15
 
 ### 🛡️ Confirmación al eliminar desde X roja
