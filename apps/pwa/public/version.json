@@ -1,8 +1,11 @@
 {
-  "version": "2.48.08",
+  "version": "2.48.09",
   "buildDate": "2026-02-15",
-  "buildTimestamp": 1771199400000,
+  "buildTimestamp": 1771203000000,
   "features": [
+    "Texto de barras más legible: mayor tamaño, mayor peso tipográfico y sombra suave para contraste",
+    "Dependencias más claras: doble trazo (halo + línea) y color por tipo FS/SS/FF/SF",
+    "Ruteo ortogonal refinado para dependencias hacia atrás con desvío lateral limpio",
     "Barras de timeline al doble de altura (2x en eje Y): de h-3 a h-6 para lectura claramente más visible",
     "Texto sobre barras con contraste adaptado por rango de avance (foreground semántico)",
     "Anclas y handles de edición más grandes para interacción más clara en modo dependencia y resize",

@@ -309,17 +309,16 @@ function buildOrthogonalDependencyPath(fromX: number, fromY: number, toX: number
 
   const goingForward = toX >= fromX
   const horizontalGap = Math.abs(toX - fromX)
-  const exitOffset = goingForward
-    ? Math.max(14, Math.min(30, horizontalGap * 0.45 || 14))
-    : Math.max(18, Math.min(34, (horizontalGap + 24) * 0.4))
-  const entryOffset = Math.max(8, Math.min(16, horizontalGap * 0.3 || 8))
+  if (goingForward) {
+    const exitOffset = Math.max(16, Math.min(34, horizontalGap * 0.46 || 16))
+    const entryOffset = Math.max(10, Math.min(20, horizontalGap * 0.32 || 10))
+    const midX = Math.max(fromX + exitOffset, toX - entryOffset)
+    return `M ${fromX} ${fromY} H ${midX} V ${toY} H ${toX}`
+  }
 
-  const midX = goingForward
-    ? Math.max(fromX + exitOffset, toX - entryOffset - 8)
-    : Math.min(fromX - exitOffset, toX + entryOffset + 8)
-  const preEndX = goingForward ? toX - entryOffset : toX + entryOffset
-
-  return `M ${fromX} ${fromY} H ${midX} V ${toY} H ${preEndX} H ${toX}`
+  const detourOffset = Math.max(20, Math.min(38, (horizontalGap + 28) * 0.5))
+  const detourX = Math.max(8, Math.min(fromX, toX) - detourOffset)
+  return `M ${fromX} ${fromY} H ${detourX} V ${toY} H ${toX}`
 }
 
 function compactHierarchyPath(hierarchyPath?: string) {
@@ -2361,21 +2360,40 @@ export function GanttPlannerPage() {
                             </marker>
                           </defs>
                           {timelineDependencyLines.map((line) => {
-                            const strokeWidth = line.depType === 'FS' ? 2 : 1.5
+                            const strokeWidth = line.depType === 'FS' ? 1.9 : 1.5
+                            const depStrokeClass = line.depType === 'FS'
+                              ? 'text-primary/80'
+                              : line.depType === 'SS'
+                                ? 'text-warning/80'
+                                : line.depType === 'FF'
+                                  ? 'text-success/80'
+                                  : 'text-destructive/75'
                             const pathData = buildOrthogonalDependencyPath(line.fromX, line.fromY, line.toX, line.toY)
 
                             return (
-                              <path
-                                key={`dep-path-${line.key}`}
-                                d={pathData}
-                                fill="none"
-                                stroke="currentColor"
-                                strokeOpacity={line.depType === 'FS' ? 0.7 : 0.5}
-                                strokeWidth={strokeWidth}
-                                markerEnd="url(#timeline-dep-arrow)"
-                              >
-                                <title>{line.infoTitle}</title>
-                              </path>
+                              <g key={`dep-path-${line.key}`} className={depStrokeClass}>
+                                <path
+                                  d={pathData}
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeOpacity="0.24"
+                                  strokeWidth={strokeWidth + 2.2}
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
+                                <path
+                                  d={pathData}
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeOpacity={line.depType === 'FS' ? 0.78 : 0.64}
+                                  strokeWidth={strokeWidth}
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  markerEnd="url(#timeline-dep-arrow)"
+                                >
+                                  <title>{line.infoTitle}</title>
+                                </path>
+                              </g>
                             )
                           })}
                         </svg>
@@ -2510,7 +2528,7 @@ export function GanttPlannerPage() {
                                 className={`absolute inset-y-0 left-0 ${barProgressClass}`}
                                 style={{ width: `${progressPct}%` }}
                               />
-                              <span className={`absolute inset-0 px-1 text-[11px] leading-6 font-medium ${barTextClass} truncate`}>
+                              <span className={`absolute inset-0 px-2 text-[12px] leading-6 font-semibold drop-shadow-sm ${barTextClass} truncate`}>
                                 {row.task.titulo} · {row.task.progress}%
                               </span>
                             </div>

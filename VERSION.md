@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.48.08**
+## Versión Actual: **v2.48.09**
 
 **Fecha de lanzamiento**: 15 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,12 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.48.09 - Texto más legible y dependencias más claras (15/02/2026)
+- 🔤 **Mejor lectura de etiquetas**: `título · %` con tamaño mayor, mayor peso y sombra suave.
+- 🎨 **Dependencias por tipo**: `FS/SS/FF/SF` con color semántico para distinguir enlaces.
+- 🧷 **Doble trazo en líneas**: halo tenue + línea principal para separar visualmente de la grilla.
+- ↪️ **Back-links más limpios**: ruta ortogonal con desvío lateral en enlaces hacia atrás.
 
 ### v2.48.08 - Barras al doble de alto en timeline (15/02/2026)
 - 📏 **Altura 2x en eje Y**: barra principal en `h-6` (doble de la base `h-3`).

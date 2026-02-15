@@ -7,6 +7,16 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.09] - 2026-02-15
+
+### 🧭 Legibilidad de barras + dependencias más limpias
+
+#### Mejoras
+- **Texto más claro en barras**: incremento de tamaño/peso tipográfico y `drop-shadow` suave para lectura en fondos de progreso.
+- **Dependencias por tipo más legibles**: codificación de color semántica (`FS/SS/FF/SF`) para distinguir relaciones rápidamente.
+- **Trazado con halo**: doble trazo (base tenue + línea principal) para separar flechas del fondo y rejilla.
+- **Ruta ortogonal refinada**: en dependencias hacia atrás se usa desvío lateral limpio para reducir cruces visuales.
+
 ## [2.48.08] - 2026-02-15
 
 ### 📏 Barras del timeline al doble de altura (2x)
