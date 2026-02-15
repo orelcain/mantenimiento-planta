@@ -1,8 +1,12 @@
 {
-  "version": "2.48.03",
+  "version": "2.48.04",
   "buildDate": "2026-02-15",
-  "buildTimestamp": 1771181400000,
+  "buildTimestamp": 1771185000000,
   "features": [
+    "Flechas de dependencia con trazado ortogonal robusto cuando las tareas no coinciden en inicio/fin",
+    "Conexiones más claras en dependencias hacia atrás: la línea se dobla y entra correctamente a la barra destino",
+    "Texto operativo dentro de la barra: título de tarea y porcentaje de avance en la misma barra",
+    "Hover enriquecido en barras de timeline con estado, responsable, fechas y dependencias",
     "Carga por técnico movida a pestaña dedicada para reducir ruido visual en timeline",
     "Timeline incorpora botón Nueva tarea para abrir creación directa desde la vista temporal",
     "Ubicación de tarea con selección encadenada de 7 niveles jerárquicos (Área→Elemento)",

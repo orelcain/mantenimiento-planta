@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.48.03**
+## Versión Actual: **v2.48.04**
 
 **Fecha de lanzamiento**: 15 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,12 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.48.04 - Flechas robustas y barra informativa en timeline (15/02/2026)
+- 🏹 **Dependencias mejoradas**: trazado ortogonal más estable cuando origen y destino no coinciden en inicio/fin.
+- ↩️ **Conexiones hacia atrás claras**: la línea se dobla e ingresa al destino sin corrimiento visual.
+- 📝 **Texto en barra**: muestra `título · %` directamente sobre la barra de tarea.
+- 💬 **Hover enriquecido**: estado, responsable, fechas y número de dependencias en cada barra.
 
 ### v2.48.03 - Timeline limpio + jerarquía 7 niveles (15/02/2026)
 - 🧼 **Menos ruido en timeline**: la carga por técnico se mueve a una pestaña dedicada.

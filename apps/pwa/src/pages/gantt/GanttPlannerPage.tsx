@@ -294,6 +294,27 @@ function dependencyTypeLabel(type: 'FS' | 'SS' | 'FF' | 'SF') {
   return 'SF · Inicio → Fin'
 }
 
+function buildOrthogonalDependencyPath(fromX: number, fromY: number, toX: number, toY: number) {
+  const verticalDelta = toY - fromY
+  if (Math.abs(verticalDelta) < 1) {
+    return `M ${fromX} ${fromY} H ${toX}`
+  }
+
+  const goingForward = toX >= fromX
+  const horizontalGap = Math.abs(toX - fromX)
+  const exitOffset = goingForward
+    ? Math.max(14, Math.min(30, horizontalGap * 0.45 || 14))
+    : Math.max(18, Math.min(34, (horizontalGap + 24) * 0.4))
+  const entryOffset = Math.max(8, Math.min(16, horizontalGap * 0.3 || 8))
+
+  const midX = goingForward
+    ? Math.max(fromX + exitOffset, toX - entryOffset - 8)
+    : Math.min(fromX - exitOffset, toX + entryOffset + 8)
+  const preEndX = goingForward ? toX - entryOffset : toX + entryOffset
+
+  return `M ${fromX} ${fromY} H ${midX} V ${toY} H ${preEndX} H ${toX}`
+}
+
 function compactHierarchyPath(hierarchyPath?: string) {
   const parts = (hierarchyPath ?? '')
     .split('>')
@@ -761,10 +782,10 @@ export function GanttPlannerPage() {
     const byId = new Map(timelineRows.map((row) => [row.task.id, row]))
     const lines: Array<{
       key: string
-      left: number
-      top: number
-      width: number
-      height: number
+      fromX: number
+      fromY: number
+      toX: number
+      toY: number
       depType: 'FS' | 'SS' | 'FF' | 'SF'
       infoTitle: string
     }> = []
@@ -786,18 +807,15 @@ export function GanttPlannerPage() {
           const toX = dependency.type === 'FS' || dependency.type === 'SS'
             ? successorStartX
             : successorEndX
-
-          const top = Math.min(predecessor.rowIndex, row.rowIndex) * 44 + 22
-          const height = Math.abs(row.rowIndex - predecessor.rowIndex) * 44
-          const width = Math.max(8, Math.abs(toX - fromX))
-          const left = Math.min(fromX, toX)
+          const fromY = predecessor.rowIndex * 44 + 15
+          const toY = row.rowIndex * 44 + 15
 
           lines.push({
             key: `${row.task.id}-${dependency.predecessorId}-${dependency.type}-${index}`,
-            left,
-            top,
-            width,
-            height,
+            fromX,
+            fromY,
+            toX,
+            toY,
             depType: dependency.type,
             infoTitle: dependencyDescription(dependency.type, predecessor.task.titulo, row.task.titulo),
           })
@@ -2337,17 +2355,7 @@ export function GanttPlannerPage() {
                           </defs>
                           {timelineDependencyLines.map((line) => {
                             const strokeWidth = line.depType === 'FS' ? 2 : 1.5
-                            const endX = line.left + line.width
-                            const endY = line.top + line.height
-                            const absHeight = Math.abs(line.height)
-                            const direction = line.height >= 0 ? 1 : -1
-                            const cornerRadius = Math.min(8, Math.max(0, line.width / 2), Math.max(0, absHeight / 2))
-                            const bendStartX = endX - cornerRadius
-                            const bendEndY = line.top + direction * cornerRadius
-                            const verticalEndY = endY - direction * cornerRadius
-                            const pathData = absHeight > 0 && cornerRadius > 0
-                              ? `M ${line.left} ${line.top} H ${bendStartX} Q ${endX} ${line.top} ${endX} ${bendEndY} V ${verticalEndY} Q ${endX} ${endY} ${endX} ${endY}`
-                              : `M ${line.left} ${line.top} H ${endX} ${absHeight > 0 ? `V ${endY}` : ''}`
+                            const pathData = buildOrthogonalDependencyPath(line.fromX, line.fromY, line.toX, line.toY)
 
                             return (
                               <path
@@ -2379,16 +2387,7 @@ export function GanttPlannerPage() {
                               const startY = timelineLinkPreview.sourceY
                               const endX = timelineLinkPreview.targetX
                               const endY = timelineLinkPreview.targetY
-                              const deltaX = endX - startX
-                              const deltaY = endY - startY
-                              const directionY = deltaY >= 0 ? 1 : -1
-                              const absY = Math.abs(deltaY)
-                              const radius = Math.min(8, Math.max(0, Math.abs(deltaX) / 3), Math.max(0, absY / 2))
-                              const elbowX = endX - Math.sign(deltaX || 1) * Math.max(14, Math.min(28, Math.abs(deltaX) / 2 || 14))
-                              const preBendY = endY - directionY * radius
-                              const pathData = absY > 0
-                                ? `M ${startX} ${startY} H ${elbowX - radius} Q ${elbowX} ${startY} ${elbowX} ${startY + directionY * radius} V ${preBendY} Q ${elbowX} ${endY} ${elbowX + Math.sign(deltaX || 1) * radius} ${endY} H ${endX}`
-                                : `M ${startX} ${startY} H ${endX}`
+                              const pathData = buildOrthogonalDependencyPath(startX, startY, endX, endY)
 
                               return (
                                 <path
@@ -2462,7 +2461,7 @@ export function GanttPlannerPage() {
                               style={{ left: `${row.baselineLeft}px`, top: `${row.rowIndex * 44 + 16}px`, width: `${row.baselineWidth}px` }}
                             />
                             <div
-                              className={`absolute h-3 rounded ${row.isCritical ? 'bg-red-500' : 'bg-primary'}`}
+                              className={`absolute h-3 rounded ${row.isCritical ? 'bg-red-500' : 'bg-primary'} overflow-hidden`}
                               style={{ left: `${row.left}px`, top: `${row.rowIndex * 44 + 14}px`, width: `${row.width}px` }}
                               onClick={() => setSelectedTaskId(row.task.id)}
                               onDoubleClick={() => openTimelineQuickEditor(row.task.id)}
@@ -2475,8 +2474,20 @@ export function GanttPlannerPage() {
                                 ? 'Sin permisos para mover'
                                 : timelineDependencyMode
                                   ? 'Modo dependencia activo: usa anclas de inicio/fin para enlazar'
-                                  : 'Arrastrar para mover fechas'}
-                            />
+                                  : [
+                                    row.task.titulo,
+                                    `Avance: ${row.task.progress}%`,
+                                    `Estado: ${STATUS_META[row.task.status].label}`,
+                                    `Responsable: ${row.task.responsibleName ?? 'Sin asignar'}`,
+                                    `Inicio: ${row.task.startDate.toLocaleString()}`,
+                                    `Fin: ${row.task.endDate.toLocaleString()}`,
+                                    `Dependencias: ${row.task.dependencies.length}`,
+                                  ].join('\n')}
+                            >
+                              <span className="absolute inset-0 px-1 text-[10px] leading-3 text-white truncate">
+                                {row.task.titulo} · {row.task.progress}%
+                              </span>
+                            </div>
                             {timelineDrag?.taskId === row.task.id && (
                               <div
                                 className="absolute z-20 -translate-x-1/2 rounded border bg-background px-2 py-1 text-[10px] text-foreground shadow"

@@ -7,6 +7,16 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.04] - 2026-02-15
+
+### 🏹 Dependencias más precisas + barras más informativas
+
+#### Mejoras
+- **Flechas robustas en casos desfasados**: ajuste del trazado para que dependencias entre tareas no alineadas entren correctamente a la barra destino.
+- **Ruta ortogonal estable**: mejor lectura cuando una dependencia va hacia atrás o con desfase temporal importante.
+- **Texto en barra**: cada barra de timeline muestra `título · % avance` para lectura directa sin abrir detalle.
+- **Hover de data relevante**: tooltip nativo con estado, responsable, fechas y cantidad de dependencias por tarea.
+
 ## [2.48.03] - 2026-02-15
 
 ### 🧭 Timeline más limpio + jerarquía extendida de ubicación
