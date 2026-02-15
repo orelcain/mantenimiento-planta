@@ -1,8 +1,12 @@
 {
-  "version": "2.48.02",
+  "version": "2.48.03",
   "buildDate": "2026-02-15",
-  "buildTimestamp": 1771177800000,
+  "buildTimestamp": 1771181400000,
   "features": [
+    "Carga por técnico movida a pestaña dedicada para reducir ruido visual en timeline",
+    "Timeline incorpora botón Nueva tarea para abrir creación directa desde la vista temporal",
+    "Ubicación de tarea con selección encadenada de 7 niveles jerárquicos (Área→Elemento)",
+    "Listado de tareas muestra solo el último nivel jerárquico para lectura más directa",
     "Estandarización oficial del flujo de cierre por mejora: versionado, validación, commit y push en main",
     "Convención fija de commit de release: release: vX.Y.Z <resumen-corto>",
     "Checklist de versiones actualizado con secuencia obligatoria y manejo de non-fast-forward con pull --rebase",

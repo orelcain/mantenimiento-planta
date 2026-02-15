@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.48.02**
+## Versión Actual: **v2.48.03**
 
 **Fecha de lanzamiento**: 15 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,12 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.48.03 - Timeline limpio + jerarquía 7 niveles (15/02/2026)
+- 🧼 **Menos ruido en timeline**: la carga por técnico se mueve a una pestaña dedicada.
+- ➕ **Nueva tarea desde timeline**: botón directo para ir a creación sin salir del flujo.
+- 🧭 **Ubicación jerárquica completa**: selección secuencial de 7 niveles (`Área` a `Elemento`) en creación y edición rápida.
+- 📋 **Lista más clara**: visualización de solo último nivel jerárquico en tareas.
 
 ### v2.48.02 - Convenciones oficiales de release y commit (15/02/2026)
 - 📏 **Estándar institucionalizado**: cada mejora cierra con versionado + validación + commit + push.

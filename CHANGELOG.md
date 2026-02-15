@@ -7,6 +7,16 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.03] - 2026-02-15
+
+### 🧭 Timeline más limpio + jerarquía extendida de ubicación
+
+#### Mejoras
+- **Carga por técnico desacoplada del timeline**: se mueve a pestaña propia para reducir ruido visual en la vista temporal.
+- **Acción directa de creación**: se agrega botón `Nueva tarea` en timeline para abrir rápidamente la configuración de alta.
+- **Ubicación con 7 niveles jerárquicos**: en creación/edición de tarea se habilita selección encadenada desde `Área` hasta `Elemento`.
+- **Listado más directo**: en tabla/listado de tareas se muestra solo el último nivel de jerarquía para lectura compacta.
+
 ## [2.48.02] - 2026-02-15
 
 ### 📏 Convenciones oficiales de release y commit

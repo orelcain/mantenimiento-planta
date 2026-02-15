@@ -42,7 +42,7 @@ import {
 } from '@/services/gantt'
 import { useHierarchyTree } from '@/hooks/useHierarchy'
 import type { Equipment, GanttTask, GanttTaskComment, IncidentPriority, User } from '@/types'
-import { HierarchyLevel, type HierarchyNode, type HierarchyNodeWithChildren } from '@/types/hierarchy'
+import { HIERARCHY_LEVEL_NAMES, HierarchyLevel, type HierarchyNode, type HierarchyNodeWithChildren } from '@/types/hierarchy'
 
 const STATUS_OPTIONS: Array<GanttTask['status']> = ['planificada', 'en_progreso', 'bloqueada', 'completada']
 const STATUS_META: Record<GanttTask['status'], { label: string; variant: 'outline' | 'secondary' | 'destructive' | 'warning' | 'success' }> = {
@@ -58,7 +58,27 @@ const DAY_MS = 24 * 60 * 60 * 1000
 const HOUR_MS = 60 * 60 * 1000
 
 type TimelineDragMode = 'move' | 'resize-start' | 'resize-end'
-type PlannerTab = 'configuracion' | 'tareas' | 'timeline'
+type PlannerTab = 'configuracion' | 'tareas' | 'timeline' | 'carga_tecnico'
+
+const TASK_LOCATION_LEVELS: HierarchyLevel[] = [
+  HierarchyLevel.AREA,
+  HierarchyLevel.SUB_AREA,
+  HierarchyLevel.SISTEMA,
+  HierarchyLevel.SUB_SISTEMA,
+  HierarchyLevel.SECCION,
+  HierarchyLevel.SUB_SECCION,
+  HierarchyLevel.ELEMENTO,
+]
+
+type HierarchySelectionMap = Record<number, string>
+
+function createEmptyHierarchySelection(): HierarchySelectionMap {
+  const selection: HierarchySelectionMap = {}
+  TASK_LOCATION_LEVELS.forEach((level) => {
+    selection[level] = 'none'
+  })
+  return selection
+}
 
 interface ImportedTaskDraft {
   sourceRow: number
@@ -281,8 +301,7 @@ function compactHierarchyPath(hierarchyPath?: string) {
     .filter(Boolean)
 
   if (parts.length === 0) return 'Sin área'
-  if (parts.length === 1) return parts[0]
-  return parts.slice(-2).join(' > ')
+  return parts[parts.length - 1]
 }
 
 function taskLocationSummary(task: Pick<GanttTask, 'hierarchyPath' | 'equipmentNombre'>) {
@@ -332,7 +351,7 @@ export function GanttPlannerPage() {
   const [technicians, setTechnicians] = useState<User[]>([])
 
   const [title, setTitle] = useState('')
-  const [areaId, setAreaId] = useState<string>('none')
+  const [createHierarchySelection, setCreateHierarchySelection] = useState<HierarchySelectionMap>(() => createEmptyHierarchySelection())
   const [equipmentId, setEquipmentId] = useState<string>('none')
   const [priority, setPriority] = useState<IncidentPriority>('media')
   const [startDate, setStartDate] = useState(toInputDate(new Date()))
@@ -367,7 +386,7 @@ export function GanttPlannerPage() {
   const [timelineQuickStart, setTimelineQuickStart] = useState('')
   const [timelineQuickEnd, setTimelineQuickEnd] = useState('')
   const [timelineQuickTitle, setTimelineQuickTitle] = useState('')
-  const [timelineQuickAreaId, setTimelineQuickAreaId] = useState<string>('none')
+  const [timelineQuickHierarchySelection, setTimelineQuickHierarchySelection] = useState<HierarchySelectionMap>(() => createEmptyHierarchySelection())
   const [timelineQuickEquipmentId, setTimelineQuickEquipmentId] = useState<string>('none')
   const [timelineQuickHours, setTimelineQuickHours] = useState('')
   const [timelineQuickDays, setTimelineQuickDays] = useState('')
@@ -408,24 +427,60 @@ export function GanttPlannerPage() {
   const timelineTableWidthStorageKey = useMemo(() => `gantt:timelineTableWidth:${user?.id ?? 'anon'}`, [user?.id])
 
   const hierarchyNodes = useMemo(() => flattenHierarchyTree(hierarchyTree), [hierarchyTree])
+  const hierarchyNodeById = useMemo(() => new Map(hierarchyNodes.map((node) => [node.id, node])), [hierarchyNodes])
   const areaNodes = useMemo(
     () => hierarchyNodes.filter((node) => node.nivel === HierarchyLevel.AREA && node.activo),
     [hierarchyNodes]
-  )
-  const selectedArea = useMemo(
-    () => areaNodes.find((node) => node.id === areaId),
-    [areaId, areaNodes]
   )
   const selectedAreaFilter = useMemo(
     () => areaNodes.find((node) => node.id === areaFilter),
     [areaFilter, areaNodes]
   )
 
-  const equipmentForSelectedArea = useMemo(() => {
-    if (areaId === 'none') return equipment
-    const areaName = normalizeKey(selectedArea?.nombre ?? '')
-    return equipment.filter((item) => normalizeKey(item.hierarchyPath ?? '').includes(areaName))
-  }, [areaId, equipment, selectedArea?.nombre])
+  const hierarchyOptionsByLevel = useCallback((selection: HierarchySelectionMap, level: HierarchyLevel) => {
+    const levelNodes = hierarchyNodes
+      .filter((node) => node.activo && node.nivel === level)
+      .sort((left, right) => left.nombre.localeCompare(right.nombre, 'es'))
+
+    const levelIndex = TASK_LOCATION_LEVELS.indexOf(level)
+    if (levelIndex <= 0) return levelNodes
+
+    const previousLevel = TASK_LOCATION_LEVELS[levelIndex - 1]
+    if (previousLevel === undefined) return []
+    const previousSelectedId = selection[previousLevel]
+    if (!previousSelectedId || previousSelectedId === 'none') return []
+
+    return levelNodes.filter((node) => node.parentId === previousSelectedId)
+  }, [hierarchyNodes])
+
+  const createSelectedHierarchyNode = useMemo(() => {
+    for (let index = TASK_LOCATION_LEVELS.length - 1; index >= 0; index -= 1) {
+      const level = TASK_LOCATION_LEVELS[index]
+      if (level === undefined) continue
+      const selectedId = createHierarchySelection[level]
+      if (selectedId && selectedId !== 'none') {
+        return hierarchyNodeById.get(selectedId)
+      }
+    }
+    return undefined
+  }, [createHierarchySelection, hierarchyNodeById])
+
+  const createHierarchyOptions = useMemo(() => {
+    const result = new Map<HierarchyLevel, HierarchyNode[]>()
+    TASK_LOCATION_LEVELS.forEach((level) => {
+      result.set(level, hierarchyOptionsByLevel(createHierarchySelection, level))
+    })
+    return result
+  }, [createHierarchySelection, hierarchyOptionsByLevel])
+
+  const equipmentForSelectedHierarchy = useMemo(() => {
+    if (!createSelectedHierarchyNode) return equipment
+    const locationKey = normalizeKey(createSelectedHierarchyNode.nombre)
+    return equipment.filter((item) => {
+      if (item.hierarchyNodeId && item.hierarchyNodeId === createSelectedHierarchyNode.id) return true
+      return normalizeKey(item.hierarchyPath ?? '').includes(locationKey)
+    })
+  }, [createSelectedHierarchyNode, equipment])
 
   const technicianLookupByName = useMemo(() => {
     const map = new Map<string, User>()
@@ -757,17 +812,34 @@ export function GanttPlannerPage() {
     return timelineFilteredTasks.find((task) => task.id === selectedTaskId) ?? selectedTask
   }, [selectedTask, selectedTaskId, timelineFilteredTasks])
 
-  const timelineQuickArea = useMemo(
-    () => areaNodes.find((node) => node.id === timelineQuickAreaId),
-    [areaNodes, timelineQuickAreaId]
-  )
+  const timelineQuickSelectedHierarchyNode = useMemo(() => {
+    for (let index = TASK_LOCATION_LEVELS.length - 1; index >= 0; index -= 1) {
+      const level = TASK_LOCATION_LEVELS[index]
+      if (level === undefined) continue
+      const selectedId = timelineQuickHierarchySelection[level]
+      if (selectedId && selectedId !== 'none') {
+        return hierarchyNodeById.get(selectedId)
+      }
+    }
+    return undefined
+  }, [hierarchyNodeById, timelineQuickHierarchySelection])
+
+  const timelineQuickHierarchyOptions = useMemo(() => {
+    const result = new Map<HierarchyLevel, HierarchyNode[]>()
+    TASK_LOCATION_LEVELS.forEach((level) => {
+      result.set(level, hierarchyOptionsByLevel(timelineQuickHierarchySelection, level))
+    })
+    return result
+  }, [hierarchyOptionsByLevel, timelineQuickHierarchySelection])
 
   const timelineQuickEquipmentOptions = useMemo(() => {
-    if (timelineQuickAreaId === 'none') return equipment
-    const areaName = normalizeKey(timelineQuickArea?.nombre ?? '')
-    if (!areaName) return equipment
-    return equipment.filter((item) => normalizeKey(item.hierarchyPath ?? '').includes(areaName))
-  }, [equipment, timelineQuickArea?.nombre, timelineQuickAreaId])
+    if (!timelineQuickSelectedHierarchyNode) return equipment
+    const locationKey = normalizeKey(timelineQuickSelectedHierarchyNode.nombre)
+    return equipment.filter((item) => {
+      if (item.hierarchyNodeId && item.hierarchyNodeId === timelineQuickSelectedHierarchyNode.id) return true
+      return normalizeKey(item.hierarchyPath ?? '').includes(locationKey)
+    })
+  }, [equipment, timelineQuickSelectedHierarchyNode])
 
   const timelineQuickDependencyCandidates = useMemo(() => {
     if (!selectedTimelineTask) return [] as GanttTask[]
@@ -1035,6 +1107,42 @@ export function GanttPlannerPage() {
     }
   }, [timelineTableWidth])
 
+  const handleCreateHierarchyLevelChange = useCallback((level: HierarchyLevel, value: string) => {
+    setCreateHierarchySelection((current) => {
+      const next = { ...current, [level]: value }
+      let reset = false
+      TASK_LOCATION_LEVELS.forEach((candidate) => {
+        if (candidate === level) {
+          reset = true
+          return
+        }
+        if (reset) {
+          next[candidate] = 'none'
+        }
+      })
+      return next
+    })
+    setEquipmentId('none')
+  }, [])
+
+  const handleTimelineQuickHierarchyLevelChange = useCallback((level: HierarchyLevel, value: string) => {
+    setTimelineQuickHierarchySelection((current) => {
+      const next = { ...current, [level]: value }
+      let reset = false
+      TASK_LOCATION_LEVELS.forEach((candidate) => {
+        if (candidate === level) {
+          reset = true
+          return
+        }
+        if (reset) {
+          next[candidate] = 'none'
+        }
+      })
+      return next
+    })
+    setTimelineQuickEquipmentId('none')
+  }, [])
+
   const openTimelineQuickEditor = useCallback((taskId: string) => {
     timelineQuickFocusPendingRef.current = true
     setPlannerTab('timeline')
@@ -1108,16 +1216,14 @@ export function GanttPlannerPage() {
     const selectedEquipment = timelineQuickEquipmentId === 'none'
       ? undefined
       : equipment.find((item) => item.id === timelineQuickEquipmentId)
-    const selectedAreaNode = timelineQuickAreaId === 'none'
-      ? undefined
-      : areaNodes.find((node) => node.id === timelineQuickAreaId)
+    const selectedHierarchyNode = timelineQuickSelectedHierarchyNode
 
     await updateGanttTask(selectedTimelineTask.id, {
       titulo: nextTitle,
       equipmentId: selectedEquipment?.id,
       equipmentNombre: selectedEquipment?.nombre,
-      hierarchyNodeId: selectedEquipment?.hierarchyNodeId ?? selectedAreaNode?.id,
-      hierarchyPath: selectedEquipment?.hierarchyPath ?? selectedAreaNode?.nombre,
+      hierarchyNodeId: selectedEquipment?.hierarchyNodeId ?? selectedHierarchyNode?.id,
+      hierarchyPath: selectedEquipment?.hierarchyPath ?? selectedHierarchyNode?.nombre,
     })
     await load()
   }
@@ -1162,7 +1268,7 @@ export function GanttPlannerPage() {
 
   useEffect(() => {
     const savedTab = window.localStorage.getItem(plannerTabStorageKey)
-    if (savedTab === 'configuracion' || savedTab === 'tareas' || savedTab === 'timeline') {
+    if (savedTab === 'configuracion' || savedTab === 'tareas' || savedTab === 'timeline' || savedTab === 'carga_tecnico') {
       setPlannerTab(savedTab)
     }
   }, [plannerTabStorageKey])
@@ -1235,7 +1341,7 @@ export function GanttPlannerPage() {
       setTimelineQuickStart('')
       setTimelineQuickEnd('')
       setTimelineQuickTitle('')
-      setTimelineQuickAreaId('none')
+      setTimelineQuickHierarchySelection(createEmptyHierarchySelection())
       setTimelineQuickEquipmentId('none')
       setTimelineQuickHours('')
       setTimelineQuickDays('')
@@ -1265,15 +1371,19 @@ export function GanttPlannerPage() {
     const taskEquipment = selectedTimelineTask.equipmentId
       ? equipment.find((item) => item.id === selectedTimelineTask.equipmentId)
       : equipment.find((item) => item.nombre === selectedTimelineTask.equipmentNombre)
-    const areaByNodeId = selectedTimelineTask.hierarchyNodeId
-      ? areaNodes.find((node) => node.id === selectedTimelineTask.hierarchyNodeId)
+    const nextHierarchySelection = createEmptyHierarchySelection()
+    const selectedNode = selectedTimelineTask.hierarchyNodeId
+      ? hierarchyNodeById.get(selectedTimelineTask.hierarchyNodeId)
       : undefined
-    const areaByEquipment = taskEquipment
-      ? areaNodes.find((node) => normalizeKey(taskEquipment.hierarchyPath ?? '').includes(normalizeKey(node.nombre)))
-      : undefined
-    const areaByPath = areaNodes.find((node) => normalizeKey(selectedTimelineTask.hierarchyPath ?? '').includes(normalizeKey(node.nombre)))
+    selectedNode?.path?.forEach((nodeId) => {
+      const node = hierarchyNodeById.get(nodeId)
+      if (!node) return
+      if (TASK_LOCATION_LEVELS.includes(node.nivel)) {
+        nextHierarchySelection[node.nivel] = node.id
+      }
+    })
 
-    setTimelineQuickAreaId(areaByNodeId?.id ?? areaByEquipment?.id ?? areaByPath?.id ?? 'none')
+    setTimelineQuickHierarchySelection(nextHierarchySelection)
     setTimelineQuickEquipmentId(taskEquipment?.id ?? 'none')
 
     if (timelineQuickFocusPendingRef.current) {
@@ -1283,7 +1393,7 @@ export function GanttPlannerPage() {
         timelineQuickStartInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
       }, 0)
     }
-  }, [areaNodes, equipment, selectedTimelineTask])
+  }, [equipment, hierarchyNodeById, selectedTimelineTask])
 
   useEffect(() => {
     if (timelineQuickEquipmentId === 'none') return
@@ -1292,6 +1402,14 @@ export function GanttPlannerPage() {
       setTimelineQuickEquipmentId('none')
     }
   }, [timelineQuickEquipmentId, timelineQuickEquipmentOptions])
+
+  useEffect(() => {
+    if (equipmentId === 'none') return
+    const existsForSelection = equipmentForSelectedHierarchy.some((item) => item.id === equipmentId)
+    if (!existsForSelection) {
+      setEquipmentId('none')
+    }
+  }, [equipmentForSelectedHierarchy, equipmentId])
 
   useEffect(() => {
     if (selectedTaskId === 'none') {
@@ -1473,6 +1591,7 @@ export function GanttPlannerPage() {
     }
 
     const selectedEquipment = equipment.find((item) => item.id === equipmentId)
+    const selectedHierarchyNode = createSelectedHierarchyNode
     const selectedTechnician = createResponsibleId !== 'self' && createResponsibleId !== 'none'
       ? technicians.find((tech) => tech.id === createResponsibleId)
       : undefined
@@ -1498,8 +1617,8 @@ export function GanttPlannerPage() {
       descripcion: '',
       equipmentId: equipmentId === 'none' ? undefined : equipmentId,
       equipmentNombre: selectedEquipment?.nombre,
-      hierarchyNodeId: selectedEquipment?.hierarchyNodeId ?? (areaId === 'none' ? undefined : areaId),
-      hierarchyPath: selectedEquipment?.hierarchyPath ?? selectedArea?.nombre,
+      hierarchyNodeId: selectedEquipment?.hierarchyNodeId ?? selectedHierarchyNode?.id,
+      hierarchyPath: selectedEquipment?.hierarchyPath ?? selectedHierarchyNode?.nombre,
       status: 'planificada',
       prioridad: priority,
       startDate: start,
@@ -1518,6 +1637,7 @@ export function GanttPlannerPage() {
 
     setTitle('')
     setSparePartIdsText('')
+    setCreateHierarchySelection(createEmptyHierarchySelection())
     setEquipmentId('none')
     setCreateResponsibleId('self')
     await load()
@@ -1953,6 +2073,13 @@ export function GanttPlannerPage() {
         >
           Timeline
         </Button>
+        <Button
+          size="sm"
+          variant={plannerTab === 'carga_tecnico' ? 'default' : 'outline'}
+          onClick={() => setPlannerTab('carga_tecnico')}
+        >
+          Carga por técnico
+        </Button>
       </div>
 
       {plannerTab === 'timeline' && (
@@ -2049,11 +2176,16 @@ export function GanttPlannerPage() {
               <span>
                 Doble clic para editar. Tecla D: {timelineDependencyMode ? 'modo dependencia ACTIVO' : 'modo dependencia inactivo'}.
               </span>
-              {selectedTimelineTask && (
-                <Button size="sm" variant="outline" onClick={() => openTimelineQuickEditor(selectedTimelineTask.id)}>
-                  Editar seleccionada
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="outline" onClick={() => setPlannerTab('configuracion')}>
+                  <Plus className="h-4 w-4 mr-1" /> Nueva tarea
                 </Button>
-              )}
+                {selectedTimelineTask && (
+                  <Button size="sm" variant="outline" onClick={() => openTimelineQuickEditor(selectedTimelineTask.id)}>
+                    Editar seleccionada
+                  </Button>
+                )}
+              </div>
             </div>
 
             {timelineDependencyMode && (
@@ -2068,25 +2200,6 @@ export function GanttPlannerPage() {
               </div>
             )}
 
-            <div className="rounded border p-3">
-              <p className="text-xs font-medium">Carga por técnico (tareas visibles)</p>
-              <p className="text-[11px] text-muted-foreground mb-2">Histogramado por horas planificadas activas, útil para detectar sobrecarga.</p>
-              {timelineResourceLoad.length === 0 ? (
-                <p className="text-xs text-muted-foreground">Sin tareas activas asignadas para calcular carga.</p>
-              ) : (
-                <div className="space-y-2">
-                  {timelineResourceLoad.map((row) => (
-                    <div key={`load-${row.name}`} className="grid grid-cols-[140px_1fr_auto] items-center gap-2">
-                      <span className="truncate text-xs">{row.name}</span>
-                      <div className="h-2 rounded bg-muted overflow-hidden">
-                        <div className="h-full bg-primary/80" style={{ width: `${row.pct}%` }} />
-                      </div>
-                      <span className="text-[11px] text-muted-foreground">{row.hours}h · {row.tasks} tarea(s)</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
           </CardContent>
         </Card>
 
@@ -2483,8 +2596,8 @@ export function GanttPlannerPage() {
               <div className="space-y-3">
                 <div className="rounded border p-3 space-y-2">
                   <p className="text-xs font-medium">Datos base de la tarea</p>
-                  <div className="grid gap-2 sm:grid-cols-3">
-                    <div className="sm:col-span-3">
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <div className="sm:col-span-2">
                       <Label className="text-xs text-muted-foreground">Título</Label>
                       <Input
                         value={timelineQuickTitle}
@@ -2493,18 +2606,31 @@ export function GanttPlannerPage() {
                         placeholder="Nombre de la tarea"
                       />
                     </div>
-                    <div>
-                      <Label className="text-xs text-muted-foreground">Área</Label>
-                      <Select value={timelineQuickAreaId} onValueChange={setTimelineQuickAreaId} disabled={!canEditTaskIdentity}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">Sin área</SelectItem>
-                          {areaNodes.map((node) => (
-                            <SelectItem key={`timeline-quick-area-${node.id}`} value={node.id}>{node.nombre}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    {TASK_LOCATION_LEVELS.map((level) => {
+                      const options = timelineQuickHierarchyOptions.get(level) ?? []
+                      const levelIndex = TASK_LOCATION_LEVELS.indexOf(level)
+                      const previousLevel = levelIndex > 0 ? TASK_LOCATION_LEVELS[levelIndex - 1] : null
+                      const isDisabled = !canEditTaskIdentity || (!!previousLevel && timelineQuickHierarchySelection[previousLevel] === 'none')
+
+                      return (
+                        <div key={`timeline-quick-level-${level}`}>
+                          <Label className="text-xs text-muted-foreground">{HIERARCHY_LEVEL_NAMES[level]}</Label>
+                          <Select
+                            value={timelineQuickHierarchySelection[level] ?? 'none'}
+                            onValueChange={(value) => handleTimelineQuickHierarchyLevelChange(level, value)}
+                            disabled={isDisabled}
+                          >
+                            <SelectTrigger><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">Sin selección</SelectItem>
+                              {options.map((node) => (
+                                <SelectItem key={`timeline-quick-level-node-${level}-${node.id}`} value={node.id}>{node.nombre}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )
+                    })}
                     <div className="sm:col-span-2">
                       <Label className="text-xs text-muted-foreground">Equipo</Label>
                       <Select value={timelineQuickEquipmentId} onValueChange={setTimelineQuickEquipmentId} disabled={!canEditTaskIdentity}>
@@ -2692,6 +2818,32 @@ export function GanttPlannerPage() {
 
       {plannerTab !== 'timeline' && (
       <div className="grid gap-3 md:grid-cols-6">
+        {plannerTab === 'carga_tecnico' && (
+        <Card className="md:col-span-6">
+          <CardHeader className="pb-2">
+            <CardTitle>Carga por técnico</CardTitle>
+            <p className="text-xs text-muted-foreground">Histogramado por horas planificadas activas para detectar sobrecarga.</p>
+          </CardHeader>
+          <CardContent>
+            {timelineResourceLoad.length === 0 ? (
+              <p className="text-xs text-muted-foreground">Sin tareas activas asignadas para calcular carga.</p>
+            ) : (
+              <div className="space-y-2">
+                {timelineResourceLoad.map((row) => (
+                  <div key={`load-tab-${row.name}`} className="grid grid-cols-[160px_1fr_auto] items-center gap-2">
+                    <span className="truncate text-xs">{row.name}</span>
+                    <div className="h-2 rounded bg-muted overflow-hidden">
+                      <div className="h-full bg-primary/80" style={{ width: `${row.pct}%` }} />
+                    </div>
+                    <span className="text-[11px] text-muted-foreground">{row.hours}h · {row.tasks} tarea(s)</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        )}
+
         {plannerTab === 'tareas' && (
         <Card className="lg:col-span-4">
           <CardHeader className="flex flex-row items-center justify-between space-y-0">
@@ -2900,6 +3052,7 @@ export function GanttPlannerPage() {
         </Card>
         )}
 
+        {plannerTab !== 'carga_tecnico' && (
         <div className={plannerTab === 'configuracion' ? 'md:col-span-6 grid gap-4 md:grid-cols-2' : 'lg:col-span-2 space-y-4'}>
           {plannerTab === 'configuracion' && (
           <Card className="md:col-span-2">
@@ -2990,26 +3143,36 @@ export function GanttPlannerPage() {
                 <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Cambio de rodamiento" />
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <Label>Área</Label>
-                  <Select value={areaId} onValueChange={(value) => {
-                    setAreaId(value)
-                    setEquipmentId('none')
-                  }}>
-                    <SelectTrigger><SelectValue placeholder="Opcional" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Sin área</SelectItem>
-                      {areaNodes.map((node) => <SelectItem key={`area-create-${node.id}`} value={node.id}>{node.nombre}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
+                {TASK_LOCATION_LEVELS.map((level) => {
+                  const options = createHierarchyOptions.get(level) ?? []
+                  const levelIndex = TASK_LOCATION_LEVELS.indexOf(level)
+                  const previousLevel = levelIndex > 0 ? TASK_LOCATION_LEVELS[levelIndex - 1] : null
+                  const isDisabled = !!previousLevel && createHierarchySelection[previousLevel] === 'none'
+
+                  return (
+                    <div key={`create-level-${level}`}>
+                      <Label>{HIERARCHY_LEVEL_NAMES[level]}</Label>
+                      <Select
+                        value={createHierarchySelection[level] ?? 'none'}
+                        onValueChange={(value) => handleCreateHierarchyLevelChange(level, value)}
+                        disabled={isDisabled}
+                      >
+                        <SelectTrigger><SelectValue placeholder="Opcional" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Sin selección</SelectItem>
+                          {options.map((node) => <SelectItem key={`create-level-node-${level}-${node.id}`} value={node.id}>{node.nombre}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )
+                })}
                 <div>
                   <Label>Equipo</Label>
                   <Select value={equipmentId} onValueChange={setEquipmentId}>
                     <SelectTrigger><SelectValue placeholder="Opcional" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">Sin equipo</SelectItem>
-                      {equipmentForSelectedArea.map((item) => <SelectItem key={item.id} value={item.id}>{item.nombre}</SelectItem>)}
+                      {equipmentForSelectedHierarchy.map((item) => <SelectItem key={item.id} value={item.id}>{item.nombre}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -3288,6 +3451,7 @@ export function GanttPlannerPage() {
           </Card>
           )}
         </div>
+        )}
       </div>
       )}
     </div>
