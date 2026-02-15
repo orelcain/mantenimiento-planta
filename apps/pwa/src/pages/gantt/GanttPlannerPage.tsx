@@ -1716,6 +1716,12 @@ export function GanttPlannerPage() {
     await load()
   }
 
+  function confirmDeleteFromTimelineRow(task: GanttTask) {
+    const approved = window.confirm(`¿Eliminar tarea?\n\n${task.titulo}`)
+    if (!approved) return
+    void handleDelete(task.id)
+  }
+
   async function handleAssignResponsible(task: GanttTask, technicianId: string) {
     if (!canEdit || technicianId === 'none') return
     const technician = technicians.find((row) => row.id === technicianId)
@@ -2260,7 +2266,7 @@ export function GanttPlannerPage() {
                             className="h-6 w-6 text-destructive hover:text-destructive"
                             onClick={(event) => {
                               event.stopPropagation()
-                              void handleDelete(row.task.id)
+                              confirmDeleteFromTimelineRow(row.task)
                             }}
                             title="Eliminar tarea"
                           >

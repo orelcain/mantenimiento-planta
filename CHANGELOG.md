@@ -7,6 +7,14 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.11] - 2026-02-15
+
+### 🛡️ Confirmación al eliminar desde X roja
+
+#### Mejoras
+- **Confirmación previa**: al usar la `X` roja en tabla timeline ahora aparece `¿Eliminar tarea?` con el título de la tarea.
+- **Menos borrados accidentales**: el borrado rápido mantiene velocidad, pero con una capa mínima de seguridad.
+
 ## [2.48.10] - 2026-02-15
 
 ### 🔎 Filtro único + eliminación rápida en tabla timeline

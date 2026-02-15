@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.48.10**
+## Versión Actual: **v2.48.11**
 
 **Fecha de lanzamiento**: 15 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.48.11 - Confirmación de borrado en X roja (15/02/2026)
+- 🛡️ **Confirmación previa**: la `X` roja del timeline solicita validación antes de eliminar.
+- 🧾 **Contexto visible**: el mensaje muestra el título de la tarea a borrar.
+- ✅ **Flujo rápido conservado**: se mantiene eliminación directa desde tabla, con menor riesgo de error humano.
 
 ### v2.48.10 - Buscador único y borrado rápido admin (15/02/2026)
 - 🔎 **Un solo filtro timeline**: búsqueda global en área, equipo, tarea y responsable.
