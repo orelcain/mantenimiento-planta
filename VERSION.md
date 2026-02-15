@@ -1,14 +1,21 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.48.00**
+## Versión Actual: **v2.48.01**
 
-**Fecha de lanzamiento**: 14 de febrero de 2026  \
+**Fecha de lanzamiento**: 15 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
 **Build**: ✅ Stable
 
 ---
 
 ## 📋 Información de la Versión
+
+### v2.48.01 - Limpieza visual y edición por rol en Gantt (15/02/2026)
+- 🧼 **Menos ruido visual**: removido el bloque de texto introductorio en timeline para dejar foco en operación.
+- 🧭 **Ubicación compacta**: área mostrada en formato resumido (sin raíz completa), priorizando lectura rápida.
+- 🔐 **Permisos claros por rol**: edición de título/área/equipo habilitada solo para `admin` y `supervisor`.
+- 🔎 **Dependencias rápidas mejoradas**: buscador de predecesora, etiquetas explícitas para `FS/SS/FF/SF` y ayuda hover de `Lag`.
+- 💬 **Hover en truncados**: tooltips en tabla/listado para ver texto completo sin agrandar celdas.
 
 ### v2.48.00 - Dependencias visuales con flecha y codo (14/02/2026)
 - 🧭 **Dirección explícita**: flecha visible en líneas de dependencia para entender rápidamente de dónde sale y a dónde llega.

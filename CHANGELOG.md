@@ -7,6 +7,17 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.01] - 2026-02-15
+
+### 🧼 Limpieza visual + edición por rol en Gantt
+
+#### Mejoras
+- **Menos ruido en timeline**: se elimina el bloque textual de propuesta/objetivo para priorizar información operativa.
+- **Ubicación resumida**: en vistas y modal se muestra solo la parte útil final del área (sin la raíz jerárquica completa).
+- **Edición de identidad de tarea por rol**: en edición rápida se puede cambiar título, área y equipo; disponible solo para `admin` y `supervisor`.
+- **Dependencias rápidas más usables**: buscador de predecesora, selector de tipo con etiqueta explícita (`FS/SS/FF/SF`) y ayuda contextual para `Lag (h)`.
+- **Tooltips en textos truncados**: hover con contenido completo en tabla/listado para mantener compacta la pantalla sin perder información.
+
 ## [2.48.00] - 2026-02-14
 
 ### 🧭 Dependencias visuales tipo GanttPRO (flecha + codo)

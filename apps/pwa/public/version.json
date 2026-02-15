@@ -1,8 +1,13 @@
 {
-  "version": "2.48.00",
-  "buildDate": "2026-02-14",
-  "buildTimestamp": 1771091400000,
+  "version": "2.48.01",
+  "buildDate": "2026-02-15",
+  "buildTimestamp": 1771177800000,
   "features": [
+    "Timeline más limpio: se elimina bloque descriptivo redundante para reducir ruido visual",
+    "Ubicación resumida en Gantt: muestra solo el tramo útil final del área y equipo (sin raíz completa)",
+    "Editor rápido con permisos por rol: solo admin/supervisor pueden modificar título, área y equipo",
+    "Dependencias rápidas mejoradas: buscador de predecesora, etiquetas claras FS/SS/FF/SF y ayuda hover para Lag",
+    "Tooltips en tabla/listado para ver texto completo cuando el contenido está truncado",
     "Líneas de dependencia renderizadas con codos/curvas y punta de flecha para lectura de origen→destino",
     "Preview de dependencia en drag con trazado en codo + flecha, alineado al estilo visual tipo GanttPRO",
     "Hotfix CI/deploy: corrección de errores TypeScript en Gantt detectados por etapa Type check",

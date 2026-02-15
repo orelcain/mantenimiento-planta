@@ -267,6 +267,30 @@ function dependencyDescription(type: 'FS' | 'SS' | 'FF' | 'SF', taskA: string, t
   return `SF (Start to Finish): la tarea B termina cuando la A empieza.\nA: ${taskA}\nB: ${taskB}\nEjemplo aplicado: "${taskB}" finaliza cuando comienza "${taskA}".`
 }
 
+function dependencyTypeLabel(type: 'FS' | 'SS' | 'FF' | 'SF') {
+  if (type === 'FS') return 'FS · Fin → Inicio'
+  if (type === 'SS') return 'SS · Inicio → Inicio'
+  if (type === 'FF') return 'FF · Fin → Fin'
+  return 'SF · Inicio → Fin'
+}
+
+function compactHierarchyPath(hierarchyPath?: string) {
+  const parts = (hierarchyPath ?? '')
+    .split('>')
+    .map((part) => part.trim())
+    .filter(Boolean)
+
+  if (parts.length === 0) return 'Sin área'
+  if (parts.length === 1) return parts[0]
+  return parts.slice(-2).join(' > ')
+}
+
+function taskLocationSummary(task: Pick<GanttTask, 'hierarchyPath' | 'equipmentNombre'>) {
+  const area = compactHierarchyPath(task.hierarchyPath)
+  const equipmentName = (task.equipmentNombre ?? '').trim()
+  return equipmentName ? `${area} · ${equipmentName}` : area
+}
+
 function suggestedRiskForEquipmentStatus(estado?: Equipment['estado']): GanttTask['predictiveRiskLevel'] {
   if (estado === 'fuera_servicio') return 'critico'
   if (estado === 'en_mantenimiento') return 'alto'
@@ -278,6 +302,7 @@ export function GanttPlannerPage() {
   const canCreate = useCan('gantt', 'crear')
   const canEdit = useCan('gantt', 'editar')
   const canDelete = useCan('gantt', 'eliminar')
+  const canEditTaskIdentity = user?.rol === 'admin' || user?.rol === 'supervisor'
 
   const [tasks, setTasks] = useState<GanttTask[]>([])
   const [equipment, setEquipment] = useState<Equipment[]>([])
@@ -341,11 +366,15 @@ export function GanttPlannerPage() {
   const [importMessage, setImportMessage] = useState<string | null>(null)
   const [timelineQuickStart, setTimelineQuickStart] = useState('')
   const [timelineQuickEnd, setTimelineQuickEnd] = useState('')
+  const [timelineQuickTitle, setTimelineQuickTitle] = useState('')
+  const [timelineQuickAreaId, setTimelineQuickAreaId] = useState<string>('none')
+  const [timelineQuickEquipmentId, setTimelineQuickEquipmentId] = useState<string>('none')
   const [timelineQuickHours, setTimelineQuickHours] = useState('')
   const [timelineQuickDays, setTimelineQuickDays] = useState('')
   const [timelineQuickDurationUnit, setTimelineQuickDurationUnit] = useState<'hours' | 'days'>('hours')
   const [timelineQuickResponsibleId, setTimelineQuickResponsibleId] = useState<string>('none')
   const [timelineQuickDependencyPredecessorId, setTimelineQuickDependencyPredecessorId] = useState<string>('none')
+  const [timelineQuickDependencySearch, setTimelineQuickDependencySearch] = useState('')
   const [timelineQuickDependencyType, setTimelineQuickDependencyType] = useState<'FS' | 'SS' | 'FF' | 'SF'>('FS')
   const [timelineQuickDependencyLag, setTimelineQuickDependencyLag] = useState<number>(0)
   const [timelineQuickModalOpen, setTimelineQuickModalOpen] = useState(false)
@@ -728,6 +757,32 @@ export function GanttPlannerPage() {
     return timelineFilteredTasks.find((task) => task.id === selectedTaskId) ?? selectedTask
   }, [selectedTask, selectedTaskId, timelineFilteredTasks])
 
+  const timelineQuickArea = useMemo(
+    () => areaNodes.find((node) => node.id === timelineQuickAreaId),
+    [areaNodes, timelineQuickAreaId]
+  )
+
+  const timelineQuickEquipmentOptions = useMemo(() => {
+    if (timelineQuickAreaId === 'none') return equipment
+    const areaName = normalizeKey(timelineQuickArea?.nombre ?? '')
+    if (!areaName) return equipment
+    return equipment.filter((item) => normalizeKey(item.hierarchyPath ?? '').includes(areaName))
+  }, [equipment, timelineQuickArea?.nombre, timelineQuickAreaId])
+
+  const timelineQuickDependencyCandidates = useMemo(() => {
+    if (!selectedTimelineTask) return [] as GanttTask[]
+    const query = normalizeKey(timelineQuickDependencySearch)
+
+    return tasks
+      .filter((task) => task.id !== selectedTimelineTask.id)
+      .filter((task) => {
+        if (!query) return true
+        const haystack = normalizeKey(`${task.titulo} ${taskLocationSummary(task)}`)
+        return haystack.includes(query)
+      })
+      .slice(0, 300)
+  }, [selectedTimelineTask, tasks, timelineQuickDependencySearch])
+
   const timelineResourceLoad = useMemo(() => {
     const totals = new Map<string, { name: string; hours: number; tasks: number }>()
 
@@ -1041,6 +1096,32 @@ export function GanttPlannerPage() {
     await handleAssignResponsible(selectedTimelineTask, timelineQuickResponsibleId)
   }
 
+  async function handleTimelineQuickSaveIdentity() {
+    if (!selectedTimelineTask || !canEditTaskIdentity) return
+
+    const nextTitle = timelineQuickTitle.trim()
+    if (!nextTitle) {
+      setError('El título de la tarea no puede quedar vacío')
+      return
+    }
+
+    const selectedEquipment = timelineQuickEquipmentId === 'none'
+      ? undefined
+      : equipment.find((item) => item.id === timelineQuickEquipmentId)
+    const selectedAreaNode = timelineQuickAreaId === 'none'
+      ? undefined
+      : areaNodes.find((node) => node.id === timelineQuickAreaId)
+
+    await updateGanttTask(selectedTimelineTask.id, {
+      titulo: nextTitle,
+      equipmentId: selectedEquipment?.id,
+      equipmentNombre: selectedEquipment?.nombre,
+      hierarchyNodeId: selectedEquipment?.hierarchyNodeId ?? selectedAreaNode?.id,
+      hierarchyPath: selectedEquipment?.hierarchyPath ?? selectedAreaNode?.nombre,
+    })
+    await load()
+  }
+
   async function handleTimelineQuickAddDependency() {
     if (!canEdit || !selectedTimelineTask || timelineQuickDependencyPredecessorId === 'none') return
     if (selectedTimelineTask.id === timelineQuickDependencyPredecessorId) {
@@ -1153,11 +1234,15 @@ export function GanttPlannerPage() {
     if (!selectedTimelineTask) {
       setTimelineQuickStart('')
       setTimelineQuickEnd('')
+      setTimelineQuickTitle('')
+      setTimelineQuickAreaId('none')
+      setTimelineQuickEquipmentId('none')
       setTimelineQuickHours('')
       setTimelineQuickDays('')
       setTimelineQuickDurationUnit('hours')
       setTimelineQuickResponsibleId('none')
       setTimelineQuickDependencyPredecessorId('none')
+      setTimelineQuickDependencySearch('')
       setTimelineQuickDependencyType('FS')
       setTimelineQuickDependencyLag(0)
       setTimelineQuickModalOpen(false)
@@ -1166,14 +1251,30 @@ export function GanttPlannerPage() {
 
     setTimelineQuickStart(toInputDate(selectedTimelineTask.startDate))
     setTimelineQuickEnd(toInputDate(selectedTimelineTask.endDate))
+    setTimelineQuickTitle(selectedTimelineTask.titulo)
     const hours = Math.max(1, Math.round((selectedTimelineTask.endDate.getTime() - selectedTimelineTask.startDate.getTime()) / HOUR_MS))
     setTimelineQuickHours(String(hours))
     setTimelineQuickDays(String(Math.max(1, Math.ceil(hours / 24))))
     setTimelineQuickDurationUnit(hours >= 24 && hours % 24 === 0 ? 'days' : 'hours')
     setTimelineQuickResponsibleId(selectedTimelineTask.responsibleUserId ?? 'none')
     setTimelineQuickDependencyPredecessorId('none')
+    setTimelineQuickDependencySearch('')
     setTimelineQuickDependencyType('FS')
     setTimelineQuickDependencyLag(0)
+
+    const taskEquipment = selectedTimelineTask.equipmentId
+      ? equipment.find((item) => item.id === selectedTimelineTask.equipmentId)
+      : equipment.find((item) => item.nombre === selectedTimelineTask.equipmentNombre)
+    const areaByNodeId = selectedTimelineTask.hierarchyNodeId
+      ? areaNodes.find((node) => node.id === selectedTimelineTask.hierarchyNodeId)
+      : undefined
+    const areaByEquipment = taskEquipment
+      ? areaNodes.find((node) => normalizeKey(taskEquipment.hierarchyPath ?? '').includes(normalizeKey(node.nombre)))
+      : undefined
+    const areaByPath = areaNodes.find((node) => normalizeKey(selectedTimelineTask.hierarchyPath ?? '').includes(normalizeKey(node.nombre)))
+
+    setTimelineQuickAreaId(areaByNodeId?.id ?? areaByEquipment?.id ?? areaByPath?.id ?? 'none')
+    setTimelineQuickEquipmentId(taskEquipment?.id ?? 'none')
 
     if (timelineQuickFocusPendingRef.current) {
       timelineQuickFocusPendingRef.current = false
@@ -1182,7 +1283,15 @@ export function GanttPlannerPage() {
         timelineQuickStartInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
       }, 0)
     }
-  }, [selectedTimelineTask])
+  }, [areaNodes, equipment, selectedTimelineTask])
+
+  useEffect(() => {
+    if (timelineQuickEquipmentId === 'none') return
+    const existsInArea = timelineQuickEquipmentOptions.some((item) => item.id === timelineQuickEquipmentId)
+    if (!existsInArea) {
+      setTimelineQuickEquipmentId('none')
+    }
+  }, [timelineQuickEquipmentId, timelineQuickEquipmentOptions])
 
   useEffect(() => {
     if (selectedTaskId === 'none') {
@@ -1851,10 +1960,7 @@ export function GanttPlannerPage() {
         <Card>
           <CardContent className="pt-4 space-y-3">
             <div className="grid gap-2 xl:grid-cols-[1fr_auto_auto_auto] xl:items-center">
-              <div>
-                <p className="text-base font-semibold">Propuesta visual de módulo Gantt (referencia GanttPRO)</p>
-                <p className="text-xs text-muted-foreground">Objetivo: validar UX de timeline profesional, no es copia literal del producto.</p>
-              </div>
+              <div />
               <div className="flex items-center gap-1">
                 <Button size="sm" variant={timelineZoom === 'day' ? 'default' : 'outline'} onClick={() => setTimelineZoom('day')}>Día</Button>
                 <Button size="sm" variant={timelineZoom === 'week' ? 'default' : 'outline'} onClick={() => setTimelineZoom('week')}>Semana</Button>
@@ -2014,10 +2120,10 @@ export function GanttPlannerPage() {
                         onClick={() => setSelectedTaskId(row.task.id)}
                         onDoubleClick={() => openTimelineQuickEditor(row.task.id)}
                       >
-                        <span className="truncate">{row.task.hierarchyPath ?? 'Sin área'}</span>
-                        <span className="truncate">{row.task.equipmentNombre ?? 'Sin equipo'}</span>
-                        <span className="truncate">{row.isCritical ? '🔴 ' : ''}{row.task.titulo}</span>
-                        <span className="truncate">{row.task.responsibleName ?? 'Sin asignar'}</span>
+                        <span className="truncate" title={row.task.hierarchyPath ?? 'Sin área'}>{compactHierarchyPath(row.task.hierarchyPath)}</span>
+                        <span className="truncate" title={row.task.equipmentNombre ?? 'Sin equipo'}>{row.task.equipmentNombre ?? 'Sin equipo'}</span>
+                        <span className="truncate" title={row.task.titulo}>{row.isCritical ? '🔴 ' : ''}{row.task.titulo}</span>
+                        <span className="truncate" title={row.task.responsibleName ?? 'Sin asignar'}>{row.task.responsibleName ?? 'Sin asignar'}</span>
                         <Badge variant={status.variant}>{status.label}</Badge>
                         <span>{row.task.progress}%</span>
                         <span className={row.baselineDeltaHours > 0 ? 'text-destructive' : row.baselineDeltaHours < 0 ? 'text-foreground' : 'text-muted-foreground'}>
@@ -2368,13 +2474,60 @@ export function GanttPlannerPage() {
               <DialogTitle>Editar tarea en timeline</DialogTitle>
               <DialogDescription>
                 {selectedTimelineTask
-                  ? `${selectedTimelineTask.hierarchyPath ?? 'Sin área'} · ${selectedTimelineTask.equipmentNombre ?? 'Sin equipo'} · ${selectedTimelineTask.titulo}`
+                  ? `${taskLocationSummary(selectedTimelineTask)} · ${selectedTimelineTask.titulo}`
                   : 'Selecciona una tarea para editar'}
               </DialogDescription>
             </DialogHeader>
 
             {selectedTimelineTask && (
               <div className="space-y-3">
+                <div className="rounded border p-3 space-y-2">
+                  <p className="text-xs font-medium">Datos base de la tarea</p>
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    <div className="sm:col-span-3">
+                      <Label className="text-xs text-muted-foreground">Título</Label>
+                      <Input
+                        value={timelineQuickTitle}
+                        onChange={(event) => setTimelineQuickTitle(event.target.value)}
+                        disabled={!canEditTaskIdentity}
+                        placeholder="Nombre de la tarea"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Área</Label>
+                      <Select value={timelineQuickAreaId} onValueChange={setTimelineQuickAreaId} disabled={!canEditTaskIdentity}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Sin área</SelectItem>
+                          {areaNodes.map((node) => (
+                            <SelectItem key={`timeline-quick-area-${node.id}`} value={node.id}>{node.nombre}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <Label className="text-xs text-muted-foreground">Equipo</Label>
+                      <Select value={timelineQuickEquipmentId} onValueChange={setTimelineQuickEquipmentId} disabled={!canEditTaskIdentity}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Sin equipo</SelectItem>
+                          {timelineQuickEquipmentOptions.map((item) => (
+                            <SelectItem key={`timeline-quick-eq-${item.id}`} value={item.id}>{item.nombre}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="flex justify-end">
+                    <Button size="sm" variant="outline" onClick={() => void handleTimelineQuickSaveIdentity()} disabled={!canEditTaskIdentity}>
+                      Guardar título/ubicación
+                    </Button>
+                  </div>
+                  {!canEditTaskIdentity && (
+                    <p className="text-[11px] text-muted-foreground">Solo admin y supervisor pueden editar título, área y equipo.</p>
+                  )}
+                </div>
+
                 <div className="grid gap-2 sm:grid-cols-2">
                   <div>
                     <Label className="text-xs text-muted-foreground">Inicio</Label>
@@ -2444,7 +2597,21 @@ export function GanttPlannerPage() {
                 <div className="rounded border p-3 space-y-3">
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-xs font-medium">Dependencias rápidas</p>
-                    <Badge variant="outline">FS / SS / FF / SF</Badge>
+                    <Badge variant="outline" title="FS: Fin→Inicio · SS: Inicio→Inicio · FF: Fin→Fin · SF: Inicio→Fin">FS / SS / FF / SF</Badge>
+                  </div>
+
+                  <div className="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-end">
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Buscar predecesora</Label>
+                      <Input
+                        value={timelineQuickDependencySearch}
+                        onChange={(event) => setTimelineQuickDependencySearch(event.target.value)}
+                        placeholder="Buscar por tarea, área o equipo"
+                      />
+                    </div>
+                    <p className="text-[11px] text-muted-foreground" title="FS: B inicia cuando A termina · SS: B inicia cuando A inicia · FF: B termina cuando A termina · SF: B termina cuando A inicia">
+                      Tipos: FS, SS, FF, SF
+                    </p>
                   </div>
 
                   <div className="grid gap-2 sm:grid-cols-[1.4fr_.7fr_.6fr_auto] sm:items-end">
@@ -2454,11 +2621,10 @@ export function GanttPlannerPage() {
                         <SelectTrigger><SelectValue placeholder="Seleccionar tarea" /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="none">Sin selección</SelectItem>
-                          {tasks
-                            .filter((task) => task.id !== selectedTimelineTask.id)
+                          {timelineQuickDependencyCandidates
                             .map((task) => (
                               <SelectItem key={`timeline-quick-dep-${task.id}`} value={task.id}>
-                                {task.titulo}
+                                {task.titulo} · {taskLocationSummary(task)}
                               </SelectItem>
                             ))}
                         </SelectContent>
@@ -2470,13 +2636,13 @@ export function GanttPlannerPage() {
                       <Select value={timelineQuickDependencyType} onValueChange={(value) => setTimelineQuickDependencyType(value as 'FS' | 'SS' | 'FF' | 'SF')}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          {DEPENDENCY_TYPES.map((dep) => <SelectItem key={`timeline-quick-dep-type-${dep}`} value={dep}>{dep}</SelectItem>)}
+                          {DEPENDENCY_TYPES.map((dep) => <SelectItem key={`timeline-quick-dep-type-${dep}`} value={dep}>{dependencyTypeLabel(dep)}</SelectItem>)}
                         </SelectContent>
                       </Select>
                     </div>
 
                     <div>
-                      <Label className="text-xs text-muted-foreground">Lag (h)</Label>
+                      <Label className="text-xs text-muted-foreground" title="Lag (h): horas de separación entre predecesora y sucesora. 0 = sin desfase. +8 = se retrasa 8h la relación.">Lag (h) ⓘ</Label>
                       <Input
                         type="number"
                         value={timelineQuickDependencyLag}
@@ -2629,7 +2795,7 @@ export function GanttPlannerPage() {
                   <div key={task.id} className={`rounded-lg border ${tasksCompactView ? 'p-2 space-y-1.5' : 'p-3 space-y-2'}`}>
                     <div className="flex items-center justify-between gap-2">
                       <div>
-                        <p className="text-xs text-muted-foreground">{task.hierarchyPath ?? 'Sin área'} · {task.equipmentNombre ?? 'Sin equipo'}</p>
+                        <p className="text-xs text-muted-foreground" title={taskLocationSummary(task)}>{taskLocationSummary(task)}</p>
                         <p className={`${tasksCompactView ? 'text-sm font-medium' : 'font-medium'}`}>{task.titulo}</p>
                         {!tasksCompactView && <p className="text-xs text-muted-foreground">{task.startDate.toLocaleString()} → {task.endDate.toLocaleString()}</p>}
                       </div>
@@ -2907,7 +3073,7 @@ export function GanttPlannerPage() {
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div className="rounded border p-2">Estado: {selectedTask.status}</div>
                     <div className="rounded border p-2">Avance: {selectedTask.progress}%</div>
-                    <div className="rounded border p-2">Área: {selectedTask.hierarchyPath ?? 'Sin área'}</div>
+                    <div className="rounded border p-2" title={selectedTask.hierarchyPath ?? 'Sin área'}>Área: {compactHierarchyPath(selectedTask.hierarchyPath)}</div>
                     <div className="rounded border p-2">Equipo: {selectedTask.equipmentNombre ?? 'Sin equipo'}</div>
                     <div className="rounded border p-2 col-span-2">Responsable: {selectedTask.responsibleName ?? 'Sin asignar'}</div>
                     <div className="rounded border p-2 col-span-2">
