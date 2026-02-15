@@ -7,6 +7,16 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.07] - 2026-02-15
+
+### 🧱 Barras de timeline más legibles
+
+#### Mejoras
+- **Más altura de barra**: se incrementa el alto visual para ocupar mejor el carril y mejorar lectura.
+- **Texto con contraste semántico**: el `título · %` adapta foreground según tramo de avance (destructive/warning/success).
+- **Interacción más cómoda**: anclas de dependencia y handles de resize más grandes y centrados en la barra.
+- **Alineación consistente**: dependencias y preview usan el centro real de barra para evitar sensación de desfase visual.
+
 ## [2.48.06] - 2026-02-15
 
 ### 🎨 Avance por rangos de color en timeline

@@ -56,6 +56,13 @@ const DEPENDENCY_TYPES: Array<'FS' | 'SS' | 'FF' | 'SF'> = ['FS', 'SS', 'FF', 'S
 const PAGE_SIZE_OPTIONS = ['10', '25', '50', '100'] as const
 const DAY_MS = 24 * 60 * 60 * 1000
 const HOUR_MS = 60 * 60 * 1000
+const TIMELINE_ROW_HEIGHT = 44
+const TIMELINE_BAR_TOP = 11
+const TIMELINE_BAR_HEIGHT_CLASS = 'h-4'
+const TIMELINE_BAR_CENTER_OFFSET = 19
+const TIMELINE_BASELINE_TOP = 17
+const TIMELINE_BASELINE_HEIGHT_CLASS = 'h-2'
+const TIMELINE_ANCHOR_RADIUS = 16
 
 type TimelineDragMode = 'move' | 'resize-start' | 'resize-end'
 type PlannerTab = 'configuracion' | 'tareas' | 'timeline' | 'carga_tecnico'
@@ -807,8 +814,8 @@ export function GanttPlannerPage() {
           const toX = dependency.type === 'FS' || dependency.type === 'SS'
             ? successorStartX
             : successorEndX
-          const fromY = predecessor.rowIndex * 44 + 15
-          const toY = row.rowIndex * 44 + 15
+          const fromY = predecessor.rowIndex * TIMELINE_ROW_HEIGHT + TIMELINE_BAR_CENTER_OFFSET
+          const toY = row.rowIndex * TIMELINE_ROW_HEIGHT + TIMELINE_BAR_CENTER_OFFSET
 
           lines.push({
             key: `${row.task.id}-${dependency.predecessorId}-${dependency.type}-${index}`,
@@ -908,7 +915,7 @@ export function GanttPlannerPage() {
 
     timelineRows.forEach((row) => {
       if (row.task.id === sourceTaskId) return
-      const y = row.rowIndex * 44 + 15
+      const y = row.rowIndex * TIMELINE_ROW_HEIGHT + TIMELINE_BAR_CENTER_OFFSET
       const anchors: Array<{ anchor: 'start' | 'end'; x: number }> = [
         { anchor: 'start', x: row.left },
         { anchor: 'end', x: row.left + row.width },
@@ -916,7 +923,7 @@ export function GanttPlannerPage() {
 
       anchors.forEach((candidate) => {
         const distance = Math.hypot(localX - candidate.x, localY - y)
-        if (distance > 14) return
+        if (distance > TIMELINE_ANCHOR_RADIUS) return
         if (!best || distance < best.distance) {
           best = { taskId: row.task.id, anchor: candidate.anchor, distance }
         }
@@ -936,7 +943,7 @@ export function GanttPlannerPage() {
 
     const rect = canvas.getBoundingClientRect()
     const sourceX = timelineLinkDraft.sourceAnchor === 'start' ? sourceRow.left : sourceRow.left + sourceRow.width
-    const sourceY = sourceRow.rowIndex * 44 + 15
+    const sourceY = sourceRow.rowIndex * TIMELINE_ROW_HEIGHT + TIMELINE_BAR_CENTER_OFFSET
 
     const targetRow = timelineLinkDraft.targetTaskId
       ? timelineRows.find((row) => row.task.id === timelineLinkDraft.targetTaskId)
@@ -945,7 +952,7 @@ export function GanttPlannerPage() {
       ? (timelineLinkDraft.targetAnchor === 'start' ? targetRow.left : targetRow.left + targetRow.width)
       : timelineLinkDraft.currentClientX - rect.left
     const targetY = targetRow
-      ? targetRow.rowIndex * 44 + 15
+      ? targetRow.rowIndex * TIMELINE_ROW_HEIGHT + TIMELINE_BAR_CENTER_OFFSET
       : timelineLinkDraft.currentClientY - rect.top
 
     return {
@@ -2322,7 +2329,7 @@ export function GanttPlannerPage() {
                       ))}
                     </div>
 
-                    <div ref={timelineCanvasRef} className="relative" style={{ width: `${timeline.widthPx}px`, height: `${timelineRows.length * 44}px` }}>
+                    <div ref={timelineCanvasRef} className="relative" style={{ width: `${timeline.widthPx}px`, height: `${timelineRows.length * TIMELINE_ROW_HEIGHT}px` }}>
                       {timelineDayBands.map((band, index) => (
                         <div
                           key={`day-body-${index}`}
@@ -2342,12 +2349,12 @@ export function GanttPlannerPage() {
                         <div
                           key={`lane-${row.task.id}`}
                           className="absolute left-0 right-0 border-b"
-                          style={{ top: `${row.rowIndex * 44 + 43}px` }}
+                          style={{ top: `${row.rowIndex * TIMELINE_ROW_HEIGHT + (TIMELINE_ROW_HEIGHT - 1)}px` }}
                         />
                       ))}
 
                       {timelineDependencyLines.length > 0 && (
-                        <svg className="pointer-events-none absolute inset-0 z-[9]" style={{ width: `${timeline.widthPx}px`, height: `${timelineRows.length * 44}px` }}>
+                        <svg className="pointer-events-none absolute inset-0 z-[9]" style={{ width: `${timeline.widthPx}px`, height: `${timelineRows.length * TIMELINE_ROW_HEIGHT}px` }}>
                           <defs>
                             <marker id="timeline-dep-arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
                               <path d="M 0 0 L 8 4 L 0 8 z" fill="currentColor" />
@@ -2376,7 +2383,7 @@ export function GanttPlannerPage() {
 
                       {timelineLinkPreview && (
                         <>
-                          <svg className="pointer-events-none absolute inset-0 z-20" style={{ width: `${timeline.widthPx}px`, height: `${timelineRows.length * 44}px` }}>
+                          <svg className="pointer-events-none absolute inset-0 z-20" style={{ width: `${timeline.widthPx}px`, height: `${timelineRows.length * TIMELINE_ROW_HEIGHT}px` }}>
                             <defs>
                               <marker id="timeline-preview-arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
                                 <path d="M 0 0 L 8 4 L 0 8 z" fill="currentColor" />
@@ -2440,36 +2447,44 @@ export function GanttPlannerPage() {
                           && linkDraft.targetTaskId === row.task.id
                           && linkDraft.targetAnchor === 'end'
                         const startAnchorClass = isTargetStart
-                          ? 'absolute h-4 w-4 rounded-full border-2 border-primary bg-primary/30 ring-2 ring-primary/40 cursor-crosshair'
+                          ? 'absolute h-5 w-5 rounded-full border-2 border-primary bg-primary/30 ring-2 ring-primary/40 cursor-crosshair'
                           : isSourceStart
-                            ? 'absolute h-3 w-3 rounded-full border-2 border-primary bg-primary/20 cursor-crosshair'
+                            ? 'absolute h-4 w-4 rounded-full border-2 border-primary bg-primary/20 cursor-crosshair'
                             : canBeTarget
-                              ? 'absolute h-3 w-3 rounded-full border border-primary/70 bg-primary/10 cursor-crosshair'
-                              : 'absolute h-3 w-3 rounded-full border bg-background cursor-crosshair'
+                              ? 'absolute h-4 w-4 rounded-full border border-primary/70 bg-primary/10 cursor-crosshair'
+                              : 'absolute h-4 w-4 rounded-full border bg-background cursor-crosshair'
                         const endAnchorClass = isTargetEnd
-                          ? 'absolute h-4 w-4 rounded-full border-2 border-primary bg-primary/30 ring-2 ring-primary/40 cursor-crosshair'
+                          ? 'absolute h-5 w-5 rounded-full border-2 border-primary bg-primary/30 ring-2 ring-primary/40 cursor-crosshair'
                           : isSourceEnd
-                            ? 'absolute h-3 w-3 rounded-full border-2 border-primary bg-primary/20 cursor-crosshair'
+                            ? 'absolute h-4 w-4 rounded-full border-2 border-primary bg-primary/20 cursor-crosshair'
                             : canBeTarget
-                              ? 'absolute h-3 w-3 rounded-full border border-primary/70 bg-primary/10 cursor-crosshair'
-                              : 'absolute h-3 w-3 rounded-full border bg-background cursor-crosshair'
+                              ? 'absolute h-4 w-4 rounded-full border border-primary/70 bg-primary/10 cursor-crosshair'
+                              : 'absolute h-4 w-4 rounded-full border bg-background cursor-crosshair'
                         const progressPct = Math.max(0, Math.min(100, row.task.progress))
+                        const rowTop = row.rowIndex * TIMELINE_ROW_HEIGHT
+                        const barTop = rowTop + TIMELINE_BAR_TOP
+                        const barCenterY = rowTop + TIMELINE_BAR_CENTER_OFFSET
                         const barBaseClass = row.isCritical ? 'bg-red-500/35' : 'bg-primary/35'
                         const barProgressClass = progressPct <= 30
                           ? 'bg-destructive'
                           : progressPct <= 70
                             ? 'bg-warning'
                             : 'bg-success'
+                        const barTextClass = progressPct <= 30
+                          ? 'text-destructive-foreground'
+                          : progressPct <= 70
+                            ? 'text-warning-foreground'
+                            : 'text-success-foreground'
 
                         return (
                           <div key={`bar-${row.task.id}`}>
                             <div
-                              className="absolute h-2 rounded bg-muted-foreground/60"
-                              style={{ left: `${row.baselineLeft}px`, top: `${row.rowIndex * 44 + 16}px`, width: `${row.baselineWidth}px` }}
+                              className={`absolute ${TIMELINE_BASELINE_HEIGHT_CLASS} rounded bg-muted-foreground/60`}
+                              style={{ left: `${row.baselineLeft}px`, top: `${rowTop + TIMELINE_BASELINE_TOP}px`, width: `${row.baselineWidth}px` }}
                             />
                             <div
-                              className={`absolute h-3 rounded ${barBaseClass} overflow-hidden border border-background/20`}
-                              style={{ left: `${row.left}px`, top: `${row.rowIndex * 44 + 14}px`, width: `${row.width}px` }}
+                              className={`absolute ${TIMELINE_BAR_HEIGHT_CLASS} rounded ${barBaseClass} overflow-hidden border border-background/20`}
+                              style={{ left: `${row.left}px`, top: `${barTop}px`, width: `${row.width}px` }}
                               onClick={() => setSelectedTaskId(row.task.id)}
                               onDoubleClick={() => openTimelineQuickEditor(row.task.id)}
                               onMouseDown={(event) => {
@@ -2495,14 +2510,14 @@ export function GanttPlannerPage() {
                                 className={`absolute inset-y-0 left-0 ${barProgressClass}`}
                                 style={{ width: `${progressPct}%` }}
                               />
-                              <span className="absolute inset-0 px-1 text-[10px] leading-3 text-white truncate">
+                              <span className={`absolute inset-0 px-1 text-[11px] leading-4 font-medium ${barTextClass} truncate`}>
                                 {row.task.titulo} · {row.task.progress}%
                               </span>
                             </div>
                             {timelineDrag?.taskId === row.task.id && (
                               <div
                                 className="absolute z-20 -translate-x-1/2 rounded border bg-background px-2 py-1 text-[10px] text-foreground shadow"
-                                style={{ left: `${row.left + row.width / 2}px`, top: `${Math.max(0, row.rowIndex * 44 - 8)}px` }}
+                                style={{ left: `${row.left + row.width / 2}px`, top: `${Math.max(0, rowTop - 8)}px` }}
                               >
                                 {formatTimelineDragDate(new Date(timelineDrag.previewStartMs))} → {formatTimelineDragDate(new Date(timelineDrag.previewEndMs))}
                                 {' · '}
@@ -2515,7 +2530,7 @@ export function GanttPlannerPage() {
                                   <>
                                     <div
                                       className={startAnchorClass}
-                                      style={{ left: `${Math.max(0, row.left - (isTargetStart ? 6 : 5))}px`, top: `${row.rowIndex * 44 + (isTargetStart ? 8 : 9)}px` }}
+                                      style={{ left: `${Math.max(0, row.left - (isTargetStart ? 10 : 8))}px`, top: `${barCenterY - (isTargetStart ? 10 : 8)}px` }}
                                       onMouseDown={(event) => {
                                         event.preventDefault()
                                         event.stopPropagation()
@@ -2525,7 +2540,7 @@ export function GanttPlannerPage() {
                                     />
                                     <div
                                       className={endAnchorClass}
-                                      style={{ left: `${row.left + row.width - (isTargetEnd ? 6 : 5)}px`, top: `${row.rowIndex * 44 + (isTargetEnd ? 8 : 9)}px` }}
+                                      style={{ left: `${row.left + row.width - (isTargetEnd ? 10 : 8)}px`, top: `${barCenterY - (isTargetEnd ? 10 : 8)}px` }}
                                       onMouseDown={(event) => {
                                         event.preventDefault()
                                         event.stopPropagation()
@@ -2536,8 +2551,8 @@ export function GanttPlannerPage() {
                                   </>
                                 )}
                                 <div
-                                  className="absolute h-3 w-2 rounded bg-background border cursor-ew-resize"
-                                  style={{ left: `${Math.max(0, row.left - 1)}px`, top: `${row.rowIndex * 44 + 14}px` }}
+                                  className="absolute h-4 w-2 rounded bg-background border cursor-ew-resize"
+                                  style={{ left: `${Math.max(0, row.left - 1)}px`, top: `${barTop}px` }}
                                   onMouseDown={(event) => {
                                     if (timelineDependencyMode) return
                                     event.preventDefault()
@@ -2547,8 +2562,8 @@ export function GanttPlannerPage() {
                                   title={timelineDependencyMode ? 'Modo dependencia activo' : 'Ajustar inicio'}
                                 />
                                 <div
-                                  className="absolute h-3 w-2 rounded bg-background border cursor-ew-resize"
-                                  style={{ left: `${row.left + row.width - 1}px`, top: `${row.rowIndex * 44 + 14}px` }}
+                                  className="absolute h-4 w-2 rounded bg-background border cursor-ew-resize"
+                                  style={{ left: `${row.left + row.width - 1}px`, top: `${barTop}px` }}
                                   onMouseDown={(event) => {
                                     if (timelineDependencyMode) return
                                     event.preventDefault()

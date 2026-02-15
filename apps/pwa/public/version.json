@@ -1,8 +1,11 @@
 {
-  "version": "2.48.06",
+  "version": "2.48.07",
   "buildDate": "2026-02-15",
-  "buildTimestamp": 1771192200000,
+  "buildTimestamp": 1771195800000,
   "features": [
+    "Barras de timeline con mayor altura para aprovechar mejor el espacio vertical y facilitar lectura",
+    "Texto sobre barras con contraste adaptado por rango de avance (foreground semántico)",
+    "Anclas y handles de edición más grandes para interacción más clara en modo dependencia y resize",
     "Progreso visual por rangos: rojo (0-30), amarillo (31-70) y verde (71-100) en barra de tarea",
     "Leyenda de timeline ampliada para interpretar rápidamente el color del avance",
     "Mini barra de progreso visual dentro de cada barra de tarea (relleno según % de avance)",

@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.48.06**
+## Versión Actual: **v2.48.07**
 
 **Fecha de lanzamiento**: 15 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,12 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.48.07 - Barras más legibles en timeline (15/02/2026)
+- 🧱 **Mayor altura de barra**: mejor aprovechamiento del carril y lectura más cómoda.
+- 🎯 **Texto con mejor contraste**: `título · %` ajusta foreground según rango de progreso.
+- 🧲 **Anclas y handles más visibles**: mejora de precisión al enlazar dependencias y redimensionar.
+- 📐 **Centro visual unificado**: líneas de dependencia alineadas al centro real de la barra.
 
 ### v2.48.06 - Progreso por rangos de color en timeline (15/02/2026)
 - 🎨 **Semáforo de avance**: rojo 0-30%, amarillo 31-70%, verde 71-100%.
