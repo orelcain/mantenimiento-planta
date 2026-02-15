@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.48.05**
+## Versión Actual: **v2.48.06**
 
 **Fecha de lanzamiento**: 15 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.48.06 - Progreso por rangos de color en timeline (15/02/2026)
+- 🎨 **Semáforo de avance**: rojo 0-30%, amarillo 31-70%, verde 71-100%.
+- ⚡ **Lectura operativa inmediata**: estado de cada tarea visible en un vistazo.
+- 🏷️ **Leyenda alineada**: referencias visuales incorporadas en pie del timeline.
 
 ### v2.48.05 - Mini barra de progreso en tareas de timeline (15/02/2026)
 - 📊 **Progreso visual integrado**: cada barra muestra relleno interno según porcentaje real de avance.

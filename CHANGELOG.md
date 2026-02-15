@@ -7,6 +7,15 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.06] - 2026-02-15
+
+### 🎨 Avance por rangos de color en timeline
+
+#### Mejoras
+- **Rangos visuales de progreso**: mini barra interna ahora usa `rojo` (0-30%), `amarillo` (31-70%) y `verde` (71-100%).
+- **Lectura más rápida**: identificación instantánea del estado de avance sin abrir detalle.
+- **Leyenda extendida**: se agregan referencias de color para interpretar cada tramo de porcentaje.
+
 ## [2.48.05] - 2026-02-15
 
 ### 📊 Progreso visual en barras del timeline

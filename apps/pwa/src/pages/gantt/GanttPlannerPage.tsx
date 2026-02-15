@@ -2455,7 +2455,11 @@ export function GanttPlannerPage() {
                               : 'absolute h-3 w-3 rounded-full border bg-background cursor-crosshair'
                         const progressPct = Math.max(0, Math.min(100, row.task.progress))
                         const barBaseClass = row.isCritical ? 'bg-red-500/35' : 'bg-primary/35'
-                        const barProgressClass = row.isCritical ? 'bg-red-500' : 'bg-primary'
+                        const barProgressClass = progressPct <= 30
+                          ? 'bg-destructive'
+                          : progressPct <= 70
+                            ? 'bg-warning'
+                            : 'bg-success'
 
                         return (
                           <div key={`bar-${row.task.id}`}>
@@ -2565,6 +2569,9 @@ export function GanttPlannerPage() {
                 <div className="flex flex-wrap gap-4 px-3 py-2 text-[11px] text-muted-foreground border-t">
                   <span className="inline-flex items-center gap-1"><span className="h-2 w-3 rounded bg-primary" /> Barra real</span>
                   <span className="inline-flex items-center gap-1"><span className="h-2 w-3 rounded bg-primary/35" /> Fondo barra</span>
+                  <span className="inline-flex items-center gap-1"><span className="h-2 w-3 rounded bg-destructive" /> Avance 0-30%</span>
+                  <span className="inline-flex items-center gap-1"><span className="h-2 w-3 rounded bg-warning" /> Avance 31-70%</span>
+                  <span className="inline-flex items-center gap-1"><span className="h-2 w-3 rounded bg-success" /> Avance 71-100%</span>
                   <span className="inline-flex items-center gap-1"><span className="h-2 w-3 rounded bg-muted-foreground/60" /> Baseline</span>
                   <span className="inline-flex items-center gap-1"><span className="h-2 w-3 rounded bg-red-500" /> Crítica</span>
                   <span className="inline-flex items-center gap-1"><span className="h-2 w-3 rounded bg-primary/60" /> Dependencia FS</span>

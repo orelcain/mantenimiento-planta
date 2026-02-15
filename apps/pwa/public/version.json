@@ -1,8 +1,10 @@
 {
-  "version": "2.48.05",
+  "version": "2.48.06",
   "buildDate": "2026-02-15",
-  "buildTimestamp": 1771188600000,
+  "buildTimestamp": 1771192200000,
   "features": [
+    "Progreso visual por rangos: rojo (0-30), amarillo (31-70) y verde (71-100) en barra de tarea",
+    "Leyenda de timeline ampliada para interpretar rápidamente el color del avance",
     "Mini barra de progreso visual dentro de cada barra de tarea (relleno según % de avance)",
     "Combinación de texto y señal visual: se mantiene título + % sobre la barra para lectura rápida",
     "Flechas de dependencia con trazado ortogonal robusto cuando las tareas no coinciden en inicio/fin",
