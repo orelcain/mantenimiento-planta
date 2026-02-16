@@ -7,6 +7,16 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.16] - 2026-02-15
+
+### 🤖 Autoajuste por comentarios operativos
+
+#### Mejoras
+- **Detección de bloqueos en texto**: comentarios como `falta componente`, `pendiente`, `bloqueado` actualizan estado a `bloqueada` automáticamente.
+- **Detección de fecha objetivo**: menciones tipo `jueves` o `dd/mm` extienden la fecha fin cuando supera la planificación actual.
+- **IA más automática**: si no se informa `%` manual y no hay bloqueo, se aplica automáticamente el `%` sugerido por Grok.
+- **Menos trabajo manual**: nota + evidencia + análisis ahora impactan directamente el estado/tiempo de la tarea.
+
 ## [2.48.15] - 2026-02-15
 
 ### 📝 Avance clicable con notas, fotos e IA en timeline

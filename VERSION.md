@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.48.15**
+## Versión Actual: **v2.48.16**
 
 **Fecha de lanzamiento**: 15 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,12 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.48.16 - Parser operativo y autoajuste inteligente (15/02/2026)
+- 🤖 **Lectura de comentarios**: detecta bloqueos operativos y ajusta estado de tarea automáticamente.
+- 📅 **Fechas desde lenguaje natural**: interpreta `jueves` y `dd/mm` para actualizar fecha fin cuando corresponde.
+- ✨ **IA Grok autoaplicable**: si no hay `%` manual, aplica sugerencia IA salvo señales de bloqueo.
+- ⚙️ **Automatización real del seguimiento**: texto + evidencia + IA ahora repercuten en planificación y avance.
 
 ### v2.48.15 - Avance editable + notas/fotos + IA en timeline (15/02/2026)
 - 📝 **Edición directa desde Avance**: clic en `%` abre modal rápido por tarea.

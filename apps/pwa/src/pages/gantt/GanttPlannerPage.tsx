@@ -182,6 +182,91 @@ function parseHours(value: unknown): number {
   return Math.max(0, n)
 }
 
+const WEEKDAY_TO_INDEX: Record<string, number> = {
+  domingo: 0,
+  lunes: 1,
+  martes: 2,
+  miercoles: 3,
+  miércoles: 3,
+  jueves: 4,
+  viernes: 5,
+  sabado: 6,
+  sábado: 6,
+}
+
+function normalizeSpanishText(value: string) {
+  return value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+}
+
+function parseOperationalRescheduleDate(comment: string, referenceDate: Date): Date | undefined {
+  const normalized = normalizeSpanishText(comment)
+
+  const explicitDateMatch = normalized.match(/\b(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?\b/)
+  if (explicitDateMatch) {
+    const day = Number(explicitDateMatch[1])
+    const month = Number(explicitDateMatch[2])
+    const yearRaw = explicitDateMatch[3]
+    const currentYear = referenceDate.getFullYear()
+    const year = yearRaw
+      ? Number(yearRaw.length === 2 ? `20${yearRaw}` : yearRaw)
+      : currentYear
+    if (Number.isFinite(day) && Number.isFinite(month) && day >= 1 && day <= 31 && month >= 1 && month <= 12) {
+      const candidate = new Date(year, month - 1, day, 18, 0, 0, 0)
+      if (!Number.isNaN(candidate.getTime())) {
+        if (!yearRaw && candidate.getTime() < referenceDate.getTime()) {
+          candidate.setFullYear(candidate.getFullYear() + 1)
+        }
+        return candidate
+      }
+    }
+  }
+
+  const weekdayMatch = normalized.match(/\b(lunes|martes|miercoles|jueves|viernes|sabado|domingo)\b/)
+  if (weekdayMatch) {
+    const weekday = weekdayMatch[1]
+    const target = WEEKDAY_TO_INDEX[weekday]
+    if (typeof target === 'number') {
+      const base = new Date(referenceDate)
+      const today = base.getDay()
+      let daysToAdd = (target - today + 7) % 7
+      if (daysToAdd === 0) {
+        daysToAdd = base.getHours() >= 18 ? 7 : 0
+      }
+      base.setDate(base.getDate() + daysToAdd)
+      base.setHours(18, 0, 0, 0)
+      return base
+    }
+  }
+
+  return undefined
+}
+
+function analyzeOperationalCommentSignals(comment: string, currentStatus: GanttTask['status'], currentEndDate: Date) {
+  const normalized = normalizeSpanishText(comment)
+  const hasBlockerSignal = /\bfalta\b|\bfaltan\b|\bpendiente\b|\bbloquead[oa]\b|\besperando\b|\bsin\s+\w+\b|\bno\s+hay\b/.test(normalized)
+  const hasProgressSignal = /\bavance\b|\bavanz\w*\b|\bse\s+hizo\b|\bcomplet\w*\b/.test(normalized)
+  const suggestedDate = parseOperationalRescheduleDate(comment, new Date())
+
+  const patch: Partial<Pick<GanttTask, 'status' | 'endDate'>> = {}
+  if (hasBlockerSignal && currentStatus !== 'completada') {
+    patch.status = 'bloqueada'
+  } else if (hasProgressSignal && currentStatus === 'planificada') {
+    patch.status = 'en_progreso'
+  }
+
+  if (suggestedDate && suggestedDate.getTime() > currentEndDate.getTime()) {
+    patch.endDate = suggestedDate
+  }
+
+  return {
+    patch,
+    hasBlockerSignal,
+  }
+}
+
 function mapStatus(value: unknown): GanttTask['status'] {
   const raw = normalizeText(value).toLowerCase()
   if (raw.includes('complet') || raw.includes('finaliz') || raw.includes('done')) return 'completada'
@@ -1877,7 +1962,7 @@ export function GanttPlannerPage() {
   }
 
   async function handleEstimateProgressWithAI(baseComments?: GanttTaskComment[]) {
-    if (!selectedTask) return
+    if (!selectedTask) return null
 
     const sourceComments = (baseComments ?? comments).slice(0, 12)
     const result = await estimateGanttProgressFromComments({
@@ -1898,6 +1983,8 @@ export function GanttPlannerPage() {
     await updateGanttTask(selectedTask.id, {
       aiSuggestedProgress: result.suggestedProgress,
     })
+
+    return result.suggestedProgress
   }
 
   async function handleApplyAISuggestion() {
@@ -2008,10 +2095,18 @@ export function GanttPlannerPage() {
         await handleUpdateTaskProgress(selectedTask, reportedProgress)
       }
 
-      const plannedHours = Math.max(1, Math.round((selectedTask.endDate.getTime() - selectedTask.startDate.getTime()) / HOUR_MS))
+      let effectiveEndDate = selectedTask.endDate
+      const plannedHours = Math.max(1, Math.round((effectiveEndDate.getTime() - selectedTask.startDate.getTime()) / HOUR_MS))
       if (typeof reportedDurationHours === 'number' && reportedDurationHours > plannedHours) {
         const nextEnd = new Date(selectedTask.startDate.getTime() + reportedDurationHours * HOUR_MS)
         await handleUpdateTaskDates(selectedTask, selectedTask.startDate, nextEnd)
+        effectiveEndDate = nextEnd
+      }
+
+      const operationalSignals = analyzeOperationalCommentSignals(newComment.trim(), selectedTask.status, effectiveEndDate)
+      if (Object.keys(operationalSignals.patch).length > 0) {
+        await updateGanttTask(selectedTask.id, operationalSignals.patch)
+        await load()
       }
 
       setNewComment('')
@@ -2023,7 +2118,11 @@ export function GanttPlannerPage() {
 
       const rows = await getTaskComments(selectedTaskId)
       setComments(rows)
-      await handleEstimateProgressWithAI(rows)
+      const suggested = await handleEstimateProgressWithAI(rows)
+
+      if (typeof suggested === 'number' && typeof reportedProgress !== 'number' && !operationalSignals.hasBlockerSignal) {
+        await handleUpdateTaskProgress(selectedTask, suggested)
+      }
     } finally {
       setCommentBusy(false)
     }
