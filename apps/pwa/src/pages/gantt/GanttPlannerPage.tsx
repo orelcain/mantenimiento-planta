@@ -2633,7 +2633,7 @@ export function GanttPlannerPage() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className={plannerTab === 'timeline' ? 'space-y-2' : 'space-y-4'}>
       <div className="flex items-center justify-between gap-2">
         <Badge variant="secondary">Duración proyecto: {cpm.projectDurationHours}h</Badge>
         <Badge variant={areNotificationsEnabled() ? 'success' : 'outline'}>
@@ -2652,12 +2652,12 @@ export function GanttPlannerPage() {
       )}
 
       <Card>
-        <CardContent className="pt-4">
-          <div className="grid gap-3 lg:grid-cols-[1.4fr_1fr_auto]">
+        <CardContent className={plannerTab === 'timeline' ? 'py-2' : 'pt-4'}>
+          <div className={plannerTab === 'timeline' ? 'grid gap-2 lg:grid-cols-[1.4fr_1fr_auto] lg:items-end' : 'grid gap-3 lg:grid-cols-[1.4fr_1fr_auto]'}>
             <div>
               <Label className="text-xs text-muted-foreground">Proyecto activo</Label>
               <Select value={selectedProject?.id ?? selectedProjectId} onValueChange={setSelectedProjectId}>
-                <SelectTrigger>
+                <SelectTrigger className={plannerTab === 'timeline' ? 'h-8' : ''}>
                   <SelectValue placeholder="Seleccionar proyecto" />
                 </SelectTrigger>
                 <SelectContent>
@@ -2674,13 +2674,14 @@ export function GanttPlannerPage() {
                 value={newProjectName}
                 onChange={(event) => setNewProjectName(event.target.value)}
                 placeholder="Ej: obras civiles"
+                className={plannerTab === 'timeline' ? 'h-8' : ''}
               />
             </div>
 
             <div className="flex items-end">
               <Button
                 variant="outline"
-                className="w-full lg:w-auto"
+                className={plannerTab === 'timeline' ? 'w-full lg:w-auto h-8 px-3' : 'w-full lg:w-auto'}
                 onClick={() => void handleCreateProject()}
                 disabled={!user?.id || !newProjectName.trim() || creatingProject}
               >
@@ -2691,26 +2692,34 @@ export function GanttPlannerPage() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className={plannerTab === 'timeline' ? 'grid gap-2 md:grid-cols-4' : 'grid gap-4 md:grid-cols-4'}>
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Total tareas</CardTitle></CardHeader>
-          <CardContent className="text-2xl font-bold">{metrics.totalTasks}</CardContent>
+          <CardContent className={plannerTab === 'timeline' ? 'py-2' : 'py-4'}>
+            <p className="text-[11px] text-muted-foreground">Total tareas</p>
+            <p className={plannerTab === 'timeline' ? 'text-xl font-bold leading-tight' : 'text-2xl font-bold'}>{metrics.totalTasks}</p>
+          </CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Completadas</CardTitle></CardHeader>
-          <CardContent className="text-2xl font-bold">{metrics.completedTasks}</CardContent>
+          <CardContent className={plannerTab === 'timeline' ? 'py-2' : 'py-4'}>
+            <p className="text-[11px] text-muted-foreground">Completadas</p>
+            <p className={plannerTab === 'timeline' ? 'text-xl font-bold leading-tight' : 'text-2xl font-bold'}>{metrics.completedTasks}</p>
+          </CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Atrasadas</CardTitle></CardHeader>
-          <CardContent className="text-2xl font-bold">{metrics.delayedTasks}</CardContent>
+          <CardContent className={plannerTab === 'timeline' ? 'py-2' : 'py-4'}>
+            <p className="text-[11px] text-muted-foreground">Atrasadas</p>
+            <p className={plannerTab === 'timeline' ? 'text-xl font-bold leading-tight' : 'text-2xl font-bold'}>{metrics.delayedTasks}</p>
+          </CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Ruta crítica</CardTitle></CardHeader>
-          <CardContent className="text-2xl font-bold">{metrics.criticalTasks}</CardContent>
+          <CardContent className={plannerTab === 'timeline' ? 'py-2' : 'py-4'}>
+            <p className="text-[11px] text-muted-foreground">Ruta crítica</p>
+            <p className={plannerTab === 'timeline' ? 'text-xl font-bold leading-tight' : 'text-2xl font-bold'}>{metrics.criticalTasks}</p>
+          </CardContent>
         </Card>
       </div>
 
-      <div className="flex flex-wrap gap-2">
+      <div className={plannerTab === 'timeline' ? 'flex flex-wrap gap-1' : 'flex flex-wrap gap-2'}>
         <Button
           size="sm"
           variant={plannerTab === 'configuracion' ? 'default' : 'outline'}
@@ -2749,9 +2758,9 @@ export function GanttPlannerPage() {
       </div>
 
       {plannerTab === 'timeline' && (
-      <div className="space-y-3">
+      <div className="space-y-2">
         <Card>
-          <CardContent className="pt-4 space-y-3">
+          <CardContent className="pt-3 space-y-2">
             <div className="grid gap-2 xl:grid-cols-[1fr_auto_auto_auto] xl:items-center">
               <div />
               <div className="flex items-center gap-1">
@@ -2759,8 +2768,8 @@ export function GanttPlannerPage() {
                 <Button size="sm" variant={timelineZoom === 'week' ? 'default' : 'outline'} onClick={() => setTimelineZoom('week')}>Semana</Button>
                 <Button size="sm" variant={timelineZoom === 'month' ? 'default' : 'outline'} onClick={() => setTimelineZoom('month')}>Mes</Button>
               </div>
-              <Badge variant="outline">⚡ Auto-scheduling FS/SS/FF/SF</Badge>
-              <Badge variant="outline">📍 Línea de hoy + Baseline</Badge>
+              <Badge variant="outline" className="text-[10px] px-2 py-0">⚡ Auto-scheduling FS/SS/FF/SF</Badge>
+              <Badge variant="outline" className="text-[10px] px-2 py-0">📍 Línea de hoy + Baseline</Badge>
             </div>
 
             <div className="grid gap-2 md:grid-cols-2">
@@ -2815,6 +2824,7 @@ export function GanttPlannerPage() {
               <div>
                 <Label className="text-xs text-muted-foreground">Buscar en tareas (área, equipo, tarea, responsable)</Label>
                 <Input
+                  className="h-8"
                   value={timelineSearch}
                   onChange={(event) => setTimelineSearch(event.target.value)}
                   placeholder="Ej: Acopio, Bomba, cambio de celda, Danilo"
@@ -2823,7 +2833,7 @@ export function GanttPlannerPage() {
               <div>
                 <Label className="text-xs text-muted-foreground">Filtro rápido por área (tabla timeline)</Label>
                 <Select value={timelineQuickAreaFilter} onValueChange={setTimelineQuickAreaFilter}>
-                  <SelectTrigger>
+                  <SelectTrigger className="h-8">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -2836,7 +2846,7 @@ export function GanttPlannerPage() {
               </div>
             </div>
 
-            <div className="rounded border p-2 text-xs text-muted-foreground flex items-center justify-between gap-2">
+            <div className="rounded border px-2 py-1.5 text-[11px] text-muted-foreground flex items-center justify-between gap-2">
               <span>
                 Doble clic para editar. Tecla D: {timelineDependencyMode ? 'modo dependencia ACTIVO' : 'modo dependencia inactivo'}.
               </span>
@@ -2853,7 +2863,7 @@ export function GanttPlannerPage() {
             </div>
 
             {timelineDependencyMode && (
-              <div className="rounded border p-3 text-xs space-y-2">
+              <div className="rounded border p-2 text-xs space-y-1.5">
                 <p className="font-medium text-foreground">Guía rápida de dependencias (modo D activo)</p>
                 <div className="grid gap-1 sm:grid-cols-2 text-muted-foreground">
                   <p><span className="font-semibold text-foreground">FS</span>: B inicia cuando A termina.</p>
