@@ -415,14 +415,14 @@ function buildOrthogonalDependencyPath(fromX: number, fromY: number, toX: number
   return `M ${fromX} ${fromY} H ${detourX} V ${toY} H ${toX}`
 }
 
-function compactHierarchyPath(hierarchyPath?: string) {
+function compactHierarchyPath(hierarchyPath?: string): string {
   const parts = (hierarchyPath ?? '')
     .split('>')
     .map((part) => part.trim())
     .filter(Boolean)
 
   if (parts.length === 0) return 'Sin área'
-  return parts[parts.length - 1]
+  return parts[parts.length - 1] ?? 'Sin área'
 }
 
 function taskLocationSummary(task: Pick<GanttTask, 'hierarchyPath' | 'equipmentNombre'>) {
@@ -787,9 +787,10 @@ export function GanttPlannerPage() {
     const optionsMap = new Map<string, string>()
 
     sortedTasks.forEach((task) => {
-      if (task.hierarchyNodeId) {
-        const node = hierarchyNodeById.get(task.hierarchyNodeId)
-        optionsMap.set(task.hierarchyNodeId, node?.nombre ?? compactHierarchyPath(task.hierarchyPath))
+      const hierarchyNodeId = task.hierarchyNodeId
+      if (typeof hierarchyNodeId === 'string' && hierarchyNodeId.length > 0) {
+        const node = hierarchyNodeById.get(hierarchyNodeId)
+        optionsMap.set(hierarchyNodeId, node?.nombre ?? compactHierarchyPath(task.hierarchyPath))
         return
       }
 
