@@ -7,6 +7,17 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.17] - 2026-02-16
+
+### 🧾 Notas históricas editables + estabilidad IA/comentarios
+
+#### Mejoras
+- **Notas multilinea reales**: los comentarios de avance usan `textarea` y mantienen saltos de línea al visualizar historial.
+- **Historial editable**: ahora se puede editar una nota ya creada (contenido, `%` reportado y horas reales).
+- **Evidencia editable por nota**: se pueden quitar fotos guardadas y agregar nuevas (máx. 5 por comentario).
+- **Subida consistente en WebP**: las fotos nuevas del flujo de edición reutilizan el mismo optimizador de evidencia.
+- **Menos errores en producción**: lectura de comentarios evita requerir índice compuesto y la IA aplica fallback local en GitHub Pages.
+
 ## [2.48.16] - 2026-02-15
 
 ### 🤖 Autoajuste por comentarios operativos

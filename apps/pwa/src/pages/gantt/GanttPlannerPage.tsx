@@ -21,6 +21,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Textarea,
 } from '@/components/ui'
 import { useAuthStore, useCan } from '@/store'
 import { getEquipments } from '@/services/equipment'
@@ -40,6 +41,7 @@ import {
   getTaskComments,
   simulateDelay,
   updateGanttTask,
+  updateTaskComment,
 } from '@/services/gantt'
 import { useHierarchyTree } from '@/hooks/useHierarchy'
 import type { Equipment, GanttTask, GanttTaskComment, IncidentPriority, User } from '@/types'
@@ -487,6 +489,14 @@ export function GanttPlannerPage() {
   const [commentPhotos, setCommentPhotos] = useState<File[]>([])
   const [commentPhotoPreviews, setCommentPhotoPreviews] = useState<string[]>([])
   const [commentBusy, setCommentBusy] = useState(false)
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null)
+  const [editingCommentContent, setEditingCommentContent] = useState('')
+  const [editingCommentReportedProgressInput, setEditingCommentReportedProgressInput] = useState('')
+  const [editingCommentReportedDurationInput, setEditingCommentReportedDurationInput] = useState('')
+  const [editingCommentExistingPhotos, setEditingCommentExistingPhotos] = useState<string[]>([])
+  const [editingCommentNewPhotos, setEditingCommentNewPhotos] = useState<File[]>([])
+  const [editingCommentNewPhotoPreviews, setEditingCommentNewPhotoPreviews] = useState<string[]>([])
+  const [editingCommentBusy, setEditingCommentBusy] = useState(false)
   const [progressBusy, setProgressBusy] = useState(false)
   const [aiProgressSuggestion, setAiProgressSuggestion] = useState<number | null>(null)
   const [aiProgressReason, setAiProgressReason] = useState('')
@@ -1350,6 +1360,16 @@ export function GanttPlannerPage() {
 
   const closeTimelineProgressModal = useCallback(() => {
     setTimelineProgressModalTaskId(null)
+    setEditingCommentId(null)
+    setEditingCommentContent('')
+    setEditingCommentReportedProgressInput('')
+    setEditingCommentReportedDurationInput('')
+    setEditingCommentExistingPhotos([])
+    setEditingCommentNewPhotos([])
+    setEditingCommentNewPhotoPreviews((current) => {
+      current.forEach((url) => URL.revokeObjectURL(url))
+      return []
+    })
     setCommentPhotos([])
     commentPhotoPreviews.forEach((url) => URL.revokeObjectURL(url))
     setCommentPhotoPreviews([])
@@ -1645,9 +1665,11 @@ export function GanttPlannerPage() {
       setComments([])
       setAiProgressSuggestion(null)
       setAiProgressReason('')
+      handleCancelEditComment()
       return
     }
     getTaskComments(selectedTaskId).then(setComments).catch(() => setComments([]))
+    handleCancelEditComment()
   }, [selectedTaskId])
 
   useEffect(() => {
@@ -1655,6 +1677,12 @@ export function GanttPlannerPage() {
       commentPhotoPreviews.forEach((url) => URL.revokeObjectURL(url))
     }
   }, [commentPhotoPreviews])
+
+  useEffect(() => {
+    return () => {
+      editingCommentNewPhotoPreviews.forEach((url) => URL.revokeObjectURL(url))
+    }
+  }, [editingCommentNewPhotoPreviews])
 
   useEffect(() => {
     if (!areNotificationsEnabled()) return
@@ -2004,6 +2032,107 @@ export function GanttPlannerPage() {
     setCommentPhotoPreviews(previews)
 
     event.target.value = ''
+  }
+
+  function handleStartEditComment(comment: GanttTaskComment) {
+    setEditingCommentId(comment.id)
+    setEditingCommentContent(comment.content)
+    setEditingCommentReportedProgressInput(typeof comment.reportedProgress === 'number' ? String(comment.reportedProgress) : '')
+    setEditingCommentReportedDurationInput(typeof comment.reportedDurationHours === 'number' ? String(comment.reportedDurationHours) : '')
+    setEditingCommentExistingPhotos(comment.photos ?? [])
+    setEditingCommentNewPhotos([])
+    setEditingCommentNewPhotoPreviews((current) => {
+      current.forEach((url) => URL.revokeObjectURL(url))
+      return []
+    })
+  }
+
+  function handleCancelEditComment() {
+    setEditingCommentId(null)
+    setEditingCommentContent('')
+    setEditingCommentReportedProgressInput('')
+    setEditingCommentReportedDurationInput('')
+    setEditingCommentExistingPhotos([])
+    setEditingCommentNewPhotos([])
+    setEditingCommentNewPhotoPreviews((current) => {
+      current.forEach((url) => URL.revokeObjectURL(url))
+      return []
+    })
+  }
+
+  function handleSelectEditCommentPhotos(event: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files ?? [])
+    if (files.length === 0) return
+
+    const availableSlots = Math.max(0, 5 - editingCommentExistingPhotos.length)
+    if (availableSlots === 0) {
+      event.target.value = ''
+      return
+    }
+
+    const limited = [...editingCommentNewPhotos, ...files].slice(0, availableSlots)
+    setEditingCommentNewPhotos(limited)
+
+    editingCommentNewPhotoPreviews.forEach((url) => URL.revokeObjectURL(url))
+    const previews = limited.map((file) => URL.createObjectURL(file))
+    setEditingCommentNewPhotoPreviews(previews)
+
+    event.target.value = ''
+  }
+
+  function handleRemoveEditingExistingPhoto(photoIndex: number) {
+    setEditingCommentExistingPhotos((current) => current.filter((_, index) => index !== photoIndex))
+  }
+
+  async function handleSaveEditedComment(comment: GanttTaskComment) {
+    if (!user?.id || selectedTaskId === 'none' || !selectedTask || editingCommentId !== comment.id) return
+    if (!canOperateTask(selectedTask)) {
+      setError('Solo el técnico asignado o un usuario con permisos de edición puede editar notas')
+      return
+    }
+
+    const content = editingCommentContent.trim()
+    if (!content) return
+
+    const parsedProgress = editingCommentReportedProgressInput.trim().length > 0
+      ? Number(editingCommentReportedProgressInput.replace(',', '.'))
+      : null
+
+    const reportedProgress = parsedProgress !== null && Number.isFinite(parsedProgress)
+      ? Math.max(0, Math.min(100, Math.round(parsedProgress)))
+      : undefined
+
+    const parsedDuration = editingCommentReportedDurationInput.trim().length > 0
+      ? Number(editingCommentReportedDurationInput.replace(',', '.'))
+      : null
+
+    const reportedDurationHours = parsedDuration !== null && Number.isFinite(parsedDuration) && parsedDuration > 0
+      ? Math.max(0.25, parsedDuration)
+      : undefined
+
+    setEditingCommentBusy(true)
+    setError(null)
+    try {
+      const uploadedPhotos = editingCommentNewPhotos.length > 0
+        ? await Promise.all(editingCommentNewPhotos.map((file) => uploadGanttCommentPhoto(selectedTaskId, comment.id, file)))
+        : []
+
+      const mergedPhotos = [...editingCommentExistingPhotos, ...uploadedPhotos]
+
+      await updateTaskComment(comment.id, {
+        content,
+        reportedProgress,
+        reportedDurationHours,
+        photos: mergedPhotos.length > 0 ? mergedPhotos : undefined,
+      })
+
+      const rows = await getTaskComments(selectedTaskId)
+      setComments(rows)
+      await handleEstimateProgressWithAI(rows)
+      handleCancelEditComment()
+    } finally {
+      setEditingCommentBusy(false)
+    }
   }
 
   async function handleAddDependency() {
@@ -3269,10 +3398,11 @@ export function GanttPlannerPage() {
 
                 <div>
                   <Label className="text-xs">Nota / comentario de avance</Label>
-                  <Input
+                  <Textarea
                     value={newComment}
                     onChange={(event) => setNewComment(event.target.value)}
                     placeholder="Ej: falta componente X; se retoma el jueves con evidencia"
+                    rows={3}
                   />
                 </div>
 
@@ -3296,6 +3426,120 @@ export function GanttPlannerPage() {
                 >
                   <Camera className="h-4 w-4 mr-1" /> {commentBusy ? 'Guardando...' : 'Guardar nota + evidencia'}
                 </Button>
+
+                <div className="rounded border p-2 space-y-2">
+                  <p className="text-xs text-muted-foreground">Historial de notas</p>
+                  <div className="space-y-2 max-h-48 overflow-auto">
+                    {comments.map((comment) => {
+                      const isEditing = editingCommentId === comment.id
+                      return (
+                        <div key={`timeline-comment-${comment.id}`} className="rounded border p-2 text-xs space-y-2">
+                          {isEditing ? (
+                            <>
+                              <Textarea
+                                value={editingCommentContent}
+                                onChange={(event) => setEditingCommentContent(event.target.value)}
+                                rows={3}
+                                placeholder="Actualizar nota operativa"
+                              />
+                              <div className="grid gap-2 sm:grid-cols-2">
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  max={100}
+                                  value={editingCommentReportedProgressInput}
+                                  onChange={(event) => setEditingCommentReportedProgressInput(event.target.value)}
+                                  placeholder="% avance (opcional)"
+                                />
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  step={0.25}
+                                  value={editingCommentReportedDurationInput}
+                                  onChange={(event) => setEditingCommentReportedDurationInput(event.target.value)}
+                                  placeholder="Horas reales (opcional)"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label className="text-[11px] text-muted-foreground">Fotos guardadas</Label>
+                                {editingCommentExistingPhotos.length > 0 ? (
+                                  <div className="grid grid-cols-4 gap-2">
+                                    {editingCommentExistingPhotos.map((photo, index) => (
+                                      <div key={`timeline-edit-photo-${comment.id}-${index}`} className="space-y-1">
+                                        <a href={photo} target="_blank" rel="noreferrer">
+                                          <img src={photo} alt={`foto comentario ${index + 1}`} className="h-16 w-full rounded border object-cover" />
+                                        </a>
+                                        <Button size="sm" variant="outline" className="w-full" onClick={() => handleRemoveEditingExistingPhoto(index)}>
+                                          Quitar
+                                        </Button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <p className="text-[11px] text-muted-foreground">Sin fotos guardadas.</p>
+                                )}
+                              </div>
+                              <div className="space-y-2">
+                                <Label className="text-[11px] text-muted-foreground">Agregar fotos (máx. 5 total)</Label>
+                                <Input type="file" accept="image/*" multiple onChange={handleSelectEditCommentPhotos} />
+                                {editingCommentNewPhotoPreviews.length > 0 && (
+                                  <div className="grid grid-cols-4 gap-2">
+                                    {editingCommentNewPhotoPreviews.map((preview, index) => (
+                                      <img key={`timeline-edit-preview-${comment.id}-${index}`} src={preview} alt={`nueva evidencia ${index + 1}`} className="h-16 w-full rounded border object-cover" />
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  className="flex-1"
+                                  disabled={editingCommentBusy || !editingCommentContent.trim()}
+                                  onClick={() => void handleSaveEditedComment(comment)}
+                                >
+                                  {editingCommentBusy ? 'Guardando...' : 'Guardar edición'}
+                                </Button>
+                                <Button size="sm" variant="outline" className="flex-1" onClick={handleCancelEditComment}>
+                                  Cancelar
+                                </Button>
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <p className="whitespace-pre-wrap">{comment.content}</p>
+                              {typeof comment.reportedProgress === 'number' && (
+                                <p className="text-muted-foreground">Reporte técnico: {comment.reportedProgress}%</p>
+                              )}
+                              {typeof comment.reportedDurationHours === 'number' && (
+                                <p className="text-muted-foreground">Tiempo real reportado: {comment.reportedDurationHours} h</p>
+                              )}
+                              {comment.photos && comment.photos.length > 0 && (
+                                <div className="grid grid-cols-4 gap-2">
+                                  {comment.photos.map((photo, index) => (
+                                    <a key={`timeline-comment-photo-${comment.id}-${index}`} href={photo} target="_blank" rel="noreferrer">
+                                      <img src={photo} alt={`foto comentario ${index + 1}`} className="h-16 w-full rounded border object-cover" />
+                                    </a>
+                                  ))}
+                                </div>
+                              )}
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="text-muted-foreground">{comment.createdByName ?? comment.createdBy} · {comment.createdAt.toLocaleString()}</p>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleStartEditComment(comment)}
+                                  disabled={!timelineProgressModalTask || !canOperateTask(timelineProgressModalTask)}
+                                >
+                                  Editar
+                                </Button>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
 
                 <p className="text-[11px] text-muted-foreground">
                   Si reportas más horas de las planificadas, el sistema extiende automáticamente la fecha fin de la tarea.
@@ -3941,7 +4185,7 @@ export function GanttPlannerPage() {
           <Card>
             <CardHeader><CardTitle>Comentarios de tarea</CardTitle></CardHeader>
             <CardContent className="space-y-3">
-              <Input value={newComment} onChange={(event) => setNewComment(event.target.value)} placeholder="Comentario operativo para seguimiento" />
+              <Textarea value={newComment} onChange={(event) => setNewComment(event.target.value)} placeholder="Comentario operativo para seguimiento" rows={3} />
               <Input
                 type="number"
                 min={0}
@@ -3979,24 +4223,108 @@ export function GanttPlannerPage() {
               </Button>
               <div className="space-y-2 max-h-44 overflow-auto">
                 {comments.map((comment) => (
-                  <div key={comment.id} className="rounded border p-2 text-xs">
-                    <p>{comment.content}</p>
-                    {typeof comment.reportedProgress === 'number' && (
-                      <p className="text-muted-foreground mt-1">Reporte técnico: {comment.reportedProgress}%</p>
+                  <div key={comment.id} className="rounded border p-2 text-xs space-y-2">
+                    {editingCommentId === comment.id ? (
+                      <>
+                        <Textarea
+                          value={editingCommentContent}
+                          onChange={(event) => setEditingCommentContent(event.target.value)}
+                          rows={3}
+                          placeholder="Actualizar nota operativa"
+                        />
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          <Input
+                            type="number"
+                            min={0}
+                            max={100}
+                            value={editingCommentReportedProgressInput}
+                            onChange={(event) => setEditingCommentReportedProgressInput(event.target.value)}
+                            placeholder="% avance (opcional)"
+                          />
+                          <Input
+                            type="number"
+                            min={0}
+                            step={0.25}
+                            value={editingCommentReportedDurationInput}
+                            onChange={(event) => setEditingCommentReportedDurationInput(event.target.value)}
+                            placeholder="Horas reales (opcional)"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-[11px] text-muted-foreground">Fotos guardadas</Label>
+                          {editingCommentExistingPhotos.length > 0 ? (
+                            <div className="grid grid-cols-4 gap-2">
+                              {editingCommentExistingPhotos.map((photo, index) => (
+                                <div key={`task-edit-photo-${comment.id}-${index}`} className="space-y-1">
+                                  <a href={photo} target="_blank" rel="noreferrer">
+                                    <img src={photo} alt={`foto comentario ${index + 1}`} className="h-16 w-full rounded border object-cover" />
+                                  </a>
+                                  <Button size="sm" variant="outline" className="w-full" onClick={() => handleRemoveEditingExistingPhoto(index)}>
+                                    Quitar
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-[11px] text-muted-foreground">Sin fotos guardadas.</p>
+                          )}
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-[11px] text-muted-foreground">Agregar fotos (máx. 5 total)</Label>
+                          <Input type="file" accept="image/*" multiple onChange={handleSelectEditCommentPhotos} />
+                          {editingCommentNewPhotoPreviews.length > 0 && (
+                            <div className="grid grid-cols-4 gap-2">
+                              {editingCommentNewPhotoPreviews.map((preview, index) => (
+                                <img key={`task-edit-preview-${comment.id}-${index}`} src={preview} alt={`nueva evidencia ${index + 1}`} className="h-16 w-full rounded border object-cover" />
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            className="flex-1"
+                            disabled={editingCommentBusy || !editingCommentContent.trim()}
+                            onClick={() => void handleSaveEditedComment(comment)}
+                          >
+                            {editingCommentBusy ? 'Guardando...' : 'Guardar edición'}
+                          </Button>
+                          <Button size="sm" variant="outline" className="flex-1" onClick={handleCancelEditComment}>
+                            Cancelar
+                          </Button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <p className="whitespace-pre-wrap">{comment.content}</p>
+                        {typeof comment.reportedProgress === 'number' && (
+                          <p className="text-muted-foreground mt-1">Reporte técnico: {comment.reportedProgress}%</p>
+                        )}
+                        {typeof comment.reportedDurationHours === 'number' && (
+                          <p className="text-muted-foreground mt-1">Tiempo real reportado: {comment.reportedDurationHours} h</p>
+                        )}
+                        {comment.photos && comment.photos.length > 0 && (
+                          <div className="mt-2 grid grid-cols-4 gap-2">
+                            {comment.photos.map((photo, index) => (
+                              <a key={`${comment.id}-photo-${index}`} href={photo} target="_blank" rel="noreferrer">
+                                <img src={photo} alt={`foto comentario ${index + 1}`} className="h-16 w-full rounded border object-cover" />
+                              </a>
+                            ))}
+                          </div>
+                        )}
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-muted-foreground mt-1">{comment.createdByName ?? comment.createdBy} · {comment.createdAt.toLocaleString()}</p>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleStartEditComment(comment)}
+                            disabled={!selectedTask || !canOperateTask(selectedTask)}
+                          >
+                            Editar
+                          </Button>
+                        </div>
+                      </>
                     )}
-                    {typeof comment.reportedDurationHours === 'number' && (
-                      <p className="text-muted-foreground mt-1">Tiempo real reportado: {comment.reportedDurationHours} h</p>
-                    )}
-                    {comment.photos && comment.photos.length > 0 && (
-                      <div className="mt-2 grid grid-cols-4 gap-2">
-                        {comment.photos.map((photo, index) => (
-                          <a key={`${comment.id}-photo-${index}`} href={photo} target="_blank" rel="noreferrer">
-                            <img src={photo} alt={`foto comentario ${index + 1}`} className="h-16 w-full rounded border object-cover" />
-                          </a>
-                        ))}
-                      </div>
-                    )}
-                    <p className="text-muted-foreground mt-1">{comment.createdByName ?? comment.createdBy} · {comment.createdAt.toLocaleString()}</p>
                   </div>
                 ))}
               </div>

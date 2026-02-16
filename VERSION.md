@@ -1,14 +1,20 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.48.16**
+## Versión Actual: **v2.48.17**
 
-**Fecha de lanzamiento**: 15 de febrero de 2026  \
+**Fecha de lanzamiento**: 16 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
 **Build**: ✅ Stable
 
 ---
 
 ## 📋 Información de la Versión
+
+### v2.48.17 - Notas históricas editables y robustez de seguimiento (16/02/2026)
+- 🧾 **Notas multilinea**: campo de comentario en `textarea` para registrar avances con saltos de línea reales.
+- ✏️ **Historial editable**: ahora se pueden editar notas previas (texto, `%` reportado y horas reales).
+- 📷 **Evidencia en edición**: permite quitar fotos existentes y adjuntar nuevas manteniendo tope de 5 por nota.
+- 🧠 **Flujo más estable**: mejoras para evitar errores de IA y consulta de comentarios en producción.
 
 ### v2.48.16 - Parser operativo y autoajuste inteligente (15/02/2026)
 - 🤖 **Lectura de comentarios**: detecta bloqueos operativos y ajusta estado de tarea automáticamente.

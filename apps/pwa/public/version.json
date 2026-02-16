@@ -1,8 +1,14 @@
 {
-  "version": "2.48.16",
-  "buildDate": "2026-02-15",
-  "buildTimestamp": 1771228200000,
+  "version": "2.48.17",
+  "buildDate": "2026-02-16",
+  "buildTimestamp": 1771205141766,
   "features": [
+    "Notas de avance ahora usan campo multilinea (textarea) para conservar saltos de línea reales",
+    "Historial de notas editable: permite actualizar texto, % y horas de comentarios ya registrados",
+    "Edición de evidencia por nota: quitar fotos previas y agregar nuevas con tope total de 5 imágenes",
+    "Persistencia de edición de comentarios vía updateTaskComment con recálculo de sugerencia IA",
+    "Consulta de comentarios sin índice compuesto obligatorio (ordenamiento del historial en cliente)",
+    "Fallback IA reforzado en GitHub Pages para evitar errores remotos en estimación",
     "Parser operativo en comentarios detecta bloqueos (falta componente/pendiente) y ajusta estado automáticamente",
     "Detección de fechas en texto (día de semana o dd/mm) para extender fecha fin según lo reportado en notas",
     "Aplicación automática de % sugerido por IA cuando no se reporta % manual y no hay señales de bloqueo",

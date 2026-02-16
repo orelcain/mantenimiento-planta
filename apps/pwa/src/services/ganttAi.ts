@@ -106,6 +106,15 @@ function heuristicEstimate(input: EstimateInput): EstimateOutput {
 export async function estimateGanttProgressFromComments(input: EstimateInput): Promise<EstimateOutput> {
   const fallback = heuristicEstimate(input)
 
+  const host = typeof window !== 'undefined' ? window.location.hostname.toLowerCase() : ''
+  const forceLocalFallback = host.endsWith('github.io')
+  if (forceLocalFallback) {
+    return {
+      ...fallback,
+      rationale: `${fallback.rationale} (estimación local por disponibilidad del entorno)`
+    }
+  }
+
   try {
     const functions = getFunctions(firebaseApp)
     const groqProxy = httpsCallable(functions, 'groqProxy')

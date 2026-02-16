@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.48.16' as const
+export const APP_VERSION = '2.48.17' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -11,12 +11,12 @@ export const APP_VERSION = '2.48.16' as const
 /**
  * Fecha de la versión actual
  */
-export const VERSION_DATE = '2026-02-15' as const
+export const VERSION_DATE = '2026-02-16' as const
 
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Gantt: parser operativo para autoajuste por comentarios' as const
+export const VERSION_NAME = 'Gantt: notas históricas editables, multilinea y robustez IA/comentarios' as const
 
 /**
  * Nota:

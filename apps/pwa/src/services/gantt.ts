@@ -4,7 +4,6 @@ import {
   deleteDoc,
   doc,
   getDocs,
-  orderBy,
   query,
   serverTimestamp,
   Timestamp,
@@ -217,12 +216,11 @@ export async function deleteGanttTask(id: string): Promise<void> {
 export async function getTaskComments(taskId: string): Promise<GanttTaskComment[]> {
   const q = query(
     collection(db, GANTT_COMMENTS_COLLECTION),
-    where('taskId', '==', taskId),
-    orderBy('createdAt', 'desc')
+    where('taskId', '==', taskId)
   )
   const snapshot = await getDocs(q)
 
-  return snapshot.docs.map((snap) => {
+  const rows = snapshot.docs.map((snap) => {
     const data = snap.data()
     return {
       id: snap.id,
@@ -230,6 +228,9 @@ export async function getTaskComments(taskId: string): Promise<GanttTaskComment[
       createdAt: asDate(data.createdAt),
     } as GanttTaskComment
   })
+
+  rows.sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
+  return rows
 }
 
 export async function addTaskComment(
@@ -245,6 +246,18 @@ export async function addTaskComment(
   const ref = await addDoc(collection(db, GANTT_COMMENTS_COLLECTION), payload)
 
   return ref.id
+}
+
+export async function updateTaskComment(
+  commentId: string,
+  patch: Partial<Pick<GanttTaskComment, 'content' | 'reportedProgress' | 'reportedDurationHours' | 'photos' | 'aiSuggestedProgress'>>
+): Promise<void> {
+  const payload: Record<string, unknown> = stripUndefinedDeep({
+    ...patch,
+    updatedAt: serverTimestamp(),
+  })
+
+  await updateDoc(doc(db, GANTT_COMMENTS_COLLECTION, commentId), payload)
 }
 
 export function calculateCPM(tasks: GanttTask[]): GanttCPMResult {
