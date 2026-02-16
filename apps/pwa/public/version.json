@@ -1,8 +1,9 @@
 {
-  "version": "2.48.13",
+  "version": "2.48.14",
   "buildDate": "2026-02-15",
-  "buildTimestamp": 1771217400000,
+  "buildTimestamp": 1771221000000,
   "features": [
+    "Ubicación masiva suma acción Seleccionar filtro para marcar todas las tareas del resultado actual",
     "Admin puede seleccionar múltiples tareas con checkbox en listado y aplicar una ubicación en lote",
     "Nuevo bloque de Ubicación para múltiples tareas con jerarquía encadenada y guardado masivo",
     "Confirmación de borrado con Dialog UI ahora protege anti doble clic (espera 1s antes de habilitar Eliminar)",

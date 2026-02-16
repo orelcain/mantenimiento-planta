@@ -1235,6 +1235,11 @@ export function GanttPlannerPage() {
     setBulkSelectedTaskIds((current) => Array.from(new Set([...current, ...pagedIds])))
   }, [pagedListTasks])
 
+  const handleSelectAllFilteredTasks = useCallback(() => {
+    const filteredIds = sortedTasks.map((task) => task.id)
+    setBulkSelectedTaskIds((current) => Array.from(new Set([...current, ...filteredIds])))
+  }, [sortedTasks])
+
   const handleClearBulkTaskSelection = useCallback(() => {
     setBulkSelectedTaskIds([])
   }, [])
@@ -3156,6 +3161,7 @@ export function GanttPlannerPage() {
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-xs font-medium">Ubicación para múltiples tareas</p>
                   <div className="flex gap-2">
+                    <Button size="sm" variant="outline" onClick={handleSelectAllFilteredTasks}>Seleccionar filtro</Button>
                     <Button size="sm" variant="outline" onClick={handleSelectAllPagedTasks}>Seleccionar página</Button>
                     <Button size="sm" variant="outline" onClick={handleClearBulkTaskSelection}>Limpiar selección</Button>
                   </div>

@@ -7,6 +7,14 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.14] - 2026-02-15
+
+### ✅ Selección masiva por filtro completo
+
+#### Mejoras
+- **Seleccionar filtro**: en ubicación múltiple (admin) se agrega acción para marcar todas las tareas que cumplen el filtro actual.
+- **Flujo más rápido**: evita depender de `Seleccionar página` cuando el filtro devuelve muchas tareas.
+
 ## [2.48.13] - 2026-02-15
 
 ### 📌 Ubicación masiva por selección (admin)

@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.48.13**
+## Versión Actual: **v2.48.14**
 
 **Fecha de lanzamiento**: 15 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.48.14 - Seleccionar todo el filtro actual (15/02/2026)
+- ✅ **Nuevo botón Seleccionar filtro** en ubicación múltiple para admin.
+- ⚡ **Cobertura completa del resultado**: marca en bloque todas las tareas filtradas, no solo la página visible.
+- 🧭 **Operación más ágil**: reduce clics cuando varias tareas comparten misma máquina/ubicación.
 
 ### v2.48.13 - Ubicación masiva y seguridad extra al eliminar (15/02/2026)
 - 📌 **Asignación de ubicación a múltiples tareas**: admin puede seleccionar varias tareas y aplicar una misma ubicación en lote.
