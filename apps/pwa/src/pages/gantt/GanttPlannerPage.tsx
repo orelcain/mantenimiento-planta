@@ -35,9 +35,11 @@ import { generateId } from '@/lib/utils'
 import {
   addTaskComment,
   buildGanttMetrics,
+  createGanttProject,
   calculateCPM,
   createGanttTask,
   deleteGanttTask,
+  getGanttProjects,
   getGanttTasks,
   getTaskComments,
   simulateDelay,
@@ -45,7 +47,7 @@ import {
   updateTaskComment,
 } from '@/services/gantt'
 import { useHierarchyTree } from '@/hooks/useHierarchy'
-import type { Equipment, GanttTask, GanttTaskComment, IncidentPriority, User } from '@/types'
+import type { Equipment, GanttProject, GanttTask, GanttTaskComment, IncidentPriority, User } from '@/types'
 import { HIERARCHY_LEVEL_NAMES, HierarchyLevel, type HierarchyNode, type HierarchyNodeWithChildren } from '@/types/hierarchy'
 
 const STATUS_OPTIONS: Array<GanttTask['status']> = ['planificada', 'en_progreso', 'bloqueada', 'completada']
@@ -67,9 +69,11 @@ const TIMELINE_BAR_CENTER_OFFSET = 22
 const TIMELINE_BASELINE_TOP = 19
 const TIMELINE_BASELINE_HEIGHT_CLASS = 'h-2'
 const TIMELINE_ANCHOR_RADIUS = 16
+const DEFAULT_PROJECT_ID = 'project-temporada-baja-antarfood-2026'
+const DEFAULT_PROJECT_NAME = 'temporada baja antarfood 2026'
 
 type TimelineDragMode = 'move' | 'resize-start' | 'resize-end'
-type PlannerTab = 'configuracion' | 'tareas' | 'timeline' | 'carga_tecnico'
+type PlannerTab = 'configuracion' | 'tareas' | 'timeline' | 'carga_tecnico' | 'estadisticas'
 
 const TASK_LOCATION_LEVELS: HierarchyLevel[] = [
   HierarchyLevel.AREA,
@@ -442,6 +446,10 @@ export function GanttPlannerPage() {
   const canEditTaskIdentity = user?.rol === 'admin' || user?.rol === 'supervisor'
 
   const [tasks, setTasks] = useState<GanttTask[]>([])
+  const [projects, setProjects] = useState<GanttProject[]>([])
+  const [selectedProjectId, setSelectedProjectId] = useState(DEFAULT_PROJECT_ID)
+  const [newProjectName, setNewProjectName] = useState('')
+  const [creatingProject, setCreatingProject] = useState(false)
   const [equipment, setEquipment] = useState<Equipment[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -460,6 +468,7 @@ export function GanttPlannerPage() {
   const [listPageSize, setListPageSize] = useState<(typeof PAGE_SIZE_OPTIONS)[number]>('25')
   const [timelineTableWidth, setTimelineTableWidth] = useState(420)
   const [timelineSearch, setTimelineSearch] = useState('')
+  const [timelineQuickAreaFilter, setTimelineQuickAreaFilter] = useState<string>('all')
   const [timelineZoom, setTimelineZoom] = useState<'day' | 'week' | 'month'>('week')
   const [timelineWorkCalendar, setTimelineWorkCalendar] = useState<'all' | 'workdays'>('all')
   const [timelineSnapHours, setTimelineSnapHours] = useState<'auto' | '1' | '6' | '12' | '24'>('auto')
@@ -571,6 +580,44 @@ export function GanttPlannerPage() {
     [areaFilter, areaNodes]
   )
 
+  const availableProjects = useMemo(() => {
+    const activeProjects = projects
+      .filter((project) => project.active !== false && project.name.trim().length > 0)
+      .sort((left, right) => left.name.localeCompare(right.name, 'es'))
+
+    const hasDefault = activeProjects.some((project) => project.id === DEFAULT_PROJECT_ID)
+    if (hasDefault) {
+      return activeProjects
+    }
+
+    return [
+      {
+        id: DEFAULT_PROJECT_ID,
+        name: DEFAULT_PROJECT_NAME,
+        active: true,
+        createdBy: 'system',
+        createdAt: new Date(0),
+        updatedAt: new Date(0),
+      },
+      ...activeProjects,
+    ]
+  }, [projects])
+
+  const selectedProject = useMemo(
+    () => availableProjects.find((project) => project.id === selectedProjectId) ?? availableProjects[0] ?? null,
+    [availableProjects, selectedProjectId]
+  )
+
+  useEffect(() => {
+    if (!selectedProject && availableProjects.length === 0) return
+    if (!availableProjects.some((project) => project.id === selectedProjectId)) {
+      const fallbackProject = availableProjects[0]
+      if (fallbackProject) {
+        setSelectedProjectId(fallbackProject.id)
+      }
+    }
+  }, [availableProjects, selectedProject, selectedProjectId])
+
   const hierarchyOptionsByLevel = useCallback((selection: HierarchySelectionMap, level: HierarchyLevel) => {
     const levelNodes = hierarchyNodes
       .filter((node) => node.activo && node.nivel === level)
@@ -651,12 +698,14 @@ export function GanttPlannerPage() {
     setLoading(true)
     setError(null)
     try {
-      const [rows, eq, techs] = await Promise.all([
+      const [rows, projectRows, eq, techs] = await Promise.all([
         getGanttTasks(),
+        getGanttProjects().catch(() => [] as GanttProject[]),
         getEquipments().catch(() => [] as Equipment[]),
         getTechnicians().catch(() => [] as User[]),
       ])
       setTasks(rows)
+      setProjects(projectRows)
       setEquipment(eq)
       setTechnicians(techs)
     } catch (e) {
@@ -670,9 +719,16 @@ export function GanttPlannerPage() {
     void load()
   }, [load])
 
+  const projectScopedTasks = useMemo(() => {
+    if (selectedProjectId === DEFAULT_PROJECT_ID) {
+      return tasks.filter((task) => !task.projectId || task.projectId === DEFAULT_PROJECT_ID)
+    }
+    return tasks.filter((task) => task.projectId === selectedProjectId)
+  }, [selectedProjectId, tasks])
+
   const filteredTasks = useMemo(() => {
     const query = searchText.trim().toLowerCase()
-    return tasks.filter((task) => {
+    return projectScopedTasks.filter((task) => {
       if (areaFilter !== 'all') {
         const areaName = normalizeKey(selectedAreaFilter?.nombre ?? '')
         const matchById = task.hierarchyNodeId === areaFilter
@@ -697,7 +753,7 @@ export function GanttPlannerPage() {
       }
       return true
     })
-  }, [areaFilter, assignmentFilter, equipmentFilter, searchText, selectedAreaFilter?.nombre, statusFilter, tasks, user?.id])
+  }, [areaFilter, assignmentFilter, equipmentFilter, projectScopedTasks, searchText, selectedAreaFilter?.nombre, statusFilter, user?.id])
 
   const sortedTasks = useMemo(() => {
     const rows = [...filteredTasks]
@@ -727,15 +783,99 @@ export function GanttPlannerPage() {
     return rows
   }, [filteredTasks, sortMode])
 
+  const timelineQuickAreaOptions = useMemo(() => {
+    const optionsMap = new Map<string, string>()
+
+    sortedTasks.forEach((task) => {
+      if (task.hierarchyNodeId) {
+        const node = hierarchyNodeById.get(task.hierarchyNodeId)
+        optionsMap.set(task.hierarchyNodeId, node?.nombre ?? compactHierarchyPath(task.hierarchyPath))
+        return
+      }
+
+      const firstPath = (task.hierarchyPath ?? '')
+        .split('>')
+        .map((part) => part.trim())
+        .filter(Boolean)[0] ?? 'Sin área'
+      optionsMap.set(`path:${normalizeKey(firstPath) || 'sin-area'}`, firstPath)
+    })
+
+    return Array.from(optionsMap.entries())
+      .map(([value, label]) => ({ value, label }))
+      .sort((left, right) => left.label.localeCompare(right.label, 'es'))
+  }, [hierarchyNodeById, sortedTasks])
+
+  useEffect(() => {
+    if (timelineQuickAreaFilter === 'all') return
+    const exists = timelineQuickAreaOptions.some((option) => option.value === timelineQuickAreaFilter)
+    if (!exists) {
+      setTimelineQuickAreaFilter('all')
+    }
+  }, [timelineQuickAreaFilter, timelineQuickAreaOptions])
+
   const cpm = useMemo(() => calculateCPM(filteredTasks), [filteredTasks])
   const cpmMap = useMemo(() => new Map(cpm.tasks.map((row) => [row.taskId, row])), [cpm.tasks])
   const metrics = useMemo(() => buildGanttMetrics(filteredTasks), [filteredTasks])
+  const projectMetrics = useMemo(() => buildGanttMetrics(projectScopedTasks), [projectScopedTasks])
+
+  const areaStatistics = useMemo(() => {
+    const now = Date.now()
+    const map = new Map<string, { area: string; total: number; completed: number; inProgress: number; blocked: number; delayed: number; progressSum: number }>()
+
+    projectScopedTasks.forEach((task) => {
+      const areaName = compactHierarchyPath(task.hierarchyPath).split('/')[0]?.trim() || 'Sin área'
+      const entry = map.get(areaName) ?? {
+        area: areaName,
+        total: 0,
+        completed: 0,
+        inProgress: 0,
+        blocked: 0,
+        delayed: 0,
+        progressSum: 0,
+      }
+
+      entry.total += 1
+      entry.progressSum += task.progress
+      if (task.status === 'completada') entry.completed += 1
+      if (task.status === 'en_progreso') entry.inProgress += 1
+      if (task.status === 'bloqueada') entry.blocked += 1
+      if (task.status !== 'completada' && task.endDate.getTime() < now) entry.delayed += 1
+
+      map.set(areaName, entry)
+    })
+
+    return Array.from(map.values())
+      .map((row) => {
+        const completion = row.total > 0 ? Math.round((row.completed / row.total) * 100) : 0
+        const averageProgress = row.total > 0 ? Math.round(row.progressSum / row.total) : 0
+        return {
+          ...row,
+          completion,
+          averageProgress,
+        }
+      })
+      .sort((left, right) => right.delayed - left.delayed || right.total - left.total || left.area.localeCompare(right.area, 'es'))
+  }, [projectScopedTasks])
 
   const timelineFilteredTasks = useMemo(() => {
     const query = normalizeKey(timelineSearch)
-    if (!query) return sortedTasks
+    const rowsByArea = sortedTasks.filter((task) => {
+      if (timelineQuickAreaFilter === 'all') return true
 
-    return sortedTasks.filter((task) => {
+      if (timelineQuickAreaFilter.startsWith('path:')) {
+        const firstPath = (task.hierarchyPath ?? '')
+          .split('>')
+          .map((part) => part.trim())
+          .filter(Boolean)[0] ?? ''
+        return normalizeKey(firstPath) === timelineQuickAreaFilter.replace('path:', '')
+      }
+
+      return task.hierarchyNodeId === timelineQuickAreaFilter
+    })
+
+    if (!query) return rowsByArea
+
+    return rowsByArea.filter((task) => {
       const haystack = normalizeKey([
         task.hierarchyPath ?? '',
         compactHierarchyPath(task.hierarchyPath),
@@ -746,7 +886,7 @@ export function GanttPlannerPage() {
       ].join(' '))
       return haystack.includes(query)
     })
-  }, [sortedTasks, timelineSearch])
+  }, [sortedTasks, timelineQuickAreaFilter, timelineSearch])
 
   const timelinePageSizeNum = Number(timelinePageSize)
   const listPageSizeNum = Number(listPageSize)
@@ -786,9 +926,15 @@ export function GanttPlannerPage() {
 
     const minStart = Math.min(...timelineSourceTasks.map((task) => (task.baselineStartDate ?? task.startDate).getTime()))
     const maxEnd = Math.max(...timelineSourceTasks.map((task) => (task.baselineEndDate ?? task.endDate).getTime()))
-    const paddedStart = minStart - DAY_MS
-    const paddedEnd = maxEnd + DAY_MS
-    const totalDays = Math.max(2, Math.ceil((paddedEnd - paddedStart) / DAY_MS))
+  const paddingDays = timelineZoom === 'day' ? 1 : timelineZoom === 'week' ? 4 : 14
+  const minSpanDays = timelineZoom === 'day' ? 2 : timelineZoom === 'week' ? 14 : 60
+  const paddedStartCandidate = minStart - paddingDays * DAY_MS
+  const paddedEndCandidate = maxEnd + paddingDays * DAY_MS
+  const currentSpanDays = Math.max(1, Math.ceil((paddedEndCandidate - paddedStartCandidate) / DAY_MS))
+  const missingDays = Math.max(0, minSpanDays - currentSpanDays)
+  const paddedStart = paddedStartCandidate - Math.floor(missingDays / 2) * DAY_MS
+  const paddedEnd = paddedEndCandidate + Math.ceil(missingDays / 2) * DAY_MS
+  const totalDays = Math.max(minSpanDays, Math.ceil((paddedEnd - paddedStart) / DAY_MS))
     const pixelsPerDay = timelineZoom === 'day' ? 120 : timelineZoom === 'week' ? 40 : 14
     const minWidthByZoom = timelineZoom === 'day' ? 900 : timelineZoom === 'week' ? 680 : 520
     const widthPx = Math.max(minWidthByZoom, Math.round(totalDays * pixelsPerDay))
@@ -1521,11 +1667,11 @@ export function GanttPlannerPage() {
   useEffect(() => {
     setTimelinePage(1)
     setListPage(1)
-  }, [areaFilter, assignmentFilter, equipmentFilter, statusFilter, sortMode, searchText, timelinePageSize, listPageSize])
+  }, [areaFilter, assignmentFilter, equipmentFilter, selectedProjectId, statusFilter, sortMode, searchText, timelineQuickAreaFilter, timelinePageSize, listPageSize])
 
   useEffect(() => {
     const savedTab = window.localStorage.getItem(plannerTabStorageKey)
-    if (savedTab === 'configuracion' || savedTab === 'tareas' || savedTab === 'timeline' || savedTab === 'carga_tecnico') {
+    if (savedTab === 'configuracion' || savedTab === 'tareas' || savedTab === 'timeline' || savedTab === 'carga_tecnico' || savedTab === 'estadisticas') {
       setPlannerTab(savedTab)
     }
   }, [plannerTabStorageKey])
@@ -1870,6 +2016,28 @@ export function GanttPlannerPage() {
     }
   }, [])
 
+  async function handleCreateProject() {
+    if (!user?.id || !newProjectName.trim()) return
+
+    setCreatingProject(true)
+    setError(null)
+    try {
+      const projectId = await createGanttProject({
+        name: newProjectName.trim(),
+        createdBy: user.id,
+        createdByName: `${user.nombre} ${user.apellido}`,
+      })
+      setNewProjectName('')
+      await load()
+      setSelectedProjectId(projectId)
+      setPlannerTab('timeline')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'No se pudo crear el proyecto')
+    } finally {
+      setCreatingProject(false)
+    }
+  }
+
   async function handleCreateTask() {
     if (!user?.id || !title.trim()) return
 
@@ -1905,6 +2073,8 @@ export function GanttPlannerPage() {
     await createGanttTask({
       titulo: title.trim(),
       descripcion: '',
+      projectId: selectedProject?.id ?? DEFAULT_PROJECT_ID,
+      projectName: selectedProject?.name ?? DEFAULT_PROJECT_NAME,
       equipmentId: equipmentId === 'none' ? undefined : equipmentId,
       equipmentNombre: selectedEquipment?.nombre,
       hierarchyNodeId: selectedEquipment?.hierarchyNodeId ?? selectedHierarchyNode?.id,
@@ -2426,6 +2596,8 @@ export function GanttPlannerPage() {
         await createGanttTask({
           titulo: task.titulo,
           descripcion: task.descripcion ?? '',
+          projectId: selectedProject?.id ?? DEFAULT_PROJECT_ID,
+          projectName: selectedProject?.name ?? DEFAULT_PROJECT_NAME,
           equipmentId: task.equipmentId,
           equipmentNombre: task.equipmentNombre,
           hierarchyNodeId: task.hierarchyNodeId,
@@ -2478,6 +2650,46 @@ export function GanttPlannerPage() {
         </Card>
       )}
 
+      <Card>
+        <CardContent className="pt-4">
+          <div className="grid gap-3 lg:grid-cols-[1.4fr_1fr_auto]">
+            <div>
+              <Label className="text-xs text-muted-foreground">Proyecto activo</Label>
+              <Select value={selectedProject?.id ?? selectedProjectId} onValueChange={setSelectedProjectId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar proyecto" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableProjects.map((project) => (
+                    <SelectItem key={project.id} value={project.id}>{project.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label className="text-xs text-muted-foreground">Nuevo proyecto</Label>
+              <Input
+                value={newProjectName}
+                onChange={(event) => setNewProjectName(event.target.value)}
+                placeholder="Ej: obras civiles"
+              />
+            </div>
+
+            <div className="flex items-end">
+              <Button
+                variant="outline"
+                className="w-full lg:w-auto"
+                onClick={() => void handleCreateProject()}
+                disabled={!user?.id || !newProjectName.trim() || creatingProject}
+              >
+                {creatingProject ? 'Creando...' : 'Crear proyecto'}
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm">Total tareas</CardTitle></CardHeader>
@@ -2525,6 +2737,13 @@ export function GanttPlannerPage() {
           onClick={() => setPlannerTab('carga_tecnico')}
         >
           Carga por técnico
+        </Button>
+        <Button
+          size="sm"
+          variant={plannerTab === 'estadisticas' ? 'default' : 'outline'}
+          onClick={() => setPlannerTab('estadisticas')}
+        >
+          Estadísticas
         </Button>
       </div>
 
@@ -2591,7 +2810,7 @@ export function GanttPlannerPage() {
               </Button>
             </div>
 
-            <div className="grid gap-2 md:grid-cols-1">
+            <div className="grid gap-2 md:grid-cols-2">
               <div>
                 <Label className="text-xs text-muted-foreground">Buscar en tareas (área, equipo, tarea, responsable)</Label>
                 <Input
@@ -2599,6 +2818,20 @@ export function GanttPlannerPage() {
                   onChange={(event) => setTimelineSearch(event.target.value)}
                   placeholder="Ej: Acopio, Bomba, cambio de celda, Danilo"
                 />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Filtro rápido por área (tabla timeline)</Label>
+                <Select value={timelineQuickAreaFilter} onValueChange={setTimelineQuickAreaFilter}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas las áreas</SelectItem>
+                    {timelineQuickAreaOptions.map((option) => (
+                      <SelectItem key={`timeline-quick-area-${option.value}`} value={option.value}>{option.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
@@ -3599,6 +3832,79 @@ export function GanttPlannerPage() {
 
       {plannerTab !== 'timeline' && (
       <div className="grid gap-3 md:grid-cols-6">
+        {plannerTab === 'estadisticas' && (
+        <>
+          <Card className="md:col-span-6">
+            <CardHeader className="pb-2">
+              <CardTitle>Estadísticas por áreas</CardTitle>
+              <p className="text-xs text-muted-foreground">
+                Proyecto: {selectedProject?.name ?? DEFAULT_PROJECT_NAME}. Métricas ejecutivas de cumplimiento, avance y atrasos por área.
+              </p>
+            </CardHeader>
+            <CardContent className="grid gap-3 md:grid-cols-4">
+              <div className="rounded border p-3">
+                <p className="text-xs text-muted-foreground">Tareas del proyecto</p>
+                <p className="text-2xl font-semibold">{projectMetrics.totalTasks}</p>
+              </div>
+              <div className="rounded border p-3">
+                <p className="text-xs text-muted-foreground">Completadas</p>
+                <p className="text-2xl font-semibold">{projectMetrics.completedTasks}</p>
+              </div>
+              <div className="rounded border p-3">
+                <p className="text-xs text-muted-foreground">Atrasadas</p>
+                <p className="text-2xl font-semibold">{projectMetrics.delayedTasks}</p>
+              </div>
+              <div className="rounded border p-3">
+                <p className="text-xs text-muted-foreground">Avance promedio</p>
+                <p className="text-2xl font-semibold">{projectMetrics.averageProgress}%</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="md:col-span-6">
+            <CardHeader className="pb-2">
+              <CardTitle>Análisis profesional por área</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {areaStatistics.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No hay tareas en el proyecto seleccionado para generar estadísticas.</p>
+              ) : (
+                <div className="space-y-3">
+                  {areaStatistics.map((row) => (
+                    <div key={`stats-area-${row.area}`} className="rounded border p-3 space-y-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="font-medium">{row.area}</p>
+                        <div className="flex flex-wrap gap-2 text-xs">
+                          <Badge variant="outline">{row.total} tareas</Badge>
+                          <Badge variant="success">{row.completed} completas</Badge>
+                          <Badge variant="secondary">{row.inProgress} en progreso</Badge>
+                          <Badge variant="warning">{row.blocked} bloqueadas</Badge>
+                          <Badge variant="destructive">{row.delayed} atrasadas</Badge>
+                        </div>
+                      </div>
+                      <div className="grid gap-2 md:grid-cols-2">
+                        <div>
+                          <p className="text-[11px] text-muted-foreground">Cumplimiento ({row.completion}%)</p>
+                          <div className="h-2 rounded bg-muted overflow-hidden">
+                            <div className="h-full bg-primary" style={{ width: `${row.completion}%` }} />
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-[11px] text-muted-foreground">Avance promedio ({row.averageProgress}%)</p>
+                          <div className="h-2 rounded bg-muted overflow-hidden">
+                            <div className="h-full bg-primary/70" style={{ width: `${row.averageProgress}%` }} />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </>
+        )}
+
         {plannerTab === 'carga_tecnico' && (
         <Card className="md:col-span-6">
           <CardHeader className="pb-2">
@@ -3895,7 +4201,7 @@ export function GanttPlannerPage() {
         </Card>
         )}
 
-        {plannerTab !== 'carga_tecnico' && (
+        {plannerTab !== 'carga_tecnico' && plannerTab !== 'estadisticas' && (
         <div className={plannerTab === 'configuracion' ? 'md:col-span-6 grid gap-4 md:grid-cols-2' : 'lg:col-span-2 space-y-4'}>
           {plannerTab === 'configuracion' && (
           <Card className="md:col-span-2">

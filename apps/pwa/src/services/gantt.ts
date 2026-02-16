@@ -16,6 +16,7 @@ import type {
   GanttCPMResult,
   GanttCPMTask,
   GanttDelaySimulationInput,
+  GanttProject,
   GanttDelaySimulationResult,
   GanttScheduleMetrics,
   GanttTask,
@@ -24,6 +25,7 @@ import type {
 
 const GANTT_TASKS_COLLECTION = 'ganttTasks'
 const GANTT_COMMENTS_COLLECTION = 'ganttTaskComments'
+const GANTT_PROJECTS_COLLECTION = 'ganttProjects'
 
 function asDate(value: unknown): Date {
   const now = new Date()
@@ -191,6 +193,45 @@ export async function createGanttTask(
 
   const ref = await addDoc(collection(db, GANTT_TASKS_COLLECTION), payload)
 
+  return ref.id
+}
+
+export async function getGanttProjects(): Promise<GanttProject[]> {
+  const q = query(collection(db, GANTT_PROJECTS_COLLECTION), orderBy('createdAt', 'desc'))
+  const snapshot = await getDocs(q)
+
+  return snapshot.docs.map((snap) => {
+    const data = snap.data()
+    return {
+      id: snap.id,
+      name: String(data.name ?? '').trim(),
+      description: typeof data.description === 'string' ? data.description : undefined,
+      active: data.active !== false,
+      createdBy: String(data.createdBy ?? ''),
+      createdByName: typeof data.createdByName === 'string' ? data.createdByName : undefined,
+      createdAt: asDate(data.createdAt),
+      updatedAt: asDate(data.updatedAt),
+    } as GanttProject
+  })
+}
+
+export async function createGanttProject(data: {
+  name: string
+  description?: string
+  createdBy: string
+  createdByName?: string
+}): Promise<string> {
+  const payload = stripUndefinedDeep({
+    name: data.name.trim(),
+    description: data.description?.trim() || undefined,
+    active: true,
+    createdBy: data.createdBy,
+    createdByName: data.createdByName,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  })
+
+  const ref = await addDoc(collection(db, GANTT_PROJECTS_COLLECTION), payload)
   return ref.id
 }
 

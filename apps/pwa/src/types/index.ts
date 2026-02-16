@@ -533,6 +533,8 @@ export interface GanttTask {
   id: string
   titulo: string
   descripcion?: string
+  projectId?: string
+  projectName?: string
   hierarchyNodeId?: string
   hierarchyPath?: string
   equipmentId?: string
@@ -554,6 +556,17 @@ export interface GanttTask {
   predictiveSourceId?: string
   commentsCount?: number
   createdBy: string
+  createdAt: Date
+  updatedAt: Date
+}
+
+export interface GanttProject {
+  id: string
+  name: string
+  description?: string
+  active: boolean
+  createdBy: string
+  createdByName?: string
   createdAt: Date
   updatedAt: Date
 }
