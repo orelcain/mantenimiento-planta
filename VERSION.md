@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.48.19**
+## Versión Actual: **v2.48.20**
 
 **Fecha de lanzamiento**: 15 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.48.20 - Zoom y alineación corregidos en timeline Gantt (15/02/2026)
+- 🧭 **Zoom Día/Semana/Mes funcional**: la escala ahora modifica visualmente el timeline incluso con pocas jornadas.
+- 📐 **Fila y barra alineadas**: sincronización vertical entre tabla y timeline para mantener correspondencia exacta.
+- 🧱 **Cabecera consistente**: ajuste de altura para eliminar desfase visual en el inicio de filas.
 
 ### v2.48.19 - Visor seguro de evidencia en Gantt (15/02/2026)
 - 🔒 **Sin redirección externa**: fotos de comentarios se visualizan dentro de la app.

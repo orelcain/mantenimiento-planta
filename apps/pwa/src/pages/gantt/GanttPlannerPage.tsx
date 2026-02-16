@@ -553,6 +553,9 @@ export function GanttPlannerPage() {
   const timelineQuickStartInputRef = useRef<HTMLInputElement | null>(null)
   const timelineQuickFocusPendingRef = useRef(false)
   const timelineCanvasRef = useRef<HTMLDivElement | null>(null)
+  const timelineTableBodyRef = useRef<HTMLDivElement | null>(null)
+  const timelineChartScrollRef = useRef<HTMLDivElement | null>(null)
+  const syncingTimelineScrollRef = useRef(false)
   const { tree: hierarchyTree } = useHierarchyTree()
   const plannerTabStorageKey = useMemo(() => `gantt:plannerTab:${user?.id ?? 'anon'}`, [user?.id])
   const timelineTableWidthStorageKey = useMemo(() => `gantt:timelineTableWidth:${user?.id ?? 'anon'}`, [user?.id])
@@ -787,7 +790,8 @@ export function GanttPlannerPage() {
     const paddedEnd = maxEnd + DAY_MS
     const totalDays = Math.max(2, Math.ceil((paddedEnd - paddedStart) / DAY_MS))
     const pixelsPerDay = timelineZoom === 'day' ? 120 : timelineZoom === 'week' ? 40 : 14
-    const widthPx = Math.max(900, totalDays * pixelsPerDay)
+    const minWidthByZoom = timelineZoom === 'day' ? 900 : timelineZoom === 'week' ? 680 : 520
+    const widthPx = Math.max(minWidthByZoom, Math.round(totalDays * pixelsPerDay))
     const now = Date.now()
     const todayLeftPx = ((now - paddedStart) / (paddedEnd - paddedStart)) * widthPx
 
@@ -1270,6 +1274,32 @@ export function GanttPlannerPage() {
       startWidth: timelineTableWidth,
     }
   }, [timelineTableWidth])
+
+  const handleTimelineTableBodyScroll = useCallback(() => {
+    const table = timelineTableBodyRef.current
+    const chart = timelineChartScrollRef.current
+    if (!table || !chart) return
+    if (syncingTimelineScrollRef.current) return
+
+    syncingTimelineScrollRef.current = true
+    chart.scrollTop = table.scrollTop
+    window.requestAnimationFrame(() => {
+      syncingTimelineScrollRef.current = false
+    })
+  }, [])
+
+  const handleTimelineChartScroll = useCallback(() => {
+    const table = timelineTableBodyRef.current
+    const chart = timelineChartScrollRef.current
+    if (!table || !chart) return
+    if (syncingTimelineScrollRef.current) return
+
+    syncingTimelineScrollRef.current = true
+    table.scrollTop = chart.scrollTop
+    window.requestAnimationFrame(() => {
+      syncingTimelineScrollRef.current = false
+    })
+  }, [])
 
   const handleCreateHierarchyLevelChange = useCallback((level: HierarchyLevel, value: string) => {
     setCreateHierarchySelection((current) => {
@@ -2614,7 +2644,7 @@ export function GanttPlannerPage() {
                 <CardTitle className="text-sm">Tabla de tareas (WBS/estado/owner)</CardTitle>
               </CardHeader>
               <CardContent className="p-0">
-                <div className="grid grid-cols-[1fr_1fr_1.4fr_.8fr_.7fr_.6fr_.6fr_.42fr] gap-2 px-3 py-2 text-[11px] border-y text-muted-foreground">
+                <div className="grid h-8 grid-cols-[1fr_1fr_1.4fr_.8fr_.7fr_.6fr_.6fr_.42fr] gap-2 px-3 text-[11px] border-y text-muted-foreground items-center">
                   <span>Área</span>
                   <span>Equipo</span>
                   <span>Tarea</span>
@@ -2624,7 +2654,11 @@ export function GanttPlannerPage() {
                   <span title="Diferencia en horas entre duración real y baseline">Δ Plan (h)</span>
                   <span className="text-center">X</span>
                 </div>
-                <div className="max-h-[560px] overflow-auto">
+                <div
+                  ref={timelineTableBodyRef}
+                  className="max-h-[560px] overflow-auto"
+                  onScroll={handleTimelineTableBodyScroll}
+                >
                   {timelineRows.map((row) => {
                     const status = STATUS_META[row.task.status]
                     return (
@@ -2711,7 +2745,11 @@ export function GanttPlannerPage() {
                 </div>
               </CardHeader>
               <CardContent className="p-0">
-                <div className="overflow-auto">
+                <div
+                  ref={timelineChartScrollRef}
+                  className="max-h-[560px] overflow-auto"
+                  onScroll={handleTimelineChartScroll}
+                >
                   <div style={{ minWidth: `${timeline.widthPx}px` }}>
                     <div className="sticky top-0 z-10 h-8 border-y bg-background/95" style={{ width: `${timeline.widthPx}px` }}>
                       {timelineDayBands.map((band, index) => (

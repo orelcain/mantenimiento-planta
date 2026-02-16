@@ -7,6 +7,15 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.20] - 2026-02-15
+
+### 🧭 Corrección de zoom y alineación en timeline Gantt
+
+#### Fixes
+- **Zoom perceptible en rangos cortos**: `Día / Semana / Mes` ahora ajusta anchos mínimos distintos por escala para que las barras cambien visualmente.
+- **Alineación fila-barra estable**: sincronizado el scroll vertical entre la tabla izquierda y el panel de barras del timeline.
+- **Desfase de encabezados corregido**: altura de cabecera unificada para que tarea y barra queden en la misma línea.
+
 ## [2.48.19] - 2026-02-15
 
 ### 🔍 Visor seguro de evidencia en Gantt

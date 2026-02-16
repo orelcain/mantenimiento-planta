@@ -1,8 +1,11 @@
 {
-  "version": "2.48.19",
+  "version": "2.48.20",
   "buildDate": "2026-02-15",
-  "buildTimestamp": 1771158600000,
+  "buildTimestamp": 1771160400000,
   "features": [
+    "Timeline Gantt: zoom Día/Semana/Mes ahora cambia ancho mínimo por escala y se percibe correctamente en rangos cortos",
+    "Timeline Gantt: sincronización de scroll vertical entre tabla de tareas y panel de barras para mantener alineación",
+    "Cabeceras de tabla/timeline alineadas para evitar desfase visual entre fila y barra",
     "Gantt ahora abre fotos de evidencia en visor interno seguro (sin redirección directa a URL de Firebase)",
     "Visor de evidencia en Gantt incluye zoom in/out, reset y paneo por arrastre",
     "Click en miniatura de historial abre imagen ampliada dentro del modal/pestaña de Gantt",
