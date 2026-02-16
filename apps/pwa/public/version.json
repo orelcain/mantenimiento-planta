@@ -1,8 +1,11 @@
 {
-  "version": "2.48.20",
-  "buildDate": "2026-02-15",
-  "buildTimestamp": 1771160400000,
+  "version": "2.48.21",
+  "buildDate": "2026-02-16",
+  "buildTimestamp": 1771279363050,
   "features": [
+    "CI Pages: concurrencia ajustada para evitar auto-cancelaciones de deploy en progreso",
+    "CI Pages: deploy acotado con timeout interno, límite de errores y reintento controlado",
+    "Gantt Timeline: bloque superior compactado (proyecto, KPIs y controles) para mostrar más área útil del diagrama",
     "Timeline Gantt: zoom Día/Semana/Mes ahora cambia ancho mínimo por escala y se percibe correctamente en rangos cortos",
     "Timeline Gantt: sincronización de scroll vertical entre tabla de tareas y panel de barras para mantener alineación",
     "Cabeceras de tabla/timeline alineadas para evitar desfase visual entre fila y barra",

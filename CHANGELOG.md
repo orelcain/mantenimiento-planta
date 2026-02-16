@@ -7,6 +7,19 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.21] - 2026-02-16
+
+### 🚀 Estabilidad de deploy Pages + compactación visual del timeline
+
+#### Fixes
+- **Deploy GitHub Pages sin cancelaciones cruzadas**: se ajustó la concurrencia del workflow para evitar auto-cancelación de ejecuciones en progreso.
+- **Polling acotado en `deploy-pages`**: se incorporaron timeout interno, límite de errores y reintento controlado para evitar bucles largos en estado pending.
+- **Fallo explícito y trazable**: si ambos intentos de publicación fallan, el workflow termina con error claro en lugar de quedar indefinidamente consultando estado.
+
+#### Mejoras
+- **Timeline más compacto en cabecera**: selector de proyecto, KPIs y bloque de controles superiores reducen altura para maximizar área útil del diagrama.
+- **Controles densificados sin perder funcionalidad**: inputs/selects/badges y espaciados fueron ajustados para mejorar lectura y operación en pantallas medianas.
+
 ## [2.48.20] - 2026-02-15
 
 ### 🧭 Corrección de zoom y alineación en timeline Gantt

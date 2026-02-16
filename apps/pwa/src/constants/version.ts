@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.48.20' as const
+export const APP_VERSION = '2.48.21' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-02-16' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Gantt: zoom día/semana/mes y alineación fila-barra' as const
+export const VERSION_NAME = 'Gantt: timeline compacto + deploy Pages estable' as const
 
 /**
  * Nota:

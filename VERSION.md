@@ -1,14 +1,19 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.48.20**
+## Versión Actual: **v2.48.21**
 
-**Fecha de lanzamiento**: 15 de febrero de 2026  \
+**Fecha de lanzamiento**: 16 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
 **Build**: ✅ Stable
 
 ---
 
 ## 📋 Información de la Versión
+
+### v2.48.21 - Deploy Pages estable + timeline compacto (16/02/2026)
+- 🛡️ **Deploy sin bucle/cancelación cruzada**: ajustes de concurrencia y retry acotado en workflow de GitHub Pages.
+- ⏱️ **Polling con límites reales**: timeout, error_count y reporting_interval para evitar espera indefinida en `actions/deploy-pages`.
+- 🧭 **Timeline con más área útil**: compactación del bloque superior (proyecto/KPIs/controles) para priorizar la visualización del gráfico.
 
 ### v2.48.20 - Zoom y alineación corregidos en timeline Gantt (15/02/2026)
 - 🧭 **Zoom Día/Semana/Mes funcional**: la escala ahora modifica visualmente el timeline incluso con pocas jornadas.
