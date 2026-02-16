@@ -1,5 +1,5 @@
 name: Deploy PWA to GitHub Pages
-# Version: v2.2.29 - Updated: 2026-01-09
+# Version: v2.2.30 - Updated: 2026-02-16
 
 on:
   push:
@@ -64,6 +64,10 @@ jobs:
           path: 'apps/pwa/dist'
 
   deploy:
+    timeout-minutes: 20
+    concurrency:
+      group: pages-deploy
+      cancel-in-progress: false
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
