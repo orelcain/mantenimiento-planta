@@ -1,14 +1,19 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.48.17**
+## Versión Actual: **v2.48.18**
 
-**Fecha de lanzamiento**: 16 de febrero de 2026  \
+**Fecha de lanzamiento**: 15 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
 **Build**: ✅ Stable
 
 ---
 
 ## 📋 Información de la Versión
+
+### v2.48.18 - Hotfix deploy y errores VS Code (15/02/2026)
+- 🧯 **TypeScript Gantt corregido**: resuelto error de índice `undefined` en mapeo de días de semana.
+- 🧱 **Compilación restaurada**: import `orderBy` reintroducido en servicio Gantt para build CI.
+- ✅ **Problemas de VS Code limpiados**: vista `Problems` y pipeline de deploy quedan consistentes.
 
 ### v2.48.17 - Notas históricas editables y robustez de seguimiento (16/02/2026)
 - 🧾 **Notas multilinea**: campo de comentario en `textarea` para registrar avances con saltos de línea reales.

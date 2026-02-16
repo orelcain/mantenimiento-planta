@@ -1,8 +1,11 @@
 {
-  "version": "2.48.17",
-  "buildDate": "2026-02-16",
-  "buildTimestamp": 1771205141766,
+  "version": "2.48.18",
+  "buildDate": "2026-02-15",
+  "buildTimestamp": 1771156800000,
   "features": [
+    "Hotfix TypeScript para deploy: acceso tipado en WEEKDAY_TO_INDEX evita error undefined como índice",
+    "Hotfix build Gantt: se restaura import orderBy requerido por consulta de tareas",
+    "Corrección de errores visibles en VS Code Problems alineada con CI de GitHub Actions",
     "Notas de avance ahora usan campo multilinea (textarea) para conservar saltos de línea reales",
     "Historial de notas editable: permite actualizar texto, % y horas de comentarios ya registrados",
     "Edición de evidencia por nota: quitar fotos previas y agregar nuevas con tope total de 5 imágenes",

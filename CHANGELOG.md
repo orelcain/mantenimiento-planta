@@ -7,6 +7,15 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.18] - 2026-02-15
+
+### 🧯 Hotfix deploy y limpieza de errores en VS Code
+
+#### Fixes
+- **Type-check estable en CI**: corregido acceso tipado de día de semana en `GanttPlannerPage` para evitar `Type 'undefined' cannot be used as an index type`.
+- **Build de Gantt restaurado**: re-agregado `orderBy` en imports de `gantt.ts` para compilar consultas de tareas correctamente.
+- **Paridad local/Actions**: errores reportados en VS Code Problems ahora quedan alineados con pipeline de GitHub Pages.
+
 ## [2.48.17] - 2026-02-16
 
 ### 🧾 Notas históricas editables + estabilidad IA/comentarios

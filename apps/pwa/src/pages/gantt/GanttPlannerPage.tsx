@@ -228,7 +228,8 @@ function parseOperationalRescheduleDate(comment: string, referenceDate: Date): D
 
   const weekdayMatch = normalized.match(/\b(lunes|martes|miercoles|jueves|viernes|sabado|domingo)\b/)
   if (weekdayMatch) {
-    const weekday = weekdayMatch[1]
+    const weekday = weekdayMatch[1] as keyof typeof WEEKDAY_TO_INDEX | undefined
+    if (!weekday) return undefined
     const target = WEEKDAY_TO_INDEX[weekday]
     if (typeof target === 'number') {
       const base = new Date(referenceDate)
