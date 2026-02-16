@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.48.18' as const
+export const APP_VERSION = '2.48.19' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-02-15' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Hotfix deploy: TypeScript Gantt + limpieza errores VS Code' as const
+export const VERSION_NAME = 'Gantt: visor seguro de evidencia con zoom y pan' as const
 
 /**
  * Nota:

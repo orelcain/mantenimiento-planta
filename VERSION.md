@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.48.18**
+## Versión Actual: **v2.48.19**
 
 **Fecha de lanzamiento**: 15 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.48.19 - Visor seguro de evidencia en Gantt (15/02/2026)
+- 🔒 **Sin redirección externa**: fotos de comentarios se visualizan dentro de la app.
+- 🔍 **Zoom/Pan integrado**: visor ampliado con acercar, alejar, restablecer y arrastre.
+- 🧭 **Cobertura en todo Gantt**: aplica al historial de evidencia en Timeline y en pestaña `Tareas`.
 
 ### v2.48.18 - Hotfix deploy y errores VS Code (15/02/2026)
 - 🧯 **TypeScript Gantt corregido**: resuelto error de índice `undefined` en mapeo de días de semana.

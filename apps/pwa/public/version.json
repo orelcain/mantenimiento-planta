@@ -1,8 +1,11 @@
 {
-  "version": "2.48.18",
+  "version": "2.48.19",
   "buildDate": "2026-02-15",
-  "buildTimestamp": 1771156800000,
+  "buildTimestamp": 1771158600000,
   "features": [
+    "Gantt ahora abre fotos de evidencia en visor interno seguro (sin redirección directa a URL de Firebase)",
+    "Visor de evidencia en Gantt incluye zoom in/out, reset y paneo por arrastre",
+    "Click en miniatura de historial abre imagen ampliada dentro del modal/pestaña de Gantt",
     "Hotfix TypeScript para deploy: acceso tipado en WEEKDAY_TO_INDEX evita error undefined como índice",
     "Hotfix build Gantt: se restaura import orderBy requerido por consulta de tareas",
     "Corrección de errores visibles en VS Code Problems alineada con CI de GitHub Actions",

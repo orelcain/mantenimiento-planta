@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react'
-import { AlertTriangle, Bell, CalendarClock, Camera, ChevronDown, ChevronUp, FileSpreadsheet, GitBranchPlus, Link2Off, Plus, Sparkles, Trash2, Upload } from 'lucide-react'
+import { AlertTriangle, Bell, CalendarClock, Camera, ChevronDown, ChevronUp, FileSpreadsheet, GitBranchPlus, Link2Off, Plus, RotateCcw, Sparkles, Trash2, Upload, X, ZoomIn, ZoomOut } from 'lucide-react'
 import * as XLSX from 'xlsx'
+import { TransformComponent, TransformWrapper } from 'react-zoom-pan-pinch'
 import {
   Badge,
   Button,
@@ -498,6 +499,7 @@ export function GanttPlannerPage() {
   const [editingCommentNewPhotos, setEditingCommentNewPhotos] = useState<File[]>([])
   const [editingCommentNewPhotoPreviews, setEditingCommentNewPhotoPreviews] = useState<string[]>([])
   const [editingCommentBusy, setEditingCommentBusy] = useState(false)
+  const [viewingCommentPhoto, setViewingCommentPhoto] = useState<string | null>(null)
   const [progressBusy, setProgressBusy] = useState(false)
   const [aiProgressSuggestion, setAiProgressSuggestion] = useState<number | null>(null)
   const [aiProgressReason, setAiProgressReason] = useState('')
@@ -3467,9 +3469,9 @@ export function GanttPlannerPage() {
                                   <div className="grid grid-cols-4 gap-2">
                                     {editingCommentExistingPhotos.map((photo, index) => (
                                       <div key={`timeline-edit-photo-${comment.id}-${index}`} className="space-y-1">
-                                        <a href={photo} target="_blank" rel="noreferrer">
+                                        <button type="button" className="w-full" onClick={() => setViewingCommentPhoto(photo)}>
                                           <img src={photo} alt={`foto comentario ${index + 1}`} className="h-16 w-full rounded border object-cover" />
-                                        </a>
+                                        </button>
                                         <Button size="sm" variant="outline" className="w-full" onClick={() => handleRemoveEditingExistingPhoto(index)}>
                                           Quitar
                                         </Button>
@@ -3517,9 +3519,14 @@ export function GanttPlannerPage() {
                               {comment.photos && comment.photos.length > 0 && (
                                 <div className="grid grid-cols-4 gap-2">
                                   {comment.photos.map((photo, index) => (
-                                    <a key={`timeline-comment-photo-${comment.id}-${index}`} href={photo} target="_blank" rel="noreferrer">
+                                    <button
+                                      key={`timeline-comment-photo-${comment.id}-${index}`}
+                                      type="button"
+                                      className="w-full"
+                                      onClick={() => setViewingCommentPhoto(photo)}
+                                    >
                                       <img src={photo} alt={`foto comentario ${index + 1}`} className="h-16 w-full rounded border object-cover" />
-                                    </a>
+                                    </button>
                                   ))}
                                 </div>
                               )}
@@ -4257,9 +4264,9 @@ export function GanttPlannerPage() {
                             <div className="grid grid-cols-4 gap-2">
                               {editingCommentExistingPhotos.map((photo, index) => (
                                 <div key={`task-edit-photo-${comment.id}-${index}`} className="space-y-1">
-                                  <a href={photo} target="_blank" rel="noreferrer">
+                                  <button type="button" className="w-full" onClick={() => setViewingCommentPhoto(photo)}>
                                     <img src={photo} alt={`foto comentario ${index + 1}`} className="h-16 w-full rounded border object-cover" />
-                                  </a>
+                                  </button>
                                   <Button size="sm" variant="outline" className="w-full" onClick={() => handleRemoveEditingExistingPhoto(index)}>
                                     Quitar
                                   </Button>
@@ -4307,9 +4314,14 @@ export function GanttPlannerPage() {
                         {comment.photos && comment.photos.length > 0 && (
                           <div className="mt-2 grid grid-cols-4 gap-2">
                             {comment.photos.map((photo, index) => (
-                              <a key={`${comment.id}-photo-${index}`} href={photo} target="_blank" rel="noreferrer">
+                              <button
+                                key={`${comment.id}-photo-${index}`}
+                                type="button"
+                                className="w-full"
+                                onClick={() => setViewingCommentPhoto(photo)}
+                              >
                                 <img src={photo} alt={`foto comentario ${index + 1}`} className="h-16 w-full rounded border object-cover" />
-                              </a>
+                              </button>
                             ))}
                           </div>
                         )}
@@ -4336,6 +4348,83 @@ export function GanttPlannerPage() {
         )}
       </div>
       )}
+
+      <Dialog
+        open={Boolean(viewingCommentPhoto)}
+        onOpenChange={(open) => {
+          if (!open) setViewingCommentPhoto(null)
+        }}
+      >
+        <DialogContent className="max-w-5xl p-0 overflow-hidden">
+          <div className="relative h-[85vh] flex flex-col bg-background">
+            <div className="absolute top-2 right-2 z-20">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => setViewingCommentPhoto(null)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {viewingCommentPhoto && (
+              <TransformWrapper
+                key={viewingCommentPhoto}
+                initialScale={1}
+                minScale={0.5}
+                maxScale={5}
+                wheel={{ step: 0.1 }}
+                pinch={{ step: 5 }}
+                doubleClick={{ mode: 'toggle' }}
+              >
+                {({ zoomIn, zoomOut, resetTransform }) => (
+                  <>
+                    <div className="absolute top-2 left-2 z-20 flex items-center gap-1 rounded border bg-background/90 p-1">
+                      <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => zoomIn()} title="Acercar">
+                        <ZoomIn className="h-4 w-4" />
+                      </Button>
+                      <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => zoomOut()} title="Alejar">
+                        <ZoomOut className="h-4 w-4" />
+                      </Button>
+                      <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => resetTransform()} title="Restablecer">
+                        <RotateCcw className="h-4 w-4" />
+                      </Button>
+                    </div>
+
+                    <TransformComponent
+                      wrapperStyle={{
+                        width: '100%',
+                        height: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                      contentStyle={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <img
+                        src={viewingCommentPhoto}
+                        alt="Evidencia ampliada"
+                        className="max-w-full max-h-[80vh] object-contain select-none"
+                        draggable={false}
+                      />
+                    </TransformComponent>
+                  </>
+                )}
+              </TransformWrapper>
+            )}
+
+            <div className="absolute bottom-4 right-4 z-20 text-xs text-muted-foreground hidden sm:block">
+              Scroll o pellizcar para zoom • Arrastrar para mover • Doble click para alternar
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

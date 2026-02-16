@@ -7,6 +7,16 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.19] - 2026-02-15
+
+### 🔍 Visor seguro de evidencia en Gantt
+
+#### Mejoras
+- **Sin salida a URL pública**: las fotos de comentarios ya no abren `target=_blank` a Firebase Storage.
+- **Visor interno ampliado**: click en miniatura abre modal en la misma app.
+- **Zoom y pan**: controles de `acercar`, `alejar`, `restablecer`, además de paneo por arrastre y doble click para toggle.
+- **Cobertura completa**: aplica tanto en modal rápido de timeline como en historial de la pestaña `Tareas`.
+
 ## [2.48.18] - 2026-02-15
 
 ### 🧯 Hotfix deploy y limpieza de errores en VS Code
