@@ -1,8 +1,12 @@
 {
-  "version": "2.48.14",
+  "version": "2.48.15",
   "buildDate": "2026-02-15",
-  "buildTimestamp": 1771221000000,
+  "buildTimestamp": 1771224600000,
   "features": [
+    "Columna Avance en timeline ahora es clicable para abrir edición rápida de %",
+    "Modal de avance rápido incluye nota/comentario, carga de fotos de evidencia y guardado directo",
+    "Integración IA (Grok) disponible en modal rápido para estimar y aplicar % sugerido",
+    "Si se reportan más horas reales, la tarea ajusta automáticamente su fecha fin",
     "Ubicación masiva suma acción Seleccionar filtro para marcar todas las tareas del resultado actual",
     "Admin puede seleccionar múltiples tareas con checkbox en listado y aplicar una ubicación en lote",
     "Nuevo bloque de Ubicación para múltiples tareas con jerarquía encadenada y guardado masivo",

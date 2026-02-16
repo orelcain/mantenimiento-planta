@@ -7,6 +7,16 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.15] - 2026-02-15
+
+### 📝 Avance clicable con notas, fotos e IA en timeline
+
+#### Mejoras
+- **Click en Avance (%)**: desde la tabla timeline ahora abre modal de edición rápida por tarea.
+- **Registro operativo completo**: en ese modal se puede actualizar `%`, agregar nota y adjuntar fotos de evidencia.
+- **IA Grok en flujo rápido**: estimación y aplicación de porcentaje sugerido sin salir del timeline.
+- **Ajuste automático de tiempo**: al reportar más horas reales, la tarea extiende fecha fin automáticamente.
+
 ## [2.48.14] - 2026-02-15
 
 ### ✅ Selección masiva por filtro completo

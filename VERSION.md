@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.48.14**
+## Versión Actual: **v2.48.15**
 
 **Fecha de lanzamiento**: 15 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,12 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.48.15 - Avance editable + notas/fotos + IA en timeline (15/02/2026)
+- 📝 **Edición directa desde Avance**: clic en `%` abre modal rápido por tarea.
+- 📷 **Trazabilidad en sitio**: nota + evidencia fotográfica guardadas desde el mismo modal.
+- ✨ **Grok integrado**: sugiere porcentaje según comentarios y permite aplicar de inmediato.
+- ⏱️ **Tiempo autoajustable**: horas reales reportadas pueden extender fin de tarea automáticamente.
 
 ### v2.48.14 - Seleccionar todo el filtro actual (15/02/2026)
 - ✅ **Nuevo botón Seleccionar filtro** en ubicación múltiple para admin.

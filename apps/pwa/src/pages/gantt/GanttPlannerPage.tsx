@@ -424,6 +424,7 @@ export function GanttPlannerPage() {
   const [timelineQuickDependencyType, setTimelineQuickDependencyType] = useState<'FS' | 'SS' | 'FF' | 'SF'>('FS')
   const [timelineQuickDependencyLag, setTimelineQuickDependencyLag] = useState<number>(0)
   const [timelineQuickModalOpen, setTimelineQuickModalOpen] = useState(false)
+  const [timelineProgressModalTaskId, setTimelineProgressModalTaskId] = useState<string | null>(null)
   const [timelineDeleteConfirmTaskId, setTimelineDeleteConfirmTaskId] = useState<string | null>(null)
   const [timelineDeleteConfirmArmed, setTimelineDeleteConfirmArmed] = useState(false)
   const [bulkLocationSelection, setBulkLocationSelection] = useState<HierarchySelectionMap>(() => createEmptyHierarchySelection())
@@ -872,6 +873,11 @@ export function GanttPlannerPage() {
     return timelineFilteredTasks.find((task) => task.id === selectedTaskId) ?? selectedTask
   }, [selectedTask, selectedTaskId, timelineFilteredTasks])
 
+  const timelineProgressModalTask = useMemo(() => {
+    if (!timelineProgressModalTaskId) return null
+    return tasks.find((task) => task.id === timelineProgressModalTaskId) ?? null
+  }, [tasks, timelineProgressModalTaskId])
+
   const timelineQuickSelectedHierarchyNode = useMemo(() => {
     for (let index = TASK_LOCATION_LEVELS.length - 1; index >= 0; index -= 1) {
       const level = TASK_LOCATION_LEVELS[index]
@@ -1252,6 +1258,18 @@ export function GanttPlannerPage() {
     setTimelineQuickModalOpen(true)
   }, [])
 
+  const openTimelineProgressModal = useCallback((taskId: string) => {
+    setSelectedTaskId(taskId)
+    setTimelineProgressModalTaskId(taskId)
+  }, [])
+
+  const closeTimelineProgressModal = useCallback(() => {
+    setTimelineProgressModalTaskId(null)
+    setCommentPhotos([])
+    commentPhotoPreviews.forEach((url) => URL.revokeObjectURL(url))
+    setCommentPhotoPreviews([])
+  }, [commentPhotoPreviews])
+
   const handleTimelineQuickSaveDates = useCallback(async () => {
     if (!selectedTimelineTask) return
 
@@ -1450,6 +1468,17 @@ export function GanttPlannerPage() {
       setAiProgressSuggestion(selectedTask.aiSuggestedProgress)
     }
   }, [selectedTask])
+
+  useEffect(() => {
+    if (!timelineProgressModalTaskId) return
+    setNewComment('')
+    setReportedDurationInput('')
+    setCommentPhotos([])
+    setCommentPhotoPreviews((current) => {
+      current.forEach((url) => URL.revokeObjectURL(url))
+      return []
+    })
+  }, [timelineProgressModalTaskId])
 
   useEffect(() => {
     if (!selectedTimelineTask) {
@@ -2000,6 +2029,17 @@ export function GanttPlannerPage() {
     }
   }
 
+  async function handleTimelineProgressModalSaveProgress() {
+    if (!timelineProgressModalTask) return
+    const value = Number(reportedProgressInput.replace(',', '.'))
+    if (!Number.isFinite(value)) return
+    await handleUpdateTaskProgress(timelineProgressModalTask, value)
+  }
+
+  async function handleTimelineProgressModalSaveComment() {
+    await handleAddComment()
+  }
+
   async function handleParseImportFile() {
     if (!importFile) return
 
@@ -2368,7 +2408,18 @@ export function GanttPlannerPage() {
                         <span className="truncate" title={row.task.titulo}>{row.isCritical ? '🔴 ' : ''}{row.task.titulo}</span>
                         <span className="truncate" title={row.task.responsibleName ?? 'Sin asignar'}>{row.task.responsibleName ?? 'Sin asignar'}</span>
                         <Badge variant={status.variant}>{status.label}</Badge>
-                        <span>{row.task.progress}%</span>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 px-2"
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            openTimelineProgressModal(row.task.id)
+                          }}
+                          title="Editar avance y notas"
+                        >
+                          {row.task.progress}%
+                        </Button>
                         <span className={row.baselineDeltaHours > 0 ? 'text-destructive' : row.baselineDeltaHours < 0 ? 'text-foreground' : 'text-muted-foreground'}>
                           {formatDeltaHours(row.baselineDeltaHours)}
                         </span>
@@ -3029,6 +3080,129 @@ export function GanttPlannerPage() {
                 {timelineDeleteConfirmArmed ? 'Eliminar' : 'Eliminar (espera 1s)'}
               </Button>
             </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog
+          open={timelineProgressModalTaskId !== null}
+          onOpenChange={(open) => {
+            if (!open) closeTimelineProgressModal()
+          }}
+        >
+          <DialogContent className="max-w-[95vw] sm:max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Avance rápido + notas de tarea</DialogTitle>
+              <DialogDescription>
+                {timelineProgressModalTask
+                  ? `${taskLocationSummary(timelineProgressModalTask)} · ${timelineProgressModalTask.titulo}`
+                  : 'Selecciona una tarea para reportar avance'}
+              </DialogDescription>
+            </DialogHeader>
+
+            {timelineProgressModalTask && (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="rounded border p-2">Estado: {timelineProgressModalTask.status}</div>
+                  <div className="rounded border p-2">Avance actual: {timelineProgressModalTask.progress}%</div>
+                </div>
+
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <div>
+                    <Label className="text-xs">% avance técnico</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={reportedProgressInput}
+                      onChange={(event) => setReportedProgressInput(event.target.value)}
+                      placeholder={String(timelineProgressModalTask.progress)}
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Tiempo real reportado (h, opcional)</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      step={0.25}
+                      value={reportedDurationInput}
+                      onChange={(event) => setReportedDurationInput(event.target.value)}
+                      placeholder="Ej: 6"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <Button
+                    className="flex-1"
+                    variant="outline"
+                    disabled={progressBusy || reportedProgressInput.trim().length === 0 || !canOperateTask(timelineProgressModalTask)}
+                    onClick={() => void handleTimelineProgressModalSaveProgress()}
+                  >
+                    Guardar %
+                  </Button>
+                </div>
+
+                <div className="rounded border p-2 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-muted-foreground">Sugerencia IA (Grok)</p>
+                    <Button size="sm" variant="outline" onClick={() => handleEstimateProgressWithAI()}>
+                      <Sparkles className="h-3.5 w-3.5 mr-1" /> Estimar
+                    </Button>
+                  </div>
+                  {aiProgressSuggestion !== null ? (
+                    <>
+                      <p className="text-sm font-medium">{aiProgressSuggestion}% sugerido</p>
+                      {aiProgressReason && <p className="text-xs text-muted-foreground">{aiProgressReason}</p>}
+                      <Button
+                        size="sm"
+                        className="w-full"
+                        variant="secondary"
+                        disabled={!canOperateTask(timelineProgressModalTask)}
+                        onClick={handleApplyAISuggestion}
+                      >
+                        Aplicar sugerencia IA
+                      </Button>
+                    </>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">Sin sugerencia IA aún para esta tarea.</p>
+                  )}
+                </div>
+
+                <div>
+                  <Label className="text-xs">Nota / comentario de avance</Label>
+                  <Input
+                    value={newComment}
+                    onChange={(event) => setNewComment(event.target.value)}
+                    placeholder="Ej: falta componente X; se retoma el jueves con evidencia"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs">Fotos de evidencia (máx. 5)</Label>
+                  <Input type="file" accept="image/*" multiple onChange={handleSelectCommentPhotos} />
+                  {commentPhotoPreviews.length > 0 && (
+                    <div className="grid grid-cols-5 gap-2">
+                      {commentPhotoPreviews.map((preview, index) => (
+                        <img key={`timeline-progress-preview-${index}`} src={preview} alt={`evidencia ${index + 1}`} className="h-16 w-full rounded border object-cover" />
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => void handleTimelineProgressModalSaveComment()}
+                  disabled={timelineProgressModalTaskId === null || !newComment.trim() || commentBusy || !canOperateTask(timelineProgressModalTask)}
+                >
+                  <Camera className="h-4 w-4 mr-1" /> {commentBusy ? 'Guardando...' : 'Guardar nota + evidencia'}
+                </Button>
+
+                <p className="text-[11px] text-muted-foreground">
+                  Si reportas más horas de las planificadas, el sistema extiende automáticamente la fecha fin de la tarea.
+                </p>
+              </div>
+            )}
           </DialogContent>
         </Dialog>
       </div>
