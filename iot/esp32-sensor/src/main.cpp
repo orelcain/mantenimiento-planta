@@ -95,6 +95,7 @@ bool setAlertThresholds(const AlertThresholds& t);
 static void loadSendInterval();
 static void persistSendInterval(uint16_t intervalSec);
 static void startSendIntervalStream();
+static void fetchSendIntervalOnce();
 uint16_t getSendIntervalSeconds();  // Público para webserver
 void setSendIntervalSeconds(uint16_t sec);  // Público para webserver
 
@@ -1461,6 +1462,34 @@ static void startSendIntervalStream() {
   Serial.printf("👂 Escuchando intervalo de lectura en: %s\n", path.c_str());
 }
 
+static void fetchSendIntervalOnce() {
+  if (!firebaseReady) return;
+  if (deviceId.length() == 0) return;
+
+  String path;
+  path.reserve(80);
+  path = "devices/";
+  path += deviceId;
+  path += "/sendInterval";
+
+  if (!Firebase.RTDB.getInt(&fbdo, path.c_str())) {
+    Serial.printf("ℹ No se pudo leer sendInterval inicial: %s\n", fbdo.errorReason().c_str());
+    return;
+  }
+
+  int fetched = fbdo.to<int>();
+  if (fetched <= 0) return;
+
+  uint16_t newInterval = (uint16_t)fetched;
+  if (newInterval < MIN_SEND_INTERVAL) newInterval = MIN_SEND_INTERVAL;
+  if (newInterval > MAX_SEND_INTERVAL) newInterval = MAX_SEND_INTERVAL;
+
+  if (newInterval != sendIntervalSeconds) {
+    Serial.printf("⏱️ Intervalo inicial leído en RTDB: %d segundos\n", newInterval);
+    setSendIntervalSeconds(newInterval);
+  }
+}
+
 static void printDhtPinState(const char* context) {
   // El DHT normalmente deja la línea en HIGH (pull-up). Si queda siempre LOW,
   // suele ser corto a GND / pinout incorrecto / sensor trabado.
@@ -1906,11 +1935,12 @@ void setupFirebase() {
     Serial.printf("📌 Equipo asignado (local): %s\n", currentEquipmentId.c_str());
     sendDeviceStatus(true);
     startDeviceAssignmentStream();
+    startSendIntervalStream();
+    fetchSendIntervalOnce();
   #if ENABLE_OPTIONAL_DEVICE_STREAMS
     startEquipmentPathStream();
     startApConfigStream();
     startWifiConfigStream();
-    startSendIntervalStream();
     startWifiScanRequestStream();
   #endif
     
@@ -2413,6 +2443,13 @@ void loop() {
   // Procesar stream de asignación (devices/{deviceId}/assignedEquipmentId)
   if (firebaseReady && millis() - lastStreamReadMs > 500) {
     Firebase.RTDB.readStream(&stream);
+    Firebase.RTDB.readStream(&sendIntervalStream);
+#if ENABLE_OPTIONAL_DEVICE_STREAMS
+    Firebase.RTDB.readStream(&equipmentPathStream);
+    Firebase.RTDB.readStream(&apConfigStream);
+    Firebase.RTDB.readStream(&wifiConfigStream);
+    Firebase.RTDB.readStream(&wifiScanStream);
+#endif
     lastStreamReadMs = millis();
   }
 

@@ -37,6 +37,16 @@ function getTelemetryAlert(device: DeviceRow): 'normal' | 'warning' | 'critical'
   return 'normal'
 }
 
+function isDeviceFresh(device: DeviceRow, nowMs: number): boolean {
+  if (!device.online) return false
+  const lastSeen = device.lastSeen
+  if (!lastSeen || !Number.isFinite(lastSeen)) return false
+
+  const intervalSec = device.sendInterval && device.sendInterval > 0 ? device.sendInterval : 10
+  const freshnessWindowMs = Math.max(intervalSec * 3 * 1000, 30000)
+  return nowMs - lastSeen <= freshnessWindowMs
+}
+
 function buildSparklineCoordinates(values: number[], width: number, height: number, padding: number) {
   if (values.length < 2) return []
 
@@ -255,6 +265,7 @@ export function SensorsMonitorPage() {
   const [search, setSearch] = useState('')
   const [areaFilter, setAreaFilter] = useState('all')
   const [readingsByEquipment, setReadingsByEquipment] = useState<Record<string, SensorReading[]>>({})
+  const [panelNowMs, setPanelNowMs] = useState(() => Date.now())
 
   useEffect(() => {
     let isMounted = true
@@ -288,6 +299,11 @@ export function SensorsMonitorPage() {
       isMounted = false
       unsub()
     }
+  }, [])
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setPanelNowMs(Date.now()), 5000)
+    return () => window.clearInterval(timer)
   }, [])
 
   const assignedEquipmentIds = useMemo(() => {
@@ -374,7 +390,7 @@ export function SensorsMonitorPage() {
     let unassigned = 0
 
     for (const device of devices) {
-      if (device.online) online += 1
+      if (isDeviceFresh(device, panelNowMs)) online += 1
       const alert = getTelemetryAlert(device)
       if (alert === 'warning') warning += 1
       if (alert === 'critical') critical += 1
@@ -388,7 +404,7 @@ export function SensorsMonitorPage() {
       critical,
       unassigned,
     }
-  }, [devices])
+  }, [devices, panelNowMs])
 
   if (!canSeeSensors) {
     return <Navigate to="/" replace />
@@ -466,6 +482,7 @@ export function SensorsMonitorPage() {
           const alert = getTelemetryAlert(device)
           const area = getAreaLabel(assignedEquipment)
           const trendReadings = device.assignedEquipmentId ? readingsByEquipment[device.assignedEquipmentId] : undefined
+          const isFresh = isDeviceFresh(device, panelNowMs)
 
           return (
             <Card key={device.deviceId}>
@@ -481,7 +498,7 @@ export function SensorsMonitorPage() {
                     </p>
                   </div>
                   <div className="flex gap-2 flex-wrap justify-end">
-                    <Badge variant={device.online ? 'default' : 'secondary'}>{device.online ? 'Online' : 'Offline'}</Badge>
+                    <Badge variant={isFresh ? 'default' : 'secondary'}>{isFresh ? 'Online' : 'Sin datos recientes'}</Badge>
                     {alert === 'critical' && <Badge variant="destructive">Crítico</Badge>}
                     {alert === 'warning' && <Badge className="bg-amber-600 hover:bg-amber-600">Warning</Badge>}
                     {alert === 'normal' && <Badge variant="outline">Normal</Badge>}
