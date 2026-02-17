@@ -205,9 +205,9 @@ function TrendSparkline({ readings, sendIntervalSec, thresholds }: { readings?: 
     )
   }
 
-  // Aspect ratio 4:3 (ancho > alto)
+  // Dimensiones SVG compactas
   const width = 400
-  const height = chartMode === 'dual' ? 180 : 220
+  const height = chartMode === 'dual' ? 140 : 170
   const padding = 8
   const th = resolveThresholds(thresholds)
 
@@ -420,7 +420,7 @@ function TrendSparkline({ readings, sendIntervalSec, thresholds }: { readings?: 
         </span>
       </div>
 
-      <div className="w-full rounded-lg bg-gradient-to-b from-muted/30 to-muted/5 overflow-hidden border border-border/20" style={{ aspectRatio: '4/3' }}>
+      <div className="w-full h-44 rounded-lg bg-gradient-to-b from-muted/30 to-muted/5 overflow-hidden border border-border/20">
         <svg
           viewBox={`0 0 ${width} ${height}`}
           preserveAspectRatio="none"

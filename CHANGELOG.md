@@ -7,6 +7,15 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.37] - 2026-02-17
+
+### Fix gráfico que no cabía en pantalla
+
+- Reemplazar `aspect-ratio` por alto fijo `h-44` (11rem) que cabe completo en pantalla.
+- SVG viewBox reducido a 400×140 (dual) / 400×170 (individual).
+
+---
+
 ## [2.48.36] - 2026-02-17
 
 ### Fix tamaño gráfico + Offline
