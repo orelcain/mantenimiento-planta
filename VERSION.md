@@ -1,14 +1,20 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.48.23**
+## Versión Actual: **v2.48.24**
 
-**Fecha de lanzamiento**: 16 de febrero de 2026  \
+**Fecha de lanzamiento**: 17 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
 **Build**: ✅ Stable
 
 ---
 
 ## 📋 Información de la Versión
+
+### v2.48.24 - Gráfico de cambios del sensor en panel técnico (17/02/2026)
+- 📈 **Tendencia visible por dispositivo**: cada tarjeta del `Panel Técnico de Sensores` ahora muestra un gráfico compacto con cambios recientes de temperatura y humedad.
+- 🔄 **Datos en tiempo real desde RTDB**: el gráfico consume lecturas recientes por equipo asignado para reflejar variaciones operativas sin salir del panel.
+- 🧭 **Lectura rápida en campo**: se agregaron leyenda y estado de disponibilidad cuando no hay historial suficiente.
+- ✅ **Cierre estándar de versión**: bump y sincronización de artefactos de versionado según flujo oficial.
 
 ### v2.48.23 - ESP32 estable sin USB + OTA remota + guías operativas (16/02/2026)
 - 🔧 **Captura ESP32 estabilizada**: se evitó reinicio por memoria en arranque RTDB y se validó publicación continua de temperatura/humedad sin USB.

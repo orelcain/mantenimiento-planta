@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.48.23' as const
+export const APP_VERSION = '2.48.24' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-02-17' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'IoT: ESP32 estable sin USB + OTA remota + guías operativas' as const
+export const VERSION_NAME = 'Sensores: gráfico de cambios en tiempo real por equipo' as const
 
 /**
  * Nota:

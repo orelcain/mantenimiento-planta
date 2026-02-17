@@ -7,6 +7,18 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.24] - 2026-02-17
+
+### 📈 Gráfico de cambios del sensor en panel técnico
+
+#### Mejoras
+- **Tendencia por dispositivo en el panel**: cada tarjeta en `sensors/monitor` ahora incluye un gráfico compacto con la evolución reciente de temperatura y humedad.
+- **Lecturas en tiempo real desde RTDB**: el gráfico se alimenta con las últimas muestras por equipo asignado para visualizar variaciones sin abrir la vista de detalle.
+- **Fallback operativo claro**: cuando no hay histórico suficiente, el panel informa explícitamente que no hay datos para graficar.
+
+#### Calidad
+- **Versionado sincronizado del release**: actualización coordinada de `package.json`, constantes de versión, `version.json`, `manifest.json`, `CHANGELOG.md` y `VERSION.md`.
+
 ## [2.48.23] - 2026-02-16
 
 ### 🔧 Estabilización ESP32 en producción + OTA remota + guías operativas
