@@ -1963,6 +1963,7 @@ void setupFirebase() {
 // Firebase RTDB soporta .onDisconnect vía REST: PUT a <url>/<path>.json?auth=TOKEN
 // con header X-Firebase-ETag y body del valor a setear al desconectarse.
 // Aquí registramos online=false para que RTDB lo aplique automáticamente.
+// Firebase REST API: PUT a /<path>.json?auth=TOKEN&onDisconnect=put
 static void registerOnDisconnect() {
   if (deviceId.length() == 0) return;
   if (WiFi.status() != WL_CONNECTED) return;
@@ -1976,12 +1977,14 @@ static void registerOnDisconnect() {
   }
 
   // Registrar onDisconnect para devices/{deviceId}/online
+  // Formato correcto: PUT /<path>.json?auth=TOKEN&onDisconnect=put  Body: valor
   String disconnectUrl = String(FIREBASE_DATABASE_URL);
   if (!disconnectUrl.endsWith("/")) disconnectUrl += "/";
   disconnectUrl += "devices/";
   disconnectUrl += deviceId;
-  disconnectUrl += "/online/.onDisconnect.json?auth=";
+  disconnectUrl += "/online.json?auth=";
   disconnectUrl += token;
+  disconnectUrl += "&onDisconnect=put";
 
   HTTPClient httpOnDisc;
   httpOnDisc.begin(disconnectUrl);
@@ -2001,8 +2004,9 @@ static void registerOnDisconnect() {
     if (!sensorDiscUrl.endsWith("/")) sensorDiscUrl += "/";
     sensorDiscUrl += "sensors/";
     sensorDiscUrl += currentEquipmentId;
-    sensorDiscUrl += "/online/.onDisconnect.json?auth=";
+    sensorDiscUrl += "/online.json?auth=";
     sensorDiscUrl += token;
+    sensorDiscUrl += "&onDisconnect=put";
 
     HTTPClient httpSensorDisc;
     httpSensorDisc.begin(sensorDiscUrl);
