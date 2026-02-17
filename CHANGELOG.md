@@ -7,6 +7,27 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.34] - 2026-02-17
+
+### 🎨 Rediseño visual del Panel Técnico de Sensores
+
+#### Bugfix
+- **Fix "Sin datos recientes"**: la función `isDeviceFresh` no normalizaba timestamps (segundos vs ms) y requería `device.online=true` como precondición, causando que dispositivos activos aparecieran como offline. Ahora usa solo frescura temporal con ventana 5× intervalo (≥60s).
+
+#### Visual
+- **KPI cards rediseñadas**: borde lateral de color por categoría, iconos grandes como fondo, mejor jerarquía visual.
+- **Tarjetas de sensor con color**: temperatura en naranja, humedad en cyan, con fondos tintados y tipografía más grande.
+- **Status pills**: reemplazo de badges planos por pills con `ring`, dot animado (pulse) para online, iconos en alertas.
+- **Borde lateral en dispositivos**: color según estado (verde=online, ámbar=warning, rojo=crítico, gris=offline).
+- **Gráfico mejorado**: dimensiones más grandes (500×160/220), rellenos de área con gradientes SVG, cuadrícula horizontal, líneas suavizadas (`strokeLinejoin/round`), puntos de cursor con halo.
+- **Controles simplificados**: 4 líneas de metadatos reducidas a 1 fila compacta (mode+muestras+countdown).
+- **Tooltip mejorado**: dot de color + valor coloreado para cada métrica.
+- **Leyenda con dots**: círculos de color en lugar de barras.
+- **Botones de acción**: iconos integrados, altura uniforme.
+- **Humedad siempre visible**: línea cyan sólida en modo dual (antes era gray dashed invisible).
+
+---
+
 ## [2.48.33] - 2026-02-17
 
 ### 📊 Gráfico con zonas de alerta para temperatura y humedad

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { Activity, AlertTriangle, Cpu, Thermometer, Droplets, Link2 } from 'lucide-react'
-import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input } from '@/components/ui'
+import { Button, Card, CardContent, CardHeader, CardTitle, Input } from '@/components/ui'
 import { useCanSee } from '@/store'
 import { getEquipments } from '@/services/equipment'
 import { subscribeDevices, type DeviceRow } from '@/services/devicesRtdb'
@@ -38,13 +38,15 @@ function getTelemetryAlert(device: DeviceRow): 'normal' | 'warning' | 'critical'
 }
 
 function isDeviceFresh(device: DeviceRow, nowMs: number): boolean {
-  if (!device.online) return false
   const lastSeen = device.lastSeen
   if (!lastSeen || !Number.isFinite(lastSeen)) return false
 
+  // Normalizar: si está en segundos, convertir a ms
+  const lastSeenMs = lastSeen > 0 && lastSeen < 1e12 ? lastSeen * 1000 : lastSeen
   const intervalSec = device.sendInterval && device.sendInterval > 0 ? device.sendInterval : 10
-  const freshnessWindowMs = Math.max(intervalSec * 3 * 1000, 30000)
-  return nowMs - lastSeen <= freshnessWindowMs
+  // Ventana de frescura: 5× intervalo o mínimo 60 s
+  const freshnessWindowMs = Math.max(intervalSec * 5 * 1000, 60_000)
+  return nowMs - lastSeenMs <= freshnessWindowMs
 }
 
 function buildSparklineCoordinates(values: number[], width: number, height: number, padding: number, fixedMin?: number, fixedMax?: number) {
@@ -111,8 +113,8 @@ function TrendSparkline({ readings, sendIntervalSec }: { readings?: SensorReadin
     )
   }
 
-  const width = 294
-  const height = chartMode === 'dual' ? 124 : 182
+  const width = 500
+  const height = chartMode === 'dual' ? 160 : 220
   const padding = 6
   const th = DEFAULT_THRESHOLDS
 
@@ -293,58 +295,39 @@ function TrendSparkline({ readings, sendIntervalSec }: { readings?: SensorReadin
   }
 
   return (
-    <div className="rounded-md border p-2 space-y-2">
-      <div className="flex items-center justify-between text-xs text-muted-foreground">
-        <span>Cambios recientes del sensor</span>
-        <span>{Math.min(tempValues.length, humValues.length)} muestras</span>
-      </div>
-
-      <div className="flex items-center justify-between text-[11px] text-muted-foreground gap-2 flex-wrap">
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] font-medium">Tipo de gráfico</span>
+    <div className="rounded-xl border border-border/40 bg-card/30 p-3 space-y-2.5">
+      {/* Controles compactos */}
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-2.5">
+          <h4 className="text-xs font-semibold text-foreground tracking-wide">Tendencia</h4>
           <select
             value={chartMode}
             onChange={(e) => setChartMode(e.target.value as ChartMode)}
-            className="h-6 rounded border bg-background px-1.5 text-[11px]"
+            className="h-6 rounded-md border border-border/50 bg-background/60 px-1.5 text-[11px] text-muted-foreground"
           >
-            <option value="dual">Doble eje (Recomendado)</option>
+            <option value="dual">Temp + Humedad</option>
             <option value="temperature">Solo Temperatura</option>
             <option value="humidity">Solo Humedad</option>
           </select>
+          {chartMode !== 'dual' && (
+            <label className="flex items-center gap-1 text-[11px] text-muted-foreground cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={showThresholds}
+                onChange={() => setShowThresholds(!showThresholds)}
+                className="h-3 w-3 accent-primary rounded"
+              />
+              Umbrales
+            </label>
+          )}
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] font-medium">Rango temporal</span>
-          <select className="h-6 rounded border bg-background px-1.5 text-[11px]">
-            <option>Últimas 24 horas</option>
-          </select>
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-        <span>Intervalo configurado: {sendIntervalSec && sendIntervalSec > 0 ? `${sendIntervalSec}s` : 'N/D'}</span>
-        <span>
-          {remainingSec != null ? `Próxima actualización estimada: ${remainingSec}s` : 'Actualización en tiempo real'}
+        <span className="text-[11px] text-muted-foreground tabular-nums">
+          {visibleReadings.length}/{normalizedReadings.length} muestras
+          {remainingSec != null && <span className="text-primary/70"> · Próx: {remainingSec}s</span>}
         </span>
       </div>
 
-      <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-        <span>Ventana visible: {visibleReadings.length}/{normalizedReadings.length} muestras</span>
-        <span>{windowSize > 0 ? 'Rueda: zoom horizontal · Shift+rueda: desplazar' : 'Seguimiento en tiempo real (auto)'}</span>
-      </div>
-
-      {chartMode !== 'dual' && (
-        <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={showThresholds}
-            onChange={() => setShowThresholds(!showThresholds)}
-            className="h-3 w-3 accent-primary"
-          />
-          Mostrar zonas de alerta
-        </label>
-      )}
-
-      <div className={`${chartMode === 'dual' ? 'h-28' : 'h-44'} w-full rounded-md bg-muted/20 overflow-hidden`}>
+      <div className={`${chartMode === 'dual' ? 'h-40' : 'h-56'} w-full rounded-lg bg-gradient-to-b from-muted/30 to-muted/5 overflow-hidden border border-border/20`}>
         <svg
           viewBox={`0 0 ${width} ${height}`}
           preserveAspectRatio="none"
@@ -353,14 +336,49 @@ function TrendSparkline({ readings, sendIntervalSec }: { readings?: SensorReadin
           onMouseLeave={() => setHoverIndex(null)}
           onWheel={handleWheel}
         >
+          {/* Gradientes para relleno de área */}
+          <defs>
+            <linearGradient id="tempAreaGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#f97316" stopOpacity="0.35" />
+              <stop offset="100%" stopColor="#f97316" stopOpacity="0.03" />
+            </linearGradient>
+            <linearGradient id="humAreaGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.2" />
+              <stop offset="100%" stopColor="#06b6d4" stopOpacity="0.02" />
+            </linearGradient>
+          </defs>
+
+          {/* Cuadrícula horizontal */}
+          {[0.25, 0.5, 0.75].map(pct => {
+            const gy = padding + pct * (height - padding * 2)
+            return <line key={pct} x1={padding} x2={width - padding} y1={gy} y2={gy}
+              stroke="currentColor" strokeOpacity="0.06" strokeWidth="0.5" className="text-muted-foreground" />
+          })}
+
           {/* Zonas de alerta (solo en modo individual) */}
           {chartMode === 'temperature' && renderThresholdZones(
             tempRange, th.tempWarnLow, th.tempWarnHigh, th.tempCritLow, th.tempCritHigh,
-            '#f59e0b', '#ef4444' // amarillo/rojo para temperatura
+            '#f59e0b', '#ef4444'
           )}
           {chartMode === 'humidity' && renderThresholdZones(
             humRange, th.humWarnLow, th.humWarnHigh, th.humCritLow, th.humCritHigh,
-            '#06b6d4', '#3b82f6' // cyan/azul para humedad
+            '#06b6d4', '#3b82f6'
+          )}
+
+          {/* Relleno de área - Humedad */}
+          {showHum && humCoords.length >= 2 && (
+            <path
+              d={`M ${humCoords[0]!.x},${height - padding} ${humCoords.map(p => `L ${p.x},${p.y}`).join(' ')} L ${humCoords[humCoords.length - 1]!.x},${height - padding} Z`}
+              fill="url(#humAreaGrad)"
+            />
+          )}
+
+          {/* Relleno de área - Temperatura */}
+          {showTemp && tempCoords.length >= 2 && (
+            <path
+              d={`M ${tempCoords[0]!.x},${height - padding} ${tempCoords.map(p => `L ${p.x},${p.y}`).join(' ')} L ${tempCoords[tempCoords.length - 1]!.x},${height - padding} Z`}
+              fill="url(#tempAreaGrad)"
+            />
           )}
 
           {/* Línea de cursor */}
@@ -371,8 +389,8 @@ function TrendSparkline({ readings, sendIntervalSec }: { readings?: SensorReadin
               y1={padding}
               y2={height - padding}
               stroke="currentColor"
-              strokeOpacity="0.35"
-              strokeDasharray="2 3"
+              strokeOpacity="0.25"
+              strokeDasharray="3 4"
               className="text-muted-foreground"
             />
           )}
@@ -382,10 +400,10 @@ function TrendSparkline({ readings, sendIntervalSec }: { readings?: SensorReadin
             <polyline
               points={humPoints}
               fill="none"
-              stroke={chartMode === 'humidity' ? '#06b6d4' : 'currentColor'}
-              strokeWidth="2"
-              strokeDasharray={chartMode === 'dual' ? '5 4' : undefined}
-              className={chartMode === 'dual' ? 'text-muted-foreground' : ''}
+              stroke="#06b6d4"
+              strokeWidth="1.8"
+              strokeLinejoin="round"
+              strokeLinecap="round"
             />
           )}
 
@@ -394,52 +412,67 @@ function TrendSparkline({ readings, sendIntervalSec }: { readings?: SensorReadin
             <polyline
               points={tempPoints}
               fill="none"
-              stroke={chartMode === 'temperature' ? '#f97316' : 'currentColor'}
+              stroke="#f97316"
               strokeWidth="2"
-              className={chartMode === 'dual' ? 'text-primary' : ''}
+              strokeLinejoin="round"
+              strokeLinecap="round"
             />
           )}
 
           {/* Puntos de cursor */}
           {showTemp && selectedTempPoint && (
-            <circle cx={selectedTempPoint.x} cy={selectedTempPoint.y} r="2.6"
-              fill={chartMode === 'temperature' ? '#f97316' : 'currentColor'}
-              className={chartMode === 'dual' ? 'text-primary' : ''} />
+            <>
+              <circle cx={selectedTempPoint.x} cy={selectedTempPoint.y} r="4.5" fill="#f97316" fillOpacity="0.2" />
+              <circle cx={selectedTempPoint.x} cy={selectedTempPoint.y} r="2.5" fill="#f97316" />
+            </>
           )}
           {showHum && selectedHumPoint && (
-            <circle cx={selectedHumPoint.x} cy={selectedHumPoint.y} r="2.6"
-              fill={chartMode === 'humidity' ? '#06b6d4' : 'currentColor'}
-              className={chartMode === 'dual' ? 'text-muted-foreground' : ''} />
+            <>
+              <circle cx={selectedHumPoint.x} cy={selectedHumPoint.y} r="4.5" fill="#06b6d4" fillOpacity="0.2" />
+              <circle cx={selectedHumPoint.x} cy={selectedHumPoint.y} r="2.5" fill="#06b6d4" />
+            </>
           )}
         </svg>
       </div>
 
+      {/* Tooltip interactivo */}
       {selectedReading && (
-        <div className="text-[11px] text-muted-foreground rounded-md border px-2 py-1">
-          {formatDateTime(selectedReading.timestamp)}
-          {showTemp && ` · Temp ${selectedReading.temperature.toFixed(1)} °C`}
-          {showHum && ` · Hum ${selectedReading.humidity.toFixed(1)} %`}
+        <div className="flex items-center gap-3 text-[11px] rounded-lg bg-muted/30 px-3 py-1.5 border border-border/20">
+          <span className="text-muted-foreground">{formatDateTime(selectedReading.timestamp)}</span>
+          {showTemp && (
+            <span className="inline-flex items-center gap-1 font-medium">
+              <span className="h-2 w-2 rounded-full bg-orange-500" />
+              <span className="text-orange-400">{selectedReading.temperature.toFixed(1)} °C</span>
+            </span>
+          )}
+          {showHum && (
+            <span className="inline-flex items-center gap-1 font-medium">
+              <span className="h-2 w-2 rounded-full bg-cyan-500" />
+              <span className="text-cyan-400">{selectedReading.humidity.toFixed(1)} %</span>
+            </span>
+          )}
         </div>
       )}
 
+      {/* Leyenda */}
       <div className="flex items-center gap-4 text-[11px] text-muted-foreground flex-wrap">
         {showTemp && (
-          <span className="inline-flex items-center gap-1">
-            <span className={`h-1.5 w-4 rounded ${chartMode === 'temperature' ? 'bg-orange-500' : 'bg-primary'}`} /> Temperatura
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-orange-500" /> Temperatura
           </span>
         )}
         {showHum && (
-          <span className="inline-flex items-center gap-1">
-            <span className={`h-1.5 w-4 rounded ${chartMode === 'humidity' ? 'bg-cyan-500' : 'bg-muted-foreground'}`} /> Humedad
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-cyan-500" /> Humedad
           </span>
         )}
         {chartMode !== 'dual' && showThresholds && (
           <>
-            <span className="inline-flex items-center gap-1">
-              <span className={`h-1.5 w-4 rounded ${chartMode === 'temperature' ? 'bg-amber-500/50' : 'bg-cyan-500/50'}`} /> Advertencia
+            <span className="inline-flex items-center gap-1.5">
+              <span className={`h-2 w-2 rounded-sm ${chartMode === 'temperature' ? 'bg-amber-500/60' : 'bg-cyan-500/60'}`} /> Advertencia
             </span>
-            <span className="inline-flex items-center gap-1">
-              <span className={`h-1.5 w-4 rounded ${chartMode === 'temperature' ? 'bg-red-500/50' : 'bg-blue-500/50'}`} /> Peligro
+            <span className="inline-flex items-center gap-1.5">
+              <span className={`h-2 w-2 rounded-sm ${chartMode === 'temperature' ? 'bg-red-500/60' : 'bg-blue-500/60'}`} /> Peligro
             </span>
           </>
         )}
@@ -620,25 +653,60 @@ export function SensorsMonitorPage() {
       </div>
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Dispositivos</CardTitle></CardHeader>
-          <CardContent><div className="text-2xl font-bold">{metrics.total}</div></CardContent>
+        <Card className="border-l-4 border-l-primary">
+          <CardContent className="pt-4 pb-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Dispositivos</p>
+                <p className="text-2xl font-bold">{metrics.total}</p>
+              </div>
+              <Cpu className="h-8 w-8 text-primary/20" />
+            </div>
+          </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Online</CardTitle></CardHeader>
-          <CardContent><div className="text-2xl font-bold text-green-600">{metrics.online}</div></CardContent>
+        <Card className="border-l-4 border-l-emerald-500">
+          <CardContent className="pt-4 pb-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Online</p>
+                <p className="text-2xl font-bold text-emerald-500">{metrics.online}</p>
+              </div>
+              <Activity className="h-8 w-8 text-emerald-500/20" />
+            </div>
+          </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Warning</CardTitle></CardHeader>
-          <CardContent><div className="text-2xl font-bold text-amber-600">{metrics.warning}</div></CardContent>
+        <Card className="border-l-4 border-l-amber-500">
+          <CardContent className="pt-4 pb-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Warning</p>
+                <p className="text-2xl font-bold text-amber-500">{metrics.warning}</p>
+              </div>
+              <AlertTriangle className="h-8 w-8 text-amber-500/20" />
+            </div>
+          </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Crítico</CardTitle></CardHeader>
-          <CardContent><div className="text-2xl font-bold text-red-600">{metrics.critical}</div></CardContent>
+        <Card className="border-l-4 border-l-red-500">
+          <CardContent className="pt-4 pb-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Crítico</p>
+                <p className="text-2xl font-bold text-red-500">{metrics.critical}</p>
+              </div>
+              <AlertTriangle className="h-8 w-8 text-red-500/20" />
+            </div>
+          </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="pb-2"><CardTitle className="text-sm">Sin asignar</CardTitle></CardHeader>
-          <CardContent><div className="text-2xl font-bold text-slate-600">{metrics.unassigned}</div></CardContent>
+        <Card className="border-l-4 border-l-slate-500">
+          <CardContent className="pt-4 pb-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Sin asignar</p>
+                <p className="text-2xl font-bold text-slate-500">{metrics.unassigned}</p>
+              </div>
+              <Link2 className="h-8 w-8 text-slate-500/20" />
+            </div>
+          </CardContent>
         </Card>
       </div>
 
@@ -679,7 +747,11 @@ export function SensorsMonitorPage() {
           const isFresh = isDeviceFresh(device, panelNowMs)
 
           return (
-            <Card key={device.deviceId}>
+            <Card key={device.deviceId} className={`border-l-4 ${
+              alert === 'critical' ? 'border-l-red-500' :
+              alert === 'warning' ? 'border-l-amber-500' :
+              isFresh ? 'border-l-emerald-500' : 'border-l-muted-foreground/30'
+            }`}>
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between gap-3">
                   <div>
@@ -691,11 +763,30 @@ export function SensorsMonitorPage() {
                       {assignedEquipment ? `${assignedEquipment.nombre} (${assignedEquipment.codigo})` : 'Sin equipo asignado'}
                     </p>
                   </div>
-                  <div className="flex gap-2 flex-wrap justify-end">
-                    <Badge variant={isFresh ? 'default' : 'secondary'}>{isFresh ? 'Online' : 'Sin datos recientes'}</Badge>
-                    {alert === 'critical' && <Badge variant="destructive">Crítico</Badge>}
-                    {alert === 'warning' && <Badge className="bg-amber-600 hover:bg-amber-600">Warning</Badge>}
-                    {alert === 'normal' && <Badge variant="outline">Normal</Badge>}
+                  <div className="flex items-center gap-2 flex-wrap justify-end">
+                    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                      isFresh
+                        ? 'bg-emerald-500/15 text-emerald-500 ring-1 ring-emerald-500/30'
+                        : 'bg-muted text-muted-foreground ring-1 ring-border'
+                    }`}>
+                      <span className={`h-1.5 w-1.5 rounded-full ${isFresh ? 'bg-emerald-500 animate-pulse' : 'bg-muted-foreground'}`} />
+                      {isFresh ? 'Online' : 'Offline'}
+                    </span>
+                    {alert === 'critical' && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-red-500/15 px-2.5 py-0.5 text-xs font-medium text-red-500 ring-1 ring-red-500/30">
+                        <AlertTriangle className="h-3 w-3" /> Crítico
+                      </span>
+                    )}
+                    {alert === 'warning' && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2.5 py-0.5 text-xs font-medium text-amber-500 ring-1 ring-amber-500/30">
+                        <AlertTriangle className="h-3 w-3" /> Warning
+                      </span>
+                    )}
+                    {alert === 'normal' && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground ring-1 ring-border">
+                        Normal
+                      </span>
+                    )}
                   </div>
                 </div>
               </CardHeader>
@@ -706,16 +797,22 @@ export function SensorsMonitorPage() {
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">
-                  <div className="rounded-md border p-2">
-                    <div className="text-xs text-muted-foreground flex items-center gap-1"><Thermometer className="h-3.5 w-3.5" />Temperatura</div>
-                    <div className="font-semibold">
-                      {device.telemetry?.temperatura?.value?.toFixed(1) ?? '—'} {device.telemetry?.temperatura?.unit ?? '°C'}
+                  <div className="rounded-lg border border-orange-500/20 bg-orange-500/5 p-3">
+                    <div className="text-xs text-orange-400/80 flex items-center gap-1.5 mb-1">
+                      <Thermometer className="h-3.5 w-3.5" />Temperatura
+                    </div>
+                    <div className="text-lg font-bold text-orange-400">
+                      {device.telemetry?.temperatura?.value?.toFixed(1) ?? '—'}
+                      <span className="text-sm font-normal ml-0.5">{device.telemetry?.temperatura?.unit ?? '°C'}</span>
                     </div>
                   </div>
-                  <div className="rounded-md border p-2">
-                    <div className="text-xs text-muted-foreground flex items-center gap-1"><Droplets className="h-3.5 w-3.5" />Humedad</div>
-                    <div className="font-semibold">
-                      {device.telemetry?.humedad?.value?.toFixed(1) ?? '—'} {device.telemetry?.humedad?.unit ?? '%'}
+                  <div className="rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-3">
+                    <div className="text-xs text-cyan-400/80 flex items-center gap-1.5 mb-1">
+                      <Droplets className="h-3.5 w-3.5" />Humedad
+                    </div>
+                    <div className="text-lg font-bold text-cyan-400">
+                      {device.telemetry?.humedad?.value?.toFixed(1) ?? '—'}
+                      <span className="text-sm font-normal ml-0.5">{device.telemetry?.humedad?.unit ?? '%'}</span>
                     </div>
                   </div>
                 </div>
@@ -734,11 +831,13 @@ export function SensorsMonitorPage() {
                   </div>
                 )}
 
-                <div className="flex gap-2">
-                  <Button size="sm" variant="outline" className="flex-1" onClick={() => navigate('/sensors')}>
+                <div className="flex gap-2 pt-1">
+                  <Button size="sm" variant="outline" className="flex-1 h-9" onClick={() => navigate('/sensors')}>
+                    <Activity className="h-3.5 w-3.5 mr-1.5" />
                     Detalle IoT
                   </Button>
-                  <Button size="sm" className="flex-1" onClick={() => navigate('/incidents')}>
+                  <Button size="sm" className="flex-1 h-9 bg-primary hover:bg-primary/90" onClick={() => navigate('/incidents')}>
+                    <AlertTriangle className="h-3.5 w-3.5 mr-1.5" />
                     Incidencias
                   </Button>
                 </div>
