@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.48.30**
+## Versión Actual: **v2.48.31**
 
 **Fecha de lanzamiento**: 17 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.48.31 - Consistencia online en Sensores IoT (17/02/2026)
+- 🎯 **KPI online consistente**: el contador superior de `Sensores IoT` ahora usa frescura real y no el booleano online crudo.
+- 📶 **WiFi principal sin falso conectado**: el bloque cambia entre `Conectado` y `Configurada` según frescura del dispositivo.
+- ✅ **Cierre estándar de versión**: bump y sincronización de artefactos de versionado según flujo oficial.
 
 ### v2.48.30 - Estado fresco consistente en pestaña Sensores (17/02/2026)
 - 🧭 **Online real por frescura**: la vista `Sensores` ahora decide `Online` con `lastSeen` y `sendInterval`, evitando mostrar online cuando el equipo dejó de reportar.

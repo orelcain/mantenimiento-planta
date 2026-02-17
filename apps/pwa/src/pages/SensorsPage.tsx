@@ -932,7 +932,7 @@ export function SensorsPage() {
                 <div>
                   <div className="text-sm text-muted-foreground">Online</div>
                   <div className="text-2xl font-bold text-green-600">
-                    {devices.filter(d => d.online).length}
+                    {devices.filter((d) => isDeviceFresh(d, panelNowMs)).length}
                   </div>
                 </div>
                 <Activity className="h-8 w-8 text-green-600" />
@@ -1376,10 +1376,16 @@ export function SensorsPage() {
                 <CardContent className="space-y-3">
                   {/* WiFi Principal (Station Mode) */}
                   {selectedDevice.wifiSsid && (
-                    <div className="rounded border p-3 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 border-green-200 dark:border-green-800">
-                      <div className="text-xs font-semibold text-green-700 dark:text-green-300 mb-2 flex items-center gap-1">
+                    <div className={`rounded border p-3 ${selectedDeviceIsFresh
+                      ? 'bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 border-green-200 dark:border-green-800'
+                      : 'bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/20 dark:to-orange-950/20 border-amber-200 dark:border-amber-800'
+                      }`}>
+                      <div className={`text-xs font-semibold mb-2 flex items-center gap-1 ${selectedDeviceIsFresh
+                        ? 'text-green-700 dark:text-green-300'
+                        : 'text-amber-700 dark:text-amber-300'
+                        }`}>
                         <Wifi className="h-3 w-3" />
-                        WiFi Principal (Conectado)
+                        {selectedDeviceIsFresh ? 'WiFi Principal (Conectado)' : 'WiFi Principal (Configurada)'}
                       </div>
                       <div className="space-y-2">
                         <div className="flex items-center justify-between gap-2">
@@ -1436,6 +1442,9 @@ export function SensorsPage() {
                             IP: {selectedDevice.ip}
                           </div>
                         )}
+                        <div className="text-xs text-muted-foreground">
+                          Estado: {selectedDeviceIsFresh ? 'En línea' : 'Sin datos recientes'}
+                        </div>
                         {typeof selectedDevice.rssi === 'number' && (
                           <div className="text-xs text-muted-foreground">
                             Señal: {selectedDevice.rssi} dBm{' '}

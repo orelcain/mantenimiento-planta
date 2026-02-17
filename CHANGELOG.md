@@ -7,6 +7,18 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.31] - 2026-02-17
+
+### 🎯 Consistencia de estado online en Sensores IoT
+
+#### Fixes
+- **KPI Online corregido**: el contador superior en `Sensores IoT` ahora usa frescura real (`lastSeen + sendInterval`) y deja de contar equipos stale como conectados.
+- **Card WiFi coherente**: el bloque `WiFi Principal` muestra `Conectado` solo cuando el dispositivo está fresco; si no, cambia a `Configurada`.
+- **Estado explícito en WiFi**: se agrega línea de estado (`En línea` / `Sin datos recientes`) para evitar ambigüedad operativa.
+
+#### Calidad
+- **Versionado sincronizado del release**: actualización coordinada de `package.json`, constantes de versión, `version.json`, `manifest.json`, `CHANGELOG.md` y `VERSION.md`.
+
 ## [2.48.30] - 2026-02-17
 
 ### 🧭 Fix de estado online en pestaña Sensores
