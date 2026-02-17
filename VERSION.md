@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.48.22**
+## Versión Actual: **v2.48.23**
 
 **Fecha de lanzamiento**: 16 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,12 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.48.23 - ESP32 estable sin USB + OTA remota + guías operativas (16/02/2026)
+- 🔧 **Captura ESP32 estabilizada**: se evitó reinicio por memoria en arranque RTDB y se validó publicación continua de temperatura/humedad sin USB.
+- 🌐 **OTA remota pull habilitada**: firmware preparado para buscar manifiesto y actualizarse desde publicación central (sin requerir misma WiFi del PC).
+- 📚 **Documentación operativa completa**: alta manual de nuevos ESP32 desde cualquier PC + prueba rápida inicial para LOGO cableado.
+- ✅ **Cierre de release sincronizado**: versión alineada y verificada en archivos de versión y despliegue.
 
 ### v2.48.22 - Panel técnico de sensores + integración LOGO documentada (16/02/2026)
 - 📟 **Nuevo panel técnico rápido**: vista `sensors/monitor` para operación diaria con KPIs y foco en estado de dispositivos.

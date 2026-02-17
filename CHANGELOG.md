@@ -7,6 +7,23 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.23] - 2026-02-16
+
+### 🔧 Estabilización ESP32 en producción + OTA remota + guías operativas
+
+#### Mejoras
+- **ESP32 estabilizado sin USB**: se ajustó el firmware para evitar reinicios por memoria al iniciar streams opcionales de RTDB y mantener captura continua de temperatura/humedad.
+- **OTA remota tipo pull habilitada**: el dispositivo puede consultar manifiesto publicado y actualizar firmware sin depender de estar en la misma red WiFi que el PC.
+- **Particiones preparadas para OTA grande**: se agregó tabla de particiones personalizada para soportar firmware con funciones avanzadas de actualización.
+
+#### Documentación
+- **Guía completa de alta manual de nuevos ESP32**: procedimiento paso a paso para primera carga USB desde cualquier PC y operación posterior por OTA.
+- **Guía de prueba rápida LOGO**: flujo mínimo para validar conectividad y visualización en PWA con contrato RTDB vigente.
+
+#### Calidad
+- **Validación operativa end-to-end**: verificado en campo que el ESP32 publica `lastSeen`, `temperatura` y `humedad` en RTDB sin conexión USB al PC.
+- **Sincronización de versión release**: actualización coordinada de `package.json`, constantes de versión, `version.json`, `CHANGELOG.md` y `VERSION.md`.
+
 ## [2.48.22] - 2026-02-16
 
 ### 📟 Panel técnico de sensores + cierre de sincronización de release

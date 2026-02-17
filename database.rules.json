@@ -2,14 +2,41 @@
   "rules": {
     "devices": {
       ".read": "auth != null",
-      ".write": "auth != null && (root.child('users').child(auth.uid).child('rol').val() == 'admin' || root.child('users').child(auth.uid).child('rol').val() == 'tecnico')"
+      ".write": "auth != null && (root.child('users').child(auth.uid).child('rol').val() == 'admin' || root.child('users').child(auth.uid).child('rol').val() == 'tecnico')",
+      "$deviceId": {
+        ".read": "auth != null",
+        ".write": "auth != null && (root.child('users').child(auth.uid).child('rol').val() == 'admin' || root.child('users').child(auth.uid).child('rol').val() == 'tecnico')",
+        "online": { ".write": "auth != null" },
+        "lastSeen": { ".write": "auth != null" },
+        "ip": { ".write": "auth != null" },
+        "rssi": { ".write": "auth != null" },
+        "wifiSsid": { ".write": "auth != null" },
+        "mdns": { ".write": "auth != null" },
+        "deviceName": { ".write": "auth != null" },
+        "firmwareVersion": { ".write": "auth != null" },
+        "sensorType": { ".write": "auth != null" },
+        "sendInterval": { ".write": "auth != null" },
+        "assignedEquipmentId": { ".write": "auth != null" },
+        "apAlwaysOn": { ".write": "auth != null" },
+        "apSsid": { ".write": "auth != null" },
+        "apIp": { ".write": "auth != null" },
+        "telemetry": { ".write": "auth != null" },
+        "alerts": { ".write": "auth != null" }
+      }
     },
     "sensors": {
       ".read": "auth != null",
       ".write": "auth != null",
       "$equipmentId": {
         ".read": "auth != null",
-        ".write": "auth != null && (root.child('users').child(auth.uid).child('rol').val() == 'admin' || root.child('users').child(auth.uid).child('rol').val() == 'tecnico')"
+        ".write": "auth != null && (root.child('users').child(auth.uid).child('rol').val() == 'admin' || root.child('users').child(auth.uid).child('rol').val() == 'tecnico')",
+        "temperatura": { ".write": "auth != null" },
+        "humedad": { ".write": "auth != null" },
+        "readings": { ".write": "auth != null" },
+        "online": { ".write": "auth != null" },
+        "lastSeen": { ".write": "auth != null" },
+        "equipmentId": { ".write": "auth != null" },
+        "alerts": { ".write": "auth != null" }
       }
     }
   }

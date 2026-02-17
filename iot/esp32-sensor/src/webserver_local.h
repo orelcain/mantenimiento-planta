@@ -39,6 +39,7 @@ extern void setSendIntervalSeconds(uint16_t sec);
 extern uint32_t getFlashHistoryCount();
 extern bool getFlashReading(uint32_t index, uint64_t& ts, float& temp, float& hum, uint8_t& tempSt, uint8_t& humSt, bool& sim);
 extern void applyWifiConfig(const String& ssid, const String& password, bool reconnect);
+extern void requestRemoteOtaCheck();
 
 // ============ UMBRALES DE ALERTA (TEMP/HUM) ============
 struct AlertThresholds {

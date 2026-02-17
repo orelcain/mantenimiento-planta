@@ -124,6 +124,16 @@ void handleApiWifiConfig() {
   portalServer.send(200, "application/json", "{\"ok\":true}");
 }
 
+void handleApiOtaCheck() {
+  if (portalServer.method() != HTTP_POST) {
+    portalServer.send(405, "application/json", "{\"error\":\"Method not allowed\"}");
+    return;
+  }
+
+  requestRemoteOtaCheck();
+  portalServer.send(202, "application/json", "{\"ok\":true,\"message\":\"ota_check_requested\"}");
+}
+
 // ============ SETUP ============
 
 void setupLocalWebServer() {
@@ -132,6 +142,7 @@ void setupLocalWebServer() {
   portalServer.on("/api/current", handleApiCurrent);
   portalServer.on("/api/wifi", HTTP_GET, handleApiWifiStatus);
   portalServer.on("/api/wifi", HTTP_POST, handleApiWifiConfig);
+  portalServer.on("/api/ota/check", HTTP_POST, handleApiOtaCheck);
 
   Serial.println("✅ Endpoints del dashboard registrados en puerto " + String(LOCAL_WEB_SERVER_PORT));
   Serial.println("🌐 Accede via:");

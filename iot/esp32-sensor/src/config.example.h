@@ -47,4 +47,21 @@
 // #define OTA_ENABLED 1
 // #define OTA_PASSWORD "TU_CLAVE_OTA"
 
+// OTA remota (pull): el ESP32 consulta este manifiesto y aplica update si version > FIRMWARE_VERSION.
+// Formato JSON esperado:
+// {"version":"2.15.0","url":"https://tu-servidor/firmware.bin"}
+// #define OTA_REMOTE_MANIFEST_URL "https://tu-dominio/esp32/manifest.json"
+
+// 0 = solo HTTP (binario más liviano), 1 = permite HTTPS
+// #define OTA_REMOTE_USE_TLS 0
+
+// Intervalo de chequeo automático del manifiesto (segundos)
+// #define OTA_REMOTE_CHECK_INTERVAL_SEC 1800
+
+// 1 = permite TLS sin validar certificado (útil en pruebas), 0 = validación estricta
+// #define OTA_REMOTE_ALLOW_INSECURE_TLS 1
+
+// Versión actual del firmware (usada para comparar contra manifest.version)
+// #define FIRMWARE_VERSION "2.14.1"
+
 #endif // CONFIG_H

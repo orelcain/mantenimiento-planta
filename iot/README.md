@@ -2,6 +2,8 @@
 
 Sistema de monitoreo en tiempo real con ESP32 para equipos industriales.
 
+> Guía operativa de alta manual de nuevos ESP32 (USB inicial + OTA desde PWA): `docs/setup/ESP32_ALTA_MANUAL_PC_CUALQUIER.md`.
+
 ## 📋 Requisitos
 
 ### Hardware
@@ -218,6 +220,39 @@ Una vez que veas datos en Firebase, abre la PWA y ve al equipo que configuraste.
 Verás una nueva pestaña "📡 IoT" con los datos en tiempo real!
 
 ---
+
+## 🌐 OTA REMOTA (PC y ESP32 en redes distintas)
+
+El firmware ahora soporta actualización remota tipo "pull": el ESP32 consulta un manifiesto HTTP/HTTPS y, si hay versión más nueva, descarga e instala el binario.
+
+### Configuración mínima en `iot/esp32-sensor/src/config.h`
+
+```cpp
+#define FIRMWARE_VERSION "2.14.1"
+#define OTA_REMOTE_MANIFEST_URL "https://tu-dominio/esp32/manifest.json"
+#define OTA_REMOTE_USE_TLS 0
+#define OTA_REMOTE_CHECK_INTERVAL_SEC 1800
+#define OTA_REMOTE_ALLOW_INSECURE_TLS 1
+```
+
+`OTA_REMOTE_USE_TLS` en `0` mantiene el firmware más liviano para evitar desbordes de flash en particiones OTA pequeñas.
+
+### Formato del manifiesto
+
+```json
+{
+   "version": "2.15.0",
+   "url": "https://tu-dominio/esp32/firmware-2.15.0.bin"
+}
+```
+
+### Trigger manual desde red local del ESP32
+
+Puedes forzar un chequeo sin esperar el intervalo automático:
+
+```bash
+curl -X POST http://IP_DEL_ESP32/api/ota/check
+```
 
 ## 🆘 Solución de Problemas
 

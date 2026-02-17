@@ -22,6 +22,11 @@
 #include <ESPmDNS.h>
 #include <esp_task_wdt.h>
 #include <ArduinoOTA.h>
+#include <HTTPClient.h>
+#include <Update.h>
+#if defined(OTA_REMOTE_USE_TLS) && OTA_REMOTE_USE_TLS
+#include <WiFiClientSecure.h>
+#endif
 #include "webserver_local.h"
 #include "network_local.h"
 
@@ -45,9 +50,14 @@ String getStatus(float value, float warnLow, float warnHigh, float critLow, floa
 uint64_t getTimestamp();
 void sendOnlineStatus(bool online);
 void sendSensorData();
+void requestRemoteOtaCheck();
+String getFirmwareVersion();
 
 static void handleConfigPortalLoop();
 static void initAfterWifiOnce();
+static void maybeCheckRemoteOta();
+static bool checkAndApplyRemoteOta(bool force);
+static int compareSemver(const String& currentVersion, const String& targetVersion);
 
 static void ensureHttpServerStarted();
 static void ensureHttpServerListening();
@@ -104,6 +114,30 @@ bool getFlashReading(uint32_t index, uint64_t& ts, float& temp, float& hum, uint
 #define MIN_SEND_INTERVAL 5        // Mínimo 5 segundos
 #define MAX_SEND_INTERVAL 300      // Máximo 5 minutos
 #define RECONNECT_INTERVAL 30000   // Reintentar conexión cada 30 seg
+
+#ifndef FIRMWARE_VERSION
+#define FIRMWARE_VERSION "2.14.1"
+#endif
+
+#ifndef OTA_REMOTE_MANIFEST_URL
+#define OTA_REMOTE_MANIFEST_URL ""
+#endif
+
+#ifndef OTA_REMOTE_CHECK_INTERVAL_SEC
+#define OTA_REMOTE_CHECK_INTERVAL_SEC 1800
+#endif
+
+#ifndef OTA_REMOTE_ALLOW_INSECURE_TLS
+#define OTA_REMOTE_ALLOW_INSECURE_TLS 1
+#endif
+
+#ifndef OTA_REMOTE_USE_TLS
+#define OTA_REMOTE_USE_TLS 0
+#endif
+
+#ifndef ENABLE_OPTIONAL_DEVICE_STREAMS
+#define ENABLE_OPTIONAL_DEVICE_STREAMS 0
+#endif
 
 // Intervalo configurable (en segundos)
 static uint16_t sendIntervalSeconds = DEFAULT_SEND_INTERVAL;
@@ -213,6 +247,9 @@ static bool mdnsStarted = false;
 #if defined(OTA_ENABLED) || defined(OTA_PASSWORD)
 static bool otaStarted = false;
 #endif
+static unsigned long lastRemoteOtaCheckMs = 0;
+static volatile bool remoteOtaCheckRequested = false;
+static String remoteOtaLastStatus = "idle";
 
 static void loadLocalSettings() {
   prefs.begin("iot", false);
@@ -1038,34 +1075,59 @@ static void sendDeviceStatus(bool online) {
   if (millis() - lastDeviceStatusMs < 500) return;
   lastDeviceStatusMs = millis();
 
-  FirebaseJson json;
-  json.set("online", online);
-  json.set("lastSeen", (double)getTimestamp());
-  json.set("ip", WiFi.localIP().toString());
-  json.set("rssi", WiFi.RSSI());
-  json.set("wifiSsid", WiFi.SSID());
-  // json.set("wifiPassword", WiFi.psk()); // Excluido por seguridad
-  json.set("mdns", staHostname.length() ? (staHostname + ".local") : "");
-  json.set("deviceName", deviceName);
-  json.set("firmwareVersion", "2.14.0");
-  json.set("sensorType", "dht11");
-  json.set("sendInterval", (int)sendIntervalSeconds);
-  json.set("assignedEquipmentId", hasAssignedEquipment() ? currentEquipmentId : "");
-  json.set("apAlwaysOn", apAlwaysOn);
-  json.set("apSsid", WiFi.softAPSSID());
-  json.set("apIp", WiFi.softAPIP().toString());
-  // json.set("apPassword", apPassword); // Excluido por seguridad
+  String basePath;
+  basePath.reserve(64);
+  basePath = "devices/";
+  basePath += deviceId;
 
-  String path;
-  path.reserve(64);
-  path = "devices/";
-  path += deviceId;
+  bool ok = true;
+  auto writeBoolField = [&](const char* field, bool value) {
+    String path = basePath + "/" + field;
+    if (!Firebase.RTDB.setBool(&fbdo, path.c_str(), value)) {
+      ok = false;
+      Serial.printf("✗ Error %s: %s\n", field, fbdo.errorReason().c_str());
+    }
+  };
+  auto writeIntField = [&](const char* field, int value) {
+    String path = basePath + "/" + field;
+    if (!Firebase.RTDB.setInt(&fbdo, path.c_str(), value)) {
+      ok = false;
+      Serial.printf("✗ Error %s: %s\n", field, fbdo.errorReason().c_str());
+    }
+  };
+  auto writeDoubleField = [&](const char* field, double value) {
+    String path = basePath + "/" + field;
+    if (!Firebase.RTDB.setDouble(&fbdo, path.c_str(), value)) {
+      ok = false;
+      Serial.printf("✗ Error %s: %s\n", field, fbdo.errorReason().c_str());
+    }
+  };
+  auto writeStringField = [&](const char* field, const String& value) {
+    String path = basePath + "/" + field;
+    if (!Firebase.RTDB.setString(&fbdo, path.c_str(), value)) {
+      ok = false;
+      Serial.printf("✗ Error %s: %s\n", field, fbdo.errorReason().c_str());
+    }
+  };
 
-  if (!Firebase.RTDB.setJSON(&fbdo, path.c_str(), &json)) {
-    Serial.printf("✗ Error actualizando device status: %s\n", fbdo.errorReason().c_str());
-  } else {
-    Serial.printf("✓ Device status publicado en devices/%s (online: %s, equipo: %s)\n", 
-                  deviceId.c_str(), 
+  writeBoolField("online", online);
+  writeDoubleField("lastSeen", (double)getTimestamp());
+  writeStringField("ip", WiFi.localIP().toString());
+  writeIntField("rssi", WiFi.RSSI());
+  writeStringField("wifiSsid", WiFi.SSID());
+  writeStringField("mdns", staHostname.length() ? (staHostname + ".local") : "");
+  writeStringField("deviceName", deviceName);
+  writeStringField("firmwareVersion", getFirmwareVersion());
+  writeStringField("sensorType", "dht11");
+  writeIntField("sendInterval", (int)sendIntervalSeconds);
+  writeStringField("assignedEquipmentId", hasAssignedEquipment() ? currentEquipmentId : "");
+  writeBoolField("apAlwaysOn", apAlwaysOn);
+  writeStringField("apSsid", WiFi.softAPSSID());
+  writeStringField("apIp", WiFi.softAPIP().toString());
+
+  if (ok) {
+    Serial.printf("✓ Device status publicado en devices/%s (online: %s, equipo: %s)\n",
+                  deviceId.c_str(),
                   online ? "true" : "false",
                   hasAssignedEquipment() ? currentEquipmentId.c_str() : "ninguno");
   }
@@ -1802,9 +1864,17 @@ static void initAfterWifiOnce() {
 void setupFirebase() {
   Serial.println("⏳ Configurando Firebase...");
   
-  // Configurar credenciales - SOLO database_url (sin API_KEY = sin auth)
+  // Configurar credenciales para Auth anónimo (evita uso de legacy secret)
+  config.api_key = FIREBASE_API_KEY;
   config.database_url = FIREBASE_DATABASE_URL;
-  config.signer.tokens.legacy_token = FIREBASE_DATABASE_SECRET; // Token legacy (no crea usuarios)
+  config.token_status_callback = tokenStatusCallback;
+
+  Serial.println("  Solicitando token anónimo...");
+  if (Firebase.signUp(&config, &auth, "", "")) {
+    Serial.println("  ✓ Auth anónima inicializada");
+  } else {
+    Serial.printf("  ✗ Error auth anónima: %s\n", config.signer.signupError.message.c_str());
+  }
   
   // Configurar reconexión automática
   Firebase.reconnectWiFi(true);
@@ -1812,9 +1882,7 @@ void setupFirebase() {
   // Configurar timeout
   config.timeout.serverResponse = 10 * 1000; // 10 segundos
 
-  // ⚠️ NO usar Firebase.signUp() - esto crea usuarios anónimos constantemente
-  // En su lugar, usar Database Secret (legacy) que NO requiere auth de usuario
-  Serial.println("  Conectando con Database Secret (sin crear usuarios)...");
+  Serial.println("  Conectando con Firebase Auth...");
   
   Firebase.begin(&config, &auth);
   
@@ -1829,8 +1897,7 @@ void setupFirebase() {
   
   if (Firebase.ready()) {
     Serial.println();
-    Serial.println("✓ Firebase conectado con Database Secret!");
-    Serial.println("  (Sin autenticación de usuario - no crea usuarios anónimos)");
+    Serial.println("✓ Firebase conectado con Auth anónima");
     firebaseReady = true;
 
     // Cargar equipo asignado (NVS/config) y registrar el device
@@ -1839,11 +1906,13 @@ void setupFirebase() {
     Serial.printf("📌 Equipo asignado (local): %s\n", currentEquipmentId.c_str());
     sendDeviceStatus(true);
     startDeviceAssignmentStream();
+  #if ENABLE_OPTIONAL_DEVICE_STREAMS
     startEquipmentPathStream();
     startApConfigStream();
     startWifiConfigStream();
     startSendIntervalStream();
     startWifiScanRequestStream();
+  #endif
     
     // Enviar estado inicial
     sendOnlineStatus(true);
@@ -1906,6 +1975,199 @@ uint64_t getTimestamp() {
   time_t now;
   time(&now);
   return (uint64_t)now * 1000ULL; // ms epoch, requiere 64-bit
+}
+
+String getFirmwareVersion() {
+  return String(FIRMWARE_VERSION);
+}
+
+void requestRemoteOtaCheck() {
+  remoteOtaCheckRequested = true;
+}
+
+static int compareSemver(const String& currentVersion, const String& targetVersion) {
+  int currentParts[4] = {0, 0, 0, 0};
+  int targetParts[4] = {0, 0, 0, 0};
+
+  auto parseVersion = [](const String& version, int* outParts) {
+    int partIndex = 0;
+    int start = 0;
+    while (partIndex < 4 && start < (int)version.length()) {
+      int dot = version.indexOf('.', start);
+      String chunk;
+      if (dot < 0) {
+        chunk = version.substring(start);
+        start = version.length();
+      } else {
+        chunk = version.substring(start, dot);
+        start = dot + 1;
+      }
+      chunk.trim();
+      outParts[partIndex++] = chunk.toInt();
+    }
+  };
+
+  parseVersion(currentVersion, currentParts);
+  parseVersion(targetVersion, targetParts);
+
+  for (int i = 0; i < 4; i++) {
+    if (currentParts[i] < targetParts[i]) return -1;
+    if (currentParts[i] > targetParts[i]) return 1;
+  }
+  return 0;
+}
+
+static String extractJsonStringField(const String& json, const char* fieldName) {
+  String key = String("\"") + fieldName + "\"";
+  int keyPos = json.indexOf(key);
+  if (keyPos < 0) return "";
+
+  int colonPos = json.indexOf(':', keyPos + key.length());
+  if (colonPos < 0) return "";
+
+  int firstQuote = json.indexOf('"', colonPos + 1);
+  if (firstQuote < 0) return "";
+
+  int secondQuote = json.indexOf('"', firstQuote + 1);
+  if (secondQuote < 0) return "";
+
+  return json.substring(firstQuote + 1, secondQuote);
+}
+
+static bool checkAndApplyRemoteOta(bool force) {
+  if (WiFi.status() != WL_CONNECTED) return false;
+
+  String manifestUrl = String(OTA_REMOTE_MANIFEST_URL);
+  manifestUrl.trim();
+  if (manifestUrl.length() == 0) return false;
+
+  HTTPClient manifestHttp;
+  const bool manifestHttps = manifestUrl.startsWith("https://");
+
+  if (manifestHttps) {
+#if OTA_REMOTE_USE_TLS
+    WiFiClientSecure manifestSecure;
+#if OTA_REMOTE_ALLOW_INSECURE_TLS
+    manifestSecure.setInsecure();
+#endif
+    if (!manifestHttp.begin(manifestSecure, manifestUrl)) {
+      remoteOtaLastStatus = "manifest_begin_failed";
+      return false;
+    }
+#else
+    remoteOtaLastStatus = "https_disabled";
+    return false;
+#endif
+  } else {
+    if (!manifestHttp.begin(manifestUrl)) {
+      remoteOtaLastStatus = "manifest_begin_failed";
+      return false;
+    }
+  }
+
+  manifestHttp.setTimeout(15000);
+  int manifestCode = manifestHttp.GET();
+  if (manifestCode != HTTP_CODE_OK) {
+    remoteOtaLastStatus = String("manifest_http_") + String(manifestCode);
+    manifestHttp.end();
+    return false;
+  }
+
+  String manifestBody = manifestHttp.getString();
+  manifestHttp.end();
+
+  String targetVersion = extractJsonStringField(manifestBody, "version");
+  String firmwareUrl = extractJsonStringField(manifestBody, "url");
+  targetVersion.trim();
+  firmwareUrl.trim();
+
+  if (targetVersion.length() == 0 || firmwareUrl.length() == 0) {
+    remoteOtaLastStatus = "manifest_missing_fields";
+    return false;
+  }
+
+  if (!force && compareSemver(getFirmwareVersion(), targetVersion) >= 0) {
+    remoteOtaLastStatus = "up_to_date";
+    return false;
+  }
+
+  Serial.printf("⬇ OTA remota: %s -> %s\n", getFirmwareVersion().c_str(), targetVersion.c_str());
+
+  HTTPClient binHttp;
+  const bool binHttps = firmwareUrl.startsWith("https://");
+
+  if (binHttps) {
+ #if OTA_REMOTE_USE_TLS
+    WiFiClientSecure binSecure;
+#if OTA_REMOTE_ALLOW_INSECURE_TLS
+    binSecure.setInsecure();
+#endif
+    if (!binHttp.begin(binSecure, firmwareUrl)) {
+      remoteOtaLastStatus = "bin_begin_failed";
+      return false;
+    }
+ #else
+    remoteOtaLastStatus = "https_disabled";
+    return false;
+ #endif
+  } else {
+    if (!binHttp.begin(firmwareUrl)) {
+      remoteOtaLastStatus = "bin_begin_failed";
+      return false;
+    }
+  }
+
+  binHttp.setTimeout(20000);
+  int binCode = binHttp.GET();
+  if (binCode != HTTP_CODE_OK) {
+    remoteOtaLastStatus = String("bin_http_") + String(binCode);
+    binHttp.end();
+    return false;
+  }
+
+  int contentLength = binHttp.getSize();
+  if (!Update.begin(contentLength > 0 ? (size_t)contentLength : UPDATE_SIZE_UNKNOWN)) {
+    remoteOtaLastStatus = "update_begin_failed";
+    binHttp.end();
+    return false;
+  }
+
+  WiFiClient* stream = binHttp.getStreamPtr();
+  size_t written = Update.writeStream(*stream);
+
+  bool updateOk = Update.end();
+  bool updateFinished = Update.isFinished();
+  binHttp.end();
+
+  if (!updateOk || !updateFinished) {
+    remoteOtaLastStatus = String("update_failed_") + Update.errorString();
+    return false;
+  }
+
+  if (contentLength > 0 && (int)written != contentLength) {
+    remoteOtaLastStatus = "update_size_mismatch";
+    return false;
+  }
+
+  remoteOtaLastStatus = String("updated_to_") + targetVersion;
+  Serial.printf("✅ OTA remota aplicada: %s\n", targetVersion.c_str());
+  delay(300);
+  ESP.restart();
+  return true;
+}
+
+static void maybeCheckRemoteOta() {
+  if (WiFi.status() != WL_CONNECTED) return;
+
+  const unsigned long intervalMs = (unsigned long)OTA_REMOTE_CHECK_INTERVAL_SEC * 1000UL;
+  const bool forced = remoteOtaCheckRequested;
+  if (!forced && intervalMs > 0 && millis() - lastRemoteOtaCheckMs < intervalMs) {
+    return;
+  }
+
+  remoteOtaCheckRequested = false;
+  lastRemoteOtaCheckMs = millis();
+  checkAndApplyRemoteOta(forced);
 }
 
 // ============ FUNCIÓN: ENVIAR ESTADO ONLINE ============
@@ -2153,6 +2415,8 @@ void loop() {
     Firebase.RTDB.readStream(&stream);
     lastStreamReadMs = millis();
   }
+
+  maybeCheckRemoteOta();
   
   // Enviar datos según intervalo configurable
   unsigned long intervalMs = (unsigned long)sendIntervalSeconds * 1000UL;
