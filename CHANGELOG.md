@@ -7,6 +7,18 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.28] - 2026-02-17
+
+### 🔎 Zoom horizontal en gráfico del panel sensores
+
+#### Mejoras
+- **Zoom temporal con rueda del mouse**: el gráfico por dispositivo ahora permite ampliar o reducir la ventana horizontal de muestras con scroll.
+- **Desplazamiento lateral con `Shift + rueda`**: se puede navegar el histórico visible sin salir del panel.
+- **Indicador de ventana activa**: muestra cuántas muestras están visibles vs el total para lectura operativa rápida.
+
+#### Calidad
+- **Versionado sincronizado del release**: actualización coordinada de `package.json`, constantes de versión, `version.json`, `manifest.json`, `CHANGELOG.md` y `VERSION.md`.
+
 ## [2.48.27] - 2026-02-17
 
 ### 📊 Gráfico de sensores interactivo en panel técnico

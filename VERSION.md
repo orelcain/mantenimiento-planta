@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.48.27**
+## Versión Actual: **v2.48.28**
 
 **Fecha de lanzamiento**: 17 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.48.28 - Zoom horizontal en gráfico de sensores (17/02/2026)
+- 🔎 **Zoom temporal con rueda**: la gráfica del panel técnico permite acercar/alejar horizontalmente sobre las muestras.
+- ↔️ **Pan lateral con Shift+rueda**: navegación del histórico visible manteniendo hover y lectura temporal.
+- ✅ **Cierre estándar de versión**: bump y sincronización de artefactos de versionado según flujo oficial.
 
 ### v2.48.27 - Gráfico interactivo con hover e intervalo (17/02/2026)
 - 📊 **Lectura temporal con mouse hover**: al pasar el cursor por la curva se muestra fecha/hora exacta y valores de temperatura/humedad del punto seleccionado.

@@ -55,6 +55,8 @@ function buildSparklineCoordinates(values: number[], width: number, height: numb
 function TrendSparkline({ readings, sendIntervalSec }: { readings?: SensorReading[]; sendIntervalSec?: number }) {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null)
   const [nowMs, setNowMs] = useState(() => Date.now())
+  const [windowStart, setWindowStart] = useState(0)
+  const [windowSize, setWindowSize] = useState(0)
 
   const normalizedReadings = useMemo(() => {
     if (!readings) return []
@@ -69,6 +71,26 @@ function TrendSparkline({ readings, sendIntervalSec }: { readings?: SensorReadin
     return () => window.clearInterval(timer)
   }, [sendIntervalSec])
 
+  useEffect(() => {
+    const total = normalizedReadings.length
+    if (total <= 0) {
+      setWindowStart(0)
+      setWindowSize(0)
+      return
+    }
+
+    setWindowSize((prev) => {
+      if (prev <= 0) return total
+      return Math.min(prev, total)
+    })
+
+    setWindowStart((prev) => {
+      const size = windowSize > 0 ? Math.min(windowSize, total) : total
+      const maxStart = Math.max(0, total - size)
+      return Math.min(prev, maxStart)
+    })
+  }, [normalizedReadings.length, windowSize])
+
   if (normalizedReadings.length < 2) {
     return (
       <div className="rounded-md border p-2 text-xs text-muted-foreground">
@@ -81,8 +103,13 @@ function TrendSparkline({ readings, sendIntervalSec }: { readings?: SensorReadin
   const height = 88
   const padding = 6
 
-  const tempValues = normalizedReadings.map((r) => r.temperature)
-  const humValues = normalizedReadings.map((r) => r.humidity)
+  const effectiveWindowSize = windowSize > 0 ? Math.min(windowSize, normalizedReadings.length) : normalizedReadings.length
+  const maxStart = Math.max(0, normalizedReadings.length - effectiveWindowSize)
+  const effectiveWindowStart = Math.min(windowStart, maxStart)
+  const visibleReadings = normalizedReadings.slice(effectiveWindowStart, effectiveWindowStart + effectiveWindowSize)
+
+  const tempValues = visibleReadings.map((r) => r.temperature)
+  const humValues = visibleReadings.map((r) => r.humidity)
 
   if (tempValues.length < 2 || humValues.length < 2) {
     return (
@@ -98,8 +125,8 @@ function TrendSparkline({ readings, sendIntervalSec }: { readings?: SensorReadin
   const tempPoints = tempCoords.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')
   const humPoints = humCoords.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')
 
-  const selectedIndex = hoverIndex != null ? hoverIndex : normalizedReadings.length - 1
-  const selectedReading = normalizedReadings[selectedIndex]
+  const selectedIndex = hoverIndex != null ? hoverIndex : visibleReadings.length - 1
+  const selectedReading = visibleReadings[selectedIndex]
   const selectedTempPoint = tempCoords[selectedIndex]
   const selectedHumPoint = humCoords[selectedIndex]
 
@@ -109,11 +136,44 @@ function TrendSparkline({ readings, sendIntervalSec }: { readings?: SensorReadin
 
   const handleMouseMove: React.MouseEventHandler<SVGSVGElement> = (event) => {
     const rect = event.currentTarget.getBoundingClientRect()
-    if (rect.width <= 0 || normalizedReadings.length <= 1) return
+    if (rect.width <= 0 || visibleReadings.length <= 1) return
 
     const relative = (event.clientX - rect.left) / rect.width
-    const index = Math.max(0, Math.min(normalizedReadings.length - 1, Math.round(relative * (normalizedReadings.length - 1))))
+    const index = Math.max(0, Math.min(visibleReadings.length - 1, Math.round(relative * (visibleReadings.length - 1))))
     setHoverIndex(index)
+  }
+
+  const handleWheel: React.WheelEventHandler<SVGSVGElement> = (event) => {
+    const total = normalizedReadings.length
+    if (total <= 8) return
+    event.preventDefault()
+
+    const currentSize = effectiveWindowSize
+    const currentStart = effectiveWindowStart
+
+    if (event.shiftKey) {
+      const panStep = Math.max(1, Math.round(currentSize * 0.18))
+      const nextStart = event.deltaY > 0 ? currentStart + panStep : currentStart - panStep
+      setWindowStart(Math.max(0, Math.min(total - currentSize, nextStart)))
+      return
+    }
+
+    const rect = event.currentTarget.getBoundingClientRect()
+    const relative = rect.width > 0 ? Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)) : 0.5
+    const cursorIndex = Math.round(relative * Math.max(1, currentSize - 1))
+    const cursorGlobalIndex = currentStart + cursorIndex
+
+    const zoomStep = Math.max(1, Math.round(total * 0.12))
+    const minWindow = Math.min(8, total)
+    const nextSize = event.deltaY > 0
+      ? Math.min(total, currentSize + zoomStep)
+      : Math.max(minWindow, currentSize - zoomStep)
+
+    const ratio = currentSize > 1 ? cursorIndex / (currentSize - 1) : 0.5
+    const nextStart = Math.round(cursorGlobalIndex - ratio * Math.max(1, nextSize - 1))
+
+    setWindowSize(nextSize)
+    setWindowStart(Math.max(0, Math.min(total - nextSize, nextStart)))
   }
 
   return (
@@ -130,6 +190,11 @@ function TrendSparkline({ readings, sendIntervalSec }: { readings?: SensorReadin
         </span>
       </div>
 
+      <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+        <span>Ventana visible: {visibleReadings.length}/{normalizedReadings.length} muestras</span>
+        <span>Rueda: zoom horizontal · Shift+rueda: desplazar</span>
+      </div>
+
       <div className="h-20 w-full rounded-md bg-muted/20 overflow-hidden">
         <svg
           viewBox={`0 0 ${width} ${height}`}
@@ -137,6 +202,7 @@ function TrendSparkline({ readings, sendIntervalSec }: { readings?: SensorReadin
           className="h-full w-full"
           onMouseMove={handleMouseMove}
           onMouseLeave={() => setHoverIndex(null)}
+          onWheel={handleWheel}
         >
           {selectedTempPoint && selectedHumPoint && (
             <line
