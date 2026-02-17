@@ -71,26 +71,6 @@ function TrendSparkline({ readings, sendIntervalSec }: { readings?: SensorReadin
     return () => window.clearInterval(timer)
   }, [sendIntervalSec])
 
-  useEffect(() => {
-    const total = normalizedReadings.length
-    if (total <= 0) {
-      setWindowStart(0)
-      setWindowSize(0)
-      return
-    }
-
-    setWindowSize((prev) => {
-      if (prev <= 0) return total
-      return Math.min(prev, total)
-    })
-
-    setWindowStart((prev) => {
-      const size = windowSize > 0 ? Math.min(windowSize, total) : total
-      const maxStart = Math.max(0, total - size)
-      return Math.min(prev, maxStart)
-    })
-  }, [normalizedReadings.length, windowSize])
-
   if (normalizedReadings.length < 2) {
     return (
       <div className="rounded-md border p-2 text-xs text-muted-foreground">
@@ -169,6 +149,12 @@ function TrendSparkline({ readings, sendIntervalSec }: { readings?: SensorReadin
       ? Math.min(total, currentSize + zoomStep)
       : Math.max(minWindow, currentSize - zoomStep)
 
+    if (nextSize >= total) {
+      setWindowSize(0)
+      setWindowStart(0)
+      return
+    }
+
     const ratio = currentSize > 1 ? cursorIndex / (currentSize - 1) : 0.5
     const nextStart = Math.round(cursorGlobalIndex - ratio * Math.max(1, nextSize - 1))
 
@@ -192,7 +178,7 @@ function TrendSparkline({ readings, sendIntervalSec }: { readings?: SensorReadin
 
       <div className="flex items-center justify-between text-[11px] text-muted-foreground">
         <span>Ventana visible: {visibleReadings.length}/{normalizedReadings.length} muestras</span>
-        <span>Rueda: zoom horizontal · Shift+rueda: desplazar</span>
+        <span>{windowSize > 0 ? 'Rueda: zoom horizontal · Shift+rueda: desplazar' : 'Seguimiento en tiempo real (auto)'}</span>
       </div>
 
       <div className="h-20 w-full rounded-md bg-muted/20 overflow-hidden">

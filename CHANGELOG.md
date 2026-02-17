@@ -7,6 +7,18 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.29] - 2026-02-17
+
+### 🔄 Fix de actualización en tiempo real del gráfico de sensores
+
+#### Fixes
+- **Seguimiento en vivo corregido**: la gráfica vuelve a mostrar por defecto las lecturas más recientes conforme llegan desde RTDB según el intervalo configurado del sensor.
+- **Ventana histórica sin bloquear el vivo**: el zoom/pan horizontal solo fija la ventana cuando el usuario interactúa; al volver al rango total, la vista retoma el modo automático en tiempo real.
+- **Indicador de estado de vista**: se distingue entre modo `auto` y modo de navegación histórica para evitar confusión operativa.
+
+#### Calidad
+- **Versionado sincronizado del release**: actualización coordinada de `package.json`, constantes de versión, `version.json`, `manifest.json`, `CHANGELOG.md` y `VERSION.md`.
+
 ## [2.48.28] - 2026-02-17
 
 ### 🔎 Zoom horizontal en gráfico del panel sensores

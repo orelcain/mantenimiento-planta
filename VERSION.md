@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.48.28**
+## Versión Actual: **v2.48.29**
 
 **Fecha de lanzamiento**: 17 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.48.29 - Fix de seguimiento en tiempo real del gráfico (17/02/2026)
+- 🔄 **Vista viva restaurada**: el gráfico vuelve a seguir automáticamente las últimas lecturas del ESP32 en RTDB según el intervalo configurado.
+- ↔️ **Zoom/pan sin congelar la operación**: el modo histórico se activa solo al interactuar y al volver al rango total se recupera el seguimiento automático.
+- ✅ **Cierre estándar de versión**: bump y sincronización de artefactos de versionado según flujo oficial.
 
 ### v2.48.28 - Zoom horizontal en gráfico de sensores (17/02/2026)
 - 🔎 **Zoom temporal con rueda**: la gráfica del panel técnico permite acercar/alejar horizontalmente sobre las muestras.
