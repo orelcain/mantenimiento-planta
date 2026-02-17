@@ -7,6 +7,18 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.30] - 2026-02-17
+
+### 🧭 Fix de estado online en pestaña Sensores
+
+#### Fixes
+- **Estado operativo consistente**: la pestaña `Sensores` ahora considera frescura real (`lastSeen + sendInterval`) para mostrar estado del dispositivo, evitando falsos `Online` cuando no hay reportes recientes.
+- **Indicadores unificados**: lista de dispositivos, bloque de telemetría y sección de emparejar usan la misma evaluación de frescura.
+- **Actualización visual periódica**: el estado se recalcula automáticamente cada pocos segundos para reflejar cambios sin recargar la página.
+
+#### Calidad
+- **Versionado sincronizado del release**: actualización coordinada de `package.json`, constantes de versión, `version.json`, `manifest.json`, `CHANGELOG.md` y `VERSION.md`.
+
 ## [2.48.29] - 2026-02-17
 
 ### 🔄 Fix de actualización en tiempo real del gráfico de sensores
