@@ -111,8 +111,8 @@ function TrendSparkline({ readings, sendIntervalSec }: { readings?: SensorReadin
     )
   }
 
-  const width = 420
-  const height = chartMode === 'dual' ? 88 : 130
+  const width = 294
+  const height = chartMode === 'dual' ? 124 : 182
   const padding = 6
   const th = DEFAULT_THRESHOLDS
 
@@ -344,7 +344,7 @@ function TrendSparkline({ readings, sendIntervalSec }: { readings?: SensorReadin
         </label>
       )}
 
-      <div className={`${chartMode === 'dual' ? 'h-20' : 'h-32'} w-full rounded-md bg-muted/20 overflow-hidden`}>
+      <div className={`${chartMode === 'dual' ? 'h-28' : 'h-44'} w-full rounded-md bg-muted/20 overflow-hidden`}>
         <svg
           viewBox={`0 0 ${width} ${height}`}
           preserveAspectRatio="none"
