@@ -7,6 +7,15 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.36] - 2026-02-17
+
+### Fix tamaño gráfico + Offline
+
+- **Gráfico reducido a la mitad**: aspect ratio cambiado de 3:4 (vertical) a 4:3 (horizontal), SVG viewBox 400×180/220.
+- **Fix Offline**: `isDeviceFresh` ahora también confía en `device.online === true` de RTDB y amplía ventana a 10× intervalo (mín 120s).
+
+---
+
 ## [2.48.35] - 2026-02-17
 
 ### ⚙️ Umbrales configurables por sensor + aspect ratio 3:4

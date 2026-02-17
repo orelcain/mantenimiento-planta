@@ -38,14 +38,17 @@ function getTelemetryAlert(device: DeviceRow): 'normal' | 'warning' | 'critical'
 }
 
 function isDeviceFresh(device: DeviceRow, nowMs: number): boolean {
+  // Si Firebase RTDB dice online, confiar
+  if (device.online === true) return true
+
   const lastSeen = device.lastSeen
   if (!lastSeen || !Number.isFinite(lastSeen)) return false
 
   // Normalizar: si está en segundos, convertir a ms
   const lastSeenMs = lastSeen > 0 && lastSeen < 1e12 ? lastSeen * 1000 : lastSeen
   const intervalSec = device.sendInterval && device.sendInterval > 0 ? device.sendInterval : 10
-  // Ventana de frescura: 5× intervalo o mínimo 60 s
-  const freshnessWindowMs = Math.max(intervalSec * 5 * 1000, 60_000)
+  // Ventana de frescura: 10× intervalo o mínimo 120 s
+  const freshnessWindowMs = Math.max(intervalSec * 10 * 1000, 120_000)
   return nowMs - lastSeenMs <= freshnessWindowMs
 }
 
@@ -202,9 +205,9 @@ function TrendSparkline({ readings, sendIntervalSec, thresholds }: { readings?: 
     )
   }
 
-  // Aspect ratio 3:4 (ancho:alto)
-  const width = 360
-  const height = chartMode === 'dual' ? 270 : 360
+  // Aspect ratio 4:3 (ancho > alto)
+  const width = 400
+  const height = chartMode === 'dual' ? 180 : 220
   const padding = 8
   const th = resolveThresholds(thresholds)
 
@@ -417,7 +420,7 @@ function TrendSparkline({ readings, sendIntervalSec, thresholds }: { readings?: 
         </span>
       </div>
 
-      <div className={`w-full rounded-lg bg-gradient-to-b from-muted/30 to-muted/5 overflow-hidden border border-border/20`} style={{ aspectRatio: '3/4' }}>
+      <div className="w-full rounded-lg bg-gradient-to-b from-muted/30 to-muted/5 overflow-hidden border border-border/20" style={{ aspectRatio: '4/3' }}>
         <svg
           viewBox={`0 0 ${width} ${height}`}
           preserveAspectRatio="none"
