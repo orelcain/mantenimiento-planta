@@ -192,8 +192,7 @@ export async function updateDeviceThresholds(
   deviceId: string,
   thresholds: SensorThresholds
 ): Promise<void> {
-  const path = `devices/${deviceId}/thresholds`
-  const r = ref(rtdb, path)
-  await update(r, thresholds)
+  const r = ref(rtdb, `devices/${deviceId}`)
+  await update(r, { thresholds })
   console.log(`[devicesRtdb] Umbrales actualizados: ${deviceId}`, thresholds)
 }

@@ -7,6 +7,15 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.39] - 2026-02-17
+### Bugfix
+- **Fix PERMISSION_DENIED umbrales**: los usuarios están en Firestore, no en RTDB. La regla `root.child('users')` nunca encontraba el rol. Cambiado a `auth != null` (el frontend ya valida admin).
+- Escritura de umbrales ahora usa `update()` a nivel de dispositivo para mayor compatibilidad con reglas.
+
+### Visual
+- **Gráfico adaptativo**: el chart se expande cuando el editor de umbrales está cerrado y se reduce cuando está abierto, aprovechando todo el espacio disponible.
+- Transición suave de 300ms al cambiar tamaño del gráfico.
+
 ## [2.48.38] - 2026-02-17
 
 ### Fix umbrales + gráfico individual más legible

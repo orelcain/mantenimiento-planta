@@ -176,7 +176,7 @@ function ThresholdEditor({ deviceId, current, onClose }: {
   )
 }
 
-function TrendSparkline({ readings, sendIntervalSec, thresholds }: { readings?: SensorReading[]; sendIntervalSec?: number; thresholds?: SensorThresholds }) {
+function TrendSparkline({ readings, sendIntervalSec, thresholds, editorOpen = false }: { readings?: SensorReading[]; sendIntervalSec?: number; thresholds?: SensorThresholds; editorOpen?: boolean }) {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null)
   const [nowMs, setNowMs] = useState(() => Date.now())
   const [windowStart, setWindowStart] = useState(0)
@@ -205,9 +205,11 @@ function TrendSparkline({ readings, sendIntervalSec, thresholds }: { readings?: 
     )
   }
 
-  // Dimensiones SVG — individual más alto para que se entienda con umbrales
+  // Dimensiones SVG — más alto cuando el editor de umbrales está cerrado
   const width = 400
-  const height = chartMode === 'dual' ? 130 : 240
+  const height = chartMode === 'dual'
+    ? (editorOpen ? 120 : 170)
+    : (editorOpen ? 200 : 280)
   const padding = chartMode === 'dual' ? 8 : 20
   const th = resolveThresholds(thresholds)
 
@@ -427,7 +429,8 @@ function TrendSparkline({ readings, sendIntervalSec, thresholds }: { readings?: 
         </span>
       </div>
 
-      <div className={`w-full ${chartMode === 'dual' ? 'h-36' : 'h-52'} rounded-lg bg-gradient-to-b from-muted/30 to-muted/5 overflow-hidden border border-border/20`}>
+      <div className={`w-full rounded-lg bg-gradient-to-b from-muted/30 to-muted/5 overflow-hidden border border-border/20 transition-all duration-300`}
+        style={{ height: chartMode === 'dual' ? (editorOpen ? '9rem' : '12rem') : (editorOpen ? '12rem' : '16rem') }}>  
         <svg
           viewBox={`0 0 ${width} ${height}`}
           preserveAspectRatio="xMidYMid meet"
@@ -669,7 +672,7 @@ function DeviceCard({ device, equipmentById, readingsByEquipment, panelNowMs, na
           </div>
         </div>
 
-        <TrendSparkline readings={trendReadings} sendIntervalSec={device.sendInterval} thresholds={device.thresholds} />
+        <TrendSparkline readings={trendReadings} sendIntervalSec={device.sendInterval} thresholds={device.thresholds} editorOpen={showThresholdEditor} />
 
         {/* Editor de umbrales (solo admin) */}
         {isAdmin && (
