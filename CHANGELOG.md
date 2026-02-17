@@ -7,6 +7,22 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.38] - 2026-02-17
+
+### Fix umbrales + gráfico individual más legible
+
+#### Bugfix
+- **Deploy reglas RTDB**: desplegadas reglas con nodo `thresholds` para admin. Fix PERMISSION_DENIED al guardar umbrales.
+
+#### Visual
+- **Gráfico individual más alto**: h-36 (dual) / h-52 (individual). SVG 400×130 (dual) / 400×240 (individual) con padding 20px.
+- **Zona normal verde**: banda verde semitransparente entre warnLow y warnHigh con etiqueta "NORMAL" centrada.
+- **Etiquetas de umbral en eje Y izquierdo**: números con grados (°) alineados al borde izquierdo, font 8px con peso 500.
+- **Líneas de umbral más suaves**: 0.8px, dashes 6+3.
+- **preserveAspectRatio=xMidYMid meet**: proporciones correctas en vez de estirado.
+
+---
+
 ## [2.48.37] - 2026-02-17
 
 ### Fix gráfico que no cabía en pantalla

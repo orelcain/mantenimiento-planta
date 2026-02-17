@@ -205,10 +205,10 @@ function TrendSparkline({ readings, sendIntervalSec, thresholds }: { readings?: 
     )
   }
 
-  // Dimensiones SVG compactas
+  // Dimensiones SVG — individual más alto para que se entienda con umbrales
   const width = 400
-  const height = chartMode === 'dual' ? 140 : 170
-  const padding = 8
+  const height = chartMode === 'dual' ? 130 : 240
+  const padding = chartMode === 'dual' ? 8 : 20
   const th = resolveThresholds(thresholds)
 
   const effectiveWindowSize = windowSize > 0 ? Math.min(windowSize, normalizedReadings.length) : normalizedReadings.length
@@ -345,43 +345,50 @@ function TrendSparkline({ readings, sendIntervalSec, thresholds }: { readings?: 
 
     return (
       <>
+        {/* Zona normal central: entre warnLow y warnHigh (verde) */}
+        <rect x={x0} y={yWarnHigh} width={x1 - x0} height={Math.max(0, yWarnLow - yWarnHigh)}
+          fill="#22c55e" fillOpacity="0.08" />
         {/* Zona crítica superior: por encima de critHigh */}
         {critHigh < rMax && (
           <rect x={x0} y={yTop} width={x1 - x0} height={Math.max(0, yCritHigh - yTop)}
-            fill={critColor} fillOpacity="0.18" />
+            fill={critColor} fillOpacity="0.15" />
         )}
         {/* Zona warning superior: entre warnHigh y critHigh */}
         {warnHigh < rMax && (
           <rect x={x0} y={yCritHigh} width={x1 - x0} height={Math.max(0, yWarnHigh - yCritHigh)}
-            fill={warnColor} fillOpacity="0.15" />
+            fill={warnColor} fillOpacity="0.12" />
         )}
         {/* Zona warning inferior: entre critLow y warnLow */}
         {warnLow > rMin && (
           <rect x={x0} y={yWarnLow} width={x1 - x0} height={Math.max(0, yCritLow - yWarnLow)}
-            fill={warnColor} fillOpacity="0.15" />
+            fill={warnColor} fillOpacity="0.12" />
         )}
         {/* Zona crítica inferior: por debajo de critLow */}
         {critLow > rMin && (
           <rect x={x0} y={yCritLow} width={x1 - x0} height={Math.max(0, yBot - yCritLow)}
-            fill={critColor} fillOpacity="0.18" />
+            fill={critColor} fillOpacity="0.15" />
         )}
         {/* Líneas de umbral */}
-        <line x1={x0} x2={x1} y1={yCritHigh} y2={yCritHigh} stroke={critColor} strokeWidth="1" strokeDasharray="4 3" strokeOpacity="0.7" />
-        <line x1={x0} x2={x1} y1={yWarnHigh} y2={yWarnHigh} stroke={warnColor} strokeWidth="1" strokeDasharray="4 3" strokeOpacity="0.6" />
-        <line x1={x0} x2={x1} y1={yWarnLow} y2={yWarnLow} stroke={warnColor} strokeWidth="1" strokeDasharray="4 3" strokeOpacity="0.6" />
-        <line x1={x0} x2={x1} y1={yCritLow} y2={yCritLow} stroke={critColor} strokeWidth="1" strokeDasharray="4 3" strokeOpacity="0.7" />
-        {/* Etiquetas de umbral */}
-        <text x={x1 - 2} y={yCritHigh - 2} textAnchor="end" fontSize="7" fill={critColor} fillOpacity="0.9">
-          {critHigh}
+        <line x1={x0} x2={x1} y1={yCritHigh} y2={yCritHigh} stroke={critColor} strokeWidth="0.8" strokeDasharray="6 3" strokeOpacity="0.6" />
+        <line x1={x0} x2={x1} y1={yWarnHigh} y2={yWarnHigh} stroke={warnColor} strokeWidth="0.8" strokeDasharray="6 3" strokeOpacity="0.5" />
+        <line x1={x0} x2={x1} y1={yWarnLow} y2={yWarnLow} stroke={warnColor} strokeWidth="0.8" strokeDasharray="6 3" strokeOpacity="0.5" />
+        <line x1={x0} x2={x1} y1={yCritLow} y2={yCritLow} stroke={critColor} strokeWidth="0.8" strokeDasharray="6 3" strokeOpacity="0.6" />
+        {/* Etiquetas de umbral en eje Y izquierdo */}
+        <text x={x0 + 2} y={yCritHigh - 3} textAnchor="start" fontSize="8" fill={critColor} fillOpacity="0.9" fontWeight="500">
+          {critHigh}°
         </text>
-        <text x={x1 - 2} y={yWarnHigh - 2} textAnchor="end" fontSize="7" fill={warnColor} fillOpacity="0.85">
-          {warnHigh}
+        <text x={x0 + 2} y={yWarnHigh - 3} textAnchor="start" fontSize="8" fill={warnColor} fillOpacity="0.85" fontWeight="500">
+          {warnHigh}°
         </text>
-        <text x={x1 - 2} y={yWarnLow + 9} textAnchor="end" fontSize="7" fill={warnColor} fillOpacity="0.85">
-          {warnLow}
+        <text x={x0 + 2} y={yWarnLow + 11} textAnchor="start" fontSize="8" fill={warnColor} fillOpacity="0.85" fontWeight="500">
+          {warnLow}°
         </text>
-        <text x={x1 - 2} y={yCritLow + 9} textAnchor="end" fontSize="7" fill={critColor} fillOpacity="0.9">
-          {critLow}
+        <text x={x0 + 2} y={yCritLow + 11} textAnchor="start" fontSize="8" fill={critColor} fillOpacity="0.9" fontWeight="500">
+          {critLow}°
+        </text>
+        {/* Etiqueta de zona normal */}
+        <text x={(x0 + x1) / 2} y={(yWarnHigh + yWarnLow) / 2 + 3} textAnchor="middle" fontSize="9" fill="#22c55e" fillOpacity="0.5" fontWeight="600">
+          NORMAL
         </text>
       </>
     )
@@ -420,10 +427,10 @@ function TrendSparkline({ readings, sendIntervalSec, thresholds }: { readings?: 
         </span>
       </div>
 
-      <div className="w-full h-44 rounded-lg bg-gradient-to-b from-muted/30 to-muted/5 overflow-hidden border border-border/20">
+      <div className={`w-full ${chartMode === 'dual' ? 'h-36' : 'h-52'} rounded-lg bg-gradient-to-b from-muted/30 to-muted/5 overflow-hidden border border-border/20`}>
         <svg
           viewBox={`0 0 ${width} ${height}`}
-          preserveAspectRatio="none"
+          preserveAspectRatio="xMidYMid meet"
           className="h-full w-full"
           onMouseMove={handleMouseMove}
           onMouseLeave={() => setHoverIndex(null)}
