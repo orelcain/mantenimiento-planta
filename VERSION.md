@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.48.26**
+## Versión Actual: **v2.48.27**
 
 **Fecha de lanzamiento**: 17 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.48.27 - Gráfico interactivo con hover e intervalo (17/02/2026)
+- 📊 **Lectura temporal con mouse hover**: al pasar el cursor por la curva se muestra fecha/hora exacta y valores de temperatura/humedad del punto seleccionado.
+- ⏱️ **Actualización ligada al intervalo configurado**: el panel muestra el `sendInterval` activo del dispositivo y el tiempo estimado para la próxima muestra.
+- ✅ **Cierre estándar de versión**: bump y sincronización de artefactos de versionado según flujo oficial.
 
 ### v2.48.26 - Fix 404 de modulepreload en GitHub Pages (17/02/2026)
 - 🧯 **Preloads conflictivos eliminados**: desactivado `modulePreload` en build para evitar `404` de requests automáticos a chunks en caché.

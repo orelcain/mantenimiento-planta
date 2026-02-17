@@ -37,25 +37,39 @@ function getTelemetryAlert(device: DeviceRow): 'normal' | 'warning' | 'critical'
   return 'normal'
 }
 
-function buildSparklinePoints(values: number[], width: number, height: number, padding: number): string {
-  if (values.length < 2) return ''
+function buildSparklineCoordinates(values: number[], width: number, height: number, padding: number) {
+  if (values.length < 2) return []
 
   const min = Math.min(...values)
   const max = Math.max(...values)
   const range = Math.max(1e-9, max - min)
   const step = (width - padding * 2) / (values.length - 1)
 
-  return values
-    .map((value, index) => {
+  return values.map((value, index) => {
       const x = padding + index * step
       const y = height - padding - ((value - min) / range) * (height - padding * 2)
-      return `${x.toFixed(1)},${y.toFixed(1)}`
+      return { x, y }
     })
-    .join(' ')
 }
 
-function TrendSparkline({ readings }: { readings?: SensorReading[] }) {
-  if (!readings || readings.length < 2) {
+function TrendSparkline({ readings, sendIntervalSec }: { readings?: SensorReading[]; sendIntervalSec?: number }) {
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null)
+  const [nowMs, setNowMs] = useState(() => Date.now())
+
+  const normalizedReadings = useMemo(() => {
+    if (!readings) return []
+    return readings.filter(
+      (r) => Number.isFinite(r.timestamp) && Number.isFinite(r.temperature) && Number.isFinite(r.humidity)
+    )
+  }, [readings])
+
+  useEffect(() => {
+    if (!sendIntervalSec || sendIntervalSec <= 0) return
+    const timer = window.setInterval(() => setNowMs(Date.now()), 1000)
+    return () => window.clearInterval(timer)
+  }, [sendIntervalSec])
+
+  if (normalizedReadings.length < 2) {
     return (
       <div className="rounded-md border p-2 text-xs text-muted-foreground">
         Sin histórico suficiente para graficar cambios.
@@ -67,8 +81,8 @@ function TrendSparkline({ readings }: { readings?: SensorReading[] }) {
   const height = 88
   const padding = 6
 
-  const tempValues = readings.map((r) => r.temperature).filter(Number.isFinite)
-  const humValues = readings.map((r) => r.humidity).filter(Number.isFinite)
+  const tempValues = normalizedReadings.map((r) => r.temperature)
+  const humValues = normalizedReadings.map((r) => r.humidity)
 
   if (tempValues.length < 2 || humValues.length < 2) {
     return (
@@ -78,8 +92,29 @@ function TrendSparkline({ readings }: { readings?: SensorReading[] }) {
     )
   }
 
-  const tempPoints = buildSparklinePoints(tempValues, width, height, padding)
-  const humPoints = buildSparklinePoints(humValues, width, height, padding)
+  const tempCoords = buildSparklineCoordinates(tempValues, width, height, padding)
+  const humCoords = buildSparklineCoordinates(humValues, width, height, padding)
+
+  const tempPoints = tempCoords.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')
+  const humPoints = humCoords.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')
+
+  const selectedIndex = hoverIndex != null ? hoverIndex : normalizedReadings.length - 1
+  const selectedReading = normalizedReadings[selectedIndex]
+  const selectedTempPoint = tempCoords[selectedIndex]
+  const selectedHumPoint = humCoords[selectedIndex]
+
+  const lastTs = normalizedReadings[normalizedReadings.length - 1]?.timestamp
+  const nextUpdateTs = sendIntervalSec && lastTs ? lastTs + sendIntervalSec * 1000 : undefined
+  const remainingSec = nextUpdateTs ? Math.max(0, Math.ceil((nextUpdateTs - nowMs) / 1000)) : undefined
+
+  const handleMouseMove: React.MouseEventHandler<SVGSVGElement> = (event) => {
+    const rect = event.currentTarget.getBoundingClientRect()
+    if (rect.width <= 0 || normalizedReadings.length <= 1) return
+
+    const relative = (event.clientX - rect.left) / rect.width
+    const index = Math.max(0, Math.min(normalizedReadings.length - 1, Math.round(relative * (normalizedReadings.length - 1))))
+    setHoverIndex(index)
+  }
 
   return (
     <div className="rounded-md border p-2 space-y-2">
@@ -88,8 +123,33 @@ function TrendSparkline({ readings }: { readings?: SensorReading[] }) {
         <span>{Math.min(tempValues.length, humValues.length)} muestras</span>
       </div>
 
+      <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+        <span>Intervalo configurado: {sendIntervalSec && sendIntervalSec > 0 ? `${sendIntervalSec}s` : 'N/D'}</span>
+        <span>
+          {remainingSec != null ? `Próxima actualización estimada: ${remainingSec}s` : 'Actualización en tiempo real'}
+        </span>
+      </div>
+
       <div className="h-20 w-full rounded-md bg-muted/20 overflow-hidden">
-        <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="h-full w-full">
+        <svg
+          viewBox={`0 0 ${width} ${height}`}
+          preserveAspectRatio="none"
+          className="h-full w-full"
+          onMouseMove={handleMouseMove}
+          onMouseLeave={() => setHoverIndex(null)}
+        >
+          {selectedTempPoint && selectedHumPoint && (
+            <line
+              x1={selectedTempPoint.x}
+              x2={selectedTempPoint.x}
+              y1={padding}
+              y2={height - padding}
+              stroke="currentColor"
+              strokeOpacity="0.35"
+              strokeDasharray="2 3"
+              className="text-muted-foreground"
+            />
+          )}
           <polyline
             points={humPoints}
             fill="none"
@@ -105,8 +165,20 @@ function TrendSparkline({ readings }: { readings?: SensorReading[] }) {
             strokeWidth="2"
             className="text-primary"
           />
+          {selectedTempPoint && (
+            <circle cx={selectedTempPoint.x} cy={selectedTempPoint.y} r="2.6" fill="currentColor" className="text-primary" />
+          )}
+          {selectedHumPoint && (
+            <circle cx={selectedHumPoint.x} cy={selectedHumPoint.y} r="2.6" fill="currentColor" className="text-muted-foreground" />
+          )}
         </svg>
       </div>
+
+      {selectedReading && (
+        <div className="text-[11px] text-muted-foreground rounded-md border px-2 py-1">
+          {formatDateTime(selectedReading.timestamp)} · Temp {selectedReading.temperature.toFixed(1)} °C · Hum {selectedReading.humidity.toFixed(1)} %
+        </div>
+      )}
 
       <div className="flex items-center gap-4 text-[11px] text-muted-foreground">
         <span className="inline-flex items-center gap-1">
@@ -385,7 +457,7 @@ export function SensorsMonitorPage() {
                   </div>
                 </div>
 
-                <TrendSparkline readings={trendReadings} />
+                <TrendSparkline readings={trendReadings} sendIntervalSec={device.sendInterval} />
 
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <span>Última actualización</span>

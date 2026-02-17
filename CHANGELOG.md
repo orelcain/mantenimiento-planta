@@ -7,6 +7,18 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.27] - 2026-02-17
+
+### 📊 Gráfico de sensores interactivo en panel técnico
+
+#### Mejoras
+- **Hover sobre la curva con dato temporal**: el gráfico por dispositivo ahora permite mover el mouse y ver el punto seleccionado con fecha/hora, temperatura y humedad registradas.
+- **Referencia al intervalo configurado**: se muestra el `sendInterval` del dispositivo y una estimación de próxima actualización basada en la última lectura recibida.
+- **Seguimiento visual del punto activo**: se agrega guía vertical y marcadores para facilitar lectura operativa del registro en el tiempo.
+
+#### Calidad
+- **Versionado sincronizado del release**: actualización coordinada de `package.json`, constantes de versión, `version.json`, `manifest.json`, `CHANGELOG.md` y `VERSION.md`.
+
 ## [2.48.26] - 2026-02-17
 
 ### 🧯 Fix final de errores 404 en consola (modulepreload)
