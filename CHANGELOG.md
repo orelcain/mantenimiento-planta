@@ -7,6 +7,19 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.32] - 2026-02-17
+
+### 📡 Firmware: onDisconnect automático en Firebase RTDB
+
+#### Features
+- **`registerOnDisconnect()` en ESP32**: al conectar a Firebase, el firmware registra un handler `onDisconnect` vía REST API que automáticamente establece `online: false` en `devices/{id}` y `sensors/{equipmentId}` cuando el ESP32 pierde conexión.
+- **Eliminación de estado stale**: cuando el ESP32 pierde WiFi (ej. hotspot iPhone se apaga), Firebase RTDB marca `online: false` automáticamente sin necesidad de que el dispositivo envíe un último mensaje.
+
+#### Técnico
+- Usa `Firebase.getToken()` para obtener el ID token de autenticación anónima.
+- PUT a `/.onDisconnect.json` endpoint de Firebase REST API.
+- Se invoca automáticamente en `setupFirebase()` después de `sendOnlineStatus(true)`.
+
 ## [2.48.31] - 2026-02-17
 
 ### 🎯 Consistencia de estado online en Sensores IoT

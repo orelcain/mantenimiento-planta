@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.48.31**
+## Versión Actual: **v2.48.32**
 
 **Fecha de lanzamiento**: 17 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.48.32 - Firmware: onDisconnect automático en RTDB (17/02/2026)
+- 📡 **onDisconnect en ESP32**: el firmware registra automáticamente `online: false` en Firebase RTDB al perder conexión WiFi/Firebase.
+- 🔌 **Soporte dual**: se registra para `devices/{id}/online` y `sensors/{equipmentId}/online`.
+- 🔐 **Auth via REST API**: usa `Firebase.getToken()` y endpoint `.onDisconnect.json`.
 
 ### v2.48.31 - Consistencia online en Sensores IoT (17/02/2026)
 - 🎯 **KPI online consistente**: el contador superior de `Sensores IoT` ahora usa frescura real y no el booleano online crudo.

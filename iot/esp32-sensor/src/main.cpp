@@ -59,6 +59,8 @@ static void maybeCheckRemoteOta();
 static bool checkAndApplyRemoteOta(bool force);
 static int compareSemver(const String& currentVersion, const String& targetVersion);
 
+static void registerOnDisconnect();
+
 static void ensureHttpServerStarted();
 static void ensureHttpServerListening();
 static void ensureAlwaysOnAp();
@@ -1946,11 +1948,72 @@ void setupFirebase() {
     
     // Enviar estado inicial
     sendOnlineStatus(true);
+    
+    // Registrar onDisconnect para que RTDB marque online=false automáticamente
+    registerOnDisconnect();
   } else {
     Serial.println();
     Serial.println("✗ Error: No se pudo conectar a Firebase");
     Serial.println("  Verifica API_KEY, DATABASE_URL y que Auth Anónimo esté habilitado");
     firebaseReady = false;
+  }
+}
+
+// ============ FUNCIÓN: REGISTRAR onDisconnect (REST API) ============
+// Firebase RTDB soporta .onDisconnect vía REST: PUT a <url>/<path>.json?auth=TOKEN
+// con header X-Firebase-ETag y body del valor a setear al desconectarse.
+// Aquí registramos online=false para que RTDB lo aplique automáticamente.
+static void registerOnDisconnect() {
+  if (deviceId.length() == 0) return;
+  if (WiFi.status() != WL_CONNECTED) return;
+  if (!Firebase.ready()) return;
+
+  // Obtener el token de autenticación actual
+  const char* token = Firebase.getToken();
+  if (!token || strlen(token) == 0) {
+    Serial.println("⚠ onDisconnect: no hay token disponible");
+    return;
+  }
+
+  // Registrar onDisconnect para devices/{deviceId}/online
+  String disconnectUrl = String(FIREBASE_DATABASE_URL);
+  if (!disconnectUrl.endsWith("/")) disconnectUrl += "/";
+  disconnectUrl += "devices/";
+  disconnectUrl += deviceId;
+  disconnectUrl += "/online/.onDisconnect.json?auth=";
+  disconnectUrl += token;
+
+  HTTPClient httpOnDisc;
+  httpOnDisc.begin(disconnectUrl);
+  httpOnDisc.addHeader("Content-Type", "application/json");
+  int httpCode = httpOnDisc.PUT("false");  // Setear online=false al desconectarse
+
+  if (httpCode == 200) {
+    Serial.println("✓ onDisconnect registrado: devices/" + deviceId + "/online -> false");
+  } else {
+    Serial.printf("⚠ onDisconnect falló (HTTP %d): %s\n", httpCode, httpOnDisc.getString().c_str());
+  }
+  httpOnDisc.end();
+
+  // También registrar para sensors/{equipmentId}/online si hay equipo
+  if (hasAssignedEquipment()) {
+    String sensorDiscUrl = String(FIREBASE_DATABASE_URL);
+    if (!sensorDiscUrl.endsWith("/")) sensorDiscUrl += "/";
+    sensorDiscUrl += "sensors/";
+    sensorDiscUrl += currentEquipmentId;
+    sensorDiscUrl += "/online/.onDisconnect.json?auth=";
+    sensorDiscUrl += token;
+
+    HTTPClient httpSensorDisc;
+    httpSensorDisc.begin(sensorDiscUrl);
+    httpSensorDisc.addHeader("Content-Type", "application/json");
+    int sensorCode = httpSensorDisc.PUT("false");
+    if (sensorCode == 200) {
+      Serial.println("✓ onDisconnect registrado: sensors/" + currentEquipmentId + "/online -> false");
+    } else {
+      Serial.printf("⚠ onDisconnect (sensor) falló (HTTP %d)\n", sensorCode);
+    }
+    httpSensorDisc.end();
   }
 }
 
