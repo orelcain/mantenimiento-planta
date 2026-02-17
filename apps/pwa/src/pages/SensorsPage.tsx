@@ -22,6 +22,15 @@ function normalizeTs(ts: number | undefined): number | null {
   return ts
 }
 
+function isDeviceFresh(device: Pick<DeviceRow, 'online' | 'lastSeen' | 'sendInterval'> | null | undefined, nowMs: number): boolean {
+  if (!device?.online) return false
+  const lastSeen = normalizeTs(device.lastSeen)
+  if (!lastSeen) return false
+  const intervalSec = device.sendInterval && device.sendInterval > 0 ? device.sendInterval : 10
+  const freshnessWindowMs = Math.max(30_000, intervalSec * 3_000)
+  return nowMs - lastSeen <= freshnessWindowMs
+}
+
 function formatDateTime(timestamp: number | Date | undefined): string {
   if (!timestamp) return '—'
   
@@ -78,7 +87,7 @@ function toEquipmentSearchText(e: Equipment): string {
 
 function onlineBadge(online: boolean | undefined) {
   if (online) return <Badge variant="default">Online</Badge>
-  return <Badge variant="secondary">Offline</Badge>
+  return <Badge variant="secondary">Sin datos recientes</Badge>
 }
 
 export function SensorsPage() {
@@ -172,6 +181,8 @@ export function SensorsPage() {
   // Estado para eliminar dispositivos
   const [deletingDevice, setDeletingDevice] = useState<string | null>(null)
 
+  const [panelNowMs, setPanelNowMs] = useState<number>(() => Date.now())
+
   // Estado para colapsar/expandir sección de Emparejar
   const [isPairingExpanded, setIsPairingExpanded] = useState(true)
   
@@ -212,6 +223,11 @@ export function SensorsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  useEffect(() => {
+    const timer = window.setInterval(() => setPanelNowMs(Date.now()), 5_000)
+    return () => window.clearInterval(timer)
+  }, [])
+
   const filteredDevices = useMemo(() => {
     const q = deviceSearch.trim().toLowerCase()
     if (!q) return devices
@@ -221,6 +237,11 @@ export function SensorsPage() {
   const selectedDevice = useMemo(
     () => devices.find((d) => d.deviceId === selectedDeviceId) ?? null,
     [devices, selectedDeviceId]
+  )
+
+  const selectedDeviceIsFresh = useMemo(
+    () => isDeviceFresh(selectedDevice, panelNowMs),
+    [selectedDevice, panelNowMs]
   )
 
   const otaHostname = selectedDevice?.deviceId ? `esp32-${selectedDevice.deviceId.slice(-6)}` : ''
@@ -426,7 +447,7 @@ export function SensorsPage() {
       return {
         temperatura: selectedDevice.telemetry.temperatura,
         humedad: selectedDevice.telemetry.humedad,
-        online: selectedDevice.online,
+        online: selectedDeviceIsFresh,
         lastSeen: selectedDevice.lastSeen,
         source: selectedDevice.telemetry.source || 'device'
       }
@@ -442,7 +463,7 @@ export function SensorsPage() {
   }, [
     // Solo depender de los valores que realmente importan
     selectedDevice?.telemetry,
-    selectedDevice?.online,
+    selectedDeviceIsFresh,
     selectedDevice?.lastSeen,
     sensorData
   ])
@@ -1021,6 +1042,7 @@ export function SensorsPage() {
                   <div className="space-y-2 max-h-[500px] overflow-auto">
                     {filteredDevices.map((d) => {
                       const lastSeen = normalizeTs(d.lastSeen)
+                      const isFresh = isDeviceFresh(d, panelNowMs)
                       const isSelected = d.deviceId === selectedDeviceId
                       const assignedEquip = d.assignedEquipmentId 
                         ? equipment.find((e) => e.id === d.assignedEquipmentId)
@@ -1056,7 +1078,7 @@ export function SensorsPage() {
                                   </div>
                                 )}
                               </div>
-                              {onlineBadge(Boolean(d.online))}
+                              {onlineBadge(isFresh)}
                             </div>
 
                             {assignedEquip && (
@@ -1417,21 +1439,21 @@ export function SensorsPage() {
                         {typeof selectedDevice.rssi === 'number' && (
                           <div className="text-xs text-muted-foreground">
                             Señal: {selectedDevice.rssi} dBm{' '}
-                            <span className={getRssiQualityClass(selectedDevice.rssi, selectedDevice.online)}>
-                              ({getRssiQuality(selectedDevice.rssi, selectedDevice.online)})
+                            <span className={getRssiQualityClass(selectedDevice.rssi, selectedDeviceIsFresh)}>
+                              ({getRssiQuality(selectedDevice.rssi, selectedDeviceIsFresh)})
                             </span>
                           </div>
                         )}
                         {typeof selectedDevice.rssi === 'number' && (
                           <div className="text-xs text-muted-foreground">
-                            Tasa est.: {getRssiRateEstimate(selectedDevice.rssi, selectedDevice.online)}
+                            Tasa est.: {getRssiRateEstimate(selectedDevice.rssi, selectedDeviceIsFresh)}
                           </div>
                         )}
                         {typeof selectedDevice.rssi === 'number' && (
                           <div className="mt-1">
                             <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
                               <div
-                                className={`h-full transition-all ${getRssiBarClass(selectedDevice.rssi, selectedDevice.online)} ${getRssiBarWidth(selectedDevice.rssi, selectedDevice.online)}`}
+                                className={`h-full transition-all ${getRssiBarClass(selectedDevice.rssi, selectedDeviceIsFresh)} ${getRssiBarWidth(selectedDevice.rssi, selectedDeviceIsFresh)}`}
                               />
                             </div>
                           </div>
@@ -1630,7 +1652,7 @@ export function SensorsPage() {
                         Emparejar
                       </span>
                       <div className="flex items-center gap-2">
-                        {onlineBadge(Boolean(selectedDevice.online))}
+                        {onlineBadge(selectedDeviceIsFresh)}
                         {isPairingExpanded ? (
                           <ChevronUp className="h-5 w-5 text-muted-foreground" />
                         ) : (
@@ -1650,13 +1672,13 @@ export function SensorsPage() {
                       {typeof selectedDevice.rssi === 'number' && (
                         <span>
                           {' '}· RSSI: {selectedDevice.rssi} dBm{' '}
-                          <span className={getRssiQualityClass(selectedDevice.rssi, selectedDevice.online)}>
-                            ({getRssiQuality(selectedDevice.rssi, selectedDevice.online)})
+                          <span className={getRssiQualityClass(selectedDevice.rssi, selectedDeviceIsFresh)}>
+                            ({getRssiQuality(selectedDevice.rssi, selectedDeviceIsFresh)})
                           </span>
                           <span className="inline-flex items-center ml-2 align-middle">
                             <span className="h-1 w-20 rounded-full bg-muted overflow-hidden">
                               <span
-                                className={`block h-full ${getRssiBarClass(selectedDevice.rssi, selectedDevice.online)} ${getRssiBarWidth(selectedDevice.rssi, selectedDevice.online)}`}
+                                className={`block h-full ${getRssiBarClass(selectedDevice.rssi, selectedDeviceIsFresh)} ${getRssiBarWidth(selectedDevice.rssi, selectedDeviceIsFresh)}`}
                               />
                             </span>
                           </span>
