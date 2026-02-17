@@ -5,6 +5,7 @@ import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input } from '
 import { useCanSee } from '@/store'
 import { getEquipments } from '@/services/equipment'
 import { subscribeDevices, type DeviceRow } from '@/services/devicesRtdb'
+import { subscribeSensorReadings, type SensorReading } from '@/services/sensorsRtdb'
 import type { Equipment } from '@/types'
 
 function formatDateTime(timestamp?: number): string {
@@ -36,6 +37,89 @@ function getTelemetryAlert(device: DeviceRow): 'normal' | 'warning' | 'critical'
   return 'normal'
 }
 
+function buildSparklinePoints(values: number[], width: number, height: number, padding: number): string {
+  if (values.length < 2) return ''
+
+  const min = Math.min(...values)
+  const max = Math.max(...values)
+  const range = Math.max(1e-9, max - min)
+  const step = (width - padding * 2) / (values.length - 1)
+
+  return values
+    .map((value, index) => {
+      const x = padding + index * step
+      const y = height - padding - ((value - min) / range) * (height - padding * 2)
+      return `${x.toFixed(1)},${y.toFixed(1)}`
+    })
+    .join(' ')
+}
+
+function TrendSparkline({ readings }: { readings?: SensorReading[] }) {
+  if (!readings || readings.length < 2) {
+    return (
+      <div className="rounded-md border p-2 text-xs text-muted-foreground">
+        Sin histórico suficiente para graficar cambios.
+      </div>
+    )
+  }
+
+  const width = 420
+  const height = 88
+  const padding = 6
+
+  const tempValues = readings.map((r) => r.temperature).filter(Number.isFinite)
+  const humValues = readings.map((r) => r.humidity).filter(Number.isFinite)
+
+  if (tempValues.length < 2 || humValues.length < 2) {
+    return (
+      <div className="rounded-md border p-2 text-xs text-muted-foreground">
+        Sin histórico suficiente para graficar cambios.
+      </div>
+    )
+  }
+
+  const tempPoints = buildSparklinePoints(tempValues, width, height, padding)
+  const humPoints = buildSparklinePoints(humValues, width, height, padding)
+
+  return (
+    <div className="rounded-md border p-2 space-y-2">
+      <div className="flex items-center justify-between text-xs text-muted-foreground">
+        <span>Cambios recientes del sensor</span>
+        <span>{Math.min(tempValues.length, humValues.length)} muestras</span>
+      </div>
+
+      <div className="h-20 w-full rounded-md bg-muted/20 overflow-hidden">
+        <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="h-full w-full">
+          <polyline
+            points={humPoints}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeDasharray="5 4"
+            className="text-muted-foreground"
+          />
+          <polyline
+            points={tempPoints}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            className="text-primary"
+          />
+        </svg>
+      </div>
+
+      <div className="flex items-center gap-4 text-[11px] text-muted-foreground">
+        <span className="inline-flex items-center gap-1">
+          <span className="h-1.5 w-4 rounded bg-primary" /> Temperatura
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <span className="h-1.5 w-4 rounded bg-muted-foreground" /> Humedad
+        </span>
+      </div>
+    </div>
+  )
+}
+
 export function SensorsMonitorPage() {
   const canSeeSensors = useCanSee('sensores')
   const navigate = useNavigate()
@@ -46,6 +130,7 @@ export function SensorsMonitorPage() {
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [areaFilter, setAreaFilter] = useState('all')
+  const [readingsByEquipment, setReadingsByEquipment] = useState<Record<string, SensorReading[]>>({})
 
   useEffect(() => {
     let isMounted = true
@@ -80,6 +165,48 @@ export function SensorsMonitorPage() {
       unsub()
     }
   }, [])
+
+  const assignedEquipmentIds = useMemo(() => {
+    return [...new Set(devices.map((device) => device.assignedEquipmentId).filter(Boolean) as string[])].sort()
+  }, [devices])
+
+  useEffect(() => {
+    if (!assignedEquipmentIds.length) {
+      setReadingsByEquipment({})
+      return
+    }
+
+    setReadingsByEquipment((prev) => {
+      const next: Record<string, SensorReading[]> = {}
+      for (const equipmentId of assignedEquipmentIds) {
+        if (prev[equipmentId]) next[equipmentId] = prev[equipmentId]
+      }
+      return next
+    })
+
+    const unsubs = assignedEquipmentIds.map((equipmentId) =>
+      subscribeSensorReadings(
+        equipmentId,
+        30,
+        (rows) => {
+          setReadingsByEquipment((prev) => ({
+            ...prev,
+            [equipmentId]: rows,
+          }))
+        },
+        () => {
+          setReadingsByEquipment((prev) => ({
+            ...prev,
+            [equipmentId]: [],
+          }))
+        }
+      )
+    )
+
+    return () => {
+      for (const unsub of unsubs) unsub()
+    }
+  }, [assignedEquipmentIds])
 
   const equipmentById = useMemo(
     () => new Map(equipment.map((item) => [item.id, item])),
@@ -214,6 +341,7 @@ export function SensorsMonitorPage() {
           const assignedEquipment = device.assignedEquipmentId ? equipmentById.get(device.assignedEquipmentId) : undefined
           const alert = getTelemetryAlert(device)
           const area = getAreaLabel(assignedEquipment)
+          const trendReadings = device.assignedEquipmentId ? readingsByEquipment[device.assignedEquipmentId] : undefined
 
           return (
             <Card key={device.deviceId}>
@@ -256,6 +384,8 @@ export function SensorsMonitorPage() {
                     </div>
                   </div>
                 </div>
+
+                <TrendSparkline readings={trendReadings} />
 
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <span>Última actualización</span>
