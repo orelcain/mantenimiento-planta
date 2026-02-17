@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.48.25**
+## Versión Actual: **v2.48.26**
 
 **Fecha de lanzamiento**: 17 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.48.26 - Fix 404 de modulepreload en GitHub Pages (17/02/2026)
+- 🧯 **Preloads conflictivos eliminados**: desactivado `modulePreload` en build para evitar `404` de requests automáticos a chunks en caché.
+- 🌐 **Consola limpia en producción**: mitigados los errores `GET ... net::ERR_ABORTED 404` en líneas 34–36 del HTML publicado.
+- ✅ **Cierre estándar de versión**: bump y sincronización de artefactos de versionado según flujo oficial.
 
 ### v2.48.25 - Fix 404 de chunks en GitHub Pages (17/02/2026)
 - 🛠️ **Build con nombres estables**: configuración de Vite para generar `assets` sin hash cambiante y reducir errores `404` por desalineación de caché.

@@ -7,6 +7,17 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.26] - 2026-02-17
+
+### 🧯 Fix final de errores 404 en consola (modulepreload)
+
+#### Fixes
+- **Modulepreload desactivado en build**: se eliminan solicitudes automáticas `modulepreload` que podían quedar desfasadas por caché en GitHub Pages y disparar `404` en líneas 34–36 del `index`.
+- **Carga principal más robusta**: la app mantiene carga por `index.js` sin ruido de errores de pre-carga obsoleta en consola.
+
+#### Calidad
+- **Versionado sincronizado del release**: actualización coordinada de `package.json`, constantes de versión, `version.json`, `manifest.json`, `CHANGELOG.md` y `VERSION.md`.
+
 ## [2.48.25] - 2026-02-17
 
 ### 🛠️ Fix de errores 404 en PWA desplegada
