@@ -51,6 +51,7 @@ const navigation: Array<{ name: string; href: string; icon: React.ElementType; m
   { name: 'Planificador Gantt', href: '/gantt', icon: CalendarClock, module: 'gantt' },
   { name: 'Predictivo', href: '/predictive', icon: Activity },
   { name: 'Sensores', href: '/sensors', icon: Cpu, module: 'sensores' },
+  { name: 'Panel Sensores', href: '/sensors/monitor', icon: Activity, module: 'sensores' },
   { name: 'Visor de Mapas', href: '/map', icon: Map, module: 'mapa' },
   { name: 'Equipos', href: '/equipment', icon: Wrench, module: 'equipos' },
   { name: 'Repuestos', href: '/repuestos', icon: Package, module: 'repuestos' },

@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.48.21**
+## Versión Actual: **v2.48.22**
 
 **Fecha de lanzamiento**: 16 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,12 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.48.22 - Panel técnico de sensores + integración LOGO documentada (16/02/2026)
+- 📟 **Nuevo panel técnico rápido**: vista `sensors/monitor` para operación diaria con KPIs y foco en estado de dispositivos.
+- 🧭 **Acceso directo optimizado**: disponible desde menú lateral, botón en `Sensores IoT` y CTA sticky móvil.
+- 🔌 **Contrato de integración LOGO listo**: guía publicada para publicar telemetría Siemens LOGO en el esquema RTDB compatible con la PWA.
+- ✅ **Cierre de release sincronizado**: versionado y documentación alineados + revisión de Problems en VS Code sin errores activos.
 
 ### v2.48.21 - Deploy Pages estable + timeline compacto (16/02/2026)
 - 🛡️ **Deploy sin bucle/cancelación cruzada**: ajustes de concurrencia y retry acotado en workflow de GitHub Pages.

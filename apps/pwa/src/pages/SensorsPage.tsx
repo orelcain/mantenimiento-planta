@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Cpu, Link2, Unlink2, AlertTriangle, Thermometer, Droplets, Activity, X, BarChart3, Wifi, Trash2, ChevronDown, ChevronUp, Eye, EyeOff, Copy, RefreshCw, Check, Usb } from 'lucide-react'
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui'
 import { useAppStore, useAuthStore } from '@/store'
@@ -81,6 +82,7 @@ function onlineBadge(online: boolean | undefined) {
 }
 
 export function SensorsPage() {
+  const navigate = useNavigate()
   const equipmentStore = useAppStore((s) => s.equipment)
   const user = useAuthStore((s) => s.user)
 
@@ -853,11 +855,22 @@ export function SensorsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Sensores IoT</h1>
-        <p className="text-muted-foreground">
-          Gestiona dispositivos ESP32, visualiza telemetría en tiempo real y configura WiFi local (AP).
-        </p>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold">Sensores IoT</h1>
+          <p className="text-muted-foreground">
+            Gestiona dispositivos ESP32, visualiza telemetría en tiempo real y configura WiFi local (AP).
+          </p>
+        </div>
+        <Button className="hidden md:inline-flex" onClick={() => navigate('/sensors/monitor')}>
+          Abrir panel técnico
+        </Button>
+      </div>
+
+      <div className="md:hidden sticky top-16 z-20 bg-background/95 backdrop-blur border-b pb-3">
+        <Button className="w-full" onClick={() => navigate('/sensors/monitor')}>
+          Panel técnico
+        </Button>
       </div>
 
       {loadError && (

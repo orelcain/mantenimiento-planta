@@ -1,5 +1,7 @@
 # 🔌 Configuración LOGO 8 → Firebase
 
+> Nota (2026-02): para integración directa con el módulo actual de sensores de la PWA usar el contrato de RTDB definido en `docs/setup/LOGO8_PWA_RTDB_CONTRACT.md`.
+
 ## Hardware Disponible
 - ✅ LOGO 8 (ya disponible)
 - 📦 ESP32 Gateway (comprar: $8)

@@ -1,8 +1,11 @@
 {
-  "version": "2.48.21",
+  "version": "2.48.22",
   "buildDate": "2026-02-16",
-  "buildTimestamp": 1771279363050,
+  "buildTimestamp": 1771287587818,
   "features": [
+    "Nuevo panel técnico rápido de sensores en /sensors/monitor con KPIs operativos en tiempo real",
+    "Acceso directo al panel técnico desde menú lateral, botón en Sensores y CTA sticky móvil",
+    "Guía formal de integración Siemens LOGO → RTDB publicada y alineada al contrato consumido por la PWA",
     "CI Pages: concurrencia ajustada para evitar auto-cancelaciones de deploy en progreso",
     "CI Pages: deploy acotado con timeout interno, límite de errores y reintento controlado",
     "Gantt Timeline: bloque superior compactado (proyecto, KPIs y controles) para mostrar más área útil del diagrama",

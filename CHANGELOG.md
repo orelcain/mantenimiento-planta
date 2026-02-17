@@ -7,6 +7,20 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.22] - 2026-02-16
+
+### 📟 Panel técnico de sensores + cierre de sincronización de release
+
+#### Mejoras
+- **Nuevo panel operativo rápido de sensores**: se agrega la vista `sensors/monitor` orientada a técnicos con KPIs de estado, alertas y acceso directo a incidencias.
+- **Acceso ágil desde navegación**: el panel técnico quedó disponible tanto en menú lateral como desde botón directo en `Sensores IoT`.
+- **Optimización móvil**: se incorpora CTA sticky en móvil (`Panel técnico`) para acceso inmediato durante el recorrido de monitoreo.
+- **Contrato LOGO→RTDB formalizado**: documentación técnica publicada para integrar Siemens LOGO con el esquema RTDB ya consumido por la PWA.
+
+#### Calidad
+- **Versionado sincronizado**: release alineado en `apps/pwa/package.json`, `src/constants/version.ts`, `public/version.json`, `CHANGELOG.md` y `VERSION.md`.
+- **Verificación VS Code Problems**: sin errores activos detectados en el workspace tras los cambios.
+
 ## [2.48.21] - 2026-02-16
 
 ### 🚀 Estabilidad de deploy Pages + compactación visual del timeline

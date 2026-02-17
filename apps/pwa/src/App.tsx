@@ -57,6 +57,7 @@ const HierarchyPage = lazyWithReload(() => import('@/pages/HierarchyPage').then(
 const PhotoEvidencePage = lazyWithReload(() => import('@/pages/PhotoEvidencePage').then((mod) => ({ default: mod.PhotoEvidencePage })))
 const PublicEquipmentView = lazyWithReload(() => import('@/pages/PublicEquipmentView').then((mod) => ({ default: mod.PublicEquipmentView })))
 const SensorsPage = lazyWithReload(() => import('@/pages/SensorsPage').then((mod) => ({ default: mod.SensorsPage })))
+const SensorsMonitorPage = lazyWithReload(() => import('@/pages/SensorsMonitorPage').then((mod) => ({ default: mod.SensorsMonitorPage })))
 const MapsAdminPage = lazyWithReload(() => import('@/pages/admin/MapsAdminPage').then((mod) => ({ default: mod.MapsAdminPage })))
 const InspectionsPage = lazyWithReload(() => import('@/pages/InspectionsPage').then((mod) => ({ default: mod.InspectionsPage })))
 const ETTPage = lazyWithReload(() => import('@/pages/admin/ETTPage').then((mod) => ({ default: mod.ETTPage })))
@@ -243,6 +244,11 @@ export function App() {
             <Route path="sensors" element={
               <Suspense fallback={<LoadingScreen />}>
                 <SensorsPage />
+              </Suspense>
+            } />
+            <Route path="sensors/monitor" element={
+              <Suspense fallback={<LoadingScreen />}>
+                <SensorsMonitorPage />
               </Suspense>
             } />
             <Route path="preventive" element={
