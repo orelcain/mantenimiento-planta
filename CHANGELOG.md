@@ -7,6 +7,23 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.33] - 2026-02-17
+
+### 📊 Gráfico con zonas de alerta para temperatura y humedad
+
+#### Features
+- **Selector de modo de gráfico**: nuevo dropdown permite elegir entre `Doble eje (Recomendado)`, `Solo Temperatura` o `Solo Humedad`.
+- **Zonas de alerta visual**: en modos individuales (temperatura/humedad) se dibujan bandas coloreadas que muestran las zonas de advertencia y peligro:
+  - **Temperatura**: amarillo (advertencia) y rojo (peligro) para límites superiores e inferiores.
+  - **Humedad**: cyan (advertencia) y azul (peligro) para límites superiores e inferiores.
+- **Líneas de umbral**: líneas punteadas con etiquetas numéricas para cada límite (warn/crit alto y bajo).
+- **Toggle visual**: checkbox para mostrar/ocultar zonas de alerta.
+- **Leyenda dinámica**: incluye indicadores de advertencia y peligro junto a temperatura/humedad.
+
+#### Umbrales por defecto (sincronizados con firmware ESP32)
+- Temperatura: Advertencia 15–30 °C, Peligro 10–40 °C
+- Humedad: Advertencia 30–70 %, Peligro 20–85 %
+
 ## [2.48.32] - 2026-02-17
 
 ### 📡 Firmware: onDisconnect automático en Firebase RTDB

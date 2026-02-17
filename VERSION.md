@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.48.32**
+## Versión Actual: **v2.48.33**
 
 **Fecha de lanzamiento**: 17 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,12 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.48.33 - Gráfico con zonas de alerta temperatura/humedad (17/02/2026)
+- 📊 **Selector de modo**: doble eje, solo temperatura o solo humedad.
+- 🟡 **Zonas de advertencia**: bandas amarillas/cyan con transparencia al superar umbrales warn.
+- 🔴 **Zonas de peligro**: bandas rojas/azules con transparencia al superar umbrales crit.
+- 📏 **Líneas de umbral**: punteadas con etiquetas numéricas en los 4 límites.
 
 ### v2.48.32 - Firmware: onDisconnect automático en RTDB (17/02/2026)
 - 📡 **onDisconnect en ESP32**: el firmware registra automáticamente `online: false` en Firebase RTDB al perder conexión WiFi/Firebase.

@@ -47,11 +47,11 @@ function isDeviceFresh(device: DeviceRow, nowMs: number): boolean {
   return nowMs - lastSeen <= freshnessWindowMs
 }
 
-function buildSparklineCoordinates(values: number[], width: number, height: number, padding: number) {
+function buildSparklineCoordinates(values: number[], width: number, height: number, padding: number, fixedMin?: number, fixedMax?: number) {
   if (values.length < 2) return []
 
-  const min = Math.min(...values)
-  const max = Math.max(...values)
+  const min = fixedMin ?? Math.min(...values)
+  const max = fixedMax ?? Math.max(...values)
   const range = Math.max(1e-9, max - min)
   const step = (width - padding * 2) / (values.length - 1)
 
@@ -62,11 +62,33 @@ function buildSparklineCoordinates(values: number[], width: number, height: numb
     })
 }
 
+/** Convierte un valor numérico a coordenada Y en el SVG */
+function valueToY(value: number, min: number, max: number, height: number, padding: number): number {
+  const range = Math.max(1e-9, max - min)
+  return height - padding - ((value - min) / range) * (height - padding * 2)
+}
+
+// Umbrales por defecto (sincronizados con firmware ESP32)
+const DEFAULT_THRESHOLDS = {
+  tempWarnLow: 15,
+  tempWarnHigh: 30,
+  tempCritLow: 10,
+  tempCritHigh: 40,
+  humWarnLow: 30,
+  humWarnHigh: 70,
+  humCritLow: 20,
+  humCritHigh: 85,
+}
+
+type ChartMode = 'dual' | 'temperature' | 'humidity'
+
 function TrendSparkline({ readings, sendIntervalSec }: { readings?: SensorReading[]; sendIntervalSec?: number }) {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null)
   const [nowMs, setNowMs] = useState(() => Date.now())
   const [windowStart, setWindowStart] = useState(0)
   const [windowSize, setWindowSize] = useState(0)
+  const [chartMode, setChartMode] = useState<ChartMode>('dual')
+  const [showThresholds, setShowThresholds] = useState(true)
 
   const normalizedReadings = useMemo(() => {
     if (!readings) return []
@@ -90,8 +112,9 @@ function TrendSparkline({ readings, sendIntervalSec }: { readings?: SensorReadin
   }
 
   const width = 420
-  const height = 88
+  const height = chartMode === 'dual' ? 88 : 130
   const padding = 6
+  const th = DEFAULT_THRESHOLDS
 
   const effectiveWindowSize = windowSize > 0 ? Math.min(windowSize, normalizedReadings.length) : normalizedReadings.length
   const maxStart = Math.max(0, normalizedReadings.length - effectiveWindowSize)
@@ -109,8 +132,35 @@ function TrendSparkline({ readings, sendIntervalSec }: { readings?: SensorReadin
     )
   }
 
-  const tempCoords = buildSparklineCoordinates(tempValues, width, height, padding)
-  const humCoords = buildSparklineCoordinates(humValues, width, height, padding)
+  // Para modos individuales, incluir los umbrales en el rango para que se vean las zonas completas
+  const computeRange = (values: number[], _wL: number, _wH: number, cL: number, cH: number) => {
+    const dataMin = Math.min(...values)
+    const dataMax = Math.max(...values)
+    if (!showThresholds) return { min: dataMin, max: dataMax }
+    const rangeMin = Math.min(dataMin, cL - 2)
+    const rangeMax = Math.max(dataMax, cH + 2)
+    return { min: rangeMin, max: rangeMax }
+  }
+
+  // Coords para cada modo
+  const showTemp = chartMode === 'dual' || chartMode === 'temperature'
+  const showHum = chartMode === 'dual' || chartMode === 'humidity'
+
+  let tempCoords: ReturnType<typeof buildSparklineCoordinates> = []
+  let humCoords: ReturnType<typeof buildSparklineCoordinates> = []
+  let tempRange = { min: 0, max: 1 }
+  let humRange = { min: 0, max: 1 }
+
+  if (chartMode === 'dual') {
+    tempCoords = buildSparklineCoordinates(tempValues, width, height, padding)
+    humCoords = buildSparklineCoordinates(humValues, width, height, padding)
+  } else if (chartMode === 'temperature') {
+    tempRange = computeRange(tempValues, th.tempWarnLow, th.tempWarnHigh, th.tempCritLow, th.tempCritHigh)
+    tempCoords = buildSparklineCoordinates(tempValues, width, height, padding, tempRange.min, tempRange.max)
+  } else {
+    humRange = computeRange(humValues, th.humWarnLow, th.humWarnHigh, th.humCritLow, th.humCritHigh)
+    humCoords = buildSparklineCoordinates(humValues, width, height, padding, humRange.min, humRange.max)
+  }
 
   const tempPoints = tempCoords.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')
   const humPoints = humCoords.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')
@@ -172,11 +222,102 @@ function TrendSparkline({ readings, sendIntervalSec }: { readings?: SensorReadin
     setWindowStart(Math.max(0, Math.min(total - nextSize, nextStart)))
   }
 
+  /** Renderiza zonas de alerta (rectángulos con relleno transparente) + líneas de umbral */
+  const renderThresholdZones = (
+    range: { min: number; max: number },
+    warnLow: number,
+    warnHigh: number,
+    critLow: number,
+    critHigh: number,
+    warnColor: string,
+    critColor: string,
+  ) => {
+    if (!showThresholds) return null
+    const rMin = range.min
+    const rMax = range.max
+    const toY = (v: number) => valueToY(Math.max(rMin, Math.min(rMax, v)), rMin, rMax, height, padding)
+
+    const yTop = padding
+    const yBot = height - padding
+    const x0 = padding
+    const x1 = width - padding
+
+    // Clamp to visible range
+    const yCritHigh = toY(critHigh)
+    const yWarnHigh = toY(warnHigh)
+    const yWarnLow = toY(warnLow)
+    const yCritLow = toY(critLow)
+
+    return (
+      <>
+        {/* Zona crítica superior: por encima de critHigh */}
+        {critHigh < rMax && (
+          <rect x={x0} y={yTop} width={x1 - x0} height={Math.max(0, yCritHigh - yTop)}
+            fill={critColor} fillOpacity="0.18" />
+        )}
+        {/* Zona warning superior: entre warnHigh y critHigh */}
+        {warnHigh < rMax && (
+          <rect x={x0} y={yCritHigh} width={x1 - x0} height={Math.max(0, yWarnHigh - yCritHigh)}
+            fill={warnColor} fillOpacity="0.15" />
+        )}
+        {/* Zona warning inferior: entre critLow y warnLow */}
+        {warnLow > rMin && (
+          <rect x={x0} y={yWarnLow} width={x1 - x0} height={Math.max(0, yCritLow - yWarnLow)}
+            fill={warnColor} fillOpacity="0.15" />
+        )}
+        {/* Zona crítica inferior: por debajo de critLow */}
+        {critLow > rMin && (
+          <rect x={x0} y={yCritLow} width={x1 - x0} height={Math.max(0, yBot - yCritLow)}
+            fill={critColor} fillOpacity="0.18" />
+        )}
+        {/* Líneas de umbral */}
+        <line x1={x0} x2={x1} y1={yCritHigh} y2={yCritHigh} stroke={critColor} strokeWidth="1" strokeDasharray="4 3" strokeOpacity="0.7" />
+        <line x1={x0} x2={x1} y1={yWarnHigh} y2={yWarnHigh} stroke={warnColor} strokeWidth="1" strokeDasharray="4 3" strokeOpacity="0.6" />
+        <line x1={x0} x2={x1} y1={yWarnLow} y2={yWarnLow} stroke={warnColor} strokeWidth="1" strokeDasharray="4 3" strokeOpacity="0.6" />
+        <line x1={x0} x2={x1} y1={yCritLow} y2={yCritLow} stroke={critColor} strokeWidth="1" strokeDasharray="4 3" strokeOpacity="0.7" />
+        {/* Etiquetas de umbral */}
+        <text x={x1 - 2} y={yCritHigh - 2} textAnchor="end" fontSize="7" fill={critColor} fillOpacity="0.9">
+          {critHigh}
+        </text>
+        <text x={x1 - 2} y={yWarnHigh - 2} textAnchor="end" fontSize="7" fill={warnColor} fillOpacity="0.85">
+          {warnHigh}
+        </text>
+        <text x={x1 - 2} y={yWarnLow + 9} textAnchor="end" fontSize="7" fill={warnColor} fillOpacity="0.85">
+          {warnLow}
+        </text>
+        <text x={x1 - 2} y={yCritLow + 9} textAnchor="end" fontSize="7" fill={critColor} fillOpacity="0.9">
+          {critLow}
+        </text>
+      </>
+    )
+  }
+
   return (
     <div className="rounded-md border p-2 space-y-2">
       <div className="flex items-center justify-between text-xs text-muted-foreground">
         <span>Cambios recientes del sensor</span>
         <span>{Math.min(tempValues.length, humValues.length)} muestras</span>
+      </div>
+
+      <div className="flex items-center justify-between text-[11px] text-muted-foreground gap-2 flex-wrap">
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-medium">Tipo de gráfico</span>
+          <select
+            value={chartMode}
+            onChange={(e) => setChartMode(e.target.value as ChartMode)}
+            className="h-6 rounded border bg-background px-1.5 text-[11px]"
+          >
+            <option value="dual">Doble eje (Recomendado)</option>
+            <option value="temperature">Solo Temperatura</option>
+            <option value="humidity">Solo Humedad</option>
+          </select>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-medium">Rango temporal</span>
+          <select className="h-6 rounded border bg-background px-1.5 text-[11px]">
+            <option>Últimas 24 horas</option>
+          </select>
+        </div>
       </div>
 
       <div className="flex items-center justify-between text-[11px] text-muted-foreground">
@@ -191,7 +332,19 @@ function TrendSparkline({ readings, sendIntervalSec }: { readings?: SensorReadin
         <span>{windowSize > 0 ? 'Rueda: zoom horizontal · Shift+rueda: desplazar' : 'Seguimiento en tiempo real (auto)'}</span>
       </div>
 
-      <div className="h-20 w-full rounded-md bg-muted/20 overflow-hidden">
+      {chartMode !== 'dual' && (
+        <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={showThresholds}
+            onChange={() => setShowThresholds(!showThresholds)}
+            className="h-3 w-3 accent-primary"
+          />
+          Mostrar zonas de alerta
+        </label>
+      )}
+
+      <div className={`${chartMode === 'dual' ? 'h-20' : 'h-32'} w-full rounded-md bg-muted/20 overflow-hidden`}>
         <svg
           viewBox={`0 0 ${width} ${height}`}
           preserveAspectRatio="none"
@@ -200,10 +353,21 @@ function TrendSparkline({ readings, sendIntervalSec }: { readings?: SensorReadin
           onMouseLeave={() => setHoverIndex(null)}
           onWheel={handleWheel}
         >
-          {selectedTempPoint && selectedHumPoint && (
+          {/* Zonas de alerta (solo en modo individual) */}
+          {chartMode === 'temperature' && renderThresholdZones(
+            tempRange, th.tempWarnLow, th.tempWarnHigh, th.tempCritLow, th.tempCritHigh,
+            '#f59e0b', '#ef4444' // amarillo/rojo para temperatura
+          )}
+          {chartMode === 'humidity' && renderThresholdZones(
+            humRange, th.humWarnLow, th.humWarnHigh, th.humCritLow, th.humCritHigh,
+            '#06b6d4', '#3b82f6' // cyan/azul para humedad
+          )}
+
+          {/* Línea de cursor */}
+          {(selectedTempPoint || selectedHumPoint) && (
             <line
-              x1={selectedTempPoint.x}
-              x2={selectedTempPoint.x}
+              x1={(selectedTempPoint ?? selectedHumPoint)!.x}
+              x2={(selectedTempPoint ?? selectedHumPoint)!.x}
               y1={padding}
               y2={height - padding}
               stroke="currentColor"
@@ -212,43 +376,73 @@ function TrendSparkline({ readings, sendIntervalSec }: { readings?: SensorReadin
               className="text-muted-foreground"
             />
           )}
-          <polyline
-            points={humPoints}
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeDasharray="5 4"
-            className="text-muted-foreground"
-          />
-          <polyline
-            points={tempPoints}
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            className="text-primary"
-          />
-          {selectedTempPoint && (
-            <circle cx={selectedTempPoint.x} cy={selectedTempPoint.y} r="2.6" fill="currentColor" className="text-primary" />
+
+          {/* Línea de humedad */}
+          {showHum && humPoints && (
+            <polyline
+              points={humPoints}
+              fill="none"
+              stroke={chartMode === 'humidity' ? '#06b6d4' : 'currentColor'}
+              strokeWidth="2"
+              strokeDasharray={chartMode === 'dual' ? '5 4' : undefined}
+              className={chartMode === 'dual' ? 'text-muted-foreground' : ''}
+            />
           )}
-          {selectedHumPoint && (
-            <circle cx={selectedHumPoint.x} cy={selectedHumPoint.y} r="2.6" fill="currentColor" className="text-muted-foreground" />
+
+          {/* Línea de temperatura */}
+          {showTemp && tempPoints && (
+            <polyline
+              points={tempPoints}
+              fill="none"
+              stroke={chartMode === 'temperature' ? '#f97316' : 'currentColor'}
+              strokeWidth="2"
+              className={chartMode === 'dual' ? 'text-primary' : ''}
+            />
+          )}
+
+          {/* Puntos de cursor */}
+          {showTemp && selectedTempPoint && (
+            <circle cx={selectedTempPoint.x} cy={selectedTempPoint.y} r="2.6"
+              fill={chartMode === 'temperature' ? '#f97316' : 'currentColor'}
+              className={chartMode === 'dual' ? 'text-primary' : ''} />
+          )}
+          {showHum && selectedHumPoint && (
+            <circle cx={selectedHumPoint.x} cy={selectedHumPoint.y} r="2.6"
+              fill={chartMode === 'humidity' ? '#06b6d4' : 'currentColor'}
+              className={chartMode === 'dual' ? 'text-muted-foreground' : ''} />
           )}
         </svg>
       </div>
 
       {selectedReading && (
         <div className="text-[11px] text-muted-foreground rounded-md border px-2 py-1">
-          {formatDateTime(selectedReading.timestamp)} · Temp {selectedReading.temperature.toFixed(1)} °C · Hum {selectedReading.humidity.toFixed(1)} %
+          {formatDateTime(selectedReading.timestamp)}
+          {showTemp && ` · Temp ${selectedReading.temperature.toFixed(1)} °C`}
+          {showHum && ` · Hum ${selectedReading.humidity.toFixed(1)} %`}
         </div>
       )}
 
-      <div className="flex items-center gap-4 text-[11px] text-muted-foreground">
-        <span className="inline-flex items-center gap-1">
-          <span className="h-1.5 w-4 rounded bg-primary" /> Temperatura
-        </span>
-        <span className="inline-flex items-center gap-1">
-          <span className="h-1.5 w-4 rounded bg-muted-foreground" /> Humedad
-        </span>
+      <div className="flex items-center gap-4 text-[11px] text-muted-foreground flex-wrap">
+        {showTemp && (
+          <span className="inline-flex items-center gap-1">
+            <span className={`h-1.5 w-4 rounded ${chartMode === 'temperature' ? 'bg-orange-500' : 'bg-primary'}`} /> Temperatura
+          </span>
+        )}
+        {showHum && (
+          <span className="inline-flex items-center gap-1">
+            <span className={`h-1.5 w-4 rounded ${chartMode === 'humidity' ? 'bg-cyan-500' : 'bg-muted-foreground'}`} /> Humedad
+          </span>
+        )}
+        {chartMode !== 'dual' && showThresholds && (
+          <>
+            <span className="inline-flex items-center gap-1">
+              <span className={`h-1.5 w-4 rounded ${chartMode === 'temperature' ? 'bg-amber-500/50' : 'bg-cyan-500/50'}`} /> Advertencia
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <span className={`h-1.5 w-4 rounded ${chartMode === 'temperature' ? 'bg-red-500/50' : 'bg-blue-500/50'}`} /> Peligro
+            </span>
+          </>
+        )}
       </div>
     </div>
   )
