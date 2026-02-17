@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.48.24**
+## Versión Actual: **v2.48.25**
 
 **Fecha de lanzamiento**: 17 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.48.25 - Fix 404 de chunks en GitHub Pages (17/02/2026)
+- 🛠️ **Build con nombres estables**: configuración de Vite para generar `assets` sin hash cambiante y reducir errores `404` por desalineación de caché.
+- 🌐 **PWA más estable en despliegue**: mitigado el `net::ERR_ABORTED 404` observado al cargar bundles en producción.
+- ✅ **Cierre estándar de versión**: bump y sincronización de artefactos de versionado según flujo oficial.
 
 ### v2.48.24 - Gráfico de cambios del sensor en panel técnico (17/02/2026)
 - 📈 **Tendencia visible por dispositivo**: cada tarjeta del `Panel Técnico de Sensores` ahora muestra un gráfico compacto con cambios recientes de temperatura y humedad.

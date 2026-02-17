@@ -7,6 +7,17 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.25] - 2026-02-17
+
+### 🛠️ Fix de errores 404 en PWA desplegada
+
+#### Fixes
+- **Assets de build con nombres estables**: se configuró Vite para emitir `entry/chunk/assets` sin hash cambiante, reduciendo errores `404` cuando el navegador conserva un `index.html` de una versión anterior.
+- **Mayor robustez en GitHub Pages**: se evita el desacople temporal entre HTML cacheado y bundles publicados que causaba `net::ERR_ABORTED 404` en consola.
+
+#### Calidad
+- **Versionado sincronizado del release**: actualización coordinada de `package.json`, constantes de versión, `version.json`, `manifest.json`, `CHANGELOG.md` y `VERSION.md`.
+
 ## [2.48.24] - 2026-02-17
 
 ### 📈 Gráfico de cambios del sensor en panel técnico
