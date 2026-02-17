@@ -21,6 +21,7 @@
         "apSsid": { ".write": "auth != null" },
         "apIp": { ".write": "auth != null" },
         "telemetry": { ".write": "auth != null" },
+        "thresholds": { ".write": "auth != null && (root.child('users').child(auth.uid).child('rol').val() == 'admin')" },
         "alerts": { ".write": "auth != null" }
       }
     },

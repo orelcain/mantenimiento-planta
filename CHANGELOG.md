@@ -7,6 +7,23 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.35] - 2026-02-17
+
+### ⚙️ Umbrales configurables por sensor + aspect ratio 3:4
+
+#### Features
+- **Umbrales por sensor en RTDB**: cada dispositivo puede tener sus propios umbrales (`devices/{id}/thresholds`) con 8 campos: tempWarnLow/High, tempCritLow/High, humWarnLow/High, humCritLow/High.
+- **Editor de umbrales (admin)**: botón “Configurar umbrales” visible solo para admins en cada tarjeta de sensor. Abre panel inline con inputs numéricos organizados por temperatura/humedad y nivel (advertencia/crítico).
+- **Fallback a defaults**: si un sensor no tiene umbrales configurados usa los valores por defecto del firmware (temp 10-15-30-40, hum 20-30-70-85).
+- **Función `updateDeviceThresholds()`**: nueva función en devicesRtdb.ts para persistir umbrales en RTDB.
+- **Regla RTDB `thresholds`**: solo admin puede escribir umbrales.
+
+#### Visual
+- **Aspect ratio 3:4**: gráfico cambiado de 16:9 a 3:4 (más alto, proporcional).
+- **DeviceCard como componente**: extraído para manejar estado propio (editor de umbrales).
+
+---
+
 ## [2.48.34] - 2026-02-17
 
 ### 🎨 Rediseño visual del Panel Técnico de Sensores

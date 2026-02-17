@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useCallback } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
-import { Activity, AlertTriangle, Cpu, Thermometer, Droplets, Link2 } from 'lucide-react'
+import { Activity, AlertTriangle, Cpu, Thermometer, Droplets, Link2, Settings2, Save, X } from 'lucide-react'
 import { Button, Card, CardContent, CardHeader, CardTitle, Input } from '@/components/ui'
-import { useCanSee } from '@/store'
+import { useCanSee, useIsAdmin } from '@/store'
 import { getEquipments } from '@/services/equipment'
-import { subscribeDevices, type DeviceRow } from '@/services/devicesRtdb'
+import { subscribeDevices, updateDeviceThresholds, type DeviceRow, type SensorThresholds } from '@/services/devicesRtdb'
 import { subscribeSensorReadings, type SensorReading } from '@/services/sensorsRtdb'
 import type { Equipment } from '@/types'
 
@@ -84,7 +84,96 @@ const DEFAULT_THRESHOLDS = {
 
 type ChartMode = 'dual' | 'temperature' | 'humidity'
 
-function TrendSparkline({ readings, sendIntervalSec }: { readings?: SensorReading[]; sendIntervalSec?: number }) {
+function resolveThresholds(device?: SensorThresholds): typeof DEFAULT_THRESHOLDS {
+  return {
+    tempWarnLow: device?.tempWarnLow ?? DEFAULT_THRESHOLDS.tempWarnLow,
+    tempWarnHigh: device?.tempWarnHigh ?? DEFAULT_THRESHOLDS.tempWarnHigh,
+    tempCritLow: device?.tempCritLow ?? DEFAULT_THRESHOLDS.tempCritLow,
+    tempCritHigh: device?.tempCritHigh ?? DEFAULT_THRESHOLDS.tempCritHigh,
+    humWarnLow: device?.humWarnLow ?? DEFAULT_THRESHOLDS.humWarnLow,
+    humWarnHigh: device?.humWarnHigh ?? DEFAULT_THRESHOLDS.humWarnHigh,
+    humCritLow: device?.humCritLow ?? DEFAULT_THRESHOLDS.humCritLow,
+    humCritHigh: device?.humCritHigh ?? DEFAULT_THRESHOLDS.humCritHigh,
+  }
+}
+
+/* ── Editor de umbrales (solo admin) ── */
+function ThresholdEditor({ deviceId, current, onClose }: {
+  deviceId: string
+  current: SensorThresholds
+  onClose: () => void
+}) {
+  const resolved = resolveThresholds(current)
+  const [form, setForm] = useState(resolved)
+  const [saving, setSaving] = useState(false)
+
+  const set = (key: keyof typeof form, val: string) => {
+    const n = parseFloat(val)
+    if (!Number.isNaN(n)) setForm(prev => ({ ...prev, [key]: n }))
+  }
+
+  const handleSave = useCallback(async () => {
+    setSaving(true)
+    try {
+      await updateDeviceThresholds(deviceId, form)
+      onClose()
+    } catch (err) {
+      console.error('Error guardando umbrales', err)
+    } finally {
+      setSaving(false)
+    }
+  }, [deviceId, form, onClose])
+
+  const field = (label: string, key: keyof typeof form, color: string) => (
+    <div className="flex items-center gap-2">
+      <label className={`text-[11px] w-20 text-right ${color}`}>{label}</label>
+      <input
+        type="number"
+        step="0.5"
+        value={form[key]}
+        onChange={e => set(key, e.target.value)}
+        className="h-7 w-16 rounded border border-border/50 bg-background/60 px-1.5 text-xs text-center tabular-nums"
+      />
+    </div>
+  )
+
+  return (
+    <div className="rounded-xl border border-border/40 bg-card p-3 space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
+      <div className="flex items-center justify-between">
+        <h4 className="text-xs font-semibold flex items-center gap-1.5">
+          <Settings2 className="h-3.5 w-3.5" /> Umbrales de alerta
+        </h4>
+        <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1.5">
+          <p className="text-[10px] font-medium text-orange-400 flex items-center gap-1"><Thermometer className="h-3 w-3" /> Temperatura (°C)</p>
+          {field('Crít. bajo', 'tempCritLow', 'text-red-400')}
+          {field('Adv. bajo', 'tempWarnLow', 'text-amber-400')}
+          {field('Adv. alto', 'tempWarnHigh', 'text-amber-400')}
+          {field('Crít. alto', 'tempCritHigh', 'text-red-400')}
+        </div>
+        <div className="space-y-1.5">
+          <p className="text-[10px] font-medium text-cyan-400 flex items-center gap-1"><Droplets className="h-3 w-3" /> Humedad (%)</p>
+          {field('Crít. bajo', 'humCritLow', 'text-blue-400')}
+          {field('Adv. bajo', 'humWarnLow', 'text-cyan-400')}
+          {field('Adv. alto', 'humWarnHigh', 'text-cyan-400')}
+          {field('Crít. alto', 'humCritHigh', 'text-blue-400')}
+        </div>
+      </div>
+      <div className="flex justify-end gap-2">
+        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={onClose}>Cancelar</Button>
+        <Button size="sm" className="h-7 text-xs" disabled={saving} onClick={handleSave}>
+          <Save className="h-3 w-3 mr-1" />{saving ? 'Guardando…' : 'Guardar'}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+function TrendSparkline({ readings, sendIntervalSec, thresholds }: { readings?: SensorReading[]; sendIntervalSec?: number; thresholds?: SensorThresholds }) {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null)
   const [nowMs, setNowMs] = useState(() => Date.now())
   const [windowStart, setWindowStart] = useState(0)
@@ -113,10 +202,11 @@ function TrendSparkline({ readings, sendIntervalSec }: { readings?: SensorReadin
     )
   }
 
-  const width = 500
-  const height = chartMode === 'dual' ? 160 : 220
-  const padding = 6
-  const th = DEFAULT_THRESHOLDS
+  // Aspect ratio 3:4 (ancho:alto)
+  const width = 360
+  const height = chartMode === 'dual' ? 270 : 360
+  const padding = 8
+  const th = resolveThresholds(thresholds)
 
   const effectiveWindowSize = windowSize > 0 ? Math.min(windowSize, normalizedReadings.length) : normalizedReadings.length
   const maxStart = Math.max(0, normalizedReadings.length - effectiveWindowSize)
@@ -327,7 +417,7 @@ function TrendSparkline({ readings, sendIntervalSec }: { readings?: SensorReadin
         </span>
       </div>
 
-      <div className={`${chartMode === 'dual' ? 'h-40' : 'h-56'} w-full rounded-lg bg-gradient-to-b from-muted/30 to-muted/5 overflow-hidden border border-border/20`}>
+      <div className={`w-full rounded-lg bg-gradient-to-b from-muted/30 to-muted/5 overflow-hidden border border-border/20`} style={{ aspectRatio: '3/4' }}>
         <svg
           viewBox={`0 0 ${width} ${height}`}
           preserveAspectRatio="none"
@@ -478,6 +568,142 @@ function TrendSparkline({ readings, sendIntervalSec }: { readings?: SensorReadin
         )}
       </div>
     </div>
+  )
+}
+
+/* ── Tarjeta de dispositivo (componente con estado propio) ── */
+function DeviceCard({ device, equipmentById, readingsByEquipment, panelNowMs, navigate }: {
+  device: DeviceRow
+  equipmentById: Map<string, Equipment>
+  readingsByEquipment: Record<string, SensorReading[]>
+  panelNowMs: number
+  navigate: ReturnType<typeof useNavigate>
+}) {
+  const isAdmin = useIsAdmin()
+  const [showThresholdEditor, setShowThresholdEditor] = useState(false)
+
+  const assignedEquipment = device.assignedEquipmentId ? equipmentById.get(device.assignedEquipmentId) : undefined
+  const alert = getTelemetryAlert(device)
+  const area = getAreaLabel(assignedEquipment)
+  const trendReadings = device.assignedEquipmentId ? readingsByEquipment[device.assignedEquipmentId] : undefined
+  const isFresh = isDeviceFresh(device, panelNowMs)
+
+  return (
+    <Card className={`border-l-4 ${
+      alert === 'critical' ? 'border-l-red-500' :
+      alert === 'warning' ? 'border-l-amber-500' :
+      isFresh ? 'border-l-emerald-500' : 'border-l-muted-foreground/30'
+    }`}>
+      <CardHeader className="pb-3">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Cpu className="h-4 w-4" />
+              {device.deviceId}
+            </CardTitle>
+            <p className="text-sm text-muted-foreground mt-1">
+              {assignedEquipment ? `${assignedEquipment.nombre} (${assignedEquipment.codigo})` : 'Sin equipo asignado'}
+            </p>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${
+              isFresh
+                ? 'bg-emerald-500/15 text-emerald-500 ring-1 ring-emerald-500/30'
+                : 'bg-muted text-muted-foreground ring-1 ring-border'
+            }`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${isFresh ? 'bg-emerald-500 animate-pulse' : 'bg-muted-foreground'}`} />
+              {isFresh ? 'Online' : 'Offline'}
+            </span>
+            {alert === 'critical' && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-red-500/15 px-2.5 py-0.5 text-xs font-medium text-red-500 ring-1 ring-red-500/30">
+                <AlertTriangle className="h-3 w-3" /> Crítico
+              </span>
+            )}
+            {alert === 'warning' && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2.5 py-0.5 text-xs font-medium text-amber-500 ring-1 ring-amber-500/30">
+                <AlertTriangle className="h-3 w-3" /> Warning
+              </span>
+            )}
+            {alert === 'normal' && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground ring-1 ring-border">
+                Normal
+              </span>
+            )}
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3 text-sm">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Link2 className="h-4 w-4" />
+          Área: {area}
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <div className="rounded-lg border border-orange-500/20 bg-orange-500/5 p-3">
+            <div className="text-xs text-orange-400/80 flex items-center gap-1.5 mb-1">
+              <Thermometer className="h-3.5 w-3.5" />Temperatura
+            </div>
+            <div className="text-lg font-bold text-orange-400">
+              {device.telemetry?.temperatura?.value?.toFixed(1) ?? '—'}
+              <span className="text-sm font-normal ml-0.5">{device.telemetry?.temperatura?.unit ?? '°C'}</span>
+            </div>
+          </div>
+          <div className="rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-3">
+            <div className="text-xs text-cyan-400/80 flex items-center gap-1.5 mb-1">
+              <Droplets className="h-3.5 w-3.5" />Humedad
+            </div>
+            <div className="text-lg font-bold text-cyan-400">
+              {device.telemetry?.humedad?.value?.toFixed(1) ?? '—'}
+              <span className="text-sm font-normal ml-0.5">{device.telemetry?.humedad?.unit ?? '%'}</span>
+            </div>
+          </div>
+        </div>
+
+        <TrendSparkline readings={trendReadings} sendIntervalSec={device.sendInterval} thresholds={device.thresholds} />
+
+        {/* Editor de umbrales (solo admin) */}
+        {isAdmin && (
+          showThresholdEditor ? (
+            <ThresholdEditor
+              deviceId={device.deviceId}
+              current={device.thresholds ?? {}}
+              onClose={() => setShowThresholdEditor(false)}
+            />
+          ) : (
+            <button
+              onClick={() => setShowThresholdEditor(true)}
+              className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <Settings2 className="h-3.5 w-3.5" />
+              Configurar umbrales
+            </button>
+          )
+        )}
+
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <span>Última actualización</span>
+          <span>{formatDateTime(device.lastSeen)}</span>
+        </div>
+
+        {alert !== 'normal' && (
+          <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-amber-700 flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4" />
+            Revisar condición anómala y evaluar creación de incidencia.
+          </div>
+        )}
+
+        <div className="flex gap-2 pt-1">
+          <Button size="sm" variant="outline" className="flex-1 h-9" onClick={() => navigate('/sensors')}>
+            <Activity className="h-3.5 w-3.5 mr-1.5" />
+            Detalle IoT
+          </Button>
+          <Button size="sm" className="flex-1 h-9 bg-primary hover:bg-primary/90" onClick={() => navigate('/incidents')}>
+            <AlertTriangle className="h-3.5 w-3.5 mr-1.5" />
+            Incidencias
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 
@@ -739,112 +965,16 @@ export function SensorsMonitorPage() {
       )}
 
       <div className="grid gap-3 lg:grid-cols-2">
-        {filteredDevices.map((device) => {
-          const assignedEquipment = device.assignedEquipmentId ? equipmentById.get(device.assignedEquipmentId) : undefined
-          const alert = getTelemetryAlert(device)
-          const area = getAreaLabel(assignedEquipment)
-          const trendReadings = device.assignedEquipmentId ? readingsByEquipment[device.assignedEquipmentId] : undefined
-          const isFresh = isDeviceFresh(device, panelNowMs)
-
-          return (
-            <Card key={device.deviceId} className={`border-l-4 ${
-              alert === 'critical' ? 'border-l-red-500' :
-              alert === 'warning' ? 'border-l-amber-500' :
-              isFresh ? 'border-l-emerald-500' : 'border-l-muted-foreground/30'
-            }`}>
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <Cpu className="h-4 w-4" />
-                      {device.deviceId}
-                    </CardTitle>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {assignedEquipment ? `${assignedEquipment.nombre} (${assignedEquipment.codigo})` : 'Sin equipo asignado'}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 flex-wrap justify-end">
-                    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                      isFresh
-                        ? 'bg-emerald-500/15 text-emerald-500 ring-1 ring-emerald-500/30'
-                        : 'bg-muted text-muted-foreground ring-1 ring-border'
-                    }`}>
-                      <span className={`h-1.5 w-1.5 rounded-full ${isFresh ? 'bg-emerald-500 animate-pulse' : 'bg-muted-foreground'}`} />
-                      {isFresh ? 'Online' : 'Offline'}
-                    </span>
-                    {alert === 'critical' && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-red-500/15 px-2.5 py-0.5 text-xs font-medium text-red-500 ring-1 ring-red-500/30">
-                        <AlertTriangle className="h-3 w-3" /> Crítico
-                      </span>
-                    )}
-                    {alert === 'warning' && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2.5 py-0.5 text-xs font-medium text-amber-500 ring-1 ring-amber-500/30">
-                        <AlertTriangle className="h-3 w-3" /> Warning
-                      </span>
-                    )}
-                    {alert === 'normal' && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground ring-1 ring-border">
-                        Normal
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Link2 className="h-4 w-4" />
-                  Área: {area}
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="rounded-lg border border-orange-500/20 bg-orange-500/5 p-3">
-                    <div className="text-xs text-orange-400/80 flex items-center gap-1.5 mb-1">
-                      <Thermometer className="h-3.5 w-3.5" />Temperatura
-                    </div>
-                    <div className="text-lg font-bold text-orange-400">
-                      {device.telemetry?.temperatura?.value?.toFixed(1) ?? '—'}
-                      <span className="text-sm font-normal ml-0.5">{device.telemetry?.temperatura?.unit ?? '°C'}</span>
-                    </div>
-                  </div>
-                  <div className="rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-3">
-                    <div className="text-xs text-cyan-400/80 flex items-center gap-1.5 mb-1">
-                      <Droplets className="h-3.5 w-3.5" />Humedad
-                    </div>
-                    <div className="text-lg font-bold text-cyan-400">
-                      {device.telemetry?.humedad?.value?.toFixed(1) ?? '—'}
-                      <span className="text-sm font-normal ml-0.5">{device.telemetry?.humedad?.unit ?? '%'}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <TrendSparkline readings={trendReadings} sendIntervalSec={device.sendInterval} />
-
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span>Última actualización</span>
-                  <span>{formatDateTime(device.lastSeen)}</span>
-                </div>
-
-                {alert !== 'normal' && (
-                  <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-amber-700 flex items-center gap-2">
-                    <AlertTriangle className="h-4 w-4" />
-                    Revisar condición anómala y evaluar creación de incidencia.
-                  </div>
-                )}
-
-                <div className="flex gap-2 pt-1">
-                  <Button size="sm" variant="outline" className="flex-1 h-9" onClick={() => navigate('/sensors')}>
-                    <Activity className="h-3.5 w-3.5 mr-1.5" />
-                    Detalle IoT
-                  </Button>
-                  <Button size="sm" className="flex-1 h-9 bg-primary hover:bg-primary/90" onClick={() => navigate('/incidents')}>
-                    <AlertTriangle className="h-3.5 w-3.5 mr-1.5" />
-                    Incidencias
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )
-        })}
+        {filteredDevices.map((device) => (
+          <DeviceCard
+            key={device.deviceId}
+            device={device}
+            equipmentById={equipmentById}
+            readingsByEquipment={readingsByEquipment}
+            panelNowMs={panelNowMs}
+            navigate={navigate}
+          />
+        ))}
       </div>
 
       {!loading && filteredDevices.length === 0 && (

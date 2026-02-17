@@ -7,6 +7,17 @@ import {
 } from 'firebase/database'
 import { rtdb } from './firebase'
 
+export type SensorThresholds = {
+  tempWarnLow?: number
+  tempWarnHigh?: number
+  tempCritLow?: number
+  tempCritHigh?: number
+  humWarnLow?: number
+  humWarnHigh?: number
+  humCritLow?: number
+  humCritHigh?: number
+}
+
 export type DeviceNode = {
   online?: boolean
   lastSeen?: number
@@ -15,6 +26,7 @@ export type DeviceNode = {
   firmwareVersion?: string
   sensorType?: string
   sendInterval?: number
+  thresholds?: SensorThresholds
   wifiScan?: {
     ts?: number
     networks?: Array<{
@@ -171,4 +183,17 @@ export async function deleteDevice(deviceId: string): Promise<void> {
   const r = ref(rtdb, path)
   await remove(r)
   console.log(`[devicesRtdb] Dispositivo eliminado: ${deviceId}`)
+}
+
+/**
+ * Actualiza los umbrales de alerta de un dispositivo.
+ */
+export async function updateDeviceThresholds(
+  deviceId: string,
+  thresholds: SensorThresholds
+): Promise<void> {
+  const path = `devices/${deviceId}/thresholds`
+  const r = ref(rtdb, path)
+  await update(r, thresholds)
+  console.log(`[devicesRtdb] Umbrales actualizados: ${deviceId}`, thresholds)
 }
