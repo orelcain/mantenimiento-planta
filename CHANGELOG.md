@@ -7,6 +7,18 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.46] - 2026-02-17
+### Visual/UX
+- **Línea de tiempo más amplia**: el panel ahora consume hasta 360 muestras por sensor (antes 30), permitiendo ver mucho más historial.
+- Selector de ventana en gráfica (`60 / 180 / 360 / Todo`) para ajustar cuánto historial ver.
+
+### Precisión de datos
+- **Solo registros reales**: se eliminó la inyección de punto sintético desde telemetry en la gráfica.
+- Eje X de la curva ahora se calcula por `timestamp` real de cada lectura (no por índice uniforme), respetando intervalos reales (ej. cada 5s si así está configurado).
+- Grilla vertical basada en timestamps reales visibles.
+- Grilla horizontal en modos individuales basada en rangos de medición (1°C en temperatura, 5% en humedad).
+- Se dibujan puntos de muestra reales sobre la línea para evidenciar que no hay datos inventados.
+
 ## [2.48.45] - 2026-02-17
 ### Bugfix
 - **Online falso corregido**: el estado del dispositivo ahora exige timestamp reciente (`lastSeen`/telemetry) y no confía ciegamente en `online=true` cuando quedó pegado.

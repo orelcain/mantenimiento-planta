@@ -77,6 +77,33 @@ function buildSparklineCoordinates(values: number[], width: number, height: numb
     })
 }
 
+function buildTimeSeriesCoordinates(
+  readings: SensorReading[],
+  width: number,
+  height: number,
+  padding: number,
+  valueSelector: (reading: SensorReading) => number,
+  fixedMin?: number,
+  fixedMax?: number,
+) {
+  if (readings.length < 2) return []
+
+  const values = readings.map(valueSelector)
+  const min = fixedMin ?? Math.min(...values)
+  const max = fixedMax ?? Math.max(...values)
+  const range = Math.max(1e-9, max - min)
+
+  const tMin = readings[0]!.timestamp
+  const tMax = readings[readings.length - 1]!.timestamp
+  const tRange = Math.max(1, tMax - tMin)
+
+  return readings.map((reading) => {
+    const x = padding + ((reading.timestamp - tMin) / tRange) * (width - padding * 2)
+    const y = height - padding - ((valueSelector(reading) - min) / range) * (height - padding * 2)
+    return { x, y }
+  })
+}
+
 /** Convierte un valor numérico a coordenada Y en el SVG */
 function valueToY(value: number, min: number, max: number, height: number, padding: number): number {
   const range = Math.max(1e-9, max - min)
@@ -190,6 +217,7 @@ const CHART_MIN_H = 120
 const CHART_MAX_H = 600
 const CHART_DEFAULT_H = 192  // 12rem
 const CHART_STORAGE_PREFIX = 'chart-h-'
+const CHART_HISTORY_LIMIT = 360
 
 function getStoredChartHeight(deviceId: string): number {
   try {
@@ -207,18 +235,17 @@ function TrendSparkline({
   sendIntervalSec,
   thresholds,
   deviceId,
-  latestTelemetry,
 }: {
   readings?: SensorReading[]
   sendIntervalSec?: number
   thresholds?: SensorThresholds
   deviceId: string
-  latestTelemetry?: { timestamp?: number; temperature?: number; humidity?: number }
 }) {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null)
   const [nowMs, setNowMs] = useState(() => Date.now())
   const [windowStart, setWindowStart] = useState(0)
   const [windowSize, setWindowSize] = useState(0)
+  const [windowPreset, setWindowPreset] = useState<'all' | '60' | '180' | '360'>('all')
   const [chartMode, setChartMode] = useState<ChartMode>('dual')
   const [showThresholds, setShowThresholds] = useState(true)
 
@@ -284,31 +311,12 @@ function TrendSparkline({
   }, [deviceId])
 
   const normalizedReadings = useMemo(() => {
-    const base = (readings ?? []).filter(
-      (r) => Number.isFinite(r.timestamp) && Number.isFinite(r.temperature) && Number.isFinite(r.humidity)
-    )
-
-    const liveTs = Number(latestTelemetry?.timestamp)
-    const liveTemp = Number(latestTelemetry?.temperature)
-    const liveHum = Number(latestTelemetry?.humidity)
-    const hasLive = Number.isFinite(liveTs) && Number.isFinite(liveTemp) && Number.isFinite(liveHum)
-
-    if (!hasLive) return base
-
-    const sorted = [...base].sort((a, b) => a.timestamp - b.timestamp)
-    const lastTs = sorted[sorted.length - 1]?.timestamp ?? -Infinity
-
-    if (liveTs > lastTs) {
-      sorted.push({
-        timestamp: liveTs,
-        temperature: liveTemp,
-        humidity: liveHum,
-        source: 'live-telemetry',
-      })
-    }
-
-    return sorted
-  }, [readings, latestTelemetry])
+    return (readings ?? [])
+      .filter(
+        (r) => Number.isFinite(r.timestamp) && Number.isFinite(r.temperature) && Number.isFinite(r.humidity)
+      )
+      .sort((a, b) => a.timestamp - b.timestamp)
+  }, [readings])
 
   useEffect(() => {
     if (!sendIntervalSec || sendIntervalSec <= 0) return
@@ -367,18 +375,43 @@ function TrendSparkline({
   let humRange = { min: 0, max: 1 }
 
   if (chartMode === 'dual') {
-    tempCoords = buildSparklineCoordinates(tempValues, width, height, padding)
-    humCoords = buildSparklineCoordinates(humValues, width, height, padding)
+    tempCoords = buildTimeSeriesCoordinates(visibleReadings, width, height, padding, (r) => r.temperature)
+    humCoords = buildTimeSeriesCoordinates(visibleReadings, width, height, padding, (r) => r.humidity)
   } else if (chartMode === 'temperature') {
     tempRange = computeRange(tempValues, th.tempWarnLow, th.tempWarnHigh, th.tempCritLow, th.tempCritHigh)
-    tempCoords = buildSparklineCoordinates(tempValues, width, height, padding, tempRange.min, tempRange.max)
+    tempCoords = buildTimeSeriesCoordinates(visibleReadings, width, height, padding, (r) => r.temperature, tempRange.min, tempRange.max)
   } else {
     humRange = computeRange(humValues, th.humWarnLow, th.humWarnHigh, th.humCritLow, th.humCritHigh)
-    humCoords = buildSparklineCoordinates(humValues, width, height, padding, humRange.min, humRange.max)
+    humCoords = buildTimeSeriesCoordinates(visibleReadings, width, height, padding, (r) => r.humidity, humRange.min, humRange.max)
   }
+
+  const xPositions = useMemo(() => {
+    if (visibleReadings.length < 2) return []
+    const tMin = visibleReadings[0]!.timestamp
+    const tMax = visibleReadings[visibleReadings.length - 1]!.timestamp
+    const tRange = Math.max(1, tMax - tMin)
+    return visibleReadings.map((reading) => padding + ((reading.timestamp - tMin) / tRange) * (width - padding * 2))
+  }, [visibleReadings, padding, width])
 
   const tempPoints = tempCoords.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')
   const humPoints = humCoords.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')
+
+  const xGridStride = Math.max(1, Math.ceil(visibleReadings.length / 12))
+  const xGridIndices = visibleReadings
+    .map((_, idx) => idx)
+    .filter((idx) => idx % xGridStride === 0 || idx === visibleReadings.length - 1)
+
+  const yGridValues = useMemo(() => {
+    if (chartMode === 'dual') return [] as number[]
+    const range = chartMode === 'temperature' ? tempRange : humRange
+    const step = chartMode === 'temperature' ? 1 : 5
+    const start = Math.ceil(range.min / step) * step
+    const values: number[] = []
+    for (let value = start; value <= range.max; value += step) {
+      values.push(Number(value.toFixed(2)))
+    }
+    return values
+  }, [chartMode, tempRange, humRange])
 
   const selectedIndex = hoverIndex != null ? hoverIndex : visibleReadings.length - 1
   const selectedReading = visibleReadings[selectedIndex]
@@ -393,9 +426,19 @@ function TrendSparkline({
     const rect = event.currentTarget.getBoundingClientRect()
     if (rect.width <= 0 || visibleReadings.length <= 1) return
 
-    const relative = (event.clientX - rect.left) / rect.width
-    const index = Math.max(0, Math.min(visibleReadings.length - 1, Math.round(relative * (visibleReadings.length - 1))))
-    setHoverIndex(index)
+    const relative = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width))
+    const targetX = padding + relative * (width - padding * 2)
+
+    let nearestIdx = 0
+    let nearestDist = Number.POSITIVE_INFINITY
+    for (let i = 0; i < xPositions.length; i++) {
+      const dist = Math.abs(xPositions[i]! - targetX)
+      if (dist < nearestDist) {
+        nearestDist = dist
+        nearestIdx = i
+      }
+    }
+    setHoverIndex(nearestIdx)
   }
 
   const handleWheel: React.WheelEventHandler<SVGSVGElement> = (event) => {
@@ -407,7 +450,7 @@ function TrendSparkline({
     const currentStart = effectiveWindowStart
 
     if (event.shiftKey) {
-      const panStep = Math.max(1, Math.round(currentSize * 0.18))
+      const panStep = Math.max(1, Math.round(currentSize * 0.22))
       const nextStart = event.deltaY > 0 ? currentStart + panStep : currentStart - panStep
       setWindowStart(Math.max(0, Math.min(total - currentSize, nextStart)))
       return
@@ -418,7 +461,7 @@ function TrendSparkline({
     const cursorIndex = Math.round(relative * Math.max(1, currentSize - 1))
     const cursorGlobalIndex = currentStart + cursorIndex
 
-    const zoomStep = Math.max(1, Math.round(total * 0.12))
+    const zoomStep = Math.max(1, Math.round(total * 0.16))
     const minWindow = Math.min(8, total)
     const nextSize = event.deltaY > 0
       ? Math.min(total, currentSize + zoomStep)
@@ -540,6 +583,29 @@ function TrendSparkline({
               Umbrales
             </label>
           )}
+          <select
+            value={windowPreset}
+            onChange={(e) => {
+              const preset = e.target.value as 'all' | '60' | '180' | '360'
+              setWindowPreset(preset)
+              if (preset === 'all') {
+                setWindowSize(0)
+                setWindowStart(0)
+              } else {
+                const nextSize = Number.parseInt(preset, 10)
+                const bounded = Math.min(Math.max(8, nextSize), normalizedReadings.length)
+                setWindowSize(bounded)
+                setWindowStart(Math.max(0, normalizedReadings.length - bounded))
+              }
+            }}
+            className="h-6 rounded-md border border-border/50 bg-background/60 px-1.5 text-[11px] text-muted-foreground"
+            title="Ventana temporal"
+          >
+            <option value="60">60 pts</option>
+            <option value="180">180 pts</option>
+            <option value="360">360 pts</option>
+            <option value="all">Todo</option>
+          </select>
           {!isMobile && (
             <div className="flex items-center gap-1.5">
               <button
@@ -608,11 +674,72 @@ function TrendSparkline({
             </linearGradient>
           </defs>
 
-          {/* Cuadrícula horizontal */}
-          {[0.25, 0.5, 0.75].map(pct => {
+          {/* Cuadrícula vertical por tiempo real (timestamps existentes) */}
+          {xGridIndices.map((idx) => {
+            const gx = xPositions[idx] ?? padding
+            return (
+              <line
+                key={`xg-${idx}`}
+                x1={gx}
+                x2={gx}
+                y1={padding}
+                y2={height - padding}
+                stroke="currentColor"
+                strokeOpacity="0.06"
+                strokeWidth="0.5"
+                className="text-muted-foreground"
+              />
+            )
+          })}
+
+          {/* Cuadrícula horizontal por rango de medición */}
+          {chartMode === 'dual' && [0.25, 0.5, 0.75].map((pct) => {
             const gy = padding + pct * (height - padding * 2)
-            return <line key={pct} x1={padding} x2={width - padding} y1={gy} y2={gy}
-              stroke="currentColor" strokeOpacity="0.06" strokeWidth="0.5" className="text-muted-foreground" />
+            return (
+              <line
+                key={`yg-dual-${pct}`}
+                x1={padding}
+                x2={width - padding}
+                y1={gy}
+                y2={gy}
+                stroke="currentColor"
+                strokeOpacity="0.06"
+                strokeWidth="0.5"
+                className="text-muted-foreground"
+              />
+            )
+          })}
+          {chartMode === 'temperature' && yGridValues.map((value) => {
+            const gy = valueToY(value, tempRange.min, tempRange.max, height, padding)
+            return (
+              <line
+                key={`yg-temp-${value}`}
+                x1={padding}
+                x2={width - padding}
+                y1={gy}
+                y2={gy}
+                stroke="currentColor"
+                strokeOpacity="0.06"
+                strokeWidth="0.5"
+                className="text-muted-foreground"
+              />
+            )
+          })}
+          {chartMode === 'humidity' && yGridValues.map((value) => {
+            const gy = valueToY(value, humRange.min, humRange.max, height, padding)
+            return (
+              <line
+                key={`yg-hum-${value}`}
+                x1={padding}
+                x2={width - padding}
+                y1={gy}
+                y2={gy}
+                stroke="currentColor"
+                strokeOpacity="0.06"
+                strokeWidth="0.5"
+                className="text-muted-foreground"
+              />
+            )
           })}
 
           {/* Zonas de alerta (solo en modo individual) */}
@@ -678,6 +805,14 @@ function TrendSparkline({
               strokeLinecap="round"
             />
           )}
+
+          {/* Muestras reales (sin datos sintéticos) */}
+          {showTemp && tempCoords.length > 0 && tempCoords.length <= 500 && tempCoords.map((point, idx) => (
+            <circle key={`tp-${idx}`} cx={point.x} cy={point.y} r="1.2" fill="#f97316" fillOpacity="0.65" />
+          ))}
+          {showHum && humCoords.length > 0 && humCoords.length <= 500 && humCoords.map((point, idx) => (
+            <circle key={`hp-${idx}`} cx={point.x} cy={point.y} r="1.2" fill="#06b6d4" fillOpacity="0.65" />
+          ))}
 
           {/* Puntos de cursor */}
           {showTemp && selectedTempPoint && (
@@ -782,11 +917,6 @@ function DeviceCard({ device, equipmentById, readingsByEquipment, panelNowMs, na
     telemetryHumTs,
     readingTs,
   )
-  const liveTelemetry = {
-    timestamp: Math.max(device.telemetry?.temperatura?.timestamp ?? 0, device.telemetry?.humedad?.timestamp ?? 0),
-    temperature: device.telemetry?.temperatura?.value,
-    humidity: device.telemetry?.humedad?.value,
-  }
 
   return (
     <Card className={`border-l-4 ${
@@ -845,7 +975,7 @@ function DeviceCard({ device, equipmentById, readingsByEquipment, panelNowMs, na
             </div>
             <div className="text-lg font-bold text-orange-400">
               {currentTemp?.toFixed(1) ?? '—'}
-              <span className="text-sm font-normal ml-0.5">{device.telemetry?.temperatura?.unit ?? '°C'}</span>
+              <span className="text-sm font-normal ml-0.5">°C</span>
             </div>
           </div>
           <div className="rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-3">
@@ -854,7 +984,7 @@ function DeviceCard({ device, equipmentById, readingsByEquipment, panelNowMs, na
             </div>
             <div className="text-lg font-bold text-cyan-400">
               {currentHum?.toFixed(1) ?? '—'}
-              <span className="text-sm font-normal ml-0.5">{device.telemetry?.humedad?.unit ?? '%'}</span>
+              <span className="text-sm font-normal ml-0.5">%</span>
             </div>
           </div>
         </div>
@@ -864,7 +994,6 @@ function DeviceCard({ device, equipmentById, readingsByEquipment, panelNowMs, na
           sendIntervalSec={device.sendInterval}
           thresholds={device.thresholds}
           deviceId={device.deviceId}
-          latestTelemetry={liveTelemetry}
         />
 
         {/* Editor de umbrales (solo admin) */}
@@ -991,7 +1120,7 @@ export function SensorsMonitorPage() {
     const unsubs = assignedEquipmentIds.map((equipmentId) =>
       subscribeSensorReadings(
         equipmentId,
-        30,
+        CHART_HISTORY_LIMIT,
         (rows) => {
           setReadingsByEquipment((prev) => ({
             ...prev,
@@ -1022,7 +1151,7 @@ export function SensorsMonitorPage() {
       const results = await Promise.all(
         assignedEquipmentIds.map(async (equipmentId) => {
           try {
-            const rows = await fetchLastSensorReadings(equipmentId, 30)
+            const rows = await fetchLastSensorReadings(equipmentId, CHART_HISTORY_LIMIT)
             return { equipmentId, rows }
           } catch {
             return { equipmentId, rows: null as SensorReading[] | null }
