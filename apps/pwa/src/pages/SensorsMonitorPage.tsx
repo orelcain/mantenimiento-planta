@@ -62,21 +62,6 @@ function isDeviceFresh(device: DeviceRow, nowMs: number): boolean {
   return nowMs - freshestTs <= freshnessWindowMs
 }
 
-function buildSparklineCoordinates(values: number[], width: number, height: number, padding: number, fixedMin?: number, fixedMax?: number) {
-  if (values.length < 2) return []
-
-  const min = fixedMin ?? Math.min(...values)
-  const max = fixedMax ?? Math.max(...values)
-  const range = Math.max(1e-9, max - min)
-  const step = (width - padding * 2) / (values.length - 1)
-
-  return values.map((value, index) => {
-      const x = padding + index * step
-      const y = height - padding - ((value - min) / range) * (height - padding * 2)
-      return { x, y }
-    })
-}
-
 function buildTimeSeriesCoordinates(
   readings: SensorReading[],
   width: number,
@@ -369,8 +354,8 @@ function TrendSparkline({
   const showTemp = chartMode === 'dual' || chartMode === 'temperature'
   const showHum = chartMode === 'dual' || chartMode === 'humidity'
 
-  let tempCoords: ReturnType<typeof buildSparklineCoordinates> = []
-  let humCoords: ReturnType<typeof buildSparklineCoordinates> = []
+  let tempCoords: ReturnType<typeof buildTimeSeriesCoordinates> = []
+  let humCoords: ReturnType<typeof buildTimeSeriesCoordinates> = []
   let tempRange = { min: 0, max: 1 }
   let humRange = { min: 0, max: 1 }
 
@@ -385,13 +370,13 @@ function TrendSparkline({
     humCoords = buildTimeSeriesCoordinates(visibleReadings, width, height, padding, (r) => r.humidity, humRange.min, humRange.max)
   }
 
-  const xPositions = useMemo(() => {
+  const xPositions = (() => {
     if (visibleReadings.length < 2) return []
     const tMin = visibleReadings[0]!.timestamp
     const tMax = visibleReadings[visibleReadings.length - 1]!.timestamp
     const tRange = Math.max(1, tMax - tMin)
     return visibleReadings.map((reading) => padding + ((reading.timestamp - tMin) / tRange) * (width - padding * 2))
-  }, [visibleReadings, padding, width])
+  })()
 
   const tempPoints = tempCoords.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')
   const humPoints = humCoords.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')
@@ -401,7 +386,7 @@ function TrendSparkline({
     .map((_, idx) => idx)
     .filter((idx) => idx % xGridStride === 0 || idx === visibleReadings.length - 1)
 
-  const yGridValues = useMemo(() => {
+  const yGridValues = (() => {
     if (chartMode === 'dual') return [] as number[]
     const range = chartMode === 'temperature' ? tempRange : humRange
     const step = chartMode === 'temperature' ? 1 : 5
@@ -411,7 +396,7 @@ function TrendSparkline({
       values.push(Number(value.toFixed(2)))
     }
     return values
-  }, [chartMode, tempRange, humRange])
+  })()
 
   const selectedIndex = hoverIndex != null ? hoverIndex : visibleReadings.length - 1
   const selectedReading = visibleReadings[selectedIndex]
@@ -1139,7 +1124,7 @@ export function SensorsMonitorPage() {
     return () => {
       for (const unsub of unsubs) unsub()
     }
-  }, [assignedEquipmentIdsKey])
+  }, [assignedEquipmentIds, assignedEquipmentIdsKey])
 
   // Fallback anti-congelamiento: sondeo periódico por si la suscripción en tiempo real se atasca.
   useEffect(() => {
@@ -1187,7 +1172,7 @@ export function SensorsMonitorPage() {
       cancelled = true
       window.clearInterval(timer)
     }
-  }, [assignedEquipmentIdsKey])
+  }, [assignedEquipmentIds, assignedEquipmentIdsKey])
 
   const equipmentById = useMemo(
     () => new Map(equipment.map((item) => [item.id, item])),

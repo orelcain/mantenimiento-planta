@@ -7,6 +7,12 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.47] - 2026-02-17
+### Fix deploy
+- Corregidos errores de hooks/lint en `SensorsMonitorPage` que rompían GitHub Actions (`React Hook called conditionally`).
+- Ajustada lógica de cálculo de grilla/posiciones para mantener el mismo resultado sin violar reglas de hooks.
+- Build + lint verificados localmente en verde.
+
 ## [2.48.46] - 2026-02-17
 ### Visual/UX
 - **Línea de tiempo más amplia**: el panel ahora consume hasta 360 muestras por sensor (antes 30), permitiendo ver mucho más historial.
