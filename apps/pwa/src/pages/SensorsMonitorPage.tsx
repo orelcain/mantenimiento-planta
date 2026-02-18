@@ -202,7 +202,7 @@ const CHART_MIN_H = 120
 const CHART_MAX_H = 600
 const CHART_DEFAULT_H = 192  // 12rem
 const CHART_STORAGE_PREFIX = 'chart-h-'
-const CHART_HISTORY_LIMIT = 360
+const CHART_HISTORY_LIMIT = 5000
 
 function getStoredChartHeight(deviceId: string): number {
   try {
@@ -230,7 +230,10 @@ function TrendSparkline({
   const [nowMs, setNowMs] = useState(() => Date.now())
   const [windowStart, setWindowStart] = useState(0)
   const [windowSize, setWindowSize] = useState(0)
-  const [windowPreset, setWindowPreset] = useState<'all' | '60' | '180' | '360'>('all')
+  const [windowPreset, setWindowPreset] = useState<'all' | '100' | '360' | '1000'>('100')
+  const [timeFilterPreset, setTimeFilterPreset] = useState<'all' | '15' | '60' | '240' | '1440' | 'custom'>('all')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
   const [chartMode, setChartMode] = useState<ChartMode>('dual')
   const [showThresholds, setShowThresholds] = useState(true)
 
@@ -303,13 +306,50 @@ function TrendSparkline({
       .sort((a, b) => a.timestamp - b.timestamp)
   }, [readings])
 
+  const timeFilteredReadings = useMemo(() => {
+    if (normalizedReadings.length === 0) return []
+
+    if (timeFilterPreset === 'all') return normalizedReadings
+
+    if (timeFilterPreset === 'custom') {
+      const fromMs = customFrom ? new Date(customFrom).getTime() : Number.NEGATIVE_INFINITY
+      const toMs = customTo ? new Date(customTo).getTime() : Number.POSITIVE_INFINITY
+      return normalizedReadings.filter((reading) => reading.timestamp >= fromMs && reading.timestamp <= toMs)
+    }
+
+    const minutes = Number.parseInt(timeFilterPreset, 10)
+    if (!Number.isFinite(minutes) || minutes <= 0) return normalizedReadings
+    const fromMs = nowMs - minutes * 60_000
+    return normalizedReadings.filter((reading) => reading.timestamp >= fromMs)
+  }, [normalizedReadings, timeFilterPreset, customFrom, customTo, nowMs])
+
+  useEffect(() => {
+    const total = timeFilteredReadings.length
+    if (total <= 0) {
+      setWindowSize(0)
+      setWindowStart(0)
+      return
+    }
+
+    if (windowPreset === 'all') {
+      setWindowSize(0)
+      setWindowStart(0)
+      return
+    }
+
+    const presetSize = Number.parseInt(windowPreset, 10)
+    const bounded = Math.min(Math.max(8, presetSize), total)
+    setWindowSize(bounded)
+    setWindowStart(Math.max(0, total - bounded))
+  }, [windowPreset, timeFilteredReadings.length])
+
   useEffect(() => {
     if (!sendIntervalSec || sendIntervalSec <= 0) return
     const timer = window.setInterval(() => setNowMs(Date.now()), 1000)
     return () => window.clearInterval(timer)
   }, [sendIntervalSec])
 
-  if (normalizedReadings.length < 2) {
+  if (timeFilteredReadings.length < 2) {
     return (
       <div className="rounded-md border p-2 text-xs text-muted-foreground">
         Sin histórico suficiente para graficar cambios.
@@ -324,10 +364,10 @@ function TrendSparkline({
   const padding = chartMode === 'dual' ? 8 : 20
   const th = resolveThresholds(thresholds)
 
-  const effectiveWindowSize = windowSize > 0 ? Math.min(windowSize, normalizedReadings.length) : normalizedReadings.length
-  const maxStart = Math.max(0, normalizedReadings.length - effectiveWindowSize)
+  const effectiveWindowSize = windowSize > 0 ? Math.min(windowSize, timeFilteredReadings.length) : timeFilteredReadings.length
+  const maxStart = Math.max(0, timeFilteredReadings.length - effectiveWindowSize)
   const effectiveWindowStart = Math.min(windowStart, maxStart)
-  const visibleReadings = normalizedReadings.slice(effectiveWindowStart, effectiveWindowStart + effectiveWindowSize)
+  const visibleReadings = timeFilteredReadings.slice(effectiveWindowStart, effectiveWindowStart + effectiveWindowSize)
 
   const tempValues = visibleReadings.map((r) => r.temperature)
   const humValues = visibleReadings.map((r) => r.humidity)
@@ -403,7 +443,7 @@ function TrendSparkline({
   const selectedTempPoint = tempCoords[selectedIndex]
   const selectedHumPoint = humCoords[selectedIndex]
 
-  const lastTs = normalizedReadings[normalizedReadings.length - 1]?.timestamp
+  const lastTs = timeFilteredReadings[timeFilteredReadings.length - 1]?.timestamp
   const nextUpdateTs = sendIntervalSec && lastTs ? lastTs + sendIntervalSec * 1000 : undefined
   const remainingSec = nextUpdateTs ? Math.max(0, Math.ceil((nextUpdateTs - nowMs) / 1000)) : undefined
 
@@ -427,7 +467,7 @@ function TrendSparkline({
   }
 
   const handleWheel: React.WheelEventHandler<SVGSVGElement> = (event) => {
-    const total = normalizedReadings.length
+    const total = timeFilteredReadings.length
     if (total <= 8) return
     event.preventDefault()
 
@@ -571,26 +611,48 @@ function TrendSparkline({
           <select
             value={windowPreset}
             onChange={(e) => {
-              const preset = e.target.value as 'all' | '60' | '180' | '360'
+              const preset = e.target.value as 'all' | '100' | '360' | '1000'
               setWindowPreset(preset)
-              if (preset === 'all') {
-                setWindowSize(0)
-                setWindowStart(0)
-              } else {
-                const nextSize = Number.parseInt(preset, 10)
-                const bounded = Math.min(Math.max(8, nextSize), normalizedReadings.length)
-                setWindowSize(bounded)
-                setWindowStart(Math.max(0, normalizedReadings.length - bounded))
-              }
             }}
             className="h-6 rounded-md border border-border/50 bg-background/60 px-1.5 text-[11px] text-muted-foreground"
             title="Ventana temporal"
           >
-            <option value="60">60 pts</option>
-            <option value="180">180 pts</option>
+            <option value="100">100 pts</option>
             <option value="360">360 pts</option>
+            <option value="1000">1000 pts</option>
             <option value="all">Todo</option>
           </select>
+          <select
+            value={timeFilterPreset}
+            onChange={(e) => setTimeFilterPreset(e.target.value as 'all' | '15' | '60' | '240' | '1440' | 'custom')}
+            className="h-6 rounded-md border border-border/50 bg-background/60 px-1.5 text-[11px] text-muted-foreground"
+            title="Filtrar por rango de tiempo"
+          >
+            <option value="all">Todo tiempo</option>
+            <option value="15">Últ. 15 min</option>
+            <option value="60">Últ. 1 h</option>
+            <option value="240">Últ. 4 h</option>
+            <option value="1440">Últ. 24 h</option>
+            <option value="custom">Rango fecha/hora</option>
+          </select>
+          {timeFilterPreset === 'custom' && (
+            <>
+              <input
+                type="datetime-local"
+                value={customFrom}
+                onChange={(e) => setCustomFrom(e.target.value)}
+                className="h-6 rounded-md border border-border/50 bg-background/60 px-1.5 text-[11px] text-muted-foreground"
+                title="Desde"
+              />
+              <input
+                type="datetime-local"
+                value={customTo}
+                onChange={(e) => setCustomTo(e.target.value)}
+                className="h-6 rounded-md border border-border/50 bg-background/60 px-1.5 text-[11px] text-muted-foreground"
+                title="Hasta"
+              />
+            </>
+          )}
           {!isMobile && (
             <div className="flex items-center gap-1.5">
               <button
@@ -629,7 +691,10 @@ function TrendSparkline({
           )}
         </div>
         <span className="text-[11px] text-muted-foreground tabular-nums">
-          {visibleReadings.length}/{normalizedReadings.length} muestras
+          {visibleReadings.length}/{timeFilteredReadings.length} muestras
+          {timeFilteredReadings.length < normalizedReadings.length && (
+            <span className="text-primary/70"> · filtradas de {normalizedReadings.length}</span>
+          )}
           {remainingSec != null && <span className="text-primary/70"> · Próx: {remainingSec}s</span>}
         </span>
       </div>
@@ -825,6 +890,21 @@ function TrendSparkline({
           </div>
         )}
       </div>
+
+      {timeFilteredReadings.length > 1 && effectiveWindowSize < timeFilteredReadings.length && (
+        <div className="px-1 pt-1">
+          <input
+            type="range"
+            min={0}
+            max={Math.max(0, timeFilteredReadings.length - effectiveWindowSize)}
+            step={1}
+            value={effectiveWindowStart}
+            onChange={(e) => setWindowStart(Number(e.target.value))}
+            className="w-full accent-primary"
+            title="Scroll de línea de tiempo"
+          />
+        </div>
+      )}
 
       {/* Tooltip interactivo */}
       {selectedReading && (

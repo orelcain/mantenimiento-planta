@@ -7,6 +7,19 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.48] - 2026-02-17
+### Feature
+- Historial ampliado del monitor: carga hasta 5000 registros por sensor para análisis temporal extendido.
+- Selector de muestras visibles en pantalla: `100 / 360 / 1000 / Todo`.
+- Filtro temporal por:
+  - minutos recientes (`15m`, `1h`, `4h`, `24h`)
+  - rango exacto con fecha/hora (`datetime-local` desde/hasta).
+- Scroll de línea de tiempo con slider cuando la ventana visible es menor al total filtrado.
+- Tooltip de hover mantiene detalle puntual real: timestamp + temperatura + humedad de cada muestra real.
+
+### Precisión
+- La gráfica usa únicamente registros reales recibidos; no genera datos sintéticos para completar intervalos.
+
 ## [2.48.47] - 2026-02-17
 ### Fix deploy
 - Corregidos errores de hooks/lint en `SensorsMonitorPage` que rompían GitHub Actions (`React Hook called conditionally`).
