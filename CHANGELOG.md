@@ -7,6 +7,10 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.49] - 2026-02-17
+### UX
+- Botón **Último** en el monitor de tendencia para saltar al extremo más reciente de la línea de tiempo al navegar historial/scroll.
+
 ## [2.48.48] - 2026-02-17
 ### Feature
 - Historial ampliado del monitor: carga hasta 5000 registros por sensor para análisis temporal extendido.

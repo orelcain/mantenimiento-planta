@@ -368,6 +368,7 @@ function TrendSparkline({
   const maxStart = Math.max(0, timeFilteredReadings.length - effectiveWindowSize)
   const effectiveWindowStart = Math.min(windowStart, maxStart)
   const visibleReadings = timeFilteredReadings.slice(effectiveWindowStart, effectiveWindowStart + effectiveWindowSize)
+  const canJumpToLatest = maxStart > 0 && effectiveWindowStart < maxStart
 
   const tempValues = visibleReadings.map((r) => r.temperature)
   const humValues = visibleReadings.map((r) => r.humidity)
@@ -655,6 +656,18 @@ function TrendSparkline({
           )}
           {!isMobile && (
             <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                disabled={!canJumpToLatest}
+                onClick={() => {
+                  setWindowStart(maxStart)
+                  setHoverIndex(null)
+                }}
+                className="h-6 rounded border border-border/50 bg-background/60 px-1.5 text-[10px] text-muted-foreground hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed"
+                title="Ir al dato más reciente"
+              >
+                Último
+              </button>
               <button
                 type="button"
                 onClick={() => {
