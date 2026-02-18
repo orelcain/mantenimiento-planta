@@ -7,6 +7,14 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.40] - 2026-02-17
+### Feature
+- **Gráfico redimensionable**: el chart de tendencia se puede redimensionar arrastrando el handle en la esquina inferior derecha.
+- Persistencia del tamaño por dispositivo en `localStorage` (clave `chart-h-{deviceId}`).
+- En móvil (< 640px) el handle se oculta y se usa tamaño por defecto adaptativo.
+- SVG viewBox se ajusta dinámicamente al tamaño del contenedor.
+- Transición suave al soltar el drag; sin transición durante arrastre para fluidez.
+
 ## [2.48.39] - 2026-02-17
 ### Bugfix
 - **Fix PERMISSION_DENIED umbrales**: los usuarios están en Firestore, no en RTDB. La regla `root.child('users')` nunca encontraba el rol. Cambiado a `auth != null` (el frontend ya valida admin).

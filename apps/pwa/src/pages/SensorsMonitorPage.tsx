@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState, useCallback } from 'react'
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
-import { Activity, AlertTriangle, Cpu, Thermometer, Droplets, Link2, Settings2, Save, X } from 'lucide-react'
+import { Activity, AlertTriangle, Cpu, Thermometer, Droplets, Link2, Settings2, Save, X, GripVertical } from 'lucide-react'
 import { Button, Card, CardContent, CardHeader, CardTitle, Input } from '@/components/ui'
 import { useCanSee, useIsAdmin } from '@/store'
 import { getEquipments } from '@/services/equipment'
@@ -176,13 +176,84 @@ function ThresholdEditor({ deviceId, current, onClose }: {
   )
 }
 
-function TrendSparkline({ readings, sendIntervalSec, thresholds, editorOpen = false }: { readings?: SensorReading[]; sendIntervalSec?: number; thresholds?: SensorThresholds; editorOpen?: boolean }) {
+const CHART_MIN_H = 120
+const CHART_MAX_H = 600
+const CHART_DEFAULT_H = 192  // 12rem
+const CHART_STORAGE_PREFIX = 'chart-h-'
+
+function getStoredChartHeight(deviceId: string): number {
+  try {
+    const v = localStorage.getItem(CHART_STORAGE_PREFIX + deviceId)
+    if (v) {
+      const n = parseInt(v, 10)
+      if (n >= CHART_MIN_H && n <= CHART_MAX_H) return n
+    }
+  } catch { /* noop */ }
+  return CHART_DEFAULT_H
+}
+
+function TrendSparkline({ readings, sendIntervalSec, thresholds, deviceId }: { readings?: SensorReading[]; sendIntervalSec?: number; thresholds?: SensorThresholds; deviceId: string }) {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null)
   const [nowMs, setNowMs] = useState(() => Date.now())
   const [windowStart, setWindowStart] = useState(0)
   const [windowSize, setWindowSize] = useState(0)
   const [chartMode, setChartMode] = useState<ChartMode>('dual')
   const [showThresholds, setShowThresholds] = useState(true)
+
+  // ── Resizable chart height ──
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 640
+  const [chartH, setChartH] = useState(() => isMobile ? CHART_DEFAULT_H : getStoredChartHeight(deviceId))
+  const containerRef = useRef<HTMLDivElement>(null)
+  const dragging = useRef(false)
+  const startY = useRef(0)
+  const startH = useRef(0)
+
+  // Persist on change (debounced via ref)
+  const persistTimer = useRef<ReturnType<typeof setTimeout>>()
+  const persistHeight = useCallback((h: number) => {
+    if (isMobile) return
+    clearTimeout(persistTimer.current)
+    persistTimer.current = setTimeout(() => {
+      try { localStorage.setItem(CHART_STORAGE_PREFIX + deviceId, String(h)) } catch { /* noop */ }
+    }, 300)
+  }, [deviceId, isMobile])
+
+  // Drag handlers (pointer events for touch + mouse)
+  const onPointerDown = useCallback((e: React.PointerEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    dragging.current = true
+    startY.current = e.clientY
+    startH.current = chartH
+    ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+  }, [chartH])
+
+  const onPointerMove = useCallback((e: React.PointerEvent) => {
+    if (!dragging.current) return
+    const delta = e.clientY - startY.current
+    const newH = Math.min(CHART_MAX_H, Math.max(CHART_MIN_H, startH.current + delta))
+    setChartH(newH)
+  }, [])
+
+  const onPointerUp = useCallback((e: React.PointerEvent) => {
+    if (!dragging.current) return
+    dragging.current = false
+    ;(e.target as HTMLElement).releasePointerCapture(e.pointerId)
+    const delta = e.clientY - startY.current
+    const finalH = Math.min(CHART_MAX_H, Math.max(CHART_MIN_H, startH.current + delta))
+    setChartH(finalH)
+    persistHeight(finalH)
+  }, [persistHeight])
+
+  // Listen for window resize → reset to default on mobile
+  useEffect(() => {
+    const onResize = () => {
+      if (window.innerWidth < 640) setChartH(CHART_DEFAULT_H)
+      else setChartH(getStoredChartHeight(deviceId))
+    }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [deviceId])
 
   const normalizedReadings = useMemo(() => {
     if (!readings) return []
@@ -205,11 +276,10 @@ function TrendSparkline({ readings, sendIntervalSec, thresholds, editorOpen = fa
     )
   }
 
-  // Dimensiones SVG — más alto cuando el editor de umbrales está cerrado
+  // Dimensiones SVG — se adaptan al alto del contenedor
   const width = 400
-  const height = chartMode === 'dual'
-    ? (editorOpen ? 120 : 170)
-    : (editorOpen ? 200 : 280)
+  const svgAspect = width / Math.max(chartH, CHART_MIN_H)
+  const height = Math.round(chartH * svgAspect)  // proporcional
   const padding = chartMode === 'dual' ? 8 : 20
   const th = resolveThresholds(thresholds)
 
@@ -429,8 +499,11 @@ function TrendSparkline({ readings, sendIntervalSec, thresholds, editorOpen = fa
         </span>
       </div>
 
-      <div className={`w-full rounded-lg bg-gradient-to-b from-muted/30 to-muted/5 overflow-hidden border border-border/20 transition-all duration-300`}
-        style={{ height: chartMode === 'dual' ? (editorOpen ? '9rem' : '12rem') : (editorOpen ? '12rem' : '16rem') }}>  
+      <div
+        ref={containerRef}
+        className="w-full rounded-lg bg-gradient-to-b from-muted/30 to-muted/5 overflow-hidden border border-border/20 relative select-none"
+        style={{ height: `${chartH}px`, transition: dragging.current ? 'none' : 'height 0.2s ease' }}
+      >
         <svg
           viewBox={`0 0 ${width} ${height}`}
           preserveAspectRatio="xMidYMid meet"
@@ -536,6 +609,19 @@ function TrendSparkline({ readings, sendIntervalSec, thresholds, editorOpen = fa
             </>
           )}
         </svg>
+
+        {/* Resize handle */}
+        {!isMobile && (
+          <div
+            className="absolute bottom-0 right-0 w-6 h-6 flex items-center justify-center cursor-ns-resize rounded-tl-md bg-muted/40 hover:bg-muted/70 transition-colors touch-none"
+            title="Arrastrar para redimensionar"
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+          >
+            <GripVertical className="h-3 w-3 text-muted-foreground/60" />
+          </div>
+        )}
       </div>
 
       {/* Tooltip interactivo */}
@@ -672,7 +758,7 @@ function DeviceCard({ device, equipmentById, readingsByEquipment, panelNowMs, na
           </div>
         </div>
 
-        <TrendSparkline readings={trendReadings} sendIntervalSec={device.sendInterval} thresholds={device.thresholds} editorOpen={showThresholdEditor} />
+        <TrendSparkline readings={trendReadings} sendIntervalSec={device.sendInterval} thresholds={device.thresholds} deviceId={device.deviceId} />
 
         {/* Editor de umbrales (solo admin) */}
         {isAdmin && (
