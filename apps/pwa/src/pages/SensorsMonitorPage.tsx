@@ -5,7 +5,7 @@ import { Button, Card, CardContent, CardHeader, CardTitle, Input } from '@/compo
 import { useCanSee, useIsAdmin } from '@/store'
 import { getEquipments } from '@/services/equipment'
 import { subscribeDevices, updateDeviceThresholds, type DeviceRow, type SensorThresholds } from '@/services/devicesRtdb'
-import { subscribeSensorReadings, type SensorReading } from '@/services/sensorsRtdb'
+import { subscribeSensorReadings, fetchLastSensorReadings, type SensorReading } from '@/services/sensorsRtdb'
 import type { Equipment } from '@/types'
 
 function formatDateTime(timestamp?: number): string {
@@ -999,6 +999,54 @@ export function SensorsMonitorPage() {
 
     return () => {
       for (const unsub of unsubs) unsub()
+    }
+  }, [assignedEquipmentIdsKey])
+
+  // Fallback anti-congelamiento: sondeo periódico por si la suscripción en tiempo real se atasca.
+  useEffect(() => {
+    if (!assignedEquipmentIds.length) return
+
+    let cancelled = false
+
+    const refreshReadings = async () => {
+      const results = await Promise.all(
+        assignedEquipmentIds.map(async (equipmentId) => {
+          try {
+            const rows = await fetchLastSensorReadings(equipmentId, 30)
+            return { equipmentId, rows }
+          } catch {
+            return { equipmentId, rows: null as SensorReading[] | null }
+          }
+        })
+      )
+
+      if (cancelled) return
+
+      setReadingsByEquipment((prev) => {
+        const next = { ...prev }
+
+        for (const { equipmentId, rows } of results) {
+          if (!rows || rows.length === 0) continue
+
+          const prevRows = prev[equipmentId] ?? []
+          const prevLastTs = prevRows[prevRows.length - 1]?.timestamp ?? 0
+          const nextLastTs = rows[rows.length - 1]?.timestamp ?? 0
+
+          if (nextLastTs > prevLastTs || rows.length !== prevRows.length) {
+            next[equipmentId] = rows
+          }
+        }
+
+        return next
+      })
+    }
+
+    refreshReadings()
+    const timer = window.setInterval(refreshReadings, 8000)
+
+    return () => {
+      cancelled = true
+      window.clearInterval(timer)
     }
   }, [assignedEquipmentIdsKey])
 

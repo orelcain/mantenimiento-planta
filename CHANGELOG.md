@@ -7,6 +7,11 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.44] - 2026-02-17
+### Bugfix
+- **Anti-congelamiento de lecturas**: agregado fallback de sondeo cada 8s (`fetchLastSensorReadings`) para refrescar valores si la suscripción RTDB en tiempo real se queda sin eventos.
+- El sondeo actualiza solo cuando detecta datos más nuevos (o cambio de tamaño de ventana), evitando renders innecesarios.
+
 ## [2.48.43] - 2026-02-17
 ### Bugfix
 - **Valores de sensores vuelven a actualizarse en tarjeta**: Temperatura/Humedad ahora toman la fuente más reciente entre `devices/{deviceId}/telemetry` y la última lectura en `sensors/{equipmentId}/readings`.

@@ -1,7 +1,7 @@
 {
-  "version": "2.48.43",
+  "version": "2.48.44",
   "buildDate": "2026-02-17",
-  "buildTimestamp": 1771375513373,
+  "buildTimestamp": 1771377340528,
   "features": [
     "Nuevo panel técnico rápido de sensores en /sensors/monitor con KPIs operativos en tiempo real",
     "Acceso directo al panel técnico desde menú lateral, botón en Sensores y CTA sticky móvil",
