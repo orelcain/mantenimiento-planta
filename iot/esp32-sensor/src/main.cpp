@@ -770,6 +770,29 @@ int failedAttempts = 0;
 static unsigned long lastDeviceStatusMs = 0;
 static unsigned long lastStreamReadMs = 0;
 
+static bool shouldForceFirebaseReconnect(String reason) {
+  reason.toLowerCase();
+  return reason.indexOf("auth") >= 0 ||
+         reason.indexOf("token") >= 0 ||
+         reason.indexOf("permission") >= 0 ||
+         reason.indexOf("unauthorized") >= 0 ||
+         reason.indexOf("network") >= 0 ||
+         reason.indexOf("connection") >= 0 ||
+         reason.indexOf("timeout") >= 0 ||
+         reason.indexOf("401") >= 0 ||
+         reason.indexOf("403") >= 0;
+}
+
+static void markFirebaseStaleIfNeeded(const char* context) {
+  String reason = fbdo.errorReason();
+  if (!shouldForceFirebaseReconnect(reason)) return;
+
+  Serial.printf("⚠ Firebase stale en %s: %s\n", context, reason.c_str());
+  firebaseReady = false;
+  // Forzar reintento inmediato en loop.
+  lastReconnectTime = 0;
+}
+
 static String getDeviceId() {
   // MAC sin ':' para usarla como key en RTDB.
   // Ojo: WiFi.macAddress() puede tocar la pila TCP/IP y crashear si WiFi aún no está inicializado.
@@ -2394,6 +2417,7 @@ void sendSensorData() {
     Serial.println("✓ Telemetría publicada en devices/{deviceId}/telemetry");
   } else {
     Serial.printf("✗ Error telemetría device: %s\n", fbdo.errorReason().c_str());
+    markFirebaseStaleIfNeeded("devices/{deviceId}/telemetry");
   }
   
   // 2. Si está asignado, TAMBIÉN publicar en sensors/{equipmentId} (para historial)
@@ -2421,6 +2445,7 @@ void sendSensorData() {
     Serial.println("✓ Temperatura enviada a Firebase");
   } else {
     Serial.printf("✗ Error temperatura: %s\n", fbdo.errorReason().c_str());
+    markFirebaseStaleIfNeeded("sensors/{equipmentId}/temperatura");
   }
   
   // Humedad
@@ -2437,6 +2462,7 @@ void sendSensorData() {
     Serial.println("✓ Humedad enviada a Firebase");
   } else {
     Serial.printf("✗ Error humedad: %s\n", fbdo.errorReason().c_str());
+    markFirebaseStaleIfNeeded("sensors/{equipmentId}/humedad");
   }
 
   // Histórico de lecturas (para analítica/predicción)
@@ -2454,6 +2480,7 @@ void sendSensorData() {
     Serial.printf("✗ Error guardando histórico: %s\n", fbdo.errorReason().c_str());
     // Guardar en buffer para reintento/backfill
     bufferReading(currentEquipmentId, timestamp, temperature, humidity, tempStatus, humStatus, simulated);
+    markFirebaseStaleIfNeeded("sensors/{equipmentId}/readings");
   }
   
   // Actualizar estado online
@@ -2497,6 +2524,13 @@ void loop() {
   // Si ya hay WiFi y Firebase está listo, intentar enviar backlog.
   flushBufferedReadings();
   flushBacklogFromFlash();
+
+  // Si SDK perdió sesión/token, forzar ruta de reconexión.
+  if (firebaseReady && WiFi.status() == WL_CONNECTED && !Firebase.ready()) {
+    Serial.println("⚠ Firebase.ready()=false durante loop. Marcando reconexión...");
+    firebaseReady = false;
+    lastReconnectTime = 0;
+  }
 
   // Verificar Firebase (solo si hay WiFi)
   if (WiFi.status() == WL_CONNECTED && !firebaseReady) {
