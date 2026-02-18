@@ -7,6 +7,13 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.41] - 2026-02-17
+### Bugfix
+- **Resize drag funcional**: migrado de pointer capture (fallaba con elementos pequeños) a document-level `pointermove`/`pointerup` listeners. Ahora se puede arrastrar fluido incluso moviendo el mouse rápido fuera del handle.
+- **Handle visible**: barra inferior completa con indicador central (pill) en vez de icono pequeño en esquina.
+- Body cursor `ns-resize` y `user-select: none` durante drag.
+- **Índice RTDB para readings**: agregado `.indexOn: ["timestamp"]` en `sensors/$equipmentId/readings`. Elimina warning de Firebase y mejora rendimiento de queries `orderByChild('timestamp')` + `limitToLast`.
+
 ## [2.48.40] - 2026-02-17
 ### Feature
 - **Gráfico redimensionable**: el chart de tendencia se puede redimensionar arrastrando el handle en la esquina inferior derecha.

@@ -33,7 +33,10 @@
         ".write": "auth != null && (root.child('users').child(auth.uid).child('rol').val() == 'admin' || root.child('users').child(auth.uid).child('rol').val() == 'tecnico')",
         "temperatura": { ".write": "auth != null" },
         "humedad": { ".write": "auth != null" },
-        "readings": { ".write": "auth != null" },
+        "readings": {
+          ".write": "auth != null",
+          ".indexOn": ["timestamp"]
+        },
         "online": { ".write": "auth != null" },
         "lastSeen": { ".write": "auth != null" },
         "equipmentId": { ".write": "auth != null" },

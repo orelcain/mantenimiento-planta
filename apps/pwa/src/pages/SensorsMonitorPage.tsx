@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
-import { Activity, AlertTriangle, Cpu, Thermometer, Droplets, Link2, Settings2, Save, X, GripVertical } from 'lucide-react'
+import { Activity, AlertTriangle, Cpu, Thermometer, Droplets, Link2, Settings2, Save, X } from 'lucide-react'
 import { Button, Card, CardContent, CardHeader, CardTitle, Input } from '@/components/ui'
 import { useCanSee, useIsAdmin } from '@/store'
 import { getEquipments } from '@/services/equipment'
@@ -204,11 +204,9 @@ function TrendSparkline({ readings, sendIntervalSec, thresholds, deviceId }: { r
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 640
   const [chartH, setChartH] = useState(() => isMobile ? CHART_DEFAULT_H : getStoredChartHeight(deviceId))
   const containerRef = useRef<HTMLDivElement>(null)
-  const dragging = useRef(false)
-  const startY = useRef(0)
-  const startH = useRef(0)
+  const dragState = useRef<{ active: boolean; startY: number; startH: number }>({ active: false, startY: 0, startH: 0 })
 
-  // Persist on change (debounced via ref)
+  // Persist on change (debounced)
   const persistTimer = useRef<ReturnType<typeof setTimeout>>()
   const persistHeight = useCallback((h: number) => {
     if (isMobile) return
@@ -218,32 +216,40 @@ function TrendSparkline({ readings, sendIntervalSec, thresholds, deviceId }: { r
     }, 300)
   }, [deviceId, isMobile])
 
-  // Drag handlers (pointer events for touch + mouse)
-  const onPointerDown = useCallback((e: React.PointerEvent) => {
+  // Document-level move/up for reliable drag
+  useEffect(() => {
+    const onMove = (e: PointerEvent) => {
+      if (!dragState.current.active) return
+      e.preventDefault()
+      const delta = e.clientY - dragState.current.startY
+      const newH = Math.min(CHART_MAX_H, Math.max(CHART_MIN_H, dragState.current.startH + delta))
+      setChartH(newH)
+    }
+    const onUp = (e: PointerEvent) => {
+      if (!dragState.current.active) return
+      dragState.current.active = false
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+      const delta = e.clientY - dragState.current.startY
+      const finalH = Math.min(CHART_MAX_H, Math.max(CHART_MIN_H, dragState.current.startH + delta))
+      setChartH(finalH)
+      persistHeight(finalH)
+    }
+    document.addEventListener('pointermove', onMove)
+    document.addEventListener('pointerup', onUp)
+    return () => {
+      document.removeEventListener('pointermove', onMove)
+      document.removeEventListener('pointerup', onUp)
+    }
+  }, [persistHeight])
+
+  const onHandleDown = useCallback((e: React.PointerEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    dragging.current = true
-    startY.current = e.clientY
-    startH.current = chartH
-    ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+    dragState.current = { active: true, startY: e.clientY, startH: chartH }
+    document.body.style.cursor = 'ns-resize'
+    document.body.style.userSelect = 'none'
   }, [chartH])
-
-  const onPointerMove = useCallback((e: React.PointerEvent) => {
-    if (!dragging.current) return
-    const delta = e.clientY - startY.current
-    const newH = Math.min(CHART_MAX_H, Math.max(CHART_MIN_H, startH.current + delta))
-    setChartH(newH)
-  }, [])
-
-  const onPointerUp = useCallback((e: React.PointerEvent) => {
-    if (!dragging.current) return
-    dragging.current = false
-    ;(e.target as HTMLElement).releasePointerCapture(e.pointerId)
-    const delta = e.clientY - startY.current
-    const finalH = Math.min(CHART_MAX_H, Math.max(CHART_MIN_H, startH.current + delta))
-    setChartH(finalH)
-    persistHeight(finalH)
-  }, [persistHeight])
 
   // Listen for window resize → reset to default on mobile
   useEffect(() => {
@@ -502,7 +508,7 @@ function TrendSparkline({ readings, sendIntervalSec, thresholds, deviceId }: { r
       <div
         ref={containerRef}
         className="w-full rounded-lg bg-gradient-to-b from-muted/30 to-muted/5 overflow-hidden border border-border/20 relative select-none"
-        style={{ height: `${chartH}px`, transition: dragging.current ? 'none' : 'height 0.2s ease' }}
+        style={{ height: `${chartH}px`, transition: dragState.current.active ? 'none' : 'height 0.2s ease' }}
       >
         <svg
           viewBox={`0 0 ${width} ${height}`}
@@ -610,16 +616,14 @@ function TrendSparkline({ readings, sendIntervalSec, thresholds, deviceId }: { r
           )}
         </svg>
 
-        {/* Resize handle */}
+        {/* Resize handle — barra inferior completa */}
         {!isMobile && (
           <div
-            className="absolute bottom-0 right-0 w-6 h-6 flex items-center justify-center cursor-ns-resize rounded-tl-md bg-muted/40 hover:bg-muted/70 transition-colors touch-none"
+            className="absolute bottom-0 left-0 right-0 h-3 flex items-center justify-center cursor-ns-resize bg-gradient-to-t from-muted/60 to-transparent hover:from-muted/90 transition-colors touch-none group"
             title="Arrastrar para redimensionar"
-            onPointerDown={onPointerDown}
-            onPointerMove={onPointerMove}
-            onPointerUp={onPointerUp}
+            onPointerDown={onHandleDown}
           >
-            <GripVertical className="h-3 w-3 text-muted-foreground/60" />
+            <div className="w-10 h-1 rounded-full bg-muted-foreground/30 group-hover:bg-muted-foreground/60 transition-colors" />
           </div>
         )}
       </div>
