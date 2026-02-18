@@ -7,6 +7,13 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.42] - 2026-02-17
+### Bugfix
+- **Ajuste de tamaño del monitor usable**: se agregaron controles explícitos `Alto -`, `Alto +` y `Reset` en la cabecera de Tendencia para ajustar el alto sin depender del drag.
+- **Persistencia por sensor**: los cambios de altura quedan guardados por `deviceId` y se restauran al volver.
+- **Actualización de curva en vivo**: el chart ahora inyecta la última telemetría de `devices/{deviceId}/telemetry` cuando viene más nueva que `readings`, evitando la sensación de gráfico “congelado”.
+- **Suscripción estable de readings**: se evita re-suscribir en cada tick de `devices` si no cambió el conjunto de equipos asignados.
+
 ## [2.48.41] - 2026-02-17
 ### Bugfix
 - **Resize drag funcional**: migrado de pointer capture (fallaba con elementos pequeños) a document-level `pointermove`/`pointerup` listeners. Ahora se puede arrastrar fluido incluso moviendo el mouse rápido fuera del handle.

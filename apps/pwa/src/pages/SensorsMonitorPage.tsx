@@ -192,7 +192,19 @@ function getStoredChartHeight(deviceId: string): number {
   return CHART_DEFAULT_H
 }
 
-function TrendSparkline({ readings, sendIntervalSec, thresholds, deviceId }: { readings?: SensorReading[]; sendIntervalSec?: number; thresholds?: SensorThresholds; deviceId: string }) {
+function TrendSparkline({
+  readings,
+  sendIntervalSec,
+  thresholds,
+  deviceId,
+  latestTelemetry,
+}: {
+  readings?: SensorReading[]
+  sendIntervalSec?: number
+  thresholds?: SensorThresholds
+  deviceId: string
+  latestTelemetry?: { timestamp?: number; temperature?: number; humidity?: number }
+}) {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null)
   const [nowMs, setNowMs] = useState(() => Date.now())
   const [windowStart, setWindowStart] = useState(0)
@@ -262,11 +274,31 @@ function TrendSparkline({ readings, sendIntervalSec, thresholds, deviceId }: { r
   }, [deviceId])
 
   const normalizedReadings = useMemo(() => {
-    if (!readings) return []
-    return readings.filter(
+    const base = (readings ?? []).filter(
       (r) => Number.isFinite(r.timestamp) && Number.isFinite(r.temperature) && Number.isFinite(r.humidity)
     )
-  }, [readings])
+
+    const liveTs = Number(latestTelemetry?.timestamp)
+    const liveTemp = Number(latestTelemetry?.temperature)
+    const liveHum = Number(latestTelemetry?.humidity)
+    const hasLive = Number.isFinite(liveTs) && Number.isFinite(liveTemp) && Number.isFinite(liveHum)
+
+    if (!hasLive) return base
+
+    const sorted = [...base].sort((a, b) => a.timestamp - b.timestamp)
+    const lastTs = sorted[sorted.length - 1]?.timestamp ?? -Infinity
+
+    if (liveTs > lastTs) {
+      sorted.push({
+        timestamp: liveTs,
+        temperature: liveTemp,
+        humidity: liveHum,
+        source: 'live-telemetry',
+      })
+    }
+
+    return sorted
+  }, [readings, latestTelemetry])
 
   useEffect(() => {
     if (!sendIntervalSec || sendIntervalSec <= 0) return
@@ -498,6 +530,42 @@ function TrendSparkline({ readings, sendIntervalSec, thresholds, deviceId }: { r
               Umbrales
             </label>
           )}
+          {!isMobile && (
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  const next = Math.max(CHART_MIN_H, chartH - 24)
+                  setChartH(next)
+                  persistHeight(next)
+                }}
+                className="h-6 rounded border border-border/50 bg-background/60 px-1.5 text-[10px] text-muted-foreground hover:text-foreground"
+              >
+                Alto -
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const next = Math.min(CHART_MAX_H, chartH + 24)
+                  setChartH(next)
+                  persistHeight(next)
+                }}
+                className="h-6 rounded border border-border/50 bg-background/60 px-1.5 text-[10px] text-muted-foreground hover:text-foreground"
+              >
+                Alto +
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setChartH(CHART_DEFAULT_H)
+                  persistHeight(CHART_DEFAULT_H)
+                }}
+                className="h-6 rounded border border-border/50 bg-background/60 px-1.5 text-[10px] text-muted-foreground hover:text-foreground"
+              >
+                Reset
+              </button>
+            </div>
+          )}
         </div>
         <span className="text-[11px] text-muted-foreground tabular-nums">
           {visibleReadings.length}/{normalizedReadings.length} muestras
@@ -690,6 +758,11 @@ function DeviceCard({ device, equipmentById, readingsByEquipment, panelNowMs, na
   const area = getAreaLabel(assignedEquipment)
   const trendReadings = device.assignedEquipmentId ? readingsByEquipment[device.assignedEquipmentId] : undefined
   const isFresh = isDeviceFresh(device, panelNowMs)
+  const liveTelemetry = {
+    timestamp: Math.max(device.telemetry?.temperatura?.timestamp ?? 0, device.telemetry?.humedad?.timestamp ?? 0),
+    temperature: device.telemetry?.temperatura?.value,
+    humidity: device.telemetry?.humedad?.value,
+  }
 
   return (
     <Card className={`border-l-4 ${
@@ -762,7 +835,13 @@ function DeviceCard({ device, equipmentById, readingsByEquipment, panelNowMs, na
           </div>
         </div>
 
-        <TrendSparkline readings={trendReadings} sendIntervalSec={device.sendInterval} thresholds={device.thresholds} deviceId={device.deviceId} />
+        <TrendSparkline
+          readings={trendReadings}
+          sendIntervalSec={device.sendInterval}
+          thresholds={device.thresholds}
+          deviceId={device.deviceId}
+          latestTelemetry={liveTelemetry}
+        />
 
         {/* Editor de umbrales (solo admin) */}
         {isAdmin && (
@@ -866,6 +945,11 @@ export function SensorsMonitorPage() {
     return [...new Set(devices.map((device) => device.assignedEquipmentId).filter(Boolean) as string[])].sort()
   }, [devices])
 
+  const assignedEquipmentIdsKey = useMemo(
+    () => assignedEquipmentIds.join('|'),
+    [assignedEquipmentIds]
+  )
+
   useEffect(() => {
     if (!assignedEquipmentIds.length) {
       setReadingsByEquipment({})
@@ -902,7 +986,7 @@ export function SensorsMonitorPage() {
     return () => {
       for (const unsub of unsubs) unsub()
     }
-  }, [assignedEquipmentIds])
+  }, [assignedEquipmentIdsKey])
 
   const equipmentById = useMemo(
     () => new Map(equipment.map((item) => [item.id, item])),
