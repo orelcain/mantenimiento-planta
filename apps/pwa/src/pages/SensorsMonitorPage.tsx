@@ -758,6 +758,20 @@ function DeviceCard({ device, equipmentById, readingsByEquipment, panelNowMs, na
   const area = getAreaLabel(assignedEquipment)
   const trendReadings = device.assignedEquipmentId ? readingsByEquipment[device.assignedEquipmentId] : undefined
   const isFresh = isDeviceFresh(device, panelNowMs)
+  const latestReading = trendReadings && trendReadings.length > 0 ? trendReadings[trendReadings.length - 1] : undefined
+  const telemetryTempTs = device.telemetry?.temperatura?.timestamp ?? 0
+  const telemetryHumTs = device.telemetry?.humedad?.timestamp ?? 0
+  const readingTs = latestReading?.timestamp ?? 0
+  const tempFromTelemetry = telemetryTempTs >= readingTs
+  const humFromTelemetry = telemetryHumTs >= readingTs
+  const currentTemp = tempFromTelemetry ? device.telemetry?.temperatura?.value : latestReading?.temperature
+  const currentHum = humFromTelemetry ? device.telemetry?.humedad?.value : latestReading?.humidity
+  const lastUpdateTs = Math.max(
+    device.lastSeen ?? 0,
+    telemetryTempTs,
+    telemetryHumTs,
+    readingTs,
+  )
   const liveTelemetry = {
     timestamp: Math.max(device.telemetry?.temperatura?.timestamp ?? 0, device.telemetry?.humedad?.timestamp ?? 0),
     temperature: device.telemetry?.temperatura?.value,
@@ -820,7 +834,7 @@ function DeviceCard({ device, equipmentById, readingsByEquipment, panelNowMs, na
               <Thermometer className="h-3.5 w-3.5" />Temperatura
             </div>
             <div className="text-lg font-bold text-orange-400">
-              {device.telemetry?.temperatura?.value?.toFixed(1) ?? '—'}
+              {currentTemp?.toFixed(1) ?? '—'}
               <span className="text-sm font-normal ml-0.5">{device.telemetry?.temperatura?.unit ?? '°C'}</span>
             </div>
           </div>
@@ -829,7 +843,7 @@ function DeviceCard({ device, equipmentById, readingsByEquipment, panelNowMs, na
               <Droplets className="h-3.5 w-3.5" />Humedad
             </div>
             <div className="text-lg font-bold text-cyan-400">
-              {device.telemetry?.humedad?.value?.toFixed(1) ?? '—'}
+              {currentHum?.toFixed(1) ?? '—'}
               <span className="text-sm font-normal ml-0.5">{device.telemetry?.humedad?.unit ?? '%'}</span>
             </div>
           </div>
@@ -864,7 +878,7 @@ function DeviceCard({ device, equipmentById, readingsByEquipment, panelNowMs, na
 
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <span>Última actualización</span>
-          <span>{formatDateTime(device.lastSeen)}</span>
+          <span>{formatDateTime(lastUpdateTs || undefined)}</span>
         </div>
 
         {alert !== 'normal' && (

@@ -7,6 +7,11 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.43] - 2026-02-17
+### Bugfix
+- **Valores de sensores vuelven a actualizarse en tarjeta**: Temperatura/Humedad ahora toman la fuente más reciente entre `devices/{deviceId}/telemetry` y la última lectura en `sensors/{equipmentId}/readings`.
+- **Última actualización real**: se calcula con el timestamp más nuevo entre `lastSeen`, telemetría de temperatura/humedad y última lectura histórica.
+
 ## [2.48.42] - 2026-02-17
 ### Bugfix
 - **Ajuste de tamaño del monitor usable**: se agregaron controles explícitos `Alto -`, `Alto +` y `Reset` en la cabecera de Tendencia para ajustar el alto sin depender del drag.
