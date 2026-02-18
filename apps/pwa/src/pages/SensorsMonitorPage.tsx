@@ -467,29 +467,16 @@ function TrendSparkline({
     setHoverIndex(nearestIdx)
   }
 
-  const handleWheel: React.WheelEventHandler<SVGSVGElement> = (event) => {
+  const applyZoom = (direction: 'in' | 'out') => {
     const total = timeFilteredReadings.length
     if (total <= 8) return
-    event.preventDefault()
 
     const currentSize = effectiveWindowSize
     const currentStart = effectiveWindowStart
 
-    if (event.shiftKey) {
-      const panStep = Math.max(1, Math.round(currentSize * 0.22))
-      const nextStart = event.deltaY > 0 ? currentStart + panStep : currentStart - panStep
-      setWindowStart(Math.max(0, Math.min(total - currentSize, nextStart)))
-      return
-    }
-
-    const rect = event.currentTarget.getBoundingClientRect()
-    const relative = rect.width > 0 ? Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)) : 0.5
-    const cursorIndex = Math.round(relative * Math.max(1, currentSize - 1))
-    const cursorGlobalIndex = currentStart + cursorIndex
-
-    const zoomStep = Math.max(1, Math.round(total * 0.16))
+    const zoomStep = Math.max(1, Math.round(total * 0.1))
     const minWindow = Math.min(8, total)
-    const nextSize = event.deltaY > 0
+    const nextSize = direction === 'out'
       ? Math.min(total, currentSize + zoomStep)
       : Math.max(minWindow, currentSize - zoomStep)
 
@@ -499,8 +486,8 @@ function TrendSparkline({
       return
     }
 
-    const ratio = currentSize > 1 ? cursorIndex / (currentSize - 1) : 0.5
-    const nextStart = Math.round(cursorGlobalIndex - ratio * Math.max(1, nextSize - 1))
+    const center = currentStart + currentSize / 2
+    const nextStart = Math.round(center - nextSize / 2)
 
     setWindowSize(nextSize)
     setWindowStart(Math.max(0, Math.min(total - nextSize, nextStart)))
@@ -623,6 +610,22 @@ function TrendSparkline({
             <option value="1000">1000 pts</option>
             <option value="all">Todo</option>
           </select>
+          <button
+            type="button"
+            onClick={() => applyZoom('in')}
+            className="h-6 rounded border border-border/50 bg-background/60 px-1.5 text-[10px] text-muted-foreground hover:text-foreground"
+            title="Acercar"
+          >
+            Zoom +
+          </button>
+          <button
+            type="button"
+            onClick={() => applyZoom('out')}
+            className="h-6 rounded border border-border/50 bg-background/60 px-1.5 text-[10px] text-muted-foreground hover:text-foreground"
+            title="Alejar"
+          >
+            Zoom -
+          </button>
           <select
             value={timeFilterPreset}
             onChange={(e) => setTimeFilterPreset(e.target.value as 'all' | '15' | '60' | '240' | '1440' | 'custom')}
@@ -723,7 +726,6 @@ function TrendSparkline({
           className="h-full w-full"
           onMouseMove={handleMouseMove}
           onMouseLeave={() => setHoverIndex(null)}
-          onWheel={handleWheel}
         >
           {/* Gradientes para relleno de área */}
           <defs>

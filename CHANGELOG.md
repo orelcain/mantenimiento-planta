@@ -7,6 +7,11 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.50] - 2026-02-17
+### UX
+- Se desactiva zoom con rueda del mouse en el gráfico de tendencia (comportamiento agresivo).
+- Se agregan controles explícitos **Zoom +** y **Zoom -** para ajustar la ventana de forma suave y predecible.
+
 ## [2.48.49] - 2026-02-17
 ### UX
 - Botón **Último** en el monitor de tendencia para saltar al extremo más reciente de la línea de tiempo al navegar historial/scroll.
