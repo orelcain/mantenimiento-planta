@@ -7,6 +7,14 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.45] - 2026-02-17
+### Bugfix
+- **Online falso corregido**: el estado del dispositivo ahora exige timestamp reciente (`lastSeen`/telemetry) y no confía ciegamente en `online=true` cuando quedó pegado.
+- Evita mostrar Online cuando los datos están congelados; mejora diagnóstico de sensores detenidos.
+
+### Diagnóstico operativo
+- Se verificó en RTDB que el dispositivo `58650D71FE68` tiene `lastSeen`/telemetry en `1771367805xxx` (19:36 local), por eso no aparecen nuevas lecturas en panel.
+
 ## [2.48.44] - 2026-02-17
 ### Bugfix
 - **Anti-congelamiento de lecturas**: agregado fallback de sondeo cada 8s (`fetchLastSensorReadings`) para refrescar valores si la suscripción RTDB en tiempo real se queda sin eventos.

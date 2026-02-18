@@ -38,18 +38,28 @@ function getTelemetryAlert(device: DeviceRow): 'normal' | 'warning' | 'critical'
 }
 
 function isDeviceFresh(device: DeviceRow, nowMs: number): boolean {
-  // Si Firebase RTDB dice online, confiar
-  if (device.online === true) return true
-
   const lastSeen = device.lastSeen
-  if (!lastSeen || !Number.isFinite(lastSeen)) return false
+  const tempTs = device.telemetry?.temperatura?.timestamp
+  const humTs = device.telemetry?.humedad?.timestamp
 
-  // Normalizar: si está en segundos, convertir a ms
-  const lastSeenMs = lastSeen > 0 && lastSeen < 1e12 ? lastSeen * 1000 : lastSeen
+  const norm = (ts?: number) => {
+    if (!ts || !Number.isFinite(ts)) return 0
+    return ts > 0 && ts < 1e12 ? ts * 1000 : ts
+  }
+
+  const freshestTs = Math.max(norm(lastSeen), norm(tempTs), norm(humTs))
+  if (freshestTs <= 0) return false
+
   const intervalSec = device.sendInterval && device.sendInterval > 0 ? device.sendInterval : 10
   // Ventana de frescura: 10× intervalo o mínimo 120 s
   const freshnessWindowMs = Math.max(intervalSec * 10 * 1000, 120_000)
-  return nowMs - lastSeenMs <= freshnessWindowMs
+
+  // Aceptar online=true solo si además hay señal reciente.
+  if (device.online === true) {
+    return nowMs - freshestTs <= freshnessWindowMs
+  }
+
+  return nowMs - freshestTs <= freshnessWindowMs
 }
 
 function buildSparklineCoordinates(values: number[], width: number, height: number, padding: number, fixedMin?: number, fixedMax?: number) {
