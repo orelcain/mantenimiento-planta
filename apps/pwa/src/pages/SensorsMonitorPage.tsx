@@ -480,8 +480,8 @@ function TrendSparkline({
         emphasis: {
           handleStyle: { color: '#6366f1', borderColor: '#818cf8' }
         }
-      }
-    ],
+      } as any
+    ] as any,
     series: [
       ...(showTemp ? [{
         name: 'Temperatura',
