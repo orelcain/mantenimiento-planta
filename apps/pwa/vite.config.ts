@@ -26,6 +26,7 @@ export default defineConfig({
           vendor: ['react', 'react-dom', 'react-router-dom'],
           firebase: ['firebase/app', 'firebase/auth', 'firebase/firestore', 'firebase/storage'],
           ui: ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-select'],
+          echarts: ['echarts', 'echarts-for-react'],
           // Three.js se carga dinámicamente via lazy import de Visor3D (~1MB)
         }
       }

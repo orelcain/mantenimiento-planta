@@ -7,6 +7,20 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.51] - 2026-02-19
+### Feature
+- **Migración a Apache ECharts**: Reemplazo completo del gráfico SVG custom por [Apache ECharts](https://echarts.apache.org/).
+  - Zoom y pan nativos con `dataZoom` (slider inferior + arrastre dentro del gráfico).
+  - Tooltip interactivo tipo crosshair con timestamp + valores de temperatura/humedad.
+  - MarkArea y MarkLine para visualizar zonas de alerta (normal, advertencia, crítico).
+  - Doble eje Y (°C izquierda, % derecha) en modo dual.
+  - Rendimiento superior con grandes volúmenes de datos (5000+ puntos).
+- Chunk de ECharts separado en build (code-splitting), reduce tamaño del bundle de SensorsMonitorPage de ~1.1 MB a ~27 KB.
+
+### Removido
+- Se elimina la implementación SVG custom (`buildTimeSeriesCoordinates`, `valueToY`, tooltip manual, zoom buttons, scroll slider).
+- Se simplifican los controles de la barra superior (el propio ECharts gestiona zoom/pan/scroll).
+
 ## [2.48.50] - 2026-02-17
 ### UX
 - Se desactiva zoom con rueda del mouse en el gráfico de tendencia (comportamiento agresivo).

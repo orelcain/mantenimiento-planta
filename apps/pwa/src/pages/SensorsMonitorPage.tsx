@@ -7,6 +7,8 @@ import { getEquipments } from '@/services/equipment'
 import { subscribeDevices, updateDeviceThresholds, type DeviceRow, type SensorThresholds } from '@/services/devicesRtdb'
 import { subscribeSensorReadings, fetchLastSensorReadings, type SensorReading } from '@/services/sensorsRtdb'
 import type { Equipment } from '@/types'
+import ReactECharts from 'echarts-for-react'
+import type { EChartsOption } from 'echarts'
 
 function formatDateTime(timestamp?: number): string {
   if (!timestamp || !Number.isFinite(timestamp)) return '—'
@@ -60,39 +62,6 @@ function isDeviceFresh(device: DeviceRow, nowMs: number): boolean {
   }
 
   return nowMs - freshestTs <= freshnessWindowMs
-}
-
-function buildTimeSeriesCoordinates(
-  readings: SensorReading[],
-  width: number,
-  height: number,
-  padding: number,
-  valueSelector: (reading: SensorReading) => number,
-  fixedMin?: number,
-  fixedMax?: number,
-) {
-  if (readings.length < 2) return []
-
-  const values = readings.map(valueSelector)
-  const min = fixedMin ?? Math.min(...values)
-  const max = fixedMax ?? Math.max(...values)
-  const range = Math.max(1e-9, max - min)
-
-  const tMin = readings[0]!.timestamp
-  const tMax = readings[readings.length - 1]!.timestamp
-  const tRange = Math.max(1, tMax - tMin)
-
-  return readings.map((reading) => {
-    const x = padding + ((reading.timestamp - tMin) / tRange) * (width - padding * 2)
-    const y = height - padding - ((valueSelector(reading) - min) / range) * (height - padding * 2)
-    return { x, y }
-  })
-}
-
-/** Convierte un valor numérico a coordenada Y en el SVG */
-function valueToY(value: number, min: number, max: number, height: number, padding: number): number {
-  const range = Math.max(1e-9, max - min)
-  return height - padding - ((value - min) / range) * (height - padding * 2)
 }
 
 // Umbrales por defecto (sincronizados con firmware ESP32)
@@ -226,11 +195,7 @@ function TrendSparkline({
   thresholds?: SensorThresholds
   deviceId: string
 }) {
-  const [hoverIndex, setHoverIndex] = useState<number | null>(null)
   const [nowMs, setNowMs] = useState(() => Date.now())
-  const [windowStart, setWindowStart] = useState(0)
-  const [windowSize, setWindowSize] = useState(0)
-  const [windowPreset, setWindowPreset] = useState<'all' | '100' | '360' | '1000'>('100')
   const [timeFilterPreset, setTimeFilterPreset] = useState<'all' | '15' | '60' | '240' | '1440' | 'custom'>('all')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
@@ -243,7 +208,6 @@ function TrendSparkline({
   const containerRef = useRef<HTMLDivElement>(null)
   const dragState = useRef<{ active: boolean; startY: number; startH: number }>({ active: false, startY: 0, startH: 0 })
 
-  // Persist on change (debounced)
   const persistTimer = useRef<ReturnType<typeof setTimeout>>()
   const persistHeight = useCallback((h: number) => {
     if (isMobile) return
@@ -253,7 +217,6 @@ function TrendSparkline({
     }, 300)
   }, [deviceId, isMobile])
 
-  // Document-level move/up for reliable drag
   useEffect(() => {
     const onMove = (e: PointerEvent) => {
       if (!dragState.current.active) return
@@ -288,7 +251,6 @@ function TrendSparkline({
     document.body.style.userSelect = 'none'
   }, [chartH])
 
-  // Listen for window resize → reset to default on mobile
   useEffect(() => {
     const onResize = () => {
       if (window.innerWidth < 640) setChartH(CHART_DEFAULT_H)
@@ -324,26 +286,6 @@ function TrendSparkline({
   }, [normalizedReadings, timeFilterPreset, customFrom, customTo, nowMs])
 
   useEffect(() => {
-    const total = timeFilteredReadings.length
-    if (total <= 0) {
-      setWindowSize(0)
-      setWindowStart(0)
-      return
-    }
-
-    if (windowPreset === 'all') {
-      setWindowSize(0)
-      setWindowStart(0)
-      return
-    }
-
-    const presetSize = Number.parseInt(windowPreset, 10)
-    const bounded = Math.min(Math.max(8, presetSize), total)
-    setWindowSize(bounded)
-    setWindowStart(Math.max(0, total - bounded))
-  }, [windowPreset, timeFilteredReadings.length])
-
-  useEffect(() => {
     if (!sendIntervalSec || sendIntervalSec <= 0) return
     const timer = window.setInterval(() => setNowMs(Date.now()), 1000)
     return () => window.clearInterval(timer)
@@ -357,222 +299,193 @@ function TrendSparkline({
     )
   }
 
-  // Dimensiones SVG — se adaptan al alto del contenedor
-  const width = 400
-  const svgAspect = width / Math.max(chartH, CHART_MIN_H)
-  const height = Math.round(chartH * svgAspect)  // proporcional
-  const padding = chartMode === 'dual' ? 8 : 20
   const th = resolveThresholds(thresholds)
-
-  const effectiveWindowSize = windowSize > 0 ? Math.min(windowSize, timeFilteredReadings.length) : timeFilteredReadings.length
-  const maxStart = Math.max(0, timeFilteredReadings.length - effectiveWindowSize)
-  const effectiveWindowStart = Math.min(windowStart, maxStart)
-  const visibleReadings = timeFilteredReadings.slice(effectiveWindowStart, effectiveWindowStart + effectiveWindowSize)
-  const canJumpToLatest = maxStart > 0 && effectiveWindowStart < maxStart
-
-  const tempValues = visibleReadings.map((r) => r.temperature)
-  const humValues = visibleReadings.map((r) => r.humidity)
-
-  if (tempValues.length < 2 || humValues.length < 2) {
-    return (
-      <div className="rounded-md border p-2 text-xs text-muted-foreground">
-        Sin histórico suficiente para graficar cambios.
-      </div>
-    )
-  }
-
-  // Para modos individuales, incluir los umbrales en el rango para que se vean las zonas completas
-  const computeRange = (values: number[], _wL: number, _wH: number, cL: number, cH: number) => {
-    const dataMin = Math.min(...values)
-    const dataMax = Math.max(...values)
-    if (!showThresholds) return { min: dataMin, max: dataMax }
-    const rangeMin = Math.min(dataMin, cL - 2)
-    const rangeMax = Math.max(dataMax, cH + 2)
-    return { min: rangeMin, max: rangeMax }
-  }
-
-  // Coords para cada modo
   const showTemp = chartMode === 'dual' || chartMode === 'temperature'
   const showHum = chartMode === 'dual' || chartMode === 'humidity'
 
-  let tempCoords: ReturnType<typeof buildTimeSeriesCoordinates> = []
-  let humCoords: ReturnType<typeof buildTimeSeriesCoordinates> = []
-  let tempRange = { min: 0, max: 1 }
-  let humRange = { min: 0, max: 1 }
+  const tempData = timeFilteredReadings.map(r => [r.timestamp, r.temperature])
+  const humData = timeFilteredReadings.map(r => [r.timestamp, r.humidity])
 
-  if (chartMode === 'dual') {
-    tempCoords = buildTimeSeriesCoordinates(visibleReadings, width, height, padding, (r) => r.temperature)
-    humCoords = buildTimeSeriesCoordinates(visibleReadings, width, height, padding, (r) => r.humidity)
-  } else if (chartMode === 'temperature') {
-    tempRange = computeRange(tempValues, th.tempWarnLow, th.tempWarnHigh, th.tempCritLow, th.tempCritHigh)
-    tempCoords = buildTimeSeriesCoordinates(visibleReadings, width, height, padding, (r) => r.temperature, tempRange.min, tempRange.max)
-  } else {
-    humRange = computeRange(humValues, th.humWarnLow, th.humWarnHigh, th.humCritLow, th.humCritHigh)
-    humCoords = buildTimeSeriesCoordinates(visibleReadings, width, height, padding, (r) => r.humidity, humRange.min, humRange.max)
+  const markAreaTemp = showThresholds && chartMode === 'temperature' ? {
+    silent: true,
+    data: [
+      [{ yAxis: th.tempCritHigh, itemStyle: { color: 'rgba(239, 68, 68, 0.15)' } }, { yAxis: 'max' }],
+      [{ yAxis: th.tempWarnHigh, itemStyle: { color: 'rgba(245, 158, 11, 0.12)' } }, { yAxis: th.tempCritHigh }],
+      [{ yAxis: th.tempWarnLow, itemStyle: { color: 'rgba(34, 197, 94, 0.08)' } }, { yAxis: th.tempWarnHigh }],
+      [{ yAxis: th.tempCritLow, itemStyle: { color: 'rgba(245, 158, 11, 0.12)' } }, { yAxis: th.tempWarnLow }],
+      [{ yAxis: 'min', itemStyle: { color: 'rgba(239, 68, 68, 0.15)' } }, { yAxis: th.tempCritLow }]
+    ]
+  } : undefined
+
+  const markLineTemp = showThresholds && chartMode === 'temperature' ? {
+    silent: true,
+    symbol: 'none',
+    lineStyle: { type: 'dashed', width: 1 },
+    data: [
+      { yAxis: th.tempCritHigh, lineStyle: { color: '#ef4444' }, label: { formatter: '{c}°', position: 'insideStartBottom', color: '#ef4444' } },
+      { yAxis: th.tempWarnHigh, lineStyle: { color: '#f59e0b' }, label: { formatter: '{c}°', position: 'insideStartBottom', color: '#f59e0b' } },
+      { yAxis: th.tempWarnLow, lineStyle: { color: '#f59e0b' }, label: { formatter: '{c}°', position: 'insideStartTop', color: '#f59e0b' } },
+      { yAxis: th.tempCritLow, lineStyle: { color: '#ef4444' }, label: { formatter: '{c}°', position: 'insideStartTop', color: '#ef4444' } }
+    ]
+  } : undefined
+
+  const markAreaHum = showThresholds && chartMode === 'humidity' ? {
+    silent: true,
+    data: [
+      [{ yAxis: th.humCritHigh, itemStyle: { color: 'rgba(59, 130, 246, 0.15)' } }, { yAxis: 'max' }],
+      [{ yAxis: th.humWarnHigh, itemStyle: { color: 'rgba(6, 182, 212, 0.12)' } }, { yAxis: th.humCritHigh }],
+      [{ yAxis: th.humWarnLow, itemStyle: { color: 'rgba(34, 197, 94, 0.08)' } }, { yAxis: th.humWarnHigh }],
+      [{ yAxis: th.humCritLow, itemStyle: { color: 'rgba(6, 182, 212, 0.12)' } }, { yAxis: th.humWarnLow }],
+      [{ yAxis: 'min', itemStyle: { color: 'rgba(59, 130, 246, 0.15)' } }, { yAxis: th.humCritLow }]
+    ]
+  } : undefined
+
+  const markLineHum = showThresholds && chartMode === 'humidity' ? {
+    silent: true,
+    symbol: 'none',
+    lineStyle: { type: 'dashed', width: 1 },
+    data: [
+      { yAxis: th.humCritHigh, lineStyle: { color: '#3b82f6' }, label: { formatter: '{c}%', position: 'insideStartBottom', color: '#3b82f6' } },
+      { yAxis: th.humWarnHigh, lineStyle: { color: '#06b6d4' }, label: { formatter: '{c}%', position: 'insideStartBottom', color: '#06b6d4' } },
+      { yAxis: th.humWarnLow, lineStyle: { color: '#06b6d4' }, label: { formatter: '{c}%', position: 'insideStartTop', color: '#06b6d4' } },
+      { yAxis: th.humCritLow, lineStyle: { color: '#3b82f6' }, label: { formatter: '{c}%', position: 'insideStartTop', color: '#3b82f6' } }
+    ]
+  } : undefined
+
+  const option: EChartsOption = {
+    animation: false,
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'cross', crossStyle: { color: '#94a3b8', type: 'dashed' } },
+      backgroundColor: 'rgba(15, 23, 42, 0.9)',
+      borderColor: 'rgba(255, 255, 255, 0.1)',
+      textStyle: { color: '#f8fafc', fontSize: 11 },
+      formatter: (params: any) => {
+        if (!params || !params.length) return ''
+        const date = new Date(params[0].value[0])
+        const timeStr = date.toLocaleString('es-ES', {
+          day: '2-digit', month: '2-digit', year: 'numeric',
+          hour: '2-digit', minute: '2-digit', second: '2-digit'
+        })
+        let res = `<div style="margin-bottom:4px;color:#94a3b8">${timeStr}</div>`
+        params.forEach((p: any) => {
+          const color = p.color
+          const unit = p.seriesName === 'Temperatura' ? '°C' : '%'
+          res += `<div style="display:flex;align-items:center;gap:6px;margin-top:2px">
+            <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background-color:${color}"></span>
+            <span class="text-muted-foreground">${p.seriesName}:</span>
+            <span class="font-bold" style="color:${color}">${p.value[1].toFixed(1)} ${unit}</span>
+          </div>`
+        })
+        return res
+      }
+    },
+    grid: {
+      top: 20,
+      right: chartMode === 'dual' ? 40 : 20,
+      bottom: 20,
+      left: 40,
+      containLabel: true
+    },
+    xAxis: {
+      type: 'time',
+      splitLine: { show: true, lineStyle: { color: 'rgba(255, 255, 255, 0.05)' } },
+      axisLabel: { color: '#94a3b8', fontSize: 10 },
+      axisLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.1)' } }
+    },
+    yAxis: [
+      {
+        type: 'value',
+        name: showTemp ? '°C' : '',
+        nameTextStyle: { color: '#f97316', fontSize: 10, align: 'right' },
+        position: 'left',
+        splitLine: { show: true, lineStyle: { color: 'rgba(255, 255, 255, 0.05)' } },
+        axisLabel: { color: '#94a3b8', fontSize: 10 },
+        min: chartMode === 'temperature' && showThresholds ? (value: any) => Math.min(value.min, th.tempCritLow - 2) : 'dataMin',
+        max: chartMode === 'temperature' && showThresholds ? (value: any) => Math.max(value.max, th.tempCritHigh + 2) : 'dataMax',
+        show: showTemp
+      },
+      {
+        type: 'value',
+        name: showHum ? '%' : '',
+        nameTextStyle: { color: '#06b6d4', fontSize: 10, align: 'left' },
+        position: 'right',
+        splitLine: { show: false },
+        axisLabel: { color: '#94a3b8', fontSize: 10 },
+        min: chartMode === 'humidity' && showThresholds ? (value: any) => Math.min(value.min, th.humCritLow - 2) : 'dataMin',
+        max: chartMode === 'humidity' && showThresholds ? (value: any) => Math.max(value.max, th.humCritHigh + 2) : 'dataMax',
+        show: showHum
+      }
+    ],
+    dataZoom: [
+      {
+        type: 'inside',
+        xAxisIndex: 0,
+        filterMode: 'none'
+      },
+      {
+        type: 'slider',
+        xAxisIndex: 0,
+        filterMode: 'none',
+        height: 20,
+        bottom: 0,
+        borderColor: 'transparent',
+        backgroundColor: 'rgba(255, 255, 255, 0.02)',
+        fillerColor: 'rgba(255, 255, 255, 0.1)',
+        handleStyle: { color: '#94a3b8' },
+        textStyle: { color: '#94a3b8' }
+      }
+    ],
+    series: [
+      ...(showTemp ? [{
+        name: 'Temperatura',
+        type: 'line',
+        data: tempData,
+        yAxisIndex: 0,
+        showSymbol: false,
+        itemStyle: { color: '#f97316' },
+        lineStyle: { width: 2 },
+        areaStyle: {
+          color: {
+            type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+            colorStops: [
+              { offset: 0, color: 'rgba(249, 115, 22, 0.35)' },
+              { offset: 1, color: 'rgba(249, 115, 22, 0.03)' }
+            ]
+          }
+        },
+        markArea: markAreaTemp,
+        markLine: markLineTemp
+      }] : []),
+      ...(showHum ? [{
+        name: 'Humedad',
+        type: 'line',
+        data: humData,
+        yAxisIndex: showTemp ? 1 : 0,
+        showSymbol: false,
+        itemStyle: { color: '#06b6d4' },
+        lineStyle: { width: 2 },
+        areaStyle: {
+          color: {
+            type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+            colorStops: [
+              { offset: 0, color: 'rgba(6, 182, 212, 0.2)' },
+              { offset: 1, color: 'rgba(6, 182, 212, 0.02)' }
+            ]
+          }
+        },
+        markArea: markAreaHum,
+        markLine: markLineHum
+      }] : [])
+    ]
   }
-
-  const xPositions = (() => {
-    if (visibleReadings.length < 2) return []
-    const tMin = visibleReadings[0]!.timestamp
-    const tMax = visibleReadings[visibleReadings.length - 1]!.timestamp
-    const tRange = Math.max(1, tMax - tMin)
-    return visibleReadings.map((reading) => padding + ((reading.timestamp - tMin) / tRange) * (width - padding * 2))
-  })()
-
-  const tempPoints = tempCoords.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')
-  const humPoints = humCoords.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')
-
-  const xGridStride = Math.max(1, Math.ceil(visibleReadings.length / 12))
-  const xGridIndices = visibleReadings
-    .map((_, idx) => idx)
-    .filter((idx) => idx % xGridStride === 0 || idx === visibleReadings.length - 1)
-
-  const yGridValues = (() => {
-    if (chartMode === 'dual') return [] as number[]
-    const range = chartMode === 'temperature' ? tempRange : humRange
-    const step = chartMode === 'temperature' ? 1 : 5
-    const start = Math.ceil(range.min / step) * step
-    const values: number[] = []
-    for (let value = start; value <= range.max; value += step) {
-      values.push(Number(value.toFixed(2)))
-    }
-    return values
-  })()
-
-  const selectedIndex = hoverIndex != null ? hoverIndex : visibleReadings.length - 1
-  const selectedReading = visibleReadings[selectedIndex]
-  const selectedTempPoint = tempCoords[selectedIndex]
-  const selectedHumPoint = humCoords[selectedIndex]
 
   const lastTs = timeFilteredReadings[timeFilteredReadings.length - 1]?.timestamp
   const nextUpdateTs = sendIntervalSec && lastTs ? lastTs + sendIntervalSec * 1000 : undefined
   const remainingSec = nextUpdateTs ? Math.max(0, Math.ceil((nextUpdateTs - nowMs) / 1000)) : undefined
 
-  const handleMouseMove: React.MouseEventHandler<SVGSVGElement> = (event) => {
-    const rect = event.currentTarget.getBoundingClientRect()
-    if (rect.width <= 0 || visibleReadings.length <= 1) return
-
-    const relative = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width))
-    const targetX = padding + relative * (width - padding * 2)
-
-    let nearestIdx = 0
-    let nearestDist = Number.POSITIVE_INFINITY
-    for (let i = 0; i < xPositions.length; i++) {
-      const dist = Math.abs(xPositions[i]! - targetX)
-      if (dist < nearestDist) {
-        nearestDist = dist
-        nearestIdx = i
-      }
-    }
-    setHoverIndex(nearestIdx)
-  }
-
-  const applyZoom = (direction: 'in' | 'out') => {
-    const total = timeFilteredReadings.length
-    if (total <= 8) return
-
-    const currentSize = effectiveWindowSize
-    const currentStart = effectiveWindowStart
-
-    const zoomStep = Math.max(1, Math.round(total * 0.1))
-    const minWindow = Math.min(8, total)
-    const nextSize = direction === 'out'
-      ? Math.min(total, currentSize + zoomStep)
-      : Math.max(minWindow, currentSize - zoomStep)
-
-    if (nextSize >= total) {
-      setWindowSize(0)
-      setWindowStart(0)
-      return
-    }
-
-    const center = currentStart + currentSize / 2
-    const nextStart = Math.round(center - nextSize / 2)
-
-    setWindowSize(nextSize)
-    setWindowStart(Math.max(0, Math.min(total - nextSize, nextStart)))
-  }
-
-  /** Renderiza zonas de alerta (rectángulos con relleno transparente) + líneas de umbral */
-  const renderThresholdZones = (
-    range: { min: number; max: number },
-    warnLow: number,
-    warnHigh: number,
-    critLow: number,
-    critHigh: number,
-    warnColor: string,
-    critColor: string,
-  ) => {
-    if (!showThresholds) return null
-    const rMin = range.min
-    const rMax = range.max
-    const toY = (v: number) => valueToY(Math.max(rMin, Math.min(rMax, v)), rMin, rMax, height, padding)
-
-    const yTop = padding
-    const yBot = height - padding
-    const x0 = padding
-    const x1 = width - padding
-
-    // Clamp to visible range
-    const yCritHigh = toY(critHigh)
-    const yWarnHigh = toY(warnHigh)
-    const yWarnLow = toY(warnLow)
-    const yCritLow = toY(critLow)
-
-    return (
-      <>
-        {/* Zona normal central: entre warnLow y warnHigh (verde) */}
-        <rect x={x0} y={yWarnHigh} width={x1 - x0} height={Math.max(0, yWarnLow - yWarnHigh)}
-          fill="#22c55e" fillOpacity="0.08" />
-        {/* Zona crítica superior: por encima de critHigh */}
-        {critHigh < rMax && (
-          <rect x={x0} y={yTop} width={x1 - x0} height={Math.max(0, yCritHigh - yTop)}
-            fill={critColor} fillOpacity="0.15" />
-        )}
-        {/* Zona warning superior: entre warnHigh y critHigh */}
-        {warnHigh < rMax && (
-          <rect x={x0} y={yCritHigh} width={x1 - x0} height={Math.max(0, yWarnHigh - yCritHigh)}
-            fill={warnColor} fillOpacity="0.12" />
-        )}
-        {/* Zona warning inferior: entre critLow y warnLow */}
-        {warnLow > rMin && (
-          <rect x={x0} y={yWarnLow} width={x1 - x0} height={Math.max(0, yCritLow - yWarnLow)}
-            fill={warnColor} fillOpacity="0.12" />
-        )}
-        {/* Zona crítica inferior: por debajo de critLow */}
-        {critLow > rMin && (
-          <rect x={x0} y={yCritLow} width={x1 - x0} height={Math.max(0, yBot - yCritLow)}
-            fill={critColor} fillOpacity="0.15" />
-        )}
-        {/* Líneas de umbral */}
-        <line x1={x0} x2={x1} y1={yCritHigh} y2={yCritHigh} stroke={critColor} strokeWidth="0.8" strokeDasharray="6 3" strokeOpacity="0.6" />
-        <line x1={x0} x2={x1} y1={yWarnHigh} y2={yWarnHigh} stroke={warnColor} strokeWidth="0.8" strokeDasharray="6 3" strokeOpacity="0.5" />
-        <line x1={x0} x2={x1} y1={yWarnLow} y2={yWarnLow} stroke={warnColor} strokeWidth="0.8" strokeDasharray="6 3" strokeOpacity="0.5" />
-        <line x1={x0} x2={x1} y1={yCritLow} y2={yCritLow} stroke={critColor} strokeWidth="0.8" strokeDasharray="6 3" strokeOpacity="0.6" />
-        {/* Etiquetas de umbral en eje Y izquierdo */}
-        <text x={x0 + 2} y={yCritHigh - 3} textAnchor="start" fontSize="8" fill={critColor} fillOpacity="0.9" fontWeight="500">
-          {critHigh}°
-        </text>
-        <text x={x0 + 2} y={yWarnHigh - 3} textAnchor="start" fontSize="8" fill={warnColor} fillOpacity="0.85" fontWeight="500">
-          {warnHigh}°
-        </text>
-        <text x={x0 + 2} y={yWarnLow + 11} textAnchor="start" fontSize="8" fill={warnColor} fillOpacity="0.85" fontWeight="500">
-          {warnLow}°
-        </text>
-        <text x={x0 + 2} y={yCritLow + 11} textAnchor="start" fontSize="8" fill={critColor} fillOpacity="0.9" fontWeight="500">
-          {critLow}°
-        </text>
-        {/* Etiqueta de zona normal */}
-        <text x={(x0 + x1) / 2} y={(yWarnHigh + yWarnLow) / 2 + 3} textAnchor="middle" fontSize="9" fill="#22c55e" fillOpacity="0.5" fontWeight="600">
-          NORMAL
-        </text>
-      </>
-    )
-  }
-
   return (
     <div className="rounded-xl border border-border/40 bg-card/30 p-3 space-y-2.5">
-      {/* Controles compactos */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2.5">
           <h4 className="text-xs font-semibold text-foreground tracking-wide">Tendencia</h4>
@@ -596,36 +509,6 @@ function TrendSparkline({
               Umbrales
             </label>
           )}
-          <select
-            value={windowPreset}
-            onChange={(e) => {
-              const preset = e.target.value as 'all' | '100' | '360' | '1000'
-              setWindowPreset(preset)
-            }}
-            className="h-6 rounded-md border border-border/50 bg-background/60 px-1.5 text-[11px] text-muted-foreground"
-            title="Ventana temporal"
-          >
-            <option value="100">100 pts</option>
-            <option value="360">360 pts</option>
-            <option value="1000">1000 pts</option>
-            <option value="all">Todo</option>
-          </select>
-          <button
-            type="button"
-            onClick={() => applyZoom('in')}
-            className="h-6 rounded border border-border/50 bg-background/60 px-1.5 text-[10px] text-muted-foreground hover:text-foreground"
-            title="Acercar"
-          >
-            Zoom +
-          </button>
-          <button
-            type="button"
-            onClick={() => applyZoom('out')}
-            className="h-6 rounded border border-border/50 bg-background/60 px-1.5 text-[10px] text-muted-foreground hover:text-foreground"
-            title="Alejar"
-          >
-            Zoom -
-          </button>
           <select
             value={timeFilterPreset}
             onChange={(e) => setTimeFilterPreset(e.target.value as 'all' | '15' | '60' | '240' | '1440' | 'custom')}
@@ -659,18 +542,6 @@ function TrendSparkline({
           )}
           {!isMobile && (
             <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                disabled={!canJumpToLatest}
-                onClick={() => {
-                  setWindowStart(maxStart)
-                  setHoverIndex(null)
-                }}
-                className="h-6 rounded border border-border/50 bg-background/60 px-1.5 text-[10px] text-muted-foreground hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed"
-                title="Ir al dato más reciente"
-              >
-                Último
-              </button>
               <button
                 type="button"
                 onClick={() => {
@@ -707,7 +578,7 @@ function TrendSparkline({
           )}
         </div>
         <span className="text-[11px] text-muted-foreground tabular-nums">
-          {visibleReadings.length}/{timeFilteredReadings.length} muestras
+          {timeFilteredReadings.length} muestras
           {timeFilteredReadings.length < normalizedReadings.length && (
             <span className="text-primary/70"> · filtradas de {normalizedReadings.length}</span>
           )}
@@ -720,181 +591,13 @@ function TrendSparkline({
         className="w-full rounded-lg bg-gradient-to-b from-muted/30 to-muted/5 overflow-hidden border border-border/20 relative select-none"
         style={{ height: `${chartH}px`, transition: dragState.current.active ? 'none' : 'height 0.2s ease' }}
       >
-        <svg
-          viewBox={`0 0 ${width} ${height}`}
-          preserveAspectRatio="xMidYMid meet"
-          className="h-full w-full"
-          onMouseMove={handleMouseMove}
-          onMouseLeave={() => setHoverIndex(null)}
-        >
-          {/* Gradientes para relleno de área */}
-          <defs>
-            <linearGradient id="tempAreaGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#f97316" stopOpacity="0.35" />
-              <stop offset="100%" stopColor="#f97316" stopOpacity="0.03" />
-            </linearGradient>
-            <linearGradient id="humAreaGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.2" />
-              <stop offset="100%" stopColor="#06b6d4" stopOpacity="0.02" />
-            </linearGradient>
-          </defs>
+        <ReactECharts
+          option={option}
+          style={{ height: '100%', width: '100%' }}
+          notMerge={true}
+          lazyUpdate={true}
+        />
 
-          {/* Cuadrícula vertical por tiempo real (timestamps existentes) */}
-          {xGridIndices.map((idx) => {
-            const gx = xPositions[idx] ?? padding
-            return (
-              <line
-                key={`xg-${idx}`}
-                x1={gx}
-                x2={gx}
-                y1={padding}
-                y2={height - padding}
-                stroke="currentColor"
-                strokeOpacity="0.06"
-                strokeWidth="0.5"
-                className="text-muted-foreground"
-              />
-            )
-          })}
-
-          {/* Cuadrícula horizontal por rango de medición */}
-          {chartMode === 'dual' && [0.25, 0.5, 0.75].map((pct) => {
-            const gy = padding + pct * (height - padding * 2)
-            return (
-              <line
-                key={`yg-dual-${pct}`}
-                x1={padding}
-                x2={width - padding}
-                y1={gy}
-                y2={gy}
-                stroke="currentColor"
-                strokeOpacity="0.06"
-                strokeWidth="0.5"
-                className="text-muted-foreground"
-              />
-            )
-          })}
-          {chartMode === 'temperature' && yGridValues.map((value) => {
-            const gy = valueToY(value, tempRange.min, tempRange.max, height, padding)
-            return (
-              <line
-                key={`yg-temp-${value}`}
-                x1={padding}
-                x2={width - padding}
-                y1={gy}
-                y2={gy}
-                stroke="currentColor"
-                strokeOpacity="0.06"
-                strokeWidth="0.5"
-                className="text-muted-foreground"
-              />
-            )
-          })}
-          {chartMode === 'humidity' && yGridValues.map((value) => {
-            const gy = valueToY(value, humRange.min, humRange.max, height, padding)
-            return (
-              <line
-                key={`yg-hum-${value}`}
-                x1={padding}
-                x2={width - padding}
-                y1={gy}
-                y2={gy}
-                stroke="currentColor"
-                strokeOpacity="0.06"
-                strokeWidth="0.5"
-                className="text-muted-foreground"
-              />
-            )
-          })}
-
-          {/* Zonas de alerta (solo en modo individual) */}
-          {chartMode === 'temperature' && renderThresholdZones(
-            tempRange, th.tempWarnLow, th.tempWarnHigh, th.tempCritLow, th.tempCritHigh,
-            '#f59e0b', '#ef4444'
-          )}
-          {chartMode === 'humidity' && renderThresholdZones(
-            humRange, th.humWarnLow, th.humWarnHigh, th.humCritLow, th.humCritHigh,
-            '#06b6d4', '#3b82f6'
-          )}
-
-          {/* Relleno de área - Humedad */}
-          {showHum && humCoords.length >= 2 && (
-            <path
-              d={`M ${humCoords[0]!.x},${height - padding} ${humCoords.map(p => `L ${p.x},${p.y}`).join(' ')} L ${humCoords[humCoords.length - 1]!.x},${height - padding} Z`}
-              fill="url(#humAreaGrad)"
-            />
-          )}
-
-          {/* Relleno de área - Temperatura */}
-          {showTemp && tempCoords.length >= 2 && (
-            <path
-              d={`M ${tempCoords[0]!.x},${height - padding} ${tempCoords.map(p => `L ${p.x},${p.y}`).join(' ')} L ${tempCoords[tempCoords.length - 1]!.x},${height - padding} Z`}
-              fill="url(#tempAreaGrad)"
-            />
-          )}
-
-          {/* Línea de cursor */}
-          {(selectedTempPoint || selectedHumPoint) && (
-            <line
-              x1={(selectedTempPoint ?? selectedHumPoint)!.x}
-              x2={(selectedTempPoint ?? selectedHumPoint)!.x}
-              y1={padding}
-              y2={height - padding}
-              stroke="currentColor"
-              strokeOpacity="0.25"
-              strokeDasharray="3 4"
-              className="text-muted-foreground"
-            />
-          )}
-
-          {/* Línea de humedad */}
-          {showHum && humPoints && (
-            <polyline
-              points={humPoints}
-              fill="none"
-              stroke="#06b6d4"
-              strokeWidth="1.8"
-              strokeLinejoin="round"
-              strokeLinecap="round"
-            />
-          )}
-
-          {/* Línea de temperatura */}
-          {showTemp && tempPoints && (
-            <polyline
-              points={tempPoints}
-              fill="none"
-              stroke="#f97316"
-              strokeWidth="2"
-              strokeLinejoin="round"
-              strokeLinecap="round"
-            />
-          )}
-
-          {/* Muestras reales (sin datos sintéticos) */}
-          {showTemp && tempCoords.length > 0 && tempCoords.length <= 500 && tempCoords.map((point, idx) => (
-            <circle key={`tp-${idx}`} cx={point.x} cy={point.y} r="1.2" fill="#f97316" fillOpacity="0.65" />
-          ))}
-          {showHum && humCoords.length > 0 && humCoords.length <= 500 && humCoords.map((point, idx) => (
-            <circle key={`hp-${idx}`} cx={point.x} cy={point.y} r="1.2" fill="#06b6d4" fillOpacity="0.65" />
-          ))}
-
-          {/* Puntos de cursor */}
-          {showTemp && selectedTempPoint && (
-            <>
-              <circle cx={selectedTempPoint.x} cy={selectedTempPoint.y} r="4.5" fill="#f97316" fillOpacity="0.2" />
-              <circle cx={selectedTempPoint.x} cy={selectedTempPoint.y} r="2.5" fill="#f97316" />
-            </>
-          )}
-          {showHum && selectedHumPoint && (
-            <>
-              <circle cx={selectedHumPoint.x} cy={selectedHumPoint.y} r="4.5" fill="#06b6d4" fillOpacity="0.2" />
-              <circle cx={selectedHumPoint.x} cy={selectedHumPoint.y} r="2.5" fill="#06b6d4" />
-            </>
-          )}
-        </svg>
-
-        {/* Resize handle — barra inferior completa */}
         {!isMobile && (
           <div
             className="absolute bottom-0 left-0 right-0 h-3 flex items-center justify-center cursor-ns-resize bg-gradient-to-t from-muted/60 to-transparent hover:from-muted/90 transition-colors touch-none group"
@@ -906,41 +609,6 @@ function TrendSparkline({
         )}
       </div>
 
-      {timeFilteredReadings.length > 1 && effectiveWindowSize < timeFilteredReadings.length && (
-        <div className="px-1 pt-1">
-          <input
-            type="range"
-            min={0}
-            max={Math.max(0, timeFilteredReadings.length - effectiveWindowSize)}
-            step={1}
-            value={effectiveWindowStart}
-            onChange={(e) => setWindowStart(Number(e.target.value))}
-            className="w-full accent-primary"
-            title="Scroll de línea de tiempo"
-          />
-        </div>
-      )}
-
-      {/* Tooltip interactivo */}
-      {selectedReading && (
-        <div className="flex items-center gap-3 text-[11px] rounded-lg bg-muted/30 px-3 py-1.5 border border-border/20">
-          <span className="text-muted-foreground">{formatDateTime(selectedReading.timestamp)}</span>
-          {showTemp && (
-            <span className="inline-flex items-center gap-1 font-medium">
-              <span className="h-2 w-2 rounded-full bg-orange-500" />
-              <span className="text-orange-400">{selectedReading.temperature.toFixed(1)} °C</span>
-            </span>
-          )}
-          {showHum && (
-            <span className="inline-flex items-center gap-1 font-medium">
-              <span className="h-2 w-2 rounded-full bg-cyan-500" />
-              <span className="text-cyan-400">{selectedReading.humidity.toFixed(1)} %</span>
-            </span>
-          )}
-        </div>
-      )}
-
-      {/* Leyenda */}
       <div className="flex items-center gap-4 text-[11px] text-muted-foreground flex-wrap">
         {showTemp && (
           <span className="inline-flex items-center gap-1.5">
