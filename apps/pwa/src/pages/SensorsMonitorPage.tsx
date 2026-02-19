@@ -352,6 +352,7 @@ function TrendSparkline({
     ]
   } : undefined
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const option: EChartsOption = {
     animation: false,
     tooltip: {
@@ -439,7 +440,7 @@ function TrendSparkline({
     series: [
       ...(showTemp ? [{
         name: 'Temperatura',
-        type: 'line',
+        type: 'line' as const,
         data: tempData,
         yAxisIndex: 0,
         showSymbol: false,
@@ -454,12 +455,12 @@ function TrendSparkline({
             ]
           }
         },
-        markArea: markAreaTemp,
-        markLine: markLineTemp
+        ...(markAreaTemp ? { markArea: markAreaTemp } : {}),
+        ...(markLineTemp ? { markLine: markLineTemp } : {})
       }] : []),
       ...(showHum ? [{
         name: 'Humedad',
-        type: 'line',
+        type: 'line' as const,
         data: humData,
         yAxisIndex: showTemp ? 1 : 0,
         showSymbol: false,
@@ -474,10 +475,10 @@ function TrendSparkline({
             ]
           }
         },
-        markArea: markAreaHum,
-        markLine: markLineHum
+        ...(markAreaHum ? { markArea: markAreaHum } : {}),
+        ...(markLineHum ? { markLine: markLineHum } : {})
       }] : [])
-    ]
+    ] as any
   }
 
   const lastTs = timeFilteredReadings[timeFilteredReadings.length - 1]?.timestamp
