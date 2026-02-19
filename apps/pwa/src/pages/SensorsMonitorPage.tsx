@@ -196,6 +196,7 @@ function TrendSparkline({
   deviceId: string
 }) {
   const [nowMs, setNowMs] = useState(() => Date.now())
+  const [countdownMs, setCountdownMs] = useState(() => Date.now())
   const [timeFilterPreset, setTimeFilterPreset] = useState<'all' | '15' | '60' | '240' | '1440' | 'custom'>('all')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
@@ -287,8 +288,14 @@ function TrendSparkline({
 
   useEffect(() => {
     if (!sendIntervalSec || sendIntervalSec <= 0) return
-    const timer = window.setInterval(() => setNowMs(Date.now()), 1000)
-    return () => window.clearInterval(timer)
+    // Countdown display: every 1s (lightweight — only updates text, not chart)
+    const countdownTimer = window.setInterval(() => setCountdownMs(Date.now()), 1000)
+    // Data filter refresh: every 15s (reduces chart recalculations)
+    const dataTimer = window.setInterval(() => setNowMs(Date.now()), 15_000)
+    return () => {
+      window.clearInterval(countdownTimer)
+      window.clearInterval(dataTimer)
+    }
   }, [sendIntervalSec])
 
   if (timeFilteredReadings.length < 2) {
@@ -354,13 +361,24 @@ function TrendSparkline({
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const option: EChartsOption = {
-    animation: false,
+    animation: true,
+    animationDuration: 250,
+    animationEasing: 'cubicOut',
+    animationThreshold: 5000,
     tooltip: {
       trigger: 'axis',
-      axisPointer: { type: 'cross', crossStyle: { color: '#94a3b8', type: 'dashed' } },
-      backgroundColor: 'rgba(15, 23, 42, 0.9)',
-      borderColor: 'rgba(255, 255, 255, 0.1)',
-      textStyle: { color: '#f8fafc', fontSize: 11 },
+      axisPointer: {
+        type: 'cross',
+        crossStyle: { color: 'rgba(148, 163, 184, 0.4)', type: 'dashed', width: 1 },
+        lineStyle: { color: 'rgba(148, 163, 184, 0.3)', type: 'dashed' },
+        label: { backgroundColor: '#1e293b', color: '#e2e8f0', fontSize: 10, borderColor: 'rgba(255,255,255,0.08)' }
+      },
+      backgroundColor: 'rgba(15, 23, 42, 0.95)',
+      borderColor: 'rgba(255, 255, 255, 0.06)',
+      borderRadius: 8,
+      padding: [10, 14],
+      textStyle: { color: '#f1f5f9', fontSize: 11 },
+      extraCssText: 'box-shadow: 0 8px 32px rgba(0,0,0,0.4); backdrop-filter: blur(8px);',
       formatter: (params: any) => {
         if (!params || !params.length) return ''
         const date = new Date(params[0].value[0])
@@ -368,40 +386,48 @@ function TrendSparkline({
           day: '2-digit', month: '2-digit', year: 'numeric',
           hour: '2-digit', minute: '2-digit', second: '2-digit'
         })
-        let res = `<div style="margin-bottom:4px;color:#94a3b8">${timeStr}</div>`
+        let res = `<div style="font-size:10px;color:#64748b;margin-bottom:6px;letter-spacing:0.3px">${timeStr}</div>`
         params.forEach((p: any) => {
           const color = p.color
           const unit = p.seriesName === 'Temperatura' ? '°C' : '%'
-          res += `<div style="display:flex;align-items:center;gap:6px;margin-top:2px">
-            <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background-color:${color}"></span>
-            <span class="text-muted-foreground">${p.seriesName}:</span>
-            <span class="font-bold" style="color:${color}">${p.value[1].toFixed(1)} ${unit}</span>
+          res += `<div style="display:flex;align-items:center;gap:8px;margin-top:3px;font-size:12px">
+            <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${color};box-shadow:0 0 6px ${color}80"></span>
+            <span style="color:#94a3b8;min-width:82px">${p.seriesName}</span>
+            <span style="font-weight:600;color:${color};font-variant-numeric:tabular-nums">${p.value[1].toFixed(1)}${unit}</span>
           </div>`
         })
         return res
       }
     },
     grid: {
-      top: 20,
-      right: chartMode === 'dual' ? 40 : 20,
-      bottom: 20,
-      left: 40,
+      top: 24,
+      right: chartMode === 'dual' ? 48 : 24,
+      bottom: 52,
+      left: 8,
       containLabel: true
     },
     xAxis: {
       type: 'time',
-      splitLine: { show: true, lineStyle: { color: 'rgba(255, 255, 255, 0.05)' } },
-      axisLabel: { color: '#94a3b8', fontSize: 10 },
-      axisLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.1)' } }
+      splitLine: { show: false },
+      axisTick: { show: true, lineStyle: { color: 'rgba(255, 255, 255, 0.06)' } },
+      axisLabel: {
+        color: '#64748b',
+        fontSize: 10,
+        hideOverlap: true,
+        margin: 12
+      },
+      axisLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.06)' } }
     },
     yAxis: [
       {
         type: 'value',
         name: showTemp ? '°C' : '',
-        nameTextStyle: { color: '#f97316', fontSize: 10, align: 'right' },
+        nameTextStyle: { color: '#f97316', fontSize: 10, align: 'right', padding: [0, 4, 0, 0] },
         position: 'left',
-        splitLine: { show: true, lineStyle: { color: 'rgba(255, 255, 255, 0.05)' } },
-        axisLabel: { color: '#94a3b8', fontSize: 10 },
+        splitLine: { show: true, lineStyle: { color: 'rgba(255, 255, 255, 0.04)', type: 'dashed' } },
+        axisLine: { show: false },
+        axisTick: { show: false },
+        axisLabel: { color: '#64748b', fontSize: 10, formatter: (v: number) => v.toFixed(1) },
         min: chartMode === 'temperature' && showThresholds ? (value: any) => Math.min(value.min, th.tempCritLow - 2) : 'dataMin',
         max: chartMode === 'temperature' && showThresholds ? (value: any) => Math.max(value.max, th.tempCritHigh + 2) : 'dataMax',
         show: showTemp
@@ -409,10 +435,12 @@ function TrendSparkline({
       {
         type: 'value',
         name: showHum ? '%' : '',
-        nameTextStyle: { color: '#06b6d4', fontSize: 10, align: 'left' },
+        nameTextStyle: { color: '#06b6d4', fontSize: 10, align: 'left', padding: [0, 0, 0, 4] },
         position: 'right',
         splitLine: { show: false },
-        axisLabel: { color: '#94a3b8', fontSize: 10 },
+        axisLine: { show: false },
+        axisTick: { show: false },
+        axisLabel: { color: '#64748b', fontSize: 10, formatter: (v: number) => v.toFixed(1) },
         min: chartMode === 'humidity' && showThresholds ? (value: any) => Math.min(value.min, th.humCritLow - 2) : 'dataMin',
         max: chartMode === 'humidity' && showThresholds ? (value: any) => Math.max(value.max, th.humCritHigh + 2) : 'dataMax',
         show: showHum
@@ -422,19 +450,36 @@ function TrendSparkline({
       {
         type: 'inside',
         xAxisIndex: 0,
-        filterMode: 'none'
+        filterMode: 'none',
+        zoomOnMouseWheel: true,
+        moveOnMouseMove: false,
+        moveOnMouseWheel: false,
+        preventDefaultMouseMove: true
       },
       {
         type: 'slider',
         xAxisIndex: 0,
         filterMode: 'none',
-        height: 20,
-        bottom: 0,
+        height: 28,
+        bottom: 6,
         borderColor: 'transparent',
-        backgroundColor: 'rgba(255, 255, 255, 0.02)',
-        fillerColor: 'rgba(255, 255, 255, 0.1)',
-        handleStyle: { color: '#94a3b8' },
-        textStyle: { color: '#94a3b8' }
+        backgroundColor: 'rgba(255, 255, 255, 0.03)',
+        fillerColor: 'rgba(99, 102, 241, 0.12)',
+        handleSize: '80%',
+        handleStyle: { color: '#475569', borderColor: '#64748b', borderWidth: 1 },
+        textStyle: { color: '#64748b', fontSize: 10 },
+        dataBackground: {
+          lineStyle: { color: 'rgba(148, 163, 184, 0.25)', width: 1 },
+          areaStyle: { color: 'rgba(148, 163, 184, 0.06)' }
+        },
+        selectedDataBackground: {
+          lineStyle: { color: 'rgba(99, 102, 241, 0.6)', width: 1 },
+          areaStyle: { color: 'rgba(99, 102, 241, 0.12)' }
+        },
+        brushSelect: false,
+        emphasis: {
+          handleStyle: { color: '#6366f1', borderColor: '#818cf8' }
+        }
       }
     ],
     series: [
@@ -444,14 +489,24 @@ function TrendSparkline({
         data: tempData,
         yAxisIndex: 0,
         showSymbol: false,
+        symbol: 'circle',
+        symbolSize: 4,
+        smooth: 0.25,
+        sampling: 'lttb',
         itemStyle: { color: '#f97316' },
-        lineStyle: { width: 2 },
+        lineStyle: { width: 1.5 },
+        emphasis: {
+          focus: 'series',
+          lineStyle: { width: 2.5 },
+          itemStyle: { borderWidth: 2, borderColor: '#f97316', color: '#fff' }
+        },
         areaStyle: {
           color: {
             type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
             colorStops: [
-              { offset: 0, color: 'rgba(249, 115, 22, 0.35)' },
-              { offset: 1, color: 'rgba(249, 115, 22, 0.03)' }
+              { offset: 0, color: 'rgba(249, 115, 22, 0.20)' },
+              { offset: 0.6, color: 'rgba(249, 115, 22, 0.05)' },
+              { offset: 1, color: 'rgba(249, 115, 22, 0)' }
             ]
           }
         },
@@ -464,14 +519,24 @@ function TrendSparkline({
         data: humData,
         yAxisIndex: showTemp ? 1 : 0,
         showSymbol: false,
+        symbol: 'circle',
+        symbolSize: 4,
+        smooth: 0.25,
+        sampling: 'lttb',
         itemStyle: { color: '#06b6d4' },
-        lineStyle: { width: 2 },
+        lineStyle: { width: 1.5 },
+        emphasis: {
+          focus: 'series',
+          lineStyle: { width: 2.5 },
+          itemStyle: { borderWidth: 2, borderColor: '#06b6d4', color: '#fff' }
+        },
         areaStyle: {
           color: {
             type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
             colorStops: [
-              { offset: 0, color: 'rgba(6, 182, 212, 0.2)' },
-              { offset: 1, color: 'rgba(6, 182, 212, 0.02)' }
+              { offset: 0, color: 'rgba(6, 182, 212, 0.15)' },
+              { offset: 0.6, color: 'rgba(6, 182, 212, 0.03)' },
+              { offset: 1, color: 'rgba(6, 182, 212, 0)' }
             ]
           }
         },
@@ -483,7 +548,7 @@ function TrendSparkline({
 
   const lastTs = timeFilteredReadings[timeFilteredReadings.length - 1]?.timestamp
   const nextUpdateTs = sendIntervalSec && lastTs ? lastTs + sendIntervalSec * 1000 : undefined
-  const remainingSec = nextUpdateTs ? Math.max(0, Math.ceil((nextUpdateTs - nowMs) / 1000)) : undefined
+  const remainingSec = nextUpdateTs ? Math.max(0, Math.ceil((nextUpdateTs - countdownMs) / 1000)) : undefined
 
   return (
     <div className="rounded-xl border border-border/40 bg-card/30 p-3 space-y-2.5">
@@ -593,9 +658,10 @@ function TrendSparkline({
         style={{ height: `${chartH}px`, transition: dragState.current.active ? 'none' : 'height 0.2s ease' }}
       >
         <ReactECharts
+          key={`${chartMode}-${showThresholds}`}
           option={option}
           style={{ height: '100%', width: '100%' }}
-          notMerge={true}
+          notMerge={false}
           lazyUpdate={true}
         />
 
