@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.48.51' as const
+export const APP_VERSION = '2.48.52' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-02-19' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Migración a Apache ECharts para gráficos de telemetría' as const
+export const VERSION_NAME = 'Pulido visual del gráfico ECharts + fix de zoom' as const
 
 /**
  * Nota:

@@ -7,6 +7,20 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.52] - 2026-02-19
+### Fix
+- **Zoom que se reseteaba**: Cambio de `notMerge=true` a `false` en ReactECharts para preservar estado del zoom al re-renderizar.
+- **Timer optimizado**: Separar countdown visual (1s) del filtrado de datos (15s) para reducir recálculos innecesarios del gráfico.
+
+### Mejorado
+- **Visual del gráfico más limpio**: Líneas más finas (1.5px), suavizado sutil (`smooth: 0.25`), sampling LTTB.
+- **DataZoom slider mejorado**: Más grande (28px), colores indigo, mini-preview de datos.
+- **Tooltip refinado**: Bordes redondeados, backdrop blur, glow en indicadores de color.
+- **Ejes y grid**: SplitLines dashed más tenues, ejes sin líneas/ticks visibles, labels en tono menor.
+- **Emphasis por serie**: Resalte automático de la serie al pasar el mouse.
+
+---
+
 ## [2.48.51] - 2026-02-19
 ### Feature
 - **Migración a Apache ECharts**: Reemplazo completo del gráfico SVG custom por [Apache ECharts](https://echarts.apache.org/).
