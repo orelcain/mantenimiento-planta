@@ -170,11 +170,12 @@ static uint32_t historySavedIndex = 0;  // Último índice guardado en prefs
 // RAM: útil para cortes breves (rápido). Flash (LittleFS): sobrevive reinicios.
 //
 // ── Capacidad offline ──
-// RAM:   BufferedReading ~56 bytes × 2160 = ~118 KB (~3 h a 5s, ~6 h a 10s)
+// RAM:   BufferedReading ~56 bytes × 1080 = ~59 KB (~1.5 h a 5s, ~3 h a 10s)
+//        ESP32 DRAM ~320 KB total; 1080 es el máximo seguro sin overflow.
 // Flash: Partición spiffs 0x130000 = 1.19 MB
 //        Línea CSV ~50 bytes → ~24 000 lecturas (~33 h a 5s, ~67 h a 10s)
 //        La flash es el almacenamiento primario; RAM es fallback si LittleFS falla.
-#define READINGS_BUFFER_MAX 2160 // ~3 horas a 5s (fallback RAM)
+#define READINGS_BUFFER_MAX 1080 // ~1.5 horas a 5s (fallback RAM, máx seguro)
 #define READINGS_FLUSH_BATCH 25  // máx lecturas por ciclo
 
 // Backlog persistente en flash

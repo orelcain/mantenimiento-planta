@@ -9,7 +9,7 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ## [2.48.60] - 2026-02-20
 ### Feature
-- **Buffer offline RAM triplicado**: `READINGS_BUFFER_MAX` aumentado de 720 a 2160 (~3 horas a 5s, ~6 horas a 10s) como fallback cuando LittleFS no está disponible.
+- **Buffer offline RAM ampliado**: `READINGS_BUFFER_MAX` aumentado de 720 a 1080 (~1.5 horas a 5s, ~3 horas a 10s) como fallback cuando LittleFS no está disponible. Máximo seguro para los 320 KB de DRAM del ESP32.
 - **Capacidad flash documentada**: Partición LittleFS de 1.19 MB soporta ~24,000 lecturas offline (~33 horas a 5s, ~67 horas a 10s). Endpoint `/status.json` ahora reporta `flashTotalBytes`, `flashUsedBytes`, `flashFreeBytes` y `ramBacklogMax`.
 - **Indicador visual de backfill en PWA**: Cuando el ESP32 reenvía lecturas offline almacenadas, la PWA muestra:
   - Badge animado "Backfill" (sky/cyan con icono giratorio) en DeviceCard y FocusModal.
