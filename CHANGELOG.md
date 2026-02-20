@@ -7,6 +7,12 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.61] - 2026-02-20
+### Feature
+- **Margen informativo a umbrales en PWA**: En las tarjetas de Temperatura/Humedad (vista normal y enfoque) se muestra cuánto falta para alcanzar el umbral `warning` más cercano, o cuánto se excede cuando ya está fuera de rango.
+
+---
+
 ## [2.48.60] - 2026-02-20
 ### Feature
 - **Buffer offline RAM ampliado**: `READINGS_BUFFER_MAX` aumentado de 720 a 1080 (~1.5 horas a 5s, ~3 horas a 10s) como fallback cuando LittleFS no está disponible. Máximo seguro para los 320 KB de DRAM del ESP32.
@@ -15,7 +21,6 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
   - Badge animado "Backfill" (sky/cyan con icono giratorio) en DeviceCard y FocusModal.
   - Barra informativa con detalle de pendientes (RAM + flash).
   - El ESP32 escribe `sensors/{equipmentId}/backfillPending` en RTDB solo al cambiar de estado (activo/inactivo) o cada 30s si sigue activo. Se elimina el nodo al completar.
-- **Margen informativo a umbrales en PWA**: En las tarjetas de Temperatura/Humedad (vista normal y enfoque) se muestra cuánto falta para alcanzar el umbral `warning` más cercano, o cuánto se excede cuando ya está fuera de rango.
 
 ---
 
