@@ -24,7 +24,7 @@ export default defineConfig({
         assetFileNames: 'assets/[name][extname]',
         manualChunks: {
           vendor: ['react', 'react-dom', 'react-router-dom'],
-          firebase: ['firebase/app', 'firebase/auth', 'firebase/firestore', 'firebase/storage'],
+          firebase: ['firebase/app', 'firebase/auth', 'firebase/firestore', 'firebase/storage', 'firebase/database', 'firebase/messaging'],
           ui: ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-select'],
           echarts: ['echarts', 'echarts-for-react'],
           // Three.js se carga dinámicamente via lazy import de Visor3D (~1MB)

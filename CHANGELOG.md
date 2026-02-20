@@ -7,6 +7,12 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.55] - 2026-02-19
+### Fix
+- **Crash `_checkNotDeleted is not a function`**: `firebase/database` y `firebase/messaging` no estaban incluidos en el chunk manual `firebase` de Vite, quedando en un chunk separado que perdía la referencia interna al `FirebaseApp`. Ahora todos los módulos de Firebase van en el mismo chunk.
+
+---
+
 ## [2.48.54] - 2026-02-19
 ### Feature
 - **Modo enfoque para sensores**: Botón "Enfoque" en cada tarjeta de dispositivo abre un modal fullscreen.
