@@ -1,6 +1,6 @@
 {
-  "version": "2.48.59",
-  "buildDate": "2026-02-19",
+  "version": "2.48.60",
+  "buildDate": "2026-02-20",
   "buildTimestamp": 1771567200000,
   "features": [
     "Nuevo panel técnico rápido de sensores en /sensors/monitor con KPIs operativos en tiempo real",

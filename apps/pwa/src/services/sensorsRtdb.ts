@@ -41,6 +41,13 @@ export type SensorReadingRow = SensorReading & {
   id: string
 }
 
+export type BackfillStatus = {
+  active: boolean
+  ramPending?: number
+  flashActive?: boolean
+  ts?: number
+}
+
 // Obtener historial de lecturas (limitado para gráficas)
 export async function fetchSensorHistory(
   equipmentId: string,
@@ -218,6 +225,35 @@ export function subscribeSensorReadings(
     q,
     (snap) => {
       onData(snapshotToReadings(snap))
+    },
+    (err) => {
+      onError?.(err)
+    }
+  )
+
+  return () => {
+    unsubscribe()
+  }
+}
+
+/**
+ * Suscripción al estado de backfill del ESP32.
+ * El nodo `sensors/{equipmentId}/backfillPending` existe solo cuando
+ * el ESP32 está reenviando lecturas offline almacenadas.
+ */
+export function subscribeBackfillStatus(
+  equipmentId: string,
+  onData: (status: BackfillStatus | null) => void,
+  onError?: (error: unknown) => void
+) {
+  const path = `sensors/${equipmentId}/backfillPending`
+  const r = ref(rtdb, path)
+
+  const unsubscribe = onValue(
+    r,
+    (snap) => {
+      const val = snap.val() as BackfillStatus | null
+      onData(val && val.active ? val : null)
     },
     (err) => {
       onError?.(err)

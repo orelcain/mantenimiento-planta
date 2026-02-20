@@ -7,6 +7,17 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.60] - 2026-02-20
+### Feature
+- **Buffer offline RAM triplicado**: `READINGS_BUFFER_MAX` aumentado de 720 a 2160 (~3 horas a 5s, ~6 horas a 10s) como fallback cuando LittleFS no está disponible.
+- **Capacidad flash documentada**: Partición LittleFS de 1.19 MB soporta ~24,000 lecturas offline (~33 horas a 5s, ~67 horas a 10s). Endpoint `/status.json` ahora reporta `flashTotalBytes`, `flashUsedBytes`, `flashFreeBytes` y `ramBacklogMax`.
+- **Indicador visual de backfill en PWA**: Cuando el ESP32 reenvía lecturas offline almacenadas, la PWA muestra:
+  - Badge animado "Backfill" (sky/cyan con icono giratorio) en DeviceCard y FocusModal.
+  - Barra informativa con detalle de pendientes (RAM + flash).
+  - El ESP32 escribe `sensors/{equipmentId}/backfillPending` en RTDB solo al cambiar de estado (activo/inactivo) o cada 30s si sigue activo. Se elimina el nodo al completar.
+
+---
+
 ## [2.48.59] - 2026-02-19
 ### Feature
 - **Ventana rodante de 30 días para lecturas de sensores**: Cloud Function schedulada que purga automáticamente lecturas con más de 30 días en Firebase RTDB.

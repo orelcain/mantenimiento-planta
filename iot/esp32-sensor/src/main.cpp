@@ -168,8 +168,14 @@ static uint32_t historySavedIndex = 0;  // Último índice guardado en prefs
 // ============ BUFFER OFFLINE (BACKFILL) ============
 // Guarda lecturas en RAM cuando no hay WiFi/Firebase y las envía al volver.
 // RAM: útil para cortes breves (rápido). Flash (LittleFS): sobrevive reinicios.
-#define READINGS_BUFFER_MAX 720 // ~1 hora a 5s
-#define READINGS_FLUSH_BATCH 25 // máx lecturas por ciclo
+//
+// ── Capacidad offline ──
+// RAM:   BufferedReading ~56 bytes × 2160 = ~118 KB (~3 h a 5s, ~6 h a 10s)
+// Flash: Partición spiffs 0x130000 = 1.19 MB
+//        Línea CSV ~50 bytes → ~24 000 lecturas (~33 h a 5s, ~67 h a 10s)
+//        La flash es el almacenamiento primario; RAM es fallback si LittleFS falla.
+#define READINGS_BUFFER_MAX 2160 // ~3 horas a 5s (fallback RAM)
+#define READINGS_FLUSH_BATCH 25  // máx lecturas por ciclo
 
 // Backlog persistente en flash
 #define BACKLOG_FILE_PATH "/backlog.csv"
@@ -224,6 +230,10 @@ static bool fsReady = false;
 static uint32_t backlogOffset = 0;
 static uint32_t backlogSentSinceSave = 0;
 static bool flashBacklogHasFile = false;
+
+// Estado de backfill reportado a RTDB (solo se escribe al cambiar)
+static bool lastReportedBackfillActive = false;
+static unsigned long lastBackfillReportMs = 0;
 
 // Última lectura (para dashboard local)
 static uint64_t lastReadingTs = 0;
@@ -339,8 +349,15 @@ static void ensureHttpServerStarted() {
     json += "\"humStatus\":\"" + lastHumStatus + "\",";
     json += "\"source\":\"" + String(lastSimulated ? "simulated" : "dht11") + "\",";
     json += "\"ramBacklogCount\":" + String((unsigned)getRamBacklogCount()) + ",";
+    json += "\"ramBacklogMax\":" + String((unsigned)READINGS_BUFFER_MAX) + ",";
     json += "\"flashBacklogOffset\":" + String((unsigned long)backlogOffset) + ",";
-    json += "\"flashBacklogReady\":" + String(fsReady ? "true" : "false");
+    json += "\"flashBacklogReady\":" + String(fsReady ? "true" : "false") + ",";
+    // Flash capacity info
+    size_t flashTotal = 0, flashUsed = 0;
+    if (fsReady) { flashTotal = LittleFS.totalBytes(); flashUsed = LittleFS.usedBytes(); }
+    json += "\"flashTotalBytes\":" + String((unsigned long)flashTotal) + ",";
+    json += "\"flashUsedBytes\":" + String((unsigned long)flashUsed) + ",";
+    json += "\"flashFreeBytes\":" + String((unsigned long)(flashTotal > flashUsed ? flashTotal - flashUsed : 0));
     json += "}";
 
     portalServer.send(200, "application/json", json);
@@ -2524,6 +2541,37 @@ void loop() {
   // Si ya hay WiFi y Firebase está listo, intentar enviar backlog.
   flushBufferedReadings();
   flushBacklogFromFlash();
+
+  // ── Reportar estado de backfill a RTDB (solo al cambiar, o cada 30 s si activo) ──
+  {
+    const bool hasBackfill = (readingCount > 0) || flashBacklogHasFile;
+    const unsigned long now = millis();
+    const bool shouldReport =
+      (hasBackfill != lastReportedBackfillActive) ||
+      (hasBackfill && (now - lastBackfillReportMs > 30000));
+
+    if (shouldReport && firebaseReady && WiFi.status() == WL_CONNECTED && hasAssignedEquipment()) {
+      String bfPath;
+      bfPath.reserve(96);
+      bfPath = "sensors/";
+      bfPath += currentEquipmentId;
+      bfPath += "/backfillPending";
+
+      if (hasBackfill) {
+        FirebaseJson bfJson;
+        bfJson.set("active", true);
+        bfJson.set("ramPending", (int)readingCount);
+        bfJson.set("flashActive", flashBacklogHasFile);
+        bfJson.set("ts", (double)getTimestamp());
+        Firebase.RTDB.setJSON(&fbdo, bfPath.c_str(), &bfJson);
+      } else {
+        // Backfill completado: eliminar el nodo
+        Firebase.RTDB.deleteNode(&fbdo, bfPath.c_str());
+      }
+      lastReportedBackfillActive = hasBackfill;
+      lastBackfillReportMs = now;
+    }
+  }
 
   // Si SDK perdió sesión/token, forzar ruta de reconexión.
   if (firebaseReady && WiFi.status() == WL_CONNECTED && !Firebase.ready()) {

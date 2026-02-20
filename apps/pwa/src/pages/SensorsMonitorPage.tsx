@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
-import { Activity, AlertTriangle, Cpu, Thermometer, Droplets, Link2, Settings2, Save, X, Maximize2, ZoomIn } from 'lucide-react'
+import { Activity, AlertTriangle, Cpu, Thermometer, Droplets, Link2, Settings2, Save, X, Maximize2, ZoomIn, RefreshCw } from 'lucide-react'
 import { Button, Card, CardContent, CardHeader, CardTitle, Input } from '@/components/ui'
 import { useCanSee, useIsAdmin } from '@/store'
 import { getEquipments } from '@/services/equipment'
 import { subscribeDevices, updateDeviceThresholds, type DeviceRow, type SensorThresholds } from '@/services/devicesRtdb'
-import { subscribeSensorReadings, fetchLastSensorReadings, type SensorReading } from '@/services/sensorsRtdb'
+import { subscribeSensorReadings, fetchLastSensorReadings, subscribeBackfillStatus, type SensorReading, type BackfillStatus } from '@/services/sensorsRtdb'
 import type { Equipment } from '@/types'
 import ReactECharts from 'echarts-for-react'
 import type { EChartsOption } from 'echarts'
@@ -844,10 +844,11 @@ function TrendSparkline({
 }
 
 /* ── Modal de modo enfoque ── */
-function FocusModal({ device, equipmentById, readingsByEquipment, panelNowMs, onClose }: {
+function FocusModal({ device, equipmentById, readingsByEquipment, backfillByEquipment, panelNowMs, onClose }: {
   device: DeviceRow
   equipmentById: Map<string, Equipment>
   readingsByEquipment: Record<string, SensorReading[]>
+  backfillByEquipment: Record<string, BackfillStatus | null>
   panelNowMs: number
   onClose: () => void
 }) {
@@ -870,6 +871,7 @@ function FocusModal({ device, equipmentById, readingsByEquipment, panelNowMs, on
   const alert = getTelemetryAlert(device)
   const area = getAreaLabel(assignedEquipment)
   const trendReadings = device.assignedEquipmentId ? readingsByEquipment[device.assignedEquipmentId] : undefined
+  const backfillStatus = device.assignedEquipmentId ? backfillByEquipment[device.assignedEquipmentId] : null
   const isFresh = isDeviceFresh(device, panelNowMs)
   const latestReading = trendReadings && trendReadings.length > 0 ? trendReadings[trendReadings.length - 1] : undefined
   const telemetryTempTs = device.telemetry?.temperatura?.timestamp ?? 0
@@ -906,6 +908,11 @@ function FocusModal({ device, equipmentById, readingsByEquipment, panelNowMs, on
               {alert === 'warning' && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-500 ring-1 ring-amber-500/30">
                   <AlertTriangle className="h-3 w-3" /> Warning
+                </span>
+              )}
+              {backfillStatus?.active && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-sky-500/15 px-2 py-0.5 text-[10px] font-medium text-sky-500 ring-1 ring-sky-500/30 animate-pulse" title="Reenviando lecturas offline almacenadas">
+                  <RefreshCw className="h-3 w-3 animate-spin" /> Backfill
                 </span>
               )}
             </h2>
@@ -955,6 +962,17 @@ function FocusModal({ device, equipmentById, readingsByEquipment, panelNowMs, on
         </div>
 
         {/* Chart – takes remaining space */}
+        {backfillStatus?.active && (
+          <div className="rounded-lg border border-sky-500/40 bg-sky-500/10 px-3 py-2 text-sky-600 dark:text-sky-400 flex items-center gap-2 text-sm">
+            <RefreshCw className="h-4 w-4 animate-spin flex-shrink-0" />
+            <span>
+              Reenviando datos offline almacenados
+              {backfillStatus.ramPending ? ` (${backfillStatus.ramPending} en RAM)` : ''}
+              {backfillStatus.flashActive ? ' + flash' : ''}
+              — el gráfico se actualizará progresivamente
+            </span>
+          </div>
+        )}
         <TrendSparkline
           readings={trendReadings}
           sendIntervalSec={device.sendInterval}
@@ -968,10 +986,11 @@ function FocusModal({ device, equipmentById, readingsByEquipment, panelNowMs, on
 }
 
 /* ── Tarjeta de dispositivo (componente con estado propio) ── */
-function DeviceCard({ device, equipmentById, readingsByEquipment, panelNowMs, navigate, onFocus }: {
+function DeviceCard({ device, equipmentById, readingsByEquipment, backfillByEquipment, panelNowMs, navigate, onFocus }: {
   device: DeviceRow
   equipmentById: Map<string, Equipment>
   readingsByEquipment: Record<string, SensorReading[]>
+  backfillByEquipment: Record<string, BackfillStatus | null>
   panelNowMs: number
   navigate: ReturnType<typeof useNavigate>
   onFocus: (deviceId: string) => void
@@ -983,6 +1002,7 @@ function DeviceCard({ device, equipmentById, readingsByEquipment, panelNowMs, na
   const alert = getTelemetryAlert(device)
   const area = getAreaLabel(assignedEquipment)
   const trendReadings = device.assignedEquipmentId ? readingsByEquipment[device.assignedEquipmentId] : undefined
+  const backfillStatus = device.assignedEquipmentId ? backfillByEquipment[device.assignedEquipmentId] : null
   const isFresh = isDeviceFresh(device, panelNowMs)
   const latestReading = trendReadings && trendReadings.length > 0 ? trendReadings[trendReadings.length - 1] : undefined
   const telemetryTempTs = device.telemetry?.temperatura?.timestamp ?? 0
@@ -1038,6 +1058,11 @@ function DeviceCard({ device, equipmentById, readingsByEquipment, panelNowMs, na
             {alert === 'normal' && (
               <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground ring-1 ring-border">
                 Normal
+              </span>
+            )}
+            {backfillStatus?.active && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-sky-500/15 px-2.5 py-0.5 text-xs font-medium text-sky-500 ring-1 ring-sky-500/30 animate-pulse" title="Reenviando lecturas offline almacenadas">
+                <RefreshCw className="h-3 w-3 animate-spin" /> Backfill
               </span>
             )}
           </div>
@@ -1102,6 +1127,17 @@ function DeviceCard({ device, equipmentById, readingsByEquipment, panelNowMs, na
           <span>{formatDateTime(lastUpdateTs || undefined)}</span>
         </div>
 
+        {backfillStatus?.active && (
+          <div className="rounded-md border border-sky-500/40 bg-sky-500/10 p-2 text-sky-600 dark:text-sky-400 flex items-center gap-2 text-xs">
+            <RefreshCw className="h-3.5 w-3.5 animate-spin flex-shrink-0" />
+            <span>
+              Reenviando datos offline almacenados
+              {backfillStatus.ramPending ? ` (${backfillStatus.ramPending} en RAM)` : ''}
+              {backfillStatus.flashActive ? ' + flash' : ''}
+            </span>
+          </div>
+        )}
+
         {alert !== 'normal' && (
           <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-amber-700 flex items-center gap-2">
             <AlertTriangle className="h-4 w-4" />
@@ -1139,6 +1175,7 @@ export function SensorsMonitorPage() {
   const [search, setSearch] = useState('')
   const [areaFilter, setAreaFilter] = useState('all')
   const [readingsByEquipment, setReadingsByEquipment] = useState<Record<string, SensorReading[]>>({})
+  const [backfillByEquipment, setBackfillByEquipment] = useState<Record<string, BackfillStatus | null>>({})
   const [panelNowMs, setPanelNowMs] = useState(() => Date.now())
   const [focusDeviceId, setFocusDeviceId] = useState<string | null>(null)
 
@@ -1218,6 +1255,30 @@ export function SensorsMonitorPage() {
           setReadingsByEquipment((prev) => ({
             ...prev,
             [equipmentId]: [],
+          }))
+        }
+      )
+    )
+
+    return () => {
+      for (const unsub of unsubs) unsub()
+    }
+  }, [assignedEquipmentIds, assignedEquipmentIdsKey])
+
+  // Suscripción al estado de backfill por equipo
+  useEffect(() => {
+    if (!assignedEquipmentIds.length) {
+      setBackfillByEquipment({})
+      return
+    }
+
+    const unsubs = assignedEquipmentIds.map((equipmentId) =>
+      subscribeBackfillStatus(
+        equipmentId,
+        (status) => {
+          setBackfillByEquipment((prev) => ({
+            ...prev,
+            [equipmentId]: status,
           }))
         }
       )
@@ -1446,6 +1507,7 @@ export function SensorsMonitorPage() {
             device={device}
             equipmentById={equipmentById}
             readingsByEquipment={readingsByEquipment}
+            backfillByEquipment={backfillByEquipment}
             panelNowMs={panelNowMs}
             navigate={navigate}
             onFocus={setFocusDeviceId}
@@ -1467,6 +1529,7 @@ export function SensorsMonitorPage() {
             device={focusDevice}
             equipmentById={equipmentById}
             readingsByEquipment={readingsByEquipment}
+            backfillByEquipment={backfillByEquipment}
             panelNowMs={panelNowMs}
             onClose={() => setFocusDeviceId(null)}
           />
