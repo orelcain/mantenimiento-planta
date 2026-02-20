@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, Plus, FileText, Upload, FolderTree } from 'lucide-react'
+import { AlertTriangle, Plus, FileText, Upload, FolderTree, Package, PackageCheck, PackageX, DollarSign, TrendingDown, Wrench } from 'lucide-react'
 import { RepuestosTable } from '@/components/repuestos/RepuestosTable'
 import { RepuestoFormModal } from '@/components/repuestos/RepuestoForm'
 import { RepuestosFilters } from '@/components/repuestos/RepuestosFilters'
@@ -357,11 +357,22 @@ export function RepuestosDashboard() {
       </div>
 
       <div className="flex-1 p-3 sm:p-6 space-y-4 sm:space-y-6 overflow-x-hidden">
-        {/* Header */}
+        {/* Machine Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <h1 className="text-lg sm:text-xl font-semibold text-foreground truncate">
-            Repuestos - {currentMachine.nombre}
-          </h1>
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: (currentMachine.color || '#3b82f6') + '20' }}>
+              <Wrench className="h-5 w-5" style={{ color: currentMachine.color || '#3b82f6' }} />
+            </div>
+            <div>
+              <h1 className="text-lg sm:text-xl font-semibold text-foreground leading-tight">
+                {currentMachine.nombre}
+              </h1>
+              <p className="text-xs text-muted-foreground">
+                {[currentMachine.marca, currentMachine.modelo].filter(Boolean).join(' · ') || 'Catálogo de repuestos'}
+                {repuestos.length > 0 && <span className="ml-1.5 text-muted-foreground/70">— {repuestos.length} repuestos</span>}
+              </p>
+            </div>
+          </div>
           
           <div className="flex flex-wrap gap-2">
              {/* Mobile: Collapse secondary actions or use icons only if needed */}
@@ -426,8 +437,63 @@ export function RepuestosDashboard() {
           </div>
         </div>
 
-        {/* Stats Cards - Hidden for now */}
-        {/* Resumen oculto por ahora */}
+        {/* KPI Summary Cards */}
+        {(() => {
+          const totalRepuestos = repuestos.length
+          const totalConStock = repuestos.filter(r => getStockTotal(r) > 0).length
+          const totalSinStock = repuestos.filter(r => getStockTotal(r) === 0).length
+          const totalBajoStock = repuestos.filter(r => { const s = getStockTotal(r); return s > 0 && s < 5 }).length
+          const valorTotal = repuestos.reduce((sum, r) => sum + (r.valorUnitario || 0) * Math.max(getStockTotal(r), 1), 0)
+          return (
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              {/* Total repuestos */}
+              <div className="bg-card border rounded-xl p-4 flex items-center gap-3 hover:shadow-md transition-shadow">
+                <div className="h-10 w-10 rounded-lg bg-blue-500/10 flex items-center justify-center shrink-0">
+                  <Package className="h-5 w-5 text-blue-500" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Total</p>
+                  <p className="text-xl font-bold text-foreground">{totalRepuestos}</p>
+                </div>
+              </div>
+              {/* Con stock */}
+              <div className="bg-card border rounded-xl p-4 flex items-center gap-3 hover:shadow-md transition-shadow">
+                <div className="h-10 w-10 rounded-lg bg-emerald-500/10 flex items-center justify-center shrink-0">
+                  <PackageCheck className="h-5 w-5 text-emerald-500" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Con stock</p>
+                  <p className="text-xl font-bold text-emerald-500">{totalConStock}</p>
+                </div>
+              </div>
+              {/* Sin stock */}
+              <div className="bg-card border rounded-xl p-4 flex items-center gap-3 hover:shadow-md transition-shadow">
+                <div className="h-10 w-10 rounded-lg bg-red-500/10 flex items-center justify-center shrink-0">
+                  <PackageX className="h-5 w-5 text-red-500" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Sin stock</p>
+                  <p className="text-xl font-bold text-red-400">{totalSinStock}</p>
+                  {totalBajoStock > 0 && (
+                    <p className="text-[10px] text-amber-400 flex items-center gap-0.5">
+                      <TrendingDown className="h-3 w-3" />{totalBajoStock} bajo
+                    </p>
+                  )}
+                </div>
+              </div>
+              {/* Valor inventario */}
+              <div className="bg-card border rounded-xl p-4 flex items-center gap-3 hover:shadow-md transition-shadow">
+                <div className="h-10 w-10 rounded-lg bg-violet-500/10 flex items-center justify-center shrink-0">
+                  <DollarSign className="h-5 w-5 text-violet-500" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Valor inv.</p>
+                  <p className="text-lg font-bold text-foreground">${valorTotal.toLocaleString('es-CL')}</p>
+                </div>
+              </div>
+            </div>
+          )
+        })()}
 
         {/* Error Display */}
         {(repuestosError || tagsError) && (
@@ -440,10 +506,12 @@ export function RepuestosDashboard() {
         {/* Content Area */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <div className="flex flex-col">
-              <span className="text-sm font-semibold text-foreground">Listado de repuestos</span>
-              <span className="text-xs text-muted-foreground">
-                {filteredRepuestos.length} de {repuestos.length} elementos.
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold text-foreground">Catálogo de repuestos</span>
+              <span className="text-xs text-muted-foreground bg-muted/50 px-2 py-0.5 rounded-full">
+                {filteredRepuestos.length === repuestos.length
+                  ? `${repuestos.length} items`
+                  : `${filteredRepuestos.length} de ${repuestos.length}`}
               </span>
             </div>
           </div>

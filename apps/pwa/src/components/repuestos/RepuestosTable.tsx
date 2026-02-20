@@ -1,4 +1,6 @@
+import { Package, ImageIcon, AlertTriangle, TrendingDown } from 'lucide-react'
 import type { Repuesto } from '@/types/repuestos'
+import { isTagAsignado } from '@/types/tags'
 import { RepuestoActionsMenu } from './RepuestoActionsMenu'
 
 interface RepuestosTableProps {
@@ -17,6 +19,62 @@ interface RepuestosTableProps {
 const formatNumber = (value: number) =>
   Number.isFinite(value) ? value.toLocaleString('es-CL') : '-';
 
+/** Calcula stock total desde tags o campo legacy */
+function getStockTotal(rep: Repuesto): number {
+  const fromTags = Array.isArray(rep.tags)
+    ? rep.tags.reduce((s, t) => {
+        if (isTagAsignado(t) && t.tipo === 'stock') return s + (t.cantidad || 0)
+        return s
+      }, 0)
+    : 0
+  return fromTags > 0 ? fromTags : rep.cantidadStockBodega || 0
+}
+
+/** Badge de stock con color semáforo */
+function StockBadge({ stock }: { stock: number }) {
+  if (stock === 0) {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-red-500/15 text-red-400 ring-1 ring-red-500/20">
+        <AlertTriangle className="h-3 w-3" />
+        Sin stock
+      </span>
+    )
+  }
+  if (stock < 5) {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/15 text-amber-400 ring-1 ring-amber-500/20">
+        <TrendingDown className="h-3 w-3" />
+        {stock}
+      </span>
+    )
+  }
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/20">
+      {stock}
+    </span>
+  )
+}
+
+/** Thumbnail de la primera imagen disponible */
+function RepuestoThumbnail({ rep }: { rep: Repuesto }) {
+  const img = rep.fotosReales?.[0] || rep.imagenesManual?.[0] || rep.gallery?.[0]
+  if (!img) {
+    return (
+      <div className="h-10 w-10 rounded-lg bg-muted/50 flex items-center justify-center shrink-0">
+        <Package className="h-4 w-4 text-muted-foreground/50" />
+      </div>
+    )
+  }
+  return (
+    <img
+      src={img.url}
+      alt=""
+      className="h-10 w-10 rounded-lg object-cover ring-1 ring-border shrink-0"
+      loading="lazy"
+    />
+  )
+}
+
 
 export function RepuestosTable({
   repuestos,
@@ -31,16 +89,20 @@ export function RepuestosTable({
 }: RepuestosTableProps) {
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12 text-muted-foreground">
-        <span className="animate-pulse">Cargando repuestos...</span>
+      <div className="flex items-center justify-center py-16 text-muted-foreground">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 border-2 border-muted-foreground/30 border-t-primary rounded-full animate-spin" />
+          <span className="text-sm">Cargando repuestos...</span>
+        </div>
       </div>
     );
   }
 
   if (repuestos.length === 0) {
     return (
-      <div className="flex items-center justify-center py-12 text-muted-foreground border rounded-lg bg-card/50">
-        No hay repuestos en esta máquina.
+      <div className="flex flex-col items-center justify-center py-16 text-muted-foreground border rounded-xl bg-card/30 gap-3">
+        <Package className="h-10 w-10 text-muted-foreground/30" />
+        <span>No hay repuestos en esta máquina.</span>
       </div>
     );
   }
@@ -48,15 +110,18 @@ export function RepuestosTable({
   return (
     <>
       {/* Mobile Card View */}
-      <div className="grid grid-cols-1 gap-4 sm:hidden">
-        {repuestos.map((rep) => (
-          <div key={rep.id} className="bg-card border rounded-lg p-4 space-y-3 shadow-sm">
-             <div className="flex justify-between items-start">
-               <div>
-                  <div className="text-xs font-mono text-muted-foreground mb-1">{rep.codigoSAP || 'S/C'}</div>
-                  <div className="font-medium text-foreground line-clamp-2">{rep.textoBreve || 'Sin nombre'}</div>
-               </div>
-               <RepuestoActionsMenu
+      <div className="grid grid-cols-1 gap-3 sm:hidden">
+        {repuestos.map((rep) => {
+          const stock = getStockTotal(rep)
+          return (
+            <div key={rep.id} className="bg-card border rounded-xl p-4 space-y-3 shadow-sm hover:shadow-md transition-shadow">
+              <div className="flex gap-3 items-start">
+                <RepuestoThumbnail rep={rep} />
+                <div className="flex-1 min-w-0">
+                  <div className="text-[11px] font-mono text-muted-foreground">{rep.codigoSAP || 'S/C'}</div>
+                  <div className="font-medium text-foreground line-clamp-2 text-sm">{rep.textoBreve || 'Sin nombre'}</div>
+                </div>
+                <RepuestoActionsMenu
                   repuesto={rep}
                   onEdit={onEdit}
                   onDelete={onDelete}
@@ -66,64 +131,107 @@ export function RepuestosTable({
                   onViewSpecs={onViewSpecs}
                   onViewGallery={onViewGallery}
                 />
-             </div>
+              </div>
              
-             {rep.descripcion && (
-               <p className="text-xs text-muted-foreground line-clamp-2 bg-muted/30 p-2 rounded">
-                 {rep.descripcion}
-               </p>
-             )}
+              {rep.descripcion && (
+                <p className="text-xs text-muted-foreground line-clamp-2 bg-muted/20 p-2 rounded-lg">
+                  {rep.descripcion}
+                </p>
+              )}
 
-             <div className="flex items-center justify-between pt-2 border-t">
-               <div className="flex flex-col">
-                 <span className="text-[10px] text-muted-foreground uppercase">Valor Unit.</span>
-                 <span className="font-semibold text-sm">${formatNumber(rep.valorUnitario || 0)}</span>
-               </div>
-               {/* Podemos agregar más info aquí si es necesario, como stock */}
-               {(rep.cantidadStockBodega !== undefined && rep.cantidadStockBodega > 0) && (
-                  <div className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 text-xs px-2 py-1 rounded-full font-medium">
-                    Stock: {rep.cantidadStockBodega}
-                  </div>
-               )}
-             </div>
-          </div>
-        ))}
+              <div className="flex items-center justify-between pt-2 border-t border-border/50">
+                <div className="flex flex-col">
+                  <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Valor Unit.</span>
+                  <span className="font-semibold text-sm">${formatNumber(rep.valorUnitario || 0)}</span>
+                </div>
+                <StockBadge stock={stock} />
+              </div>
+            </div>
+          )
+        })}
       </div>
 
       {/* Desktop Table View */}
-      <div className="hidden sm:block overflow-auto rounded-lg border bg-card">
+      <div className="hidden sm:block overflow-auto rounded-xl border bg-card shadow-sm">
         <table className="min-w-full divide-y divide-border">
-          <thead className="bg-muted/50">
-            <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground">
-              <th className="px-4 py-3 font-semibold">Código SAP</th>
-              <th className="px-4 py-3 font-semibold">Texto breve</th>
-              <th className="px-4 py-3 font-semibold">Valor unitario</th>
-              <th className="px-4 py-3 font-semibold text-right">Acciones</th>
+          <thead>
+            <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground bg-muted/30">
+              <th className="pl-4 pr-2 py-3 font-semibold w-12"></th>
+              <th className="px-3 py-3 font-semibold">Código SAP</th>
+              <th className="px-3 py-3 font-semibold">Repuesto</th>
+              <th className="px-3 py-3 font-semibold">Cód. Fabricante</th>
+              <th className="px-3 py-3 font-semibold text-center">Stock</th>
+              <th className="px-3 py-3 font-semibold text-right">Valor Unit.</th>
+              <th className="px-3 py-3 font-semibold text-right">Acciones</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-border text-sm">
-            {repuestos.map((rep) => (
-              <tr key={rep.id} className="hover:bg-muted/50 transition-colors">
-                <td className="px-4 py-3 whitespace-nowrap font-mono text-xs text-muted-foreground">{rep.codigoSAP || '—'}</td>
-                <td className="px-4 py-3">
-                  <div className="font-medium text-foreground">{rep.textoBreve || 'Sin nombre'}</div>
-                  {rep.descripcion ? <div className="text-xs text-muted-foreground line-clamp-2 max-w-[300px]">{rep.descripcion}</div> : null}
-                </td>
-                <td className="px-4 py-3 text-right font-mono">${formatNumber(rep.valorUnitario || 0)}</td>
-                <td className="px-4 py-3">
-                  <RepuestoActionsMenu
-                    repuesto={rep}
-                    onEdit={onEdit}
-                    onDelete={onDelete}
-                    onViewManual={onViewManual}
-                    onViewPhotos={onViewPhotos}
-                    onViewHistory={onViewHistory}
-                    onViewSpecs={onViewSpecs}
-                    onViewGallery={onViewGallery}
-                  />
-                </td>
-              </tr>
-            ))}
+          <tbody className="divide-y divide-border/50 text-sm">
+            {repuestos.map((rep, idx) => {
+              const stock = getStockTotal(rep)
+              const hasMedia = (rep.fotosReales?.length || 0) + (rep.imagenesManual?.length || 0) + (rep.gallery?.length || 0) > 0
+              return (
+                <tr
+                  key={rep.id}
+                  className={`group hover:bg-primary/5 transition-colors ${idx % 2 === 0 ? '' : 'bg-muted/10'}`}
+                >
+                  {/* Thumbnail */}
+                  <td className="pl-4 pr-2 py-2.5">
+                    <RepuestoThumbnail rep={rep} />
+                  </td>
+                  {/* Código SAP */}
+                  <td className="px-3 py-2.5 whitespace-nowrap">
+                    <span className="font-mono text-xs text-muted-foreground bg-muted/40 px-1.5 py-0.5 rounded">
+                      {rep.codigoSAP || '—'}
+                    </span>
+                  </td>
+                  {/* Nombre y descripción */}
+                  <td className="px-3 py-2.5 max-w-[300px]">
+                    <div className="flex items-center gap-2">
+                      <div className="min-w-0">
+                        <div className="font-medium text-foreground truncate">{rep.textoBreve || 'Sin nombre'}</div>
+                        {rep.descripcion ? (
+                          <div className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{rep.descripcion}</div>
+                        ) : null}
+                      </div>
+                      {hasMedia && (
+                        <ImageIcon className="h-3.5 w-3.5 text-blue-400/60 shrink-0" />
+                      )}
+                    </div>
+                  </td>
+                  {/* Código fabricante */}
+                  <td className="px-3 py-2.5 whitespace-nowrap">
+                    <span className="text-xs text-muted-foreground">
+                      {rep.codigoBaader || '—'}
+                    </span>
+                  </td>
+                  {/* Stock */}
+                  <td className="px-3 py-2.5 text-center">
+                    <StockBadge stock={stock} />
+                  </td>
+                  {/* Valor unitario */}
+                  <td className="px-3 py-2.5 text-right whitespace-nowrap">
+                    <span className="font-mono text-sm">
+                      ${formatNumber(rep.valorUnitario || 0)}
+                    </span>
+                  </td>
+                  {/* Acciones */}
+                  <td className="px-3 py-2.5">
+                    <div className="opacity-60 group-hover:opacity-100 transition-opacity">
+                      <RepuestoActionsMenu
+                        repuesto={rep}
+                        onEdit={onEdit}
+                        onDelete={onDelete}
+                        onViewManual={onViewManual}
+                        onViewPhotos={onViewPhotos}
+                        onViewHistory={onViewHistory}
+                        onViewSpecs={onViewSpecs}
+                        onViewGallery={onViewGallery}
+                      />
+                    </div>
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>

@@ -7,6 +7,18 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.62] - 2026-02-20
+### UI/UX
+- **Catálogo de repuestos rediseñado**: Mejora visual completa del módulo de repuestos:
+  - KPI cards de resumen (total, con stock, sin stock, valor inventario) con colores semáforo
+  - Header de máquina mejorado con icono de color, marca/modelo, conteo de repuestos
+  - Tabla enriquecida con thumbnails de fotos, columna de stock con badges semáforo (verde/ámbar/rojo), columna de código de fabricante
+  - Spinner de carga animado y estados vacíos con iconografía
+  - Filas alternadas y acciones con opacidad progresiva al hover
+  - Cards móviles rediseñadas con thumbnails y badges de stock
+
+---
+
 ## [2.48.61] - 2026-02-20
 ### Feature
 - **Margen informativo a umbrales en PWA**: En las tarjetas de Temperatura/Humedad (vista normal y enfoque) se muestra cuánto falta para alcanzar el umbral `warning` más cercano, o cuánto se excede cuando ya está fuera de rango.
