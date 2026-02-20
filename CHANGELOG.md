@@ -15,6 +15,7 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
   - Badge animado "Backfill" (sky/cyan con icono giratorio) en DeviceCard y FocusModal.
   - Barra informativa con detalle de pendientes (RAM + flash).
   - El ESP32 escribe `sensors/{equipmentId}/backfillPending` en RTDB solo al cambiar de estado (activo/inactivo) o cada 30s si sigue activo. Se elimina el nodo al completar.
+- **Margen informativo a umbrales en PWA**: En las tarjetas de Temperatura/Humedad (vista normal y enfoque) se muestra cuánto falta para alcanzar el umbral `warning` más cercano, o cuánto se excede cuando ya está fuera de rango.
 
 ---
 
