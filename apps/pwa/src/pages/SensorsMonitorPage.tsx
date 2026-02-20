@@ -408,11 +408,11 @@ function TrendSparkline({
       seriesIndex: showTemp ? 1 : 0,
       dimension: 1,
       pieces: [
-        { lte: th.humCritLow, color: '#ef4444' },
-        { gt: th.humCritLow, lte: th.humWarnLow, color: '#f59e0b' },
+        { lte: th.humCritLow, color: '#7c3aed' },
+        { gt: th.humCritLow, lte: th.humWarnLow, color: '#3b82f6' },
         { gt: th.humWarnLow, lte: th.humWarnHigh, color: '#06b6d4' },
-        { gt: th.humWarnHigh, lte: th.humCritHigh, color: '#f59e0b' },
-        { gt: th.humCritHigh, color: '#ef4444' },
+        { gt: th.humWarnHigh, lte: th.humCritHigh, color: '#3b82f6' },
+        { gt: th.humCritHigh, color: '#7c3aed' },
       ]
     }] : [])
   ] : undefined

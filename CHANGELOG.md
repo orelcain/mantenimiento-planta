@@ -7,6 +7,16 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.58] - 2026-02-19
+### Fix
+- **Colores de alerta de humedad en tonos azules**: La humedad en warning/crítico usaba los mismos colores ámbar/rojo de temperatura, creando confusión visual.
+  - Normal: `#06b6d4` (cian) — sin cambio.
+  - Warning: `#3b82f6` (azul medio) — antes era ámbar `#f59e0b`.
+  - Crítico: `#7c3aed` (violeta) — antes era rojo `#ef4444`.
+  - Temperatura mantiene sus tonos cálidos: naranja → ámbar → rojo.
+
+---
+
 ## [2.48.57] - 2026-02-19
 ### Feature
 - **Botones rápidos de zoom en gráfico de tendencia**: fila de botones debajo de los controles del gráfico para ajustar la ventana visible.
