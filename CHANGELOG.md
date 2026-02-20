@@ -7,6 +7,15 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.53] - 2026-02-19
+### Feature
+- **Control de escala de ejes Y**: Selectores para ajustar el intervalo del eje de temperatura (°C) y humedad (%) en el gráfico.
+  - Temperatura: Auto, 0.1°, 0.2°, 0.5°, 1°, 2°, 5°.
+  - Humedad: Auto, 0.5%, 1%, 2%, 5%, 10%.
+  - Formato de labels dinámico (decimales automáticos según intervalo).
+
+---
+
 ## [2.48.52] - 2026-02-19
 ### Fix
 - **Zoom que se reseteaba**: Cambio de `notMerge=true` a `false` en ReactECharts para preservar estado del zoom al re-renderizar.

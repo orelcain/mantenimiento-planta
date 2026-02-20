@@ -202,6 +202,8 @@ function TrendSparkline({
   const [customTo, setCustomTo] = useState('')
   const [chartMode, setChartMode] = useState<ChartMode>('dual')
   const [showThresholds, setShowThresholds] = useState(true)
+  const [tempInterval, setTempInterval] = useState<number | undefined>(undefined)
+  const [humInterval, setHumInterval] = useState<number | undefined>(undefined)
 
   // ── Resizable chart height ──
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 640
@@ -427,7 +429,8 @@ function TrendSparkline({
         splitLine: { show: true, lineStyle: { color: 'rgba(255, 255, 255, 0.04)', type: 'dashed' } },
         axisLine: { show: false },
         axisTick: { show: false },
-        axisLabel: { color: '#64748b', fontSize: 10, formatter: (v: number) => v.toFixed(1) },
+        axisLabel: { color: '#64748b', fontSize: 10, formatter: (v: number) => v.toFixed(tempInterval && tempInterval < 1 ? 1 : 0) },
+        ...(tempInterval ? { interval: tempInterval } : {}),
         min: chartMode === 'temperature' && showThresholds ? (value: any) => Math.min(value.min, th.tempCritLow - 2) : 'dataMin',
         max: chartMode === 'temperature' && showThresholds ? (value: any) => Math.max(value.max, th.tempCritHigh + 2) : 'dataMax',
         show: showTemp
@@ -440,7 +443,8 @@ function TrendSparkline({
         splitLine: { show: false },
         axisLine: { show: false },
         axisTick: { show: false },
-        axisLabel: { color: '#64748b', fontSize: 10, formatter: (v: number) => v.toFixed(1) },
+        axisLabel: { color: '#64748b', fontSize: 10, formatter: (v: number) => v.toFixed(humInterval && humInterval < 1 ? 1 : 0) },
+        ...(humInterval ? { interval: humInterval } : {}),
         min: chartMode === 'humidity' && showThresholds ? (value: any) => Math.min(value.min, th.humCritLow - 2) : 'dataMin',
         max: chartMode === 'humidity' && showThresholds ? (value: any) => Math.max(value.max, th.humCritHigh + 2) : 'dataMax',
         show: showHum
@@ -640,6 +644,45 @@ function TrendSparkline({
               >
                 Reset
               </button>
+            </div>
+          )}
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          {showTemp && (
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] text-orange-400/80">°C</span>
+              <select
+                value={tempInterval ?? 'auto'}
+                onChange={(e) => setTempInterval(e.target.value === 'auto' ? undefined : Number(e.target.value))}
+                className="h-5 rounded border border-border/50 bg-background/60 px-1 text-[10px] text-muted-foreground"
+                title="Intervalo eje Temperatura"
+              >
+                <option value="auto">Auto</option>
+                <option value="0.1">0.1°</option>
+                <option value="0.2">0.2°</option>
+                <option value="0.5">0.5°</option>
+                <option value="1">1°</option>
+                <option value="2">2°</option>
+                <option value="5">5°</option>
+              </select>
+            </div>
+          )}
+          {showHum && (
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] text-cyan-400/80">%</span>
+              <select
+                value={humInterval ?? 'auto'}
+                onChange={(e) => setHumInterval(e.target.value === 'auto' ? undefined : Number(e.target.value))}
+                className="h-5 rounded border border-border/50 bg-background/60 px-1 text-[10px] text-muted-foreground"
+                title="Intervalo eje Humedad"
+              >
+                <option value="auto">Auto</option>
+                <option value="0.5">0.5%</option>
+                <option value="1">1%</option>
+                <option value="2">2%</option>
+                <option value="5">5%</option>
+                <option value="10">10%</option>
+              </select>
             </div>
           )}
         </div>
