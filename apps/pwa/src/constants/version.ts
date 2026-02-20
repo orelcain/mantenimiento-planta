@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.48.58' as const
+export const APP_VERSION = '2.48.59' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-02-19' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Humidity visualMap uses blue tones instead of amber/red' as const
+export const VERSION_NAME = 'Sensor readings 30-day rolling window + purge Cloud Functions' as const
 
 /**
  * Nota:

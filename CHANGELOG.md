@@ -7,6 +7,18 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.59] - 2026-02-19
+### Feature
+- **Ventana rodante de 30 días para lecturas de sensores**: Cloud Function schedulada que purga automáticamente lecturas con más de 30 días en Firebase RTDB.
+  - `purgeSensorReadings`: ejecuta diariamente a las 03:00 (America/Santiago), elimina readings con timestamp > 30 días.
+  - `purgeSensorReadingsManual`: callable desde la PWA (solo admin), permite forzar purga con días configurables (1-365).
+  - Soporta timestamps en milisegundos y en segundos.
+  - Límite de seguridad por lote (500/1000 registros) para no exceder timeout de Cloud Functions.
+  - RTDB inicializado lazy para compatibilidad con entorno local.
+- **CHART_HISTORY_LIMIT subido a 10,000**: el gráfico ahora carga hasta 10K muestras (~28 horas a 10s intervalo).
+
+---
+
 ## [2.48.58] - 2026-02-19
 ### Fix
 - **Colores de alerta de humedad en tonos azules**: La humedad en warning/crítico usaba los mismos colores ámbar/rojo de temperatura, creando confusión visual.

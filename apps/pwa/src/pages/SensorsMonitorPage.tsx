@@ -171,7 +171,7 @@ const CHART_MIN_H = 120
 const CHART_MAX_H = 600
 const CHART_DEFAULT_H = 192  // 12rem
 const CHART_STORAGE_PREFIX = 'chart-h-'
-const CHART_HISTORY_LIMIT = 5000
+const CHART_HISTORY_LIMIT = 10000
 
 function getStoredChartHeight(deviceId: string): number {
   try {

@@ -1,13 +1,27 @@
 const { onDocumentCreated, onDocumentUpdated } = require('firebase-functions/v2/firestore')
 const { onCall } = require('firebase-functions/v2/https')
+const { onSchedule } = require('firebase-functions/v2/scheduler')
 const { logger } = require('firebase-functions')
 const { initializeApp } = require('firebase-admin/app')
 const { getFirestore } = require('firebase-admin/firestore')
+const { getDatabase } = require('firebase-admin/database')
 const { getMessaging } = require('firebase-admin/messaging')
 
 initializeApp()
 
 const db = getFirestore()
+
+// RTDB se inicializa lazy (getDatabase() requiere FIREBASE_CONFIG, solo disponible en Cloud Functions runtime)
+let _rtdb = null
+function getRtdb() {
+  if (!_rtdb) _rtdb = getDatabase()
+  return _rtdb
+}
+
+// ==================== CONSTANTES ====================
+
+/** Retención máxima de lecturas de sensores en RTDB: 30 días */
+const SENSOR_RETENTION_DAYS = 30
 
 // ==================== HELPERS ====================
 
@@ -660,6 +674,164 @@ exports.groqProxy = onCall(
     } catch (error) {
       logger.error('Groq proxy error:', error)
       throw new Error('Error al procesar la solicitud de IA')
+    }
+  }
+)
+
+// ==================== SENSOR READINGS PURGE ====================
+
+/**
+ * Purga lecturas de sensores con más de SENSOR_RETENTION_DAYS días.
+ * Ejecuta todos los días a las 03:00 UTC.
+ * Recorre sensors/{equipmentId}/readings y elimina las que tengan
+ * timestamp < (ahora - 30 días).
+ *
+ * Soporta timestamps en milisegundos y en segundos.
+ */
+exports.purgeSensorReadings = onSchedule(
+  {
+    schedule: 'every day 03:00',
+    timeZone: 'America/Santiago',
+    timeoutSeconds: 540,
+    memory: '256MiB',
+    retryCount: 1,
+  },
+  async () => {
+    const cutoffMs = Date.now() - SENSOR_RETENTION_DAYS * 24 * 60 * 60 * 1000
+    const cutoffSec = Math.floor(cutoffMs / 1000)
+
+    logger.info(`[purgeSensorReadings] Iniciando purga. Cutoff: ${new Date(cutoffMs).toISOString()} (${cutoffMs} ms / ${cutoffSec} s)`)
+
+    const sensorsRef = getRtdb().ref('sensors')
+    const sensorsSnap = await sensorsRef.once('value')
+
+    if (!sensorsSnap.exists()) {
+      logger.info('[purgeSensorReadings] No hay nodos en sensors/')
+      return
+    }
+
+    let totalDeleted = 0
+    let totalEquipments = 0
+
+    const equipmentIds = Object.keys(sensorsSnap.val())
+
+    for (const equipmentId of equipmentIds) {
+      const readingsRef = getRtdb().ref(`sensors/${equipmentId}/readings`)
+
+      // Buscar registros con timestamp < cutoff en milisegundos
+      const oldMsSnap = await readingsRef
+        .orderByChild('timestamp')
+        .endAt(cutoffMs)
+        .limitToFirst(500)
+        .once('value')
+
+      if (!oldMsSnap.exists()) continue
+
+      const updates = {}
+      let count = 0
+
+      oldMsSnap.forEach((child) => {
+        const val = child.val()
+        const ts = val?.timestamp
+        if (typeof ts !== 'number') return
+
+        // Verificar: es ms y está viejo, O es segundos y está viejo
+        const isOldMs = ts >= 1e12 && ts < cutoffMs
+        const isOldSec = ts > 0 && ts < 1e12 && ts < cutoffSec
+
+        if (isOldMs || isOldSec) {
+          updates[child.key] = null
+          count++
+        }
+      })
+
+      if (count > 0) {
+        await readingsRef.update(updates)
+        totalDeleted += count
+        totalEquipments++
+        logger.info(`[purgeSensorReadings] ${equipmentId}: eliminadas ${count} lecturas`)
+      }
+    }
+
+    logger.info(`[purgeSensorReadings] Purga completada. Total: ${totalDeleted} lecturas de ${totalEquipments} equipos`)
+  }
+)
+
+/**
+ * Purga manual invocable desde la PWA (solo admin).
+ * Permite forzar una limpieza sin esperar al cron.
+ */
+exports.purgeSensorReadingsManual = onCall(
+  { enforceAppCheck: false },
+  async (request) => {
+    // Solo admins
+    if (!request.auth) {
+      throw new Error('No autenticado')
+    }
+
+    const userDoc = await db.collection('users').doc(request.auth.uid).get()
+    const rol = userDoc.data()?.rol
+    if (rol !== 'admin') {
+      throw new Error('Solo administradores pueden ejecutar la purga manual')
+    }
+
+    const days = request.data?.days ?? SENSOR_RETENTION_DAYS
+    const retentionDays = Math.max(1, Math.min(365, Number(days) || SENSOR_RETENTION_DAYS))
+    const cutoffMs = Date.now() - retentionDays * 24 * 60 * 60 * 1000
+    const cutoffSec = Math.floor(cutoffMs / 1000)
+
+    logger.info(`[purgeSensorReadingsManual] uid=${request.auth.uid} retentionDays=${retentionDays}`)
+
+    const sensorsRef = getRtdb().ref('sensors')
+    const sensorsSnap = await sensorsRef.once('value')
+    if (!sensorsSnap.exists()) {
+      return { deleted: 0, equipments: 0, message: 'No hay datos de sensores' }
+    }
+
+    let totalDeleted = 0
+    let totalEquipments = 0
+    const equipmentIds = Object.keys(sensorsSnap.val())
+
+    for (const equipmentId of equipmentIds) {
+      const readingsRef = getRtdb().ref(`sensors/${equipmentId}/readings`)
+      const oldSnap = await readingsRef
+        .orderByChild('timestamp')
+        .endAt(cutoffMs)
+        .limitToFirst(1000)
+        .once('value')
+
+      if (!oldSnap.exists()) continue
+
+      const updates = {}
+      let count = 0
+
+      oldSnap.forEach((child) => {
+        const val = child.val()
+        const ts = val?.timestamp
+        if (typeof ts !== 'number') return
+
+        const isOldMs = ts >= 1e12 && ts < cutoffMs
+        const isOldSec = ts > 0 && ts < 1e12 && ts < cutoffSec
+
+        if (isOldMs || isOldSec) {
+          updates[child.key] = null
+          count++
+        }
+      })
+
+      if (count > 0) {
+        await readingsRef.update(updates)
+        totalDeleted += count
+        totalEquipments++
+      }
+    }
+
+    return {
+      deleted: totalDeleted,
+      equipments: totalEquipments,
+      retentionDays,
+      cutoff: new Date(cutoffMs).toISOString(),
+      message: `Eliminadas ${totalDeleted} lecturas de ${totalEquipments} equipos (retención: ${retentionDays} días)`,
     }
   }
 )
