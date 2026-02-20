@@ -91,6 +91,26 @@ function resolveThresholds(device?: SensorThresholds): typeof DEFAULT_THRESHOLDS
   }
 }
 
+function getThresholdDistanceLabel(value: number | undefined, warnLow: number, warnHigh: number, unit: string): string {
+  if (value === undefined || !Number.isFinite(value)) return 'Margen a umbral: —'
+
+  if (value < warnLow) {
+    return `Umbral bajo superado por ${(warnLow - value).toFixed(1)} ${unit}`
+  }
+
+  if (value > warnHigh) {
+    return `Umbral alto superado por ${(value - warnHigh).toFixed(1)} ${unit}`
+  }
+
+  const toLow = value - warnLow
+  const toHigh = warnHigh - value
+  if (toHigh <= toLow) {
+    return `Faltan ${toHigh.toFixed(1)} ${unit} para umbral alto`
+  }
+
+  return `Faltan ${toLow.toFixed(1)} ${unit} para umbral bajo`
+}
+
 /* ── Editor de umbrales (solo admin) ── */
 function ThresholdEditor({ deviceId, current, onClose }: {
   deviceId: string
@@ -882,6 +902,9 @@ function FocusModal({ device, equipmentById, readingsByEquipment, backfillByEqui
   const currentTemp = tempFromTelemetry ? device.telemetry?.temperatura?.value : latestReading?.temperature
   const currentHum = humFromTelemetry ? device.telemetry?.humedad?.value : latestReading?.humidity
   const lastUpdateTs = Math.max(device.lastSeen ?? 0, telemetryTempTs, telemetryHumTs, readingTs)
+  const thresholds = resolveThresholds(device.thresholds)
+  const tempThresholdInfo = getThresholdDistanceLabel(currentTemp, thresholds.tempWarnLow, thresholds.tempWarnHigh, '°C')
+  const humThresholdInfo = getThresholdDistanceLabel(currentHum, thresholds.humWarnLow, thresholds.humWarnHigh, '%')
 
   return (
     <div className="fixed inset-0 z-[100] bg-background flex flex-col animate-in fade-in duration-200">
@@ -941,6 +964,7 @@ function FocusModal({ device, equipmentById, readingsByEquipment, backfillByEqui
               {currentTemp?.toFixed(1) ?? '—'}
               <span className="text-base font-normal ml-1">°C</span>
             </div>
+            <div className="mt-1 text-[11px] text-orange-400/80">{tempThresholdInfo}</div>
           </div>
           <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/5 p-4">
             <div className="text-xs text-cyan-400/80 flex items-center gap-1.5 mb-1">
@@ -950,6 +974,7 @@ function FocusModal({ device, equipmentById, readingsByEquipment, backfillByEqui
               {currentHum?.toFixed(1) ?? '—'}
               <span className="text-base font-normal ml-1">%</span>
             </div>
+            <div className="mt-1 text-[11px] text-cyan-400/80">{humThresholdInfo}</div>
           </div>
           <div className="rounded-xl border border-border/40 bg-card/30 p-4">
             <div className="text-xs text-muted-foreground mb-1">Última actualización</div>
@@ -1012,6 +1037,9 @@ function DeviceCard({ device, equipmentById, readingsByEquipment, backfillByEqui
   const humFromTelemetry = telemetryHumTs >= readingTs
   const currentTemp = tempFromTelemetry ? device.telemetry?.temperatura?.value : latestReading?.temperature
   const currentHum = humFromTelemetry ? device.telemetry?.humedad?.value : latestReading?.humidity
+  const thresholds = resolveThresholds(device.thresholds)
+  const tempThresholdInfo = getThresholdDistanceLabel(currentTemp, thresholds.tempWarnLow, thresholds.tempWarnHigh, '°C')
+  const humThresholdInfo = getThresholdDistanceLabel(currentHum, thresholds.humWarnLow, thresholds.humWarnHigh, '%')
   const lastUpdateTs = Math.max(
     device.lastSeen ?? 0,
     telemetryTempTs,
@@ -1083,6 +1111,7 @@ function DeviceCard({ device, equipmentById, readingsByEquipment, backfillByEqui
               {currentTemp?.toFixed(1) ?? '—'}
               <span className="text-sm font-normal ml-0.5">°C</span>
             </div>
+            <div className="mt-1 text-[11px] text-orange-400/80">{tempThresholdInfo}</div>
           </div>
           <div className="rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-3">
             <div className="text-xs text-cyan-400/80 flex items-center gap-1.5 mb-1">
@@ -1092,6 +1121,7 @@ function DeviceCard({ device, equipmentById, readingsByEquipment, backfillByEqui
               {currentHum?.toFixed(1) ?? '—'}
               <span className="text-sm font-normal ml-0.5">%</span>
             </div>
+            <div className="mt-1 text-[11px] text-cyan-400/80">{humThresholdInfo}</div>
           </div>
         </div>
 
