@@ -7,6 +7,18 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.56] - 2026-02-19
+### Feature
+- **Feedback visual de alertas en gráfico de tendencia**: El gráfico general (modo dual) ahora muestra visualmente cuando los valores cruzan umbrales de warning/crítico.
+  - `visualMap` piecewise en ECharts: los segmentos de la línea cambian de color automáticamente (naranja→ámbar→rojo para temp, cian→ámbar→rojo para hum) según los umbrales configurados.
+  - Borde del contenedor del gráfico con glow animado: rojo pulsante (crítico), ámbar (warning), sutil gris (normal).
+  - Barra de alerta superior (thin red/amber bar) en el borde del gráfico cuando hay estado anómalo.
+  - Badge "Crítico" / "Advertencia" con animación pulse junto al título "Tendencia".
+  - Checkbox "Umbrales" ahora disponible en todos los modos (incluido dual, antes solo single).
+  - Leyenda de colores unificada: muestra Advertencia/Peligro en cualquier modo con umbrales activos.
+
+---
+
 ## [2.48.55] - 2026-02-19
 ### Fix
 - **Crash `_checkNotDeleted is not a function`**: `firebase/database` y `firebase/messaging` no estaban incluidos en el chunk manual `firebase` de Vite, quedando en un chunk separado que perdía la referencia interna al `FirebaseApp`. Ahora todos los módulos de Firebase van en el mismo chunk.

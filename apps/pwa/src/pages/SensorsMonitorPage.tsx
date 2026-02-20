@@ -189,11 +189,13 @@ function TrendSparkline({
   sendIntervalSec,
   thresholds,
   deviceId,
+  alertLevel = 'normal',
 }: {
   readings?: SensorReading[]
   sendIntervalSec?: number
   thresholds?: SensorThresholds
   deviceId: string
+  alertLevel?: 'normal' | 'warning' | 'critical'
 }) {
   const [nowMs, setNowMs] = useState(() => Date.now())
   const [countdownMs, setCountdownMs] = useState(() => Date.now())
@@ -361,8 +363,40 @@ function TrendSparkline({
     ]
   } : undefined
 
+  // ── Visual Map: colorea segmentos de línea según umbrales ──
+  const useVisualMap = showThresholds
+  const visualMapConfig = useVisualMap ? [
+    ...(showTemp ? [{
+      show: false,
+      type: 'piecewise' as const,
+      seriesIndex: 0,
+      dimension: 1,
+      pieces: [
+        { lte: th.tempCritLow, color: '#ef4444' },
+        { gt: th.tempCritLow, lte: th.tempWarnLow, color: '#f59e0b' },
+        { gt: th.tempWarnLow, lte: th.tempWarnHigh, color: '#f97316' },
+        { gt: th.tempWarnHigh, lte: th.tempCritHigh, color: '#f59e0b' },
+        { gt: th.tempCritHigh, color: '#ef4444' },
+      ]
+    }] : []),
+    ...(showHum ? [{
+      show: false,
+      type: 'piecewise' as const,
+      seriesIndex: showTemp ? 1 : 0,
+      dimension: 1,
+      pieces: [
+        { lte: th.humCritLow, color: '#ef4444' },
+        { gt: th.humCritLow, lte: th.humWarnLow, color: '#f59e0b' },
+        { gt: th.humWarnLow, lte: th.humWarnHigh, color: '#06b6d4' },
+        { gt: th.humWarnHigh, lte: th.humCritHigh, color: '#f59e0b' },
+        { gt: th.humCritHigh, color: '#ef4444' },
+      ]
+    }] : [])
+  ] : undefined
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const option: EChartsOption = {
+    ...(visualMapConfig ? { visualMap: visualMapConfig as any } : {}),
     animation: true,
     animationDuration: 250,
     animationEasing: 'cubicOut',
@@ -504,7 +538,7 @@ function TrendSparkline({
           lineStyle: { width: 2.5 },
           itemStyle: { borderWidth: 2, borderColor: '#f97316', color: '#fff' }
         },
-        areaStyle: {
+        areaStyle: useVisualMap ? { opacity: 0.10 } : {
           color: {
             type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
             colorStops: [
@@ -534,7 +568,7 @@ function TrendSparkline({
           lineStyle: { width: 2.5 },
           itemStyle: { borderWidth: 2, borderColor: '#06b6d4', color: '#fff' }
         },
-        areaStyle: {
+        areaStyle: useVisualMap ? { opacity: 0.10 } : {
           color: {
             type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
             colorStops: [
@@ -559,6 +593,16 @@ function TrendSparkline({
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2.5">
           <h4 className="text-xs font-semibold text-foreground tracking-wide">Tendencia</h4>
+          {alertLevel !== 'normal' && (
+            <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium animate-pulse ${
+              alertLevel === 'critical'
+                ? 'bg-red-500/15 text-red-400 ring-1 ring-red-500/30'
+                : 'bg-amber-500/15 text-amber-400 ring-1 ring-amber-500/30'
+            }`}>
+              <AlertTriangle className="h-2.5 w-2.5" />
+              {alertLevel === 'critical' ? 'Crítico' : 'Advertencia'}
+            </span>
+          )}
           <select
             value={chartMode}
             onChange={(e) => setChartMode(e.target.value as ChartMode)}
@@ -568,17 +612,15 @@ function TrendSparkline({
             <option value="temperature">Solo Temperatura</option>
             <option value="humidity">Solo Humedad</option>
           </select>
-          {chartMode !== 'dual' && (
-            <label className="flex items-center gap-1 text-[11px] text-muted-foreground cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={showThresholds}
-                onChange={() => setShowThresholds(!showThresholds)}
-                className="h-3 w-3 accent-primary rounded"
-              />
-              Umbrales
-            </label>
-          )}
+          <label className="flex items-center gap-1 text-[11px] text-muted-foreground cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={showThresholds}
+              onChange={() => setShowThresholds(!showThresholds)}
+              className="h-3 w-3 accent-primary rounded"
+            />
+            Umbrales
+          </label>
           <select
             value={timeFilterPreset}
             onChange={(e) => setTimeFilterPreset(e.target.value as 'all' | '15' | '60' | '240' | '1440' | 'custom')}
@@ -697,9 +739,21 @@ function TrendSparkline({
 
       <div
         ref={containerRef}
-        className="w-full rounded-lg bg-gradient-to-b from-muted/30 to-muted/5 overflow-hidden border border-border/20 relative select-none"
+        className={`w-full rounded-lg overflow-hidden relative select-none transition-colors duration-700 ${
+          alertLevel === 'critical'
+            ? 'border-2 border-red-500/50 bg-gradient-to-b from-red-950/40 via-muted/20 to-muted/5 shadow-[0_0_24px_rgba(239,68,68,0.15)]'
+            : alertLevel === 'warning'
+            ? 'border-2 border-amber-500/40 bg-gradient-to-b from-amber-950/30 via-muted/20 to-muted/5 shadow-[0_0_18px_rgba(245,158,11,0.10)]'
+            : 'border border-border/20 bg-gradient-to-b from-muted/30 to-muted/5'
+        }`}
         style={{ height: `${chartH}px`, transition: dragState.current.active ? 'none' : 'height 0.2s ease' }}
       >
+        {/* Barra superior de alerta */}
+        {alertLevel !== 'normal' && (
+          <div className={`absolute top-0 left-0 right-0 h-0.5 z-10 ${
+            alertLevel === 'critical' ? 'bg-red-500 animate-pulse' : 'bg-amber-500/80'
+          }`} />
+        )}
         <ReactECharts
           key={`${chartMode}-${showThresholds}`}
           option={option}
@@ -730,13 +784,13 @@ function TrendSparkline({
             <span className="h-2 w-2 rounded-full bg-cyan-500" /> Humedad
           </span>
         )}
-        {chartMode !== 'dual' && showThresholds && (
+        {showThresholds && (
           <>
             <span className="inline-flex items-center gap-1.5">
-              <span className={`h-2 w-2 rounded-sm ${chartMode === 'temperature' ? 'bg-amber-500/60' : 'bg-cyan-500/60'}`} /> Advertencia
+              <span className="h-2 w-2 rounded-sm bg-amber-500/60" /> Advertencia
             </span>
             <span className="inline-flex items-center gap-1.5">
-              <span className={`h-2 w-2 rounded-sm ${chartMode === 'temperature' ? 'bg-red-500/60' : 'bg-blue-500/60'}`} /> Peligro
+              <span className="h-2 w-2 rounded-sm bg-red-500/60" /> Peligro
             </span>
           </>
         )}
@@ -862,6 +916,7 @@ function FocusModal({ device, equipmentById, readingsByEquipment, panelNowMs, on
           sendIntervalSec={device.sendInterval}
           thresholds={device.thresholds}
           deviceId={`${device.deviceId}_focus`}
+          alertLevel={alert}
         />
       </div>
     </div>
@@ -976,6 +1031,7 @@ function DeviceCard({ device, equipmentById, readingsByEquipment, panelNowMs, na
           sendIntervalSec={device.sendInterval}
           thresholds={device.thresholds}
           deviceId={device.deviceId}
+          alertLevel={alert}
         />
 
         {/* Editor de umbrales (solo admin) */}
