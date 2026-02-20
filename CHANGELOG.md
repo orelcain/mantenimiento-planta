@@ -7,6 +7,16 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.57] - 2026-02-19
+### Feature
+- **Botones rápidos de zoom en gráfico de tendencia**: fila de botones debajo de los controles del gráfico para ajustar la ventana visible.
+  - 15 min, 30 min, 1 hora, 4 horas, Todo — controlan el dataZoom sin filtrar datos (se puede seguir haciendo scroll atrás).
+  - Botón activo resaltado con estilo `primary` para saber el zoom actual.
+  - Usa `dispatchAction({ type: 'dataZoom' })` para manipular el zoom programáticamente via ref al ECharts instance.
+  - Icono de lupa (ZoomIn) + etiqueta "Zoom:" como indicador visual.
+
+---
+
 ## [2.48.56] - 2026-02-19
 ### Feature
 - **Feedback visual de alertas en gráfico de tendencia**: El gráfico general (modo dual) ahora muestra visualmente cuando los valores cruzan umbrales de warning/crítico.

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
-import { Activity, AlertTriangle, Cpu, Thermometer, Droplets, Link2, Settings2, Save, X, Maximize2 } from 'lucide-react'
+import { Activity, AlertTriangle, Cpu, Thermometer, Droplets, Link2, Settings2, Save, X, Maximize2, ZoomIn } from 'lucide-react'
 import { Button, Card, CardContent, CardHeader, CardTitle, Input } from '@/components/ui'
 import { useCanSee, useIsAdmin } from '@/store'
 import { getEquipments } from '@/services/equipment'
@@ -206,6 +206,8 @@ function TrendSparkline({
   const [showThresholds, setShowThresholds] = useState(true)
   const [tempInterval, setTempInterval] = useState<number | undefined>(undefined)
   const [humInterval, setHumInterval] = useState<number | undefined>(undefined)
+  const [activeZoom, setActiveZoom] = useState<'15' | '30' | '60' | '240' | 'all'>('all')
+  const chartRef = useRef<ReactECharts>(null)
 
   // ── Resizable chart height ──
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 640
@@ -221,6 +223,27 @@ function TrendSparkline({
       try { localStorage.setItem(CHART_STORAGE_PREFIX + deviceId, String(h)) } catch { /* noop */ }
     }, 300)
   }, [deviceId, isMobile])
+
+  // ── Quick zoom: ajusta dataZoom sin filtrar datos ──
+  const zoomToLast = useCallback((minutes: number | 'all') => {
+    const instance = chartRef.current?.getEchartsInstance()
+    if (!instance) return
+    if (minutes === 'all') {
+      instance.dispatchAction({ type: 'dataZoom', start: 0, end: 100 })
+      setActiveZoom('all')
+      return
+    }
+    const data = timeFilteredReadings
+    if (!data.length) return
+    const lastTs = data[data.length - 1]!.timestamp
+    const firstTs = data[0]!.timestamp
+    const span = lastTs - firstTs
+    if (span <= 0) return
+    const fromTs = lastTs - minutes * 60_000
+    const startPct = Math.max(0, ((fromTs - firstTs) / span) * 100)
+    instance.dispatchAction({ type: 'dataZoom', start: startPct, end: 100 })
+    setActiveZoom(String(minutes) as typeof activeZoom)
+  }, [timeFilteredReadings])
 
   useEffect(() => {
     const onMove = (e: PointerEvent) => {
@@ -737,6 +760,26 @@ function TrendSparkline({
         </span>
       </div>
 
+      {/* ── Botones rápidos de zoom ── */}
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <ZoomIn className="h-3 w-3 text-muted-foreground/60" />
+        <span className="text-[10px] text-muted-foreground/60 mr-0.5">Zoom:</span>
+        {([['15', '15 min'], ['30', '30 min'], ['60', '1 hora'], ['240', '4 horas'], ['all', 'Todo']] as const).map(([val, label]) => (
+          <button
+            key={val}
+            type="button"
+            onClick={() => zoomToLast(val === 'all' ? 'all' : Number(val))}
+            className={`h-6 rounded-md px-2 text-[10px] font-medium transition-colors ${
+              activeZoom === val
+                ? 'bg-primary/15 text-primary ring-1 ring-primary/30'
+                : 'border border-border/50 bg-background/60 text-muted-foreground hover:text-foreground hover:bg-muted/40'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
       <div
         ref={containerRef}
         className={`w-full rounded-lg overflow-hidden relative select-none transition-colors duration-700 ${
@@ -755,6 +798,7 @@ function TrendSparkline({
           }`} />
         )}
         <ReactECharts
+          ref={chartRef}
           key={`${chartMode}-${showThresholds}`}
           option={option}
           style={{ height: '100%', width: '100%' }}
