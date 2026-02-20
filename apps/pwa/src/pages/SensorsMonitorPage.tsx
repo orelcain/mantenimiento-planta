@@ -224,27 +224,6 @@ function TrendSparkline({
     }, 300)
   }, [deviceId, isMobile])
 
-  // ── Quick zoom: ajusta dataZoom sin filtrar datos ──
-  const zoomToLast = useCallback((minutes: number | 'all') => {
-    const instance = chartRef.current?.getEchartsInstance()
-    if (!instance) return
-    if (minutes === 'all') {
-      instance.dispatchAction({ type: 'dataZoom', start: 0, end: 100 })
-      setActiveZoom('all')
-      return
-    }
-    const data = timeFilteredReadings
-    if (!data.length) return
-    const lastTs = data[data.length - 1]!.timestamp
-    const firstTs = data[0]!.timestamp
-    const span = lastTs - firstTs
-    if (span <= 0) return
-    const fromTs = lastTs - minutes * 60_000
-    const startPct = Math.max(0, ((fromTs - firstTs) / span) * 100)
-    instance.dispatchAction({ type: 'dataZoom', start: startPct, end: 100 })
-    setActiveZoom(String(minutes) as typeof activeZoom)
-  }, [timeFilteredReadings])
-
   useEffect(() => {
     const onMove = (e: PointerEvent) => {
       if (!dragState.current.active) return
@@ -312,6 +291,27 @@ function TrendSparkline({
     const fromMs = nowMs - minutes * 60_000
     return normalizedReadings.filter((reading) => reading.timestamp >= fromMs)
   }, [normalizedReadings, timeFilterPreset, customFrom, customTo, nowMs])
+
+  // ── Quick zoom: ajusta dataZoom sin filtrar datos ──
+  const zoomToLast = useCallback((minutes: number | 'all') => {
+    const instance = chartRef.current?.getEchartsInstance()
+    if (!instance) return
+    if (minutes === 'all') {
+      instance.dispatchAction({ type: 'dataZoom', start: 0, end: 100 })
+      setActiveZoom('all')
+      return
+    }
+    const data = timeFilteredReadings
+    if (!data.length) return
+    const lastTs = data[data.length - 1]!.timestamp
+    const firstTs = data[0]!.timestamp
+    const span = lastTs - firstTs
+    if (span <= 0) return
+    const fromTs = lastTs - minutes * 60_000
+    const startPct = Math.max(0, ((fromTs - firstTs) / span) * 100)
+    instance.dispatchAction({ type: 'dataZoom', start: startPct, end: 100 })
+    setActiveZoom(String(minutes) as typeof activeZoom)
+  }, [timeFilteredReadings])
 
   useEffect(() => {
     if (!sendIntervalSec || sendIntervalSec <= 0) return
