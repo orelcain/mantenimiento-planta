@@ -7,6 +7,17 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.54] - 2026-02-19
+### Feature
+- **Modo enfoque para sensores**: Botón "Enfoque" en cada tarjeta de dispositivo abre un modal fullscreen.
+  - Sin barra lateral ni header del layout — vista 100% dedicada al sensor.
+  - KPIs grandes de temperatura, humedad, última actualización y muestras.
+  - Gráfico ECharts completo con todos los controles (zoom, escala, filtro tiempo).
+  - Salir con botón "Salir enfoque" o tecla `Escape`.
+  - Bloqueo de scroll del body mientras el modal está activo.
+
+---
+
 ## [2.48.53] - 2026-02-19
 ### Feature
 - **Control de escala de ejes Y**: Selectores para ajustar el intervalo del eje de temperatura (°C) y humedad (%) en el gráfico.
