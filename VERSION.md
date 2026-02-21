@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.48.62**
+## Versión Actual: **v2.48.63**
 
 **Fecha de lanzamiento**: 20 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,15 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.48.63 - Repuestos: catálogo puro sin inventario (20/02/2026)
+- 🧹 **Eliminación sistema de tags**: removido completamente useTags, TagSelector y RepuestoHistoryModal.
+- 📦 **Modelo simplificado**: Repuesto ahora usa `cantidadPorMaquina` y `ubicacionEnPlanta` en lugar de stock/solicitudes/tags.
+- 📊 **KPIs de catálogo**: dashboard muestra total repuestos, con ficha técnica, con foto/manual y valor referencial.
+- 📥 **Import simplificado**: ImportRepuestosModal solo modo catálogo (sin modo cantidades+tag).
+- 📤 **Export limpio**: ExportReportModal sin referencias a tags.
+- 🔍 **Búsqueda mejorada**: incluye código fabricante y ubicación en planta.
+- 🗑️ **-1938 líneas eliminadas**: reducción masiva de complejidad del módulo.
 
 ### v2.48.33 - Gráfico con zonas de alerta temperatura/humedad (17/02/2026)
 - 📊 **Selector de modo**: doble eje, solo temperatura o solo humedad.

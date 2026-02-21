@@ -7,6 +7,20 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.63] - 2026-02-20
+### Refactor
+- **Repuestos transformado a catálogo puro**: Eliminación completa del sistema de inventario/tags/solicitudes:
+  - Removidos: useTags hook, TagSelector, RepuestoHistoryModal, StockBadge
+  - Modelo simplificado: `cantidadPorMaquina` y `ubicacionEnPlanta` reemplazan tags/stock/solicitudes
+  - useRepuestos reescrito sin lógica de tags (importCantidadesPorTag, renameTag, deleteTag eliminados)
+  - ImportRepuestosModal: solo modo catálogo, columnas adaptadas al nuevo modelo
+  - ExportReportModal: eliminadas referencias a rep.tags y parámetros includeTagsDetail/includeTags
+  - Dashboard: KPIs de catálogo (total, con ficha, con foto/manual, valor referencial)
+  - Búsqueda ampliada: incluye código fabricante y ubicación en planta
+  - Reducción neta: -1938 líneas, +227 líneas (15 archivos modificados, 3 eliminados)
+
+---
+
 ## [2.48.62] - 2026-02-20
 ### UI/UX
 - **Catálogo de repuestos rediseñado**: Mejora visual completa del módulo de repuestos:
