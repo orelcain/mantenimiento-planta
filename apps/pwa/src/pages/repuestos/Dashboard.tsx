@@ -1,12 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, Plus, FileText, Upload, FolderTree, Package, ClipboardList, ImageIcon, DollarSign, Wrench } from 'lucide-react'
 import { RepuestosTable } from '@/components/repuestos/RepuestosTable'
 import { RepuestoFormModal } from '@/components/repuestos/RepuestoForm'
 import { RepuestosFilters } from '@/components/repuestos/RepuestosFilters'
 import { RepuestosPagination } from '@/components/repuestos/RepuestosPagination'
 import { EmptyState } from '@/components/repuestos/EmptyState'
-import { CategorySelector } from '@/components/repuestos/CategorySelector'
-import { MachineSelector } from '@/components/repuestos/MachineSelector'
+import { MachineAccordionNav } from '@/components/repuestos/MachineAccordionNav'
 import { MachineHierarchySelector } from '@/components/repuestos/MachineHierarchySelector'
 import { RepuestoPhotosModal } from '@/components/repuestos/RepuestoPhotosModal'
 import { RepuestoManualModal } from '@/components/repuestos/RepuestoManualModal'
@@ -32,7 +31,7 @@ import {
 } from '@/components/ui'
 
 export function RepuestosDashboard() {
-  const { machines, loading: machinesLoading, setCurrentMachine, setCurrentMachineDirect } = useMachineContext()
+  const { machines, loading: machinesLoading, setCurrentMachineDirect } = useMachineContext()
   const currentMachine = useCurrentMachine()
   const isAdmin = useIsAdmin()
   const { categories } = useMachineCategories()
@@ -49,10 +48,7 @@ export function RepuestosDashboard() {
   const [newMachineOpen, setNewMachineOpen] = useState(false)
   const [structureManagerOpen, setStructureManagerOpen] = useState(false)
   const [exportReportOpen, setExportReportOpen] = useState(false)
-
-  // Filtro de categorías
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>('maquinas-principales')
-  const lastCategoryRef = useRef<string | null>(selectedCategoryId)
 
   // Filtros y paginación
   const [searchQuery, setSearchQuery] = useState('')
@@ -87,17 +83,14 @@ export function RepuestosDashboard() {
     }
   }
 
-  // Calcular conteos de máquinas por categoría
-  const machineCountsByCategory = useMemo(() => {
+  // Calcular conteos de repuestos por máquina para el navegador
+  const repuestosCounts = useMemo(() => {
     const counts: Record<string, number> = {}
-    machines.forEach((machine) => {
-      if (machine.activa) {
-        const categoryId = machine.categoryId || 'maquinas-principales'
-        counts[categoryId] = (counts[categoryId] || 0) + 1
-      }
+    machines.forEach(m => {
+      counts[m.id] = m.id === currentMachine?.id ? repuestos.length : 0
     })
     return counts
-  }, [machines])
+  }, [machines, currentMachine, repuestos])
 
   // Filtrar repuestos — Búsqueda mejorada incluye código fabricante
   const filteredRepuestos = useMemo(() => {
@@ -132,44 +125,6 @@ export function RepuestosDashboard() {
   useEffect(() => {
     setCurrentPage(1)
   }, [searchQuery, pageSize])
-
-  // IDs de subcategorías de la categoría seleccionada
-  const subcategoryIds = useMemo(() => {
-    if (!selectedCategoryId) return []
-    return categories
-      .filter(c => c.parentId === selectedCategoryId)
-      .map(c => c.id)
-  }, [categories, selectedCategoryId])
-
-  // Seleccionar primera máquina cuando cambia de categoría
-  useEffect(() => {
-    if (!machines.length) return
-    if (lastCategoryRef.current === selectedCategoryId) return
-    lastCategoryRef.current = selectedCategoryId
-
-    const machinesInCategory = machines.filter((m) => {
-      if (!m.activa) return false
-      if (selectedCategoryId === 'maquinas-principales') {
-        return !m.categoryId || m.categoryId === 'maquinas-principales'
-      }
-      if (m.categoryId === selectedCategoryId) return true
-      if (subcategoryIds.includes(m.categoryId || '')) return true
-      return false
-    })
-
-    if (machinesInCategory.length > 0) {
-      setCurrentMachine(machinesInCategory[0]!.id)
-    }
-  }, [selectedCategoryId, machines, subcategoryIds, setCurrentMachine])
-
-  // Contar repuestos por máquina para el MachineSelector
-  const repuestosCounts = useMemo(() => {
-    const counts: Record<string, number> = {}
-    machines.forEach(m => {
-      counts[m.id] = m.id === currentMachine?.id ? repuestos.length : 0
-    })
-    return counts
-  }, [machines, currentMachine, repuestos])
 
   const handleClearFilters = () => {
     setSearchQuery('')
@@ -258,30 +213,44 @@ export function RepuestosDashboard() {
 
   return (
     <div className="flex flex-col h-full bg-background">
-      {/* Category Selector Tabs */}
-      <div className="sticky top-0 z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
-         <CategorySelector
-            selectedCategoryId={selectedCategoryId}
-            onSelectCategory={setSelectedCategoryId}
-            machineCountsByCategory={machineCountsByCategory}
-          />
-         <MachineSelector
-            repuestosCounts={repuestosCounts}
-            selectedCategoryId={selectedCategoryId}
-        />
-      </div>
+      <div className="flex-1 p-3 sm:p-6 space-y-4 sm:space-y-5 overflow-x-hidden overflow-y-auto">
+        {/* Page title + global actions */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-lg sm:text-xl font-bold text-foreground">Catálogo de Repuestos</h1>
+            <p className="text-xs text-muted-foreground mt-0.5">Selecciona un equipo para ver su listado</p>
+          </div>
+          <div className="flex gap-2">
+            {isAdmin && (
+              <>
+                <Button onClick={() => setStructureManagerOpen(true)} variant="outline" size="sm" className="gap-2 hidden sm:flex">
+                  <FolderTree className="h-4 w-4" /> Estructura
+                </Button>
+                <Button onClick={() => setNewMachineOpen(true)} variant="outline" size="sm" className="gap-2 hidden sm:flex">
+                  <Plus className="h-4 w-4" /> Nuevo equipo
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
 
-      <div className="flex-1 p-3 sm:p-6 space-y-4 sm:space-y-6 overflow-x-hidden">
+        {/* Accordion Navigator: Categoría → Máquina */}
+        <MachineAccordionNav
+          repuestosCounts={repuestosCounts}
+          onCategoryChange={setSelectedCategoryId}
+        />
+        {/* ═══ Detalle de la máquina seleccionada ═══ */}
+        <div className="border-t border-border/40 pt-4">
         {/* Machine Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: (currentMachine.color || '#3b82f6') + '20' }}>
               <Wrench className="h-5 w-5" style={{ color: currentMachine.color || '#3b82f6' }} />
             </div>
             <div>
-              <h1 className="text-lg sm:text-xl font-semibold text-foreground leading-tight">
+              <h2 className="text-base sm:text-lg font-semibold text-foreground leading-tight">
                 {currentMachine.nombre}
-              </h1>
+              </h2>
               <p className="text-xs text-muted-foreground">
                 {[currentMachine.marca, currentMachine.modelo].filter(Boolean).join(' · ') || 'Catálogo de repuestos'}
                 {repuestos.length > 0 && <span className="ml-1.5 text-muted-foreground/70">— {repuestos.length} repuestos</span>}
@@ -312,7 +281,7 @@ export function RepuestosDashboard() {
                 )}
              </div>
              
-             {/* Mas opciones mobile */}
+             {/* Mobile extra options */}
              <div className="flex flex-col sm:hidden w-full gap-2">
                <div className="flex w-full gap-2">
                   <Button variant="outline" size="sm" onClick={handleOpenExportReport} className="flex-1 gap-1" title="Reportes">
@@ -330,21 +299,6 @@ export function RepuestosDashboard() {
                       <span className="text-xs">Equipo</span>
                     </Button>
                  </div>
-               )}
-             </div>
-             
-             <div className="hidden sm:flex gap-2">
-               {isAdmin && (
-                 <>
-                   <Button onClick={() => setStructureManagerOpen(true)} className="gap-2" variant="outline" size="sm">
-                     <FolderTree className="h-4 w-4" />
-                     Estructura
-                   </Button>
-                   <Button onClick={() => setNewMachineOpen(true)} className="gap-2" variant="outline" size="sm">
-                     <Plus className="h-4 w-4" />
-                     Nuevo equipo
-                   </Button>
-                 </>
                )}
              </div>
           </div>
@@ -459,6 +413,7 @@ export function RepuestosDashboard() {
             </>
           )}
         </div>
+        </div>{/* cierre border-t detail section */}
       </div>
 
       {/* Create Modal */}

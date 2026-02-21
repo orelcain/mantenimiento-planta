@@ -7,6 +7,19 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.64] - 2026-02-20
+### UI/UX
+- **Navegación acordeón por categoría**: Rediseño completo de la navegación de repuestos:
+  - Categorías como secciones colapsables (acordeón vertical) en lugar de tabs horizontales
+  - Máquinas como tarjetas (cards) con color, icono, nombre y badge de conteo de repuestos
+  - Subcategorías integradas con separador visual dentro de cada sección expandida
+  - Selección directa: click en tarjeta muestra repuestos debajo
+  - Grid responsivo de 2 columnas (móvil) a 6 columnas (desktop)
+  - Título de página y botones globales (Estructura, Nuevo equipo) movidos al header superior
+  - Nuevo componente MachineAccordionNav reemplaza CategorySelector + MachineSelector en Dashboard
+
+---
+
 ## [2.48.63] - 2026-02-20
 ### Refactor
 - **Repuestos transformado a catálogo puro**: Eliminación completa del sistema de inventario/tags/solicitudes:

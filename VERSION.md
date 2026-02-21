@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.48.63**
+## Versión Actual: **v2.48.64**
 
 **Fecha de lanzamiento**: 20 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,14 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.48.64 - Navegación acordeón por categoría (20/02/2026)
+- 🏢 **Acordeón vertical**: cada categoría (Máquinas Principales, Motores y Bombas, Cintas Transportadoras) es una sección colapsable.
+- 🎨 **Tarjetas de máquina**: al expandir una categoría, los equipos se muestran como cards responsivas con color, nombre y conteo de repuestos.
+- 📦 **Subcategorías integradas**: sub-secciones con separador visual dentro de cada categoría expandida.
+- ⚡ **Selección directa**: click en tarjeta selecciona máquina y muestra sus repuestos debajo.
+- 📱 **Grid responsivo**: 2 cols móvil → 6 cols desktop.
+- 🧹 **Dashboard limpio**: eliminados tabs horizontales de categoría y pills de máquinas.
 
 ### v2.48.63 - Repuestos: catálogo puro sin inventario (20/02/2026)
 - 🧹 **Eliminación sistema de tags**: removido completamente useTags, TagSelector y RepuestoHistoryModal.
