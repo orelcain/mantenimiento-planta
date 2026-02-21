@@ -1,4 +1,4 @@
-import { FileText, Image, History, Pencil, Trash2, ClipboardList, Camera } from 'lucide-react'
+import { FileText, Image, Pencil, Trash2, ClipboardList, Camera } from 'lucide-react'
 import type { Repuesto } from '@/types/repuestos'
 import { Button } from '@/components/ui'
 
@@ -8,7 +8,6 @@ interface RepuestoActionsProps {
   onDelete?: (repuesto: Repuesto) => void
   onViewManual?: (repuesto: Repuesto) => void
   onViewPhotos?: (repuesto: Repuesto) => void
-  onViewHistory?: (repuesto: Repuesto) => void
   onViewSpecs?: (repuesto: Repuesto) => void
   onViewGallery?: (repuesto: Repuesto) => void
 }
@@ -19,7 +18,6 @@ export function RepuestoActionsMenu({
   onDelete,
   onViewManual,
   onViewPhotos,
-  onViewHistory,
   onViewSpecs,
   onViewGallery,
 }: RepuestoActionsProps) {
@@ -81,19 +79,6 @@ export function RepuestoActionsMenu({
         </Button>
       ) : null}
 
-      {/* Historial */}
-      {onViewHistory ? (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => onViewHistory(repuesto)}
-          title="Historial de cambios"
-          className="h-8 w-8 p-0"
-        >
-          <History className="h-4 w-4" />
-        </Button>
-      ) : null}
-
       {/* Editar */}
       {onEdit ? (
         <Button
@@ -122,4 +107,3 @@ export function RepuestoActionsMenu({
     </div>
   )
 }
-

@@ -4,10 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import type { ImportCantidadRow } from '@/types/repuestos'
-
-export type ImportMode = 'catalogo' | 'cantidades'
+import type { ImportCatalogoRow } from '@/types/repuestos'
 
 interface ImportRepuestosModalProps {
   open: boolean
@@ -15,8 +12,7 @@ interface ImportRepuestosModalProps {
   onSuccess: (message: string) => void
   onError: (message: string) => void
   machineName?: string
-  importCatalogoDesdeExcel: (args: { rows: Omit<ImportCantidadRow, 'cantidad'>[]; placeholder?: string }) => Promise<void>
-  importCantidadesPorTag: (args: { rows: ImportCantidadRow[]; tagName: string; tipo: 'solicitud' | 'stock'; placeholder?: string }) => Promise<void>
+  importCatalogoDesdeExcel: (args: { rows: ImportCatalogoRow[]; placeholder?: string }) => Promise<void>
 }
 
 function normalizeNumber(value: unknown, fallback = 0): number {
@@ -29,10 +25,10 @@ function normalizeNumber(value: unknown, fallback = 0): number {
   if (typeof value === 'string') {
     const sanitized = value
       .trim()
-      .replace(/\s+/g, '') // elimina espacios internos
-      .replace(/[$¢€£₱₡₲₴₺₽₹]/g, '') // quita símbolos de moneda comunes
-      .replace(/\./g, '') // quita separador de miles tipo 1.234,56
-      .replace(/,/g, '.') // convierte coma decimal en punto
+      .replace(/\s+/g, '')
+      .replace(/[$¢€£₱₡₲₴₺₽₹]/g, '')
+      .replace(/\./g, '')
+      .replace(/,/g, '.')
 
     const parsed = Number(sanitized)
     return Number.isFinite(parsed) ? parsed : fallback
@@ -47,7 +43,7 @@ function normalizeString(value: unknown): string {
   return String(value).trim()
 }
 
-function mapRowToImport(row: Record<string, unknown>): ImportCantidadRow {
+function mapRowToImport(row: Record<string, unknown>): ImportCatalogoRow {
   const lower: Record<string, unknown> = {}
   Object.entries(row).forEach(([k, v]) => {
     lower[k.toLowerCase()] = v
@@ -65,10 +61,16 @@ function mapRowToImport(row: Record<string, unknown>): ImportCantidadRow {
   const descripcion = normalizeString(
     lower['descripcion'] || lower['descripción'] || lower['detalle'] || lower['texto'] || textoBreve
   )
-  const cantidad = normalizeNumber(lower['cantidad'] || lower['stock'] || lower['qty'] || lower['cantidadsolicitada'], 0)
   const valorUnitario = normalizeNumber(
     lower['valorunitario'] || lower['valor unitario'] || lower['precio'] || lower['costo'] || lower['pu'],
     0
+  )
+  const cantidadPorMaquina = normalizeNumber(
+    lower['cantidadpormaquina'] || lower['cantidad por maquina'] || lower['cantidad'] || lower['qty'] || lower['stock'],
+    0
+  )
+  const ubicacionEnPlanta = normalizeString(
+    lower['ubicacionenplanta'] || lower['ubicacion en planta'] || lower['ubicacion'] || lower['ubicación']
   )
 
   return {
@@ -76,8 +78,9 @@ function mapRowToImport(row: Record<string, unknown>): ImportCantidadRow {
     codigoBaader,
     textoBreve,
     descripcion,
-    cantidad,
     valorUnitario,
+    cantidadPorMaquina,
+    ubicacionEnPlanta,
   }
 }
 
@@ -88,14 +91,11 @@ export function ImportRepuestosModal({
   onError,
   machineName,
   importCatalogoDesdeExcel,
-  importCantidadesPorTag,
 }: ImportRepuestosModalProps) {
-  const [mode, setMode] = useState<ImportMode>('catalogo')
-  const [tagName, setTagName] = useState('stock')
   const [file, setFile] = useState<File | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
-  const isReady = useMemo(() => !!file && (mode === 'catalogo' || tagName.trim().length > 0), [file, mode, tagName])
+  const isReady = useMemo(() => !!file, [file])
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const nextFile = event.target.files?.[0] || null
@@ -122,20 +122,8 @@ export function ImportRepuestosModal({
 
       if (mapped.length === 0) throw new Error('No se encontraron columnas válidas (codigoSAP / codigoBaader / textoBreve / descripcion)')
 
-      if (mode === 'catalogo') {
-        await importCatalogoDesdeExcel({
-          rows: mapped.map(({ cantidad: _cantidad, ...rest }) => rest),
-        })
-        onSuccess('Catálogo importado (sin cantidades)')
-      } else {
-        await importCantidadesPorTag({
-          rows: mapped,
-          tagName: tagName.trim(),
-          tipo: 'stock',
-        })
-        onSuccess(`Cantidades importadas al tag "${tagName}"`)
-      }
-
+      await importCatalogoDesdeExcel({ rows: mapped })
+      onSuccess(`Catálogo importado correctamente (${mapped.length} filas)`)
       onClose()
     } catch (err) {
       const message = err instanceof Error ? err.message : 'No se pudo importar el Excel'
@@ -144,7 +132,7 @@ export function ImportRepuestosModal({
     } finally {
       setIsLoading(false)
     }
-  }, [file, importCatalogoDesdeExcel, importCantidadesPorTag, mode, onClose, onError, onSuccess, tagName])
+  }, [file, importCatalogoDesdeExcel, onClose, onError, onSuccess])
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
@@ -152,37 +140,16 @@ export function ImportRepuestosModal({
         <DialogHeader>
           <DialogTitle>Importar repuestos desde Excel</DialogTitle>
           <DialogDescription>
-            {machineName ? `Máquina: ${machineName}` : 'Selecciona archivo Excel exportado desde la app anterior.'}
+            {machineName ? `Máquina: ${machineName}` : 'Selecciona archivo Excel para importar al catálogo.'}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label>Modo de importación</Label>
-            <Select value={mode} onValueChange={(value) => setMode(value as ImportMode)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecciona modo" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="catalogo">Solo catálogo (sin cantidades)</SelectItem>
-                <SelectItem value="cantidades">Catálogo + cantidades al tag</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {mode === 'cantidades' && (
-            <div className="space-y-2">
-              <Label>Tag destino</Label>
-              <Input value={tagName} onChange={(e) => setTagName(e.target.value)} placeholder="stock" />
-              <p className="text-xs text-muted-foreground">Se guardará como tag de tipo stock con la cantidad del Excel.</p>
-            </div>
-          )}
-
-          <div className="space-y-2">
             <Label>Archivo Excel (.xlsx)</Label>
             <Input type="file" accept=".xlsx,.xls" onChange={handleFileChange} />
             <p className="text-xs text-muted-foreground">
-              Columnas esperadas: codigoSAP, codigoBaader, textoBreve, descripcion, cantidad, valorUnitario.
+              Columnas esperadas: codigoSAP, codigoBaader, textoBreve, descripcion, valorUnitario, cantidadPorMaquina, ubicacionEnPlanta.
             </p>
           </div>
         </div>
@@ -192,7 +159,7 @@ export function ImportRepuestosModal({
             Cancelar
           </Button>
           <Button onClick={handleImport} disabled={!isReady || isLoading}>
-            {isLoading ? 'Importando…' : 'Importar'}
+            {isLoading ? 'Importando…' : 'Importar Catálogo'}
           </Button>
         </DialogFooter>
       </DialogContent>

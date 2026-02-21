@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, Plus, FileText, Upload, FolderTree, Package, PackageCheck, PackageX, DollarSign, TrendingDown, Wrench } from 'lucide-react'
+import { AlertTriangle, Plus, FileText, Upload, FolderTree, Package, ClipboardList, ImageIcon, DollarSign, Wrench } from 'lucide-react'
 import { RepuestosTable } from '@/components/repuestos/RepuestosTable'
 import { RepuestoFormModal } from '@/components/repuestos/RepuestoForm'
 import { RepuestosFilters } from '@/components/repuestos/RepuestosFilters'
@@ -10,16 +10,13 @@ import { MachineSelector } from '@/components/repuestos/MachineSelector'
 import { MachineHierarchySelector } from '@/components/repuestos/MachineHierarchySelector'
 import { RepuestoPhotosModal } from '@/components/repuestos/RepuestoPhotosModal'
 import { RepuestoManualModal } from '@/components/repuestos/RepuestoManualModal'
-import { RepuestoHistoryModal } from '@/components/repuestos/RepuestoHistoryModal'
 import { TechnicalSpecsModal } from '@/components/repuestos/TechnicalSpecsModal'
 import { useRepuestos } from '@/hooks/repuestos/useRepuestos'
-import { useTags } from '@/hooks/repuestos/useTags'
 import { useMachineCategories } from '@/hooks/repuestos/useMachineCategories'
 import { useToast } from '@/hooks/useToast'
 import { useMachineContext, useCurrentMachine } from '@/contexts/MachineContext'
 import { useIsAdmin } from '@/store/authStore'
 import type { Repuesto, RepuestoFormData, TechnicalSpecs, MachineImage } from '@/types/repuestos'
-import { isTagAsignado, getTagNombre } from '@/types/tags'
 import { CategoryManager } from '@/components/repuestos/CategoryManager'
 import { ImportRepuestosModal } from './ImportRepuestosModal'
 import { ExportReportModal } from '@/components/repuestos/ExportReportModal'
@@ -33,26 +30,6 @@ import {
   DialogTitle,
   LoadingScreen,
 } from '@/components/ui'
-
-const getStockTotal = (repuesto: Repuesto) => {
-  const stockFromTags = Array.isArray(repuesto.tags)
-    ? repuesto.tags.reduce((sum, tag) => {
-        if (isTagAsignado(tag) && tag.tipo === 'stock') return sum + (tag.cantidad || 0)
-        return sum
-      }, 0)
-    : 0
-  return stockFromTags > 0 ? stockFromTags : repuesto.cantidadStockBodega || 0
-}
-
-const getSolicitudTotal = (repuesto: Repuesto) => {
-  const solicitudFromTags = Array.isArray(repuesto.tags)
-    ? repuesto.tags.reduce((sum, tag) => {
-        if (isTagAsignado(tag) && tag.tipo === 'solicitud') return sum + (tag.cantidad || 0)
-        return sum
-      }, 0)
-    : 0
-  return solicitudFromTags > 0 ? solicitudFromTags : repuesto.cantidadSolicitada || 0
-}
 
 export function RepuestosDashboard() {
   const { machines, loading: machinesLoading, setCurrentMachine, setCurrentMachineDirect } = useMachineContext()
@@ -68,7 +45,6 @@ export function RepuestosDashboard() {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [photoModal, setPhotoModal] = useState<Repuesto | null>(null)
   const [manualModal, setManualModal] = useState<Repuesto | null>(null)
-  const [historyModal, setHistoryModal] = useState<Repuesto | null>(null)
   const [specsTarget, setSpecsTarget] = useState<{repuesto: Repuesto, tab: 'specs' | 'gallery'} | null>(null)
   const [newMachineOpen, setNewMachineOpen] = useState(false)
   const [structureManagerOpen, setStructureManagerOpen] = useState(false)
@@ -80,9 +56,6 @@ export function RepuestosDashboard() {
 
   // Filtros y paginación
   const [searchQuery, setSearchQuery] = useState('')
-  const [selectedTags, setSelectedTags] = useState<string[]>([])
-  const [stockFilter, setStockFilter] = useState<'all' | 'with-stock' | 'without-stock' | 'low-stock'>('all')
-  const [solicitudFilter, setSolicitudFilter] = useState<'all' | 'with-solicitud' | 'without-solicitud'>('all')
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(25)
 
@@ -94,10 +67,7 @@ export function RepuestosDashboard() {
     updateRepuesto,
     deleteRepuesto,
     importCatalogoDesdeExcel,
-    importCantidadesPorTag,
   } = useRepuestos(currentMachine?.id || 'baader-200')
-
-  const { tags, error: tagsError } = useTags(repuestos, currentMachine?.id || 'baader-200')
 
   const handleSaveSpecs = async (repuestoId: string, specs: TechnicalSpecs, gallery: MachineImage[]) => {
     try {
@@ -106,7 +76,6 @@ export function RepuestosDashboard() {
         title: 'Ficha técnica actualizada',
         description: 'Los cambios se han guardado correctamente.',
       });
-      // El modal se cierra desde el componente hijo llamando a onOpenChange
     } catch (err) {
       console.error('Error saving specs:', err);
       toast({
@@ -114,7 +83,7 @@ export function RepuestosDashboard() {
         title: 'Error al guardar',
         description: 'No se pudieron guardar los cambios en la ficha técnica.',
       });
-      throw err; // Re-throw to let the modal handle loading state if necessary
+      throw err;
     }
   }
 
@@ -130,52 +99,25 @@ export function RepuestosDashboard() {
     return counts
   }, [machines])
 
-  // Filtrar repuestos
+  // Filtrar repuestos — Búsqueda mejorada incluye código fabricante
   const filteredRepuestos = useMemo(() => {
     let filtered = [...repuestos]
 
-    // Búsqueda por texto
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase()
       filtered = filtered.filter((r) => {
         return (
           r.codigoSAP?.toLowerCase().includes(query) ||
           r.textoBreve?.toLowerCase().includes(query) ||
-          r.descripcion?.toLowerCase().includes(query)
+          r.descripcion?.toLowerCase().includes(query) ||
+          r.codigoBaader?.toLowerCase().includes(query) ||
+          r.ubicacionEnPlanta?.toLowerCase().includes(query)
         )
       })
     }
 
-    // Filtrar por tags
-    if (selectedTags.length > 0) {
-      filtered = filtered.filter((r) => {
-        if (!Array.isArray(r.tags)) return false
-        const repuestoTagNames = r.tags.map((t) => getTagNombre(t))
-        return selectedTags.some((tagName) => repuestoTagNames.includes(tagName))
-      })
-    }
-
-    // Filtrar por stock
-    if (stockFilter === 'with-stock') {
-      filtered = filtered.filter((r) => getStockTotal(r) > 0)
-    } else if (stockFilter === 'without-stock') {
-      filtered = filtered.filter((r) => getStockTotal(r) === 0)
-    } else if (stockFilter === 'low-stock') {
-      filtered = filtered.filter((r) => {
-        const stock = getStockTotal(r)
-        return stock > 0 && stock < 5
-      })
-    }
-
-    // Filtrar por solicitud
-    if (solicitudFilter === 'with-solicitud') {
-      filtered = filtered.filter((r) => getSolicitudTotal(r) > 0)
-    } else if (solicitudFilter === 'without-solicitud') {
-      filtered = filtered.filter((r) => getSolicitudTotal(r) === 0)
-    }
-
     return filtered
-  }, [repuestos, searchQuery, selectedTags, stockFilter, solicitudFilter])
+  }, [repuestos, searchQuery])
 
   // Paginar repuestos
   const paginatedRepuestos = useMemo(() => {
@@ -189,7 +131,7 @@ export function RepuestosDashboard() {
   // Reset a página 1 cuando cambien los filtros
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchQuery, selectedTags, stockFilter, solicitudFilter, pageSize])
+  }, [searchQuery, pageSize])
 
   // IDs de subcategorías de la categoría seleccionada
   const subcategoryIds = useMemo(() => {
@@ -205,31 +147,20 @@ export function RepuestosDashboard() {
     if (lastCategoryRef.current === selectedCategoryId) return
     lastCategoryRef.current = selectedCategoryId
 
-    // Filtrar máquinas de la categoría seleccionada (incluyendo subcategorías)
     const machinesInCategory = machines.filter((m) => {
       if (!m.activa) return false
       if (selectedCategoryId === 'maquinas-principales') {
         return !m.categoryId || m.categoryId === 'maquinas-principales'
       }
-      // Incluir máquinas directas de la categoría
       if (m.categoryId === selectedCategoryId) return true
-      // También incluir máquinas de subcategorías
       if (subcategoryIds.includes(m.categoryId || '')) return true
       return false
     })
 
-    // Seleccionar la primera máquina de la categoría
     if (machinesInCategory.length > 0) {
       setCurrentMachine(machinesInCategory[0]!.id)
     }
   }, [selectedCategoryId, machines, subcategoryIds, setCurrentMachine])
-
-  // Elimino stats porque no se usa
-  /*
-  const stats = useMemo(() => {
-    ...
-  }, [repuestos])
-  */
 
   // Contar repuestos por máquina para el MachineSelector
   const repuestosCounts = useMemo(() => {
@@ -242,13 +173,9 @@ export function RepuestosDashboard() {
 
   const handleClearFilters = () => {
     setSearchQuery('')
-    setSelectedTags([])
-    setStockFilter('all')
-    setSolicitudFilter('all')
   }
 
   const handleOpenExportReport = () => {
-    // Ya no bloqueamos si no hay filtrados, porque el modal ahora permite seleccionar todo el catálogo
     setExportReportOpen(true)
   }
 
@@ -274,11 +201,7 @@ export function RepuestosDashboard() {
       setCreateOpen(false)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'No se pudo crear el repuesto.'
-      toast({
-        title: 'Error',
-        description: message,
-        variant: 'destructive',
-      })
+      toast({ title: 'Error', description: message, variant: 'destructive' })
     } finally {
       setSaving(false)
     }
@@ -288,7 +211,7 @@ export function RepuestosDashboard() {
     if (!editTarget) return
     setSaving(true)
     try {
-      await updateRepuesto(editTarget.id, { ...payload, tags: payload.tags }, editTarget)
+      await updateRepuesto(editTarget.id, { ...payload }, editTarget)
       toast({
         title: 'Repuesto actualizado',
         description: 'Los cambios han sido guardados exitosamente.',
@@ -297,11 +220,7 @@ export function RepuestosDashboard() {
       setEditTarget(null)
     } catch (err) {
       const message = err instanceof Error ? err.message : 'No se pudo actualizar el repuesto.'
-      toast({
-        title: 'Error',
-        description: message,
-        variant: 'destructive',
-      })
+      toast({ title: 'Error', description: message, variant: 'destructive' })
     } finally {
       setSaving(false)
     }
@@ -319,11 +238,7 @@ export function RepuestosDashboard() {
       })
     } catch (err) {
       const message = err instanceof Error ? err.message : 'No se pudo eliminar el repuesto.'
-      toast({
-        title: 'Error',
-        description: message,
-        variant: 'destructive',
-      })
+      toast({ title: 'Error', description: message, variant: 'destructive' })
     } finally {
       setConfirmDelete(null)
       setDeletingId(null)
@@ -375,8 +290,6 @@ export function RepuestosDashboard() {
           </div>
           
           <div className="flex flex-wrap gap-2">
-             {/* Mobile: Collapse secondary actions or use icons only if needed */}
-             
              <div className="flex items-center gap-2 w-full sm:w-auto">
                 {isAdmin && (
                 <Button variant="outline" size="sm" onClick={() => setImportOpen(true)} className="flex-1 sm:flex-none gap-2" title="Importar">
@@ -437,13 +350,12 @@ export function RepuestosDashboard() {
           </div>
         </div>
 
-        {/* KPI Summary Cards */}
+        {/* KPI Summary Cards — Catálogo puro */}
         {(() => {
           const totalRepuestos = repuestos.length
-          const totalConStock = repuestos.filter(r => getStockTotal(r) > 0).length
-          const totalSinStock = repuestos.filter(r => getStockTotal(r) === 0).length
-          const totalBajoStock = repuestos.filter(r => { const s = getStockTotal(r); return s > 0 && s < 5 }).length
-          const valorTotal = repuestos.reduce((sum, r) => sum + (r.valorUnitario || 0) * Math.max(getStockTotal(r), 1), 0)
+          const conFicha = repuestos.filter(r => r.technicalSpecs).length
+          const conFotoManual = repuestos.filter(r => (r.fotosReales?.length || 0) + (r.imagenesManual?.length || 0) + (r.gallery?.length || 0) > 0).length
+          const valorReferencial = repuestos.reduce((sum, r) => sum + ((r.cantidadPorMaquina || 1) * (r.valorUnitario || 0)), 0)
           return (
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
               {/* Total repuestos */}
@@ -456,39 +368,34 @@ export function RepuestosDashboard() {
                   <p className="text-xl font-bold text-foreground">{totalRepuestos}</p>
                 </div>
               </div>
-              {/* Con stock */}
+              {/* Con ficha técnica */}
               <div className="bg-card border rounded-xl p-4 flex items-center gap-3 hover:shadow-md transition-shadow">
                 <div className="h-10 w-10 rounded-lg bg-emerald-500/10 flex items-center justify-center shrink-0">
-                  <PackageCheck className="h-5 w-5 text-emerald-500" />
+                  <ClipboardList className="h-5 w-5 text-emerald-500" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Con stock</p>
-                  <p className="text-xl font-bold text-emerald-500">{totalConStock}</p>
+                  <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Con ficha</p>
+                  <p className="text-xl font-bold text-emerald-500">{conFicha}</p>
                 </div>
               </div>
-              {/* Sin stock */}
+              {/* Con foto / manual */}
               <div className="bg-card border rounded-xl p-4 flex items-center gap-3 hover:shadow-md transition-shadow">
-                <div className="h-10 w-10 rounded-lg bg-red-500/10 flex items-center justify-center shrink-0">
-                  <PackageX className="h-5 w-5 text-red-500" />
+                <div className="h-10 w-10 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
+                  <ImageIcon className="h-5 w-5 text-amber-500" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Sin stock</p>
-                  <p className="text-xl font-bold text-red-400">{totalSinStock}</p>
-                  {totalBajoStock > 0 && (
-                    <p className="text-[10px] text-amber-400 flex items-center gap-0.5">
-                      <TrendingDown className="h-3 w-3" />{totalBajoStock} bajo
-                    </p>
-                  )}
+                  <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Con foto</p>
+                  <p className="text-xl font-bold text-amber-500">{conFotoManual}</p>
                 </div>
               </div>
-              {/* Valor inventario */}
+              {/* Valor referencial */}
               <div className="bg-card border rounded-xl p-4 flex items-center gap-3 hover:shadow-md transition-shadow">
                 <div className="h-10 w-10 rounded-lg bg-violet-500/10 flex items-center justify-center shrink-0">
                   <DollarSign className="h-5 w-5 text-violet-500" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Valor inv.</p>
-                  <p className="text-lg font-bold text-foreground">${valorTotal.toLocaleString('es-CL')}</p>
+                  <p className="text-[11px] text-muted-foreground uppercase tracking-wider">Valor ref.</p>
+                  <p className="text-lg font-bold text-foreground">${valorReferencial.toLocaleString('es-CL')}</p>
                 </div>
               </div>
             </div>
@@ -496,10 +403,10 @@ export function RepuestosDashboard() {
         })()}
 
         {/* Error Display */}
-        {(repuestosError || tagsError) && (
+        {repuestosError && (
           <div className="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive flex items-center gap-2">
             <AlertTriangle className="h-4 w-4" />
-            {repuestosError || tagsError}
+            {repuestosError}
           </div>
         )}
 
@@ -519,19 +426,12 @@ export function RepuestosDashboard() {
           <RepuestosFilters
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
-            selectedTags={selectedTags}
-            onTagsChange={setSelectedTags}
-            stockFilter={stockFilter}
-            onStockFilterChange={setStockFilter}
-            solicitudFilter={solicitudFilter}
-            onSolicitudFilterChange={setSolicitudFilter}
-            availableTags={tags}
             onClearFilters={handleClearFilters}
           />
 
           {filteredRepuestos.length === 0 ? (
             <EmptyState
-              hasFilters={searchQuery !== '' || selectedTags.length > 0 || stockFilter !== 'all' || solicitudFilter !== 'all'}
+              hasFilters={searchQuery !== ''}
               onClearFilters={handleClearFilters}
             />
           ) : (
@@ -544,7 +444,6 @@ export function RepuestosDashboard() {
                 onDelete={isAdmin ? (rep) => setConfirmDelete(rep) : undefined}
                 onViewPhotos={(rep) => setPhotoModal(rep)}
                 onViewManual={(rep) => setManualModal(rep)}
-                onViewHistory={(rep) => setHistoryModal(rep)}
                 onViewSpecs={(rep) => setSpecsTarget({ repuesto: rep, tab: 'specs' })}
                 onViewGallery={(rep) => setSpecsTarget({ repuesto: rep, tab: 'gallery' })}
               />
@@ -568,7 +467,6 @@ export function RepuestosDashboard() {
         onClose={() => setCreateOpen(false)}
         mode="create"
         machineName={currentMachine.nombre}
-        availableTags={tags}
         onSubmit={handleCreate}
         loading={saving}
       />
@@ -579,7 +477,6 @@ export function RepuestosDashboard() {
         onClose={() => setEditTarget(null)}
         mode="edit"
         machineName={currentMachine.nombre}
-        availableTags={tags}
         initialData={editTarget || undefined}
         onSubmit={handleUpdate}
         loading={saving}
@@ -591,7 +488,7 @@ export function RepuestosDashboard() {
           <DialogHeader>
             <DialogTitle>Eliminar repuesto</DialogTitle>
             <DialogDescription>
-              Esta acción no se puede deshacer. Se eliminará el repuesto y su historial.
+              Esta acción no se puede deshacer. Se eliminará el repuesto del catálogo.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2 text-sm">
@@ -618,7 +515,6 @@ export function RepuestosDashboard() {
         onError={handleImportError}
         machineName={currentMachine.nombre}
         importCatalogoDesdeExcel={importCatalogoDesdeExcel}
-        importCantidadesPorTag={importCantidadesPorTag}
       />
 
       {/* Modales de vista adicional */}
@@ -640,22 +536,13 @@ export function RepuestosDashboard() {
         />
       )}
 
-      {historyModal && (
-        <RepuestoHistoryModal
-          open={true}
-          onOpenChange={(open) => !open && setHistoryModal(null)}
-          repuesto={historyModal}
-          machineId={currentMachine?.id}
-        />
-      )}
-
       {/* Modal de Ficha Técnica */}
       {specsTarget && (
         <TechnicalSpecsModal
           open={!!specsTarget}
           onOpenChange={(open) => !open && setSpecsTarget(null)}
           repuesto={specsTarget.repuesto}
-          machineId={currentMachine?.id} // Pasamos el ID de la máquina actual
+          machineId={currentMachine?.id}
           initialTab={specsTarget.tab}
           onSave={handleSaveSpecs}
           readOnly={!isAdmin}
@@ -668,7 +555,6 @@ export function RepuestosDashboard() {
         onOpenChange={setNewMachineOpen}
         categoryId={selectedCategoryId || undefined}
         onMachineCreated={(machine) => {
-          // Al crear un nuevo equipo, lo establecemos directamente
           setCurrentMachineDirect(machine)
           toast({
             title: 'Equipo creado',

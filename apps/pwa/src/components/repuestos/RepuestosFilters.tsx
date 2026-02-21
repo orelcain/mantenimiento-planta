@@ -1,47 +1,28 @@
 import { Search, X } from 'lucide-react'
 import { Input, Button } from '@/components/ui'
-import type { TagGlobal } from '@/types/tags'
 
 interface RepuestosFiltersProps {
   searchQuery: string
   onSearchChange: (value: string) => void
-  selectedTags: string[]
-  onTagsChange: (tags: string[]) => void
-  stockFilter: 'all' | 'with-stock' | 'without-stock' | 'low-stock'
-  onStockFilterChange: (value: 'all' | 'with-stock' | 'without-stock' | 'low-stock') => void
-  solicitudFilter: 'all' | 'with-solicitud' | 'without-solicitud'
-  onSolicitudFilterChange: (value: 'all' | 'with-solicitud' | 'without-solicitud') => void
-  availableTags: TagGlobal[]
   onClearFilters: () => void
 }
 
 export function RepuestosFilters({
   searchQuery,
   onSearchChange,
-  selectedTags,
-  onTagsChange: _onTagsChange,
-  stockFilter,
-  onStockFilterChange: _onStockFilterChange,
-  solicitudFilter,
-  onSolicitudFilterChange: _onSolicitudFilterChange,
-  availableTags: _availableTags,
   onClearFilters,
 }: RepuestosFiltersProps) {
-  const hasActiveFilters = 
-    searchQuery !== '' || 
-    selectedTags.length > 0 || 
-    stockFilter !== 'all' || 
-    solicitudFilter !== 'all'
+  const hasActiveFilters = searchQuery !== ''
 
   return (
     <div className="space-y-3">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        {/* Search input */}
+        {/* Search input — includes código SAP, texto breve, descripción y código fabricante */}
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             type="text"
-            placeholder="Buscar por código SAP, texto breve o descripción..."
+            placeholder="Buscar por código SAP, fabricante, nombre o descripción..."
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
             className="pl-9 pr-9"
@@ -64,7 +45,6 @@ export function RepuestosFilters({
           </Button>
         )}
       </div>
-
     </div>
   )
 }

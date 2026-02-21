@@ -1,6 +1,5 @@
-import { Package, ImageIcon, AlertTriangle, TrendingDown } from 'lucide-react'
+import { Package, ImageIcon } from 'lucide-react'
 import type { Repuesto } from '@/types/repuestos'
-import { isTagAsignado } from '@/types/tags'
 import { RepuestoActionsMenu } from './RepuestoActionsMenu'
 
 interface RepuestosTableProps {
@@ -11,49 +10,12 @@ interface RepuestosTableProps {
   onDelete?: (repuesto: Repuesto) => void
   onViewManual?: (repuesto: Repuesto) => void
   onViewPhotos?: (repuesto: Repuesto) => void
-  onViewHistory?: (repuesto: Repuesto) => void
   onViewSpecs?: (repuesto: Repuesto) => void
   onViewGallery?: (repuesto: Repuesto) => void
 }
 
 const formatNumber = (value: number) =>
   Number.isFinite(value) ? value.toLocaleString('es-CL') : '-';
-
-/** Calcula stock total desde tags o campo legacy */
-function getStockTotal(rep: Repuesto): number {
-  const fromTags = Array.isArray(rep.tags)
-    ? rep.tags.reduce((s, t) => {
-        if (isTagAsignado(t) && t.tipo === 'stock') return s + (t.cantidad || 0)
-        return s
-      }, 0)
-    : 0
-  return fromTags > 0 ? fromTags : rep.cantidadStockBodega || 0
-}
-
-/** Badge de stock con color semáforo */
-function StockBadge({ stock }: { stock: number }) {
-  if (stock === 0) {
-    return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-red-500/15 text-red-400 ring-1 ring-red-500/20">
-        <AlertTriangle className="h-3 w-3" />
-        Sin stock
-      </span>
-    )
-  }
-  if (stock < 5) {
-    return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/15 text-amber-400 ring-1 ring-amber-500/20">
-        <TrendingDown className="h-3 w-3" />
-        {stock}
-      </span>
-    )
-  }
-  return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/20">
-      {stock}
-    </span>
-  )
-}
 
 /** Thumbnail de la primera imagen disponible */
 function RepuestoThumbnail({ rep }: { rep: Repuesto }) {
@@ -83,7 +45,6 @@ export function RepuestosTable({
   onDelete,
   onViewManual,
   onViewPhotos,
-  onViewHistory,
   onViewSpecs,
   onViewGallery,
 }: RepuestosTableProps) {
@@ -112,7 +73,6 @@ export function RepuestosTable({
       {/* Mobile Card View */}
       <div className="grid grid-cols-1 gap-3 sm:hidden">
         {repuestos.map((rep) => {
-          const stock = getStockTotal(rep)
           return (
             <div key={rep.id} className="bg-card border rounded-xl p-4 space-y-3 shadow-sm hover:shadow-md transition-shadow">
               <div className="flex gap-3 items-start">
@@ -127,7 +87,6 @@ export function RepuestosTable({
                   onDelete={onDelete}
                   onViewManual={onViewManual}
                   onViewPhotos={onViewPhotos}
-                  onViewHistory={onViewHistory}
                   onViewSpecs={onViewSpecs}
                   onViewGallery={onViewGallery}
                 />
@@ -144,7 +103,11 @@ export function RepuestosTable({
                   <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Valor Unit.</span>
                   <span className="font-semibold text-sm">${formatNumber(rep.valorUnitario || 0)}</span>
                 </div>
-                <StockBadge stock={stock} />
+                {(rep.cantidadPorMaquina || 0) > 0 && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-blue-500/15 text-blue-400 ring-1 ring-blue-500/20">
+                    {rep.cantidadPorMaquina} por máq.
+                  </span>
+                )}
               </div>
             </div>
           )
@@ -160,14 +123,13 @@ export function RepuestosTable({
               <th className="px-3 py-3 font-semibold">Código SAP</th>
               <th className="px-3 py-3 font-semibold">Repuesto</th>
               <th className="px-3 py-3 font-semibold">Cód. Fabricante</th>
-              <th className="px-3 py-3 font-semibold text-center">Stock</th>
+              <th className="px-3 py-3 font-semibold text-center">Cant/Máq</th>
               <th className="px-3 py-3 font-semibold text-right">Valor Unit.</th>
               <th className="px-3 py-3 font-semibold text-right">Acciones</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border/50 text-sm">
             {repuestos.map((rep, idx) => {
-              const stock = getStockTotal(rep)
               const hasMedia = (rep.fotosReales?.length || 0) + (rep.imagenesManual?.length || 0) + (rep.gallery?.length || 0) > 0
               return (
                 <tr
@@ -204,9 +166,11 @@ export function RepuestosTable({
                       {rep.codigoBaader || '—'}
                     </span>
                   </td>
-                  {/* Stock */}
+                  {/* Cantidad por máquina */}
                   <td className="px-3 py-2.5 text-center">
-                    <StockBadge stock={stock} />
+                    <span className="font-mono text-sm">
+                      {rep.cantidadPorMaquina || 0}
+                    </span>
                   </td>
                   {/* Valor unitario */}
                   <td className="px-3 py-2.5 text-right whitespace-nowrap">
@@ -223,7 +187,6 @@ export function RepuestosTable({
                         onDelete={onDelete}
                         onViewManual={onViewManual}
                         onViewPhotos={onViewPhotos}
-                        onViewHistory={onViewHistory}
                         onViewSpecs={onViewSpecs}
                         onViewGallery={onViewGallery}
                       />

@@ -46,23 +46,12 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
     }
   }, [isOpen, filteredRepuestos, repuestos.length])
 
-  // Helper to determine category for a repuesto since it doesn't have a direct categoryId
-    const getRepuestoCategoryId = useCallback((rep: Repuesto): string | undefined => {
-      // 1. Try to find a tag that exactly matches a category ID
-      for (const tag of rep.tags) {
-          const tagStr = typeof tag === 'string' ? tag : tag.nombre
-          // Check EXACT ID match first
-          const catById = categories.find(c => c.id === tagStr)
-          if (catById) return catById.id
-      }
-      // 2. Try to find a tag that matches matches name
-      for (const tag of rep.tags) {
-          const tagStr = typeof tag === 'string' ? tag : tag.nombre
-          const catByName = categories.find(c => c.nombre.toLowerCase() === tagStr.toLowerCase())
-          if (catByName) return catByName.id
-      }
+  // Helper to determine category for a repuesto (sin tags, usa matching por nombre)
+    const getRepuestoCategoryId = useCallback((_rep: Repuesto): string | undefined => {
+      // Sin tags, los repuestos no tienen categoría asignada directamente.
+      // Se agrupan todos bajo "Sin Categoría" a menos que se implemente otro mecanismo.
       return undefined
-    }, [categories])
+    }, [])
 
   const treeData = useMemo(() => {
     const sourceList = filterMode === 'filtered' && filteredRepuestos ? filteredRepuestos : repuestos
@@ -214,14 +203,12 @@ export function ExportReportModal({ isOpen, onClose, repuestos, filteredRepuesto
             case 'catalog':
                 await repuestoExports.exportRepuestosToPDF(selected, { 
                     machineName, 
-                    includeStats: true, 
-                    includeTagsDetail: true
+                    includeStats: true
                 }) 
                 break
             case 'excel':
                 await repuestoExports.exportRepuestosToExcel(selected, {
                     machineName,
-                    includeTags: true,
                     includeImages: includeImages
                 })
                 break

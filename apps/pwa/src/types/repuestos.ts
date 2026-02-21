@@ -1,10 +1,9 @@
 /**
  * Tipos para el módulo de Repuestos
- * Sistema multi-máquina con gestión de inventario y tags por evento
+ * Catálogo puro: Área → Equipo/Máquina → Lista de repuestos
  */
 
 import { Timestamp } from 'firebase/firestore';
-import { TagAsignado } from './tags';
 import { VinculoManual } from './vinculos';
 
 /**
@@ -41,8 +40,8 @@ export interface HistorialCambio {
 }
 
 /**
- * Repuesto principal
- * Compatible con sistema legacy y nuevo con tags
+ * Repuesto principal — Catálogo puro
+ * "Esta máquina usa estos repuestos"
  */
 export interface Repuesto {
   id: string;
@@ -52,16 +51,12 @@ export interface Repuesto {
   nombreManual?: string; // Nombre según el manual del fabricante
   codigoBaader: string; // o código del fabricante
   
-  // DEPRECATED: usar tags para cantidades por evento
-  cantidadSolicitada: number;
-  cantidadStockBodega: number;
-  
   valorUnitario: number;
-  total: number; // DEPRECATED: se calcula desde tags
-  fechaUltimaActualizacionInventario: Date | null;
-  
-  // Sistema de tags: soporta formato antiguo (string) y nuevo (TagAsignado)
-  tags: (string | TagAsignado)[];
+
+  /** Cuántas unidades de este repuesto usa la máquina (BOM simplificado) */
+  cantidadPorMaquina: number;
+  /** Dónde se encuentra/usa dentro de la máquina */
+  ubicacionEnPlanta?: string;
   
   // Vínculos a páginas del manual con marcadores visuales
   vinculosManual: VinculoManual[];
@@ -165,7 +160,7 @@ export interface MachineContextType {
 }
 
 /**
- * Formulario de repuesto
+ * Formulario de repuesto — Catálogo puro
  */
 export interface RepuestoFormData {
   codigoSAP: string;
@@ -173,10 +168,11 @@ export interface RepuestoFormData {
   descripcion?: string;
   nombreManual?: string;
   codigoBaader: string;
-  cantidadSolicitada: number; // DEPRECATED
   valorUnitario: number;
-  cantidadStockBodega: number; // DEPRECATED
-  tags?: (string | TagAsignado)[]; // soporta ambos formatos
+  /** Cuántas unidades de este repuesto usa la máquina */
+  cantidadPorMaquina: number;
+  /** Dónde se encuentra/usa dentro de la máquina */
+  ubicacionEnPlanta?: string;
 }
 
 /**
@@ -189,15 +185,16 @@ export interface ExportData {
 }
 
 /**
- * Fila del Excel de importación
+ * Fila del Excel de importación — Catálogo puro
  */
-export interface ImportCantidadRow {
+export interface ImportCatalogoRow {
   codigoSAP?: string;
   codigoBaader?: string;
   textoBreve?: string;
   descripcion?: string;
-  cantidad: number;
   valorUnitario?: number;
+  cantidadPorMaquina?: number;
+  ubicacionEnPlanta?: string;
   forceOverride?: {
     codigoSAP?: boolean;
     codigoBaader?: boolean;
