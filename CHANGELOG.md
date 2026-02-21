@@ -7,6 +7,15 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.65] - 2026-02-20
+### UI/UX
+- **Navegación compacta tabs + chips**: Rediseño del navigator de repuestos:
+  - Categorías como tabs horizontales compactos (reemplaza acordeón vertical)
+  - Sub-tabs para subcategorías dentro de cada categoría seleccionada
+  - Máquinas como chips mínimos con dot de color y badge de conteo
+  - Conteos reales de repuestos por máquina (getCountFromServer aggregation)
+  - Mucho menos espacio vertical ocupado por la navegación
+
 ## [2.48.64] - 2026-02-20
 ### UI/UX
 - **Navegación acordeón por categoría**: Rediseño completo de la navegación de repuestos:

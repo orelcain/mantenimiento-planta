@@ -11,6 +11,7 @@ import { RepuestoPhotosModal } from '@/components/repuestos/RepuestoPhotosModal'
 import { RepuestoManualModal } from '@/components/repuestos/RepuestoManualModal'
 import { TechnicalSpecsModal } from '@/components/repuestos/TechnicalSpecsModal'
 import { useRepuestos } from '@/hooks/repuestos/useRepuestos'
+import { useRepuestosCounts } from '@/hooks/repuestos/useRepuestosCounts'
 import { useMachineCategories } from '@/hooks/repuestos/useMachineCategories'
 import { useToast } from '@/hooks/useToast'
 import { useMachineContext, useCurrentMachine } from '@/contexts/MachineContext'
@@ -84,13 +85,8 @@ export function RepuestosDashboard() {
   }
 
   // Calcular conteos de repuestos por máquina para el navegador
-  const repuestosCounts = useMemo(() => {
-    const counts: Record<string, number> = {}
-    machines.forEach(m => {
-      counts[m.id] = m.id === currentMachine?.id ? repuestos.length : 0
-    })
-    return counts
-  }, [machines, currentMachine, repuestos])
+  // Usa getCountFromServer (aggregation) para obtener conteos reales de todas las máquinas
+  const { counts: repuestosCounts } = useRepuestosCounts(machines)
 
   // Filtrar repuestos — Búsqueda mejorada incluye código fabricante
   const filteredRepuestos = useMemo(() => {

@@ -1,13 +1,12 @@
 {
-  "version": "2.48.64",
+  "version": "2.48.65",
   "buildDate": "2026-02-20",
   "buildTimestamp": 1771567200000,
   "features": [
-    "Navegación acordeón por categoría: secciones colapsables con tarjetas de máquinas",
-    "Cards responsivas de equipos con color, nombre y conteo de repuestos",
-    "Subcategorías integradas con separador visual dentro de cada categoría",
-    "Grid adaptativo de 2 a 6 columnas según viewport",
-    "Selección directa de máquina desde tarjeta para ver sus repuestos",
+    "Navegación compacta: tabs horizontales de categorías + sub-tabs + chips de máquinas",
+    "Conteo real de repuestos por máquina (getCountFromServer aggregation)",
+    "Chips compactos con dot de color y badge de conteo visible sin hacer click",
+    "Sub-tabs para subcategorías con filtro Todos",
     "Dashboard limpio: título de página con botones globales en header superior",
     "Timeline Gantt: zoom Día/Semana/Mes ahora cambia ancho mínimo por escala y se percibe correctamente en rangos cortos",
     "Timeline Gantt: sincronización de scroll vertical entre tabla de tareas y panel de barras para mantener alineación",

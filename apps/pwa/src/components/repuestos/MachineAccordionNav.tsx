@@ -1,29 +1,26 @@
 /**
- * MachineAccordionNav — Navegación tipo acordeón por Categoría → Máquina
+ * MachineAccordionNav — Navegación compacta por Categoría → Subcategoría → Máquina
  *
- * Cada categoría raíz se muestra como una sección colapsable.
- * Al expandir se ven las máquinas como tarjetas en grid.
- * Click en una tarjeta selecciona la máquina y muestra sus repuestos.
- *
- * Si la categoría tiene subcategorías, se muestran como sub-secciones
- * con un header secundario y su propio grid de máquinas.
+ * Layout:
+ *  Fila 1 — Tabs horizontales por categoría raíz
+ *  Fila 2 — Sub-tabs horizontales por subcategoría (si aplica)
+ *  Fila 3 — Chips compactos de máquinas con badge de conteo
  */
 
 import { useState, useMemo, useEffect } from 'react'
-import { ChevronDown, ChevronRight, Package, Wrench, FolderOpen } from 'lucide-react'
+import { Package } from 'lucide-react'
 import { useCurrentMachine, useActiveMachines, useMachineContext } from '@/contexts/MachineContext'
 import { useMachineCategories } from '@/hooks/repuestos/useMachineCategories'
-import type { Machine, MachineCategory } from '@/types/repuestos'
+import type { Machine } from '@/types/repuestos'
 
 interface MachineAccordionNavProps {
   repuestosCounts?: Record<string, number>
   className?: string
-  /** Callback para que el padre sepa qué categoría está seleccionada */
   onCategoryChange?: (categoryId: string | null) => void
 }
 
-/** Card de una máquina individual */
-function MachineCard({
+/* ────────── Chip compacto de máquina ────────── */
+function MachineChip({
   machine,
   isActive,
   count,
@@ -34,127 +31,47 @@ function MachineCard({
   count: number
   onClick: () => void
 }) {
-  const accentColor = machine.color || '#3b82f6'
+  const accent = machine.color || '#3b82f6'
 
   return (
     <button
       onClick={onClick}
+      title={`${machine.nombre} — ${count} repuesto${count !== 1 ? 's' : ''}`}
       className={`
-        group relative flex flex-col items-start p-3 rounded-xl border text-left w-full
-        transition-all duration-200 min-w-0
+        inline-flex items-center gap-1.5 pl-2 pr-1.5 py-1 rounded-lg border text-xs
+        transition-all whitespace-nowrap cursor-pointer
         ${isActive
-          ? 'bg-primary/8 border-primary/40 ring-1 ring-primary/20 shadow-sm'
-          : 'bg-card/60 border-border/60 hover:bg-muted/40 hover:border-border hover:shadow-sm'
+          ? 'border-primary/50 shadow-sm ring-1 ring-primary/20'
+          : 'border-border/50 hover:border-border hover:bg-muted/40'
         }
       `}
+      style={isActive ? { backgroundColor: accent + '14' } : undefined}
     >
-      {/* Color accent bar */}
-      <div
-        className="absolute top-0 left-3 right-3 h-[2px] rounded-b-full opacity-80"
-        style={{ backgroundColor: isActive ? accentColor : 'transparent' }}
+      {/* Dot de color */}
+      <span
+        className="h-2 w-2 rounded-full shrink-0"
+        style={{ backgroundColor: accent }}
       />
-
-      <div className="flex items-center gap-2.5 w-full min-w-0">
-        <div
-          className="h-8 w-8 rounded-lg flex items-center justify-center shrink-0 transition-colors"
-          style={{
-            backgroundColor: accentColor + (isActive ? '25' : '12'),
-          }}
-        >
-          <Wrench className="h-4 w-4" style={{ color: accentColor }} />
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className={`text-sm font-medium truncate ${isActive ? 'text-foreground' : 'text-muted-foreground group-hover:text-foreground'}`}>
-            {machine.nombre}
-          </div>
-          {(machine.marca || machine.modelo) && (
-            <div className="text-[10px] text-muted-foreground/70 truncate">
-              {[machine.marca, machine.modelo].filter(Boolean).join(' ')}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Badge de conteo */}
-      <div className="flex items-center gap-1.5 mt-2 w-full">
-        <Package className="h-3 w-3 text-muted-foreground/50" />
-        <span className={`text-[11px] font-medium ${isActive ? 'text-primary' : 'text-muted-foreground/70'}`}>
-          {count} repuesto{count !== 1 ? 's' : ''}
-        </span>
-      </div>
-    </button>
-  )
-}
-
-/** Header de categoría colapsable */
-function CategoryHeader({
-  category,
-  isExpanded,
-  machineCount,
-  totalRepuestos,
-  onToggle,
-}: {
-  category: MachineCategory
-  isExpanded: boolean
-  machineCount: number
-  totalRepuestos: number
-  onToggle: () => void
-}) {
-  return (
-    <button
-      onClick={onToggle}
-      className={`
-        w-full flex items-center gap-3 px-4 py-3 text-left rounded-xl border
-        transition-all duration-200
-        ${isExpanded
-          ? 'bg-muted/50 border-border shadow-sm'
-          : 'bg-card/40 border-border/40 hover:bg-muted/30 hover:border-border/60'
-        }
-      `}
-    >
-      {/* Expand icon */}
-      <div className={`shrink-0 text-muted-foreground transition-transform duration-200 ${isExpanded ? 'rotate-0' : '-rotate-90'}`}>
-        <ChevronDown className="h-4 w-4" />
-      </div>
-
-      {/* Category icon */}
-      <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-        <FolderOpen className={`h-4 w-4 ${isExpanded ? 'text-primary' : 'text-muted-foreground'}`} />
-      </div>
-
-      {/* Category name + info */}
-      <div className="flex-1 min-w-0">
-        <div className={`text-sm font-semibold ${isExpanded ? 'text-foreground' : 'text-muted-foreground'}`}>
-          {category.nombre}
-        </div>
-        <div className="text-[11px] text-muted-foreground/70">
-          {machineCount} equipo{machineCount !== 1 ? 's' : ''}
-          {totalRepuestos > 0 && (
-            <span className="ml-1.5">· {totalRepuestos.toLocaleString('es-CL')} repuestos</span>
-          )}
-        </div>
-      </div>
-
-      {/* Arrow indicator */}
-      <ChevronRight className={`h-4 w-4 text-muted-foreground/40 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} />
-    </button>
-  )
-}
-
-/** Sub-header para subcategorías dentro de una categoría expandida */
-function SubcategoryHeader({ name, count }: { name: string; count: number }) {
-  return (
-    <div className="flex items-center gap-2 px-1 pt-3 pb-1.5">
-      <div className="h-px flex-1 bg-border/40" />
-      <span className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground/60 shrink-0">
-        {name}
+      <span className={`truncate max-w-[140px] ${isActive ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
+        {machine.nombre}
       </span>
-      <span className="text-[10px] text-muted-foreground/40">({count})</span>
-      <div className="h-px flex-1 bg-border/40" />
-    </div>
+      {/* Badge de conteo */}
+      <span className={`
+        inline-flex items-center justify-center min-w-[20px] h-[18px] px-1 rounded-full text-[10px] font-bold
+        ${isActive
+          ? 'bg-primary/20 text-primary'
+          : count > 0
+            ? 'bg-muted text-muted-foreground'
+            : 'bg-transparent text-muted-foreground/40'
+        }
+      `}>
+        {count}
+      </span>
+    </button>
   )
 }
 
+/* ────────── Componente principal ────────── */
 export function MachineAccordionNav({
   repuestosCounts = {},
   className = '',
@@ -172,109 +89,116 @@ export function MachineAccordionNav({
       .sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0))
   }, [categories])
 
-  // Determinar categoría expandida default (la que contiene la máquina actual)
-  const getDefaultExpanded = (): Set<string> => {
-    if (!currentMachine) {
-      return new Set(rootCategories.length > 0 ? [rootCategories[0]!.id] : [])
+  // Estado: categoría seleccionada
+  const [activeCatId, setActiveCatId] = useState<string>(
+    () => {
+      if (currentMachine) {
+        const catId = currentMachine.categoryId || 'maquinas-principales'
+        const sub = categories.find(c => c.id === catId && c.parentId)
+        return sub?.parentId || catId
+      }
+      return rootCategories[0]?.id || 'maquinas-principales'
     }
-    const catId = currentMachine.categoryId || 'maquinas-principales'
-    // Puede estar en una subcategoría
-    const subcat = categories.find(c => c.id === catId && c.parentId)
-    if (subcat?.parentId) return new Set([subcat.parentId])
-    return new Set([catId])
-  }
+  )
 
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(getDefaultExpanded)
+  // Estado: subcategoría seleccionada (null = "Todos")
+  const [activeSubcatId, setActiveSubcatId] = useState<string | null>(null)
 
-  // Máquinas por categoría (incluye directas + en subcategorías)
-  const machinesByCategory = useMemo(() => {
-    const result: Record<string, { direct: Machine[]; subcats: { category: MachineCategory; machines: Machine[] }[] }> = {}
+  // Subcategorías de la categoría activa
+  const subcategories = useMemo(() => {
+    return categories
+      .filter(c => c.parentId === activeCatId && c.activa)
+      .sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0))
+  }, [categories, activeCatId])
 
-    rootCategories.forEach(cat => {
-      const subcats = categories
-        .filter(c => c.parentId === cat.id && c.activa)
+  // Máquinas según categoría + subcategoría seleccionadas
+  const visibleMachines = useMemo(() => {
+    if (activeSubcatId) {
+      return activeMachines
+        .filter(m => m.categoryId === activeSubcatId)
         .sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0))
+    }
 
-      // Máquinas directas en la categoría
-      let direct: Machine[]
+    // Sin subcategoría seleccionada: todas las de la categoría raíz
+    const subcatIds = subcategories.map(sc => sc.id)
+    const allCatIds = [activeCatId, ...subcatIds]
+
+    if (activeCatId === 'maquinas-principales') {
+      return activeMachines
+        .filter(m => !m.categoryId || allCatIds.includes(m.categoryId))
+        .sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0))
+    }
+
+    return activeMachines
+      .filter(m => m.categoryId && allCatIds.includes(m.categoryId))
+      .sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0))
+  }, [activeMachines, activeCatId, activeSubcatId, subcategories])
+
+  // Conteo total de repuestos por categoría raíz (para badge en tab)
+  const countPerRootCat = useMemo(() => {
+    const result: Record<string, number> = {}
+    rootCategories.forEach(cat => {
+      const subcatIds = categories.filter(c => c.parentId === cat.id && c.activa).map(c => c.id)
+      const allIds = [cat.id, ...subcatIds]
+
+      let machines: Machine[]
       if (cat.id === 'maquinas-principales') {
-        direct = activeMachines.filter(m => !m.categoryId || m.categoryId === 'maquinas-principales')
+        machines = activeMachines.filter(m => !m.categoryId || allIds.includes(m.categoryId || ''))
       } else {
-        direct = activeMachines.filter(m => m.categoryId === cat.id)
+        machines = activeMachines.filter(m => m.categoryId && allIds.includes(m.categoryId))
       }
 
-      // Máquinas en subcategorías
-      const subcatData = subcats.map(sc => ({
-        category: sc,
-        machines: activeMachines.filter(m => m.categoryId === sc.id),
-      })).filter(sd => sd.machines.length > 0)
-
-      result[cat.id] = { direct, subcats: subcatData }
+      result[cat.id] = machines.reduce((sum, m) => sum + (repuestosCounts[m.id] || 0), 0)
     })
+    return result
+  }, [rootCategories, categories, activeMachines, repuestosCounts])
 
+  // Conteo de máquinas por categoría raíz
+  const machineCountPerRootCat = useMemo(() => {
+    const result: Record<string, number> = {}
+    rootCategories.forEach(cat => {
+      const subcatIds = categories.filter(c => c.parentId === cat.id && c.activa).map(c => c.id)
+      const allIds = [cat.id, ...subcatIds]
+
+      if (cat.id === 'maquinas-principales') {
+        result[cat.id] = activeMachines.filter(m => !m.categoryId || allIds.includes(m.categoryId || '')).length
+      } else {
+        result[cat.id] = activeMachines.filter(m => m.categoryId && allIds.includes(m.categoryId)).length
+      }
+    })
     return result
   }, [rootCategories, categories, activeMachines])
 
-  // Conteo total de repuestos por categoría
-  const repuestosPerCategory = useMemo(() => {
-    const result: Record<string, number> = {}
-    rootCategories.forEach(cat => {
-      const data = machinesByCategory[cat.id]
-      if (!data) { result[cat.id] = 0; return }
-      let total = 0
-      data.direct.forEach(m => { total += repuestosCounts[m.id] || 0 })
-      data.subcats.forEach(sc => sc.machines.forEach(m => { total += repuestosCounts[m.id] || 0 }))
-      result[cat.id] = total
-    })
-    return result
-  }, [rootCategories, machinesByCategory, repuestosCounts])
-
-  // Conteo de máquinas por categoría
-  const machineCountPerCategory = useMemo(() => {
-    const result: Record<string, number> = {}
-    rootCategories.forEach(cat => {
-      const data = machinesByCategory[cat.id]
-      if (!data) { result[cat.id] = 0; return }
-      result[cat.id] = data.direct.length + data.subcats.reduce((sum, sc) => sum + sc.machines.length, 0)
-    })
-    return result
-  }, [rootCategories, machinesByCategory])
-
-  const toggleCategory = (categoryId: string) => {
-    setExpandedCategories(prev => {
-      const next = new Set(prev)
-      if (next.has(categoryId)) {
-        next.delete(categoryId)
-      } else {
-        next.add(categoryId)
-      }
-      return next
-    })
+  // Al cambiar de categoría raíz
+  const handleCategoryChange = (catId: string) => {
+    setActiveCatId(catId)
+    setActiveSubcatId(null)
+    onCategoryChange?.(catId)
   }
 
+  // Seleccionar máquina
   const handleSelectMachine = (machine: Machine) => {
     setCurrentMachine(machine.id)
-    // Notificar categoría
     const catId = machine.categoryId || 'maquinas-principales'
-    const subcat = categories.find(c => c.id === catId && c.parentId)
-    onCategoryChange?.(subcat?.parentId || catId)
+    const sub = categories.find(c => c.id === catId && c.parentId)
+    onCategoryChange?.(sub?.parentId || catId)
   }
 
-  // Auto-expandir categoría de la máquina actual si cambia externamente
+  // Sincronizar cuando cambia la máquina externamente
   useEffect(() => {
     if (!currentMachine) return
     const catId = currentMachine.categoryId || 'maquinas-principales'
-    const subcat = categories.find(c => c.id === catId && c.parentId)
-    const rootId = subcat?.parentId || catId
-    setExpandedCategories(prev => {
-      if (prev.has(rootId)) return prev
-      return new Set([...prev, rootId])
-    })
+    const sub = categories.find(c => c.id === catId && c.parentId)
+    const rootId = sub?.parentId || catId
+    if (rootId !== activeCatId) {
+      setActiveCatId(rootId)
+      setActiveSubcatId(sub?.id || null)
+    }
   }, [currentMachine, categories])
 
   if (rootCategories.length === 0) {
     return (
-      <div className="text-center py-8 text-muted-foreground text-sm">
+      <div className="text-center py-4 text-muted-foreground text-sm">
         No hay categorías configuradas.
       </div>
     )
@@ -282,71 +206,104 @@ export function MachineAccordionNav({
 
   return (
     <div className={`space-y-2 ${className}`}>
-      {rootCategories.map(cat => {
-        const isExpanded = expandedCategories.has(cat.id)
-        const data = machinesByCategory[cat.id]
-        const machineCount = machineCountPerCategory[cat.id] || 0
-        const totalRepuestos = repuestosPerCategory[cat.id] || 0
+      {/* ═══ Row 1: Category tabs ═══ */}
+      <div className="flex items-center gap-1 overflow-x-auto pb-0.5 scrollbar-thin">
+        {rootCategories.map(cat => {
+          const isActive = activeCatId === cat.id
+          const mCount = machineCountPerRootCat[cat.id] || 0
+          const rCount = countPerRootCat[cat.id] || 0
 
-        return (
-          <div key={cat.id} className="transition-all duration-200">
-            <CategoryHeader
-              category={cat}
-              isExpanded={isExpanded}
-              machineCount={machineCount}
-              totalRepuestos={totalRepuestos}
-              onToggle={() => toggleCategory(cat.id)}
-            />
+          return (
+            <button
+              key={cat.id}
+              onClick={() => handleCategoryChange(cat.id)}
+              className={`
+                inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium
+                whitespace-nowrap transition-all border shrink-0
+                ${isActive
+                  ? 'bg-primary/10 border-primary/40 text-primary shadow-sm'
+                  : 'bg-card/60 border-border/40 text-muted-foreground hover:bg-muted/40 hover:text-foreground'
+                }
+              `}
+            >
+              <span>{cat.nombre}</span>
+              <span className={`
+                text-[10px] rounded-full px-1.5 py-0.5 font-bold
+                ${isActive ? 'bg-primary/20 text-primary' : 'bg-muted/80 text-muted-foreground/60'}
+              `}>
+                {mCount}
+              </span>
+              {rCount > 0 && (
+                <span className="text-[10px] text-muted-foreground/50 font-normal">
+                  · {rCount.toLocaleString('es-CL')} rep.
+                </span>
+              )}
+            </button>
+          )
+        })}
+      </div>
 
-            {isExpanded && data && (
-              <div className="mt-2 ml-2 mr-1 mb-1 animate-in slide-in-from-top-2 duration-200">
-                {/* Máquinas directas */}
-                {data.direct.length > 0 && (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 px-1">
-                    {data.direct.map(machine => (
-                      <MachineCard
-                        key={machine.id}
-                        machine={machine}
-                        isActive={currentMachine?.id === machine.id}
-                        count={repuestosCounts[machine.id] || 0}
-                        onClick={() => handleSelectMachine(machine)}
-                      />
-                    ))}
-                  </div>
+      {/* ═══ Row 2: Subcategory tabs (si hay) ═══ */}
+      {subcategories.length > 0 && (
+        <div className="flex items-center gap-1 overflow-x-auto pb-0.5 scrollbar-thin">
+          <button
+            onClick={() => setActiveSubcatId(null)}
+            className={`
+              inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium
+              whitespace-nowrap transition-all border shrink-0
+              ${!activeSubcatId
+                ? 'bg-secondary/80 border-secondary text-secondary-foreground'
+                : 'bg-transparent border-border/30 text-muted-foreground/70 hover:text-muted-foreground hover:bg-muted/30'
+              }
+            `}
+          >
+            Todos
+          </button>
+          {subcategories.map(sc => {
+            const isActive = activeSubcatId === sc.id
+            const scMachines = activeMachines.filter(m => m.categoryId === sc.id)
+            const scCount = scMachines.reduce((sum, m) => sum + (repuestosCounts[m.id] || 0), 0)
+
+            return (
+              <button
+                key={sc.id}
+                onClick={() => setActiveSubcatId(sc.id)}
+                className={`
+                  inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium
+                  whitespace-nowrap transition-all border shrink-0
+                  ${isActive
+                    ? 'bg-secondary/80 border-secondary text-secondary-foreground'
+                    : 'bg-transparent border-border/30 text-muted-foreground/70 hover:text-muted-foreground hover:bg-muted/30'
+                  }
+                `}
+              >
+                <span>{sc.nombre}</span>
+                <span className="text-[10px] opacity-60">({scMachines.length})</span>
+                {scCount > 0 && (
+                  <span className="text-[10px] opacity-40">· {scCount}</span>
                 )}
+              </button>
+            )
+          })}
+        </div>
+      )}
 
-                {/* Subcategorías con sus máquinas */}
-                {data.subcats.map(sc => (
-                  <div key={sc.category.id}>
-                    <SubcategoryHeader
-                      name={sc.category.nombre}
-                      count={sc.machines.length}
-                    />
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 px-1">
-                      {sc.machines.map(machine => (
-                        <MachineCard
-                          key={machine.id}
-                          machine={machine}
-                          isActive={currentMachine?.id === machine.id}
-                          count={repuestosCounts[machine.id] || 0}
-                          onClick={() => handleSelectMachine(machine)}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                ))}
-
-                {/* Si no hay máquinas en ningún nivel */}
-                {data.direct.length === 0 && data.subcats.length === 0 && (
-                  <div className="text-center py-6 text-muted-foreground/60 text-sm">
-                    Sin equipos en esta categoría
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )
-      })}
+      {/* ═══ Row 3: Machine chips ═══ */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <Package className="h-3.5 w-3.5 text-muted-foreground/40 mr-0.5" />
+        {visibleMachines.length === 0 && (
+          <span className="text-xs text-muted-foreground/50 italic">Sin equipos en esta categoría</span>
+        )}
+        {visibleMachines.map(machine => (
+          <MachineChip
+            key={machine.id}
+            machine={machine}
+            isActive={currentMachine?.id === machine.id}
+            count={repuestosCounts[machine.id] || 0}
+            onClick={() => handleSelectMachine(machine)}
+          />
+        ))}
+      </div>
     </div>
   )
 }
