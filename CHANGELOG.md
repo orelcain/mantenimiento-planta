@@ -7,6 +7,17 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.71] - 2026-02-22
+### Funcionalidad
+- **Repuestos — Reordenar equipos (drag & drop)**: Los administradores pueden reordenar las máquinas dentro de cada subcategoría para reflejar la secuencia física del proceso productivo
+  - Botón "Ordenar" en la cabecera del panel (solo visible para admin)
+  - Modo reordenamiento: tarjetas numeradas con handle de arrastre
+  - Drag & drop HTML5 nativo (sin librerías externas)
+  - Botón "Guardar orden" persiste el nuevo orden en Firestore (batch update)
+  - Botón "Cancelar" descarta cambios sin guardar
+
+---
+
 ## [2.48.70] - 2026-02-22
 ### UI/UX
 - **Repuestos — limpieza al cambiar categoría/subcategoría**: Al pinchar otra categoría o subcategoría, se limpia la máquina seleccionada y se muestra un estado vacío ("Ningún equipo seleccionado") hasta que el usuario elija una nueva máquina. Evita mostrar repuestos de la máquina anterior al navegar entre categorías.

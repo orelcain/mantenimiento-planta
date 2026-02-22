@@ -6,7 +6,7 @@
  *  Admin mode integrado
  */
 
-import { useState, useMemo, useEffect, useCallback } from 'react'
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import {
   Settings2,
   X,
@@ -15,12 +15,16 @@ import {
   Wrench,
   Link2,
   ChevronRight,
+  GripVertical,
+  Save,
 } from 'lucide-react'
 import { useCurrentMachine, useActiveMachines, useMachineContext } from '@/contexts/MachineContext'
 import { useMachineCategories } from '@/hooks/repuestos/useMachineCategories'
 import { useIsAdmin } from '@/store/authStore'
 import { CategoryManager } from '@/components/repuestos/CategoryManager'
 import { Button, Input } from '@/components/ui'
+import { doc, writeBatch, Timestamp } from 'firebase/firestore'
+import { db } from '@/services/firebase'
 import type { Machine, MachineCategory } from '@/types/repuestos'
 
 /* ═══════════════════════════════════════════════════════════════ */
@@ -176,6 +180,11 @@ export function EquipmentNavigator({
 
   const [adminMode, setAdminMode] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [reorderMode, setReorderMode] = useState(false)
+  const [localOrder, setLocalOrder] = useState<Machine[]>([])
+  const [savingOrder, setSavingOrder] = useState(false)
+  const dragItem = useRef<number | null>(null)
+  const dragOverItem = useRef<number | null>(null)
 
   // ── Categorías raíz ──
   const rootCategories = useMemo(() =>
@@ -302,6 +311,61 @@ export function EquipmentNavigator({
     onCategoryChange?.(sub?.parentId || catId)
   }, [categories, setCurrentMachine, onCategoryChange])
 
+  // ── Reorder (drag & drop) ──
+  const enterReorderMode = useCallback(() => {
+    setLocalOrder([...machinesInSubcat])
+    setReorderMode(true)
+  }, [machinesInSubcat])
+
+  const cancelReorder = useCallback(() => {
+    setReorderMode(false)
+    setLocalOrder([])
+  }, [])
+
+  const handleDragStart = useCallback((index: number) => {
+    dragItem.current = index
+  }, [])
+
+  const handleDragEnter = useCallback((index: number) => {
+    dragOverItem.current = index
+  }, [])
+
+  const handleDragEnd = useCallback(() => {
+    if (dragItem.current === null || dragOverItem.current === null) return
+    if (dragItem.current === dragOverItem.current) {
+      dragItem.current = null
+      dragOverItem.current = null
+      return
+    }
+    setLocalOrder(prev => {
+      const updated = [...prev]
+      const draggedItem = updated.splice(dragItem.current!, 1)[0]
+      if (draggedItem) updated.splice(dragOverItem.current!, 0, draggedItem)
+      return updated
+    })
+    dragItem.current = null
+    dragOverItem.current = null
+  }, [])
+
+  const saveOrder = useCallback(async () => {
+    if (localOrder.length === 0) return
+    setSavingOrder(true)
+    try {
+      const batch = writeBatch(db)
+      localOrder.forEach((machine, index) => {
+        const ref = doc(db, 'machines', machine.id)
+        batch.update(ref, { orden: index, updatedAt: Timestamp.now() })
+      })
+      await batch.commit()
+      setReorderMode(false)
+      setLocalOrder([])
+    } catch (err) {
+      console.error('Error saving order:', err)
+    } finally {
+      setSavingOrder(false)
+    }
+  }, [localOrder])
+
   // Sync activeCatId + activeSubcatId when currentMachine changes externally
   useEffect(() => {
     if (!currentMachine) return
@@ -378,6 +442,36 @@ export function EquipmentNavigator({
             <span className="text-[10px] font-semibold bg-primary text-primary-foreground px-1.5 py-0.5 rounded-full tabular-nums">
               {filteredMachines.length}
             </span>
+            <div className="ml-auto flex items-center gap-1">
+              {isAdmin && !reorderMode && (
+                <button
+                  onClick={enterReorderMode}
+                  title="Reordenar equipos (drag & drop)"
+                  className="flex items-center gap-1 px-2 py-1 text-[10px] text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
+                >
+                  <GripVertical className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Ordenar</span>
+                </button>
+              )}
+              {reorderMode && (
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={cancelReorder}
+                    className="flex items-center gap-1 px-2 py-1 text-[10px] text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
+                  >
+                    <X className="h-3 w-3" /> Cancelar
+                  </button>
+                  <button
+                    onClick={saveOrder}
+                    disabled={savingOrder}
+                    className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-primary-foreground bg-primary hover:bg-primary/90 rounded transition-colors disabled:opacity-50"
+                  >
+                    <Save className="h-3 w-3" />
+                    {savingOrder ? 'Guardando…' : 'Guardar orden'}
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Breadcrumb */}
@@ -435,26 +529,72 @@ export function EquipmentNavigator({
 
           {/* Machine Grid */}
           <div className="px-2 pb-2 pt-0.5">
-            {filteredMachines.length === 0 ? (
-              <div className="text-center py-4 text-muted-foreground text-xs">
-                {searchQuery
-                  ? <>🔍 Sin resultados para &quot;{searchQuery}&quot;</>
-                  : 'Sin equipos en esta subcategoría'
-                }
-              </div>
+            {reorderMode ? (
+              /* ── Reorder mode: drag & drop list ── */
+              localOrder.length === 0 ? (
+                <div className="text-center py-4 text-muted-foreground text-xs">
+                  Sin equipos en esta subcategoría
+                </div>
+              ) : (
+                <>
+                  <div className="mb-1.5 px-1">
+                    <span className="text-[10px] text-muted-foreground">
+                      ↕ Arrastra los equipos para reordenar · El orden refleja la secuencia física del proceso
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1">
+                    {localOrder.map((machine, index) => (
+                      <div
+                        key={machine.id}
+                        draggable
+                        onDragStart={() => handleDragStart(index)}
+                        onDragEnter={() => handleDragEnter(index)}
+                        onDragEnd={handleDragEnd}
+                        onDragOver={(e) => e.preventDefault()}
+                        className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg border border-border bg-card hover:border-primary/50 cursor-grab active:cursor-grabbing transition-colors select-none"
+                      >
+                        <span className="text-[10px] font-mono text-muted-foreground w-4 text-center shrink-0">
+                          {index + 1}
+                        </span>
+                        <GripVertical className="h-3.5 w-3.5 text-muted-foreground/60 shrink-0" />
+                        <span
+                          className="w-2 h-2 rounded-full shrink-0"
+                          style={{ backgroundColor: machine.color || '#3b82f6' }}
+                        />
+                        <span className="text-xs font-medium text-foreground truncate">
+                          {machine.nombre}
+                        </span>
+                        <span className="ml-auto text-[10px] text-muted-foreground tabular-nums shrink-0">
+                          {repuestosCounts[machine.id] || 0}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1">
-                {filteredMachines.map(machine => (
-                  <MachineCard
-                    key={machine.id}
-                    machine={machine}
-                    isActive={currentMachine?.id === machine.id}
-                    count={repuestosCounts[machine.id] || 0}
-                    maxCount={maxCount}
-                    onClick={() => handleSelectMachine(machine)}
-                  />
-                ))}
-              </div>
+              /* ── Browse mode: normal grid ── */
+              filteredMachines.length === 0 ? (
+                <div className="text-center py-4 text-muted-foreground text-xs">
+                  {searchQuery
+                    ? <>🔍 Sin resultados para &quot;{searchQuery}&quot;</>
+                    : 'Sin equipos en esta subcategoría'
+                  }
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1">
+                  {filteredMachines.map(machine => (
+                    <MachineCard
+                      key={machine.id}
+                      machine={machine}
+                      isActive={currentMachine?.id === machine.id}
+                      count={repuestosCounts[machine.id] || 0}
+                      maxCount={maxCount}
+                      onClick={() => handleSelectMachine(machine)}
+                    />
+                  ))}
+                </div>
+              )
             )}
           </div>
         </div>
