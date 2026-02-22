@@ -157,6 +157,7 @@ export interface MachineContextType {
   loading: boolean;
   setCurrentMachine: (machineId: string) => Promise<void>;
   setCurrentMachineDirect: (machine: Machine) => void;
+  clearCurrentMachine: () => void;
 }
 
 /**

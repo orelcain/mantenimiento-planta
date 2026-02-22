@@ -94,12 +94,19 @@ export function MachineProvider({ children }: MachineProviderProps) {
     console.log(`✅ Set machine directly: ${machine.nombre} (${machine.id})`);
   };
 
+  // Limpiar máquina seleccionada (al cambiar categoría se deja sin máquina)
+  const clearCurrentMachine = () => {
+    setCurrentMachineState(null);
+    localStorage.removeItem(STORAGE_KEY);
+  };
+
   const value: MachineContextType = {
     currentMachine,
     machines,
     loading: loading || machinesLoading,
     setCurrentMachine,
     setCurrentMachineDirect,
+    clearCurrentMachine,
   };
 
   return (

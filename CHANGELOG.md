@@ -7,6 +7,12 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.70] - 2026-02-22
+### UI/UX
+- **Repuestos — limpieza al cambiar categoría/subcategoría**: Al pinchar otra categoría o subcategoría, se limpia la máquina seleccionada y se muestra un estado vacío ("Ningún equipo seleccionado") hasta que el usuario elija una nueva máquina. Evita mostrar repuestos de la máquina anterior al navegar entre categorías.
+
+---
+
 ## [2.48.69] - 2026-02-22
 ### UI/UX
 - **Sidebar colapsable**: Botón de contraer/expandir en el borde del menú lateral principal

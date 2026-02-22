@@ -170,7 +170,7 @@ export function EquipmentNavigator({
 }: EquipmentNavigatorProps) {
   const currentMachine = useCurrentMachine()
   const activeMachines = useActiveMachines()
-  const { setCurrentMachine } = useMachineContext()
+  const { setCurrentMachine, clearCurrentMachine } = useMachineContext()
   const { categories } = useMachineCategories()
   const isAdmin = useIsAdmin()
 
@@ -285,13 +285,15 @@ export function EquipmentNavigator({
   const handleCategoryChange = useCallback((catId: string) => {
     setActiveCatId(catId)
     setSearchQuery('')
+    clearCurrentMachine()
     onCategoryChange?.(catId)
-  }, [onCategoryChange])
+  }, [clearCurrentMachine, onCategoryChange])
 
   const handleSubcatChange = useCallback((subcatId: string) => {
     setActiveSubcatId(subcatId)
     setSearchQuery('')
-  }, [])
+    clearCurrentMachine()
+  }, [clearCurrentMachine])
 
   const handleSelectMachine = useCallback((machine: Machine) => {
     setCurrentMachine(machine.id)

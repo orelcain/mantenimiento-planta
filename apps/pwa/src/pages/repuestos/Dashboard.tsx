@@ -195,7 +195,7 @@ export function RepuestosDashboard() {
 
   if (machinesLoading) return <LoadingScreen />
 
-  if (!currentMachine) {
+  if (machines.length === 0) {
     return (
       <div className="p-6 space-y-4">
         <h1 className="text-2xl font-bold">Repuestos</h1>
@@ -218,7 +218,19 @@ export function RepuestosDashboard() {
           repuestosCounts={repuestosCounts}
           onCategoryChange={setSelectedCategoryId}
         />
+
         {/* ═══ Detalle de la máquina seleccionada ═══ */}
+        {!currentMachine ? (
+          <div className="border-t border-border/40 pt-8 flex flex-col items-center justify-center text-center gap-3 py-12">
+            <div className="p-4 rounded-full bg-muted/50">
+              <Package className="h-8 w-8 text-muted-foreground/60" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Ningún equipo seleccionado</p>
+              <p className="text-xs text-muted-foreground/70 mt-1">Selecciona una máquina del panel superior para ver sus repuestos</p>
+            </div>
+          </div>
+        ) : (
         <div className="border-t border-border/40 pt-4">
         {/* Machine Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
@@ -366,7 +378,8 @@ export function RepuestosDashboard() {
             </>
           )}
         </div>
-        </div>{/* cierre border-t detail section */}
+        </div>
+        )}
       </div>
 
       {/* Create Modal */}
@@ -374,7 +387,7 @@ export function RepuestosDashboard() {
         open={createOpen}
         onClose={() => setCreateOpen(false)}
         mode="create"
-        machineName={currentMachine.nombre}
+        machineName={currentMachine?.nombre ?? ''}
         onSubmit={handleCreate}
         loading={saving}
       />
@@ -384,7 +397,7 @@ export function RepuestosDashboard() {
         open={Boolean(editTarget)}
         onClose={() => setEditTarget(null)}
         mode="edit"
-        machineName={currentMachine.nombre}
+        machineName={currentMachine?.nombre ?? ''}
         initialData={editTarget || undefined}
         onSubmit={handleUpdate}
         loading={saving}
@@ -421,7 +434,7 @@ export function RepuestosDashboard() {
         onClose={() => setImportOpen(false)}
         onSuccess={handleImportSuccess}
         onError={handleImportError}
-        machineName={currentMachine.nombre}
+        machineName={currentMachine?.nombre ?? ''}
         importCatalogoDesdeExcel={importCatalogoDesdeExcel}
       />
 
