@@ -1,6 +1,7 @@
 import { Package, ImageIcon } from 'lucide-react'
 import type { Repuesto } from '@/types/repuestos'
 import { RepuestoActionsMenu } from './RepuestoActionsMenu'
+import { InlineEditName } from './InlineEditName'
 
 interface RepuestosTableProps {
   repuestos: Repuesto[]
@@ -12,6 +13,7 @@ interface RepuestosTableProps {
   onViewPhotos?: (repuesto: Repuesto) => void
   onViewSpecs?: (repuesto: Repuesto) => void
   onViewGallery?: (repuesto: Repuesto) => void
+  onRenameRepuesto?: (repuestoId: string, newName: string) => Promise<void>
 }
 
 const formatNumber = (value: number) =>
@@ -47,6 +49,7 @@ export function RepuestosTable({
   onViewPhotos,
   onViewSpecs,
   onViewGallery,
+  onRenameRepuesto,
 }: RepuestosTableProps) {
   if (loading) {
     return (
@@ -79,7 +82,16 @@ export function RepuestosTable({
                 <RepuestoThumbnail rep={rep} />
                 <div className="flex-1 min-w-0">
                   <div className="text-[11px] font-mono text-muted-foreground">{rep.codigoSAP || 'S/C'}</div>
-                  <div className="font-medium text-foreground line-clamp-2 text-sm">{rep.textoBreve || 'Sin nombre'}</div>
+                  {onRenameRepuesto ? (
+                    <InlineEditName
+                      value={rep.textoBreve || 'Sin nombre'}
+                      onSave={(n) => onRenameRepuesto(rep.id, n)}
+                      canEdit
+                      textClassName="font-medium text-foreground line-clamp-2 text-sm"
+                    />
+                  ) : (
+                    <div className="font-medium text-foreground line-clamp-2 text-sm">{rep.textoBreve || 'Sin nombre'}</div>
+                  )}
                 </div>
                 <RepuestoActionsMenu
                   repuesto={rep}
@@ -150,7 +162,16 @@ export function RepuestosTable({
                   <td className="px-3 py-2.5 max-w-[300px]">
                     <div className="flex items-center gap-2">
                       <div className="min-w-0">
-                        <div className="font-medium text-foreground truncate">{rep.textoBreve || 'Sin nombre'}</div>
+                        {onRenameRepuesto ? (
+                          <InlineEditName
+                            value={rep.textoBreve || 'Sin nombre'}
+                            onSave={(n) => onRenameRepuesto(rep.id, n)}
+                            canEdit
+                            textClassName="font-medium text-foreground truncate"
+                          />
+                        ) : (
+                          <div className="font-medium text-foreground truncate">{rep.textoBreve || 'Sin nombre'}</div>
+                        )}
                         {rep.descripcion ? (
                           <div className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{rep.descripcion}</div>
                         ) : null}

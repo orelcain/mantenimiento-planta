@@ -155,6 +155,12 @@ export function RepuestosDashboard() {
     }
   }
 
+  // Rename repuesto inline (solo nombre/textoBreve)
+  const handleRenameRepuesto = async (repuestoId: string, newName: string) => {
+    const original = repuestos.find(r => r.id === repuestoId)
+    await updateRepuesto(repuestoId, { textoBreve: newName }, original)
+  }
+
   const handleUpdate = async (payload: RepuestoFormData) => {
     if (!editTarget) return
     setSaving(true)
@@ -365,6 +371,7 @@ export function RepuestosDashboard() {
                 onViewManual={(rep) => setManualModal(rep)}
                 onViewSpecs={(rep) => setSpecsTarget({ repuesto: rep, tab: 'specs' })}
                 onViewGallery={(rep) => setSpecsTarget({ repuesto: rep, tab: 'gallery' })}
+                onRenameRepuesto={isAdmin ? handleRenameRepuesto : undefined}
               />
 
               <RepuestosPagination

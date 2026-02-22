@@ -7,6 +7,19 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.72] - 2026-02-22
+### Funcionalidad
+- **Repuestos — Edición inline de nombres**: Los administradores pueden renombrar categorías, subcategorías, máquinas y repuestos directamente desde la interfaz de navegación
+  - Componente reutilizable `InlineEditName` con doble-clic o icono lápiz
+  - **Categorías**: nombre editable en la cabecera del panel
+  - **Subcategorías**: nombre editable en los chips de subcategoría
+  - **Máquinas**: nombre editable en las tarjetas del grid
+  - **Repuestos**: campo `textoBreve` editable inline en la tabla (mobile + desktop)
+  - Enter / blur guarda · Escape cancela · indicador de carga
+  - Solo visible para administradores (icono lápiz aparece al hacer hover)
+
+---
+
 ## [2.48.71] - 2026-02-22
 ### Funcionalidad
 - **Repuestos — Reordenar equipos (drag & drop)**: Los administradores pueden reordenar las máquinas dentro de cada subcategoría para reflejar la secuencia física del proceso productivo

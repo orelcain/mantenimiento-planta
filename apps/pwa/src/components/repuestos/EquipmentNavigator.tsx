@@ -23,9 +23,10 @@ import { useMachineCategories } from '@/hooks/repuestos/useMachineCategories'
 import { useIsAdmin } from '@/store/authStore'
 import { CategoryManager } from '@/components/repuestos/CategoryManager'
 import { Button, Input } from '@/components/ui'
-import { doc, writeBatch, Timestamp } from 'firebase/firestore'
+import { doc, writeBatch, updateDoc, Timestamp } from 'firebase/firestore'
 import { db } from '@/services/firebase'
 import type { Machine, MachineCategory } from '@/types/repuestos'
+import { InlineEditName } from '@/components/repuestos/InlineEditName'
 
 /* ═══════════════════════════════════════════════════════════════ */
 interface EquipmentNavigatorProps {
@@ -91,9 +92,10 @@ function RailButton({
    Subcategory Chip
    ═══════════════════════════════════════════════════════════════ */
 function SubcatChip({
-  label, isActive, count, onClick,
+  label, isActive, count, onClick, canEdit, onRename,
 }: {
   label: string; isActive: boolean; count: number; onClick: () => void
+  canEdit?: boolean; onRename?: (newName: string) => Promise<void>
 }) {
   return (
     <button
@@ -107,7 +109,16 @@ function SubcatChip({
         }
       `}
     >
-      {label}
+      {canEdit && onRename ? (
+        <InlineEditName
+          value={label}
+          onSave={onRename}
+          canEdit
+          textClassName="truncate"
+        />
+      ) : (
+        label
+      )}
       <span className={`text-[9px] tabular-nums ${isActive ? 'text-primary' : 'opacity-50'}`}>
         {count}
       </span>
@@ -119,9 +130,10 @@ function SubcatChip({
    Machine Card (grid item)
    ═══════════════════════════════════════════════════════════════ */
 function MachineCard({
-  machine, isActive, count, maxCount, onClick,
+  machine, isActive, count, maxCount, onClick, canEdit, onRename,
 }: {
   machine: Machine; isActive: boolean; count: number; maxCount: number; onClick: () => void
+  canEdit?: boolean; onRename?: (newName: string) => Promise<void>
 }) {
   const accent = machine.color || '#3b82f6'
   const pct = maxCount > 0 ? Math.min(100, (count / maxCount) * 100) : 0
@@ -141,9 +153,19 @@ function MachineCard({
       `}
     >
       <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: accent }} />
-      <span className={`flex-1 truncate text-[12px] ${isActive ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>
-        {machine.nombre}
-      </span>
+      {canEdit && onRename ? (
+        <InlineEditName
+          value={machine.nombre}
+          onSave={onRename}
+          canEdit
+          className="flex-1 min-w-0"
+          textClassName={`truncate text-[12px] ${isActive ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}
+        />
+      ) : (
+        <span className={`flex-1 truncate text-[12px] ${isActive ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>
+          {machine.nombre}
+        </span>
+      )}
       <span className={`
         text-[10px] tabular-nums px-1.5 py-0.5 rounded
         ${isActive
@@ -175,7 +197,7 @@ export function EquipmentNavigator({
   const currentMachine = useCurrentMachine()
   const activeMachines = useActiveMachines()
   const { setCurrentMachine, clearCurrentMachine } = useMachineContext()
-  const { categories } = useMachineCategories()
+  const { categories, updateCategory } = useMachineCategories()
   const isAdmin = useIsAdmin()
 
   const [adminMode, setAdminMode] = useState(false)
@@ -366,6 +388,16 @@ export function EquipmentNavigator({
     }
   }, [localOrder])
 
+  // ── Rename handlers (inline edit) ──
+  const handleRenameCategory = useCallback(async (catId: string, newName: string) => {
+    await updateCategory(catId, { nombre: newName })
+  }, [updateCategory])
+
+  const handleRenameMachine = useCallback(async (machineId: string, newName: string) => {
+    const ref = doc(db, 'machines', machineId)
+    await updateDoc(ref, { nombre: newName, updatedAt: Timestamp.now() })
+  }, [])
+
   // Sync activeCatId + activeSubcatId when currentMachine changes externally
   useEffect(() => {
     if (!currentMachine) return
@@ -438,7 +470,16 @@ export function EquipmentNavigator({
         <div className="flex-1 min-w-0">
           {/* Header */}
           <div className="flex items-center gap-2 px-3 py-2 border-b border-border">
-            <span className="text-sm font-semibold text-foreground">{activeCat?.nombre}</span>
+            {isAdmin && activeCat ? (
+              <InlineEditName
+                value={activeCat.nombre}
+                onSave={(n) => handleRenameCategory(activeCat.id, n)}
+                canEdit
+                textClassName="text-sm font-semibold text-foreground"
+              />
+            ) : (
+              <span className="text-sm font-semibold text-foreground">{activeCat?.nombre}</span>
+            )}
             <span className="text-[10px] font-semibold bg-primary text-primary-foreground px-1.5 py-0.5 rounded-full tabular-nums">
               {filteredMachines.length}
             </span>
@@ -503,6 +544,8 @@ export function EquipmentNavigator({
                     isActive={activeSubcatId === sc.id}
                     count={machineCountPerSubcat[sc.id] || 0}
                     onClick={() => handleSubcatChange(sc.id)}
+                    canEdit={isAdmin}
+                    onRename={(n) => handleRenameCategory(sc.id, n)}
                   />
                 ))}
               </div>
@@ -591,6 +634,8 @@ export function EquipmentNavigator({
                       count={repuestosCounts[machine.id] || 0}
                       maxCount={maxCount}
                       onClick={() => handleSelectMachine(machine)}
+                      canEdit={isAdmin}
+                      onRename={(n) => handleRenameMachine(machine.id, n)}
                     />
                   ))}
                 </div>
