@@ -216,9 +216,10 @@ export function EquipmentNavigator({
   // Auto-select first subcategory when category changes or subcats load
   useEffect(() => {
     if (subcategories.length > 0) {
+      const first = subcategories[0]
       // If current activeSubcatId is not in this list, select first
-      if (!activeSubcatId || !subcategories.find(s => s.id === activeSubcatId)) {
-        setActiveSubcatId(subcategories[0].id)
+      if (first && (!activeSubcatId || !subcategories.find(s => s.id === activeSubcatId))) {
+        setActiveSubcatId(first.id)
       }
     } else {
       setActiveSubcatId(null)
