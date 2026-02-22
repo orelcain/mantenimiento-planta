@@ -7,6 +7,17 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.67] - 2026-02-22
+### UI/UX
+- **Navegación inline horizontal**: Máquinas en una sola fila horizontal con wrap:
+  - Subcategorías como separadores inline sutiles (línea vertical + nombre en mayúsculas)
+  - Sin grupos verticales, sin botón "Todos" — mínimo espacio
+  - Pills de máquinas más compactos (11px, sin borde)
+- **Admin: máquinas huérfanas**: Sección "Sin categoría asignada" en el panel de administración:
+  - Detecta máquinas sin categoryId o con categoría inexistente
+  - Botón "Asignar" para reasignar a la categoría correcta
+  - Indicador visual color amber para visibilidad
+
 ## [2.48.66] - 2026-02-22
 ### UI/UX
 - **Navegación limpia + Admin inline**: Rediseño completo del navigator de repuestos:

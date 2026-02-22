@@ -1,6 +1,6 @@
 {
-  "version": "2.48.66",
-  "buildDate": "2026-02-20",
+  "version": "2.48.67",
+  "buildDate": "2026-02-22",
   "buildTimestamp": 1771567200000,
   "features": [
     "Navegación compacta: tabs horizontales de categorías + sub-tabs + chips de máquinas",
