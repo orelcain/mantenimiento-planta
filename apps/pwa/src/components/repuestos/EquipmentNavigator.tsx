@@ -16,7 +16,7 @@ import { useMachineCategories } from '@/hooks/repuestos/useMachineCategories'
 import { useIsAdmin } from '@/store/authStore'
 import { CategoryManager } from '@/components/repuestos/CategoryManager'
 import { Button } from '@/components/ui'
-import type { Machine, MachineCategory } from '@/types/repuestos'
+import type { Machine } from '@/types/repuestos'
 
 /* ═══════════════════════════════════════════════════════════════ */
 interface EquipmentNavigatorProps {
