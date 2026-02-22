@@ -46,7 +46,7 @@ export function RepuestosDashboard() {
   const [manualModal, setManualModal] = useState<Repuesto | null>(null)
   const [specsTarget, setSpecsTarget] = useState<{repuesto: Repuesto, tab: 'specs' | 'gallery'} | null>(null)
   const [exportReportOpen, setExportReportOpen] = useState(false)
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>('maquinas-principales')
+  const [, setSelectedCategoryId] = useState<string | null>('maquinas-principales')
 
   // Filtros y paginación
   const [searchQuery, setSearchQuery] = useState('')
