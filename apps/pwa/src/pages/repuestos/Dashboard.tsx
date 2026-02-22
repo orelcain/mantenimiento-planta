@@ -1,12 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, Plus, FileText, Upload, FolderTree, Package, ClipboardList, ImageIcon, DollarSign, Wrench } from 'lucide-react'
+import { AlertTriangle, Plus, FileText, Upload, Package, ClipboardList, ImageIcon, DollarSign, Wrench } from 'lucide-react'
 import { RepuestosTable } from '@/components/repuestos/RepuestosTable'
 import { RepuestoFormModal } from '@/components/repuestos/RepuestoForm'
 import { RepuestosFilters } from '@/components/repuestos/RepuestosFilters'
 import { RepuestosPagination } from '@/components/repuestos/RepuestosPagination'
 import { EmptyState } from '@/components/repuestos/EmptyState'
-import { MachineAccordionNav } from '@/components/repuestos/MachineAccordionNav'
-import { MachineHierarchySelector } from '@/components/repuestos/MachineHierarchySelector'
+import { EquipmentNavigator } from '@/components/repuestos/EquipmentNavigator'
 import { RepuestoPhotosModal } from '@/components/repuestos/RepuestoPhotosModal'
 import { RepuestoManualModal } from '@/components/repuestos/RepuestoManualModal'
 import { TechnicalSpecsModal } from '@/components/repuestos/TechnicalSpecsModal'
@@ -17,7 +16,7 @@ import { useToast } from '@/hooks/useToast'
 import { useMachineContext, useCurrentMachine } from '@/contexts/MachineContext'
 import { useIsAdmin } from '@/store/authStore'
 import type { Repuesto, RepuestoFormData, TechnicalSpecs, MachineImage } from '@/types/repuestos'
-import { CategoryManager } from '@/components/repuestos/CategoryManager'
+// CategoryManager ahora se renderiza dentro de EquipmentNavigator
 import { ImportRepuestosModal } from './ImportRepuestosModal'
 import { ExportReportModal } from '@/components/repuestos/ExportReportModal'
 import {
@@ -32,7 +31,7 @@ import {
 } from '@/components/ui'
 
 export function RepuestosDashboard() {
-  const { machines, loading: machinesLoading, setCurrentMachineDirect } = useMachineContext()
+  const { machines, loading: machinesLoading } = useMachineContext()
   const currentMachine = useCurrentMachine()
   const isAdmin = useIsAdmin()
   const { categories } = useMachineCategories()
@@ -46,8 +45,6 @@ export function RepuestosDashboard() {
   const [photoModal, setPhotoModal] = useState<Repuesto | null>(null)
   const [manualModal, setManualModal] = useState<Repuesto | null>(null)
   const [specsTarget, setSpecsTarget] = useState<{repuesto: Repuesto, tab: 'specs' | 'gallery'} | null>(null)
-  const [newMachineOpen, setNewMachineOpen] = useState(false)
-  const [structureManagerOpen, setStructureManagerOpen] = useState(false)
   const [exportReportOpen, setExportReportOpen] = useState(false)
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>('maquinas-principales')
 
@@ -210,28 +207,14 @@ export function RepuestosDashboard() {
   return (
     <div className="flex flex-col h-full bg-background">
       <div className="flex-1 p-3 sm:p-6 space-y-4 sm:space-y-5 overflow-x-hidden overflow-y-auto">
-        {/* Page title + global actions */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-lg sm:text-xl font-bold text-foreground">Catálogo de Repuestos</h1>
-            <p className="text-xs text-muted-foreground mt-0.5">Selecciona un equipo para ver su listado</p>
-          </div>
-          <div className="flex gap-2">
-            {isAdmin && (
-              <>
-                <Button onClick={() => setStructureManagerOpen(true)} variant="outline" size="sm" className="gap-2 hidden sm:flex">
-                  <FolderTree className="h-4 w-4" /> Estructura
-                </Button>
-                <Button onClick={() => setNewMachineOpen(true)} variant="outline" size="sm" className="gap-2 hidden sm:flex">
-                  <Plus className="h-4 w-4" /> Nuevo equipo
-                </Button>
-              </>
-            )}
-          </div>
+        {/* Page title */}
+        <div>
+          <h1 className="text-lg sm:text-xl font-bold text-foreground">Catálogo de Repuestos</h1>
+          <p className="text-xs text-muted-foreground mt-0.5">Selecciona un equipo para ver su listado</p>
         </div>
 
-        {/* Accordion Navigator: Categoría → Máquina */}
-        <MachineAccordionNav
+        {/* Equipment Navigator: Categoría → Subcategoría → Máquina + Admin */}
+        <EquipmentNavigator
           repuestosCounts={repuestosCounts}
           onCategoryChange={setSelectedCategoryId}
         />
@@ -254,49 +237,23 @@ export function RepuestosDashboard() {
             </div>
           </div>
           
-          <div className="flex flex-wrap gap-2">
-             <div className="flex items-center gap-2 w-full sm:w-auto">
-                {isAdmin && (
-                <Button variant="outline" size="sm" onClick={() => setImportOpen(true)} className="flex-1 sm:flex-none gap-2" title="Importar">
-                  <Upload className="h-4 w-4" />
-                  <span className="sm:inline">Importar</span>
-                </Button>
-                )}
-                
-                <div className="hidden sm:flex gap-2">
-                   <Button variant="outline" size="sm" onClick={handleOpenExportReport} className="gap-2" title="Centro de Exportación / Reportes">
-                      <FileText className="h-4 w-4" /> Exportar / Reportes
-                   </Button>
-                </div>
-
-                {isAdmin && (
-                <Button size="sm" onClick={() => setCreateOpen(true)} className="flex-1 sm:flex-none gap-2">
-                  <Plus className="h-4 w-4" />
-                  <span className="truncate">Repuesto</span>
-                </Button>
-                )}
-             </div>
-             
-             {/* Mobile extra options */}
-             <div className="flex flex-col sm:hidden w-full gap-2">
-               <div className="flex w-full gap-2">
-                  <Button variant="outline" size="sm" onClick={handleOpenExportReport} className="flex-1 gap-1" title="Reportes">
-                    <FileText className="h-3 w-3" /> <span className="text-xs">Reportes</span>
-                  </Button>
-               </div>
-               {isAdmin && (
-                 <div className="flex w-full gap-2">
-                     <Button onClick={() => setStructureManagerOpen(true)} className="flex-1 gap-1" variant="outline" size="sm">
-                      <FolderTree className="h-3 w-3" />
-                      <span className="text-xs">Estructura</span>
-                    </Button>
-                     <Button onClick={() => setNewMachineOpen(true)} className="flex-1 gap-1" variant="outline" size="sm">
-                      <Plus className="h-3 w-3" />
-                      <span className="text-xs">Equipo</span>
-                    </Button>
-                 </div>
-               )}
-             </div>
+          <div className="flex items-center gap-2">
+            {isAdmin && (
+              <Button variant="outline" size="sm" onClick={() => setImportOpen(true)} className="gap-1.5" title="Importar">
+                <Upload className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline text-xs">Importar</span>
+              </Button>
+            )}
+            <Button variant="outline" size="sm" onClick={handleOpenExportReport} className="gap-1.5" title="Exportar / Reportes">
+              <FileText className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline text-xs">Exportar</span>
+            </Button>
+            {isAdmin && (
+              <Button size="sm" onClick={() => setCreateOpen(true)} className="gap-1.5">
+                <Plus className="h-3.5 w-3.5" />
+                <span className="text-xs">Repuesto</span>
+              </Button>
+            )}
           </div>
         </div>
 
@@ -499,39 +456,6 @@ export function RepuestosDashboard() {
           readOnly={!isAdmin}
         />
       )}
-
-      {/* Modal para crear nuevo equipo o subcategoría */}
-      <MachineHierarchySelector
-        open={newMachineOpen}
-        onOpenChange={setNewMachineOpen}
-        categoryId={selectedCategoryId || undefined}
-        onMachineCreated={(machine) => {
-          setCurrentMachineDirect(machine)
-          toast({
-            title: 'Equipo creado',
-            description: `${machine.nombre} ha sido creado exitosamente.`,
-            variant: 'success',
-          })
-        }}
-        onSubcategoryCreated={(category) => {
-          toast({
-            title: 'Subcategoría creada',
-            description: `${category.nombre} ha sido creada. Puedes seguir agregando equipos o más subcategorías.`,
-            variant: 'success',
-          })
-        }}
-      />
-
-      <Dialog open={structureManagerOpen} onOpenChange={setStructureManagerOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-0">
-          <DialogHeader className="px-6 py-4 border-b">
-            <DialogTitle>Gestión de Estructura de Planta</DialogTitle>
-          </DialogHeader>
-          <div className="flex-1 overflow-y-auto px-6 py-4">
-             <CategoryManager />
-          </div>
-        </DialogContent>
-      </Dialog>
       
       <ExportReportModal 
         isOpen={exportReportOpen}

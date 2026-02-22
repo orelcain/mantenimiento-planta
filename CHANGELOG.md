@@ -7,6 +7,20 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.66] - 2026-02-22
+### UI/UX
+- **Navegación limpia + Admin inline**: Rediseño completo del navigator de repuestos:
+  - Categorías como botones minimalistas (elimina badges ruidosos)
+  - Subcategorías con breadcrumb chevron sutil
+  - Pills de máquinas limpios con dot de color y conteo discreto
+  - Botón "Administrar" (solo admin) abre panel inline de gestión:
+    - Crear/editar/eliminar categorías y subcategorías
+    - Crear/editar/eliminar máquinas
+    - Reordenar con drag & drop
+    - Mover máquinas entre categorías
+  - Eliminados botones redundantes (Estructura, Nuevo equipo)
+  - Dashboard más limpio con acciones consolidadas
+
 ## [2.48.65] - 2026-02-20
 ### UI/UX
 - **Navegación compacta tabs + chips**: Rediseño del navigator de repuestos:
