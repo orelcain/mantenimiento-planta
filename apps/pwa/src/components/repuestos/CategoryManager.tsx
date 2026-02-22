@@ -11,7 +11,7 @@
  */
 
 import { useState, useMemo } from 'react';
-import { Plus, Pencil, Trash2, Archive, ArchiveRestore, GripVertical, ChevronDown, ChevronRight, Wrench, MoreVertical, FolderPlus, ClipboardList, Camera, FileText } from 'lucide-react';
+import { Plus, Pencil, Trash2, Archive, ArchiveRestore, GripVertical, ChevronDown, ChevronRight, Wrench, MoreVertical, FolderPlus, ClipboardList, Camera, FileText, AlertTriangle } from 'lucide-react';
 import {
   DndContext,
   pointerWithin,
@@ -452,6 +452,16 @@ export function CategoryManager() {
 
   const getMachinesByCategory = (categoryId: string) => machines.filter((m) => m.categoryId === categoryId);
 
+  // Máquinas huérfanas: sin categoryId o con categoryId que no existe en ninguna categoría activa
+  const orphanMachines = useMemo(() => {
+    const allCategoryIds = new Set(categories.map(c => c.id));
+    return machines.filter(m => {
+      if (!m.categoryId) return true;
+      if (!allCategoryIds.has(m.categoryId)) return true;
+      return false;
+    });
+  }, [machines, categories]);
+
   // --- DRAG END LOGIC ---
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
@@ -663,6 +673,34 @@ export function CategoryManager() {
                ))}
              </SortableContext>
           </div>
+
+          {/* ── Máquinas sin categoría ── */}
+          {orphanMachines.length > 0 && (
+            <div className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <AlertTriangle className="h-4 w-4 text-amber-500" />
+                <span className="text-sm font-semibold text-amber-500">Sin categoría asignada</span>
+                <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">
+                  {orphanMachines.length} equipo{orphanMachines.length !== 1 ? 's' : ''}
+                </span>
+              </div>
+              <p className="text-[11px] text-muted-foreground mb-2">Estos equipos no pertenecen a ninguna categoría. Edítalos para asignarles una.</p>
+              <div className="flex flex-col gap-1">
+                {orphanMachines.map(machine => (
+                  <div key={machine.id} className="flex items-center gap-2 py-1.5 px-2 bg-card rounded border border-border/40">
+                    <div className="w-1.5 h-5 rounded-full shrink-0" style={{ backgroundColor: machine.color || '#3b82f6' }} />
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm font-medium truncate block">{machine.nombre}</span>
+                      <span className="text-[10px] text-muted-foreground">{machine.marca} {machine.modelo}</span>
+                    </div>
+                    <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => handleEditMachine(machine)}>
+                      <Pencil className="h-3 w-3" /> Asignar
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           
           <DragOverlay>
              {activeId ? (
