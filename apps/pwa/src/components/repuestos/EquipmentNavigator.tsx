@@ -106,7 +106,6 @@ export function EquipmentNavigator({
       return rootCategories[0]?.id || 'maquinas-principales'
     }
   )
-  const [activeSubcatId, setActiveSubcatId] = useState<string | null>(null)
 
   // ── Subcategorías ──
   const subcategories = useMemo(() => {
@@ -115,24 +114,52 @@ export function EquipmentNavigator({
       .sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0))
   }, [categories, activeCatId])
 
-  // ── Máquinas visibles ──
-  const visibleMachines = useMemo(() => {
-    if (activeSubcatId) {
-      return activeMachines
-        .filter(m => m.categoryId === activeSubcatId)
+  // ── Máquinas agrupadas por subcategoría ──
+  // Si la categoría tiene subcategorías, agrupa: [{ label, machines }]
+  // Si no tiene subcategorías, un solo grupo sin label
+  const machineGroups = useMemo(() => {
+    type MachineGroup = { id: string; label: string | null; machines: Machine[] }
+    const groups: MachineGroup[] = []
+
+    if (subcategories.length > 0) {
+      // Máquinas directamente en la categoría raíz (sin subcategoría)
+      const directMachines = activeMachines
+        .filter(m => {
+          if (activeCatId === 'maquinas-principales') {
+            return m.categoryId === activeCatId || !m.categoryId
+          }
+          return m.categoryId === activeCatId
+        })
         .sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0))
+
+      if (directMachines.length > 0) {
+        groups.push({ id: activeCatId, label: 'Sin subcategoría', machines: directMachines })
+      }
+
+      // Máquinas por cada subcategoría
+      subcategories.forEach(sc => {
+        const scMachines = activeMachines
+          .filter(m => m.categoryId === sc.id)
+          .sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0))
+        groups.push({ id: sc.id, label: sc.nombre, machines: scMachines })
+      })
+    } else {
+      // Sin subcategorías: un solo grupo
+      let machines: Machine[]
+      if (activeCatId === 'maquinas-principales') {
+        machines = activeMachines
+          .filter(m => !m.categoryId || m.categoryId === activeCatId)
+          .sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0))
+      } else {
+        machines = activeMachines
+          .filter(m => m.categoryId === activeCatId)
+          .sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0))
+      }
+      groups.push({ id: activeCatId, label: null, machines })
     }
-    const subcatIds = subcategories.map(sc => sc.id)
-    const allCatIds = [activeCatId, ...subcatIds]
-    if (activeCatId === 'maquinas-principales') {
-      return activeMachines
-        .filter(m => !m.categoryId || allCatIds.includes(m.categoryId))
-        .sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0))
-    }
-    return activeMachines
-      .filter(m => m.categoryId && allCatIds.includes(m.categoryId))
-      .sort((a, b) => (a.orden ?? 0) - (b.orden ?? 0))
-  }, [activeMachines, activeCatId, activeSubcatId, subcategories])
+
+    return groups
+  }, [activeMachines, activeCatId, subcategories])
 
   // ── Conteo de máquinas por cat raíz ──
   const machineCountPerCat = useMemo(() => {
@@ -152,7 +179,6 @@ export function EquipmentNavigator({
   // ── Handlers ──
   const handleCategoryChange = (catId: string) => {
     setActiveCatId(catId)
-    setActiveSubcatId(null)
     onCategoryChange?.(catId)
   }
 
@@ -171,7 +197,6 @@ export function EquipmentNavigator({
     const rootId = sub?.parentId || catId
     if (rootId !== activeCatId) {
       setActiveCatId(rootId)
-      setActiveSubcatId(sub?.id || null)
     }
   }, [currentMachine, categories])
 
@@ -264,63 +289,47 @@ export function EquipmentNavigator({
         )}
       </div>
 
-      {/* ── Row 2: Subcategorías (si hay) con breadcrumb ── */}
-      {subcategories.length > 0 && (
-        <div className="flex items-center gap-0.5 overflow-x-auto scrollbar-thin pl-1">
-          <ChevronRight className="h-3 w-3 text-muted-foreground/30 shrink-0" />
-          <button
-            onClick={() => setActiveSubcatId(null)}
-            className={`
-              px-2.5 py-1 rounded-md text-[11px] font-medium whitespace-nowrap transition-all shrink-0
-              ${!activeSubcatId
-                ? 'bg-muted text-foreground'
-                : 'text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted/30'
-              }
-            `}
-          >
-            Todos
-          </button>
-          {subcategories.map(sc => {
-            const isActive = activeSubcatId === sc.id
-            const scMachines = activeMachines.filter(m => m.categoryId === sc.id)
+      {/* ── Row 2: Máquinas agrupadas por subcategoría ── */}
+      <div className="space-y-1.5 pt-0.5">
+        {machineGroups.map(group => {
+          // Saltar grupos vacíos (subcategorías sin máquinas)
+          if (group.machines.length === 0 && group.label) return null
 
-            return (
-              <button
-                key={sc.id}
-                onClick={() => setActiveSubcatId(sc.id)}
-                className={`
-                  inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-medium
-                  whitespace-nowrap transition-all shrink-0
-                  ${isActive
-                    ? 'bg-muted text-foreground'
-                    : 'text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted/30'
-                  }
-                `}
-              >
-                <span>{sc.nombre}</span>
-                <span className="text-[10px] opacity-40 tabular-nums">{scMachines.length}</span>
-              </button>
-            )
-          })}
-        </div>
-      )}
+          return (
+            <div key={group.id}>
+              {/* Label de subcategoría (solo si hay más de un grupo) */}
+              {group.label && machineGroups.length > 1 && (
+                <div className="flex items-center gap-1.5 mb-1 pl-0.5">
+                  <ChevronRight className="h-3 w-3 text-muted-foreground/30 shrink-0" />
+                  <span className="text-[11px] font-medium text-muted-foreground/70 uppercase tracking-wider">
+                    {group.label}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground/30 tabular-nums">
+                    {group.machines.length}
+                  </span>
+                </div>
+              )}
 
-      {/* ── Row 3: Máquinas ── */}
-      <div className="flex flex-wrap items-center gap-0.5 pt-0.5">
-        {visibleMachines.length === 0 && (
-          <span className="text-xs text-muted-foreground/50 italic py-1 pl-1">
-            Sin equipos en esta categoría
-          </span>
-        )}
-        {visibleMachines.map(machine => (
-          <MachinePill
-            key={machine.id}
-            machine={machine}
-            isActive={currentMachine?.id === machine.id}
-            count={repuestosCounts[machine.id] || 0}
-            onClick={() => handleSelectMachine(machine)}
-          />
-        ))}
+              {/* Pills de máquinas */}
+              <div className="flex flex-wrap items-center gap-0.5">
+                {group.machines.length === 0 && (
+                  <span className="text-xs text-muted-foreground/40 italic py-1 pl-5">
+                    Sin equipos
+                  </span>
+                )}
+                {group.machines.map(machine => (
+                  <MachinePill
+                    key={machine.id}
+                    machine={machine}
+                    isActive={currentMachine?.id === machine.id}
+                    count={repuestosCounts[machine.id] || 0}
+                    onClick={() => handleSelectMachine(machine)}
+                  />
+                ))}
+              </div>
+            </div>
+          )
+        })}
       </div>
     </div>
   )
