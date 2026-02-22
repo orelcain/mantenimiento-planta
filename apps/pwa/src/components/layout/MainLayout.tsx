@@ -12,6 +12,8 @@ import {
   X,
   LogOut,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   CalendarClock,
   FolderTree,
   RefreshCw,
@@ -74,6 +76,7 @@ export function MainLayout() {
   const isAdmin = useIsAdmin()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarPeekOpen, setSidebarPeekOpen] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem('sidebar_collapsed') === '1')
   const [ganttFocusMode, setGanttFocusMode] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [isOnline, setIsOnline] = useState(navigator.onLine)
@@ -92,7 +95,15 @@ export function MainLayout() {
   const { hasUpdate, newVersion, reload } = useAppVersion()
   const { setZones, setEquipment, setIncidents } = useAppStore()
   const isGanttRoute = location.pathname.startsWith('/gantt')
-  const shouldHideDesktopSidebar = isGanttRoute && ganttFocusMode && !sidebarPeekOpen
+  const shouldHideDesktopSidebar = sidebarCollapsed || (isGanttRoute && ganttFocusMode && !sidebarPeekOpen)
+
+  const toggleSidebarCollapse = () => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev
+      localStorage.setItem('sidebar_collapsed', next ? '1' : '0')
+      return next
+    })
+  }
 
   const handleSignOut = async () => {
     await signOut()
@@ -290,13 +301,23 @@ export function MainLayout() {
               </div>
               <span className="font-semibold">Mantenimiento</span>
             </div>
-            <button
-              onClick={() => setSidebarOpen(false)}
-              className="lg:hidden p-1 hover:bg-muted rounded"
-              aria-label="Cerrar menú"
-            >
-              <X className="h-5 w-5" />
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={toggleSidebarCollapse}
+                className="hidden lg:flex p-1.5 hover:bg-muted rounded-md transition-colors"
+                aria-label="Contraer menú"
+                title="Contraer menú"
+              >
+                <ChevronLeft className="h-4 w-4 text-muted-foreground" />
+              </button>
+              <button
+                onClick={() => setSidebarOpen(false)}
+                className="lg:hidden p-1 hover:bg-muted rounded"
+                aria-label="Cerrar menú"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
           </div>
 
           {/* Navigation */}
@@ -395,7 +416,7 @@ export function MainLayout() {
         </div>
       </aside>
 
-      {isGanttRoute && ganttFocusMode && (
+      {isGanttRoute && ganttFocusMode && !sidebarCollapsed && (
         <button
           type="button"
           className="hidden lg:block fixed left-0 top-24 z-40 h-[calc(100vh-6rem)] w-2 bg-transparent hover:bg-primary/10"
@@ -405,8 +426,21 @@ export function MainLayout() {
         />
       )}
 
+      {/* Sidebar expand edge tab (desktop, when collapsed) */}
+      {sidebarCollapsed && (
+        <button
+          type="button"
+          className="hidden lg:flex fixed left-0 top-1/2 -translate-y-1/2 z-40 items-center justify-center w-6 h-14 bg-card/80 backdrop-blur-sm border border-l-0 rounded-r-lg shadow-md hover:bg-muted hover:w-8 transition-all duration-200 group"
+          onClick={toggleSidebarCollapse}
+          aria-label="Expandir menú lateral"
+          title="Expandir menú lateral"
+        >
+          <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+        </button>
+      )}
+
       {/* Main content */}
-      <div className={cn(!shouldHideDesktopSidebar && 'lg:pl-64')}>
+      <div className={cn('transition-[padding] duration-200 ease-in-out', !shouldHideDesktopSidebar && 'lg:pl-64')}>
         {/* Top bar */}
         <header className="sticky top-0 z-30 flex items-center h-16 px-4 bg-background/80 backdrop-blur border-b">
           <button

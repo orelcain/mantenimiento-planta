@@ -7,6 +7,18 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.69] - 2026-02-22
+### UI/UX
+- **Sidebar colapsable**: Botón de contraer/expandir en el borde del menú lateral principal
+  - Chevron `‹` en la cabecera del sidebar para colapsar (desktop)
+  - Tab flotante `›` en el borde izquierdo para expandir cuando está contraído
+  - Estado persistido en `localStorage` (sobrevive recarga de página)
+  - Transición suave tanto en el sidebar como en el área de contenido
+  - No interfiere con el modo enfoque Gantt existente
+  - Solo afecta desktop; en móvil se mantiene el menú hamburguesa
+
+---
+
 ## [2.48.68] - 2026-02-22
 ### UI/UX
 - **EquipmentNavigator — Fusión P2+P6**: Rediseño completo del navegador de equipos:
