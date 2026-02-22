@@ -7,6 +7,18 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.68] - 2026-02-22
+### UI/UX
+- **EquipmentNavigator — Fusión P2+P6**: Rediseño completo del navegador de equipos:
+  - Rail lateral vertical con iconos de categoría + badge de conteo
+  - Chips de subcategoría (sin opción "Todas") con conteo por subcat
+  - Buscador inline para filtrar equipos por nombre, marca o modelo
+  - Grid de máquinas con dot de color, nombre y mini barra de stock
+  - Breadcrumb contextual: Categoría › Subcategoría › Máquina activa
+  - Auto-selección de primera subcategoría al cambiar categoría
+  - Botón admin integrado al final del rail
+  - Layout responsive: rail horizontal en móvil
+
 ## [2.48.67] - 2026-02-22
 ### UI/UX
 - **Navegación inline horizontal**: Máquinas en una sola fila horizontal con wrap:

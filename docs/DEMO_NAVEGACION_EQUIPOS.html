@@ -1,0 +1,1088 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Demo Potenciado — Propuestas 2★, 6★ y Fusión 2+6</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:        #0a0a0b;
+      --bg-card:   #111113;
+      --bg-hover:  #1a1a1e;
+      --bg-active: #1e293b;
+      --border:    #222228;
+      --fg:        #e4e4e7;
+      --fg-muted:  #71717a;
+      --fg-dim:    #52525b;
+      --primary:   #3b82f6;
+      --primary-fg:#ffffff;
+      --green:     #22c55e;
+      --amber:     #f59e0b;
+      --red:       #ef4444;
+      --purple:    #a855f7;
+      --cyan:      #06b6d4;
+      --radius:    8px;
+      --radius-lg: 12px;
+      --font:      -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    html { font-size: 14px; }
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--fg);
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+
+    /* ═══ TOP SWITCHER ═══ */
+    .top-bar {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(10,10,11,.95);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 1.5rem;
+      display: flex; align-items: center; gap: 1rem;
+    }
+    .top-bar .logo {
+      font-weight: 700; font-size: .85rem;
+      color: var(--primary); white-space: nowrap;
+      padding: .75rem 0;
+    }
+    .top-tabs { display: flex; gap: 0; flex: 1; overflow-x: auto; }
+    .top-tab {
+      padding: .75rem 1.15rem;
+      border: none; background: transparent;
+      color: var(--fg-muted); font-size: .8rem;
+      font-weight: 500; cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all .15s; white-space: nowrap;
+      font-family: var(--font);
+    }
+    .top-tab:hover { color: var(--fg); }
+    .top-tab.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
+    .top-tab .star { color: var(--amber); margin-left: 3px; }
+    .top-tab .fusion-badge {
+      display: inline-block; font-size: .55rem;
+      background: linear-gradient(135deg, var(--primary), var(--purple));
+      color: white; padding: 1px 6px;
+      border-radius: 999px; font-weight: 700;
+      margin-left: 5px; vertical-align: middle;
+    }
+
+    /* ═══ PANELS ═══ */
+    .panel { display: none; animation: fadeIn .25s ease; }
+    .panel.active { display: block; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    /* ═══ DETAIL AREA (shared) ═══ */
+    .detail-area {
+      padding: 1.5rem; min-height: 260px;
+      background: var(--bg-card);
+      border-top: 1px solid var(--border);
+    }
+    .detail-header {
+      display: flex; align-items: center; gap: .75rem;
+      margin-bottom: 1rem;
+    }
+    .detail-dot { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; }
+    .detail-name { font-size: 1.1rem; font-weight: 600; }
+    .detail-sub { font-size: .78rem; color: var(--fg-muted); margin-left: auto; }
+    .stats-row {
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      gap: .75rem; margin-bottom: 1.25rem;
+    }
+    .stat-card {
+      padding: .75rem 1rem; border-radius: var(--radius);
+      background: var(--bg); border: 1px solid var(--border);
+    }
+    .stat-label {
+      font-size: .65rem; text-transform: uppercase;
+      letter-spacing: .04em; color: var(--fg-dim); margin-bottom: 4px;
+    }
+    .stat-value { font-size: 1.1rem; font-weight: 700; }
+    .stat-value.blue { color: var(--primary); }
+    .stat-value.green { color: var(--green); }
+    .stat-value.amber { color: var(--amber); }
+    .placeholder-content {
+      padding: 2rem; border: 1px dashed var(--border);
+      border-radius: var(--radius); text-align: center;
+      color: var(--fg-dim); font-size: .82rem;
+    }
+    .empty-state { text-align: center; padding: 2rem; color: var(--fg-dim); }
+    .empty-state .icon { font-size: 2rem; margin-bottom: .5rem; }
+
+    /* ═══ SHARED SEARCH ═══ */
+    .search-box {
+      position: relative; flex: 1; max-width: 280px;
+    }
+    .search-box input {
+      width: 100%; padding: 7px 12px 7px 32px;
+      border: 1px solid var(--border); border-radius: var(--radius);
+      background: var(--bg-card); color: var(--fg);
+      font-size: .8rem; outline: none; transition: border-color .15s;
+      font-family: var(--font);
+    }
+    .search-box input:focus { border-color: var(--primary); }
+    .search-box input::placeholder { color: var(--fg-dim); }
+    .search-box .search-icon {
+      position: absolute; left: 10px; top: 50%;
+      transform: translateY(-50%); font-size: .75rem;
+      color: var(--fg-dim); pointer-events: none;
+    }
+    .search-box .clear-btn {
+      position: absolute; right: 8px; top: 50%;
+      transform: translateY(-50%);
+      background: none; border: none; color: var(--fg-dim);
+      cursor: pointer; font-size: .7rem; display: none;
+      font-family: var(--font);
+    }
+    .search-box .clear-btn.visible { display: block; }
+
+    /* ═══ RECENT BAR ═══ */
+    .recent-bar {
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 0; font-size: .72rem;
+    }
+    .recent-label { color: var(--fg-dim); font-size: .65rem; text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; }
+    .recent-items { display: flex; gap: 4px; overflow-x: auto; }
+    .recent-item {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 3px 8px; border-radius: 999px;
+      background: var(--bg-hover); border: 1px solid var(--border);
+      font-size: .68rem; color: var(--fg-muted); cursor: pointer;
+      transition: all .12s; white-space: nowrap; font-family: var(--font);
+    }
+    .recent-item:hover { border-color: var(--primary); color: var(--fg); }
+    .recent-item .rdot { width: 5px; height: 5px; border-radius: 50%; }
+
+    /* ═══════════════════════════════════════════════════════════
+       PROPUESTA 2★ — DROPDOWN CASCADER ENHANCED
+       ═══════════════════════════════════════════════════════════ */
+    .p2-wrapper { padding: 1rem 1.5rem; background: var(--bg); }
+    .p2-top-row { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; margin-bottom: .6rem; }
+    .p2-select {
+      appearance: none;
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--radius); color: var(--fg);
+      padding: 8px 32px 8px 12px; font-size: .82rem;
+      cursor: pointer; min-width: 180px; outline: none;
+      transition: all .2s; font-family: var(--font);
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2371717a' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 10px center;
+    }
+    .p2-select:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(59,130,246,.15); }
+    .p2-select:disabled { opacity: .4; cursor: not-allowed; }
+    .p2-select option { background: var(--bg-card); color: var(--fg); }
+    .p2-arrow { color: var(--fg-dim); font-size: .85rem; user-select: none; }
+    .p2-breadcrumb {
+      display: flex; align-items: center; gap: 6px;
+      font-size: .76rem; color: var(--fg-muted);
+      padding: 6px 12px;
+      background: var(--bg-card); border-radius: var(--radius);
+      border: 1px solid var(--border);
+    }
+    .p2-breadcrumb .sep { color: var(--fg-dim); }
+    .p2-breadcrumb .current { color: var(--primary); font-weight: 600; }
+    .p2-breadcrumb .total-badge {
+      margin-left: auto; font-size: .62rem;
+      background: var(--primary); color: white;
+      padding: 1px 7px; border-radius: 999px;
+      font-weight: 600;
+    }
+    .p2-section-label {
+      margin-top: .75rem; font-size: .68rem; color: var(--fg-muted);
+      text-transform: uppercase; letter-spacing: .05em;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .p2-section-label .line { flex: 1; height: 1px; background: var(--border); }
+    .p2-chips { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .4rem; }
+    .p2-chip {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 7px 12px; border-radius: var(--radius); font-size: .78rem;
+      background: var(--bg-card); border: 1px solid var(--border);
+      cursor: pointer; transition: all .18s; color: var(--fg-muted);
+      font-family: var(--font); position: relative; overflow: hidden;
+    }
+    .p2-chip:hover { border-color: var(--primary); color: var(--fg); transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,.3); }
+    .p2-chip.active {
+      border-color: var(--primary); background: rgba(59,130,246,.1);
+      color: var(--fg); font-weight: 500;
+      box-shadow: 0 0 0 1px rgba(59,130,246,.2), 0 2px 8px rgba(0,0,0,.2);
+    }
+    .p2-chip .cdot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .p2-chip .cnt {
+      font-size: .62rem; color: var(--fg-dim);
+      background: var(--bg); padding: 1px 5px;
+      border-radius: 4px; font-weight: 600;
+    }
+    .p2-chip.active .cnt { background: rgba(59,130,246,.2); color: var(--primary); }
+    .p2-chip .mini-bar {
+      position: absolute; bottom: 0; left: 0; height: 2px;
+      background: var(--primary); border-radius: 0 2px 0 0;
+      transition: width .3s ease;
+    }
+    .p2-chip.zero-stock .mini-bar { background: var(--fg-dim); }
+    .p2-chip.highlight { animation: chipHighlight .5s ease; }
+    @keyframes chipHighlight {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.03); }
+      100% { transform: scale(1); }
+    }
+    .p2-no-results {
+      padding: 1.5rem; text-align: center; color: var(--fg-dim);
+      font-size: .82rem;
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       PROPUESTA 6★ — RAIL + GRID ENHANCED
+       ═══════════════════════════════════════════════════════════ */
+    .p6-layout { display: grid; grid-template-columns: auto 1fr; min-height: 500px; }
+    .p6-rail {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 2px; padding: 8px 4px;
+      border-right: 1px solid var(--border); background: var(--bg-card);
+      transition: width .25s ease;
+      width: 62px;
+    }
+    .p6-rail.expanded { width: 180px; align-items: stretch; padding: 8px; }
+    .p6-rail-toggle {
+      width: 100%; padding: 6px; border: none; background: transparent;
+      color: var(--fg-dim); cursor: pointer; font-size: .7rem;
+      border-bottom: 1px solid var(--border); margin-bottom: 4px;
+      transition: all .15s; font-family: var(--font);
+      display: flex; align-items: center; justify-content: center; gap: 4px;
+    }
+    .p6-rail-toggle:hover { color: var(--fg); }
+    .p6-rail-btn {
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 2px;
+      border: none; background: transparent;
+      border-radius: var(--radius); cursor: pointer;
+      transition: all .15s; position: relative;
+      font-family: var(--font); color: var(--fg);
+      padding: 8px 4px; min-height: 48px;
+    }
+    .p6-rail.expanded .p6-rail-btn {
+      flex-direction: row; justify-content: flex-start;
+      gap: 10px; padding: 10px 12px;
+    }
+    .p6-rail-btn:hover { background: var(--bg-hover); }
+    .p6-rail-btn.active { background: var(--bg-active); }
+    .p6-rail-btn.active::before {
+      content: ''; position: absolute; left: -4px; top: 50%;
+      transform: translateY(-50%);
+      width: 3px; height: 22px;
+      background: var(--primary); border-radius: 0 2px 2px 0;
+    }
+    .p6-rail.expanded .p6-rail-btn.active::before { left: 0; }
+    .p6-rail-icon { font-size: 1.3rem; flex-shrink: 0; }
+    .p6-rail-label {
+      font-size: .47rem; color: var(--fg-dim);
+      text-transform: uppercase; letter-spacing: .02em;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .p6-rail.expanded .p6-rail-label {
+      font-size: .78rem; text-transform: none; letter-spacing: 0;
+    }
+    .p6-rail-btn.active .p6-rail-label { color: var(--primary); }
+    .p6-rail-count {
+      display: none; font-size: .62rem; margin-left: auto;
+      background: var(--bg); padding: 1px 6px;
+      border-radius: 999px; color: var(--fg-muted);
+    }
+    .p6-rail.expanded .p6-rail-count { display: block; }
+    .p6-rail-alert {
+      position: absolute; top: 4px; right: 4px;
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--amber);
+    }
+    .p6-rail.expanded .p6-rail-alert { position: static; margin-left: 4px; }
+
+    .p6-content { padding: 1rem 1.25rem; background: var(--bg); }
+    .p6-content-header {
+      display: flex; align-items: center; gap: 8px;
+      margin-bottom: .5rem;
+    }
+    .p6-content-title { font-size: .92rem; font-weight: 600; }
+    .p6-content-badge {
+      font-size: .6rem; background: var(--primary);
+      color: white; padding: 1px 7px;
+      border-radius: 999px; font-weight: 600;
+    }
+    .p6-toolbar {
+      display: flex; align-items: center; gap: 8px;
+      margin-bottom: .6rem;
+    }
+    .p6-view-toggle {
+      display: flex; border: 1px solid var(--border); border-radius: var(--radius);
+      overflow: hidden; margin-left: auto;
+    }
+    .p6-view-btn {
+      padding: 5px 10px; border: none; background: transparent;
+      color: var(--fg-dim); cursor: pointer; font-size: .75rem;
+      transition: all .12s; font-family: var(--font);
+    }
+    .p6-view-btn:hover { color: var(--fg); }
+    .p6-view-btn.active { background: var(--bg-active); color: var(--fg); }
+    .p6-subcat-chips { display: flex; gap: 4px; flex-wrap: wrap; flex: 1; }
+    .p6-subchip {
+      padding: 4px 10px; font-size: .72rem;
+      border: 1px solid var(--border); border-radius: 999px;
+      background: transparent; color: var(--fg-muted);
+      cursor: pointer; transition: all .12s; font-family: var(--font);
+    }
+    .p6-subchip:hover { border-color: var(--fg-dim); color: var(--fg); }
+    .p6-subchip.active {
+      border-color: var(--primary); background: rgba(59,130,246,.1);
+      color: var(--fg); font-weight: 500;
+    }
+
+    /* Grid view */
+    .p6-machines { gap: .5rem; }
+    .p6-machines.grid-view {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+    }
+    .p6-machines.list-view {
+      display: flex; flex-direction: column;
+    }
+
+    /* Grid card style */
+    .p6-machine-card {
+      padding: 10px 12px; border-radius: var(--radius);
+      cursor: pointer; transition: all .15s;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      font-family: var(--font);
+    }
+    .p6-machine-card:hover { border-color: var(--fg-dim); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,.3); }
+    .p6-machine-card.active { border-color: var(--primary); background: var(--bg-active); box-shadow: 0 0 0 1px rgba(59,130,246,.2); }
+    .p6-card-top { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+    .p6-card-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .p6-card-name {
+      font-size: .8rem; font-weight: 500; flex: 1;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .p6-card-count {
+      font-size: .62rem; background: var(--bg);
+      padding: 1px 6px; border-radius: 4px;
+      color: var(--fg-muted); font-weight: 600;
+    }
+    .p6-card-meta {
+      display: flex; gap: 8px; font-size: .65rem; color: var(--fg-dim);
+    }
+    .p6-card-meta span { display: flex; align-items: center; gap: 3px; }
+    .p6-card-bar {
+      margin-top: 6px; height: 2px; border-radius: 2px;
+      background: var(--border); overflow: hidden;
+    }
+    .p6-card-bar-fill { height: 100%; border-radius: 2px; transition: width .3s ease; }
+
+    /* List item style */
+    .p6-machine-list {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 12px; border-radius: 6px;
+      cursor: pointer; transition: all .12s;
+      border: 1px solid transparent;
+      font-family: var(--font);
+    }
+    .p6-machine-list:hover { background: var(--bg-hover); border-color: var(--border); }
+    .p6-machine-list.active { background: var(--bg-active); border-color: var(--primary); }
+    .p6-machine-list .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .p6-machine-list .name {
+      font-size: .8rem; flex: 1;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .p6-machine-list .meta { font-size: .65rem; color: var(--fg-dim); }
+    .p6-machine-list .ct {
+      font-size: .65rem; color: var(--fg-dim);
+      min-width: 24px; text-align: right;
+      font-weight: 600;
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       FUSIÓN 2+6 — BEST OF BOTH
+       ═══════════════════════════════════════════════════════════ */
+    .pf-layout { display: grid; grid-template-columns: 60px 1fr; min-height: 500px; }
+    .pf-rail {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 2px; padding: 8px 4px;
+      border-right: 1px solid var(--border); background: var(--bg-card);
+    }
+    .pf-rail-btn {
+      width: 48px; height: 48px;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 2px;
+      border: none; background: transparent;
+      border-radius: var(--radius); cursor: pointer;
+      transition: all .15s; position: relative;
+      font-family: var(--font); color: var(--fg);
+    }
+    .pf-rail-btn:hover { background: var(--bg-hover); }
+    .pf-rail-btn.active { background: var(--bg-active); }
+    .pf-rail-btn.active::before {
+      content: ''; position: absolute; left: -4px; top: 50%;
+      transform: translateY(-50%);
+      width: 3px; height: 20px;
+      background: var(--primary); border-radius: 0 2px 2px 0;
+    }
+    .pf-rail-icon { font-size: 1.25rem; }
+    .pf-rail-label {
+      font-size: .45rem; color: var(--fg-dim);
+      text-transform: uppercase; letter-spacing: .02em;
+      white-space: nowrap;
+    }
+    .pf-rail-btn.active .pf-rail-label { color: var(--primary); }
+    .pf-rail-badge {
+      position: absolute; top: 2px; right: 2px;
+      font-size: .5rem; background: var(--primary);
+      color: white; padding: 0 4px;
+      border-radius: 999px; font-weight: 700;
+      min-width: 14px; text-align: center;
+    }
+    .pf-content { background: var(--bg); }
+    .pf-header {
+      padding: .75rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 10px;
+    }
+    .pf-title { font-size: .9rem; font-weight: 600; }
+    .pf-count-badge {
+      font-size: .6rem; background: var(--primary);
+      color: white; padding: 1px 7px;
+      border-radius: 999px; font-weight: 600;
+    }
+    .pf-toolbar {
+      padding: .5rem 1.25rem;
+      display: flex; align-items: center; gap: 8px;
+      flex-wrap: wrap;
+    }
+    .pf-subchip {
+      padding: 4px 10px; font-size: .72rem;
+      border: 1px solid var(--border); border-radius: 999px;
+      background: transparent; color: var(--fg-muted);
+      cursor: pointer; transition: all .12s; font-family: var(--font);
+    }
+    .pf-subchip:hover { border-color: var(--fg-dim); color: var(--fg); }
+    .pf-subchip.active {
+      border-color: var(--primary); background: rgba(59,130,246,.1);
+      color: var(--fg); font-weight: 500;
+    }
+    .pf-search-area {
+      margin-left: auto; display: flex; align-items: center; gap: 6px;
+    }
+    .pf-machines-area { padding: .5rem 1.25rem; }
+    .pf-group-label {
+      font-size: .65rem; color: var(--fg-dim); text-transform: uppercase;
+      letter-spacing: .05em; padding: 6px 0 4px;
+      border-bottom: 1px solid var(--border); margin-bottom: 4px;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .pf-group-label .line { flex: 1; height: 1px; background: var(--border); }
+    .pf-group-count { font-size: .58rem; color: var(--fg-dim); }
+    .pf-machines-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: .4rem; margin-bottom: .75rem;
+    }
+    .pf-machine-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 9px 12px; border-radius: var(--radius);
+      cursor: pointer; transition: all .15s;
+      border: 1px solid transparent;
+      font-family: var(--font); position: relative;
+    }
+    .pf-machine-item:hover { background: var(--bg-hover); border-color: var(--border); transform: translateY(-1px); }
+    .pf-machine-item.active {
+      background: var(--bg-active); border-color: var(--primary);
+      box-shadow: 0 0 0 1px rgba(59,130,246,.15);
+    }
+    .pf-machine-item .dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+    .pf-machine-item .name {
+      font-size: .8rem; flex: 1;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .pf-machine-item .ct {
+      font-size: .62rem; color: var(--fg-dim);
+      background: var(--bg); padding: 1px 5px;
+      border-radius: 4px; font-weight: 600;
+    }
+    .pf-machine-item.active .ct { background: rgba(59,130,246,.15); color: var(--primary); }
+    .pf-machine-item .mini-bar {
+      position: absolute; bottom: 0; left: 8px; right: 8px;
+      height: 2px; border-radius: 2px;
+      background: var(--border); overflow: hidden;
+    }
+    .pf-machine-item .mini-bar-fill {
+      height: 100%; border-radius: 2px;
+    }
+    .pf-breadcrumb {
+      padding: .4rem 1.25rem; font-size: .72rem; color: var(--fg-muted);
+      background: var(--bg-card); border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 5px;
+    }
+    .pf-breadcrumb .sep { color: var(--fg-dim); }
+    .pf-breadcrumb .current { color: var(--primary); font-weight: 600; }
+    .pf-no-results { padding: 1.5rem; text-align: center; color: var(--fg-dim); font-size: .82rem; }
+
+    /* ═══ RESPONSIVE ═══ */
+    @media (max-width: 768px) {
+      .p6-layout, .pf-layout { grid-template-columns: 1fr; }
+      .p6-rail, .pf-rail {
+        flex-direction: row; border-right: none;
+        border-bottom: 1px solid var(--border); overflow-x: auto;
+        padding: 6px 8px; width: auto !important;
+      }
+      .p6-rail-btn, .pf-rail-btn {
+        width: auto; height: auto; flex-direction: row;
+        padding: 8px 12px; gap: 4px; min-height: unset;
+      }
+      .p6-rail-btn.active::before, .pf-rail-btn.active::before { display: none; }
+      .stats-row { grid-template-columns: repeat(2, 1fr); }
+      .p2-top-row { flex-direction: column; align-items: stretch; }
+      .p2-arrow { display: none; }
+      .p2-select { width: 100%; min-width: unset; }
+      .top-tabs { overflow-x: auto; }
+      .p6-machines.grid-view { grid-template-columns: 1fr; }
+      .pf-machines-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ═══ TOP BAR ═══ -->
+  <div class="top-bar">
+    <span class="logo">⚙ Repuestos — Demo v2</span>
+    <div class="top-tabs" id="topTabs">
+      <button class="top-tab active" data-panel="p2">
+        P2<span class="star">★</span> Cascader
+      </button>
+      <button class="top-tab" data-panel="p6">
+        P6<span class="star">★</span> Rail+Grid
+      </button>
+      <button class="top-tab" data-panel="pf">
+        Fusión<span class="fusion-badge">2+6</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ═══ PANEL 2 ═══ -->
+  <div id="panel-p2" class="panel active">
+    <div class="p2-wrapper" id="p2-nav"></div>
+    <div class="detail-area" id="p2-detail"></div>
+  </div>
+
+  <!-- ═══ PANEL 6 ═══ -->
+  <div id="panel-p6" class="panel">
+    <div class="p6-layout">
+      <div class="p6-rail" id="p6-rail"></div>
+      <div>
+        <div class="p6-content" id="p6-nav"></div>
+        <div class="detail-area" id="p6-detail"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ PANEL FUSIÓN ═══ -->
+  <div id="panel-pf" class="panel">
+    <div class="pf-layout">
+      <div class="pf-rail" id="pf-rail"></div>
+      <div>
+        <div id="pf-content"></div>
+        <div class="detail-area" id="pf-detail"></div>
+      </div>
+    </div>
+  </div>
+
+
+  <script>
+  // ═══════════════════════════════════════════════════════════
+  // DATA — simula tu Firestore
+  // ═══════════════════════════════════════════════════════════
+  const CATS = [
+    { id: 'maquinas-principales', nombre: 'Máquinas Principales', icon: '⚙️', orden: 0 },
+    { id: 'motores-bombas',       nombre: 'Motores y Bombas',     icon: '🔧', orden: 1 },
+    { id: 'cintas',               nombre: 'Cintas Transportadoras', icon: '🏭', orden: 2 },
+  ];
+
+  const SUBCATS = [
+    { id: 'filete',        nombre: 'Máquinas Filete',      parentId: 'maquinas-principales', orden: 0 },
+    { id: 'eviscerado',    nombre: 'Máquinas Eviscerado',  parentId: 'maquinas-principales', orden: 1 },
+    { id: 'empaque',       nombre: 'Máquinas Empaque',     parentId: 'maquinas-principales', orden: 2 },
+    { id: 'c-eviscerado',  nombre: 'Cintas Eviscerado',    parentId: 'cintas', orden: 0 },
+    { id: 'c-emparrillado',nombre: 'Cinta Emparrillado',   parentId: 'cintas', orden: 1 },
+    { id: 'c-filete',      nombre: 'Cintas Filete',        parentId: 'cintas', orden: 2 },
+    { id: 'c-empaque',     nombre: 'Cinta Empaque',        parentId: 'cintas', orden: 3 },
+  ];
+
+  const MACHINES = [
+    { id:'m1', nombre:'Volcador Bins',       color:'#ef4444', categoryId:'filete',     count:0,   marca:'Baader',  tipo:'Volcador' },
+    { id:'m2', nombre:'Baader 200',          color:'#3b82f6', categoryId:'filete',     count:119, marca:'Baader',  tipo:'Fileteo' },
+    { id:'m3', nombre:'Baader 142',          color:'#22c55e', categoryId:'eviscerado', count:3,   marca:'Baader',  tipo:'Eviscerado' },
+    { id:'m4', nombre:'Grader',              color:'#f59e0b', categoryId:'eviscerado', count:28,  marca:'Marel',   tipo:'Clasificado' },
+    { id:'m5', nombre:'Marel HG',            color:'#a855f7', categoryId:'eviscerado', count:0,   marca:'Marel',   tipo:'Head Gutting' },
+    { id:'m6', nombre:'Fishken',             color:'#06b6d4', categoryId:'empaque',    count:11,  marca:'Fishken', tipo:'Empaque' },
+    { id:'m7', nombre:'Motor Bomba Sala',    color:'#3b82f6', categoryId:'motores-bombas', count:5, marca:'WEG',   tipo:'Motor' },
+    { id:'m8', nombre:'Bomba Hidráulica',    color:'#22c55e', categoryId:'motores-bombas', count:2, marca:'Parker', tipo:'Bomba' },
+    { id:'c1',  nombre:'Cinta Elevadora Zeta',       color:'#22c55e', categoryId:'c-eviscerado',   count:4, marca:'Custom', tipo:'Elevadora' },
+    { id:'c2',  nombre:'Cinta Aceleración 1 Marel',  color:'#3b82f6', categoryId:'c-eviscerado',   count:0, marca:'Marel',  tipo:'Aceleración' },
+    { id:'c3',  nombre:'Cinta Marel HG',             color:'#f59e0b', categoryId:'c-eviscerado',   count:6, marca:'Marel',  tipo:'Transporte' },
+    { id:'c4',  nombre:'Cinta Azul Alimentación',    color:'#a855f7', categoryId:'c-eviscerado',   count:0, marca:'Custom', tipo:'Alimentación' },
+    { id:'c5',  nombre:'Cinta Transversal Salida',   color:'#06b6d4', categoryId:'c-eviscerado',   count:0, marca:'Custom', tipo:'Transversal' },
+    { id:'c6',  nombre:'Cinta Elevadora Zeta 2',     color:'#22c55e', categoryId:'c-eviscerado',   count:0, marca:'Custom', tipo:'Elevadora' },
+    { id:'c7',  nombre:'Cinta Aceleración 1 Grader', color:'#3b82f6', categoryId:'c-eviscerado',   count:0, marca:'Marel',  tipo:'Aceleración' },
+    { id:'c8',  nombre:'Cinta Aceleración 2 Grader', color:'#ef4444', categoryId:'c-eviscerado',   count:0, marca:'Marel',  tipo:'Aceleración' },
+    { id:'c9',  nombre:'Cinta Larga Grader',         color:'#f59e0b', categoryId:'c-emparrillado', count:0, marca:'Marel',  tipo:'Emparrillado' },
+    { id:'c10', nombre:'Cinta Desperdicio Baader',    color:'#22c55e', categoryId:'c-filete',       count:0, marca:'Baader', tipo:'Desperdicio' },
+    { id:'c11', nombre:'Cinta Pimponeo',             color:'#a855f7', categoryId:'c-filete',       count:0, marca:'Custom', tipo:'Pimponeo' },
+    { id:'c12', nombre:'Cinta Desperdicio Pimponeo',  color:'#ef4444', categoryId:'c-filete',       count:0, marca:'Custom', tipo:'Desperdicio' },
+    { id:'c13', nombre:'Cinta Curva',                color:'#3b82f6', categoryId:'c-filete',       count:0, marca:'Custom', tipo:'Curva' },
+    { id:'c14', nombre:'Cinta Aceleración 1 Marel F', color:'#06b6d4', categoryId:'c-filete',      count:0, marca:'Marel',  tipo:'Aceleración' },
+    { id:'c15', nombre:'Cinta Marel Filete',         color:'#f59e0b', categoryId:'c-filete',       count:0, marca:'Marel',  tipo:'Transporte' },
+    { id:'c16', nombre:'Cinta Alimentación Gea',     color:'#22c55e', categoryId:'c-empaque',      count:0, marca:'Gea',    tipo:'Alimentación' },
+    { id:'c17', nombre:'Cinta Fishken',              color:'#a855f7', categoryId:'c-empaque',      count:0, marca:'Fishken',tipo:'Empaque' },
+  ];
+
+  const MAX_COUNT = Math.max(...MACHINES.map(m=>m.count), 1);
+
+  // ═══ HELPERS ═══
+  function getSubcatsOf(catId) {
+    return SUBCATS.filter(s => s.parentId === catId).sort((a,b) => a.orden - b.orden);
+  }
+  function getMachines(catId, subcatId) {
+    const subs = getSubcatsOf(catId);
+    const subIds = subs.map(s => s.id);
+    if (subcatId && subcatId !== '__all__') return MACHINES.filter(m => m.categoryId === subcatId);
+    if (subs.length) return MACHINES.filter(m => subIds.includes(m.categoryId) || m.categoryId === catId);
+    return MACHINES.filter(m => m.categoryId === catId);
+  }
+  function countCat(catId) {
+    const subIds = getSubcatsOf(catId).map(s => s.id);
+    return MACHINES.filter(m => m.categoryId === catId || subIds.includes(m.categoryId)).length;
+  }
+  function shortLabel(name) {
+    return name.replace(/^(Cintas?|Máquinas?|Cinta) ?/i,'');
+  }
+  function getSubcatOfMachine(m) { return SUBCATS.find(s => s.id === m.categoryId); }
+  function getCatOfMachine(m) {
+    const sc = getSubcatOfMachine(m);
+    if (sc) return CATS.find(c => c.id === sc.parentId);
+    return CATS.find(c => c.id === m.categoryId);
+  }
+  function stockColor(count) {
+    if (count === 0) return 'var(--fg-dim)';
+    if (count < 5) return 'var(--amber)';
+    return 'var(--green)';
+  }
+  function barPct(count) { return Math.min(100, (count / MAX_COUNT) * 100); }
+  function hasZeroStock(catId) {
+    const ms = getMachines(catId, '__all__');
+    return ms.some(m => m.count === 0);
+  }
+  function filterMachines(machines, query) {
+    if (!query) return machines;
+    const q = query.toLowerCase();
+    return machines.filter(m =>
+      m.nombre.toLowerCase().includes(q) ||
+      (m.marca||'').toLowerCase().includes(q) ||
+      (m.tipo||'').toLowerCase().includes(q)
+    );
+  }
+
+  // ═══ RECENT HISTORY ═══
+  let recentMachines = ['m2','m4','m6']; // pre-seed
+  function addRecent(id) {
+    recentMachines = [id, ...recentMachines.filter(x=>x!==id)].slice(0,5);
+  }
+
+  // ═══ SHARED DETAIL RENDERER ═══
+  function renderDetail(containerId, machineId) {
+    const el = document.getElementById(containerId);
+    const m = MACHINES.find(x => x.id === machineId);
+    if (!m) { el.innerHTML = '<div class="empty-state"><div class="icon">📦</div>Selecciona un equipo</div>'; return; }
+    const cat = getCatOfMachine(m);
+    const sc = getSubcatOfMachine(m);
+    el.innerHTML = `
+      <div class="detail-header">
+        <span class="detail-dot" style="background:${m.color}"></span>
+        <span class="detail-name">${m.nombre}</span>
+        <span class="detail-sub">${cat?.nombre||''}${sc?' › '+sc.nombre:''}</span>
+      </div>
+      <div class="stats-row">
+        <div class="stat-card"><div class="stat-label">Total Repuestos</div><div class="stat-value blue">${m.count}</div></div>
+        <div class="stat-card"><div class="stat-label">Con Ficha Téc.</div><div class="stat-value green">${Math.floor(m.count*.6)}</div></div>
+        <div class="stat-card"><div class="stat-label">Con Fotografía</div><div class="stat-value amber">${Math.floor(m.count*.3)}</div></div>
+        <div class="stat-card"><div class="stat-label">Valor Referencial</div><div class="stat-value">$${(m.count*125).toLocaleString()}</div></div>
+      </div>
+      <div class="placeholder-content">
+        ${m.count > 0 ? `Catálogo de ${m.count} repuestos — ${m.marca||''} ${m.tipo||''}` : '⚠️ Sin repuestos registrados — Equipo pendiente de carga'}
+      </div>
+    `;
+  }
+
+  // ═══ STATE ═══
+  let S = {
+    p2: { catId:'maquinas-principales', subcatId:'filete', machineId:'m2', search:'' },
+    p6: { catId:'maquinas-principales', subcatId:'filete', machineId:'m2', search:'', viewMode:'grid', railExpanded:false },
+    pf: { catId:'maquinas-principales', subcatId:'filete', machineId:'m2', search:'' },
+  };
+
+  // ════════════════════════════════════════════════════════
+  // PROPUESTA 2★ — ENHANCED CASCADER
+  // ════════════════════════════════════════════════════════
+  function renderP2() {
+    const s = S.p2;
+    const subcats = getSubcatsOf(s.catId);
+    let machines = getMachines(s.catId, s.subcatId);
+    const filtered = filterMachines(machines, s.search);
+    const cur = MACHINES.find(m=>m.id===s.machineId);
+    const cat = CATS.find(c=>c.id===s.catId);
+    const sc = subcats.find(x=>x.id===s.subcatId);
+
+    let catOpts = CATS.map(c=>`<option value="${c.id}"${c.id===s.catId?' selected':''}>${c.icon} ${c.nombre} (${countCat(c.id)})</option>`).join('');
+    let subOpts = subcats.map(x=>{
+        const cnt = getMachines(s.catId,x.id).length;
+        return `<option value="${x.id}"${x.id===s.subcatId?' selected':''}>${x.nombre} (${cnt})</option>`;
+      }).join('');
+
+    // Breadcrumb
+    let bc = `<span>${cat?.icon||''} ${cat?.nombre||''}</span>`;
+    if (sc) bc += `<span class="sep">›</span><span>${sc.nombre}</span>`;
+    if (cur) bc += `<span class="sep">›</span><span class="current">● ${cur.nombre}</span>`;
+    bc += `<span class="total-badge">${machines.length} equipos</span>`;
+
+    // Recent
+    let recentHtml = '';
+    const validRecent = recentMachines.filter(id => MACHINES.find(m=>m.id===id));
+    if (validRecent.length) {
+      recentHtml = `<div class="recent-bar">
+        <span class="recent-label">⏱ Recientes</span>
+        <div class="recent-items">
+          ${validRecent.map(id => {
+            const m = MACHINES.find(x=>x.id===id);
+            return `<button class="recent-item" data-id="${id}"><span class="rdot" style="background:${m.color}"></span>${m.nombre}</button>`;
+          }).join('')}
+        </div>
+      </div>`;
+    }
+
+    // Chips
+    let chipsHtml;
+    if (filtered.length === 0) {
+      chipsHtml = `<div class="p2-no-results">🔍 Sin resultados para "<strong>${s.search}</strong>"</div>`;
+    } else {
+      chipsHtml = `<div class="p2-chips">${filtered.map(m=>{
+        const pct = barPct(m.count);
+        const cls = m.count === 0 ? ' zero-stock' : '';
+        return `<button class="p2-chip${m.id===s.machineId?' active':''}${cls}" data-id="${m.id}">
+          <span class="cdot" style="background:${m.color}"></span>
+          <span>${m.nombre}</span>
+          <span class="cnt">${m.count}</span>
+          <span class="mini-bar" style="width:${pct}%; background:${stockColor(m.count)}"></span>
+        </button>`;
+      }).join('')}</div>`;
+    }
+
+    document.getElementById('p2-nav').innerHTML = `
+      <div class="p2-top-row">
+        <select class="p2-select" id="p2-cat">${catOpts}</select>
+        <span class="p2-arrow">›</span>
+        <select class="p2-select" id="p2-sub"${subcats.length?'':' disabled'}>${subOpts}</select>
+        <div class="search-box">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="p2-search" placeholder="Buscar equipo, marca, tipo…" value="${s.search}" />
+          <button class="clear-btn${s.search?' visible':''}" id="p2-clear">✕</button>
+        </div>
+      </div>
+      <div class="p2-breadcrumb">${bc}</div>
+      ${recentHtml}
+      <div class="p2-section-label">
+        <span>Equipos${sc?' — '+sc.nombre:''}${s.search?' (filtrado)':''}</span>
+        <span class="line"></span>
+        <span>${filtered.length}/${machines.length}</span>
+      </div>
+      ${chipsHtml}
+    `;
+
+    // Events
+    document.getElementById('p2-cat').onchange = e => { s.catId=e.target.value; const firstSub=getSubcatsOf(s.catId)[0]; s.subcatId=firstSub?.id||s.catId; s.search=''; let ms=getMachines(s.catId,s.subcatId); s.machineId=ms[0]?.id||''; renderP2(); };
+    document.getElementById('p2-sub').onchange = e => { s.subcatId=e.target.value; s.search=''; let ms=getMachines(s.catId,s.subcatId); s.machineId=ms[0]?.id||''; renderP2(); };
+    document.getElementById('p2-search').oninput = e => { s.search=e.target.value; renderP2(); document.getElementById('p2-search').focus(); };
+    document.getElementById('p2-clear').onclick = () => { s.search=''; renderP2(); };
+
+    document.querySelectorAll('#p2-nav .p2-chip').forEach(btn => {
+      btn.onclick = () => { s.machineId=btn.dataset.id; addRecent(btn.dataset.id); renderP2(); };
+    });
+    document.querySelectorAll('#p2-nav .recent-item').forEach(btn => {
+      btn.onclick = () => {
+        const m = MACHINES.find(x=>x.id===btn.dataset.id);
+        if (m) {
+          const mc = getCatOfMachine(m);
+          const msc = getSubcatOfMachine(m);
+          if (mc) s.catId = mc.id;
+          if (msc) s.subcatId = msc.id;
+          s.machineId = btn.dataset.id;
+          s.search = '';
+          addRecent(btn.dataset.id);
+          renderP2();
+        }
+      };
+    });
+
+    // Restore focus to search if active
+    if (s.search) {
+      const inp = document.getElementById('p2-search');
+      inp.focus();
+      inp.setSelectionRange(inp.value.length, inp.value.length);
+    }
+
+    renderDetail('p2-detail', s.machineId);
+  }
+
+  // ════════════════════════════════════════════════════════
+  // PROPUESTA 6★ — ENHANCED RAIL + GRID
+  // ════════════════════════════════════════════════════════
+  function renderP6() {
+    const s = S.p6;
+    const subcats = getSubcatsOf(s.catId);
+    let machines = getMachines(s.catId, s.subcatId);
+    const filtered = filterMachines(machines, s.search);
+    const cat = CATS.find(c=>c.id===s.catId);
+
+    // Rail
+    const expanded = s.railExpanded;
+    const railEl = document.getElementById('p6-rail');
+    railEl.className = 'p6-rail' + (expanded ? ' expanded' : '');
+    railEl.innerHTML =
+      `<button class="p6-rail-toggle" id="p6-rail-toggle" title="${expanded?'Colapsar':'Expandir'}">
+        ${expanded ? '◀ Colapsar' : '▶'}
+      </button>` +
+      CATS.map(c => {
+        const alert = hasZeroStock(c.id);
+        return `<button class="p6-rail-btn${c.id===s.catId?' active':''}" data-cat="${c.id}" title="${c.nombre}">
+          <span class="p6-rail-icon">${c.icon}</span>
+          <span class="p6-rail-label">${expanded ? c.nombre : c.nombre.split(' ')[0].substring(0,6)}</span>
+          <span class="p6-rail-count">${countCat(c.id)}</span>
+          ${alert ? '<span class="p6-rail-alert" title="Equipos sin stock"></span>' : ''}
+        </button>`;
+      }).join('');
+
+    // Subcats + search + view toggle
+    let subHtml = subcats.map(sc=>`<button class="p6-subchip${sc.id===s.subcatId?' active':''}" data-sub="${sc.id}">${shortLabel(sc.nombre)}</button>`).join('');
+
+    // Machines
+    let machHtml;
+    if (filtered.length === 0) {
+      machHtml = `<div class="p2-no-results">🔍 Sin resultados para "<strong>${s.search}</strong>"</div>`;
+    } else if (s.viewMode === 'grid') {
+      machHtml = `<div class="p6-machines grid-view">${filtered.map(m => {
+        const pct = barPct(m.count);
+        return `<div class="p6-machine-card${m.id===s.machineId?' active':''}" data-id="${m.id}">
+          <div class="p6-card-top">
+            <span class="p6-card-dot" style="background:${m.color}"></span>
+            <span class="p6-card-name">${m.nombre}</span>
+            <span class="p6-card-count">${m.count}</span>
+          </div>
+          <div class="p6-card-meta">
+            <span>${m.marca||'—'}</span>
+            <span>·</span>
+            <span>${m.tipo||'—'}</span>
+          </div>
+          <div class="p6-card-bar"><div class="p6-card-bar-fill" style="width:${pct}%;background:${stockColor(m.count)}"></div></div>
+        </div>`;
+      }).join('')}</div>`;
+    } else {
+      machHtml = `<div class="p6-machines list-view">${filtered.map(m =>
+        `<div class="p6-machine-list${m.id===s.machineId?' active':''}" data-id="${m.id}">
+          <span class="dot" style="background:${m.color}"></span>
+          <span class="name">${m.nombre}</span>
+          <span class="meta">${m.marca||''}</span>
+          <span class="ct">${m.count}</span>
+        </div>`
+      ).join('')}</div>`;
+    }
+
+    document.getElementById('p6-nav').innerHTML = `
+      <div class="p6-content-header">
+        <span class="p6-content-title">${cat?.nombre||''}</span>
+        <span class="p6-content-badge">${filtered.length}/${machines.length}</span>
+      </div>
+      <div class="p6-toolbar">
+        <div class="p6-subcat-chips">${subHtml}</div>
+        <div class="search-box" style="max-width:200px">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="p6-search" placeholder="Buscar…" value="${s.search}" />
+          <button class="clear-btn${s.search?' visible':''}" id="p6-clear">✕</button>
+        </div>
+        <div class="p6-view-toggle">
+          <button class="p6-view-btn${s.viewMode==='grid'?' active':''}" data-mode="grid" title="Vista tarjetas">▦</button>
+          <button class="p6-view-btn${s.viewMode==='list'?' active':''}" data-mode="list" title="Vista lista">☰</button>
+        </div>
+      </div>
+      ${machHtml}
+    `;
+
+    // Events — rail
+    document.getElementById('p6-rail-toggle').onclick = () => { s.railExpanded=!s.railExpanded; renderP6(); };
+    document.querySelectorAll('#p6-rail .p6-rail-btn').forEach(btn => {
+      btn.onclick = () => { s.catId=btn.dataset.cat; const firstSub=getSubcatsOf(s.catId)[0]; s.subcatId=firstSub?.id||s.catId; s.search=''; let ms=getMachines(s.catId,s.subcatId); s.machineId=ms[0]?.id||''; renderP6(); };
+    });
+    // Subcats
+    document.querySelectorAll('#p6-nav .p6-subchip').forEach(btn => {
+      btn.onclick = () => {
+        s.subcatId=btn.dataset.sub; s.search='';
+        let ms=getMachines(s.catId,s.subcatId);
+        if(!ms.find(m=>m.id===s.machineId)) s.machineId=ms[0]?.id||'';
+        renderP6();
+
+      };
+    });
+    // View toggle
+    document.querySelectorAll('#p6-nav .p6-view-btn').forEach(btn => {
+      btn.onclick = () => { s.viewMode=btn.dataset.mode; renderP6(); };
+    });
+    // Search
+    document.getElementById('p6-search').oninput = e => { s.search=e.target.value; renderP6(); document.getElementById('p6-search').focus(); };
+    document.getElementById('p6-clear').onclick = () => { s.search=''; renderP6(); };
+    // Machine clicks
+    document.querySelectorAll('#p6-nav .p6-machine-card, #p6-nav .p6-machine-list').forEach(item => {
+      item.onclick = () => { s.machineId=item.dataset.id; addRecent(item.dataset.id); renderP6(); };
+    });
+
+    if (s.search) {
+      const inp = document.getElementById('p6-search');
+      inp.focus();
+      inp.setSelectionRange(inp.value.length, inp.value.length);
+    }
+
+    renderDetail('p6-detail', s.machineId);
+  }
+
+  // ════════════════════════════════════════════════════════
+  // FUSIÓN 2+6
+  // ════════════════════════════════════════════════════════
+  function renderPF() {
+    const s = S.pf;
+    const subcats = getSubcatsOf(s.catId);
+    let machines = getMachines(s.catId, s.subcatId);
+    const filtered = filterMachines(machines, s.search);
+    const cat = CATS.find(c=>c.id===s.catId);
+    const cur = MACHINES.find(m=>m.id===s.machineId);
+    const sc = subcats.find(x=>x.id===s.subcatId);
+
+    // Rail (from P6)
+    document.getElementById('pf-rail').innerHTML = CATS.map(c =>
+      `<button class="pf-rail-btn${c.id===s.catId?' active':''}" data-cat="${c.id}" title="${c.nombre}">
+        <span class="pf-rail-icon">${c.icon}</span>
+        <span class="pf-rail-label">${c.nombre.split(' ')[0].substring(0,6)}</span>
+        <span class="pf-rail-badge">${countCat(c.id)}</span>
+      </button>`
+    ).join('');
+
+    // Breadcrumb (from P2)
+    let bc = `<span>${cat?.icon||''} ${cat?.nombre||''}</span>`;
+    if (sc) bc += `<span class="sep">›</span><span>${sc.nombre}</span>`;
+    if (cur) bc += `<span class="sep">›</span><span class="current">● ${cur.nombre}</span>`;
+
+    // Subcats chips
+    let subHtml = subcats.map(x=>`<button class="pf-subchip${x.id===s.subcatId?' active':''}" data-sub="${x.id}">${shortLabel(x.nombre)}</button>`).join('');
+
+    // Machines grid (filtered by selected subcategory)
+    let groupedHtml;
+    if (filtered.length === 0) {
+      groupedHtml = `<div class="pf-no-results">🔍 Sin resultados para "<strong>${s.search}</strong>"</div>`;
+    } else {
+      groupedHtml = `<div class="pf-machines-grid">
+        ${filtered.map(m => {
+          const pct = barPct(m.count);
+          return `<div class="pf-machine-item${m.id===s.machineId?' active':''}" data-id="${m.id}">
+            <span class="dot" style="background:${m.color}"></span>
+            <span class="name">${m.nombre}</span>
+            <span class="ct">${m.count}</span>
+            <div class="mini-bar"><div class="mini-bar-fill" style="width:${pct}%;background:${stockColor(m.count)}"></div></div>
+          </div>`;
+        }).join('')}
+      </div>`;
+    }
+
+    document.getElementById('pf-content').innerHTML = `
+      <div class="pf-header">
+        <span class="pf-title">${cat?.nombre||''}</span>
+        <span class="pf-count-badge">${filtered.length} equipos</span>
+      </div>
+      <div class="pf-breadcrumb">${bc}</div>
+      <div class="pf-toolbar">
+        <div style="display:flex;gap:4px;flex-wrap:wrap;flex:1">
+          ${subHtml}
+        </div>
+        <div class="pf-search-area">
+          <div class="search-box" style="max-width:200px">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="pf-search" placeholder="Buscar…" value="${s.search}" />
+            <button class="clear-btn${s.search?' visible':''}" id="pf-clear">✕</button>
+          </div>
+        </div>
+      </div>
+      <div class="pf-machines-area">${groupedHtml}</div>
+    `;
+
+    // Events — rail
+    document.querySelectorAll('#pf-rail .pf-rail-btn').forEach(btn => {
+      btn.onclick = () => { s.catId=btn.dataset.cat; const firstSub=getSubcatsOf(s.catId)[0]; s.subcatId=firstSub?.id||s.catId; s.search=''; let ms=getMachines(s.catId,s.subcatId); s.machineId=ms[0]?.id||''; renderPF(); };
+    });
+    // Subcats
+    document.querySelectorAll('#pf-content .pf-subchip').forEach(btn => {
+      btn.onclick = () => {
+        s.subcatId=btn.dataset.sub; s.search='';
+        let ms=getMachines(s.catId,s.subcatId);
+        if(!ms.find(m=>m.id===s.machineId)) s.machineId=ms[0]?.id||'';
+        renderPF();
+
+      };
+    });
+    // Search
+    document.getElementById('pf-search').oninput = e => { s.search=e.target.value; renderPF(); document.getElementById('pf-search').focus(); };
+    document.getElementById('pf-clear').onclick = () => { s.search=''; renderPF(); };
+    // Machines
+    document.querySelectorAll('#pf-content .pf-machine-item').forEach(item => {
+      item.onclick = () => { s.machineId=item.dataset.id; addRecent(item.dataset.id); renderPF(); };
+    });
+
+    if (s.search) {
+      const inp = document.getElementById('pf-search');
+      inp.focus();
+      inp.setSelectionRange(inp.value.length, inp.value.length);
+    }
+
+    renderDetail('pf-detail', s.machineId);
+  }
+
+  // ═══ TAB SWITCHER ═══
+  document.querySelectorAll('.top-tab').forEach(tab => {
+    tab.onclick = () => {
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.top-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById('panel-' + tab.dataset.panel).classList.add('active');
+    };
+  });
+
+  // ═══ KEYBOARD SHORTCUTS ═══
+  document.addEventListener('keydown', (e) => {
+    // Ctrl+K = focus search in active panel
+    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+      e.preventDefault();
+      const active = document.querySelector('.panel.active');
+      const input = active?.querySelector('input[type="text"]');
+      if (input) input.focus();
+    }
+  });
+
+  // ═══ INIT ═══
+  renderP2();
+  renderP6();
+  renderPF();
+  </script>
+</body>
+</html>
