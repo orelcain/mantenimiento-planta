@@ -7,6 +7,13 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.74] - 2026-02-23
+### Datos
+- **Extracción automática de códigos de fabricante**: Script que analiza el campo `textoBreve` de cada repuesto y extrae el código numérico del fabricante (Baader) al campo `codigoBaader`. Actualiza 192 repuestos automáticamente, incluyendo los que tenían "pendiente"
+- **Cobertura**: baader-200 (190/199), baader-142 (2/3), w0bdEDY82jZoqiA6R3MN (1/1). 13 repuestos sin número en nombre quedan sin cambio
+
+---
+
 ## [2.48.73] - 2026-02-22
 ### Funcionalidad
 - **Repuestos — Menú de acciones rediseñado**: Reemplazado el grupo de iconos sin etiqueta por un `DropdownMenu` con acciones agrupadas y etiquetadas (Ficha Técnica, Galería, Fotos de referencia, Manual, Buscar en Manual, Editar, Eliminar)
