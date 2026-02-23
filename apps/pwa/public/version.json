@@ -1,8 +1,11 @@
 {
-  "version": "2.48.75",
+  "version": "2.48.76",
   "buildDate": "2026-02-23",
-  "buildTimestamp": 1771895300000,
+  "buildTimestamp": 1771898900000,
   "features": [
+    "Buscar en Manual: detección automática del número de posición del repuesto en la lista",
+    "Buscar en Manual: modo 'Ver en diagrama' para resaltar la posición en el dibujo técnico (azul/cyan)",
+    "Buscar en Manual: navegación entre modo código (amarillo) y modo diagrama (cyan)",
     "Buscar en Manual: navegación libre por todas las páginas del PDF",
     "Buscar en Manual: highlight visual amarillo del código de fabricante sobre el PDF",
     "Buscar en Manual: zoom ajustable (100%-300%) para diagramas técnicos",

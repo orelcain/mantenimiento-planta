@@ -7,6 +7,15 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.76] - 2026-02-23
+### Funcionalidad
+- **Buscar en Manual — Posición en diagrama**: Al encontrar un código en la lista de partes, detecta automáticamente el número de posición (ej. "55") y permite buscarlo en las páginas de diagramas técnicos con un solo clic
+- **Buscar en Manual — Highlight azul/cyan para posiciones**: Las posiciones encontradas en diagramas se resaltan con recuadros cyan con glow, diferenciándose del highlight amarillo del código
+- **Buscar en Manual — Modo dual código/diagrama**: Navegación fluida entre modo código (amarillo, lista de partes) y modo diagrama (cyan, dibujo técnico). Botón "Volver a código" para regresar
+- **Buscar en Manual — Badge de posición**: Muestra un badge cyan con el número de posición detectado en la barra de búsqueda
+
+---
+
 ## [2.48.75] - 2026-02-23
 ### Funcionalidad
 - **Buscar en Manual — Navegación libre por páginas**: Ahora se puede recorrer todo el manual (adelante/atrás/ir a página específica), no solo las páginas con coincidencias. Input numérico directo, botones primera/última página
