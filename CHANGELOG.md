@@ -7,6 +7,16 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.75] - 2026-02-23
+### Funcionalidad
+- **Buscar en Manual — Navegación libre por páginas**: Ahora se puede recorrer todo el manual (adelante/atrás/ir a página específica), no solo las páginas con coincidencias. Input numérico directo, botones primera/última página
+- **Buscar en Manual — Highlight visual del código en el PDF**: El código de fabricante se resalta directamente sobre el render del PDF con recuadros amarillos semitransparentes, facilita la ubicación rápida del código en la página
+- **Buscar en Manual — Zoom ajustable**: Controles de zoom (100%–300%) para ver detalles de diagramas técnicos y listas de posiciones
+- **Buscar en Manual — Salto entre coincidencias**: Botones "Anterior/Siguiente" para navegar rápidamente entre páginas que contienen el código buscado
+- **Buscar en Manual — Barra de páginas con coincidencias**: Pills de acceso rápido que indican qué páginas tienen coincidencias, con indicador de página actual resaltada
+
+---
+
 ## [2.48.74] - 2026-02-23
 ### Datos
 - **Extracción automática de códigos de fabricante**: Script que analiza el campo `textoBreve` de cada repuesto y extrae el código numérico del fabricante (Baader) al campo `codigoBaader`. Actualiza 192 repuestos automáticamente, incluyendo los que tenían "pendiente"

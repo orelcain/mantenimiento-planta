@@ -1,8 +1,12 @@
 {
-  "version": "2.48.74",
+  "version": "2.48.75",
   "buildDate": "2026-02-23",
-  "buildTimestamp": 1771895200000,
+  "buildTimestamp": 1771895300000,
   "features": [
+    "Buscar en Manual: navegación libre por todas las páginas del PDF",
+    "Buscar en Manual: highlight visual amarillo del código de fabricante sobre el PDF",
+    "Buscar en Manual: zoom ajustable (100%-300%) para diagramas técnicos",
+    "Buscar en Manual: salto rápido entre páginas con coincidencias",
     "Extracción automática de códigos de fabricante (codigoBaader) desde textoBreve de repuestos",
     "Actualización batch de 192 repuestos con código numérico extraído del nombre",
     "Navegación compacta: tabs horizontales de categorías + sub-tabs + chips de máquinas",
