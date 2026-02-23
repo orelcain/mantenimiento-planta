@@ -65,7 +65,7 @@ export function ManualSearchModal({
 
     // First check machine.manuals array
     if (machine.manuals && machine.manuals.length > 0) {
-      setManualUrl(machine.manuals[0])
+      setManualUrl(machine.manuals[0] ?? null)
       setManualName('Manual principal')
       setLoading(false)
       return
