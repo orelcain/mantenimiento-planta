@@ -1,7 +1,7 @@
 {
-  "version": "2.48.72",
+  "version": "2.48.73",
   "buildDate": "2026-02-22",
-  "buildTimestamp": 1771796818361,
+  "buildTimestamp": 1771808809844,
   "features": [
     "Navegación compacta: tabs horizontales de categorías + sub-tabs + chips de máquinas",
     "Conteo real de repuestos por máquina (getCountFromServer aggregation)",

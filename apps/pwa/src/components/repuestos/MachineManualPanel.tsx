@@ -1,0 +1,227 @@
+/**
+ * MachineManualPanel — Gestión de manuales PDF por máquina
+ * 
+ * Permite:
+ * - Ver manuales ya subidos para la máquina actual
+ * - Subir nuevos manuales PDF
+ * - Abrir manual en visor con búsqueda por código de fabricante
+ * - Listar todos los PDFs disponibles en Storage
+ */
+
+import { useState, useEffect, useCallback } from 'react'
+import { FileText, Upload, Trash2, BookOpen, Loader2, ExternalLink } from 'lucide-react'
+import { ref, listAll, getDownloadURL, deleteObject } from 'firebase/storage'
+import { doc, updateDoc, Timestamp, arrayUnion, arrayRemove } from 'firebase/firestore'
+import { storage, db } from '@/services/firebase'
+import { useStorage } from '@/hooks/repuestos/useStorage'
+import { useIsAdmin } from '@/store/authStore'
+import { Button } from '@/components/ui'
+import type { Machine } from '@/types/repuestos'
+
+interface MachineManualPanelProps {
+  machine: Machine
+  className?: string
+}
+
+interface ManualFile {
+  name: string
+  url: string
+  fullPath: string
+}
+
+export function MachineManualPanel({ machine, className = '' }: MachineManualPanelProps) {
+  const isAdmin = useIsAdmin()
+  const { uploadManualPDF, uploading, progress } = useStorage(machine.id)
+  const [manuals, setManuals] = useState<ManualFile[]>([])
+  const [loading, setLoading] = useState(true)
+  const [deleting, setDeleting] = useState<string | null>(null)
+
+  // Cargar lista de manuales desde Storage
+  const loadManuals = useCallback(async () => {
+    setLoading(true)
+    try {
+      const folderRef = ref(storage, `machines/${machine.id}/manuales`)
+      const listResult = await listAll(folderRef)
+      
+      const files: ManualFile[] = []
+      for (const item of listResult.items) {
+        try {
+          const url = await getDownloadURL(item)
+          files.push({
+            name: item.name.replace(/_\d+\.pdf$/i, '.pdf').replace(/_/g, ' '),
+            url,
+            fullPath: item.fullPath,
+          })
+        } catch {
+          // Skip files that can't be read
+        }
+      }
+      setManuals(files)
+    } catch {
+      // No manuals folder yet — that's fine
+      setManuals([])
+    } finally {
+      setLoading(false)
+    }
+  }, [machine.id])
+
+  useEffect(() => { loadManuals() }, [loadManuals])
+
+  // Upload handler
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    
+    const baseName = file.name.replace(/\.pdf$/i, '').replace(/[^a-zA-Z0-9áéíóúñ\s-]/gi, '')
+    try {
+      const url = await uploadManualPDF(file, baseName)
+      // Also save in machine.manuals array for quick access
+      const machineRef = doc(db, 'machines', machine.id)
+      await updateDoc(machineRef, {
+        manuals: arrayUnion(url),
+        updatedAt: Timestamp.now(),
+      })
+      await loadManuals()
+    } catch (err) {
+      console.error('Error uploading manual:', err)
+    }
+    // Reset input
+    e.target.value = ''
+  }
+
+  // Delete handler
+  const handleDelete = async (manual: ManualFile) => {
+    if (!confirm(`¿Eliminar "${manual.name}"?`)) return
+    setDeleting(manual.fullPath)
+    try {
+      const fileRef = ref(storage, manual.fullPath)
+      await deleteObject(fileRef)
+      // Remove from machine.manuals
+      const machineRef = doc(db, 'machines', machine.id)
+      await updateDoc(machineRef, {
+        manuals: arrayRemove(manual.url),
+        updatedAt: Timestamp.now(),
+      })
+      await loadManuals()
+    } catch (err) {
+      console.error('Error deleting manual:', err)
+    } finally {
+      setDeleting(null)
+    }
+  }
+
+  // Open manual in new tab
+  const handleOpen = (url: string) => {
+    window.open(url, '_blank')
+  }
+
+  if (loading) {
+    return (
+      <div className={`flex items-center gap-2 text-muted-foreground text-sm py-3 ${className}`}>
+        <Loader2 className="h-4 w-4 animate-spin" />
+        Cargando manuales...
+      </div>
+    )
+  }
+
+  return (
+    <div className={`space-y-2 ${className}`}>
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <BookOpen className="h-4 w-4 text-purple-500" />
+          <span className="text-sm font-semibold text-foreground">Manuales de la máquina</span>
+          <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">
+            {manuals.length}
+          </span>
+        </div>
+        {isAdmin && (
+          <label className="cursor-pointer">
+            <input
+              type="file"
+              accept=".pdf"
+              className="hidden"
+              onChange={handleUpload}
+              disabled={uploading}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 h-7 text-xs"
+              disabled={uploading}
+              asChild
+            >
+              <span>
+                {uploading ? (
+                  <>
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    {progress}%
+                  </>
+                ) : (
+                  <>
+                    <Upload className="h-3 w-3" />
+                    Subir PDF
+                  </>
+                )}
+              </span>
+            </Button>
+          </label>
+        )}
+      </div>
+
+      {/* Manual list */}
+      {manuals.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-6 text-muted-foreground border border-dashed rounded-lg bg-muted/10 gap-2">
+          <FileText className="h-8 w-8 text-muted-foreground/30" />
+          <span className="text-xs">No hay manuales cargados para {machine.nombre}</span>
+          {isAdmin && (
+            <span className="text-[10px] text-muted-foreground/60">
+              Sube un PDF para habilitar la búsqueda por código de fabricante
+            </span>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-1">
+          {manuals.map((manual) => (
+            <div
+              key={manual.fullPath}
+              className="flex items-center gap-2 p-2 rounded-lg border border-border hover:bg-muted/30 transition-colors group"
+            >
+              <FileText className="h-5 w-5 text-red-500/80 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium text-foreground truncate">{manual.name}</div>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleOpen(manual.url)}
+                  title="Abrir en nueva pestaña"
+                  className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                >
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </Button>
+                {isAdmin && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDelete(manual)}
+                    disabled={deleting === manual.fullPath}
+                    title="Eliminar manual"
+                    className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+                  >
+                    {deleting === manual.fullPath ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-3.5 w-3.5" />
+                    )}
+                  </Button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}

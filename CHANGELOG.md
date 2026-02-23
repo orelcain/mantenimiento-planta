@@ -7,6 +7,15 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.73] - 2026-02-22
+### Funcionalidad
+- **Repuestos — Menú de acciones rediseñado**: Reemplazado el grupo de iconos sin etiqueta por un `DropdownMenu` con acciones agrupadas y etiquetadas (Ficha Técnica, Galería, Fotos de referencia, Manual, Buscar en Manual, Editar, Eliminar)
+- **Repuestos — Previsualización rápida de imágenes**: Las miniaturas en la tabla son clicables y abren un overlay de previsualización a pantalla completa. Se muestra badge con conteo total de imágenes
+- **Repuestos — Panel de manuales por máquina** (`MachineManualPanel`): Permite listar, subir y eliminar PDFs de manuales almacenados en Firebase Storage (`machines/{id}/manuales/`). Solo administradores pueden subir/eliminar
+- **Repuestos — Búsqueda en manual por código de fabricante** (`ManualSearchModal`): Carga el PDF del manual de la máquina, extrae texto de todas las páginas con pdf.js, busca el `codigoBaader` del repuesto, muestra coincidencias con snippet de contexto y renderiza la página en canvas con navegación
+
+---
+
 ## [2.48.72] - 2026-02-22
 ### Funcionalidad
 - **Repuestos — Edición inline de nombres**: Los administradores pueden renombrar categorías, subcategorías, máquinas y repuestos directamente desde la interfaz de navegación

@@ -9,6 +9,8 @@ import { EquipmentNavigator } from '@/components/repuestos/EquipmentNavigator'
 import { RepuestoPhotosModal } from '@/components/repuestos/RepuestoPhotosModal'
 import { RepuestoManualModal } from '@/components/repuestos/RepuestoManualModal'
 import { TechnicalSpecsModal } from '@/components/repuestos/TechnicalSpecsModal'
+import { MachineManualPanel } from '@/components/repuestos/MachineManualPanel'
+import { ManualSearchModal } from '@/components/repuestos/ManualSearchModal'
 import { useRepuestos } from '@/hooks/repuestos/useRepuestos'
 import { useRepuestosCounts } from '@/hooks/repuestos/useRepuestosCounts'
 import { useMachineCategories } from '@/hooks/repuestos/useMachineCategories'
@@ -46,6 +48,7 @@ export function RepuestosDashboard() {
   const [manualModal, setManualModal] = useState<Repuesto | null>(null)
   const [specsTarget, setSpecsTarget] = useState<{repuesto: Repuesto, tab: 'specs' | 'gallery'} | null>(null)
   const [exportReportOpen, setExportReportOpen] = useState(false)
+  const [manualSearchTarget, setManualSearchTarget] = useState<Repuesto | null>(null)
   const [, setSelectedCategoryId] = useState<string | null>('maquinas-principales')
 
   // Filtros y paginación
@@ -337,6 +340,11 @@ export function RepuestosDashboard() {
 
         {/* Content Area */}
         <div className="space-y-4">
+          {/* Machine Manual Panel — shows available PDFs */}
+          {currentMachine && (
+            <MachineManualPanel machine={currentMachine} className="p-3 bg-card/50 rounded-xl border border-border" />
+          )}
+
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="text-sm font-semibold text-foreground">Catálogo de repuestos</span>
@@ -372,6 +380,7 @@ export function RepuestosDashboard() {
                 onViewSpecs={(rep) => setSpecsTarget({ repuesto: rep, tab: 'specs' })}
                 onViewGallery={(rep) => setSpecsTarget({ repuesto: rep, tab: 'gallery' })}
                 onRenameRepuesto={isAdmin ? handleRenameRepuesto : undefined}
+                onSearchInManual={currentMachine ? (rep) => setManualSearchTarget(rep) : undefined}
               />
 
               <RepuestosPagination
@@ -477,6 +486,16 @@ export function RepuestosDashboard() {
         />
       )}
       
+      {/* Modal de Búsqueda en Manual */}
+      {manualSearchTarget && currentMachine && (
+        <ManualSearchModal
+          open={!!manualSearchTarget}
+          onOpenChange={(open) => !open && setManualSearchTarget(null)}
+          machine={currentMachine}
+          repuesto={manualSearchTarget}
+        />
+      )}
+
       <ExportReportModal 
         isOpen={exportReportOpen}
         onClose={() => setExportReportOpen(false)}
