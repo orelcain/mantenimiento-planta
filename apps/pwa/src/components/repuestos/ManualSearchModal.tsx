@@ -87,6 +87,7 @@ export function ManualSearchModal({
   // Position / diagram search state
   const [highlightMode, setHighlightMode] = useState<HighlightMode>('code')
   const [activePosition, setActivePosition] = useState<string | null>(null)
+  const [searchingDiagram, setSearchingDiagram] = useState(false)
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const highlightLayerRef = useRef<HTMLDivElement>(null)
@@ -109,6 +110,7 @@ export function ManualSearchModal({
     setScaleIdx(DEFAULT_SCALE_IDX)
     setHighlightMode('code')
     setActivePosition(null)
+    setSearchingDiagram(false)
 
     if (machine.manuals && machine.manuals.length > 0) {
       setManualUrl(machine.manuals[0] ?? null)
@@ -392,16 +394,44 @@ export function ManualSearchModal({
   }
 
   // ─── Position / diagram mode ───────────────────────────────
-  const goToDiagram = (posNum: string) => {
+  const goToDiagram = useCallback(async (posNum: string) => {
+    if (!pdfDoc) return
+    setSearchingDiagram(true)
     setActivePosition(posNum)
     setHighlightMode('position')
-    // Jump to a few pages before the first match (where diagrams usually are)
+
+    // Scan pages *before* the first match looking for the position number
     const firstMatch = results[0]
-    if (firstMatch) {
-      const targetPage = Math.max(1, firstMatch.page - DIAGRAM_SEARCH_RANGE)
-      goToPage(targetPage)
+    if (!firstMatch) { setSearchingDiagram(false); return }
+
+    const posRegex = new RegExp(`(?:^|\\D)${escapeRegex(posNum)}(?:\\D|$)`)
+    let bestPage: number | null = null
+
+    // Search from matchPage-1 backwards, up to DIAGRAM_SEARCH_RANGE pages
+    const startPage = Math.max(1, firstMatch.page - 1)
+    const endPage = Math.max(1, firstMatch.page - DIAGRAM_SEARCH_RANGE)
+
+    for (let p = startPage; p >= endPage; p--) {
+      try {
+        const page = await pdfDoc.getPage(p)
+        const content = await page.getTextContent()
+        const hasPos = content.items.some((item) => {
+          if (!('str' in item)) return false
+          const str = item.str.trim()
+          return str === posNum || posRegex.test(item.str)
+        })
+        if (hasPos) {
+          bestPage = p
+          break // Found the closest diagram page
+        }
+      } catch {
+        // Skip problematic pages
+      }
     }
-  }
+
+    setSearchingDiagram(false)
+    goToPage(bestPage ?? Math.max(1, firstMatch.page - 2))
+  }, [pdfDoc, results])
 
   const exitPositionMode = () => {
     setHighlightMode('code')
@@ -573,10 +603,14 @@ export function ManualSearchModal({
                               size="sm"
                               className="h-7 px-2.5 text-[11px] gap-1.5 border-cyan-500/40 text-cyan-400 hover:bg-cyan-500/10"
                               onClick={() => goToDiagram(detectedPosition)}
+                              disabled={searchingDiagram}
                               title={`Buscar posición ${detectedPosition} en el diagrama`}
                             >
-                              <Crosshair className="h-3.5 w-3.5" />
-                              Ver pos. {detectedPosition} en diagrama
+                              {searchingDiagram
+                                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                : <Crosshair className="h-3.5 w-3.5" />
+                              }
+                              {searchingDiagram ? 'Buscando...' : `Ver pos. ${detectedPosition} en diagrama`}
                             </Button>
                           </>
                         )}

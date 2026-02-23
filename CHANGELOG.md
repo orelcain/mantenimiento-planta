@@ -7,6 +7,13 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.77] - 2026-02-23
+### Mejora
+- **Buscar en Manual — Búsqueda inteligente de diagrama**: En vez de saltar ciegamente 5 páginas atrás, ahora escanea las páginas anteriores al match buscando dónde realmente aparece el número de posición como texto, y salta directamente a esa página
+- **Buscar en Manual — Indicador de búsqueda**: Muestra spinner "Buscando..." mientras escanea las páginas del diagrama
+
+---
+
 ## [2.48.76] - 2026-02-23
 ### Funcionalidad
 - **Buscar en Manual — Posición en diagrama**: Al encontrar un código en la lista de partes, detecta automáticamente el número de posición (ej. "55") y permite buscarlo en las páginas de diagramas técnicos con un solo clic
