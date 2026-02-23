@@ -13,5 +13,7 @@
   },
   "files.associations": {
     "*.css": "tailwindcss"
-  }
+  },
+  "typescript.tsdk": "apps/pwa/node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true
 }
