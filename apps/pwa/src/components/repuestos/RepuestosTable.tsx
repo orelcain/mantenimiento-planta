@@ -206,6 +206,13 @@ export function RepuestosTable({
                 </p>
               )}
 
+              {rep.ubicacionEnPlanta && (
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-muted-foreground">Ubic:</span>
+                  <span className="text-xs text-foreground/80 truncate">{rep.ubicacionEnPlanta}</span>
+                </div>
+              )}
+
               <div className="flex items-center justify-between pt-2 border-t border-border/50">
                 <div className="flex flex-col">
                   <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Valor Unit.</span>
@@ -233,6 +240,7 @@ export function RepuestosTable({
               <th className="px-3 py-3 font-semibold">Cód. Fabricante</th>
               <th className="px-3 py-3 font-semibold text-center">Cant/Máq</th>
               <th className="px-3 py-3 font-semibold text-right">Valor Unit.</th>
+              <th className="px-3 py-3 font-semibold">Ubicación</th>
               <th className="px-3 py-3 font-semibold text-right">Acciones</th>
             </tr>
           </thead>
@@ -309,6 +317,16 @@ export function RepuestosTable({
                     <span className="font-mono text-sm">
                       ${formatNumber(rep.valorUnitario || 0)}
                     </span>
+                  </td>
+                  {/* Ubicación */}
+                  <td className="px-3 py-2.5 max-w-[150px]">
+                    {rep.ubicacionEnPlanta ? (
+                      <span className="text-xs text-muted-foreground truncate block" title={rep.ubicacionEnPlanta}>
+                        {rep.ubicacionEnPlanta}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground/40">—</span>
+                    )}
                   </td>
                   {/* Acciones — botones inline con tooltips */}
                   <td className="px-3 py-2.5">
