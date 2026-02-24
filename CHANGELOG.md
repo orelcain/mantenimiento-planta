@@ -7,6 +7,16 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.84] - 2026-02-23
+### Mejora
+- **Edición de forma existente**: Al hacer click en "Editar forma" se cargan los puntos del polígono guardado para editarlos in-situ sin redibujar desde cero
+- **Arrastrar vértices**: Los puntos del polígono se pueden arrastrar (drag) para reposicionarlos con feedback visual (cursor grab/grabbing, punto resaltado)
+- **Agregar punto en arista**: Click en cualquier arista del polígono cerrado agrega un nuevo vértice en esa posición, con puntos medios visibles como guía
+- **Eliminar punto (doble-click)**: Doble-click sobre un vértice lo elimina (mínimo 3 puntos)
+- **Cambiar estilo sin redibujar**: Botón "Cambiar estilo" permite editar color, opacidad y borde de una anotación existente con vista previa en tiempo real, sin tocar los puntos
+- **Zoom-safe durante edición**: Los puntos del polígono se reescalan automáticamente al cambiar zoom durante la edición
+- **Mejor feedback visual**: Puntos resaltados al hover, cursor contextual (crosshair/grab/grabbing), instrucciones dinámicas según modo
+
 ## [2.48.83] - 2026-02-23
 ### Mejora
 - **Ver en Manual instantáneo**: Al abrir "Ver en Manual" con una anotación existente, el PDF se carga directamente en la página marcada sin ejecutar búsqueda de texto (antes tardaba varios segundos). La búsqueda de coincidencias se ejecuta en segundo plano después de la carga

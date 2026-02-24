@@ -1,10 +1,12 @@
 /**
- * ManualSearchModal v2.48.83
+ * ManualSearchModal v2.48.84
  *
- * Optimizaciones:
- *  - "Ver en manual" es instantáneo: carga el PDF sin buscar texto
- *  - La búsqueda de texto se ejecuta en background (deferred) y no bloquea la vista
- *  - Admin: opciones de color, borde y transparencia para el polígono
+ * Características:
+ *  - "Ver en manual" instantáneo (solo carga PDF, búsqueda diferida)
+ *  - Admin: dibujo con opciones de color, borde, transparencia
+ *  - Edición de puntos existentes: arrastrar, agregar en arista, eliminar (dblclick)
+ *  - Edición de estilo de anotación existente sin redibujar (color, borde, opacidad)
+ *  - Zoom-safe: los puntos se reescalan al cambiar zoom
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
@@ -43,9 +45,7 @@ export interface ManualSearchModalProps {
   onOpenChange: (open: boolean) => void
   machine: Machine
   repuesto: Repuesto
-  /** Si se pasa, abre en modo vista directamente en la anotación guardada */
   initialVinculo?: VinculoManual
-  /** Si es admin, puede editar/eliminar la anotación y opciones avanzadas */
   isAdmin?: boolean
 }
 
@@ -74,6 +74,8 @@ type ModalStep = 'select-manual' | 'viewing'
 const SCALE_STEPS = [1, 1.25, 1.5, 2, 2.5, 3]
 const DEFAULT_SCALE_IDX = 2
 const CLOSE_THRESHOLD_PX = 14
+const DRAG_THRESHOLD_PX = 12
+const EDGE_ADD_THRESHOLD_PX = 20
 
 const OPACITY_PRESETS = [
   { label: '10%', value: 0.1 },
@@ -82,6 +84,62 @@ const OPACITY_PRESETS = [
   { label: '50%', value: 0.5 },
   { label: '70%', value: 0.7 },
 ]
+
+// ─── Helpers ────────────────────────────────────────────────
+
+function createHighlightDiv(rect: TextRect): HTMLDivElement {
+  const div = document.createElement('div')
+  div.style.position = 'absolute'
+  div.style.left = `${rect.x - 2}px`
+  div.style.top = `${rect.y - 2}px`
+  div.style.width = `${rect.width + 4}px`
+  div.style.height = `${rect.height + 4}px`
+  div.style.borderRadius = '3px'
+  div.style.pointerEvents = 'none'
+  div.style.mixBlendMode = 'multiply'
+  div.style.backgroundColor = 'rgba(250, 204, 21, 0.4)'
+  div.style.border = '2px solid rgba(250, 204, 21, 0.9)'
+  return div
+}
+
+function highlightCode(text: string, code: string): React.ReactNode {
+  if (!code) return text
+  const parts = text.split(new RegExp(`(${escapeRegex(code)})`, 'gi'))
+  return parts.map((part, i) =>
+    part.toLowerCase() === code.toLowerCase()
+      ? <span key={i} className="font-bold text-yellow-400 not-italic">{part}</span>
+      : <span key={i}>{part}</span>
+  )
+}
+
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/** Distancia de un punto a un segmento AB */
+function pointToSegmentDist(p: PixelPoint, a: PixelPoint, b: PixelPoint): number {
+  const dx = b.x - a.x
+  const dy = b.y - a.y
+  const lenSq = dx * dx + dy * dy
+  if (lenSq === 0) return Math.sqrt((p.x - a.x) ** 2 + (p.y - a.y) ** 2)
+  let t = ((p.x - a.x) * dx + (p.y - a.y) * dy) / lenSq
+  t = Math.max(0, Math.min(1, t))
+  const px = a.x + t * dx
+  const py = a.y + t * dy
+  return Math.sqrt((p.x - px) ** 2 + (p.y - py) ** 2)
+}
+
+/** Parsea el color y la opacidad de un color rgba guardado */
+function parseColorInfo(savedColor: string) {
+  const colorIdx = MARKER_COLORS.findIndex(c => {
+    const baseA = c.value.replace(/[\d.]+\)$/, '')
+    const baseB = savedColor.replace(/[\d.]+\)$/, '')
+    return baseA === baseB
+  })
+  const opacityMatch = savedColor.match(/([\d.]+)\)$/)
+  const opacity = opacityMatch ? parseFloat(opacityMatch[1] ?? '0.2') : 0.2
+  return { colorIdx: colorIdx >= 0 ? colorIdx : 2, opacity }
+}
 
 // ─── Component ──────────────────────────────────────────────
 
@@ -125,10 +183,20 @@ export function ManualSearchModal({
   const [deletingAnnotation, setDeletingAnnotation] = useState(false)
 
   // ─── Admin drawing options ──────────────────────────────
-  const [drawColorIdx, setDrawColorIdx] = useState(2) // Verde por defecto
+  const [drawColorIdx, setDrawColorIdx] = useState(2)
   const [drawOpacity, setDrawOpacity] = useState(0.2)
   const [drawNoBorder, setDrawNoBorder] = useState(false)
   const [showColorPicker, setShowColorPicker] = useState(false)
+
+  // ─── Editing existing annotation ─────────────────────────
+  const [editingExisting, setEditingExisting] = useState(false)
+  const [originalVinculo, setOriginalVinculo] = useState<VinculoManual | null>(null)
+  const [draggingIdx, setDraggingIdx] = useState<number | null>(null)
+  const [hoveredPointIdx, setHoveredPointIdx] = useState<number | null>(null)
+
+  // ─── Style-only editing ──────────────────────────────────
+  const [editingStyle, setEditingStyle] = useState(false)
+  const [savingStyle, setSavingStyle] = useState(false)
 
   // ─── Existing saved annotation ───────────────────────────
   const existingVinculo = repuesto.vinculosManual?.find(v => v.machineId === machine.id) ?? initialVinculo ?? null
@@ -139,6 +207,8 @@ export function ManualSearchModal({
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const drawLayerRef = useRef<HTMLDivElement>(null)
   const svgRef = useRef<SVGSVGElement>(null)
+  const justDraggedRef = useRef(false)
+  const prevScaleRef = useRef<number | null>(null)
 
   const searchCode = repuesto.codigoBaader || ''
   const scale = SCALE_STEPS[scaleIdx] ?? 1.5
@@ -146,6 +216,21 @@ export function ManualSearchModal({
 
   // Current color
   const currentColor = MARKER_COLORS[drawColorIdx] ?? MARKER_COLORS[2]!
+  const drawFillColor = currentColor
+    ? currentColor.value.replace(/[\d.]+\)$/, `${drawOpacity})`)
+    : `rgba(34, 197, 94, ${drawOpacity})`
+  const drawStrokeColor = currentColor?.border ?? '#22c55e'
+  const drawFillPreview = drawFillColor
+  const drawStrokePreview = drawNoBorder ? 'transparent' : drawStrokeColor
+
+  // ─── Rescale points on zoom ────────────────────────────────
+  useEffect(() => {
+    if (prevScaleRef.current !== null && prevScaleRef.current !== scale && drawingMode && polyPoints.length > 0) {
+      const ratio = scale / prevScaleRef.current
+      setPolyPoints(prev => prev.map(p => ({ x: p.x * ratio, y: p.y * ratio })))
+    }
+    prevScaleRef.current = scale
+  }, [scale, drawingMode, polyPoints.length])
 
   // ─── 1. Load manual options ──────────────────────────────
   const loadManualOptions = useCallback(async () => {
@@ -218,8 +303,6 @@ export function ManualSearchModal({
       const pdf = await loadingTask.promise
       setPdfDoc(pdf)
       setTotalPages(pdf.numPages)
-
-      // Ir directamente a la página de la anotación
       if (initialVinculo?.pagina) {
         setCurrentPage(initialVinculo.pagina)
       }
@@ -242,18 +325,11 @@ export function ManualSearchModal({
       for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i)
         const content = await page.getTextContent()
-        const pageText = content.items
-          .map((item) => ('str' in item ? item.str : ''))
-          .join(' ')
-
+        const pageText = content.items.map((item) => ('str' in item ? item.str : '')).join(' ')
         const lowerText = pageText.toLowerCase()
         let matchCount = 0
         let pos = lowerText.indexOf(searchLower)
-        while (pos !== -1) {
-          matchCount++
-          pos = lowerText.indexOf(searchLower, pos + 1)
-        }
-
+        while (pos !== -1) { matchCount++; pos = lowerText.indexOf(searchLower, pos + 1) }
         if (matchCount > 0) {
           pages.add(i)
           const matchIdx = lowerText.indexOf(searchLower)
@@ -261,7 +337,6 @@ export function ManualSearchModal({
           found.push({ page: i, textSnippet: snippet, matchCount })
         }
       }
-
       setResults(found)
       setMatchPages(pages)
     } catch (err) {
@@ -273,14 +348,9 @@ export function ManualSearchModal({
 
   // ─── 4. Full search (load + search, for search mode) ────
   const searchInPdf = useCallback(async (url: string) => {
-    if (!searchCode) {
-      // No code to search — just load PDF
-      await loadPdfOnly(url)
-      return
-    }
+    if (!searchCode) { await loadPdfOnly(url); return }
     setLoadingPdf(true)
     setResults([])
-
     try {
       const loadingTask = pdfjsLib.getDocument({
         url,
@@ -290,28 +360,18 @@ export function ManualSearchModal({
       const pdf = await loadingTask.promise
       setPdfDoc(pdf)
       setTotalPages(pdf.numPages)
-
-      // Search text
       setSearching(true)
       const found: SearchResult[] = []
       const pages = new Set<number>()
       const searchLower = searchCode.toLowerCase().trim()
-
       for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i)
         const content = await page.getTextContent()
-        const pageText = content.items
-          .map((item) => ('str' in item ? item.str : ''))
-          .join(' ')
-
+        const pageText = content.items.map((item) => ('str' in item ? item.str : '')).join(' ')
         const lowerText = pageText.toLowerCase()
         let matchCount = 0
         let pos = lowerText.indexOf(searchLower)
-        while (pos !== -1) {
-          matchCount++
-          pos = lowerText.indexOf(searchLower, pos + 1)
-        }
-
+        while (pos !== -1) { matchCount++; pos = lowerText.indexOf(searchLower, pos + 1) }
         if (matchCount > 0) {
           pages.add(i)
           const matchIdx = lowerText.indexOf(searchLower)
@@ -319,13 +379,9 @@ export function ManualSearchModal({
           found.push({ page: i, textSnippet: snippet, matchCount })
         }
       }
-
       setResults(found)
       setMatchPages(pages)
-
-      if (found.length > 0 && found[0]) {
-        setCurrentPage(found[0].page)
-      }
+      if (found.length > 0 && found[0]) setCurrentPage(found[0].page)
     } catch (err) {
       console.error('Error searching PDF:', err)
     } finally {
@@ -344,38 +400,27 @@ export function ManualSearchModal({
     const content = await page.getTextContent()
     const codeLower = code.toLowerCase()
     const rects: TextRect[] = []
-
     let fullStr = ''
     const charMap: Array<{ itemIdx: number; charIdx: number }> = []
-
     for (let iIdx = 0; iIdx < content.items.length; iIdx++) {
       const item = content.items[iIdx]
       if (!item || !('str' in item)) continue
       const str = item.str
-      for (let c = 0; c < str.length; c++) {
-        charMap.push({ itemIdx: iIdx, charIdx: c })
-        fullStr += str[c]
-      }
-      charMap.push({ itemIdx: iIdx, charIdx: str.length })
-      fullStr += ' '
+      for (let c = 0; c < str.length; c++) { charMap.push({ itemIdx: iIdx, charIdx: c }); fullStr += str[c] }
+      charMap.push({ itemIdx: iIdx, charIdx: str.length }); fullStr += ' '
     }
-
     const lowerFull = fullStr.toLowerCase()
     let searchPos = 0
-
     while (true) {
       const idx = lowerFull.indexOf(codeLower, searchPos)
       if (idx === -1) break
       searchPos = idx + 1
-
       const firstCharInfo = charMap[idx]
       if (!firstCharInfo) continue
       const item = content.items[firstCharInfo.itemIdx]
       if (!item || !('transform' in item)) continue
-
       const tx = item.transform
       if (!tx) continue
-
       const fontSize = Math.sqrt(tx[2] * tx[2] + tx[3] * tx[3])
       const x = tx[4] * viewport.scale
       const y = viewport.height - (tx[5] * viewport.scale) - (fontSize * viewport.scale)
@@ -383,7 +428,6 @@ export function ManualSearchModal({
       const h = fontSize * viewport.scale * 1.3
       rects.push({ x, y, width: w, height: h })
     }
-
     return rects
   }, [])
 
@@ -400,7 +444,6 @@ export function ManualSearchModal({
       const viewport = page.getViewport({ scale })
       canvas.height = viewport.height
       canvas.width = viewport.width
-
       await page.render({ canvasContext: ctx, viewport }).promise
 
       // Highlight layer
@@ -413,13 +456,14 @@ export function ManualSearchModal({
         // Yellow code highlights
         if (searchCode && matchPages.has(pageNum)) {
           const rects = await findHighlightRects(page, viewport, searchCode)
-          for (const rect of rects) {
-            layer.appendChild(createHighlightDiv(rect))
-          }
+          for (const rect of rects) layer.appendChild(createHighlightDiv(rect))
         }
 
-        // Saved polygon annotation
-        if (existingVinculo && existingVinculo.pagina === pageNum && existingVinculo.puntos && existingVinculo.puntos.length >= 3) {
+        // Saved polygon annotation — skip when editing (points are in SVG layer)
+        const showSavedAnnotation = existingVinculo && !editingExisting && !drawingMode
+        const vinculoForDisplay = existingVinculo
+
+        if (showSavedAnnotation && vinculoForDisplay && vinculoForDisplay.pagina === pageNum && vinculoForDisplay.puntos && vinculoForDisplay.puntos.length >= 3) {
           const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
           svg.setAttribute('width', String(viewport.width))
           svg.setAttribute('height', String(viewport.height))
@@ -429,21 +473,24 @@ export function ManualSearchModal({
           svg.style.pointerEvents = 'none'
 
           const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon')
-          const pointsStr = existingVinculo.puntos
+          const pointsStr = vinculoForDisplay.puntos
             .map(p => `${p.x * viewport.width},${p.y * viewport.height}`)
             .join(' ')
           polygon.setAttribute('points', pointsStr)
 
-          // Usar el color guardado o default verde
-          const savedColor = existingVinculo.color || 'rgba(34, 197, 94, 0.4)'
-          const matchedColor = MARKER_COLORS.find(c => c.value === savedColor)
+          // Use style-editing preview or saved values
+          const useTempStyle = editingStyle
+          const savedColor = vinculoForDisplay.color || 'rgba(34, 197, 94, 0.4)'
+          const displayFill = useTempStyle ? drawFillColor : savedColor
+          const displayNoBorder = useTempStyle ? drawNoBorder : !!vinculoForDisplay.sinBorde
+          const matchedColor = MARKER_COLORS.find(c => {
+            const base = c.value.replace(/[\d.]+\)$/, '')
+            return displayFill.startsWith(base)
+          })
           const borderColor = matchedColor?.border ?? '#22c55e'
-          // Parse opacity from saved rgba
-          const opacityMatch = savedColor.match(/[\d.]+\)$/)
-          const savedOpacity = opacityMatch ? parseFloat(opacityMatch[0]) : 0.2
 
-          polygon.setAttribute('fill', savedColor.replace(/[\d.]+\)$/, `${savedOpacity})`))
-          if (!existingVinculo.sinBorde) {
+          polygon.setAttribute('fill', displayFill)
+          if (!displayNoBorder) {
             polygon.setAttribute('stroke', borderColor)
             polygon.setAttribute('stroke-width', '3')
           }
@@ -452,8 +499,8 @@ export function ManualSearchModal({
         }
 
         // Saved rect annotation (backwards compatibility)
-        if (existingVinculo && existingVinculo.pagina === pageNum && existingVinculo.coordenadas && !existingVinculo.puntos) {
-          const c = existingVinculo.coordenadas
+        if (showSavedAnnotation && vinculoForDisplay && vinculoForDisplay.pagina === pageNum && vinculoForDisplay.coordenadas && !vinculoForDisplay.puntos) {
+          const c = vinculoForDisplay.coordenadas
           const div = document.createElement('div')
           div.style.position = 'absolute'
           div.style.left = `${c.x * viewport.width}px`
@@ -482,7 +529,7 @@ export function ManualSearchModal({
     } finally {
       setRendering(false)
     }
-  }, [pdfDoc, scale, searchCode, matchPages, findHighlightRects, existingVinculo])
+  }, [pdfDoc, scale, searchCode, matchPages, findHighlightRects, existingVinculo, editingExisting, drawingMode, editingStyle, drawFillColor, drawNoBorder])
 
   // ─── Lifecycle ─────────────────────────────────────────────
   useEffect(() => {
@@ -495,6 +542,12 @@ export function ManualSearchModal({
       setResults([])
       setMatchPages(new Set())
       setShowColorPicker(false)
+      setEditingExisting(false)
+      setOriginalVinculo(null)
+      setDraggingIdx(null)
+      setEditingStyle(false)
+      setHoveredPointIdx(null)
+      prevScaleRef.current = null
       setStep(initialVinculo ? 'viewing' : 'select-manual')
       loadManualOptions()
     }
@@ -506,27 +559,18 @@ export function ManualSearchModal({
     }
   }, [open, loadManualOptions, initialVinculo])
 
-  // When manualUrl changes and we're viewing:
-  // - View mode (initialVinculo): load PDF only → instant, then background search
-  // - Search mode: full search
   useEffect(() => {
     if (!manualUrl || step !== 'viewing') return
     if (isViewMode) {
-      // Fast path: load PDF, jump to annotation page
       loadPdfOnly(manualUrl)
     } else {
-      // Search mode: load + search
       searchInPdf(manualUrl)
     }
   }, [manualUrl, step, isViewMode, loadPdfOnly, searchInPdf])
 
-  // Background search after PDF loaded in view mode
   useEffect(() => {
     if (pdfDoc && isViewMode && searchCode && results.length === 0 && !searching) {
-      // Defer background search so initial render is fast
-      const timer = setTimeout(() => {
-        searchInPdfBackground(pdfDoc)
-      }, 500)
+      const timer = setTimeout(() => { searchInPdfBackground(pdfDoc) }, 500)
       return () => clearTimeout(timer)
     }
   }, [pdfDoc, isViewMode, searchCode, results.length, searching, searchInPdfBackground])
@@ -536,6 +580,14 @@ export function ManualSearchModal({
       renderPage(currentPage)
     }
   }, [pdfDoc, currentPage, renderPage, totalPages])
+
+  // Re-render when style editing options change (live preview)
+  useEffect(() => {
+    if (editingStyle && pdfDoc && currentPage >= 1) {
+      renderPage(currentPage)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editingStyle, drawFillColor, drawNoBorder])
 
   // ─── Accept manual selection → start search ───────────────
   const acceptManualSelection = () => {
@@ -573,7 +625,7 @@ export function ManualSearchModal({
     setPageInput('')
   }
 
-  // ─── Polygon drawing handlers ─────────────────────────────
+  // ─── Toggle drawing mode ──────────────────────────────────
   const toggleDrawingMode = () => {
     if (drawingMode) {
       setDrawingMode(false)
@@ -582,8 +634,13 @@ export function ManualSearchModal({
       setHoverPoint(null)
       setNearFirstPoint(false)
       setShowColorPicker(false)
+      setEditingExisting(false)
+      setOriginalVinculo(null)
+      setDraggingIdx(null)
+      setHoveredPointIdx(null)
     } else {
       setDrawingMode(true)
+      setEditingStyle(false)
       setPolyPoints([])
       setPolyClosed(false)
       setHoverPoint(null)
@@ -599,12 +656,75 @@ export function ManualSearchModal({
     }
   }
 
-  const handleDrawClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!drawingMode || polyClosed || !drawLayerRef.current) return
+  // ─── Polygon interaction handlers ─────────────────────────
+
+  const handleDrawMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!drawingMode || !polyClosed || !drawLayerRef.current) return
     const layerRect = drawLayerRef.current.getBoundingClientRect()
     const x = e.clientX - layerRect.left
     const y = e.clientY - layerRect.top
 
+    // Check if near an existing vertex → start drag
+    for (let i = 0; i < polyPoints.length; i++) {
+      const p = polyPoints[i]
+      if (!p) continue
+      const dist = Math.sqrt((x - p.x) ** 2 + (y - p.y) ** 2)
+      if (dist < DRAG_THRESHOLD_PX) {
+        setDraggingIdx(i)
+        e.preventDefault()
+        return
+      }
+    }
+  }
+
+  const handleDrawMouseUp = () => {
+    if (draggingIdx !== null) {
+      setDraggingIdx(null)
+      justDraggedRef.current = true
+      setTimeout(() => { justDraggedRef.current = false }, 100)
+    }
+  }
+
+  const handleDrawClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!drawingMode || !drawLayerRef.current) return
+
+    // Prevent click after drag
+    if (justDraggedRef.current) return
+
+    const layerRect = drawLayerRef.current.getBoundingClientRect()
+    const x = e.clientX - layerRect.left
+    const y = e.clientY - layerRect.top
+
+    // When polygon is closed: add point on nearest edge
+    if (polyClosed) {
+      // Check not near existing vertex
+      if (polyPoints.some(p => Math.sqrt((x - p.x) ** 2 + (y - p.y) ** 2) < DRAG_THRESHOLD_PX)) return
+
+      // Find nearest edge
+      let nearestEdge = -1
+      let nearestDist = Infinity
+      for (let i = 0; i < polyPoints.length; i++) {
+        const a = polyPoints[i]
+        const b = polyPoints[(i + 1) % polyPoints.length]
+        if (!a || !b) continue
+        const dist = pointToSegmentDist({ x, y }, a, b)
+        if (dist < nearestDist) {
+          nearestDist = dist
+          nearestEdge = i
+        }
+      }
+
+      if (nearestDist < EDGE_ADD_THRESHOLD_PX && nearestEdge >= 0) {
+        setPolyPoints(prev => {
+          const next = [...prev]
+          next.splice(nearestEdge + 1, 0, { x, y })
+          return next
+        })
+      }
+      return
+    }
+
+    // Open polygon: attempt to close or add point
     if (polyPoints.length >= 3) {
       const first = polyPoints[0]
       if (first) {
@@ -622,12 +742,34 @@ export function ManualSearchModal({
   }
 
   const handleDrawMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!drawingMode || polyClosed || !drawLayerRef.current) return
+    if (!drawingMode || !drawLayerRef.current) return
     const layerRect = drawLayerRef.current.getBoundingClientRect()
     const x = e.clientX - layerRect.left
     const y = e.clientY - layerRect.top
-    setHoverPoint({ x, y })
 
+    // Dragging a vertex
+    if (draggingIdx !== null) {
+      setPolyPoints(prev => prev.map((p, i) => i === draggingIdx ? { x, y } : p))
+      return
+    }
+
+    // Closed polygon: track which vertex is hovered
+    if (polyClosed) {
+      let foundIdx: number | null = null
+      for (let i = 0; i < polyPoints.length; i++) {
+        const p = polyPoints[i]
+        if (!p) continue
+        if (Math.sqrt((x - p.x) ** 2 + (y - p.y) ** 2) < DRAG_THRESHOLD_PX) {
+          foundIdx = i
+          break
+        }
+      }
+      setHoveredPointIdx(foundIdx)
+      return
+    }
+
+    // Open polygon: hover preview
+    setHoverPoint({ x, y })
     if (polyPoints.length >= 3) {
       const first = polyPoints[0]
       if (first) {
@@ -642,15 +784,36 @@ export function ManualSearchModal({
   const handleDrawLeave = () => {
     setHoverPoint(null)
     setNearFirstPoint(false)
+    setHoveredPointIdx(null)
   }
 
-  // ─── Derived draw colors ──────────────────────────────────
-  const drawFillColor = currentColor
-    ? currentColor.value.replace(/[\d.]+\)$/, `${drawOpacity})`)
-    : `rgba(34, 197, 94, ${drawOpacity})`
-  const drawStrokeColor = currentColor?.border ?? '#22c55e'
-  const drawFillPreview = drawFillColor
-  const drawStrokePreview = drawNoBorder ? 'transparent' : drawStrokeColor
+  /** Double-click: remove point (min 3 points) */
+  const handleDrawDoubleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!drawingMode || !polyClosed || !drawLayerRef.current) return
+    if (polyPoints.length <= 3) return
+
+    const layerRect = drawLayerRef.current.getBoundingClientRect()
+    const x = e.clientX - layerRect.left
+    const y = e.clientY - layerRect.top
+
+    const idx = polyPoints.findIndex(p => Math.sqrt((x - p.x) ** 2 + (y - p.y) ** 2) < DRAG_THRESHOLD_PX)
+    if (idx >= 0) {
+      e.preventDefault()
+      setPolyPoints(prev => prev.filter((_, i) => i !== idx))
+    }
+  }
+
+  // ─── Cursor for draw layer ────────────────────────────────
+  const getDrawCursor = (): string => {
+    if (!drawingMode) return 'default'
+    if (draggingIdx !== null) return 'grabbing'
+    if (polyClosed) {
+      if (hoveredPointIdx !== null) return 'grab'
+      return 'crosshair' // can add point on edge
+    }
+    if (nearFirstPoint) return 'pointer'
+    return 'crosshair'
+  }
 
   // ─── Save polygon annotation ──────────────────────────────
   const saveAnnotation = useCallback(async () => {
@@ -667,7 +830,7 @@ export function ManualSearchModal({
     }))
 
     const vinculo: VinculoManual = {
-      id: `vinc_${Date.now()}`,
+      id: editingExisting && originalVinculo ? originalVinculo.id : `vinc_${Date.now()}`,
       pagina: currentPage,
       machineId: machine.id,
       manualUrl,
@@ -680,21 +843,35 @@ export function ManualSearchModal({
 
     try {
       const repuestoRef = doc(db, `machines/${machine.id}/repuestos`, repuesto.id)
+
+      // If editing existing: remove old first
+      if (editingExisting && originalVinculo) {
+        await updateDoc(repuestoRef, {
+          vinculosManual: arrayRemove(originalVinculo),
+          updatedAt: Timestamp.now(),
+        })
+      }
+
       await updateDoc(repuestoRef, {
         vinculosManual: arrayUnion(vinculo),
         updatedAt: Timestamp.now(),
       })
+
       setDrawingMode(false)
       setPolyPoints([])
       setPolyClosed(false)
       setShowColorPicker(false)
+      setEditingExisting(false)
+      setOriginalVinculo(null)
+      setDraggingIdx(null)
+      setHoveredPointIdx(null)
       renderPage(currentPage)
     } catch (err) {
       console.error('Error saving annotation:', err)
     } finally {
       setSavingAnnotation(false)
     }
-  }, [polyPoints, polyClosed, manualUrl, currentPage, machine.id, repuesto.id, repuesto.codigoBaader, repuesto.codigoSAP, repuesto.textoBreve, drawFillColor, drawNoBorder, renderPage])
+  }, [polyPoints, polyClosed, manualUrl, currentPage, machine.id, repuesto.id, repuesto.codigoBaader, repuesto.codigoSAP, repuesto.textoBreve, drawFillColor, drawNoBorder, editingExisting, originalVinculo, renderPage])
 
   // ─── Delete existing annotation (admin) ────────────────────
   const deleteAnnotation = useCallback(async () => {
@@ -709,6 +886,8 @@ export function ManualSearchModal({
       setDrawingMode(true)
       setPolyPoints([])
       setPolyClosed(false)
+      setEditingExisting(false)
+      setOriginalVinculo(null)
       renderPage(currentPage)
     } catch (err) {
       console.error('Error deleting annotation:', err)
@@ -717,13 +896,92 @@ export function ManualSearchModal({
     }
   }, [existingVinculo, machine.id, repuesto.id, currentPage, renderPage])
 
+  // ─── Start editing existing annotation (load points) ──────
   const startEditAnnotation = useCallback(() => {
-    if (!existingVinculo) return
+    if (!existingVinculo || !canvasRef.current) return
+
+    // Navigate to annotation page if needed
     if (existingVinculo.pagina !== currentPage) {
       goToPage(existingVinculo.pagina)
     }
-    deleteAnnotation()
-  }, [existingVinculo, currentPage, deleteAnnotation, goToPage])
+
+    // Store original for later replacement
+    setOriginalVinculo(existingVinculo)
+
+    // Initialize style from existing
+    const savedColor = existingVinculo.color || 'rgba(34, 197, 94, 0.4)'
+    const info = parseColorInfo(savedColor)
+    setDrawColorIdx(info.colorIdx)
+    setDrawOpacity(info.opacity)
+    setDrawNoBorder(!!existingVinculo.sinBorde)
+
+    // Convert normalized → pixel
+    const cw = canvasRef.current.width
+    const ch = canvasRef.current.height
+    if (existingVinculo.puntos && existingVinculo.puntos.length >= 3 && cw > 0 && ch > 0) {
+      const pixelPoints = existingVinculo.puntos.map(p => ({
+        x: p.x * cw,
+        y: p.y * ch,
+      }))
+      setPolyPoints(pixelPoints)
+      setPolyClosed(true)
+    } else {
+      setPolyPoints([])
+      setPolyClosed(false)
+    }
+
+    setEditingExisting(true)
+    setDrawingMode(true)
+    setEditingStyle(false)
+    setShowColorPicker(true) // show style panel by default when editing
+  }, [existingVinculo, currentPage, goToPage])
+
+  // ─── Start style-only editing ─────────────────────────────
+  const startEditStyle = useCallback(() => {
+    if (!existingVinculo) return
+    const savedColor = existingVinculo.color || 'rgba(34, 197, 94, 0.4)'
+    const info = parseColorInfo(savedColor)
+    setDrawColorIdx(info.colorIdx)
+    setDrawOpacity(info.opacity)
+    setDrawNoBorder(!!existingVinculo.sinBorde)
+    setEditingStyle(true)
+  }, [existingVinculo])
+
+  // ─── Save style only (without changing points) ────────────
+  const saveStyleOnly = useCallback(async () => {
+    if (!existingVinculo) return
+    setSavingStyle(true)
+    try {
+      const repuestoRef = doc(db, `machines/${machine.id}/repuestos`, repuesto.id)
+
+      const updatedVinculo: VinculoManual = {
+        ...existingVinculo,
+        color: drawFillColor,
+        sinBorde: drawNoBorder,
+      }
+
+      await updateDoc(repuestoRef, {
+        vinculosManual: arrayRemove(existingVinculo),
+        updatedAt: Timestamp.now(),
+      })
+      await updateDoc(repuestoRef, {
+        vinculosManual: arrayUnion(updatedVinculo),
+        updatedAt: Timestamp.now(),
+      })
+
+      setEditingStyle(false)
+      renderPage(currentPage)
+    } catch (err) {
+      console.error('Error saving style:', err)
+    } finally {
+      setSavingStyle(false)
+    }
+  }, [existingVinculo, machine.id, repuesto.id, drawFillColor, drawNoBorder, currentPage, renderPage])
+
+  const cancelEditStyle = () => {
+    setEditingStyle(false)
+    renderPage(currentPage)
+  }
 
   // ─── Derived state ─────────────────────────────────────────
   const currentMatchInfo = results.find(r => r.page === currentPage) ?? null
@@ -952,15 +1210,19 @@ export function ManualSearchModal({
                 <div className="shrink-0 px-4 py-1.5 bg-green-500/10 border-b border-green-500/20 text-xs flex items-center gap-2">
                   <span className="inline-block w-2 h-2 rounded-full bg-green-400 animate-pulse" />
                   <span className="text-foreground">
-                    <span className="font-semibold text-green-400">Modo marcado</span> —{' '}
-                    {polyPoints.length === 0 && 'Haz click para colocar el primer punto.'}
-                    {polyPoints.length > 0 && polyPoints.length < 3 && `Punto ${polyPoints.length} — necesitas al menos 3.`}
-                    {polyPoints.length >= 3 && !polyClosed && 'Click en el primer punto (verde) para cerrar.'}
-                    {polyClosed && '¡Figura cerrada! Puedes guardar.'}
+                    <span className="font-semibold text-green-400">
+                      {editingExisting ? 'Editando marcado' : 'Modo marcado'}
+                    </span>
+                    {' — '}
+                    {polyClosed && editingExisting && 'Arrastra puntos · Click en arista para agregar · Doble-click para eliminar.'}
+                    {polyClosed && !editingExisting && '¡Figura cerrada! Arrastra puntos para ajustar, o guarda.'}
+                    {!polyClosed && polyPoints.length === 0 && 'Haz click para colocar el primer punto.'}
+                    {!polyClosed && polyPoints.length > 0 && polyPoints.length < 3 && `Punto ${polyPoints.length} — necesitas al menos 3.`}
+                    {!polyClosed && polyPoints.length >= 3 && 'Click en el primer punto (verde) para cerrar.'}
                   </span>
 
                   <div className="ml-auto flex items-center gap-1.5">
-                    {/* Admin: color picker toggle */}
+                    {/* Style toggle */}
                     {isAdmin && (
                       <Button variant="ghost" size="sm"
                         className={`h-6 px-2 text-[11px] gap-1 ${showColorPicker ? 'text-foreground bg-muted/50' : 'text-muted-foreground hover:text-foreground'}`}
@@ -989,10 +1251,10 @@ export function ManualSearchModal({
                         <Button variant="outline" size="sm"
                           className="h-6 px-2 text-[11px] gap-1 border-green-500/40 text-green-400 hover:bg-green-500/10"
                           onClick={saveAnnotation} disabled={savingAnnotation}
-                          title="Guardar dibujo como ubicación del repuesto"
+                          title="Guardar marcado"
                         >
                           {savingAnnotation ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
-                          Guardar marcado
+                          {editingExisting ? 'Guardar cambios' : 'Guardar marcado'}
                         </Button>
                       </>
                     )}
@@ -1000,8 +1262,8 @@ export function ManualSearchModal({
                 </div>
               )}
 
-              {/* Admin: Color/Border/Opacity picker panel */}
-              {drawingMode && showColorPicker && isAdmin && (
+              {/* Color/Border/Opacity picker panel (drawing or style-editing) */}
+              {((drawingMode && showColorPicker) || editingStyle) && isAdmin && (
                 <div className="shrink-0 px-4 py-2 bg-muted/30 border-b border-border flex flex-wrap items-center gap-4 text-xs">
                   {/* Color */}
                   <div className="flex items-center gap-2">
@@ -1073,11 +1335,29 @@ export function ManualSearchModal({
                       }}
                     />
                   </div>
+
+                  {/* Style-only save/cancel buttons */}
+                  {editingStyle && (
+                    <>
+                      <div className="h-4 w-px bg-border" />
+                      <Button variant="ghost" size="sm"
+                        className="h-6 px-2 text-[11px] text-muted-foreground hover:text-foreground"
+                        onClick={cancelEditStyle}
+                      >Cancelar</Button>
+                      <Button variant="outline" size="sm"
+                        className="h-6 px-2 text-[11px] gap-1 border-green-500/40 text-green-400 hover:bg-green-500/10"
+                        onClick={saveStyleOnly} disabled={savingStyle}
+                      >
+                        {savingStyle ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+                        Guardar estilo
+                      </Button>
+                    </>
+                  )}
                 </div>
               )}
 
               {/* Existing annotation info */}
-              {existingVinculo && !drawingMode && (
+              {existingVinculo && !drawingMode && !editingStyle && (
                 <div className="shrink-0 px-4 py-1.5 bg-green-500/10 border-b border-green-500/20 text-xs flex items-center gap-2">
                   <Eye className="h-3.5 w-3.5 text-green-400" />
                   <span className="text-foreground">
@@ -1087,19 +1367,27 @@ export function ManualSearchModal({
                     <Button variant="ghost" size="sm"
                       className="h-5 px-2 text-[10px] text-green-400 hover:text-green-300"
                       onClick={() => goToPage(existingVinculo.pagina)}
-                      title="Ir a la página donde está marcado el repuesto"
+                      title="Ir a la página marcada"
                     >Ir a marcado</Button>
                   )}
                   {isAdmin && (
                     <div className="ml-auto flex items-center gap-1">
                       <Button variant="ghost" size="sm"
+                        className="h-5 px-2 text-[10px] gap-1 text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10"
+                        onClick={startEditStyle}
+                        title="Cambiar color, borde y transparencia sin redibujar"
+                      >
+                        <Palette className="h-3 w-3" />
+                        Cambiar estilo
+                      </Button>
+                      <Button variant="ghost" size="sm"
                         className="h-5 px-2 text-[10px] gap-1 text-yellow-400 hover:text-yellow-300 hover:bg-yellow-500/10"
                         onClick={startEditAnnotation}
                         disabled={deletingAnnotation}
-                        title="Eliminar el marcado actual y redibujar"
+                        title="Editar los puntos del marcado (arrastrar, agregar, eliminar)"
                       >
                         {deletingAnnotation ? <Loader2 className="h-3 w-3 animate-spin" /> : <Pencil className="h-3 w-3" />}
-                        Editar ubicación
+                        Editar forma
                       </Button>
                       <Button variant="ghost" size="sm"
                         className="h-5 px-2 text-[10px] gap-1 text-destructive/70 hover:text-destructive hover:bg-destructive/10"
@@ -1112,6 +1400,16 @@ export function ManualSearchModal({
                       </Button>
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* Editing style info bar (replaces annotation bar) */}
+              {editingStyle && existingVinculo && !drawingMode && (
+                <div className="shrink-0 px-4 py-1.5 bg-cyan-500/10 border-b border-cyan-500/20 text-xs flex items-center gap-2">
+                  <Palette className="h-3.5 w-3.5 text-cyan-400" />
+                  <span className="text-foreground">
+                    <span className="font-semibold text-cyan-400">Editando estilo</span> — Cambia el color, opacidad o borde del marcado en <span className="font-bold text-cyan-400">página {existingVinculo.pagina}</span>
+                  </span>
                 </div>
               )}
 
@@ -1169,12 +1467,15 @@ export function ManualSearchModal({
                       className="absolute top-0 left-0"
                       style={{
                         zIndex: drawingMode ? 15 : -1,
-                        cursor: drawingMode ? (nearFirstPoint ? 'pointer' : 'crosshair') : 'default',
+                        cursor: getDrawCursor(),
                         pointerEvents: drawingMode ? 'auto' : 'none',
                       }}
+                      onMouseDown={handleDrawMouseDown}
+                      onMouseUp={handleDrawMouseUp}
                       onClick={handleDrawClick}
                       onMouseMove={handleDrawMove}
                       onMouseLeave={handleDrawLeave}
+                      onDoubleClick={handleDrawDoubleClick}
                     >
                       <svg
                         ref={svgRef}
@@ -1203,28 +1504,58 @@ export function ManualSearchModal({
                             strokeDasharray="4 3"
                           />
                         )}
+                        {/* Edge midpoints when closed (add hint) */}
+                        {polyClosed && polyPoints.map((p, i) => {
+                          const next = polyPoints[(i + 1) % polyPoints.length]
+                          if (!next) return null
+                          const mx = (p.x + next.x) / 2
+                          const my = (p.y + next.y) / 2
+                          return (
+                            <circle
+                              key={`mid-${i}`}
+                              cx={mx}
+                              cy={my}
+                              r={3}
+                              fill="rgba(255,255,255,0.3)"
+                              stroke={`${drawStrokeColor}60`}
+                              strokeWidth="1"
+                            />
+                          )
+                        })}
                         {/* Point dots */}
-                        {polyPoints.map((p, i) => (
-                          <circle
-                            key={i}
-                            cx={p.x}
-                            cy={p.y}
-                            r={i === 0 && nearFirstPoint ? 8 : 5}
-                            fill={i === 0
-                              ? (nearFirstPoint ? drawStrokeColor : `${drawStrokeColor}cc`)
-                              : 'rgba(255, 255, 255, 0.9)'
-                            }
-                            stroke={i === 0 ? '#fff' : drawStrokeColor}
-                            strokeWidth={i === 0 ? 2.5 : 2}
-                            style={{ transition: 'r 0.15s ease' }}
-                          />
-                        ))}
+                        {polyPoints.map((p, i) => {
+                          const isFirst = i === 0
+                          const isHovered = hoveredPointIdx === i
+                          const isDragged = draggingIdx === i
+                          const isActive = isHovered || isDragged
+                          const baseR = isFirst && nearFirstPoint ? 8 : 5
+                          const r = isActive ? baseR + 3 : baseR
+                          return (
+                            <circle
+                              key={i}
+                              cx={p.x}
+                              cy={p.y}
+                              r={r}
+                              fill={isDragged
+                                ? drawStrokeColor
+                                : isFirst
+                                  ? (nearFirstPoint ? drawStrokeColor : `${drawStrokeColor}cc`)
+                                  : isHovered
+                                    ? '#fff'
+                                    : 'rgba(255, 255, 255, 0.9)'
+                              }
+                              stroke={isFirst ? '#fff' : drawStrokeColor}
+                              strokeWidth={isActive ? 3 : (isFirst ? 2.5 : 2)}
+                              style={{ transition: 'r 0.12s ease, stroke-width 0.12s ease' }}
+                            />
+                          )
+                        })}
                         {/* Point labels */}
                         {polyPoints.map((p, i) => (
                           <text
                             key={`label-${i}`}
                             x={p.x}
-                            y={p.y - 10}
+                            y={p.y - 12}
                             textAnchor="middle"
                             fill="white"
                             fontSize="10"
@@ -1245,35 +1576,4 @@ export function ManualSearchModal({
       </DialogContent>
     </Dialog>
   )
-}
-
-// ─── Helpers ────────────────────────────────────────────────
-
-function createHighlightDiv(rect: TextRect): HTMLDivElement {
-  const div = document.createElement('div')
-  div.style.position = 'absolute'
-  div.style.left = `${rect.x - 2}px`
-  div.style.top = `${rect.y - 2}px`
-  div.style.width = `${rect.width + 4}px`
-  div.style.height = `${rect.height + 4}px`
-  div.style.borderRadius = '3px'
-  div.style.pointerEvents = 'none'
-  div.style.mixBlendMode = 'multiply'
-  div.style.backgroundColor = 'rgba(250, 204, 21, 0.4)'
-  div.style.border = '2px solid rgba(250, 204, 21, 0.9)'
-  return div
-}
-
-function highlightCode(text: string, code: string): React.ReactNode {
-  if (!code) return text
-  const parts = text.split(new RegExp(`(${escapeRegex(code)})`, 'gi'))
-  return parts.map((part, i) =>
-    part.toLowerCase() === code.toLowerCase()
-      ? <span key={i} className="font-bold text-yellow-400 not-italic">{part}</span>
-      : <span key={i}>{part}</span>
-  )
-}
-
-function escapeRegex(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
