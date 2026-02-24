@@ -1,5 +1,5 @@
 /**
- * ManualSearchModal v2.48.86
+ * ManualSearchModal v2.48.88
  *
  * Características:
  *  - "Ver en manual" instantáneo (solo carga PDF, búsqueda diferida)
@@ -19,7 +19,7 @@ import {
   BookOpen, Search, Loader2, FileText,
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
   ExternalLink, AlertTriangle, ZoomIn, ZoomOut, Maximize2, Minimize2,
-  Save, Eye, Undo2, MousePointerClick, Trash2, Pencil, Palette, Hand,
+  Save, Eye, Undo2, MousePointerClick, Trash2, Pencil, Palette,
 } from 'lucide-react'
 import * as pdfjsLib from 'pdfjs-dist'
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist'
@@ -178,7 +178,6 @@ export function ManualSearchModal({
   const [rendering, setRendering] = useState(false)
   const [scaleIdx, setScaleIdx] = useState(DEFAULT_SCALE_IDX)
   const [pageInput, setPageInput] = useState('')
-  const [panMode, setPanMode] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
 
   // ─── Polygon drawing state ──────────────────────────────
@@ -626,9 +625,11 @@ export function ManualSearchModal({
     setPageInput('')
   }
 
-  // ─── Pan mode handlers ────────────────────────────────────
+  // ─── Pan handlers (always active when not drawing) ───────
   const handlePanMouseDown = useCallback((e: React.MouseEvent) => {
-    if (!panMode || drawingMode) return
+    if (drawingMode) return
+    // Only left button
+    if (e.button !== 0) return
     const container = scrollContainerRef.current
     if (!container) return
     isPanningRef.current = true
@@ -639,7 +640,7 @@ export function ManualSearchModal({
       scrollTop: container.scrollTop,
     }
     e.preventDefault()
-  }, [panMode, drawingMode])
+  }, [drawingMode])
 
   const handlePanMouseMove = useCallback((e: React.MouseEvent) => {
     if (!isPanningRef.current) return
@@ -655,41 +656,46 @@ export function ManualSearchModal({
     isPanningRef.current = false
   }, [])
 
-  // ─── Wheel zoom (Ctrl+wheel) ──────────────────────────────
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    if (!e.ctrlKey && !e.metaKey) return
-    e.preventDefault()
-    e.stopPropagation()
+  // ─── Wheel zoom (Ctrl+wheel) — native listener for passive:false ───
+  const scaleIdxRef = useRef(scaleIdx)
+  scaleIdxRef.current = scaleIdx
 
+  useEffect(() => {
     const container = scrollContainerRef.current
     if (!container) return
 
-    // Save scroll position ratio for centering
-    const rect = container.getBoundingClientRect()
-    const mouseX = e.clientX - rect.left
-    const mouseY = e.clientY - rect.top
-    const scrollX = container.scrollLeft + mouseX
-    const scrollY = container.scrollTop + mouseY
-    const ratioX = scrollX / (container.scrollWidth || 1)
-    const ratioY = scrollY / (container.scrollHeight || 1)
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return
+      e.preventDefault()
+      e.stopPropagation()
 
-    setScaleIdx(prev => {
+      const rect = container.getBoundingClientRect()
+      const mouseX = e.clientX - rect.left
+      const mouseY = e.clientY - rect.top
+      const scrollX = container.scrollLeft + mouseX
+      const scrollY = container.scrollTop + mouseY
+      const ratioX = scrollX / (container.scrollWidth || 1)
+      const ratioY = scrollY / (container.scrollHeight || 1)
+
+      const prev = scaleIdxRef.current
       const next = e.deltaY < 0
         ? Math.min(SCALE_STEPS.length - 1, prev + 1)
         : Math.max(0, prev - 1)
 
-      // Reposition scroll after scale change to keep mouse centered
-      requestAnimationFrame(() => {
-        if (!container) return
-        const newScrollX = ratioX * container.scrollWidth - mouseX
-        const newScrollY = ratioY * container.scrollHeight - mouseY
-        container.scrollLeft = newScrollX
-        container.scrollTop = newScrollY
-      })
+      if (next !== prev) {
+        setScaleIdx(next)
+        requestAnimationFrame(() => {
+          const newScrollX = ratioX * container.scrollWidth - mouseX
+          const newScrollY = ratioY * container.scrollHeight - mouseY
+          container.scrollLeft = newScrollX
+          container.scrollTop = newScrollY
+        })
+      }
+    }
 
-      return next
-    })
-  }, [])
+    container.addEventListener('wheel', onWheel, { passive: false })
+    return () => container.removeEventListener('wheel', onWheel)
+  }, [pdfDoc, step]) // re-attach when PDF loads or step changes
 
   // ─── Fullscreen toggle ─────────────────────────────────────
   const toggleFullscreen = useCallback(() => {
@@ -726,7 +732,6 @@ export function ManualSearchModal({
     } else {
       setDrawingMode(true)
       setEditingStyle(false)
-      setPanMode(false) // Disable pan when drawing
       setPolyPoints([])
       setPolyClosed(false)
       setHoverPoint(null)
@@ -1162,6 +1167,7 @@ export function ManualSearchModal({
           ? 'fixed inset-0 max-w-none max-h-none w-screen h-screen rounded-none flex flex-col overflow-hidden p-0 z-50'
           : 'max-w-5xl max-h-[95vh] flex flex-col overflow-hidden p-0'
         }
+        style={isFullscreen ? { transform: 'none', left: 0, top: 0 } : undefined}
       >
         {/* Header */}
         <DialogHeader className="shrink-0 px-4 pt-4 pb-2">
@@ -1247,20 +1253,11 @@ export function ManualSearchModal({
 
                 <div className="h-5 w-px bg-border mx-1" />
 
-                {/* Pan tool + Fullscreen */}
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant={panMode ? 'default' : 'ghost'}
-                    size="sm"
-                    className={`h-7 w-7 p-0 ${panMode ? 'bg-blue-600 hover:bg-blue-700 text-white' : ''}`}
-                    onClick={() => setPanMode(!panMode)}
-                    title={panMode ? 'Desactivar paneo (mano)' : 'Activar paneo (mano) — arrastra para mover'}
-                  ><Hand className="h-4 w-4" /></Button>
-                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0"
-                    onClick={toggleFullscreen}
-                    title={isFullscreen ? 'Salir de pantalla completa (Esc)' : 'Pantalla completa'}
-                  >{isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}</Button>
-                </div>
+                {/* Fullscreen */}
+                <Button variant="ghost" size="sm" className="h-7 w-7 p-0"
+                  onClick={toggleFullscreen}
+                  title={isFullscreen ? 'Salir de pantalla completa (Esc)' : 'Pantalla completa'}
+                >{isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}</Button>
 
                 <div className="h-5 w-px bg-border mx-1" />
                 {searching ? (
@@ -1557,13 +1554,12 @@ export function ManualSearchModal({
               <div
                 ref={scrollContainerRef}
                 className={`flex-1 overflow-auto min-h-0 bg-neutral-800/50 ${
-                  panMode && !drawingMode ? 'cursor-grab active:cursor-grabbing' : ''
+                  !drawingMode ? 'cursor-grab active:cursor-grabbing' : ''
                 }`}
                 onMouseDown={handlePanMouseDown}
                 onMouseMove={handlePanMouseMove}
                 onMouseUp={handlePanMouseUp}
                 onMouseLeave={handlePanMouseUp}
-                onWheel={handleWheel}
               >
                 <div className="flex justify-center p-4">
                   <div className="relative inline-block shadow-xl">

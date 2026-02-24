@@ -7,6 +7,12 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.88] - 2026-02-24
+### Fix
+- **Paneo automático**: El paneo (arrastrar para mover el PDF) ahora es automático cuando el cursor está sobre el manual y no se está dibujando. Ya no requiere botón de mano — cursor grab/grabbing siempre activo
+- **Ctrl+rueda zoom corregido**: Corregido bug donde Ctrl+scroll hacía zoom al navegador completo en vez de solo al PDF. Ahora usa evento nativo con `passive: false` para interceptar correctamente el zoom del browser
+- **Pantalla completa corregida**: Corregido bug de posicionamiento en pantalla completa — el dialog aparecía en la esquina superior izquierda en vez de llenar la pantalla. Se anulan los transforms de Radix Dialog con `style` inline
+
 ## [2.48.87] - 2026-02-24
 ### Mejora
 - **Zoom extendido (50%–500%)**: Escala de zoom ampliada con 11 niveles (50%, 75%, 100%, 125%, 150%, 200%, 250%, 300%, 350%, 400%, 500%) para poder inspeccionar repuestos con detalle de cerca
