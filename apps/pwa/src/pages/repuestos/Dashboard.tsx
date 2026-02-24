@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, Plus, FileText, Upload, Package, ClipboardList, ImageIcon, DollarSign, Wrench, ArrowRightLeft } from 'lucide-react'
+import { AlertTriangle, Plus, FileText, Upload, Package, ClipboardList, ImageIcon, DollarSign, Wrench, ArrowRightLeft, Copy as CopyDuplicateIcon } from 'lucide-react'
 import { RepuestosTable } from '@/components/repuestos/RepuestosTable'
 import { RepuestoFormModal } from '@/components/repuestos/RepuestoForm'
 import { RepuestosFilters } from '@/components/repuestos/RepuestosFilters'
@@ -23,6 +23,7 @@ import { ImportRepuestosModal } from './ImportRepuestosModal'
 import { ExportReportModal } from '@/components/repuestos/ExportReportModal'
 import { RelocateRepuestoModal } from '@/components/repuestos/RelocateRepuestoModal'
 import { BulkRelocateModal } from '@/components/repuestos/BulkRelocateModal'
+import { DuplicatesModal } from '@/components/repuestos/DuplicatesModal'
 import {
   Button,
   Dialog,
@@ -54,6 +55,7 @@ export function RepuestosDashboard() {
   const [viewInManualTarget, setViewInManualTarget] = useState<Repuesto | null>(null)
   const [relocateTarget, setRelocateTarget] = useState<Repuesto | null>(null)
   const [bulkRelocateOpen, setBulkRelocateOpen] = useState(false)
+  const [duplicatesOpen, setDuplicatesOpen] = useState(false)
   const [, setSelectedCategoryId] = useState<string | null>('maquinas-principales')
 
   // Filtros y paginación
@@ -280,6 +282,12 @@ export function RepuestosDashboard() {
               <Button variant="outline" size="sm" onClick={() => setBulkRelocateOpen(true)} className="gap-1.5 border-amber-500/30 text-amber-400 hover:bg-amber-500/10 hover:text-amber-300" title="Reubicar repuestos masivamente">
                 <ArrowRightLeft className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline text-xs">Reubicar</span>
+              </Button>
+            )}
+            {isAdmin && (
+              <Button variant="outline" size="sm" onClick={() => setDuplicatesOpen(true)} className="gap-1.5 border-purple-500/30 text-purple-400 hover:bg-purple-500/10 hover:text-purple-300" title="Detectar y fusionar duplicados">
+                <CopyDuplicateIcon className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline text-xs">Duplicados</span>
               </Button>
             )}
             {isAdmin && (
@@ -566,6 +574,16 @@ export function RepuestosDashboard() {
           }}
         />
       )}
+
+      {/* Modal Duplicados */}
+      <DuplicatesModal
+        open={duplicatesOpen}
+        onOpenChange={setDuplicatesOpen}
+        machines={machines}
+        onDone={() => {
+          toast({ title: 'Duplicados gestionados', description: 'Los repuestos duplicados fueron fusionados exitosamente.' })
+        }}
+      />
     </div>
   )
 }

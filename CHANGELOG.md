@@ -7,6 +7,15 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.93] - 2026-02-24
+### Funcionalidad
+- **Detección de duplicados cross-machine** (admin): Nuevo modal "Duplicados" en barra de herramientas que escanea TODAS las máquinas activas y agrupa repuestos con el mismo código SAP
+- **Fusión inteligente**: Selección manual o auto-selección del "ganador" (el repuesto con más datos). Al fusionar, combina cantidades, fotos, vínculos, galería, ubica mejor valor unitario, rellena campos vacíos del ganador con datos de los perdedores
+- **Merge masivo**: Botón "Fusionar todos" con barra de progreso para resolver todos los duplicados de una vez
+- **Historial de merge**: Cada fusión registra un evento `merge` en el historial del repuesto ganador con detalle de los duplicados eliminados
+- **Hook `useDuplicateScanner`**: Escaneo eficiente con normalización de código SAP (uppercase, trim, excluye "PENDIENTE")
+- **Servicio `mergeRepuestos`**: Lógica standalone de fusión Firestore con eliminación limpia de duplicados y sus historiales
+
 ## [2.48.92] - 2026-02-24
 ### Funcionalidad
 - **Reubicar repuesto individual** (admin): Botón "Reubicar a otra máquina" en menú de acciones y como botón inline en la tabla. Muestra selector de máquina destino con preview visual (color de máquina, flechas origen→destino)
