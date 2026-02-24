@@ -1,14 +1,15 @@
 /**
- * ManualSearchModal — Busca un código de fabricante dentro del manual PDF
+ * ManualSearchModal v2.48.81
  *
- * Funcionalidades:
- *  - Selector de manual cuando la máquina tiene múltiples PDFs
- *  - Busca el código en todas las páginas y resalta coincidencias (amarillo)
- *  - Detecta posición del repuesto en la lista del manual
- *  - Busca la posición en los diagramas técnicos (resaltado cyan)
- *  - Modo dibujo: marcar con un rectángulo dónde está el repuesto en el diagrama
- *  - Guarda la anotación como VinculoManual en Firestore
- *  - Navegación libre, zoom ajustable
+ * Flujo:
+ *  1. Se abre y carga la lista de manuales disponibles
+ *  2. El usuario elige en qué manual buscar → botón "Buscar"
+ *  3. Se busca el código de fabricante en todas las páginas y resalta en amarillo
+ *  4. El usuario navega manualmente por las páginas para encontrar el diagrama
+ *  5. "Marcar en diagrama" activa modo polígono: click para colocar puntos,
+ *     click en punto 1 para cerrar la figura
+ *  6. Guardar → se persiste como VinculoManual con puntos normalizados (0-1)
+ *  7. "Ver en manual" aparece al lado de "Buscar en manual" una vez guardado
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
@@ -16,7 +17,7 @@ import {
   BookOpen, Search, Loader2, FileText,
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
   ExternalLink, AlertTriangle, ZoomIn, ZoomOut, Maximize2,
-  Crosshair, Check, Pencil, X, Square, Save, Eye,
+  Save, Eye, Undo2, MousePointerClick,
 } from 'lucide-react'
 import * as pdfjsLib from 'pdfjs-dist'
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist'
@@ -34,7 +35,7 @@ import {
 import type { Machine, Repuesto } from '@/types/repuestos'
 import type { VinculoManual } from '@/types/vinculos'
 
-// Worker PDF.js
+// PDF.js worker
 if (typeof window !== 'undefined') {
   pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`
 }
@@ -46,7 +47,7 @@ export interface ManualSearchModalProps {
   onOpenChange: (open: boolean) => void
   machine: Machine
   repuesto: Repuesto
-  /** If set, opens directly on the given VinculoManual (view mode) */
+  /** Si se pasa, abre en modo vista directamente en la anotación guardada */
   initialVinculo?: VinculoManual
 }
 
@@ -54,14 +55,10 @@ interface SearchResult {
   page: number
   textSnippet: string
   matchCount: number
-  position: string | null
 }
 
 interface TextRect {
-  x: number
-  y: number
-  width: number
-  height: number
+  x: number; y: number; width: number; height: number
 }
 
 interface ManualOption {
@@ -69,19 +66,17 @@ interface ManualOption {
   url: string
 }
 
-/** Rectangle being drawn (pixel coords relative to canvas) */
-interface DrawRect {
-  startX: number
-  startY: number
-  endX: number
-  endY: number
+/** Punto en píxeles relativos al canvas */
+interface PixelPoint {
+  x: number
+  y: number
 }
 
-type HighlightMode = 'code' | 'position'
+type ModalStep = 'select-manual' | 'viewing'
 
 const SCALE_STEPS = [1, 1.25, 1.5, 2, 2.5, 3]
 const DEFAULT_SCALE_IDX = 2
-const DIAGRAM_SEARCH_RANGE = 5
+const CLOSE_THRESHOLD_PX = 14 // px para detectar cierre del polígono
 
 // ─── Component ──────────────────────────────────────────────
 
@@ -92,17 +87,20 @@ export function ManualSearchModal({
   repuesto,
   initialVinculo,
 }: ManualSearchModalProps) {
-  // ─── Manual selection state ──────────────────────────────
+  // ─── Step state ──────────────────────────────────────────
+  const [step, setStep] = useState<ModalStep>('select-manual')
+
+  // ─── Manual selection ────────────────────────────────────
   const [manualOptions, setManualOptions] = useState<ManualOption[]>([])
   const [selectedManualIdx, setSelectedManualIdx] = useState(0)
   const [loadingManuals, setLoadingManuals] = useState(true)
+  const [noManual, setNoManual] = useState(false)
 
-  // ─── Core PDF state ──────────────────────────────────────
+  // ─── PDF state ───────────────────────────────────────────
   const [searching, setSearching] = useState(false)
   const [manualUrl, setManualUrl] = useState<string | null>(null)
   const [results, setResults] = useState<SearchResult[]>([])
   const [matchPages, setMatchPages] = useState<Set<number>>(new Set())
-  const [noManual, setNoManual] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(0)
   const [pdfDoc, setPdfDoc] = useState<PDFDocumentProxy | null>(null)
@@ -110,22 +108,15 @@ export function ManualSearchModal({
   const [scaleIdx, setScaleIdx] = useState(DEFAULT_SCALE_IDX)
   const [pageInput, setPageInput] = useState('')
 
-  // ─── Position / diagram state ────────────────────────────
-  const [highlightMode, setHighlightMode] = useState<HighlightMode>('code')
-  const [activePosition, setActivePosition] = useState<string | null>(null)
-  const [searchingDiagram, setSearchingDiagram] = useState(false)
-  const [editingPosition, setEditingPosition] = useState(false)
-  const [positionInput, setPositionInput] = useState('')
-  const [savingPosition, setSavingPosition] = useState(false)
-  const [savedPosition, setSavedPosition] = useState<string | undefined>(repuesto.posicionManual)
-
-  // ─── Drawing / annotation state ──────────────────────────
+  // ─── Polygon drawing state ──────────────────────────────
   const [drawingMode, setDrawingMode] = useState(false)
-  const [drawRect, setDrawRect] = useState<DrawRect | null>(null)
-  const [isDrawing, setIsDrawing] = useState(false)
+  const [polyPoints, setPolyPoints] = useState<PixelPoint[]>([])
+  const [polyClosed, setPolyClosed] = useState(false)
+  const [hoverPoint, setHoverPoint] = useState<PixelPoint | null>(null)
+  const [nearFirstPoint, setNearFirstPoint] = useState(false)
   const [savingAnnotation, setSavingAnnotation] = useState(false)
 
-  // ─── Existing saved annotation for this repuesto ─────────
+  // ─── Existing saved annotation ───────────────────────────
   const existingVinculo = repuesto.vinculosManual?.find(v => v.machineId === machine.id) ?? initialVinculo ?? null
 
   // ─── Refs ────────────────────────────────────────────────
@@ -133,21 +124,18 @@ export function ManualSearchModal({
   const highlightLayerRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const drawLayerRef = useRef<HTMLDivElement>(null)
+  const svgRef = useRef<SVGSVGElement>(null)
 
   const searchCode = repuesto.codigoBaader || ''
   const scale = SCALE_STEPS[scaleIdx] ?? 1.5
-  const autoDetectedPosition = results.find(r => r.position)?.position ?? null
-  const effectivePosition = savedPosition || autoDetectedPosition
 
-  // ─── 1. Load available manuals ───────────────────────────
+  // ─── 1. Load manual options ──────────────────────────────
   const loadManualOptions = useCallback(async () => {
     setLoadingManuals(true)
     const options: ManualOption[] = []
 
-    // Add manuals from machine.manuals[] (saved URLs)
     if (machine.manuals && machine.manuals.length > 0) {
       machine.manuals.forEach((url, i) => {
-        // Extract a readable name from the URL
         const decoded = decodeURIComponent(url)
         const fileName = decoded.split('/').pop()?.split('?')[0] ?? `Manual ${i + 1}`
         const cleanName = fileName
@@ -158,14 +146,12 @@ export function ManualSearchModal({
       })
     }
 
-    // Also scan Storage for additional PDFs not yet in machine.manuals
     try {
       const folderRef = ref(storage, `machines/${machine.id}/manuales`)
       const listResult = await listAll(folderRef)
       for (const item of listResult.items) {
         if (item.name.toLowerCase().endsWith('.pdf')) {
           const url = await getDownloadURL(item)
-          // Avoid duplicates
           if (!options.some(o => o.url === url)) {
             const cleanName = item.name
               .replace(/_\d+\.pdf$/i, '.pdf')
@@ -175,9 +161,7 @@ export function ManualSearchModal({
           }
         }
       }
-    } catch {
-      // No folder — that's ok
-    }
+    } catch { /* sin carpeta */ }
 
     setManualOptions(options)
     setLoadingManuals(false)
@@ -187,39 +171,23 @@ export function ManualSearchModal({
       return
     }
 
-    // If we have an initialVinculo with a manualUrl, select that manual
+    // Si tenemos vínculo inicial, seleccionamos su manual
     if (initialVinculo?.manualUrl) {
       const idx = options.findIndex(o => o.url === initialVinculo.manualUrl)
-      if (idx >= 0) {
-        setSelectedManualIdx(idx)
-        return
-      }
+      if (idx >= 0) setSelectedManualIdx(idx)
     }
 
-    setSelectedManualIdx(0)
-  }, [machine, initialVinculo])
-
-  // ─── 2. When manual selection changes, set URL ───────────
-  useEffect(() => {
-    if (manualOptions.length > 0) {
-      const opt = manualOptions[selectedManualIdx]
+    // Si viene con initialVinculo, saltamos la selección
+    if (initialVinculo) {
+      const opt = options[initialVinculo.manualUrl ? options.findIndex(o => o.url === initialVinculo.manualUrl) : 0]
       if (opt) {
         setManualUrl(opt.url)
-        // Reset search state when changing manual
-        setResults([])
-        setMatchPages(new Set())
-        setCurrentPage(1)
-        setTotalPages(0)
-        setPdfDoc(null)
-        setHighlightMode('code')
-        setActivePosition(null)
-        setDrawingMode(false)
-        setDrawRect(null)
+        setStep('viewing')
       }
     }
-  }, [selectedManualIdx, manualOptions])
+  }, [machine, initialVinculo])
 
-  // ─── 3. Search text in PDF ─────────────────────────────────
+  // ─── 2. Search text in PDF ─────────────────────────────────
   const searchInPdf = useCallback(async (url: string) => {
     if (!searchCode) return
     setSearching(true)
@@ -257,19 +225,14 @@ export function ManualSearchModal({
         if (matchCount > 0) {
           pages.add(i)
           const matchIdx = lowerText.indexOf(searchLower)
-          const start = Math.max(0, matchIdx - 200)
-          const end = Math.min(pageText.length, matchIdx + searchCode.length + 40)
-          const snippet = pageText.substring(Math.max(0, matchIdx - 40), end)
-          const beforeText = pageText.substring(start, matchIdx)
-          const positionNum = extractPositionNumber(beforeText)
-          found.push({ page: i, textSnippet: snippet, matchCount, position: positionNum })
+          const snippet = pageText.substring(Math.max(0, matchIdx - 40), Math.min(pageText.length, matchIdx + searchCode.length + 40))
+          found.push({ page: i, textSnippet: snippet, matchCount })
         }
       }
 
       setResults(found)
       setMatchPages(pages)
 
-      // If we have an initialVinculo, go to that page; else go to first match
       if (initialVinculo?.pagina) {
         setCurrentPage(initialVinculo.pagina)
       } else if (found.length > 0 && found[0]) {
@@ -282,7 +245,7 @@ export function ManualSearchModal({
     }
   }, [searchCode, initialVinculo])
 
-  // ─── 4. Find highlight rectangles ──────────────────────────
+  // ─── 3. Highlight rect finder ────────────────────────────
   const findHighlightRects = useCallback(async (
     page: PDFPageProxy,
     viewport: { width: number; height: number; scale: number },
@@ -325,7 +288,7 @@ export function ManualSearchModal({
       if (!tx) continue
 
       const fontSize = Math.sqrt(tx[2] * tx[2] + tx[3] * tx[3])
-      const x = (tx[4] * viewport.scale)
+      const x = tx[4] * viewport.scale
       const y = viewport.height - (tx[5] * viewport.scale) - (fontSize * viewport.scale)
       const w = (item.width ?? code.length * fontSize * 0.6) * viewport.scale
       const h = fontSize * viewport.scale * 1.3
@@ -335,42 +298,7 @@ export function ManualSearchModal({
     return rects
   }, [])
 
-  const findPositionRects = useCallback(async (
-    page: PDFPageProxy,
-    viewport: { width: number; height: number; scale: number },
-    posNum: string
-  ): Promise<TextRect[]> => {
-    if (!posNum) return []
-    const content = await page.getTextContent()
-    const rects: TextRect[] = []
-    const posRegex = new RegExp(`(?:^|\\D)${escapeRegex(posNum)}(?:\\D|$)`)
-
-    for (let iIdx = 0; iIdx < content.items.length; iIdx++) {
-      const item = content.items[iIdx]
-      if (!item || !('str' in item) || !('transform' in item)) continue
-
-      const str = item.str.trim()
-      const isExactMatch = str === posNum
-      const hasWordMatch = posRegex.test(item.str)
-      if (!isExactMatch && !hasWordMatch) continue
-
-      const tx = item.transform
-      if (!tx) continue
-
-      const fontSize = Math.sqrt(tx[2] * tx[2] + tx[3] * tx[3])
-      const x = (tx[4] * viewport.scale)
-      const y = viewport.height - (tx[5] * viewport.scale) - (fontSize * viewport.scale)
-      const w = isExactMatch
-        ? (item.width ?? posNum.length * fontSize * 0.7) * viewport.scale
-        : posNum.length * fontSize * 0.7 * viewport.scale
-      const h = fontSize * viewport.scale * 1.4
-      rects.push({ x, y, width: w, height: h })
-    }
-
-    return rects
-  }, [])
-
-  // ─── 5. Render page + highlights + saved annotation ────────
+  // ─── 4. Render page ──────────────────────────────────────
   const renderPage = useCallback(async (pageNum: number) => {
     if (!pdfDoc || !canvasRef.current) return
     setRendering(true)
@@ -386,7 +314,7 @@ export function ManualSearchModal({
 
       await page.render({ canvasContext: ctx, viewport }).promise
 
-      // Highlight overlays
+      // Highlight layer
       if (highlightLayerRef.current) {
         const layer = highlightLayerRef.current
         layer.innerHTML = ''
@@ -397,20 +325,34 @@ export function ManualSearchModal({
         if (searchCode && matchPages.has(pageNum)) {
           const rects = await findHighlightRects(page, viewport, searchCode)
           for (const rect of rects) {
-            layer.appendChild(createHighlightDiv(rect, 'yellow'))
+            layer.appendChild(createHighlightDiv(rect))
           }
         }
 
-        // Cyan position highlights
-        if (highlightMode === 'position' && activePosition) {
-          const posRects = await findPositionRects(page, viewport, activePosition)
-          for (const rect of posRects) {
-            layer.appendChild(createHighlightDiv(rect, 'blue'))
-          }
+        // Saved polygon annotation (green)
+        if (existingVinculo && existingVinculo.pagina === pageNum && existingVinculo.puntos && existingVinculo.puntos.length >= 3) {
+          const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+          svg.setAttribute('width', String(viewport.width))
+          svg.setAttribute('height', String(viewport.height))
+          svg.style.position = 'absolute'
+          svg.style.top = '0'
+          svg.style.left = '0'
+          svg.style.pointerEvents = 'none'
+
+          const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon')
+          const pointsStr = existingVinculo.puntos
+            .map(p => `${p.x * viewport.width},${p.y * viewport.height}`)
+            .join(' ')
+          polygon.setAttribute('points', pointsStr)
+          polygon.setAttribute('fill', 'rgba(34, 197, 94, 0.18)')
+          polygon.setAttribute('stroke', 'rgba(34, 197, 94, 0.9)')
+          polygon.setAttribute('stroke-width', '3')
+          svg.appendChild(polygon)
+          layer.appendChild(svg)
         }
 
-        // Saved annotation overlay (green rectangle)
-        if (existingVinculo && existingVinculo.pagina === pageNum && existingVinculo.coordenadas) {
+        // Saved rect annotation (backwards compatibility)
+        if (existingVinculo && existingVinculo.pagina === pageNum && existingVinculo.coordenadas && !existingVinculo.puntos) {
           const c = existingVinculo.coordenadas
           const div = document.createElement('div')
           div.style.position = 'absolute'
@@ -422,34 +364,35 @@ export function ManualSearchModal({
           div.style.backgroundColor = 'rgba(34, 197, 94, 0.15)'
           div.style.borderRadius = '4px'
           div.style.pointerEvents = 'none'
-          div.style.boxShadow = '0 0 12px rgba(34, 197, 94, 0.4)'
           layer.appendChild(div)
         }
       }
 
-      // Update drawing layer size
+      // Update draw layer size
       if (drawLayerRef.current) {
         drawLayerRef.current.style.width = `${viewport.width}px`
         drawLayerRef.current.style.height = `${viewport.height}px`
+      }
+      if (svgRef.current) {
+        svgRef.current.setAttribute('width', String(viewport.width))
+        svgRef.current.setAttribute('height', String(viewport.height))
       }
     } catch (err) {
       console.error('Error rendering page:', err)
     } finally {
       setRendering(false)
     }
-  }, [pdfDoc, scale, searchCode, matchPages, findHighlightRects, findPositionRects, highlightMode, activePosition, existingVinculo])
+  }, [pdfDoc, scale, searchCode, matchPages, findHighlightRects, existingVinculo])
 
   // ─── Lifecycle ─────────────────────────────────────────────
   useEffect(() => {
     if (open) {
       setNoManual(false)
       setScaleIdx(DEFAULT_SCALE_IDX)
-      setHighlightMode('code')
-      setActivePosition(null)
-      setSearchingDiagram(false)
       setDrawingMode(false)
-      setDrawRect(null)
-      setSavedPosition(repuesto.posicionManual)
+      setPolyPoints([])
+      setPolyClosed(false)
+      setStep(initialVinculo ? 'viewing' : 'select-manual')
       loadManualOptions()
     }
     return () => {
@@ -458,19 +401,27 @@ export function ManualSearchModal({
       setManualUrl(null)
       setMatchPages(new Set())
     }
-  }, [open, loadManualOptions, repuesto.posicionManual])
+  }, [open, loadManualOptions, initialVinculo])
 
   useEffect(() => {
-    if (manualUrl && !loadingManuals) {
+    if (manualUrl && step === 'viewing') {
       searchInPdf(manualUrl)
     }
-  }, [manualUrl, loadingManuals, searchInPdf])
+  }, [manualUrl, step, searchInPdf])
 
   useEffect(() => {
     if (pdfDoc && currentPage >= 1 && currentPage <= totalPages) {
       renderPage(currentPage)
     }
   }, [pdfDoc, currentPage, renderPage, totalPages])
+
+  // ─── Accept manual selection → start search ───────────────
+  const acceptManualSelection = () => {
+    const opt = manualOptions[selectedManualIdx]
+    if (!opt) return
+    setManualUrl(opt.url)
+    setStep('viewing')
+  }
 
   // ─── Page navigation ───────────────────────────────────────
   const goToPage = (p: number) => {
@@ -500,124 +451,103 @@ export function ManualSearchModal({
     setPageInput('')
   }
 
-  // ─── Position / diagram mode ───────────────────────────────
-  const goToDiagram = useCallback(async (posNum: string) => {
-    if (!pdfDoc) return
-    setSearchingDiagram(true)
-    setActivePosition(posNum)
-    setHighlightMode('position')
-
-    const firstMatch = results[0]
-    if (!firstMatch) { setSearchingDiagram(false); return }
-
-    const posRegex = new RegExp(`(?:^|\\D)${escapeRegex(posNum)}(?:\\D|$)`)
-    let bestPage: number | null = null
-    const startPage = Math.max(1, firstMatch.page - 1)
-    const endPage = Math.max(1, firstMatch.page - DIAGRAM_SEARCH_RANGE)
-
-    for (let p = startPage; p >= endPage; p--) {
-      try {
-        const page = await pdfDoc.getPage(p)
-        const content = await page.getTextContent()
-        const hasPos = content.items.some((item) => {
-          if (!('str' in item)) return false
-          const str = item.str.trim()
-          return str === posNum || posRegex.test(item.str)
-        })
-        if (hasPos) { bestPage = p; break }
-      } catch { /* skip */ }
-    }
-
-    setSearchingDiagram(false)
-    goToPage(bestPage ?? Math.max(1, firstMatch.page - 2))
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pdfDoc, results])
-
-  const exitPositionMode = () => {
-    setHighlightMode('code')
-    setActivePosition(null)
-    const firstMatch = results[0]
-    if (firstMatch) goToPage(firstMatch.page)
-  }
-
-  // ─── Save position to Firestore ────────────────────────────
-  const savePosition = useCallback(async (pos: string) => {
-    const trimmed = pos.trim()
-    if (!trimmed) return
-    setSavingPosition(true)
-    try {
-      const repuestoRef = doc(db, `machines/${machine.id}/repuestos`, repuesto.id)
-      await updateDoc(repuestoRef, { posicionManual: trimmed, updatedAt: Timestamp.now() })
-      setSavedPosition(trimmed)
-      setEditingPosition(false)
-    } catch (err) { console.error('Error saving position:', err) }
-    finally { setSavingPosition(false) }
-  }, [machine.id, repuesto.id])
-
-  const clearSavedPosition = useCallback(async () => {
-    setSavingPosition(true)
-    try {
-      const repuestoRef = doc(db, `machines/${machine.id}/repuestos`, repuesto.id)
-      await updateDoc(repuestoRef, { posicionManual: '', updatedAt: Timestamp.now() })
-      setSavedPosition(undefined)
-    } catch (err) { console.error('Error clearing position:', err) }
-    finally { setSavingPosition(false) }
-  }, [machine.id, repuesto.id])
-
-  const startEditingPosition = () => {
-    setPositionInput(effectivePosition || '')
-    setEditingPosition(true)
-  }
-
-  // ─── Drawing mode handlers ─────────────────────────────────
+  // ─── Polygon drawing handlers ─────────────────────────────
   const toggleDrawingMode = () => {
-    setDrawingMode(prev => !prev)
-    setDrawRect(null)
-    setIsDrawing(false)
+    if (drawingMode) {
+      // Cancel
+      setDrawingMode(false)
+      setPolyPoints([])
+      setPolyClosed(false)
+      setHoverPoint(null)
+      setNearFirstPoint(false)
+    } else {
+      setDrawingMode(true)
+      setPolyPoints([])
+      setPolyClosed(false)
+      setHoverPoint(null)
+      setNearFirstPoint(false)
+    }
   }
 
-  const handleDrawStart = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!drawingMode || !drawLayerRef.current) return
+  const undoLastPoint = () => {
+    if (polyClosed) {
+      setPolyClosed(false)
+    } else {
+      setPolyPoints(prev => prev.slice(0, -1))
+    }
+  }
+
+  const handleDrawClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!drawingMode || polyClosed || !drawLayerRef.current) return
     const layerRect = drawLayerRef.current.getBoundingClientRect()
     const x = e.clientX - layerRect.left
     const y = e.clientY - layerRect.top
-    setIsDrawing(true)
-    setDrawRect({ startX: x, startY: y, endX: x, endY: y })
+
+    // Check if clicking near first point to close polygon
+    if (polyPoints.length >= 3) {
+      const first = polyPoints[0]
+      if (first) {
+        const dist = Math.sqrt((x - first.x) ** 2 + (y - first.y) ** 2)
+        if (dist < CLOSE_THRESHOLD_PX) {
+          setPolyClosed(true)
+          setHoverPoint(null)
+          setNearFirstPoint(false)
+          return
+        }
+      }
+    }
+
+    setPolyPoints(prev => [...prev, { x, y }])
   }
 
   const handleDrawMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isDrawing || !drawRect || !drawLayerRef.current) return
+    if (!drawingMode || polyClosed || !drawLayerRef.current) return
     const layerRect = drawLayerRef.current.getBoundingClientRect()
-    setDrawRect(prev => prev ? { ...prev, endX: e.clientX - layerRect.left, endY: e.clientY - layerRect.top } : null)
+    const x = e.clientX - layerRect.left
+    const y = e.clientY - layerRect.top
+    setHoverPoint({ x, y })
+
+    // Check proximity to first point
+    if (polyPoints.length >= 3) {
+      const first = polyPoints[0]
+      if (first) {
+        const dist = Math.sqrt((x - first.x) ** 2 + (y - first.y) ** 2)
+        setNearFirstPoint(dist < CLOSE_THRESHOLD_PX)
+      }
+    } else {
+      setNearFirstPoint(false)
+    }
   }
 
-  const handleDrawEnd = () => {
-    setIsDrawing(false)
+  const handleDrawLeave = () => {
+    setHoverPoint(null)
+    setNearFirstPoint(false)
   }
 
+  // ─── Save polygon annotation ──────────────────────────────
   const saveAnnotation = useCallback(async () => {
-    if (!drawRect || !canvasRef.current || !manualUrl) return
+    if (polyPoints.length < 3 || !polyClosed || !canvasRef.current || !manualUrl) return
     setSavingAnnotation(true)
 
     const canvas = canvasRef.current
     const cw = canvas.width
     const ch = canvas.height
 
-    // Normalize to 0-1
-    const x = Math.min(drawRect.startX, drawRect.endX) / cw
-    const y = Math.min(drawRect.startY, drawRect.endY) / ch
-    const w = Math.abs(drawRect.endX - drawRect.startX) / cw
-    const h = Math.abs(drawRect.endY - drawRect.startY) / ch
+    // Normalizar puntos a 0-1
+    const normalizedPoints = polyPoints.map(p => ({
+      x: p.x / cw,
+      y: p.y / ch,
+    }))
 
     const vinculo: VinculoManual = {
       id: `vinc_${Date.now()}`,
       pagina: currentPage,
       machineId: machine.id,
       manualUrl,
-      coordenadas: { x, y, width: w, height: h },
-      forma: 'rectangulo',
+      puntos: normalizedPoints,
+      forma: 'poligono',
       color: 'rgba(34, 197, 94, 0.4)',
-      descripcion: `Pos. ${effectivePosition || '?'} — ${repuesto.codigoBaader || repuesto.codigoSAP}`,
+      descripcion: `${repuesto.codigoBaader || repuesto.codigoSAP} — ${repuesto.textoBreve || 'Repuesto'}`,
     }
 
     try {
@@ -626,30 +556,103 @@ export function ManualSearchModal({
         vinculosManual: arrayUnion(vinculo),
         updatedAt: Timestamp.now(),
       })
+      // Limpiar dibujo y re-render
       setDrawingMode(false)
-      setDrawRect(null)
-      // Re-render to show the saved annotation
+      setPolyPoints([])
+      setPolyClosed(false)
       renderPage(currentPage)
     } catch (err) {
       console.error('Error saving annotation:', err)
     } finally {
       setSavingAnnotation(false)
     }
-  }, [drawRect, manualUrl, currentPage, machine.id, repuesto.id, repuesto.codigoBaader, repuesto.codigoSAP, effectivePosition, renderPage])
+  }, [polyPoints, polyClosed, manualUrl, currentPage, machine.id, repuesto.id, repuesto.codigoBaader, repuesto.codigoSAP, repuesto.textoBreve, renderPage])
 
   // ─── Derived state ─────────────────────────────────────────
   const currentMatchInfo = results.find(r => r.page === currentPage) ?? null
   const isMatchPage = matchPages.has(currentPage)
 
-  // Compute draw rect in CSS pixels for the overlay
-  const drawRectNorm = drawRect ? {
-    left: Math.min(drawRect.startX, drawRect.endX),
-    top: Math.min(drawRect.startY, drawRect.endY),
-    width: Math.abs(drawRect.endX - drawRect.startX),
-    height: Math.abs(drawRect.endY - drawRect.startY),
-  } : null
+  // Build SVG polygon points string for the drawing
+  const buildPolyStr = () => {
+    const pts = [...polyPoints]
+    if (!polyClosed && hoverPoint) pts.push(hoverPoint)
+    return pts.map(p => `${p.x},${p.y}`).join(' ')
+  }
 
-  // ─── JSX ───────────────────────────────────────────────────
+  // ─── JSX: Step 1 — Select manual ──────────────────────────
+  if (step === 'select-manual') {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <BookOpen className="h-5 w-5 text-purple-500" />
+              Buscar en Manual
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="text-sm text-muted-foreground">
+              Buscando <span className="font-mono font-bold text-purple-400">{searchCode || repuesto.codigoSAP}</span> en manual de{' '}
+              <span className="font-semibold text-foreground">{machine.nombre}</span>
+            </div>
+
+            {loadingManuals ? (
+              <div className="flex items-center justify-center py-8 gap-3">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                <span className="text-sm text-muted-foreground">Cargando manuales...</span>
+              </div>
+            ) : noManual ? (
+              <div className="flex flex-col items-center py-6 gap-3 text-center">
+                <AlertTriangle className="h-8 w-8 text-amber-500/60" />
+                <p className="text-sm font-medium">No hay manual cargado</p>
+                <p className="text-xs text-muted-foreground">
+                  Sube un PDF del manual de <span className="font-semibold">{machine.nombre}</span> primero.
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">Selecciona el manual:</label>
+                  <div className="space-y-1.5">
+                    {manualOptions.map((opt, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setSelectedManualIdx(i)}
+                        className={`w-full text-left px-3 py-2.5 rounded-lg border text-sm transition-all ${
+                          selectedManualIdx === i
+                            ? 'bg-purple-500/15 border-purple-500/50 text-foreground ring-1 ring-purple-500/30'
+                            : 'bg-muted/30 border-border text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <FileText className={`h-4 w-4 shrink-0 ${selectedManualIdx === i ? 'text-purple-400' : 'text-muted-foreground'}`} />
+                          <span className="truncate">{opt.label}</span>
+                          {selectedManualIdx === i && (
+                            <span className="ml-auto text-[10px] text-purple-400 font-medium shrink-0">Seleccionado</span>
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancelar</Button>
+                  <Button onClick={acceptManualSelection} className="gap-2">
+                    <Search className="h-4 w-4" />
+                    Buscar
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    )
+  }
+
+  // ─── JSX: Step 2 — Viewing PDF ─────────────────────────────
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl max-h-[95vh] flex flex-col overflow-hidden p-0">
@@ -663,114 +666,25 @@ export function ManualSearchModal({
           </DialogTitle>
         </DialogHeader>
 
-        {/* Search info bar + manual selector */}
+        {/* Info bar */}
         <div className="flex items-center gap-3 px-4 py-2 bg-muted/30 border-y border-border shrink-0">
           <Search className="h-4 w-4 text-muted-foreground shrink-0" />
           <div className="flex-1 min-w-0">
             <div className="text-sm text-foreground">
               {initialVinculo ? 'Ubicación de' : 'Buscando'}{' '}
               <span className="font-mono font-bold text-purple-400">{searchCode || repuesto.codigoSAP}</span>{' '}
-              en manual de <span className="font-semibold">{machine.nombre}</span>
+              en <span className="font-semibold">{manualOptions[selectedManualIdx]?.label || 'manual'}</span>
             </div>
             <div className="text-[11px] text-muted-foreground truncate">
               {repuesto.textoBreve || 'Repuesto'}
               {repuesto.codigoSAP && <span className="ml-2 opacity-50">(SAP: {repuesto.codigoSAP})</span>}
             </div>
           </div>
-
-          {/* Manual selector */}
-          {manualOptions.length > 1 && (
-            <div className="shrink-0">
-              <select
-                value={selectedManualIdx}
-                onChange={(e) => setSelectedManualIdx(Number(e.target.value))}
-                className="h-7 text-xs bg-muted border border-border rounded px-2 py-0.5 text-foreground max-w-[200px] truncate"
-                title="Seleccionar manual"
-              >
-                {manualOptions.map((opt, i) => (
-                  <option key={i} value={i}>{opt.label}</option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {/* Position badge — editable */}
-          <div className="shrink-0 flex items-center gap-1.5">
-            {editingPosition ? (
-              <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-cyan-500/15 border border-cyan-500/40">
-                <Crosshair className="h-3.5 w-3.5 text-cyan-400" />
-                <span className="text-[10px] text-cyan-300">Pos.</span>
-                <Input
-                  className="h-5 w-12 text-center text-xs font-mono px-1 bg-transparent border-cyan-500/30"
-                  value={positionInput}
-                  onChange={(e) => setPositionInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') savePosition(positionInput)
-                    if (e.key === 'Escape') setEditingPosition(false)
-                  }}
-                  autoFocus
-                  placeholder="#"
-                />
-                <Button variant="ghost" size="sm" className="h-5 w-5 p-0 text-green-400 hover:text-green-300"
-                  onClick={() => savePosition(positionInput)}
-                  disabled={savingPosition || !positionInput.trim()}
-                  title="Guardar posición"
-                >
-                  {savingPosition ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
-                </Button>
-                <Button variant="ghost" size="sm" className="h-5 w-5 p-0 text-muted-foreground hover:text-foreground"
-                  onClick={() => setEditingPosition(false)} title="Cancelar"
-                >
-                  <X className="h-3 w-3" />
-                </Button>
-              </div>
-            ) : effectivePosition ? (
-              <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-cyan-500/15 border border-cyan-500/30">
-                <Crosshair className="h-3.5 w-3.5 text-cyan-400" />
-                <span className="text-xs font-bold text-cyan-400">Pos. {effectivePosition}</span>
-                {savedPosition && <span className="text-[9px] text-green-400/70 ml-0.5" title="Guardada">✓</span>}
-                <Button variant="ghost" size="sm" className="h-5 w-5 p-0 ml-0.5 text-cyan-400/50 hover:text-cyan-300"
-                  onClick={startEditingPosition} title="Editar posición"
-                >
-                  <Pencil className="h-2.5 w-2.5" />
-                </Button>
-                {savedPosition && (
-                  <Button variant="ghost" size="sm" className="h-5 w-5 p-0 text-red-400/40 hover:text-red-400"
-                    onClick={clearSavedPosition} disabled={savingPosition} title="Borrar posición"
-                  >
-                    <X className="h-2.5 w-2.5" />
-                  </Button>
-                )}
-              </div>
-            ) : (
-              <Button variant="ghost" size="sm"
-                className="h-7 px-2 text-[11px] gap-1 text-cyan-400/60 hover:text-cyan-400 border border-dashed border-cyan-500/20 hover:border-cyan-500/40 rounded-full"
-                onClick={startEditingPosition} title="Asignar posición manualmente"
-              >
-                <Pencil className="h-3 w-3" /> Asignar pos.
-              </Button>
-            )}
-          </div>
         </div>
 
         {/* Content */}
         <div className="flex-1 overflow-hidden min-h-0 flex flex-col">
-          {loadingManuals ? (
-            <div className="flex flex-col items-center justify-center py-16 gap-3">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <span className="text-sm text-muted-foreground">Cargando manuales...</span>
-            </div>
-          ) : noManual ? (
-            <div className="flex flex-col items-center justify-center py-16 gap-3 text-center px-4">
-              <AlertTriangle className="h-10 w-10 text-amber-500/60" />
-              <div>
-                <p className="text-sm font-medium text-foreground">No hay manual cargado</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Sube un PDF del manual de <span className="font-semibold">{machine.nombre}</span> para habilitar la búsqueda.
-                </p>
-              </div>
-            </div>
-          ) : searching ? (
+          {searching ? (
             <div className="flex flex-col items-center justify-center py-16 gap-3">
               <Loader2 className="h-8 w-8 animate-spin text-purple-500" />
               <span className="text-sm text-muted-foreground">Buscando &quot;{searchCode}&quot; en el PDF...</span>
@@ -827,55 +741,22 @@ export function ManualSearchModal({
 
                 <div className="h-5 w-px bg-border mx-1" />
 
-                {/* Match / position navigation */}
-                {highlightMode === 'code' ? (
-                  <>
-                    {results.length > 0 ? (
-                      <div className="flex items-center gap-1.5">
-                        <FileText className="h-3.5 w-3.5 text-green-500" />
-                        <span className="text-[11px] text-foreground">
-                          <span className="font-bold text-green-400">{results.length}</span> pág.
-                        </span>
-                        <Button variant="ghost" size="sm" className="h-7 px-2 text-[11px] gap-1"
-                          onClick={goPrevMatch} title="Anterior"
-                        ><ChevronLeft className="h-3 w-3" /> Ant.</Button>
-                        <Button variant="ghost" size="sm" className="h-7 px-2 text-[11px] gap-1"
-                          onClick={goNextMatch} title="Siguiente"
-                        >Sig. <ChevronRight className="h-3 w-3" /></Button>
-
-                        <div className="h-5 w-px bg-border mx-1" />
-                        {effectivePosition ? (
-                          <Button variant="outline" size="sm"
-                            className="h-7 px-2.5 text-[11px] gap-1.5 border-cyan-500/40 text-cyan-400 hover:bg-cyan-500/10"
-                            onClick={() => goToDiagram(effectivePosition)} disabled={searchingDiagram}
-                            title={`Buscar posición ${effectivePosition} en el diagrama`}
-                          >
-                            {searchingDiagram
-                              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                              : <Crosshair className="h-3.5 w-3.5" />}
-                            {searchingDiagram ? 'Buscando...' : `Ver pos. ${effectivePosition} en diagrama`}
-                          </Button>
-                        ) : (
-                          <Button variant="ghost" size="sm"
-                            className="h-7 px-2 text-[11px] gap-1 text-cyan-400/60 hover:text-cyan-400 border border-dashed border-cyan-500/20 hover:border-cyan-500/40 rounded-full"
-                            onClick={startEditingPosition} title="Asignar posición"
-                          ><Pencil className="h-3 w-3" /> Asignar pos.</Button>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="text-[11px] text-muted-foreground">Sin coincidencias para &quot;{searchCode}&quot;</span>
-                    )}
-                  </>
-                ) : (
+                {/* Match navigation */}
+                {results.length > 0 ? (
                   <div className="flex items-center gap-1.5">
-                    <Crosshair className="h-3.5 w-3.5 text-cyan-400" />
-                    <span className="text-[11px] text-cyan-300 font-medium">
-                      Modo diagrama — posición <span className="font-bold">{activePosition}</span>
+                    <FileText className="h-3.5 w-3.5 text-green-500" />
+                    <span className="text-[11px] text-foreground">
+                      <span className="font-bold text-green-400">{results.length}</span> pág.
                     </span>
-                    <Button variant="ghost" size="sm" className="h-7 px-2 text-[11px] gap-1 text-yellow-400 hover:text-yellow-300"
-                      onClick={exitPositionMode}
-                    >← Volver a código</Button>
+                    <Button variant="ghost" size="sm" className="h-7 px-2 text-[11px] gap-1"
+                      onClick={goPrevMatch} title="Coincidencia anterior"
+                    ><ChevronLeft className="h-3 w-3" /> Ant.</Button>
+                    <Button variant="ghost" size="sm" className="h-7 px-2 text-[11px] gap-1"
+                      onClick={goNextMatch} title="Coincidencia siguiente"
+                    >Sig. <ChevronRight className="h-3 w-3" /></Button>
                   </div>
+                ) : (
+                  <span className="text-[11px] text-muted-foreground">Sin coincidencias para &quot;{searchCode}&quot;</span>
                 )}
 
                 <div className="flex-1" />
@@ -891,7 +772,7 @@ export function ManualSearchModal({
                   onClick={toggleDrawingMode}
                   title={drawingMode ? 'Cancelar marcado' : 'Marcar repuesto en el diagrama'}
                 >
-                  <Square className="h-3.5 w-3.5" />
+                  <MousePointerClick className="h-3.5 w-3.5" />
                   {drawingMode ? 'Cancelar marcado' : 'Marcar en diagrama'}
                 </Button>
 
@@ -908,21 +789,44 @@ export function ManualSearchModal({
                 <div className="shrink-0 px-4 py-1.5 bg-green-500/10 border-b border-green-500/20 text-xs flex items-center gap-2">
                   <span className="inline-block w-2 h-2 rounded-full bg-green-400 animate-pulse" />
                   <span className="text-foreground">
-                    <span className="font-semibold text-green-400">Modo marcado</span> — dibuja un rectángulo sobre el repuesto en el diagrama
+                    <span className="font-semibold text-green-400">Modo marcado</span> — haz click para colocar puntos.
+                    {polyPoints.length === 0 && ' Coloca el primer punto.'}
+                    {polyPoints.length > 0 && polyPoints.length < 3 && ` Punto ${polyPoints.length}/${polyPoints.length} — necesitas al menos 3 puntos.`}
+                    {polyPoints.length >= 3 && !polyClosed && ' Haz click en el primer punto (verde) para cerrar la figura.'}
+                    {polyClosed && ' ¡Figura cerrada! Puedes guardar.'}
                   </span>
-                  {drawRect && !isDrawing && (
-                    <Button variant="outline" size="sm"
-                      className="h-6 px-2 text-[11px] gap-1 border-green-500/40 text-green-400 hover:bg-green-500/10 ml-auto"
-                      onClick={saveAnnotation} disabled={savingAnnotation}
-                    >
-                      {savingAnnotation ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
-                      Guardar marcado
-                    </Button>
-                  )}
+
+                  <div className="ml-auto flex items-center gap-1.5">
+                    {polyPoints.length > 0 && !polyClosed && (
+                      <Button variant="ghost" size="sm"
+                        className="h-6 px-2 text-[11px] gap-1 text-yellow-400 hover:text-yellow-300"
+                        onClick={undoLastPoint}
+                      >
+                        <Undo2 className="h-3 w-3" /> Deshacer punto
+                      </Button>
+                    )}
+                    {polyClosed && (
+                      <>
+                        <Button variant="ghost" size="sm"
+                          className="h-6 px-2 text-[11px] gap-1 text-yellow-400 hover:text-yellow-300"
+                          onClick={undoLastPoint}
+                        >
+                          <Undo2 className="h-3 w-3" /> Reabrir
+                        </Button>
+                        <Button variant="outline" size="sm"
+                          className="h-6 px-2 text-[11px] gap-1 border-green-500/40 text-green-400 hover:bg-green-500/10"
+                          onClick={saveAnnotation} disabled={savingAnnotation}
+                        >
+                          {savingAnnotation ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+                          Guardar marcado
+                        </Button>
+                      </>
+                    )}
+                  </div>
                 </div>
               )}
 
-              {/* Existing annotation info bar */}
+              {/* Existing annotation info */}
               {existingVinculo && !drawingMode && (
                 <div className="shrink-0 px-4 py-1.5 bg-green-500/10 border-b border-green-500/20 text-xs flex items-center gap-2">
                   <Eye className="h-3.5 w-3.5 text-green-400" />
@@ -938,27 +842,13 @@ export function ManualSearchModal({
                 </div>
               )}
 
-              {/* Position mode info bar */}
-              {highlightMode === 'position' && activePosition && !drawingMode && (
-                <div className="shrink-0 px-4 py-1.5 bg-cyan-500/10 border-b border-cyan-500/20 text-xs flex items-center gap-2">
-                  <span className="inline-block w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-                  <span className="text-foreground">
-                    Buscando <span className="font-bold text-cyan-400">posición {activePosition}</span> en el diagrama
-                  </span>
-                  <span className="text-muted-foreground ml-1">— navega por las páginas cercanas</span>
-                </div>
-              )}
-
               {/* Code match info bar */}
-              {highlightMode === 'code' && isMatchPage && currentMatchInfo && !drawingMode && !existingVinculo && (
+              {isMatchPage && currentMatchInfo && !drawingMode && (
                 <div className="shrink-0 px-4 py-1.5 bg-yellow-500/10 border-b border-yellow-500/20 text-xs flex items-center gap-2">
                   <span className="inline-block w-2 h-2 rounded-full bg-yellow-400 animate-pulse" />
                   <span className="text-foreground">
                     Pág. <span className="font-bold">{currentPage}</span>
                     {' — '}{currentMatchInfo.matchCount} coincidencia{currentMatchInfo.matchCount > 1 ? 's' : ''}
-                    {currentMatchInfo.position && (
-                      <span className="ml-2 text-cyan-400 font-medium">(Posición {currentMatchInfo.position})</span>
-                    )}
                   </span>
                   <span className="text-muted-foreground italic ml-2 truncate hidden sm:inline">
                     &quot;...{highlightCode(currentMatchInfo.textSnippet, searchCode)}...&quot;
@@ -967,7 +857,7 @@ export function ManualSearchModal({
               )}
 
               {/* Quick match page pills */}
-              {results.length > 0 && highlightMode === 'code' && !drawingMode && (
+              {results.length > 0 && !drawingMode && (
                 <div className="shrink-0 px-3 py-1.5 border-b border-border flex flex-wrap items-center gap-1 bg-muted/10">
                   <span className="text-[10px] text-muted-foreground mr-1">Coincidencias en:</span>
                   {results.map((r) => (
@@ -985,7 +875,7 @@ export function ManualSearchModal({
                 </div>
               )}
 
-              {/* PDF Canvas + drawing layer */}
+              {/* PDF Canvas + polygon drawing layer */}
               <div ref={scrollContainerRef} className="flex-1 overflow-auto min-h-0 bg-neutral-800/50">
                 <div className="flex justify-center p-4">
                   <div className="relative inline-block shadow-xl">
@@ -995,7 +885,7 @@ export function ManualSearchModal({
                       </div>
                     )}
                     <canvas ref={canvasRef} className="block max-w-none" />
-                    {/* Highlight overlay (code/position) */}
+                    {/* Highlight overlay */}
                     <div ref={highlightLayerRef}
                       className="absolute top-0 left-0 pointer-events-none"
                       style={{ zIndex: 10 }}
@@ -1006,25 +896,75 @@ export function ManualSearchModal({
                       className="absolute top-0 left-0"
                       style={{
                         zIndex: drawingMode ? 15 : -1,
-                        cursor: drawingMode ? 'crosshair' : 'default',
+                        cursor: drawingMode
+                          ? (nearFirstPoint ? 'pointer' : 'crosshair')
+                          : 'default',
                         pointerEvents: drawingMode ? 'auto' : 'none',
                       }}
-                      onMouseDown={handleDrawStart}
+                      onClick={handleDrawClick}
                       onMouseMove={handleDrawMove}
-                      onMouseUp={handleDrawEnd}
+                      onMouseLeave={handleDrawLeave}
                     >
-                      {/* Rectangle being drawn */}
-                      {drawRectNorm && (
-                        <div
-                          className="absolute border-2 border-green-400 bg-green-400/20 rounded"
-                          style={{
-                            left: drawRectNorm.left,
-                            top: drawRectNorm.top,
-                            width: drawRectNorm.width,
-                            height: drawRectNorm.height,
-                          }}
-                        />
-                      )}
+                      {/* SVG for polygon drawing */}
+                      <svg
+                        ref={svgRef}
+                        className="absolute top-0 left-0"
+                        style={{ width: '100%', height: '100%', pointerEvents: 'none' }}
+                      >
+                        {/* Polygon shape (dashed when open, solid when closed) */}
+                        {polyPoints.length >= 2 && (
+                          <polygon
+                            points={polyClosed ? polyPoints.map(p => `${p.x},${p.y}`).join(' ') : buildPolyStr()}
+                            fill={polyClosed ? 'rgba(34, 197, 94, 0.18)' : 'rgba(34, 197, 94, 0.08)'}
+                            stroke={polyClosed ? 'rgba(34, 197, 94, 0.9)' : 'rgba(34, 197, 94, 0.6)'}
+                            strokeWidth={polyClosed ? 3 : 2}
+                            strokeDasharray={polyClosed ? 'none' : '6 3'}
+                          />
+                        )}
+                        {/* Line from last point to hover (when open) */}
+                        {polyPoints.length >= 1 && !polyClosed && hoverPoint && (
+                          <line
+                            x1={polyPoints[polyPoints.length - 1]?.x ?? 0}
+                            y1={polyPoints[polyPoints.length - 1]?.y ?? 0}
+                            x2={hoverPoint.x}
+                            y2={hoverPoint.y}
+                            stroke="rgba(34, 197, 94, 0.5)"
+                            strokeWidth="1.5"
+                            strokeDasharray="4 3"
+                          />
+                        )}
+                        {/* Point dots */}
+                        {polyPoints.map((p, i) => (
+                          <circle
+                            key={i}
+                            cx={p.x}
+                            cy={p.y}
+                            r={i === 0 && nearFirstPoint ? 8 : 5}
+                            fill={i === 0
+                              ? (nearFirstPoint ? 'rgba(34, 197, 94, 1)' : 'rgba(34, 197, 94, 0.8)')
+                              : 'rgba(255, 255, 255, 0.9)'
+                            }
+                            stroke={i === 0 ? '#fff' : 'rgba(34, 197, 94, 0.9)'}
+                            strokeWidth={i === 0 ? 2.5 : 2}
+                            style={{ transition: 'r 0.15s ease' }}
+                          />
+                        ))}
+                        {/* Point labels */}
+                        {polyPoints.map((p, i) => (
+                          <text
+                            key={`label-${i}`}
+                            x={p.x}
+                            y={p.y - 10}
+                            textAnchor="middle"
+                            fill="white"
+                            fontSize="10"
+                            fontWeight="bold"
+                            style={{ textShadow: '0 1px 3px rgba(0,0,0,0.8)' }}
+                          >
+                            {i + 1}
+                          </text>
+                        ))}
+                      </svg>
                     </div>
                   </div>
                 </div>
@@ -1037,9 +977,9 @@ export function ManualSearchModal({
   )
 }
 
-// ─── Helper functions ───────────────────────────────────────
+// ─── Helpers ────────────────────────────────────────────────
 
-function createHighlightDiv(rect: TextRect, color: 'yellow' | 'blue'): HTMLDivElement {
+function createHighlightDiv(rect: TextRect): HTMLDivElement {
   const div = document.createElement('div')
   div.style.position = 'absolute'
   div.style.left = `${rect.x - 2}px`
@@ -1049,24 +989,9 @@ function createHighlightDiv(rect: TextRect, color: 'yellow' | 'blue'): HTMLDivEl
   div.style.borderRadius = '3px'
   div.style.pointerEvents = 'none'
   div.style.mixBlendMode = 'multiply'
-  if (color === 'yellow') {
-    div.style.backgroundColor = 'rgba(250, 204, 21, 0.4)'
-    div.style.border = '2px solid rgba(250, 204, 21, 0.9)'
-  } else {
-    div.style.backgroundColor = 'rgba(34, 211, 238, 0.35)'
-    div.style.border = '2.5px solid rgba(34, 211, 238, 0.95)'
-    div.style.boxShadow = '0 0 8px rgba(34, 211, 238, 0.5)'
-  }
+  div.style.backgroundColor = 'rgba(250, 204, 21, 0.4)'
+  div.style.border = '2px solid rgba(250, 204, 21, 0.9)'
   return div
-}
-
-function extractPositionNumber(beforeText: string): string | null {
-  const matches = [...beforeText.matchAll(/(?:^|\s)(\d{1,3})\s+[A-Za-zÀ-ÿ]/g)]
-  if (matches.length > 0) {
-    const lastMatch = matches[matches.length - 1]
-    if (lastMatch?.[1]) return lastMatch[1]
-  }
-  return null
 }
 
 function highlightCode(text: string, code: string): React.ReactNode {

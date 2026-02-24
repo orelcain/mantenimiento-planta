@@ -7,6 +7,14 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.81] - 2026-02-23
+### Mejora de flujo
+- **Buscar en Manual — Selección de manual primero**: Al presionar "Buscar en manual", ahora se pide elegir el manual donde buscar antes de iniciar la búsqueda
+- **Eliminado "Asignar posición"**: Se eliminó la funcionalidad de asignar posición numérica, simplificando el flujo
+- **Marcar en diagrama — Dibujo de polígono con puntos**: Se reemplazó el rectángulo por un sistema de puntos click-a-click (punto 1, punto 2… cerrar en punto 1) para dibujar polígonos precisos alrededor del repuesto
+- **Botón "Ver en manual" inline**: El botón "Ver en manual" ahora aparece al lado de "Buscar en manual" (no solo en dropdown) y solo se muestra cuando ya existe una anotación guardada
+- **Compatibilidad hacia atrás**: Los rectángulos guardados anteriormente siguen mostrándose correctamente
+
 ## [2.48.80] - 2026-02-23
 ### Funcionalidad
 - **Buscar en Manual — Selector de manual**: Cuando una máquina tiene múltiples manuales PDF, aparece un selector para elegir en cuál buscar

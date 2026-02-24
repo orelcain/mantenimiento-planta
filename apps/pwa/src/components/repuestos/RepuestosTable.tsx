@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Package, ImageIcon, X, BookOpen } from 'lucide-react'
+import { Package, ImageIcon, X, BookOpen, Eye } from 'lucide-react'
 import type { Repuesto } from '@/types/repuestos'
 import { RepuestoActionsMenu } from './RepuestoActionsMenu'
 import { InlineEditName } from './InlineEditName'
@@ -167,6 +167,15 @@ export function RepuestosTable({
                     >
                       <BookOpen className="h-3 w-3" />
                       <span>Buscar en manual</span>
+                    </button>
+                  )}
+                  {onViewInManual && (rep.vinculosManual?.length ?? 0) > 0 && (
+                    <button
+                      onClick={() => onViewInManual(rep)}
+                      className="inline-flex items-center gap-1 text-[10px] text-green-400 hover:text-green-300 transition-colors"
+                    >
+                      <Eye className="h-3 w-3" />
+                      <span>Ver en manual</span>
                     </button>
                   )}
                 </div>
