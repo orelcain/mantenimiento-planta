@@ -1,10 +1,13 @@
 /**
- * ManualSearchModal v2.48.85
+ * ManualSearchModal v2.48.86
  *
  * Características:
  *  - "Ver en manual" instantáneo (solo carga PDF, búsqueda diferida)
  *  - Caché de PDFs: in-memory + Cache API (no re-descarga el mismo manual)
  *  - Pre-carga de manuales al seleccionar máquina en Dashboard
+ *  - Zoom extendido (50%–500%) con Ctrl+rueda, centrado en el cursor
+ *  - Paneo con herramienta mano (Hand tool) — arrastra para mover el PDF
+ *  - Pantalla completa del visor de manual
  *  - Admin: dibujo con opciones de color, borde, transparencia
  *  - Edición de puntos existentes: arrastrar, agregar en arista, eliminar (dblclick)
  *  - Edición de estilo de anotación existente sin redibujar (color, borde, opacidad)
@@ -15,8 +18,8 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   BookOpen, Search, Loader2, FileText,
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
-  ExternalLink, AlertTriangle, ZoomIn, ZoomOut, Maximize2,
-  Save, Eye, Undo2, MousePointerClick, Trash2, Pencil, Palette,
+  ExternalLink, AlertTriangle, ZoomIn, ZoomOut, Maximize2, Minimize2,
+  Save, Eye, Undo2, MousePointerClick, Trash2, Pencil, Palette, Hand,
 } from 'lucide-react'
 import * as pdfjsLib from 'pdfjs-dist'
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist'
@@ -74,8 +77,8 @@ interface PixelPoint {
 
 type ModalStep = 'select-manual' | 'viewing'
 
-const SCALE_STEPS = [1, 1.25, 1.5, 2, 2.5, 3]
-const DEFAULT_SCALE_IDX = 2
+const SCALE_STEPS = [0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3, 3.5, 4, 5]
+const DEFAULT_SCALE_IDX = 4  // 150%
 const CLOSE_THRESHOLD_PX = 14
 const DRAG_THRESHOLD_PX = 12
 const EDGE_ADD_THRESHOLD_PX = 20
@@ -175,6 +178,8 @@ export function ManualSearchModal({
   const [rendering, setRendering] = useState(false)
   const [scaleIdx, setScaleIdx] = useState(DEFAULT_SCALE_IDX)
   const [pageInput, setPageInput] = useState('')
+  const [panMode, setPanMode] = useState(false)
+  const [isFullscreen, setIsFullscreen] = useState(false)
 
   // ─── Polygon drawing state ──────────────────────────────
   const [drawingMode, setDrawingMode] = useState(false)
@@ -212,6 +217,9 @@ export function ManualSearchModal({
   const svgRef = useRef<SVGSVGElement>(null)
   const justDraggedRef = useRef(false)
   const prevScaleRef = useRef<number | null>(null)
+  const isPanningRef = useRef(false)
+  const panStartRef = useRef({ x: 0, y: 0, scrollLeft: 0, scrollTop: 0 })
+  const dialogRef = useRef<HTMLDivElement>(null)
 
   const searchCode = repuesto.codigoBaader || ''
   const scale = SCALE_STEPS[scaleIdx] ?? 1.5
@@ -618,6 +626,90 @@ export function ManualSearchModal({
     setPageInput('')
   }
 
+  // ─── Pan mode handlers ────────────────────────────────────
+  const handlePanMouseDown = useCallback((e: React.MouseEvent) => {
+    if (!panMode || drawingMode) return
+    const container = scrollContainerRef.current
+    if (!container) return
+    isPanningRef.current = true
+    panStartRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+      scrollLeft: container.scrollLeft,
+      scrollTop: container.scrollTop,
+    }
+    e.preventDefault()
+  }, [panMode, drawingMode])
+
+  const handlePanMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!isPanningRef.current) return
+    const container = scrollContainerRef.current
+    if (!container) return
+    const dx = e.clientX - panStartRef.current.x
+    const dy = e.clientY - panStartRef.current.y
+    container.scrollLeft = panStartRef.current.scrollLeft - dx
+    container.scrollTop = panStartRef.current.scrollTop - dy
+  }, [])
+
+  const handlePanMouseUp = useCallback(() => {
+    isPanningRef.current = false
+  }, [])
+
+  // ─── Wheel zoom (Ctrl+wheel) ──────────────────────────────
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    if (!e.ctrlKey && !e.metaKey) return
+    e.preventDefault()
+    e.stopPropagation()
+
+    const container = scrollContainerRef.current
+    if (!container) return
+
+    // Save scroll position ratio for centering
+    const rect = container.getBoundingClientRect()
+    const mouseX = e.clientX - rect.left
+    const mouseY = e.clientY - rect.top
+    const scrollX = container.scrollLeft + mouseX
+    const scrollY = container.scrollTop + mouseY
+    const ratioX = scrollX / (container.scrollWidth || 1)
+    const ratioY = scrollY / (container.scrollHeight || 1)
+
+    setScaleIdx(prev => {
+      const next = e.deltaY < 0
+        ? Math.min(SCALE_STEPS.length - 1, prev + 1)
+        : Math.max(0, prev - 1)
+
+      // Reposition scroll after scale change to keep mouse centered
+      requestAnimationFrame(() => {
+        if (!container) return
+        const newScrollX = ratioX * container.scrollWidth - mouseX
+        const newScrollY = ratioY * container.scrollHeight - mouseY
+        container.scrollLeft = newScrollX
+        container.scrollTop = newScrollY
+      })
+
+      return next
+    })
+  }, [])
+
+  // ─── Fullscreen toggle ─────────────────────────────────────
+  const toggleFullscreen = useCallback(() => {
+    setIsFullscreen(prev => !prev)
+  }, [])
+
+  // Listen for Escape to exit fullscreen
+  useEffect(() => {
+    if (!isFullscreen) return
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        e.stopPropagation()
+        setIsFullscreen(false)
+      }
+    }
+    window.addEventListener('keydown', handleKey, true)
+    return () => window.removeEventListener('keydown', handleKey, true)
+  }, [isFullscreen])
+
   // ─── Toggle drawing mode ──────────────────────────────────
   const toggleDrawingMode = () => {
     if (drawingMode) {
@@ -634,6 +726,7 @@ export function ManualSearchModal({
     } else {
       setDrawingMode(true)
       setEditingStyle(false)
+      setPanMode(false) // Disable pan when drawing
       setPolyPoints([])
       setPolyClosed(false)
       setHoverPoint(null)
@@ -1062,8 +1155,14 @@ export function ManualSearchModal({
 
   // ─── JSX: Step 2 — Viewing PDF ─────────────────────────────
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[95vh] flex flex-col overflow-hidden p-0">
+    <Dialog open={open} onOpenChange={(o) => { if (!o && isFullscreen) { setIsFullscreen(false); return } onOpenChange(o) }}>
+      <DialogContent
+        ref={dialogRef}
+        className={isFullscreen
+          ? 'fixed inset-0 max-w-none max-h-none w-screen h-screen rounded-none flex flex-col overflow-hidden p-0 z-50'
+          : 'max-w-5xl max-h-[95vh] flex flex-col overflow-hidden p-0'
+        }
+      >
         {/* Header */}
         <DialogHeader className="shrink-0 px-4 pt-4 pb-2">
           <DialogTitle className="flex items-center gap-2">
@@ -1141,14 +1240,29 @@ export function ManualSearchModal({
                     disabled={scaleIdx >= SCALE_STEPS.length - 1}
                     onClick={() => setScaleIdx(Math.min(SCALE_STEPS.length - 1, scaleIdx + 1))} title="Aumentar zoom"
                   ><ZoomIn className="h-4 w-4" /></Button>
-                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0"
+                  <Button variant="ghost" size="sm" className="h-7 px-1.5 text-[10px] font-mono text-muted-foreground hover:text-foreground"
                     onClick={() => setScaleIdx(DEFAULT_SCALE_IDX)} title="Zoom original (150%)"
-                  ><Maximize2 className="h-3.5 w-3.5" /></Button>
+                  >Fit</Button>
                 </div>
 
                 <div className="h-5 w-px bg-border mx-1" />
 
-                {/* Match navigation */}
+                {/* Pan tool + Fullscreen */}
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant={panMode ? 'default' : 'ghost'}
+                    size="sm"
+                    className={`h-7 w-7 p-0 ${panMode ? 'bg-blue-600 hover:bg-blue-700 text-white' : ''}`}
+                    onClick={() => setPanMode(!panMode)}
+                    title={panMode ? 'Desactivar paneo (mano)' : 'Activar paneo (mano) — arrastra para mover'}
+                  ><Hand className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0"
+                    onClick={toggleFullscreen}
+                    title={isFullscreen ? 'Salir de pantalla completa (Esc)' : 'Pantalla completa'}
+                  >{isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}</Button>
+                </div>
+
+                <div className="h-5 w-px bg-border mx-1" />
                 {searching ? (
                   <div className="flex items-center gap-1.5">
                     <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
@@ -1440,7 +1554,17 @@ export function ManualSearchModal({
               )}
 
               {/* PDF Canvas + polygon drawing layer */}
-              <div ref={scrollContainerRef} className="flex-1 overflow-auto min-h-0 bg-neutral-800/50">
+              <div
+                ref={scrollContainerRef}
+                className={`flex-1 overflow-auto min-h-0 bg-neutral-800/50 ${
+                  panMode && !drawingMode ? 'cursor-grab active:cursor-grabbing' : ''
+                }`}
+                onMouseDown={handlePanMouseDown}
+                onMouseMove={handlePanMouseMove}
+                onMouseUp={handlePanMouseUp}
+                onMouseLeave={handlePanMouseUp}
+                onWheel={handleWheel}
+              >
                 <div className="flex justify-center p-4">
                   <div className="relative inline-block shadow-xl">
                     {rendering && (

@@ -7,6 +7,15 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.87] - 2026-02-24
+### Mejora
+- **Zoom extendido (50%–500%)**: Escala de zoom ampliada con 11 niveles (50%, 75%, 100%, 125%, 150%, 200%, 250%, 300%, 350%, 400%, 500%) para poder inspeccionar repuestos con detalle de cerca
+- **Zoom con Ctrl+rueda**: Ctrl+scroll del mouse hace zoom in/out centrado en la posición del cursor, sin perder el punto de interés
+- **Herramienta mano (pan)**: Botón de mano en la barra de herramientas para paneo libre — arrastra para mover el PDF cuando está ampliado. Cursor grab/grabbing visual
+- **Pantalla completa**: Botón de pantalla completa que expande el visor de manual a toda la pantalla para mayor área de inspección. Esc o el botón minimizar para volver al tamaño normal
+- **Botón Fit**: Reseteo rápido del zoom a 150% (escala por defecto)
+- **Pan se desactiva al dibujar**: Al entrar en modo marcado, el paneo se desactiva automáticamente para no interferir
+
 ## [2.48.86] - 2026-02-24
 ### Mejora
 - **Indicador de precarga de manuales**: Barra de progreso sutil en el panel de manuales que muestra cuántos PDFs se están descargando y cuántos ya están listos
