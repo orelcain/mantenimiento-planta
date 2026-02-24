@@ -1,5 +1,5 @@
 /**
- * ManualSearchModal v2.48.90
+ * ManualSearchModal v2.48.91
  *
  * Características:
  *  - "Ver en manual" instantáneo (solo carga PDF, búsqueda diferida)
@@ -8,6 +8,9 @@
  *  - Zoom extendido (50%–500%) con Ctrl+rueda, centrado en el cursor
  *  - Paneo con herramienta mano (Hand tool) — arrastra para mover el PDF
  *  - Pantalla completa del visor de manual
+ *  - Búsqueda editable: input para cambiar término de búsqueda en el PDF
+ *  - Chips de búsqueda rápida: código fabricante y código SAP
+ *  - Copiar código al portapapeles con un click
  *  - Admin: dibujo con opciones de color, borde, transparencia
  *  - Edición de puntos existentes: arrastrar, agregar en arista, eliminar (dblclick)
  *  - Edición de estilo de anotación existente sin redibujar (color, borde, opacidad)
@@ -20,6 +23,7 @@ import {
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
   ExternalLink, AlertTriangle, ZoomIn, ZoomOut, Maximize2, Minimize2,
   Save, Eye, Undo2, MousePointerClick, Trash2, Pencil, Palette,
+  Copy, Check,
 } from 'lucide-react'
 import * as pdfjsLib from 'pdfjs-dist'
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist'
@@ -219,8 +223,12 @@ export function ManualSearchModal({
   const isPanningRef = useRef(false)
   const panStartRef = useRef({ x: 0, y: 0, scrollLeft: 0, scrollTop: 0 })
   const dialogRef = useRef<HTMLDivElement>(null)
+  const manualSearchRef = useRef(false)
 
-  const searchCode = repuesto.codigoFabricante || ''
+  const [searchCode, setSearchCode] = useState(repuesto.codigoFabricante || '')
+  const [searchInput, setSearchInput] = useState(repuesto.codigoFabricante || '')
+  const [copiedCode, setCopiedCode] = useState(false)
+
   const scale = SCALE_STEPS[scaleIdx] ?? 1.5
   const isViewMode = !!initialVinculo
 
@@ -390,6 +398,44 @@ export function ManualSearchModal({
     }
   }, [searchCode, loadPdfOnly])
 
+  // ─── 4b. Re-search loaded PDF (for manual search changes) ─
+  const reSearchCurrentPdf = useCallback(async (code: string) => {
+    if (!pdfDoc || !code.trim()) {
+      setResults([])
+      setMatchPages(new Set())
+      return
+    }
+    setSearching(true)
+    setResults([])
+    try {
+      const found: SearchResult[] = []
+      const pages = new Set<number>()
+      const searchLower = code.toLowerCase().trim()
+      for (let i = 1; i <= pdfDoc.numPages; i++) {
+        const page = await pdfDoc.getPage(i)
+        const content = await page.getTextContent()
+        const pageText = content.items.map(item => ('str' in item ? item.str : '')).join(' ')
+        const lowerText = pageText.toLowerCase()
+        let matchCount = 0
+        let pos = lowerText.indexOf(searchLower)
+        while (pos !== -1) { matchCount++; pos = lowerText.indexOf(searchLower, pos + 1) }
+        if (matchCount > 0) {
+          pages.add(i)
+          const matchIdx = lowerText.indexOf(searchLower)
+          const snippet = pageText.substring(Math.max(0, matchIdx - 40), Math.min(pageText.length, matchIdx + code.length + 40))
+          found.push({ page: i, textSnippet: snippet, matchCount })
+        }
+      }
+      setResults(found)
+      setMatchPages(pages)
+      if (found.length > 0 && found[0]) setCurrentPage(found[0].page)
+    } catch (err) {
+      console.error('Error re-searching PDF:', err)
+    } finally {
+      setSearching(false)
+    }
+  }, [pdfDoc])
+
   // ─── 5. Highlight rect finder ────────────────────────────
   const findHighlightRects = useCallback(async (
     page: PDFPageProxy,
@@ -547,7 +593,11 @@ export function ManualSearchModal({
       setDraggingIdx(null)
       setEditingStyle(false)
       setHoveredPointIdx(null)
+      setCopiedCode(false)
+      setSearchCode(repuesto.codigoFabricante || '')
+      setSearchInput(repuesto.codigoFabricante || '')
       prevScaleRef.current = null
+      manualSearchRef.current = false
       setStep(initialVinculo ? 'viewing' : 'select-manual')
       loadManualOptions()
     }
@@ -561,6 +611,7 @@ export function ManualSearchModal({
 
   useEffect(() => {
     if (!manualUrl || step !== 'viewing') return
+    if (manualSearchRef.current) { manualSearchRef.current = false; return }
     if (isViewMode) {
       loadPdfOnly(manualUrl)
     } else {
@@ -646,6 +697,29 @@ export function ManualSearchModal({
     if (!isNaN(num)) goToPage(num)
     setPageInput('')
   }
+
+  // ─── Manual search: change search term and re-search ─────
+  const handleManualSearch = useCallback((term?: string) => {
+    const newTerm = (term ?? searchInput).trim()
+    if (!newTerm) return
+    if (term !== undefined) setSearchInput(newTerm)
+    setSearchCode(newTerm)
+    setResults([])
+    setMatchPages(new Set())
+    if (pdfDoc) {
+      manualSearchRef.current = true
+      reSearchCurrentPdf(newTerm)
+    }
+  }, [searchInput, pdfDoc, reSearchCurrentPdf])
+
+  const handleCopyCode = useCallback(() => {
+    const code = searchCode || repuesto.codigoFabricante || repuesto.codigoSAP || ''
+    if (!code) return
+    navigator.clipboard.writeText(code).then(() => {
+      setCopiedCode(true)
+      setTimeout(() => setCopiedCode(false), 1500)
+    }).catch(() => { /* clipboard not available */ })
+  }, [searchCode, repuesto.codigoFabricante, repuesto.codigoSAP])
 
   // ─── Pan handlers (always active when not drawing) ───────
   const handlePanMouseDown = useCallback((e: React.MouseEvent) => {
@@ -1201,19 +1275,77 @@ export function ManualSearchModal({
           </DialogTitle>
         </DialogHeader>
 
-        {/* Info bar */}
-        <div className="flex items-center gap-3 px-4 py-2 bg-muted/30 border-y border-border shrink-0">
-          <Search className="h-4 w-4 text-muted-foreground shrink-0" />
-          <div className="flex-1 min-w-0">
-            <div className="text-sm text-foreground">
-              {isViewMode ? 'Ubicación de' : 'Buscando'}{' '}
-              <span className="font-mono font-bold text-purple-400">{searchCode || repuesto.codigoSAP}</span>{' '}
-              en <span className="font-semibold">{manualOptions[selectedManualIdx]?.label || 'manual'}</span>
+        {/* Info bar with editable search */}
+        <div className="shrink-0 px-4 py-2 bg-muted/30 border-y border-border space-y-1.5">
+          {/* Row 1: Search input + quick chips */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-1.5">
+              <Search className="h-4 w-4 text-muted-foreground shrink-0" />
+              <Input
+                className="h-7 w-48 text-xs px-2 font-mono"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleManualSearch() }}
+                placeholder="Buscar texto en PDF..."
+              />
+              <Button
+                variant="outline" size="sm"
+                className="h-7 px-2.5 text-[11px] gap-1"
+                onClick={() => handleManualSearch()}
+                disabled={!searchInput.trim()}
+              >
+                {searching ? <Loader2 className="h-3 w-3 animate-spin" /> : <Search className="h-3 w-3" />}
+                Buscar
+              </Button>
             </div>
-            <div className="text-[11px] text-muted-foreground truncate">
-              {repuesto.textoBreve || 'Repuesto'}
-              {repuesto.codigoSAP && <span className="ml-2 opacity-50">(SAP: {repuesto.codigoSAP})</span>}
-            </div>
+
+            <div className="h-5 w-px bg-border" />
+
+            {/* Quick-search chips */}
+            {repuesto.codigoFabricante && (
+              <button
+                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] transition-colors border ${
+                  searchCode === repuesto.codigoFabricante
+                    ? 'bg-purple-500/25 text-purple-300 border-purple-500/40 ring-1 ring-purple-500/30'
+                    : 'bg-purple-500/10 text-purple-400/70 border-purple-500/20 hover:bg-purple-500/20 hover:text-purple-300'
+                }`}
+                onClick={() => handleManualSearch(repuesto.codigoFabricante)}
+                title={`Buscar código fabricante: ${repuesto.codigoFabricante}`}
+              >
+                Fab: {repuesto.codigoFabricante}
+              </button>
+            )}
+            {repuesto.codigoSAP && repuesto.codigoSAP !== repuesto.codigoFabricante && (
+              <button
+                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] transition-colors border ${
+                  searchCode === repuesto.codigoSAP
+                    ? 'bg-blue-500/25 text-blue-300 border-blue-500/40 ring-1 ring-blue-500/30'
+                    : 'bg-blue-500/10 text-blue-400/70 border-blue-500/20 hover:bg-blue-500/20 hover:text-blue-300'
+                }`}
+                onClick={() => handleManualSearch(repuesto.codigoSAP)}
+                title={`Buscar código SAP: ${repuesto.codigoSAP}`}
+              >
+                SAP: {repuesto.codigoSAP}
+              </button>
+            )}
+
+            {/* Copy active search code to clipboard */}
+            <button
+              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+              onClick={handleCopyCode}
+              title={`Copiar "${searchCode}" al portapapeles`}
+            >
+              {copiedCode ? <Check className="h-3 w-3 text-green-400" /> : <Copy className="h-3 w-3" />}
+              {copiedCode ? '¡Copiado!' : 'Copiar'}
+            </button>
+          </div>
+
+          {/* Row 2: Repuesto info */}
+          <div className="text-[11px] text-muted-foreground truncate">
+            {repuesto.textoBreve || 'Repuesto'}
+            {' · '}
+            <span className="font-semibold text-foreground/80">{manualOptions[selectedManualIdx]?.label || 'manual'}</span>
+            {repuesto.codigoSAP && <span className="ml-2 opacity-50">(SAP: {repuesto.codigoSAP})</span>}
           </div>
         </div>
 

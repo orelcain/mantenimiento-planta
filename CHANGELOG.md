@@ -7,6 +7,14 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.91] - 2026-02-24
+### Mejora
+- **Búsqueda editable en manual PDF**: El input de búsqueda ahora es editable — el usuario puede cambiar el término y re-buscar en el PDF sin cerrar el modal
+- **Chips de búsqueda rápida**: Botones "Fab: {código}" y "SAP: {código}" para lanzar búsqueda por código fabricante o SAP con un click
+- **Copiar código al portapapeles**: Botón “Copiar” en la barra de info con feedback visual (¡Copiado!)
+- **Re-búsqueda optimizada**: Cuando el PDF ya está cargado, la re-búsqueda no recarga el archivo (usa el PDF en memoria)
+- **Resaltado dinámico**: Al buscar un nuevo término, las coincidencias se resaltan en amarillo y la página navega al primer resultado
+
 ## [2.48.90] - 2026-02-24
 ### Mejora
 - **Importación inventario bodega febrero 2026**: 1,577 repuestos del Excel de inventario importados a Firestore como catálogo (1,515 nuevos + 62 actualizados)
