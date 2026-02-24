@@ -707,25 +707,33 @@ export function ManualSearchModal({
                         >
                           Sig. <ChevronRight className="h-3 w-3" />
                         </Button>
-                        {/* "Ver en diagrama" button */}
-                        {effectivePosition && (
-                          <>
-                            <div className="h-5 w-px bg-border mx-1" />
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-7 px-2.5 text-[11px] gap-1.5 border-cyan-500/40 text-cyan-400 hover:bg-cyan-500/10"
-                              onClick={() => goToDiagram(effectivePosition)}
-                              disabled={searchingDiagram}
-                              title={`Buscar posición ${effectivePosition} en el diagrama`}
-                            >
-                              {searchingDiagram
-                                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                : <Crosshair className="h-3.5 w-3.5" />
-                              }
-                              {searchingDiagram ? 'Buscando...' : `Ver pos. ${effectivePosition} en diagrama`}
-                            </Button>
-                          </>
+                        {/* "Ver en diagrama" button + position edit */}
+                        <div className="h-5 w-px bg-border mx-1" />
+                        {effectivePosition ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 px-2.5 text-[11px] gap-1.5 border-cyan-500/40 text-cyan-400 hover:bg-cyan-500/10"
+                            onClick={() => goToDiagram(effectivePosition)}
+                            disabled={searchingDiagram}
+                            title={`Buscar posición ${effectivePosition} en el diagrama`}
+                          >
+                            {searchingDiagram
+                              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              : <Crosshair className="h-3.5 w-3.5" />
+                            }
+                            {searchingDiagram ? 'Buscando...' : `Ver pos. ${effectivePosition} en diagrama`}
+                          </Button>
+                        ) : (
+                          <Button
+                            variant="ghost" size="sm"
+                            className="h-7 px-2 text-[11px] gap-1 text-cyan-400/60 hover:text-cyan-400 border border-dashed border-cyan-500/20 hover:border-cyan-500/40 rounded-full"
+                            onClick={startEditingPosition}
+                            title="Asignar posición manualmente"
+                          >
+                            <Pencil className="h-3 w-3" />
+                            Asignar pos.
+                          </Button>
                         )}
                       </div>
                     ) : (

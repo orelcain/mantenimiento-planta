@@ -7,6 +7,12 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.79] - 2026-02-23
+### Mejora
+- **Buscar en Manual — Asignar posición desde toolbar**: El botón "Asignar pos." ahora también aparece en la barra de herramientas junto a los resultados de búsqueda, facilitando asignar o corregir la posición mientras se revisan las coincidencias del código
+
+---
+
 ## [2.48.78] - 2026-02-23
 ### Funcionalidad
 - **Buscar en Manual — Posición manual editable**: Se puede asignar y corregir manualmente el número de posición del repuesto en el diagrama del manual
