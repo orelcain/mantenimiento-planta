@@ -36,7 +36,7 @@ export function RepuestoActionsMenu({
   const hasPhotos = (repuesto.fotosReales?.length || 0) > 0
   const hasImagenes = (repuesto.imagenesManual?.length || 0) > 0
   const hasGallery = (repuesto.gallery?.length || 0) > 0
-  const hasFabCode = !!repuesto.codigoBaader
+  const hasFabCode = !!repuesto.codigoFabricante
   const hasVinculos = (repuesto.vinculosManual?.length || 0) > 0
 
   const hasViewActions = onViewSpecs || onViewGallery || onViewManual || onViewPhotos || onSearchInManual || onViewInManual
@@ -96,7 +96,7 @@ export function RepuestoActionsMenu({
                 <BookOpen className="h-4 w-4 text-purple-500" />
                 <span>Buscar en Manual</span>
                 <span className="ml-auto text-[10px] font-mono text-muted-foreground truncate max-w-[60px]">
-                  {repuesto.codigoBaader}
+                  {repuesto.codigoFabricante}
                 </span>
               </DropdownMenuItem>
             )}

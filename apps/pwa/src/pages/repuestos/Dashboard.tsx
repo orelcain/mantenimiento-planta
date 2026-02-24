@@ -100,7 +100,7 @@ export function RepuestosDashboard() {
           r.codigoSAP?.toLowerCase().includes(query) ||
           r.textoBreve?.toLowerCase().includes(query) ||
           r.descripcion?.toLowerCase().includes(query) ||
-          r.codigoBaader?.toLowerCase().includes(query) ||
+          r.codigoFabricante?.toLowerCase().includes(query) ||
           r.ubicacionEnPlanta?.toLowerCase().includes(query)
         )
       })

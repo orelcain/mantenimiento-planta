@@ -52,8 +52,8 @@ function mapRowToImport(row: Record<string, unknown>): ImportCatalogoRow {
   const codigoSAP = normalizeString(
     lower['codigosap'] || lower['codigo sap'] || lower['sap'] || lower['codigo'] || lower['sapcode']
   )
-  const codigoBaader = normalizeString(
-    lower['codigobaader'] || lower['codigo baader'] || lower['baader'] || lower['baadercode']
+  const codigoFabricante = normalizeString(
+    lower['codigofabricante'] || lower['codigo fabricante'] || lower['fabricante'] || lower['codigobaader'] || lower['codigo baader'] || lower['baader'] || lower['baadercode']
   )
   const textoBreve = normalizeString(
     lower['textobreve'] || lower['texto breve'] || lower['nombre'] || lower['descripcion corta']
@@ -75,7 +75,7 @@ function mapRowToImport(row: Record<string, unknown>): ImportCatalogoRow {
 
   return {
     codigoSAP,
-    codigoBaader,
+    codigoFabricante,
     textoBreve,
     descripcion,
     valorUnitario,
@@ -118,9 +118,9 @@ export function ImportRepuestosModal({
 
       const mapped = rows
         .map(mapRowToImport)
-        .filter((r) => r.codigoSAP || r.codigoBaader || r.textoBreve || r.descripcion)
+        .filter((r) => r.codigoSAP || r.codigoFabricante || r.textoBreve || r.descripcion)
 
-      if (mapped.length === 0) throw new Error('No se encontraron columnas válidas (codigoSAP / codigoBaader / textoBreve / descripcion)')
+      if (mapped.length === 0) throw new Error('No se encontraron columnas válidas (codigoSAP / codigoFabricante / textoBreve / descripcion)')
 
       await importCatalogoDesdeExcel({ rows: mapped })
       onSuccess(`Catálogo importado correctamente (${mapped.length} filas)`)
@@ -149,7 +149,7 @@ export function ImportRepuestosModal({
             <Label>Archivo Excel (.xlsx)</Label>
             <Input type="file" accept=".xlsx,.xls" onChange={handleFileChange} />
             <p className="text-xs text-muted-foreground">
-              Columnas esperadas: codigoSAP, codigoBaader, textoBreve, descripcion, valorUnitario, cantidadPorMaquina, ubicacionEnPlanta.
+              Columnas esperadas: codigoSAP, codigoFabricante, textoBreve, descripcion, valorUnitario, cantidadPorMaquina, ubicacionEnPlanta.
             </p>
           </div>
         </div>

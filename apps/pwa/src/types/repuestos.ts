@@ -49,7 +49,7 @@ export interface Repuesto {
   textoBreve: string;
   descripcion: string;
   nombreManual?: string; // Nombre según el manual del fabricante
-  codigoBaader: string; // o código del fabricante
+  codigoFabricante: string; // o código del fabricante
   
   valorUnitario: number;
 
@@ -171,7 +171,7 @@ export interface RepuestoFormData {
   textoBreve: string;
   descripcion?: string;
   nombreManual?: string;
-  codigoBaader: string;
+  codigoFabricante: string;
   valorUnitario: number;
   /** Cuántas unidades de este repuesto usa la máquina */
   cantidadPorMaquina: number;
@@ -193,7 +193,7 @@ export interface ExportData {
  */
 export interface ImportCatalogoRow {
   codigoSAP?: string;
-  codigoBaader?: string;
+  codigoFabricante?: string;
   textoBreve?: string;
   descripcion?: string;
   valorUnitario?: number;
@@ -201,7 +201,7 @@ export interface ImportCatalogoRow {
   ubicacionEnPlanta?: string;
   forceOverride?: {
     codigoSAP?: boolean;
-    codigoBaader?: boolean;
+    codigoFabricante?: boolean;
     textoBreve?: boolean;
     descripcion?: boolean;
     valorUnitario?: boolean;

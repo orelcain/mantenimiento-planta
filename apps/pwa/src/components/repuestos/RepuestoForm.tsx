@@ -26,7 +26,7 @@ interface RepuestoFormModalProps {
 
 const defaultForm: RepuestoFormData = {
   codigoSAP: '',
-  codigoBaader: '',
+  codigoFabricante: '',
   textoBreve: '',
   descripcion: '',
   valorUnitario: 0,
@@ -52,7 +52,7 @@ export function RepuestoFormModal({
       if (initialData) {
         setForm({
           codigoSAP: initialData.codigoSAP || '',
-          codigoBaader: initialData.codigoBaader || '',
+          codigoFabricante: initialData.codigoFabricante || '',
           textoBreve: initialData.textoBreve || '',
           descripcion: initialData.descripcion || '',
           valorUnitario: initialData.valorUnitario || 0,
@@ -72,7 +72,7 @@ export function RepuestoFormModal({
     try {
       const payload: RepuestoFormData = {
         codigoSAP: form.codigoSAP.trim(),
-        codigoBaader: form.codigoBaader.trim(),
+        codigoFabricante: form.codigoFabricante.trim(),
         textoBreve: form.textoBreve.trim(),
         descripcion: form.descripcion?.trim() || '',
         valorUnitario: Number(form.valorUnitario) || 0,
@@ -119,11 +119,11 @@ export function RepuestoFormModal({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="codigoBaader">Código Fabricante</Label>
+              <Label htmlFor="codigoFabricante">Código Fabricante</Label>
               <Input
-                id="codigoBaader"
-                value={form.codigoBaader}
-                onChange={(e) => setForm({ ...form, codigoBaader: e.target.value })}
+                id="codigoFabricante"
+                value={form.codigoFabricante}
+                onChange={(e) => setForm({ ...form, codigoFabricante: e.target.value })}
                 placeholder="Ej: BA-200"
               />
             </div>

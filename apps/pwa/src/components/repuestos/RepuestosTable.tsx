@@ -172,10 +172,10 @@ export function RepuestosTable({
               </div>
 
               {/* Código fabricante + buscar en manual */}
-              {rep.codigoBaader && (
+              {rep.codigoFabricante && (
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] text-muted-foreground">Cód. Fab:</span>
-                  <span className="font-mono text-xs text-foreground bg-muted/40 px-1.5 py-0.5 rounded">{rep.codigoBaader}</span>
+                  <span className="font-mono text-xs text-foreground bg-muted/40 px-1.5 py-0.5 rounded">{rep.codigoFabricante}</span>
                   {onSearchInManual && (
                     <button
                       onClick={() => onSearchInManual(rep)}
@@ -276,10 +276,10 @@ export function RepuestosTable({
                   </td>
                   {/* Código fabricante */}
                   <td className="px-3 py-2.5 whitespace-nowrap">
-                    {rep.codigoBaader ? (
+                    {rep.codigoFabricante ? (
                       <div className="flex items-center gap-1.5">
                         <span className="font-mono text-xs text-muted-foreground bg-muted/40 px-1.5 py-0.5 rounded">
-                          {rep.codigoBaader}
+                          {rep.codigoFabricante}
                         </span>
                         {onSearchInManual && (
                           <button
@@ -341,7 +341,7 @@ export function RepuestosTable({
                       )}
 
                       {/* ── Manual ── */}
-                      {onSearchInManual && rep.codigoBaader && (
+                      {onSearchInManual && rep.codigoFabricante && (
                         <Tip label="Buscar en Manual">
                           <button onClick={() => onSearchInManual(rep)}
                             className="h-7 w-7 inline-flex items-center justify-center rounded-md text-purple-400/60 hover:text-purple-400 hover:bg-purple-500/10 transition-colors">

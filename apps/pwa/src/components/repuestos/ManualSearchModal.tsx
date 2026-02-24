@@ -1,5 +1,5 @@
 /**
- * ManualSearchModal v2.48.89
+ * ManualSearchModal v2.48.90
  *
  * Características:
  *  - "Ver en manual" instantáneo (solo carga PDF, búsqueda diferida)
@@ -220,7 +220,7 @@ export function ManualSearchModal({
   const panStartRef = useRef({ x: 0, y: 0, scrollLeft: 0, scrollTop: 0 })
   const dialogRef = useRef<HTMLDivElement>(null)
 
-  const searchCode = repuesto.codigoBaader || ''
+  const searchCode = repuesto.codigoFabricante || ''
   const scale = SCALE_STEPS[scaleIdx] ?? 1.5
   const isViewMode = !!initialVinculo
 
@@ -950,7 +950,7 @@ export function ManualSearchModal({
       puntos: normalizedPoints,
       forma: 'poligono',
       color: drawFillColor,
-      descripcion: `${repuesto.codigoBaader || repuesto.codigoSAP} — ${repuesto.textoBreve || 'Repuesto'}`,
+      descripcion: `${repuesto.codigoFabricante || repuesto.codigoSAP} — ${repuesto.textoBreve || 'Repuesto'}`,
       sinBorde: drawNoBorder,
     }
 
@@ -984,7 +984,7 @@ export function ManualSearchModal({
     } finally {
       setSavingAnnotation(false)
     }
-  }, [polyPoints, polyClosed, manualUrl, currentPage, machine.id, repuesto.id, repuesto.codigoBaader, repuesto.codigoSAP, repuesto.textoBreve, drawFillColor, drawNoBorder, editingExisting, originalVinculo, renderPage])
+  }, [polyPoints, polyClosed, manualUrl, currentPage, machine.id, repuesto.id, repuesto.codigoFabricante, repuesto.codigoSAP, repuesto.textoBreve, drawFillColor, drawNoBorder, editingExisting, originalVinculo, renderPage])
 
   // ─── Delete existing annotation (admin) ────────────────────
   const deleteAnnotation = useCallback(async () => {

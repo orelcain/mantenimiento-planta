@@ -28,7 +28,7 @@ export async function exportRepuestosToExcel(
       'Código SAP': rep.codigoSAP || '',
       'Texto Breve': rep.textoBreve || '',
       'Descripción': rep.descripcion || '',
-      'Código Fabricante': rep.codigoBaader || '',
+      'Código Fabricante': rep.codigoFabricante || '',
       'Valor Unitario': rep.valorUnitario || 0,
       'Cant/Máquina': rep.cantidadPorMaquina || 0,
       'Ubicación': rep.ubicacionEnPlanta || '',
@@ -92,7 +92,7 @@ export function exportCantidadesTemplate(repuestos: Repuesto[]): void {
   const data = repuestos.map(rep => ({
     'Código SAP': rep.codigoSAP || '',
     'Texto Breve': rep.textoBreve || '',
-    'Código Fabricante': rep.codigoBaader || '',
+    'Código Fabricante': rep.codigoFabricante || '',
     'Valor Unitario': rep.valorUnitario || 0,
     'Cant/Máquina': rep.cantidadPorMaquina || 0,
     'Ubicación': rep.ubicacionEnPlanta || '',

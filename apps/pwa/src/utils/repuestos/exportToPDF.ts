@@ -71,7 +71,7 @@ export async function exportRepuestosToPDF(
   const tableData = repuestos.map(rep => [
     rep.codigoSAP || '-',
     rep.textoBreve || '-',
-    rep.codigoBaader || '-',
+    rep.codigoFabricante || '-',
     (rep.cantidadPorMaquina || 0).toString(),
     rep.valorUnitario ? `$${rep.valorUnitario.toLocaleString('es-CL')}` : '-',
     rep.ubicacionEnPlanta || '-',

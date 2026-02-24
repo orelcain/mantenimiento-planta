@@ -57,12 +57,17 @@ export function useRepuestos(machineId: string | null) {
     
     const unsubscribe = onSnapshot(q, 
       (snapshot) => {
-        const data = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-          createdAt: doc.data().createdAt?.toDate() || new Date(),
-          updatedAt: doc.data().updatedAt?.toDate() || new Date(),
-        })) as Repuesto[];
+        const data = snapshot.docs.map(doc => {
+          const d = doc.data();
+          return {
+            id: doc.id,
+            ...d,
+            // Backward compat: old docs may have codigoBaader instead of codigoFabricante
+            codigoFabricante: d.codigoFabricante || d.codigoBaader || '',
+            createdAt: d.createdAt?.toDate() || new Date(),
+            updatedAt: d.updatedAt?.toDate() || new Date(),
+          };
+        }) as Repuesto[];
         
         setRepuestos(data);
         setLoading(false);
@@ -111,7 +116,7 @@ export function useRepuestos(machineId: string | null) {
 
       const newRepuesto = {
         codigoSAP: data.codigoSAP,
-        codigoBaader: data.codigoBaader,
+        codigoFabricante: data.codigoFabricante,
         textoBreve: data.textoBreve,
         descripcion: data.descripcion || '',
         nombreManual: data.nombreManual || '',
@@ -231,7 +236,7 @@ export function useRepuestos(machineId: string | null) {
         const docRef = doc(collection(db, collectionPath));
         batch.set(docRef, {
           codigoSAP: item.codigoSAP,
-          codigoBaader: item.codigoBaader,
+          codigoFabricante: item.codigoFabricante,
           textoBreve: item.textoBreve,
           descripcion: item.descripcion || '',
           valorUnitario: item.valorUnitario,
@@ -269,7 +274,7 @@ export function useRepuestos(machineId: string | null) {
     const byText = new Map<string, Repuesto>();
     repuestos.forEach((r) => {
       if (r.codigoSAP && r.codigoSAP !== placeholder) bySAP.set(normalizeKey(r.codigoSAP), r);
-      if (r.codigoBaader && r.codigoBaader !== placeholder) byBaader.set(normalizeKey(r.codigoBaader), r);
+      if (r.codigoFabricante && r.codigoFabricante !== placeholder) byBaader.set(normalizeKey(r.codigoFabricante), r);
       
       const textKey = normalizeText(r.descripcion || r.textoBreve || '');
       if (textKey.length > 5) {
@@ -279,9 +284,9 @@ export function useRepuestos(machineId: string | null) {
 
     const ops = rows.map((row) => {
       const codigoSAP = (row.codigoSAP || '').trim() || placeholder;
-      const codigoBaader = (row.codigoBaader || '').trim() || placeholder;
+      const codigoFabricante = (row.codigoFabricante || '').trim() || placeholder;
       const keySAP = codigoSAP !== placeholder ? normalizeKey(codigoSAP) : '';
-      const keyBaader = codigoBaader !== placeholder ? normalizeKey(codigoBaader) : '';
+      const keyBaader = codigoFabricante !== placeholder ? normalizeKey(codigoFabricante) : '';
 
       let existing = (keySAP && bySAP.get(keySAP)) || (keyBaader && byBaader.get(keyBaader)) || null;
       
@@ -292,14 +297,14 @@ export function useRepuestos(machineId: string | null) {
       const ubicacionEnPlanta = (row.ubicacionEnPlanta || '').trim();
       const forceOverride = row.forceOverride || {};
       
-      if (!existing && codigoSAP === placeholder && codigoBaader === placeholder) {
+      if (!existing && codigoSAP === placeholder && codigoFabricante === placeholder) {
         const textKey = normalizeText(descripcion || textoBreve || '');
         if (textKey.length > 5) {
           existing = byText.get(textKey) || null;
         }
       }
 
-      return { existing, codigoSAP, codigoBaader, valorUnitario, cantidadPorMaquina, textoBreve, descripcion, ubicacionEnPlanta, forceOverride };
+      return { existing, codigoSAP, codigoFabricante, valorUnitario, cantidadPorMaquina, textoBreve, descripcion, ubicacionEnPlanta, forceOverride };
     });
 
     const chunks = chunk(ops, 400);
@@ -311,7 +316,7 @@ export function useRepuestos(machineId: string | null) {
           const r = op.existing;
           const nextValorUnitario = op.forceOverride.valorUnitario ? op.valorUnitario : (r.valorUnitario === 0 && op.valorUnitario > 0 ? op.valorUnitario : r.valorUnitario);
           const nextCodigoSAP = op.forceOverride.codigoSAP ? op.codigoSAP : (r.codigoSAP === placeholder && op.codigoSAP !== placeholder ? op.codigoSAP : r.codigoSAP);
-          const nextCodigoBaader = op.forceOverride.codigoBaader ? op.codigoBaader : (r.codigoBaader === placeholder && op.codigoBaader !== placeholder ? op.codigoBaader : r.codigoBaader);
+          const nextCodigoFabricante = op.forceOverride.codigoFabricante ? op.codigoFabricante : (r.codigoFabricante === placeholder && op.codigoFabricante !== placeholder ? op.codigoFabricante : r.codigoFabricante);
           const nextTextoBreve = op.forceOverride.textoBreve ? op.textoBreve : ((!r.textoBreve || r.textoBreve.trim().length === 0) && op.textoBreve ? op.textoBreve : r.textoBreve);
           const nextDescripcion = op.forceOverride.descripcion 
             ? op.descripcion 
@@ -319,7 +324,7 @@ export function useRepuestos(machineId: string | null) {
 
           batch.update(doc(db, collectionPath, r.id), {
             codigoSAP: nextCodigoSAP,
-            codigoBaader: nextCodigoBaader,
+            codigoFabricante: nextCodigoFabricante,
             textoBreve: nextTextoBreve,
             descripcion: nextDescripcion,
             valorUnitario: nextValorUnitario,
@@ -332,7 +337,7 @@ export function useRepuestos(machineId: string | null) {
 
           batch.set(docRef, {
             codigoSAP: op.codigoSAP,
-            codigoBaader: op.codigoBaader,
+            codigoFabricante: op.codigoFabricante,
             textoBreve: op.textoBreve || '',
             descripcion: op.descripcion || op.textoBreve || '',
             valorUnitario: op.valorUnitario,

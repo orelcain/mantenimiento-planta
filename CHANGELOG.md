@@ -7,6 +7,17 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.90] - 2026-02-24
+### Mejora
+- **Importación inventario bodega febrero 2026**: 1,577 repuestos del Excel de inventario importados a Firestore como catálogo (1,515 nuevos + 62 actualizados)
+- **4 máquinas nuevas creadas**: Garibaldi, Knuro, Multivac, Sin Asignar — para repuestos sin equipo definido
+- **Campo `codigoFabricante`**: Renombrado `codigoBaader` → `codigoFabricante` en toda la app (tipos, hooks, componentes, utilidades, scripts) para ser genérico a cualquier fabricante
+- **Backward compatibility**: La lectura de Firestore reconoce tanto `codigoFabricante` como el antiguo `codigoBaader`. La importación de Excel acepta ambas columnas
+- **Migración de datos**: 233 documentos existentes migrados automáticamente de `codigoBaader` → `codigoFabricante`
+- **Ubicación física en bodega**: Campo `ubicacionEnPlanta` poblado con ubicaciones tipo 5S (A-1-15, B-5-2, C-7, etc.)
+- **Extracción automática de código fabricante**: Regex de 4+ dígitos aplicada al texto del material para extraer Part Numbers
+- **Deduplicación por SAP**: Repuestos con mismo código SAP se actualizan en vez de duplicarse
+
 ## [2.48.89] - 2026-02-24
 ### Fix
 - **Zoom con scroll directo**: La rueda del mouse ahora hace zoom directamente sobre el PDF sin necesitar Ctrl — scroll up acerca, scroll down aleja, centrado en la posición del cursor
