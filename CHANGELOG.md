@@ -7,6 +7,14 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.83] - 2026-02-23
+### Mejora
+- **Ver en Manual instantáneo**: Al abrir "Ver en Manual" con una anotación existente, el PDF se carga directamente en la página marcada sin ejecutar búsqueda de texto (antes tardaba varios segundos). La búsqueda de coincidencias se ejecuta en segundo plano después de la carga
+- **Opciones de dibujo admin (color, borde, opacidad)**: Los administradores pueden elegir color (6 opciones), opacidad (5 niveles) y activar/desactivar el borde del polígono al marcar un repuesto en el manual
+- **Tooltips visibles en acciones**: Todos los botones de acción en la tabla desktop ahora muestran tooltips instantáneos al pasar el cursor, con etiquetas descriptivas claras
+- **Separadores visuales en acciones**: Los botones de la columna ACCIONES están agrupados visualmente: Ficha Técnica | Galería | Manual/Ver | Editar/Eliminar
+- **Botón Manual/Datasheet eliminado**: Se removió el botón redundante de Manual/Datasheet de la tabla y el menú móvil, ya que la funcionalidad está cubierta por "Buscar en Manual" y "Ver en Manual"
+
 ## [2.48.82] - 2026-02-23
 ### Mejora
 - **Acciones inline en tabla desktop**: Los botones de acción (Ficha Técnica, Galería, Manual, Buscar en Manual, Ver en Manual, Editar, Eliminar) ahora aparecen directamente en la columna ACCIONES como íconos, sin necesidad de abrir un menú desplegable

@@ -1,15 +1,10 @@
 /**
- * ManualSearchModal v2.48.81
+ * ManualSearchModal v2.48.83
  *
- * Flujo:
- *  1. Se abre y carga la lista de manuales disponibles
- *  2. El usuario elige en qué manual buscar → botón "Buscar"
- *  3. Se busca el código de fabricante en todas las páginas y resalta en amarillo
- *  4. El usuario navega manualmente por las páginas para encontrar el diagrama
- *  5. "Marcar en diagrama" activa modo polígono: click para colocar puntos,
- *     click en punto 1 para cerrar la figura
- *  6. Guardar → se persiste como VinculoManual con puntos normalizados (0-1)
- *  7. "Ver en manual" aparece al lado de "Buscar en manual" una vez guardado
+ * Optimizaciones:
+ *  - "Ver en manual" es instantáneo: carga el PDF sin buscar texto
+ *  - La búsqueda de texto se ejecuta en background (deferred) y no bloquea la vista
+ *  - Admin: opciones de color, borde y transparencia para el polígono
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
@@ -17,7 +12,7 @@ import {
   BookOpen, Search, Loader2, FileText,
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
   ExternalLink, AlertTriangle, ZoomIn, ZoomOut, Maximize2,
-  Save, Eye, Undo2, MousePointerClick, Trash2, Pencil,
+  Save, Eye, Undo2, MousePointerClick, Trash2, Pencil, Palette,
 } from 'lucide-react'
 import * as pdfjsLib from 'pdfjs-dist'
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist'
@@ -34,6 +29,7 @@ import {
 } from '@/components/ui'
 import type { Machine, Repuesto } from '@/types/repuestos'
 import type { VinculoManual } from '@/types/vinculos'
+import { MARKER_COLORS } from '@/types/vinculos'
 
 // PDF.js worker
 if (typeof window !== 'undefined') {
@@ -49,7 +45,7 @@ export interface ManualSearchModalProps {
   repuesto: Repuesto
   /** Si se pasa, abre en modo vista directamente en la anotación guardada */
   initialVinculo?: VinculoManual
-  /** Si es admin, puede editar/eliminar la anotación */
+  /** Si es admin, puede editar/eliminar la anotación y opciones avanzadas */
   isAdmin?: boolean
 }
 
@@ -68,7 +64,6 @@ interface ManualOption {
   url: string
 }
 
-/** Punto en píxeles relativos al canvas */
 interface PixelPoint {
   x: number
   y: number
@@ -78,7 +73,15 @@ type ModalStep = 'select-manual' | 'viewing'
 
 const SCALE_STEPS = [1, 1.25, 1.5, 2, 2.5, 3]
 const DEFAULT_SCALE_IDX = 2
-const CLOSE_THRESHOLD_PX = 14 // px para detectar cierre del polígono
+const CLOSE_THRESHOLD_PX = 14
+
+const OPACITY_PRESETS = [
+  { label: '10%', value: 0.1 },
+  { label: '20%', value: 0.2 },
+  { label: '30%', value: 0.3 },
+  { label: '50%', value: 0.5 },
+  { label: '70%', value: 0.7 },
+]
 
 // ─── Component ──────────────────────────────────────────────
 
@@ -101,6 +104,7 @@ export function ManualSearchModal({
 
   // ─── PDF state ───────────────────────────────────────────
   const [searching, setSearching] = useState(false)
+  const [loadingPdf, setLoadingPdf] = useState(false)
   const [manualUrl, setManualUrl] = useState<string | null>(null)
   const [results, setResults] = useState<SearchResult[]>([])
   const [matchPages, setMatchPages] = useState<Set<number>>(new Set())
@@ -118,6 +122,13 @@ export function ManualSearchModal({
   const [hoverPoint, setHoverPoint] = useState<PixelPoint | null>(null)
   const [nearFirstPoint, setNearFirstPoint] = useState(false)
   const [savingAnnotation, setSavingAnnotation] = useState(false)
+  const [deletingAnnotation, setDeletingAnnotation] = useState(false)
+
+  // ─── Admin drawing options ──────────────────────────────
+  const [drawColorIdx, setDrawColorIdx] = useState(2) // Verde por defecto
+  const [drawOpacity, setDrawOpacity] = useState(0.2)
+  const [drawNoBorder, setDrawNoBorder] = useState(false)
+  const [showColorPicker, setShowColorPicker] = useState(false)
 
   // ─── Existing saved annotation ───────────────────────────
   const existingVinculo = repuesto.vinculosManual?.find(v => v.machineId === machine.id) ?? initialVinculo ?? null
@@ -131,6 +142,10 @@ export function ManualSearchModal({
 
   const searchCode = repuesto.codigoBaader || ''
   const scale = SCALE_STEPS[scaleIdx] ?? 1.5
+  const isViewMode = !!initialVinculo
+
+  // Current color
+  const currentColor = MARKER_COLORS[drawColorIdx] ?? MARKER_COLORS[2]!
 
   // ─── 1. Load manual options ──────────────────────────────
   const loadManualOptions = useCallback(async () => {
@@ -174,15 +189,16 @@ export function ManualSearchModal({
       return
     }
 
-    // Si tenemos vínculo inicial, seleccionamos su manual
     if (initialVinculo?.manualUrl) {
       const idx = options.findIndex(o => o.url === initialVinculo.manualUrl)
       if (idx >= 0) setSelectedManualIdx(idx)
     }
 
-    // Si viene con initialVinculo, saltamos la selección
     if (initialVinculo) {
-      const opt = options[initialVinculo.manualUrl ? options.findIndex(o => o.url === initialVinculo.manualUrl) : 0]
+      const idx = initialVinculo.manualUrl
+        ? options.findIndex(o => o.url === initialVinculo.manualUrl)
+        : 0
+      const opt = options[idx >= 0 ? idx : 0]
       if (opt) {
         setManualUrl(opt.url)
         setStep('viewing')
@@ -190,10 +206,79 @@ export function ManualSearchModal({
     }
   }, [machine, initialVinculo])
 
-  // ─── 2. Search text in PDF ─────────────────────────────────
-  const searchInPdf = useCallback(async (url: string) => {
+  // ─── 2. Load PDF only (no text search) — fast path ──────
+  const loadPdfOnly = useCallback(async (url: string) => {
+    setLoadingPdf(true)
+    try {
+      const loadingTask = pdfjsLib.getDocument({
+        url,
+        cMapUrl: `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/cmaps/`,
+        cMapPacked: true,
+      })
+      const pdf = await loadingTask.promise
+      setPdfDoc(pdf)
+      setTotalPages(pdf.numPages)
+
+      // Ir directamente a la página de la anotación
+      if (initialVinculo?.pagina) {
+        setCurrentPage(initialVinculo.pagina)
+      }
+    } catch (err) {
+      console.error('Error loading PDF:', err)
+    } finally {
+      setLoadingPdf(false)
+    }
+  }, [initialVinculo])
+
+  // ─── 3. Search text in PDF (deferred in background) ─────
+  const searchInPdfBackground = useCallback(async (pdf: PDFDocumentProxy) => {
     if (!searchCode) return
     setSearching(true)
+    try {
+      const found: SearchResult[] = []
+      const pages = new Set<number>()
+      const searchLower = searchCode.toLowerCase().trim()
+
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i)
+        const content = await page.getTextContent()
+        const pageText = content.items
+          .map((item) => ('str' in item ? item.str : ''))
+          .join(' ')
+
+        const lowerText = pageText.toLowerCase()
+        let matchCount = 0
+        let pos = lowerText.indexOf(searchLower)
+        while (pos !== -1) {
+          matchCount++
+          pos = lowerText.indexOf(searchLower, pos + 1)
+        }
+
+        if (matchCount > 0) {
+          pages.add(i)
+          const matchIdx = lowerText.indexOf(searchLower)
+          const snippet = pageText.substring(Math.max(0, matchIdx - 40), Math.min(pageText.length, matchIdx + searchCode.length + 40))
+          found.push({ page: i, textSnippet: snippet, matchCount })
+        }
+      }
+
+      setResults(found)
+      setMatchPages(pages)
+    } catch (err) {
+      console.error('Error searching PDF:', err)
+    } finally {
+      setSearching(false)
+    }
+  }, [searchCode])
+
+  // ─── 4. Full search (load + search, for search mode) ────
+  const searchInPdf = useCallback(async (url: string) => {
+    if (!searchCode) {
+      // No code to search — just load PDF
+      await loadPdfOnly(url)
+      return
+    }
+    setLoadingPdf(true)
     setResults([])
 
     try {
@@ -206,6 +291,8 @@ export function ManualSearchModal({
       setPdfDoc(pdf)
       setTotalPages(pdf.numPages)
 
+      // Search text
+      setSearching(true)
       const found: SearchResult[] = []
       const pages = new Set<number>()
       const searchLower = searchCode.toLowerCase().trim()
@@ -236,19 +323,18 @@ export function ManualSearchModal({
       setResults(found)
       setMatchPages(pages)
 
-      if (initialVinculo?.pagina) {
-        setCurrentPage(initialVinculo.pagina)
-      } else if (found.length > 0 && found[0]) {
+      if (found.length > 0 && found[0]) {
         setCurrentPage(found[0].page)
       }
     } catch (err) {
       console.error('Error searching PDF:', err)
     } finally {
       setSearching(false)
+      setLoadingPdf(false)
     }
-  }, [searchCode, initialVinculo])
+  }, [searchCode, loadPdfOnly])
 
-  // ─── 3. Highlight rect finder ────────────────────────────
+  // ─── 5. Highlight rect finder ────────────────────────────
   const findHighlightRects = useCallback(async (
     page: PDFPageProxy,
     viewport: { width: number; height: number; scale: number },
@@ -301,7 +387,7 @@ export function ManualSearchModal({
     return rects
   }, [])
 
-  // ─── 4. Render page ──────────────────────────────────────
+  // ─── 6. Render page ──────────────────────────────────────
   const renderPage = useCallback(async (pageNum: number) => {
     if (!pdfDoc || !canvasRef.current) return
     setRendering(true)
@@ -332,7 +418,7 @@ export function ManualSearchModal({
           }
         }
 
-        // Saved polygon annotation (green)
+        // Saved polygon annotation
         if (existingVinculo && existingVinculo.pagina === pageNum && existingVinculo.puntos && existingVinculo.puntos.length >= 3) {
           const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
           svg.setAttribute('width', String(viewport.width))
@@ -347,9 +433,20 @@ export function ManualSearchModal({
             .map(p => `${p.x * viewport.width},${p.y * viewport.height}`)
             .join(' ')
           polygon.setAttribute('points', pointsStr)
-          polygon.setAttribute('fill', 'rgba(34, 197, 94, 0.18)')
-          polygon.setAttribute('stroke', 'rgba(34, 197, 94, 0.9)')
-          polygon.setAttribute('stroke-width', '3')
+
+          // Usar el color guardado o default verde
+          const savedColor = existingVinculo.color || 'rgba(34, 197, 94, 0.4)'
+          const matchedColor = MARKER_COLORS.find(c => c.value === savedColor)
+          const borderColor = matchedColor?.border ?? '#22c55e'
+          // Parse opacity from saved rgba
+          const opacityMatch = savedColor.match(/[\d.]+\)$/)
+          const savedOpacity = opacityMatch ? parseFloat(opacityMatch[0]) : 0.2
+
+          polygon.setAttribute('fill', savedColor.replace(/[\d.]+\)$/, `${savedOpacity})`))
+          if (!existingVinculo.sinBorde) {
+            polygon.setAttribute('stroke', borderColor)
+            polygon.setAttribute('stroke-width', '3')
+          }
           svg.appendChild(polygon)
           layer.appendChild(svg)
         }
@@ -395,6 +492,9 @@ export function ManualSearchModal({
       setDrawingMode(false)
       setPolyPoints([])
       setPolyClosed(false)
+      setResults([])
+      setMatchPages(new Set())
+      setShowColorPicker(false)
       setStep(initialVinculo ? 'viewing' : 'select-manual')
       loadManualOptions()
     }
@@ -406,11 +506,30 @@ export function ManualSearchModal({
     }
   }, [open, loadManualOptions, initialVinculo])
 
+  // When manualUrl changes and we're viewing:
+  // - View mode (initialVinculo): load PDF only → instant, then background search
+  // - Search mode: full search
   useEffect(() => {
-    if (manualUrl && step === 'viewing') {
+    if (!manualUrl || step !== 'viewing') return
+    if (isViewMode) {
+      // Fast path: load PDF, jump to annotation page
+      loadPdfOnly(manualUrl)
+    } else {
+      // Search mode: load + search
       searchInPdf(manualUrl)
     }
-  }, [manualUrl, step, searchInPdf])
+  }, [manualUrl, step, isViewMode, loadPdfOnly, searchInPdf])
+
+  // Background search after PDF loaded in view mode
+  useEffect(() => {
+    if (pdfDoc && isViewMode && searchCode && results.length === 0 && !searching) {
+      // Defer background search so initial render is fast
+      const timer = setTimeout(() => {
+        searchInPdfBackground(pdfDoc)
+      }, 500)
+      return () => clearTimeout(timer)
+    }
+  }, [pdfDoc, isViewMode, searchCode, results.length, searching, searchInPdfBackground])
 
   useEffect(() => {
     if (pdfDoc && currentPage >= 1 && currentPage <= totalPages) {
@@ -427,11 +546,11 @@ export function ManualSearchModal({
   }
 
   // ─── Page navigation ───────────────────────────────────────
-  const goToPage = (p: number) => {
+  const goToPage = useCallback((p: number) => {
     const clamped = Math.max(1, Math.min(totalPages, p))
     setCurrentPage(clamped)
     scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
-  }
+  }, [totalPages])
 
   const goNextMatch = () => {
     const nextMatch = results.find(r => r.page > currentPage)
@@ -457,12 +576,12 @@ export function ManualSearchModal({
   // ─── Polygon drawing handlers ─────────────────────────────
   const toggleDrawingMode = () => {
     if (drawingMode) {
-      // Cancel
       setDrawingMode(false)
       setPolyPoints([])
       setPolyClosed(false)
       setHoverPoint(null)
       setNearFirstPoint(false)
+      setShowColorPicker(false)
     } else {
       setDrawingMode(true)
       setPolyPoints([])
@@ -486,7 +605,6 @@ export function ManualSearchModal({
     const x = e.clientX - layerRect.left
     const y = e.clientY - layerRect.top
 
-    // Check if clicking near first point to close polygon
     if (polyPoints.length >= 3) {
       const first = polyPoints[0]
       if (first) {
@@ -510,7 +628,6 @@ export function ManualSearchModal({
     const y = e.clientY - layerRect.top
     setHoverPoint({ x, y })
 
-    // Check proximity to first point
     if (polyPoints.length >= 3) {
       const first = polyPoints[0]
       if (first) {
@@ -527,6 +644,14 @@ export function ManualSearchModal({
     setNearFirstPoint(false)
   }
 
+  // ─── Derived draw colors ──────────────────────────────────
+  const drawFillColor = currentColor
+    ? currentColor.value.replace(/[\d.]+\)$/, `${drawOpacity})`)
+    : `rgba(34, 197, 94, ${drawOpacity})`
+  const drawStrokeColor = currentColor?.border ?? '#22c55e'
+  const drawFillPreview = drawFillColor
+  const drawStrokePreview = drawNoBorder ? 'transparent' : drawStrokeColor
+
   // ─── Save polygon annotation ──────────────────────────────
   const saveAnnotation = useCallback(async () => {
     if (polyPoints.length < 3 || !polyClosed || !canvasRef.current || !manualUrl) return
@@ -536,7 +661,6 @@ export function ManualSearchModal({
     const cw = canvas.width
     const ch = canvas.height
 
-    // Normalizar puntos a 0-1
     const normalizedPoints = polyPoints.map(p => ({
       x: p.x / cw,
       y: p.y / ch,
@@ -549,8 +673,9 @@ export function ManualSearchModal({
       manualUrl,
       puntos: normalizedPoints,
       forma: 'poligono',
-      color: 'rgba(34, 197, 94, 0.4)',
+      color: drawFillColor,
       descripcion: `${repuesto.codigoBaader || repuesto.codigoSAP} — ${repuesto.textoBreve || 'Repuesto'}`,
+      sinBorde: drawNoBorder,
     }
 
     try {
@@ -559,21 +684,19 @@ export function ManualSearchModal({
         vinculosManual: arrayUnion(vinculo),
         updatedAt: Timestamp.now(),
       })
-      // Limpiar dibujo y re-render
       setDrawingMode(false)
       setPolyPoints([])
       setPolyClosed(false)
+      setShowColorPicker(false)
       renderPage(currentPage)
     } catch (err) {
       console.error('Error saving annotation:', err)
     } finally {
       setSavingAnnotation(false)
     }
-  }, [polyPoints, polyClosed, manualUrl, currentPage, machine.id, repuesto.id, repuesto.codigoBaader, repuesto.codigoSAP, repuesto.textoBreve, renderPage])
+  }, [polyPoints, polyClosed, manualUrl, currentPage, machine.id, repuesto.id, repuesto.codigoBaader, repuesto.codigoSAP, repuesto.textoBreve, drawFillColor, drawNoBorder, renderPage])
 
   // ─── Delete existing annotation (admin) ────────────────────
-  const [deletingAnnotation, setDeletingAnnotation] = useState(false)
-
   const deleteAnnotation = useCallback(async () => {
     if (!existingVinculo) return
     setDeletingAnnotation(true)
@@ -583,7 +706,6 @@ export function ManualSearchModal({
         vinculosManual: arrayRemove(existingVinculo),
         updatedAt: Timestamp.now(),
       })
-      // Ahora entrar en modo dibujo para la nueva marca
       setDrawingMode(true)
       setPolyPoints([])
       setPolyClosed(false)
@@ -597,19 +719,17 @@ export function ManualSearchModal({
 
   const startEditAnnotation = useCallback(() => {
     if (!existingVinculo) return
-    // Ir a la página de la anotación si es necesario
     if (existingVinculo.pagina !== currentPage) {
       goToPage(existingVinculo.pagina)
     }
-    // Eliminar la vieja y entrar en modo dibujo
     deleteAnnotation()
   }, [existingVinculo, currentPage, deleteAnnotation, goToPage])
 
   // ─── Derived state ─────────────────────────────────────────
   const currentMatchInfo = results.find(r => r.page === currentPage) ?? null
   const isMatchPage = matchPages.has(currentPage)
+  const isLoading = loadingPdf && !pdfDoc
 
-  // Build SVG polygon points string for the drawing
   const buildPolyStr = () => {
     const pts = [...polyPoints]
     if (!polyClosed && hoverPoint) pts.push(hoverPoint)
@@ -696,7 +816,7 @@ export function ManualSearchModal({
         {/* Header */}
         <DialogHeader className="shrink-0 px-4 pt-4 pb-2">
           <DialogTitle className="flex items-center gap-2">
-            {initialVinculo
+            {isViewMode
               ? <><Eye className="h-5 w-5 text-green-500" /> Ver en Manual</>
               : <><BookOpen className="h-5 w-5 text-purple-500" /> Buscar en Manual</>
             }
@@ -708,7 +828,7 @@ export function ManualSearchModal({
           <Search className="h-4 w-4 text-muted-foreground shrink-0" />
           <div className="flex-1 min-w-0">
             <div className="text-sm text-foreground">
-              {initialVinculo ? 'Ubicación de' : 'Buscando'}{' '}
+              {isViewMode ? 'Ubicación de' : 'Buscando'}{' '}
               <span className="font-mono font-bold text-purple-400">{searchCode || repuesto.codigoSAP}</span>{' '}
               en <span className="font-semibold">{manualOptions[selectedManualIdx]?.label || 'manual'}</span>
             </div>
@@ -721,11 +841,10 @@ export function ManualSearchModal({
 
         {/* Content */}
         <div className="flex-1 overflow-hidden min-h-0 flex flex-col">
-          {searching ? (
+          {isLoading ? (
             <div className="flex flex-col items-center justify-center py-16 gap-3">
               <Loader2 className="h-8 w-8 animate-spin text-purple-500" />
-              <span className="text-sm text-muted-foreground">Buscando &quot;{searchCode}&quot; en el PDF...</span>
-              <span className="text-xs text-muted-foreground">Esto puede tomar unos segundos</span>
+              <span className="text-sm text-muted-foreground">Cargando PDF...</span>
             </div>
           ) : (
             <>
@@ -734,10 +853,10 @@ export function ManualSearchModal({
                 {/* Page nav */}
                 <div className="flex items-center gap-1">
                   <Button variant="ghost" size="sm" className="h-7 w-7 p-0"
-                    disabled={currentPage <= 1} onClick={() => goToPage(1)} title="Primera"
+                    disabled={currentPage <= 1} onClick={() => goToPage(1)} title="Primera página"
                   ><ChevronsLeft className="h-4 w-4" /></Button>
                   <Button variant="ghost" size="sm" className="h-7 w-7 p-0"
-                    disabled={currentPage <= 1} onClick={() => goToPage(currentPage - 1)} title="Anterior"
+                    disabled={currentPage <= 1} onClick={() => goToPage(currentPage - 1)} title="Página anterior"
                   ><ChevronLeft className="h-4 w-4" /></Button>
                   <div className="flex items-center gap-1 mx-1">
                     <Input className="h-7 w-14 text-center text-xs font-mono px-1"
@@ -750,10 +869,10 @@ export function ManualSearchModal({
                     <span className="text-xs text-muted-foreground">/ {totalPages}</span>
                   </div>
                   <Button variant="ghost" size="sm" className="h-7 w-7 p-0"
-                    disabled={currentPage >= totalPages} onClick={() => goToPage(currentPage + 1)} title="Siguiente"
+                    disabled={currentPage >= totalPages} onClick={() => goToPage(currentPage + 1)} title="Página siguiente"
                   ><ChevronRight className="h-4 w-4" /></Button>
                   <Button variant="ghost" size="sm" className="h-7 w-7 p-0"
-                    disabled={currentPage >= totalPages} onClick={() => goToPage(totalPages)} title="Última"
+                    disabled={currentPage >= totalPages} onClick={() => goToPage(totalPages)} title="Última página"
                   ><ChevronsRight className="h-4 w-4" /></Button>
                 </div>
 
@@ -762,24 +881,29 @@ export function ManualSearchModal({
                 {/* Zoom */}
                 <div className="flex items-center gap-1">
                   <Button variant="ghost" size="sm" className="h-7 w-7 p-0"
-                    disabled={scaleIdx <= 0} onClick={() => setScaleIdx(Math.max(0, scaleIdx - 1))} title="Reducir"
+                    disabled={scaleIdx <= 0} onClick={() => setScaleIdx(Math.max(0, scaleIdx - 1))} title="Reducir zoom"
                   ><ZoomOut className="h-4 w-4" /></Button>
                   <span className="text-[11px] font-mono text-muted-foreground w-10 text-center">
                     {Math.round(scale * 100)}%
                   </span>
                   <Button variant="ghost" size="sm" className="h-7 w-7 p-0"
                     disabled={scaleIdx >= SCALE_STEPS.length - 1}
-                    onClick={() => setScaleIdx(Math.min(SCALE_STEPS.length - 1, scaleIdx + 1))} title="Ampliar"
+                    onClick={() => setScaleIdx(Math.min(SCALE_STEPS.length - 1, scaleIdx + 1))} title="Aumentar zoom"
                   ><ZoomIn className="h-4 w-4" /></Button>
                   <Button variant="ghost" size="sm" className="h-7 w-7 p-0"
-                    onClick={() => setScaleIdx(DEFAULT_SCALE_IDX)} title="Tamaño original"
+                    onClick={() => setScaleIdx(DEFAULT_SCALE_IDX)} title="Zoom original (150%)"
                   ><Maximize2 className="h-3.5 w-3.5" /></Button>
                 </div>
 
                 <div className="h-5 w-px bg-border mx-1" />
 
                 {/* Match navigation */}
-                {results.length > 0 ? (
+                {searching ? (
+                  <div className="flex items-center gap-1.5">
+                    <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                    <span className="text-[11px] text-muted-foreground">Buscando coincidencias...</span>
+                  </div>
+                ) : results.length > 0 ? (
                   <div className="flex items-center gap-1.5">
                     <FileText className="h-3.5 w-3.5 text-green-500" />
                     <span className="text-[11px] text-foreground">
@@ -792,9 +916,11 @@ export function ManualSearchModal({
                       onClick={goNextMatch} title="Coincidencia siguiente"
                     >Sig. <ChevronRight className="h-3 w-3" /></Button>
                   </div>
-                ) : (
-                  <span className="text-[11px] text-muted-foreground">Sin coincidencias para &quot;{searchCode}&quot;</span>
-                )}
+                ) : searchCode ? (
+                  <span className="text-[11px] text-muted-foreground">
+                    {isViewMode && !searching ? 'Buscando en fondo...' : `Sin coincidencias para "${searchCode}"`}
+                  </span>
+                ) : null}
 
                 <div className="flex-1" />
 
@@ -810,13 +936,13 @@ export function ManualSearchModal({
                   title={drawingMode ? 'Cancelar marcado' : 'Marcar repuesto en el diagrama'}
                 >
                   <MousePointerClick className="h-3.5 w-3.5" />
-                  {drawingMode ? 'Cancelar marcado' : 'Marcar en diagrama'}
+                  {drawingMode ? 'Cancelar' : 'Marcar en diagrama'}
                 </Button>
 
                 {/* Open external */}
                 {manualUrl && (
                   <Button variant="ghost" size="sm" className="h-7 px-2 text-[11px] gap-1"
-                    onClick={() => window.open(manualUrl, '_blank')}
+                    onClick={() => window.open(manualUrl, '_blank')} title="Abrir PDF en pestaña nueva"
                   ><ExternalLink className="h-3 w-3" /> Abrir PDF</Button>
                 )}
               </div>
@@ -826,39 +952,126 @@ export function ManualSearchModal({
                 <div className="shrink-0 px-4 py-1.5 bg-green-500/10 border-b border-green-500/20 text-xs flex items-center gap-2">
                   <span className="inline-block w-2 h-2 rounded-full bg-green-400 animate-pulse" />
                   <span className="text-foreground">
-                    <span className="font-semibold text-green-400">Modo marcado</span> — haz click para colocar puntos.
-                    {polyPoints.length === 0 && ' Coloca el primer punto.'}
-                    {polyPoints.length > 0 && polyPoints.length < 3 && ` Punto ${polyPoints.length}/${polyPoints.length} — necesitas al menos 3 puntos.`}
-                    {polyPoints.length >= 3 && !polyClosed && ' Haz click en el primer punto (verde) para cerrar la figura.'}
-                    {polyClosed && ' ¡Figura cerrada! Puedes guardar.'}
+                    <span className="font-semibold text-green-400">Modo marcado</span> —{' '}
+                    {polyPoints.length === 0 && 'Haz click para colocar el primer punto.'}
+                    {polyPoints.length > 0 && polyPoints.length < 3 && `Punto ${polyPoints.length} — necesitas al menos 3.`}
+                    {polyPoints.length >= 3 && !polyClosed && 'Click en el primer punto (verde) para cerrar.'}
+                    {polyClosed && '¡Figura cerrada! Puedes guardar.'}
                   </span>
 
                   <div className="ml-auto flex items-center gap-1.5">
+                    {/* Admin: color picker toggle */}
+                    {isAdmin && (
+                      <Button variant="ghost" size="sm"
+                        className={`h-6 px-2 text-[11px] gap-1 ${showColorPicker ? 'text-foreground bg-muted/50' : 'text-muted-foreground hover:text-foreground'}`}
+                        onClick={() => setShowColorPicker(!showColorPicker)}
+                        title="Opciones de color y borde"
+                      >
+                        <Palette className="h-3 w-3" /> Estilo
+                      </Button>
+                    )}
                     {polyPoints.length > 0 && !polyClosed && (
                       <Button variant="ghost" size="sm"
                         className="h-6 px-2 text-[11px] gap-1 text-yellow-400 hover:text-yellow-300"
-                        onClick={undoLastPoint}
+                        onClick={undoLastPoint} title="Deshacer último punto"
                       >
-                        <Undo2 className="h-3 w-3" /> Deshacer punto
+                        <Undo2 className="h-3 w-3" /> Deshacer
                       </Button>
                     )}
                     {polyClosed && (
                       <>
                         <Button variant="ghost" size="sm"
                           className="h-6 px-2 text-[11px] gap-1 text-yellow-400 hover:text-yellow-300"
-                          onClick={undoLastPoint}
+                          onClick={undoLastPoint} title="Reabrir polígono"
                         >
                           <Undo2 className="h-3 w-3" /> Reabrir
                         </Button>
                         <Button variant="outline" size="sm"
                           className="h-6 px-2 text-[11px] gap-1 border-green-500/40 text-green-400 hover:bg-green-500/10"
                           onClick={saveAnnotation} disabled={savingAnnotation}
+                          title="Guardar dibujo como ubicación del repuesto"
                         >
                           {savingAnnotation ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
                           Guardar marcado
                         </Button>
                       </>
                     )}
+                  </div>
+                </div>
+              )}
+
+              {/* Admin: Color/Border/Opacity picker panel */}
+              {drawingMode && showColorPicker && isAdmin && (
+                <div className="shrink-0 px-4 py-2 bg-muted/30 border-b border-border flex flex-wrap items-center gap-4 text-xs">
+                  {/* Color */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground font-medium">Color:</span>
+                    <div className="flex gap-1">
+                      {MARKER_COLORS.map((c, i) => (
+                        <button
+                          key={i}
+                          onClick={() => setDrawColorIdx(i)}
+                          className={`w-5 h-5 rounded-full border-2 transition-transform ${
+                            drawColorIdx === i ? 'border-white scale-125 ring-1 ring-white/50' : 'border-transparent hover:scale-110'
+                          }`}
+                          style={{ backgroundColor: c.border }}
+                          title={c.name}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="h-4 w-px bg-border" />
+
+                  {/* Opacity */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground font-medium">Opacidad:</span>
+                    <div className="flex gap-1">
+                      {OPACITY_PRESETS.map((o) => (
+                        <button
+                          key={o.value}
+                          onClick={() => setDrawOpacity(o.value)}
+                          className={`px-1.5 py-0.5 rounded text-[10px] transition-colors ${
+                            drawOpacity === o.value
+                              ? 'bg-foreground/20 text-foreground font-bold'
+                              : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                          }`}
+                          title={`Transparencia ${o.label}`}
+                        >{o.label}</button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="h-4 w-px bg-border" />
+
+                  {/* Border toggle */}
+                  <button
+                    onClick={() => setDrawNoBorder(!drawNoBorder)}
+                    className={`flex items-center gap-1.5 px-2 py-0.5 rounded transition-colors ${
+                      drawNoBorder
+                        ? 'bg-muted/50 text-foreground'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                    title={drawNoBorder ? 'Activar borde del polígono' : 'Quitar borde del polígono'}
+                  >
+                    <span className="w-3 h-3 rounded-sm border-2"
+                      style={{
+                        borderColor: drawNoBorder ? 'transparent' : drawStrokeColor,
+                        backgroundColor: drawFillPreview,
+                      }}
+                    />
+                    <span>{drawNoBorder ? 'Sin borde' : 'Con borde'}</span>
+                  </button>
+
+                  {/* Preview swatch */}
+                  <div className="flex items-center gap-1.5 ml-auto">
+                    <span className="text-muted-foreground">Vista previa:</span>
+                    <span className="w-8 h-5 rounded"
+                      style={{
+                        backgroundColor: drawFillPreview,
+                        border: drawNoBorder ? 'none' : `2px solid ${drawStrokePreview}`,
+                      }}
+                    />
                   </div>
                 </div>
               )}
@@ -874,6 +1087,7 @@ export function ManualSearchModal({
                     <Button variant="ghost" size="sm"
                       className="h-5 px-2 text-[10px] text-green-400 hover:text-green-300"
                       onClick={() => goToPage(existingVinculo.pagina)}
+                      title="Ir a la página donde está marcado el repuesto"
                     >Ir a marcado</Button>
                   )}
                   {isAdmin && (
@@ -882,6 +1096,7 @@ export function ManualSearchModal({
                         className="h-5 px-2 text-[10px] gap-1 text-yellow-400 hover:text-yellow-300 hover:bg-yellow-500/10"
                         onClick={startEditAnnotation}
                         disabled={deletingAnnotation}
+                        title="Eliminar el marcado actual y redibujar"
                       >
                         {deletingAnnotation ? <Loader2 className="h-3 w-3 animate-spin" /> : <Pencil className="h-3 w-3" />}
                         Editar ubicación
@@ -890,6 +1105,7 @@ export function ManualSearchModal({
                         className="h-5 px-2 text-[10px] gap-1 text-destructive/70 hover:text-destructive hover:bg-destructive/10"
                         onClick={deleteAnnotation}
                         disabled={deletingAnnotation}
+                        title="Eliminar permanentemente el marcado"
                       >
                         <Trash2 className="h-3 w-3" />
                         Eliminar
@@ -953,39 +1169,36 @@ export function ManualSearchModal({
                       className="absolute top-0 left-0"
                       style={{
                         zIndex: drawingMode ? 15 : -1,
-                        cursor: drawingMode
-                          ? (nearFirstPoint ? 'pointer' : 'crosshair')
-                          : 'default',
+                        cursor: drawingMode ? (nearFirstPoint ? 'pointer' : 'crosshair') : 'default',
                         pointerEvents: drawingMode ? 'auto' : 'none',
                       }}
                       onClick={handleDrawClick}
                       onMouseMove={handleDrawMove}
                       onMouseLeave={handleDrawLeave}
                     >
-                      {/* SVG for polygon drawing */}
                       <svg
                         ref={svgRef}
                         className="absolute top-0 left-0"
                         style={{ width: '100%', height: '100%', pointerEvents: 'none' }}
                       >
-                        {/* Polygon shape (dashed when open, solid when closed) */}
+                        {/* Polygon shape */}
                         {polyPoints.length >= 2 && (
                           <polygon
                             points={polyClosed ? polyPoints.map(p => `${p.x},${p.y}`).join(' ') : buildPolyStr()}
-                            fill={polyClosed ? 'rgba(34, 197, 94, 0.18)' : 'rgba(34, 197, 94, 0.08)'}
-                            stroke={polyClosed ? 'rgba(34, 197, 94, 0.9)' : 'rgba(34, 197, 94, 0.6)'}
+                            fill={polyClosed ? drawFillPreview : drawFillColor.replace(/[\d.]+\)$/, '0.08)')}
+                            stroke={polyClosed && drawNoBorder ? 'none' : (polyClosed ? drawStrokeColor : `${drawStrokeColor}99`)}
                             strokeWidth={polyClosed ? 3 : 2}
                             strokeDasharray={polyClosed ? 'none' : '6 3'}
                           />
                         )}
-                        {/* Line from last point to hover (when open) */}
+                        {/* Line from last point to hover */}
                         {polyPoints.length >= 1 && !polyClosed && hoverPoint && (
                           <line
                             x1={polyPoints[polyPoints.length - 1]?.x ?? 0}
                             y1={polyPoints[polyPoints.length - 1]?.y ?? 0}
                             x2={hoverPoint.x}
                             y2={hoverPoint.y}
-                            stroke="rgba(34, 197, 94, 0.5)"
+                            stroke={`${drawStrokeColor}80`}
                             strokeWidth="1.5"
                             strokeDasharray="4 3"
                           />
@@ -998,10 +1211,10 @@ export function ManualSearchModal({
                             cy={p.y}
                             r={i === 0 && nearFirstPoint ? 8 : 5}
                             fill={i === 0
-                              ? (nearFirstPoint ? 'rgba(34, 197, 94, 1)' : 'rgba(34, 197, 94, 0.8)')
+                              ? (nearFirstPoint ? drawStrokeColor : `${drawStrokeColor}cc`)
                               : 'rgba(255, 255, 255, 0.9)'
                             }
-                            stroke={i === 0 ? '#fff' : 'rgba(34, 197, 94, 0.9)'}
+                            stroke={i === 0 ? '#fff' : drawStrokeColor}
                             strokeWidth={i === 0 ? 2.5 : 2}
                             style={{ transition: 'r 0.15s ease' }}
                           />

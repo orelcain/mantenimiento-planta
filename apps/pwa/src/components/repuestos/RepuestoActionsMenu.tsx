@@ -1,4 +1,4 @@
-import { MoreVertical, FileText, Image, Pencil, Trash2, ClipboardList, Camera, BookOpen, Eye } from 'lucide-react'
+import { MoreVertical, Image, Pencil, Trash2, ClipboardList, Camera, BookOpen, Eye } from 'lucide-react'
 import type { Repuesto } from '@/types/repuestos'
 import {
   Button,
@@ -33,7 +33,6 @@ export function RepuestoActionsMenu({
   onSearchInManual,
   onViewInManual,
 }: RepuestoActionsProps) {
-  const hasManual = (repuesto.vinculosManual?.length || 0) > 0
   const hasPhotos = (repuesto.fotosReales?.length || 0) > 0
   const hasImagenes = (repuesto.imagenesManual?.length || 0) > 0
   const hasGallery = (repuesto.gallery?.length || 0) > 0
@@ -89,13 +88,6 @@ export function RepuestoActionsMenu({
                 <span className="ml-auto text-[10px] text-muted-foreground">
                   {(repuesto.fotosReales?.length || 0) + (repuesto.imagenesManual?.length || 0)}
                 </span>
-              </DropdownMenuItem>
-            )}
-
-            {hasManual && onViewManual && (
-              <DropdownMenuItem onClick={() => onViewManual(repuesto)} className="gap-2 cursor-pointer">
-                <FileText className="h-4 w-4 text-amber-500" />
-                <span>Manual / Datasheet</span>
               </DropdownMenuItem>
             )}
 

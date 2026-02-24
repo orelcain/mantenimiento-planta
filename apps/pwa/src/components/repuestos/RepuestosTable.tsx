@@ -1,8 +1,20 @@
 import { useState } from 'react'
-import { Package, ImageIcon, X, BookOpen, Eye, ClipboardList, Camera, Pencil, Trash2, FileText } from 'lucide-react'
+import { Package, ImageIcon, X, BookOpen, Eye, ClipboardList, Camera, Pencil, Trash2 } from 'lucide-react'
 import type { Repuesto } from '@/types/repuestos'
 import { RepuestoActionsMenu } from './RepuestoActionsMenu'
 import { InlineEditName } from './InlineEditName'
+
+/** Tooltip ligero para botones de acción (CSS puro, sin deps) */
+function Tip({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <span className="relative group/tip">
+      {children}
+      <span className="pointer-events-none absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-popover text-popover-foreground text-[10px] px-1.5 py-0.5 opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 z-50 shadow-lg border border-border">
+        {label}
+      </span>
+    </span>
+  )
+}
 
 interface RepuestosTableProps {
   repuestos: Repuesto[]
@@ -295,56 +307,86 @@ export function RepuestosTable({
                       ${formatNumber(rep.valorUnitario || 0)}
                     </span>
                   </td>
-                  {/* Acciones — botones inline */}
+                  {/* Acciones — botones inline con tooltips */}
                   <td className="px-3 py-2.5">
-                    <div className="flex items-center justify-end gap-1 flex-wrap">
+                    <div className="flex items-center justify-end gap-0.5 flex-wrap">
+                      {/* ── Ficha Técnica (separada) ── */}
                       {onViewSpecs && (
-                        <button onClick={() => onViewSpecs(rep)} title="Ficha Técnica"
-                          className="h-7 w-7 inline-flex items-center justify-center rounded-md text-blue-400/60 hover:text-blue-400 hover:bg-blue-500/10 transition-colors">
-                          <ClipboardList className="h-3.5 w-3.5" />
-                        </button>
+                        <Tip label="Ficha Técnica">
+                          <button onClick={() => onViewSpecs(rep)}
+                            className="h-7 w-7 inline-flex items-center justify-center rounded-md text-blue-400/60 hover:text-blue-400 hover:bg-blue-500/10 transition-colors">
+                            <ClipboardList className="h-3.5 w-3.5" />
+                          </button>
+                        </Tip>
                       )}
+
+                      {/* Separador visual */}
+                      {onViewSpecs && onViewGallery && (
+                        <span className="w-px h-4 bg-border mx-0.5" />
+                      )}
+
+                      {/* ── Galería ── */}
                       {onViewGallery && (
-                        <button onClick={() => onViewGallery(rep)} title="Galería"
-                          className="h-7 w-7 inline-flex items-center justify-center rounded-md text-indigo-400/60 hover:text-indigo-400 hover:bg-indigo-500/10 transition-colors">
-                          <Camera className="h-3.5 w-3.5" />
-                        </button>
+                        <Tip label="Galería">
+                          <button onClick={() => onViewGallery(rep)}
+                            className="h-7 w-7 inline-flex items-center justify-center rounded-md text-indigo-400/60 hover:text-indigo-400 hover:bg-indigo-500/10 transition-colors">
+                            <Camera className="h-3.5 w-3.5" />
+                          </button>
+                        </Tip>
                       )}
-                      {(rep.vinculosManual?.length ?? 0) > 0 && onViewManual && (
-                        <button onClick={() => onViewManual(rep)} title="Manual / Datasheet"
-                          className="h-7 w-7 inline-flex items-center justify-center rounded-md text-amber-400/60 hover:text-amber-400 hover:bg-amber-500/10 transition-colors">
-                          <FileText className="h-3.5 w-3.5" />
-                        </button>
+
+                      {/* Separador visual */}
+                      {(onViewGallery || onViewSpecs) && (onSearchInManual || onViewInManual) && (
+                        <span className="w-px h-4 bg-border mx-0.5" />
                       )}
+
+                      {/* ── Manual ── */}
                       {onSearchInManual && rep.codigoBaader && (
-                        <button onClick={() => onSearchInManual(rep)} title="Buscar en Manual"
-                          className="h-7 w-7 inline-flex items-center justify-center rounded-md text-purple-400/60 hover:text-purple-400 hover:bg-purple-500/10 transition-colors">
-                          <BookOpen className="h-3.5 w-3.5" />
-                        </button>
+                        <Tip label="Buscar en Manual">
+                          <button onClick={() => onSearchInManual(rep)}
+                            className="h-7 w-7 inline-flex items-center justify-center rounded-md text-purple-400/60 hover:text-purple-400 hover:bg-purple-500/10 transition-colors">
+                            <BookOpen className="h-3.5 w-3.5" />
+                          </button>
+                        </Tip>
                       )}
                       {onViewInManual && (rep.vinculosManual?.length ?? 0) > 0 && (
-                        <button onClick={() => onViewInManual(rep)} title="Ver en Manual (ubicado)"
-                          className="h-7 w-7 inline-flex items-center justify-center rounded-md text-green-400/60 hover:text-green-400 hover:bg-green-500/10 transition-colors">
-                          <Eye className="h-3.5 w-3.5" />
-                        </button>
+                        <Tip label="Ver en Manual">
+                          <button onClick={() => onViewInManual(rep)}
+                            className="h-7 w-7 inline-flex items-center justify-center rounded-md text-green-400/60 hover:text-green-400 hover:bg-green-500/10 transition-colors">
+                            <Eye className="h-3.5 w-3.5" />
+                          </button>
+                        </Tip>
                       )}
                       {isAdmin && onEditAnnotation && (rep.vinculosManual?.length ?? 0) > 0 && (
-                        <button onClick={() => onEditAnnotation(rep)} title="Editar ubicación en manual"
-                          className="h-7 w-7 inline-flex items-center justify-center rounded-md text-yellow-400/60 hover:text-yellow-400 hover:bg-yellow-500/10 transition-colors">
-                          <Pencil className="h-3 w-3" />
-                        </button>
+                        <Tip label="Editar ubicación">
+                          <button onClick={() => onEditAnnotation(rep)}
+                            className="h-7 w-7 inline-flex items-center justify-center rounded-md text-yellow-400/60 hover:text-yellow-400 hover:bg-yellow-500/10 transition-colors">
+                            <Pencil className="h-3 w-3" />
+                          </button>
+                        </Tip>
                       )}
+
+                      {/* Separador visual */}
+                      {(onEdit || onDelete) && (
+                        <span className="w-px h-4 bg-border mx-0.5" />
+                      )}
+
+                      {/* ── Editar / Eliminar ── */}
                       {onEdit && (
-                        <button onClick={() => onEdit(rep)} title="Editar repuesto"
-                          className="h-7 w-7 inline-flex items-center justify-center rounded-md text-muted-foreground/60 hover:text-foreground hover:bg-muted/50 transition-colors">
-                          <Pencil className="h-3.5 w-3.5" />
-                        </button>
+                        <Tip label="Editar repuesto">
+                          <button onClick={() => onEdit(rep)}
+                            className="h-7 w-7 inline-flex items-center justify-center rounded-md text-muted-foreground/60 hover:text-foreground hover:bg-muted/50 transition-colors">
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                        </Tip>
                       )}
                       {onDelete && (
-                        <button onClick={() => onDelete(rep)} title="Eliminar"
-                          className="h-7 w-7 inline-flex items-center justify-center rounded-md text-destructive/40 hover:text-destructive hover:bg-destructive/10 transition-colors">
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
+                        <Tip label="Eliminar">
+                          <button onClick={() => onDelete(rep)}
+                            className="h-7 w-7 inline-flex items-center justify-center rounded-md text-destructive/40 hover:text-destructive hover:bg-destructive/10 transition-colors">
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </Tip>
                       )}
                     </div>
                   </td>
