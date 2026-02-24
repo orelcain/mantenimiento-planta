@@ -16,6 +16,7 @@ interface RepuestosTableProps {
   onViewGallery?: (repuesto: Repuesto) => void
   onRenameRepuesto?: (repuestoId: string, newName: string) => Promise<void>
   onSearchInManual?: (repuesto: Repuesto) => void
+  onViewInManual?: (repuesto: Repuesto) => void
 }
 
 const formatNumber = (value: number) =>
@@ -90,6 +91,7 @@ export function RepuestosTable({
   onViewGallery,
   onRenameRepuesto,
   onSearchInManual,
+  onViewInManual,
 }: RepuestosTableProps) {
   const [preview, setPreview] = useState<{ url: string; name: string } | null>(null)
 
@@ -149,6 +151,7 @@ export function RepuestosTable({
                   onViewSpecs={onViewSpecs}
                   onViewGallery={onViewGallery}
                   onSearchInManual={onSearchInManual}
+                  onViewInManual={onViewInManual}
                 />
               </div>
 
@@ -291,6 +294,7 @@ export function RepuestosTable({
                         onViewSpecs={onViewSpecs}
                         onViewGallery={onViewGallery}
                         onSearchInManual={onSearchInManual}
+                        onViewInManual={onViewInManual}
                       />
                     </div>
                   </td>

@@ -49,6 +49,7 @@ export function RepuestosDashboard() {
   const [specsTarget, setSpecsTarget] = useState<{repuesto: Repuesto, tab: 'specs' | 'gallery'} | null>(null)
   const [exportReportOpen, setExportReportOpen] = useState(false)
   const [manualSearchTarget, setManualSearchTarget] = useState<Repuesto | null>(null)
+  const [viewInManualTarget, setViewInManualTarget] = useState<Repuesto | null>(null)
   const [, setSelectedCategoryId] = useState<string | null>('maquinas-principales')
 
   // Filtros y paginación
@@ -381,6 +382,7 @@ export function RepuestosDashboard() {
                 onViewGallery={(rep) => setSpecsTarget({ repuesto: rep, tab: 'gallery' })}
                 onRenameRepuesto={isAdmin ? handleRenameRepuesto : undefined}
                 onSearchInManual={currentMachine ? (rep) => setManualSearchTarget(rep) : undefined}
+                onViewInManual={currentMachine ? (rep) => setViewInManualTarget(rep) : undefined}
               />
 
               <RepuestosPagination
@@ -493,6 +495,17 @@ export function RepuestosDashboard() {
           onOpenChange={(open) => !open && setManualSearchTarget(null)}
           machine={currentMachine}
           repuesto={manualSearchTarget}
+        />
+      )}
+
+      {/* Modal de Ver en Manual (con vínculo guardado) */}
+      {viewInManualTarget && currentMachine && (
+        <ManualSearchModal
+          open={!!viewInManualTarget}
+          onOpenChange={(open) => !open && setViewInManualTarget(null)}
+          machine={currentMachine}
+          repuesto={viewInManualTarget}
+          initialVinculo={viewInManualTarget.vinculosManual?.find(v => v.machineId === currentMachine.id) ?? viewInManualTarget.vinculosManual?.[0]}
         />
       )}
 

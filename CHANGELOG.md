@@ -7,6 +7,15 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.80] - 2026-02-23
+### Funcionalidad
+- **Buscar en Manual — Selector de manual**: Cuando una máquina tiene múltiples manuales PDF, aparece un selector para elegir en cuál buscar
+- **Buscar en Manual — Marcar en diagrama**: Nuevo modo de dibujo que permite trazar un rectángulo sobre el diagrama para marcar exactamente dónde está el repuesto
+- **Buscar en Manual — Guardar marcado**: La anotación dibujada se guarda como `VinculoManual` en Firestore con coordenadas normalizadas, página y URL del manual
+- **Ver en Manual**: Nuevo botón en el menú de acciones del repuesto que aparece solo cuando el repuesto ya tiene una ubicación marcada en el manual; abre directamente la página y muestra el rectángulo verde guardado
+
+---
+
 ## [2.48.79] - 2026-02-23
 ### Mejora
 - **Buscar en Manual — Asignar posición desde toolbar**: El botón "Asignar pos." ahora también aparece en la barra de herramientas junto a los resultados de búsqueda, facilitando asignar o corregir la posición mientras se revisan las coincidencias del código

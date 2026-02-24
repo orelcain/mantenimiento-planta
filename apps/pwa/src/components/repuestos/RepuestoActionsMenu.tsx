@@ -1,4 +1,4 @@
-import { MoreVertical, FileText, Image, Pencil, Trash2, ClipboardList, Camera, BookOpen } from 'lucide-react'
+import { MoreVertical, FileText, Image, Pencil, Trash2, ClipboardList, Camera, BookOpen, Eye } from 'lucide-react'
 import type { Repuesto } from '@/types/repuestos'
 import {
   Button,
@@ -19,6 +19,7 @@ interface RepuestoActionsProps {
   onViewSpecs?: (repuesto: Repuesto) => void
   onViewGallery?: (repuesto: Repuesto) => void
   onSearchInManual?: (repuesto: Repuesto) => void
+  onViewInManual?: (repuesto: Repuesto) => void
 }
 
 export function RepuestoActionsMenu({
@@ -30,14 +31,16 @@ export function RepuestoActionsMenu({
   onViewSpecs,
   onViewGallery,
   onSearchInManual,
+  onViewInManual,
 }: RepuestoActionsProps) {
   const hasManual = (repuesto.vinculosManual?.length || 0) > 0
   const hasPhotos = (repuesto.fotosReales?.length || 0) > 0
   const hasImagenes = (repuesto.imagenesManual?.length || 0) > 0
   const hasGallery = (repuesto.gallery?.length || 0) > 0
   const hasFabCode = !!repuesto.codigoBaader
+  const hasVinculos = (repuesto.vinculosManual?.length || 0) > 0
 
-  const hasViewActions = onViewSpecs || onViewGallery || onViewManual || onViewPhotos || onSearchInManual
+  const hasViewActions = onViewSpecs || onViewGallery || onViewManual || onViewPhotos || onSearchInManual || onViewInManual
   const hasEditActions = onEdit || onDelete
 
   return (
@@ -103,6 +106,14 @@ export function RepuestoActionsMenu({
                 <span className="ml-auto text-[10px] font-mono text-muted-foreground truncate max-w-[60px]">
                   {repuesto.codigoBaader}
                 </span>
+              </DropdownMenuItem>
+            )}
+
+            {onViewInManual && hasVinculos && (
+              <DropdownMenuItem onClick={() => onViewInManual(repuesto)} className="gap-2 cursor-pointer">
+                <Eye className="h-4 w-4 text-green-500" />
+                <span>Ver en Manual</span>
+                <span className="ml-auto text-[10px] text-green-400">✓ ubicado</span>
               </DropdownMenuItem>
             )}
           </>
