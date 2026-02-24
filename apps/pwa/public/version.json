@@ -1,7 +1,7 @@
 {
-  "version": "2.48.83",
-  "buildDate": "2026-02-23",
-  "buildTimestamp": 1771899310353,
+  "version": "2.48.84",
+  "buildDate": "2026-02-24",
+  "buildTimestamp": 1771915007241,
   "features": [
     "Buscar en Manual: detección automática del número de posición del repuesto en la lista",
     "Buscar en Manual: modo 'Ver en diagrama' para resaltar la posición en el dibujo técnico (azul/cyan)",
