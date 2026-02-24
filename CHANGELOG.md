@@ -7,6 +7,12 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.89] - 2026-02-24
+### Fix
+- **Zoom con scroll directo**: La rueda del mouse ahora hace zoom directamente sobre el PDF sin necesitar Ctrl — scroll up acerca, scroll down aleja, centrado en la posición del cursor
+- **Paneo en todas las direcciones**: El arrastre con el mouse ahora funciona en las 4 direcciones (arriba, abajo, izquierda, derecha) gracias a padding interno que asegura overflow en ambos ejes
+- **Centrado automático**: Al cambiar de página o hacer zoom, el scroll se centra automáticamente para permitir paneo inmediato en cualquier dirección
+
 ## [2.48.88] - 2026-02-24
 ### Fix
 - **Paneo automático**: El paneo (arrastrar para mover el PDF) ahora es automático cuando el cursor está sobre el manual y no se está dibujando. Ya no requiere botón de mano — cursor grab/grabbing siempre activo

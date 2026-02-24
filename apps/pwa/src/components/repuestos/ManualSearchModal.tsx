@@ -1,5 +1,5 @@
 /**
- * ManualSearchModal v2.48.88
+ * ManualSearchModal v2.48.89
  *
  * Características:
  *  - "Ver en manual" instantáneo (solo carga PDF, búsqueda diferida)
@@ -589,6 +589,18 @@ export function ManualSearchModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editingStyle, drawFillColor, drawNoBorder])
 
+  // Center scroll when rendering finishes (so pan works in all directions)
+  useEffect(() => {
+    if (!rendering && pdfDoc) {
+      const container = scrollContainerRef.current
+      if (!container) return
+      requestAnimationFrame(() => {
+        container.scrollLeft = (container.scrollWidth - container.clientWidth) / 2
+        container.scrollTop = (container.scrollHeight - container.clientHeight) / 2
+      })
+    }
+  }, [rendering, pdfDoc, scaleIdx])
+
   // ─── Accept manual selection → start search ───────────────
   const acceptManualSelection = () => {
     const opt = manualOptions[selectedManualIdx]
@@ -597,12 +609,22 @@ export function ManualSearchModal({
     setStep('viewing')
   }
 
+  // ─── Center scroll helper (so pan works in all directions) ─
+  const centerScroll = useCallback(() => {
+    const container = scrollContainerRef.current
+    if (!container) return
+    requestAnimationFrame(() => {
+      container.scrollLeft = (container.scrollWidth - container.clientWidth) / 2
+      container.scrollTop = (container.scrollHeight - container.clientHeight) / 2
+    })
+  }, [])
+
   // ─── Page navigation ───────────────────────────────────────
   const goToPage = useCallback((p: number) => {
     const clamped = Math.max(1, Math.min(totalPages, p))
     setCurrentPage(clamped)
-    scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
-  }, [totalPages])
+    requestAnimationFrame(() => centerScroll())
+  }, [totalPages, centerScroll])
 
   const goNextMatch = () => {
     const nextMatch = results.find(r => r.page > currentPage)
@@ -656,7 +678,7 @@ export function ManualSearchModal({
     isPanningRef.current = false
   }, [])
 
-  // ─── Wheel zoom (Ctrl+wheel) — native listener for passive:false ───
+  // ─── Wheel zoom — ALL scroll on PDF area = zoom (native passive:false) ───
   const scaleIdxRef = useRef(scaleIdx)
   scaleIdxRef.current = scaleIdx
 
@@ -665,7 +687,7 @@ export function ManualSearchModal({
     if (!container) return
 
     const onWheel = (e: WheelEvent) => {
-      if (!e.ctrlKey && !e.metaKey) return
+      // ALL wheel events on the PDF container = zoom (no Ctrl required)
       e.preventDefault()
       e.stopPropagation()
 
@@ -1561,7 +1583,7 @@ export function ManualSearchModal({
                 onMouseUp={handlePanMouseUp}
                 onMouseLeave={handlePanMouseUp}
               >
-                <div className="flex justify-center p-4">
+                <div className="flex justify-center p-4" style={{ minWidth: 'calc(100% + 60px)', minHeight: 'calc(100% + 60px)' }}>
                   <div className="relative inline-block shadow-xl">
                     {rendering && (
                       <div className="absolute inset-0 flex items-center justify-center bg-white/60 z-20 rounded">
