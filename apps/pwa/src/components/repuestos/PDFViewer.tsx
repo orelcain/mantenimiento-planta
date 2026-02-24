@@ -18,6 +18,7 @@ import * as pdfjsLib from 'pdfjs-dist';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { ZoomIn, ZoomOut, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { VinculoManual } from '@/types/vinculos';
+import { getCachedPdf } from '@/services/pdfCache';
 import {
   normalizeCoordinates,
   denormalizeCoordinates,
@@ -88,8 +89,7 @@ export function PDFViewer({
         setLoading(true);
         setError(null);
 
-        const loadingTask = pdfjsLib.getDocument(pdfUrl);
-        const pdf = await loadingTask.promise;
+        const pdf = await getCachedPdf(pdfUrl);
 
         if (!isMounted) return;
 

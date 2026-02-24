@@ -7,6 +7,13 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.85] - 2026-02-23
+### Mejora
+- **Pre-carga de manuales PDF**: Al seleccionar una máquina, los PDFs de sus manuales se descargan en background para que estén listos instantáneamente al hacer clic en "Ver en Manual"
+- **Caché de PDFs in-memory + Cache API**: Los PDFs cargados se almacenan en memoria (LRU, max 10) y en Cache API del navegador. Las siguientes aperturas del mismo manual son instantáneas sin re-descarga
+- **Deduplicación de cargas**: Múltiples solicitudes al mismo PDF comparten la misma descarga en curso, evitando descargas duplicadas
+- **Integración global**: El caché se usa en ManualSearchModal, PDFViewer y cualquier componente que cargue PDFs
+
 ## [2.48.84] - 2026-02-23
 ### Mejora
 - **Edición de forma existente**: Al hacer click en "Editar forma" se cargan los puntos del polígono guardado para editarlos in-situ sin redibujar desde cero

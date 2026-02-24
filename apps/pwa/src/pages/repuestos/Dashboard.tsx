@@ -11,6 +11,7 @@ import { RepuestoManualModal } from '@/components/repuestos/RepuestoManualModal'
 import { TechnicalSpecsModal } from '@/components/repuestos/TechnicalSpecsModal'
 import { MachineManualPanel } from '@/components/repuestos/MachineManualPanel'
 import { ManualSearchModal } from '@/components/repuestos/ManualSearchModal'
+import { preloadMachinePdfs } from '@/services/pdfCache'
 import { useRepuestos } from '@/hooks/repuestos/useRepuestos'
 import { useRepuestosCounts } from '@/hooks/repuestos/useRepuestosCounts'
 import { useMachineCategories } from '@/hooks/repuestos/useMachineCategories'
@@ -88,6 +89,13 @@ export function RepuestosDashboard() {
   // Calcular conteos de repuestos por máquina para el navegador
   // Usa getCountFromServer (aggregation) para obtener conteos reales de todas las máquinas
   const { counts: repuestosCounts } = useRepuestosCounts(machines)
+
+  // Pre-cargar PDFs de la máquina seleccionada en background
+  useEffect(() => {
+    if (currentMachine) {
+      preloadMachinePdfs(currentMachine).catch(() => {})
+    }
+  }, [currentMachine])
 
   // Filtrar repuestos — Búsqueda mejorada incluye código fabricante
   const filteredRepuestos = useMemo(() => {

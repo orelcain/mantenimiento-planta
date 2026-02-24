@@ -1,8 +1,10 @@
 /**
- * ManualSearchModal v2.48.84
+ * ManualSearchModal v2.48.85
  *
  * Características:
  *  - "Ver en manual" instantáneo (solo carga PDF, búsqueda diferida)
+ *  - Caché de PDFs: in-memory + Cache API (no re-descarga el mismo manual)
+ *  - Pre-carga de manuales al seleccionar máquina en Dashboard
  *  - Admin: dibujo con opciones de color, borde, transparencia
  *  - Edición de puntos existentes: arrastrar, agregar en arista, eliminar (dblclick)
  *  - Edición de estilo de anotación existente sin redibujar (color, borde, opacidad)
@@ -19,6 +21,7 @@ import {
 import * as pdfjsLib from 'pdfjs-dist'
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist'
 import { ref, listAll, getDownloadURL } from 'firebase/storage'
+import { getCachedPdf } from '@/services/pdfCache'
 import { doc, updateDoc, Timestamp, arrayUnion, arrayRemove } from '@/services/firestoreTracked'
 import { storage, db } from '@/services/firebase'
 import {
@@ -295,12 +298,7 @@ export function ManualSearchModal({
   const loadPdfOnly = useCallback(async (url: string) => {
     setLoadingPdf(true)
     try {
-      const loadingTask = pdfjsLib.getDocument({
-        url,
-        cMapUrl: `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/cmaps/`,
-        cMapPacked: true,
-      })
-      const pdf = await loadingTask.promise
+      const pdf = await getCachedPdf(url)
       setPdfDoc(pdf)
       setTotalPages(pdf.numPages)
       if (initialVinculo?.pagina) {
@@ -352,12 +350,7 @@ export function ManualSearchModal({
     setLoadingPdf(true)
     setResults([])
     try {
-      const loadingTask = pdfjsLib.getDocument({
-        url,
-        cMapUrl: `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/cmaps/`,
-        cMapPacked: true,
-      })
-      const pdf = await loadingTask.promise
+      const pdf = await getCachedPdf(url)
       setPdfDoc(pdf)
       setTotalPages(pdf.numPages)
       setSearching(true)
