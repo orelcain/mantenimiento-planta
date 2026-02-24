@@ -12,7 +12,7 @@
  *     una máquina, así los PDFs ya están listos al hacer clic en "Ver en manual"
  *
  * Uso:
- *   import { getCachedPdf, preloadMachinePdfs } from '@/services/pdfCache'
+ *   import { getCachedPdf, preloadMachinePdfs, preloadMachinePdfsWithProgress } from '@/services/pdfCache'
  *   const pdf = await getCachedPdf(url)
  */
 
@@ -210,6 +210,69 @@ export async function preloadMachinePdfs(machine: Machine): Promise<void> {
  */
 export function getCacheSize(): number {
   return memoryCache.size
+}
+
+/**
+ * Verifica si un URL ya está en caché de memoria.
+ */
+export function isCached(url: string): boolean {
+  return memoryCache.has(url)
+}
+
+/**
+ * Pre-descarga todos los PDFs de una máquina con reporte de progreso.
+ *
+ * @param machine — La máquina cuyos PDFs se pre-descargarán
+ * @param onProgress — Callback con { loaded, total, done }
+ * @returns — Las URLs que se intentaron precargar
+ */
+export async function preloadMachinePdfsWithProgress(
+  machine: Machine,
+  onProgress: (info: { loaded: number; total: number; done: boolean }) => void,
+): Promise<string[]> {
+  const urls = new Set<string>()
+
+  // 1. From machine.manuals[]
+  if (machine.manuals) {
+    for (const url of machine.manuals) {
+      urls.add(url)
+    }
+  }
+
+  // 2. From Firebase Storage folder
+  try {
+    const folderRef = ref(storage, `machines/${machine.id}/manuales`)
+    const listResult = await listAll(folderRef)
+    for (const item of listResult.items) {
+      if (item.name.toLowerCase().endsWith('.pdf')) {
+        const url = await getDownloadURL(item)
+        urls.add(url)
+      }
+    }
+  } catch { /* no folder, skip */ }
+
+  const urlArray = [...urls]
+  const total = urlArray.length
+  let loaded = urlArray.filter(u => memoryCache.has(u)).length
+
+  // Report initial state
+  onProgress({ loaded, total, done: loaded >= total })
+
+  if (loaded >= total) return urlArray
+
+  // Preload remaining
+  const remaining = urlArray.filter(u => !memoryCache.has(u))
+  const CONCURRENCY = 2
+  for (let i = 0; i < remaining.length; i += CONCURRENCY) {
+    const batch = remaining.slice(i, i + CONCURRENCY)
+    const results = await Promise.allSettled(batch.map(u => preloadPdf(u)))
+    for (const r of results) {
+      if (r.status === 'fulfilled') loaded++
+    }
+    onProgress({ loaded, total, done: loaded >= total })
+  }
+
+  return urlArray
 }
 
 /**

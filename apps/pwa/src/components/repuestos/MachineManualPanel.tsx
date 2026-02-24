@@ -6,16 +6,19 @@
  * - Subir nuevos manuales PDF
  * - Abrir manual en visor con búsqueda por código de fabricante
  * - Listar todos los PDFs disponibles en Storage
+ * - Indicador sutil de precarga de PDFs (barra/badge)
+ * - Botón para limpiar caché de PDFs
  */
 
-import { useState, useEffect, useCallback } from 'react'
-import { FileText, Upload, Trash2, BookOpen, Loader2, ExternalLink } from 'lucide-react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { FileText, Upload, Trash2, BookOpen, Loader2, ExternalLink, HardDriveDownload, CheckCircle2, RefreshCw } from 'lucide-react'
 import { ref, listAll, getDownloadURL, deleteObject } from 'firebase/storage'
 import { doc, updateDoc, Timestamp, arrayUnion, arrayRemove } from 'firebase/firestore'
 import { storage, db } from '@/services/firebase'
 import { useStorage } from '@/hooks/repuestos/useStorage'
 import { useIsAdmin } from '@/store/authStore'
 import { Button } from '@/components/ui'
+import { preloadMachinePdfsWithProgress, clearPdfCache, isCached } from '@/services/pdfCache'
 import type { Machine } from '@/types/repuestos'
 
 interface MachineManualPanelProps {
@@ -35,6 +38,13 @@ export function MachineManualPanel({ machine, className = '' }: MachineManualPan
   const [manuals, setManuals] = useState<ManualFile[]>([])
   const [loading, setLoading] = useState(true)
   const [deleting, setDeleting] = useState<string | null>(null)
+
+  // ─── PDF Cache state ─────────────────────────────────────
+  const [cacheState, setCacheState] = useState<'idle' | 'loading' | 'done'>('idle')
+  const [cacheLoaded, setCacheLoaded] = useState(0)
+  const [cacheTotal, setCacheTotal] = useState(0)
+  const [clearingCache, setClearingCache] = useState(false)
+  const preloadAbortRef = useRef(false)
 
   // Cargar lista de manuales desde Storage
   const loadManuals = useCallback(async () => {
@@ -66,6 +76,59 @@ export function MachineManualPanel({ machine, className = '' }: MachineManualPan
   }, [machine.id])
 
   useEffect(() => { loadManuals() }, [loadManuals])
+
+  // ─── Preload PDFs con progreso ───────────────────────────
+  useEffect(() => {
+    preloadAbortRef.current = false
+    setCacheState('idle')
+    setCacheLoaded(0)
+    setCacheTotal(0)
+
+    // Esperar a que los manuales se listen antes de precargar
+    if (loading) return
+
+    const runPreload = async () => {
+      setCacheState('loading')
+      try {
+        await preloadMachinePdfsWithProgress(machine, ({ loaded, total, done }) => {
+          if (preloadAbortRef.current) return
+          setCacheLoaded(loaded)
+          setCacheTotal(total)
+          if (done) setCacheState('done')
+        })
+      } catch {
+        if (!preloadAbortRef.current) setCacheState('idle')
+      }
+    }
+
+    runPreload()
+
+    return () => { preloadAbortRef.current = true }
+  }, [machine, loading])
+
+  // ─── Clear cache handler ─────────────────────────────────
+  const handleClearCache = async () => {
+    setClearingCache(true)
+    try {
+      await clearPdfCache()
+      setCacheState('idle')
+      setCacheLoaded(0)
+      setCacheTotal(0)
+      // Re-trigger preload
+      preloadAbortRef.current = false
+      setCacheState('loading')
+      await preloadMachinePdfsWithProgress(machine, ({ loaded, total, done }) => {
+        if (preloadAbortRef.current) return
+        setCacheLoaded(loaded)
+        setCacheTotal(total)
+        if (done) setCacheState('done')
+      })
+    } catch {
+      setCacheState('idle')
+    } finally {
+      setClearingCache(false)
+    }
+  }
 
   // Upload handler
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -135,39 +198,91 @@ export function MachineManualPanel({ machine, className = '' }: MachineManualPan
             {manuals.length}
           </span>
         </div>
-        {isAdmin && (
-          <label className="cursor-pointer">
-            <input
-              type="file"
-              accept=".pdf"
-              className="hidden"
-              onChange={handleUpload}
-              disabled={uploading}
-            />
+        <div className="flex items-center gap-1">
+          {/* Cache clear button */}
+          {cacheState === 'done' && cacheTotal > 0 && (
             <Button
-              variant="outline"
+              variant="ghost"
               size="sm"
-              className="gap-1.5 h-7 text-xs"
-              disabled={uploading}
-              asChild
+              onClick={handleClearCache}
+              disabled={clearingCache}
+              title="Limpiar caché de manuales (se volverán a descargar)"
+              className="h-7 w-7 p-0 text-muted-foreground hover:text-orange-500"
             >
-              <span>
-                {uploading ? (
-                  <>
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                    {progress}%
-                  </>
-                ) : (
-                  <>
-                    <Upload className="h-3 w-3" />
-                    Subir PDF
-                  </>
-                )}
-              </span>
+              {clearingCache ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="h-3.5 w-3.5" />
+              )}
             </Button>
-          </label>
-        )}
+          )}
+          {isAdmin && (
+            <label className="cursor-pointer">
+              <input
+                type="file"
+                accept=".pdf"
+                className="hidden"
+                onChange={handleUpload}
+                disabled={uploading}
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5 h-7 text-xs"
+                disabled={uploading}
+                asChild
+              >
+                <span>
+                  {uploading ? (
+                    <>
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      {progress}%
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="h-3 w-3" />
+                      Subir PDF
+                    </>
+                  )}
+                </span>
+              </Button>
+            </label>
+          )}
+        </div>
       </div>
+
+      {/* Cache progress indicator */}
+      {cacheTotal > 0 && (
+        <div className="flex items-center gap-2">
+          <div className="flex-1 h-1 bg-muted rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-500 ease-out ${
+                cacheState === 'done'
+                  ? 'bg-emerald-500'
+                  : 'bg-blue-500 animate-pulse'
+              }`}
+              style={{ width: `${cacheTotal > 0 ? (cacheLoaded / cacheTotal) * 100 : 0}%` }}
+            />
+          </div>
+          <div className="flex items-center gap-1 shrink-0">
+            {cacheState === 'loading' ? (
+              <>
+                <HardDriveDownload className="h-3 w-3 text-blue-500 animate-pulse" />
+                <span className="text-[10px] text-blue-500 font-medium">
+                  Precargando {cacheLoaded}/{cacheTotal}
+                </span>
+              </>
+            ) : cacheState === 'done' ? (
+              <>
+                <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+                <span className="text-[10px] text-emerald-500 font-medium">
+                  {cacheTotal} {cacheTotal === 1 ? 'manual listo' : 'manuales listos'}
+                </span>
+              </>
+            ) : null}
+          </div>
+        </div>
+      )}
 
       {/* Manual list */}
       {manuals.length === 0 ? (
@@ -187,7 +302,12 @@ export function MachineManualPanel({ machine, className = '' }: MachineManualPan
               key={manual.fullPath}
               className="flex items-center gap-2 p-2 rounded-lg border border-border hover:bg-muted/30 transition-colors group"
             >
-              <FileText className="h-5 w-5 text-red-500/80 shrink-0" />
+              <div className="relative shrink-0">
+                <FileText className="h-5 w-5 text-red-500/80" />
+                {isCached(manual.url) && (
+                  <div className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-emerald-500 ring-1 ring-background" title="En caché — acceso instantáneo" />
+                )}
+              </div>
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-medium text-foreground truncate">{manual.name}</div>
               </div>

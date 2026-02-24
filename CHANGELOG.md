@@ -7,6 +7,14 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.86] - 2026-02-24
+### Mejora
+- **Indicador de precarga de manuales**: Barra de progreso sutil en el panel de manuales que muestra cuántos PDFs se están descargando y cuántos ya están listos
+- **Badge de caché por manual**: Punto verde en cada manual que ya está en caché, indicando acceso instantáneo
+- **Estado visual claro**: Azul pulsante durante precarga, verde esmeralda cuando todos los manuales están listos
+- **Botón limpiar caché**: Botón de refresh junto al header de manuales para limpiar la caché y volver a descargar (útil si un manual se actualizó)
+- **Precarga desde MachineManualPanel**: La precarga se ejecuta automáticamente después de listar los manuales, con progreso visible
+
 ## [2.48.85] - 2026-02-23
 ### Mejora
 - **Pre-carga de manuales PDF**: Al seleccionar una máquina, los PDFs de sus manuales se descargan en background para que estén listos instantáneamente al hacer clic en "Ver en Manual"
