@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Package, ImageIcon, X, BookOpen, Eye, ClipboardList, Camera, Pencil, Trash2 } from 'lucide-react'
+import { Package, ImageIcon, X, BookOpen, Eye, ClipboardList, Camera, Pencil, Trash2, ArrowRightLeft } from 'lucide-react'
 import type { Repuesto } from '@/types/repuestos'
 import { RepuestoActionsMenu } from './RepuestoActionsMenu'
 import { InlineEditName } from './InlineEditName'
@@ -31,6 +31,7 @@ interface RepuestosTableProps {
   onSearchInManual?: (repuesto: Repuesto) => void
   onViewInManual?: (repuesto: Repuesto) => void
   onEditAnnotation?: (repuesto: Repuesto) => void
+  onRelocate?: (repuesto: Repuesto) => void
 }
 
 const formatNumber = (value: number) =>
@@ -108,6 +109,7 @@ export function RepuestosTable({
   onSearchInManual,
   onViewInManual,
   onEditAnnotation,
+  onRelocate,
 }: RepuestosTableProps) {
   const [preview, setPreview] = useState<{ url: string; name: string } | null>(null)
 
@@ -168,6 +170,7 @@ export function RepuestosTable({
                   onViewGallery={onViewGallery}
                   onSearchInManual={onSearchInManual}
                   onViewInManual={onViewInManual}
+                  onRelocate={onRelocate}
                 />
               </div>
 
@@ -377,6 +380,14 @@ export function RepuestosTable({
                           <button onClick={() => onEdit(rep)}
                             className="h-7 w-7 inline-flex items-center justify-center rounded-md text-muted-foreground/60 hover:text-foreground hover:bg-muted/50 transition-colors">
                             <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                        </Tip>
+                      )}
+                      {onRelocate && (
+                        <Tip label="Reubicar">
+                          <button onClick={() => onRelocate(rep)}
+                            className="h-7 w-7 inline-flex items-center justify-center rounded-md text-amber-400/60 hover:text-amber-400 hover:bg-amber-500/10 transition-colors">
+                            <ArrowRightLeft className="h-3.5 w-3.5" />
                           </button>
                         </Tip>
                       )}

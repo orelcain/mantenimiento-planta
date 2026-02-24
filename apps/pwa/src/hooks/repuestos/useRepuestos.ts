@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   collection,
   doc,
+  getDoc,
   getDocs,
   addDoc,
   updateDoc,
@@ -356,6 +357,72 @@ export function useRepuestos(machineId: string | null) {
     }
   }, [machineId, repuestos]);
 
+  // Reubicar un repuesto a otra máquina (copia datos + historial, borra original)
+  const relocateRepuesto = useCallback(async (repuestoId: string, targetMachineId: string): Promise<string> => {
+    if (!machineId) throw new Error('Machine ID de origen es requerido');
+    if (machineId === targetMachineId) throw new Error('La máquina destino es la misma que la actual');
+
+    const sourcePath = getCollectionPath(machineId);
+    const targetPath = getCollectionPath(targetMachineId);
+
+    // 1. Leer el doc original
+    const sourceRef = doc(db, sourcePath, repuestoId);
+    const sourceSnap = await getDoc(sourceRef);
+    if (!sourceSnap.exists()) throw new Error('Repuesto no encontrado');
+
+    const data = sourceSnap.data();
+
+    // 2. Crear en la máquina destino (sin id, sin createdAt/updatedAt — se regeneran)
+    const { ...repData } = data;
+    delete repData.createdAt;
+    delete repData.updatedAt;
+
+    const newDocRef = await addDoc(collection(db, targetPath), {
+      ...repData,
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+    });
+
+    // 3. Copiar subcollection historial
+    const historialSnap = await getDocs(collection(db, `${sourcePath}/${repuestoId}/historial`));
+    if (!historialSnap.empty) {
+      const batch = writeBatch(db);
+      historialSnap.docs.forEach(h => {
+        const hRef = doc(collection(db, `${targetPath}/${newDocRef.id}/historial`));
+        batch.set(hRef, h.data());
+      });
+      await batch.commit();
+    }
+
+    // 4. Registrar reubicación en historial del nuevo doc
+    await addDoc(collection(db, `${targetPath}/${newDocRef.id}/historial`), {
+      campo: 'reubicacion',
+      valorAnterior: machineId,
+      valorNuevo: targetMachineId,
+      fecha: Timestamp.now(),
+    });
+
+    // 5. Borrar historial y doc de la máquina de origen
+    if (!historialSnap.empty) {
+      const delBatch = writeBatch(db);
+      historialSnap.docs.forEach(h => delBatch.delete(h.ref));
+      await delBatch.commit();
+    }
+    await deleteDoc(sourceRef);
+
+    return newDocRef.id;
+  }, [machineId]);
+
+  // Reubicar múltiples repuestos a otra máquina
+  const bulkRelocateRepuestos = useCallback(async (repuestoIds: string[], targetMachineId: string): Promise<number> => {
+    let moved = 0;
+    for (const id of repuestoIds) {
+      await relocateRepuesto(id, targetMachineId);
+      moved++;
+    }
+    return moved;
+  }, [relocateRepuesto]);
+
   return {
     repuestos,
     loading,
@@ -366,5 +433,7 @@ export function useRepuestos(machineId: string | null) {
     getHistorial,
     importRepuestos,
     importCatalogoDesdeExcel,
+    relocateRepuesto,
+    bulkRelocateRepuestos,
   };
 }

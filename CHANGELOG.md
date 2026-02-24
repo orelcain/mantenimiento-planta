@@ -7,6 +7,13 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.92] - 2026-02-24
+### Funcionalidad
+- **Reubicar repuesto individual** (admin): Botón "Reubicar a otra máquina" en menú de acciones y como botón inline en la tabla. Muestra selector de máquina destino con preview visual (color de máquina, flechas origen→destino)
+- **Reubicación masiva** (admin): Botón "Reubicar" en la barra de herramientas del catálogo. Modal con checkboxes, búsqueda, selección total, selector de máquina destino, barra de progreso y confirmación
+- **Lógica Firestore**: Copia el repuesto completo (datos + historial) a la subcolección de la máquina destino, registra evento `reubicacion` en historial, y elimina el original de la máquina de origen
+- **Solo admin**: Ambos botones y modales solo son visibles para usuarios con rol admin
+
 ## [2.48.91] - 2026-02-24
 ### Mejora
 - **Búsqueda editable en manual PDF**: El input de búsqueda ahora es editable — el usuario puede cambiar el término y re-buscar en el PDF sin cerrar el modal

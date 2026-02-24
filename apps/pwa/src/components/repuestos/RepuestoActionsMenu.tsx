@@ -1,4 +1,4 @@
-import { MoreVertical, Image, Pencil, Trash2, ClipboardList, Camera, BookOpen, Eye } from 'lucide-react'
+import { MoreVertical, Image, Pencil, Trash2, ClipboardList, Camera, BookOpen, Eye, ArrowRightLeft } from 'lucide-react'
 import type { Repuesto } from '@/types/repuestos'
 import {
   Button,
@@ -20,6 +20,7 @@ interface RepuestoActionsProps {
   onViewGallery?: (repuesto: Repuesto) => void
   onSearchInManual?: (repuesto: Repuesto) => void
   onViewInManual?: (repuesto: Repuesto) => void
+  onRelocate?: (repuesto: Repuesto) => void
 }
 
 export function RepuestoActionsMenu({
@@ -32,6 +33,7 @@ export function RepuestoActionsMenu({
   onViewGallery,
   onSearchInManual,
   onViewInManual,
+  onRelocate,
 }: RepuestoActionsProps) {
   const hasPhotos = (repuesto.fotosReales?.length || 0) > 0
   const hasImagenes = (repuesto.imagenesManual?.length || 0) > 0
@@ -40,7 +42,7 @@ export function RepuestoActionsMenu({
   const hasVinculos = (repuesto.vinculosManual?.length || 0) > 0
 
   const hasViewActions = onViewSpecs || onViewGallery || onViewManual || onViewPhotos || onSearchInManual || onViewInManual
-  const hasEditActions = onEdit || onDelete
+  const hasEditActions = onEdit || onDelete || onRelocate
 
   return (
     <DropdownMenu>
@@ -120,6 +122,13 @@ export function RepuestoActionsMenu({
               <DropdownMenuItem onClick={() => onEdit(repuesto)} className="gap-2 cursor-pointer">
                 <Pencil className="h-4 w-4" />
                 <span>Editar repuesto</span>
+              </DropdownMenuItem>
+            )}
+
+            {onRelocate && (
+              <DropdownMenuItem onClick={() => onRelocate(repuesto)} className="gap-2 cursor-pointer text-amber-400 focus:text-amber-400">
+                <ArrowRightLeft className="h-4 w-4" />
+                <span>Reubicar a otra máquina</span>
               </DropdownMenuItem>
             )}
 

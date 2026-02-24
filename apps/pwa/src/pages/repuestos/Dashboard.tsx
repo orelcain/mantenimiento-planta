@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, Plus, FileText, Upload, Package, ClipboardList, ImageIcon, DollarSign, Wrench } from 'lucide-react'
+import { AlertTriangle, Plus, FileText, Upload, Package, ClipboardList, ImageIcon, DollarSign, Wrench, ArrowRightLeft } from 'lucide-react'
 import { RepuestosTable } from '@/components/repuestos/RepuestosTable'
 import { RepuestoFormModal } from '@/components/repuestos/RepuestoForm'
 import { RepuestosFilters } from '@/components/repuestos/RepuestosFilters'
@@ -21,6 +21,8 @@ import type { Repuesto, RepuestoFormData, TechnicalSpecs, MachineImage } from '@
 // CategoryManager ahora se renderiza dentro de EquipmentNavigator
 import { ImportRepuestosModal } from './ImportRepuestosModal'
 import { ExportReportModal } from '@/components/repuestos/ExportReportModal'
+import { RelocateRepuestoModal } from '@/components/repuestos/RelocateRepuestoModal'
+import { BulkRelocateModal } from '@/components/repuestos/BulkRelocateModal'
 import {
   Button,
   Dialog,
@@ -50,6 +52,8 @@ export function RepuestosDashboard() {
   const [exportReportOpen, setExportReportOpen] = useState(false)
   const [manualSearchTarget, setManualSearchTarget] = useState<Repuesto | null>(null)
   const [viewInManualTarget, setViewInManualTarget] = useState<Repuesto | null>(null)
+  const [relocateTarget, setRelocateTarget] = useState<Repuesto | null>(null)
+  const [bulkRelocateOpen, setBulkRelocateOpen] = useState(false)
   const [, setSelectedCategoryId] = useState<string | null>('maquinas-principales')
 
   // Filtros y paginación
@@ -65,6 +69,8 @@ export function RepuestosDashboard() {
     updateRepuesto,
     deleteRepuesto,
     importCatalogoDesdeExcel,
+    relocateRepuesto,
+    bulkRelocateRepuestos,
   } = useRepuestos(currentMachine?.id || 'baader-200')
 
   const handleSaveSpecs = async (repuestoId: string, specs: TechnicalSpecs, gallery: MachineImage[]) => {
@@ -270,6 +276,12 @@ export function RepuestosDashboard() {
               <FileText className="h-3.5 w-3.5" />
               <span className="hidden sm:inline text-xs">Exportar</span>
             </Button>
+            {isAdmin && repuestos.length > 0 && (
+              <Button variant="outline" size="sm" onClick={() => setBulkRelocateOpen(true)} className="gap-1.5 border-amber-500/30 text-amber-400 hover:bg-amber-500/10 hover:text-amber-300" title="Reubicar repuestos masivamente">
+                <ArrowRightLeft className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline text-xs">Reubicar</span>
+              </Button>
+            )}
             {isAdmin && (
               <Button size="sm" onClick={() => setCreateOpen(true)} className="gap-1.5">
                 <Plus className="h-3.5 w-3.5" />
@@ -385,6 +397,7 @@ export function RepuestosDashboard() {
                 onSearchInManual={currentMachine ? (rep) => setManualSearchTarget(rep) : undefined}
                 onViewInManual={currentMachine ? (rep) => setViewInManualTarget(rep) : undefined}
                 onEditAnnotation={isAdmin && currentMachine ? (rep) => setViewInManualTarget(rep) : undefined}
+                onRelocate={isAdmin && currentMachine ? (rep) => setRelocateTarget(rep) : undefined}
               />
 
               <RepuestosPagination
@@ -521,6 +534,38 @@ export function RepuestosDashboard() {
         categories={categories}
         machineName={currentMachine?.nombre}
       />
+
+      {/* Modal Reubicar Individual */}
+      {relocateTarget && currentMachine && (
+        <RelocateRepuestoModal
+          open={!!relocateTarget}
+          onOpenChange={(o) => !o && setRelocateTarget(null)}
+          repuesto={relocateTarget}
+          currentMachine={currentMachine}
+          machines={machines}
+          onRelocate={relocateRepuesto}
+          onSuccess={() => {
+            setRelocateTarget(null)
+            toast({ title: 'Repuesto reubicado', description: 'El repuesto fue movido a la nueva máquina.' })
+          }}
+        />
+      )}
+
+      {/* Modal Reubicar Masivo */}
+      {bulkRelocateOpen && currentMachine && (
+        <BulkRelocateModal
+          open={bulkRelocateOpen}
+          onOpenChange={setBulkRelocateOpen}
+          repuestos={repuestos}
+          currentMachine={currentMachine}
+          machines={machines}
+          onBulkRelocate={bulkRelocateRepuestos}
+          onSuccess={() => {
+            setBulkRelocateOpen(false)
+            toast({ title: 'Reubicación masiva completada', description: 'Los repuestos fueron movidos a la nueva máquina.' })
+          }}
+        />
+      )}
     </div>
   )
 }
