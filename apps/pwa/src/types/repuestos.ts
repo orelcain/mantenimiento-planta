@@ -60,6 +60,9 @@ export interface Repuesto {
   
   // Vínculos a páginas del manual con marcadores visuales
   vinculosManual: VinculoManual[];
+
+  /** Posición confirmada manualmente en el diagrama del manual (ej. "55") */
+  posicionManual?: string;
   
   // Imágenes del manual y fotos reales
   imagenesManual: ImagenRepuesto[];

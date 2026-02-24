@@ -7,6 +7,16 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.78] - 2026-02-23
+### Funcionalidad
+- **Buscar en Manual — Posición manual editable**: Se puede asignar y corregir manualmente el número de posición del repuesto en el diagrama del manual
+- **Buscar en Manual — Guardado en Firestore**: La posición confirmada se guarda como `posicionManual` en el documento del repuesto, evitando re-detección automática en futuras búsquedas
+- **Buscar en Manual — Prioridad posición guardada**: Usa la posición guardada si existe; si no, la auto-detectada del texto del PDF
+- **Buscar en Manual — Badge interactivo**: Badge cyan con edición inline, botón guardar (✓), editar (lápiz) y borrar (×); si no hay posición, muestra botón "Asignar pos."
+- **Tipo Repuesto**: Nuevo campo opcional `posicionManual` en la interfaz
+
+---
+
 ## [2.48.77] - 2026-02-23
 ### Mejora
 - **Buscar en Manual — Búsqueda inteligente de diagrama**: En vez de saltar ciegamente 5 páginas atrás, ahora escanea las páginas anteriores al match buscando dónde realmente aparece el número de posición como texto, y salta directamente a esa página

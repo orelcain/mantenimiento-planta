@@ -14,12 +14,13 @@ import {
   BookOpen, Search, Loader2, FileText,
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
   ExternalLink, AlertTriangle, ZoomIn, ZoomOut, Maximize2,
-  Crosshair,
+  Crosshair, Check, Pencil, X,
 } from 'lucide-react'
 import * as pdfjsLib from 'pdfjs-dist'
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist'
 import { ref, listAll, getDownloadURL } from 'firebase/storage'
-import { storage } from '@/services/firebase'
+import { doc, updateDoc, Timestamp } from '@/services/firestoreTracked'
+import { storage, db } from '@/services/firebase'
 import {
   Dialog,
   DialogContent,
@@ -89,6 +90,12 @@ export function ManualSearchModal({
   const [activePosition, setActivePosition] = useState<string | null>(null)
   const [searchingDiagram, setSearchingDiagram] = useState(false)
 
+  // Position manual edit state
+  const [editingPosition, setEditingPosition] = useState(false)
+  const [positionInput, setPositionInput] = useState('')
+  const [savingPosition, setSavingPosition] = useState(false)
+  const [savedPosition, setSavedPosition] = useState<string | undefined>(repuesto.posicionManual)
+
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const highlightLayerRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -96,8 +103,10 @@ export function ManualSearchModal({
   const searchCode = repuesto.codigoBaader || ''
   const scale = SCALE_STEPS[scaleIdx] ?? 1.5
 
-  // Detected position from the first result
-  const detectedPosition = results.find(r => r.position)?.position ?? null
+  // Detected position from the first result (auto-extracted from PDF text)
+  const autoDetectedPosition = results.find(r => r.position)?.position ?? null
+  // Priority: saved > auto-detected
+  const effectivePosition = savedPosition || autoDetectedPosition
 
   // ─── Load manual URL from Storage ──────────────────────────
   const loadManual = useCallback(async () => {
@@ -441,6 +450,47 @@ export function ManualSearchModal({
     if (firstMatch) goToPage(firstMatch.page)
   }
 
+  // ─── Save position to Firestore ────────────────────────────
+  const savePosition = useCallback(async (pos: string) => {
+    const trimmed = pos.trim()
+    if (!trimmed) return
+    setSavingPosition(true)
+    try {
+      const repuestoRef = doc(db, `machines/${machine.id}/repuestos`, repuesto.id)
+      await updateDoc(repuestoRef, {
+        posicionManual: trimmed,
+        updatedAt: Timestamp.now(),
+      })
+      setSavedPosition(trimmed)
+      setEditingPosition(false)
+    } catch (err) {
+      console.error('Error saving position:', err)
+    } finally {
+      setSavingPosition(false)
+    }
+  }, [machine.id, repuesto.id])
+
+  const clearSavedPosition = useCallback(async () => {
+    setSavingPosition(true)
+    try {
+      const repuestoRef = doc(db, `machines/${machine.id}/repuestos`, repuesto.id)
+      await updateDoc(repuestoRef, {
+        posicionManual: '',
+        updatedAt: Timestamp.now(),
+      })
+      setSavedPosition(undefined)
+    } catch (err) {
+      console.error('Error clearing position:', err)
+    } finally {
+      setSavingPosition(false)
+    }
+  }, [machine.id, repuesto.id])
+
+  const startEditingPosition = () => {
+    setPositionInput(effectivePosition || '')
+    setEditingPosition(true)
+  }
+
   const currentMatchInfo = results.find(r => r.page === currentPage) ?? null
   const isMatchPage = matchPages.has(currentPage)
 
@@ -467,13 +517,76 @@ export function ManualSearchModal({
               {repuesto.codigoSAP && <span className="ml-2 opacity-50">(SAP: {repuesto.codigoSAP})</span>}
             </div>
           </div>
-          {/* Position badge */}
-          {detectedPosition && (
-            <div className="shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-cyan-500/15 border border-cyan-500/30">
-              <Crosshair className="h-3.5 w-3.5 text-cyan-400" />
-              <span className="text-xs font-bold text-cyan-400">Pos. {detectedPosition}</span>
-            </div>
-          )}
+          {/* Position badge — editable */}
+          <div className="shrink-0 flex items-center gap-1.5">
+            {editingPosition ? (
+              <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-cyan-500/15 border border-cyan-500/40">
+                <Crosshair className="h-3.5 w-3.5 text-cyan-400" />
+                <span className="text-[10px] text-cyan-300">Pos.</span>
+                <Input
+                  className="h-5 w-12 text-center text-xs font-mono px-1 bg-transparent border-cyan-500/30"
+                  value={positionInput}
+                  onChange={(e) => setPositionInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') savePosition(positionInput)
+                    if (e.key === 'Escape') setEditingPosition(false)
+                  }}
+                  autoFocus
+                  placeholder="#"
+                />
+                <Button
+                  variant="ghost" size="sm" className="h-5 w-5 p-0 text-green-400 hover:text-green-300"
+                  onClick={() => savePosition(positionInput)}
+                  disabled={savingPosition || !positionInput.trim()}
+                  title="Guardar posición"
+                >
+                  {savingPosition ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+                </Button>
+                <Button
+                  variant="ghost" size="sm" className="h-5 w-5 p-0 text-muted-foreground hover:text-foreground"
+                  onClick={() => setEditingPosition(false)}
+                  title="Cancelar"
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            ) : effectivePosition ? (
+              <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-cyan-500/15 border border-cyan-500/30">
+                <Crosshair className="h-3.5 w-3.5 text-cyan-400" />
+                <span className="text-xs font-bold text-cyan-400">Pos. {effectivePosition}</span>
+                {savedPosition && (
+                  <span className="text-[9px] text-green-400/70 ml-0.5" title="Posición guardada en Firestore">✓</span>
+                )}
+                <Button
+                  variant="ghost" size="sm" className="h-5 w-5 p-0 ml-0.5 text-cyan-400/50 hover:text-cyan-300"
+                  onClick={startEditingPosition}
+                  title="Editar posición"
+                >
+                  <Pencil className="h-2.5 w-2.5" />
+                </Button>
+                {savedPosition && (
+                  <Button
+                    variant="ghost" size="sm" className="h-5 w-5 p-0 text-red-400/40 hover:text-red-400"
+                    onClick={clearSavedPosition}
+                    disabled={savingPosition}
+                    title="Borrar posición guardada"
+                  >
+                    <X className="h-2.5 w-2.5" />
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <Button
+                variant="ghost" size="sm"
+                className="h-7 px-2 text-[11px] gap-1 text-cyan-400/60 hover:text-cyan-400 border border-dashed border-cyan-500/20 hover:border-cyan-500/40 rounded-full"
+                onClick={startEditingPosition}
+                title="Asignar posición manualmente"
+              >
+                <Pencil className="h-3 w-3" />
+                Asignar pos.
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* ─── Content ─── */}
@@ -595,22 +708,22 @@ export function ManualSearchModal({
                           Sig. <ChevronRight className="h-3 w-3" />
                         </Button>
                         {/* "Ver en diagrama" button */}
-                        {detectedPosition && (
+                        {effectivePosition && (
                           <>
                             <div className="h-5 w-px bg-border mx-1" />
                             <Button
                               variant="outline"
                               size="sm"
                               className="h-7 px-2.5 text-[11px] gap-1.5 border-cyan-500/40 text-cyan-400 hover:bg-cyan-500/10"
-                              onClick={() => goToDiagram(detectedPosition)}
+                              onClick={() => goToDiagram(effectivePosition)}
                               disabled={searchingDiagram}
-                              title={`Buscar posición ${detectedPosition} en el diagrama`}
+                              title={`Buscar posición ${effectivePosition} en el diagrama`}
                             >
                               {searchingDiagram
                                 ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
                                 : <Crosshair className="h-3.5 w-3.5" />
                               }
-                              {searchingDiagram ? 'Buscando...' : `Ver pos. ${detectedPosition} en diagrama`}
+                              {searchingDiagram ? 'Buscando...' : `Ver pos. ${effectivePosition} en diagrama`}
                             </Button>
                           </>
                         )}
