@@ -20,7 +20,6 @@ import {
   Timestamp,
 } from 'firebase/firestore'
 import { db } from '@/services/firebase'
-import type { Repuesto } from '@/types/repuestos'
 
 interface MergeTarget {
   repuestoId: string

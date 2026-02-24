@@ -14,7 +14,7 @@
 import { useState, useEffect } from 'react'
 import {
   Search, Loader2, AlertTriangle, CheckCircle2, Package,
-  ArrowRight, Merge, ChevronDown, ChevronUp, Copy as CopyIcon,
+  Merge, ChevronDown, ChevronUp, Copy as CopyIcon,
 } from 'lucide-react'
 import type { Machine } from '@/types/repuestos'
 import { useDuplicateScanner, type DuplicateGroup, type DuplicateEntry } from '@/hooks/repuestos/useDuplicateScanner'
