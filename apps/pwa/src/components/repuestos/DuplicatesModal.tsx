@@ -14,11 +14,12 @@
 import { useState, useEffect } from 'react'
 import {
   Search, Loader2, AlertTriangle, CheckCircle2, Package,
-  Merge, ChevronDown, ChevronUp, Copy as CopyIcon,
+  Merge, ChevronDown, ChevronUp, Copy as CopyIcon, BookOpen,
 } from 'lucide-react'
 import type { Machine } from '@/types/repuestos'
 import { useDuplicateScanner, type DuplicateGroup, type DuplicateEntry } from '@/hooks/repuestos/useDuplicateScanner'
 import { mergeRepuestos } from '@/services/mergeRepuestos'
+import { ManualSearchModal } from '@/components/repuestos/ManualSearchModal'
 import {
   Dialog,
   DialogContent,
@@ -42,46 +43,64 @@ function EntryCard({
   entry,
   isWinner,
   onSelect,
+  onSearchManual,
+  hasManuals,
 }: {
   entry: DuplicateEntry
   isWinner: boolean
   onSelect: () => void
+  onSearchManual?: () => void
+  hasManuals: boolean
 }) {
   return (
-    <button
-      onClick={onSelect}
+    <div
       className={`w-full text-left px-3 py-2 rounded-lg border transition-all text-xs ${
         isWinner
           ? 'bg-green-500/15 border-green-500/40 ring-1 ring-green-500/30'
           : 'bg-muted/20 border-border hover:bg-muted/40'
       }`}
     >
-      <div className="flex items-center gap-2">
-        <span
-          className="inline-block w-2.5 h-2.5 rounded-full shrink-0"
-          style={{ backgroundColor: entry.machineColor }}
-        />
-        <span className="font-medium text-foreground truncate">
-          {entry.machineName}
-        </span>
-        {isWinner && (
-          <Badge variant="outline" className="ml-auto text-[9px] border-green-500/40 text-green-400 px-1.5 py-0">
-            Conservar
-          </Badge>
-        )}
-      </div>
-      <div className="mt-1 pl-4.5 space-y-0.5">
-        <div className="text-foreground/80 truncate">{entry.repuesto.textoBreve || 'Sin nombre'}</div>
-        <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground">
-          <span>Cant: <span className="font-bold text-foreground">{entry.repuesto.cantidadPorMaquina || 0}</span></span>
-          <span>Valor: ${(entry.repuesto.valorUnitario || 0).toLocaleString('es-CL')}</span>
-          {entry.repuesto.codigoFabricante && <span>Fab: {entry.repuesto.codigoFabricante}</span>}
-          {entry.repuesto.ubicacionEnPlanta && <span>Ubic: {entry.repuesto.ubicacionEnPlanta}</span>}
-          {(entry.repuesto.fotosReales?.length || 0) > 0 && <span>📷 {entry.repuesto.fotosReales?.length}</span>}
-          {(entry.repuesto.vinculosManual?.length || 0) > 0 && <span>📎 {entry.repuesto.vinculosManual?.length}</span>}
+      <button onClick={onSelect} className="w-full text-left">
+        <div className="flex items-center gap-2">
+          <span
+            className="inline-block w-2.5 h-2.5 rounded-full shrink-0"
+            style={{ backgroundColor: entry.machineColor }}
+          />
+          <span className="font-medium text-foreground truncate">
+            {entry.machineName}
+          </span>
+          {isWinner && (
+            <Badge variant="outline" className="ml-auto text-[9px] border-green-500/40 text-green-400 px-1.5 py-0">
+              Conservar
+            </Badge>
+          )}
         </div>
-      </div>
-    </button>
+        <div className="mt-1 pl-4.5 space-y-0.5">
+          <div className="text-foreground/80 truncate">{entry.repuesto.textoBreve || 'Sin nombre'}</div>
+          <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-muted-foreground">
+            <span>Cant: <span className="font-bold text-foreground">{entry.repuesto.cantidadPorMaquina || 0}</span></span>
+            <span>Valor: ${(entry.repuesto.valorUnitario || 0).toLocaleString('es-CL')}</span>
+            {entry.repuesto.codigoFabricante && <span>Fab: {entry.repuesto.codigoFabricante}</span>}
+            {entry.repuesto.ubicacionEnPlanta && <span>Ubic: {entry.repuesto.ubicacionEnPlanta}</span>}
+            {(entry.repuesto.fotosReales?.length || 0) > 0 && <span>📷 {entry.repuesto.fotosReales?.length}</span>}
+            {(entry.repuesto.vinculosManual?.length || 0) > 0 && <span>📎 {entry.repuesto.vinculosManual?.length}</span>}
+          </div>
+        </div>
+      </button>
+      {/* Buscar en manual */}
+      {hasManuals && entry.repuesto.codigoFabricante && (
+        <div className="mt-1.5 pl-4.5">
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onSearchManual?.() }}
+            className="inline-flex items-center gap-1 text-[10px] text-purple-400 hover:text-purple-300 transition-colors bg-purple-500/10 hover:bg-purple-500/20 px-2 py-0.5 rounded-md"
+          >
+            <BookOpen className="h-3 w-3" />
+            Buscar "{entry.repuesto.codigoFabricante}" en manual de {entry.machineName}
+          </button>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -93,6 +112,8 @@ function GroupCard({
   onMerge,
   merging,
   merged,
+  onSearchManual,
+  machines,
 }: {
   group: DuplicateGroup
   winnerId: string | null
@@ -101,6 +122,8 @@ function GroupCard({
   onMerge: () => void
   merging: boolean
   merged: boolean
+  onSearchManual: (entry: DuplicateEntry) => void
+  machines: Machine[]
 }) {
   const [expanded, setExpanded] = useState(false)
 
@@ -161,14 +184,20 @@ function GroupCard({
           </div>
 
           <div className="space-y-1.5">
-            {group.entries.map((entry) => (
-              <EntryCard
-                key={`${entry.machineId}-${entry.repuesto.id}`}
-                entry={entry}
-                isWinner={winnerId === entry.repuesto.id && winnerMachineId === entry.machineId}
-                onSelect={() => onSelectWinner(entry.repuesto.id, entry.machineId)}
-              />
-            ))}
+            {group.entries.map((entry) => {
+              const machine = machines.find(m => m.id === entry.machineId)
+              const hasManuals = (machine?.manuals?.length || 0) > 0
+              return (
+                <EntryCard
+                  key={`${entry.machineId}-${entry.repuesto.id}`}
+                  entry={entry}
+                  isWinner={winnerId === entry.repuesto.id && winnerMachineId === entry.machineId}
+                  onSelect={() => onSelectWinner(entry.repuesto.id, entry.machineId)}
+                  onSearchManual={() => onSearchManual(entry)}
+                  hasManuals={hasManuals}
+                />
+              )
+            })}
           </div>
 
           {/* Merge preview */}
@@ -221,6 +250,7 @@ export function DuplicatesModal({
   const [mergingGroup, setMergingGroup] = useState<string | null>(null)
   const [mergedGroups, setMergedGroups] = useState<Set<string>>(new Set())
   const [mergeAllProgress, setMergeAllProgress] = useState<number | null>(null)
+  const [manualSearchEntry, setManualSearchEntry] = useState<DuplicateEntry | null>(null)
 
   // Auto-scan on open
   useEffect(() => {
@@ -460,6 +490,8 @@ export function DuplicatesModal({
                     onMerge={() => handleMergeGroup(group)}
                     merging={mergingGroup === group.codigoSAP}
                     merged={mergedGroups.has(group.codigoSAP)}
+                    onSearchManual={(entry) => setManualSearchEntry(entry)}
+                    machines={machines}
                   />
                 ))}
                 {pendingGroups.length === 0 && searchFilter && (
@@ -490,6 +522,20 @@ export function DuplicatesModal({
           )}
         </DialogFooter>
       </DialogContent>
+
+      {/* Manual Search sub-modal */}
+      {manualSearchEntry && (() => {
+        const machine = machines.find(m => m.id === manualSearchEntry.machineId)
+        return machine ? (
+          <ManualSearchModal
+            open={!!manualSearchEntry}
+            onOpenChange={(o) => !o && setManualSearchEntry(null)}
+            machine={machine}
+            repuesto={manualSearchEntry.repuesto}
+            isAdmin={false}
+          />
+        ) : null
+      })()}
     </Dialog>
   )
 }
