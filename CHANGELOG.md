@@ -7,6 +7,12 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.82] - 2026-02-23
+### Mejora
+- **Acciones inline en tabla desktop**: Los botones de acción (Ficha Técnica, Galería, Manual, Buscar en Manual, Ver en Manual, Editar, Eliminar) ahora aparecen directamente en la columna ACCIONES como íconos, sin necesidad de abrir un menú desplegable
+- **Editar ubicación en manual (admin)**: Los administradores pueden editar o eliminar el marcado/polígono guardado de un repuesto en el manual, permitiendo redibujar la ubicación
+- **Botón editar anotación (admin)**: Nuevo botón de lápiz en la tabla desktop para editar directamente la ubicación del repuesto en el manual (solo visible para admin)
+
 ## [2.48.81] - 2026-02-23
 ### Mejora de flujo
 - **Buscar en Manual — Selección de manual primero**: Al presionar "Buscar en manual", ahora se pide elegir el manual donde buscar antes de iniciar la búsqueda

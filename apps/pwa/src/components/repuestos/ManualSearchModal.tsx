@@ -17,12 +17,12 @@ import {
   BookOpen, Search, Loader2, FileText,
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
   ExternalLink, AlertTriangle, ZoomIn, ZoomOut, Maximize2,
-  Save, Eye, Undo2, MousePointerClick,
+  Save, Eye, Undo2, MousePointerClick, Trash2, Pencil,
 } from 'lucide-react'
 import * as pdfjsLib from 'pdfjs-dist'
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist'
 import { ref, listAll, getDownloadURL } from 'firebase/storage'
-import { doc, updateDoc, Timestamp, arrayUnion } from '@/services/firestoreTracked'
+import { doc, updateDoc, Timestamp, arrayUnion, arrayRemove } from '@/services/firestoreTracked'
 import { storage, db } from '@/services/firebase'
 import {
   Dialog,
@@ -49,6 +49,8 @@ export interface ManualSearchModalProps {
   repuesto: Repuesto
   /** Si se pasa, abre en modo vista directamente en la anotación guardada */
   initialVinculo?: VinculoManual
+  /** Si es admin, puede editar/eliminar la anotación */
+  isAdmin?: boolean
 }
 
 interface SearchResult {
@@ -86,6 +88,7 @@ export function ManualSearchModal({
   machine,
   repuesto,
   initialVinculo,
+  isAdmin,
 }: ManualSearchModalProps) {
   // ─── Step state ──────────────────────────────────────────
   const [step, setStep] = useState<ModalStep>('select-manual')
@@ -568,6 +571,40 @@ export function ManualSearchModal({
     }
   }, [polyPoints, polyClosed, manualUrl, currentPage, machine.id, repuesto.id, repuesto.codigoBaader, repuesto.codigoSAP, repuesto.textoBreve, renderPage])
 
+  // ─── Delete existing annotation (admin) ────────────────────
+  const [deletingAnnotation, setDeletingAnnotation] = useState(false)
+
+  const deleteAnnotation = useCallback(async () => {
+    if (!existingVinculo) return
+    setDeletingAnnotation(true)
+    try {
+      const repuestoRef = doc(db, `machines/${machine.id}/repuestos`, repuesto.id)
+      await updateDoc(repuestoRef, {
+        vinculosManual: arrayRemove(existingVinculo),
+        updatedAt: Timestamp.now(),
+      })
+      // Ahora entrar en modo dibujo para la nueva marca
+      setDrawingMode(true)
+      setPolyPoints([])
+      setPolyClosed(false)
+      renderPage(currentPage)
+    } catch (err) {
+      console.error('Error deleting annotation:', err)
+    } finally {
+      setDeletingAnnotation(false)
+    }
+  }, [existingVinculo, machine.id, repuesto.id, currentPage, renderPage])
+
+  const startEditAnnotation = useCallback(() => {
+    if (!existingVinculo) return
+    // Ir a la página de la anotación si es necesario
+    if (existingVinculo.pagina !== currentPage) {
+      goToPage(existingVinculo.pagina)
+    }
+    // Eliminar la vieja y entrar en modo dibujo
+    deleteAnnotation()
+  }, [existingVinculo, currentPage, deleteAnnotation, goToPage])
+
   // ─── Derived state ─────────────────────────────────────────
   const currentMatchInfo = results.find(r => r.page === currentPage) ?? null
   const isMatchPage = matchPages.has(currentPage)
@@ -838,6 +875,26 @@ export function ManualSearchModal({
                       className="h-5 px-2 text-[10px] text-green-400 hover:text-green-300"
                       onClick={() => goToPage(existingVinculo.pagina)}
                     >Ir a marcado</Button>
+                  )}
+                  {isAdmin && (
+                    <div className="ml-auto flex items-center gap-1">
+                      <Button variant="ghost" size="sm"
+                        className="h-5 px-2 text-[10px] gap-1 text-yellow-400 hover:text-yellow-300 hover:bg-yellow-500/10"
+                        onClick={startEditAnnotation}
+                        disabled={deletingAnnotation}
+                      >
+                        {deletingAnnotation ? <Loader2 className="h-3 w-3 animate-spin" /> : <Pencil className="h-3 w-3" />}
+                        Editar ubicación
+                      </Button>
+                      <Button variant="ghost" size="sm"
+                        className="h-5 px-2 text-[10px] gap-1 text-destructive/70 hover:text-destructive hover:bg-destructive/10"
+                        onClick={deleteAnnotation}
+                        disabled={deletingAnnotation}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                        Eliminar
+                      </Button>
+                    </div>
                   )}
                 </div>
               )}

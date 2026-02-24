@@ -374,6 +374,7 @@ export function RepuestosDashboard() {
                 repuestos={paginatedRepuestos}
                 loading={repuestosLoading}
                 machineId={currentMachine?.id}
+                isAdmin={isAdmin}
                 onEdit={isAdmin ? (rep) => setEditTarget(rep) : undefined}
                 onDelete={isAdmin ? (rep) => setConfirmDelete(rep) : undefined}
                 onViewPhotos={(rep) => setPhotoModal(rep)}
@@ -383,6 +384,7 @@ export function RepuestosDashboard() {
                 onRenameRepuesto={isAdmin ? handleRenameRepuesto : undefined}
                 onSearchInManual={currentMachine ? (rep) => setManualSearchTarget(rep) : undefined}
                 onViewInManual={currentMachine ? (rep) => setViewInManualTarget(rep) : undefined}
+                onEditAnnotation={isAdmin && currentMachine ? (rep) => setViewInManualTarget(rep) : undefined}
               />
 
               <RepuestosPagination
@@ -495,6 +497,7 @@ export function RepuestosDashboard() {
           onOpenChange={(open) => !open && setManualSearchTarget(null)}
           machine={currentMachine}
           repuesto={manualSearchTarget}
+          isAdmin={isAdmin}
         />
       )}
 
@@ -506,6 +509,7 @@ export function RepuestosDashboard() {
           machine={currentMachine}
           repuesto={viewInManualTarget}
           initialVinculo={viewInManualTarget.vinculosManual?.find(v => v.machineId === currentMachine.id) ?? viewInManualTarget.vinculosManual?.[0]}
+          isAdmin={isAdmin}
         />
       )}
 
