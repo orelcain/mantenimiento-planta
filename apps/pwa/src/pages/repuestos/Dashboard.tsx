@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState, useRef, type KeyboardEvent } from 'react'
-import { AlertTriangle, Plus, FileText, Upload, Package, ClipboardList, ImageIcon, DollarSign, Wrench, ArrowRightLeft, Copy as CopyDuplicateIcon, Globe, Camera, ExternalLink, RotateCw } from 'lucide-react'
+import { AlertTriangle, Plus, FileText, Upload, Package, ClipboardList, ImageIcon, DollarSign, Wrench, ArrowRightLeft, Copy as CopyDuplicateIcon, Globe, Camera, ExternalLink, RotateCw, Search, X, BookOpen, ChevronDown, ChevronRight } from 'lucide-react'
 import { RepuestosTable } from '@/components/repuestos/RepuestosTable'
 import { RepuestoFormModal } from '@/components/repuestos/RepuestoForm'
-import { RepuestosFilters } from '@/components/repuestos/RepuestosFilters'
 import { RepuestosPagination } from '@/components/repuestos/RepuestosPagination'
 import { EmptyState } from '@/components/repuestos/EmptyState'
 import { EquipmentNavigator } from '@/components/repuestos/EquipmentNavigator'
@@ -73,6 +72,7 @@ export function RepuestosDashboard() {
   const globalInputRef = useRef<HTMLInputElement | null>(null)
   const globalResultsRef = useRef<HTMLDivElement | null>(null)
   const [selectedGlobalResultIndex, setSelectedGlobalResultIndex] = useState(-1)
+  const [manualsExpanded, setManualsExpanded] = useState(false)
   const hasHydratedPrefsRef = useRef(false)
   const [, setSelectedCategoryId] = useState<string | null>('maquinas-principales')
 
@@ -644,6 +644,87 @@ export function RepuestosDashboard() {
           </div>
         </div>
 
+        <div className="mb-4 space-y-3">
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder={`Buscar en ${currentMachine.nombre}...`}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-9 py-2 text-sm bg-background border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  title="Limpiar búsqueda local"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+
+            <div className="relative">
+              <Globe className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-emerald-500" />
+              <input
+                ref={globalInputRef}
+                type="text"
+                placeholder="Buscar en todas las máquinas..."
+                value={globalQuery}
+                onFocus={() => setGlobalSearchMode(true)}
+                onChange={(e) => {
+                  setGlobalSearchMode(true)
+                  setGlobalQuery(e.target.value)
+                }}
+                onKeyDown={handleGlobalInputKeyDown}
+                className="w-full pl-9 pr-4 py-2 text-sm bg-background border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                disabled={globalSearch.loading}
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 text-xs"
+              onClick={handleManualReindexGlobal}
+              disabled={globalLoading || manualReindexing || machines.length === 0}
+              title="Recargar índice global"
+            >
+              <RotateCw className={`h-3.5 w-3.5 ${(globalLoading || manualReindexing) ? 'animate-spin' : ''}`} />
+              {manualReindexing || globalLoading ? 'Reindexando...' : 'Reindexar ahora'}
+            </Button>
+
+            {searchQuery && (
+              <Button variant="outline" size="sm" onClick={handleClearFilters} className="text-xs gap-1.5">
+                <X className="h-3.5 w-3.5" />
+                Limpiar búsqueda local
+              </Button>
+            )}
+
+            {globalLoading ? (
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 border border-amber-500/20 animate-pulse">
+                Indexando repuestos globales...
+              </span>
+            ) : globalSearch.error ? (
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-destructive/10 text-destructive border border-destructive/20">
+                Error de índice global
+              </span>
+            ) : globalLoaded ? (
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+                Índice listo · {globalSearch.allRepuestos.length} repuestos{globalIndexedAtLabel ? ` · ${globalIndexedAtLabel}` : ''}{globalIndexedAgoLabel ? ` (${globalIndexedAgoLabel})` : ''}
+              </span>
+            ) : (
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted/60 text-muted-foreground border border-border">
+                Índice global pendiente
+              </span>
+            )}
+          </div>
+        </div>
+
         {/* KPI Summary Cards — Catálogo puro */}
         {(() => {
           const totalRepuestos = repuestos.length
@@ -708,7 +789,24 @@ export function RepuestosDashboard() {
         <div className="space-y-4">
           {/* Machine Manual Panel — shows available PDFs */}
           {currentMachine && (
-            <MachineManualPanel machine={currentMachine} className="p-3 bg-card/50 rounded-xl border border-border" />
+            <div className="space-y-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full justify-between"
+                onClick={() => setManualsExpanded((prev) => !prev)}
+              >
+                <span className="inline-flex items-center gap-2 text-xs sm:text-sm">
+                  <BookOpen className="h-4 w-4" />
+                  Manuales de la máquina
+                </span>
+                {manualsExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </Button>
+
+              {manualsExpanded && (
+                <MachineManualPanel machine={currentMachine} className="p-3 bg-card/50 rounded-xl border border-border" />
+              )}
+            </div>
           )}
 
           <div className="flex items-center justify-between">
@@ -720,53 +818,6 @@ export function RepuestosDashboard() {
                   : `${filteredRepuestos.length} de ${repuestos.length}`}
               </span>
             </div>
-          </div>
-
-          <RepuestosFilters
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-            onClearFilters={handleClearFilters}
-          />
-
-          {/* ─── Búsqueda Global ─── */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <Button
-              variant={globalSearchMode ? 'default' : 'outline'}
-              size="sm"
-              className={`gap-2 text-xs ${globalSearchMode ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : ''}`}
-              onClick={() => setGlobalSearchMode((prev) => !prev)}
-            >
-              <Globe className="h-3.5 w-3.5" />
-              {globalSearchMode ? 'Búsqueda global activa' : 'Buscar en todas las máquinas'}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2 text-xs"
-              onClick={handleManualReindexGlobal}
-              disabled={globalLoading || manualReindexing || machines.length === 0}
-              title="Recargar índice global"
-            >
-              <RotateCw className={`h-3.5 w-3.5 ${(globalLoading || manualReindexing) ? 'animate-spin' : ''}`} />
-              {manualReindexing || globalLoading ? 'Reindexando...' : 'Reindexar ahora'}
-            </Button>
-            {globalLoading ? (
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 border border-amber-500/20 animate-pulse">
-                Indexando repuestos globales...
-              </span>
-            ) : globalSearch.error ? (
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-destructive/10 text-destructive border border-destructive/20">
-                Error de índice global
-              </span>
-            ) : globalLoaded ? (
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
-                Índice listo · {globalSearch.allRepuestos.length} repuestos{globalIndexedAtLabel ? ` · ${globalIndexedAtLabel}` : ''}{globalIndexedAgoLabel ? ` (${globalIndexedAgoLabel})` : ''}
-              </span>
-            ) : (
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted/60 text-muted-foreground border border-border">
-                Índice global pendiente
-              </span>
-            )}
           </div>
 
           {globalSearchMode && (
@@ -786,19 +837,6 @@ export function RepuestosDashboard() {
                     Actualizado {globalIndexedAtLabel}{globalIndexedAgoLabel ? ` (${globalIndexedAgoLabel})` : ''}
                   </span>
                 )}
-              </div>
-              <div className="relative max-w-md">
-                <Globe className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-emerald-500" />
-                <input
-                  ref={globalInputRef}
-                  type="text"
-                  placeholder="Buscar repuesto en todas las máquinas..."
-                  value={globalQuery}
-                  onChange={(e) => setGlobalQuery(e.target.value)}
-                  onKeyDown={handleGlobalInputKeyDown}
-                  className="w-full pl-9 pr-4 py-2 text-sm bg-background border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
-                  disabled={globalSearch.loading}
-                />
               </div>
               <p className="text-[10px] text-muted-foreground">
                 Atajos: ↑ ↓ para navegar · Enter para abrir resultado · Esc para cerrar

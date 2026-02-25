@@ -7,6 +7,14 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.50.0] - 2026-02-25
+### Funcionalidad
+- **Búsquedas reubicadas en cabecera de máquina**: la búsqueda local del equipo seleccionado aparece primero y la búsqueda global queda al lado para acceso directo
+- **Búsqueda global integrada en flujo principal**: mantiene atajos de teclado y reindexado manual desde la zona superior de trabajo
+- **Manuales colapsables por defecto**: el bloque de manuales inicia contraído y solo se expande cuando el usuario lo solicita
+
+---
+
 ## [2.49.2] - 2026-02-25
 ### Corrección
 - **CI estable en GitHub Pages**: se elimina la ruta problemática de Corepack/pnpm-action y se usa instalación directa de `pnpm@9.15.1` para evitar fallos intermitentes de self-installer/versionado
