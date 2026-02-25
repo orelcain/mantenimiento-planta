@@ -7,6 +7,17 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.98] - 2026-02-25
+### Funcionalidad
+- **Reindexado manual del buscador global**: nuevo botón `Reindexar ahora` para refrescar al instante el índice de repuestos de todas las máquinas
+- **Estado persistente del índice global**: badge visible incluso con el panel cerrado (`Indexando`, `Índice listo`, `Error`)
+- **Tiempo de actualización legible**: estado con formato humano (`justo ahora`, `hace 1 minuto`, `hace X minutos/horas`) junto a la hora
+
+### UX
+- **Feedback de reindexado**: botón bloqueado durante carga, spinner visual y toast de éxito/error al terminar
+
+---
+
 ## [2.48.97] - 2026-02-24
 ### Funcionalidad
 - **Columna de Observaciones**: nueva columna en la tabla de repuestos (desktop + móvil) para notas/observaciones con icono de mensaje, sorteable

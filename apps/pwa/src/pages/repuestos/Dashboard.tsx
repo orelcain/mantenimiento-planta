@@ -166,11 +166,14 @@ export function RepuestosDashboard() {
     if (!globalIndexedAt) return null
     const diffMs = Math.max(0, globalIndexNow - globalIndexedAt)
     const seconds = Math.floor(diffMs / 1000)
-    if (seconds < 60) return `hace ${seconds}s`
+    if (seconds < 10) return 'justo ahora'
+    if (seconds < 60) return `hace ${seconds} segundos`
     const minutes = Math.floor(seconds / 60)
-    if (minutes < 60) return `hace ${minutes}m`
+    if (minutes === 1) return 'hace 1 minuto'
+    if (minutes < 60) return `hace ${minutes} minutos`
     const hours = Math.floor(minutes / 60)
-    return `hace ${hours}h`
+    if (hours === 1) return 'hace 1 hora'
+    return `hace ${hours} horas`
   }, [globalIndexedAt, globalIndexNow])
 
   const globalResults = useMemo(() => {
