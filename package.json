@@ -24,9 +24,9 @@
     "ts-node": "^10.9.2",
     "turbo": "^2.3.3"
   },
-  "packageManager": "pnpm@9.15.1",
   "engines": {
-    "node": ">=20"
+    "node": ">=20",
+    "pnpm": ">=9"
   },
   "dependencies": {
     "firebase-admin": "^13.6.0",
