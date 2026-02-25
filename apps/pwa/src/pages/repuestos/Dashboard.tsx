@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useRef } from 'react'
-import { AlertTriangle, Plus, FileText, Upload, Package, ClipboardList, ImageIcon, DollarSign, Wrench, ArrowRightLeft, Copy as CopyDuplicateIcon, Globe, Camera, ExternalLink } from 'lucide-react'
+import { AlertTriangle, Plus, FileText, Upload, Package, ClipboardList, ImageIcon, DollarSign, Wrench, ArrowRightLeft, Copy as CopyDuplicateIcon, Globe, Camera, ExternalLink, RotateCw } from 'lucide-react'
 import { RepuestosTable } from '@/components/repuestos/RepuestosTable'
 import { RepuestoFormModal } from '@/components/repuestos/RepuestoForm'
 import { RepuestosFilters } from '@/components/repuestos/RepuestosFilters'
@@ -64,6 +64,7 @@ export function RepuestosDashboard() {
   const [globalSearchMode, setGlobalSearchMode] = useState(false)
   const [globalQuery, setGlobalQuery] = useState('')
   const [globalIndexedAt, setGlobalIndexedAt] = useState<number | null>(null)
+  const [manualReindexing, setManualReindexing] = useState(false)
   const [highlightedRepuestoId, setHighlightedRepuestoId] = useState<string | null>(null)
   const highlightTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pendingHighlightRef = useRef<string | null>(null)
@@ -259,6 +260,28 @@ export function RepuestosDashboard() {
 
   const handleClearFilters = () => {
     setSearchQuery('')
+  }
+
+  const handleManualReindexGlobal = async () => {
+    if (globalLoading || manualReindexing) return
+    setManualReindexing(true)
+    try {
+      await globalLoadAll()
+      setGlobalIndexedAt(Date.now())
+      toast({
+        title: 'Índice global actualizado',
+        description: 'Se recargaron los repuestos de todas las máquinas.',
+        variant: 'success',
+      })
+    } catch {
+      toast({
+        title: 'Error al reindexar',
+        description: 'No se pudo recargar el índice global en este momento.',
+        variant: 'destructive',
+      })
+    } finally {
+      setManualReindexing(false)
+    }
   }
 
   /** Navegar a la máquina del resultado global y resaltar el repuesto */
@@ -581,6 +604,17 @@ export function RepuestosDashboard() {
             >
               <Globe className="h-3.5 w-3.5" />
               {globalSearchMode ? 'Búsqueda global activa' : 'Buscar en todas las máquinas'}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 text-xs"
+              onClick={handleManualReindexGlobal}
+              disabled={globalLoading || manualReindexing || machines.length === 0}
+              title="Recargar índice global"
+            >
+              <RotateCw className={`h-3.5 w-3.5 ${(globalLoading || manualReindexing) ? 'animate-spin' : ''}`} />
+              {manualReindexing || globalLoading ? 'Reindexando...' : 'Reindexar ahora'}
             </Button>
             {globalLoading ? (
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 border border-amber-500/20 animate-pulse">
