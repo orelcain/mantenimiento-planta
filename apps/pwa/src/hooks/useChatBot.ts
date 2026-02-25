@@ -1,11 +1,12 @@
 /**
- * Hook para el Chatbot — v2
- * Gestiona mensajes, historial persistente, streaming y estado
+ * Hook para el Chatbot — v3
+ * Memoria por usuario, corrección de typos, historial persistente por userId
  */
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { sendChatMessage, type ChatMessage, type ChatAction } from '@/services/chatbot'
+import { useAuthStore } from '@/store/authStore'
 
-const STORAGE_KEY = 'chatbot_history'
+const STORAGE_PREFIX = 'chatbot_history_'
 const MAX_PERSISTED = 50
 
 function generateId(): string {
@@ -15,37 +16,41 @@ function generateId(): string {
 const WELCOME_MESSAGE: ChatMessage = {
   id: 'welcome',
   role: 'assistant',
-  content: '¡Hola! 👋 Soy el asistente de planta. Puedo ayudarte con:\n\n• **Repuestos** — buscar piezas por nombre, código SAP o fabricante\n• **Incidencias** — ver reportes abiertos, filtrar por estado o prioridad\n• **Equipos** — consultar estado de máquinas y criticidad\n• **Resúmenes** — panorama general de la planta\n\n¿En qué puedo ayudarte?',
+  content: '¡Hola! 👋 Soy el asistente de planta. Puedo ayudarte con:\n\n• **Repuestos** — buscar piezas por nombre, código SAP o fabricante\n• **Incidencias** — ver reportes abiertos, filtrar por estado o prioridad\n• **Equipos** — consultar estado de máquinas y criticidad\n• **Resúmenes** — panorama general de la planta\n\nEntiendo errores de tipeo (escribí "moror" y entenderé "motor" 😉)\nRecuerdo tus consultas anteriores para darte respuestas más relevantes.\n\n¿En qué puedo ayudarte?',
   timestamp: new Date(),
 }
 
-// ─── Persistencia localStorage ───────────────────────────────────────
+// ─── Persistencia localStorage POR USUARIO ───────────────────────────
 
-function loadHistory(): ChatMessage[] {
+function getStorageKey(userId: string | undefined): string {
+  return `${STORAGE_PREFIX}${userId || 'anonymous'}`
+}
+
+function loadHistory(userId: string | undefined): ChatMessage[] {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
+    const raw = localStorage.getItem(getStorageKey(userId))
     if (!raw) return [WELCOME_MESSAGE]
     const parsed = JSON.parse(raw) as ChatMessage[]
-    // Reconstituir Date objects
     return parsed.map(m => ({ ...m, timestamp: new Date(m.timestamp) }))
   } catch {
     return [WELCOME_MESSAGE]
   }
 }
 
-function saveHistory(messages: ChatMessage[]): void {
+function saveHistory(messages: ChatMessage[], userId: string | undefined): void {
   try {
     const toSave = messages.slice(-MAX_PERSISTED)
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave))
-  } catch {
-    // localStorage full o no disponible
-  }
+    localStorage.setItem(getStorageKey(userId), JSON.stringify(toSave))
+  } catch { /* localStorage full */ }
 }
 
 // ─── Hook principal ──────────────────────────────────────────────────
 
 export function useChatBot() {
-  const [messages, setMessages] = useState<ChatMessage[]>(() => loadHistory())
+  const user = useAuthStore(state => state.user)
+  const userId = user?.id
+  
+  const [messages, setMessages] = useState<ChatMessage[]>(() => loadHistory(userId))
   const [isLoading, setIsLoading] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
   const [hasUnread, setHasUnread] = useState(false)
@@ -53,6 +58,15 @@ export function useChatBot() {
   const [lastActions, setLastActions] = useState<ChatAction[]>([])
   const abortRef = useRef(false)
   const isOpenRef = useRef(false)
+  const prevUserIdRef = useRef(userId)
+  
+  // Recargar historial cuando cambia el usuario
+  useEffect(() => {
+    if (prevUserIdRef.current !== userId) {
+      setMessages(loadHistory(userId))
+      prevUserIdRef.current = userId
+    }
+  }, [userId])
 
   // Sincronizar ref con estado
   useEffect(() => {
@@ -61,8 +75,8 @@ export function useChatBot() {
 
   // Persistir historial cuando cambia
   useEffect(() => {
-    saveHistory(messages)
-  }, [messages])
+    saveHistory(messages, userId)
+  }, [messages, userId])
 
   const toggle = useCallback(() => {
     setIsOpen(prev => {
@@ -108,7 +122,8 @@ export function useChatBot() {
           if (!abortRef.current) {
             setStreamingContent(partial)
           }
-        }
+        },
+        userId,
       )
 
       if (abortRef.current) return
@@ -144,14 +159,14 @@ export function useChatBot() {
     } finally {
       setIsLoading(false)
     }
-  }, [messages, isLoading])
+  }, [messages, isLoading, userId])
 
   const clearHistory = useCallback(() => {
     setMessages([WELCOME_MESSAGE])
     setStreamingContent(null)
     setLastActions([])
-    localStorage.removeItem(STORAGE_KEY)
-  }, [])
+    localStorage.removeItem(getStorageKey(userId))
+  }, [userId])
 
   return {
     messages,

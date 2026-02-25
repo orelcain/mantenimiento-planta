@@ -7,6 +7,18 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.53.0] - 2026-02-25
+### Agregado
+- **Memoria por usuario**: cada usuario tiene su propio historial persistente en localStorage, separado por userId
+- **Contexto conversacional**: el chatbot recuerda temas frecuentes, máquinas de interés y últimas consultas del usuario para personalizar respuestas
+- **Corrección automática de typos**: algoritmo Levenshtein sobre vocabulario técnico de ~80 palabras — "moror" → "motor", "roamiento" → "rodamiento", "balve" → "valve"
+- **El chatbot informa las correcciones**: cuando detecta un typo, le dice al usuario qué entendió
+- **Vocabulario técnico expandido**: 80+ términos industriales (bombas, sensores, máquinas, etc.) para corrección fuzzy
+### Mejorado
+- **Detección de intención**: ahora también corrige typos antes de detectar la intención del mensaje
+- **Historial se recarga al cambiar de usuario**: login/logout limpia y recarga el historial correcto
+- **Mensaje de bienvenida actualizado**: menciona capacidades de corrección de typos y memoria
+
 ## [2.52.0] - 2026-02-25
 ### Agregado
 - **Streaming de respuestas**: las respuestas del chatbot aparecen letra por letra en tiempo real (cursor parpadeante)

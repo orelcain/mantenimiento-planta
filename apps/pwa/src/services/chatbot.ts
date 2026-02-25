@@ -1,6 +1,6 @@
 /**
  * Servicio de Chatbot con RAG (Retrieval-Augmented Generation)
- * v2 — Con caché, sinónimos, streaming y acciones directas
+ * v3 — Memoria por usuario, corrección de typos, contexto conversacional
  */
 import { collection, getDocs, query, where, orderBy, limit } from 'firebase/firestore'
 import { db } from './firebase'
@@ -33,6 +33,200 @@ type IntentType =
   | 'resumen'
   | 'ayuda'
   | 'general'
+
+// ─── Memoria por usuario ─────────────────────────────────────────────
+export interface UserMemory {
+  userId: string
+  topics: Record<string, number>      // tema → nº de veces consultado
+  lastQueries: string[]               // últimas 20 queries
+  preferences: Record<string, string> // preferencias detectadas (ej. máquina favorita)
+  updatedAt: number
+}
+
+const MEMORY_PREFIX = 'chatbot_memory_'
+const MEMORY_MAX_QUERIES = 20
+const MEMORY_MAX_TOPICS = 30
+
+export function loadUserMemory(userId: string): UserMemory {
+  try {
+    const raw = localStorage.getItem(`${MEMORY_PREFIX}${userId}`)
+    if (!raw) return { userId, topics: {}, lastQueries: [], preferences: {}, updatedAt: Date.now() }
+    return JSON.parse(raw) as UserMemory
+  } catch {
+    return { userId, topics: {}, lastQueries: [], preferences: {}, updatedAt: Date.now() }
+  }
+}
+
+export function saveUserMemory(memory: UserMemory): void {
+  try {
+    // Limpiar topics antiguos si hay demasiados — quedarse con los más frecuentes
+    if (Object.keys(memory.topics).length > MEMORY_MAX_TOPICS) {
+      const sorted = Object.entries(memory.topics).sort((a, b) => b[1] - a[1])
+      memory.topics = Object.fromEntries(sorted.slice(0, MEMORY_MAX_TOPICS))
+    }
+    memory.lastQueries = memory.lastQueries.slice(-MEMORY_MAX_QUERIES)
+    memory.updatedAt = Date.now()
+    localStorage.setItem(`${MEMORY_PREFIX}${memory.userId}`, JSON.stringify(memory))
+  } catch { /* localStorage full */ }
+}
+
+function updateMemoryWithQuery(memory: UserMemory, userMessage: string, intents: IntentType[]): void {
+  // Guardar el query
+  memory.lastQueries.push(userMessage)
+  
+  // Incrementar temas
+  for (const intent of intents) {
+    memory.topics[intent] = (memory.topics[intent] || 0) + 1
+  }
+  
+  // Detectar preferencias (máquinas mencionadas)
+  const machinePatterns = ['baader', 'marel', 'volcador', 'cinta', 'eviscer']
+  const lower = userMessage.toLowerCase()
+  for (const pattern of machinePatterns) {
+    if (lower.includes(pattern)) {
+      memory.preferences[`last_machine`] = pattern
+      memory.preferences[`machine_${pattern}`] = String((parseInt(memory.preferences[`machine_${pattern}`] || '0') + 1))
+    }
+  }
+}
+
+function buildMemoryContext(memory: UserMemory): string {
+  const lines: string[] = []
+  
+  // Temas frecuentes
+  const topTopics = Object.entries(memory.topics)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+  
+  if (topTopics.length > 0) {
+    lines.push('HISTORIAL DEL USUARIO:')
+    lines.push(`Temas más consultados: ${topTopics.map(([t, n]) => `${t}(${n})`).join(', ')}`)
+  }
+  
+  // Últimas queries para contexto conversacional
+  const recentQueries = memory.lastQueries.slice(-5)
+  if (recentQueries.length > 0) {
+    lines.push(`Últimas consultas: ${recentQueries.map(q => `"${q}"`).join(' → ')}`)
+  }
+  
+  // Preferencias de máquinas
+  const machinePrefs = Object.entries(memory.preferences)
+    .filter(([k]) => k.startsWith('machine_'))
+    .sort((a, b) => parseInt(b[1]) - parseInt(a[1]))
+    .slice(0, 3)
+  
+  if (machinePrefs.length > 0) {
+    lines.push(`Máquinas de interés: ${machinePrefs.map(([k, v]) => `${k.replace('machine_', '')}(×${v})`).join(', ')}`)
+  }
+  
+  return lines.length > 0 ? lines.join('\n') : ''
+}
+
+// ─── Corrección de typos (Levenshtein fuzzy) ─────────────────────────
+
+/** Distancia de Levenshtein entre dos strings */
+function levenshtein(a: string, b: string): number {
+  const la = a.length
+  const lb = b.length
+  if (la === 0) return lb
+  if (lb === 0) return la
+  
+  // Optimización: si la diferencia de longitud es muy grande, no vale la pena calcular
+  if (Math.abs(la - lb) > 3) return Math.max(la, lb)
+  
+  // Usar un solo array 1D para ahorrar memoria
+  const prev = Array.from({ length: lb + 1 }, (_, j) => j)
+  
+  for (let i = 1; i <= la; i++) {
+    let prevDiag = prev[0]!
+    prev[0] = i
+    for (let j = 1; j <= lb; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1
+      const tmp = prev[j]!
+      prev[j] = Math.min(
+        prev[j]! + 1,          // Borrar
+        prev[j - 1]! + 1,      // Insertar
+        prevDiag + cost         // Reemplazar
+      )
+      prevDiag = tmp
+    }
+  }
+  
+  return prev[lb]!
+}
+
+// Vocabulario conocido — todos los términos del dominio para corrección de typos
+const KNOWN_VOCABULARY: string[] = [
+  // De SYNONYM_MAP (las keys y todos los sinónimos)
+  'motor', 'motoreductor', 'motobomba', 'electrico',
+  'bomba', 'pump', 'bombeo', 'centrifuga',
+  'rodamiento', 'rodaje', 'bearing', 'balero', 'balinera', 'cojinete', 'ruleman',
+  'correa', 'faja', 'banda', 'belt', 'cinta',
+  'sello', 'seal', 'reten', 'junta', 'oring', 'empaque', 'empaquetadura',
+  'filtro', 'filter', 'cartucho', 'colador', 'malla',
+  'reductor', 'reductora', 'gearbox',
+  'valvula', 'valve', 'llave', 'grifo', 'electrovalvula',
+  'sensor', 'transductor', 'transmisor', 'detector', 'sonda', 'probe',
+  'engranaje', 'pinon', 'gear', 'corona', 'cremallera',
+  'cadena', 'chain', 'eslabon',
+  'eje', 'shaft', 'flecha', 'arbol',
+  'cuchillo', 'cuchilla', 'blade', 'knife', 'filo',
+  'soporte', 'bracket', 'support', 'base', 'mounting',
+  // Términos de la planta
+  'temperatura', 'humedad', 'presion', 'vibracion', 'corriente', 'voltaje',
+  'incidencia', 'falla', 'problema', 'reporte', 'pendiente', 'critica',
+  'equipo', 'maquina', 'operativo', 'mantenimiento', 'criticidad',
+  'baader', 'marel', 'volcador', 'transportadora', 'eviscerado', 'filete', 'empaque',
+  'repuesto', 'pieza', 'catalogo', 'inventario',
+  'resumen', 'estadistica', 'dashboard', 'panorama', 'total',
+]
+
+/**
+ * Corrige un término buscando el más cercano en el vocabulario conocido. 
+ * Solo corrige si la distancia es ≤ 2 y el término original no existe ya.
+ * Ejemplo: "moror" → "motor", "roamiento" → "rodamiento", "balve" → "valve"
+ */
+function correctTypo(term: string): { corrected: string; wasFixed: boolean } {
+  // Si ya es un término conocido, no corregir
+  if (KNOWN_VOCABULARY.includes(term)) return { corrected: term, wasFixed: false }
+  
+  let bestMatch = term
+  let bestDist = Infinity
+  const maxDist = term.length <= 4 ? 1 : 2  // Más estricto con palabras cortas
+  
+  for (const known of KNOWN_VOCABULARY) {
+    // Skip si la diferencia de longitud es mayor a maxDist (optimización)
+    if (Math.abs(known.length - term.length) > maxDist) continue
+    
+    const dist = levenshtein(term, known)
+    if (dist < bestDist && dist <= maxDist) {
+      bestDist = dist
+      bestMatch = known
+    }
+  }
+  
+  return bestDist <= maxDist && bestMatch !== term
+    ? { corrected: bestMatch, wasFixed: true }
+    : { corrected: term, wasFixed: false }
+}
+
+/**
+ * Corrige typos en un array de términos y devuelve los corregidos + log de correcciones
+ */
+function correctTerms(terms: string[]): { correctedTerms: string[]; corrections: string[] } {
+  const correctedTerms: string[] = []
+  const corrections: string[] = []
+  
+  for (const term of terms) {
+    const { corrected, wasFixed } = correctTypo(term)
+    correctedTerms.push(corrected)
+    if (wasFixed) {
+      corrections.push(`"${term}" → "${corrected}"`)
+    }
+  }
+  
+  return { correctedTerms, corrections }
+}
 
 // ─── Sinónimos para búsqueda semántica ───────────────────────────────
 const SYNONYM_MAP: Record<string, string[]> = {
@@ -86,9 +280,10 @@ function normalizeText(text: string): string {
 
 /**
  * Extrae términos de búsqueda significativos de un query conversacional.
- * Ejemplo: "¿Tenemos motores en stock?" → ["motor"]
+ * Incluye corrección de typos: "moror" → "motor", "roamiento" → "rodamiento"
+ * Ejemplo: "¿Tenemos moror en stock?" → ["motor"] (corregido)
  */
-function extractSearchTerms(query: string): string[] {
+function extractSearchTerms(query: string): { terms: string[]; corrections: string[] } {
   const normalized = normalizeText(query)
   const words = normalized.split(/\s+/).filter(w => w.length > 2)
   
@@ -97,12 +292,17 @@ function extractSearchTerms(query: string): string[] {
   
   // Stem básico: "motores" → "motor", "bombas" → "bomba", etc.
   const stemmed = meaningful.map(w => {
-    if (w.endsWith('es') && w.length > 4) return w.slice(0, -2)  // motores → motor
-    if (w.endsWith('s') && w.length > 3) return w.slice(0, -1)    // bombas → bomba
+    if (w.endsWith('es') && w.length > 4) return w.slice(0, -2)
+    if (w.endsWith('s') && w.length > 3) return w.slice(0, -1)
     return w
   })
   
-  return [...new Set(stemmed)]
+  const unique = [...new Set(stemmed)]
+  
+  // Corregir typos
+  const { correctedTerms, corrections } = correctTerms(unique)
+  
+  return { terms: [...new Set(correctedTerms)], corrections }
 }
 
 function expandWithSynonyms(terms: string[]): string[] {
@@ -129,12 +329,17 @@ const INTENT_KEYWORDS: Record<IntentType, string[]> = {
 }
 
 function detectIntent(text: string): IntentType[] {
-  const lower = text.toLowerCase()
+  const lower = normalizeText(text)
   const detected: IntentType[] = []
+
+  // También corregir typos en la detección de intención
+  const words = lower.split(/\s+/).filter(w => w.length > 2)
+  const correctedWords = words.map(w => correctTypo(w).corrected)
+  const correctedText = correctedWords.join(' ')
 
   for (const [intent, keywords] of Object.entries(INTENT_KEYWORDS)) {
     if (intent === 'general') continue
-    if (keywords.some(kw => lower.includes(kw))) {
+    if (keywords.some(kw => correctedText.includes(kw) || lower.includes(kw))) {
       detected.push(intent as IntentType)
     }
   }
@@ -287,12 +492,12 @@ async function fetchRepuestosSummary(userQuery: string): Promise<string> {
     let valorTotal = 0
     const repuestosByMachine: string[] = []
     
-    // Extraer solo los términos significativos del query (sin stop words, sin puntuación)
-    const searchTerms = extractSearchTerms(userQuery)
+    // Extraer solo los términos significativos del query (sin stop words, sin puntuación, con corrección de typos)
+    const { terms: searchTerms, corrections } = extractSearchTerms(userQuery)
     const expandedTerms = searchTerms.length > 0 ? expandWithSynonyms(searchTerms) : []
     const matchedRepuestos: string[] = []
 
-    logger.info(`Chatbot search: raw="${userQuery}" → terms=[${searchTerms.join(', ')}] → expanded=[${expandedTerms.join(', ')}]`)
+    logger.info(`Chatbot search: raw="${userQuery}" → terms=[${searchTerms.join(', ')}]${corrections.length ? ` (corregido: ${corrections.join(', ')})` : ''} → expanded=[${expandedTerms.join(', ')}]`)
 
     for (const machine of machines) {
       const repSnap = await getDocs(collection(db, `machines/${machine.id}/repuestos`))
@@ -339,6 +544,10 @@ async function fetchRepuestosSummary(userQuery: string): Promise<string> {
       `Máquinas con repuestos: ${machines.length}`,
       ...repuestosByMachine,
     ]
+
+    if (corrections.length > 0) {
+      lines.push(`(Corrección automática: ${corrections.join(', ')})`)
+    }
 
     if (matchedRepuestos.length > 0) {
       lines.push('', `COINCIDENCIAS con "${searchTerms.join(' ')}" (${matchedRepuestos.length} encontrados):`)
@@ -398,7 +607,7 @@ async function fetchIncidentsByFilter(userQuery: string): Promise<string> {
     }
     
     // Filtrar por texto libre (nombre de equipo, título, etc.)
-    const searchTerms = extractSearchTerms(userQuery)
+    const { terms: searchTerms } = extractSearchTerms(userQuery)
     const nonIntentTerms = searchTerms.filter(t => 
       !['incidencia', 'falla', 'reporte', 'problema', 'abierta', 'critica', 'pendiente', 'resuelta', 'cerrada', 'alta'].includes(t)
     )
@@ -492,23 +701,38 @@ export async function sendChatMessage(
   userMessage: string,
   history: ChatMessage[] = [],
   onStream?: (partial: string) => void,
-): Promise<{ reply: string; context: string; actions: ChatAction[] }> {
+  userId?: string,
+): Promise<{ reply: string; context: string; actions: ChatAction[]; typoCorrections: string[] }> {
   if (!isAIConfigured()) {
     return {
       reply: '⚠️ La IA no está configurada. Necesitas configurar la API key de Groq o el Cloud Function proxy.',
       context: '',
       actions: [],
+      typoCorrections: [],
     }
   }
 
-  // 1. Detectar intención
-  const intents = detectIntent(userMessage)
-  logger.info(`Chatbot: intents detected = ${intents.join(', ')}`)
+  // 0. Corrección de typos del mensaje del usuario
+  const { terms: correctedSearchTerms, corrections: typoCorrections } = extractSearchTerms(userMessage)
+  if (typoCorrections.length > 0) {
+    logger.info(`Chatbot: typo corrections: ${typoCorrections.join(', ')}`)
+  }
 
-  // 2. Acciones sugeridas
+  // 1. Detectar intención (con typos corregidos)
+  const intents = detectIntent(userMessage)
+  logger.info(`Chatbot: intents detected = ${intents.join(', ')} | search terms = ${correctedSearchTerms.join(', ')}`)
+
+  // 2. Cargar memoria del usuario
+  let memory: UserMemory | null = null
+  if (userId) {
+    memory = loadUserMemory(userId)
+    updateMemoryWithQuery(memory, userMessage, intents)
+  }
+
+  // 3. Acciones sugeridas
   const actions = suggestActions(intents)
 
-  // 3. Obtener contexto de Firestore (RAG)
+  // 4. Obtener contexto de Firestore (RAG)
   let ragContext = ''
   try {
     ragContext = await buildRAGContext(intents, userMessage)
@@ -517,10 +741,29 @@ export async function sendChatMessage(
     ragContext = 'No se pudieron cargar datos de la planta en este momento.'
   }
 
-  // 4. Construir mensajes para el LLM
+  // 5. Construir mensajes para el LLM
   const messages: Array<{ role: string; content: string }> = [
     { role: 'system', content: SYSTEM_PROMPT },
   ]
+
+  // Inyectar contexto de memoria del usuario
+  if (memory) {
+    const memCtx = buildMemoryContext(memory)
+    if (memCtx) {
+      messages.push({
+        role: 'system',
+        content: `CONTEXTO DEL USUARIO (usa esto para personalizar tus respuestas, anticipar necesidades y dar continuidad a la conversación):\n\n${memCtx}`,
+      })
+    }
+  }
+
+  // Inyectar correcciones de typos como nota
+  if (typoCorrections.length > 0) {
+    messages.push({
+      role: 'system',
+      content: `NOTA: El usuario escribió con errores de tipeo. Se corrigió automáticamente: ${typoCorrections.join(', ')}. Menciona brevemente la corrección al inicio de tu respuesta (ej: "Entendí que te refieres a **motor**...") para que el usuario sepa que lo entendiste.`,
+    })
+  }
 
   if (ragContext) {
     messages.push({
@@ -538,7 +781,7 @@ export async function sendChatMessage(
 
   messages.push({ role: 'user', content: userMessage })
 
-  // 5. Llamar a Groq con streaming
+  // 6. Llamar a Groq con streaming
   try {
     const result = await callGroqStream(
       messages,
@@ -546,20 +789,32 @@ export async function sendChatMessage(
       { temperature: 0.4, max_tokens: 1500 }
     )
 
+    // 7. Guardar memoria actualizada
+    if (memory && userId) {
+      saveUserMemory(memory)
+    }
+
     return {
       reply: result.content,
       context: ragContext,
       actions,
+      typoCorrections,
     }
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err)
     logger.error('Chatbot: Groq error', err instanceof Error ? err : undefined)
+
+    // Guardar memoria incluso si falla la llamada a Groq
+    if (memory && userId) {
+      saveUserMemory(memory)
+    }
 
     if (errorMsg.includes('429') || errorMsg.includes('rate')) {
       return {
         reply: '⏳ Se alcanzó el límite de consultas por minuto. Intenta de nuevo en unos segundos.',
         context: ragContext,
         actions: [],
+        typoCorrections: [],
       }
     }
 
@@ -567,6 +822,7 @@ export async function sendChatMessage(
       reply: '❌ Error al procesar tu consulta. Intenta de nuevo.',
       context: ragContext,
       actions: [],
+      typoCorrections: [],
     }
   }
 }
