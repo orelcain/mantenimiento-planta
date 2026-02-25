@@ -33,6 +33,14 @@ type IntentType =
   | 'sensores'
   | 'resumen'
   | 'ayuda'
+  | 'preventivo'
+  | 'gantt'
+  | 'ett'
+  | 'mapas'
+  | 'inspecciones'
+  | 'modelos3d'
+  | 'evidencias'
+  | 'grader'
   | 'general'
 
 // ─── Memoria por usuario ─────────────────────────────────────────────
@@ -324,6 +332,14 @@ const INTENT_KEYWORDS: Record<IntentType, string[]> = {
   incidencias: ['incidencia', 'incidencias', 'problema', 'problemas', 'falla', 'fallas', 'reporte', 'reportes', 'pendiente', 'pendientes', 'abierta', 'abiertas', 'resuelta', 'resueltas', 'crítica', 'critica', 'alta', 'prioridad'],
   equipos: ['equipo', 'equipos', 'máquina', 'maquina', 'máquinas', 'maquinas', 'operativo', 'mantenimiento', 'fuera de servicio', 'criticidad'],
   sensores: ['sensor', 'sensores', 'temperatura', 'humedad', 'lectura', 'iot', 'esp32', 'telemetría', 'telemetria', 'alerta'],
+  preventivo: ['preventivo', 'preventiva', 'preventivas', 'preventivos', 'tarea programada', 'tareas programadas', 'lubricación', 'lubricacion', 'checklist', 'rutina', 'rutinas', 'frecuencia', 'mantenimiento preventivo', 'proxima ejecucion'],
+  gantt: ['gantt', 'planificación', 'planificacion', 'planificar', 'proyecto', 'proyectos', 'cronograma', 'calendario', 'tarea', 'tareas', 'dependencia', 'dependencias', 'ruta crítica', 'ruta critica', 'temporada baja'],
+  ett: ['ett', 'especificación técnica', 'especificacion tecnica', 'procedimiento', 'procedimientos', 'riesgo', 'riesgos', 'material', 'materiales', 'trabajo seguro', 'ficha técnica', 'ficha tecnica'],
+  mapas: ['mapa', 'mapas', 'plano', 'planos', 'ubicación', 'ubicacion', 'localización', 'localizacion', 'marcador', 'marcadores', 'zona', 'zonas', 'visor de mapas'],
+  inspecciones: ['inspección', 'inspeccion', 'inspecciones', 'ronda', 'rondas', 'recorrido', 'folio', 'punto de inspección', 'cumple', 'no cumple'],
+  modelos3d: ['3d', 'modelo 3d', 'modelos 3d', 'visor 3d', 'glb', 'gltf', 'obj', 'fbx', 'anotación 3d', 'anotacion 3d', 'tridimensional'],
+  evidencias: ['evidencia', 'evidencias', 'foto', 'fotos', 'antes después', 'antes despues', 'antes y después', 'fotografía', 'fotografia', 'comparación', 'comparacion'],
+  grader: ['grader', 'análisis grader', 'analisis grader', 'clasificadora', 'session grader', 'calibración', 'calibracion'],
   resumen: ['resumen', 'resúmeme', 'resumeme', 'estadística', 'estadísticas', 'estadistica', 'cuántos', 'cuantos', 'cuántas', 'cuantas', 'total', 'totales', 'semana', 'mes', 'hoy', 'dashboard', 'panorama', 'overview'],
   ayuda: ['ayuda', 'help', 'cómo', 'como', 'qué puedes', 'que puedes', 'funciones', 'qué haces', 'que haces'],
   general: [],
@@ -370,6 +386,30 @@ function suggestActions(intents: IntentType[]): ChatAction[] {
   }
   if (intents.includes('sensores')) {
     actions.push({ label: 'Panel sensores', route: '/sensors/monitor', icon: 'Activity' })
+  }
+  if (intents.includes('preventivo')) {
+    actions.push({ label: 'Mantenimiento preventivo', route: '/preventive', icon: 'Calendar' })
+  }
+  if (intents.includes('gantt')) {
+    actions.push({ label: 'Planificador Gantt', route: '/gantt', icon: 'BarChart3' })
+  }
+  if (intents.includes('ett')) {
+    actions.push({ label: 'Ver ETT', route: '/ett', icon: 'FileText' })
+  }
+  if (intents.includes('mapas')) {
+    actions.push({ label: 'Mapas de planta', route: '/map', icon: 'Map' })
+  }
+  if (intents.includes('inspecciones')) {
+    actions.push({ label: 'Inspecciones', route: '/inspections', icon: 'ClipboardCheck' })
+  }
+  if (intents.includes('modelos3d')) {
+    actions.push({ label: 'Visor 3D', route: '/visor-3d', icon: 'Box' })
+  }
+  if (intents.includes('evidencias')) {
+    actions.push({ label: 'Evidencias fotográficas', route: '/evidence', icon: 'Camera' })
+  }
+  if (intents.includes('grader')) {
+    actions.push({ label: 'Análisis Grader', route: '/grader-analysis', icon: 'BarChart' })
   }
   return actions
 }
@@ -519,6 +559,313 @@ async function fetchUsersSummary(): Promise<string> {
   } catch (err: unknown) {
     logger.error('Chatbot: error fetching users', err instanceof Error ? err : undefined)
     return 'No se pudieron cargar los usuarios.'
+  }
+}
+
+// ─── Mantenimiento preventivo ────────────────────────────────────────
+
+async function fetchPreventiveSummary(): Promise<string> {
+  const cached = getCached('preventive_summary')
+  if (cached) return cached
+
+  try {
+    const tasksSnap = await getDocs(query(collection(db, 'preventiveTasks'), orderBy('proximaEjecucion', 'asc')))
+    const tasks = tasksSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[]
+
+    const activas = tasks.filter(t => t.activo !== false)
+    const byTipo: Record<string, number> = {}
+    const proximas: string[] = []
+
+    activas.forEach((t: any) => {
+      byTipo[t.tipo || 'general'] = (byTipo[t.tipo || 'general'] || 0) + 1
+    })
+
+    // Próximas 10 tareas
+    activas.slice(0, 10).forEach((t: any) => {
+      const fecha = t.proximaEjecucion?.toDate?.() || t.proximaEjecucion
+      const fechaStr = fecha instanceof Date ? fecha.toLocaleDateString('es-CL') : String(fecha || 'sin fecha')
+      proximas.push(`- ${t.nombre || 'Sin nombre'} [${t.tipo || 'general'}] → próxima: ${fechaStr} (cada ${t.frecuenciaDias || '?'} días)${t.equipmentId ? ` | equipo: ${t.equipmentId}` : ''}`)
+    })
+
+    const result = [
+      `MANTENIMIENTO PREVENTIVO (${activas.length} tareas activas):`,
+      `Por tipo: ${JSON.stringify(byTipo)}`,
+      `Próximas tareas:`,
+      ...proximas,
+      activas.length > 10 ? `... y ${activas.length - 10} más` : '',
+    ].join('\n')
+
+    setCache('preventive_summary', result)
+    return result
+  } catch (err: unknown) {
+    logger.error('Chatbot: error fetching preventive tasks', err instanceof Error ? err : undefined)
+    return 'No se pudieron cargar las tareas preventivas.'
+  }
+}
+
+// ─── Planificador Gantt ──────────────────────────────────────────────
+
+async function fetchGanttSummary(): Promise<string> {
+  const cached = getCached('gantt_summary')
+  if (cached) return cached
+
+  try {
+    const tasksSnap = await getDocs(query(collection(db, 'ganttTasks'), orderBy('startDate', 'asc')))
+    const tasks = tasksSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[]
+
+    const projectsSnap = await getDocs(collection(db, 'ganttProjects'))
+    const projects = projectsSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[]
+
+    const byStatus: Record<string, number> = {}
+    const taskList: string[] = []
+
+    tasks.forEach((t: any) => {
+      byStatus[t.status || 'sin_estado'] = (byStatus[t.status || 'sin_estado'] || 0) + 1
+    })
+
+    tasks.slice(0, 15).forEach((t: any) => {
+      const start = t.startDate?.toDate?.() || t.startDate
+      const end = t.endDate?.toDate?.() || t.endDate
+      const startStr = start instanceof Date ? start.toLocaleDateString('es-CL') : '?'
+      const endStr = end instanceof Date ? end.toLocaleDateString('es-CL') : '?'
+      taskList.push(`- [${t.status}] ${t.titulo} | ${startStr} - ${endStr} | progreso: ${t.progress || 0}%${t.prioridad ? ` | prioridad: ${t.prioridad}` : ''}`)
+    })
+
+    const result = [
+      `PLANIFICADOR GANTT:`,
+      `Proyectos: ${projects.length} (${projects.filter((p: any) => p.active).length} activos)`,
+      `Tareas: ${tasks.length}`,
+      `Por estado: ${JSON.stringify(byStatus)}`,
+      `Lista de tareas:`,
+      ...taskList,
+      tasks.length > 15 ? `... y ${tasks.length - 15} más` : '',
+    ].join('\n')
+
+    setCache('gantt_summary', result)
+    return result
+  } catch (err: unknown) {
+    logger.error('Chatbot: error fetching gantt', err instanceof Error ? err : undefined)
+    return 'No se pudieron cargar los datos del planificador Gantt.'
+  }
+}
+
+// ─── ETT (Especificaciones Técnicas del Trabajo) ─────────────────────
+
+async function fetchETTSummary(): Promise<string> {
+  const cached = getCached('ett_summary')
+  if (cached) return cached
+
+  try {
+    const snap = await getDocs(query(collection(db, 'ett'), orderBy('createdAt', 'desc'), limit(50)))
+    const items = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any[]
+
+    const byEstado: Record<string, number> = {}
+    const ettList: string[] = []
+
+    items.forEach((e: any) => {
+      byEstado[e.estado || 'sin_estado'] = (byEstado[e.estado || 'sin_estado'] || 0) + 1
+    })
+
+    items.slice(0, 10).forEach((e: any) => {
+      const gen = e.general || {}
+      ettList.push(`- [${e.estado}] ${gen.titulo || 'Sin título'} | Código: ${gen.codigo || 'N/A'} | Área: ${gen.area || 'N/A'} | Responsable: ${gen.responsable || 'N/A'}`)
+    })
+
+    const result = [
+      `ETT - ESPECIFICACIONES TÉCNICAS DEL TRABAJO (total: ${items.length}):`,
+      `Por estado: ${JSON.stringify(byEstado)}`,
+      `Lista:`,
+      ...ettList,
+      items.length > 10 ? `... y ${items.length - 10} más` : '',
+    ].join('\n')
+
+    setCache('ett_summary', result)
+    return result
+  } catch (err: unknown) {
+    logger.error('Chatbot: error fetching ETT', err instanceof Error ? err : undefined)
+    return 'No se pudieron cargar las ETT.'
+  }
+}
+
+// ─── Mapas e Inspecciones ────────────────────────────────────────────
+
+async function fetchMapsSummary(): Promise<string> {
+  const cached = getCached('maps_summary')
+  if (cached) return cached
+
+  try {
+    const locSnap = await getDocs(collection(db, 'mapLocations'))
+    const locations = locSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[]
+
+    const inspSnap = await getDocs(query(collection(db, 'inspections'), orderBy('createdAt', 'desc'), limit(30)))
+    const inspections = inspSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[]
+
+    const byStatus: Record<string, number> = {}
+    const inspList: string[] = []
+
+    inspections.forEach((i: any) => {
+      byStatus[i.status || 'sin_estado'] = (byStatus[i.status || 'sin_estado'] || 0) + 1
+    })
+
+    inspections.slice(0, 10).forEach((i: any) => {
+      const fecha = i.createdAt?.toDate?.() || i.createdAt
+      const fechaStr = fecha instanceof Date ? fecha.toLocaleDateString('es-CL') : '?'
+      inspList.push(`- [${i.status}] ${i.nombre} | Ubicación: ${i.locationName || 'N/A'} | Items: ${i.totalItems || 0} | Fecha: ${fechaStr}`)
+    })
+
+    const result = [
+      `MAPAS DE PLANTA (${locations.length} ubicaciones):`,
+      `Ubicaciones: ${locations.map((l: any) => l.nombre || l.id).join(', ')}`,
+      '',
+      `INSPECCIONES (${inspections.length} recientes):`,
+      `Por estado: ${JSON.stringify(byStatus)}`,
+      ...inspList,
+    ].join('\n')
+
+    setCache('maps_summary', result)
+    return result
+  } catch (err: unknown) {
+    logger.error('Chatbot: error fetching maps/inspections', err instanceof Error ? err : undefined)
+    return 'No se pudieron cargar los datos de mapas e inspecciones.'
+  }
+}
+
+// ─── Modelos 3D ──────────────────────────────────────────────────────
+
+async function fetchModels3DSummary(): Promise<string> {
+  const cached = getCached('models3d_summary')
+  if (cached) return cached
+
+  try {
+    const snap = await getDocs(query(collection(db, 'models3d'), orderBy('createdAt', 'desc')))
+    const models = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any[]
+
+    const modelList: string[] = models.map((m: any) =>
+      `- ${m.name || 'Sin nombre'} [${m.format || '?'}] | ${m.visibility || 'admin'} | ${(m.sizeBytes / 1024 / 1024).toFixed(1)} MB`
+    )
+
+    const result = [
+      `MODELOS 3D (${models.length} modelos):`,
+      ...modelList.slice(0, 15),
+      models.length > 15 ? `... y ${models.length - 15} más` : '',
+    ].join('\n')
+
+    setCache('models3d_summary', result)
+    return result
+  } catch (err: unknown) {
+    logger.error('Chatbot: error fetching 3D models', err instanceof Error ? err : undefined)
+    return 'No se pudieron cargar los modelos 3D.'
+  }
+}
+
+// ─── Evidencias fotográficas ─────────────────────────────────────────
+
+async function fetchPhotoEvidenceSummary(): Promise<string> {
+  const cached = getCached('evidence_summary')
+  if (cached) return cached
+
+  try {
+    const snap = await getDocs(query(collection(db, 'photoEvidence'), orderBy('createdAt', 'desc'), limit(30)))
+    const items = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any[]
+
+    const byStatus: Record<string, number> = {}
+    const evList: string[] = []
+
+    items.forEach((e: any) => {
+      byStatus[e.status || 'sin_estado'] = (byStatus[e.status || 'sin_estado'] || 0) + 1
+    })
+
+    items.slice(0, 10).forEach((e: any) => {
+      evList.push(`- [${e.status}] ${e.titulo || 'Sin título'} | Fotos antes: ${(e.fotosBefore || []).length} | Fotos después: ${(e.fotosAfter || []).length}`)
+    })
+
+    const result = [
+      `EVIDENCIAS FOTOGRÁFICAS (${items.length} recientes):`,
+      `Por estado: ${JSON.stringify(byStatus)}`,
+      ...evList,
+    ].join('\n')
+
+    setCache('evidence_summary', result)
+    return result
+  } catch (err: unknown) {
+    logger.error('Chatbot: error fetching photo evidence', err instanceof Error ? err : undefined)
+    return 'No se pudieron cargar las evidencias fotográficas.'
+  }
+}
+
+// ─── Análisis Grader ─────────────────────────────────────────────────
+
+async function fetchGraderSummary(): Promise<string> {
+  const cached = getCached('grader_summary')
+  if (cached) return cached
+
+  try {
+    // Las sesiones de análisis se guardan en 'graderSessions' o similar
+    let sessionsCount = 0
+    let sessionsInfo = 'No hay sesiones de análisis registradas.'
+    
+    try {
+      const snap = await getDocs(query(collection(db, 'graderSessions'), orderBy('createdAt', 'desc'), limit(20)))
+      const sessions = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any[]
+      sessionsCount = sessions.length
+      
+      if (sessions.length > 0) {
+        const sessionList = sessions.slice(0, 10).map((s: any) => {
+          const fecha = s.createdAt?.toDate?.() || s.createdAt
+          const fechaStr = fecha instanceof Date ? fecha.toLocaleDateString('es-CL') : '?'
+          return `- ${s.name || s.titulo || 'Sesión'} | Fecha: ${fechaStr} | Estado: ${s.status || 'N/A'}`
+        })
+        sessionsInfo = sessionList.join('\n')
+      }
+    } catch {
+      // Collection might not exist
+    }
+
+    const result = [
+      `ANÁLISIS GRADER (${sessionsCount} sesiones):`,
+      `El módulo de Análisis Grader permite evaluar el rendimiento de la máquina clasificadora (grader).`,
+      `Incluye: wizard de configuración, sesiones de análisis, calendario de sesiones.`,
+      sessionsInfo,
+    ].join('\n')
+
+    setCache('grader_summary', result)
+    return result
+  } catch (err: unknown) {
+    logger.error('Chatbot: error fetching grader data', err instanceof Error ? err : undefined)
+    return 'No se pudieron cargar los datos del análisis grader.'
+  }
+}
+
+// ─── Sensores IoT ────────────────────────────────────────────────────
+
+async function fetchSensorsSummary(): Promise<string> {
+  const cached = getCached('sensors_summary')
+  if (cached) return cached
+
+  try {
+    // Los sensores están vinculados a equipos — consultar equipos que tienen sensor
+    const eqSnap = await getDocs(collection(db, 'equipment'))
+    const equipments = eqSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[]
+    
+    // Los sensores usan Realtime Database, pero podemos informar de la configuración
+    const sensorEquipments = equipments.filter((eq: any) => 
+      eq.sensorEnabled || eq.sensorId || (eq.nombre || '').toLowerCase().includes('sensor')
+    )
+
+    const result = [
+      `SENSORES IoT:`,
+      `El sistema monitorea sensores ESP32 conectados por WiFi a Firebase Realtime Database.`,
+      `Métricas: temperatura y humedad en tiempo real.`,
+      `Equipos con sensor: ${sensorEquipments.length > 0 ? sensorEquipments.map((e: any) => e.nombre || e.id).join(', ') : 'Los sensores se vinculan a equipos desde la sección de Sensores.'}`,
+      `Funcionalidades: lectura en tiempo real, historial con gráficos, alertas por umbral, backfill de datos.`,
+      `Panel principal: /sensors/monitor | Configuración: /sensors`,
+    ].join('\n')
+
+    setCache('sensors_summary', result)
+    return result
+  } catch (err: unknown) {
+    logger.error('Chatbot: error fetching sensors', err instanceof Error ? err : undefined)
+    return 'No se pudieron cargar datos de sensores.'
   }
 }
 
@@ -681,27 +1028,43 @@ async function fetchIncidentsByFilter(userQuery: string): Promise<string> {
 async function buildRAGContext(intents: IntentType[], userQuery: string): Promise<string> {
   const promises: Promise<string>[] = []
 
-  // SIEMPRE cargar usuarios y equipos para que ARIA tenga contexto completo
+  // ─── CONTEXTO BASE: SIEMPRE cargar usuarios, equipos e incidencias ──
   promises.push(fetchUsersSummary())
   promises.push(fetchEquipmentSummary())
+  promises.push(fetchIncidentsSummary())
 
-  if (intents.includes('incidencias') || intents.includes('resumen')) {
-    promises.push(fetchIncidentsSummary())
-  }
-  if (intents.includes('repuestos') || intents.includes('resumen')) {
+  // ─── MÓDULOS ADICIONALES: cargar según intención o si es general/resumen ──
+  const loadAll = intents.includes('general') || intents.includes('resumen')
+
+  if (loadAll || intents.includes('repuestos')) {
     promises.push(fetchRepuestosSummary(userQuery))
+  }
+  if (loadAll || intents.includes('preventivo')) {
+    promises.push(fetchPreventiveSummary())
+  }
+  if (loadAll || intents.includes('gantt')) {
+    promises.push(fetchGanttSummary())
+  }
+  if (loadAll || intents.includes('ett')) {
+    promises.push(fetchETTSummary())
+  }
+  if (loadAll || intents.includes('mapas') || intents.includes('inspecciones')) {
+    promises.push(fetchMapsSummary())
+  }
+  if (loadAll || intents.includes('modelos3d')) {
+    promises.push(fetchModels3DSummary())
+  }
+  if (loadAll || intents.includes('evidencias')) {
+    promises.push(fetchPhotoEvidenceSummary())
+  }
+  if (loadAll || intents.includes('grader')) {
+    promises.push(fetchGraderSummary())
+  }
+  if (loadAll || intents.includes('sensores')) {
+    promises.push(fetchSensorsSummary())
   }
   if (intents.includes('incidencias') && !intents.includes('resumen')) {
     promises.push(fetchIncidentsByFilter(userQuery))
-  }
-  if (intents.includes('general')) {
-    // Para preguntas generales, dar un panorama completo
-    if (!intents.includes('incidencias') && !intents.includes('resumen')) {
-      promises.push(fetchIncidentsSummary())
-    }
-    if (!intents.includes('repuestos') && !intents.includes('resumen')) {
-      promises.push(fetchRepuestosSummary(userQuery))
-    }
   }
 
   const results = await Promise.all(promises)
@@ -711,10 +1074,10 @@ async function buildRAGContext(intents: IntentType[], userQuery: string): Promis
 // ─── System prompt ───────────────────────────────────────────────────
 
 const SYSTEM_PROMPT = `Eres ARIA (Asistente de Reportes e Incidencias Automatizada), la asistente virtual de la aplicación de Mantenimiento de Planta Industrial.
-Tu nombre es "ARIA". Eres inteligente, eficiente y proactiva — puedes ejecutar acciones reales en la app.
+Tu nombre es "ARIA". Eres inteligente, eficiente y proactiva. Tienes acceso completo a TODOS los módulos de la app como administradora.
 
 Tu rol:
-- Responder preguntas sobre repuestos, incidencias, equipos, sensores y usuarios de la planta
+- Responder preguntas sobre CUALQUIER módulo de la app: incidencias, equipos, repuestos, sensores, usuarios, ETT, planificación Gantt, mapas, inspecciones, modelos 3D, evidencias, análisis Grader, mantenimiento preventivo
 - Usar EXCLUSIVAMENTE los DATOS REALES proporcionados como contexto para dar respuestas precisas
 - NUNCA inventar datos. Si la información no está en el contexto, dilo claramente
 - Ser conciso pero útil, con formato claro (usa **negritas** para destacar)
@@ -747,31 +1110,30 @@ REGLAS cuando el usuario describe un problema/falla:
 REGLAS CRÍTICAS para responder sobre repuestos:
 - Si el contexto dice "COINCIDENCIAS con X (N encontrados)" → ESOS SON LOS RESULTADOS REALES. Enuméralos.
 - Si hay coincidencias, di cuántas hay y muéstralas con sus datos (máquina, SAP, fabricante, precio)
-- Si no hay coincidencias pero sí hay términos de búsqueda, explica que no se encontraron con ese nombre exacto y sugiere buscar por código SAP o fabricante
-- Cuando des listas, usa viñetas (•) o formato legible
-- Puedes usar emojis moderadamente para hacer la respuesta más legible
+- Si no hay coincidencias, explica que no se encontraron y sugiere buscar por código SAP o fabricante
 
-REGLAS para responder sobre USUARIOS:
-- Los datos de usuarios están en tu contexto bajo "USUARIOS ACTIVOS"
-- Puedes decir quién es técnico, supervisor, admin
-- Puedes sugerir a quién asignar una incidencia basándote en los roles
+MÓDULOS DE LA APP (tienes acceso completo a todos):
 
-REGLAS para responder sobre EQUIPOS:
-- Los datos de equipos están en tu contexto bajo "EQUIPOS"
-- Incluyen nombre, código, estado operativo, criticidad
-- Si el usuario pregunta por una máquina específica (ej: grader, baader), búscala en la lista de equipos del contexto
+📋 **Incidencias** (/incidents) — Reportes de fallas con prioridad, estado, equipo asignado. Datos en contexto bajo "INCIDENCIAS".
+🔧 **Equipos** (/equipment) — Máquinas con estado operativo, criticidad. Datos bajo "EQUIPOS".
+📦 **Repuestos** (/repuestos) — Catálogo de piezas por máquina con SAP, precios. Datos bajo "REPUESTOS".
+👥 **Usuarios** — Técnicos, supervisores, admins activos. Datos bajo "USUARIOS ACTIVOS".
+🌡️ **Sensores IoT** (/sensors, /sensors/monitor) — ESP32, temperatura y humedad en tiempo real. Datos bajo "SENSORES IoT".
+🔄 **Mantenimiento Preventivo** (/preventive) — Tareas programadas con frecuencia, checklist, ejecuciones. Datos bajo "MANTENIMIENTO PREVENTIVO".
+📊 **Planificador Gantt** (/gantt) — Proyectos, tareas con dependencias, ruta crítica, progreso. Datos bajo "PLANIFICADOR GANTT".
+📑 **ETT** (/ett) — Especificaciones Técnicas del Trabajo: procedimientos, materiales, riesgos, adjuntos. Datos bajo "ETT".
+🗺️ **Mapas** (/map) — Mapas interactivos de la planta con marcadores y zonas. Datos bajo "MAPAS DE PLANTA".
+🔍 **Inspecciones** (/inspections) — Rondas de inspección con fotos, checklist, cumplimiento. Datos bajo "INSPECCIONES".
+📷 **Evidencias Fotográficas** (/evidence) — Comparación antes/después de trabajos realizados. Datos bajo "EVIDENCIAS FOTOGRÁFICAS".
+🎮 **Visor 3D** (/visor3d) — Modelos 3D de equipos con anotaciones interactivas. Datos bajo "MODELOS 3D".
+📐 **Análisis Grader** (/analisis-grader) — Sesiones de análisis de la máquina clasificadora. Datos bajo "ANÁLISIS GRADER".
+🤖 **Análisis Predictivo** (/predictive) — IA para predecir fallas antes de que ocurran.
+⚙️ **Configuración** (/settings) — Ajustes de la app, permisos, y preferencias.
+🏗️ **Jerarquía** (/hierarchy) — Estructura jerárquica de la planta (plantas > líneas > equipos).
 
-Capacidades de la app:
-- Catálogo de repuestos organizado por máquinas (con códigos SAP, precios, cantidades)
-- Sistema de incidencias (reportes de fallas con prioridad y estado)
-- Gestión de equipos (estado operativo, criticidad)
-- Monitoreo de sensores IoT (temperatura, humedad)
-- Mantenimiento preventivo (tareas programadas)
-- Mapas interactivos de la planta
-- Análisis predictivo con IA
-- Gestión de usuarios y roles
+Cuando el usuario pregunte sobre CUALQUIER módulo, usa los datos del contexto correspondiente. Si no tienes datos específicos, describe las capacidades del módulo y sugiere navegar a la sección apropiada.
 
-Cuando te pregunten qué puedes hacer, destaca que puedes CREAR INCIDENCIAS por voz o texto, adjuntar fotos desde el chat, consultar usuarios y equipos, y sugerir técnicos para asignar.
+Cuando te pregunten qué puedes hacer, destaca que tienes acceso COMPLETO a todos los módulos de la app y puedes responder sobre cualquier tema.
 Tu nombre es ARIA — Asistente de Reportes e Incidencias Automatizada. Preséntate así cuando te pregunten.`
 
 // ─── Función principal con streaming ─────────────────────────────────

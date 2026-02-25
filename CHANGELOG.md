@@ -7,6 +7,17 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.55.2] - 2026-02-28
+### Agregado
+- **ARIA con acceso COMPLETO a todos los módulos de la app**
+  - Nuevos módulos RAG: Mantenimiento Preventivo, Planificador Gantt, ETT, Mapas, Inspecciones, Modelos 3D, Evidencias Fotográficas, Análisis Grader, Sensores IoT
+  - 9 nuevas funciones de fetch con caché de 3 minutos para cada módulo
+  - ARIA ahora puede responder preguntas sobre CUALQUIER sección de la app
+  - Detección de intención expandida con 8 nuevas categorías y keywords
+  - Sistema prompt completamente reescrito describiendo los 15+ módulos
+  - Navegación inteligente: ARIA sugiere ir a la sección relevante según la consulta
+  - buildRAGContext carga TODOS los módulos en consultas generales, o módulos específicos por intención
+
 ## [2.55.1] - 2026-02-27
 ### Corregido
 - **ARIA ya crea incidencias de verdad**: patrones de detección de fallas ampliados masivamente (~20 patrones vs 6 anteriores)
