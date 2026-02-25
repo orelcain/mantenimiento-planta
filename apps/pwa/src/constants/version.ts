@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.48.93' as const
+export const APP_VERSION = '2.48.94' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-02-24' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Repuestos: navegación acordeón por categoría con tarjetas de máquinas' as const
+export const VERSION_NAME = 'Repuestos: Ficha Técnica rediseñada, Galería separada, Búsqueda Global' as const
 
 /**
  * Nota:

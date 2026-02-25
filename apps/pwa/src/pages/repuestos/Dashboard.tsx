@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, Plus, FileText, Upload, Package, ClipboardList, ImageIcon, DollarSign, Wrench, ArrowRightLeft, Copy as CopyDuplicateIcon } from 'lucide-react'
+import { AlertTriangle, Plus, FileText, Upload, Package, ClipboardList, ImageIcon, DollarSign, Wrench, ArrowRightLeft, Copy as CopyDuplicateIcon, Globe, ChevronRight } from 'lucide-react'
 import { RepuestosTable } from '@/components/repuestos/RepuestosTable'
 import { RepuestoFormModal } from '@/components/repuestos/RepuestoForm'
 import { RepuestosFilters } from '@/components/repuestos/RepuestosFilters'
@@ -9,6 +9,7 @@ import { EquipmentNavigator } from '@/components/repuestos/EquipmentNavigator'
 import { RepuestoPhotosModal } from '@/components/repuestos/RepuestoPhotosModal'
 import { RepuestoManualModal } from '@/components/repuestos/RepuestoManualModal'
 import { TechnicalSpecsModal } from '@/components/repuestos/TechnicalSpecsModal'
+import { RepuestoGalleryModal } from '@/components/repuestos/RepuestoGalleryModal'
 import { MachineManualPanel } from '@/components/repuestos/MachineManualPanel'
 import { ManualSearchModal } from '@/components/repuestos/ManualSearchModal'
 import { useRepuestos } from '@/hooks/repuestos/useRepuestos'
@@ -24,6 +25,7 @@ import { ExportReportModal } from '@/components/repuestos/ExportReportModal'
 import { RelocateRepuestoModal } from '@/components/repuestos/RelocateRepuestoModal'
 import { BulkRelocateModal } from '@/components/repuestos/BulkRelocateModal'
 import { DuplicatesModal } from '@/components/repuestos/DuplicatesModal'
+import { useGlobalSearch } from '@/hooks/repuestos/useGlobalSearch'
 import {
   Button,
   Dialog,
@@ -49,13 +51,16 @@ export function RepuestosDashboard() {
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [photoModal, setPhotoModal] = useState<Repuesto | null>(null)
   const [manualModal, setManualModal] = useState<Repuesto | null>(null)
-  const [specsTarget, setSpecsTarget] = useState<{repuesto: Repuesto, tab: 'specs' | 'gallery'} | null>(null)
+  const [specsTarget, setSpecsTarget] = useState<Repuesto | null>(null)
+  const [galleryTarget, setGalleryTarget] = useState<Repuesto | null>(null)
   const [exportReportOpen, setExportReportOpen] = useState(false)
   const [manualSearchTarget, setManualSearchTarget] = useState<Repuesto | null>(null)
   const [viewInManualTarget, setViewInManualTarget] = useState<Repuesto | null>(null)
   const [relocateTarget, setRelocateTarget] = useState<Repuesto | null>(null)
   const [bulkRelocateOpen, setBulkRelocateOpen] = useState(false)
   const [duplicatesOpen, setDuplicatesOpen] = useState(false)
+  const [globalSearchMode, setGlobalSearchMode] = useState(false)
+  const [globalQuery, setGlobalQuery] = useState('')
   const [, setSelectedCategoryId] = useState<string | null>('maquinas-principales')
 
   // Filtros y paginación
@@ -75,9 +80,9 @@ export function RepuestosDashboard() {
     bulkRelocateRepuestos,
   } = useRepuestos(currentMachine?.id || 'baader-200')
 
-  const handleSaveSpecs = async (repuestoId: string, specs: TechnicalSpecs, gallery: MachineImage[]) => {
+  const handleSaveSpecs = async (repuestoId: string, specs: TechnicalSpecs, _gallery: MachineImage[]) => {
     try {
-      await updateRepuesto(repuestoId, { technicalSpecs: specs, gallery: gallery });
+      await updateRepuesto(repuestoId, { technicalSpecs: specs });
       toast({
         title: 'Ficha técnica actualizada',
         description: 'Los cambios se han guardado correctamente.',
@@ -93,9 +98,42 @@ export function RepuestosDashboard() {
     }
   }
 
+  const handleSaveGallery = async (repuestoId: string, gallery: MachineImage[]) => {
+    try {
+      await updateRepuesto(repuestoId, { gallery });
+      toast({
+        title: 'Galería actualizada',
+        description: 'Las imágenes se han guardado correctamente.',
+      });
+    } catch (err) {
+      console.error('Error saving gallery:', err);
+      toast({
+        variant: 'destructive',
+        title: 'Error al guardar',
+        description: 'No se pudieron guardar los cambios en la galería.',
+      });
+      throw err;
+    }
+  }
+
   // Calcular conteos de repuestos por máquina para el navegador
   // Usa getCountFromServer (aggregation) para obtener conteos reales de todas las máquinas
   const { counts: repuestosCounts } = useRepuestosCounts(machines)
+
+  // ─── Búsqueda Global cross-machine ───
+  const globalSearch = useGlobalSearch(machines)
+
+  // Cuando se activa la búsqueda global, cargar todos los repuestos
+  useEffect(() => {
+    if (globalSearchMode && !globalSearch.loaded && !globalSearch.loading) {
+      globalSearch.loadAll()
+    }
+  }, [globalSearchMode, globalSearch])
+
+  const globalResults = useMemo(() => {
+    if (!globalSearchMode || !globalQuery.trim()) return []
+    return globalSearch.search(globalQuery)
+  }, [globalSearchMode, globalQuery, globalSearch])
 
   // Filtrar repuestos — Búsqueda mejorada incluye código fabricante
   const filteredRepuestos = useMemo(() => {
@@ -383,6 +421,88 @@ export function RepuestosDashboard() {
             onClearFilters={handleClearFilters}
           />
 
+          {/* ─── Búsqueda Global ─── */}
+          <div className="flex items-center gap-2">
+            <Button
+              variant={globalSearchMode ? 'default' : 'outline'}
+              size="sm"
+              className={`gap-2 text-xs ${globalSearchMode ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : ''}`}
+              onClick={() => {
+                setGlobalSearchMode(!globalSearchMode)
+                if (!globalSearchMode) setGlobalQuery('')
+              }}
+            >
+              <Globe className="h-3.5 w-3.5" />
+              {globalSearchMode ? 'Búsqueda global activa' : 'Buscar en todas las máquinas'}
+            </Button>
+          </div>
+
+          {globalSearchMode && (
+            <div className="space-y-3 p-4 bg-emerald-500/5 border border-emerald-500/20 rounded-xl">
+              <div className="flex items-center gap-2">
+                <Globe className="h-4 w-4 text-emerald-500" />
+                <span className="text-xs font-semibold text-emerald-600 uppercase tracking-wider">
+                  Búsqueda Global — Todas las máquinas
+                </span>
+                {globalSearch.loaded && (
+                  <span className="text-[10px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                    {globalSearch.allRepuestos.length} repuestos cargados
+                  </span>
+                )}
+              </div>
+              <div className="relative max-w-md">
+                <Globe className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-emerald-500" />
+                <input
+                  type="text"
+                  placeholder="Buscar repuesto en todas las máquinas..."
+                  value={globalQuery}
+                  onChange={(e) => setGlobalQuery(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 text-sm bg-background border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                  disabled={globalSearch.loading}
+                />
+              </div>
+              {globalSearch.loading && (
+                <p className="text-xs text-muted-foreground animate-pulse">Cargando repuestos de todas las máquinas...</p>
+              )}
+              {globalSearch.error && (
+                <p className="text-xs text-destructive">{globalSearch.error}</p>
+              )}
+              {globalQuery.trim() && globalResults.length > 0 && (
+                <div className="space-y-1.5 max-h-[300px] overflow-y-auto">
+                  <span className="text-[10px] text-muted-foreground">{globalResults.length} resultados</span>
+                  {globalResults.slice(0, 50).map((r) => (
+                    <div
+                      key={`${r.machineId}-${r.repuesto.id}`}
+                      className="flex items-center justify-between p-2.5 bg-background border rounded-lg hover:bg-muted/30 transition-colors text-sm"
+                    >
+                      <div className="flex flex-col gap-0.5 min-w-0 flex-1">
+                        <span className="font-medium truncate">{r.repuesto.textoBreve || r.repuesto.codigoSAP}</span>
+                        <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-mono">
+                          <span>SAP: {r.repuesto.codigoSAP || 'N/A'}</span>
+                          {r.repuesto.codigoFabricante && <span>Fab: {r.repuesto.codigoFabricante}</span>}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className="text-[10px] bg-emerald-500/10 text-emerald-600 px-2 py-0.5 rounded-full font-medium">
+                          {r.machineName}
+                        </span>
+                        <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                      </div>
+                    </div>
+                  ))}
+                  {globalResults.length > 50 && (
+                    <p className="text-xs text-muted-foreground text-center py-2">
+                      Mostrando 50 de {globalResults.length} resultados. Refina tu búsqueda.
+                    </p>
+                  )}
+                </div>
+              )}
+              {globalQuery.trim() && globalResults.length === 0 && globalSearch.loaded && (
+                <p className="text-xs text-muted-foreground text-center py-4">No se encontraron resultados.</p>
+              )}
+            </div>
+          )}
+
           {filteredRepuestos.length === 0 ? (
             <EmptyState
               hasFilters={searchQuery !== ''}
@@ -399,8 +519,8 @@ export function RepuestosDashboard() {
                 onDelete={isAdmin ? (rep) => setConfirmDelete(rep) : undefined}
                 onViewPhotos={(rep) => setPhotoModal(rep)}
                 onViewManual={(rep) => setManualModal(rep)}
-                onViewSpecs={(rep) => setSpecsTarget({ repuesto: rep, tab: 'specs' })}
-                onViewGallery={(rep) => setSpecsTarget({ repuesto: rep, tab: 'gallery' })}
+                onViewSpecs={(rep) => setSpecsTarget(rep)}
+                onViewGallery={(rep) => setGalleryTarget(rep)}
                 onRenameRepuesto={isAdmin ? handleRenameRepuesto : undefined}
                 onSearchInManual={currentMachine ? (rep) => setManualSearchTarget(rep) : undefined}
                 onViewInManual={currentMachine ? (rep) => setViewInManualTarget(rep) : undefined}
@@ -503,10 +623,21 @@ export function RepuestosDashboard() {
         <TechnicalSpecsModal
           open={!!specsTarget}
           onOpenChange={(open) => !open && setSpecsTarget(null)}
-          repuesto={specsTarget.repuesto}
+          repuesto={specsTarget}
           machineId={currentMachine?.id}
-          initialTab={specsTarget.tab}
           onSave={handleSaveSpecs}
+          readOnly={!isAdmin}
+        />
+      )}
+
+      {/* Modal de Galería */}
+      {galleryTarget && (
+        <RepuestoGalleryModal
+          open={!!galleryTarget}
+          onOpenChange={(open) => !open && setGalleryTarget(null)}
+          repuesto={galleryTarget}
+          machineId={currentMachine?.id}
+          onSave={handleSaveGallery}
           readOnly={!isAdmin}
         />
       )}

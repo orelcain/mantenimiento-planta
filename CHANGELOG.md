@@ -7,6 +7,16 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.94] - 2026-02-24
+### Funcionalidad
+- **Ficha Técnica rediseñada completamente**: 11 tipos de componente (Motor, Bomba, Reductor, Cinta, Válvula, Sensor, Cilindro, Compresor, Intercambiador, Filtro, General) cada uno con campos técnicos específicos
+- **Campos comunes universales**: Fabricante, Modelo, N° Serie, Año Instalación, Proveedor y Garantía se muestran para todos los tipos
+- **Galería separada de Ficha Técnica**: Ahora son dos modales independientes — el botón 📋 abre solo la ficha técnica y el botón 📷 abre solo la galería de imágenes
+- **Búsqueda Global cross-machine**: Nuevo botón "Buscar en todas las máquinas" que carga repuestos de todas las máquinas activas y permite búsqueda por SAP, fabricante, nombre, descripción y ubicación
+- **Backward compatibility**: Datos existentes con tipos 'pump' y 'conveyor' se normalizan automáticamente a 'bomba' y 'cinta'
+- **Iconos y colores por tipo**: Cada tipo de componente tiene un icono y color diferenciado en la ficha técnica
+- **Badges de progreso**: Indicadores visuales de campos llenados vs totales en cada sección
+
 ## [2.48.93] - 2026-02-24
 ### Funcionalidad
 - **Detección de duplicados cross-machine** (admin): Nuevo modal "Duplicados" en barra de herramientas que escanea TODAS las máquinas activas y agrupa repuestos con el mismo código SAP

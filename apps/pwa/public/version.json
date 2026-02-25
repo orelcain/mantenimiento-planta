@@ -1,8 +1,13 @@
 {
-  "version": "2.48.93",
+  "version": "2.48.94",
   "buildDate": "2026-02-24",
   "buildTimestamp": 1771967426852,
   "features": [
+    "Ficha Técnica rediseñada: 11 tipos de componente con campos específicos expandidos",
+    "Ficha Técnica: campos comunes (Fabricante, Modelo, N° Serie, Año, Proveedor, Garantía)",
+    "Ficha Técnica: backward-compatible con datos existentes (pump→bomba, conveyor→cinta)",
+    "Galería de Imágenes: modal independiente separado de Ficha Técnica",
+    "Búsqueda Global: buscar repuestos en TODAS las máquinas cross-machine",
     "Buscar en Manual: detección automática del número de posición del repuesto en la lista",
     "Buscar en Manual: modo 'Ver en diagrama' para resaltar la posición en el dibujo técnico (azul/cyan)",
     "Buscar en Manual: navegación entre modo código (amarillo) y modo diagrama (cyan)",

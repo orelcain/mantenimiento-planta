@@ -1,505 +1,520 @@
-import { useState, useEffect, useRef } from 'react';
-import { 
-  ClipboardList, 
-  Camera, 
-  Trash2, 
-  Plus, 
-  Save, 
-  Loader2,
-  FileDown
-} from 'lucide-react';
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  Button,
-  Input,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-  Textarea,
-  Tabs,
-  TabsList,
-  TabsTrigger,
-  TabsContent,
-} from '@/components/ui';
-import type { Repuesto, TechnicalSpecs, MachineImage, TechnicalDataField, TechnicalDataType } from '@/types/repuestos';
-import { useStorage } from '@/hooks/repuestos/useStorage';
-import { exportTechnicalSheetToPDF } from '@/utils/repuestos/exportTechnicalSheet';
-import { useToast } from '@/hooks/useToast';
+/**
+ * TechnicalSpecsModal v2.48.94
+ *
+ * Modal de Ficha Técnica rediseñado:
+ *  - Separado de Galería (ahora es modal independiente)
+ *  - 11 tipos de componente con campos específicos expandidos
+ *  - Campos comunes para todos los tipos (Fabricante, Modelo, Serie, etc.)
+ *  - Campos personalizados ilimitados
+ *  - Exportación PDF
+ *  - Backward compatible con datos existentes (pump→bomba, conveyor→cinta)
+ */
 
-interface TechnicalSpecsModalProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  repuesto: Repuesto | null;
-  machineId?: string; // Needed for storage path
-  initialTab?: 'specs' | 'gallery';
-  readOnly?: boolean;
-  onSave?: (repuestoId: string, specs: TechnicalSpecs, gallery: MachineImage[]) => Promise<void>;
+import { useState, useEffect } from 'react'
+import {
+  ClipboardList, Trash2, Plus, Save, Loader2, FileDown,
+  Zap, Droplets, Cog, ArrowRightLeft, GitBranch, Gauge,
+  Wind, Thermometer, Filter, Package, CircleDot,
+} from 'lucide-react'
+import {
+  Dialog, DialogContent, DialogTitle, Button, Input,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Textarea, Badge,
+} from '@/components/ui'
+import type { Repuesto, TechnicalSpecs, MachineImage, TechnicalDataType } from '@/types/repuestos'
+import { exportTechnicalSheetToPDF } from '@/utils/repuestos/exportTechnicalSheet'
+import { useToast } from '@/hooks/useToast'
+
+// ─── Templates ──────────────────────────────────────────────
+
+/** Campos comunes que aplican a TODOS los tipos */
+const COMMON_FIELDS: Record<string, string> = {
+  fabricante: 'Fabricante / Marca',
+  modelo: 'Modelo',
+  numeroSerie: 'N° Serie',
+  anoInstalacion: 'Año Instalación',
+  proveedor: 'Proveedor',
+  garantiaMeses: 'Garantía (meses)',
 }
 
-const TEMPLATES: Record<string, { label: string; fields: Record<string, string> }> = {
+interface TemplateConfig {
+  label: string
+  icon: typeof Zap
+  color: string
+  fields: Record<string, string>
+}
+
+const TEMPLATES: Record<string, TemplateConfig> = {
   motor: {
     label: 'Motor Eléctrico',
+    icon: Zap,
+    color: 'text-yellow-400',
     fields: {
-      power: 'Potencia (HP)',
+      potencia: 'Potencia (HP/kW)',
       rpm: 'RPM',
-      voltage: 'Voltaje',
-      frame: 'Frame / Carcasa'
-    }
+      voltaje: 'Voltaje (V)',
+      amperaje: 'Amperaje (A)',
+      frecuencia: 'Frecuencia (Hz)',
+      frame: 'Frame / Carcasa',
+      fases: 'Fases',
+      tipoArranque: 'Tipo de Arranque',
+      gradoProteccion: 'Grado Protección (IP)',
+      claseAislacion: 'Clase de Aislación',
+    },
   },
   bomba: {
-    label: 'Bomba Hidráulica',
+    label: 'Bomba',
+    icon: Droplets,
+    color: 'text-blue-400',
     fields: {
-      flow: 'Caudal (L/min)',
-      head: 'Altura (m)',
-      inlet: 'Entrada (pulgadas)',
-      outlet: 'Salida (pulgadas)'
-    }
+      tipoBomba: 'Tipo de Bomba',
+      caudal: 'Caudal (L/min)',
+      presion: 'Presión (bar/psi)',
+      altura: 'Altura (m)',
+      entrada: 'Entrada (pulgadas)',
+      salida: 'Salida (pulgadas)',
+      materialCuerpo: 'Material Cuerpo',
+      tipoSello: 'Tipo de Sello',
+    },
+  },
+  reductor: {
+    label: 'Reductor / Motorreductor',
+    icon: Cog,
+    color: 'text-zinc-400',
+    fields: {
+      relacion: 'Relación (Ratio)',
+      torqueSalida: 'Torque Salida (Nm)',
+      ejeSalida: 'Eje Salida (mm)',
+      ejeEntrada: 'Eje Entrada (mm)',
+      tipoReductor: 'Tipo (Helicoidal/Sin fin/Planetario)',
+      posicionMontaje: 'Posición de Montaje',
+    },
   },
   cinta: {
     label: 'Cinta Transportadora',
+    icon: ArrowRightLeft,
+    color: 'text-green-400',
     fields: {
-      width: 'Ancho Banda (mm)',
-      length: 'Largo Total (mm)',
-      material: 'Material',
-      type: 'Tipo de Banda'
-    }
+      anchoBanda: 'Ancho Banda (mm)',
+      largoTotal: 'Largo Total (mm)',
+      materialBanda: 'Material Banda',
+      tipoBanda: 'Tipo de Banda',
+      velocidad: 'Velocidad (m/min)',
+      capacidad: 'Capacidad (kg/h)',
+    },
   },
-  reductor: {
-    label: 'Reductor',
+  valvula: {
+    label: 'Válvula',
+    icon: GitBranch,
+    color: 'text-red-400',
     fields: {
-      ratio: 'Relación (Ratio)',
-      torque: 'Torque (Nm)',
-      shaftCheck: 'Eje Salida (mm)'
-    }
+      tipoValvula: 'Tipo (Bola/Mariposa/Globo/Check)',
+      diametro: 'Diámetro (pulgadas)',
+      presionTrabajo: 'Presión de Trabajo (bar)',
+      materialCuerpo: 'Material Cuerpo',
+      tipoConexion: 'Tipo de Conexión',
+      actuador: 'Tipo de Actuador',
+    },
+  },
+  sensor: {
+    label: 'Sensor / Instrumento',
+    icon: Gauge,
+    color: 'text-purple-400',
+    fields: {
+      tipoSensor: 'Tipo (Temp/Presión/Flujo/Nivel/pH)',
+      rangoMedicion: 'Rango de Medición',
+      senalSalida: 'Señal Salida (4-20mA/0-10V/Digital)',
+      conexionProceso: 'Conexión al Proceso',
+      alimentacion: 'Alimentación (V)',
+      precision: 'Precisión (%)',
+    },
+  },
+  cilindro: {
+    label: 'Cilindro Neumático/Hidráulico',
+    icon: CircleDot,
+    color: 'text-orange-400',
+    fields: {
+      tipoCilindro: 'Tipo (Neumático/Hidráulico)',
+      diametroPiston: 'Diámetro Pistón (mm)',
+      carrera: 'Carrera (mm)',
+      presionMax: 'Presión Máx. (bar)',
+      tipoMontaje: 'Tipo de Montaje',
+      amortiguacion: 'Amortiguación',
+    },
+  },
+  compresor: {
+    label: 'Compresor',
+    icon: Wind,
+    color: 'text-cyan-400',
+    fields: {
+      tipoCompresor: 'Tipo (Pistón/Tornillo/Centrífugo)',
+      caudalAire: 'Caudal (CFM / m³/min)',
+      presionMax: 'Presión Máx. (bar)',
+      potenciaMotor: 'Potencia Motor (HP)',
+      refrigerante: 'Refrigerante/Lubricante',
+      volumenTanque: 'Volumen Tanque (L)',
+    },
+  },
+  intercambiador: {
+    label: 'Intercambiador de Calor',
+    icon: Thermometer,
+    color: 'text-rose-400',
+    fields: {
+      tipoIntercambiador: 'Tipo (Placas/Tubular/Carcasa)',
+      capacidadTermica: 'Capacidad Térmica (kW)',
+      flujoCaliente: 'Flujo Lado Caliente',
+      flujoFrio: 'Flujo Lado Frío',
+      materialPlacas: 'Material Placas/Tubos',
+      conexiones: 'Conexiones (pulgadas)',
+    },
+  },
+  filtro: {
+    label: 'Filtro',
+    icon: Filter,
+    color: 'text-emerald-400',
+    fields: {
+      tipoFiltro: 'Tipo (Bolsa/Cartucho/Prensa/Arena)',
+      retencion: 'Tamaño Retención (μm)',
+      caudalMax: 'Caudal Máx. (L/min)',
+      materialCuerpo: 'Material Cuerpo',
+      superficieFiltrado: 'Superficie Filtrado (m²)',
+    },
   },
   general: {
     label: 'General / Otro',
-    fields: {}
-  }
-};
+    icon: Package,
+    color: 'text-muted-foreground',
+    fields: {},
+  },
+}
+
+/** Normaliza tipos legacy de Firestore */
+function normalizeType(t: string): string {
+  if (t === 'pump') return 'bomba'
+  if (t === 'conveyor') return 'cinta'
+  return t
+}
+
+// ─── Props ──────────────────────────────────────────────────
+
+interface TechnicalSpecsModalProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  repuesto: Repuesto | null
+  machineId?: string
+  initialTab?: 'specs' | 'gallery' // kept for backward compat, ignored
+  readOnly?: boolean
+  onSave?: (repuestoId: string, specs: TechnicalSpecs, gallery: MachineImage[]) => Promise<void>
+}
+
+// ─── Component ──────────────────────────────────────────────
 
 export function TechnicalSpecsModal({
   open,
   onOpenChange,
   repuesto,
   machineId,
-  initialTab = 'specs',  readOnly = false,  onSave
+  readOnly = false,
+  onSave,
 }: TechnicalSpecsModalProps) {
-  const [activeTab, setActiveTab] = useState<string>(initialTab);
-  const [saving, setSaving] = useState(false);
-  const [exporting, setExporting] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const { toast } = useToast();
-  
-  // Storage Hook
-  // We don't have direct access to 'uploadImage' that returns URL easily from here without refactoring useStorage 
-  // or assuming machineId is passed. Ideally pass machineId prop.
-  const { uploadImage, uploading } = useStorage(machineId || null);
-  
-  // State for Specs
+  const [saving, setSaving] = useState(false)
+  const [exporting, setExporting] = useState(false)
+  const { toast } = useToast()
+
   const [specs, setSpecs] = useState<TechnicalSpecs>({
     type: 'general',
     standardValues: {},
     customFields: [],
-    updatedAt: Date.now()
-  });
+    updatedAt: Date.now(),
+  })
 
-  // State for Gallery
-  const [gallery, setGallery] = useState<MachineImage[]>([]);
-
-  // Load data when opening
   useEffect(() => {
     if (open && repuesto) {
-      setActiveTab(initialTab);
-      
       if (repuesto.technicalSpecs) {
-        setSpecs({ ...repuesto.technicalSpecs });
-      } else {
-        // Init default
         setSpecs({
-          type: 'general',
-          standardValues: {},
-          customFields: [],
-          updatedAt: Date.now()
-        });
-      }
-
-      if (repuesto.gallery) {
-        setGallery([...repuesto.gallery]);
+          ...repuesto.technicalSpecs,
+          type: normalizeType(repuesto.technicalSpecs.type) as TechnicalDataType,
+        })
       } else {
-        setGallery([]);
+        setSpecs({ type: 'general', standardValues: {}, customFields: [], updatedAt: Date.now() })
       }
     }
-  }, [open, repuesto, initialTab]);
+  }, [open, repuesto])
 
-  const handleStandardChange = (key: string, value: string | number) => {
+  const currentTemplate = TEMPLATES[specs.type] || TEMPLATES.general
+
+  const handleStandardChange = (key: string, value: string) => {
     setSpecs(prev => ({
       ...prev,
-      standardValues: {
-        ...prev.standardValues,
-        [key]: value
-      }
-    }));
-  };
+      standardValues: { ...prev.standardValues, [key]: value },
+    }))
+  }
 
   const handleCustomChange = (id: string, field: 'label' | 'value', value: string) => {
     setSpecs(prev => ({
       ...prev,
-      customFields: prev.customFields.map(f => 
-        f.id === id ? { ...f, [field]: value } : f
-      )
-    }));
-  };
+      customFields: prev.customFields.map(f => (f.id === id ? { ...f, [field]: value } : f)),
+    }))
+  }
 
   const addCustomField = () => {
-    const newField: TechnicalDataField = {
-      id: crypto.randomUUID(),
-      label: '',
-      value: '',
-      isCustom: true
-    };
     setSpecs(prev => ({
       ...prev,
-      customFields: [...prev.customFields, newField]
-    }));
-  };
+      customFields: [
+        ...prev.customFields,
+        { id: crypto.randomUUID(), label: '', value: '', isCustom: true },
+      ],
+    }))
+  }
 
   const removeCustomField = (id: string) => {
     setSpecs(prev => ({
       ...prev,
-      customFields: prev.customFields.filter(f => f.id !== id)
-    }));
-  };
+      customFields: prev.customFields.filter(f => f.id !== id),
+    }))
+  }
 
   const handleSave = async () => {
-    if (!repuesto || !onSave) return;
-    
-    setSaving(true);
+    if (!repuesto || !onSave) return
+    setSaving(true)
     try {
-      await onSave(repuesto.id, { ...specs, updatedAt: Date.now() }, gallery);
-      onOpenChange(false);
-    } catch (error) {
-      console.error('Error saving specs', error);
+      await onSave(repuesto.id, { ...specs, updatedAt: Date.now() }, repuesto.gallery || [])
+      onOpenChange(false)
+    } catch (err) {
+      console.error('Error saving specs:', err)
     } finally {
-      setSaving(false);
+      setSaving(false)
     }
-  };
+  }
 
   const handleExportPDF = async () => {
-    if (!repuesto) return;
-    setExporting(true);
+    if (!repuesto) return
+    setExporting(true)
     try {
-        await exportTechnicalSheetToPDF(
-             { ...repuesto, technicalSpecs: specs, gallery }, // Use current state
-             machineId // We might want machine name, but ID is what we have. API can resolve name if needed or pass as prop.
-        );
-        toast({ title: 'PDF Exportado', description: 'La ficha técnica se ha descargado.'});
+      await exportTechnicalSheetToPDF({ ...repuesto, technicalSpecs: specs }, machineId)
+      toast({ title: 'PDF Exportado', description: 'La ficha técnica se ha descargado.' })
     } catch (err) {
-        console.error(err);
-        toast({ title: 'Error', description: 'No se pudo generar el PDF', variant: 'destructive'});
+      console.error(err)
+      toast({ title: 'Error', description: 'No se pudo generar el PDF', variant: 'destructive' })
     } finally {
-        setExporting(false);
+      setExporting(false)
     }
-  };
+  }
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || e.target.files.length === 0 || !repuesto) return;
-    
-    // Explicitly assert file exists because of the check above
-    const file = e.target.files[0];
-    if (!file) return;
+  const filledCommon = Object.keys(COMMON_FIELDS).filter(k => specs.standardValues[k]).length
+  const filledSpecific = Object.keys(currentTemplate.fields).filter(k => specs.standardValues[k]).length
+  const filledCustom = specs.customFields.filter(f => f.label && f.value).length
 
-    if (!machineId) {
-        toast({ title: 'Error', description: 'Falta ID de máquina para subir fotos', variant: 'destructive'});
-        return;
-    }
+  if (!repuesto) return null
 
-    try {
-        // Upload
-        const uploadedImg = await uploadImage(file, repuesto.id, 'real');
-        
-        // Add to gallery state
-        const newGalleryItem: MachineImage = {
-            id: uploadedImg.id,
-            url: uploadedImg.url,
-            type: 'equipment', // Start as generic equipment/part
-            timestamp: Date.now(),
-            notes: '',
-            size: uploadedImg.sizeFinal,
-            format: uploadedImg.formatFinal,
-            dimensions: (uploadedImg.width && uploadedImg.height) ? { width: uploadedImg.width, height: uploadedImg.height } : undefined
-        };
-        
-        setGallery(prev => [newGalleryItem, ...prev]);
-        toast({ title: 'Imagen subida', description: 'La imagen se agregó a la galería' });
-
-    } catch (err) {
-        console.error(err);
-        toast({ title: 'Error subiendo imagen', description: 'Intente nuevamente', variant: 'destructive' });
-    } finally {
-        // Clear input
-        if (fileInputRef.current) fileInputRef.current.value = '';
-    }
-  };
-
-  const handleDeleteImage = (imgId: string) => {
-      // Note: This only removes from the list reference, not from Storage to avoid accidental data loss via modal cancel.
-      // If immediate delete is required, deleteObject should be called.
-      setGallery(prev => prev.filter(img => img.id !== imgId));
-  };
-
-  if (!repuesto) return null;
+  const Icon = currentTemplate.icon
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0">
-        {/* Header Personalizado */}
+        {/* Header */}
         <div className="p-4 border-b bg-muted/20 flex flex-col gap-1">
           <div className="flex items-center gap-2 text-muted-foreground mb-1">
             <ClipboardList className="w-4 h-4" />
-            <span className="text-xs font-mono uppercase tracking-wider">Ficha Técnica & Galería</span>
+            <span className="text-xs font-mono uppercase tracking-wider">Ficha Técnica</span>
           </div>
           <DialogTitle className="text-lg font-bold truncate pr-8">
             {repuesto.textoBreve || 'Repuesto sin nombre'}
           </DialogTitle>
-          <div className="text-xs text-muted-foreground font-mono">
-            SAP: {repuesto.codigoSAP || 'N/A'}
+          <div className="flex items-center gap-3 text-xs text-muted-foreground font-mono">
+            <span>SAP: {repuesto.codigoSAP || 'N/A'}</span>
+            {repuesto.codigoFabricante && <span>Fab: {repuesto.codigoFabricante}</span>}
           </div>
         </div>
 
-        {/* Content with Scroll */}
-        <div className="flex-1 overflow-y-auto">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <div className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b px-4 pt-2">
-              <TabsList className="w-full grid grid-cols-2">
-                <TabsTrigger value="specs">Especificaciones</TabsTrigger>
-                <TabsTrigger value="gallery">Galería</TabsTrigger>
-              </TabsList>
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-5">
+
+          {/* Tipo de Componente */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Tipo de Componente
+              </span>
+              <div className="flex items-center gap-1.5">
+                <Icon className={`h-4 w-4 ${currentTemplate.color}`} />
+                <span className={`text-xs font-medium ${currentTemplate.color}`}>{currentTemplate.label}</span>
+              </div>
             </div>
+            <Select
+              disabled={readOnly}
+              value={specs.type}
+              onValueChange={(val) => setSpecs(prev => ({ ...prev, type: val as TechnicalDataType }))}
+            >
+              <SelectTrigger className="h-9">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(TEMPLATES).map(([key, tpl]) => {
+                  const TplIcon = tpl.icon
+                  return (
+                    <SelectItem key={key} value={key}>
+                      <div className="flex items-center gap-2">
+                        <TplIcon className={`h-3.5 w-3.5 ${tpl.color}`} />
+                        <span>{tpl.label}</span>
+                      </div>
+                    </SelectItem>
+                  )
+                })}
+              </SelectContent>
+            </Select>
+          </div>
 
-            <div className="p-4">
-              <TabsContent value="specs" className="mt-0 space-y-6">
-                
-                {/* Selector de Tipo */}
-                <div className="space-y-2">
-                  <span className="text-xs font-semibold text-muted-foreground uppercase">Tipo de Componente</span>
-                  <Select 
+          {/* Datos Comunes */}
+          <div className="space-y-3 p-3 bg-blue-500/5 rounded-lg border border-blue-500/20">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                <h3 className="text-xs font-semibold uppercase text-muted-foreground">Datos Generales</h3>
+              </div>
+              <Badge variant="outline" className="text-[9px] px-1.5 py-0">
+                {filledCommon}/{Object.keys(COMMON_FIELDS).length}
+              </Badge>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {Object.entries(COMMON_FIELDS).map(([key, label]) => (
+                <div key={key} className="space-y-1">
+                  <label className="text-[10px] font-medium text-muted-foreground uppercase">{label}</label>
+                  <Input
                     disabled={readOnly}
-                    value={specs.type} 
-                    onValueChange={(val: TechnicalDataType) => setSpecs(prev => ({ ...prev, type: val }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(TEMPLATES).map(([key, tpl]) => (
-                        <SelectItem key={key} value={key}>{tpl.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Campos Estándar Dinámicos */}
-                {Object.keys(TEMPLATES[specs.type]?.fields || {}).length > 0 && (
-                  <div className="space-y-3 p-3 bg-muted/30 rounded-lg border border-border/50">
-                    <div className="flex items-center gap-2 mb-1">
-                      <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
-                      <h3 className="text-xs font-semibold uppercase text-muted-foreground">Datos Estándar</h3>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {Object.entries(TEMPLATES[specs.type]?.fields || {}).map(([fieldKey, label]) => (
-                        <div key={fieldKey} className="space-y-1">
-                          <label className="text-[10px] font-medium text-muted-foreground uppercase">{label}</label>
-                          <Input 
-                            disabled={readOnly}
-                            value={specs.standardValues[fieldKey] || ''} 
-                            onChange={(e) => handleStandardChange(fieldKey, e.target.value)}
-                            className="bg-background h-8 text-sm"
-                            placeholder="-"
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Campos Personalizados */}
-                <div className="space-y-3 pt-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-1.5 h-1.5 rounded-full bg-amber-500"></div>
-                      <h3 className="text-xs font-semibold uppercase text-muted-foreground">Campos Adicionales</h3>
-                    </div>
-                    {!readOnly && (
-                    <Button variant="outline" size="sm" onClick={addCustomField} className="h-7 text-xs gap-1">
-                      <Plus className="w-3 h-3" /> Agregar
-                    </Button>
-                    )}
-                  </div>
-
-                  {specs.customFields.length === 0 ? (
-                    <div className="text-center py-4 text-xs text-muted-foreground italic border border-dashed rounded-lg">
-                      No hay campos personalizados
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {specs.customFields.map((field) => (
-                        <div key={field.id} className="flex gap-2 items-start animate-in fade-in slide-in-from-left-2 duration-200">
-                          <div className="flex-1 grid grid-cols-2 gap-2">
-                            <Input 
-                              disabled={readOnly}
-                              placeholder="Nombre (ej: Marca sello)"
-                              value={field.label}
-                              onChange={(e) => handleCustomChange(field.id, 'label', e.target.value)}
-                              className="h-8 text-xs font-medium"
-                            />
-                            <Input 
-                              disabled={readOnly}
-                              placeholder="Valor"
-                              value={field.value}
-                              onChange={(e) => handleCustomChange(field.id, 'value', e.target.value)}
-                              className="h-8 text-sm"
-                            />
-                          </div>
-                          {!readOnly && (
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0"
-                            onClick={() => removeCustomField(field.id)}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Notas */}
-                <div className="space-y-2 pt-2 border-t">
-                  <span className="text-xs font-semibold text-muted-foreground uppercase">Observaciones</span>
-                  <Textarea 
-                    disabled={readOnly}
-                    value={specs.notes || ''} 
-                    onChange={(e) => setSpecs(prev => ({ ...prev, notes: e.target.value }))}
-                    className="min-h-[80px] bg-background resize-none text-sm" 
-                    placeholder="Información relevante adicional..."
+                    value={specs.standardValues[key]?.toString() || ''}
+                    onChange={(e) => handleStandardChange(key, e.target.value)}
+                    className="bg-background h-8 text-sm"
+                    placeholder="—"
                   />
                 </div>
-              </TabsContent>
-
-              <TabsContent value="gallery" className="mt-0 space-y-4">
-                
-                {/* Hidden Input */}
-                <input 
-                    type="file" 
-                    ref={fileInputRef} 
-                    className="hidden" 
-                    accept="image/*"
-                    onChange={handleFileSelect}
-                />
-
-                {/* Upload Placeholder */}
-                {!readOnly && (
-                <div 
-                    onClick={() => !uploading && fileInputRef.current?.click()}
-                    className={`border-2 border-dashed border-muted-foreground/25 hover:border-blue-500/50 hover:bg-muted/10 rounded-lg p-6 flex flex-col items-center justify-center text-center transition-all cursor-pointer ${uploading ? 'opacity-50 pointer-events-none' : ''}`}
-                >
-                  <div className="bg-muted p-3 rounded-full mb-3">
-                    {uploading ? <Loader2 className="w-6 h-6 animate-spin text-blue-500"/> : <Camera className="w-6 h-6 text-muted-foreground" />}
-                  </div>
-                  <p className="text-sm font-medium">{uploading ? 'Subiendo imagen...' : 'Click para subir nuevas fotos'}</p>
-                  <p className="text-xs text-muted-foreground mt-1">Placas, detalles o estado actual</p>
-                </div>
-                )}
-
-                <div className="space-y-2">
-                   <h3 className="text-xs font-semibold uppercase text-muted-foreground mb-2">Imágenes Guardadas ({gallery.length})</h3>
-                   {gallery.length === 0 ? (
-                     <div className="text-center py-8 text-muted-foreground text-sm">
-                       No hay imágenes en la galería
-                     </div>
-                   ) : (
-                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                       {gallery.map((img) => (
-                           <div key={img.id} className="group relative aspect-square bg-muted rounded-lg overflow-hidden border border-border">
-                               <img src={img.url} alt="Gallery item" className="w-full h-full object-cover" />
-                               
-                               {/* Overlay Actions */}
-                               <div className="absolute inset-x-0 bottom-0 bg-black/60 p-2 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col gap-1">
-                                   <div className="flex items-center justify-between">
-                                       <span className="text-[10px] text-white truncate max-w-[70%]">{new Date(img.timestamp).toLocaleDateString()}</span>
-                                       {!readOnly && (
-                                       <Button 
-                                        variant="destructive" 
-                                        size="icon" 
-                                        className="h-6 w-6" 
-                                        onClick={(e) => { e.stopPropagation(); handleDeleteImage(img.id); }}
-                                       >
-                                           <Trash2 className="w-3 h-3" />
-                                       </Button>
-                                       )}
-                                   </div>
-                                    {/* Info Técnica */}
-                                    <div className="flex flex-col text-[9px] text-gray-300 font-mono leading-tight">
-                                        {img.dimensions && <span>{img.dimensions.width}x{img.dimensions.height}</span>}
-                                        {(img.size || img.format) && (
-                                            <span>
-                                                {img.size ? `${Math.round(img.size / 1024)}KB` : ''} 
-                                                {img.format ? ` • ${img.format.toUpperCase()}` : ''}
-                                            </span>
-                                        )}
-                                    </div>
-                               </div>
-
-                               {/* Type Badge */}
-                               <div className="absolute top-2 left-2 px-1.5 py-0.5 bg-black/50 backdrop-blur rounded text-[10px] text-white font-medium uppercase">
-                                   {img.type === 'plate' ? 'Placa' : img.type === 'equipment' ? 'Equipo' : 'Repuesto'}
-                               </div>
-                           </div>
-                       ))}
-                     </div>
-                   )}
-                </div>
-              </TabsContent>
+              ))}
             </div>
-          </Tabs>
+          </div>
+
+          {/* Campos Específicos del Tipo */}
+          {Object.keys(currentTemplate.fields).length > 0 && (
+            <div className="space-y-3 p-3 bg-muted/30 rounded-lg border border-border/50">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Icon className={`h-3.5 w-3.5 ${currentTemplate.color}`} />
+                  <h3 className="text-xs font-semibold uppercase text-muted-foreground">
+                    Datos {currentTemplate.label}
+                  </h3>
+                </div>
+                <Badge variant="outline" className="text-[9px] px-1.5 py-0">
+                  {filledSpecific}/{Object.keys(currentTemplate.fields).length}
+                </Badge>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {Object.entries(currentTemplate.fields).map(([key, label]) => (
+                  <div key={key} className="space-y-1">
+                    <label className="text-[10px] font-medium text-muted-foreground uppercase">{label}</label>
+                    <Input
+                      disabled={readOnly}
+                      value={specs.standardValues[key]?.toString() || ''}
+                      onChange={(e) => handleStandardChange(key, e.target.value)}
+                      className="bg-background h-8 text-sm"
+                      placeholder="—"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Campos Personalizados */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                <h3 className="text-xs font-semibold uppercase text-muted-foreground">Campos Adicionales</h3>
+                {filledCustom > 0 && (
+                  <Badge variant="outline" className="text-[9px] px-1.5 py-0">{filledCustom}</Badge>
+                )}
+              </div>
+              {!readOnly && (
+                <Button variant="outline" size="sm" onClick={addCustomField} className="h-7 text-xs gap-1">
+                  <Plus className="w-3 h-3" /> Agregar
+                </Button>
+              )}
+            </div>
+
+            {specs.customFields.length === 0 ? (
+              <div className="text-center py-4 text-xs text-muted-foreground italic border border-dashed rounded-lg">
+                No hay campos personalizados
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {specs.customFields.map((field) => (
+                  <div key={field.id} className="flex gap-2 items-start animate-in fade-in slide-in-from-left-2 duration-200">
+                    <div className="flex-1 grid grid-cols-2 gap-2">
+                      <Input
+                        disabled={readOnly}
+                        placeholder="Nombre (ej: Marca sello)"
+                        value={field.label}
+                        onChange={(e) => handleCustomChange(field.id, 'label', e.target.value)}
+                        className="h-8 text-xs font-medium"
+                      />
+                      <Input
+                        disabled={readOnly}
+                        placeholder="Valor"
+                        value={field.value}
+                        onChange={(e) => handleCustomChange(field.id, 'value', e.target.value)}
+                        className="h-8 text-sm"
+                      />
+                    </div>
+                    {!readOnly && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0"
+                        onClick={() => removeCustomField(field.id)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Observaciones */}
+          <div className="space-y-2 pt-2 border-t">
+            <span className="text-xs font-semibold text-muted-foreground uppercase">Observaciones</span>
+            <Textarea
+              disabled={readOnly}
+              value={specs.notes || ''}
+              onChange={(e) => setSpecs(prev => ({ ...prev, notes: e.target.value }))}
+              className="min-h-[80px] bg-background resize-none text-sm"
+              placeholder="Información relevante adicional..."
+            />
+          </div>
         </div>
 
         {/* Footer */}
         <div className="p-4 border-t bg-background flex justify-between gap-2">
-           <Button variant="outline" onClick={handleExportPDF} disabled={exporting} className="gap-2">
-              {exporting ? <Loader2 className="w-4 h-4 animate-spin"/> : <FileDown className="w-4 h-4"/>}
-              PDF
-           </Button>
-
-           <div className="flex gap-2">
-              <Button variant="ghost" onClick={() => onOpenChange(false)}>
-                {readOnly ? 'Cerrar' : 'Cancelar'}
-              </Button>
-              {!readOnly && (
+          <Button variant="outline" onClick={handleExportPDF} disabled={exporting} className="gap-2">
+            {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />}
+            PDF
+          </Button>
+          <div className="flex gap-2">
+            <Button variant="ghost" onClick={() => onOpenChange(false)}>
+              {readOnly ? 'Cerrar' : 'Cancelar'}
+            </Button>
+            {!readOnly && (
               <Button onClick={handleSave} disabled={saving} className="bg-blue-600 hover:bg-blue-500 text-white">
                 {saving ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Guardando...
-                  </>
+                  <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Guardando...</>
                 ) : (
-                  <>
-                    <Save className="w-4 h-4 mr-2" /> Guardar Cambios
-                  </>
+                  <><Save className="w-4 h-4 mr-2" /> Guardar Cambios</>
                 )}
               </Button>
-              )}
-           </div>
+            )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>
-  );
+  )
 }

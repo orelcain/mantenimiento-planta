@@ -120,7 +120,12 @@ export interface Machine {
 }
 
 //Tipos para Ficha Técnica y Galería
-export type TechnicalDataType = 'motor' | 'pump' | 'conveyor' | 'reductor' | 'general';
+export type TechnicalDataType =
+  | 'motor' | 'bomba' | 'reductor' | 'cinta'
+  | 'valvula' | 'sensor' | 'cilindro' | 'compresor'
+  | 'intercambiador' | 'filtro' | 'general'
+  // legacy aliases (backward compat)
+  | 'pump' | 'conveyor';
 
 export interface TechnicalDataField {
   id: string;
