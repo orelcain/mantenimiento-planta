@@ -6,7 +6,7 @@
  * todos los repuestos y luego filtra client-side.
  */
 
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback } from 'react'
 import { collection, getDocs } from 'firebase/firestore'
 import { db } from '@/services/firebase'
 import type { Repuesto, Machine } from '@/types/repuestos'
@@ -22,15 +22,6 @@ export function useGlobalSearch(machines: Machine[]) {
   const [loading, setLoading] = useState(false)
   const [loaded, setLoaded] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  /** Mapa machineId → nombre (construido a partir de las máquinas activas) */
-  const machineMap = useMemo(() => {
-    const m = new Map<string, string>()
-    for (const machine of machines) {
-      m.set(machine.id, machine.nombre || machine.id)
-    }
-    return m
-  }, [machines])
 
   /**
    * Carga todos los repuestos de todas las máquinas.
