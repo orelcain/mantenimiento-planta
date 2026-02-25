@@ -65,6 +65,7 @@ export function RepuestosDashboard() {
   const [globalQuery, setGlobalQuery] = useState('')
   const [highlightedRepuestoId, setHighlightedRepuestoId] = useState<string | null>(null)
   const highlightTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const pendingHighlightRef = useRef<string | null>(null)
   const [, setSelectedCategoryId] = useState<string | null>('maquinas-principales')
 
   // Filtros, ordenamiento y paginación
@@ -248,33 +249,60 @@ export function RepuestosDashboard() {
   const handleNavigateToResult = async (machineId: string, repuestoId: string) => {
     // Limpiar highlight anterior
     if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current)
+    setHighlightedRepuestoId(null)
 
-    // Cambiar máquina si es diferente
-    if (currentMachine?.id !== machineId) {
-      await setCurrentMachine(machineId)
-    }
+    // Guardar el id pendiente — el useEffect se encargará de scroll+highlight cuando carguen los repuestos
+    pendingHighlightRef.current = repuestoId
 
     // Cerrar búsqueda global y limpiar filtros
     setGlobalSearchMode(false)
     setGlobalQuery('')
     setSearchQuery('')
-    setCurrentPage(1)
     setSortColumn(null)
     setSortDirection('asc')
 
-    // Resaltar el repuesto (con delay para dar tiempo al render)
+    // Cambiar máquina si es diferente
+    if (currentMachine?.id !== machineId) {
+      await setCurrentMachine(machineId)
+    } else {
+      // Si ya estamos en la misma máquina, disparar el scroll directamente
+      scrollToAndHighlight(repuestoId)
+    }
+  }
+
+  /** Scroll al repuesto y resaltarlo */
+  const scrollToAndHighlight = (repuestoId: string) => {
+    // Primero: encontrar en qué página está el repuesto (sin filtros ni sort activos)
+    const idx = repuestos.findIndex(r => r.id === repuestoId)
+    if (idx >= 0) {
+      const targetPage = Math.floor(idx / pageSize) + 1
+      setCurrentPage(targetPage)
+    }
+
+    // Resaltar y hacer scroll (con delay para que React renderice la página correcta)
     setTimeout(() => {
       setHighlightedRepuestoId(repuestoId)
-      // Scroll al repuesto
       const el = document.getElementById(`repuesto-${repuestoId}`)
-      el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    }, 300)
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
 
-    // Limpiar highlight después de 4s
-    highlightTimeoutRef.current = setTimeout(() => {
-      setHighlightedRepuestoId(null)
-    }, 4000)
+      // Limpiar highlight después de 4s
+      highlightTimeoutRef.current = setTimeout(() => {
+        setHighlightedRepuestoId(null)
+      }, 4000)
+    }, 150)
   }
+
+  // ─── Efecto: cuando los repuestos terminen de cargar y haya un highlight pendiente ───
+  useEffect(() => {
+    if (!repuestosLoading && pendingHighlightRef.current && repuestos.length > 0) {
+      const repuestoId = pendingHighlightRef.current
+      pendingHighlightRef.current = null
+      scrollToAndHighlight(repuestoId)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [repuestosLoading, repuestos])
 
   const handleOpenExportReport = () => {
     setExportReportOpen(true)
