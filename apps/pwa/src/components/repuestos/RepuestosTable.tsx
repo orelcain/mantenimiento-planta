@@ -35,6 +35,7 @@ interface RepuestosTableProps {
   onViewInManual?: (repuesto: Repuesto) => void
   onEditAnnotation?: (repuesto: Repuesto) => void
   onRelocate?: (repuesto: Repuesto) => void
+  highlightedRepuestoId?: string | null
 }
 
 const formatNumber = (value: number) =>
@@ -159,6 +160,7 @@ export function RepuestosTable({
   onViewInManual,
   onEditAnnotation,
   onRelocate,
+  highlightedRepuestoId,
 }: RepuestosTableProps) {
   const [preview, setPreview] = useState<{ url: string; name: string } | null>(null)
 
@@ -193,7 +195,7 @@ export function RepuestosTable({
       <div className="grid grid-cols-1 gap-3 sm:hidden">
         {repuestos.map((rep) => {
           return (
-            <div key={rep.id} className="bg-card border rounded-xl p-4 space-y-3 shadow-sm hover:shadow-md transition-shadow">
+            <div key={rep.id} id={`repuesto-${rep.id}`} className={`bg-card border rounded-xl p-4 space-y-3 shadow-sm hover:shadow-md transition-shadow ${highlightedRepuestoId === rep.id ? 'ring-2 ring-emerald-500 bg-emerald-500/10 animate-pulse' : ''}`}>
               <div className="flex gap-3 items-start">
                 <RepuestoThumbnail rep={rep} onPreview={(url, name) => setPreview({ url, name })} />
                 <div className="flex-1 min-w-0">
@@ -299,7 +301,8 @@ export function RepuestosTable({
               return (
                 <tr
                   key={rep.id}
-                  className={`group hover:bg-primary/5 transition-colors ${idx % 2 === 0 ? '' : 'bg-muted/10'}`}
+                  id={`repuesto-${rep.id}`}
+                  className={`group hover:bg-primary/5 transition-colors ${idx % 2 === 0 ? '' : 'bg-muted/10'} ${highlightedRepuestoId === rep.id ? 'ring-2 ring-inset ring-emerald-500 bg-emerald-500/10 animate-pulse' : ''}`}
                 >
                   {/* Thumbnail */}
                   <td className="pl-4 pr-2 py-2.5">

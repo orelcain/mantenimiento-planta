@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, Plus, FileText, Upload, Package, ClipboardList, ImageIcon, DollarSign, Wrench, ArrowRightLeft, Copy as CopyDuplicateIcon, Globe, ChevronRight } from 'lucide-react'
+import { useEffect, useMemo, useState, useRef } from 'react'
+import { AlertTriangle, Plus, FileText, Upload, Package, ClipboardList, ImageIcon, DollarSign, Wrench, ArrowRightLeft, Copy as CopyDuplicateIcon, Globe, Camera, ExternalLink } from 'lucide-react'
 import { RepuestosTable } from '@/components/repuestos/RepuestosTable'
 import { RepuestoFormModal } from '@/components/repuestos/RepuestoForm'
 import { RepuestosFilters } from '@/components/repuestos/RepuestosFilters'
@@ -38,7 +38,7 @@ import {
 } from '@/components/ui'
 
 export function RepuestosDashboard() {
-  const { machines, loading: machinesLoading } = useMachineContext()
+  const { machines, loading: machinesLoading, setCurrentMachine } = useMachineContext()
   const currentMachine = useCurrentMachine()
   const isAdmin = useIsAdmin()
   const { categories } = useMachineCategories()
@@ -61,6 +61,8 @@ export function RepuestosDashboard() {
   const [duplicatesOpen, setDuplicatesOpen] = useState(false)
   const [globalSearchMode, setGlobalSearchMode] = useState(false)
   const [globalQuery, setGlobalQuery] = useState('')
+  const [highlightedRepuestoId, setHighlightedRepuestoId] = useState<string | null>(null)
+  const highlightTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [, setSelectedCategoryId] = useState<string | null>('maquinas-principales')
 
   // Filtros, ordenamiento y paginación
@@ -234,6 +236,38 @@ export function RepuestosDashboard() {
 
   const handleClearFilters = () => {
     setSearchQuery('')
+  }
+
+  /** Navegar a la máquina del resultado global y resaltar el repuesto */
+  const handleNavigateToResult = async (machineId: string, repuestoId: string) => {
+    // Limpiar highlight anterior
+    if (highlightTimeoutRef.current) clearTimeout(highlightTimeoutRef.current)
+
+    // Cambiar máquina si es diferente
+    if (currentMachine?.id !== machineId) {
+      await setCurrentMachine(machineId)
+    }
+
+    // Cerrar búsqueda global y limpiar filtros
+    setGlobalSearchMode(false)
+    setGlobalQuery('')
+    setSearchQuery('')
+    setCurrentPage(1)
+    setSortColumn(null)
+    setSortDirection('asc')
+
+    // Resaltar el repuesto (con delay para dar tiempo al render)
+    setTimeout(() => {
+      setHighlightedRepuestoId(repuestoId)
+      // Scroll al repuesto
+      const el = document.getElementById(`repuesto-${repuestoId}`)
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 300)
+
+    // Limpiar highlight después de 4s
+    highlightTimeoutRef.current = setTimeout(() => {
+      setHighlightedRepuestoId(null)
+    }, 4000)
   }
 
   const handleOpenExportReport = () => {
@@ -531,25 +565,47 @@ export function RepuestosDashboard() {
                 <p className="text-xs text-destructive">{globalSearch.error}</p>
               )}
               {globalQuery.trim() && globalResults.length > 0 && (
-                <div className="space-y-1.5 max-h-[300px] overflow-y-auto">
+                <div className="space-y-1.5 max-h-[400px] overflow-y-auto">
                   <span className="text-[10px] text-muted-foreground">{globalResults.length} resultados</span>
                   {globalResults.slice(0, 50).map((r) => (
                     <div
                       key={`${r.machineId}-${r.repuesto.id}`}
-                      className="flex items-center justify-between p-2.5 bg-background border rounded-lg hover:bg-muted/30 transition-colors text-sm"
+                      className="flex items-center gap-2 p-2.5 bg-background border rounded-lg hover:bg-muted/30 hover:border-emerald-500/30 transition-colors text-sm group/result cursor-pointer"
+                      onClick={() => handleNavigateToResult(r.machineId, r.repuesto.id)}
                     >
                       <div className="flex flex-col gap-0.5 min-w-0 flex-1">
                         <span className="font-medium truncate">{r.repuesto.textoBreve || r.repuesto.codigoSAP}</span>
                         <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-mono">
                           <span>SAP: {r.repuesto.codigoSAP || 'N/A'}</span>
                           {r.repuesto.codigoFabricante && <span>Fab: {r.repuesto.codigoFabricante}</span>}
+                          {(r.repuesto.cantidadPorMaquina ?? 0) > 0 && (
+                            <span className="text-blue-400">Cant: {r.repuesto.cantidadPorMaquina}</span>
+                          )}
                         </div>
                       </div>
+                      {/* Acciones rápidas */}
+                      <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover/result:opacity-100 transition-opacity">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setSpecsTarget(r.repuesto) }}
+                          className="h-7 w-7 inline-flex items-center justify-center rounded-md text-blue-400/70 hover:text-blue-400 hover:bg-blue-500/10 transition-colors"
+                          title="Ficha Técnica"
+                        >
+                          <ClipboardList className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setGalleryTarget(r.repuesto) }}
+                          className="h-7 w-7 inline-flex items-center justify-center rounded-md text-indigo-400/70 hover:text-indigo-400 hover:bg-indigo-500/10 transition-colors"
+                          title="Galería"
+                        >
+                          <Camera className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                      {/* Máquina + flecha */}
                       <div className="flex items-center gap-1.5 shrink-0">
                         <span className="text-[10px] bg-emerald-500/10 text-emerald-600 px-2 py-0.5 rounded-full font-medium">
                           {r.machineName}
                         </span>
-                        <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                        <ExternalLink className="h-3 w-3 text-muted-foreground/50 group-hover/result:text-emerald-500 transition-colors" />
                       </div>
                     </div>
                   ))}
@@ -592,6 +648,7 @@ export function RepuestosDashboard() {
                 onViewInManual={currentMachine ? (rep) => setViewInManualTarget(rep) : undefined}
                 onEditAnnotation={isAdmin && currentMachine ? (rep) => setViewInManualTarget(rep) : undefined}
                 onRelocate={isAdmin && currentMachine ? (rep) => setRelocateTarget(rep) : undefined}
+                highlightedRepuestoId={highlightedRepuestoId}
               />
 
               <RepuestosPagination

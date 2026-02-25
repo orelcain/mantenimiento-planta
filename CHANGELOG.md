@@ -7,6 +7,14 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.96] - 2026-02-24
+### Funcionalidad
+- **Navegación desde búsqueda global**: click en cualquier resultado cambia a la máquina correspondiente, cierra la búsqueda global y hace scroll + highlight al repuesto encontrado
+- **Acciones rápidas en resultados globales**: botones inline de Ficha Técnica (📋) y Galería (📷) visibles al pasar el cursor sobre cada resultado
+- **Highlight con animación**: el repuesto seleccionado se resalta con borde verde + pulse durante 4 segundos para fácil identificación
+
+---
+
 ## [2.48.95] - 2026-02-24
 ### Funcionalidad
 - **Ordenamiento de columnas en tabla de repuestos**: click en cualquier header (Código SAP, Repuesto, Cód. Fabricante, Cant/Máq, Valor Unit., Ubicación) para ordenar ascendente/descendente. Tercer click limpia el orden
