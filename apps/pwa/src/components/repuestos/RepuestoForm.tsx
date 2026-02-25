@@ -32,6 +32,7 @@ const defaultForm: RepuestoFormData = {
   valorUnitario: 0,
   cantidadPorMaquina: 0,
   ubicacionEnPlanta: '',
+  observaciones: '',
 }
 
 export function RepuestoFormModal({
@@ -58,6 +59,7 @@ export function RepuestoFormModal({
           valorUnitario: initialData.valorUnitario || 0,
           cantidadPorMaquina: initialData.cantidadPorMaquina || 0,
           ubicacionEnPlanta: initialData.ubicacionEnPlanta || '',
+          observaciones: initialData.observaciones || '',
         })
       } else {
         setForm(defaultForm)
@@ -78,6 +80,7 @@ export function RepuestoFormModal({
         valorUnitario: Number(form.valorUnitario) || 0,
         cantidadPorMaquina: Number(form.cantidadPorMaquina) || 0,
         ubicacionEnPlanta: form.ubicacionEnPlanta?.trim() || '',
+        observaciones: form.observaciones?.trim() || '',
       }
 
       if (!payload.textoBreve) {
@@ -161,6 +164,17 @@ export function RepuestoFormModal({
               onChange={(e) => setForm({ ...form, descripcion: e.target.value })}
               placeholder="Detalles, proveedor, especificaciones..."
               rows={3}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="observaciones">Observaciones</Label>
+            <Textarea
+              id="observaciones"
+              value={form.observaciones}
+              onChange={(e) => setForm({ ...form, observaciones: e.target.value })}
+              placeholder="Notas adicionales, estado, condiciones especiales..."
+              rows={2}
             />
           </div>
 

@@ -10,6 +10,7 @@ import { RepuestoPhotosModal } from '@/components/repuestos/RepuestoPhotosModal'
 import { RepuestoManualModal } from '@/components/repuestos/RepuestoManualModal'
 import { TechnicalSpecsModal } from '@/components/repuestos/TechnicalSpecsModal'
 import { RepuestoGalleryModal } from '@/components/repuestos/RepuestoGalleryModal'
+import { RepuestoDetailModal } from '@/components/repuestos/RepuestoDetailModal'
 import { MachineManualPanel } from '@/components/repuestos/MachineManualPanel'
 import { ManualSearchModal } from '@/components/repuestos/ManualSearchModal'
 import { useRepuestos } from '@/hooks/repuestos/useRepuestos'
@@ -59,6 +60,7 @@ export function RepuestosDashboard() {
   const [relocateTarget, setRelocateTarget] = useState<Repuesto | null>(null)
   const [bulkRelocateOpen, setBulkRelocateOpen] = useState(false)
   const [duplicatesOpen, setDuplicatesOpen] = useState(false)
+  const [detailTarget, setDetailTarget] = useState<Repuesto | null>(null)
   const [globalSearchMode, setGlobalSearchMode] = useState(false)
   const [globalQuery, setGlobalQuery] = useState('')
   const [highlightedRepuestoId, setHighlightedRepuestoId] = useState<string | null>(null)
@@ -192,6 +194,10 @@ export function RepuestosDashboard() {
         case 'ubicacionEnPlanta':
           va = a.ubicacionEnPlanta || ''
           vb = b.ubicacionEnPlanta || ''
+          break
+        case 'observaciones':
+          va = a.observaciones || ''
+          vb = b.observaciones || ''
           break
         default:
           return 0
@@ -648,6 +654,7 @@ export function RepuestosDashboard() {
                 onViewInManual={currentMachine ? (rep) => setViewInManualTarget(rep) : undefined}
                 onEditAnnotation={isAdmin && currentMachine ? (rep) => setViewInManualTarget(rep) : undefined}
                 onRelocate={isAdmin && currentMachine ? (rep) => setRelocateTarget(rep) : undefined}
+                onViewDetail={(rep) => setDetailTarget(rep)}
                 highlightedRepuestoId={highlightedRepuestoId}
               />
 
@@ -838,6 +845,16 @@ export function RepuestosDashboard() {
           toast({ title: 'Duplicados gestionados', description: 'Los repuestos duplicados fueron fusionados exitosamente.' })
         }}
       />
+
+      {/* Modal Ficha completa de repuesto */}
+      {detailTarget && (
+        <RepuestoDetailModal
+          open={!!detailTarget}
+          onOpenChange={(open) => !open && setDetailTarget(null)}
+          repuesto={detailTarget}
+          machineName={currentMachine?.nombre}
+        />
+      )}
     </div>
   )
 }

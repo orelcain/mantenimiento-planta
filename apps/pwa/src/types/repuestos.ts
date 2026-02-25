@@ -68,6 +68,9 @@ export interface Repuesto {
   imagenesManual: ImagenRepuesto[];
   fotosReales: ImagenRepuesto[];
   
+  /** Observaciones o notas adicionales del repuesto */
+  observaciones?: string;
+
   // Ficha Técnica y Galería (Extendido de Machine)
   technicalSpecs?: TechnicalSpecs;
   gallery?: MachineImage[];
@@ -182,6 +185,8 @@ export interface RepuestoFormData {
   cantidadPorMaquina: number;
   /** Dónde se encuentra/usa dentro de la máquina */
   ubicacionEnPlanta?: string;
+  /** Observaciones o notas adicionales */
+  observaciones?: string;
 }
 
 /**

@@ -7,6 +7,21 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.97] - 2026-02-24
+### Funcionalidad
+- **Columna de Observaciones**: nueva columna en la tabla de repuestos (desktop + móvil) para notas/observaciones con icono de mensaje, sorteable
+- **Campo Observaciones en formulario**: al crear/editar repuesto ahora se puede agregar observaciones
+- **Ficha completa de repuesto (RepuestoDetailModal)**: click en el nombre del repuesto abre una vista completa con toda la información:
+  - Datos generales (códigos, nombre, descripción)
+  - Valores y ubicación (valor unitario, cantidad por máquina, ubicación)
+  - Observaciones con fondo destacado
+  - Ficha técnica completa (si existe)
+  - Galería de imágenes con lightbox (fotos reales, manual, galería)
+  - Vínculos al manual
+- Accesible para TODOS los usuarios (no solo admin)
+
+---
+
 ## [2.48.96] - 2026-02-24
 ### Funcionalidad
 - **Navegación desde búsqueda global**: click en cualquier resultado cambia a la máquina correspondiente, cierra la búsqueda global y hace scroll + highlight al repuesto encontrado

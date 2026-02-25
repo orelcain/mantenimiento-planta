@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Package, ImageIcon, X, BookOpen, Eye, ClipboardList, Camera, Pencil, Trash2, ArrowRightLeft, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
+import { Package, ImageIcon, X, BookOpen, Eye, ClipboardList, Camera, Pencil, Trash2, ArrowRightLeft, ArrowUpDown, ArrowUp, ArrowDown, MessageSquareText } from 'lucide-react'
 import type { Repuesto } from '@/types/repuestos'
 import { RepuestoActionsMenu } from './RepuestoActionsMenu'
 import { InlineEditName } from './InlineEditName'
@@ -35,6 +35,7 @@ interface RepuestosTableProps {
   onViewInManual?: (repuesto: Repuesto) => void
   onEditAnnotation?: (repuesto: Repuesto) => void
   onRelocate?: (repuesto: Repuesto) => void
+  onViewDetail?: (repuesto: Repuesto) => void
   highlightedRepuestoId?: string | null
 }
 
@@ -160,6 +161,7 @@ export function RepuestosTable({
   onViewInManual,
   onEditAnnotation,
   onRelocate,
+  onViewDetail,
   highlightedRepuestoId,
 }: RepuestosTableProps) {
   const [preview, setPreview] = useState<{ url: string; name: string } | null>(null)
@@ -208,7 +210,10 @@ export function RepuestosTable({
                       textClassName="font-medium text-foreground line-clamp-2 text-sm"
                     />
                   ) : (
-                    <div className="font-medium text-foreground line-clamp-2 text-sm">{rep.textoBreve || 'Sin nombre'}</div>
+                    <button
+                      onClick={() => onViewDetail?.(rep)}
+                      className="font-medium text-foreground line-clamp-2 text-sm text-left hover:text-primary hover:underline transition-colors"
+                    >{rep.textoBreve || 'Sin nombre'}</button>
                   )}
                 </div>
                 <RepuestoActionsMenu
@@ -264,6 +269,13 @@ export function RepuestosTable({
                 </div>
               )}
 
+              {rep.observaciones && (
+                <div className="flex items-start gap-2 bg-amber-500/5 p-2 rounded-lg">
+                  <MessageSquareText className="h-3 w-3 text-amber-400/60 shrink-0 mt-0.5" />
+                  <span className="text-xs text-muted-foreground line-clamp-2">{rep.observaciones}</span>
+                </div>
+              )}
+
               <div className="flex items-center justify-between pt-2 border-t border-border/50">
                 <div className="flex flex-col">
                   <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Valor Unit.</span>
@@ -292,6 +304,7 @@ export function RepuestosTable({
               <SortableTh column="cantidadPorMaquina" label="Cant/Máq" sortColumn={sortColumn} sortDirection={sortDirection} onToggleSort={onToggleSort} className="text-center" />
               <SortableTh column="valorUnitario" label="Valor Unit." sortColumn={sortColumn} sortDirection={sortDirection} onToggleSort={onToggleSort} className="text-right" />
               <SortableTh column="ubicacionEnPlanta" label="Ubicación" sortColumn={sortColumn} sortDirection={sortDirection} onToggleSort={onToggleSort} />
+              <SortableTh column="observaciones" label="Observaciones" sortColumn={sortColumn} sortDirection={sortDirection} onToggleSort={onToggleSort} />
               <th className="px-3 py-3 font-semibold text-right">Acciones</th>
             </tr>
           </thead>
@@ -326,7 +339,11 @@ export function RepuestosTable({
                             textClassName="font-medium text-foreground truncate"
                           />
                         ) : (
-                          <div className="font-medium text-foreground truncate">{rep.textoBreve || 'Sin nombre'}</div>
+                          <button
+                            onClick={() => onViewDetail?.(rep)}
+                            className="font-medium text-foreground truncate text-left hover:text-primary hover:underline transition-colors cursor-pointer"
+                            title="Ver ficha completa"
+                          >{rep.textoBreve || 'Sin nombre'}</button>
                         )}
                         {rep.descripcion ? (
                           <div className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{rep.descripcion}</div>
@@ -376,6 +393,19 @@ export function RepuestosTable({
                       <span className="text-xs text-muted-foreground truncate block" title={rep.ubicacionEnPlanta}>
                         {rep.ubicacionEnPlanta}
                       </span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground/40">—</span>
+                    )}
+                  </td>
+                  {/* Observaciones */}
+                  <td className="px-3 py-2.5 max-w-[200px]">
+                    {rep.observaciones ? (
+                      <div className="flex items-start gap-1">
+                        <MessageSquareText className="h-3 w-3 text-amber-400/60 shrink-0 mt-0.5" />
+                        <span className="text-xs text-muted-foreground line-clamp-2" title={rep.observaciones}>
+                          {rep.observaciones}
+                        </span>
+                      </div>
                     ) : (
                       <span className="text-xs text-muted-foreground/40">—</span>
                     )}
