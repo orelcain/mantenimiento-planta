@@ -17,6 +17,7 @@ export interface ChatMessage {
   timestamp: Date
   context?: string
   actions?: ChatAction[]
+  photoUrls?: string[]
 }
 
 export interface ChatAction {
@@ -373,6 +374,12 @@ function suggestActions(intents: IntentType[]): ChatAction[] {
   return actions
 }
 
+/** Detecta si el usuario quiere ver el historial de ARIA */
+function isAriaHistoryRequest(text: string): boolean {
+  return /(?:historial|acciones|log|registro)\s*(?:de\s+)?(?:aria|asistente|bot|chat)/i.test(text) ||
+    /historial\s+de\s+aria/i.test(text)
+}
+
 // ─── Caché de contexto RAG (TTL: 3 minutos) ─────────────────────────
 interface CacheEntry {
   data: string
@@ -664,8 +671,8 @@ async function buildRAGContext(intents: IntentType[], userQuery: string): Promis
 
 // ─── System prompt ───────────────────────────────────────────────────
 
-const SYSTEM_PROMPT = `Eres el asistente virtual de la aplicación de Mantenimiento de Planta Industrial.
-Tu nombre es "Asistente de Planta". Eres como JARVIS — puedes ejecutar acciones reales en la app.
+const SYSTEM_PROMPT = `Eres ARIA (Asistente de Reportes e Incidencias Automatizada), la asistente virtual de la aplicación de Mantenimiento de Planta Industrial.
+Tu nombre es "ARIA". Eres inteligente, eficiente y proactiva — puedes ejecutar acciones reales en la app.
 
 Tu rol:
 - Responder preguntas sobre repuestos, incidencias, equipos y sensores de la planta
@@ -703,7 +710,8 @@ Capacidades de la app:
 - Mapas interactivos de la planta
 - Análisis predictivo con IA
 
-Cuando te pregunten qué puedes hacer, destaca especialmente que puedes CREAR INCIDENCIAS por voz o texto, como un asistente JARVIS.`
+Cuando te pregunten qué puedes hacer, destaca que puedes CREAR INCIDENCIAS por voz o texto, adjuntar fotos desde el chat, y sugerir técnicos para asignar.
+Tu nombre es ARIA — Asistente de Reportes e Incidencias Automatizada. Preséntate así cuando te pregunten.`
 
 // ─── Función principal con streaming ─────────────────────────────────
 
@@ -713,6 +721,9 @@ import {
   executeCreateIncident,
   formatDraftForDisplay,
   findRecentIncidents,
+  suggestTechnicianForIncident,
+  logAriaAction,
+  notifyAriaAction,
   type PendingAction,
   type IncidentDraft,
 } from './chatActions'
@@ -760,17 +771,59 @@ export async function sendChatMessage(
 
     if (isConfirm && pendingAction.type === 'create_incident' && userId) {
       const draft = pendingAction.data as unknown as IncidentDraft
-      const userName = history.find(m => m.role === 'user')?.content ? undefined : undefined // will rely on userId
-      const result = await executeCreateIncident(draft, userId, userName)
+      
+      // Extraer URLs de fotos si el usuario adjuntó alguna durante el flujo
+      const photoUrlsFromChat: string[] = []
+      const photoRegex = /\[SISTEMA: El usuario adjuntó .+ foto\(s\).*URLs: (.+)\]/
+      for (const msg of history.slice(-5)) {
+        const match = msg.content.match(photoRegex)
+        if (match?.[1]) {
+          photoUrlsFromChat.push(...match[1].split(', ').map(u => u.trim()).filter(Boolean))
+        }
+      }
+
+      // Si hay fotos del chat, inyectarlas en el draft
+      if (photoUrlsFromChat.length > 0) {
+        (draft as any).chatPhotoUrls = photoUrlsFromChat
+      }
+
+      const result = await executeCreateIncident(draft, userId, undefined, photoUrlsFromChat)
       
       if (result.success) {
+        // Log acción en Firestore
+        await logAriaAction({
+          userId,
+          actionType: 'create_incident',
+          description: `Incidencia creada: "${draft.titulo}" (${draft.prioridad})`,
+          resultId: result.incidentId,
+          success: true,
+          metadata: { draft, photoCount: photoUrlsFromChat.length },
+        })
+
+        // Notificación push local
+        notifyAriaAction('incident_created', {
+          titulo: draft.titulo,
+          incidentId: result.incidentId,
+        })
+
+        // Sugerir técnico para asignar
+        let techSuggestion = ''
+        try {
+          const { suggested, reason } = await suggestTechnicianForIncident(draft.equipmentId)
+          if (suggested) {
+            techSuggestion = `\n\n👷 **Técnico sugerido:** ${suggested.nombre} ${suggested.apellido || ''}\n📊 ${reason}\n💡 Puedes asignarlo desde la sección de incidencias.`
+          }
+        } catch { /* ignore */ }
+
         return {
           reply: `✅ **¡Incidencia creada exitosamente!**\n\n` +
             `📋 ID: **${result.incidentId}**\n` +
             `📌 "${draft.titulo}"\n` +
-            `⚡ Prioridad: ${draft.prioridad}\n\n` +
-            `La incidencia quedó en estado **pendiente** y será revisada por un supervisor.\n\n` +
-            `💡 Puedes agregar fotos desde la sección de incidencias, o decirme si necesitas algo más.`,
+            `⚡ Prioridad: ${draft.prioridad}\n` +
+            (photoUrlsFromChat.length > 0 ? `📷 ${photoUrlsFromChat.length} foto${photoUrlsFromChat.length > 1 ? 's' : ''} adjuntada${photoUrlsFromChat.length > 1 ? 's' : ''}\n` : '') +
+            `\nLa incidencia quedó en estado **pendiente** y será revisada por un supervisor.` +
+            techSuggestion +
+            `\n\n💡 ¿Necesitas algo más?`,
           context: '',
           actions: [
             { label: 'Ver incidencias', route: '/incidents', icon: 'AlertTriangle' },
@@ -779,6 +832,14 @@ export async function sendChatMessage(
           pendingAction: { ...pendingAction, status: 'completed', resultId: result.incidentId },
         }
       } else {
+        // Log error
+        await logAriaAction({
+          userId,
+          actionType: 'create_incident',
+          description: `Error al crear incidencia: ${result.error}`,
+          success: false,
+        })
+
         return {
           reply: `❌ Error al crear la incidencia: ${result.error}\n\nIntenta de nuevo o créala manualmente desde la sección de incidencias.`,
           context: '',
@@ -819,6 +880,17 @@ export async function sendChatMessage(
   }
 
   // ─── DETECCIÓN DE ACCIÓN NUEVA ──────────────────────────────────────
+
+  // Historial de ARIA
+  if (isAriaHistoryRequest(userMessage)) {
+    return {
+      reply: '📋 Te llevo al **Dashboard de Acciones** donde puedes ver todo mi historial de acciones ejecutadas.',
+      context: '',
+      actions: [{ label: 'Ver historial ARIA', route: '/aria-actions', icon: 'Bot' }],
+      typoCorrections,
+    }
+  }
+
   const detectedActionType = detectAction(userMessage)
   
   if (detectedActionType === 'create_incident' && userId) {
@@ -842,6 +914,7 @@ export async function sendChatMessage(
       replyText += `⚠️ No pude identificar el equipo exacto. Puedes:\n• Decirme el nombre del equipo para buscarlo\n• Confirmar así y asignarlo después\n\n`
     }
 
+    replyText += `📷 *Puedes adjuntar fotos con el botón de cámara antes de confirmar.*\n\n`
     replyText += `¿Quieres que **cree esta incidencia**? (Sí / No / Modificar)`
 
     return {

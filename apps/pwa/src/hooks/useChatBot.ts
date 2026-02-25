@@ -1,10 +1,11 @@
 /**
- * Hook para el Chatbot — v4
- * JARVIS mode: acciones ejecutables (crear incidencias, actualizar estado)
+ * Hook para el Chatbot — v5 ARIA
+ * ARIA mode: acciones ejecutables, fotos por chat, auto-asignación, notificaciones
  * Memoria por usuario, corrección de typos, historial persistente por userId
  */
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { sendChatMessage, type ChatMessage, type ChatAction, type PendingAction } from '@/services/chatbot'
+import { uploadChatPhoto } from '@/services/chatActions'
 import { useAuthStore } from '@/store/authStore'
 
 const STORAGE_PREFIX = 'chatbot_history_'
@@ -17,14 +18,16 @@ function generateId(): string {
 const WELCOME_MESSAGE: ChatMessage = {
   id: 'welcome',
   role: 'assistant',
-  content: '¡Hola! 👋 Soy **JARVIS**, el asistente inteligente de planta. Puedo:\n\n' +
+  content: '¡Hola! 👋 Soy **ARIA** — *Asistente de Reportes e Incidencias Automatizada*.\n\n' +
+    'Puedo ayudarte con:\n' +
     '• 🔧 **Crear incidencias** — describe la falla y yo genero el reporte\n' +
+    '• 📷 **Adjuntar fotos** — envía una imagen directamente desde el chat\n' +
     '• 🔍 **Buscar repuestos** — por nombre, código SAP o fabricante\n' +
-    '• 📋 **Consultar incidencias** — estado, prioridad, historial\n' +
+    '• 📋 **Actualizar estado** — resolver, cerrar o cambiar incidencias por voz\n' +
+    '• 👷 **Asignar técnicos** — sugiero al técnico más adecuado\n' +
     '• ⚙️ **Estado de equipos** — criticidad y disponibilidad\n' +
     '• 📊 **Resúmenes** — panorama general de la planta\n\n' +
-    'Entiendo errores de tipeo y lenguaje natural.\n' +
-    'Ejemplo: *"se rompió la cinta de filete, hay que reemplazarla"* → creo la incidencia por ti.\n\n' +
+    'Ejemplo: *"se rompió la cinta de filete"* → creo la incidencia por ti.\n\n' +
     '¿En qué puedo ayudarte?',
   timestamp: new Date(),
 }
@@ -104,15 +107,27 @@ export function useChatBot() {
     setIsOpen(false)
   }, [])
 
-  const sendMessage = useCallback(async (text: string) => {
+  const sendMessage = useCallback(async (text: string, photos?: File[]) => {
     const trimmed = text.trim()
-    if (!trimmed || isLoading) return
+    if ((!trimmed && (!photos || photos.length === 0)) || isLoading) return
+
+    // Upload photos first if any
+    let photoUrls: string[] = []
+    if (photos && photos.length > 0 && userId) {
+      try {
+        const uploadPromises = photos.map(f => uploadChatPhoto(userId, f))
+        photoUrls = await Promise.all(uploadPromises)
+      } catch {
+        // Continue without photos if upload fails
+      }
+    }
 
     const userMsg: ChatMessage = {
       id: generateId(),
       role: 'user',
-      content: trimmed,
+      content: trimmed || (photoUrls.length > 0 ? `📷 [${photoUrls.length} foto${photoUrls.length > 1 ? 's' : ''} adjunta${photoUrls.length > 1 ? 's' : ''}]` : ''),
       timestamp: new Date(),
+      ...(photoUrls.length > 0 && { photoUrls }),
     }
 
     setMessages(prev => [...prev, userMsg])
@@ -124,8 +139,13 @@ export function useChatBot() {
     try {
       const history = [...messages, userMsg].filter(m => m.role !== 'system')
 
+      // If photos were uploaded and there's a pending incident action, inject them
+      const messageWithPhotoContext = photoUrls.length > 0
+        ? `${trimmed || 'Adjunté fotos'}\n[SISTEMA: El usuario adjuntó ${photoUrls.length} foto(s) desde el chat. URLs: ${photoUrls.join(', ')}]`
+        : trimmed || ''
+
       const result = await sendChatMessage(
-        trimmed,
+        messageWithPhotoContext,
         history,
         // Streaming callback
         (partial) => {

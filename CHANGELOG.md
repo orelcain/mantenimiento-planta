@@ -7,6 +7,34 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.55.0] - 2026-02-27
+### Agregado
+- **ARIA (Asistente de Reportes e Incidencias Automatizada)**: renombrado del chatbot JARVIS a ARIA con identidad femenina
+- **Fotos via chat**: adjuntar hasta 3 imágenes desde la cámara o galería al conversar con ARIA
+  - Compresión automática a WebP antes de subir a Firebase Storage
+  - Preview con opción de eliminar antes de enviar
+  - Fotos se vinculan automáticamente a la incidencia creada (campo `fotos`)
+  - Imágenes visibles inline en las burbujas del chat
+- **Auto-asignación de técnicos**: tras crear una incidencia, ARIA sugiere el técnico con menor carga de trabajo
+  - Cuenta incidencias activas por técnico y ordena por disponibilidad
+  - Muestra nombre del técnico sugerido y motivo de la recomendación
+- **Dashboard de acciones ARIA** (`/aria-actions`): página completa con historial de acciones ejecutadas
+  - 4 tarjetas de estadísticas: total acciones, exitosas, incidencias creadas, acciones hoy
+  - Filtros por tipo de acción y resultado (éxito/fallo)
+  - Links directos a incidencias creadas desde el historial
+  - Admin ve todas las acciones; usuarios normales solo las propias
+- **Notificaciones push locales**: ARIA envía notificación local al completar una acción (crear incidencia, actualizar estado)
+- **Registro de acciones en Firestore**: cada acción de ARIA se guarda en colección `ariaActions` con userId, tipo, resultado, timestamp
+- **Sugerencia rápida "Historial de ARIA"**: acceso directo al dashboard desde el chat
+### Mejorado
+- **System prompt ARIA**: identidad actualizada con capacidades expandidas (fotos, asignación, historial)
+- **Hook useChatBot v5**: soporte para envío de fotos junto con mensajes de texto
+- **UI ChatBot v4**: botón de cámara, preview de fotos, header ARIA, footer ARIA v5
+- **Flujo de confirmación**: extrae fotos del historial de chat y las adjunta al crear incidencia
+- **Message bubbles**: renderizan imágenes inline cuando el mensaje incluye fotos
+
+---
+
 ## [2.54.0] - 2026-02-26
 ### Agregado
 - **JARVIS Mode**: el chatbot ahora puede EJECUTAR ACCIONES reales en la app, no solo responder preguntas

@@ -1,5 +1,5 @@
 /**
- * Chat Actions Service — "JARVIS Mode"
+ * Chat Actions Service — "ARIA Mode"
  * 
  * Permite al chatbot ejecutar acciones reales en la app:
  * - Crear incidencias
@@ -279,6 +279,7 @@ export async function executeCreateIncident(
   draft: IncidentDraft,
   userId: string,
   userName?: string,
+  photoUrls?: string[],
 ): Promise<{ success: boolean; incidentId?: string; error?: string }> {
   try {
     const incident = await createIncident({
@@ -287,7 +288,7 @@ export async function executeCreateIncident(
       descripcion: draft.descripcion,
       prioridad: draft.prioridad,
       status: 'pendiente',
-      fotos: [],
+      fotos: photoUrls && photoUrls.length > 0 ? photoUrls : [],
       reportadoPor: userId,
       creadoPor: userId,
       creadoPorNombre: userName,
@@ -298,7 +299,7 @@ export async function executeCreateIncident(
       ...(draft.hierarchyNodeId && { hierarchyNodeId: draft.hierarchyNodeId }),
     })
 
-    logger.info('chatActions: incident created via chatbot', { incidentId: incident.id })
+    logger.info('chatActions: incident created via ARIA', { incidentId: incident.id, photoCount: photoUrls?.length || 0 })
     return { success: true, incidentId: incident.id }
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Error desconocido'
@@ -383,4 +384,157 @@ export function formatDraftForDisplay(draft: IncidentDraft): string {
   }
 
   return lines.join('\n')
+}
+
+// ─── Subir foto desde chat ───────────────────────────────────────────
+
+import { uploadIncidentPhoto, compressImage } from './storage'
+
+/**
+ * Sube una foto desde el chat y retorna la URL.
+ * Usa un incidentId temporal (chat_{userId}_{ts}) que se puede reasignar.
+ */
+export async function uploadChatPhoto(userId: string, file: File): Promise<string> {
+  try {
+    // Comprimir imagen a WebP
+    const compressed = await compressImage(file, 1920, 0.85, true)
+    // Usar un bucket path temporal para chat uploads
+    const tempId = `chat_${userId}_${Date.now()}`
+    const url = await uploadIncidentPhoto(tempId, compressed)
+    logger.info('chatActions: photo uploaded from chat', { userId, size: compressed.size })
+    return url
+  } catch (err) {
+    logger.error('chatActions: error uploading chat photo', err instanceof Error ? err : undefined)
+    throw err
+  }
+}
+
+// ─── Sugerir técnico para asignación ─────────────────────────────────
+
+import { getTechnicians } from './auth'
+import type { User } from '@/types'
+
+/**
+ * Busca técnicos disponibles y sugiere el más adecuado.
+ * Criterios: (1) rol técnico activo, (2) menor carga de incidencias abiertas
+ */
+export async function suggestTechnicianForIncident(
+  _equipmentId?: string,
+): Promise<{ suggested: User | null; candidates: User[]; reason: string }> {
+  try {
+    const technicians = await getTechnicians()
+    
+    if (technicians.length === 0) {
+      return { suggested: null, candidates: [], reason: 'No hay técnicos registrados en el sistema.' }
+    }
+
+    // Obtener incidencias activas para contar carga por técnico
+    const activeIncidents = await getIncidents({ status: 'en_proceso' })
+    const assignmentCount: Record<string, number> = {}
+    
+    for (const inc of activeIncidents) {
+      if (inc.asignadoA) {
+        assignmentCount[inc.asignadoA] = (assignmentCount[inc.asignadoA] || 0) + 1
+      }
+    }
+
+    // Ordenar por menor carga de trabajo
+    const sorted = [...technicians].sort((a, b) => {
+      const countA = assignmentCount[a.id] || 0
+      const countB = assignmentCount[b.id] || 0
+      return countA - countB
+    })
+
+    const suggested = sorted[0] ?? null
+    if (!suggested) {
+      return { suggested: null, candidates: sorted.slice(0, 5), reason: 'No se pudo determinar técnico sugerido.' }
+    }
+    const load = assignmentCount[suggested.id] || 0
+    const reason = load === 0
+      ? `${suggested.nombre} ${suggested.apellido || ''} no tiene incidencias asignadas actualmente.`
+      : `${suggested.nombre} ${suggested.apellido || ''} tiene menor carga (${load} incidencia${load > 1 ? 's' : ''} activa${load > 1 ? 's' : ''}).`
+
+    return {
+      suggested,
+      candidates: sorted.slice(0, 5),
+      reason,
+    }
+  } catch (err) {
+    logger.error('chatActions: error suggesting technician', err instanceof Error ? err : undefined)
+    return { suggested: null, candidates: [], reason: 'Error al buscar técnicos disponibles.' }
+  }
+}
+
+// ─── Registrar acción ARIA en historial ──────────────────────────────
+
+import { doc as firestoreDoc, setDoc as firestoreSetDoc, serverTimestamp as srvTimestamp } from '@/services/firestoreTracked'
+import { db } from './firebase'
+
+export interface AriaActionLog {
+  id: string
+  userId: string
+  userName?: string
+  actionType: ActionType
+  description: string
+  resultId?: string
+  success: boolean
+  timestamp: Date
+  metadata?: Record<string, unknown>
+}
+
+/**
+ * Registra una acción ejecutada por ARIA en la colección `ariaActions`.
+ */
+export async function logAriaAction(action: Omit<AriaActionLog, 'id' | 'timestamp'>): Promise<void> {
+  try {
+    const id = `aria_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
+    await firestoreSetDoc(firestoreDoc(db, 'ariaActions', id), {
+      ...action,
+      id,
+      timestamp: srvTimestamp(),
+    })
+    logger.info('chatActions: logged ARIA action', { type: action.actionType, success: action.success })
+  } catch (err) {
+    logger.error('chatActions: error logging action', err instanceof Error ? err : undefined)
+  }
+}
+
+// ─── Notificar por acción de ARIA ────────────────────────────────────
+
+import { showLocalNotification, areNotificationsEnabled, NotificationType, getNotificationConfig } from './notifications'
+
+/**
+ * Envía una notificación local cuando ARIA completa una acción.
+ */
+export function notifyAriaAction(
+  type: 'incident_created' | 'incident_updated' | 'technician_assigned',
+  data: { titulo: string; incidentId?: string; technicianName?: string },
+): void {
+  if (!areNotificationsEnabled()) return
+
+  let title: string
+  let body: string
+
+  switch (type) {
+    case 'incident_created': {
+      const config = getNotificationConfig(NotificationType.INCIDENT_CREATED, data)
+      title = `🤖 ARIA: ${config.title}`
+      body = config.body
+      break
+    }
+    case 'incident_updated':
+      title = '🤖 ARIA: Incidencia actualizada'
+      body = `"${data.titulo}" fue actualizada por ARIA`
+      break
+    case 'technician_assigned':
+      title = '🤖 ARIA: Técnico asignado'
+      body = `${data.technicianName} fue asignado a "${data.titulo}"`
+      break
+  }
+
+  showLocalNotification(title, {
+    body,
+    tag: `aria-${type}-${Date.now()}`,
+    data: data.incidentId ? { url: `/incidents?id=${data.incidentId}` } : undefined,
+  })
 }

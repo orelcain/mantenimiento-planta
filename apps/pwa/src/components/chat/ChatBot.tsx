@@ -1,11 +1,11 @@
 /**
- * Componente ChatBot — v3 JARVIS
- * Burbuja flotante con streaming, voz, acciones ejecutables (crear incidencias),
- * confirmación inline y tamaño ampliado
+ * Componente ChatBot — v4 ARIA
+ * Burbuja flotante con streaming, voz, fotos, acciones ejecutables,
+ * confirmación inline, auto-asignación y tamaño ampliado
  */
-import { useState, useRef, useEffect, useCallback, type KeyboardEvent } from 'react'
+import { useState, useRef, useEffect, useCallback, type KeyboardEvent, type ChangeEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { MessageCircle, X, Send, Trash2, Loader2, Bot, User, Mic, MicOff, ExternalLink, AlertTriangle, CheckCircle, XCircle } from 'lucide-react'
+import { MessageCircle, X, Send, Trash2, Loader2, Bot, User, Mic, MicOff, ExternalLink, AlertTriangle, CheckCircle, XCircle, Camera } from 'lucide-react'
 import { useChatBot } from '@/hooks/useChatBot'
 import type { ChatMessage, ChatAction } from '@/services/chatbot'
 
@@ -18,6 +18,43 @@ function formatMessage(text: string): string {
     .replace(/\n/g, '<br/>')
     .replace(/<br\/>• /g, '<br/>&#8226; ')
     .replace(/<br\/>- /g, '<br/>&#8211; ')
+}
+
+// ─── Preview de foto en chat ────────────────────────────────────────
+function PhotoPreview({ src, onRemove }: { src: string; onRemove: () => void }) {
+  return (
+    <div className="relative inline-block mr-2 mb-2">
+      <img 
+        src={src} 
+        alt="Preview" 
+        className="w-20 h-20 object-cover rounded-lg border border-border"
+      />
+      <button
+        onClick={onRemove}
+        className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center text-xs shadow"
+      >
+        ×
+      </button>
+    </div>
+  )
+}
+
+// ─── Imagen inline en burbuja ───────────────────────────────────────
+function MessagePhotos({ urls }: { urls: string[] }) {
+  if (!urls.length) return null
+  return (
+    <div className="flex flex-wrap gap-1.5 mt-1.5">
+      {urls.map((url, i) => (
+        <a key={i} href={url} target="_blank" rel="noopener noreferrer">
+          <img 
+            src={url} 
+            alt={`Foto ${i + 1}`}
+            className="w-24 h-24 object-cover rounded-md border border-border hover:opacity-80 transition-opacity cursor-pointer" 
+          />
+        </a>
+      ))}
+    </div>
+  )
 }
 
 // ─── Botones de acción ──────────────────────────────────────────────
@@ -55,6 +92,7 @@ function MessageBubble({ msg, onNavigate }: { msg: ChatMessage; onNavigate: (rou
         isUser ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground'
       }`}>
         <div dangerouslySetInnerHTML={{ __html: formatMessage(msg.content) }} />
+        {msg.photoUrls && msg.photoUrls.length > 0 && <MessagePhotos urls={msg.photoUrls} />}
         {msg.actions && <ActionButtons actions={msg.actions} onNavigate={onNavigate} />}
         <div className={`text-[10px] mt-1 ${
           isUser ? 'text-primary-foreground/60' : 'text-muted-foreground'
@@ -103,7 +141,7 @@ const QUICK_SUGGESTIONS = [
   '¿Qué repuestos tenemos?',
   '¿Estado de los equipos?',
   '📊 Resumen de la planta',
-  '¿Incidencias críticas?',
+  '📋 Historial de ARIA',
 ]
 
 function QuickSuggestions({ onSelect }: { onSelect: (text: string) => void }) {
@@ -210,8 +248,11 @@ export function ChatBot() {
   } = useChatBot()
 
   const [input, setInput] = useState('')
+  const [photoFiles, setPhotoFiles] = useState<File[]>([])
+  const [photoPreviews, setPhotoPreviews] = useState<string[]>([])
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const photoInputRef = useRef<HTMLInputElement>(null)
 
   const { isListening, transcript, startListening, stopListening, isSupported: voiceSupported } = useSpeechRecognition()
 
@@ -234,10 +275,42 @@ export function ChatBot() {
     }
   }, [transcript, isListening])
 
+  // Cleanup previews on unmount
+  useEffect(() => {
+    return () => {
+      photoPreviews.forEach(url => URL.revokeObjectURL(url))
+    }
+  }, [photoPreviews])
+
+  const handlePhotoSelect = (e: ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files) return
+    const maxPhotos = 3
+    const newFiles = Array.from(files).slice(0, maxPhotos - photoFiles.length)
+    if (newFiles.length === 0) return
+    
+    const previews = newFiles.map(f => URL.createObjectURL(f))
+    setPhotoFiles(prev => [...prev, ...newFiles])
+    setPhotoPreviews(prev => [...prev, ...previews])
+    // Reset input so same file can be re-selected
+    e.target.value = ''
+  }
+
+  const removePhoto = (index: number) => {
+    const url = photoPreviews[index]
+    if (url) URL.revokeObjectURL(url)
+    setPhotoFiles(prev => prev.filter((_, i) => i !== index))
+    setPhotoPreviews(prev => prev.filter((_, i) => i !== index))
+  }
+
   const handleSend = () => {
-    if (!input.trim() || isLoading) return
-    sendMessage(input.trim())
+    if ((!input.trim() && photoFiles.length === 0) || isLoading) return
+    sendMessage(input.trim(), photoFiles.length > 0 ? photoFiles : undefined)
     setInput('')
+    // Clean up photo previews
+    photoPreviews.forEach(url => URL.revokeObjectURL(url))
+    setPhotoFiles([])
+    setPhotoPreviews([])
   }
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -277,7 +350,7 @@ export function ChatBot() {
                 <Bot className="w-5 h-5 text-primary" />
               </div>
               <div>
-                <h3 className="text-sm font-semibold">JARVIS — Asistente de Planta</h3>
+                <h3 className="text-sm font-semibold">ARIA — Asistente de Planta</h3>
                 <p className="text-[10px] text-muted-foreground">
                   {pendingAction?.status === 'confirming' ? '⚡ Acción pendiente de confirmación' : 'IA · Datos en tiempo real'}
                 </p>
@@ -325,7 +398,35 @@ export function ChatBot() {
 
           {/* Input */}
           <div className="border-t border-border px-3 py-2 bg-background">
+            {/* Photo previews */}
+            {photoPreviews.length > 0 && (
+              <div className="flex flex-wrap mb-2">
+                {photoPreviews.map((src, i) => (
+                  <PhotoPreview key={i} src={src} onRemove={() => removePhoto(i)} />
+                ))}
+              </div>
+            )}
+
             <div className="flex items-center gap-2">
+              {/* Botón de foto */}
+              <button
+                onClick={() => photoInputRef.current?.click()}
+                disabled={isLoading || photoFiles.length >= 3}
+                className="p-2 rounded-lg bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80 disabled:opacity-50 transition-colors"
+                title={photoFiles.length >= 3 ? 'Máximo 3 fotos' : 'Adjuntar foto'}
+              >
+                <Camera className="w-4 h-4" />
+              </button>
+              <input
+                ref={photoInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                capture="environment"
+                onChange={handlePhotoSelect}
+                className="hidden"
+              />
+
               {/* Botón de voz */}
               {voiceSupported && (
                 <button
@@ -355,7 +456,7 @@ export function ChatBot() {
 
               <button
                 onClick={handleSend}
-                disabled={!input.trim() || isLoading}
+                disabled={(!input.trim() && photoFiles.length === 0) || isLoading}
                 className="p-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 title="Enviar"
               >
@@ -363,7 +464,7 @@ export function ChatBot() {
               </button>
             </div>
             <p className="text-[10px] text-muted-foreground mt-1 text-center">
-              JARVIS v4 · Powered by Groq AI · Acciones en tiempo real
+              ARIA v5 · Powered by Groq AI · Acciones en tiempo real
             </p>
           </div>
         </div>
