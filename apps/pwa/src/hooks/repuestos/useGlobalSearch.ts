@@ -22,7 +22,10 @@ const normalizeText = (value: string) =>
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9\s\-_/]/g, ' ')
+    // Preservar puntos/comas entre dígitos (decimales: 2.2, 2,2)
+    .replace(/(\d)[.,](\d)/g, '$1⋅$2')
+    .replace(/[^a-z0-9\s\-_/⋅]/g, ' ')
+    .replace(/⋅/g, '.')
     .replace(/\s+/g, ' ')
     .trim()
 
@@ -90,6 +93,21 @@ const getExpandedTokens = (tokens: string[]) => {
   return [...expanded]
 }
 
+/**
+ * Verifica si un token (o sus sinónimos o un match fuzzy) aparece en el texto.
+ * Retorna true si el token está "presente" en el texto buscable.
+ */
+const tokenMatchesText = (token: string, searchable: string, words: string[], expandedTokens: string[]) => {
+  // Match directo
+  if (searchable.includes(token)) return true
+  // Match por sinónimo
+  const synonyms = SYNONYM_LOOKUP[token]
+  if (synonyms?.some((s) => searchable.includes(s))) return true
+  // Match fuzzy (solo para tokens largos)
+  if (token.length >= 4 && words.some((word) => word.length >= 4 && editDistanceAtMostOne(token, word))) return true
+  return false
+}
+
 const scoreResult = (result: GlobalSearchResult, normalizedQuery: string, tokens: string[], expandedTokens: string[]) => {
   const rep = result.repuesto
   const name = normalizeText(rep.textoBreve || '')
@@ -102,7 +120,17 @@ const scoreResult = (result: GlobalSearchResult, normalizedQuery: string, tokens
   const searchable = `${name} ${sap} ${fabricante} ${descripcion} ${ubicacion} ${machineName}`.trim()
   const words = searchable.split(' ').filter(Boolean)
 
-  let score = 0
+  // ── FILTRO AND: TODOS los tokens deben estar presentes ──
+  // (match directo, por sinónimo o fuzzy)
+  const uniqueTokens = [...new Set(tokens.filter(Boolean))]
+  for (const token of uniqueTokens) {
+    if (!tokenMatchesText(token, searchable, words, expandedTokens)) {
+      return 0 // token ausente → descartado
+    }
+  }
+
+  // ── SCORING: solo para resultados que pasaron el filtro AND ──
+  let score = 1 // base: pasó el filtro
 
   if (sap === normalizedQuery) score += 220
   if (fabricante === normalizedQuery) score += 180
@@ -118,25 +146,20 @@ const scoreResult = (result: GlobalSearchResult, normalizedQuery: string, tokens
   if (machineName.includes(normalizedQuery)) score += 25
   if (ubicacion.includes(normalizedQuery)) score += 20
 
-  for (const token of tokens) {
+  for (const token of uniqueTokens) {
     if (!token) continue
+    // Bonus por campo donde aparece
     if (name.includes(token)) score += 25
     if (sap.includes(token)) score += 22
     if (fabricante.includes(token)) score += 18
     if (descripcion.includes(token)) score += 10
     if (machineName.includes(token)) score += 9
     if (ubicacion.includes(token)) score += 7
-
-    if (token.length >= 4 && !searchable.includes(token)) {
-      const approx = words.some((word) => word.length >= 4 && editDistanceAtMostOne(token, word))
-      if (approx) score += 6
-    }
   }
 
-  for (const token of expandedTokens) {
-    if (!tokens.includes(token) && token && searchable.includes(token)) {
-      score += 5
-    }
+  // Bonus extra si todos los tokens aparecen juntos (frase exacta)
+  if (uniqueTokens.length > 1 && searchable.includes(normalizedQuery)) {
+    score += 50
   }
 
   return score

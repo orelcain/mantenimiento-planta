@@ -7,6 +7,14 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.49.1] - 2026-02-25
+### Corrección
+- **Búsqueda global: filtro AND obligatorio** — ahora TODOS los tokens de la query deben estar presentes (antes bastaba con 1, devolviendo miles de falsos positivos)
+- **Preservar decimales en normalización** — "motor 2.2 kw" se mantiene como "motor 2.2 kw" en vez de fragmentarse en "motor 2 2 kw"
+- **Bonus de frase exacta** — resultados donde los tokens aparecen juntos reciben más relevancia
+
+---
+
 ## [2.49.0] - 2026-02-25
 ### Funcionalidad
 - **Atajos de teclado en búsqueda global**: navegación con `↑/↓`, apertura con `Enter` y cierre con `Esc`, con resaltado visual de la fila activa
