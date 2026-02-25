@@ -7,6 +7,25 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.55.3] - 2026-02-25
+### Corregido
+- **ARIA ya no confunde Grader con Baader**: agregado "grader" al vocabulario conocido para evitar corrección Levenshtein incorrecta
+### Agregado
+- **Planificador Gantt reconstruido desde cero** con:
+  - Vista split: tabla de tareas (izq) + timeline con barras Gantt (der)
+  - Splitter arrastrable entre tabla y timeline
+  - Zoom por Día / Semana / Mes con columnas adaptativas
+  - Barras de progreso visual por tarea con colores por estado
+  - Ruta crítica (CPM) destacada con borde rojo y ícono de alerta
+  - Baseline vs actual (barra gris inferior)
+  - Marcador "Hoy" con auto-scroll al cargar
+  - Creación de tareas con modal (título, proyecto, prioridad, fechas, horas)
+  - Edición rápida con modal (estado, progreso, fechas)
+  - Eliminación con confirmación
+  - Buscador por tarea, equipo, responsable o proyecto
+  - Badges resumen: total, completadas, en progreso, ruta crítica
+  - Permisos: respeta `useCan('gantt', 'editar|crear|eliminar')`
+
 ## [2.55.2] - 2026-02-28
 ### Agregado
 - **ARIA con acceso COMPLETO a todos los módulos de la app**

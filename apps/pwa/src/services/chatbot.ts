@@ -185,7 +185,7 @@ const KNOWN_VOCABULARY: string[] = [
   'temperatura', 'humedad', 'presion', 'vibracion', 'corriente', 'voltaje',
   'incidencia', 'falla', 'problema', 'reporte', 'pendiente', 'critica',
   'equipo', 'maquina', 'operativo', 'mantenimiento', 'criticidad',
-  'baader', 'marel', 'volcador', 'transportadora', 'eviscerado', 'filete', 'empaque',
+  'baader', 'marel', 'volcador', 'grader', 'transportadora', 'eviscerado', 'filete', 'empaque',
   'repuesto', 'pieza', 'catalogo', 'inventario',
   'resumen', 'estadistica', 'dashboard', 'panorama', 'total',
 ]
