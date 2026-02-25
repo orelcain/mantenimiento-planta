@@ -3,9 +3,9 @@
  * Burbuja flotante con streaming, voz, fotos, acciones ejecutables,
  * confirmación inline, auto-asignación y tamaño ampliado
  */
-import { useState, useRef, useEffect, useCallback, type KeyboardEvent, type ChangeEvent } from 'react'
+import { useState, useRef, useEffect, useCallback, type KeyboardEvent, type ChangeEvent, type MouseEvent as ReactMouseEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { MessageCircle, X, Send, Trash2, Loader2, Bot, User, Mic, MicOff, ExternalLink, AlertTriangle, CheckCircle, XCircle, Camera } from 'lucide-react'
+import { MessageCircle, X, Send, Trash2, Loader2, Bot, User, Mic, MicOff, ExternalLink, AlertTriangle, CheckCircle, XCircle, Camera, GripVertical } from 'lucide-react'
 import { useChatBot } from '@/hooks/useChatBot'
 import type { ChatMessage, ChatAction } from '@/services/chatbot'
 
@@ -254,6 +254,60 @@ export function ChatBot() {
   const inputRef = useRef<HTMLInputElement>(null)
   const photoInputRef = useRef<HTMLInputElement>(null)
 
+  // ─── Chat width (resizable) ──────────────────────────────
+  const MIN_WIDTH = 380
+  const MAX_WIDTH = 900
+  const DEFAULT_WIDTH = 532
+
+  const [chatWidth, setChatWidth] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('aria_chat_width')
+      if (saved) {
+        const w = parseInt(saved, 10)
+        if (w >= MIN_WIDTH && w <= MAX_WIDTH) return w
+      }
+    } catch { /* ignore */ }
+    return DEFAULT_WIDTH
+  })
+  const isResizingRef = useRef(false)
+  const startXRef = useRef(0)
+  const startWidthRef = useRef(DEFAULT_WIDTH)
+
+  const handleResizeStart = useCallback((e: ReactMouseEvent) => {
+    e.preventDefault()
+    isResizingRef.current = true
+    startXRef.current = e.clientX
+    startWidthRef.current = chatWidth
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+
+    const onMouseMove = (ev: globalThis.MouseEvent) => {
+      if (!isResizingRef.current) return
+      // Dragging LEFT edge: moving left = wider, moving right = narrower
+      const delta = startXRef.current - ev.clientX
+      const newWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, startWidthRef.current + delta))
+      setChatWidth(newWidth)
+    }
+
+    const onMouseUp = () => {
+      isResizingRef.current = false
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+      document.removeEventListener('mousemove', onMouseMove)
+      document.removeEventListener('mouseup', onMouseUp)
+      // Persist
+      try { localStorage.setItem('aria_chat_width', String(chatWidth)) } catch { /* ignore */ }
+    }
+
+    document.addEventListener('mousemove', onMouseMove)
+    document.addEventListener('mouseup', onMouseUp)
+  }, [chatWidth])
+
+  // Persist width changes
+  useEffect(() => {
+    try { localStorage.setItem('aria_chat_width', String(chatWidth)) } catch { /* ignore */ }
+  }, [chatWidth])
+
   const { isListening, transcript, startListening, stopListening, isSupported: voiceSupported } = useSpeechRecognition()
 
   // Auto-scroll
@@ -342,7 +396,20 @@ export function ChatBot() {
     <>
       {/* Panel de chat */}
       {isOpen && (
-        <div className="fixed bottom-20 right-4 z-50 w-[532px] max-w-[calc(100vw-2rem)] h-[676px] max-h-[calc(100vh-6rem)] bg-background border border-border rounded-xl shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-4 fade-in duration-200">
+        <div
+          style={{ width: chatWidth }}
+          className="fixed bottom-20 right-4 z-50 max-w-[calc(100vw-2rem)] h-[676px] max-h-[calc(100vh-6rem)] bg-background border border-border rounded-xl shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-4 fade-in duration-200"
+        >
+          {/* Resize handle (left edge) */}
+          <div
+            onMouseDown={handleResizeStart}
+            className="absolute left-0 top-0 bottom-0 w-2 cursor-col-resize z-10 group flex items-center"
+            title="Arrastrar para redimensionar"
+          >
+            <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-primary/20 rounded-r px-px py-6">
+              <GripVertical className="w-3 h-3 text-primary/60" />
+            </div>
+          </div>
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/50">
             <div className="flex items-center gap-2">

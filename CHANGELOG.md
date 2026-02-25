@@ -7,6 +7,29 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.55.1] - 2026-02-27
+### Corregido
+- **ARIA ya crea incidencias de verdad**: patrones de detección de fallas ampliados masivamente (~20 patrones vs 6 anteriores)
+  - Ahora detecta: "se rompió X", "no funciona X", "está fallando", "necesita limpieza", "incidencia para X", "quiero reportar", etc.
+  - Reconoce equipos específicos: grader, descamadora, fileteadora, eviscerador, empacadora, selladora, caldera, chiller, IQF, etc.
+  - Ya no cae al flujo LLM normal que "alucinaba" acciones sin ejecutarlas
+- **ARIA ya conoce los usuarios**: nueva función `fetchUsersSummary()` que carga todos los usuarios activos como contexto RAG
+  - ARIA sabe quién es técnico, supervisor, admin — puede sugerir asignaciones reales
+- **ARIA siempre tiene contexto completo**: `buildRAGContext()` ahora SIEMPRE carga usuarios y equipos (antes solo si la intención era específica)
+  - Antes: si el intent era "general", cargaba todo; si era "incidencias", NO cargaba equipos ni usuarios
+  - Ahora: usuarios + equipos se cargan en TODA conversación
+### Mejorado
+- **System prompt anti-alucinación**: reglas explícitas que prohíben al LLM afirmar que creó/modificó datos
+  - Nueva sección "⚠️ REGLAS CRÍTICAS DE EJECUCIÓN"
+  - ARIA ya no dice "ya creé la incidencia" cuando no la creó — propone borradores correctamente
+  - Instrucciones específicas para usar datos de contexto (usuarios, equipos) en respuestas
+- **Chat redimensionable**: el panel de ARIA ahora se puede hacer más ancho/estrecho arrastrando el borde izquierdo
+  - Ancho mínimo: 380px, máximo: 900px, default: 532px
+  - El tamaño se guarda en localStorage y persiste entre sesiones
+  - Handle visual con ícono de grip que aparece al pasar el mouse
+
+---
+
 ## [2.55.0] - 2026-02-27
 ### Agregado
 - **ARIA (Asistente de Reportes e Incidencias Automatizada)**: renombrado del chatbot JARVIS a ARIA con identidad femenina

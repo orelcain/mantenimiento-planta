@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.55.0' as const
+export const APP_VERSION = '2.55.1' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-02-27' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'ARIA v1: fotos en chat, notificaciones, dashboard de acciones, auto-asignación de técnicos' as const
+export const VERSION_NAME = 'ARIA v1.1: contexto completo (usuarios+equipos), chat redimensionable, anti-alucinacion, deteccion ampliada' as const
 
 /**
  * Nota:

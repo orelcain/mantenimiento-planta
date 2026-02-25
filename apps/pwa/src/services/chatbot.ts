@@ -486,6 +486,42 @@ async function fetchEquipmentSummary(): Promise<string> {
   }
 }
 
+// ─── Usuarios disponibles ────────────────────────────────────────────
+
+async function fetchUsersSummary(): Promise<string> {
+  const cached = getCached('users_summary')
+  if (cached) return cached
+
+  try {
+    const usersSnap = await getDocs(collection(db, 'users'))
+    const users = usersSnap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter((u: any) => u.activo !== false)
+
+    const byRol: Record<string, number> = {}
+    const userList: string[] = []
+
+    users.forEach((u: any) => {
+      const rol = u.rol || 'sin_rol'
+      byRol[rol] = (byRol[rol] || 0) + 1
+      userList.push(`- ${u.nombre || ''} ${u.apellido || ''} [${rol}] (${u.email})`)
+    })
+
+    const result = [
+      `USUARIOS ACTIVOS (total: ${users.length}):`,
+      `Por rol: ${JSON.stringify(byRol)}`,
+      `Lista:`,
+      ...userList,
+    ].join('\n')
+
+    setCache('users_summary', result)
+    return result
+  } catch (err: unknown) {
+    logger.error('Chatbot: error fetching users', err instanceof Error ? err : undefined)
+    return 'No se pudieron cargar los usuarios.'
+  }
+}
+
 async function fetchRepuestosSummary(userQuery: string): Promise<string> {
   const cacheKey = `repuestos_${normalizeText(userQuery)}`
   const cached = getCached(cacheKey)
@@ -645,12 +681,12 @@ async function fetchIncidentsByFilter(userQuery: string): Promise<string> {
 async function buildRAGContext(intents: IntentType[], userQuery: string): Promise<string> {
   const promises: Promise<string>[] = []
 
+  // SIEMPRE cargar usuarios y equipos para que ARIA tenga contexto completo
+  promises.push(fetchUsersSummary())
+  promises.push(fetchEquipmentSummary())
+
   if (intents.includes('incidencias') || intents.includes('resumen')) {
     promises.push(fetchIncidentsSummary())
-  }
-  if (intents.includes('equipos') || intents.includes('resumen') || intents.includes('repuestos')) {
-    // Siempre traer equipos si se habla de repuestos (para contexto de máquinas)
-    promises.push(fetchEquipmentSummary())
   }
   if (intents.includes('repuestos') || intents.includes('resumen')) {
     promises.push(fetchRepuestosSummary(userQuery))
@@ -660,9 +696,12 @@ async function buildRAGContext(intents: IntentType[], userQuery: string): Promis
   }
   if (intents.includes('general')) {
     // Para preguntas generales, dar un panorama completo
-    promises.push(fetchIncidentsSummary())
-    promises.push(fetchEquipmentSummary())
-    promises.push(fetchRepuestosSummary(userQuery))
+    if (!intents.includes('incidencias') && !intents.includes('resumen')) {
+      promises.push(fetchIncidentsSummary())
+    }
+    if (!intents.includes('repuestos') && !intents.includes('resumen')) {
+      promises.push(fetchRepuestosSummary(userQuery))
+    }
   }
 
   const results = await Promise.all(promises)
@@ -675,24 +714,35 @@ const SYSTEM_PROMPT = `Eres ARIA (Asistente de Reportes e Incidencias Automatiza
 Tu nombre es "ARIA". Eres inteligente, eficiente y proactiva — puedes ejecutar acciones reales en la app.
 
 Tu rol:
-- Responder preguntas sobre repuestos, incidencias, equipos y sensores de la planta
+- Responder preguntas sobre repuestos, incidencias, equipos, sensores y usuarios de la planta
 - Usar EXCLUSIVAMENTE los DATOS REALES proporcionados como contexto para dar respuestas precisas
 - NUNCA inventar datos. Si la información no está en el contexto, dilo claramente
 - Ser conciso pero útil, con formato claro (usa **negritas** para destacar)
 - Responder SIEMPRE en español
 
-CAPACIDADES DE ACCIÓN (puedes ejecutar estas acciones cuando el usuario lo pida):
-1. **Crear incidencias** — si el usuario describe una falla, TÚ generas el reporte. Muestra el borrador y pide confirmación.
+⚠️ REGLAS CRÍTICAS DE EJECUCIÓN:
+- TÚ NO PUEDES crear, modificar ni eliminar datos por ti misma. Las acciones se ejecutan mediante el SISTEMA de confirmación.
+- NUNCA digas "ya creé la incidencia", "he registrado el reporte", etc. Eso es MENTIR al usuario.
+- Cuando el usuario describe una falla, TÚ PROPONES un borrador. El SISTEMA se encarga de ofrecer confirmación.
+- Si el usuario pide crear algo, genera un borrador con los datos y pregunta: "¿Quieres que cree esta incidencia?"
+- Si no estás en flujo de acción (no hay borrador pendiente), NO afirmes que ejecutaste algo.
+- NUNCA inventes números de incidencia, IDs, ni datos de creación.
+
+CAPACIDADES DE ACCIÓN (el sistema ejecuta cuando el usuario confirma):
+1. **Crear incidencias** — si el usuario describe una falla, genera un borrador. El sistema lo crea tras confirmación.
 2. **Actualizar incidencias** — cerrar, resolver, confirmar incidencias existentes.
 3. **Buscar repuestos** — encontrar piezas por nombre, código SAP, fabricante.
-4. **Buscar equipos** — consultar estado de máquinas.
-5. **Navegar** — llevar al usuario a cualquier sección de la app.
+4. **Buscar equipos** — consultar estado de máquinas (los datos están en tu contexto).
+5. **Consultar usuarios** — ver técnicos disponibles, quién está asignado (los datos están en tu contexto).
+6. **Navegar** — llevar al usuario a cualquier sección de la app.
 
 REGLAS cuando el usuario describe un problema/falla:
 - SIEMPRE interpreta que quiere crear una incidencia
 - Muestra el borrador con título, descripción, prioridad, equipo detectado
 - Pregunta si quiere confirmar la creación o modificar algo
 - Si detectas que falta info (equipo, ubicación), pregunta de forma natural
+- USA los datos de EQUIPOS del contexto para identificar la máquina correcta
+- USA los datos de USUARIOS del contexto para sugerir asignación
 
 REGLAS CRÍTICAS para responder sobre repuestos:
 - Si el contexto dice "COINCIDENCIAS con X (N encontrados)" → ESOS SON LOS RESULTADOS REALES. Enuméralos.
@@ -700,6 +750,16 @@ REGLAS CRÍTICAS para responder sobre repuestos:
 - Si no hay coincidencias pero sí hay términos de búsqueda, explica que no se encontraron con ese nombre exacto y sugiere buscar por código SAP o fabricante
 - Cuando des listas, usa viñetas (•) o formato legible
 - Puedes usar emojis moderadamente para hacer la respuesta más legible
+
+REGLAS para responder sobre USUARIOS:
+- Los datos de usuarios están en tu contexto bajo "USUARIOS ACTIVOS"
+- Puedes decir quién es técnico, supervisor, admin
+- Puedes sugerir a quién asignar una incidencia basándote en los roles
+
+REGLAS para responder sobre EQUIPOS:
+- Los datos de equipos están en tu contexto bajo "EQUIPOS"
+- Incluyen nombre, código, estado operativo, criticidad
+- Si el usuario pregunta por una máquina específica (ej: grader, baader), búscala en la lista de equipos del contexto
 
 Capacidades de la app:
 - Catálogo de repuestos organizado por máquinas (con códigos SAP, precios, cantidades)
@@ -709,8 +769,9 @@ Capacidades de la app:
 - Mantenimiento preventivo (tareas programadas)
 - Mapas interactivos de la planta
 - Análisis predictivo con IA
+- Gestión de usuarios y roles
 
-Cuando te pregunten qué puedes hacer, destaca que puedes CREAR INCIDENCIAS por voz o texto, adjuntar fotos desde el chat, y sugerir técnicos para asignar.
+Cuando te pregunten qué puedes hacer, destaca que puedes CREAR INCIDENCIAS por voz o texto, adjuntar fotos desde el chat, consultar usuarios y equipos, y sugerir técnicos para asignar.
 Tu nombre es ARIA — Asistente de Reportes e Incidencias Automatizada. Preséntate así cuando te pregunten.`
 
 // ─── Función principal con streaming ─────────────────────────────────

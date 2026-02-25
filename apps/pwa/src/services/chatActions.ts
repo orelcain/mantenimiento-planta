@@ -61,20 +61,37 @@ const ACTION_PATTERNS: { type: ActionType; patterns: RegExp[] }[] = [
   {
     type: 'create_incident',
     patterns: [
-      /(?:crear|generar|abrir|registrar|reportar|levantar)\s+(?:una?\s+)?(?:incidencia|reporte|falla|problema)/i,
-      /(?:tenemos|hay)\s+(?:una?\s+)?(?:falla|problema|rotura|avería|averia)/i,
-      /(?:se\s+)?(?:rompió|rompio|quebr[oó]|fall[oó]|dañ[oó]|danó|descompuso|detuvo|paró|par[oó])/i,
-      /(?:cinta|motor|bomba|equipo|maquina|máquina).+(?:fall[oó]|rompió|rompio|no\s+funciona|detenid[oa]|parad[oa])/i,
-      /(?:falla|problema|rotura|avería).+(?:en|de)\s+/i,
-      /(?:debemos|hay\s+que|necesitamos|urge)\s+(?:reemplazar|reparar|cambiar|arreglar|revisar)/i,
+      // Petición directa de creación
+      /(?:crear?|generar?|abrir|registrar?|reportar?|levantar?|hacer|a[ñn]adir|ingresar?)\s+(?:una?\s+)?(?:incidencia|reporte|falla|problema|ticket|orden)/i,
+      // Hay un problema / falla
+      /(?:tenemos|hay|existe|ocurri[oó]|detect[eé]|se\s+detect[oó])\s+(?:una?\s+)?(?:falla|problema|rotura|aver[ií]a|defecto|anomal[ií]a|situaci[oó]n|desperfecto)/i,
+      // Algo se rompió / falló / paró
+      /(?:se\s+)?(?:rompi[oó]|quebr[oó]|fall[oó]|da[ñn][oó]|descompuso|detuvo|par[oó]|quem[oó]|trab[oó]|atasc[oó]|revent[oó]|bot[oó]|salt[oó]|cort[oó])/i,
+      // Equipo + estado negativo
+      /(?:cinta|motor|bomba|equipo|m[aá]quina|reductor|compresor|grader|baader|marel|volcador|sensor|v[aá]lvula|rodamiento|turbina|ventilador|transportador|faja).+(?:fall[oó]|rompi[oó]|no\s+funciona|detenid[oa]|parad[oa]|da[ñn]ad[oa]|malogr|aver[ií]|bota|gotea|vibra|calienta|ruido)/i,
+      // Estado negativo + equipo
+      /(?:falla|problema|rotura|aver[ií]a|fuga|goteo|ruido|vibraci[oó]n|calentamiento|humo|olor).+(?:en|de|del)\s+/i,
+      // Necesitamos reparar / revisar
+      /(?:debemos|hay\s+que|necesitamos|urge|toca|falta|requiere)\s+(?:reemplazar|reparar|cambiar|arreglar|revisar|corregir|intervenir|mantener|limpiar|ajustar)/i,
+      // No funciona / no arranca / no enciende
+      /(?:no\s+(?:funciona|arranca|enciende|prende|parte|opera|gira|enfr[ií]a|calienta|bombea|corta|sella))/i,
+      // Está fallando / botando / goteando
+      /(?:est[aá]\s+(?:fallando|botando|goteando|vibrando|calentando|haciendo\s+ruido|sonando|tir[aá]ndo))/i,
+      // "Incidencia de X" "incidencia para X"
+      /(?:incidencia|reporte|falla)\s+(?:de|para|por|sobre|en)\s+/i,
+      // "limpieza / mantenimiento de equipo"
+      /(?:necesita|requiere|falta)\s+(?:una?\s+)?(?:limpieza|mantenci[oó]n|mantenimiento|revisi[oó]n|calibraci[oó]n|lubricaci[oó]n|ajuste)/i,
+      // "quiero reportar" / "necesito reportar"
+      /(?:quiero|necesito|debo|puedo|podr[ií]as?)\s+(?:reportar|crear|generar|levantar|registrar|abrir)/i,
     ],
   },
   {
     type: 'update_incident_status',
     patterns: [
-      /(?:cerrar|resolver|confirmar|rechazar)\s+(?:la?\s+)?(?:incidencia|reporte|falla)/i,
-      /(?:marcar|cambiar|actualizar|poner)\s+(?:como?\s+)?(?:resuelt[ao]|cerrad[ao]|confirmad[ao]|en\s+proceso)/i,
-      /(?:incidencia|reporte).+(?:ya\s+)?(?:está|esta)\s+(?:resuelt[ao]|list[ao]|arreglad[ao])/i,
+      /(?:cerrar|resolver|confirmar|rechazar|completar|finalizar)\s+(?:la?\s+)?(?:incidencia|reporte|falla|ticket|orden)/i,
+      /(?:marcar|cambiar|actualizar|poner|pasar|mover)\s+(?:como?\s+|a\s+)?(?:resuelt[ao]|cerrad[ao]|confirmad[ao]|en\s+proceso|completad[ao])/i,
+      /(?:incidencia|reporte).+(?:ya\s+)?(?:est[aá]|esta|fue|qued[oó])\s+(?:resuelt[ao]|list[ao]|arreglad[ao]|reparad[ao]|terminad[ao])/i,
+      /(?:ya\s+)?(?:arregl[eé]|repar[eé]|resolv[ií]|termin[eé]|complet[eé]).+(?:incidencia|falla|reporte|problema)/i,
     ],
   },
 ]
@@ -179,10 +196,10 @@ export function extractIncidentFromText(text: string): ExtractedIncidentData {
   // Extraer keywords de equipo
   const equipKeywords: string[] = []
   const equipPatterns = [
-    /(?:cinta|correa|banda)\s+(?:de\s+)?(\w+(?:\s+\w+)?)/i,
-    /(?:motor|bomba|reductor|compresor)\s+(?:de\s+)?(\w+(?:\s+\w+)?)/i,
-    /(?:máquina|maquina|equipo)\s+(\w+(?:\s+\w+)?)/i,
-    /(?:baader|marel|volcador)\s*(\d*)/i,
+    /(?:cinta|correa|banda|faja)\s+(?:de\s+)?(\w+(?:\s+\w+)?)/i,
+    /(?:motor|bomba|reductor|compresor|turbina|ventilador|generador|transformador|v[aá]lvula|rodamiento)\s+(?:de\s+)?(\w+(?:\s+\w+)?)/i,
+    /(?:m[aá]quina|equipo|sistema|unidad|l[ií]nea|panel|tablero|sensor)\s+(\w+(?:\s+\w+)?)/i,
+    /(?:baader|marel|volcador|grader|descamadora|fileteadora|eviscerador[a]?|empacadora|selladora|transportador[a]?|cortadora|pesadora|clasificadora|detector[a]?|enfriador|congelador|iqf|caldera|chiller|tina)\s*(\d*(?:\s+\w+)?)/i,
   ]
   for (const pattern of equipPatterns) {
     const match = text.match(pattern)
