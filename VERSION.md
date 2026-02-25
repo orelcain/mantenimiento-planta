@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.49.1**
+## Versión Actual: **v2.49.2**
 
 **Fecha de lanzamiento**: 23 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
