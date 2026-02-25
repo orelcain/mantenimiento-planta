@@ -130,13 +130,13 @@ export function RepuestosDashboard() {
   // ─── Búsqueda Global cross-machine ───
   const globalSearch = useGlobalSearch(machines)
 
-  // Cuando se activa la búsqueda global, cargar todos los repuestos
+  // Precargar búsqueda global al entrar al dashboard (sin esperar abrir el panel)
   const { loadAll: globalLoadAll, loaded: globalLoaded, loading: globalLoading } = globalSearch
   useEffect(() => {
-    if (globalSearchMode && !globalLoaded && !globalLoading) {
+    if (machines.length > 0 && !globalLoaded && !globalLoading) {
       globalLoadAll()
     }
-  }, [globalSearchMode, globalLoaded, globalLoading, globalLoadAll])
+  }, [machines.length, globalLoaded, globalLoading, globalLoadAll])
 
   const globalResults = useMemo(() => {
     if (!globalSearchMode || !globalQuery.trim()) return []
@@ -287,10 +287,10 @@ export function RepuestosDashboard() {
         el.scrollIntoView({ behavior: 'smooth', block: 'center' })
       }
 
-      // Limpiar highlight después de 4s
+      // Limpiar highlight después de 1 minuto
       highlightTimeoutRef.current = setTimeout(() => {
         setHighlightedRepuestoId(null)
-      }, 4000)
+      }, 60000)
     }, 150)
   }
 

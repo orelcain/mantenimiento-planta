@@ -6,7 +6,7 @@
  * todos los repuestos y luego filtra client-side.
  */
 
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { collection, getDocs } from 'firebase/firestore'
 import { db } from '@/services/firebase'
 import type { Repuesto, Machine } from '@/types/repuestos'
@@ -23,6 +23,11 @@ export function useGlobalSearch(machines: Machine[]) {
   const [loaded, setLoaded] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const loadingRef = useRef(false)
+
+  // Si cambia el set de máquinas, invalidar cache para recargar el índice global
+  useEffect(() => {
+    setLoaded(false)
+  }, [machines])
 
   /**
    * Carga todos los repuestos de todas las máquinas.
