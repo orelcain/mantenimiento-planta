@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useRef, type KeyboardEvent } from 'react'
-import { AlertTriangle, Plus, FileText, Upload, Package, ClipboardList, ImageIcon, DollarSign, Wrench, ArrowRightLeft, Copy as CopyDuplicateIcon, Globe, Camera, ExternalLink, RotateCw, Search, X, BookOpen, ChevronDown, ChevronRight } from 'lucide-react'
+import { AlertTriangle, Plus, FileText, Upload, Package, ClipboardList, ImageIcon, DollarSign, Wrench, ArrowRightLeft, Copy as CopyDuplicateIcon, Globe, Camera, ExternalLink, RotateCw, Search, X } from 'lucide-react'
 import { RepuestosTable } from '@/components/repuestos/RepuestosTable'
 import { RepuestoFormModal } from '@/components/repuestos/RepuestoForm'
 import { RepuestosPagination } from '@/components/repuestos/RepuestosPagination'
@@ -10,7 +10,7 @@ import { RepuestoManualModal } from '@/components/repuestos/RepuestoManualModal'
 import { TechnicalSpecsModal } from '@/components/repuestos/TechnicalSpecsModal'
 import { RepuestoGalleryModal } from '@/components/repuestos/RepuestoGalleryModal'
 import { RepuestoDetailModal } from '@/components/repuestos/RepuestoDetailModal'
-import { MachineManualPanel } from '@/components/repuestos/MachineManualPanel'
+
 import { ManualSearchModal } from '@/components/repuestos/ManualSearchModal'
 import { useRepuestos } from '@/hooks/repuestos/useRepuestos'
 import { useRepuestosCounts } from '@/hooks/repuestos/useRepuestosCounts'
@@ -72,7 +72,6 @@ export function RepuestosDashboard() {
   const globalInputRef = useRef<HTMLInputElement | null>(null)
   const globalResultsRef = useRef<HTMLDivElement | null>(null)
   const [selectedGlobalResultIndex, setSelectedGlobalResultIndex] = useState(-1)
-  const [manualsExpanded, setManualsExpanded] = useState(false)
   const hasHydratedPrefsRef = useRef(false)
   const [, setSelectedCategoryId] = useState<string | null>('maquinas-principales')
 
