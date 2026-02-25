@@ -30,7 +30,7 @@ async function getGroqProxy() {
 /**
  * Llamada centralizada a Groq: primero intenta Cloud Function, luego directo
  */
-async function callGroq(messages: Array<{ role: string; content: string }>, opts?: { temperature?: number; max_tokens?: number }): Promise<{ content: string; tokens: number }> {
+export async function callGroq(messages: Array<{ role: string; content: string }>, opts?: { temperature?: number; max_tokens?: number }): Promise<{ content: string; tokens: number }> {
   // Intentar Cloud Function proxy (API key segura en server)
   if (useCloudProxy) {
     try {

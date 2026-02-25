@@ -7,6 +7,17 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.51.0] - 2026-02-25
+### Agregado
+- **Chatbot asistente de planta**: burbuja flotante con chat inteligente que consulta datos reales de Firestore
+- **RAG (Retrieval-Augmented Generation)**: el chatbot detecta la intención del usuario (repuestos, incidencias, equipos) y busca datos relevantes antes de responder
+- **Sugerencias rápidas**: botones de consultas frecuentes al iniciar el chat
+- **Historial de conversación**: mantiene contexto entre mensajes para respuestas coherentes
+- **Servicio chatbot.ts**: lógica RAG con detección de intenciones, consultas Firestore paralelas y prompt engineering
+- **Hook useChatBot.ts**: gestión de estado del chat, mensajes y loading
+- **Componente ChatBot.tsx**: UI tipo WhatsApp con burbujas, indicador de typing y markdown básico
+- Usa infraestructura Groq existente (callGroq) — sin costo adicional
+
 ## [2.50.1] - 2026-02-25
 ### Corrección
 - **Búsqueda global más intuitiva**: el panel de resultados se activa automáticamente al escribir en la búsqueda global (sin pasos extra)

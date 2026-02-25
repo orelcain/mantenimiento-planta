@@ -43,6 +43,7 @@ import { initUploadQueue } from '@/services/offlineUploadQueue'
 import { useUploadQueueStore } from '@/store/uploadQueueStore'
 
 import type { AppModule } from '@/types/permissions'
+import { ChatBot } from '@/components/chat/ChatBot'
 
 const navigation: Array<{ name: string; href: string; icon: React.ElementType; module?: AppModule }> = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard, module: 'dashboard' },
@@ -773,6 +774,9 @@ export function MainLayout() {
       {/* Help System Modals */}
       <HelpModal />
       <WelcomeModal />
+
+      {/* Chatbot flotante */}
+      <ChatBot />
     </div>
   )
 }

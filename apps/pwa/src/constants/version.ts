@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.50.1' as const
+export const APP_VERSION = '2.51.0' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-02-25' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Búsqueda global compacta y profesional' as const
+export const VERSION_NAME = 'Chatbot asistente de planta con RAG' as const
 
 /**
  * Nota:
