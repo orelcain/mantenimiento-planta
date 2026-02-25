@@ -48,14 +48,69 @@ const SYNONYM_MAP: Record<string, string[]> = {
   engranaje: ['engranaje', 'piñón', 'pinon', 'gear', 'corona', 'cremallera'],
   cadena: ['cadena', 'chain', 'eslabón', 'eslabon'],
   eje: ['eje', 'shaft', 'flecha', 'árbol', 'arbol'],
+  cuchillo: ['cuchillo', 'cuchilla', 'blade', 'knife', 'filo'],
+  soporte: ['soporte', 'bracket', 'support', 'base', 'mounting'],
+}
+const SYNONYM_MAP_ENTRIES = Object.entries(SYNONYM_MAP)
+
+// ─── Stop words para limpiar queries conversacionales ────────────────
+const STOP_WORDS = new Set([
+  // Artículos y preposiciones
+  'el', 'la', 'los', 'las', 'un', 'una', 'unos', 'unas', 'de', 'del', 'en', 'con', 'por', 'para',
+  'al', 'a', 'y', 'o', 'que', 'se', 'es', 'su', 'lo', 'como',
+  // Verbos comunes en preguntas
+  'tenemos', 'tiene', 'tienen', 'hay', 'estar', 'esta', 'estan', 'son', 'ser', 'tener',
+  'necesito', 'necesitamos', 'busco', 'buscar', 'quiero', 'dame', 'dime', 'muestrame', 'muestra',
+  'cuantos', 'cuantas', 'cuanto', 'cuanta', 'donde', 'cual', 'cuales', 'puedo', 'puede',
+  // Palabras de contexto genéricas
+  'stock', 'inventario', 'disponible', 'disponibles', 'lista', 'listado', 'info', 'informacion',
+  'datos', 'detalle', 'detalles', 'ver', 'sobre', 'algo', 'todo', 'todos', 'todas',
+  'tipo', 'tipos', 'clase', 'clases', 'parte', 'partes', 'pieza', 'piezas',
+  'repuesto', 'repuestos', 'catalogo', 'precio', 'precios', 'valor',
+  'planta', 'nuestra', 'nuestro', 'nuestras', 'nuestros', 'cual', 'mas',
+  'por', 'favor', 'gracias', 'hola', 'buenas', 'bueno',
+])
+
+/**
+ * Normaliza texto: strip diacritics, puntuación, lowercase
+ */
+function normalizeText(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // strip diacritics
+    .replace(/[^a-z0-9\s\-_.]/g, ' ') // remove punctuation
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/**
+ * Extrae términos de búsqueda significativos de un query conversacional.
+ * Ejemplo: "¿Tenemos motores en stock?" → ["motor"]
+ */
+function extractSearchTerms(query: string): string[] {
+  const normalized = normalizeText(query)
+  const words = normalized.split(/\s+/).filter(w => w.length > 2)
+  
+  // Filtrar stop words
+  const meaningful = words.filter(w => !STOP_WORDS.has(w))
+  
+  // Stem básico: "motores" → "motor", "bombas" → "bomba", etc.
+  const stemmed = meaningful.map(w => {
+    if (w.endsWith('es') && w.length > 4) return w.slice(0, -2)  // motores → motor
+    if (w.endsWith('s') && w.length > 3) return w.slice(0, -1)    // bombas → bomba
+    return w
+  })
+  
+  return [...new Set(stemmed)]
 }
 
 function expandWithSynonyms(terms: string[]): string[] {
   const expanded = new Set(terms)
   for (const term of terms) {
     for (const [, synonyms] of Object.entries(SYNONYM_MAP)) {
-      if (synonyms.some(s => s.includes(term) || term.includes(s))) {
-        synonyms.forEach(s => expanded.add(s))
+      if (synonyms.some(s => normalizeText(s).includes(term) || term.includes(normalizeText(s)))) {
+        synonyms.forEach(s => expanded.add(normalizeText(s)))
       }
     }
   }
@@ -220,7 +275,7 @@ async function fetchEquipmentSummary(): Promise<string> {
 }
 
 async function fetchRepuestosSummary(userQuery: string): Promise<string> {
-  const cacheKey = `repuestos_${userQuery.toLowerCase().trim()}`
+  const cacheKey = `repuestos_${normalizeText(userQuery)}`
   const cached = getCached(cacheKey)
   if (cached) return cached
 
@@ -231,9 +286,13 @@ async function fetchRepuestosSummary(userQuery: string): Promise<string> {
     let totalRepuestos = 0
     let valorTotal = 0
     const repuestosByMachine: string[] = []
-    const rawTerms = userQuery.toLowerCase().split(/\s+/).filter(t => t.length > 2)
-    const searchTerms = expandWithSynonyms(rawTerms)
+    
+    // Extraer solo los términos significativos del query (sin stop words, sin puntuación)
+    const searchTerms = extractSearchTerms(userQuery)
+    const expandedTerms = searchTerms.length > 0 ? expandWithSynonyms(searchTerms) : []
     const matchedRepuestos: string[] = []
+
+    logger.info(`Chatbot search: raw="${userQuery}" → terms=[${searchTerms.join(', ')}] → expanded=[${expandedTerms.join(', ')}]`)
 
     for (const machine of machines) {
       const repSnap = await getDocs(collection(db, `machines/${machine.id}/repuestos`))
@@ -244,13 +303,31 @@ async function fetchRepuestosSummary(userQuery: string): Promise<string> {
       valorTotal += machineTotal
       repuestosByMachine.push(`- ${machine.nombre}: ${reps.length} repuestos ($${Math.round(machineTotal).toLocaleString()})`)
 
-      if (rawTerms.length > 0) {
+      // Buscar repuestos que coincidan con los términos de búsqueda
+      if (expandedTerms.length > 0) {
         reps.forEach(r => {
-          const text = `${r.textoBreve} ${r.descripcion} ${r.codigoSAP} ${r.codigoFabricante} ${r.nombreManual || ''}`.toLowerCase()
-          const matchCount = searchTerms.filter(term => text.includes(term)).length
-          if (matchCount >= rawTerms.length) {
+          const text = normalizeText(
+            `${r.textoBreve} ${r.descripcion} ${r.codigoSAP} ${r.codigoFabricante} ${r.nombreManual || ''} ${r.ubicacionEnPlanta || ''}`
+          )
+          // Basta con que AL MENOS UN término original (o su sinónimo expandido) matchee
+          // Pero si hay múltiples searchTerms, requerimos que todos los originales estén
+          const originalMatches = searchTerms.filter(term => {
+            // El term original o alguno de sus sinónimos está en el texto
+            const relatedTerms = expandedTerms.filter(et => {
+              // Check if this expanded term is related to this original term
+              return et === term || SYNONYM_MAP_ENTRIES.some(([, syns]) => {
+                const normSyns = syns.map(s => normalizeText(s))
+                return (normSyns.includes(term) || normSyns.some(ns => term.includes(ns) || ns.includes(term)))
+                    && (normSyns.includes(et) || normSyns.some(ns => et.includes(ns) || ns.includes(et)))
+              })
+            })
+            // Direct match or synonym match
+            return text.includes(term) || relatedTerms.some(rt => text.includes(rt))
+          })
+          
+          if (originalMatches.length >= searchTerms.length) {
             matchedRepuestos.push(
-              `  ✓ [${machine.nombre}] ${r.textoBreve} | SAP: ${r.codigoSAP} | Fab: ${r.codigoFabricante} | $${r.valorUnitario} × ${r.cantidadPorMaquina}`
+              `  ✓ [${machine.nombre}] ${r.textoBreve} | SAP: ${r.codigoSAP} | Fab: ${r.codigoFabricante} | Cant: ${r.cantidadPorMaquina} | $${r.valorUnitario}`
             )
           }
         })
@@ -264,14 +341,15 @@ async function fetchRepuestosSummary(userQuery: string): Promise<string> {
     ]
 
     if (matchedRepuestos.length > 0) {
-      lines.push('', `COINCIDENCIAS con "${userQuery}" (${matchedRepuestos.length}):`)
-      lines.push(...matchedRepuestos.slice(0, 20))
-      if (matchedRepuestos.length > 20) {
-        lines.push(`... y ${matchedRepuestos.length - 20} más`)
+      lines.push('', `COINCIDENCIAS con "${searchTerms.join(' ')}" (${matchedRepuestos.length} encontrados):`)
+      lines.push(...matchedRepuestos.slice(0, 30))
+      if (matchedRepuestos.length > 30) {
+        lines.push(`... y ${matchedRepuestos.length - 30} más`)
       }
-    } else if (rawTerms.length > 0) {
-      lines.push('', `No se encontraron repuestos que coincidan con "${userQuery}".`)
-      lines.push(`(Se buscó también sinónimos: ${searchTerms.slice(0, 10).join(', ')})`)
+    } else if (searchTerms.length > 0) {
+      lines.push('', `No se encontraron repuestos que coincidan exactamente con "${searchTerms.join(' ')}".`)
+      lines.push(`(Se buscó con sinónimos: ${expandedTerms.slice(0, 15).join(', ')})`)
+      lines.push(`Nota: los repuestos pueden estar registrados con nombres técnicos o códigos SAP diferentes.`)
     }
 
     const result = lines.join('\n')
@@ -285,7 +363,7 @@ async function fetchRepuestosSummary(userQuery: string): Promise<string> {
 
 async function fetchIncidentsByFilter(userQuery: string): Promise<string> {
   try {
-    const lower = userQuery.toLowerCase()
+    const lower = normalizeText(userQuery)
     const colRef = collection(db, 'incidents')
 
     let statusFilter: string | null = null
@@ -295,6 +373,10 @@ async function fetchIncidentsByFilter(userQuery: string): Promise<string> {
     else if (lower.includes('resuelta')) statusFilter = 'resuelta'
     else if (lower.includes('cerrada')) statusFilter = 'cerrada'
 
+    let priorityFilter: string | null = null
+    if (lower.includes('critica') || lower.includes('urgente')) priorityFilter = 'critica'
+    else if (lower.includes('alta')) priorityFilter = 'alta'
+    
     let q
     if (statusFilter) {
       q = query(colRef, where('status', '==', statusFilter), orderBy('createdAt', 'desc'), limit(15))
@@ -305,15 +387,36 @@ async function fetchIncidentsByFilter(userQuery: string): Promise<string> {
     }
 
     const snap = await getDocs(q)
-    const incidents = snap.docs.map(d => {
+    let incidents = snap.docs.map(d => {
       const data = d.data()
-      return `- [${data.status}][${data.prioridad}] ${data.titulo} (equipo: ${data.equipmentId || 'N/A'})`
+      return { ...data, id: d.id } as Incident
     })
 
+    // Filtrar por prioridad si se pidió
+    if (priorityFilter) {
+      incidents = incidents.filter(inc => inc.prioridad === priorityFilter)
+    }
+    
+    // Filtrar por texto libre (nombre de equipo, título, etc.)
+    const searchTerms = extractSearchTerms(userQuery)
+    const nonIntentTerms = searchTerms.filter(t => 
+      !['incidencia', 'falla', 'reporte', 'problema', 'abierta', 'critica', 'pendiente', 'resuelta', 'cerrada', 'alta'].includes(t)
+    )
+    if (nonIntentTerms.length > 0) {
+      incidents = incidents.filter(inc => {
+        const text = normalizeText(`${inc.titulo} ${inc.descripcion || ''} ${inc.equipmentId || ''}`)
+        return nonIntentTerms.some(term => text.includes(term))
+      })
+    }
+
+    const formatted = incidents.map(inc =>
+      `- [${inc.status}][${inc.prioridad}] ${inc.titulo} (equipo: ${inc.equipmentId || 'N/A'})`
+    )
+
     return [
-      `INCIDENCIAS FILTRADAS${statusFilter ? ` (${statusFilter})` : ''}:`,
-      ...incidents,
-      incidents.length === 0 ? 'No hay incidencias que coincidan.' : '',
+      `INCIDENCIAS FILTRADAS${statusFilter ? ` (${statusFilter})` : ''}${priorityFilter ? ` [prioridad: ${priorityFilter}]` : ''} (${formatted.length} resultados):`,
+      ...formatted,
+      formatted.length === 0 ? 'No hay incidencias que coincidan con esos criterios.' : '',
     ].join('\n')
   } catch (err: unknown) {
     logger.error('Chatbot: error fetching filtered incidents', err instanceof Error ? err : undefined)
@@ -329,7 +432,8 @@ async function buildRAGContext(intents: IntentType[], userQuery: string): Promis
   if (intents.includes('incidencias') || intents.includes('resumen')) {
     promises.push(fetchIncidentsSummary())
   }
-  if (intents.includes('equipos') || intents.includes('resumen')) {
+  if (intents.includes('equipos') || intents.includes('resumen') || intents.includes('repuestos')) {
+    // Siempre traer equipos si se habla de repuestos (para contexto de máquinas)
     promises.push(fetchEquipmentSummary())
   }
   if (intents.includes('repuestos') || intents.includes('resumen')) {
@@ -339,8 +443,10 @@ async function buildRAGContext(intents: IntentType[], userQuery: string): Promis
     promises.push(fetchIncidentsByFilter(userQuery))
   }
   if (intents.includes('general')) {
+    // Para preguntas generales, dar un panorama completo
     promises.push(fetchIncidentsSummary())
     promises.push(fetchEquipmentSummary())
+    promises.push(fetchRepuestosSummary(userQuery))
   }
 
   const results = await Promise.all(promises)
@@ -354,12 +460,18 @@ Tu nombre es "Asistente de Planta".
 
 Tu rol:
 - Responder preguntas sobre repuestos, incidencias, equipos y sensores de la planta
-- Usar los DATOS REALES proporcionados como contexto para dar respuestas precisas
+- Usar EXCLUSIVAMENTE los DATOS REALES proporcionados como contexto para dar respuestas precisas
+- NUNCA inventar datos. Si la información no está en el contexto, dilo claramente
 - Ser conciso pero útil, con formato claro (usa **negritas** para destacar)
 - Responder SIEMPRE en español
-- Si no tienes datos suficientes, dilo honestamente
+
+REGLAS CRÍTICAS para responder sobre repuestos:
+- Si el contexto dice "COINCIDENCIAS con X (N encontrados)" → ESOS SON LOS RESULTADOS REALES. Enuméralos.
+- Si hay coincidencias, di cuántas hay y muéstralas con sus datos (máquina, SAP, fabricante, precio)
+- Si no hay coincidencias pero sí hay términos de búsqueda, explica que no se encontraron con ese nombre exacto y sugiere buscar por código SAP o fabricante
 - Cuando des listas, usa viñetas (•) o formato legible
 - Si mencionas códigos SAP o de fabricante, ponlos completos
+- Siempre indica en qué máquina está cada repuesto encontrado
 - Puedes usar emojis moderadamente para hacer la respuesta más legible
 - Cuando sea útil, sugiere que el usuario puede navegar a la sección correspondiente de la app
 
