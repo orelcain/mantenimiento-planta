@@ -41,9 +41,14 @@ export async function callGroq(messages: Array<{ role: string; content: string }
         return { content: data.content, tokens: data.usage?.total_tokens || 0 }
       }
     } catch (err: unknown) {
-      // Si falla (Cloud Function no deployada), fallback a llamada directa
+      // Si falla (Cloud Function no deployada o error), fallback a llamada directa
       const errorMsg = err instanceof Error ? err.message : String(err)
-      if (errorMsg.includes('not-found') || errorMsg.includes('NOT_FOUND') || errorMsg.includes('not found')) {
+      if (
+        errorMsg.includes('not-found') || errorMsg.includes('NOT_FOUND') || errorMsg.includes('not found') ||
+        errorMsg.includes('internal') || errorMsg.includes('INTERNAL') ||
+        errorMsg.includes('unavailable') || errorMsg.includes('UNAVAILABLE') ||
+        errorMsg.includes('500') || errorMsg.includes('503') || errorMsg.includes('deadline-exceeded')
+      ) {
         useCloudProxy = false
         logger.info('Cloud Function groqProxy no disponible, usando llamada directa')
       } else {
@@ -80,6 +85,79 @@ export async function callGroq(messages: Array<{ role: string; content: string }
     content: data.choices?.[0]?.message?.content || '',
     tokens: data.usage?.total_tokens || 0,
   }
+}
+
+/**
+ * Streaming version of callGroq — calls onChunk with each text delta
+ * Falls back to non-streaming if Cloud Function is used
+ */
+export async function callGroqStream(
+  messages: Array<{ role: string; content: string }>,
+  onChunk: (text: string) => void,
+  opts?: { temperature?: number; max_tokens?: number }
+): Promise<{ content: string; tokens: number }> {
+  // If no direct API key, fall back to non-streaming
+  if (!GROQ_API_KEY) {
+    const result = await callGroq(messages, opts)
+    onChunk(result.content)
+    return result
+  }
+
+  const response = await fetch(GROQ_API_URL, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${GROQ_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      messages,
+      temperature: opts?.temperature ?? 0.3,
+      max_tokens: opts?.max_tokens || 2048,
+      stream: true,
+    }),
+  })
+
+  if (!response.ok) {
+    throw new Error(`Groq API error: ${response.status}`)
+  }
+
+  const reader = response.body?.getReader()
+  if (!reader) {
+    throw new Error('No readable stream available')
+  }
+
+  const decoder = new TextDecoder()
+  let fullContent = ''
+  let buffer = ''
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split('\n')
+    buffer = lines.pop() || ''
+
+    for (const line of lines) {
+      const trimmed = line.trim()
+      if (!trimmed || trimmed === 'data: [DONE]') continue
+      if (!trimmed.startsWith('data: ')) continue
+
+      try {
+        const json = JSON.parse(trimmed.slice(6))
+        const delta = json.choices?.[0]?.delta?.content
+        if (delta) {
+          fullContent += delta
+          onChunk(fullContent)
+        }
+      } catch {
+        // skip malformed chunks
+      }
+    }
+  }
+
+  return { content: fullContent, tokens: 0 }
 }
 
 export type SensorForecast = {

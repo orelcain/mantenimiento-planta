@@ -7,6 +7,20 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.52.0] - 2026-02-25
+### Agregado
+- **Streaming de respuestas**: las respuestas del chatbot aparecen letra por letra en tiempo real (cursor parpadeante)
+- **Entrada por voz**: botón de micrófono con Web Speech API (es-CL), transcripción automática al input
+- **Historial persistente**: conversaciones guardadas en localStorage, se mantienen al refrescar la página
+- **Caché de contexto RAG**: consultas a Firestore cacheadas 3 minutos para respuestas más rápidas
+- **Búsqueda semántica con sinónimos**: "balinera" encuentra rodamientos, "faja" encuentra correas, etc.
+- **Acciones directas**: botones en respuestas para navegar a secciones de la app (incidencias, equipos, repuestos)
+- **6 sugerencias rápidas** ampliadas (motores, incidencias críticas, etc.)
+### Mejorado
+- **Fix crítico**: Cloud Function que devuelve 500 ahora hace fallback correctamente a API directa
+- **Chat 40% más ancho y 30% más alto** (532×676px) para mejor legibilidad
+- **Burbujas al 85%** del ancho disponible para textos largos
+
 ## [2.51.0] - 2026-02-25
 ### Agregado
 - **Chatbot asistente de planta**: burbuja flotante con chat inteligente que consulta datos reales de Firestore

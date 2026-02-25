@@ -1,49 +1,60 @@
 /**
- * Componente ChatBot — burbuja flotante con panel de chat
+ * Componente ChatBot — v2
+ * Burbuja flotante con streaming, voz, acciones directas y tamaño ampliado
  */
-import { useState, useRef, useEffect, type KeyboardEvent } from 'react'
-import { MessageCircle, X, Send, Trash2, Loader2, Bot, User } from 'lucide-react'
+import { useState, useRef, useEffect, useCallback, type KeyboardEvent } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { MessageCircle, X, Send, Trash2, Loader2, Bot, User, Mic, MicOff, ExternalLink } from 'lucide-react'
 import { useChatBot } from '@/hooks/useChatBot'
-import type { ChatMessage } from '@/services/chatbot'
+import type { ChatMessage, ChatAction } from '@/services/chatbot'
 
 // ─── Formateador de markdown básico ────────────────────────────────
 function formatMessage(text: string): string {
   return text
-    // Bold
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    // Italic
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
-    // Inline code
     .replace(/`(.+?)`/g, '<code class="bg-muted px-1 py-0.5 rounded text-xs">$1</code>')
-    // Line breaks
     .replace(/\n/g, '<br/>')
-    // List items
     .replace(/<br\/>• /g, '<br/>&#8226; ')
     .replace(/<br\/>- /g, '<br/>&#8211; ')
 }
 
+// ─── Botones de acción ──────────────────────────────────────────────
+function ActionButtons({ actions, onNavigate }: { actions: ChatAction[]; onNavigate: (route: string) => void }) {
+  if (!actions.length) return null
+  return (
+    <div className="flex flex-wrap gap-1.5 mt-2">
+      {actions.map(action => (
+        <button
+          key={action.route}
+          onClick={() => onNavigate(action.route)}
+          className="inline-flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-md border border-primary/30 bg-primary/5 text-primary hover:bg-primary/10 transition-colors"
+        >
+          <ExternalLink className="w-3 h-3" />
+          {action.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 // ─── Burbuja de mensaje ─────────────────────────────────────────────
-function MessageBubble({ msg }: { msg: ChatMessage }) {
+function MessageBubble({ msg, onNavigate }: { msg: ChatMessage; onNavigate: (route: string) => void }) {
   const isUser = msg.role === 'user'
 
   return (
     <div className={`flex gap-2 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
-      {/* Avatar */}
       <div className={`flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-xs ${
-        isUser
-          ? 'bg-primary text-primary-foreground'
-          : 'bg-muted text-muted-foreground'
+        isUser ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
       }`}>
         {isUser ? <User className="w-3.5 h-3.5" /> : <Bot className="w-3.5 h-3.5" />}
       </div>
 
-      {/* Mensaje */}
-      <div className={`max-w-[80%] rounded-lg px-3 py-2 text-sm leading-relaxed ${
-        isUser
-          ? 'bg-primary text-primary-foreground'
-          : 'bg-muted text-foreground'
+      <div className={`max-w-[85%] rounded-lg px-3 py-2 text-sm leading-relaxed ${
+        isUser ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground'
       }`}>
         <div dangerouslySetInnerHTML={{ __html: formatMessage(msg.content) }} />
+        {msg.actions && <ActionButtons actions={msg.actions} onNavigate={onNavigate} />}
         <div className={`text-[10px] mt-1 ${
           isUser ? 'text-primary-foreground/60' : 'text-muted-foreground'
         }`}>
@@ -54,16 +65,31 @@ function MessageBubble({ msg }: { msg: ChatMessage }) {
   )
 }
 
-// ─── Indicador de "escribiendo" ─────────────────────────────────────
-function TypingIndicator() {
+// ─── Burbuja de streaming ───────────────────────────────────────────
+function StreamingBubble({ content }: { content: string }) {
+  return (
+    <div className="flex gap-2 flex-row">
+      <div className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center bg-muted text-muted-foreground">
+        <Bot className="w-3.5 h-3.5" />
+      </div>
+      <div className="max-w-[85%] rounded-lg px-3 py-2 text-sm leading-relaxed bg-muted text-foreground">
+        <div dangerouslySetInnerHTML={{ __html: formatMessage(content) }} />
+        <span className="inline-block w-1.5 h-4 bg-primary/60 animate-pulse ml-0.5 align-text-bottom" />
+      </div>
+    </div>
+  )
+}
+
+// ─── Indicador de "consultando datos" ───────────────────────────────
+function LoadingIndicator() {
   return (
     <div className="flex gap-2 items-end">
       <div className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center bg-muted text-muted-foreground">
         <Bot className="w-3.5 h-3.5" />
       </div>
-      <div className="bg-muted rounded-lg px-3 py-2 flex gap-1 items-center">
+      <div className="bg-muted rounded-lg px-3 py-2 flex gap-1.5 items-center">
         <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
-        <span className="text-xs text-muted-foreground">Consultando datos...</span>
+        <span className="text-xs text-muted-foreground">Consultando datos de la planta...</span>
       </div>
     </div>
   )
@@ -73,14 +99,17 @@ function TypingIndicator() {
 const QUICK_SUGGESTIONS = [
   '¿Cuántas incidencias abiertas hay?',
   '¿Qué repuestos tenemos?',
-  '¿Cuál es el estado de los equipos?',
+  '¿Estado de los equipos?',
   'Dame un resumen de la planta',
+  '¿Tenemos motores en stock?',
+  '¿Incidencias críticas?',
 ]
 
 function QuickSuggestions({ onSelect }: { onSelect: (text: string) => void }) {
   return (
-    <div className="flex flex-wrap gap-1.5 px-3 py-2">
-      {QUICK_SUGGESTIONS.map((suggestion) => (
+    <div className="flex flex-wrap gap-1.5 px-3 py-2 border-t border-border bg-muted/30">
+      <span className="w-full text-[10px] text-muted-foreground mb-0.5">Sugerencias rápidas:</span>
+      {QUICK_SUGGESTIONS.map(suggestion => (
         <button
           key={suggestion}
           onClick={() => onSelect(suggestion)}
@@ -93,13 +122,62 @@ function QuickSuggestions({ onSelect }: { onSelect: (text: string) => void }) {
   )
 }
 
+// ─── Hook de reconocimiento de voz ──────────────────────────────────
+function useSpeechRecognition() {
+  const [isListening, setIsListening] = useState(false)
+  const [transcript, setTranscript] = useState('')
+  const recognitionRef = useRef<any>(null)
+
+  const isSupported = typeof window !== 'undefined' && ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)
+
+  const startListening = useCallback(() => {
+    if (!isSupported) return
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+    const recognition = new SpeechRecognition()
+    recognition.lang = 'es-CL'
+    recognition.continuous = false
+    recognition.interimResults = true
+
+    recognition.onresult = (event: any) => {
+      let finalTranscript = ''
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const t = event.results[i][0].transcript
+        if (event.results[i].isFinal) {
+          finalTranscript += t
+        }
+      }
+      if (finalTranscript) {
+        setTranscript(finalTranscript)
+      }
+    }
+
+    recognition.onend = () => setIsListening(false)
+    recognition.onerror = () => setIsListening(false)
+
+    recognitionRef.current = recognition
+    recognition.start()
+    setIsListening(true)
+    setTranscript('')
+  }, [isSupported])
+
+  const stopListening = useCallback(() => {
+    recognitionRef.current?.stop()
+    setIsListening(false)
+  }, [])
+
+  return { isListening, transcript, startListening, stopListening, isSupported }
+}
+
 // ─── Componente principal ───────────────────────────────────────────
 export function ChatBot() {
+  const navigate = useNavigate()
   const {
     messages,
     isLoading,
     isOpen,
     hasUnread,
+    streamingContent,
     toggle,
     sendMessage,
     clearHistory,
@@ -109,10 +187,12 @@ export function ChatBot() {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // Auto-scroll al final cuando hay nuevos mensajes
+  const { isListening, transcript, startListening, stopListening, isSupported: voiceSupported } = useSpeechRecognition()
+
+  // Auto-scroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, isLoading])
+  }, [messages, isLoading, streamingContent])
 
   // Focus input al abrir
   useEffect(() => {
@@ -120,6 +200,13 @@ export function ChatBot() {
       setTimeout(() => inputRef.current?.focus(), 200)
     }
   }, [isOpen])
+
+  // Llenar input cuando termina la transcripción de voz
+  useEffect(() => {
+    if (transcript && !isListening) {
+      setInput(prev => prev ? `${prev} ${transcript}` : transcript)
+    }
+  }, [transcript, isListening])
 
   const handleSend = () => {
     if (!input.trim() || isLoading) return
@@ -138,18 +225,26 @@ export function ChatBot() {
     sendMessage(text)
   }
 
+  const handleNavigate = (route: string) => {
+    navigate(route)
+    toggle() // cerrar chat al navegar
+  }
+
+  // 380 * 1.4 ≈ 532px ancho | 520 * 1.3 ≈ 676px alto
   return (
     <>
       {/* Panel de chat */}
       {isOpen && (
-        <div className="fixed bottom-20 right-4 z-50 w-[380px] max-w-[calc(100vw-2rem)] h-[520px] max-h-[calc(100vh-6rem)] bg-background border border-border rounded-xl shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-4 fade-in duration-200">
+        <div className="fixed bottom-20 right-4 z-50 w-[532px] max-w-[calc(100vw-2rem)] h-[676px] max-h-[calc(100vh-6rem)] bg-background border border-border rounded-xl shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-4 fade-in duration-200">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/50">
             <div className="flex items-center gap-2">
-              <Bot className="w-5 h-5 text-primary" />
+              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                <Bot className="w-5 h-5 text-primary" />
+              </div>
               <div>
                 <h3 className="text-sm font-semibold">Asistente de Planta</h3>
-                <p className="text-[10px] text-muted-foreground">Consulta datos en tiempo real</p>
+                <p className="text-[10px] text-muted-foreground">IA · Datos en tiempo real</p>
               </div>
             </div>
             <div className="flex items-center gap-1">
@@ -173,13 +268,16 @@ export function ChatBot() {
           {/* Mensajes */}
           <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3">
             {messages.map(msg => (
-              <MessageBubble key={msg.id} msg={msg} />
+              <MessageBubble key={msg.id} msg={msg} onNavigate={handleNavigate} />
             ))}
-            {isLoading && <TypingIndicator />}
+            {/* Streaming: mostrar respuesta parcial */}
+            {streamingContent && <StreamingBubble content={streamingContent} />}
+            {/* Loading: solo si no hay streaming aún */}
+            {isLoading && !streamingContent && <LoadingIndicator />}
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Sugerencias rápidas (solo si hay pocos mensajes) */}
+          {/* Sugerencias rápidas */}
           {messages.length <= 1 && !isLoading && (
             <QuickSuggestions onSelect={handleQuickSelect} />
           )}
@@ -187,16 +285,33 @@ export function ChatBot() {
           {/* Input */}
           <div className="border-t border-border px-3 py-2 bg-background">
             <div className="flex items-center gap-2">
+              {/* Botón de voz */}
+              {voiceSupported && (
+                <button
+                  onClick={isListening ? stopListening : startListening}
+                  disabled={isLoading}
+                  className={`p-2 rounded-lg transition-colors ${
+                    isListening
+                      ? 'bg-destructive text-destructive-foreground animate-pulse'
+                      : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80'
+                  } disabled:opacity-50`}
+                  title={isListening ? 'Detener grabación' : 'Hablar'}
+                >
+                  {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                </button>
+              )}
+
               <input
                 ref={inputRef}
                 type="text"
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Pregunta algo sobre la planta..."
+                placeholder={isListening ? 'Escuchando...' : 'Pregunta algo sobre la planta...'}
                 disabled={isLoading}
                 className="flex-1 text-sm px-3 py-2 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-50 placeholder:text-muted-foreground"
               />
+
               <button
                 onClick={handleSend}
                 disabled={!input.trim() || isLoading}

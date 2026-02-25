@@ -1,8 +1,12 @@
 /**
- * Hook para el Chatbot — gestiona mensajes, historial y estado
+ * Hook para el Chatbot — v2
+ * Gestiona mensajes, historial persistente, streaming y estado
  */
-import { useState, useCallback, useRef } from 'react'
-import { sendChatMessage, type ChatMessage } from '@/services/chatbot'
+import { useState, useCallback, useRef, useEffect } from 'react'
+import { sendChatMessage, type ChatMessage, type ChatAction } from '@/services/chatbot'
+
+const STORAGE_KEY = 'chatbot_history'
+const MAX_PERSISTED = 50
 
 function generateId(): string {
   return `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
@@ -15,12 +19,50 @@ const WELCOME_MESSAGE: ChatMessage = {
   timestamp: new Date(),
 }
 
+// ─── Persistencia localStorage ───────────────────────────────────────
+
+function loadHistory(): ChatMessage[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return [WELCOME_MESSAGE]
+    const parsed = JSON.parse(raw) as ChatMessage[]
+    // Reconstituir Date objects
+    return parsed.map(m => ({ ...m, timestamp: new Date(m.timestamp) }))
+  } catch {
+    return [WELCOME_MESSAGE]
+  }
+}
+
+function saveHistory(messages: ChatMessage[]): void {
+  try {
+    const toSave = messages.slice(-MAX_PERSISTED)
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave))
+  } catch {
+    // localStorage full o no disponible
+  }
+}
+
+// ─── Hook principal ──────────────────────────────────────────────────
+
 export function useChatBot() {
-  const [messages, setMessages] = useState<ChatMessage[]>([WELCOME_MESSAGE])
+  const [messages, setMessages] = useState<ChatMessage[]>(() => loadHistory())
   const [isLoading, setIsLoading] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
   const [hasUnread, setHasUnread] = useState(false)
+  const [streamingContent, setStreamingContent] = useState<string | null>(null)
+  const [lastActions, setLastActions] = useState<ChatAction[]>([])
   const abortRef = useRef(false)
+  const isOpenRef = useRef(false)
+
+  // Sincronizar ref con estado
+  useEffect(() => {
+    isOpenRef.current = isOpen
+  }, [isOpen])
+
+  // Persistir historial cuando cambia
+  useEffect(() => {
+    saveHistory(messages)
+  }, [messages])
 
   const toggle = useCallback(() => {
     setIsOpen(prev => {
@@ -42,7 +84,6 @@ export function useChatBot() {
     const trimmed = text.trim()
     if (!trimmed || isLoading) return
 
-    // Agregar mensaje del usuario
     const userMsg: ChatMessage = {
       id: generateId(),
       role: 'user',
@@ -52,14 +93,28 @@ export function useChatBot() {
 
     setMessages(prev => [...prev, userMsg])
     setIsLoading(true)
+    setStreamingContent(null)
+    setLastActions([])
     abortRef.current = false
 
     try {
-      // Enviar al servicio (RAG + LLM)
       const history = [...messages, userMsg].filter(m => m.role !== 'system')
-      const { reply, context } = await sendChatMessage(trimmed, history)
+
+      const { reply, context, actions } = await sendChatMessage(
+        trimmed,
+        history,
+        // Streaming callback
+        (partial) => {
+          if (!abortRef.current) {
+            setStreamingContent(partial)
+          }
+        }
+      )
 
       if (abortRef.current) return
+
+      setStreamingContent(null)
+      setLastActions(actions)
 
       const assistantMsg: ChatMessage = {
         id: generateId(),
@@ -67,18 +122,18 @@ export function useChatBot() {
         content: reply,
         timestamp: new Date(),
         context,
+        actions: actions.length > 0 ? actions : undefined,
       }
 
       setMessages(prev => [...prev, assistantMsg])
 
-      // Si el chat está cerrado, marcar como no leído
-      setIsOpen(current => {
-        if (!current) setHasUnread(true)
-        return current
-      })
-    } catch (err) {
+      if (!isOpenRef.current) {
+        setHasUnread(true)
+      }
+    } catch {
       if (abortRef.current) return
 
+      setStreamingContent(null)
       const errorMsg: ChatMessage = {
         id: generateId(),
         role: 'assistant',
@@ -93,6 +148,9 @@ export function useChatBot() {
 
   const clearHistory = useCallback(() => {
     setMessages([WELCOME_MESSAGE])
+    setStreamingContent(null)
+    setLastActions([])
+    localStorage.removeItem(STORAGE_KEY)
   }, [])
 
   return {
@@ -100,6 +158,8 @@ export function useChatBot() {
     isLoading,
     isOpen,
     hasUnread,
+    streamingContent,
+    lastActions,
     toggle,
     open,
     close,

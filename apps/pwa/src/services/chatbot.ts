@@ -1,10 +1,10 @@
 /**
  * Servicio de Chatbot con RAG (Retrieval-Augmented Generation)
- * Consulta datos reales de Firestore y los inyecta como contexto al LLM
+ * v2 — Con caché, sinónimos, streaming y acciones directas
  */
 import { collection, getDocs, query, where, orderBy, limit } from 'firebase/firestore'
 import { db } from './firebase'
-import { callGroq, isAIConfigured } from './ai'
+import { callGroqStream, isAIConfigured } from './ai'
 import { logger } from '@/lib/logger'
 import type { Incident } from '@/types'
 import type { Machine, Repuesto } from '@/types/repuestos'
@@ -15,7 +15,14 @@ export interface ChatMessage {
   role: 'user' | 'assistant' | 'system'
   content: string
   timestamp: Date
-  context?: string // datos RAG usados (para debug)
+  context?: string
+  actions?: ChatAction[]
+}
+
+export interface ChatAction {
+  label: string
+  route: string
+  icon?: string
 }
 
 type IntentType =
@@ -27,10 +34,38 @@ type IntentType =
   | 'ayuda'
   | 'general'
 
+// ─── Sinónimos para búsqueda semántica ───────────────────────────────
+const SYNONYM_MAP: Record<string, string[]> = {
+  motor: ['motor', 'motoreductor', 'motobomba', 'electrico', 'eléctrico'],
+  bomba: ['bomba', 'pump', 'bombeo', 'motobomba', 'centrífuga', 'centrifuga'],
+  rodamiento: ['rodamiento', 'rodaje', 'bearing', 'balero', 'balinera', 'cojinete', 'ruleman'],
+  correa: ['correa', 'faja', 'banda', 'belt', 'cinta'],
+  sello: ['sello', 'seal', 'retén', 'reten', 'junta', 'o-ring', 'oring', 'empaque', 'empaquetadura'],
+  filtro: ['filtro', 'filter', 'cartucho', 'colador', 'malla'],
+  reductor: ['reductor', 'reductora', 'caja reductora', 'gearbox', 'motoreductor'],
+  válvula: ['válvula', 'valvula', 'valve', 'llave', 'grifo', 'electroválvula', 'electrovalvula'],
+  sensor: ['sensor', 'transductor', 'transmisor', 'detector', 'sonda', 'probe'],
+  engranaje: ['engranaje', 'piñón', 'pinon', 'gear', 'corona', 'cremallera'],
+  cadena: ['cadena', 'chain', 'eslabón', 'eslabon'],
+  eje: ['eje', 'shaft', 'flecha', 'árbol', 'arbol'],
+}
+
+function expandWithSynonyms(terms: string[]): string[] {
+  const expanded = new Set(terms)
+  for (const term of terms) {
+    for (const [, synonyms] of Object.entries(SYNONYM_MAP)) {
+      if (synonyms.some(s => s.includes(term) || term.includes(s))) {
+        synonyms.forEach(s => expanded.add(s))
+      }
+    }
+  }
+  return Array.from(expanded)
+}
+
 // ─── Detección de intención ──────────────────────────────────────────
 const INTENT_KEYWORDS: Record<IntentType, string[]> = {
-  repuestos: ['repuesto', 'repuestos', 'pieza', 'piezas', 'sap', 'stock', 'rodamiento', 'motor', 'bomba', 'filtro', 'correa', 'sello', 'cojinete', 'reductor', 'válvula', 'sensor', 'catálogo', 'catalogo', 'precio', 'valor', 'caro', 'barato', 'código', 'codigo'],
-  incidencias: ['incidencia', 'incidencias', 'problema', 'problemas', 'falla', 'fallas', 'reporte', 'reportes', 'pendiente', 'pendientes', 'abierta', 'abiertas', 'resuelta', 'resueltas', 'crítica', 'critica', 'alta', 'prioridad', 'estado'],
+  repuestos: ['repuesto', 'repuestos', 'pieza', 'piezas', 'sap', 'stock', 'rodamiento', 'motor', 'bomba', 'filtro', 'correa', 'sello', 'cojinete', 'reductor', 'válvula', 'sensor', 'catálogo', 'catalogo', 'precio', 'valor', 'caro', 'barato', 'código', 'codigo', 'tenemos', 'hay'],
+  incidencias: ['incidencia', 'incidencias', 'problema', 'problemas', 'falla', 'fallas', 'reporte', 'reportes', 'pendiente', 'pendientes', 'abierta', 'abiertas', 'resuelta', 'resueltas', 'crítica', 'critica', 'alta', 'prioridad'],
   equipos: ['equipo', 'equipos', 'máquina', 'maquina', 'máquinas', 'maquinas', 'operativo', 'mantenimiento', 'fuera de servicio', 'criticidad'],
   sensores: ['sensor', 'sensores', 'temperatura', 'humedad', 'lectura', 'iot', 'esp32', 'telemetría', 'telemetria', 'alerta'],
   resumen: ['resumen', 'resúmeme', 'resumeme', 'estadística', 'estadísticas', 'estadistica', 'cuántos', 'cuantos', 'cuántas', 'cuantas', 'total', 'totales', 'semana', 'mes', 'hoy', 'dashboard', 'panorama', 'overview'],
@@ -49,12 +84,64 @@ function detectIntent(text: string): IntentType[] {
     }
   }
 
+  // Si menciona cosas como "motor", "bomba" sin otros indicadores → repuestos
+  if (detected.length === 0) {
+    const repKeywords = Object.keys(SYNONYM_MAP)
+    if (repKeywords.some(kw => lower.includes(kw))) {
+      detected.push('repuestos')
+    }
+  }
+
   return detected.length > 0 ? detected : ['general']
+}
+
+// ─── Acciones sugeridas según intención ──────────────────────────────
+function suggestActions(intents: IntentType[]): ChatAction[] {
+  const actions: ChatAction[] = []
+  if (intents.includes('incidencias')) {
+    actions.push({ label: 'Ver incidencias', route: '/incidents', icon: 'AlertTriangle' })
+  }
+  if (intents.includes('equipos')) {
+    actions.push({ label: 'Ver equipos', route: '/equipment', icon: 'Wrench' })
+  }
+  if (intents.includes('repuestos')) {
+    actions.push({ label: 'Catálogo repuestos', route: '/repuestos', icon: 'Package' })
+  }
+  if (intents.includes('sensores')) {
+    actions.push({ label: 'Panel sensores', route: '/sensors/monitor', icon: 'Activity' })
+  }
+  return actions
+}
+
+// ─── Caché de contexto RAG (TTL: 3 minutos) ─────────────────────────
+interface CacheEntry {
+  data: string
+  timestamp: number
+}
+
+const CACHE_TTL_MS = 3 * 60 * 1000
+const contextCache = new Map<string, CacheEntry>()
+
+function getCached(key: string): string | null {
+  const entry = contextCache.get(key)
+  if (!entry) return null
+  if (Date.now() - entry.timestamp > CACHE_TTL_MS) {
+    contextCache.delete(key)
+    return null
+  }
+  return entry.data
+}
+
+function setCache(key: string, data: string): void {
+  contextCache.set(key, { data, timestamp: Date.now() })
 }
 
 // ─── Consultas Firestore (RAG context) ───────────────────────────────
 
 async function fetchIncidentsSummary(): Promise<string> {
+  const cached = getCached('incidents_summary')
+  if (cached) return cached
+
   try {
     const colRef = collection(db, 'incidents')
     const snap = await getDocs(colRef)
@@ -62,14 +149,12 @@ async function fetchIncidentsSummary(): Promise<string> {
 
     const byStatus: Record<string, number> = {}
     const byPriority: Record<string, number> = {}
-    const recentTitles: string[] = []
 
     incidents.forEach(inc => {
       byStatus[inc.status] = (byStatus[inc.status] || 0) + 1
       byPriority[inc.prioridad] = (byPriority[inc.prioridad] || 0) + 1
     })
 
-    // Las 10 más recientes
     const sorted = incidents
       .sort((a, b) => {
         const ta = a.createdAt instanceof Date ? a.createdAt.getTime() : (a.createdAt as any)?.toMillis?.() || 0
@@ -78,17 +163,20 @@ async function fetchIncidentsSummary(): Promise<string> {
       })
       .slice(0, 10)
 
-    sorted.forEach(inc => {
-      recentTitles.push(`- [${inc.status}][${inc.prioridad}] ${inc.titulo} (${inc.equipmentId || 'sin equipo'})`)
-    })
+    const recentTitles = sorted.map(inc =>
+      `- [${inc.status}][${inc.prioridad}] ${inc.titulo} (${inc.equipmentId || 'sin equipo'})`
+    )
 
-    return [
+    const result = [
       `INCIDENCIAS (total: ${incidents.length}):`,
       `Por estado: ${JSON.stringify(byStatus)}`,
       `Por prioridad: ${JSON.stringify(byPriority)}`,
       `Recientes:`,
       ...recentTitles,
     ].join('\n')
+
+    setCache('incidents_summary', result)
+    return result
   } catch (err: unknown) {
     logger.error('Chatbot: error fetching incidents', err instanceof Error ? err : undefined)
     return 'No se pudieron cargar las incidencias.'
@@ -96,6 +184,9 @@ async function fetchIncidentsSummary(): Promise<string> {
 }
 
 async function fetchEquipmentSummary(): Promise<string> {
+  const cached = getCached('equipment_summary')
+  if (cached) return cached
+
   try {
     const colRef = collection(db, 'equipment')
     const snap = await getDocs(colRef)
@@ -111,7 +202,7 @@ async function fetchEquipmentSummary(): Promise<string> {
       names.push(`- ${eq.nombre || eq.codigo} [${eq.estado}] (${eq.criticidad})`)
     })
 
-    return [
+    const result = [
       `EQUIPOS (total: ${items.length}):`,
       `Por estado: ${JSON.stringify(byEstado)}`,
       `Por criticidad: ${JSON.stringify(byCriticidad)}`,
@@ -119,6 +210,9 @@ async function fetchEquipmentSummary(): Promise<string> {
       ...names.slice(0, 20),
       items.length > 20 ? `... y ${items.length - 20} más` : '',
     ].join('\n')
+
+    setCache('equipment_summary', result)
+    return result
   } catch (err: unknown) {
     logger.error('Chatbot: error fetching equipment', err instanceof Error ? err : undefined)
     return 'No se pudieron cargar los equipos.'
@@ -126,15 +220,19 @@ async function fetchEquipmentSummary(): Promise<string> {
 }
 
 async function fetchRepuestosSummary(userQuery: string): Promise<string> {
+  const cacheKey = `repuestos_${userQuery.toLowerCase().trim()}`
+  const cached = getCached(cacheKey)
+  if (cached) return cached
+
   try {
-    // Cargar las máquinas del catálogo de repuestos
     const machinesSnap = await getDocs(collection(db, 'machines'))
     const machines = machinesSnap.docs.map(d => ({ id: d.id, ...d.data() })) as Machine[]
 
     let totalRepuestos = 0
     let valorTotal = 0
     const repuestosByMachine: string[] = []
-    const searchTerms = userQuery.toLowerCase().split(/\s+/).filter(t => t.length > 2)
+    const rawTerms = userQuery.toLowerCase().split(/\s+/).filter(t => t.length > 2)
+    const searchTerms = expandWithSynonyms(rawTerms)
     const matchedRepuestos: string[] = []
 
     for (const machine of machines) {
@@ -146,11 +244,11 @@ async function fetchRepuestosSummary(userQuery: string): Promise<string> {
       valorTotal += machineTotal
       repuestosByMachine.push(`- ${machine.nombre}: ${reps.length} repuestos ($${Math.round(machineTotal).toLocaleString()})`)
 
-      // Buscar coincidencias con la consulta del usuario
-      if (searchTerms.length > 0) {
+      if (rawTerms.length > 0) {
         reps.forEach(r => {
-          const text = `${r.textoBreve} ${r.descripcion} ${r.codigoSAP} ${r.codigoFabricante}`.toLowerCase()
-          if (searchTerms.every(term => text.includes(term))) {
+          const text = `${r.textoBreve} ${r.descripcion} ${r.codigoSAP} ${r.codigoFabricante} ${r.nombreManual || ''}`.toLowerCase()
+          const matchCount = searchTerms.filter(term => text.includes(term)).length
+          if (matchCount >= rawTerms.length) {
             matchedRepuestos.push(
               `  ✓ [${machine.nombre}] ${r.textoBreve} | SAP: ${r.codigoSAP} | Fab: ${r.codigoFabricante} | $${r.valorUnitario} × ${r.cantidadPorMaquina}`
             )
@@ -167,15 +265,18 @@ async function fetchRepuestosSummary(userQuery: string): Promise<string> {
 
     if (matchedRepuestos.length > 0) {
       lines.push('', `COINCIDENCIAS con "${userQuery}" (${matchedRepuestos.length}):`)
-      lines.push(...matchedRepuestos.slice(0, 15))
-      if (matchedRepuestos.length > 15) {
-        lines.push(`... y ${matchedRepuestos.length - 15} más`)
+      lines.push(...matchedRepuestos.slice(0, 20))
+      if (matchedRepuestos.length > 20) {
+        lines.push(`... y ${matchedRepuestos.length - 20} más`)
       }
-    } else if (searchTerms.length > 0) {
+    } else if (rawTerms.length > 0) {
       lines.push('', `No se encontraron repuestos que coincidan con "${userQuery}".`)
+      lines.push(`(Se buscó también sinónimos: ${searchTerms.slice(0, 10).join(', ')})`)
     }
 
-    return lines.join('\n')
+    const result = lines.join('\n')
+    setCache(cacheKey, result)
+    return result
   } catch (err: unknown) {
     logger.error('Chatbot: error fetching repuestos', err instanceof Error ? err : undefined)
     return 'No se pudieron cargar los repuestos.'
@@ -187,14 +288,12 @@ async function fetchIncidentsByFilter(userQuery: string): Promise<string> {
     const lower = userQuery.toLowerCase()
     const colRef = collection(db, 'incidents')
 
-    // Intentar filtrar por estado si el usuario lo menciona
     let statusFilter: string | null = null
     if (lower.includes('pendiente')) statusFilter = 'pendiente'
     else if (lower.includes('confirmada')) statusFilter = 'confirmada'
     else if (lower.includes('en proceso') || lower.includes('en_proceso')) statusFilter = 'en_proceso'
     else if (lower.includes('resuelta')) statusFilter = 'resuelta'
     else if (lower.includes('cerrada')) statusFilter = 'cerrada'
-    else if (lower.includes('abierta') || lower.includes('activa')) statusFilter = null // buscar no-cerradas
 
     let q
     if (statusFilter) {
@@ -225,8 +324,6 @@ async function fetchIncidentsByFilter(userQuery: string): Promise<string> {
 // ─── Construcción del contexto RAG ───────────────────────────────────
 
 async function buildRAGContext(intents: IntentType[], userQuery: string): Promise<string> {
-  const contextParts: string[] = []
-
   const promises: Promise<string>[] = []
 
   if (intents.includes('incidencias') || intents.includes('resumen')) {
@@ -242,15 +339,12 @@ async function buildRAGContext(intents: IntentType[], userQuery: string): Promis
     promises.push(fetchIncidentsByFilter(userQuery))
   }
   if (intents.includes('general')) {
-    // Para preguntas generales, dar un resumen rápido
     promises.push(fetchIncidentsSummary())
     promises.push(fetchEquipmentSummary())
   }
 
   const results = await Promise.all(promises)
-  contextParts.push(...results)
-
-  return contextParts.join('\n\n')
+  return results.join('\n\n')
 }
 
 // ─── System prompt ───────────────────────────────────────────────────
@@ -261,12 +355,13 @@ Tu nombre es "Asistente de Planta".
 Tu rol:
 - Responder preguntas sobre repuestos, incidencias, equipos y sensores de la planta
 - Usar los DATOS REALES proporcionados como contexto para dar respuestas precisas
-- Ser conciso pero útil, con formato claro
+- Ser conciso pero útil, con formato claro (usa **negritas** para destacar)
 - Responder SIEMPRE en español
 - Si no tienes datos suficientes, dilo honestamente
-- Cuando des listas, usa viñetas o formato legible
+- Cuando des listas, usa viñetas (•) o formato legible
 - Si mencionas códigos SAP o de fabricante, ponlos completos
 - Puedes usar emojis moderadamente para hacer la respuesta más legible
+- Cuando sea útil, sugiere que el usuario puede navegar a la sección correspondiente de la app
 
 Capacidades de la app:
 - Catálogo de repuestos organizado por máquinas (con códigos SAP, precios, cantidades)
@@ -279,16 +374,18 @@ Capacidades de la app:
 
 Cuando te pregunten qué puedes hacer, explica estas capacidades de forma amigable.`
 
-// ─── Función principal del chat ──────────────────────────────────────
+// ─── Función principal con streaming ─────────────────────────────────
 
 export async function sendChatMessage(
   userMessage: string,
-  history: ChatMessage[] = []
-): Promise<{ reply: string; context: string }> {
+  history: ChatMessage[] = [],
+  onStream?: (partial: string) => void,
+): Promise<{ reply: string; context: string; actions: ChatAction[] }> {
   if (!isAIConfigured()) {
     return {
       reply: '⚠️ La IA no está configurada. Necesitas configurar la API key de Groq o el Cloud Function proxy.',
       context: '',
+      actions: [],
     }
   }
 
@@ -296,7 +393,10 @@ export async function sendChatMessage(
   const intents = detectIntent(userMessage)
   logger.info(`Chatbot: intents detected = ${intents.join(', ')}`)
 
-  // 2. Obtener contexto de Firestore (RAG)
+  // 2. Acciones sugeridas
+  const actions = suggestActions(intents)
+
+  // 3. Obtener contexto de Firestore (RAG)
   let ragContext = ''
   try {
     ragContext = await buildRAGContext(intents, userMessage)
@@ -305,12 +405,11 @@ export async function sendChatMessage(
     ragContext = 'No se pudieron cargar datos de la planta en este momento.'
   }
 
-  // 3. Construir mensajes para el LLM
+  // 4. Construir mensajes para el LLM
   const messages: Array<{ role: string; content: string }> = [
     { role: 'system', content: SYSTEM_PROMPT },
   ]
 
-  // Agregar contexto RAG como mensaje del sistema
   if (ragContext) {
     messages.push({
       role: 'system',
@@ -318,7 +417,6 @@ export async function sendChatMessage(
     })
   }
 
-  // Agregar historial reciente (últimos 10 mensajes para no exceder tokens)
   const recentHistory = history.slice(-10)
   for (const msg of recentHistory) {
     if (msg.role === 'user' || msg.role === 'assistant') {
@@ -326,19 +424,20 @@ export async function sendChatMessage(
     }
   }
 
-  // Agregar el mensaje actual del usuario
   messages.push({ role: 'user', content: userMessage })
 
-  // 4. Llamar a Groq
+  // 5. Llamar a Groq con streaming
   try {
-    const result = await callGroq(messages, {
-      temperature: 0.4,
-      max_tokens: 1500,
-    })
+    const result = await callGroqStream(
+      messages,
+      (partial) => onStream?.(partial),
+      { temperature: 0.4, max_tokens: 1500 }
+    )
 
     return {
       reply: result.content,
       context: ragContext,
+      actions,
     }
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err)
@@ -348,12 +447,14 @@ export async function sendChatMessage(
       return {
         reply: '⏳ Se alcanzó el límite de consultas por minuto. Intenta de nuevo en unos segundos.',
         context: ragContext,
+        actions: [],
       }
     }
 
     return {
       reply: '❌ Error al procesar tu consulta. Intenta de nuevo.',
       context: ragContext,
+      actions: [],
     }
   }
 }
