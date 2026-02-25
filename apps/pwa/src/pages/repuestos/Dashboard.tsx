@@ -64,6 +64,7 @@ export function RepuestosDashboard() {
   const [globalSearchMode, setGlobalSearchMode] = useState(false)
   const [globalQuery, setGlobalQuery] = useState('')
   const [globalIndexedAt, setGlobalIndexedAt] = useState<number | null>(null)
+  const [globalIndexNow, setGlobalIndexNow] = useState<number>(Date.now())
   const [manualReindexing, setManualReindexing] = useState(false)
   const [highlightedRepuestoId, setHighlightedRepuestoId] = useState<string | null>(null)
   const highlightTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -154,6 +155,23 @@ export function RepuestosDashboard() {
       minute: '2-digit',
     })
   }, [globalIndexedAt])
+
+  // Refresca el "hace X" cada 30s para mantener el estado vivo
+  useEffect(() => {
+    const interval = setInterval(() => setGlobalIndexNow(Date.now()), 30000)
+    return () => clearInterval(interval)
+  }, [])
+
+  const globalIndexedAgoLabel = useMemo(() => {
+    if (!globalIndexedAt) return null
+    const diffMs = Math.max(0, globalIndexNow - globalIndexedAt)
+    const seconds = Math.floor(diffMs / 1000)
+    if (seconds < 60) return `hace ${seconds}s`
+    const minutes = Math.floor(seconds / 60)
+    if (minutes < 60) return `hace ${minutes}m`
+    const hours = Math.floor(minutes / 60)
+    return `hace ${hours}h`
+  }, [globalIndexedAt, globalIndexNow])
 
   const globalResults = useMemo(() => {
     if (!globalSearchMode || !globalQuery.trim()) return []
@@ -626,7 +644,7 @@ export function RepuestosDashboard() {
               </span>
             ) : globalLoaded ? (
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
-                Índice listo · {globalSearch.allRepuestos.length} repuestos{globalIndexedAtLabel ? ` · ${globalIndexedAtLabel}` : ''}
+                Índice listo · {globalSearch.allRepuestos.length} repuestos{globalIndexedAtLabel ? ` · ${globalIndexedAtLabel}` : ''}{globalIndexedAgoLabel ? ` (${globalIndexedAgoLabel})` : ''}
               </span>
             ) : (
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted/60 text-muted-foreground border border-border">
@@ -649,7 +667,7 @@ export function RepuestosDashboard() {
                 )}
                 {globalIndexedAtLabel && (
                   <span className="text-[10px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-                    Actualizado {globalIndexedAtLabel}
+                    Actualizado {globalIndexedAtLabel}{globalIndexedAgoLabel ? ` (${globalIndexedAgoLabel})` : ''}
                   </span>
                 )}
               </div>
