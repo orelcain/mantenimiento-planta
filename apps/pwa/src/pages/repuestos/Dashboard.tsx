@@ -63,6 +63,7 @@ export function RepuestosDashboard() {
   const [detailTarget, setDetailTarget] = useState<Repuesto | null>(null)
   const [globalSearchMode, setGlobalSearchMode] = useState(false)
   const [globalQuery, setGlobalQuery] = useState('')
+  const [globalIndexedAt, setGlobalIndexedAt] = useState<number | null>(null)
   const [highlightedRepuestoId, setHighlightedRepuestoId] = useState<string | null>(null)
   const highlightTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pendingHighlightRef = useRef<string | null>(null)
@@ -137,6 +138,21 @@ export function RepuestosDashboard() {
       globalLoadAll()
     }
   }, [machines.length, globalLoaded, globalLoading, globalLoadAll])
+
+  // Marcar hora de última indexación global exitosa
+  useEffect(() => {
+    if (globalLoaded && !globalLoading) {
+      setGlobalIndexedAt(Date.now())
+    }
+  }, [globalLoaded, globalLoading, globalSearch.allRepuestos.length])
+
+  const globalIndexedAtLabel = useMemo(() => {
+    if (!globalIndexedAt) return null
+    return new Date(globalIndexedAt).toLocaleTimeString('es-CL', {
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  }, [globalIndexedAt])
 
   const globalResults = useMemo(() => {
     if (!globalSearchMode || !globalQuery.trim()) return []
@@ -553,7 +569,7 @@ export function RepuestosDashboard() {
           />
 
           {/* ─── Búsqueda Global ─── */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Button
               variant={globalSearchMode ? 'default' : 'outline'}
               size="sm"
@@ -566,6 +582,23 @@ export function RepuestosDashboard() {
               <Globe className="h-3.5 w-3.5" />
               {globalSearchMode ? 'Búsqueda global activa' : 'Buscar en todas las máquinas'}
             </Button>
+            {globalLoading ? (
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 border border-amber-500/20 animate-pulse">
+                Indexando repuestos globales...
+              </span>
+            ) : globalSearch.error ? (
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-destructive/10 text-destructive border border-destructive/20">
+                Error de índice global
+              </span>
+            ) : globalLoaded ? (
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+                Índice listo · {globalSearch.allRepuestos.length} repuestos{globalIndexedAtLabel ? ` · ${globalIndexedAtLabel}` : ''}
+              </span>
+            ) : (
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted/60 text-muted-foreground border border-border">
+                Índice global pendiente
+              </span>
+            )}
           </div>
 
           {globalSearchMode && (
@@ -578,6 +611,11 @@ export function RepuestosDashboard() {
                 {globalSearch.loaded && (
                   <span className="text-[10px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
                     {globalSearch.allRepuestos.length} repuestos cargados
+                  </span>
+                )}
+                {globalIndexedAtLabel && (
+                  <span className="text-[10px] text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                    Actualizado {globalIndexedAtLabel}
                   </span>
                 )}
               </div>
