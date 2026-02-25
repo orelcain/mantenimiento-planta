@@ -82,22 +82,11 @@ const editDistanceAtMostOne = (a: string, b: string) => {
   return edits <= 1
 }
 
-const getExpandedTokens = (tokens: string[]) => {
-  const expanded = new Set(tokens)
-  for (const token of tokens) {
-    const synonyms = SYNONYM_LOOKUP[token]
-    if (synonyms) {
-      for (const synonym of synonyms) expanded.add(synonym)
-    }
-  }
-  return [...expanded]
-}
-
 /**
  * Verifica si un token (o sus sinónimos o un match fuzzy) aparece en el texto.
  * Retorna true si el token está "presente" en el texto buscable.
  */
-const tokenMatchesText = (token: string, searchable: string, words: string[], expandedTokens: string[]) => {
+const tokenMatchesText = (token: string, searchable: string, words: string[]) => {
   // Match directo
   if (searchable.includes(token)) return true
   // Match por sinónimo
@@ -108,7 +97,7 @@ const tokenMatchesText = (token: string, searchable: string, words: string[], ex
   return false
 }
 
-const scoreResult = (result: GlobalSearchResult, normalizedQuery: string, tokens: string[], expandedTokens: string[]) => {
+const scoreResult = (result: GlobalSearchResult, normalizedQuery: string, tokens: string[]) => {
   const rep = result.repuesto
   const name = normalizeText(rep.textoBreve || '')
   const sap = normalizeText(rep.codigoSAP || '')
@@ -124,7 +113,7 @@ const scoreResult = (result: GlobalSearchResult, normalizedQuery: string, tokens
   // (match directo, por sinónimo o fuzzy)
   const uniqueTokens = [...new Set(tokens.filter(Boolean))]
   for (const token of uniqueTokens) {
-    if (!tokenMatchesText(token, searchable, words, expandedTokens)) {
+    if (!tokenMatchesText(token, searchable, words)) {
       return 0 // token ausente → descartado
     }
   }
@@ -233,12 +222,11 @@ export function useGlobalSearch(machines: Machine[]) {
       if (!normalizedQuery) return allRepuestos
 
       const tokens = normalizedQuery.split(' ').filter(Boolean)
-      const expandedTokens = getExpandedTokens(tokens)
 
       return allRepuestos
         .map((result) => ({
           result,
-          score: scoreResult(result, normalizedQuery, tokens, expandedTokens),
+          score: scoreResult(result, normalizedQuery, tokens),
         }))
         .filter((item) => item.score > 0)
         .sort((a, b) => b.score - a.score)
