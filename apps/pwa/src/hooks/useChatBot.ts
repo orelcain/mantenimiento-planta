@@ -219,6 +219,7 @@ export function useChatBot() {
     streamingContent,
     lastActions,
     pendingAction,
+    userId,
     toggle,
     open,
     close,

@@ -5,9 +5,10 @@
  */
 import { useState, useRef, useEffect, useCallback, type KeyboardEvent, type ChangeEvent, type MouseEvent as ReactMouseEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { MessageCircle, X, Send, Trash2, Loader2, Bot, User, Mic, MicOff, ExternalLink, AlertTriangle, CheckCircle, XCircle, Camera, GripVertical } from 'lucide-react'
+import { MessageCircle, X, Send, Trash2, Loader2, Bot, User, Mic, MicOff, ExternalLink, AlertTriangle, CheckCircle, XCircle, Camera, GripVertical, ThumbsUp, ThumbsDown } from 'lucide-react'
 import { useChatBot } from '@/hooks/useChatBot'
 import type { ChatMessage, ChatAction } from '@/services/chatbot'
+import { saveFeedback } from '@/services/ariaLearning'
 
 // ─── Formateador de markdown básico ────────────────────────────────
 function formatMessage(text: string): string {
@@ -77,8 +78,23 @@ function ActionButtons({ actions, onNavigate }: { actions: ChatAction[]; onNavig
 }
 
 // ─── Burbuja de mensaje ─────────────────────────────────────────────
-function MessageBubble({ msg, onNavigate }: { msg: ChatMessage; onNavigate: (route: string) => void }) {
+function MessageBubble({
+  msg,
+  onNavigate,
+  onFeedback,
+}: {
+  msg: ChatMessage
+  onNavigate: (route: string) => void
+  onFeedback?: (msgId: string, rating: 'positive' | 'negative') => void
+}) {
   const isUser = msg.role === 'user'
+  const [feedbackGiven, setFeedbackGiven] = useState<'positive' | 'negative' | null>(null)
+
+  const handleFeedback = (rating: 'positive' | 'negative') => {
+    if (feedbackGiven) return // Ya se dio feedback
+    setFeedbackGiven(rating)
+    onFeedback?.(msg.id, rating)
+  }
 
   return (
     <div className={`flex gap-2 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
@@ -94,10 +110,39 @@ function MessageBubble({ msg, onNavigate }: { msg: ChatMessage; onNavigate: (rou
         <div dangerouslySetInnerHTML={{ __html: formatMessage(msg.content) }} />
         {msg.photoUrls && msg.photoUrls.length > 0 && <MessagePhotos urls={msg.photoUrls} />}
         {msg.actions && <ActionButtons actions={msg.actions} onNavigate={onNavigate} />}
-        <div className={`text-[10px] mt-1 ${
+        <div className={`flex items-center justify-between mt-1 ${
           isUser ? 'text-primary-foreground/60' : 'text-muted-foreground'
         }`}>
-          {msg.timestamp.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}
+          <span className="text-[10px]">
+            {msg.timestamp.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}
+          </span>
+          {/* Feedback thumbs — solo en mensajes de ARIA (no welcome ni errores cortos) */}
+          {!isUser && msg.id !== 'welcome' && msg.content.length > 30 && (
+            <div className="flex items-center gap-0.5 ml-2">
+              {feedbackGiven ? (
+                <span className="text-[10px]">
+                  {feedbackGiven === 'positive' ? '✓ Útil' : '✓ Registrado'}
+                </span>
+              ) : (
+                <>
+                  <button
+                    onClick={() => handleFeedback('positive')}
+                    className="p-0.5 rounded hover:bg-background/50 transition-colors"
+                    title="Respuesta útil"
+                  >
+                    <ThumbsUp className="w-3 h-3" />
+                  </button>
+                  <button
+                    onClick={() => handleFeedback('negative')}
+                    className="p-0.5 rounded hover:bg-background/50 transition-colors"
+                    title="Respuesta no útil"
+                  >
+                    <ThumbsDown className="w-3 h-3" />
+                  </button>
+                </>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -242,6 +287,7 @@ export function ChatBot() {
     hasUnread,
     streamingContent,
     pendingAction,
+    userId,
     toggle,
     sendMessage,
     clearHistory,
@@ -391,6 +437,23 @@ export function ChatBot() {
     sendMessage('No, cancelar')
   }
 
+  const handleFeedback = useCallback((messageId: string, rating: 'positive' | 'negative') => {
+    if (!userId) return
+    // Encontrar el mensaje y el query del usuario anterior
+    const msgIdx = messages.findIndex(m => m.id === messageId)
+    const ariaMsg = messages[msgIdx]
+    const userMsg = messages.slice(0, msgIdx).reverse().find(m => m.role === 'user')
+
+    saveFeedback({
+      messageId,
+      userId,
+      userQuery: userMsg?.content || '',
+      ariaResponse: ariaMsg?.content || '',
+      rating,
+      intents: [],
+    }).catch(() => { /* non-blocking */ })
+  }, [messages, userId])
+
   // 380 * 1.4 ≈ 532px ancho | 520 * 1.3 ≈ 676px alto
   return (
     <>
@@ -444,7 +507,7 @@ export function ChatBot() {
           {/* Mensajes */}
           <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3">
             {messages.map(msg => (
-              <MessageBubble key={msg.id} msg={msg} onNavigate={handleNavigate} />
+              <MessageBubble key={msg.id} msg={msg} onNavigate={handleNavigate} onFeedback={handleFeedback} />
             ))}
             {/* Streaming: mostrar respuesta parcial */}
             {streamingContent && <StreamingBubble content={streamingContent} />}

@@ -7,6 +7,19 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.55.4] - 2025-02-28
+### Agregado
+- **Sistema de Aprendizaje Continuo para ARIA** — ARIA ahora mejora con cada interacción:
+  - **Feedback 👍👎**: botones de valoración en cada respuesta de ARIA; las respuestas positivas refuerzan el conocimiento y las negativas lo debilitan/eliminan
+  - **Base de conocimiento persistente** (`ariaKnowledge`): almacena FAQs, soluciones, procedimientos y hechos con nivel de confianza 0-100 y contador de uso
+  - **Patrones de equipo** (`ariaEquipmentPatterns`): registra problemas recurrentes por máquina, soluciones comunes, tiempos promedio de resolución y repuestos asociados
+  - **Inyección de contexto aprendido**: las respuestas de ARIA ahora incluyen conocimiento acumulado de interacciones previas (bloque "INTELIGENCIA APRENDIDA")
+  - **Aprendizaje automático por incidencias**: cada incidencia creada alimenta patrones de equipo y la base de conocimiento
+  - **Caché inteligente** con TTL de 5 minutos para minimizar lecturas a Firestore
+  - **3 nuevas colecciones Firestore**: `ariaFeedback`, `ariaKnowledge`, `ariaEquipmentPatterns`
+  - Nuevo servicio `ariaLearning.ts` (~380 líneas) con funciones: `saveFeedback`, `reinforceKnowledge`, `weakenKnowledge`, `findRelevantKnowledge`, `trackEquipmentProblem`, `buildLearningContext`, `learnFromResolvedIncident`, `classifyProblem`
+- **SYSTEM_PROMPT actualizado**: ARIA ahora sabe que aprende y prioriza conocimiento acumulado
+
 ## [2.55.3] - 2026-02-25
 ### Corregido
 - **ARIA ya no confunde Grader con Baader**: agregado "grader" al vocabulario conocido para evitar corrección Levenshtein incorrecta

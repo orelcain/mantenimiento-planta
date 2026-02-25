@@ -6,6 +6,7 @@ import { collection, getDocs, query, where, orderBy, limit } from 'firebase/fire
 import { db } from './firebase'
 import { callGroqStream, isAIConfigured } from './ai'
 import { logger } from '@/lib/logger'
+import { buildLearningContext, trackEquipmentProblem } from './ariaLearning'
 import type { Incident } from '@/types'
 import type { Machine, Repuesto } from '@/types/repuestos'
 
@@ -1134,6 +1135,15 @@ MÓDULOS DE LA APP (tienes acceso completo a todos):
 Cuando el usuario pregunte sobre CUALQUIER módulo, usa los datos del contexto correspondiente. Si no tienes datos específicos, describe las capacidades del módulo y sugiere navegar a la sección apropiada.
 
 Cuando te pregunten qué puedes hacer, destaca que tienes acceso COMPLETO a todos los módulos de la app y puedes responder sobre cualquier tema.
+
+🧠 SISTEMA DE APRENDIZAJE CONTINUO:
+- Aprendes de cada interacción: los usuarios pueden valorar tus respuestas con 👍 o 👎.
+- Cuando recibes 👍, esa respuesta se fortalece en tu base de conocimiento y la usarás como referencia en consultas similares.
+- Cuando recibes 👎, se debilita o elimina el conocimiento incorrecto.
+- Además, cada incidencia creada alimenta un registro de patrones por equipo: problemas recurrentes, tiempos promedio de resolución y repuestos más usados.
+- Si recibes un bloque "INTELIGENCIA APRENDIDA", esos datos provienen de tu experiencia real y son MUY confiables — priorízalos.
+- Mientras más te usen, más precisa y útil serás. Menciona esto brevemente cuando te pregunten sobre tus capacidades.
+
 Tu nombre es ARIA — Asistente de Reportes e Incidencias Automatizada. Preséntate así cuando te pregunten.`
 
 // ─── Función principal con streaming ─────────────────────────────────
@@ -1228,6 +1238,15 @@ export async function sendChatMessage(
           titulo: draft.titulo,
           incidentId: result.incidentId,
         })
+
+        // 🧠 Aprendizaje: registrar patrón de problema en equipo
+        if (draft.equipmentId && draft.equipmentName) {
+          trackEquipmentProblem(
+            draft.equipmentId,
+            draft.equipmentName,
+            draft.titulo,
+          ).catch(() => { /* non-blocking */ })
+        }
 
         // Sugerir técnico para asignar
         let techSuggestion = ''
@@ -1405,6 +1424,19 @@ export async function sendChatMessage(
         content: `CONTEXTO DEL USUARIO (usa esto para personalizar tus respuestas, anticipar necesidades y dar continuidad a la conversación):\n\n${memCtx}`,
       })
     }
+  }
+
+  // Inyectar contexto de APRENDIZAJE (knowledge base + patrones)
+  try {
+    const learningCtx = await buildLearningContext(userMessage, intents)
+    if (learningCtx) {
+      messages.push({
+        role: 'system',
+        content: `INTELIGENCIA APRENDIDA (conocimiento acumulado de interacciones anteriores — prioriza esta info cuando sea relevante):\n\n${learningCtx}`,
+      })
+    }
+  } catch (err) {
+    logger.error('Chatbot: error building learning context', err instanceof Error ? err : undefined)
   }
 
   // Inyectar correcciones de typos como nota
