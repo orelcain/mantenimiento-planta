@@ -7,6 +7,21 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.49.0] - 2026-02-25
+### Funcionalidad
+- **Atajos de teclado en búsqueda global**: navegación con `↑/↓`, apertura con `Enter` y cierre con `Esc`, con resaltado visual de la fila activa
+- **Persistencia por usuario del contexto de búsqueda**: recuerda modo global/local, query reciente y tamaño de página usando `localStorage`
+- **Búsqueda semántica básica con ranking**:
+  - Normalización de texto (acentos/caracteres)
+  - Soporte de sinónimos técnicos (`motor`, `bomba/pump`, `cinta/conveyor`, etc.)
+  - Relevancia por campos clave (SAP, fabricante, nombre, descripción, máquina)
+  - Tolerancia básica a typos (distancia de edición)
+
+### UX
+- **Resultados más usables y rápidos**: selección por teclado se mantiene visible en el scroll y abre directamente la máquina/repuesto seleccionado
+
+---
+
 ## [2.48.98] - 2026-02-25
 ### Funcionalidad
 - **Reindexado manual del buscador global**: nuevo botón `Reindexar ahora` para refrescar al instante el índice de repuestos de todas las máquinas

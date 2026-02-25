@@ -17,6 +17,131 @@ export interface GlobalSearchResult {
   machineName: string
 }
 
+const normalizeText = (value: string) =>
+  value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s\-_/]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+const SYNONYM_GROUPS: string[][] = [
+  ['motor', 'motriz', 'motores'],
+  ['bomba', 'pump', 'bombas'],
+  ['reductor', 'motorreductor', 'gearbox'],
+  ['cinta', 'transportadora', 'conveyor', 'banda'],
+  ['valvula', 'valvula', 'valvulas'],
+  ['sensor', 'instrumento', 'transmisor'],
+  ['rodamiento', 'bearing', 'ruleman'],
+  ['sello', 'reten', 'retenedor'],
+]
+
+const SYNONYM_LOOKUP = SYNONYM_GROUPS.reduce<Record<string, string[]>>((acc, group) => {
+  const normalizedGroup = group.map(normalizeText)
+  for (const term of normalizedGroup) {
+    acc[term] = normalizedGroup.filter((item) => item !== term)
+  }
+  return acc
+}, {})
+
+const editDistanceAtMostOne = (a: string, b: string) => {
+  if (a === b) return true
+  const la = a.length
+  const lb = b.length
+  if (Math.abs(la - lb) > 1) return false
+
+  let i = 0
+  let j = 0
+  let edits = 0
+
+  while (i < la && j < lb) {
+    if (a[i] === b[j]) {
+      i++
+      j++
+      continue
+    }
+
+    edits++
+    if (edits > 1) return false
+
+    if (la > lb) {
+      i++
+    } else if (lb > la) {
+      j++
+    } else {
+      i++
+      j++
+    }
+  }
+
+  if (i < la || j < lb) edits++
+  return edits <= 1
+}
+
+const getExpandedTokens = (tokens: string[]) => {
+  const expanded = new Set(tokens)
+  for (const token of tokens) {
+    const synonyms = SYNONYM_LOOKUP[token]
+    if (synonyms) {
+      for (const synonym of synonyms) expanded.add(synonym)
+    }
+  }
+  return [...expanded]
+}
+
+const scoreResult = (result: GlobalSearchResult, normalizedQuery: string, tokens: string[], expandedTokens: string[]) => {
+  const rep = result.repuesto
+  const name = normalizeText(rep.textoBreve || '')
+  const sap = normalizeText(rep.codigoSAP || '')
+  const fabricante = normalizeText(rep.codigoFabricante || '')
+  const descripcion = normalizeText(rep.descripcion || '')
+  const ubicacion = normalizeText(rep.ubicacionEnPlanta || '')
+  const machineName = normalizeText(result.machineName || '')
+
+  const searchable = `${name} ${sap} ${fabricante} ${descripcion} ${ubicacion} ${machineName}`.trim()
+  const words = searchable.split(' ').filter(Boolean)
+
+  let score = 0
+
+  if (sap === normalizedQuery) score += 220
+  if (fabricante === normalizedQuery) score += 180
+  if (name === normalizedQuery) score += 170
+
+  if (sap.startsWith(normalizedQuery)) score += 120
+  if (fabricante.startsWith(normalizedQuery)) score += 95
+  if (name.startsWith(normalizedQuery)) score += 90
+
+  if (name.includes(normalizedQuery)) score += 65
+  if (fabricante.includes(normalizedQuery)) score += 50
+  if (descripcion.includes(normalizedQuery)) score += 35
+  if (machineName.includes(normalizedQuery)) score += 25
+  if (ubicacion.includes(normalizedQuery)) score += 20
+
+  for (const token of tokens) {
+    if (!token) continue
+    if (name.includes(token)) score += 25
+    if (sap.includes(token)) score += 22
+    if (fabricante.includes(token)) score += 18
+    if (descripcion.includes(token)) score += 10
+    if (machineName.includes(token)) score += 9
+    if (ubicacion.includes(token)) score += 7
+
+    if (token.length >= 4 && !searchable.includes(token)) {
+      const approx = words.some((word) => word.length >= 4 && editDistanceAtMostOne(token, word))
+      if (approx) score += 6
+    }
+  }
+
+  for (const token of expandedTokens) {
+    if (!tokens.includes(token) && token && searchable.includes(token)) {
+      score += 5
+    }
+  }
+
+  return score
+}
+
 export function useGlobalSearch(machines: Machine[]) {
   const [allRepuestos, setAllRepuestos] = useState<GlobalSearchResult[]>([])
   const [loading, setLoading] = useState(false)
@@ -81,18 +206,20 @@ export function useGlobalSearch(machines: Machine[]) {
   const search = useCallback(
     (queryText: string): GlobalSearchResult[] => {
       if (!queryText.trim()) return allRepuestos
-      const q = queryText.toLowerCase()
-      return allRepuestos.filter((r) => {
-        const rep = r.repuesto
-        return (
-          rep.codigoSAP?.toLowerCase().includes(q) ||
-          rep.textoBreve?.toLowerCase().includes(q) ||
-          rep.descripcion?.toLowerCase().includes(q) ||
-          rep.codigoFabricante?.toLowerCase().includes(q) ||
-          rep.ubicacionEnPlanta?.toLowerCase().includes(q) ||
-          r.machineName.toLowerCase().includes(q)
-        )
-      })
+      const normalizedQuery = normalizeText(queryText)
+      if (!normalizedQuery) return allRepuestos
+
+      const tokens = normalizedQuery.split(' ').filter(Boolean)
+      const expandedTokens = getExpandedTokens(tokens)
+
+      return allRepuestos
+        .map((result) => ({
+          result,
+          score: scoreResult(result, normalizedQuery, tokens, expandedTokens),
+        }))
+        .filter((item) => item.score > 0)
+        .sort((a, b) => b.score - a.score)
+        .map((item) => item.result)
     },
     [allRepuestos]
   )

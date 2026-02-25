@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useRef } from 'react'
+import { useEffect, useMemo, useState, useRef, type KeyboardEvent } from 'react'
 import { AlertTriangle, Plus, FileText, Upload, Package, ClipboardList, ImageIcon, DollarSign, Wrench, ArrowRightLeft, Copy as CopyDuplicateIcon, Globe, Camera, ExternalLink, RotateCw } from 'lucide-react'
 import { RepuestosTable } from '@/components/repuestos/RepuestosTable'
 import { RepuestoFormModal } from '@/components/repuestos/RepuestoForm'
@@ -18,7 +18,7 @@ import { useRepuestosCounts } from '@/hooks/repuestos/useRepuestosCounts'
 import { useMachineCategories } from '@/hooks/repuestos/useMachineCategories'
 import { useToast } from '@/hooks/useToast'
 import { useMachineContext, useCurrentMachine } from '@/contexts/MachineContext'
-import { useIsAdmin } from '@/store/authStore'
+import { useAuthStore, useIsAdmin } from '@/store/authStore'
 import type { Repuesto, RepuestoFormData, TechnicalSpecs, MachineImage } from '@/types/repuestos'
 // CategoryManager ahora se renderiza dentro de EquipmentNavigator
 import { ImportRepuestosModal } from './ImportRepuestosModal'
@@ -41,6 +41,7 @@ import {
 export function RepuestosDashboard() {
   const { machines, loading: machinesLoading, setCurrentMachine } = useMachineContext()
   const currentMachine = useCurrentMachine()
+  const currentUser = useAuthStore((state) => state.user)
   const isAdmin = useIsAdmin()
   const { categories } = useMachineCategories()
   const { toast } = useToast()
@@ -69,6 +70,10 @@ export function RepuestosDashboard() {
   const [highlightedRepuestoId, setHighlightedRepuestoId] = useState<string | null>(null)
   const highlightTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pendingHighlightRef = useRef<string | null>(null)
+  const globalInputRef = useRef<HTMLInputElement | null>(null)
+  const globalResultsRef = useRef<HTMLDivElement | null>(null)
+  const [selectedGlobalResultIndex, setSelectedGlobalResultIndex] = useState(-1)
+  const hasHydratedPrefsRef = useRef(false)
   const [, setSelectedCategoryId] = useState<string | null>('maquinas-principales')
 
   // Filtros, ordenamiento y paginación
@@ -180,6 +185,117 @@ export function RepuestosDashboard() {
     if (!globalSearchMode || !globalQuery.trim()) return []
     return globalSearch.search(globalQuery)
   }, [globalSearchMode, globalQuery, globalSearch])
+
+  const displayedGlobalResults = useMemo(() => globalResults.slice(0, 50), [globalResults])
+
+  const dashboardPrefsKey = useMemo(
+    () => `repuestos-dashboard-prefs:${currentUser?.id ?? 'anon'}`,
+    [currentUser?.id]
+  )
+
+  // Hidratar preferencias locales por usuario
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(dashboardPrefsKey)
+      if (!raw) {
+        hasHydratedPrefsRef.current = true
+        return
+      }
+
+      const prefs = JSON.parse(raw) as {
+        globalSearchMode?: boolean
+        globalQuery?: string
+        searchQuery?: string
+        pageSize?: number
+      }
+
+      if (typeof prefs.globalSearchMode === 'boolean') setGlobalSearchMode(prefs.globalSearchMode)
+      if (typeof prefs.globalQuery === 'string') setGlobalQuery(prefs.globalQuery)
+      if (typeof prefs.searchQuery === 'string') setSearchQuery(prefs.searchQuery)
+      if (typeof prefs.pageSize === 'number' && Number.isFinite(prefs.pageSize)) setPageSize(prefs.pageSize)
+    } catch (err) {
+      console.warn('No se pudieron restaurar preferencias del dashboard:', err)
+    } finally {
+      hasHydratedPrefsRef.current = true
+    }
+  }, [dashboardPrefsKey])
+
+  // Persistir preferencias de uso
+  useEffect(() => {
+    if (!hasHydratedPrefsRef.current) return
+    const payload = {
+      globalSearchMode,
+      globalQuery,
+      searchQuery,
+      pageSize,
+      updatedAt: Date.now(),
+    }
+    localStorage.setItem(dashboardPrefsKey, JSON.stringify(payload))
+  }, [dashboardPrefsKey, globalSearchMode, globalQuery, searchQuery, pageSize])
+
+  // Focus automático al abrir búsqueda global
+  useEffect(() => {
+    if (globalSearchMode) {
+      setTimeout(() => globalInputRef.current?.focus(), 0)
+    }
+  }, [globalSearchMode])
+
+  // Selección por teclado: reset cuando cambia el set de resultados
+  useEffect(() => {
+    if (!globalSearchMode || !globalQuery.trim() || displayedGlobalResults.length === 0) {
+      setSelectedGlobalResultIndex(-1)
+      return
+    }
+    setSelectedGlobalResultIndex((prev) => {
+      if (prev < 0) return 0
+      return Math.min(prev, displayedGlobalResults.length - 1)
+    })
+  }, [globalSearchMode, globalQuery, displayedGlobalResults])
+
+  // Mantener visible la fila seleccionada con flechas
+  useEffect(() => {
+    if (selectedGlobalResultIndex < 0) return
+    const row = document.getElementById(`global-result-${selectedGlobalResultIndex}`)
+    row?.scrollIntoView({ block: 'nearest' })
+  }, [selectedGlobalResultIndex])
+
+  const handleGlobalInputKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (!globalSearchMode) return
+
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      setGlobalSearchMode(false)
+      return
+    }
+
+    if (displayedGlobalResults.length === 0) return
+
+    if (event.key === 'ArrowDown') {
+      event.preventDefault()
+      setSelectedGlobalResultIndex((prev) => {
+        const next = prev < 0 ? 0 : Math.min(prev + 1, displayedGlobalResults.length - 1)
+        return next
+      })
+      return
+    }
+
+    if (event.key === 'ArrowUp') {
+      event.preventDefault()
+      setSelectedGlobalResultIndex((prev) => {
+        if (prev < 0) return 0
+        return Math.max(prev - 1, 0)
+      })
+      return
+    }
+
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      const selected = displayedGlobalResults[Math.max(0, selectedGlobalResultIndex)]
+      if (selected) {
+        handleNavigateToResult(selected.machineId, selected.repuesto.id)
+      }
+    }
+  }
 
   // Filtrar repuestos — Búsqueda mejorada incluye código fabricante
   const filteredRepuestos = useMemo(() => {
@@ -618,10 +734,7 @@ export function RepuestosDashboard() {
               variant={globalSearchMode ? 'default' : 'outline'}
               size="sm"
               className={`gap-2 text-xs ${globalSearchMode ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : ''}`}
-              onClick={() => {
-                setGlobalSearchMode(!globalSearchMode)
-                if (!globalSearchMode) setGlobalQuery('')
-              }}
+              onClick={() => setGlobalSearchMode((prev) => !prev)}
             >
               <Globe className="h-3.5 w-3.5" />
               {globalSearchMode ? 'Búsqueda global activa' : 'Buscar en todas las máquinas'}
@@ -677,14 +790,19 @@ export function RepuestosDashboard() {
               <div className="relative max-w-md">
                 <Globe className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-emerald-500" />
                 <input
+                  ref={globalInputRef}
                   type="text"
                   placeholder="Buscar repuesto en todas las máquinas..."
                   value={globalQuery}
                   onChange={(e) => setGlobalQuery(e.target.value)}
+                  onKeyDown={handleGlobalInputKeyDown}
                   className="w-full pl-9 pr-4 py-2 text-sm bg-background border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
                   disabled={globalSearch.loading}
                 />
               </div>
+              <p className="text-[10px] text-muted-foreground">
+                Atajos: ↑ ↓ para navegar · Enter para abrir resultado · Esc para cerrar
+              </p>
               {globalSearch.loading && (
                 <p className="text-xs text-muted-foreground animate-pulse">Cargando repuestos de todas las máquinas...</p>
               )}
@@ -692,12 +810,14 @@ export function RepuestosDashboard() {
                 <p className="text-xs text-destructive">{globalSearch.error}</p>
               )}
               {globalQuery.trim() && globalResults.length > 0 && (
-                <div className="space-y-1.5 max-h-[400px] overflow-y-auto">
+                <div ref={globalResultsRef} className="space-y-1.5 max-h-[400px] overflow-y-auto">
                   <span className="text-[10px] text-muted-foreground">{globalResults.length} resultados</span>
-                  {globalResults.slice(0, 50).map((r) => (
+                  {displayedGlobalResults.map((r, idx) => (
                     <div
+                      id={`global-result-${idx}`}
                       key={`${r.machineId}-${r.repuesto.id}`}
-                      className="flex items-center gap-2 p-2.5 bg-background border rounded-lg hover:bg-muted/30 hover:border-emerald-500/30 transition-colors text-sm group/result cursor-pointer"
+                      className={`flex items-center gap-2 p-2.5 bg-background border rounded-lg hover:bg-muted/30 hover:border-emerald-500/30 transition-colors text-sm group/result cursor-pointer ${selectedGlobalResultIndex === idx ? 'ring-2 ring-emerald-500/50 border-emerald-500/40 bg-emerald-500/5' : ''}`}
+                      onMouseEnter={() => setSelectedGlobalResultIndex(idx)}
                       onClick={() => handleNavigateToResult(r.machineId, r.repuesto.id)}
                     >
                       <div className="flex flex-col gap-0.5 min-w-0 flex-1">

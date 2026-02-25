@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.48.98' as const
+export const APP_VERSION = '2.49.0' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-02-25' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Búsqueda global: reindexado manual + estado de índice legible' as const
+export const VERSION_NAME = 'Búsqueda global avanzada: teclado + persistencia + semántica' as const
 
 /**
  * Nota:
