@@ -241,7 +241,7 @@ export function TechnicalSpecsModal({
     }
   }, [open, repuesto])
 
-  const currentTemplate = TEMPLATES[specs.type] || TEMPLATES.general
+  const currentTemplate: TemplateConfig = TEMPLATES[specs.type] ?? TEMPLATES.general
 
   const handleStandardChange = (key: string, value: string) => {
     setSpecs(prev => ({
