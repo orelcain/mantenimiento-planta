@@ -241,7 +241,8 @@ export function TechnicalSpecsModal({
     }
   }, [open, repuesto])
 
-  const currentTemplate: TemplateConfig = TEMPLATES[specs.type] ?? TEMPLATES.general
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+  const currentTemplate = (TEMPLATES[specs.type] ?? TEMPLATES['general'])!
 
   const handleStandardChange = (key: string, value: string) => {
     setSpecs(prev => ({
