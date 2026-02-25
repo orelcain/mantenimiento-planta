@@ -7,6 +7,27 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.54.0] - 2026-02-26
+### Agregado
+- **JARVIS Mode**: el chatbot ahora puede EJECUTAR ACCIONES reales en la app, no solo responder preguntas
+- **Crear incidencias por chat**: describe una falla en lenguaje natural y JARVIS genera el reporte automáticamente
+  - Ejemplo: "se rompió la cinta de filete" → genera borrador con título, prioridad, equipo detectado
+  - Flujo conversacional: borrador → confirmación → creación en Firestore
+  - Detección inteligente de prioridad (crítica si para producción, alta si afecta calidad, etc.)
+  - Detección de equipo por búsqueda fuzzy contra todos los equipos registrados
+  - Extracción de síntomas automática (vibración, ruido, calentamiento, fuga, etc.)
+  - Detección de ubicación/zona (filete, eviscerado, empaque, bodega, etc.)
+- **Barra de confirmación inline**: botones "Confirmar" / "Cancelar" visibles cuando hay acción pendiente
+- **Búsqueda de incidencias recientes**: para actualización de estado vía chat
+- **Servicio chatActions.ts**: motor completo de detección y ejecución de acciones
+- **Sugerencias rápidas actualizadas**: incluyen "Reportar una falla" como opción de inicio rápido
+### Mejorado
+- **System prompt JARVIS**: el LLM ahora recibe instrucciones de actuar como asistente ejecutivo
+- **Hook useChatBot v4**: gestión de estado de acciones pendientes (confirming/completed/cancelled)
+- **UI ChatBot v3**: header JARVIS, indicador de acción pendiente, placeholder contextual
+- **Mensaje de bienvenida**: ahora presenta capacidades de ejecución + ejemplo de uso
+- **sendChatMessage**: acepta `pendingAction` para flujo conversacional multi-turno
+
 ## [2.53.0] - 2026-02-25
 ### Agregado
 - **Memoria por usuario**: cada usuario tiene su propio historial persistente en localStorage, separado por userId

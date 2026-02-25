@@ -268,7 +268,7 @@ const STOP_WORDS = new Set([
 /**
  * Normaliza texto: strip diacritics, puntuación, lowercase
  */
-function normalizeText(text: string): string {
+export function normalizeText(text: string): string {
   return text
     .toLowerCase()
     .normalize('NFD')
@@ -665,7 +665,7 @@ async function buildRAGContext(intents: IntentType[], userQuery: string): Promis
 // ─── System prompt ───────────────────────────────────────────────────
 
 const SYSTEM_PROMPT = `Eres el asistente virtual de la aplicación de Mantenimiento de Planta Industrial.
-Tu nombre es "Asistente de Planta".
+Tu nombre es "Asistente de Planta". Eres como JARVIS — puedes ejecutar acciones reales en la app.
 
 Tu rol:
 - Responder preguntas sobre repuestos, incidencias, equipos y sensores de la planta
@@ -674,15 +674,25 @@ Tu rol:
 - Ser conciso pero útil, con formato claro (usa **negritas** para destacar)
 - Responder SIEMPRE en español
 
+CAPACIDADES DE ACCIÓN (puedes ejecutar estas acciones cuando el usuario lo pida):
+1. **Crear incidencias** — si el usuario describe una falla, TÚ generas el reporte. Muestra el borrador y pide confirmación.
+2. **Actualizar incidencias** — cerrar, resolver, confirmar incidencias existentes.
+3. **Buscar repuestos** — encontrar piezas por nombre, código SAP, fabricante.
+4. **Buscar equipos** — consultar estado de máquinas.
+5. **Navegar** — llevar al usuario a cualquier sección de la app.
+
+REGLAS cuando el usuario describe un problema/falla:
+- SIEMPRE interpreta que quiere crear una incidencia
+- Muestra el borrador con título, descripción, prioridad, equipo detectado
+- Pregunta si quiere confirmar la creación o modificar algo
+- Si detectas que falta info (equipo, ubicación), pregunta de forma natural
+
 REGLAS CRÍTICAS para responder sobre repuestos:
 - Si el contexto dice "COINCIDENCIAS con X (N encontrados)" → ESOS SON LOS RESULTADOS REALES. Enuméralos.
 - Si hay coincidencias, di cuántas hay y muéstralas con sus datos (máquina, SAP, fabricante, precio)
 - Si no hay coincidencias pero sí hay términos de búsqueda, explica que no se encontraron con ese nombre exacto y sugiere buscar por código SAP o fabricante
 - Cuando des listas, usa viñetas (•) o formato legible
-- Si mencionas códigos SAP o de fabricante, ponlos completos
-- Siempre indica en qué máquina está cada repuesto encontrado
 - Puedes usar emojis moderadamente para hacer la respuesta más legible
-- Cuando sea útil, sugiere que el usuario puede navegar a la sección correspondiente de la app
 
 Capacidades de la app:
 - Catálogo de repuestos organizado por máquinas (con códigos SAP, precios, cantidades)
@@ -693,16 +703,39 @@ Capacidades de la app:
 - Mapas interactivos de la planta
 - Análisis predictivo con IA
 
-Cuando te pregunten qué puedes hacer, explica estas capacidades de forma amigable.`
+Cuando te pregunten qué puedes hacer, destaca especialmente que puedes CREAR INCIDENCIAS por voz o texto, como un asistente JARVIS.`
 
 // ─── Función principal con streaming ─────────────────────────────────
+
+import {
+  detectAction,
+  buildIncidentDraft,
+  executeCreateIncident,
+  formatDraftForDisplay,
+  findRecentIncidents,
+  type PendingAction,
+  type IncidentDraft,
+} from './chatActions'
+
+export { type PendingAction, type IncidentDraft }
+
+// ─── Función principal con streaming ─────────────────────────────────
+
+export interface ChatResponse {
+  reply: string
+  context: string
+  actions: ChatAction[]
+  typoCorrections: string[]
+  pendingAction?: PendingAction
+}
 
 export async function sendChatMessage(
   userMessage: string,
   history: ChatMessage[] = [],
   onStream?: (partial: string) => void,
   userId?: string,
-): Promise<{ reply: string; context: string; actions: ChatAction[]; typoCorrections: string[] }> {
+  pendingAction?: PendingAction | null,
+): Promise<ChatResponse> {
   if (!isAIConfigured()) {
     return {
       reply: '⚠️ La IA no está configurada. Necesitas configurar la API key de Groq o el Cloud Function proxy.',
@@ -717,6 +750,127 @@ export async function sendChatMessage(
   if (typoCorrections.length > 0) {
     logger.info(`Chatbot: typo corrections: ${typoCorrections.join(', ')}`)
   }
+
+  // ─── FLUJO DE ACCIÓN: si hay un pendingAction en "confirming" ──────
+  if (pendingAction?.status === 'confirming') {
+    const lower = userMessage.toLowerCase().trim()
+    const isConfirm = /^(s[ií]|ok|dale|confirma|crear|hazlo|listo|enviar|generar|va|vamos|afirmativo|correcto)/i.test(lower)
+    const isCancel = /^(no|cancelar|cancelado|mejor no|dejalo|déjalo|olvida|descarta)/i.test(lower)
+    const isModify = /^(cambiar?|modific|edit|ajust|corr[ei]g)/i.test(lower)
+
+    if (isConfirm && pendingAction.type === 'create_incident' && userId) {
+      const draft = pendingAction.data as unknown as IncidentDraft
+      const userName = history.find(m => m.role === 'user')?.content ? undefined : undefined // will rely on userId
+      const result = await executeCreateIncident(draft, userId, userName)
+      
+      if (result.success) {
+        return {
+          reply: `✅ **¡Incidencia creada exitosamente!**\n\n` +
+            `📋 ID: **${result.incidentId}**\n` +
+            `📌 "${draft.titulo}"\n` +
+            `⚡ Prioridad: ${draft.prioridad}\n\n` +
+            `La incidencia quedó en estado **pendiente** y será revisada por un supervisor.\n\n` +
+            `💡 Puedes agregar fotos desde la sección de incidencias, o decirme si necesitas algo más.`,
+          context: '',
+          actions: [
+            { label: 'Ver incidencias', route: '/incidents', icon: 'AlertTriangle' },
+          ],
+          typoCorrections: [],
+          pendingAction: { ...pendingAction, status: 'completed', resultId: result.incidentId },
+        }
+      } else {
+        return {
+          reply: `❌ Error al crear la incidencia: ${result.error}\n\nIntenta de nuevo o créala manualmente desde la sección de incidencias.`,
+          context: '',
+          actions: [{ label: 'Crear manualmente', route: '/incidents', icon: 'AlertTriangle' }],
+          typoCorrections: [],
+          pendingAction: { ...pendingAction, status: 'cancelled' },
+        }
+      }
+    }
+
+    if (isCancel) {
+      return {
+        reply: '👍 Cancelado. No se creó ninguna incidencia. ¿En qué más puedo ayudarte?',
+        context: '',
+        actions: [],
+        typoCorrections: [],
+        pendingAction: { ...pendingAction, status: 'cancelled' },
+      }
+    }
+
+    if (isModify) {
+      return {
+        reply: '✏️ Entendido. Dime qué quieres cambiar del borrador:\n\n' +
+          '• **Título** — ej: "cambia el título a Falla en cinta X"\n' +
+          '• **Prioridad** — ej: "ponla como crítica"\n' +
+          '• **Equipo** — ej: "es la cinta de pimponeo de filete"\n\n' +
+          'O si prefieres, describe la falla de nuevo completa.',
+        context: '',
+        actions: [],
+        typoCorrections: [],
+        pendingAction, // Mantener en confirming
+      }
+    }
+
+    // Si no es ni sí/no/modificar, procesar como ajuste al borrador
+    // (ej: "cambia la prioridad a crítica")
+    // Pasar al LLM con contexto del borrador para que genere respuesta inteligente
+  }
+
+  // ─── DETECCIÓN DE ACCIÓN NUEVA ──────────────────────────────────────
+  const detectedActionType = detectAction(userMessage)
+  
+  if (detectedActionType === 'create_incident' && userId) {
+    // Construir borrador de incidencia desde el texto
+    const { draft, equipment } = await buildIncidentDraft(userMessage, userId)
+    
+    // Crear PendingAction
+    const newPendingAction: PendingAction = {
+      id: `action_${Date.now()}`,
+      type: 'create_incident',
+      status: 'confirming',
+      data: draft as unknown as Record<string, unknown>,
+      missingFields: equipment ? [] : ['equipo'],
+      createdAt: Date.now(),
+    }
+
+    const draftDisplay = formatDraftForDisplay(draft)
+    let replyText = `🤖 Detecté que quieres reportar una falla. He preparado este borrador:\n\n${draftDisplay}\n\n`
+
+    if (!equipment) {
+      replyText += `⚠️ No pude identificar el equipo exacto. Puedes:\n• Decirme el nombre del equipo para buscarlo\n• Confirmar así y asignarlo después\n\n`
+    }
+
+    replyText += `¿Quieres que **cree esta incidencia**? (Sí / No / Modificar)`
+
+    return {
+      reply: replyText,
+      context: '',
+      actions: [{ label: 'Crear manualmente', route: '/incidents', icon: 'AlertTriangle' }],
+      typoCorrections,
+      pendingAction: newPendingAction,
+    }
+  }
+
+  if (detectedActionType === 'update_incident_status') {
+    // Buscar incidencias que matchean el texto
+    const recentIncidents = await findRecentIncidents(userMessage)
+    if (recentIncidents.length > 0) {
+      const incidentList = recentIncidents.map((inc, i) =>
+        `${i + 1}. [${inc.status}] **${inc.titulo}** (${inc.prioridad})`
+      ).join('\n')
+      
+      return {
+        reply: `📋 Encontré estas incidencias recientes:\n\n${incidentList}\n\n¿Cuál quieres actualizar y a qué estado? (ej: "resolver la 1" o "cerrar la incidencia de la cinta")`,
+        context: '',
+        actions: [{ label: 'Ver incidencias', route: '/incidents', icon: 'AlertTriangle' }],
+        typoCorrections,
+      }
+    }
+  }
+
+  // ─── FLUJO NORMAL (consulta/chat) ──────────────────────────────────
 
   // 1. Detectar intención (con typos corregidos)
   const intents = detectIntent(userMessage)
@@ -765,6 +919,15 @@ export async function sendChatMessage(
     })
   }
 
+  // Inyectar borrador pendiente si estamos modificándolo
+  if (pendingAction?.status === 'confirming' && pendingAction.type === 'create_incident') {
+    const draft = pendingAction.data as unknown as IncidentDraft
+    messages.push({
+      role: 'system',
+      content: `HAY UN BORRADOR DE INCIDENCIA PENDIENTE DE CONFIRMACIÓN:\n${formatDraftForDisplay(draft)}\n\nEl usuario puede estar pidiendo cambios al borrador. Si es así, muestra el borrador actualizado y pregunta si quiere confirmar. Si el usuario está preguntando otra cosa, responde normalmente.`,
+    })
+  }
+
   if (ragContext) {
     messages.push({
       role: 'system',
@@ -799,6 +962,7 @@ export async function sendChatMessage(
       context: ragContext,
       actions,
       typoCorrections,
+      pendingAction: pendingAction?.status === 'confirming' ? pendingAction : undefined,
     }
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err)

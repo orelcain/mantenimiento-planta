@@ -1,10 +1,11 @@
 /**
- * Componente ChatBot — v2
- * Burbuja flotante con streaming, voz, acciones directas y tamaño ampliado
+ * Componente ChatBot — v3 JARVIS
+ * Burbuja flotante con streaming, voz, acciones ejecutables (crear incidencias),
+ * confirmación inline y tamaño ampliado
  */
 import { useState, useRef, useEffect, useCallback, type KeyboardEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { MessageCircle, X, Send, Trash2, Loader2, Bot, User, Mic, MicOff, ExternalLink } from 'lucide-react'
+import { MessageCircle, X, Send, Trash2, Loader2, Bot, User, Mic, MicOff, ExternalLink, AlertTriangle, CheckCircle, XCircle } from 'lucide-react'
 import { useChatBot } from '@/hooks/useChatBot'
 import type { ChatMessage, ChatAction } from '@/services/chatbot'
 
@@ -97,11 +98,11 @@ function LoadingIndicator() {
 
 // ─── Sugerencias rápidas ────────────────────────────────────────────
 const QUICK_SUGGESTIONS = [
-  '¿Cuántas incidencias abiertas hay?',
+  '🔧 Reportar una falla',
+  '¿Incidencias abiertas?',
   '¿Qué repuestos tenemos?',
   '¿Estado de los equipos?',
-  'Dame un resumen de la planta',
-  '¿Tenemos motores en stock?',
+  '📊 Resumen de la planta',
   '¿Incidencias críticas?',
 ]
 
@@ -169,6 +170,30 @@ function useSpeechRecognition() {
   return { isListening, transcript, startListening, stopListening, isSupported }
 }
 
+// ─── Barra de acción pendiente ──────────────────────────────────────
+function PendingActionBar({ onConfirm, onCancel }: { onConfirm: () => void; onCancel: () => void }) {
+  return (
+    <div className="flex items-center gap-2 px-3 py-2 border-t border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-700">
+      <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+      <span className="text-xs text-amber-800 dark:text-amber-300 flex-1">Acción pendiente de confirmación</span>
+      <button
+        onClick={onConfirm}
+        className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-md bg-green-600 text-white hover:bg-green-700 transition-colors font-medium"
+      >
+        <CheckCircle className="w-3 h-3" />
+        Confirmar
+      </button>
+      <button
+        onClick={onCancel}
+        className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-md bg-muted text-muted-foreground hover:bg-destructive hover:text-destructive-foreground transition-colors"
+      >
+        <XCircle className="w-3 h-3" />
+        Cancelar
+      </button>
+    </div>
+  )
+}
+
 // ─── Componente principal ───────────────────────────────────────────
 export function ChatBot() {
   const navigate = useNavigate()
@@ -178,6 +203,7 @@ export function ChatBot() {
     isOpen,
     hasUnread,
     streamingContent,
+    pendingAction,
     toggle,
     sendMessage,
     clearHistory,
@@ -230,6 +256,14 @@ export function ChatBot() {
     toggle() // cerrar chat al navegar
   }
 
+  const handleConfirmAction = () => {
+    sendMessage('Sí, crear la incidencia')
+  }
+
+  const handleCancelAction = () => {
+    sendMessage('No, cancelar')
+  }
+
   // 380 * 1.4 ≈ 532px ancho | 520 * 1.3 ≈ 676px alto
   return (
     <>
@@ -243,8 +277,10 @@ export function ChatBot() {
                 <Bot className="w-5 h-5 text-primary" />
               </div>
               <div>
-                <h3 className="text-sm font-semibold">Asistente de Planta</h3>
-                <p className="text-[10px] text-muted-foreground">IA · Datos en tiempo real</p>
+                <h3 className="text-sm font-semibold">JARVIS — Asistente de Planta</h3>
+                <p className="text-[10px] text-muted-foreground">
+                  {pendingAction?.status === 'confirming' ? '⚡ Acción pendiente de confirmación' : 'IA · Datos en tiempo real'}
+                </p>
               </div>
             </div>
             <div className="flex items-center gap-1">
@@ -282,6 +318,11 @@ export function ChatBot() {
             <QuickSuggestions onSelect={handleQuickSelect} />
           )}
 
+          {/* Barra de acción pendiente */}
+          {pendingAction?.status === 'confirming' && !isLoading && (
+            <PendingActionBar onConfirm={handleConfirmAction} onCancel={handleCancelAction} />
+          )}
+
           {/* Input */}
           <div className="border-t border-border px-3 py-2 bg-background">
             <div className="flex items-center gap-2">
@@ -307,7 +348,7 @@ export function ChatBot() {
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder={isListening ? 'Escuchando...' : 'Pregunta algo sobre la planta...'}
+                placeholder={isListening ? 'Escuchando...' : pendingAction?.status === 'confirming' ? 'Sí / No / Modificar...' : 'Pregunta o describe una falla...'}
                 disabled={isLoading}
                 className="flex-1 text-sm px-3 py-2 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-50 placeholder:text-muted-foreground"
               />
@@ -322,7 +363,7 @@ export function ChatBot() {
               </button>
             </div>
             <p className="text-[10px] text-muted-foreground mt-1 text-center">
-              Powered by Groq AI · Datos en tiempo real de Firestore
+              JARVIS v4 · Powered by Groq AI · Acciones en tiempo real
             </p>
           </div>
         </div>

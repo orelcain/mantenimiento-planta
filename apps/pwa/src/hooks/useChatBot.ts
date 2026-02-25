@@ -1,9 +1,10 @@
 /**
- * Hook para el Chatbot — v3
+ * Hook para el Chatbot — v4
+ * JARVIS mode: acciones ejecutables (crear incidencias, actualizar estado)
  * Memoria por usuario, corrección de typos, historial persistente por userId
  */
 import { useState, useCallback, useRef, useEffect } from 'react'
-import { sendChatMessage, type ChatMessage, type ChatAction } from '@/services/chatbot'
+import { sendChatMessage, type ChatMessage, type ChatAction, type PendingAction } from '@/services/chatbot'
 import { useAuthStore } from '@/store/authStore'
 
 const STORAGE_PREFIX = 'chatbot_history_'
@@ -16,7 +17,15 @@ function generateId(): string {
 const WELCOME_MESSAGE: ChatMessage = {
   id: 'welcome',
   role: 'assistant',
-  content: '¡Hola! 👋 Soy el asistente de planta. Puedo ayudarte con:\n\n• **Repuestos** — buscar piezas por nombre, código SAP o fabricante\n• **Incidencias** — ver reportes abiertos, filtrar por estado o prioridad\n• **Equipos** — consultar estado de máquinas y criticidad\n• **Resúmenes** — panorama general de la planta\n\nEntiendo errores de tipeo (escribí "moror" y entenderé "motor" 😉)\nRecuerdo tus consultas anteriores para darte respuestas más relevantes.\n\n¿En qué puedo ayudarte?',
+  content: '¡Hola! 👋 Soy **JARVIS**, el asistente inteligente de planta. Puedo:\n\n' +
+    '• 🔧 **Crear incidencias** — describe la falla y yo genero el reporte\n' +
+    '• 🔍 **Buscar repuestos** — por nombre, código SAP o fabricante\n' +
+    '• 📋 **Consultar incidencias** — estado, prioridad, historial\n' +
+    '• ⚙️ **Estado de equipos** — criticidad y disponibilidad\n' +
+    '• 📊 **Resúmenes** — panorama general de la planta\n\n' +
+    'Entiendo errores de tipeo y lenguaje natural.\n' +
+    'Ejemplo: *"se rompió la cinta de filete, hay que reemplazarla"* → creo la incidencia por ti.\n\n' +
+    '¿En qué puedo ayudarte?',
   timestamp: new Date(),
 }
 
@@ -56,6 +65,7 @@ export function useChatBot() {
   const [hasUnread, setHasUnread] = useState(false)
   const [streamingContent, setStreamingContent] = useState<string | null>(null)
   const [lastActions, setLastActions] = useState<ChatAction[]>([])
+  const [pendingAction, setPendingAction] = useState<PendingAction | null>(null)
   const abortRef = useRef(false)
   const isOpenRef = useRef(false)
   const prevUserIdRef = useRef(userId)
@@ -114,7 +124,7 @@ export function useChatBot() {
     try {
       const history = [...messages, userMsg].filter(m => m.role !== 'system')
 
-      const { reply, context, actions } = await sendChatMessage(
+      const result = await sendChatMessage(
         trimmed,
         history,
         // Streaming callback
@@ -124,20 +134,32 @@ export function useChatBot() {
           }
         },
         userId,
+        pendingAction,
       )
 
       if (abortRef.current) return
 
       setStreamingContent(null)
-      setLastActions(actions)
+      setLastActions(result.actions)
+
+      // Actualizar pending action
+      if (result.pendingAction) {
+        if (result.pendingAction.status === 'completed' || result.pendingAction.status === 'cancelled') {
+          setPendingAction(null)
+        } else {
+          setPendingAction(result.pendingAction)
+        }
+      } else if (!pendingAction) {
+        setPendingAction(null)
+      }
 
       const assistantMsg: ChatMessage = {
         id: generateId(),
         role: 'assistant',
-        content: reply,
+        content: result.reply,
         timestamp: new Date(),
-        context,
-        actions: actions.length > 0 ? actions : undefined,
+        context: result.context,
+        actions: result.actions.length > 0 ? result.actions : undefined,
       }
 
       setMessages(prev => [...prev, assistantMsg])
@@ -159,12 +181,13 @@ export function useChatBot() {
     } finally {
       setIsLoading(false)
     }
-  }, [messages, isLoading, userId])
+  }, [messages, isLoading, userId, pendingAction])
 
   const clearHistory = useCallback(() => {
     setMessages([WELCOME_MESSAGE])
     setStreamingContent(null)
     setLastActions([])
+    setPendingAction(null)
     localStorage.removeItem(getStorageKey(userId))
   }, [userId])
 
@@ -175,6 +198,7 @@ export function useChatBot() {
     hasUnread,
     streamingContent,
     lastActions,
+    pendingAction,
     toggle,
     open,
     close,

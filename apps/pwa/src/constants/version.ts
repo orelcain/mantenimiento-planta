@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.53.0' as const
+export const APP_VERSION = '2.54.0' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -11,12 +11,12 @@ export const APP_VERSION = '2.53.0' as const
 /**
  * Fecha de la versión actual
  */
-export const VERSION_DATE = '2026-02-25' as const
+export const VERSION_DATE = '2026-02-26' as const
 
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Chatbot v3: memoria por usuario, corrección de typos, contexto conversacional' as const
+export const VERSION_NAME = 'JARVIS Mode: chatbot crea incidencias por voz/texto, detección de acciones, confirmación inline' as const
 
 /**
  * Nota:
