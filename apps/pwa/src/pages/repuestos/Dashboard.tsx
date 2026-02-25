@@ -182,9 +182,9 @@ export function RepuestosDashboard() {
   }, [globalIndexedAt, globalIndexNow])
 
   const globalResults = useMemo(() => {
-    if (!globalSearchMode || !globalQuery.trim()) return []
+    if (!globalQuery.trim()) return []
     return globalSearch.search(globalQuery)
-  }, [globalSearchMode, globalQuery, globalSearch])
+  }, [globalQuery, globalSearch])
 
   const displayedGlobalResults = useMemo(() => globalResults.slice(0, 50), [globalResults])
 
@@ -203,13 +203,11 @@ export function RepuestosDashboard() {
       }
 
       const prefs = JSON.parse(raw) as {
-        globalSearchMode?: boolean
         globalQuery?: string
         searchQuery?: string
         pageSize?: number
       }
 
-      if (typeof prefs.globalSearchMode === 'boolean') setGlobalSearchMode(prefs.globalSearchMode)
       if (typeof prefs.globalQuery === 'string') setGlobalQuery(prefs.globalQuery)
       if (typeof prefs.searchQuery === 'string') setSearchQuery(prefs.searchQuery)
       if (typeof prefs.pageSize === 'number' && Number.isFinite(prefs.pageSize)) setPageSize(prefs.pageSize)
@@ -224,25 +222,22 @@ export function RepuestosDashboard() {
   useEffect(() => {
     if (!hasHydratedPrefsRef.current) return
     const payload = {
-      globalSearchMode,
       globalQuery,
       searchQuery,
       pageSize,
       updatedAt: Date.now(),
     }
     localStorage.setItem(dashboardPrefsKey, JSON.stringify(payload))
-  }, [dashboardPrefsKey, globalSearchMode, globalQuery, searchQuery, pageSize])
+  }, [dashboardPrefsKey, globalQuery, searchQuery, pageSize])
 
-  // Focus automático al abrir búsqueda global
+  // Estado visual del panel global: se muestra solo con query
   useEffect(() => {
-    if (globalSearchMode) {
-      setTimeout(() => globalInputRef.current?.focus(), 0)
-    }
-  }, [globalSearchMode])
+    setGlobalSearchMode(globalQuery.trim().length > 0)
+  }, [globalQuery])
 
   // Selección por teclado: reset cuando cambia el set de resultados
   useEffect(() => {
-    if (!globalSearchMode || !globalQuery.trim() || displayedGlobalResults.length === 0) {
+    if (!globalQuery.trim() || displayedGlobalResults.length === 0) {
       setSelectedGlobalResultIndex(-1)
       return
     }
@@ -250,7 +245,7 @@ export function RepuestosDashboard() {
       if (prev < 0) return 0
       return Math.min(prev, displayedGlobalResults.length - 1)
     })
-  }, [globalSearchMode, globalQuery, displayedGlobalResults])
+  }, [globalQuery, displayedGlobalResults])
 
   // Mantener visible la fila seleccionada con flechas
   useEffect(() => {
@@ -260,11 +255,9 @@ export function RepuestosDashboard() {
   }, [selectedGlobalResultIndex])
 
   const handleGlobalInputKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (!globalSearchMode) return
-
     if (event.key === 'Escape') {
       event.preventDefault()
-      setGlobalSearchMode(false)
+      setGlobalQuery('')
       return
     }
 
@@ -667,21 +660,28 @@ export function RepuestosDashboard() {
             </div>
 
             <div className="relative">
-              <Globe className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-emerald-500" />
+              <Globe className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <input
                 ref={globalInputRef}
                 type="text"
                 placeholder="Buscar en todas las máquinas..."
                 value={globalQuery}
-                onFocus={() => setGlobalSearchMode(true)}
                 onChange={(e) => {
-                  setGlobalSearchMode(true)
                   setGlobalQuery(e.target.value)
                 }}
                 onKeyDown={handleGlobalInputKeyDown}
-                className="w-full pl-9 pr-4 py-2 text-sm bg-background border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+                className="w-full pl-9 pr-9 py-2 text-sm bg-background border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30"
                 disabled={globalSearch.loading}
               />
+              {globalQuery && (
+                <button
+                  onClick={() => setGlobalQuery('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  title="Limpiar búsqueda global"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
             </div>
           </div>
 
@@ -714,7 +714,7 @@ export function RepuestosDashboard() {
                 Error de índice global
               </span>
             ) : globalLoaded ? (
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
                 Índice listo · {globalSearch.allRepuestos.length} repuestos{globalIndexedAtLabel ? ` · ${globalIndexedAtLabel}` : ''}{globalIndexedAgoLabel ? ` (${globalIndexedAgoLabel})` : ''}
               </span>
             ) : (
@@ -787,28 +787,6 @@ export function RepuestosDashboard() {
 
         {/* Content Area */}
         <div className="space-y-4">
-          {/* Machine Manual Panel — shows available PDFs */}
-          {currentMachine && (
-            <div className="space-y-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full justify-between"
-                onClick={() => setManualsExpanded((prev) => !prev)}
-              >
-                <span className="inline-flex items-center gap-2 text-xs sm:text-sm">
-                  <BookOpen className="h-4 w-4" />
-                  Manuales de la máquina
-                </span>
-                {manualsExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-              </Button>
-
-              {manualsExpanded && (
-                <MachineManualPanel machine={currentMachine} className="p-3 bg-card/50 rounded-xl border border-border" />
-              )}
-            </div>
-          )}
-
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="text-sm font-semibold text-foreground">Catálogo de repuestos</span>
@@ -821,10 +799,10 @@ export function RepuestosDashboard() {
           </div>
 
           {globalSearchMode && (
-            <div className="space-y-3 p-4 bg-emerald-500/5 border border-emerald-500/20 rounded-xl">
+            <div className="space-y-2.5 p-3 bg-card border border-border rounded-xl shadow-sm">
               <div className="flex items-center gap-2">
-                <Globe className="h-4 w-4 text-emerald-500" />
-                <span className="text-xs font-semibold text-emerald-600 uppercase tracking-wider">
+                <Globe className="h-4 w-4 text-primary" />
+                <span className="text-xs font-semibold text-foreground uppercase tracking-wider">
                   Búsqueda Global — Todas las máquinas
                 </span>
                 {globalSearch.loaded && (
@@ -848,13 +826,13 @@ export function RepuestosDashboard() {
                 <p className="text-xs text-destructive">{globalSearch.error}</p>
               )}
               {globalQuery.trim() && globalResults.length > 0 && (
-                <div ref={globalResultsRef} className="space-y-1.5 max-h-[400px] overflow-y-auto">
+                <div ref={globalResultsRef} className="space-y-1.5 max-h-[280px] overflow-y-auto pr-1">
                   <span className="text-[10px] text-muted-foreground">{globalResults.length} resultados</span>
                   {displayedGlobalResults.map((r, idx) => (
                     <div
                       id={`global-result-${idx}`}
                       key={`${r.machineId}-${r.repuesto.id}`}
-                      className={`flex items-center gap-2 p-2.5 bg-background border rounded-lg hover:bg-muted/30 hover:border-emerald-500/30 transition-colors text-sm group/result cursor-pointer ${selectedGlobalResultIndex === idx ? 'ring-2 ring-emerald-500/50 border-emerald-500/40 bg-emerald-500/5' : ''}`}
+                      className={`flex items-center gap-2 p-2.5 bg-background border rounded-lg hover:bg-muted/40 hover:border-primary/30 transition-colors text-sm group/result cursor-pointer ${selectedGlobalResultIndex === idx ? 'ring-2 ring-primary/40 border-primary/40 bg-primary/5' : ''}`}
                       onMouseEnter={() => setSelectedGlobalResultIndex(idx)}
                       onClick={() => handleNavigateToResult(r.machineId, r.repuesto.id)}
                     >
@@ -887,10 +865,10 @@ export function RepuestosDashboard() {
                       </div>
                       {/* Máquina + flecha */}
                       <div className="flex items-center gap-1.5 shrink-0">
-                        <span className="text-[10px] bg-emerald-500/10 text-emerald-600 px-2 py-0.5 rounded-full font-medium">
+                        <span className="text-[10px] bg-muted text-foreground px-2 py-0.5 rounded-full font-medium">
                           {r.machineName}
                         </span>
-                        <ExternalLink className="h-3 w-3 text-muted-foreground/50 group-hover/result:text-emerald-500 transition-colors" />
+                        <ExternalLink className="h-3 w-3 text-muted-foreground/50 group-hover/result:text-primary transition-colors" />
                       </div>
                     </div>
                   ))}

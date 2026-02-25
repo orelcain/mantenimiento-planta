@@ -7,6 +7,14 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.50.1] - 2026-02-25
+### Corrección
+- **Búsqueda global más intuitiva**: el panel de resultados se activa automáticamente al escribir en la búsqueda global (sin pasos extra)
+- **UI compacta y profesional**: se elimina el bloque visual verde dominante, se adopta estilo neutro del sistema y se compacta la altura del listado de resultados
+- **Limpieza de layout**: se elimina duplicidad del bloque de manuales para una pantalla más ordenada
+
+---
+
 ## [2.50.0] - 2026-02-25
 ### Funcionalidad
 - **Búsquedas reubicadas en cabecera de máquina**: la búsqueda local del equipo seleccionado aparece primero y la búsqueda global queda al lado para acceso directo
