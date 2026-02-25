@@ -7,6 +7,15 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.48.95] - 2026-02-24
+### Funcionalidad
+- **Ordenamiento de columnas en tabla de repuestos**: click en cualquier header (Código SAP, Repuesto, Cód. Fabricante, Cant/Máq, Valor Unit., Ubicación) para ordenar ascendente/descendente. Tercer click limpia el orden
+- **Indicadores visuales de orden**: flechas ↑↓ en la columna activa, icono sutil al hover en columnas inactivas
+
+### Corrección
+- **Fix búsqueda global**: corregido loop infinito potencial en useEffect por dependencia de objeto mutable. Ahora usa ref para guard de loading y dependencias estables
+- **Fix CI**: resuelto error `currentTemplate possibly undefined` con non-null assertion por noUncheckedIndexedAccess
+
 ## [2.48.94] - 2026-02-24
 ### Funcionalidad
 - **Ficha Técnica rediseñada completamente**: 11 tipos de componente (Motor, Bomba, Reductor, Cinta, Válvula, Sensor, Cilindro, Compresor, Intercambiador, Filtro, General) cada uno con campos técnicos específicos

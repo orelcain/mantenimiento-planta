@@ -6,7 +6,7 @@
  * todos los repuestos y luego filtra client-side.
  */
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { collection, getDocs } from 'firebase/firestore'
 import { db } from '@/services/firebase'
 import type { Repuesto, Machine } from '@/types/repuestos'
@@ -22,6 +22,7 @@ export function useGlobalSearch(machines: Machine[]) {
   const [loading, setLoading] = useState(false)
   const [loaded, setLoaded] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const loadingRef = useRef(false)
 
   /**
    * Carga todos los repuestos de todas las máquinas.
@@ -29,7 +30,8 @@ export function useGlobalSearch(machines: Machine[]) {
    * que requiere un índice de Firestore especial).
    */
   const loadAll = useCallback(async () => {
-    if (loading) return
+    if (loadingRef.current) return
+    loadingRef.current = true
     setLoading(true)
     setError(null)
 
@@ -65,9 +67,10 @@ export function useGlobalSearch(machines: Machine[]) {
       console.error('Error en búsqueda global:', err)
       setError('Error al buscar en todas las máquinas')
     } finally {
+      loadingRef.current = false
       setLoading(false)
     }
-  }, [machines, loading])
+  }, [machines])
 
   /** Filtra los resultados cargados por query de texto */
   const search = useCallback(

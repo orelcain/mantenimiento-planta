@@ -63,10 +63,12 @@ export function RepuestosDashboard() {
   const [globalQuery, setGlobalQuery] = useState('')
   const [, setSelectedCategoryId] = useState<string | null>('maquinas-principales')
 
-  // Filtros y paginación
+  // Filtros, ordenamiento y paginación
   const [searchQuery, setSearchQuery] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(25)
+  const [sortColumn, setSortColumn] = useState<string | null>(null)
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
 
   const {
     repuestos,
@@ -124,11 +126,12 @@ export function RepuestosDashboard() {
   const globalSearch = useGlobalSearch(machines)
 
   // Cuando se activa la búsqueda global, cargar todos los repuestos
+  const { loadAll: globalLoadAll, loaded: globalLoaded, loading: globalLoading } = globalSearch
   useEffect(() => {
-    if (globalSearchMode && !globalSearch.loaded && !globalSearch.loading) {
-      globalSearch.loadAll()
+    if (globalSearchMode && !globalLoaded && !globalLoading) {
+      globalLoadAll()
     }
-  }, [globalSearchMode, globalSearch])
+  }, [globalSearchMode, globalLoaded, globalLoading, globalLoadAll])
 
   const globalResults = useMemo(() => {
     if (!globalSearchMode || !globalQuery.trim()) return []
@@ -155,14 +158,74 @@ export function RepuestosDashboard() {
     return filtered
   }, [repuestos, searchQuery])
 
+  // Ordenar repuestos
+  const sortedRepuestos = useMemo(() => {
+    if (!sortColumn) return filteredRepuestos
+    const sorted = [...filteredRepuestos]
+    const dir = sortDirection === 'asc' ? 1 : -1
+    sorted.sort((a, b) => {
+      let va: string | number = ''
+      let vb: string | number = ''
+      switch (sortColumn) {
+        case 'codigoSAP':
+          va = a.codigoSAP || ''
+          vb = b.codigoSAP || ''
+          break
+        case 'textoBreve':
+          va = a.textoBreve || ''
+          vb = b.textoBreve || ''
+          break
+        case 'codigoFabricante':
+          va = a.codigoFabricante || ''
+          vb = b.codigoFabricante || ''
+          break
+        case 'cantidadPorMaquina':
+          va = a.cantidadPorMaquina || 0
+          vb = b.cantidadPorMaquina || 0
+          break
+        case 'valorUnitario':
+          va = a.valorUnitario || 0
+          vb = b.valorUnitario || 0
+          break
+        case 'ubicacionEnPlanta':
+          va = a.ubicacionEnPlanta || ''
+          vb = b.ubicacionEnPlanta || ''
+          break
+        default:
+          return 0
+      }
+      if (typeof va === 'string' && typeof vb === 'string') {
+        return va.localeCompare(vb, 'es') * dir
+      }
+      return ((va as number) - (vb as number)) * dir
+    })
+    return sorted
+  }, [filteredRepuestos, sortColumn, sortDirection])
+
+  const handleToggleSort = (column: string) => {
+    if (sortColumn === column) {
+      if (sortDirection === 'asc') {
+        setSortDirection('desc')
+      } else {
+        // Third click: clear sort
+        setSortColumn(null)
+        setSortDirection('asc')
+      }
+    } else {
+      setSortColumn(column)
+      setSortDirection('asc')
+    }
+    setCurrentPage(1)
+  }
+
   // Paginar repuestos
   const paginatedRepuestos = useMemo(() => {
     const startIndex = (currentPage - 1) * pageSize
     const endIndex = startIndex + pageSize
-    return filteredRepuestos.slice(startIndex, endIndex)
-  }, [filteredRepuestos, currentPage, pageSize])
+    return sortedRepuestos.slice(startIndex, endIndex)
+  }, [sortedRepuestos, currentPage, pageSize])
 
-  const totalPages = Math.max(1, Math.ceil(filteredRepuestos.length / pageSize))
+  const totalPages = Math.max(1, Math.ceil(sortedRepuestos.length / pageSize))
 
   // Reset a página 1 cuando cambien los filtros
   useEffect(() => {
@@ -515,6 +578,9 @@ export function RepuestosDashboard() {
                 loading={repuestosLoading}
                 machineId={currentMachine?.id}
                 isAdmin={isAdmin}
+                sortColumn={sortColumn}
+                sortDirection={sortDirection}
+                onToggleSort={handleToggleSort}
                 onEdit={isAdmin ? (rep) => setEditTarget(rep) : undefined}
                 onDelete={isAdmin ? (rep) => setConfirmDelete(rep) : undefined}
                 onViewPhotos={(rep) => setPhotoModal(rep)}

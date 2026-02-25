@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Package, ImageIcon, X, BookOpen, Eye, ClipboardList, Camera, Pencil, Trash2, ArrowRightLeft } from 'lucide-react'
+import { Package, ImageIcon, X, BookOpen, Eye, ClipboardList, Camera, Pencil, Trash2, ArrowRightLeft, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
 import type { Repuesto } from '@/types/repuestos'
 import { RepuestoActionsMenu } from './RepuestoActionsMenu'
 import { InlineEditName } from './InlineEditName'
@@ -21,6 +21,9 @@ interface RepuestosTableProps {
   loading?: boolean
   machineId?: string
   isAdmin?: boolean
+  sortColumn?: string | null
+  sortDirection?: 'asc' | 'desc'
+  onToggleSort?: (column: string) => void
   onEdit?: (repuesto: Repuesto) => void
   onDelete?: (repuesto: Repuesto) => void
   onViewManual?: (repuesto: Repuesto) => void
@@ -95,10 +98,56 @@ function QuickImagePreview({ url, name, onClose }: { url: string; name: string; 
 }
 
 
+/** Header de columna con sorting */
+function SortableTh({
+  column,
+  label,
+  sortColumn,
+  sortDirection,
+  onToggleSort,
+  className = '',
+}: {
+  column: string
+  label: string
+  sortColumn?: string | null
+  sortDirection?: 'asc' | 'desc'
+  onToggleSort?: (column: string) => void
+  className?: string
+}) {
+  const active = sortColumn === column
+  return (
+    <th
+      className={`px-3 py-3 font-semibold ${className} ${onToggleSort ? 'cursor-pointer select-none hover:text-foreground transition-colors group/sort' : ''}`}
+      onClick={() => onToggleSort?.(column)}
+    >
+      <span className="inline-flex items-center gap-1">
+        {label}
+        {onToggleSort && (
+          <span className="inline-flex">
+            {active ? (
+              sortDirection === 'asc' ? (
+                <ArrowUp className="h-3 w-3 text-primary" />
+              ) : (
+                <ArrowDown className="h-3 w-3 text-primary" />
+              )
+            ) : (
+              <ArrowUpDown className="h-3 w-3 opacity-0 group-hover/sort:opacity-40 transition-opacity" />
+            )}
+          </span>
+        )}
+      </span>
+    </th>
+  )
+}
+
+
 export function RepuestosTable({
   repuestos,
   loading,
   isAdmin,
+  sortColumn,
+  sortDirection,
+  onToggleSort,
   onEdit,
   onDelete,
   onViewManual,
@@ -235,12 +284,12 @@ export function RepuestosTable({
           <thead>
             <tr className="text-left text-[11px] uppercase tracking-wider text-muted-foreground bg-muted/30">
               <th className="pl-4 pr-2 py-3 font-semibold w-12"></th>
-              <th className="px-3 py-3 font-semibold">Código SAP</th>
-              <th className="px-3 py-3 font-semibold">Repuesto</th>
-              <th className="px-3 py-3 font-semibold">Cód. Fabricante</th>
-              <th className="px-3 py-3 font-semibold text-center">Cant/Máq</th>
-              <th className="px-3 py-3 font-semibold text-right">Valor Unit.</th>
-              <th className="px-3 py-3 font-semibold">Ubicación</th>
+              <SortableTh column="codigoSAP" label="Código SAP" sortColumn={sortColumn} sortDirection={sortDirection} onToggleSort={onToggleSort} />
+              <SortableTh column="textoBreve" label="Repuesto" sortColumn={sortColumn} sortDirection={sortDirection} onToggleSort={onToggleSort} />
+              <SortableTh column="codigoFabricante" label="Cód. Fabricante" sortColumn={sortColumn} sortDirection={sortDirection} onToggleSort={onToggleSort} />
+              <SortableTh column="cantidadPorMaquina" label="Cant/Máq" sortColumn={sortColumn} sortDirection={sortDirection} onToggleSort={onToggleSort} className="text-center" />
+              <SortableTh column="valorUnitario" label="Valor Unit." sortColumn={sortColumn} sortDirection={sortDirection} onToggleSort={onToggleSort} className="text-right" />
+              <SortableTh column="ubicacionEnPlanta" label="Ubicación" sortColumn={sortColumn} sortDirection={sortDirection} onToggleSort={onToggleSort} />
               <th className="px-3 py-3 font-semibold text-right">Acciones</th>
             </tr>
           </thead>
