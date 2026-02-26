@@ -71,10 +71,32 @@ export const usePermissionsStore = create<PermissionsState>()(
       
       // Cargar permisos del usuario
       loadPermissions: async (user: User) => {
-        // Si ya está cargando o es el mismo usuario, no hacer nada
         const state = get()
         if (state.isLoading) return
-        if (state.userId === user.id && state.isLoaded) return
+
+        // Si ya está cargado para este usuario, solo asegurar listener activo
+        if (state.userId === user.id && state.isLoaded) {
+          // Restablecer listener si no existe (ej: después de page refresh)
+          if (!state._unsubscribe) {
+            const unsubscribe = subscribeToUserPermissions(
+              user.id,
+              user.rol,
+              (updated) => {
+                set({
+                  permisos: updated.permisos,
+                  tieneOverride: updated.tieneOverride,
+                  cargadoDesde: updated.cargadoDesde,
+                })
+                logger.info('Permisos actualizados en tiempo real', {
+                  userId: user.id,
+                  tieneOverride: updated.tieneOverride,
+                })
+              }
+            )
+            set({ _unsubscribe: unsubscribe })
+          }
+          return
+        }
         
         // Limpiar listener anterior
         if (state._unsubscribe) {

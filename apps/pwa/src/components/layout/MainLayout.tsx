@@ -224,7 +224,6 @@ export function MainLayout() {
   }, [pendingWrites, isOnline, setLastSyncAt, toast])
 
   const { canSee } = usePermissionsStore()
-  const loadPermissions = usePermissionsStore((s) => s.loadPermissions)
 
   // Handler: admin self-enable ARIA
   const handleEnableAria = async () => {
@@ -241,8 +240,12 @@ export function MainLayout() {
         },
         user.id,
       )
-      // Recargar permisos para que el cambio se refleje inmediatamente
-      await loadPermissions(user)
+      // Actualizar permisos en el store inmediatamente (sin esperar listener)
+      const currentStorePerms = usePermissionsStore.getState().permisos
+      usePermissionsStore.setState({
+        permisos: { ...currentStorePerms, aria: { visible: true, actions: ['ver'] as import('@/types/permissions').ModuleAction[] } },
+        tieneOverride: true,
+      })
       toast({ title: 'ARIA Activado', description: 'El asistente ARIA está ahora disponible', variant: 'default' })
     } catch {
       toast({ title: 'Error', description: 'No se pudo activar ARIA', variant: 'destructive' })
