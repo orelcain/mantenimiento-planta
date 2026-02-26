@@ -512,12 +512,18 @@ function useSpeechRecognition() {
   return { isListening, transcript, startListening, stopListening, isSupported }
 }
 
-// ─── #5 Barra de acción pendiente con progreso visual ───────────────
-function PendingActionBar({ onConfirm, onCancel, pendingData }: {
+// ─── #5 Barra de acción pendiente con progreso visual + selector de equipo ──
+interface EquipmentCandidateUI { id: string; nombre: string; codigo: string; score: number }
+
+function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, pendingData }: {
   onConfirm: () => void
   onCancel: () => void
+  onModify: () => void
+  onSelectEquipment: (id: string, nombre: string) => void
   pendingData?: Record<string, unknown>
 }) {
+  const [showEquipmentPicker, setShowEquipmentPicker] = useState(false)
+
   // Calcular campos completados del draft
   const fields = [
     { key: 'titulo', label: 'Título', done: !!pendingData?.titulo },
@@ -527,6 +533,10 @@ function PendingActionBar({ onConfirm, onCancel, pendingData }: {
   ]
   const completed = fields.filter(f => f.done).length
   const total = fields.length
+
+  // Candidatos de equipo
+  const candidates = (pendingData?.equipmentCandidates as EquipmentCandidateUI[] | undefined) || []
+  const currentEquipmentId = pendingData?.equipmentId as string | undefined
 
   return (
     <div className="px-3 py-2 border-t border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-700">
@@ -545,6 +555,47 @@ function PendingActionBar({ onConfirm, onCancel, pendingData }: {
           </div>
         ))}
       </div>
+
+      {/* Selector de equipo (si hay candidatos) */}
+      {candidates.length > 1 && (
+        <div className="mb-2">
+          <button
+            onClick={() => setShowEquipmentPicker(p => !p)}
+            className="w-full text-left text-xs px-2 py-1.5 rounded-md border border-amber-300 dark:border-amber-600 bg-amber-100/50 dark:bg-amber-900/30 hover:bg-amber-100 dark:hover:bg-amber-900/50 transition-colors flex items-center justify-between"
+          >
+            <span className="truncate">
+              🏭 {pendingData?.equipmentName
+                ? `Equipo: ${pendingData.equipmentName as string}`
+                : 'Seleccionar equipo...'}
+            </span>
+            <ChevronUp className={`w-3.5 h-3.5 flex-shrink-0 transition-transform ${showEquipmentPicker ? '' : 'rotate-180'}`} />
+          </button>
+          {showEquipmentPicker && (
+            <div className="mt-1 max-h-32 overflow-y-auto rounded-md border border-border bg-background shadow-lg">
+              {candidates.map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => {
+                    onSelectEquipment(c.id, c.nombre)
+                    setShowEquipmentPicker(false)
+                  }}
+                  className={`w-full text-left px-2 py-1.5 text-xs hover:bg-muted transition-colors flex items-center gap-2 border-b border-border last:border-0 ${
+                    currentEquipmentId === c.id ? 'bg-primary/10 font-medium' : ''
+                  }`}
+                >
+                  <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                    c.score >= 0.7 ? 'bg-green-500' : c.score >= 0.4 ? 'bg-amber-500' : 'bg-gray-400'
+                  }`} />
+                  <span className="truncate flex-1">{c.nombre}</span>
+                  <span className="text-[9px] text-muted-foreground flex-shrink-0">{c.codigo}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Botones Sí / No / Modificar */}
       <div className="flex items-center gap-2">
         <button
           onClick={onConfirm}
@@ -552,6 +603,12 @@ function PendingActionBar({ onConfirm, onCancel, pendingData }: {
         >
           <CheckCircle className="w-3 h-3" />
           Confirmar
+        </button>
+        <button
+          onClick={onModify}
+          className="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-md bg-blue-600 text-white hover:bg-blue-700 transition-colors font-medium"
+        >
+          ✏️ Modificar
         </button>
         <button
           onClick={onCancel}
@@ -737,6 +794,16 @@ export function ChatBot() {
 
   const handleCancelAction = () => {
     sendMessage('No, cancelar')
+  }
+
+  const handleModifyAction = () => {
+    sendMessage('Modificar el borrador')
+  }
+
+  const handleSelectEquipment = (equipmentId: string, equipmentName: string) => {
+    // Informar selección al chat — chatbot actualizará el draft
+    void equipmentId // Used by chatbot via equipment name lookup
+    sendMessage(`Selecciono el equipo: ${equipmentName}`)
   }
 
   const handleFeedback = useCallback((messageId: string, rating: 'positive' | 'negative') => {
@@ -970,6 +1037,8 @@ export function ChatBot() {
             <PendingActionBar
               onConfirm={handleConfirmAction}
               onCancel={handleCancelAction}
+              onModify={handleModifyAction}
+              onSelectEquipment={handleSelectEquipment}
               pendingData={pendingAction.data as Record<string, unknown> | undefined}
             />
           )}

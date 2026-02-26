@@ -1985,6 +1985,37 @@ export async function sendChatMessage(
       }
     }
 
+    // Selección de equipo desde el picker de la UI
+    const equipSelectMatch = lower.match(/^selecciono? el equipo:\s*(.+)$/i)
+    if (equipSelectMatch) {
+      const selectedName = equipSelectMatch[1]!.trim()
+      // Buscar por nombre en los candidatos guardados o en la lista completa
+      const { findEquipmentByText } = await import('./chatActions')
+      const equipment = await findEquipmentByText(selectedName)
+
+      if (equipment) {
+        const updatedData = {
+          ...pendingAction.data,
+          equipmentId: equipment.id,
+          equipmentName: equipment.nombre,
+        }
+        const updatedDraft = updatedData as unknown as IncidentDraft
+        const draftDisplay = formatDraftForDisplay(updatedDraft)
+
+        return {
+          reply: `✅ Equipo actualizado a **${equipment.nombre}**.\n\n${draftDisplay}\n\n¿Confirmas la creación? (Sí / No / Modificar)`,
+          context: '',
+          actions: [{ label: 'Crear manualmente', route: '/incidents', icon: 'AlertTriangle' }],
+          typoCorrections: [],
+          pendingAction: {
+            ...pendingAction,
+            data: updatedData,
+            missingFields: pendingAction.missingFields.filter(f => f !== 'equipo'),
+          },
+        }
+      }
+    }
+
     // Si no es ni sí/no/modificar, procesar como ajuste al borrador
     // (ej: "cambia la prioridad a crítica")
     // Pasar al LLM con contexto del borrador para que genere respuesta inteligente
@@ -2006,14 +2037,22 @@ export async function sendChatMessage(
   
   if (detectedActionType === 'create_incident' && userId) {
     // Construir borrador de incidencia desde el texto
-    const { draft, equipment } = await buildIncidentDraft(userMessage, userId)
+    const { draft, equipment, equipmentCandidates } = await buildIncidentDraft(userMessage, userId)
     
-    // Crear PendingAction
+    // Crear PendingAction con candidatos de equipo
     const newPendingAction: PendingAction = {
       id: `action_${Date.now()}`,
       type: 'create_incident',
       status: 'confirming',
-      data: draft as unknown as Record<string, unknown>,
+      data: {
+        ...draft as unknown as Record<string, unknown>,
+        equipmentCandidates: equipmentCandidates.map(c => ({
+          id: c.equipment.id,
+          nombre: c.equipment.nombre,
+          codigo: c.equipment.codigo,
+          score: c.score,
+        })),
+      },
       missingFields: equipment ? [] : ['equipo'],
       createdAt: Date.now(),
     }
@@ -2021,7 +2060,9 @@ export async function sendChatMessage(
     const draftDisplay = formatDraftForDisplay(draft)
     let replyText = `🤖 Detecté que quieres reportar una falla. He preparado este borrador:\n\n${draftDisplay}\n\n`
 
-    if (!equipment) {
+    if (!equipment && equipmentCandidates.length > 0) {
+      replyText += `⚠️ Encontré varios equipos similares. **Selecciona el correcto** en el panel inferior.\n\n`
+    } else if (!equipment) {
       replyText += `⚠️ No pude identificar el equipo exacto. Puedes:\n• Decirme el nombre del equipo para buscarlo\n• Confirmar así y asignarlo después\n\n`
     }
 

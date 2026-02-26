@@ -128,34 +128,96 @@ export function detectPriority(text: string): IncidentPriority {
 
 // ─── Búsqueda fuzzy de equipo por texto libre ────────────────────────
 
-export async function findEquipmentByText(text: string): Promise<Equipment | null> {
+/** Devuelve los mejores candidatos de equipo con puntaje */
+export interface EquipmentCandidate {
+  equipment: Equipment
+  score: number
+}
+
+export async function findEquipmentCandidates(text: string, maxResults = 5): Promise<EquipmentCandidate[]> {
   try {
     const equipments = await getEquipments()
     const normalized = normalizeText(text)
-    
-    // Intentar match exacto primero
-    let best: Equipment | null = null
-    let bestScore = 0
-    
-    for (const eq of equipments) {
-      const eqText = normalizeText(`${eq.nombre} ${eq.codigo} ${eq.descripcion || ''} ${eq.hierarchyPath || ''}`)
-      
-      // Calcular score: cuántas palabras del query están en el equipo
-      const queryWords = normalized.split(/\s+/).filter(w => w.length > 2)
-      const matchCount = queryWords.filter(w => eqText.includes(w)).length
-      const score = queryWords.length > 0 ? matchCount / queryWords.length : 0
-      
-      if (score > bestScore && score >= 0.3) {
-        bestScore = score
-        best = eq
+    const queryWords = normalized.split(/\s+/).filter(w => w.length > 1)
+    if (queryWords.length === 0) return []
+
+    // Detectar tipo de equipo para filtro por categoría
+    const typeKeywords: Record<string, string[]> = {
+      cinta: ['cinta', 'correa', 'banda', 'faja', 'transportador'],
+      motor: ['motor'],
+      bomba: ['bomba'],
+      compresor: ['compresor'],
+      reductor: ['reductor'],
+      ventilador: ['ventilador'],
+      valvula: ['valvula', 'válvula'],
+      sensor: ['sensor'],
+      caldera: ['caldera'],
+      chiller: ['chiller', 'enfriador'],
+      maquina: ['maquina', 'máquina', 'equipo'],
+    }
+
+    // Detectar categoría del query
+    let detectedCategory: string | null = null
+    for (const [cat, keywords] of Object.entries(typeKeywords)) {
+      if (queryWords.some(w => keywords.some(k => w.includes(k) || k.includes(w)))) {
+        detectedCategory = cat
+        break
       }
     }
-    
-    return best
+
+    const candidates: EquipmentCandidate[] = []
+
+    for (const eq of equipments) {
+      if (eq.deleted) continue
+      const eqText = normalizeText(`${eq.nombre} ${eq.codigo} ${eq.descripcion || ''} ${eq.hierarchyPath || ''}`)
+      const eqWords = eqText.split(/\s+/)
+
+      // Calcular score multi-factor
+      let score = 0
+
+      // Factor 1: coincidencia de palabras del query en el equipo
+      const wordMatches = queryWords.filter(w => eqText.includes(w)).length
+      score += (wordMatches / queryWords.length) * 0.5
+
+      // Factor 2: coincidencia de números (importante para "baader 200", "cinta 3", etc.)
+      const queryNumbers = queryWords.filter(w => /^\d+$/.test(w))
+      const eqNumbers = eqWords.filter(w => /^\d+$/.test(w))
+      if (queryNumbers.length > 0) {
+        const numMatches = queryNumbers.filter(n => eqNumbers.includes(n)).length
+        score += (numMatches / queryNumbers.length) * 0.3
+      }
+
+      // Factor 3: bonus si la categoría del tipo coincide
+      if (detectedCategory) {
+        const catKws = typeKeywords[detectedCategory] || []
+        if (catKws.some(k => eqText.includes(k))) {
+          score += 0.15
+        }
+      }
+
+      // Factor 4: penalizar si el nombre es muy diferente (fuzzy por substring)
+      const eqNombre = normalizeText(eq.nombre)
+      const fullQuery = normalized
+      if (eqNombre.includes(fullQuery) || fullQuery.includes(eqNombre)) {
+        score += 0.15
+      }
+
+      if (score >= 0.25) {
+        candidates.push({ equipment: eq, score })
+      }
+    }
+
+    // Ordenar por score descendente y limitar
+    return candidates.sort((a, b) => b.score - a.score).slice(0, maxResults)
   } catch (err) {
-    logger.error('chatActions: error finding equipment', err instanceof Error ? err : undefined)
-    return null
+    logger.error('chatActions: error finding equipment candidates', err instanceof Error ? err : undefined)
+    return []
   }
+}
+
+export async function findEquipmentByText(text: string): Promise<Equipment | null> {
+  const candidates = await findEquipmentCandidates(text, 1)
+  return candidates.length > 0 && candidates[0]!.score >= 0.3 ? candidates[0]!.equipment : null
 }
 
 // ─── Extracción de datos de incidencia del texto libre ───────────────
@@ -257,17 +319,27 @@ export function extractIncidentFromText(text: string): ExtractedIncidentData {
 export async function buildIncidentDraft(
   text: string,
   _userId?: string,
-): Promise<{ draft: IncidentDraft; equipment: Equipment | null; missingFields: string[] }> {
+): Promise<{ draft: IncidentDraft; equipment: Equipment | null; missingFields: string[]; equipmentCandidates: EquipmentCandidate[] }> {
   const extracted = extractIncidentFromText(text)
   
-  // Buscar equipo mencionado
+  // Buscar equipos candidatos
+  let candidates: EquipmentCandidate[] = []
   let equipment: Equipment | null = null
+
   if (extracted.equipmentKeywords.length > 0) {
-    equipment = await findEquipmentByText(extracted.equipmentKeywords.join(' '))
+    candidates = await findEquipmentCandidates(extracted.equipmentKeywords.join(' '), 8)
   }
   // Si no encontramos por keywords, intentar con location hints
-  if (!equipment && extracted.locationHints.length > 0) {
-    equipment = await findEquipmentByText(extracted.locationHints.join(' ') + ' ' + extracted.equipmentKeywords.join(' '))
+  if (candidates.length === 0 && extracted.locationHints.length > 0) {
+    candidates = await findEquipmentCandidates(
+      extracted.locationHints.join(' ') + ' ' + extracted.equipmentKeywords.join(' '),
+      8
+    )
+  }
+
+  // Tomar el mejor como equipo principal
+  if (candidates.length > 0 && candidates[0]!.score >= 0.3) {
+    equipment = candidates[0]!.equipment
   }
 
   const draft: IncidentDraft = {
@@ -287,7 +359,7 @@ export async function buildIncidentDraft(
     missingFields.push('equipo')
   }
 
-  return { draft, equipment, missingFields }
+  return { draft, equipment, missingFields, equipmentCandidates: candidates }
 }
 
 // ─── Ejecutar creación de incidencia ─────────────────────────────────
