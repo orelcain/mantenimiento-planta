@@ -29,6 +29,7 @@ import type { User } from '@/types'
 import { 
   APP_MODULES, 
   MODULE_ACTIONS, 
+  MODULES_CONFIG,
   DEFAULT_ROLE_PERMISSIONS,
   type PermissionsMap,
   type UserPermissionsOverride,
@@ -331,12 +332,14 @@ export function PermissionsPage({ isEmbedded = false }: { isEmbedded?: boolean }
                 {APP_MODULES.map((moduleName) => {
                   const perms = currentUserPerms[moduleName]
                   const isVisible = perms?.visible ?? false
+                  const moduleConfig = MODULES_CONFIG.find(m => m.id === moduleName)
+                  const availableActions = moduleConfig?.accionesDisponibles ?? MODULE_ACTIONS
                   
                   return (
                     <Card key={moduleName} className={!isVisible ? 'opacity-70 bg-secondary/20' : ''}>
                       <CardHeader className="pb-3">
                         <div className="flex items-center justify-between">
-                          <CardTitle className="text-base capitalize">{moduleName}</CardTitle>
+                          <CardTitle className="text-base">{moduleConfig?.nombre ?? moduleName}</CardTitle>
                           <Switch 
                             checked={isVisible}
                             onCheckedChange={(checked) => handleModuleToggle(moduleName, checked)}
@@ -345,7 +348,7 @@ export function PermissionsPage({ isEmbedded = false }: { isEmbedded?: boolean }
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-3">
-                          {MODULE_ACTIONS.map((action) => (
+                          {availableActions.map((action) => (
                             <div key={`${moduleName}-${action}`} className="flex items-center space-x-2">
                               <Switch 
                                 id={`${moduleName}-${action}`}
