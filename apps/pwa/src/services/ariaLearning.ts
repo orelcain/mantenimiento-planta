@@ -221,7 +221,7 @@ async function findSimilarKnowledge(queryText: string): Promise<AriaKnowledge | 
 function extractCompactAnswer(response: string): string {
   // Remover emojis, markdown pesado, y limitar longitud
   return response
-    .replace(/[^\w\sáéíóúñüÁÉÍÓÚÑÜ.,;:!?()%$#\-\/]/g, '')
+    .replace(/[^\w\sáéíóúñüÁÉÍÓÚÑÜ.,;:!?()%$#\-/]/g, '')
     .replace(/\s+/g, ' ')
     .trim()
     .slice(0, 500)
