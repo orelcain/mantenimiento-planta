@@ -86,10 +86,12 @@ const TASK_TO_CAPABILITY: Record<TaskType, AgentCapability> = {
 // DETECCIÓN AUTOMÁTICA de tipo de tarea
 // ═══════════════════════════════════════════════════════════════════════
 
-const REASONING_PATTERNS = /\b(por qu[eé]|analiz|compar|evalu|diagnostic|razon|explain|causa ra[ií]z|root cause|profund|complej)\b/i
-const CODE_PATTERNS = /\b(c[oó]digo|script|funci[oó]n|variable|debug|error de c|programar?|api|json|sql)\b/i
-const SPEED_PATTERNS = /\b(r[aá]pid|quick|simple|s[ií]|no|ok|hola|list|dame|cu[aá]nto)\b/i
-const ANALYSIS_PATTERNS = /\b(tendencia|histori|estad[ií]stic|patr[oó]n|predicti|gr[aá]fic|reporte|resumen|sensor|telemetr[ií]a)\b/i
+const REASONING_PATTERNS = /\b(por qu[eé]|analiz[ae]|compar|evalu|diagnostic|razon|explain|causa ra[ííi]z|root cause|profund|complej|investigar?|deduci|hipotesis|conclusi[oó]n)\b/i
+const CODE_PATTERNS = /\b(c[oó]digo|script|funci[oó]n|variable|debug|error de c|programar?|api|json|sql|regex|algoritmo)\b/i
+const SPEED_PATTERNS = /\b(r[aá]pid|quick|simple|s[ííi]|no|ok|hola|list|dame|cu[aá]nto|gracias|chao|adi[oó]s)\b/i
+const ANALYSIS_PATTERNS = /\b(tendencia|histori|estad[ííi]stic|patr[oó]n|predicti|gr[aá]fic|reporte|resumen|sensor|telemetr[ííi]a|consumo|m[eé]trica|kpi|indicador|rendimiento|eficiencia|producci[oó]n)\b/i
+// Palabras clave del contexto industrial de la planta
+const INDUSTRIAL_PATTERNS = /\b(repuesto|motor|grader|bomba|compresor|variador|plc|equipo|componente|falla|incidencia|mantenci[oó]n|mantenimiento|cat[aá]logo|stock|inventario|sap|t[eé]cnico|operador|turno|alerta|cr[ií]tic)\b/i
 
 export function detectTaskType(userMessage: string): TaskType {
   const msg = userMessage.toLowerCase()
@@ -98,6 +100,8 @@ export function detectTaskType(userMessage: string): TaskType {
   if (REASONING_PATTERNS.test(msg)) return 'reasoning'
   if (CODE_PATTERNS.test(msg)) return 'code'
   if (ANALYSIS_PATTERNS.test(msg)) return 'analysis'
+  // Consultas industriales requieren análisis de contexto (RAG) — usar agentes fuertes
+  if (INDUSTRIAL_PATTERNS.test(msg)) return 'analysis'
   if (SPEED_PATTERNS.test(msg) && msg.length < 60) return 'speed'
   return 'general'
 }

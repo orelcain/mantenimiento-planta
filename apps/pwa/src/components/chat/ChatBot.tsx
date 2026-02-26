@@ -452,16 +452,36 @@ function AgentActivityIndicator({ status }: { status: AgentStatusEvent }) {
 
 /** Badge pequeño que muestra qué agente generó una respuesta */
 function AgentBadge({ agentInfo }: { agentInfo: NonNullable<import('@/services/chatbot').ChatMessage['agentInfo']> }) {
+  const taskLabels: Record<string, string> = {
+    reasoning: '🧠 razonamiento',
+    analysis: '📊 análisis',
+    code: '💻 código',
+    speed: '⚡ rápido',
+    general: '🔄 general',
+    vision: '👁️ visión',
+  }
   return (
-    <div className="flex items-center gap-1 mt-1 text-[10px] text-muted-foreground opacity-70">
+    <div className="flex items-center gap-1 mt-1 text-[10px] text-muted-foreground opacity-70 flex-wrap">
       <span>{agentInfo.agentEmoji}</span>
       <span>{agentInfo.agentName}</span>
       <span>·</span>
       <span>{agentInfo.latencyMs > 1000 ? `${(agentInfo.latencyMs / 1000).toFixed(1)}s` : `${agentInfo.latencyMs}ms`}</span>
+      {agentInfo.taskType && (
+        <>
+          <span>·</span>
+          <span>{taskLabels[agentInfo.taskType] || agentInfo.taskType}</span>
+        </>
+      )}
+      {agentInfo.thinkingUsed && (
+        <>
+          <span>·</span>
+          <span className="text-purple-400">🧠 deep think</span>
+        </>
+      )}
       {agentInfo.fallbackUsed && (
         <>
           <span>·</span>
-          <span className="text-amber-500">fallback</span>
+          <span className="text-amber-500">⚠ fallback</span>
         </>
       )}
     </div>

@@ -137,7 +137,7 @@ function registerDefaults() {
       provider: 'groq',
       model: 'llama-3.3-70b-versatile',
       emoji: '🦙',
-      capabilities: ['general', 'speed', 'code'],
+      capabilities: ['general', 'speed', 'code', 'analysis'],
       priority: 70,
       costTier: 'free',
       dailyLimit: 14400,

@@ -30,6 +30,8 @@ export interface ChatMessage {
     agentEmoji: string
     latencyMs: number
     fallbackUsed: boolean
+    taskType?: string
+    thinkingUsed?: boolean
   }
 }
 
@@ -1613,6 +1615,8 @@ export interface ChatResponse {
     agentEmoji: string
     latencyMs: number
     fallbackUsed: boolean
+    taskType?: string
+    thinkingUsed?: boolean
   }
 }
 
@@ -2317,6 +2321,8 @@ export async function sendChatMessage(
         agentEmoji: orchResult.agentEmoji,
         latencyMs: orchResult.latencyMs,
         fallbackUsed: orchResult.fallbackUsed,
+        taskType,
+        thinkingUsed: thinkingWasUsed,
       },
     }
   } catch (err) {
