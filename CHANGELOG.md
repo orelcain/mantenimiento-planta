@@ -7,6 +7,15 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.64.3] - 2026-02-26
+### Mejorado
+- **RAG repuestos completo**: muestra TODOS los repuestos encontrados incluyendo Cant: 0 (sin stock pero catalogados), con descripción y ubicación en planta
+- **Conteo explícito en contexto RAG**: cabecera "TOTAL: N encontrados (X con stock, Y sin stock)" + instrucción obligatoria para el LLM de listar todos
+- **SYSTEM_PROMPT reforzado**: prohíbe la palabra "disponible" como filtro, obliga usar "en catálogo" y mostrar ✅/⚠️ por stock
+
+### Corregido
+- **Firestore permissions para ARIA**: agregadas reglas de seguridad para `ariaMissionLogs`, `ariaThinkingUsage`, `ariaMemory` y `ariaLearning` — resuelve error "Missing or insufficient permissions"
+
 ## [2.64.0] - 2026-02-26
 ### Agregado
 - **Agent Activity Indicator**: indicador animado en la zona de chat que muestra qué agente IA está trabajando en cada fase (analizando, seleccionando, llamando, streaming, fallback)

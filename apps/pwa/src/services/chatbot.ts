@@ -1197,9 +1197,10 @@ async function fetchRepuestosSummary(userQuery: string): Promise<string> {
       // Listar todos los repuestos de la máquina filtrada (sin búsqueda de componente)
       if (listAllForMachine) {
         reps.forEach(r => {
-          const stockNote = (r.cantidadPorMaquina || 0) === 0 ? ' [SIN STOCK]' : ''
+          const cant = r.cantidadPorMaquina ?? 0
+          const stockNote = cant === 0 ? ' [SIN STOCK - CATALOGADO]' : ` [${cant} en stock]`
           matchedRepuestos.push(
-            `  ✓ [${machine.nombre}] ${r.textoBreve} | SAP: ${r.codigoSAP} | Fab: ${r.codigoFabricante} | Cant: ${r.cantidadPorMaquina} | $${r.valorUnitario}${stockNote}`
+            `  ✓ [${machine.nombre}] ${r.textoBreve} | SAP: ${r.codigoSAP} | Fab: ${r.codigoFabricante} | Cant: ${cant}${stockNote} | $${r.valorUnitario}`
           )
         })
         continue
@@ -1230,9 +1231,12 @@ async function fetchRepuestosSummary(userQuery: string): Promise<string> {
           })
           
           if (matchedTerms.length >= componentTerms.length) {
-            const stockNote = (r.cantidadPorMaquina || 0) === 0 ? ' [SIN STOCK]' : ''
+            const cant = r.cantidadPorMaquina ?? 0
+            const stockNote = cant === 0 ? ' [SIN STOCK - CATALOGADO]' : ` [${cant} en stock]`
+            const desc = r.descripcion ? ` | Desc: ${r.descripcion.slice(0, 60)}` : ''
+            const ubic = r.ubicacionEnPlanta ? ` | Ubic: ${r.ubicacionEnPlanta}` : ''
             matchedRepuestos.push(
-              `  ✓ [${machine.nombre}] ${r.textoBreve} | SAP: ${r.codigoSAP} | Fab: ${r.codigoFabricante} | Cant: ${r.cantidadPorMaquina} | $${r.valorUnitario}${stockNote}`
+              `  ✓ [${machine.nombre}] ${r.textoBreve}${desc} | SAP: ${r.codigoSAP} | Fab: ${r.codigoFabricante} | Cant: ${cant}${stockNote} | $${r.valorUnitario}${ubic}`
             )
           } else {
             // Log para debugging: por qué no matchó
@@ -1259,13 +1263,19 @@ async function fetchRepuestosSummary(userQuery: string): Promise<string> {
       const searchLabel = componentTerms.length > 0
         ? `"${componentTerms.join(' ')}" en ${machineNames}`
         : `todos los repuestos de ${machineNames}`
-      lines.push('', `COINCIDENCIAS con ${searchLabel} (${matchedRepuestos.length} encontrados):`)
+      const withStock = matchedRepuestos.filter(r => r.includes('en stock]')).length
+      const noStock = matchedRepuestos.filter(r => r.includes('SIN STOCK')).length
+      lines.push('', `COINCIDENCIAS con ${searchLabel} — TOTAL: ${matchedRepuestos.length} encontrados (${withStock} con stock, ${noStock} sin stock):`)
+      lines.push(`⚠️ ARIA: Debes listar TODOS los ${matchedRepuestos.length} repuestos encontrados abajo, tanto los que tienen stock como los que NO tienen. NO omitas ninguno.`)
       lines.push(...matchedRepuestos.slice(0, 40))
       if (matchedRepuestos.length > 40) {
         lines.push(`... y ${matchedRepuestos.length - 40} más`)
       }
     } else if (matchedRepuestos.length > 0) {
-      lines.push('', `COINCIDENCIAS con "${searchTerms.join(' ')}" (${matchedRepuestos.length} encontrados):`)
+      const withStock = matchedRepuestos.filter(r => r.includes('en stock]')).length
+      const noStock = matchedRepuestos.filter(r => r.includes('SIN STOCK')).length
+      lines.push('', `COINCIDENCIAS con "${searchTerms.join(' ')}" — TOTAL: ${matchedRepuestos.length} encontrados (${withStock} con stock, ${noStock} sin stock):`)
+      lines.push(`⚠️ ARIA: Debes listar TODOS los ${matchedRepuestos.length} repuestos. NO omitas ninguno.`)
       lines.push(...matchedRepuestos.slice(0, 30))
       if (matchedRepuestos.length > 30) {
         lines.push(`... y ${matchedRepuestos.length - 30} más`)
@@ -1488,12 +1498,15 @@ REGLAS cuando el usuario describe un problema/falla:
 - USA los datos de EQUIPOS del contexto para identificar la máquina correcta
 - USA los datos de USUARIOS del contexto para sugerir asignación
 
-REGLAS CRÍTICAS para responder sobre repuestos:
-- Si el contexto dice "COINCIDENCIAS con X (N encontrados)" → ESOS SON LOS RESULTADOS REALES. Enuméralos TODOS sin omitir ninguno.
-- SIEMPRE muestra TODOS los repuestos encontrados, incluyendo los que tienen Cantidad: 0. Un repuesto con Cant: 0 significa que está en el catálogo pero no hay stock — igualmente debe listarse.
-- Si hay coincidencias, di cuántas hay y muéstralas con sus datos (máquina, SAP, fabricante, cantidad, precio)
-- Si no hay coincidencias, explica que no se encontraron y sugiere buscar por código SAP o fabricante
-- NUNCA filtres ni omitas resultados por tu cuenta. Si el sistema encontró N coincidencias, tú DEBES mostrar las N.
+REGLAS CRÍTICAS para responder sobre repuestos (OBLIGATORIO):
+- Si el contexto dice "COINCIDENCIAS... TOTAL: N encontrados" → ESOS SON LOS RESULTADOS REALES DEL SISTEMA. Debes enumerar TODOS sin omitir ninguno.
+- MUESTRA TODOS los repuestos encontrados, INCLUYENDO los de Cant: 0 [SIN STOCK]. Un repuesto con Cant: 0 significa que EXISTE en el catálogo pero no tiene stock — el usuario NECESITA saberlo.
+- Di "Se encontraron N repuestos en el catálogo" (NO digas "N disponibles" porque eso excluye los sin stock).
+- Para cada repuesto muestra: nombre, máquina, SAP, fabricante, cantidad, precio y ubicación si está disponible.
+- Indica claramente cuáles tienen stock y cuáles no: ej. "✅ Cant: 1" o "⚠️ Cant: 0 — sin stock"
+- Si no hay coincidencias, explica que no se encontraron y sugiere buscar por código SAP o fabricante.
+- JAMÁS filtres ni omitas resultados por tu cuenta. Si el sistema encontró N coincidencias, tú DEBES mostrar las N.
+- NUNCA uses la palabra "disponible" para filtrar resultados. Usa "en catálogo" o "encontrado".
 
 MÓDULOS DE LA APP (tienes acceso completo a todos):
 

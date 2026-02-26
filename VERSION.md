@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.64.2**
+## Versión Actual: **v2.64.3**
 
 **Fecha de lanzamiento**: 26 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,12 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.64.3 — RAG repuestos mejorado + Firestore rules ARIA (26/02/2026)
+- 🔍 **RAG mejorado**: ahora muestra TODOS los repuestos encontrados (con y sin stock), incluye descripción y ubicación
+- 📊 **Conteo explícito**: contexto RAG indica "N encontrados (X con stock, Y sin stock)" con instrucción obligatoria de listar todos
+- 🛡️ **SYSTEM_PROMPT reforzado**: prohíbe filtrar por "disponible", obliga a usar "en catálogo" y mostrar items con Cant: 0
+- 🔐 **Firestore rules**: reglas de seguridad para ariaMissionLogs, ariaThinkingUsage, ariaMemory y ariaLearning
 
 ### v2.64.2 — Detección inteligente de tareas + AgentBadge mejorado (26/02/2026)
 - 🏭 **Patrones industriales**: detecta repuesto, motor, grader, bomba, variador → clasifica como `analysis`

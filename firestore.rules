@@ -384,6 +384,34 @@ service cloud.firestore {
     }
 
     // ============================================
+    // ARIA – Mission Control Logs
+    // ============================================
+    match /ariaMissionLogs/{date}/entries/{entryId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAdmin();
+    }
+
+    // ARIA – Thinking-usage metering
+    match /ariaThinkingUsage/{date}/users/{userId} {
+      allow read: if isAdmin() || request.auth.uid == userId;
+      allow create, update: if isAuthenticated() && request.auth.uid == userId;
+      allow delete: if isAdmin();
+    }
+
+    // ARIA – Per-user memory / context
+    match /ariaMemory/{userId} {
+      allow read, write: if isAdmin() || request.auth.uid == userId;
+    }
+
+    // ARIA – Collective learning entries
+    match /ariaLearning/{docId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAdmin();
+    }
+
+    // ============================================
     // REPUESTOS - CATEGORÍAS DE MÁQUINAS
     // ============================================
     match /machineCategories/{categoryId} {
