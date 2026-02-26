@@ -1423,12 +1423,12 @@ function parseSuggestions(text: string): { cleanText: string; suggestions: strin
   const regex = /\n?\[SUGERENCIAS\]\s*:\s*(.+)$/im
   const match = text.match(regex)
 
-  if (!match) {
+  if (!match?.[1]) {
     return { cleanText: text.trim(), suggestions: [] }
   }
 
   const cleanText = text.replace(regex, '').trim()
-  const raw = match[1]
+  const raw = match[1]!
 
   // Extraer textos entre comillas separados por |
   const suggestions: string[] = []
