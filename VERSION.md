@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.64.0**
+## Versión Actual: **v2.64.2**
 
 **Fecha de lanzamiento**: 26 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,17 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.64.2 — Detección inteligente de tareas + AgentBadge mejorado (26/02/2026)
+- 🏭 **Patrones industriales**: detecta repuesto, motor, grader, bomba, variador → clasifica como `analysis`
+- 🧠 **AgentBadge mejorado**: muestra tipo de tarea, indicador de pensamiento profundo, y warning de fallback
+- 📊 **taskType + thinkingUsed**: se guardan en cada ChatMessage para trazabilidad
+- 🦙 **Llama**: agregar capability `analysis` como fallback para consultas industriales
+
+### v2.64.1 — Fix Firestore undefined + API Keys desde admin (26/02/2026)
+- 🔧 **Fix Firestore**: filtrar campos `undefined` antes de escribir MissionLog (error setDoc)
+- 🔑 **API Keys en admin**: sección en Mission Control para configurar DeepSeek/Groq/Gemini sin rebuild
+- 🔄 **providerKeys en Firestore**: las keys se aplican en runtime al cargar config
 
 ### v2.64.0 — ARIA Agent Activity: Transparencia multi-agente en chat (26/02/2026)
 - 🔍 **Agent Activity Indicator**: indicador animado en el chat muestra qué agente IA está trabajando en tiempo real
