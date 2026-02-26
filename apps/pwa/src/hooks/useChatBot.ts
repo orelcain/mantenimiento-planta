@@ -4,7 +4,7 @@
  * Memoria por usuario, corrección de typos, historial persistente por userId
  */
 import { useState, useCallback, useRef, useEffect } from 'react'
-import { sendChatMessage, type ChatMessage, type ChatAction, type PendingAction } from '@/services/chatbot'
+import { sendChatMessage, generateDailySummary, type ChatMessage, type ChatAction, type PendingAction } from '@/services/chatbot'
 import { RateLimitError } from '@/services/ai'
 import { uploadChatPhoto } from '@/services/chatActions'
 import { useAuthStore } from '@/store/authStore'
@@ -102,17 +102,44 @@ export function useChatBot() {
     }
   }, [])
 
+  // #4 — Resumen ejecutivo diario: se dispara al abrir el chat la primera vez del día
+  const dailySummaryTriggered = useRef(false)
+  const triggerDailySummary = useCallback(async () => {
+    if (dailySummaryTriggered.current || !userId) return
+    const todayKey = `aria_daily_${userId}_${new Date().toISOString().slice(0, 10)}`
+    if (localStorage.getItem(todayKey)) return
+    dailySummaryTriggered.current = true
+
+    try {
+      const summary = await generateDailySummary()
+      if (summary) {
+        const summaryMsg: ChatMessage = {
+          id: generateId(),
+          role: 'assistant',
+          content: `📋 **Resumen del día — ${new Date().toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' })}**\n\n${summary}`,
+          timestamp: new Date(),
+        }
+        setMessages(prev => [...prev, summaryMsg])
+        localStorage.setItem(todayKey, '1')
+      }
+    } catch { /* non-blocking */ }
+  }, [userId])
+
   const toggle = useCallback(() => {
     setIsOpen(prev => {
-      if (!prev) setHasUnread(false)
+      if (!prev) {
+        setHasUnread(false)
+        triggerDailySummary()
+      }
       return !prev
     })
-  }, [])
+  }, [triggerDailySummary])
 
   const open = useCallback(() => {
     setIsOpen(true)
     setHasUnread(false)
-  }, [])
+    triggerDailySummary()
+  }, [triggerDailySummary])
 
   const close = useCallback(() => {
     setIsOpen(false)

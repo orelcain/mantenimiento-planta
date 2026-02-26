@@ -574,6 +574,12 @@ interface CacheEntry {
 const CACHE_TTL_MS = 3 * 60 * 1000
 const contextCache = new Map<string, CacheEntry>()
 
+/** #2 — Cache inteligente: normaliza la key semánticamente para reutilizar resultados similares */
+function normalizeCacheKey(prefix: string, query: string): string {
+  const { terms } = extractSearchTerms(query)
+  return `${prefix}_${terms.sort().join('_')}`
+}
+
 function getCached(key: string): string | null {
   const entry = contextCache.get(key)
   if (!entry) return null
@@ -586,6 +592,37 @@ function getCached(key: string): string | null {
 
 function setCache(key: string, data: string): void {
   contextCache.set(key, { data, timestamp: Date.now() })
+  // Limpiar entradas expiradas (max 30)
+  if (contextCache.size > 30) {
+    const now = Date.now()
+    for (const [k, v] of contextCache) {
+      if (now - v.timestamp > CACHE_TTL_MS) contextCache.delete(k)
+    }
+  }
+}
+
+/** #1 — Fuzzy match: coincidencia parcial tolerante a errores */
+function fuzzyMatch(text: string, term: string): boolean {
+  // Exact substring match
+  if (text.includes(term)) return true
+  // Partial match: el term aparece como parte de una palabra en text
+  const words = text.split(/\s+/)
+  for (const word of words) {
+    if (word.includes(term) || term.includes(word)) return true
+    // Levenshtein fuzzy: permite 1-2 errores según longitud
+    if (term.length >= 4 && word.length >= 4) {
+      const maxDist = term.length <= 5 ? 1 : 2
+      if (levenshtein(word, term) <= maxDist) return true
+      // Check substrings of word against term for compound words (e.g. 'motorreductor' contains 'motor')
+      if (word.length > term.length + 2) {
+        for (let i = 0; i <= word.length - term.length; i++) {
+          const sub = word.substring(i, i + term.length)
+          if (levenshtein(sub, term) <= 1) return true
+        }
+      }
+    }
+  }
+  return false
 }
 
 // ─── Consultas Firestore (RAG context) ───────────────────────────────
@@ -1015,7 +1052,8 @@ async function fetchSensorsSummary(): Promise<string> {
 }
 
 async function fetchRepuestosSummary(userQuery: string): Promise<string> {
-  const cacheKey = `repuestos_${normalizeText(userQuery)}`
+  // #2 — Cache semántico: normaliza query para reutilizar resultados
+  const cacheKey = normalizeCacheKey('repuestos', userQuery)
   const cached = getCached(cacheKey)
   if (cached) return cached
 
@@ -1110,21 +1148,20 @@ async function fetchRepuestosSummary(userQuery: string): Promise<string> {
             `${r.textoBreve} ${r.descripcion} ${r.codigoSAP} ${r.codigoFabricante} ${r.nombreManual || ''} ${r.ubicacionEnPlanta || ''}`
           )
 
-          // Búsqueda simplificada: verificar si CUALQUIER componentTerm o sus sinónimos aparece en el texto
+          // #1 — Búsqueda fuzzy: match parcial + tolerancia a errores + sinónimos
           const matchedTerms = componentTerms.filter(term => {
-            // Búsqueda directa del término
-            if (text.includes(term)) return true
-            // Búsqueda por sinónimos expandidos
+            // Fuzzy match directo del término (incluye Levenshtein + substring parcial)
+            if (fuzzyMatch(text, term)) return true
+            // Búsqueda por sinónimos expandidos con fuzzy
             return expandedTerms.some(et => {
-              if (et === term) return false // ya comprobado arriba
-              // Verificar que et es sinónimo de term
+              if (et === term) return false
               const isSynonym = SYNONYM_MAP_ENTRIES.some(([, syns]) => {
                 const normSyns = syns.map(s => normalizeText(s))
                 const termInGroup = normSyns.includes(term) || normSyns.some(ns => term.includes(ns) || ns.includes(term))
                 const etInGroup = normSyns.includes(et) || normSyns.some(ns => et.includes(ns) || ns.includes(et))
                 return termInGroup && etInGroup
               })
-              return isSynonym && text.includes(et)
+              return isSynonym && fuzzyMatch(text, et)
             })
           })
           
@@ -1198,9 +1235,33 @@ async function fetchRepuestosSummary(userQuery: string): Promise<string> {
         lines.push('')
         lines.push(`INSTRUCCIÓN: Analiza esta lista y busca repuestos que podrían ser "${componentTerms.join(' ')}" aunque el nombre no contenga exactamente esa palabra. Los motores pueden aparecer como "drum motor", "moto-reductor", "interroll", "motriz", etc.`)
       } else {
+        // #3 — FALLBACK AUTO-EXPAND: sin máquina específica y 0 matches → buscar en TODAS las máquinas con fuzzy
         lines.push('', `No se encontraron repuestos que coincidan exactamente con "${searchTerms.join(' ')}".`)
-        lines.push(`(Se buscó con sinónimos: ${expandedTerms.slice(0, 15).join(', ')})`)
-        lines.push(`Nota: los repuestos pueden estar registrados con nombres técnicos o códigos SAP diferentes.`)
+        lines.push(`Buscando con coincidencia ampliada en TODAS las máquinas...`)
+        lines.push('')
+        
+        let fallbackMatches = 0
+        for (const machine of machines) {
+          const repSnap = await getDocs(collection(db, `machines/${machine.id}/repuestos`))
+          const reps = repSnap.docs.map(d => ({ id: d.id, ...d.data() })) as Repuesto[]
+          for (const r of reps) {
+            const rText = normalizeText(`${r.textoBreve} ${r.descripcion} ${r.codigoSAP} ${r.codigoFabricante} ${r.nombreManual || ''}`)
+            const anyTermMatch = searchTerms.some(t => fuzzyMatch(rText, t)) || expandedTerms.some(t => fuzzyMatch(rText, t))
+            if (anyTermMatch && fallbackMatches < 30) {
+              const stockNote = (r.cantidadPorMaquina || 0) === 0 ? ' [SIN STOCK]' : ''
+              lines.push(`  ✓ [${machine.nombre}] ${r.textoBreve} | SAP: ${r.codigoSAP} | Fab: ${r.codigoFabricante} | Cant: ${r.cantidadPorMaquina} | $${r.valorUnitario}${stockNote}`)
+              fallbackMatches++
+            }
+          }
+        }
+
+        if (fallbackMatches > 0) {
+          lines.splice(lines.length - fallbackMatches, 0, `COINCIDENCIAS AMPLIADAS (${fallbackMatches} encontrados con búsqueda flexible):`)
+        } else {
+          lines.push(`No se encontraron resultados ni con búsqueda ampliada.`)
+          lines.push(`(Se buscó: ${[...new Set([...searchTerms, ...expandedTerms.slice(0, 10)])].join(', ')})`)
+          lines.push(`Sugerencia: intenta buscar por código SAP, fabricante o nombre técnico exacto.`)
+        }
       }
     }
 
@@ -1469,6 +1530,48 @@ export interface ChatResponse {
   typoCorrections: string[]
   pendingAction?: PendingAction
   suggestions?: string[]
+}
+
+// ─── #4 Resumen ejecutivo diario ─────────────────────────────────────
+
+/** Genera un resumen proactivo de la planta al abrir el chat por primera vez en el día */
+export async function generateDailySummary(): Promise<string | null> {
+  if (!isAIConfigured()) return null
+
+  try {
+    // Cargar datos clave en paralelo
+    const [incidentsSummary, equipmentSummary, preventiveSummary] = await Promise.all([
+      fetchIncidentsSummary(),
+      fetchEquipmentSummary(),
+      fetchPreventiveSummary(),
+    ])
+
+    const messages = [
+      {
+        role: 'system',
+        content: `Eres ARIA. Genera un RESUMEN EJECUTIVO ultra-conciso del estado de la planta para el inicio del día.
+Formato EXACTO (usa emojis y negritas):
+- Máximo 6 líneas
+- Destaca: incidencias críticas/pendientes, equipos fuera de servicio, preventivos vencidos
+- Si todo está bien, di "✅ Sin alertas críticas"
+- NO incluyas [SUGERENCIAS] en este resumen
+- Termina con una línea: "💡 ¿Qué quieres revisar primero?"`,
+      },
+      {
+        role: 'system',
+        content: `DATOS:\n\n${incidentsSummary}\n\n${equipmentSummary}\n\n${preventiveSummary}`,
+      },
+      { role: 'user', content: 'Dame el resumen de la planta de hoy.' },
+    ]
+
+    const callFn = isGeminiConfigured() ? callGemini : callGroq
+    const result = await callFn(messages, { temperature: 0.2, max_tokens: 400 })
+    // Limpiar tag de sugerencias si se cuela
+    return result.content.replace(/\n?\[SUGERENCIAS\]\s*:.*$/im, '').trim()
+  } catch (err) {
+    logger.error('ARIA daily summary error', err instanceof Error ? err : undefined)
+    return null
+  }
 }
 
 export async function sendChatMessage(
