@@ -5,7 +5,7 @@
  */
 import { useState, useRef, useEffect, useCallback, type KeyboardEvent, type ChangeEvent, type MouseEvent as ReactMouseEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { MessageCircle, X, Send, Trash2, Loader2, Bot, User, Mic, MicOff, ExternalLink, AlertTriangle, CheckCircle, XCircle, Camera, GripVertical, ThumbsUp, ThumbsDown, Copy, Check, Database, Volume2, VolumeX } from 'lucide-react'
+import { MessageCircle, X, Send, Trash2, Loader2, Bot, User, Mic, MicOff, ExternalLink, AlertTriangle, CheckCircle, XCircle, Camera, GripVertical, ThumbsUp, ThumbsDown, Copy, Check, Database, Volume2, VolumeX, RotateCcw, Star, ChevronUp } from 'lucide-react'
 import { useChatBot } from '@/hooks/useChatBot'
 import type { ChatMessage, ChatAction, MiniChartData } from '@/services/chatbot'
 import { saveFeedback } from '@/services/ariaLearning'
@@ -580,6 +580,7 @@ export function ChatBot() {
     toggle,
     sendMessage,
     clearHistory,
+    retryLastMessage,
   } = useChatBot()
 
   const [input, setInput] = useState('')
@@ -787,6 +788,7 @@ export function ChatBot() {
     { cmd: '/falla', desc: 'Reportar falla', expand: 'Quiero reportar una falla: ' },
     { cmd: '/gantt', desc: 'Planificación Gantt', expand: '¿Cómo va la planificación del Gantt?' },
     { cmd: '/ayuda', desc: 'Qué puedo hacer', expand: '¿Qué puedes hacer?' },
+    { cmd: '/mis', desc: 'Mis plantillas guardadas', expand: '__TEMPLATES__' },
   ]
 
   function resolveSlashCommand(text: string): string {
@@ -800,10 +802,39 @@ export function ChatBot() {
     return text
   }
 
-  // #8 — Recent searches
+  // #8 — Recent searches — colapsadas por defecto, solo mostrar al escribir /
   const RECENT_KEY = 'aria_recent_searches'
   const MAX_RECENT = 8
   const [showDropdown, setShowDropdown] = useState(false)
+  const [showRecents, setShowRecents] = useState(false)
+
+  // #5 v2.60 — Custom query templates
+  const TEMPLATES_KEY = `aria_templates_${userId || 'anon'}`
+  const MAX_TEMPLATES = 20
+
+  interface UserTemplate { id: string; text: string; label: string; createdAt: number }
+
+  function getTemplates(): UserTemplate[] {
+    try {
+      const raw = localStorage.getItem(TEMPLATES_KEY)
+      return raw ? JSON.parse(raw) : []
+    } catch { return [] }
+  }
+
+  function saveTemplate(text: string) {
+    const templates = getTemplates()
+    if (templates.some(t => t.text === text)) return // already saved
+    const label = text.length > 50 ? text.slice(0, 50) + '…' : text
+    templates.unshift({ id: Date.now().toString(36), text, label, createdAt: Date.now() })
+    localStorage.setItem(TEMPLATES_KEY, JSON.stringify(templates.slice(0, MAX_TEMPLATES)))
+  }
+
+  function removeTemplate(id: string) {
+    const templates = getTemplates().filter(t => t.id !== id)
+    localStorage.setItem(TEMPLATES_KEY, JSON.stringify(templates))
+  }
+
+  const [templateRefresh, setTemplateRefresh] = useState(0)
 
   function getRecentSearches(): string[] {
     try {
@@ -820,16 +851,23 @@ export function ChatBot() {
     } catch { /* ignore */ }
   }
 
-  // Items to show in the dropdown: slash commands if input starts with /, else recent searches
+  // Items to show in the dropdown: slash commands if input starts with /, else recent searches only if expanded
   const dropdownItems = (() => {
+    void templateRefresh // Force re-render when templates added/removed
     const trimmed = input.trim().toLowerCase()
+    if (trimmed === '/mis' || trimmed.startsWith('/mis ')) {
+      // #5 v2.60 — Show saved templates
+      const tpls = getTemplates()
+      if (tpls.length === 0) return [{ label: '(Sin plantillas guardadas — usa ⭐ para guardar)', value: '', isTemplate: false, templateId: '' }]
+      return tpls.map(t => ({ label: `⭐ ${t.label}`, value: t.text, isTemplate: true, templateId: t.id }))
+    }
     if (trimmed.startsWith('/')) {
       return SLASH_COMMANDS
         .filter(sc => sc.cmd.startsWith(trimmed) || trimmed === '/')
-        .map(sc => ({ label: `${sc.cmd} — ${sc.desc}`, value: sc.cmd }))
+        .map(sc => ({ label: `${sc.cmd} — ${sc.desc}`, value: sc.cmd, isTemplate: false, templateId: '' }))
     }
-    if (trimmed.length === 0) {
-      return getRecentSearches().map(s => ({ label: `🕐 ${s}`, value: s }))
+    if (trimmed.length === 0 && showRecents) {
+      return getRecentSearches().map(s => ({ label: `🕐 ${s}`, value: s, isTemplate: false, templateId: '' }))
     }
     return []
   })()
@@ -899,6 +937,19 @@ export function ChatBot() {
                       disabled={isLoading}
                     />
                   )}
+                  {/* Botón reintentar — solo en el último mensaje de ARIA si no está cargando */}
+                  {isLastAssistant && !isLoading && msg.id !== 'welcome' && (
+                    <div className="flex items-center gap-2 ml-9 mt-1">
+                      <button
+                        onClick={retryLastMessage}
+                        className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-primary transition-colors px-2 py-0.5 rounded-md hover:bg-muted"
+                        title="Reintentar respuesta"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        Reintentar
+                      </button>
+                    </div>
+                  )}
                 </div>
               )
             })}
@@ -925,32 +976,52 @@ export function ChatBot() {
 
           {/* Input */}
           <div className="border-t border-border px-3 py-2 bg-background relative">
-            {/* #8 + #10 — Dropdown: búsquedas recientes o slash commands */}
+            {/* #8 + #10 — Dropdown: búsquedas recientes (colapsable) o slash commands */}
             {showDropdown && dropdownItems.length > 0 && (
               <div className="absolute bottom-full left-0 right-0 mx-3 mb-1 bg-background border border-border rounded-lg shadow-lg max-h-48 overflow-y-auto z-20 animate-in fade-in slide-in-from-bottom-2 duration-150">
-                {input.trim().startsWith('/') && (
+                {input.trim().toLowerCase().startsWith('/mis') && (
+                  <div className="px-3 py-1 text-[10px] text-muted-foreground border-b border-border">⭐ Mis plantillas guardadas</div>
+                )}
+                {input.trim().startsWith('/') && !input.trim().toLowerCase().startsWith('/mis') && (
                   <div className="px-3 py-1 text-[10px] text-muted-foreground border-b border-border">⚡ Comandos rápidos</div>
                 )}
-                {!input.trim().startsWith('/') && input.trim().length === 0 && (
-                  <div className="px-3 py-1 text-[10px] text-muted-foreground border-b border-border">🕐 Búsquedas recientes · Escribe / para comandos</div>
+                {!input.trim().startsWith('/') && showRecents && (
+                  <div className="px-3 py-1 text-[10px] text-muted-foreground border-b border-border">🕐 Búsquedas recientes</div>
                 )}
                 {dropdownItems.map((item, i) => (
-                  <button
-                    key={i}
-                    onMouseDown={(e) => {
-                      e.preventDefault() // Evitar blur del input
-                      if (item.value.startsWith('/')) {
-                        setInput(item.value + ' ')
-                      } else {
-                        sendMessage(item.value)
-                        setShowDropdown(false)
-                        setInput('')
-                      }
-                    }}
-                    className="w-full text-left px-3 py-2 text-xs hover:bg-muted transition-colors truncate"
-                  >
-                    {item.label}
-                  </button>
+                  <div key={i} className="flex items-center hover:bg-muted transition-colors">
+                    <button
+                      onMouseDown={(e) => {
+                        e.preventDefault()
+                        if (!item.value) return // placeholder "(Sin plantillas...)"
+                        if (item.value.startsWith('/')) {
+                          setInput(item.value + ' ')
+                        } else {
+                          sendMessage(item.value)
+                          setShowDropdown(false)
+                          setInput('')
+                        }
+                      }}
+                      className="flex-1 text-left px-3 py-2 text-xs truncate"
+                    >
+                      {item.label}
+                    </button>
+                    {item.isTemplate && (
+                      <button
+                        onMouseDown={(e) => {
+                          e.preventDefault()
+                          removeTemplate(item.templateId)
+                          setTemplateRefresh(p => p + 1)
+                          // Re-trigger dropdown
+                          setInput('/mis')
+                        }}
+                        className="px-2 py-1 text-muted-foreground hover:text-destructive transition-colors"
+                        title="Eliminar plantilla"
+                      >
+                        <XCircle className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
                 ))}
               </div>
             )}
@@ -965,6 +1036,20 @@ export function ChatBot() {
             )}
 
             <div className="flex items-center gap-2">
+              {/* Botón de recientes (toggle) */}
+              {getRecentSearches().length > 0 && (
+                <button
+                  onMouseDown={(e) => {
+                    e.preventDefault()
+                    setShowRecents(prev => !prev)
+                    setShowDropdown(prev => !prev)
+                  }}
+                  className={`p-2 rounded-lg transition-colors ${showRecents ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80'}`}
+                  title={showRecents ? 'Ocultar recientes' : 'Búsquedas recientes'}
+                >
+                  <ChevronUp className={`w-4 h-4 transition-transform ${showRecents ? '' : 'rotate-180'}`} />
+                </button>
+              )}
               {/* Botón de foto */}
               <button
                 onClick={() => photoInputRef.current?.click()}
@@ -1004,14 +1089,30 @@ export function ChatBot() {
                 ref={inputRef}
                 type="text"
                 value={input}
-                onChange={e => { setInput(e.target.value); setShowDropdown(true) }}
-                onFocus={() => setShowDropdown(true)}
-                onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
+                onChange={e => { setInput(e.target.value); setShowDropdown(true); if (!e.target.value.trim()) setShowRecents(false) }}
+                onFocus={() => { if (input.trim().startsWith('/')) setShowDropdown(true) }}
+                onBlur={() => setTimeout(() => { setShowDropdown(false); setShowRecents(false) }, 150)}
                 onKeyDown={handleKeyDown}
                 placeholder={isListening ? 'Escuchando...' : pendingAction?.status === 'confirming' ? 'Sí / No / Modificar...' : 'Pregunta, /comando o describe una falla...'}
                 disabled={isLoading}
                 className="flex-1 text-sm px-3 py-2 rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-50 placeholder:text-muted-foreground"
               />
+
+              {/* #5 v2.60 — Save template button */}
+              <button
+                onClick={() => {
+                  const t = input.trim()
+                  if (t && !t.startsWith('/')) {
+                    saveTemplate(t)
+                    setTemplateRefresh(p => p + 1)
+                  }
+                }}
+                disabled={!input.trim() || input.trim().startsWith('/') || isLoading}
+                className="p-2 rounded-lg bg-muted text-muted-foreground hover:text-amber-500 hover:bg-muted/80 disabled:opacity-30 transition-colors"
+                title="Guardar como plantilla (⭐)"
+              >
+                <Star className="w-4 h-4" />
+              </button>
 
               <button
                 onClick={handleSend}
@@ -1023,7 +1124,7 @@ export function ChatBot() {
               </button>
             </div>
             <p className="text-[10px] text-muted-foreground mt-1 text-center">
-              ARIA v6 · Powered by Gemini AI · /ayuda para comandos
+              ARIA v6 · Powered by Gemini AI · /ayuda · /mis para plantillas
             </p>
           </div>
         </div>

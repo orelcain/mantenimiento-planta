@@ -248,7 +248,7 @@ export async function callGemini(
     contents,
     generationConfig: {
       temperature: opts?.temperature ?? 0.1,
-      maxOutputTokens: opts?.max_tokens || 1024,
+      maxOutputTokens: opts?.max_tokens || 2048,
     },
   }
   if (systemInstruction) body.systemInstruction = systemInstruction
@@ -268,6 +268,74 @@ export async function callGemini(
     }
     const errText = await response.text().catch(() => '')
     throw new Error(`Gemini API error: ${response.status} ${errText.slice(0, 200)}`)
+  }
+
+  const data = await response.json()
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+  const tokens = data.usageMetadata?.totalTokenCount || 0
+  return { content: text, tokens }
+}
+
+/**
+ * Gemini Vision — análisis multimodal de imágenes
+ * Envía una o más imágenes como base64 junto con un prompt de texto
+ */
+export async function callGeminiVision(
+  imageUrls: string[],
+  prompt: string,
+  opts?: { temperature?: number; max_tokens?: number },
+): Promise<{ content: string; tokens: number }> {
+  if (!GEMINI_API_KEY) throw new Error('Gemini API key not configured')
+
+  // Descargar imágenes y convertir a base64
+  const imageParts: Array<{ inlineData: { mimeType: string; data: string } }> = []
+  for (const url of imageUrls.slice(0, 3)) {
+    try {
+      const resp = await fetch(url)
+      const blob = await resp.blob()
+      const mimeType = blob.type || 'image/jpeg'
+      const buffer = await blob.arrayBuffer()
+      const base64 = btoa(
+        new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
+      )
+      imageParts.push({ inlineData: { mimeType, data: base64 } })
+    } catch {
+      // Skip failed image downloads
+    }
+  }
+
+  if (imageParts.length === 0) {
+    return { content: 'No se pudieron cargar las imágenes para análisis.', tokens: 0 }
+  }
+
+  const body = {
+    contents: [{
+      parts: [
+        ...imageParts,
+        { text: prompt },
+      ],
+    }],
+    generationConfig: {
+      temperature: opts?.temperature ?? 0.3,
+      maxOutputTokens: opts?.max_tokens || 1024,
+    },
+  }
+
+  const response = await fetch(
+    `${GEMINI_API_URL}:generateContent?key=${GEMINI_API_KEY}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    },
+  )
+
+  if (!response.ok) {
+    if (response.status === 429) {
+      throw new RateLimitError(parseRetryAfter(response), 'Gemini')
+    }
+    const errText = await response.text().catch(() => '')
+    throw new Error(`Gemini Vision error: ${response.status} ${errText.slice(0, 200)}`)
   }
 
   const data = await response.json()

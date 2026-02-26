@@ -4,9 +4,10 @@
  * Memoria por usuario, corrección de typos, historial persistente por userId
  */
 import { useState, useCallback, useRef, useEffect } from 'react'
-import { sendChatMessage, generateDailySummary, generateWeeklySummary, checkCreatedIncidents, checkProactiveAlerts, loadUserMemory, loadMemoryFromFirestore, saveUserMemory, type ChatMessage, type ChatAction, type PendingAction } from '@/services/chatbot'
+import { sendChatMessage, generateDailySummary, generateWeeklySummary, checkCreatedIncidents, checkProactiveAlerts, checkPredictivePatterns, loadUserMemory, loadMemoryFromFirestore, saveUserMemory, type ChatMessage, type ChatAction, type PendingAction } from '@/services/chatbot'
 import { RateLimitError } from '@/services/ai'
 import { uploadChatPhoto } from '@/services/chatActions'
+import { showLocalNotification, areNotificationsEnabled } from '@/services/notifications'
 import { useAuthStore } from '@/store/authStore'
 
 const STORAGE_PREFIX = 'chatbot_history_'
@@ -174,6 +175,40 @@ export function useChatBot() {
           timestamp: new Date(),
         }
         setMessages(prev => [...prev, alertMsg])
+
+        // #7 v2.60 — Push notification si el chat está cerrado
+        if (!isOpenRef.current && areNotificationsEnabled()) {
+          showLocalNotification('ARIA — Alerta Proactiva', {
+            body: proactiveAlert.replace(/[*#_`]/g, '').slice(0, 200),
+            tag: 'aria-proactive',
+          })
+          setHasUnread(true)
+        }
+      }
+
+      // #3 v2.60 — Patrones predictivos de fallas
+      const predictiveKey = `aria_predictive_${userId}_${new Date().toISOString().slice(0, 10)}`
+      if (!localStorage.getItem(predictiveKey)) {
+        const predictiveMsg = await checkPredictivePatterns()
+        if (predictiveMsg) {
+          localStorage.setItem(predictiveKey, '1')
+          const predMsg: ChatMessage = {
+            id: generateId(),
+            role: 'assistant',
+            content: predictiveMsg,
+            timestamp: new Date(),
+          }
+          setMessages(prev => [...prev, predMsg])
+
+          // #7 v2.60 — Push notification si el chat está cerrado
+          if (!isOpenRef.current && areNotificationsEnabled()) {
+            showLocalNotification('ARIA — Patrón Predictivo', {
+              body: predictiveMsg.replace(/[*#_`]/g, '').slice(0, 200),
+              tag: 'aria-predictive',
+            })
+            setHasUnread(true)
+          }
+        }
       }
 
       // #10 — Auto-seguimiento de incidencias creadas
@@ -188,6 +223,15 @@ export function useChatBot() {
             timestamp: new Date(),
           }
           setMessages(prev => [...prev, followUpMsg])
+
+          // #7 v2.60 — Push notification si el chat está cerrado
+          if (!isOpenRef.current && areNotificationsEnabled()) {
+            showLocalNotification('ARIA — Seguimiento de Incidencia', {
+              body: followUp.replace(/[*#_`]/g, '').slice(0, 200),
+              tag: 'aria-followup',
+            })
+            setHasUnread(true)
+          }
         }
       }
     } catch { /* non-blocking */ }
@@ -384,6 +428,26 @@ export function useChatBot() {
     localStorage.removeItem(getStorageKey(userId))
   }, [userId])
 
+  // Reintentar último mensaje del usuario
+  const retryLastMessage = useCallback(() => {
+    if (isLoading) return
+    // Encontrar el último mensaje del usuario
+    const lastUserMsgIdx = messages.map((m, i) => ({ m, i })).reverse().find(x => x.m.role === 'user')
+    if (!lastUserMsgIdx) return
+    const lastUserMsg = lastUserMsgIdx.m
+    // Eliminar la respuesta de ARIA que vino después (si existe)
+    const nextMsgs = messages.slice(lastUserMsgIdx.i + 1)
+    const ariaReplyIdx = nextMsgs.findIndex(m => m.role === 'assistant')
+    if (ariaReplyIdx !== -1) {
+      const globalIdx = lastUserMsgIdx.i + 1 + ariaReplyIdx
+      setMessages(prev => prev.filter((_, i) => i !== globalIdx))
+    }
+    // También eliminar el propio mensaje de usuario para que sendMessage lo re-agregue
+    setMessages(prev => prev.filter((_, i) => i !== lastUserMsgIdx.i))
+    // Reintentar con el mismo texto y fotos
+    sendMessage(lastUserMsg.content, undefined)
+  }, [messages, isLoading, sendMessage])
+
   return {
     messages,
     isLoading,
@@ -399,5 +463,6 @@ export function useChatBot() {
     close,
     sendMessage,
     clearHistory,
+    retryLastMessage,
   }
 }

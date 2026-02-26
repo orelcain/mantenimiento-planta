@@ -1535,7 +1535,13 @@ Cuando menciones un equipo, incidencia o sección específica, USA este formato 
 - Secciones: [[ir:RUTA|TEXTO]] — ej: "Puedes verlo en [[ir:/equipment|Equipos]]"
 Estos links serán renderizados como botones clickeables en la interfaz.
 
-Tu nombre es ARIA — Asistente de Reportes e Incidencias Automatizada. Preséntate así cuando te pregunten.`
+Tu nombre es ARIA — Asistente de Reportes e Incidencias Automatizada. Preséntate así cuando te pregunten.
+
+📏 FORMATO Y EXTENSIÓN DE RESPUESTAS:
+- SIEMPRE completa tus respuestas. NUNCA dejes una respuesta a medias o cortada.
+- Si la respuesta es larga, organízala con listas numeradas y negritas para facilitar la lectura.
+- Si el usuario pide TODOS los resultados, muéstralos TODOS sin truncar.
+- Prefiere respuestas completas y bien estructuradas antes que breves e incompletas.`
 
 // ─── Parsear sugerencias del LLM ────────────────────────────────────
 function parseSuggestions(text: string): { cleanText: string; suggestions: string[] } {
@@ -1727,6 +1733,39 @@ export async function checkProactiveAlerts(): Promise<string | null> {
       return `🚨 **Alerta:** ${critCount} incidencia${critCount > 1 ? 's' : ''} crítica${critCount > 1 ? 's' : ''} pendiente${critCount > 1 ? 's' : ''}:\n${titles.map(t => `• ${t}`).join('\n')}\n\n¿Quieres verlas?`
     }
     return null
+  } catch {
+    return null
+  }
+}
+
+// ─── #3 ARIA Predictiva — análisis de patrones de falla recurrentes ──
+export async function checkPredictivePatterns(): Promise<string | null> {
+  try {
+    const { getEquipmentPatterns } = await import('./ariaLearning')
+    const patterns = await getEquipmentPatterns()
+
+    if (patterns.length === 0) return null
+
+    // Buscar equipos con 3+ ocurrencias recientes (potencial falla inminente)
+    const highRisk = patterns.filter(p => p.occurrences >= 3)
+    if (highRisk.length === 0) return null
+
+    // Verificar cuáles tuvieron ocurrencias recientes (últimos 30 días)
+    const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000
+    const recentHighRisk = highRisk.filter(p => {
+      const lastOcc = (p.lastOccurrence as any)?.toMillis?.() || (p.lastOccurrence as any)?.seconds * 1000 || 0
+      return lastOcc > thirtyDaysAgo
+    })
+
+    if (recentHighRisk.length === 0) return null
+
+    const warnings = recentHighRisk.slice(0, 3).map(p => {
+      const avgH = p.avgResolutionHours ? ` (resol. promedio: ${Math.round(p.avgResolutionHours)}h)` : ''
+      const spares = p.relatedSpares?.length ? ` — repuestos: ${p.relatedSpares.slice(0, 2).join(', ')}` : ''
+      return `• **${p.equipmentName}** → "${p.problemType}" (${p.occurrences}x)${avgH}${spares}`
+    })
+
+    return `🔮 **Análisis Predictivo — Patrones detectados:**\n${warnings.join('\n')}\n\n💡 Estos equipos muestran fallas recurrentes. Recomiendo inspección preventiva.\n\n¿Quieres ver más detalles o crear una tarea preventiva?`
   } catch {
     return null
   }
@@ -2041,6 +2080,29 @@ export async function sendChatMessage(
     ragContext = 'No se pudieron cargar datos de la planta en este momento.'
   }
 
+  // 4b. #2 Análisis de fotos con Gemini Vision — si el usuario adjuntó imágenes
+  let photoAnalysis = ''
+  const photoRegexNormal = /\[SISTEMA: El usuario adjuntó .+ foto\(s\).*URLs: (.+)\]/
+  const photoMatch = userMessage.match(photoRegexNormal)
+  if (photoMatch?.[1] && isGeminiConfigured()) {
+    const photoUrls = photoMatch[1].split(', ').map(u => u.trim()).filter(Boolean)
+    if (photoUrls.length > 0) {
+      try {
+        const { callGeminiVision } = await import('./ai')
+        const visionResult = await callGeminiVision(
+          photoUrls,
+          'Eres un experto en mantenimiento industrial. Analiza esta(s) imagen(es) de una planta industrial. Describe lo que ves: estado del equipo, posibles fallas, daños, fugas, corrosión, desgaste, piezas rotas, o cualquier anomalía. Sé específico y técnico. Si la imagen no es de equipos industriales, describe lo que ves brevemente. Responde en español.',
+          { temperature: 0.2, max_tokens: 600 },
+        )
+        if (visionResult.content) {
+          photoAnalysis = visionResult.content
+        }
+      } catch (err) {
+        logger.error('Chatbot: Gemini Vision analysis failed', err instanceof Error ? err : undefined)
+      }
+    }
+  }
+
   // 5. Construir mensajes para el LLM
   const messages: Array<{ role: string; content: string }> = [
     { role: 'system', content: SYSTEM_PROMPT },
@@ -2114,6 +2176,14 @@ export async function sendChatMessage(
     })
   }
 
+  // #2 — Inyectar análisis visual de fotos adjuntas
+  if (photoAnalysis) {
+    messages.push({
+      role: 'system',
+      content: `📷 ANÁLISIS VISUAL DE FOTOS ADJUNTAS (Gemini Vision):\n${photoAnalysis}\n\nUsa este análisis para complementar tu respuesta. Si el usuario preguntó algo sobre la foto o reportó una falla con foto, incorpora los hallazgos visuales en tu respuesta.`,
+    })
+  }
+
   // Historial conversacional ampliado (20 mensajes)
   const recentHistory = history.slice(-20)
   for (const msg of recentHistory) {
@@ -2130,7 +2200,7 @@ export async function sendChatMessage(
     const result = await streamFn(
       messages,
       (partial) => onStream?.(partial),
-      { temperature: 0.4, max_tokens: 1500 }
+      { temperature: 0.4, max_tokens: 4096 }
     )
 
     // 7. Guardar memoria actualizada + sync a Firestore

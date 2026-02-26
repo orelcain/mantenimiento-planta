@@ -7,6 +7,18 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.60.0] - 2026-02-25
+### Corregido
+- **Respuestas incompletas de ARIA**: aumentado `max_tokens` de 1500→4096 y `maxOutputTokens` Gemini de 1024→2048; instrucción explícita en SYSTEM_PROMPT para completar siempre las respuestas sin truncar
+- **Búsquedas recientes bloqueaban el chat**: dropdown de recientes ahora colapsado por defecto, toggle manual con botón ▲
+
+### Agregado
+- **Botón Reintentar respuesta**: botón con ícono RotateCcw debajo de la última respuesta de ARIA para regenerar
+- **Análisis de fotos con Gemini Vision (#2)**: `callGeminiVision()` analiza fotos adjuntas al chat usando modelo multimodal Gemini 2.5 Flash; inyecta análisis de anomalías/daños como contexto al LLM
+- **Patrones predictivos de fallas (#3)**: `checkPredictivePatterns()` consulta patrones de ariaLearning y alerta sobre equipos con ≥3 incidencias recurrentes en 30 días, incluyendo tiempo promedio de resolución y repuestos relacionados
+- **Plantillas de consulta personalizadas (#5)**: guardar consultas frecuentes con ⭐, recuperar con `/mis`; máximo 20 plantillas por usuario con gestión completa (agregar/eliminar)
+- **Push notifications desde ARIA (#7)**: notificaciones del navegador cuando alertas proactivas, patrones predictivos o seguimiento de incidencias se disparan con el chat cerrado; usa `showLocalNotification` existente
+
 ## [2.59.0] - 2026-02-25
 ### Agregado
 - **Mini-charts inline (#2)**: gráficos de barras y donut renderizados con canvas directamente en las burbujas de chat de ARIA cuando se consultan estadísticas
