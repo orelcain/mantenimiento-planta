@@ -326,6 +326,8 @@ function MessageBubble({
             <span>{dataSource.join(' · ')}</span>
           </div>
         )}
+        {/* Badge de agente IA que generó la respuesta */}
+        {!isUser && msg.agentInfo && <AgentBadge agentInfo={msg.agentInfo} />}
         <div className={`flex items-center justify-between mt-1 ${
           isUser ? 'text-primary-foreground/60' : 'text-muted-foreground'
         }`}>
@@ -411,6 +413,57 @@ function LoadingIndicator() {
         <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
         <span className="text-xs text-muted-foreground">Consultando datos de la planta...</span>
       </div>
+    </div>
+  )
+}
+
+// ─── Indicador de actividad de agente IA ─────────────────────────────
+import type { AgentStatusEvent } from '@/services/ariaOrchestrator'
+
+function AgentActivityIndicator({ status }: { status: AgentStatusEvent }) {
+  const phaseStyles: Record<string, { color: string; animate: boolean }> = {
+    analyzing: { color: 'text-blue-400', animate: true },
+    selecting: { color: 'text-purple-400', animate: true },
+    calling: { color: 'text-amber-400', animate: true },
+    streaming: { color: 'text-green-400', animate: true },
+    fallback: { color: 'text-orange-400', animate: true },
+    done: { color: 'text-green-500', animate: false },
+    error: { color: 'text-red-400', animate: false },
+  }
+  const style = phaseStyles[status.phase] || { color: 'text-muted-foreground', animate: true }
+
+  return (
+    <div className="flex gap-2 items-center mb-1">
+      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted/80 border border-border/50 text-[11px] max-w-[85%] overflow-hidden">
+        {style.animate && (
+          <Loader2 className={`w-3 h-3 animate-spin ${style.color} shrink-0`} />
+        )}
+        {!style.animate && status.phase === 'done' && (
+          <span className="text-green-500 shrink-0">✓</span>
+        )}
+        {status.agentEmoji && (
+          <span className="shrink-0">{status.agentEmoji}</span>
+        )}
+        <span className={`${style.color} truncate`}>{status.message}</span>
+      </div>
+    </div>
+  )
+}
+
+/** Badge pequeño que muestra qué agente generó una respuesta */
+function AgentBadge({ agentInfo }: { agentInfo: NonNullable<import('@/services/chatbot').ChatMessage['agentInfo']> }) {
+  return (
+    <div className="flex items-center gap-1 mt-1 text-[10px] text-muted-foreground opacity-70">
+      <span>{agentInfo.agentEmoji}</span>
+      <span>{agentInfo.agentName}</span>
+      <span>·</span>
+      <span>{agentInfo.latencyMs > 1000 ? `${(agentInfo.latencyMs / 1000).toFixed(1)}s` : `${agentInfo.latencyMs}ms`}</span>
+      {agentInfo.fallbackUsed && (
+        <>
+          <span>·</span>
+          <span className="text-amber-500">fallback</span>
+        </>
+      )}
     </div>
   )
 }
@@ -631,6 +684,7 @@ export function ChatBot() {
     isOpen,
     hasUnread,
     streamingContent,
+    agentStatus,
     pendingAction,
     retryCountdown,
     userId,
@@ -1040,10 +1094,25 @@ export function ChatBot() {
                 </div>
               )
             })}
+            {/* Indicador de actividad de agente IA */}
+            {isLoading && agentStatus && !streamingContent && agentStatus.phase !== 'done' && (
+              <AgentActivityIndicator status={agentStatus} />
+            )}
             {/* Streaming: mostrar respuesta parcial */}
-            {streamingContent && <StreamingBubble content={streamingContent} />}
+            {streamingContent && (
+              <div>
+                {agentStatus && (
+                  <div className="mb-1 ml-9">
+                    <span className="text-[10px] text-muted-foreground">
+                      {agentStatus.agentEmoji} {agentStatus.agentName}
+                    </span>
+                  </div>
+                )}
+                <StreamingBubble content={streamingContent} />
+              </div>
+            )}
             {/* Loading: solo si no hay streaming aún y no hay countdown */}
-            {isLoading && !streamingContent && retryCountdown === 0 && <LoadingIndicator />}
+            {isLoading && !streamingContent && retryCountdown === 0 && !agentStatus && <LoadingIndicator />}
             <div ref={messagesEndRef} />
           </div>
 

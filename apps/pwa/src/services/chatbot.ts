@@ -6,7 +6,7 @@ import { collection, getDocs, getDoc, setDoc, doc, query, where, orderBy, limit,
 import { db } from './firebase'
 import { callGroq, callGemini, isAIConfigured, isGeminiConfigured, RateLimitError } from './ai'
 import { checkThinkingAllowance, recordThinkingUsage, getAriaConfig } from './ariaThinkingTracker'
-import { orchestrateStream, detectTaskType } from './ariaOrchestrator'
+import { orchestrateStream, detectTaskType, type AgentStatusEvent } from './ariaOrchestrator'
 import { logger } from '@/lib/logger'
 import { buildLearningContext, trackEquipmentProblem } from './ariaLearning'
 import type { Incident } from '@/types'
@@ -23,6 +23,14 @@ export interface ChatMessage {
   photoUrls?: string[]
   suggestions?: string[]
   chartData?: MiniChartData  // #2 — datos para mini gráfico inline
+  /** Info del agente IA que generó esta respuesta */
+  agentInfo?: {
+    agentId: string
+    agentName: string
+    agentEmoji: string
+    latencyMs: number
+    fallbackUsed: boolean
+  }
 }
 
 /** #2 — Datos para renderizar mini gráficos en burbujas */
@@ -1598,6 +1606,14 @@ export interface ChatResponse {
   pendingAction?: PendingAction
   suggestions?: string[]
   chartData?: MiniChartData  // #2 — datos para mini gráfico
+  /** Info del agente que respondió */
+  agentInfo?: {
+    agentId: string
+    agentName: string
+    agentEmoji: string
+    latencyMs: number
+    fallbackUsed: boolean
+  }
 }
 
 // ─── #4 Resumen ejecutivo diario ─────────────────────────────────────
@@ -1842,6 +1858,7 @@ export async function sendChatMessage(
   userName?: string,
   _userRole?: string,
   thinkingEnabled?: boolean,
+  onAgentStatus?: (event: AgentStatusEvent) => void,
 ): Promise<ChatResponse> {
   if (!isAIConfigured()) {
     return {
@@ -2264,6 +2281,7 @@ export async function sendChatMessage(
         opts: { temperature: 0.4, max_tokens: 4096, thinkingBudget },
       },
       (partial) => onStream?.(partial),
+      onAgentStatus,
     )
     const result = { content: orchResult.content, tokens: orchResult.tokens }
 
@@ -2293,6 +2311,13 @@ export async function sendChatMessage(
       suggestions: suggestions.length > 0 ? suggestions : undefined,
       chartData,
       pendingAction: pendingAction?.status === 'confirming' ? pendingAction : undefined,
+      agentInfo: {
+        agentId: orchResult.agentId,
+        agentName: orchResult.agentName,
+        agentEmoji: orchResult.agentEmoji,
+        latencyMs: orchResult.latencyMs,
+        fallbackUsed: orchResult.fallbackUsed,
+      },
     }
   } catch (err) {
     // Propagar RateLimitError al UI para que maneje countdown + auto-retry

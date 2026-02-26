@@ -7,6 +7,19 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.64.0] - 2026-02-26
+### Agregado
+- **Agent Activity Indicator**: indicador animado en la zona de chat que muestra qué agente IA está trabajando en cada fase (analizando, seleccionando, llamando, streaming, fallback)
+- **Agent Badge en respuestas**: cada mensaje de ARIA muestra un mini-badge con el emoji del agente, nombre y latencia de respuesta
+- **Fases de orquestación visibles**: `AgentStatusEvent` con 7 fases (analyzing/selecting/calling/streaming/fallback/done/error) emitidas en tiempo real
+- **Callback `onAgentStatus`**: pipeline completo desde ariaOrchestrator → chatbot → useChatBot → ChatBot.tsx para status en vivo
+- **`agentInfo` en mensajes**: cada `ChatMessage` de ARIA guarda qué agente lo generó, latencia y si hubo fallback
+- **DeepSeek R1 activo**: API key integrada en build, agente disponible en la cadena de orquestación
+
+### Mejorado
+- **LoadingIndicator inteligente**: se reemplaza por AgentActivityIndicator cuando hay status de agente, mostrando información real en vez de texto genérico
+- **StreamingBubble con contexto**: muestra el nombre del agente que está generando la respuesta durante el streaming
+
 ## [2.60.0] - 2026-02-25
 ### Corregido
 - **Respuestas incompletas de ARIA**: aumentado `max_tokens` de 1500→4096 y `maxOutputTokens` Gemini de 1024→2048; instrucción explícita en SYSTEM_PROMPT para completar siempre las respuestas sin truncar

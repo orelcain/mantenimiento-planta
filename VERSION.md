@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.63.0**
+## Versión Actual: **v2.64.0**
 
 **Fecha de lanzamiento**: 26 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,14 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.64.0 — ARIA Agent Activity: Transparencia multi-agente en chat (26/02/2026)
+- 🔍 **Agent Activity Indicator**: indicador animado en el chat muestra qué agente IA está trabajando en tiempo real
+- 🏷️ **Agent Badge**: cada respuesta de ARIA muestra qué agente la generó (emoji + nombre + latencia)
+- ⚡ **Fases visibles**: analyzing → selecting → calling → streaming → done con colores diferenciados
+- 🔄 **Fallback visible**: el usuario ve cuando ARIA cambia de agente por fallback
+- 🔑 **DeepSeek R1 habilitado**: API key integrada, agente activo en la cadena de orquestación
+- 🎨 **UX mejorada**: transiciones suaves, badges minimalistas, información sin ruido
 
 ### v2.63.0 — ARIA Mission Control: Orquestación multi-agente (26/02/2026)
 - 🛰️ **Mission Control**: nueva pestaña en Configuración para monitorear todos los agentes IA

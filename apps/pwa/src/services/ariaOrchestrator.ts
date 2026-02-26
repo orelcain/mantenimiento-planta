@@ -51,11 +51,22 @@ export interface OrchestratorResult {
   tokens: number
   agentId: string
   agentName: string
+  agentEmoji: string
   latencyMs: number
   /** ¿Hubo fallback? */
   fallbackUsed: boolean
   /** Cadena de intentos */
   attempts: Array<{ agentId: string; success: boolean; error?: string }>
+}
+
+/** Evento de status que el orquestador emite para que el UI muestre actividad */
+export interface AgentStatusEvent {
+  phase: 'analyzing' | 'selecting' | 'calling' | 'streaming' | 'fallback' | 'done' | 'error'
+  agentId?: string
+  agentName?: string
+  agentEmoji?: string
+  taskType?: TaskType
+  message: string
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -163,6 +174,7 @@ export async function orchestrate(task: OrchestratorTask): Promise<OrchestratorR
         tokens: result.tokens,
         agentId,
         agentName: agent?.name || agentId,
+        agentEmoji: agent?.emoji || '🤖',
         latencyMs: result.latencyMs,
         fallbackUsed: attempts.length > 1,
         attempts,
@@ -191,15 +203,24 @@ export async function orchestrate(task: OrchestratorTask): Promise<OrchestratorR
 
 /**
  * Igual que orchestrate pero con streaming — le da al usuario la respuesta progresiva
+ * @param onStatus — callback para mostrar al usuario qué agente está haciendo qué
  */
 export async function orchestrateStream(
   task: OrchestratorTask,
   onChunk: (text: string) => void,
+  onStatus?: (event: AgentStatusEvent) => void,
 ): Promise<OrchestratorResult> {
   await getAgentsConfig()
 
   const capability = TASK_TO_CAPABILITY[task.taskType]
   const preview = task.taskPreview || task.messages[task.messages.length - 1]?.content?.slice(0, 80) || '(empty)'
+
+  // Fase 1: Analizando
+  onStatus?.({
+    phase: 'analyzing',
+    taskType: task.taskType,
+    message: `Analizando consulta · tipo: ${task.taskType}`,
+  })
 
   let agentChain: string[]
   if (task.opts?.forceAgent) {
@@ -216,8 +237,19 @@ export async function orchestrateStream(
   }
 
   if (agentChain.length === 0) {
+    onStatus?.({ phase: 'error', message: 'No hay agentes disponibles' })
     throw new Error('No hay agentes IA disponibles.')
   }
+
+  // Fase 2: Seleccionando agente
+  const firstAgent = getAllAgents().find(a => a.id === agentChain[0])
+  onStatus?.({
+    phase: 'selecting',
+    agentId: agentChain[0],
+    agentName: firstAgent?.name,
+    agentEmoji: firstAgent?.emoji,
+    message: `Seleccionando ${firstAgent?.emoji || ''} ${firstAgent?.name || agentChain[0]}`,
+  })
 
   const attempts: OrchestratorResult['attempts'] = []
   let lastError: Error | null = null
@@ -228,15 +260,45 @@ export async function orchestrateStream(
       continue
     }
 
+    const agent = getAllAgents().find(a => a.id === agentId)
+
+    // Fase 3: Llamando al agente
+    onStatus?.({
+      phase: attempts.length > 0 ? 'fallback' : 'calling',
+      agentId,
+      agentName: agent?.name,
+      agentEmoji: agent?.emoji,
+      message: attempts.length > 0
+        ? `Cambiando a ${agent?.emoji || ''} ${agent?.name || agentId}...`
+        : `${agent?.emoji || ''} ${agent?.name || agentId} procesando...`,
+    })
+
     try {
+      // Fase 4: Streaming
+      onStatus?.({
+        phase: 'streaming',
+        agentId,
+        agentName: agent?.name,
+        agentEmoji: agent?.emoji,
+        message: `${agent?.emoji || ''} ${agent?.name || agentId} respondiendo...`,
+      })
+
       const result = await callAgentStream(agentId, task.messages, onChunk, {
         temperature: task.opts?.temperature,
         max_tokens: task.opts?.max_tokens,
         thinkingBudget: task.opts?.thinkingBudget,
       })
 
-      const agent = getAllAgents().find(a => a.id === agentId)
       attempts.push({ agentId, success: true })
+
+      // Fase 5: Done
+      onStatus?.({
+        phase: 'done',
+        agentId,
+        agentName: agent?.name,
+        agentEmoji: agent?.emoji,
+        message: `${agent?.emoji || ''} ${agent?.name || agentId} completó en ${result.latencyMs > 1000 ? (result.latencyMs / 1000).toFixed(1) + 's' : result.latencyMs + 'ms'}`,
+      })
 
       addMissionLog({
         taskType: task.taskType,
@@ -254,6 +316,7 @@ export async function orchestrateStream(
         tokens: result.tokens,
         agentId,
         agentName: agent?.name || agentId,
+        agentEmoji: agent?.emoji || '🤖',
         latencyMs: result.latencyMs,
         fallbackUsed: attempts.length > 1,
         attempts,
@@ -261,9 +324,20 @@ export async function orchestrateStream(
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err))
       attempts.push({ agentId, success: false, error: lastError.message })
+
+      onStatus?.({
+        phase: 'fallback',
+        agentId,
+        agentName: agent?.name,
+        agentEmoji: agent?.emoji,
+        message: `${agent?.emoji || ''} ${agent?.name || agentId} falló · buscando alternativa...`,
+      })
+
       logger.warn(`Stream agent ${agentId} falló: ${lastError.message}`)
     }
   }
+
+  onStatus?.({ phase: 'error', message: 'Todos los agentes fallaron' })
 
   addMissionLog({
     taskType: task.taskType,

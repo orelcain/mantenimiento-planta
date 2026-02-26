@@ -5,6 +5,7 @@
  */
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { sendChatMessage, generateDailySummary, generateWeeklySummary, checkCreatedIncidents, checkProactiveAlerts, checkPredictivePatterns, loadUserMemory, loadMemoryFromFirestore, saveUserMemory, type ChatMessage, type ChatAction, type PendingAction } from '@/services/chatbot'
+import type { AgentStatusEvent } from '@/services/ariaOrchestrator'
 import { RateLimitError } from '@/services/ai'
 import { uploadChatPhoto } from '@/services/chatActions'
 import { showLocalNotification, areNotificationsEnabled } from '@/services/notifications'
@@ -76,6 +77,7 @@ export function useChatBot() {
   const [isOpen, setIsOpen] = useState(false)
   const [hasUnread, setHasUnread] = useState(false)
   const [streamingContent, setStreamingContent] = useState<string | null>(null)
+  const [agentStatus, setAgentStatus] = useState<AgentStatusEvent | null>(null)
   const [lastActions, setLastActions] = useState<ChatAction[]>([])
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null)
   const [retryCountdown, setRetryCountdown] = useState(0) // segundos restantes
@@ -290,6 +292,7 @@ export function useChatBot() {
     setMessages(prev => [...prev, userMsg])
     setIsLoading(true)
     setStreamingContent(null)
+    setAgentStatus(null)
     setLastActions([])
     abortRef.current = false
 
@@ -316,11 +319,16 @@ export function useChatBot() {
         userName,
         user?.rol,
         canThink && thinkingEnabled,
+        // Agent status callback — mostrar qué agente está haciendo qué
+        (event) => {
+          if (!abortRef.current) setAgentStatus(event)
+        },
       )
 
       if (abortRef.current) return
 
       setStreamingContent(null)
+      setAgentStatus(null)
       setLastActions(result.actions)
 
       // Actualizar pending action
@@ -342,6 +350,7 @@ export function useChatBot() {
         context: result.context,
         actions: result.actions.length > 0 ? result.actions : undefined,
         suggestions: result.suggestions,
+        agentInfo: result.agentInfo,
       }
 
       setMessages(prev => [...prev, assistantMsg])
@@ -472,6 +481,7 @@ export function useChatBot() {
     isOpen,
     hasUnread,
     streamingContent,
+    agentStatus,
     lastActions,
     pendingAction,
     retryCountdown,
