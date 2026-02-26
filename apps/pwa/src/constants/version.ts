@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.56.0' as const
+export const APP_VERSION = '2.56.1' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-02-25' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'ARIA v1.1: contexto completo (usuarios+equipos), chat redimensionable, anti-alucinacion, deteccion ampliada' as const
+export const VERSION_NAME = 'ARIA v1.2: Gemini 2.0 Flash + auto-retry rate limit con countdown' as const
 
 /**
  * Nota:
