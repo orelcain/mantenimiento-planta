@@ -5,6 +5,7 @@
  */
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { sendChatMessage, type ChatMessage, type ChatAction, type PendingAction } from '@/services/chatbot'
+import { RateLimitError } from '@/services/ai'
 import { uploadChatPhoto } from '@/services/chatActions'
 import { useAuthStore } from '@/store/authStore'
 
@@ -69,9 +70,12 @@ export function useChatBot() {
   const [streamingContent, setStreamingContent] = useState<string | null>(null)
   const [lastActions, setLastActions] = useState<ChatAction[]>([])
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null)
+  const [retryCountdown, setRetryCountdown] = useState(0) // segundos restantes
   const abortRef = useRef(false)
   const isOpenRef = useRef(false)
   const prevUserIdRef = useRef(userId)
+  const retryTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const retryDataRef = useRef<{ text: string; photos?: File[] } | null>(null)
   
   // Recargar historial cuando cambia el usuario
   useEffect(() => {
@@ -90,6 +94,13 @@ export function useChatBot() {
   useEffect(() => {
     saveHistory(messages, userId)
   }, [messages, userId])
+
+  // Limpiar timer de retry al desmontar
+  useEffect(() => {
+    return () => {
+      if (retryTimerRef.current) clearInterval(retryTimerRef.current)
+    }
+  }, [])
 
   const toggle = useCallback(() => {
     setIsOpen(prev => {
@@ -187,10 +198,72 @@ export function useChatBot() {
       if (!isOpenRef.current) {
         setHasUnread(true)
       }
-    } catch {
+    } catch (err) {
       if (abortRef.current) return
 
       setStreamingContent(null)
+
+      // Rate limit: mostrar countdown y auto-reintentar
+      if (err instanceof RateLimitError) {
+        const waitSecs = Math.ceil(err.retryAfterMs / 1000)
+        retryDataRef.current = { text, photos }
+
+        // Mensaje de espera con countdown
+        const waitMsg: ChatMessage = {
+          id: 'rate_limit_wait',
+          role: 'assistant',
+          content: `⏳ Límite de consultas alcanzado. Reintentando automáticamente en **${waitSecs}** segundos...`,
+          timestamp: new Date(),
+        }
+        setMessages(prev => {
+          // Reemplazar si ya hay un mensaje de rate limit previo
+          const filtered = prev.filter(m => m.id !== 'rate_limit_wait')
+          return [...filtered, waitMsg]
+        })
+
+        setRetryCountdown(waitSecs)
+        setIsLoading(true) // mantener loading durante countdown
+
+        // Limpiar timer previo si existe
+        if (retryTimerRef.current) clearInterval(retryTimerRef.current)
+
+        let remaining = waitSecs
+        retryTimerRef.current = setInterval(() => {
+          remaining -= 1
+          setRetryCountdown(remaining)
+
+          // Actualizar mensaje con countdown
+          setMessages(prev => prev.map(m =>
+            m.id === 'rate_limit_wait'
+              ? {
+                  ...m,
+                  content: remaining > 0
+                    ? `⏳ Límite de consultas alcanzado. Reintentando automáticamente en **${remaining}** segundo${remaining !== 1 ? 's' : ''}...`
+                    : `♻️ Reintentando consulta...`,
+                }
+              : m
+          ))
+
+          if (remaining <= 0) {
+            clearInterval(retryTimerRef.current!)
+            retryTimerRef.current = null
+            setRetryCountdown(0)
+
+            // Remover mensaje de espera y reintentar
+            setMessages(prev => prev.filter(m => m.id !== 'rate_limit_wait'))
+            const retryData = retryDataRef.current
+            retryDataRef.current = null
+            setIsLoading(false)
+            if (retryData) {
+              // Reintentar automáticamente
+              sendMessage(retryData.text, retryData.photos)
+            }
+          }
+        }, 1000)
+
+        return
+      }
+
       const errorMsg: ChatMessage = {
         id: generateId(),
         role: 'assistant',
@@ -199,7 +272,10 @@ export function useChatBot() {
       }
       setMessages(prev => [...prev, errorMsg])
     } finally {
-      setIsLoading(false)
+      // No desactivar loading si hay countdown de rate limit activo
+      if (!retryTimerRef.current) {
+        setIsLoading(false)
+      }
     }
   }, [messages, isLoading, userId, pendingAction])
 
@@ -219,6 +295,7 @@ export function useChatBot() {
     streamingContent,
     lastActions,
     pendingAction,
+    retryCountdown,
     userId,
     toggle,
     open,

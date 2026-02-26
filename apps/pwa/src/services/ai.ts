@@ -3,6 +3,27 @@ import { httpsCallable } from 'firebase/functions'
 import type { Incident, Equipment, AIAnalysis, PredictiveThresholds } from '@/types'
 import type { SensorReading, SensorSummaryNode } from '@/services/sensorsRtdb'
 
+// ─── Rate Limit Error con tiempo de espera ──────────────────────────
+export class RateLimitError extends Error {
+  retryAfterMs: number
+  constructor(retryAfterMs: number, provider: string) {
+    super(`Rate limit de ${provider} alcanzado`)
+    this.name = 'RateLimitError'
+    this.retryAfterMs = retryAfterMs
+  }
+}
+
+/** Parsea Retry-After header (segundos o fecha) y devuelve ms a esperar */
+function parseRetryAfter(response: Response): number {
+  const header = response.headers.get('Retry-After') || response.headers.get('retry-after')
+  if (!header) return 60_000 // default 60s
+  const secs = Number(header)
+  if (!isNaN(secs)) return Math.max(secs * 1000, 5_000)
+  const date = Date.parse(header)
+  if (!isNaN(date)) return Math.max(date - Date.now(), 5_000)
+  return 60_000
+}
+
 const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY || ''
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions'
 const MODEL = 'llama-3.3-70b-versatile' // Gratis, 14,400 req/día
@@ -83,6 +104,9 @@ export async function callGroq(messages: Array<{ role: string; content: string }
   })
 
   if (!response.ok) {
+    if (response.status === 429) {
+      throw new RateLimitError(parseRetryAfter(response), 'Groq')
+    }
     throw new Error(`Groq API error: ${response.status}`)
   }
 
@@ -125,6 +149,9 @@ export async function callGroqStream(
   })
 
   if (!response.ok) {
+    if (response.status === 429) {
+      throw new RateLimitError(parseRetryAfter(response), 'Groq')
+    }
     throw new Error(`Groq API error: ${response.status}`)
   }
 
@@ -236,6 +263,9 @@ export async function callGemini(
   )
 
   if (!response.ok) {
+    if (response.status === 429) {
+      throw new RateLimitError(parseRetryAfter(response), 'Gemini')
+    }
     const errText = await response.text().catch(() => '')
     throw new Error(`Gemini API error: ${response.status} ${errText.slice(0, 200)}`)
   }
@@ -280,6 +310,9 @@ export async function callGeminiStream(
   )
 
   if (!response.ok) {
+    if (response.status === 429) {
+      throw new RateLimitError(parseRetryAfter(response), 'Gemini')
+    }
     const errText = await response.text().catch(() => '')
     throw new Error(`Gemini stream error: ${response.status} ${errText.slice(0, 200)}`)
   }

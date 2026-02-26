@@ -4,7 +4,7 @@
  */
 import { collection, getDocs, query, where, orderBy, limit } from 'firebase/firestore'
 import { db } from './firebase'
-import { callGroq, callGroqStream, callGemini, callGeminiStream, isAIConfigured, isGeminiConfigured } from './ai'
+import { callGroq, callGroqStream, callGemini, callGeminiStream, isAIConfigured, isGeminiConfigured, RateLimitError } from './ai'
 import { logger } from '@/lib/logger'
 import { buildLearningContext, trackEquipmentProblem } from './ariaLearning'
 import type { Incident } from '@/types'
@@ -543,6 +543,8 @@ async function analyzeQuery(
       }
     }
   } catch (err) {
+    // Propagar rate limit para que el UI muestre countdown
+    if (err instanceof RateLimitError) throw err
     logger.error('Chatbot: analyzeQuery LLM error, falling back to keywords', err instanceof Error ? err : undefined)
   }
 
@@ -1747,21 +1749,25 @@ export async function sendChatMessage(
       pendingAction: pendingAction?.status === 'confirming' ? pendingAction : undefined,
     }
   } catch (err) {
-    const errorMsg = err instanceof Error ? err.message : String(err)
-    logger.error('Chatbot: Groq error', err instanceof Error ? err : undefined)
+    // Propagar RateLimitError al UI para que maneje countdown + auto-retry
+    if (err instanceof RateLimitError) {
+      // Guardar memoria incluso si falla por rate limit
+      if (memory && userId) {
+        saveUserMemory(memory)
+      }
+      throw err
+    }
 
-    // Guardar memoria incluso si falla la llamada a Groq
+    const errorMsg = err instanceof Error ? err.message : String(err)
+    logger.error('Chatbot: LLM error', err instanceof Error ? err : undefined)
+
+    // Guardar memoria incluso si falla la llamada
     if (memory && userId) {
       saveUserMemory(memory)
     }
 
     if (errorMsg.includes('429') || errorMsg.includes('rate')) {
-      return {
-        reply: '⏳ Se alcanzó el límite de consultas por minuto. Intenta de nuevo en unos segundos.',
-        context: ragContext,
-        actions: [],
-        typoCorrections: [],
-      }
+      throw new RateLimitError(60_000, 'AI')
     }
 
     return {

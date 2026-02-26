@@ -287,6 +287,7 @@ export function ChatBot() {
     hasUnread,
     streamingContent,
     pendingAction,
+    retryCountdown,
     userId,
     toggle,
     sendMessage,
@@ -511,8 +512,8 @@ export function ChatBot() {
             ))}
             {/* Streaming: mostrar respuesta parcial */}
             {streamingContent && <StreamingBubble content={streamingContent} />}
-            {/* Loading: solo si no hay streaming aún */}
-            {isLoading && !streamingContent && <LoadingIndicator />}
+            {/* Loading: solo si no hay streaming aún y no hay countdown */}
+            {isLoading && !streamingContent && retryCountdown === 0 && <LoadingIndicator />}
             <div ref={messagesEndRef} />
           </div>
 
@@ -594,7 +595,7 @@ export function ChatBot() {
               </button>
             </div>
             <p className="text-[10px] text-muted-foreground mt-1 text-center">
-              ARIA v5 · Powered by Groq AI · Acciones en tiempo real
+              ARIA v5 · Powered by Gemini AI · Acciones en tiempo real
             </p>
           </div>
         </div>
