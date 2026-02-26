@@ -238,20 +238,21 @@ function convertToGeminiFormat(messages: Array<{ role: string; content: string }
  */
 export async function callGemini(
   messages: Array<{ role: string; content: string }>,
-  opts?: { temperature?: number; max_tokens?: number },
+  opts?: { temperature?: number; max_tokens?: number; thinkingBudget?: number },
 ): Promise<{ content: string; tokens: number }> {
   if (!GEMINI_API_KEY) throw new Error('Gemini API key not configured')
 
   const { systemInstruction, contents } = convertToGeminiFormat(messages)
 
-  const body: Record<string, unknown> = {
-    contents,
-    generationConfig: {
-      temperature: opts?.temperature ?? 0.1,
-      maxOutputTokens: opts?.max_tokens || 2048,
-      thinkingConfig: { thinkingBudget: 2048 },
-    },
+  const generationConfig: Record<string, unknown> = {
+    temperature: opts?.temperature ?? 0.1,
+    maxOutputTokens: opts?.max_tokens || 2048,
   }
+  if (opts?.thinkingBudget && opts.thinkingBudget > 0) {
+    generationConfig.thinkingConfig = { thinkingBudget: opts.thinkingBudget }
+  }
+
+  const body: Record<string, unknown> = { contents, generationConfig }
   if (systemInstruction) body.systemInstruction = systemInstruction
 
   const response = await fetch(
@@ -284,7 +285,7 @@ export async function callGemini(
 export async function callGeminiVision(
   imageUrls: string[],
   prompt: string,
-  opts?: { temperature?: number; max_tokens?: number },
+  opts?: { temperature?: number; max_tokens?: number; thinkingBudget?: number },
 ): Promise<{ content: string; tokens: number }> {
   if (!GEMINI_API_KEY) throw new Error('Gemini API key not configured')
 
@@ -309,6 +310,14 @@ export async function callGeminiVision(
     return { content: 'No se pudieron cargar las imágenes para análisis.', tokens: 0 }
   }
 
+  const generationConfigVision: Record<string, unknown> = {
+    temperature: opts?.temperature ?? 0.3,
+    maxOutputTokens: opts?.max_tokens || 1024,
+  }
+  if (opts?.thinkingBudget && opts.thinkingBudget > 0) {
+    generationConfigVision.thinkingConfig = { thinkingBudget: opts.thinkingBudget }
+  }
+
   const body = {
     contents: [{
       parts: [
@@ -316,11 +325,7 @@ export async function callGeminiVision(
         { text: prompt },
       ],
     }],
-    generationConfig: {
-      temperature: opts?.temperature ?? 0.3,
-      maxOutputTokens: opts?.max_tokens || 1024,
-      thinkingConfig: { thinkingBudget: 1024 },
-    },
+    generationConfig: generationConfigVision,
   }
 
   const response = await fetch(
@@ -352,7 +357,7 @@ export async function callGeminiVision(
 export async function callGeminiStream(
   messages: Array<{ role: string; content: string }>,
   onChunk: (text: string) => void,
-  opts?: { temperature?: number; max_tokens?: number },
+  opts?: { temperature?: number; max_tokens?: number; thinkingBudget?: number },
 ): Promise<{ content: string; tokens: number }> {
   if (!GEMINI_API_KEY) {
     // Fallback a Groq si no hay Gemini configurado
@@ -361,14 +366,15 @@ export async function callGeminiStream(
 
   const { systemInstruction, contents } = convertToGeminiFormat(messages)
 
-  const body: Record<string, unknown> = {
-    contents,
-    generationConfig: {
-      temperature: opts?.temperature ?? 0.3,
-      maxOutputTokens: opts?.max_tokens || 2048,
-      thinkingConfig: { thinkingBudget: 2048 },
-    },
+  const generationConfigStream: Record<string, unknown> = {
+    temperature: opts?.temperature ?? 0.3,
+    maxOutputTokens: opts?.max_tokens || 2048,
   }
+  if (opts?.thinkingBudget && opts.thinkingBudget > 0) {
+    generationConfigStream.thinkingConfig = { thinkingBudget: opts.thinkingBudget }
+  }
+
+  const body: Record<string, unknown> = { contents, generationConfig: generationConfigStream }
   if (systemInstruction) body.systemInstruction = systemInstruction
 
   const response = await fetch(

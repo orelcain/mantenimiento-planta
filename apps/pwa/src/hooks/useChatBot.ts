@@ -308,6 +308,7 @@ export function useChatBot() {
         userId,
         pendingAction,
         userName,
+        user?.rol,
       )
 
       if (abortRef.current) return

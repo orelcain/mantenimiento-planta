@@ -1838,6 +1838,7 @@ export async function sendChatMessage(
   userId?: string,
   pendingAction?: PendingAction | null,
   userName?: string,
+  userRole?: string,
 ): Promise<ChatResponse> {
   if (!isAIConfigured()) {
     return {
@@ -2135,7 +2136,7 @@ export async function sendChatMessage(
         const visionResult = await callGeminiVision(
           photoUrls,
           'Eres un experto en mantenimiento industrial. Analiza esta(s) imagen(es) de una planta industrial. Describe lo que ves: estado del equipo, posibles fallas, daños, fugas, corrosión, desgaste, piezas rotas, o cualquier anomalía. Sé específico y técnico. Si la imagen no es de equipos industriales, describe lo que ves brevemente. Responde en español.',
-          { temperature: 0.2, max_tokens: 600 },
+          { temperature: 0.2, max_tokens: 600, thinkingBudget: (userRole === 'admin' || userRole === 'supervisor') ? 1024 : 0 },
         )
         if (visionResult.content) {
           photoAnalysis = visionResult.content
@@ -2238,12 +2239,15 @@ export async function sendChatMessage(
   messages.push({ role: 'user', content: userMessage })
 
   // 6. Llamar al LLM con streaming (Gemini si disponible, si no Groq)
+  // Thinking mode solo para admin/supervisor (reduce consumo de tokens)
+  const useThinking = userRole === 'admin' || userRole === 'supervisor'
+  const thinkingBudget = useThinking ? 2048 : 0
   try {
     const streamFn = isGeminiConfigured() ? callGeminiStream : callGroqStream
     const result = await streamFn(
       messages,
       (partial) => onStream?.(partial),
-      { temperature: 0.4, max_tokens: 4096 }
+      { temperature: 0.4, max_tokens: 4096, thinkingBudget }
     )
 
     // 7. Guardar memoria actualizada + sync a Firestore
