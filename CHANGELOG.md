@@ -7,6 +7,32 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.58.0] - 2026-02-25
+### Agregado
+- **Búsqueda fuzzy en repuestos (#1)**: tolerancia a errores tipográficos con algoritmo Levenshtein + coincidencia parcial por substring
+- **Cache semántico inteligente (#2)**: normalización de claves de caché (ordena términos, elimina stop words) + limpieza automática al superar 30 entradas
+- **Fallback auto-expand (#3)**: cuando hay 0 resultados, busca automáticamente en TODAS las máquinas con fuzzy matching
+- **Resumen diario ejecutivo (#4)**: briefing automático al abrir ARIA (1x/día/usuario) con estado de incidencias, equipos y mantenimiento preventivo
+- **Wizard multi-turno mejorado (#5)**: barra de progreso visual con 4 campos (Título, Equipo, Prioridad, Descripción) e indicadores verde/gris + porcentaje
+- **Copiar mensaje (#6)**: botón de clipboard en cada respuesta de ARIA para copiar contenido al portapapeles
+- **Indicador fuente de datos (#7)**: badge con ícono Database mostrando las fuentes consultadas (REPUESTOS · EQUIPOS · SENSORES…)
+- **Búsquedas recientes (#8)**: dropdown con historial de últimas 8 búsquedas guardadas en localStorage
+- **Renderizado de tablas (#9)**: detección de tablas markdown y renderizado como `<table>` HTML con estilos
+- **Slash commands (#10)**: 9 comandos rápidos (`/repuestos`, `/incidencias`, `/equipos`, `/resumen`, `/preventivo`, `/sensores`, `/falla`, `/gantt`, `/ayuda`) con dropdown autocomplete
+- Footer actualizado: "ARIA v6 · Powered by Gemini AI · /ayuda para comandos"
+- Placeholder input mejorado: "Pregunta, /comando o describe una falla..."
+
+## [2.57.0] - 2026-02-25
+### Agregado
+- **Sugerencias contextuales clickeables**: chips de sugerencia debajo de cada respuesta de ARIA
+- Tag `[SUGERENCIAS]` en SYSTEM_PROMPT para generación automática por el LLM
+- `parseSuggestions()` para extraer y limpiar sugerencias del texto
+- Componente `ContextualSuggestions` con chips interactivos
+- Limpieza de tags durante streaming
+
+### Corregido
+- Fix TS error: null check en `parseSuggestions` para `match[1]` posiblemente undefined
+
 ## [2.56.0] - 2025-02-25
 ### Agregado
 - **Google Gemini 2.0 Flash** como motor de IA principal para ARIA:

@@ -2,13 +2,30 @@
 
 ## Versión Actual: **v2.58.0**
 
-**Fecha de lanzamiento**: 28 de febrero de 2026  \
+**Fecha de lanzamiento**: 25 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
 **Build**: ✅ Stable
 
 ---
 
 ## 📋 Información de la Versión
+
+### v2.58.0 — 10 mejoras de inteligencia ARIA (25/02/2026)
+- 🔍 **Fuzzy search**: búsqueda tolerante a typos con Levenshtein + substring matching
+- 🧠 **Smart cache**: normalización semántica de claves + limpieza automática (>30 entradas)
+- 🔄 **Fallback auto-expand**: busca en TODAS las máquinas si 0 resultados iniciales
+- 📊 **Resumen diario ejecutivo**: briefing automático al abrir chat (1x/día/usuario)
+- 📝 **Wizard multi-turno**: barra de progreso visual para crear incidencias (4 campos)
+- 📋 **Copiar mensaje**: botón clipboard en cada respuesta de ARIA
+- 🏷️ **Data source badge**: indicador de fuentes de datos consultadas
+- 🕐 **Búsquedas recientes**: dropdown con historial (max 8) al enfocar input
+- 📊 **Tablas mejoradas**: renderizado HTML de tablas markdown
+- ⚡ **Slash commands**: 9 comandos rápidos (/repuestos, /incidencias, /equipos, /resumen, /preventivo, /sensores, /falla, /gantt, /ayuda)
+
+### v2.57.0 — Sugerencias contextuales ARIA (25/02/2026)
+- 💡 **Chips de sugerencia**: sugerencias clickeables debajo de cada respuesta de ARIA
+- 🏷️ Tag `[SUGERENCIAS]` automático en respuestas del LLM
+- 🧹 Limpieza de tags durante streaming
 
 ### v2.48.64 - Navegación acordeón por categoría (20/02/2026)
 - 🏢 **Acordeón vertical**: cada categoría (Máquinas Principales, Motores y Bombas, Cintas Transportadoras) es una sección colapsable.
