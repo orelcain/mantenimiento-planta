@@ -7,6 +7,19 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.55.6] - 2025-02-25
+### Agregado
+- **ARIA con Razonamiento Autónomo (Pre-Análisis LLM)**:
+  - Nueva función `analyzeQuery()` que usa el LLM como paso previo para **entender el contexto conversacional**
+  - **Resolución de referencias implícitas**: si el usuario dice "y sus repuestos?" después de hablar de la Grader → ARIA entiende que se refiere a los repuestos de la Grader
+  - **Detección de entidades**: extrae automáticamente máquinas, componentes, estados y personas del mensaje + contexto
+  - **Intención inteligente**: reemplaza la detección por keywords con análisis LLM cuando el contexto es ambiguo
+  - **Shortcut inteligente**: mensajes simples ("hola", "ayuda") y keywords claros sin historial se procesan sin LLM (ahorra latencia)
+  - Inyecta el razonamiento (`ANÁLISIS DE CONTEXTO CONVERSACIONAL`) al LLM principal para respuestas más precisas
+  - El `resolvedQuery` se utiliza para RAG y búsqueda de repuestos, no el mensaje literal
+  - Historial conversacional ampliado de 10 a 20 mensajes
+  - Importado `callGroq` (non-streaming) para el pre-análisis rápido
+
 ## [2.55.5] - 2025-02-25
 ### Corregido
 - **Búsqueda de repuestos con contexto de máquina**: ARIA ahora detecta nombres de máquina en el query (ej. "motores de la Grader") y:

@@ -4,7 +4,7 @@
  */
 import { collection, getDocs, query, where, orderBy, limit } from 'firebase/firestore'
 import { db } from './firebase'
-import { callGroqStream, isAIConfigured } from './ai'
+import { callGroq, callGroqStream, isAIConfigured } from './ai'
 import { logger } from '@/lib/logger'
 import { buildLearningContext, trackEquipmentProblem } from './ariaLearning'
 import type { Incident } from '@/types'
@@ -414,6 +414,144 @@ function suggestActions(intents: IntentType[]): ChatAction[] {
     actions.push({ label: 'Análisis Grader', route: '/grader-analysis', icon: 'BarChart' })
   }
   return actions
+}
+
+// ─── PRE-ANÁLISIS CON LLM (Razonamiento Autónomo) ───────────────────
+
+interface QueryAnalysis {
+  intents: IntentType[]
+  entities: {
+    machines: string[]
+    components: string[]
+    statuses: string[]
+    people: string[]
+  }
+  resolvedQuery: string
+  needsData: IntentType[]
+  reasoning: string
+}
+
+const ANALYSIS_PROMPT = `Eres un analizador de intención ultrarrápido para una app de mantenimiento industrial.
+Analiza el mensaje del usuario EN CONTEXTO de la conversación reciente.
+
+Responde SOLO con JSON válido (sin markdown, sin comentarios):
+{
+  "intents": [...],
+  "entities": { "machines": [...], "components": [...], "statuses": [...], "people": [...] },
+  "resolvedQuery": "...",
+  "needsData": [...],
+  "reasoning": "..."
+}
+
+CAMPOS:
+- intents: array de categorías detectadas. Valores posibles: "repuestos", "incidencias", "equipos", "sensores", "preventivo", "gantt", "ett", "mapas", "inspecciones", "modelos3d", "evidencias", "grader", "resumen", "ayuda", "general"
+- entities.machines: nombres de máquinas/equipos mencionados o implícitos por contexto (ej: "Grader", "Baader 200", "Marel I-Cut")
+- entities.components: componentes mencionados (ej: "motor", "rodamiento", "bomba", "filtro", "cuchillo")
+- entities.statuses: estados mencionados (ej: "pendiente", "resuelto", "crítica")
+- entities.people: personas mencionadas (ej: "Juan", "el técnico")
+- resolvedQuery: el mensaje del usuario con TODAS las referencias implícitas resueltas usando la conversación. Si el usuario dijo "y sus repuestos?" y antes hablaban de la Grader → "repuestos de la máquina Grader". Si dice "cuántos tiene?" y antes hablaban de motores de la Baader → "cuántos motores tiene la Baader"
+- needsData: qué módulos de datos necesitas para responder bien (puede ser más amplio que intents)
+- reasoning: una frase breve explicando tu razonamiento
+
+REGLAS CRÍTICAS:
+- Si el usuario usa pronombres (eso, esa, ese, lo, la, los, sus, esos) o frases vagas ("y los repuestos?", "cuántos tiene?", "muéstrame más"), DEBES resolver la referencia mirando la conversación anterior
+- Si no hay contexto previo para resolver, usa el mensaje tal cual
+- Si el mensaje es simple y claro ("hola", "qué puedes hacer"), no necesitas análisis profundo
+- machines incluye cualquier referencia a equipos de planta: Grader, Baader, Marel, cinta, faja, etc.`
+
+/**
+ * Pre-análisis con LLM: entiende el contexto conversacional y resuelve referencias implícitas.
+ * Se ejecuta ANTES de la respuesta principal para determinar qué datos buscar y cómo interpretar el query.
+ */
+async function analyzeQuery(
+  userMessage: string,
+  recentHistory: ChatMessage[],
+): Promise<QueryAnalysis> {
+  // Shortcut: si el mensaje es muy simple, no gastar un call al LLM
+  const lower = normalizeText(userMessage)
+  const simplePatterns = /^(hola|buenos? d[ií]as?|buenas|hey|ayuda|help|que puedes hacer|que haces|gracias|ok|si|no)$/
+  if (simplePatterns.test(lower.trim())) {
+    const kwIntents = detectIntent(userMessage)
+    return {
+      intents: kwIntents,
+      entities: { machines: [], components: [], statuses: [], people: [] },
+      resolvedQuery: userMessage,
+      needsData: kwIntents.filter(i => i !== 'general' && i !== 'ayuda'),
+      reasoning: 'Mensaje simple, no requiere análisis profundo',
+    }
+  }
+
+  // Si no hay historial relevante y la detección por keywords es clara, evitar el call
+  const kwIntents = detectIntent(userMessage)
+  const hasHistory = recentHistory.length > 1
+  const hasImplicitRef = /\b(eso|esa|ese|esos|esas|lo|la|los|las|sus|su|tiene|tienen|más|estos|estas|el mismo|la misma)\b/i.test(userMessage)
+
+  if (!hasHistory && kwIntents.length > 0 && !kwIntents.includes('general') && !hasImplicitRef) {
+    // Keywords claros + sin historial = no necesita LLM
+    return {
+      intents: kwIntents,
+      entities: { machines: [], components: [], statuses: [], people: [] },
+      resolvedQuery: userMessage,
+      needsData: kwIntents,
+      reasoning: 'Intención clara por keywords, sin contexto previo',
+    }
+  }
+
+  // Construir contexto conversacional compacto
+  const contextMessages = recentHistory.slice(-8)
+  const conversationContext = contextMessages.map(m =>
+    `${m.role === 'user' ? 'Usuario' : 'ARIA'}: ${m.content.slice(0, 300)}`
+  ).join('\n')
+
+  const messages: Array<{ role: string; content: string }> = [
+    { role: 'system', content: ANALYSIS_PROMPT },
+  ]
+
+  if (conversationContext) {
+    messages.push({
+      role: 'system',
+      content: `Conversación reciente:\n${conversationContext}`,
+    })
+  }
+
+  messages.push({ role: 'user', content: userMessage })
+
+  try {
+    const result = await callGroq(messages, { temperature: 0.05, max_tokens: 400 })
+    const jsonMatch = result.content.match(/\{[\s\S]*\}/)
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]) as Partial<QueryAnalysis>
+      // Validar y completar campos
+      const validIntents = (parsed.intents || []).filter(i =>
+        Object.keys(INTENT_KEYWORDS).includes(i)
+      )
+      return {
+        intents: validIntents.length > 0 ? validIntents : kwIntents,
+        entities: {
+          machines: parsed.entities?.machines || [],
+          components: parsed.entities?.components || [],
+          statuses: parsed.entities?.statuses || [],
+          people: parsed.entities?.people || [],
+        },
+        resolvedQuery: parsed.resolvedQuery || userMessage,
+        needsData: (parsed.needsData || validIntents).filter(i =>
+          Object.keys(INTENT_KEYWORDS).includes(i)
+        ),
+        reasoning: parsed.reasoning || '',
+      }
+    }
+  } catch (err) {
+    logger.error('Chatbot: analyzeQuery LLM error, falling back to keywords', err instanceof Error ? err : undefined)
+  }
+
+  // Fallback a detección por keywords
+  return {
+    intents: kwIntents,
+    entities: { machines: [], components: [], statuses: [], people: [] },
+    resolvedQuery: userMessage,
+    needsData: kwIntents.filter(i => i !== 'general' && i !== 'ayuda'),
+    reasoning: 'Fallback a detección por keywords',
+  }
 }
 
 /** Detecta si el usuario quiere ver el historial de ARIA */
@@ -1261,7 +1399,7 @@ export async function sendChatMessage(
   }
 
   // 0. Corrección de typos del mensaje del usuario
-  const { terms: correctedSearchTerms, corrections: typoCorrections } = extractSearchTerms(userMessage)
+  const { corrections: typoCorrections } = extractSearchTerms(userMessage)
   if (typoCorrections.length > 0) {
     logger.info(`Chatbot: typo corrections: ${typoCorrections.join(', ')}`)
   }
@@ -1458,9 +1596,11 @@ export async function sendChatMessage(
 
   // ─── FLUJO NORMAL (consulta/chat) ──────────────────────────────────
 
-  // 1. Detectar intención (con typos corregidos)
-  const intents = detectIntent(userMessage)
-  logger.info(`Chatbot: intents detected = ${intents.join(', ')} | search terms = ${correctedSearchTerms.join(', ')}`)
+  // 1. Pre-análisis con LLM: razonamiento autónomo + resolución de referencias
+  const analysis = await analyzeQuery(userMessage, history)
+  const intents = analysis.intents
+  const resolvedQuery = analysis.resolvedQuery
+  logger.info(`Chatbot: ANALYSIS intents=[${intents.join(', ')}] resolved="${resolvedQuery}" entities=${JSON.stringify(analysis.entities)} reasoning="${analysis.reasoning}"`)
 
   // 2. Cargar memoria del usuario
   let memory: UserMemory | null = null
@@ -1472,10 +1612,11 @@ export async function sendChatMessage(
   // 3. Acciones sugeridas
   const actions = suggestActions(intents)
 
-  // 4. Obtener contexto de Firestore (RAG)
+  // 4. Obtener contexto de Firestore (RAG) — usar needsData + resolvedQuery
+  const dataIntents = analysis.needsData.length > 0 ? analysis.needsData : intents
   let ragContext = ''
   try {
-    ragContext = await buildRAGContext(intents, userMessage)
+    ragContext = await buildRAGContext(dataIntents, resolvedQuery)
   } catch (err: unknown) {
     logger.error('Chatbot: error building RAG context', err instanceof Error ? err : undefined)
     ragContext = 'No se pudieron cargar datos de la planta en este momento.'
@@ -1499,7 +1640,7 @@ export async function sendChatMessage(
 
   // Inyectar contexto de APRENDIZAJE (knowledge base + patrones)
   try {
-    const learningCtx = await buildLearningContext(userMessage, intents)
+    const learningCtx = await buildLearningContext(resolvedQuery, intents)
     if (learningCtx) {
       messages.push({
         role: 'system',
@@ -1508,6 +1649,19 @@ export async function sendChatMessage(
     }
   } catch (err) {
     logger.error('Chatbot: error building learning context', err instanceof Error ? err : undefined)
+  }
+
+  // Inyectar razonamiento del pre-análisis como guía interna
+  if (analysis.reasoning && analysis.resolvedQuery !== userMessage) {
+    messages.push({
+      role: 'system',
+      content: `ANÁLISIS DE CONTEXTO CONVERSACIONAL:\n` +
+        `- El usuario dijo: "${userMessage}"\n` +
+        `- Interpretación con contexto: "${analysis.resolvedQuery}"\n` +
+        `- Entidades detectadas: máquinas=[${analysis.entities.machines.join(', ')}], componentes=[${analysis.entities.components.join(', ')}]\n` +
+        `- Razonamiento: ${analysis.reasoning}\n\n` +
+        `IMPORTANTE: Responde a la INTERPRETACIÓN con contexto, no al mensaje literal. El usuario espera que entiendas la conversación.`,
+    })
   }
 
   // Inyectar correcciones de typos como nota
@@ -1534,7 +1688,8 @@ export async function sendChatMessage(
     })
   }
 
-  const recentHistory = history.slice(-10)
+  // Historial conversacional ampliado (20 mensajes)
+  const recentHistory = history.slice(-20)
   for (const msg of recentHistory) {
     if (msg.role === 'user' || msg.role === 'assistant') {
       messages.push({ role: msg.role, content: msg.content })
