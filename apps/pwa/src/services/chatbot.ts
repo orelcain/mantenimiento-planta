@@ -1837,6 +1837,7 @@ export async function sendChatMessage(
   onStream?: (partial: string) => void,
   userId?: string,
   pendingAction?: PendingAction | null,
+  userName?: string,
 ): Promise<ChatResponse> {
   if (!isAIConfigured()) {
     return {
@@ -1878,7 +1879,7 @@ export async function sendChatMessage(
         (draft as any).chatPhotoUrls = photoUrlsFromChat
       }
 
-      const result = await executeCreateIncident(draft, userId, undefined, photoUrlsFromChat)
+      const result = await executeCreateIncident(draft, userId, userName, photoUrlsFromChat)
       
       if (result.success) {
         // Log acción en Firestore
@@ -1929,6 +1930,7 @@ export async function sendChatMessage(
             `📋 ID: **${result.incidentId}**\n` +
             `📌 "${draft.titulo}"\n` +
             `⚡ Prioridad: ${draft.prioridad}\n` +
+            (userName ? `👤 Creado por: **${userName}**\n` : '') +
             (photoUrlsFromChat.length > 0 ? `📷 ${photoUrlsFromChat.length} foto${photoUrlsFromChat.length > 1 ? 's' : ''} adjuntada${photoUrlsFromChat.length > 1 ? 's' : ''}\n` : '') +
             `\nLa incidencia quedó en estado **pendiente** y será revisada por un supervisor.` +
             techSuggestion +

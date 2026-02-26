@@ -63,6 +63,7 @@ function saveHistory(messages: ChatMessage[], userId: string | undefined): void 
 export function useChatBot() {
   const user = useAuthStore(state => state.user)
   const userId = user?.id
+  const userName = user ? `${user.nombre} ${user.apellido}`.trim() : undefined
   
   const [messages, setMessages] = useState<ChatMessage[]>(() => loadHistory(userId))
   const [isLoading, setIsLoading] = useState(false)
@@ -306,6 +307,7 @@ export function useChatBot() {
         },
         userId,
         pendingAction,
+        userName,
       )
 
       if (abortRef.current) return
