@@ -1108,28 +1108,39 @@ async function fetchRepuestosSummary(userQuery: string): Promise<string> {
           const text = normalizeText(
             `${r.textoBreve} ${r.descripcion} ${r.codigoSAP} ${r.codigoFabricante} ${r.nombreManual || ''} ${r.ubicacionEnPlanta || ''}`
           )
-          // Requerimos que todos los componentTerms (no machine terms) estén presentes
-          const originalMatches = componentTerms.filter(term => {
-            // El term original o alguno de sus sinónimos está en el texto
-            const relatedTerms = expandedTerms.filter(et => {
-              return et === term || SYNONYM_MAP_ENTRIES.some(([, syns]) => {
+
+          // Búsqueda simplificada: verificar si CUALQUIER componentTerm o sus sinónimos aparece en el texto
+          const matchedTerms = componentTerms.filter(term => {
+            // Búsqueda directa del término
+            if (text.includes(term)) return true
+            // Búsqueda por sinónimos expandidos
+            return expandedTerms.some(et => {
+              if (et === term) return false // ya comprobado arriba
+              // Verificar que et es sinónimo de term
+              const isSynonym = SYNONYM_MAP_ENTRIES.some(([, syns]) => {
                 const normSyns = syns.map(s => normalizeText(s))
-                return (normSyns.includes(term) || normSyns.some(ns => term.includes(ns) || ns.includes(term)))
-                    && (normSyns.includes(et) || normSyns.some(ns => et.includes(ns) || ns.includes(et)))
+                const termInGroup = normSyns.includes(term) || normSyns.some(ns => term.includes(ns) || ns.includes(term))
+                const etInGroup = normSyns.includes(et) || normSyns.some(ns => et.includes(ns) || ns.includes(et))
+                return termInGroup && etInGroup
               })
+              return isSynonym && text.includes(et)
             })
-            return text.includes(term) || relatedTerms.some(rt => text.includes(rt))
           })
           
-          if (originalMatches.length >= componentTerms.length) {
+          if (matchedTerms.length >= componentTerms.length) {
             const stockNote = (r.cantidadPorMaquina || 0) === 0 ? ' [SIN STOCK]' : ''
             matchedRepuestos.push(
               `  ✓ [${machine.nombre}] ${r.textoBreve} | SAP: ${r.codigoSAP} | Fab: ${r.codigoFabricante} | Cant: ${r.cantidadPorMaquina} | $${r.valorUnitario}${stockNote}`
             )
+          } else {
+            // Log para debugging: por qué no matchó
+            logger.info(`Chatbot: NO match "${r.textoBreve}" text="${text.slice(0, 80)}" terms=[${componentTerms}] matched=[${matchedTerms}]`)
           }
         })
       }
     }
+
+    logger.info(`Chatbot repuestos: ${matchedRepuestos.length} matches found for component=[${componentTerms}] in machines=[${[...matchedMachineIds]}]`)
 
     const lines = [
       `REPUESTOS (total: ${totalRepuestos}, valor inventario: $${Math.round(valorTotal).toLocaleString()}):`,
@@ -1266,7 +1277,7 @@ async function fetchIncidentsByFilter(userQuery: string): Promise<string> {
 
 // ─── Construcción del contexto RAG ───────────────────────────────────
 
-async function buildRAGContext(intents: IntentType[], userQuery: string): Promise<string> {
+async function buildRAGContext(intents: IntentType[], userQuery: string, originalQuery?: string): Promise<string> {
   const promises: Promise<string>[] = []
 
   // ─── CONTEXTO BASE: SIEMPRE cargar usuarios, equipos e incidencias ──
@@ -1278,7 +1289,10 @@ async function buildRAGContext(intents: IntentType[], userQuery: string): Promis
   const loadAll = intents.includes('general') || intents.includes('resumen')
 
   if (loadAll || intents.includes('repuestos')) {
-    promises.push(fetchRepuestosSummary(userQuery))
+    // Para repuestos usar AMBOS queries: original (literal del usuario) + resuelto
+    // Esto evita que el LLM de pre-análisis sesgue la búsqueda
+    const repQuery = originalQuery || userQuery
+    promises.push(fetchRepuestosSummary(repQuery))
   }
   if (loadAll || intents.includes('preventivo')) {
     promises.push(fetchPreventiveSummary())
@@ -1645,11 +1659,11 @@ export async function sendChatMessage(
   // 3. Acciones sugeridas
   const actions = suggestActions(intents)
 
-  // 4. Obtener contexto de Firestore (RAG) — usar needsData + resolvedQuery
+  // 4. Obtener contexto de Firestore (RAG) — usar needsData + resolvedQuery + userMessage original
   const dataIntents = analysis.needsData.length > 0 ? analysis.needsData : intents
   let ragContext = ''
   try {
-    ragContext = await buildRAGContext(dataIntents, resolvedQuery)
+    ragContext = await buildRAGContext(dataIntents, resolvedQuery, userMessage)
   } catch (err: unknown) {
     logger.error('Chatbot: error building RAG context', err instanceof Error ? err : undefined)
     ragContext = 'No se pudieron cargar datos de la planta en este momento.'
