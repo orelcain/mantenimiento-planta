@@ -158,7 +158,7 @@ export async function orchestrate(task: OrchestratorTask): Promise<OrchestratorR
       attempts.push({ agentId, success: true })
 
       // Log misión exitosa
-      addMissionLog({
+      const logEntry1: Parameters<typeof addMissionLog>[0] = {
         taskType: task.taskType,
         taskPreview: preview,
         agentId,
@@ -166,8 +166,9 @@ export async function orchestrate(task: OrchestratorTask): Promise<OrchestratorR
         status: attempts.length > 1 ? 'fallback' : 'success',
         latencyMs: result.latencyMs,
         tokens: result.tokens,
-        fallbackTo: attempts.length > 1 ? agentId : undefined,
-      })
+      }
+      if (attempts.length > 1) logEntry1.fallbackTo = agentId
+      addMissionLog(logEntry1)
 
       return {
         content: result.content,
@@ -300,7 +301,7 @@ export async function orchestrateStream(
         message: `${agent?.emoji || ''} ${agent?.name || agentId} completó en ${result.latencyMs > 1000 ? (result.latencyMs / 1000).toFixed(1) + 's' : result.latencyMs + 'ms'}`,
       })
 
-      addMissionLog({
+      const logEntry2: Parameters<typeof addMissionLog>[0] = {
         taskType: task.taskType,
         taskPreview: preview,
         agentId,
@@ -308,8 +309,9 @@ export async function orchestrateStream(
         status: attempts.length > 1 ? 'fallback' : 'success',
         latencyMs: result.latencyMs,
         tokens: result.tokens,
-        fallbackTo: attempts.length > 1 ? agentId : undefined,
-      })
+      }
+      if (attempts.length > 1) logEntry2.fallbackTo = agentId
+      addMissionLog(logEntry2)
 
       return {
         content: result.content,

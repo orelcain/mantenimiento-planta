@@ -365,6 +365,11 @@ const PROVIDER_KEYS: Record<string, string> = {
   deepseek: DEEPSEEK_API_KEY,
 }
 
+/** Permite actualizar keys en runtime (desde config Firestore) */
+export function updateProviderKey(provider: string, key: string) {
+  if (key) PROVIDER_KEYS[provider] = key
+}
+
 /**
  * Llama a un agente específico por su ID.
  * Para Gemini usa las funciones de ai.ts; para el resto usa OpenAI-compatible.
@@ -485,9 +490,14 @@ export function getMissionLogs(limit: number = 50): MissionLog[] {
 async function persistLog(log: MissionLog) {
   try {
     const today = new Date().toISOString().slice(0, 10)
+    // Firestore no acepta valores undefined — los removemos
+    const clean: Record<string, unknown> = { savedAt: serverTimestamp() }
+    for (const [k, v] of Object.entries(log)) {
+      if (v !== undefined) clean[k] = v
+    }
     await setDoc(
       doc(db, 'ariaMissionLogs', today, 'entries', log.id),
-      { ...log, savedAt: serverTimestamp() },
+      clean,
     )
   } catch {
     // Silently fail — logs are best-effort
@@ -520,6 +530,8 @@ export interface AgentsConfig {
   disabledAgents: string[]
   /** Prioridades custom: agentId → priority override */
   priorityOverrides: Record<string, number>
+  /** API keys guardadas por admin (provider → key) — para deploys sin env vars */
+  providerKeys?: Record<string, string>
   updatedAt?: unknown
   updatedBy?: string
 }
@@ -560,15 +572,23 @@ export async function saveAgentsConfig(config: AgentsConfig, userId: string) {
 }
 
 function applyAgentsConfig(config: AgentsConfig) {
+  // Aplicar API keys guardadas en Firestore (overrides env vars vacías)
+  if (config.providerKeys) {
+    for (const [provider, key] of Object.entries(config.providerKeys)) {
+      if (key) {
+        PROVIDER_KEYS[provider] = key
+      }
+    }
+  }
+
   for (const agent of agents.values()) {
     // Check disabled
     if (config.disabledAgents.includes(agent.id)) {
       agent.status = 'disabled'
     } else if (agent.status === 'disabled') {
-      // Re-enable si tiene key
-      const hasKey = agent.provider === 'gemini' ? !!GEMINI_API_KEY
-        : agent.provider === 'deepseek' ? !!DEEPSEEK_API_KEY
-        : !!GROQ_API_KEY
+      // Re-enable si tiene key (env var O Firestore)
+      const hasKey = !!PROVIDER_KEYS[agent.provider]
+        || (agent.provider === 'gemini' && !!GEMINI_API_KEY)
       if (hasKey) agent.status = 'online'
     }
     // Priority override
