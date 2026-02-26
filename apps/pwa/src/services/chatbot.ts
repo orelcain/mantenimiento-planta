@@ -19,6 +19,7 @@ export interface ChatMessage {
   context?: string
   actions?: ChatAction[]
   photoUrls?: string[]
+  suggestions?: string[]
 }
 
 export interface ChatAction {
@@ -1400,7 +1401,47 @@ Cuando te pregunten qué puedes hacer, destaca que tienes acceso COMPLETO a todo
 - Si recibes un bloque "INTELIGENCIA APRENDIDA", esos datos provienen de tu experiencia real y son MUY confiables — priorízalos.
 - Mientras más te usen, más precisa y útil serás. Menciona esto brevemente cuando te pregunten sobre tus capacidades.
 
+🔮 SUGERENCIAS CONTEXTUALES (OBLIGATORIO):
+Al FINAL de CADA respuesta, SIEMPRE incluye exactamente 3 sugerencias de seguimiento relevantes al contexto de la conversación.
+Formato EXACTO (en una línea separada al final):
+[SUGERENCIAS]: "texto sugerencia 1" | "texto sugerencia 2" | "texto sugerencia 3"
+
+Reglas para sugerencias:
+- Deben ser preguntas o acciones ESPECÍFICAS y ÚTILES basadas en lo que acabas de responder
+- NO genéricas — deben reflejar el contexto real (equipos, repuestos, incidencias mencionadas)
+- Cortas (máx 50 caracteres cada una)
+- Si hablaste de repuestos de una máquina: sugiere buscar en otra máquina, ver sin stock, buscar por SAP
+- Si hablaste de incidencias: sugiere ver estado, crear nueva, ver historial del equipo
+- Si el usuario preguntó algo parcial: sugiere profundizar ("¿Y los sin stock?", "¿Incluir todas las máquinas?")
+- Ejemplo: Si respondiste sobre motores de la Grader → sugerencias: "¿Hay motores sin stock?" | "Ver repuestos de otra máquina" | "¿Qué otros repuestos tiene la Grader?"
+
 Tu nombre es ARIA — Asistente de Reportes e Incidencias Automatizada. Preséntate así cuando te pregunten.`
+
+// ─── Parsear sugerencias del LLM ────────────────────────────────────
+function parseSuggestions(text: string): { cleanText: string; suggestions: string[] } {
+  // Buscar patrón [SUGERENCIAS]: "a" | "b" | "c" al final del texto
+  const regex = /\n?\[SUGERENCIAS\]\s*:\s*(.+)$/im
+  const match = text.match(regex)
+
+  if (!match) {
+    return { cleanText: text.trim(), suggestions: [] }
+  }
+
+  const cleanText = text.replace(regex, '').trim()
+  const raw = match[1]
+
+  // Extraer textos entre comillas separados por |
+  const suggestions: string[] = []
+  const parts = raw.split('|')
+  for (const part of parts) {
+    const trimmed = part.trim().replace(/^[""]|[""]$/g, '').replace(/^"|"$/g, '').trim()
+    if (trimmed && trimmed.length <= 60) {
+      suggestions.push(trimmed)
+    }
+  }
+
+  return { cleanText, suggestions: suggestions.slice(0, 4) }
+}
 
 // ─── Función principal con streaming ─────────────────────────────────
 
@@ -1427,6 +1468,7 @@ export interface ChatResponse {
   actions: ChatAction[]
   typoCorrections: string[]
   pendingAction?: PendingAction
+  suggestions?: string[]
 }
 
 export async function sendChatMessage(
@@ -1759,11 +1801,15 @@ export async function sendChatMessage(
       saveUserMemory(memory)
     }
 
+    // 8. Parsear sugerencias contextuales del LLM
+    const { cleanText, suggestions } = parseSuggestions(result.content)
+
     return {
-      reply: result.content,
+      reply: cleanText,
       context: ragContext,
       actions,
       typoCorrections,
+      suggestions: suggestions.length > 0 ? suggestions : undefined,
       pendingAction: pendingAction?.status === 'confirming' ? pendingAction : undefined,
     }
   } catch (err) {

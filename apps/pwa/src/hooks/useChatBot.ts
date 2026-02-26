@@ -158,10 +158,11 @@ export function useChatBot() {
       const result = await sendChatMessage(
         messageWithPhotoContext,
         history,
-        // Streaming callback
+        // Streaming callback — ocultar tag [SUGERENCIAS] durante streaming
         (partial) => {
           if (!abortRef.current) {
-            setStreamingContent(partial)
+            const clean = partial.replace(/\n?\[SUGERENCIAS\]\s*:.*$/im, '')
+            setStreamingContent(clean)
           }
         },
         userId,
@@ -191,6 +192,7 @@ export function useChatBot() {
         timestamp: new Date(),
         context: result.context,
         actions: result.actions.length > 0 ? result.actions : undefined,
+        suggestions: result.suggestions,
       }
 
       setMessages(prev => [...prev, assistantMsg])

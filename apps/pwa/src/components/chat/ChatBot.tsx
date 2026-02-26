@@ -12,7 +12,9 @@ import { saveFeedback } from '@/services/ariaLearning'
 
 // ─── Formateador de markdown básico ────────────────────────────────
 function formatMessage(text: string): string {
-  return text
+  // Ocultar línea de sugerencias si aparece en streaming
+  const clean = text.replace(/\n?\[SUGERENCIAS\]\s*:.*$/im, '')
+  return clean
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
     .replace(/`(.+?)`/g, '<code class="bg-muted px-1 py-0.5 rounded text-xs">$1</code>')
@@ -179,7 +181,7 @@ function LoadingIndicator() {
   )
 }
 
-// ─── Sugerencias rápidas ────────────────────────────────────────────
+// ─── Sugerencias rápidas (inicio) ───────────────────────────────────
 const QUICK_SUGGESTIONS = [
   '🔧 Reportar una falla',
   '¿Incidencias abiertas?',
@@ -200,6 +202,29 @@ function QuickSuggestions({ onSelect }: { onSelect: (text: string) => void }) {
           className="text-xs px-2.5 py-1.5 rounded-full border border-border bg-background hover:bg-muted transition-colors text-foreground"
         >
           {suggestion}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+// ─── Chips de sugerencias contextuales (post-respuesta) ─────────────
+function ContextualSuggestions({ suggestions, onSelect, disabled }: {
+  suggestions: string[]
+  onSelect: (text: string) => void
+  disabled?: boolean
+}) {
+  if (!suggestions.length) return null
+  return (
+    <div className="flex flex-wrap gap-1.5 ml-9 mt-1 animate-in fade-in slide-in-from-bottom-2 duration-300">
+      {suggestions.map((s, i) => (
+        <button
+          key={i}
+          onClick={() => onSelect(s)}
+          disabled={disabled}
+          className="text-xs px-3 py-1.5 rounded-full border border-primary/25 bg-primary/5 text-primary hover:bg-primary/15 hover:border-primary/40 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm hover:shadow"
+        >
+          {s}
         </button>
       ))}
     </div>
@@ -507,9 +532,22 @@ export function ChatBot() {
 
           {/* Mensajes */}
           <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3">
-            {messages.map(msg => (
-              <MessageBubble key={msg.id} msg={msg} onNavigate={handleNavigate} onFeedback={handleFeedback} />
-            ))}
+            {messages.map((msg, idx) => {
+              const isLastAssistant = msg.role === 'assistant' && idx === messages.length - 1
+              return (
+                <div key={msg.id}>
+                  <MessageBubble msg={msg} onNavigate={handleNavigate} onFeedback={handleFeedback} />
+                  {/* Chips de sugerencias contextuales — solo en el último mensaje de ARIA */}
+                  {isLastAssistant && msg.suggestions && msg.suggestions.length > 0 && !isLoading && (
+                    <ContextualSuggestions
+                      suggestions={msg.suggestions}
+                      onSelect={handleQuickSelect}
+                      disabled={isLoading}
+                    />
+                  )}
+                </div>
+              )
+            })}
             {/* Streaming: mostrar respuesta parcial */}
             {streamingContent && <StreamingBubble content={streamingContent} />}
             {/* Loading: solo si no hay streaming aún y no hay countdown */}
