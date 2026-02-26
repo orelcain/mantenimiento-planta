@@ -7,6 +7,21 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.56.0] - 2025-02-25
+### Agregado
+- **Google Gemini 2.0 Flash** como motor de IA principal para ARIA:
+  - `callGemini()` — llamada non-streaming para pre-análisis/razonamiento
+  - `callGeminiStream()` — streaming para respuestas principales
+  - `convertToGeminiFormat()` — convierte mensajes OpenAI → formato Gemini (system instructions, user/model alternating)
+  - Variable de entorno: `VITE_GEMINI_API_KEY` (gratis: 15 RPM, 1500 RPD, 1M context)
+  - Si Gemini está configurado → ARIA usa Gemini para razonamiento Y respuestas
+  - Si solo Groq → funciona como antes (fallback automático)
+  - **Arquitectura dual**: Gemini para razonamiento + no consume rate limit de Groq
+- **Fallback inteligente en búsqueda de repuestos**: cuando se detecta una máquina y los términos de componente no matchean ningún repuesto literalmente:
+  - En vez de decir "no encontré", lista TODOS los repuestos de esa máquina (hasta 60) con texto completo
+  - Inyecta instrucción al LLM para que analice la lista y busque equivalencias semánticas (ej: "Interroll" = motor drum)
+  - Resuelve el caso "motores de la Grader" → "Motor Interroll" aunque el repuesto no diga literalmente "motor"
+
 ## [2.55.6] - 2025-02-25
 ### Agregado
 - **ARIA con Razonamiento Autónomo (Pre-Análisis LLM)**:

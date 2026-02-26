@@ -7,7 +7,13 @@ const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY || ''
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions'
 const MODEL = 'llama-3.3-70b-versatile' // Gratis, 14,400 req/día
 
-export const isAIConfigured = () => !!GROQ_API_KEY || useCloudProxy;
+// ─── Gemini 2.0 Flash (Google) — Gratis: 15 RPM, 1500 RPD ──────────
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || ''
+const GEMINI_MODEL = 'gemini-2.0-flash'
+const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}`
+
+export const isAIConfigured = () => !!GROQ_API_KEY || !!GEMINI_API_KEY || useCloudProxy;
+export const isGeminiConfigured = () => !!GEMINI_API_KEY
 
 // Intentar usar Cloud Function proxy (más seguro, key no expuesta)
 let useCloudProxy = true
@@ -147,6 +153,159 @@ export async function callGroqStream(
       try {
         const json = JSON.parse(trimmed.slice(6))
         const delta = json.choices?.[0]?.delta?.content
+        if (delta) {
+          fullContent += delta
+          onChunk(fullContent)
+        }
+      } catch {
+        // skip malformed chunks
+      }
+    }
+  }
+
+  return { content: fullContent, tokens: 0 }
+}
+
+// ─── Gemini 2.0 Flash ───────────────────────────────────────────────
+
+/**
+ * Convierte array de mensajes estilo OpenAI a formato Gemini
+ */
+function convertToGeminiFormat(messages: Array<{ role: string; content: string }>) {
+  const systemParts: string[] = []
+  const contents: Array<{ role: string; parts: Array<{ text: string }> }> = []
+
+  for (const msg of messages) {
+    if (msg.role === 'system') {
+      systemParts.push(msg.content)
+    } else {
+      contents.push({
+        role: msg.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: msg.content }],
+      })
+    }
+  }
+
+  // Gemini requiere que contents alterne user/model y empiece con user
+  // Si hay dos mensajes seguidos del mismo rol, combinarlos
+  const merged: Array<{ role: string; parts: Array<{ text: string }> }> = []
+  for (const c of contents) {
+    const last = merged[merged.length - 1]
+    if (last && last.role === c.role) {
+      last.parts.push(...c.parts)
+    } else {
+      merged.push({ ...c, parts: [...c.parts] })
+    }
+  }
+
+  return {
+    systemInstruction: systemParts.length > 0
+      ? { parts: [{ text: systemParts.join('\n\n') }] }
+      : undefined,
+    contents: merged,
+  }
+}
+
+/**
+ * Llamada a Gemini 2.0 Flash (non-streaming) — para razonamiento y análisis
+ */
+export async function callGemini(
+  messages: Array<{ role: string; content: string }>,
+  opts?: { temperature?: number; max_tokens?: number },
+): Promise<{ content: string; tokens: number }> {
+  if (!GEMINI_API_KEY) throw new Error('Gemini API key not configured')
+
+  const { systemInstruction, contents } = convertToGeminiFormat(messages)
+
+  const body: Record<string, unknown> = {
+    contents,
+    generationConfig: {
+      temperature: opts?.temperature ?? 0.1,
+      maxOutputTokens: opts?.max_tokens || 1024,
+    },
+  }
+  if (systemInstruction) body.systemInstruction = systemInstruction
+
+  const response = await fetch(
+    `${GEMINI_API_URL}:generateContent?key=${GEMINI_API_KEY}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    },
+  )
+
+  if (!response.ok) {
+    const errText = await response.text().catch(() => '')
+    throw new Error(`Gemini API error: ${response.status} ${errText.slice(0, 200)}`)
+  }
+
+  const data = await response.json()
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+  const tokens = data.usageMetadata?.totalTokenCount || 0
+  return { content: text, tokens }
+}
+
+/**
+ * Streaming Gemini 2.0 Flash — para respuestas principales
+ */
+export async function callGeminiStream(
+  messages: Array<{ role: string; content: string }>,
+  onChunk: (text: string) => void,
+  opts?: { temperature?: number; max_tokens?: number },
+): Promise<{ content: string; tokens: number }> {
+  if (!GEMINI_API_KEY) {
+    // Fallback a Groq si no hay Gemini configurado
+    return callGroqStream(messages, onChunk, opts)
+  }
+
+  const { systemInstruction, contents } = convertToGeminiFormat(messages)
+
+  const body: Record<string, unknown> = {
+    contents,
+    generationConfig: {
+      temperature: opts?.temperature ?? 0.3,
+      maxOutputTokens: opts?.max_tokens || 2048,
+    },
+  }
+  if (systemInstruction) body.systemInstruction = systemInstruction
+
+  const response = await fetch(
+    `${GEMINI_API_URL}:streamGenerateContent?alt=sse&key=${GEMINI_API_KEY}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    },
+  )
+
+  if (!response.ok) {
+    const errText = await response.text().catch(() => '')
+    throw new Error(`Gemini stream error: ${response.status} ${errText.slice(0, 200)}`)
+  }
+
+  const reader = response.body?.getReader()
+  if (!reader) throw new Error('No readable stream available')
+
+  const decoder = new TextDecoder()
+  let fullContent = ''
+  let buffer = ''
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split('\n')
+    buffer = lines.pop() || ''
+
+    for (const line of lines) {
+      const trimmed = line.trim()
+      if (!trimmed || !trimmed.startsWith('data: ')) continue
+
+      try {
+        const json = JSON.parse(trimmed.slice(6))
+        const delta = json.candidates?.[0]?.content?.parts?.[0]?.text
         if (delta) {
           fullContent += delta
           onChunk(fullContent)

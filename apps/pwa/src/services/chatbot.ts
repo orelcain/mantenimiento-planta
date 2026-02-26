@@ -4,7 +4,7 @@
  */
 import { collection, getDocs, query, where, orderBy, limit } from 'firebase/firestore'
 import { db } from './firebase'
-import { callGroq, callGroqStream, isAIConfigured } from './ai'
+import { callGroq, callGroqStream, callGemini, callGeminiStream, isAIConfigured, isGeminiConfigured } from './ai'
 import { logger } from '@/lib/logger'
 import { buildLearningContext, trackEquipmentProblem } from './ariaLearning'
 import type { Incident } from '@/types'
@@ -517,7 +517,9 @@ async function analyzeQuery(
   messages.push({ role: 'user', content: userMessage })
 
   try {
-    const result = await callGroq(messages, { temperature: 0.05, max_tokens: 400 })
+    // Preferir Gemini para razonamiento (mejor reasoning + no consume rate limit de Groq)
+    const analysisFn = isGeminiConfigured() ? callGemini : callGroq
+    const result = await analysisFn(messages, { temperature: 0.05, max_tokens: 400 })
     const jsonMatch = result.content.match(/\{[\s\S]*\}/)
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0]) as Partial<QueryAnalysis>
@@ -1152,13 +1154,38 @@ async function fetchRepuestosSummary(userQuery: string): Promise<string> {
         lines.push(`... y ${matchedRepuestos.length - 30} más`)
       }
     } else if (searchTerms.length > 0) {
-      lines.push('', `No se encontraron repuestos que coincidan exactamente con "${searchTerms.join(' ')}".`)
-      if (matchedMachineIds.size > 0) {
+      // ─── FALLBACK INTELIGENTE: si hay máquina detectada y 0 matches, listar TODOS ──
+      if (matchedMachineIds.size > 0 && componentTerms.length > 0) {
         const machineNames = machines.filter(m => matchedMachineIds.has(m.id)).map(m => m.nombre).join(', ')
-        lines.push(`(Se buscó "${componentTerms.join(' ')}" en repuestos de: ${machineNames})`)
+        lines.push('', `No se encontraron repuestos con "${componentTerms.join(' ')}" exacto en ${machineNames}.`)
+        lines.push(`Mostrando TODOS los repuestos de ${machineNames} para que puedas identificar el componente:`)
+        lines.push(`(Se buscó con sinónimos: ${expandedTerms.slice(0, 15).join(', ')})`)
+        lines.push('')
+
+        // Listar TODOS los repuestos de las máquinas detectadas para que el LLM razone
+        let fallbackCount = 0
+        for (const machine of machines) {
+          if (!matchedMachineIds.has(machine.id)) continue
+          const repSnap = await getDocs(collection(db, `machines/${machine.id}/repuestos`))
+          const reps = repSnap.docs.map(d => ({ id: d.id, ...d.data() })) as Repuesto[]
+          for (const r of reps) {
+            if (fallbackCount >= 60) {
+              lines.push(`  ... y más repuestos (total: ${reps.length})`)
+              break
+            }
+            lines.push(
+              `  • [${machine.nombre}] ${r.textoBreve} | ${r.descripcion || ''} | SAP: ${r.codigoSAP} | Fab: ${r.codigoFabricante} | Cant: ${r.cantidadPorMaquina} | $${r.valorUnitario}`
+            )
+            fallbackCount++
+          }
+        }
+        lines.push('')
+        lines.push(`INSTRUCCIÓN: Analiza esta lista y busca repuestos que podrían ser "${componentTerms.join(' ')}" aunque el nombre no contenga exactamente esa palabra. Los motores pueden aparecer como "drum motor", "moto-reductor", "interroll", "motriz", etc.`)
+      } else {
+        lines.push('', `No se encontraron repuestos que coincidan exactamente con "${searchTerms.join(' ')}".`)
+        lines.push(`(Se buscó con sinónimos: ${expandedTerms.slice(0, 15).join(', ')})`)
+        lines.push(`Nota: los repuestos pueden estar registrados con nombres técnicos o códigos SAP diferentes.`)
       }
-      lines.push(`(Se buscó con sinónimos: ${expandedTerms.slice(0, 15).join(', ')})`)
-      lines.push(`Nota: los repuestos pueden estar registrados con nombres técnicos o códigos SAP diferentes.`)
     }
 
     const result = lines.join('\n')
@@ -1698,9 +1725,10 @@ export async function sendChatMessage(
 
   messages.push({ role: 'user', content: userMessage })
 
-  // 6. Llamar a Groq con streaming
+  // 6. Llamar al LLM con streaming (Gemini si disponible, si no Groq)
   try {
-    const result = await callGroqStream(
+    const streamFn = isGeminiConfigured() ? callGeminiStream : callGroqStream
+    const result = await streamFn(
       messages,
       (partial) => onStream?.(partial),
       { temperature: 0.4, max_tokens: 1500 }
