@@ -28,9 +28,9 @@ const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY || ''
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions'
 const MODEL = 'llama-3.3-70b-versatile' // Gratis, 14,400 req/día
 
-// ─── Gemini 2.0 Flash (Google) — Gratis: 15 RPM, 1500 RPD ──────────
+// ─── Gemini 2.5 Flash (Google) — Gratis: 15 RPM, 1500 RPD ──────────
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || ''
-const GEMINI_MODEL = 'gemini-2.0-flash'
+const GEMINI_MODEL = 'gemini-2.5-flash'
 const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}`
 
 export const isAIConfigured = () => !!GROQ_API_KEY || !!GEMINI_API_KEY || useCloudProxy;
