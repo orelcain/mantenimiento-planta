@@ -1179,6 +1179,8 @@ async function fetchRepuestosSummary(userQuery: string): Promise<string> {
     // Si se detectó una máquina pero no quedaron términos de componente,
     // listar los repuestos de esa máquina (hasta 40)
     const listAllForMachine = matchedMachineIds.size > 0 && componentTerms.length === 0
+    // Cache de repuestos por máquina (para safety-net posterior)
+    const repsByMachineCache = new Map<string, Repuesto[]>()
 
     logger.info(`Chatbot search: raw="${userQuery}" → terms=[${searchTerms.join(', ')}] → machine filter=[${[...matchedMachineIds].join(', ')}] → component terms=[${componentTerms.join(', ')}] → expanded=[${expandedTerms.join(', ')}]${corrections.length ? ` (corregido: ${corrections.join(', ')})` : ''}`)
 
@@ -1193,6 +1195,12 @@ async function fetchRepuestosSummary(userQuery: string): Promise<string> {
 
       // Si hay filtro de máquina y esta no es la indicada, saltar búsqueda de coincidencias
       if (matchedMachineIds.size > 0 && !matchedMachineIds.has(machine.id)) continue
+
+      // Guardar en cache para safety-net
+      repsByMachineCache.set(machine.id, reps)
+
+      // DEBUG: log por máquina filtrada
+      console.warn(`[ARIA-RAG] Procesando máquina "${machine.nombre}" (${machine.id}): ${reps.length} repuestos, listAll=${listAllForMachine}, expandedTerms=${expandedTerms.length}`)
 
       // Listar todos los repuestos de la máquina filtrada (sin búsqueda de componente)
       if (listAllForMachine) {
@@ -1246,6 +1254,40 @@ async function fetchRepuestosSummary(userQuery: string): Promise<string> {
       }
     }
 
+    // ─── SAFETY NET: si hubo matches parciales, hacer búsqueda simple como respaldo ──
+    // Detecta si el fuzzy matching perdió resultados que un simple includes() encontraría
+    if (matchedMachineIds.size > 0 && componentTerms.length > 0) {
+      const matchedSAPs = new Set(matchedRepuestos.map(m => {
+        const sapMatch = m.match(/SAP: (\S+)/)
+        return sapMatch?.[1] || ''
+      }).filter(Boolean))
+
+      for (const machine of machines) {
+        if (!matchedMachineIds.has(machine.id)) continue
+        const reps = repsByMachineCache.get(machine.id) || []
+        for (const r of reps) {
+          if (matchedSAPs.has(r.codigoSAP)) continue
+          const breveLower = normalizeText(r.textoBreve || '')
+          const matchesSimple = componentTerms.some(term => breveLower.includes(term))
+          if (matchesSimple) {
+            const cant = r.cantidadPorMaquina ?? 0
+            const stockNote = cant === 0 ? ' [SIN STOCK - CATALOGADO]' : ` [${cant} en stock]`
+            const desc = r.descripcion ? ` | Desc: ${r.descripcion.slice(0, 60)}` : ''
+            const ubic = r.ubicacionEnPlanta ? ` | Ubic: ${r.ubicacionEnPlanta}` : ''
+            matchedRepuestos.push(
+              `  ✓ [${machine.nombre}] ${r.textoBreve}${desc} | SAP: ${r.codigoSAP} | Fab: ${r.codigoFabricante} | Cant: ${cant}${stockNote} | $${r.valorUnitario}${ubic}`
+            )
+            console.warn(`[ARIA-RAG] SAFETY-NET rescued: "${r.textoBreve}" (SAP: ${r.codigoSAP}) - missed by fuzzy matching!`)
+          }
+        }
+      }
+    }
+
+    // DEBUG: log detallado del matching para diagnosticar problemas
+    console.warn(`[ARIA-RAG] fetchRepuestosSummary: query="${userQuery}" → searchTerms=[${searchTerms}] → componentTerms=[${componentTerms}] → expandedTerms=[${expandedTerms.slice(0, 8)}] → matchedMachines=[${[...matchedMachineIds]}] (${matchedMachineIds.size}) → listAll=${listAllForMachine} → matches=${matchedRepuestos.length}`)
+    if (matchedRepuestos.length > 0) {
+      matchedRepuestos.forEach((m, i) => console.warn(`[ARIA-RAG] match[${i}]: ${m.slice(0, 120)}`))
+    }
     logger.info(`Chatbot repuestos: ${matchedRepuestos.length} matches found for component=[${componentTerms}] in machines=[${[...matchedMachineIds]}]`)
 
     const lines = [

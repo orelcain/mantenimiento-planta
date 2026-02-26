@@ -7,6 +7,16 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.64.4] - 2026-02-26
+### Corregido
+- **Brain toggle oculto**: admin no tenía permiso `aria:configurar` — ADMIN_PERMISSIONS.aria era `{ visible: false, actions: [] }`. Ahora admin tiene acceso completo a ARIA
+- **Permiso `canSee` para ARIA**: eliminada la excepción `modulo !== 'aria'` en `can()` y `canSee()` del permissionsStore
+
+### Agregado
+- **Safety-net matching de repuestos**: segunda pasada con `includes()` simple rescata repuestos que el fuzzy matching pueda perder
+- **Debug logging RAG**: `console.warn` detallado del pipeline de búsqueda para diagnosticar problemas de matching en producción
+- **Cache de repuestos en loop**: almacena repuestos leídos durante el loop principal para evitar re-fetch en el safety-net
+
 ## [2.64.3] - 2026-02-26
 ### Mejorado
 - **RAG repuestos completo**: muestra TODOS los repuestos encontrados incluyendo Cant: 0 (sin stock pero catalogados), con descripción y ubicación en planta

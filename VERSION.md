@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.64.3**
+## Versión Actual: **v2.64.4**
 
 **Fecha de lanzamiento**: 26 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,12 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.64.4 — Fix Brain toggle + Safety-net matching + Debug logging (26/02/2026)
+- 🧠 **Brain toggle visible**: admin ahora tiene permisos `aria:configurar` — botón Brain aparece en chat
+- 🔍 **Safety-net matching**: segunda pasada simple (`includes`) rescata repuestos que el fuzzy matching pierde
+- 📊 **Debug logging**: `console.warn` detallado del pipeline RAG (query → terms → machines → matches)
+- 🔐 **Admin full ARIA access**: eliminada restricción "ARIA requiere habilitación explícita" para admin
 
 ### v2.64.3 — RAG repuestos mejorado + Firestore rules ARIA (26/02/2026)
 - 🔍 **RAG mejorado**: ahora muestra TODOS los repuestos encontrados (con y sin stock), incluye descripción y ubicación

@@ -284,8 +284,8 @@ const ADMIN_PERMISSIONS: PermissionsMap = Object.fromEntries(
   ])
 ) as PermissionsMap
 
-// ARIA requiere habilitación explícita (incluso para admin)
-ADMIN_PERMISSIONS.aria = { visible: false, actions: [] }
+// ARIA: admin tiene acceso completo (ver + configurar pensamiento profundo)
+ADMIN_PERMISSIONS.aria = { visible: true, actions: ['ver', 'configurar'] }
 
 /**
  * Permisos para supervisor
