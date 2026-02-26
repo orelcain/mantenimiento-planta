@@ -7,6 +7,17 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.59.0] - 2026-02-25
+### Agregado
+- **Mini-charts inline (#2)**: gráficos de barras y donut renderizados con canvas directamente en las burbujas de chat de ARIA cuando se consultan estadísticas
+- **Modo voz TTS (#3)**: botón de lectura en voz alta (Text-to-Speech) en cada respuesta de ARIA usando `speechSynthesis` con voz es-CL
+- **Resumen semanal con tendencias (#4)**: resumen ejecutivo automático los lunes con análisis de la semana anterior vía LLM
+- **Alertas proactivas (#5)**: ARIA verifica incidencias críticas pendientes al abrir el chat y alerta automáticamente al usuario
+- **Memoria conversacional persistente (#6)**: sincronización de `UserMemory` a Firestore (`ariaMemory/{userId}`) para persistencia cross-device
+- **Links internos clickeables (#7)**: ARIA responde con `[[equipo:NAME]]`, `[[incidencia:TITLE]]`, `[[ir:ROUTE|TEXT]]` que se renderizan como links interactivos en el chat
+- **Contexto de turno/shift (#9)**: ARIA detecta automáticamente el turno actual (mañana/tarde/noche) e inyecta el contexto en cada consulta para respuestas más relevantes
+- **Auto-seguimiento de incidencias (#10)**: tracking de IDs de incidencias creadas vía ARIA con verificación automática de estado al reabrir el chat
+
 ## [2.58.0] - 2026-02-25
 ### Agregado
 - **Búsqueda fuzzy en repuestos (#1)**: tolerancia a errores tipográficos con algoritmo Levenshtein + coincidencia parcial por substring

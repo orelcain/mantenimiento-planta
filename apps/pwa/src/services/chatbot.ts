@@ -1,8 +1,8 @@
 /**
  * Servicio de Chatbot con RAG (Retrieval-Augmented Generation)
- * v3 — Memoria por usuario, corrección de typos, contexto conversacional
+ * v4 — Memoria Firestore, turnos, resumen semanal, auto-seguimiento, alertas proactivas
  */
-import { collection, getDocs, query, where, orderBy, limit } from 'firebase/firestore'
+import { collection, getDocs, getDoc, setDoc, doc, query, where, orderBy, limit, serverTimestamp } from 'firebase/firestore'
 import { db } from './firebase'
 import { callGroq, callGroqStream, callGemini, callGeminiStream, isAIConfigured, isGeminiConfigured, RateLimitError } from './ai'
 import { logger } from '@/lib/logger'
@@ -20,6 +20,16 @@ export interface ChatMessage {
   actions?: ChatAction[]
   photoUrls?: string[]
   suggestions?: string[]
+  chartData?: MiniChartData  // #2 — datos para mini gráfico inline
+}
+
+/** #2 — Datos para renderizar mini gráficos en burbujas */
+export interface MiniChartData {
+  type: 'bar' | 'donut'
+  title?: string
+  labels: string[]
+  values: number[]
+  colors?: string[]
 }
 
 export interface ChatAction {
@@ -45,26 +55,40 @@ type IntentType =
   | 'grader'
   | 'general'
 
-// ─── Memoria por usuario ─────────────────────────────────────────────
+// ─── Memoria por usuario (Firestore + localStorage fallback) ────────
 export interface UserMemory {
   userId: string
   topics: Record<string, number>      // tema → nº de veces consultado
   lastQueries: string[]               // últimas 20 queries
   preferences: Record<string, string> // preferencias detectadas (ej. máquina favorita)
   updatedAt: number
+  createdIncidentIds?: string[]       // #10 — IDs de incidencias creadas para auto-seguimiento
 }
 
 const MEMORY_PREFIX = 'chatbot_memory_'
 const MEMORY_MAX_QUERIES = 20
 const MEMORY_MAX_TOPICS = 30
 
+// ─── #9 — Detección de turno/shift actual ────────────────────────────
+
+type ShiftType = 'mañana' | 'tarde' | 'noche'
+
+function getCurrentShift(): { shift: ShiftType; label: string; range: string } {
+  const hour = new Date().getHours()
+  if (hour >= 6 && hour < 14) return { shift: 'mañana', label: 'Turno Mañana', range: '06:00–14:00' }
+  if (hour >= 14 && hour < 22) return { shift: 'tarde', label: 'Turno Tarde', range: '14:00–22:00' }
+  return { shift: 'noche', label: 'Turno Noche', range: '22:00–06:00' }
+}
+
+export { getCurrentShift }
+
 export function loadUserMemory(userId: string): UserMemory {
   try {
     const raw = localStorage.getItem(`${MEMORY_PREFIX}${userId}`)
-    if (!raw) return { userId, topics: {}, lastQueries: [], preferences: {}, updatedAt: Date.now() }
+    if (!raw) return { userId, topics: {}, lastQueries: [], preferences: {}, updatedAt: Date.now(), createdIncidentIds: [] }
     return JSON.parse(raw) as UserMemory
   } catch {
-    return { userId, topics: {}, lastQueries: [], preferences: {}, updatedAt: Date.now() }
+    return { userId, topics: {}, lastQueries: [], preferences: {}, updatedAt: Date.now(), createdIncidentIds: [] }
   }
 }
 
@@ -79,6 +103,34 @@ export function saveUserMemory(memory: UserMemory): void {
     memory.updatedAt = Date.now()
     localStorage.setItem(`${MEMORY_PREFIX}${memory.userId}`, JSON.stringify(memory))
   } catch { /* localStorage full */ }
+}
+
+// #6 — Persistir memoria en Firestore (backup cross-device)
+export async function syncMemoryToFirestore(memory: UserMemory): Promise<void> {
+  try {
+    const docRef = doc(db, 'ariaMemory', memory.userId)
+    await setDoc(docRef, {
+      ...memory,
+      updatedAt: serverTimestamp(),
+    }, { merge: true })
+  } catch {
+    // Non-blocking, localStorage queda como fallback
+  }
+}
+
+// #6 — Cargar memoria desde Firestore si localStorage no tiene
+export async function loadMemoryFromFirestore(userId: string): Promise<UserMemory | null> {
+  try {
+    const docRef = doc(db, 'ariaMemory', userId)
+    const snap = await getDoc(docRef)
+    if (snap.exists()) {
+      const data = snap.data() as UserMemory
+      return { ...data, userId }
+    }
+    return null
+  } catch {
+    return null
+  }
 }
 
 function updateMemoryWithQuery(memory: UserMemory, userMessage: string, intents: IntentType[]): void {
@@ -1476,6 +1528,13 @@ Reglas para sugerencias:
 - Si el usuario preguntó algo parcial: sugiere profundizar ("¿Y los sin stock?", "¿Incluir todas las máquinas?")
 - Ejemplo: Si respondiste sobre motores de la Grader → sugerencias: "¿Hay motores sin stock?" | "Ver repuestos de otra máquina" | "¿Qué otros repuestos tiene la Grader?"
 
+🔗 LINKS INTERNOS (OBLIGATORIO):
+Cuando menciones un equipo, incidencia o sección específica, USA este formato para crear links clickeables:
+- Equipos: [[equipo:NOMBRE_EQUIPO]] — ej: "La [[equipo:Cinta de Pimponeo]] tiene 3 incidencias"
+- Incidencias: [[incidencia:TITULO]] — ej: "La [[incidencia:Falla motor principal]] sigue pendiente"
+- Secciones: [[ir:RUTA|TEXTO]] — ej: "Puedes verlo en [[ir:/equipment|Equipos]]"
+Estos links serán renderizados como botones clickeables en la interfaz.
+
 Tu nombre es ARIA — Asistente de Reportes e Incidencias Automatizada. Preséntate así cuando te pregunten.`
 
 // ─── Parsear sugerencias del LLM ────────────────────────────────────
@@ -1530,6 +1589,7 @@ export interface ChatResponse {
   typoCorrections: string[]
   pendingAction?: PendingAction
   suggestions?: string[]
+  chartData?: MiniChartData  // #2 — datos para mini gráfico
 }
 
 // ─── #4 Resumen ejecutivo diario ─────────────────────────────────────
@@ -1572,6 +1632,164 @@ Formato EXACTO (usa emojis y negritas):
     logger.error('ARIA daily summary error', err instanceof Error ? err : undefined)
     return null
   }
+}
+
+// ─── #4 Resumen semanal con tendencias ───────────────────────────────
+
+/** Genera resumen semanal comparativo (se ejecuta los lunes) */
+export async function generateWeeklySummary(): Promise<string | null> {
+  if (!isAIConfigured()) return null
+
+  try {
+    const [incidentsSummary, equipmentSummary, preventiveSummary, ganttSummary] = await Promise.all([
+      fetchIncidentsSummary(),
+      fetchEquipmentSummary(),
+      fetchPreventiveSummary(),
+      fetchGanttSummary(),
+    ])
+
+    const messages = [
+      {
+        role: 'system',
+        content: `Eres ARIA. Genera un RESUMEN SEMANAL comparativo para el equipo de mantenimiento.
+Formato (conciso, max 10 líneas):
+📊 **Resumen Semanal — Semana del {fecha}**
+- KPIs: total incidencias, pendientes, resueltas, equipos operativos vs fuera de servicio
+- 🔴 Alertas: equipos que empeoraron, incidencias críticas sin resolver
+- 🟢 Logros: incidencias cerradas, preventivos completados
+- 📈 Tendencia: si hay más o menos incidencias vs semana anterior (inferir de los datos)
+- 📋 Preventivos: tareas vencidas o próximas
+- 🎯 Recomendación: 1 acción prioritaria para esta semana
+- NO incluyas [SUGERENCIAS]`,
+      },
+      {
+        role: 'system',
+        content: `DATOS:\n\n${incidentsSummary}\n\n${equipmentSummary}\n\n${preventiveSummary}\n\n${ganttSummary}`,
+      },
+      { role: 'user', content: 'Genera el resumen semanal de la planta.' },
+    ]
+
+    const callFn = isGeminiConfigured() ? callGemini : callGroq
+    const result = await callFn(messages, { temperature: 0.2, max_tokens: 600 })
+    return result.content.replace(/\n?\[SUGERENCIAS\]\s*:.*$/im, '').trim()
+  } catch (err) {
+    logger.error('ARIA weekly summary error', err instanceof Error ? err : undefined)
+    return null
+  }
+}
+
+// ─── #10 Auto-seguimiento de incidencias creadas ─────────────────────
+
+/** Verifica el estado de incidencias creadas por ARIA y devuelve alertas */
+export async function checkCreatedIncidents(incidentIds: string[]): Promise<string | null> {
+  if (incidentIds.length === 0) return null
+
+  try {
+    const alerts: string[] = []
+    for (const id of incidentIds.slice(0, 5)) {
+      try {
+        const docRef = doc(db, 'incidents', id)
+        const snap = await getDoc(docRef)
+        if (snap.exists()) {
+          const data = snap.data()
+          const status = data.status || 'desconocido'
+          const titulo = data.titulo || 'Sin título'
+          const createdAt = data.createdAt?.toDate?.() || new Date()
+          const hoursAgo = Math.round((Date.now() - createdAt.getTime()) / (1000 * 60 * 60))
+
+          if (['pendiente', 'confirmada'].includes(status) && hoursAgo >= 4) {
+            alerts.push(`⚠️ **${titulo}** lleva ${hoursAgo}h en estado **${status}**`)
+          }
+        }
+      } catch { /* skip individual errors */ }
+    }
+
+    return alerts.length > 0
+      ? `📋 **Seguimiento de tus incidencias:**\n${alerts.join('\n')}\n\n💡 ¿Quieres escalar alguna o ver su detalle?`
+      : null
+  } catch {
+    return null
+  }
+}
+
+// ─── #5 Alertas proactivas — verificar sensores/incidencias críticas ─
+
+export async function checkProactiveAlerts(): Promise<string | null> {
+  try {
+    // Verificar incidencias críticas recientes no confirmadas
+    const critSnap = await getDocs(
+      query(collection(db, 'incidents'), where('prioridad', '==', 'critica'), where('status', '==', 'pendiente'))
+    )
+    const critCount = critSnap.size
+
+    if (critCount > 0) {
+      const titles = critSnap.docs.slice(0, 3).map(d => d.data().titulo || 'Sin título')
+      return `🚨 **Alerta:** ${critCount} incidencia${critCount > 1 ? 's' : ''} crítica${critCount > 1 ? 's' : ''} pendiente${critCount > 1 ? 's' : ''}:\n${titles.map(t => `• ${t}`).join('\n')}\n\n¿Quieres verlas?`
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
+// ─── #2 Extraer datos para mini-charts del contexto RAG ──────────────
+
+function extractChartData(ragContext: string, intents: IntentType[]): MiniChartData | undefined {
+  // Intentar extraer datos de incidencias por estado
+  if (intents.includes('incidencias') || intents.includes('resumen')) {
+    const statusMatch = ragContext.match(/Por estado:\s*(\{[^}]+\})/)
+    if (statusMatch) {
+      try {
+        const data = JSON.parse(statusMatch[1]!) as Record<string, number>
+        const labels = Object.keys(data)
+        const values = Object.values(data)
+        if (labels.length >= 2) {
+          return {
+            type: 'donut',
+            title: 'Incidencias por estado',
+            labels,
+            values,
+            colors: labels.map(l => {
+              if (l === 'pendiente') return '#f59e0b'
+              if (l === 'confirmada') return '#3b82f6'
+              if (l === 'en_proceso') return '#8b5cf6'
+              if (l === 'resuelta') return '#22c55e'
+              if (l === 'cerrada') return '#6b7280'
+              return '#94a3b8'
+            }),
+          }
+        }
+      } catch { /* invalid JSON */ }
+    }
+  }
+
+  // Intentar extraer datos de equipos por estado
+  if (intents.includes('equipos')) {
+    const estadoMatch = ragContext.match(/EQUIPOS.*?Por estado:\s*(\{[^}]+\})/)
+    if (estadoMatch) {
+      try {
+        const data = JSON.parse(estadoMatch[1]!) as Record<string, number>
+        const labels = Object.keys(data)
+        const values = Object.values(data)
+        if (labels.length >= 2) {
+          return {
+            type: 'bar',
+            title: 'Equipos por estado',
+            labels,
+            values,
+            colors: labels.map(l => {
+              if (l === 'operativo') return '#22c55e'
+              if (l === 'mantenimiento') return '#f59e0b'
+              if (l === 'fuera_de_servicio' || l === 'fuera de servicio') return '#ef4444'
+              return '#94a3b8'
+            }),
+          }
+        }
+      } catch { /* invalid JSON */ }
+    }
+  }
+
+  return undefined
 }
 
 export async function sendChatMessage(
@@ -1633,6 +1851,15 @@ export async function sendChatMessage(
           success: true,
           metadata: { draft, photoCount: photoUrlsFromChat.length },
         })
+
+        // #10 — Guardar ID de incidencia para auto-seguimiento
+        try {
+          const mem = loadUserMemory(userId)
+          if (!mem.createdIncidentIds) mem.createdIncidentIds = []
+          mem.createdIncidentIds.push(result.incidentId!)
+          mem.createdIncidentIds = mem.createdIncidentIds.slice(-10) // max 10
+          saveUserMemory(mem)
+        } catch { /* ignore */ }
 
         // Notificación push local
         notifyAriaAction('incident_created', {
@@ -1830,6 +2057,13 @@ export async function sendChatMessage(
     }
   }
 
+  // #9 — Inyectar contexto de turno/shift
+  const shift = getCurrentShift()
+  messages.push({
+    role: 'system',
+    content: `TURNO ACTUAL: ${shift.label} (${shift.range}). Hora: ${new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}. Personaliza tu respuesta al turno actual cuando sea relevante.`,
+  })
+
   // Inyectar contexto de APRENDIZAJE (knowledge base + patrones)
   try {
     const learningCtx = await buildLearningContext(resolvedQuery, intents)
@@ -1899,13 +2133,18 @@ export async function sendChatMessage(
       { temperature: 0.4, max_tokens: 1500 }
     )
 
-    // 7. Guardar memoria actualizada
+    // 7. Guardar memoria actualizada + sync a Firestore
     if (memory && userId) {
       saveUserMemory(memory)
+      // #6 — Sync no-bloqueante a Firestore
+      syncMemoryToFirestore(memory).catch(() => { /* non-blocking */ })
     }
 
     // 8. Parsear sugerencias contextuales del LLM
     const { cleanText, suggestions } = parseSuggestions(result.content)
+
+    // #2 — Extraer datos para mini-chart del contexto RAG
+    const chartData = extractChartData(ragContext, intents)
 
     return {
       reply: cleanText,
@@ -1913,6 +2152,7 @@ export async function sendChatMessage(
       actions,
       typoCorrections,
       suggestions: suggestions.length > 0 ? suggestions : undefined,
+      chartData,
       pendingAction: pendingAction?.status === 'confirming' ? pendingAction : undefined,
     }
   } catch (err) {

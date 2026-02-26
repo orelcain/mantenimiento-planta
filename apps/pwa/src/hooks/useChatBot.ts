@@ -4,7 +4,7 @@
  * Memoria por usuario, corrección de typos, historial persistente por userId
  */
 import { useState, useCallback, useRef, useEffect } from 'react'
-import { sendChatMessage, generateDailySummary, type ChatMessage, type ChatAction, type PendingAction } from '@/services/chatbot'
+import { sendChatMessage, generateDailySummary, generateWeeklySummary, checkCreatedIncidents, checkProactiveAlerts, loadUserMemory, loadMemoryFromFirestore, saveUserMemory, type ChatMessage, type ChatAction, type PendingAction } from '@/services/chatbot'
 import { RateLimitError } from '@/services/ai'
 import { uploadChatPhoto } from '@/services/chatActions'
 import { useAuthStore } from '@/store/authStore'
@@ -107,10 +107,32 @@ export function useChatBot() {
   const triggerDailySummary = useCallback(async () => {
     if (dailySummaryTriggered.current || !userId) return
     const todayKey = `aria_daily_${userId}_${new Date().toISOString().slice(0, 10)}`
-    if (localStorage.getItem(todayKey)) return
+    if (localStorage.getItem(todayKey)) {
+      dailySummaryTriggered.current = true
+      // Aún si ya se hizo el resumen diario, verificar alertas y seguimiento
+      triggerProactiveChecks()
+      return
+    }
     dailySummaryTriggered.current = true
 
     try {
+      // #4 — Resumen semanal los lunes
+      const isMonday = new Date().getDay() === 1
+      const weeklyKey = `aria_weekly_${userId}_${new Date().toISOString().slice(0, 10)}`
+      if (isMonday && !localStorage.getItem(weeklyKey)) {
+        const weeklySummary = await generateWeeklySummary()
+        if (weeklySummary) {
+          const weeklyMsg: ChatMessage = {
+            id: generateId(),
+            role: 'assistant',
+            content: `📊 ${weeklySummary}`,
+            timestamp: new Date(),
+          }
+          setMessages(prev => [...prev, weeklyMsg])
+          localStorage.setItem(weeklyKey, '1')
+        }
+      }
+
       const summary = await generateDailySummary()
       if (summary) {
         const summaryMsg: ChatMessage = {
@@ -121,6 +143,52 @@ export function useChatBot() {
         }
         setMessages(prev => [...prev, summaryMsg])
         localStorage.setItem(todayKey, '1')
+      }
+    } catch { /* non-blocking */ }
+
+    // Verificar alertas proactivas + seguimiento de incidencias
+    triggerProactiveChecks()
+  }, [userId])
+
+  // #5 — Alertas proactivas + #10 Auto-seguimiento
+  const triggerProactiveChecks = useCallback(async () => {
+    if (!userId) return
+
+    try {
+      // #6 — Intentar cargar memoria desde Firestore si local está vacía
+      const localMem = loadUserMemory(userId)
+      if (localMem.lastQueries.length === 0) {
+        const firestoreMem = await loadMemoryFromFirestore(userId)
+        if (firestoreMem && firestoreMem.lastQueries.length > 0) {
+          saveUserMemory(firestoreMem)
+        }
+      }
+
+      // #5 — Verificar alertas proactivas
+      const proactiveAlert = await checkProactiveAlerts()
+      if (proactiveAlert) {
+        const alertMsg: ChatMessage = {
+          id: generateId(),
+          role: 'assistant',
+          content: proactiveAlert,
+          timestamp: new Date(),
+        }
+        setMessages(prev => [...prev, alertMsg])
+      }
+
+      // #10 — Auto-seguimiento de incidencias creadas
+      const mem = loadUserMemory(userId)
+      if (mem.createdIncidentIds && mem.createdIncidentIds.length > 0) {
+        const followUp = await checkCreatedIncidents(mem.createdIncidentIds)
+        if (followUp) {
+          const followUpMsg: ChatMessage = {
+            id: generateId(),
+            role: 'assistant',
+            content: followUp,
+            timestamp: new Date(),
+          }
+          setMessages(prev => [...prev, followUpMsg])
+        }
       }
     } catch { /* non-blocking */ }
   }, [userId])

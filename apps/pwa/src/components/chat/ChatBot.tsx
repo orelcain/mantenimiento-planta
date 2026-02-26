@@ -5,9 +5,9 @@
  */
 import { useState, useRef, useEffect, useCallback, type KeyboardEvent, type ChangeEvent, type MouseEvent as ReactMouseEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { MessageCircle, X, Send, Trash2, Loader2, Bot, User, Mic, MicOff, ExternalLink, AlertTriangle, CheckCircle, XCircle, Camera, GripVertical, ThumbsUp, ThumbsDown, Copy, Check, Database } from 'lucide-react'
+import { MessageCircle, X, Send, Trash2, Loader2, Bot, User, Mic, MicOff, ExternalLink, AlertTriangle, CheckCircle, XCircle, Camera, GripVertical, ThumbsUp, ThumbsDown, Copy, Check, Database, Volume2, VolumeX } from 'lucide-react'
 import { useChatBot } from '@/hooks/useChatBot'
-import type { ChatMessage, ChatAction } from '@/services/chatbot'
+import type { ChatMessage, ChatAction, MiniChartData } from '@/services/chatbot'
 import { saveFeedback } from '@/services/ariaLearning'
 
 // ─── Formateador de markdown básico + #9 tablas ────────────────────
@@ -81,6 +81,10 @@ function formatLine(text: string): string {
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
     .replace(/`(.+?)`/g, '<code class="bg-muted px-1 py-0.5 rounded text-xs">$1</code>')
+    // #7 — Links internos clickeables
+    .replace(/\[\[equipo:(.+?)\]\]/g, '<a class="text-primary underline cursor-pointer" data-aria-link="equipment" data-name="$1">🔧 $1</a>')
+    .replace(/\[\[incidencia:(.+?)\]\]/g, '<a class="text-primary underline cursor-pointer" data-aria-link="incident" data-name="$1">🎫 $1</a>')
+    .replace(/\[\[ir:(.+?)\|(.+?)\]\]/g, '<a class="text-primary underline cursor-pointer" data-aria-link="navigate" data-route="$1">$2</a>')
 }
 
 // ─── Preview de foto en chat ────────────────────────────────────────
@@ -98,6 +102,107 @@ function PhotoPreview({ src, onRemove }: { src: string; onRemove: () => void }) 
       >
         ×
       </button>
+    </div>
+  )
+}
+
+// ─── #2 Mini-chart inline (canvas) ──────────────────────────────────
+function MiniChart({ data }: { data: MiniChartData }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    const dpr = window.devicePixelRatio || 1
+    const w = canvas.clientWidth
+    const h = canvas.clientHeight
+    canvas.width = w * dpr
+    canvas.height = h * dpr
+    ctx.scale(dpr, dpr)
+    ctx.clearRect(0, 0, w, h)
+
+    const colors = data.colors ?? ['#3b82f6', '#ef4444', '#22c55e', '#f59e0b', '#8b5cf6', '#06b6d4', '#f97316', '#ec4899']
+
+    if (data.type === 'bar') {
+      const max = Math.max(...data.values, 1)
+      const barW = Math.min(28, (w - 20) / data.values.length - 4)
+      const gap = 4
+      const totalBarArea = data.values.length * (barW + gap) - gap
+      const startX = (w - totalBarArea) / 2
+      const barAreaH = h - 28
+
+      data.values.forEach((v, i) => {
+        const barH = (v / max) * (barAreaH - 4)
+        const x = startX + i * (barW + gap)
+        const y = barAreaH - barH
+        ctx.fillStyle = colors[i % colors.length]!
+        ctx.beginPath()
+        ctx.roundRect(x, y, barW, barH, 3)
+        ctx.fill()
+        // Value on top
+        ctx.fillStyle = '#888'
+        ctx.font = '9px sans-serif'
+        ctx.textAlign = 'center'
+        ctx.fillText(String(v), x + barW / 2, y - 3)
+        // Label at bottom
+        ctx.fillStyle = '#888'
+        ctx.font = '8px sans-serif'
+        ctx.fillText(
+          (data.labels[i] || '').slice(0, 8),
+          x + barW / 2,
+          h - 4
+        )
+      })
+    } else if (data.type === 'donut') {
+      const total = data.values.reduce((a, b) => a + b, 0)
+      if (total === 0) return
+      const cx = w / 2, cy = h / 2 - 4
+      const r = Math.min(cx, cy) - 14
+      let angle = -Math.PI / 2
+
+      data.values.forEach((v, i) => {
+        const slice = (v / total) * Math.PI * 2
+        ctx.beginPath()
+        ctx.moveTo(cx, cy)
+        ctx.arc(cx, cy, r, angle, angle + slice)
+        ctx.closePath()
+        ctx.fillStyle = colors[i % colors.length]!
+        ctx.fill()
+        // Label
+        const mid = angle + slice / 2
+        const lx = cx + (r + 10) * Math.cos(mid)
+        const ly = cy + (r + 10) * Math.sin(mid)
+        ctx.fillStyle = '#888'
+        ctx.font = '8px sans-serif'
+        ctx.textAlign = lx > cx ? 'left' : 'right'
+        ctx.fillText(`${(data.labels[i] || '').slice(0, 8)} ${v}`, lx, ly)
+        angle += slice
+      })
+      // Donut hole
+      ctx.beginPath()
+      ctx.arc(cx, cy, r * 0.5, 0, Math.PI * 2)
+      ctx.fillStyle = getComputedStyle(canvasRef.current!).getPropertyValue('--background') || '#fff'
+      ctx.fill()
+      // Center total
+      ctx.fillStyle = '#666'
+      ctx.font = 'bold 11px sans-serif'
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillText(String(total), cx, cy)
+    }
+  }, [data])
+
+  return (
+    <div className="mt-2 mb-1">
+      {data.title && <p className="text-[10px] text-muted-foreground font-medium mb-1">{data.title}</p>}
+      <canvas
+        ref={canvasRef}
+        className="w-full rounded-md border border-border/50 bg-background"
+        style={{ height: data.type === 'donut' ? 120 : 100 }}
+      />
     </div>
   )
 }
@@ -152,6 +257,7 @@ function MessageBubble({
   const isUser = msg.role === 'user'
   const [feedbackGiven, setFeedbackGiven] = useState<'positive' | 'negative' | null>(null)
   const [copied, setCopied] = useState(false)
+  const [isSpeaking, setIsSpeaking] = useState(false)
 
   const handleFeedback = (rating: 'positive' | 'negative') => {
     if (feedbackGiven) return
@@ -166,6 +272,31 @@ function MessageBubble({
       setTimeout(() => setCopied(false), 2000)
     }).catch(() => { /* ignore */ })
   }
+
+  // #3 — TTS: leer respuesta en voz alta
+  const handleSpeak = () => {
+    if (!('speechSynthesis' in window)) return
+    if (isSpeaking) {
+      window.speechSynthesis.cancel()
+      setIsSpeaking(false)
+      return
+    }
+    const plainText = msg.content.replace(/\*\*/g, '').replace(/\*/g, '').replace(/`/g, '').replace(/\[\[.*?\]\]/g, '')
+    const utterance = new SpeechSynthesisUtterance(plainText)
+    utterance.lang = 'es-CL'
+    utterance.rate = 1.0
+    utterance.onend = () => setIsSpeaking(false)
+    utterance.onerror = () => setIsSpeaking(false)
+    window.speechSynthesis.speak(utterance)
+    setIsSpeaking(true)
+  }
+
+  // Cleanup TTS on unmount
+  useEffect(() => {
+    return () => {
+      if (isSpeaking) window.speechSynthesis.cancel()
+    }
+  }, [isSpeaking])
 
   // #7 — Extraer fuente de datos del contexto
   const dataSource = !isUser && msg.context
@@ -185,6 +316,8 @@ function MessageBubble({
       }`}>
         <div dangerouslySetInnerHTML={{ __html: formatMessage(msg.content) }} />
         {msg.photoUrls && msg.photoUrls.length > 0 && <MessagePhotos urls={msg.photoUrls} />}
+        {/* #2 — Mini-chart inline */}
+        {!isUser && msg.chartData && <MiniChart data={msg.chartData} />}
         {msg.actions && <ActionButtons actions={msg.actions} onNavigate={onNavigate} />}
         {/* #7 — Indicador fuente de datos */}
         {dataSource.length > 0 && (
@@ -208,6 +341,16 @@ function MessageBubble({
                 title={copied ? 'Copiado' : 'Copiar respuesta'}
               >
                 {copied ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
+              </button>
+            )}
+            {/* #3 — Botón TTS: leer en voz alta */}
+            {!isUser && msg.content.length > 30 && 'speechSynthesis' in window && (
+              <button
+                onClick={handleSpeak}
+                className={`p-0.5 rounded hover:bg-background/50 transition-colors ${isSpeaking ? 'text-primary' : ''}`}
+                title={isSpeaking ? 'Detener lectura' : 'Leer en voz alta'}
+              >
+                {isSpeaking ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
               </button>
             )}
             {/* Feedback thumbs */}
@@ -612,6 +755,27 @@ export function ChatBot() {
     }).catch(() => { /* non-blocking */ })
   }, [messages, userId])
 
+  // #7 — Handler para links internos clickeables en mensajes
+  const handleInternalLinkClick = useCallback((e: ReactMouseEvent<HTMLDivElement>) => {
+    const target = (e.target as HTMLElement).closest('[data-aria-link]') as HTMLElement | null
+    if (!target) return
+    e.preventDefault()
+    const linkType = target.dataset.ariaLink
+    const name = target.dataset.name || ''
+    const route = target.dataset.route || ''
+
+    if (linkType === 'equipment' && name) {
+      // Buscar equipo por nombre → navegar a ficha técnica
+      sendMessage(`Muéstrame la ficha técnica de ${name}`)
+    } else if (linkType === 'incident' && name) {
+      // Buscar incidencia por título
+      sendMessage(`Dame detalles de la incidencia: ${name}`)
+    } else if (linkType === 'navigate' && route) {
+      navigate(route)
+      toggle()
+    }
+  }, [sendMessage, navigate, toggle])
+
   // #10 — Slash commands definitions
   const SLASH_COMMANDS = [
     { cmd: '/repuestos', desc: 'Buscar repuestos', expand: '¿Qué repuestos tenemos?' },
@@ -721,7 +885,7 @@ export function ChatBot() {
           </div>
 
           {/* Mensajes */}
-          <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3">
+          <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3" onClick={handleInternalLinkClick}>
             {messages.map((msg, idx) => {
               const isLastAssistant = msg.role === 'assistant' && idx === messages.length - 1
               return (
