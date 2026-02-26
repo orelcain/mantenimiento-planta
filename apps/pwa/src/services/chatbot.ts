@@ -1094,8 +1094,9 @@ async function fetchRepuestosSummary(userQuery: string): Promise<string> {
       // Listar todos los repuestos de la máquina filtrada (sin búsqueda de componente)
       if (listAllForMachine) {
         reps.forEach(r => {
+          const stockNote = (r.cantidadPorMaquina || 0) === 0 ? ' [SIN STOCK]' : ''
           matchedRepuestos.push(
-            `  ✓ [${machine.nombre}] ${r.textoBreve} | SAP: ${r.codigoSAP} | Fab: ${r.codigoFabricante} | Cant: ${r.cantidadPorMaquina} | $${r.valorUnitario}`
+            `  ✓ [${machine.nombre}] ${r.textoBreve} | SAP: ${r.codigoSAP} | Fab: ${r.codigoFabricante} | Cant: ${r.cantidadPorMaquina} | $${r.valorUnitario}${stockNote}`
           )
         })
         continue
@@ -1121,8 +1122,9 @@ async function fetchRepuestosSummary(userQuery: string): Promise<string> {
           })
           
           if (originalMatches.length >= componentTerms.length) {
+            const stockNote = (r.cantidadPorMaquina || 0) === 0 ? ' [SIN STOCK]' : ''
             matchedRepuestos.push(
-              `  ✓ [${machine.nombre}] ${r.textoBreve} | SAP: ${r.codigoSAP} | Fab: ${r.codigoFabricante} | Cant: ${r.cantidadPorMaquina} | $${r.valorUnitario}`
+              `  ✓ [${machine.nombre}] ${r.textoBreve} | SAP: ${r.codigoSAP} | Fab: ${r.codigoFabricante} | Cant: ${r.cantidadPorMaquina} | $${r.valorUnitario}${stockNote}`
             )
           }
         })
@@ -1347,9 +1349,11 @@ REGLAS cuando el usuario describe un problema/falla:
 - USA los datos de USUARIOS del contexto para sugerir asignación
 
 REGLAS CRÍTICAS para responder sobre repuestos:
-- Si el contexto dice "COINCIDENCIAS con X (N encontrados)" → ESOS SON LOS RESULTADOS REALES. Enuméralos.
-- Si hay coincidencias, di cuántas hay y muéstralas con sus datos (máquina, SAP, fabricante, precio)
+- Si el contexto dice "COINCIDENCIAS con X (N encontrados)" → ESOS SON LOS RESULTADOS REALES. Enuméralos TODOS sin omitir ninguno.
+- SIEMPRE muestra TODOS los repuestos encontrados, incluyendo los que tienen Cantidad: 0. Un repuesto con Cant: 0 significa que está en el catálogo pero no hay stock — igualmente debe listarse.
+- Si hay coincidencias, di cuántas hay y muéstralas con sus datos (máquina, SAP, fabricante, cantidad, precio)
 - Si no hay coincidencias, explica que no se encontraron y sugiere buscar por código SAP o fabricante
+- NUNCA filtres ni omitas resultados por tu cuenta. Si el sistema encontró N coincidencias, tú DEBES mostrar las N.
 
 MÓDULOS DE LA APP (tienes acceso completo a todos):
 
