@@ -61,8 +61,10 @@ import { initializeHierarchySystem, isHierarchyInitialized } from '../services/h
 import { NotificationsSettings as NotificationsPushSettings } from '@/components/settings/NotificationsSettings'
 import { CategoryManager } from '@/components/repuestos/CategoryManager'
 import { PermissionsPage } from '@/pages/admin/PermissionsPage'
+import { AriaMonitorPanel } from '@/components/admin/AriaMonitorPanel'
+import { Brain } from 'lucide-react'
 
-type TabType = 'general' | 'users' | 'invites' | 'notifications' | 'categories' | 'permissions' | 'system'
+type TabType = 'general' | 'users' | 'invites' | 'notifications' | 'categories' | 'permissions' | 'aria' | 'system'
 
 export function SettingsPage() {
   const { user } = useAuthStore()
@@ -85,6 +87,7 @@ export function SettingsPage() {
     { id: 'invites' as const, label: 'Invitaciones', icon: Key },
     { id: 'notifications' as const, label: 'Notificaciones', icon: Bell },
     { id: 'categories' as const, label: 'Categorías', icon: Database },
+    { id: 'aria' as const, label: 'ARIA', icon: Brain },
     { id: 'system' as const, label: 'Sistema', icon: Wrench },
   ] : [
     { id: 'notifications' as const, label: 'Notificaciones', icon: Bell },
@@ -124,6 +127,7 @@ export function SettingsPage() {
       {isAdmin && activeTab === 'invites' && <InvitesSettings />}
       {activeTab === 'notifications' && <NotificationsPushSettings />}
       {isAdmin && activeTab === 'categories' && <CategoryManager />}
+      {isAdmin && activeTab === 'aria' && <AriaMonitorPanel />}
       {isAdmin && activeTab === 'system' && <SystemSettings />}
     </div>
   )

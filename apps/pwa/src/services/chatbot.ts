@@ -5,6 +5,7 @@
 import { collection, getDocs, getDoc, setDoc, doc, query, where, orderBy, limit, serverTimestamp } from 'firebase/firestore'
 import { db } from './firebase'
 import { callGroq, callGroqStream, callGemini, callGeminiStream, isAIConfigured, isGeminiConfigured, RateLimitError } from './ai'
+import { checkThinkingAllowance, recordThinkingUsage, getAriaConfig } from './ariaThinkingTracker'
 import { logger } from '@/lib/logger'
 import { buildLearningContext, trackEquipmentProblem } from './ariaLearning'
 import type { Incident } from '@/types'
@@ -1838,7 +1839,8 @@ export async function sendChatMessage(
   userId?: string,
   pendingAction?: PendingAction | null,
   userName?: string,
-  userRole?: string,
+  _userRole?: string,
+  thinkingEnabled?: boolean,
 ): Promise<ChatResponse> {
   if (!isAIConfigured()) {
     return {
@@ -2136,7 +2138,7 @@ export async function sendChatMessage(
         const visionResult = await callGeminiVision(
           photoUrls,
           'Eres un experto en mantenimiento industrial. Analiza esta(s) imagen(es) de una planta industrial. Describe lo que ves: estado del equipo, posibles fallas, daños, fugas, corrosión, desgaste, piezas rotas, o cualquier anomalía. Sé específico y técnico. Si la imagen no es de equipos industriales, describe lo que ves brevemente. Responde en español.',
-          { temperature: 0.2, max_tokens: 600, thinkingBudget: (userRole === 'admin' || userRole === 'supervisor') ? 1024 : 0 },
+          { temperature: 0.2, max_tokens: 600, thinkingBudget: thinkingEnabled ? 1024 : 0 },
         )
         if (visionResult.content) {
           photoAnalysis = visionResult.content
@@ -2239,9 +2241,17 @@ export async function sendChatMessage(
   messages.push({ role: 'user', content: userMessage })
 
   // 6. Llamar al LLM con streaming (Gemini si disponible, si no Groq)
-  // Thinking mode solo para admin/supervisor (reduce consumo de tokens)
-  const useThinking = userRole === 'admin' || userRole === 'supervisor'
-  const thinkingBudget = useThinking ? 2048 : 0
+  // Thinking mode: verificar permiso + límite diario
+  let thinkingBudget = 0
+  let thinkingWasUsed = false
+  if (thinkingEnabled && userId) {
+    const allowance = await checkThinkingAllowance(userId)
+    if (allowance.allowed) {
+      const config = await getAriaConfig()
+      thinkingBudget = config.thinkingBudget || 2048
+      thinkingWasUsed = true
+    }
+  }
   try {
     const streamFn = isGeminiConfigured() ? callGeminiStream : callGroqStream
     const result = await streamFn(
@@ -2249,6 +2259,11 @@ export async function sendChatMessage(
       (partial) => onStream?.(partial),
       { temperature: 0.4, max_tokens: 4096, thinkingBudget }
     )
+
+    // Registrar uso de thinking si se usó
+    if (thinkingWasUsed && userId) {
+      recordThinkingUsage(userId, userName, result.tokens || 0).catch(() => {})
+    }
 
     // 7. Guardar memoria actualizada + sync a Firestore
     if (memory && userId) {

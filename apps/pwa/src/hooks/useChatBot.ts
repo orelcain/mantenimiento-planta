@@ -9,6 +9,7 @@ import { RateLimitError } from '@/services/ai'
 import { uploadChatPhoto } from '@/services/chatActions'
 import { showLocalNotification, areNotificationsEnabled } from '@/services/notifications'
 import { useAuthStore } from '@/store/authStore'
+import { usePermissionsStore } from '@/store/permissionsStore'
 
 const STORAGE_PREFIX = 'chatbot_history_'
 const MAX_PERSISTED = 50
@@ -64,6 +65,11 @@ export function useChatBot() {
   const user = useAuthStore(state => state.user)
   const userId = user?.id
   const userName = user ? `${user.nombre} ${user.apellido}`.trim() : undefined
+  const canThink = usePermissionsStore(state => state.can('aria', 'configurar'))
+  const [thinkingEnabled, setThinkingEnabled] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return localStorage.getItem(`aria_thinking_${user?.id}`) === '1'
+  })
   
   const [messages, setMessages] = useState<ChatMessage[]>(() => loadHistory(userId))
   const [isLoading, setIsLoading] = useState(false)
@@ -309,6 +315,7 @@ export function useChatBot() {
         pendingAction,
         userName,
         user?.rol,
+        canThink && thinkingEnabled,
       )
 
       if (abortRef.current) return
@@ -451,6 +458,14 @@ export function useChatBot() {
     sendMessage(lastUserMsg.content, undefined)
   }, [messages, isLoading, sendMessage])
 
+  const toggleThinking = useCallback(() => {
+    setThinkingEnabled(prev => {
+      const next = !prev
+      localStorage.setItem(`aria_thinking_${userId}`, next ? '1' : '0')
+      return next
+    })
+  }, [userId])
+
   return {
     messages,
     isLoading,
@@ -467,5 +482,8 @@ export function useChatBot() {
     sendMessage,
     clearHistory,
     retryLastMessage,
+    thinkingEnabled,
+    canThink,
+    toggleThinking,
   }
 }

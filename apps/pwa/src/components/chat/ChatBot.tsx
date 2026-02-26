@@ -5,7 +5,7 @@
  */
 import { useState, useRef, useEffect, useCallback, type KeyboardEvent, type ChangeEvent, type MouseEvent as ReactMouseEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { MessageCircle, X, Send, Trash2, Loader2, Bot, User, Mic, MicOff, ExternalLink, AlertTriangle, CheckCircle, XCircle, Camera, GripVertical, ThumbsUp, ThumbsDown, Copy, Check, Database, Volume2, VolumeX, RotateCcw, Star, ChevronUp } from 'lucide-react'
+import { MessageCircle, X, Send, Trash2, Loader2, Bot, User, Mic, MicOff, ExternalLink, AlertTriangle, CheckCircle, XCircle, Camera, GripVertical, ThumbsUp, ThumbsDown, Copy, Check, Database, Volume2, VolumeX, RotateCcw, Star, ChevronUp, Brain } from 'lucide-react'
 import { useChatBot } from '@/hooks/useChatBot'
 import type { ChatMessage, ChatAction, MiniChartData } from '@/services/chatbot'
 import { saveFeedback } from '@/services/ariaLearning'
@@ -638,6 +638,9 @@ export function ChatBot() {
     sendMessage,
     clearHistory,
     retryLastMessage,
+    thinkingEnabled,
+    canThink,
+    toggleThinking,
   } = useChatBot()
 
   const [input, setInput] = useState('')
@@ -967,11 +970,28 @@ export function ChatBot() {
               <div>
                 <h3 className="text-sm font-semibold">ARIA — Asistente de Planta</h3>
                 <p className="text-[10px] text-muted-foreground">
-                  {pendingAction?.status === 'confirming' ? '⚡ Acción pendiente de confirmación' : 'IA · Datos en tiempo real'}
+                  {pendingAction?.status === 'confirming'
+                    ? '⚡ Acción pendiente de confirmación'
+                    : thinkingEnabled
+                      ? '🧠 Pensamiento profundo · IA'
+                      : 'IA · Datos en tiempo real'}
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-1">
+              {canThink && (
+                <button
+                  onClick={toggleThinking}
+                  className={`p-1.5 rounded-md transition-colors ${
+                    thinkingEnabled
+                      ? 'bg-purple-500/20 text-purple-400 hover:bg-purple-500/30'
+                      : 'hover:bg-background text-muted-foreground hover:text-foreground'
+                  }`}
+                  title={thinkingEnabled ? 'Pensamiento profundo: ACTIVO — click para desactivar' : 'Activar pensamiento profundo'}
+                >
+                  <Brain className="w-4 h-4" />
+                </button>
+              )}
               <button
                 onClick={clearHistory}
                 className="p-1.5 rounded-md hover:bg-background text-muted-foreground hover:text-foreground transition-colors"

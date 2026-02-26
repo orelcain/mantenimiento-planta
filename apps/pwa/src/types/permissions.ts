@@ -266,7 +266,7 @@ export const MODULES_CONFIG: ModuleConfig[] = [
     nombre: 'ARIA Asistente',
     descripcion: 'Asistente de IA para reportes, consultas e incidencias',
     icono: 'Bot',
-    accionesDisponibles: ['ver'],
+    accionesDisponibles: ['ver', 'configurar'],
   },
 ]
 

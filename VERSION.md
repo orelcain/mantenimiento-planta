@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.61.0**
+## Versión Actual: **v2.62.0**
 
 **Fecha de lanzamiento**: 25 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,21 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.62.0 — Sistema completo de gestión ARIA Thinking (25/02/2026)
+- 🧠 **Pensamiento profundo**: toggle en chat header (icono Brain) para activar/desactivar modo thinking de Gemini
+- 🔐 **Permisos thinking**: acción 'configurar' en módulo ARIA controla quién puede usar pensamiento profundo
+- 📊 **Tracking diario**: registro automático de requests + tokens por usuario/día en Firestore
+- ⚖️ **Límites diarios**: límite global configurable + overrides por usuario individual
+- 🖥️ **Panel admin ARIA**: nueva pestaña "ARIA" en Configuración con:
+  - Config global (límite diario, budget de tokens)
+  - Consumo de hoy con barras de progreso por usuario
+  - Historial de 7 días con gráfico de barras
+  - Límites personalizados por usuario
+- 🛡️ **AriaConfig Firestore**: `settings/ariaConfig` para configuración centralizada
+- 📈 **Monitoreo consumo**: `ariaThinkingUsage/{date}/users/{userId}` para tracking granular
+
+### v2.61.0 — Permisos ARIA y activación admin (25/02/2026)
 
 ### v2.58.0 — 10 mejoras de inteligencia ARIA (25/02/2026)
 - 🔍 **Fuzzy search**: búsqueda tolerante a typos con Levenshtein + substring matching
