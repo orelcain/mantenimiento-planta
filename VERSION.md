@@ -1,14 +1,26 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.62.0**
+## Versión Actual: **v2.63.0**
 
-**Fecha de lanzamiento**: 25 de febrero de 2026  \
+**Fecha de lanzamiento**: 26 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
 **Build**: ✅ Stable
 
 ---
 
 ## 📋 Información de la Versión
+
+### v2.63.0 — ARIA Mission Control: Orquestación multi-agente (26/02/2026)
+- 🛰️ **Mission Control**: nueva pestaña en Configuración para monitorear todos los agentes IA
+- 🤖 **4 Agentes IA**: Gemini Flash, DeepSeek R1, Qwen QwQ-32B (Groq), Llama 3.3 (Groq)
+- 🧠 **ARIA Orquestadora**: detecta tipo de tarea y elige el mejor agente automáticamente
+- ⚡ **Fallback automático**: si un agente falla/rate-limit, pasa al siguiente en cadena
+- 📊 **Mission Log**: registro de cada misión con agente, latencia, tokens, status
+- 🔧 **Admin config**: habilitar/deshabilitar agentes, prioridades, estado en tiempo real
+- 🎯 **Task detection**: clasifica mensajes como reasoning/code/analysis/speed/general
+- 🟢 **Live status**: auto-refresh cada 10s, indicadores de estado por agente
+- 📈 **KPIs**: agentes online, requests hoy, tokens hoy, tasa de éxito
+- 🔗 **DeepSeek R1**: nuevo provider API compatible con OpenAI (VITE_DEEPSEEK_API_KEY)
 
 ### v2.62.0 — Sistema completo de gestión ARIA Thinking (25/02/2026)
 - 🧠 **Pensamiento profundo**: toggle en chat header (icono Brain) para activar/desactivar modo thinking de Gemini

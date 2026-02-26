@@ -4,8 +4,9 @@
  */
 import { collection, getDocs, getDoc, setDoc, doc, query, where, orderBy, limit, serverTimestamp } from 'firebase/firestore'
 import { db } from './firebase'
-import { callGroq, callGroqStream, callGemini, callGeminiStream, isAIConfigured, isGeminiConfigured, RateLimitError } from './ai'
+import { callGroq, callGemini, isAIConfigured, isGeminiConfigured, RateLimitError } from './ai'
 import { checkThinkingAllowance, recordThinkingUsage, getAriaConfig } from './ariaThinkingTracker'
+import { orchestrateStream, detectTaskType } from './ariaOrchestrator'
 import { logger } from '@/lib/logger'
 import { buildLearningContext, trackEquipmentProblem } from './ariaLearning'
 import type { Incident } from '@/types'
@@ -2240,7 +2241,7 @@ export async function sendChatMessage(
 
   messages.push({ role: 'user', content: userMessage })
 
-  // 6. Llamar al LLM con streaming (Gemini si disponible, si no Groq)
+  // 6. Llamar al LLM con streaming via Orquestador multi-agente
   // Thinking mode: verificar permiso + límite diario
   let thinkingBudget = 0
   let thinkingWasUsed = false
@@ -2253,12 +2254,18 @@ export async function sendChatMessage(
     }
   }
   try {
-    const streamFn = isGeminiConfigured() ? callGeminiStream : callGroqStream
-    const result = await streamFn(
-      messages,
+    // Detectar tipo de tarea para elegir el mejor agente
+    const taskType = thinkingWasUsed ? 'reasoning' : detectTaskType(userMessage)
+    const orchResult = await orchestrateStream(
+      {
+        messages,
+        taskType,
+        taskPreview: userMessage.slice(0, 80),
+        opts: { temperature: 0.4, max_tokens: 4096, thinkingBudget },
+      },
       (partial) => onStream?.(partial),
-      { temperature: 0.4, max_tokens: 4096, thinkingBudget }
     )
+    const result = { content: orchResult.content, tokens: orchResult.tokens }
 
     // Registrar uso de thinking si se usó
     if (thinkingWasUsed && userId) {
