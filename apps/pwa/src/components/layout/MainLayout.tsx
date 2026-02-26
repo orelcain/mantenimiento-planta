@@ -26,6 +26,7 @@ import {
   Mail,
   Box,
   BarChart3,
+  Bot,
 } from 'lucide-react'
 import { Avatar, AvatarFallback, Button } from '@/components/ui'
 import { useAuthStore, useIsAdmin, useAppStore, usePermissionsStore } from '@/store'
@@ -41,6 +42,7 @@ import { useAppVersion } from '@/hooks/useAppVersion'
 import { useToast } from '@/hooks/useToast'
 import { initUploadQueue } from '@/services/offlineUploadQueue'
 import { useUploadQueueStore } from '@/store/uploadQueueStore'
+import { saveUserPermissionsOverride, getUserPermissionsOverride } from '@/services/permissions'
 
 import type { AppModule } from '@/types/permissions'
 import { ChatBot } from '@/components/chat/ChatBot'
@@ -222,6 +224,30 @@ export function MainLayout() {
   }, [pendingWrites, isOnline, setLastSyncAt, toast])
 
   const { canSee } = usePermissionsStore()
+  const loadPermissions = usePermissionsStore((s) => s.loadPermissions)
+
+  // Handler: admin self-enable ARIA
+  const handleEnableAria = async () => {
+    if (!user) return
+    try {
+      const existing = await getUserPermissionsOverride(user.id)
+      const currentPerms = existing?.permisos ?? {}
+      await saveUserPermissionsOverride(
+        user.id,
+        {
+          activo: true,
+          permisos: { ...currentPerms, aria: { visible: true, actions: ['ver'] } },
+          notas: 'ARIA habilitado por el propio admin',
+        },
+        user.id,
+      )
+      // Recargar permisos para que el cambio se refleje inmediatamente
+      await loadPermissions(user)
+      toast({ title: 'ARIA Activado', description: 'El asistente ARIA está ahora disponible', variant: 'default' })
+    } catch {
+      toast({ title: 'Error', description: 'No se pudo activar ARIA', variant: 'destructive' })
+    }
+  }
 
   // Filter navigation by module visibility permissions
   const filteredNavigation = navigation.filter((item) => {
@@ -777,6 +803,18 @@ export function MainLayout() {
 
       {/* Chatbot flotante — controlado por permisos */}
       {canSee('aria') && <ChatBot />}
+
+      {/* Botón para que admin active ARIA si no está habilitado */}
+      {!canSee('aria') && isAdmin && (
+        <button
+          onClick={handleEnableAria}
+          className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 px-4 py-3 text-white shadow-lg hover:from-blue-700 hover:to-purple-700 transition-all hover:scale-105"
+          title="Activar ARIA Asistente"
+        >
+          <Bot className="h-5 w-5" />
+          <span className="text-sm font-medium">Activar ARIA</span>
+        </button>
+      )}
     </div>
   )
 }

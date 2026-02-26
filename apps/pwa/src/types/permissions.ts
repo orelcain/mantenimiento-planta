@@ -284,6 +284,9 @@ const ADMIN_PERMISSIONS: PermissionsMap = Object.fromEntries(
   ])
 ) as PermissionsMap
 
+// ARIA requiere habilitación explícita (incluso para admin)
+ADMIN_PERMISSIONS.aria = { visible: false, actions: [] }
+
 /**
  * Permisos para supervisor
  */
@@ -307,7 +310,7 @@ const SUPERVISOR_PERMISSIONS: PermissionsMap = {
   reportes: { visible: true, actions: ['ver', 'exportar'] },
   analisisGrader: { visible: true, actions: ['ver', 'crear', 'editar', 'exportar', 'configurar'] },
   gantt: { visible: true, actions: ['ver', 'crear', 'editar', 'eliminar', 'asignar', 'exportar'] },
-  aria: { visible: true, actions: ['ver'] },
+  aria: { visible: false, actions: [] },
 }
 
 /**

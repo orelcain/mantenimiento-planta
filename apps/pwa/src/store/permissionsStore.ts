@@ -169,8 +169,8 @@ export const usePermissionsStore = create<PermissionsState>()(
       can: (modulo: AppModule, accion: ModuleAction): boolean => {
         const { permisos, userRol } = get()
         
-        // Admin siempre puede todo
-        if (userRol === 'admin') return true
+        // Admin siempre puede todo — excepto ARIA (requiere habilitación explícita)
+        if (userRol === 'admin' && modulo !== 'aria') return true
 
         const fallback = userRol
           ? (DEFAULT_ROLE_PERMISSIONS[userRol] || DEFAULT_ROLE_PERMISSIONS['usuario'])
@@ -184,8 +184,8 @@ export const usePermissionsStore = create<PermissionsState>()(
       canSee: (modulo: AppModule): boolean => {
         const { permisos, userRol } = get()
         
-        // Admin siempre puede ver todo
-        if (userRol === 'admin') return true
+        // Admin siempre puede ver todo — excepto ARIA (requiere habilitación explícita)
+        if (userRol === 'admin' && modulo !== 'aria') return true
 
         const fallback = userRol
           ? (DEFAULT_ROLE_PERMISSIONS[userRol] || DEFAULT_ROLE_PERMISSIONS['usuario'])
