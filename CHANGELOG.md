@@ -7,6 +7,15 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.55.5] - 2025-02-25
+### Corregido
+- **Búsqueda de repuestos con contexto de máquina**: ARIA ahora detecta nombres de máquina en el query (ej. "motores de la Grader") y:
+  - Filtra los repuestos SOLO de esa máquina
+  - Separa los términos de máquina de los de componente
+  - Busca "motor" solo en los repuestos de la Grader → encuentra "Motor Interroll" correctamente
+  - Si no hay términos de componente, lista todos los repuestos de la máquina indicada
+- Añadidos "maquina", "maquinas", "equipo", "equipos" a STOP_WORDS para evitar que se usen como términos de búsqueda
+
 ## [2.55.4] - 2025-02-28
 ### Agregado
 - **Sistema de Aprendizaje Continuo para ARIA** — ARIA ahora mejora con cada interacción:

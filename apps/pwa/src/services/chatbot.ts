@@ -272,6 +272,7 @@ const STOP_WORDS = new Set([
   'tipo', 'tipos', 'clase', 'clases', 'parte', 'partes', 'pieza', 'piezas',
   'repuesto', 'repuestos', 'catalogo', 'precio', 'precios', 'valor',
   'planta', 'nuestra', 'nuestro', 'nuestras', 'nuestros', 'cual', 'mas',
+  'maquina', 'maquinas', 'equipo', 'equipos',
   'por', 'favor', 'gracias', 'hola', 'buenas', 'bueno',
 ])
 
@@ -885,10 +886,56 @@ async function fetchRepuestosSummary(userQuery: string): Promise<string> {
     
     // Extraer solo los términos significativos del query (sin stop words, sin puntuación, con corrección de typos)
     const { terms: searchTerms, corrections } = extractSearchTerms(userQuery)
-    const expandedTerms = searchTerms.length > 0 ? expandWithSynonyms(searchTerms) : []
+
+    // ─── DETECCIÓN DE MÁQUINAS EN EL QUERY ────────────────────────────
+    // Si el usuario dice "motores de la grader", detectamos "grader" como máquina
+    // y buscamos solo en los repuestos de esa máquina, con los términos restantes.
+    const normalizedQuery = normalizeText(userQuery)
+    const matchedMachineIds = new Set<string>()
+    const machineTermsToRemove = new Set<string>()
+
+    for (const machine of machines) {
+      const normName = normalizeText(machine.nombre)
+      const normMarca = normalizeText(machine.marca || '')
+      const normModelo = normalizeText(machine.modelo || '')
+      const nameWords = normName.split(/\s+/).filter(w => w.length > 2)
+
+      // Verificar si el nombre (o partes) aparece en el query
+      if (normalizedQuery.includes(normName)) {
+        matchedMachineIds.add(machine.id)
+        nameWords.forEach(w => machineTermsToRemove.add(w))
+      } else {
+        // Buscar por palabras individuales del nombre de la máquina (ej. "grader", "baader", "marel")
+        for (const word of nameWords) {
+          if (normalizedQuery.includes(word) && word.length >= 4) {
+            matchedMachineIds.add(machine.id)
+            machineTermsToRemove.add(word)
+          }
+        }
+        // También por marca o modelo
+        if (normMarca.length >= 3 && normalizedQuery.includes(normMarca)) {
+          matchedMachineIds.add(machine.id)
+          machineTermsToRemove.add(normMarca)
+        }
+        if (normModelo.length >= 3 && normalizedQuery.includes(normModelo)) {
+          matchedMachineIds.add(machine.id)
+          machineTermsToRemove.add(normModelo)
+        }
+      }
+    }
+
+    // Separar términos de búsqueda: quitar los que referencian la máquina
+    const componentTerms = matchedMachineIds.size > 0
+      ? searchTerms.filter(t => !machineTermsToRemove.has(t) && t !== 'maquina' && t !== 'maquinas')
+      : searchTerms
+    const expandedTerms = componentTerms.length > 0 ? expandWithSynonyms(componentTerms) : []
     const matchedRepuestos: string[] = []
 
-    logger.info(`Chatbot search: raw="${userQuery}" → terms=[${searchTerms.join(', ')}]${corrections.length ? ` (corregido: ${corrections.join(', ')})` : ''} → expanded=[${expandedTerms.join(', ')}]`)
+    // Si se detectó una máquina pero no quedaron términos de componente,
+    // listar los repuestos de esa máquina (hasta 40)
+    const listAllForMachine = matchedMachineIds.size > 0 && componentTerms.length === 0
+
+    logger.info(`Chatbot search: raw="${userQuery}" → terms=[${searchTerms.join(', ')}] → machine filter=[${[...matchedMachineIds].join(', ')}] → component terms=[${componentTerms.join(', ')}] → expanded=[${expandedTerms.join(', ')}]${corrections.length ? ` (corregido: ${corrections.join(', ')})` : ''}`)
 
     for (const machine of machines) {
       const repSnap = await getDocs(collection(db, `machines/${machine.id}/repuestos`))
@@ -899,29 +946,39 @@ async function fetchRepuestosSummary(userQuery: string): Promise<string> {
       valorTotal += machineTotal
       repuestosByMachine.push(`- ${machine.nombre}: ${reps.length} repuestos ($${Math.round(machineTotal).toLocaleString()})`)
 
-      // Buscar repuestos que coincidan con los términos de búsqueda
+      // Si hay filtro de máquina y esta no es la indicada, saltar búsqueda de coincidencias
+      if (matchedMachineIds.size > 0 && !matchedMachineIds.has(machine.id)) continue
+
+      // Listar todos los repuestos de la máquina filtrada (sin búsqueda de componente)
+      if (listAllForMachine) {
+        reps.forEach(r => {
+          matchedRepuestos.push(
+            `  ✓ [${machine.nombre}] ${r.textoBreve} | SAP: ${r.codigoSAP} | Fab: ${r.codigoFabricante} | Cant: ${r.cantidadPorMaquina} | $${r.valorUnitario}`
+          )
+        })
+        continue
+      }
+
+      // Buscar repuestos que coincidan con los términos de búsqueda de componente
       if (expandedTerms.length > 0) {
         reps.forEach(r => {
           const text = normalizeText(
             `${r.textoBreve} ${r.descripcion} ${r.codigoSAP} ${r.codigoFabricante} ${r.nombreManual || ''} ${r.ubicacionEnPlanta || ''}`
           )
-          // Basta con que AL MENOS UN término original (o su sinónimo expandido) matchee
-          // Pero si hay múltiples searchTerms, requerimos que todos los originales estén
-          const originalMatches = searchTerms.filter(term => {
+          // Requerimos que todos los componentTerms (no machine terms) estén presentes
+          const originalMatches = componentTerms.filter(term => {
             // El term original o alguno de sus sinónimos está en el texto
             const relatedTerms = expandedTerms.filter(et => {
-              // Check if this expanded term is related to this original term
               return et === term || SYNONYM_MAP_ENTRIES.some(([, syns]) => {
                 const normSyns = syns.map(s => normalizeText(s))
                 return (normSyns.includes(term) || normSyns.some(ns => term.includes(ns) || ns.includes(term)))
                     && (normSyns.includes(et) || normSyns.some(ns => et.includes(ns) || ns.includes(et)))
               })
             })
-            // Direct match or synonym match
             return text.includes(term) || relatedTerms.some(rt => text.includes(rt))
           })
           
-          if (originalMatches.length >= searchTerms.length) {
+          if (originalMatches.length >= componentTerms.length) {
             matchedRepuestos.push(
               `  ✓ [${machine.nombre}] ${r.textoBreve} | SAP: ${r.codigoSAP} | Fab: ${r.codigoFabricante} | Cant: ${r.cantidadPorMaquina} | $${r.valorUnitario}`
             )
@@ -940,7 +997,17 @@ async function fetchRepuestosSummary(userQuery: string): Promise<string> {
       lines.push(`(Corrección automática: ${corrections.join(', ')})`)
     }
 
-    if (matchedRepuestos.length > 0) {
+    if (matchedMachineIds.size > 0 && matchedRepuestos.length > 0) {
+      const machineNames = machines.filter(m => matchedMachineIds.has(m.id)).map(m => m.nombre).join(', ')
+      const searchLabel = componentTerms.length > 0
+        ? `"${componentTerms.join(' ')}" en ${machineNames}`
+        : `todos los repuestos de ${machineNames}`
+      lines.push('', `COINCIDENCIAS con ${searchLabel} (${matchedRepuestos.length} encontrados):`)
+      lines.push(...matchedRepuestos.slice(0, 40))
+      if (matchedRepuestos.length > 40) {
+        lines.push(`... y ${matchedRepuestos.length - 40} más`)
+      }
+    } else if (matchedRepuestos.length > 0) {
       lines.push('', `COINCIDENCIAS con "${searchTerms.join(' ')}" (${matchedRepuestos.length} encontrados):`)
       lines.push(...matchedRepuestos.slice(0, 30))
       if (matchedRepuestos.length > 30) {
@@ -948,6 +1015,10 @@ async function fetchRepuestosSummary(userQuery: string): Promise<string> {
       }
     } else if (searchTerms.length > 0) {
       lines.push('', `No se encontraron repuestos que coincidan exactamente con "${searchTerms.join(' ')}".`)
+      if (matchedMachineIds.size > 0) {
+        const machineNames = machines.filter(m => matchedMachineIds.has(m.id)).map(m => m.nombre).join(', ')
+        lines.push(`(Se buscó "${componentTerms.join(' ')}" en repuestos de: ${machineNames})`)
+      }
       lines.push(`(Se buscó con sinónimos: ${expandedTerms.slice(0, 15).join(', ')})`)
       lines.push(`Nota: los repuestos pueden estar registrados con nombres técnicos o códigos SAP diferentes.`)
     }
