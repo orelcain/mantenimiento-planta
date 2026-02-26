@@ -384,7 +384,6 @@ function PendingActionBar({ onConfirm, onCancel, pendingData }: {
   ]
   const completed = fields.filter(f => f.done).length
   const total = fields.length
-  const pct = Math.round((completed / total) * 100)
 
   return (
     <div className="px-3 py-2 border-t border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-700">
