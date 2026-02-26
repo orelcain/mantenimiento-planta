@@ -775,8 +775,8 @@ export function MainLayout() {
       <HelpModal />
       <WelcomeModal />
 
-      {/* Chatbot flotante */}
-      <ChatBot />
+      {/* Chatbot flotante — controlado por permisos */}
+      {canSee('aria') && <ChatBot />}
     </div>
   )
 }

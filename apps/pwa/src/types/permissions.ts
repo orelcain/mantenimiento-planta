@@ -32,6 +32,7 @@ export const APP_MODULES = [
   'reportes',
   'analisisGrader',
   'gantt',
+  'aria',
 ] as const
 
 export type AppModule = typeof APP_MODULES[number]
@@ -260,6 +261,13 @@ export const MODULES_CONFIG: ModuleConfig[] = [
     icono: 'CalendarClock',
     accionesDisponibles: ['ver', 'crear', 'editar', 'eliminar', 'asignar', 'exportar'],
   },
+  {
+    id: 'aria',
+    nombre: 'ARIA Asistente',
+    descripcion: 'Asistente de IA para reportes, consultas e incidencias',
+    icono: 'Bot',
+    accionesDisponibles: ['ver'],
+  },
 ]
 
 // ============================================================================
@@ -299,6 +307,7 @@ const SUPERVISOR_PERMISSIONS: PermissionsMap = {
   reportes: { visible: true, actions: ['ver', 'exportar'] },
   analisisGrader: { visible: true, actions: ['ver', 'crear', 'editar', 'exportar', 'configurar'] },
   gantt: { visible: true, actions: ['ver', 'crear', 'editar', 'eliminar', 'asignar', 'exportar'] },
+  aria: { visible: true, actions: ['ver'] },
 }
 
 /**
@@ -324,6 +333,7 @@ const TECNICO_PERMISSIONS: PermissionsMap = {
   reportes: { visible: true, actions: ['ver'] },
   analisisGrader: { visible: true, actions: ['ver'] },
   gantt: { visible: true, actions: ['ver', 'editar', 'asignar'] },
+  aria: { visible: false, actions: [] },
 }
 
 /**
@@ -349,6 +359,7 @@ const USUARIO_PERMISSIONS: PermissionsMap = {
   reportes: { visible: false, actions: [] },
   analisisGrader: { visible: false, actions: [] },
   gantt: { visible: false, actions: [] },
+  aria: { visible: false, actions: [] },
 }
 
 export const DEFAULT_ROLE_PERMISSIONS: Record<string, PermissionsMap> = {

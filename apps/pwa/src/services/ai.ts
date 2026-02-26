@@ -249,6 +249,7 @@ export async function callGemini(
     generationConfig: {
       temperature: opts?.temperature ?? 0.1,
       maxOutputTokens: opts?.max_tokens || 2048,
+      thinkingConfig: { thinkingBudget: 2048 },
     },
   }
   if (systemInstruction) body.systemInstruction = systemInstruction
@@ -318,6 +319,7 @@ export async function callGeminiVision(
     generationConfig: {
       temperature: opts?.temperature ?? 0.3,
       maxOutputTokens: opts?.max_tokens || 1024,
+      thinkingConfig: { thinkingBudget: 1024 },
     },
   }
 
@@ -364,6 +366,7 @@ export async function callGeminiStream(
     generationConfig: {
       temperature: opts?.temperature ?? 0.3,
       maxOutputTokens: opts?.max_tokens || 2048,
+      thinkingConfig: { thinkingBudget: 2048 },
     },
   }
   if (systemInstruction) body.systemInstruction = systemInstruction
