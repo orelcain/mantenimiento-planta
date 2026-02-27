@@ -642,7 +642,7 @@ function useSpeechRecognition() {
 interface EquipmentCandidateUI { id: string; nombre: string; codigo: string; score: number }
 interface TechnicianUI { id: string; nombre: string; apellido: string; rol: string }
 
-function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, onAssignTechnician, pendingData, userRole }: {
+function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, onAssignTechnician, pendingData, userRole, userId, userName }: {
   onConfirm: () => void
   onCancel: () => void
   onModify: () => void
@@ -650,6 +650,8 @@ function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, on
   onAssignTechnician: (id: string, nombre: string) => void
   pendingData?: Record<string, unknown>
   userRole?: string
+  userId?: string
+  userName?: string
 }) {
   const [showEquipmentPicker, setShowEquipmentPicker] = useState(false)
   const [equipmentSearch, setEquipmentSearch] = useState('')
@@ -660,7 +662,9 @@ function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, on
   const [allEquipment, setAllEquipment] = useState<EquipmentCandidateUI[]>([])
   const [equipLoading, setEquipLoading] = useState(false)
 
-  const canAssign = userRole === 'admin' || userRole === 'supervisor'
+  const canAssignOthers = userRole === 'admin' || userRole === 'supervisor'
+  const canSelfAssign = userRole === 'tecnico'
+  const showTechSection = canAssignOthers || canSelfAssign
 
   // Cargar todos los equipos al escribir en el buscador (lazy)
   useEffect(() => {
@@ -808,80 +812,93 @@ function PendingActionBar({ onConfirm, onCancel, onModify, onSelectEquipment, on
           )}
         </div>
 
-      {/* Selector de técnico (solo admin/supervisor) */}
-      {canAssign && (
+      {/* Selector de técnico (admin/supervisor: lista completa, técnico: autoasignarse) */}
+      {showTechSection && (
         <div className="mb-2">
-          <button
-            onClick={() => { setShowTechPicker(p => !p); setShowEquipmentPicker(false) }}
-            className="w-full text-left text-xs px-2 py-1.5 rounded-md border border-blue-300 dark:border-blue-600 bg-blue-50/50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors flex items-center justify-between"
-          >
-            <span className="truncate">
-              👷 {currentTechName
-                ? `Asignado: ${currentTechName}`
-                : 'Asignar técnico (opcional)...'}
-            </span>
-            <ChevronUp className={`w-3.5 h-3.5 flex-shrink-0 transition-transform ${showTechPicker ? '' : 'rotate-180'}`} />
-          </button>
-          {showTechPicker && (
-            <div className="mt-1 rounded-md border border-border bg-background shadow-lg">
-              {/* Buscador de técnicos */}
-              <div className="px-2 py-1.5 border-b border-border">
-                <input
-                  type="text"
-                  value={techSearch}
-                  onChange={e => setTechSearch(e.target.value)}
-                  placeholder="🔍 Buscar técnico..."
-                  className="w-full text-xs px-2 py-1 rounded border border-border bg-muted/50 focus:outline-none focus:ring-1 focus:ring-primary/50"
-                  autoFocus
-                />
-              </div>
-              <div className="max-h-36 overflow-y-auto">
-                {techLoading ? (
-                  <div className="px-2 py-2 text-xs text-muted-foreground text-center flex items-center justify-center gap-1">
-                    <Loader2 className="w-3 h-3 animate-spin" /> Cargando...
+          {canSelfAssign && !canAssignOthers ? (
+            /* Técnico: botón simple de autoasignación */
+            currentTechId === userId ? (
+              <button
+                onClick={() => { onAssignTechnician('', '') }}
+                className="w-full text-left text-xs px-2 py-1.5 rounded-md border border-green-300 dark:border-green-600 bg-green-50/50 dark:bg-green-900/30 hover:bg-green-100 dark:hover:bg-green-900/50 transition-colors flex items-center gap-2"
+              >
+                <CheckCircle className="w-3.5 h-3.5 text-green-600 dark:text-green-400 flex-shrink-0" />
+                <span className="truncate">👷 Asignada a mí — <span className="text-muted-foreground italic">clic para quitar</span></span>
+              </button>
+            ) : (
+              <button
+                onClick={() => { if (userId && userName) onAssignTechnician(userId, userName) }}
+                className="w-full text-left text-xs px-2 py-1.5 rounded-md border border-blue-300 dark:border-blue-600 bg-blue-50/50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors flex items-center gap-2"
+              >
+                <span>👷 Autoasignarme esta incidencia</span>
+              </button>
+            )
+          ) : (
+            /* Admin/Supervisor: dropdown completo */
+            <>
+              <button
+                onClick={() => { setShowTechPicker(p => !p); setShowEquipmentPicker(false) }}
+                className="w-full text-left text-xs px-2 py-1.5 rounded-md border border-blue-300 dark:border-blue-600 bg-blue-50/50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors flex items-center justify-between"
+              >
+                <span className="truncate">
+                  👷 {currentTechName
+                    ? `Asignado: ${currentTechName}`
+                    : 'Asignar técnico (opcional)...'}
+                </span>
+                <ChevronUp className={`w-3.5 h-3.5 flex-shrink-0 transition-transform ${showTechPicker ? '' : 'rotate-180'}`} />
+              </button>
+              {showTechPicker && (
+                <div className="mt-1 rounded-md border border-border bg-background shadow-lg">
+                  <div className="px-2 py-1.5 border-b border-border">
+                    <input
+                      type="text"
+                      value={techSearch}
+                      onChange={e => setTechSearch(e.target.value)}
+                      placeholder="🔍 Buscar técnico..."
+                      className="w-full text-xs px-2 py-1 rounded border border-border bg-muted/50 focus:outline-none focus:ring-1 focus:ring-primary/50"
+                      autoFocus
+                    />
                   </div>
-                ) : filteredTechs.length === 0 ? (
-                  <div className="px-2 py-2 text-xs text-muted-foreground text-center">Sin resultados</div>
-                ) : (
-                  <>
-                    {/* Opción para quitar asignación */}
-                    {currentTechId && (
-                      <button
-                        onClick={() => {
-                          onAssignTechnician('', '')
-                          setShowTechPicker(false)
-                          setTechSearch('')
-                        }}
-                        className="w-full text-left px-2 py-1.5 text-xs hover:bg-muted transition-colors border-b border-border text-muted-foreground italic"
-                      >
-                        ✕ Quitar asignación
-                      </button>
+                  <div className="max-h-36 overflow-y-auto">
+                    {techLoading ? (
+                      <div className="px-2 py-2 text-xs text-muted-foreground text-center flex items-center justify-center gap-1">
+                        <Loader2 className="w-3 h-3 animate-spin" /> Cargando...
+                      </div>
+                    ) : filteredTechs.length === 0 ? (
+                      <div className="px-2 py-2 text-xs text-muted-foreground text-center">Sin resultados</div>
+                    ) : (
+                      <>
+                        {currentTechId && (
+                          <button
+                            onClick={() => { onAssignTechnician('', ''); setShowTechPicker(false); setTechSearch('') }}
+                            className="w-full text-left px-2 py-1.5 text-xs hover:bg-muted transition-colors border-b border-border text-muted-foreground italic"
+                          >
+                            ✕ Quitar asignación
+                          </button>
+                        )}
+                        {filteredTechs.map((t) => {
+                          const fullName = `${t.nombre} ${t.apellido}`.trim()
+                          const rolLabel = t.rol === 'admin' ? '🔑' : t.rol === 'supervisor' ? '📋' : '🔧'
+                          return (
+                            <button
+                              key={t.id}
+                              onClick={() => { onAssignTechnician(t.id, fullName); setShowTechPicker(false); setTechSearch('') }}
+                              className={`w-full text-left px-2 py-1.5 text-xs hover:bg-muted transition-colors flex items-center gap-2 border-b border-border last:border-0 ${
+                                currentTechId === t.id ? 'bg-primary/10 font-medium' : ''
+                              }`}
+                            >
+                              <span className="flex-shrink-0">{rolLabel}</span>
+                              <span className="truncate flex-1">{fullName}</span>
+                              <span className="text-[9px] text-muted-foreground flex-shrink-0 capitalize">{t.rol}</span>
+                            </button>
+                          )
+                        })}
+                      </>
                     )}
-                    {filteredTechs.map((t) => {
-                      const fullName = `${t.nombre} ${t.apellido}`.trim()
-                      const rolLabel = t.rol === 'admin' ? '🔑' : t.rol === 'supervisor' ? '📋' : '🔧'
-                      return (
-                        <button
-                          key={t.id}
-                          onClick={() => {
-                            onAssignTechnician(t.id, fullName)
-                            setShowTechPicker(false)
-                            setTechSearch('')
-                          }}
-                          className={`w-full text-left px-2 py-1.5 text-xs hover:bg-muted transition-colors flex items-center gap-2 border-b border-border last:border-0 ${
-                            currentTechId === t.id ? 'bg-primary/10 font-medium' : ''
-                          }`}
-                        >
-                          <span className="flex-shrink-0">{rolLabel}</span>
-                          <span className="truncate flex-1">{fullName}</span>
-                          <span className="text-[9px] text-muted-foreground flex-shrink-0 capitalize">{t.rol}</span>
-                        </button>
-                      )
-                    })}
-                  </>
-                )}
-              </div>
-            </div>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       )}
@@ -926,6 +943,7 @@ export function ChatBot() {
     pendingAction,
     retryCountdown,
     userId,
+    userName,
     userRole,
     toggle,
     sendMessage,
@@ -1483,6 +1501,8 @@ export function ChatBot() {
               onAssignTechnician={handleAssignTechnician}
               pendingData={pendingAction.data as Record<string, unknown> | undefined}
               userRole={userRole}
+              userId={userId}
+              userName={userName}
             />
           )}
 

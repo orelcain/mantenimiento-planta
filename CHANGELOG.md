@@ -7,6 +7,11 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.66.3] - 2026-02-26
+### Agregado
+- **Autoasignación de técnicos desde ARIA**: los usuarios con rol `tecnico` ahora ven un botón "Autoasignarme esta incidencia" en la barra de borrador del chat, permitiendo asignarse a sí mismos sin necesidad de un admin/supervisor — al autoasignarse, la incidencia se crea en estado `en_proceso`
+- **Indicador visual de autoasignación**: cuando un técnico ya se autoasignó, el botón cambia a verde con checkmark y permite quitar la asignación con un clic
+
 ## [2.66.2] - 2026-02-26
 ### Corregido
 - **Creación de incidencias desde ARIA fallaba** con "Missing or insufficient permissions": faltaba la colección `ariaActions` en las reglas de Firestore — agregada con permisos read/create para autenticados y update/delete para admin

@@ -509,6 +509,7 @@ export function useChatBot() {
     pendingAction,
     retryCountdown,
     userId,
+    userName,
     userRole: user?.rol,
     toggle,
     open,
