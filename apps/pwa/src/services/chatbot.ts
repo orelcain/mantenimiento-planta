@@ -1135,9 +1135,21 @@ async function fetchRepuestosSummary(userQuery: string): Promise<string> {
     // ─── DETECCIÓN DE MÁQUINAS EN EL QUERY ────────────────────────────
     // Si el usuario dice "motores de la grader", detectamos "grader" como máquina
     // y buscamos solo en los repuestos de esa máquina, con los términos restantes.
+    // IMPORTANTE: No matchear máquinas por palabras genéricas de componentes
+    // (ej: "motor", "bomba", "sensor") porque eso causa falsos positivos
+    // como "Motor bomba caseta agua mar" matcheando por "motor".
     const normalizedQuery = normalizeText(userQuery)
     const matchedMachineIds = new Set<string>()
     const machineTermsToRemove = new Set<string>()
+
+    // Palabras que son nombres de COMPONENTES, no identificadores de máquinas.
+    // Si un nombre de máquina contiene SOLO este tipo de palabras, no debe matchear por palabra individual.
+    const COMPONENT_WORDS = new Set([
+      'motor', 'bomba', 'sensor', 'filtro', 'correa', 'sello', 'válvula', 'valvula',
+      'reductor', 'engranaje', 'cadena', 'eje', 'cuchillo', 'soporte', 'rodamiento',
+      'cilindro', 'actuador', 'variador', 'placa', 'cinta', 'polea', 'piñon', 'pinon',
+      'compresor', 'ventilador', 'generador', 'transformador', 'interruptor',
+    ])
 
     for (const machine of machines) {
       const normName = normalizeText(machine.nombre)
@@ -1145,14 +1157,15 @@ async function fetchRepuestosSummary(userQuery: string): Promise<string> {
       const normModelo = normalizeText(machine.modelo || '')
       const nameWords = normName.split(/\s+/).filter(w => w.length > 2)
 
-      // Verificar si el nombre (o partes) aparece en el query
+      // Verificar si el nombre COMPLETO aparece en el query
       if (normalizedQuery.includes(normName)) {
         matchedMachineIds.add(machine.id)
         nameWords.forEach(w => machineTermsToRemove.add(w))
       } else {
         // Buscar por palabras individuales del nombre de la máquina (ej. "grader", "baader", "marel")
+        // PERO ignorar palabras genéricas de componentes para evitar falsos positivos
         for (const word of nameWords) {
-          if (normalizedQuery.includes(word) && word.length >= 4) {
+          if (normalizedQuery.includes(word) && word.length >= 4 && !COMPONENT_WORDS.has(word)) {
             matchedMachineIds.add(machine.id)
             machineTermsToRemove.add(word)
           }

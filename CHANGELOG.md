@@ -7,6 +7,11 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.64.5] - 2026-02-26
+### Corregido
+- **Machine detection con falsos positivos**: palabras genéricas de componentes (motor, bomba, sensor, filtro, cilindro, variador, etc.) ya no matchean como nombres de máquinas. Antes "motores para la grader" matcheaba 5 máquinas (incluyendo "Motor bomba caseta agua mar") y vaciaba componentTerms, listando los 51 repuestos en vez de solo los 2 motores.
+- **COMPONENT_WORDS blocklist**: set de ~25 palabras genéricas que se excluyen del matching por palabra individual en nombres de máquinas
+
 ## [2.64.4] - 2026-02-26
 ### Corregido
 - **Brain toggle oculto**: admin no tenía permiso `aria:configurar` — ADMIN_PERMISSIONS.aria era `{ visible: false, actions: [] }`. Ahora admin tiene acceso completo a ARIA

@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.64.4**
+## Versión Actual: **v2.64.5**
 
 **Fecha de lanzamiento**: 26 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.64.5 — Fix: machine detection filtraba componentes como máquinas (26/02/2026)
+- 🔧 **COMPONENT_WORDS blocklist**: palabras genéricas (motor, bomba, sensor, filtro, etc.) ya no matchean como nombres de máquinas
+- 🔍 **Fix**: "motores para la grader" ahora retorna solo los 2 motores, no los 51 repuestos de 5 máquinas
+- 🧠 **Root cause**: "Motor bomba caseta agua mar" matcheaba por "motor" → eliminaba "motor" de componentTerms → listAllForMachine=true
 
 ### v2.64.4 — Fix Brain toggle + Safety-net matching + Debug logging (26/02/2026)
 - 🧠 **Brain toggle visible**: admin ahora tiene permisos `aria:configurar` — botón Brain aparece en chat
