@@ -6,6 +6,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { sendChatMessage, generateDailySummary, generateWeeklySummary, checkCreatedIncidents, checkProactiveAlerts, checkPredictivePatterns, loadUserMemory, loadMemoryFromFirestore, saveUserMemory, type ChatMessage, type ChatAction, type PendingAction } from '@/services/chatbot'
 import type { AgentStatusEvent } from '@/services/ariaOrchestrator'
+import { getAllAgents, type AIAgent } from '@/services/aiAgents'
 import { RateLimitError } from '@/services/ai'
 import { uploadChatPhoto } from '@/services/chatActions'
 import { showLocalNotification, areNotificationsEnabled } from '@/services/notifications'
@@ -70,6 +71,12 @@ export function useChatBot() {
   const [thinkingEnabled, setThinkingEnabled] = useState(() => {
     if (typeof window === 'undefined') return false
     return localStorage.getItem(`aria_thinking_${user?.id}`) === '1'
+  })
+  
+  // Modelo forzado por el usuario (null = auto)
+  const [selectedAgent, setSelectedAgent] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null
+    return localStorage.getItem(`aria_selected_agent_${user?.id}`) || null
   })
   
   const [messages, setMessages] = useState<ChatMessage[]>(() => loadHistory(userId))
@@ -323,6 +330,8 @@ export function useChatBot() {
         (event) => {
           if (!abortRef.current) setAgentStatus(event)
         },
+        // forceAgent — modelo elegido por el usuario (null = auto)
+        selectedAgent || undefined,
       )
 
       if (abortRef.current) return
@@ -475,6 +484,20 @@ export function useChatBot() {
     })
   }, [userId])
 
+  const changeAgent = useCallback((agentId: string | null) => {
+    setSelectedAgent(agentId)
+    if (agentId) {
+      localStorage.setItem(`aria_selected_agent_${userId}`, agentId)
+    } else {
+      localStorage.removeItem(`aria_selected_agent_${userId}`)
+    }
+  }, [userId])
+
+  // Lista de agentes disponibles para el selector UI
+  const availableAgents = useCallback((): AIAgent[] => {
+    return getAllAgents()
+  }, [])
+
   return {
     messages,
     isLoading,
@@ -495,5 +518,8 @@ export function useChatBot() {
     thinkingEnabled,
     canThink,
     toggleThinking,
+    selectedAgent,
+    changeAgent,
+    availableAgents,
   }
 }

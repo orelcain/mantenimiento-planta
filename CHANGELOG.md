@@ -7,6 +7,22 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.65.0] - 2026-02-26
+### Agregado
+- **Selector de modelo IA en chat**: dropdown en el header del chat permite al usuario elegir manualmente qué modelo usar (DeepSeek R1, Gemini Flash, Qwen QwQ, Llama 3.3) o dejar en modo "Auto" (ARIA elige)
+- **`forceAgent` pipeline completo**: ChatBot → useChatBot → sendChatMessage → orchestrateStream — cuando el usuario elige un modelo, se fuerza ese agente sin fallback
+- **Indicador de status por modelo**: el selector muestra emoji, nombre, estado (online/disabled/rate-limited) y tier de costo de cada agente
+- **Estimación de costos por modelo**: campo `estimatedCostUsd` en MissionLog, calculado automáticamente según tokens usados y tarifa del proveedor
+- **KPI de costo diario**: panel Mission Control ahora muestra costo estimado total del día en USD
+- **Costo por agente en panel**: cada tarjeta de agente muestra costo acumulado del día
+- **Costo por entrada en mission log**: cada entrada del log muestra el costo estimado de esa llamada
+- **`getTodayCostSummary()`**: función que devuelve resumen de costos por agente (requests, tokens, USD)
+- **Persistencia de selección**: el modelo elegido se guarda en localStorage por usuario
+
+### Nota técnica
+- DeepSeek R1 ya tiene prioridad 95 (la más alta) — cuando su API key está configurada en Mission Control, ARIA lo elige automáticamente primero
+- Para activar DeepSeek: ir a Configuración → ARIA Mission Control → API Keys → pegar la key de DeepSeek
+
 ## [2.64.5] - 2026-02-26
 ### Corregido
 - **Machine detection con falsos positivos**: palabras genéricas de componentes (motor, bomba, sensor, filtro, cilindro, variador, etc.) ya no matchean como nombres de máquinas. Antes "motores para la grader" matcheaba 5 máquinas (incluyendo "Motor bomba caseta agua mar") y vaciaba componentTerms, listando los 51 repuestos en vez de solo los 2 motores.

@@ -5,7 +5,7 @@
  */
 import { useState, useRef, useEffect, useCallback, type KeyboardEvent, type ChangeEvent, type MouseEvent as ReactMouseEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { MessageCircle, X, Send, Trash2, Loader2, Bot, User, Mic, MicOff, ExternalLink, AlertTriangle, CheckCircle, XCircle, Camera, GripVertical, ThumbsUp, ThumbsDown, Copy, Check, Database, Volume2, VolumeX, RotateCcw, Star, ChevronUp, Brain } from 'lucide-react'
+import { MessageCircle, X, Send, Trash2, Loader2, Bot, User, Mic, MicOff, ExternalLink, AlertTriangle, CheckCircle, XCircle, Camera, GripVertical, ThumbsUp, ThumbsDown, Copy, Check, Database, Volume2, VolumeX, RotateCcw, Star, ChevronUp, ChevronDown, Brain, Cpu } from 'lucide-react'
 import { useChatBot } from '@/hooks/useChatBot'
 import type { ChatMessage, ChatAction, MiniChartData } from '@/services/chatbot'
 import { saveFeedback } from '@/services/ariaLearning'
@@ -715,11 +715,16 @@ export function ChatBot() {
     thinkingEnabled,
     canThink,
     toggleThinking,
+    selectedAgent,
+    changeAgent,
+    availableAgents,
   } = useChatBot()
 
   const [input, setInput] = useState('')
   const [photoFiles, setPhotoFiles] = useState<File[]>([])
   const [photoPreviews, setPhotoPreviews] = useState<string[]>([])
+  const [showAgentSelector, setShowAgentSelector] = useState(false)
+  const agentSelectorRef = useRef<HTMLDivElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const photoInputRef = useRef<HTMLInputElement>(null)
@@ -805,6 +810,18 @@ export function ChatBot() {
       photoPreviews.forEach(url => URL.revokeObjectURL(url))
     }
   }, [photoPreviews])
+
+  // Click outside to close agent selector
+  useEffect(() => {
+    if (!showAgentSelector) return
+    const handler = (e: MouseEvent) => {
+      if (agentSelectorRef.current && !agentSelectorRef.current.contains(e.target as Node)) {
+        setShowAgentSelector(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [showAgentSelector])
 
   const handlePhotoSelect = (e: ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
@@ -1053,6 +1070,75 @@ export function ChatBot() {
               </div>
             </div>
             <div className="flex items-center gap-1">
+              {/* Selector de modelo IA */}
+              {canThink && (
+                <div className="relative" ref={agentSelectorRef}>
+                  <button
+                    onClick={() => setShowAgentSelector(p => !p)}
+                    className={`flex items-center gap-1 px-1.5 py-1 rounded-md text-[10px] transition-colors ${
+                      selectedAgent
+                        ? 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30'
+                        : 'hover:bg-background text-muted-foreground hover:text-foreground'
+                    }`}
+                    title={selectedAgent ? `Modelo: ${availableAgents().find(a => a.id === selectedAgent)?.name || selectedAgent}` : 'Seleccionar modelo IA (Auto)'}
+                  >
+                    <Cpu className="w-3.5 h-3.5" />
+                    <span className="max-w-[60px] truncate">
+                      {selectedAgent
+                        ? (availableAgents().find(a => a.id === selectedAgent)?.emoji || '🤖') + ' ' + (availableAgents().find(a => a.id === selectedAgent)?.name?.split(' ')[0] || '')
+                        : 'Auto'}
+                    </span>
+                    <ChevronDown className={`w-3 h-3 transition-transform ${showAgentSelector ? 'rotate-180' : ''}`} />
+                  </button>
+                  {showAgentSelector && (
+                    <div className="absolute right-0 top-full mt-1 w-56 bg-popover border border-border rounded-lg shadow-xl z-50 py-1 animate-in fade-in slide-in-from-top-1 duration-150">
+                      <div className="px-3 py-1.5 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Modelo IA</div>
+                      {/* Auto option */}
+                      <button
+                        onClick={() => { changeAgent(null); setShowAgentSelector(false) }}
+                        className={`w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-muted transition-colors ${
+                          !selectedAgent ? 'bg-primary/10 text-primary font-medium' : 'text-foreground'
+                        }`}
+                      >
+                        <span className="w-5 text-center">🔄</span>
+                        <div className="flex-1 text-left">
+                          <div>Auto <span className="text-muted-foreground">(ARIA elige)</span></div>
+                        </div>
+                        {!selectedAgent && <Check className="w-3.5 h-3.5 text-primary" />}
+                      </button>
+                      <div className="h-px bg-border mx-2 my-1" />
+                      {availableAgents().map(agent => (
+                        <button
+                          key={agent.id}
+                          onClick={() => { changeAgent(agent.id); setShowAgentSelector(false) }}
+                          className={`w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-muted transition-colors ${
+                            selectedAgent === agent.id ? 'bg-primary/10 text-primary font-medium' : 'text-foreground'
+                          }`}
+                        >
+                          <span className="w-5 text-center">{agent.emoji}</span>
+                          <div className="flex-1 text-left">
+                            <div className="flex items-center gap-1.5">
+                              {agent.name}
+                              <span className={`inline-block w-1.5 h-1.5 rounded-full ${
+                                agent.status === 'online' ? 'bg-green-500'
+                                : agent.status === 'rate-limited' ? 'bg-yellow-500'
+                                : agent.status === 'disabled' ? 'bg-gray-400'
+                                : 'bg-red-500'
+                              }`} />
+                            </div>
+                            <div className="text-[10px] text-muted-foreground">
+                              {agent.costTier === 'free' ? 'Gratis' : agent.costTier === 'cheap' ? 'Económico' : 'Moderado'}
+                              {' · '}
+                              {agent.status === 'online' ? 'Disponible' : agent.status === 'disabled' ? 'Sin API key' : agent.status}
+                            </div>
+                          </div>
+                          {selectedAgent === agent.id && <Check className="w-3.5 h-3.5 text-primary" />}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
               {canThink && (
                 <button
                   onClick={toggleThinking}

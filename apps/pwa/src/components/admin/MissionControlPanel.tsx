@@ -38,6 +38,7 @@ import {
   saveAgentsConfig,
   loadTodayLogs,
   getMissionLogs,
+  getTodayCostSummary,
   type AIAgent,
   type AgentsConfig,
   type MissionLog,
@@ -197,6 +198,8 @@ export function MissionControlPanel() {
   const onlineCount = agents.filter(a => a.status === 'online').length
   const totalRequests = agents.reduce((s, a) => s + a.usedToday, 0)
   const totalTokens = agents.reduce((s, a) => s + a.tokensToday, 0)
+  const costSummary = getTodayCostSummary()
+  const totalCostUsd = costSummary.reduce((s, c) => s + c.estimatedCostUsd, 0)
   const successRate = logs.length > 0
     ? Math.round((logs.filter(l => l.status === 'success' || l.status === 'fallback').length / logs.length) * 100)
     : 100
@@ -237,7 +240,7 @@ export function MissionControlPanel() {
       </div>
 
       {/* ─── KPIs ─── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <div className="p-3 bg-muted/50 rounded-lg text-center">
           <div className="text-2xl font-bold text-green-500">{onlineCount}</div>
           <div className="text-xs text-muted-foreground">Agentes Online</div>
@@ -257,6 +260,12 @@ export function MissionControlPanel() {
             {successRate}%
           </div>
           <div className="text-xs text-muted-foreground">Tasa Éxito</div>
+        </div>
+        <div className="p-3 bg-muted/50 rounded-lg text-center col-span-2 md:col-span-1">
+          <div className={`text-2xl font-bold ${totalCostUsd > 0 ? 'text-orange-500' : 'text-green-500'}`}>
+            ${totalCostUsd < 0.01 && totalCostUsd > 0 ? '<0.01' : totalCostUsd.toFixed(2)}
+          </div>
+          <div className="text-xs text-muted-foreground">Costo Est. USD</div>
         </div>
       </div>
 
@@ -319,6 +328,14 @@ export function MissionControlPanel() {
                   <div className="text-muted-foreground">
                     {agent.tokensToday > 1000 ? `${Math.round(agent.tokensToday / 1000)}K tok` : `${agent.tokensToday} tok`}
                   </div>
+                  {(() => {
+                    const cost = costSummary.find(c => c.agentId === agent.id)?.estimatedCostUsd || 0
+                    return cost > 0 ? (
+                      <div className="text-orange-500 font-mono text-[10px]">
+                        ${cost < 0.01 ? '<0.01' : cost.toFixed(3)}
+                      </div>
+                    ) : null
+                  })()}
                 </div>
 
                 {/* Toggle */}
@@ -376,7 +393,7 @@ export function MissionControlPanel() {
                     {log.taskPreview}
                   </span>
 
-                  {/* Latency + tokens */}
+                  {/* Latency + tokens + cost */}
                   <div className="flex items-center gap-2 shrink-0">
                     <span className="flex items-center gap-0.5 text-muted-foreground">
                       <Clock className="h-3 w-3" />
@@ -386,6 +403,11 @@ export function MissionControlPanel() {
                       <span className="flex items-center gap-0.5 text-muted-foreground">
                         <Zap className="h-3 w-3" />
                         {log.tokens}
+                      </span>
+                    )}
+                    {(log.estimatedCostUsd ?? 0) > 0 && (
+                      <span className="text-orange-500 text-[10px] font-mono">
+                        ${(log.estimatedCostUsd ?? 0).toFixed(4)}
                       </span>
                     )}
                   </div>

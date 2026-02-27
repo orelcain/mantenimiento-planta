@@ -1931,6 +1931,7 @@ export async function sendChatMessage(
   _userRole?: string,
   thinkingEnabled?: boolean,
   onAgentStatus?: (event: AgentStatusEvent) => void,
+  forceAgent?: string,
 ): Promise<ChatResponse> {
   if (!isAIConfigured()) {
     return {
@@ -2350,7 +2351,7 @@ export async function sendChatMessage(
         messages,
         taskType,
         taskPreview: userMessage.slice(0, 80),
-        opts: { temperature: 0.4, max_tokens: 4096, thinkingBudget },
+        opts: { temperature: 0.4, max_tokens: 4096, thinkingBudget, forceAgent },
       },
       (partial) => onStream?.(partial),
       onAgentStatus,

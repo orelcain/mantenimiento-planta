@@ -63,6 +63,8 @@ export interface MissionLog {
   status: 'success' | 'error' | 'fallback'
   latencyMs: number
   tokens: number
+  /** Costo estimado en USD (basado en costTier + tokens) */
+  estimatedCostUsd?: number
   errorMsg?: string
   fallbackTo?: string
 }
@@ -463,6 +465,35 @@ export async function callAgentStream(
 }
 
 // ═══════════════════════════════════════════════════════════════════════
+// COST ESTIMATION — USD por token según modelo
+// ═══════════════════════════════════════════════════════════════════════
+
+/** Precios estimados por 1M tokens (input+output promedio) */
+const COST_PER_MILLION_TOKENS: Record<string, number> = {
+  'gemini-flash': 0,         // Free tier
+  'deepseek-r1': 0.55,       // $0.55/M input, ~$2.19/M output → promedio ~$0.55
+  'qwen-qwq': 0,             // Groq free tier
+  'llama-versatile': 0,      // Groq free tier
+}
+
+export function estimateCostUsd(agentId: string, tokens: number): number {
+  const rate = COST_PER_MILLION_TOKENS[agentId] || 0
+  return (tokens / 1_000_000) * rate
+}
+
+/** Resumen de costos de hoy por agente */
+export function getTodayCostSummary(): Array<{ agentId: string; agentName: string; emoji: string; requests: number; tokens: number; estimatedCostUsd: number }> {
+  return getAllAgents().map(a => ({
+    agentId: a.id,
+    agentName: a.name,
+    emoji: a.emoji,
+    requests: a.usedToday,
+    tokens: a.tokensToday,
+    estimatedCostUsd: estimateCostUsd(a.id, a.tokensToday),
+  }))
+}
+
+// ═══════════════════════════════════════════════════════════════════════
 // MISSION LOG — Persistencia en Firestore
 // ═══════════════════════════════════════════════════════════════════════
 
@@ -474,6 +505,7 @@ export function addMissionLog(log: Omit<MissionLog, 'id' | 'timestamp'>): Missio
     ...log,
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
     timestamp: Date.now(),
+    estimatedCostUsd: log.estimatedCostUsd ?? estimateCostUsd(log.agentId, log.tokens),
   }
   missionLogs.unshift(entry)
   if (missionLogs.length > MAX_LOG_MEMORY) missionLogs.pop()
