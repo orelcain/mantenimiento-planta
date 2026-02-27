@@ -188,12 +188,21 @@ export function MissionControlPanel() {
     loadData()
   }, [loadData])
 
-  // Auto-refresh cada 10s
+  // Auto-refresh cada 10s (local) + learning stats cada 30s (Firestore)
   useEffect(() => {
     if (!autoRefresh) return
-    const interval = setInterval(() => {
+    let tick = 0
+    const interval = setInterval(async () => {
       setAgents(getAllAgents())
       setLogs(getMissionLogs(100))
+      tick++
+      // Re-fetch learning stats from Firestore every 30s (every 3rd tick)
+      if (tick % 3 === 0) {
+        try {
+          const lStats = await getLearningStats()
+          setLearningStats(lStats)
+        } catch { /* silent */ }
+      }
     }, 10_000)
     return () => clearInterval(interval)
   }, [autoRefresh])

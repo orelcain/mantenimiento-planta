@@ -7,6 +7,10 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.66.4] - 2026-02-27
+### Corregido
+- **Dashboard de Aprendizaje ARIA no se actualizaba en tiempo real**: los likes/dislikes se guardaban correctamente en Firestore pero el panel de Mission Control solo leía las estadísticas una vez al montar — ahora re-lee `getLearningStats()` desde Firestore cada 30 segundos (cada 3er ciclo del auto-refresh)
+
 ## [2.66.3] - 2026-02-26
 ### Agregado
 - **Autoasignación de técnicos desde ARIA**: los usuarios con rol `tecnico` ahora ven un botón "Autoasignarme esta incidencia" en la barra de borrador del chat, permitiendo asignarse a sí mismos sin necesidad de un admin/supervisor — al autoasignarse, la incidencia se crea en estado `en_proceso`
