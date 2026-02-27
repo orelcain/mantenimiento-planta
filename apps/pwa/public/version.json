@@ -1,7 +1,7 @@
 {
-  "version": "2.65.0",
+  "version": "2.65.1",
   "buildDate": "2026-02-26",
-  "buildTimestamp": 1772154073544,
+  "buildTimestamp": 1772154849170,
   "features": [
     "ARIA Fuzzy Search: búsqueda tolerante a errores tipográficos (Levenshtein)",
     "ARIA Smart Cache: normalización semántica de claves + limpieza automática",

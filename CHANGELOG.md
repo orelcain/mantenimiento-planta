@@ -7,6 +7,13 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.65.2] - 2026-02-26
+### Corregido
+- **DeepSeek 402 Payment Required**: cuando la API de DeepSeek responde 402 (sin saldo), ahora se detecta específicamente y el agente se marca como `disabled` (no `offline`), con mensaje claro "sin saldo: 402 Payment Required"
+- **`markAgentError` billing-aware**: nueva firma `markAgentError(id, errorMsg?)` — si el error contiene indicadores de billing (402, "sin saldo", "Payment Required", "insufficient"), el agente queda `disabled` permanentemente hasta que el admin recargue. Errores no-billing → `offline` con recovery de 2 min (antes 5 min)
+- **forceAgent sin fallback**: cuando el usuario seleccionaba un modelo manualmente y éste fallaba, no había cadena de respaldo. Ahora `forceAgent` construye la cadena como `[forceAgent, ...otherOnlineAgents]` — si DeepSeek falla con 402, Gemini Flash toma el relevo automáticamente
+- **Detección 402 en ambas APIs**: tanto `callOpenAICompatible()` como `streamOpenAICompatible()` detectan `response.status === 402` y lanzan error específico con nombre del proveedor
+
 ## [2.65.1] - 2026-02-26
 ### Corregido
 - **Búsqueda RAG con falsos positivos**: 3 bugs corregidos en la búsqueda de repuestos

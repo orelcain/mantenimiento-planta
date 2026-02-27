@@ -124,7 +124,11 @@ export async function orchestrate(task: OrchestratorTask): Promise<OrchestratorR
   // Construir cadena de agentes
   let agentChain: string[]
   if (task.opts?.forceAgent) {
-    agentChain = [task.opts.forceAgent]
+    // Forzar agente pero agregar fallbacks por si falla
+    const fallbackAgents = getAgentsForCapability(capability)
+      .map(a => a.id)
+      .filter(id => id !== task.opts!.forceAgent)
+    agentChain = [task.opts.forceAgent, ...fallbackAgents]
   } else {
     agentChain = getAgentsForCapability(capability).map(a => a.id)
     // Excluir manualmente
@@ -229,7 +233,11 @@ export async function orchestrateStream(
 
   let agentChain: string[]
   if (task.opts?.forceAgent) {
-    agentChain = [task.opts.forceAgent]
+    // Forzar agente pero agregar fallbacks por si falla (ej: 402 sin saldo)
+    const fallbackAgents = getAgentsForCapability(capability)
+      .map(a => a.id)
+      .filter(id => id !== task.opts!.forceAgent)
+    agentChain = [task.opts.forceAgent, ...fallbackAgents]
   } else {
     agentChain = getAgentsForCapability(capability).map(a => a.id)
     if (task.opts?.excludeAgents) {

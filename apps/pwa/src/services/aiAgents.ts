@@ -214,17 +214,24 @@ export function markRateLimited(id: string, retryAfterMs: number = 60000) {
   }
 }
 
-export function markAgentError(id: string) {
+export function markAgentError(id: string, errorMsg?: string) {
   const agent = agents.get(id)
   if (agent) {
+    // Error de pago: marcar disabled en vez de offline (no se recupera solo)
+    const isBillingError = errorMsg?.includes('402') || errorMsg?.includes('sin saldo') || errorMsg?.includes('Payment Required')
+    if (isBillingError) {
+      agent.status = 'disabled'
+      logger.warn(`Agent ${agent.name} deshabilitado: sin saldo (402)`)
+      return
+    }
     agent.status = 'offline'
-    // Intentar recuperar en 5 min
+    // Intentar recuperar en 2 min (reducido de 5 min)
     setTimeout(() => {
       if (agent.status === 'offline') {
         agent.status = 'online'
         logger.info(`Agent ${agent.name} reactivado tras cooldown`)
       }
-    }, 5 * 60 * 1000)
+    }, 2 * 60 * 1000)
   }
 }
 
@@ -277,6 +284,9 @@ async function callOpenAICompatible(
     if (response.status === 429) {
       throw new RateLimitError(parseRetryAfter(response), providerName)
     }
+    if (response.status === 402) {
+      throw new Error(`${providerName} sin saldo: 402 Payment Required. Recarga tu cuenta de ${providerName}.`)
+    }
     const errText = await response.text().catch(() => '')
     throw new Error(`${providerName} API error: ${response.status} ${errText.slice(0, 200)}`)
   }
@@ -318,6 +328,9 @@ async function streamOpenAICompatible(
   if (!response.ok) {
     if (response.status === 429) {
       throw new RateLimitError(parseRetryAfter(response), providerName)
+    }
+    if (response.status === 402) {
+      throw new Error(`${providerName} sin saldo: 402 Payment Required. Recarga tu cuenta de ${providerName}.`)
     }
     throw new Error(`${providerName} stream error: ${response.status}`)
   }
@@ -413,7 +426,7 @@ export async function callAgent(
     if (err instanceof RateLimitError) {
       markRateLimited(agentId, err.retryAfterMs)
     } else {
-      markAgentError(agentId)
+      markAgentError(agentId, err instanceof Error ? err.message : String(err))
     }
     throw err
   }
@@ -458,7 +471,7 @@ export async function callAgentStream(
     if (err instanceof RateLimitError) {
       markRateLimited(agentId, err.retryAfterMs)
     } else {
-      markAgentError(agentId)
+      markAgentError(agentId, err instanceof Error ? err.message : String(err))
     }
     throw err
   }
