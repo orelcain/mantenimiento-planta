@@ -36,7 +36,7 @@ import {
   Badge,
 } from '@/components/ui'
 import { IncidentDetail } from '@/components/incidents/IncidentDetail'
-import { useAppStore, useAuthStore, useCanValidateIncidents } from '@/store'
+import { useAppStore, useCanValidateIncidents } from '@/store'
 import { cn } from '@/lib/utils'
 import { formatRelativeTime } from '@/lib/utils'
 import { generateDemoMap, generateDemoRuntimeData } from '@/services/isometricMap'
@@ -83,7 +83,7 @@ export function MapPage() {
 
   // Datos del mapa (demo por ahora, luego vendrá de Firestore)
   const demoData = useMemo(() => generateDemoMap(), [])
-  const [runtimeData, setRuntimeData] = useState<Map<string, NodeRuntimeData>>(
+  const [runtimeData] = useState<Map<string, NodeRuntimeData>>(
     () => generateDemoRuntimeData(demoData.nodes)
   )
 
