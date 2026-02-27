@@ -179,20 +179,6 @@
         { "fieldPath": "active", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
-    },
-    {
-      "collectionGroup": "ariaKnowledge",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "confidence", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "ariaFeedback",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "createdAt", "order": "DESCENDING" }
-      ]
     }
   ],
   "fieldOverrides": []

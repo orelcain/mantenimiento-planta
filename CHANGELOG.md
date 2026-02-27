@@ -7,6 +7,13 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.66.1] - 2026-02-26
+### Corregido
+- **Feedback/correcciones no se guardaban**: las colecciones `ariaFeedback`, `ariaKnowledge`, `ariaEquipmentPatterns` y `ariaCorrections` no tenían reglas de Firestore desplegadas — todas las escrituras eran rechazadas silenciosamente por permisos
+- **Reglas Firestore desplegadas**: `firebase deploy --only firestore:rules` ejecutado — las 4 colecciones de aprendizaje ahora permiten read/create a usuarios autenticados y update/delete a admin
+- **Índices Firestore desplegados**: índice compuesto `ariaCorrections(active + createdAt)` desplegado
+- **Error logging mejorado**: `.catch(() => {})` en saveFeedback reemplazado por `console.error` visible — ahora los errores de guardado aparecen en la consola del navegador
+
 ## [2.66.0] - 2026-02-26
 ### Agregado — ARIA Learning System (Aprendizaje Continuo)
 - **UI de Corrección en chat**: al dar 👎 en una respuesta, se expande un formulario donde el usuario puede escribir la respuesta correcta. La corrección se guarda como regla permanente en Firestore (`ariaCorrections`)

@@ -968,7 +968,11 @@ export function ChatBot() {
       rating,
       correction,
       intents: [],
-    }).catch(() => { /* non-blocking */ })
+    }).then(() => {
+      console.log(`✅ ARIA Learning: feedback ${rating} guardado${correction ? ' con corrección' : ''}`)
+    }).catch((err) => {
+      console.error('❌ ARIA Learning: error guardando feedback', err)
+    })
   }, [messages, userId])
 
   // #7 — Handler para links internos clickeables en mensajes
