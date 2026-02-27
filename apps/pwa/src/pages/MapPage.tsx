@@ -96,7 +96,7 @@ function getDefaultSize(type: MapNode['type']): MapNode['size'] {
     building:   { width: 6,   height: 4,   depth: 5 },
     generic:    { width: 2,   height: 2,   depth: 2 },
   }
-  return sizes[type] || sizes.generic
+  return sizes[type] ?? { width: 2, height: 2, depth: 2 }
 }
 
 export function MapPage() {
@@ -172,14 +172,14 @@ export function MapPage() {
   const zoomIn = useCallback(() => {
     setViewerState((prev) => ({
       ...prev,
-      zoom: Math.min(prev.zoom + 5, 120),
+      zoom: Math.min(prev.zoom + 10, 200),
     }))
   }, [])
 
   const zoomOut = useCallback(() => {
     setViewerState((prev) => ({
       ...prev,
-      zoom: Math.max(prev.zoom - 5, 15),
+      zoom: Math.max(prev.zoom - 10, 5),
     }))
   }, [])
 
@@ -457,9 +457,9 @@ export function MapPage() {
           nodes,
           connectors,
           areas,
-          createdBy: user?.uid || 'system',
+          createdBy: user?.id || 'system',
         },
-        user?.uid || 'system'
+        user?.id || 'system'
       )
       setHasUnsavedChanges(false)
     } catch (error) {

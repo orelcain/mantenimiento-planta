@@ -244,7 +244,7 @@ export interface IsometricViewerState {
 
 export const DEFAULT_VIEWER_STATE: IsometricViewerState = {
   cameraAngle: 0,
-  zoom: 50,
+  zoom: 25,
   selectedNodeId: null,
   hoveredNodeId: null,
   mode: 'view',

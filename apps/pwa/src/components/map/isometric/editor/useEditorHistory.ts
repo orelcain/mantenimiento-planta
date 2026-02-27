@@ -75,14 +75,14 @@ export function useEditorHistory(): UseEditorHistoryReturn {
     if (currentIndex.current <= 0) return null
     currentIndex.current--
     trigger()
-    return history.current[currentIndex.current]
+    return history.current[currentIndex.current] ?? null
   }, [trigger])
 
   const redo = useCallback((): EditorSnapshot | null => {
     if (currentIndex.current >= history.current.length - 1) return null
     currentIndex.current++
     trigger()
-    return history.current[currentIndex.current]
+    return history.current[currentIndex.current] ?? null
   }, [trigger])
 
   const clear = useCallback(() => {
