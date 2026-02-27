@@ -7,6 +7,15 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.65.1] - 2026-02-26
+### Corregido
+- **Búsqueda RAG con falsos positivos**: 3 bugs corregidos en la búsqueda de repuestos
+  - **Expansión de sinónimos transitiva**: buscar "motor" expandía a "motobomba" → grupo bomba → "pump", "centrifuga", etc. Ahora solo expande sinónimos DIRECTOS del grupo donde el término es miembro exacto
+  - **Bug `ns.includes(term)` en matching**: typo `ns.includes(term)` en vez de `ns.includes(et)` hacía que CUALQUIER término expandido fuera considerado sinónimo válido de "motor". Ahora usa matching exacto con `normSyns.includes()`
+  - **`fuzzyMatch` con palabras cortas**: `term.includes(word)` matcheaba palabras de 1-2 chars sin restricción. Ahora requiere `word.length >= 4` para el check reverso
+- **"$undefined" y "Fabricante: undefined"**: campos `valorUnitario`, `codigoFabricante`, `codigoSAP`, `descripcion` ahora usan null coalescing (`?? 0` / `|| 'pendiente'` / `|| ''`) en TODAS las 5 plantillas de salida RAG
+- **Texto de búsqueda contaminado**: el `text` para fuzzy matching concatenaba campos undefined como string "undefined", potencialmente causando matches espúreos
+
 ## [2.65.0] - 2026-02-26
 ### Agregado
 - **Selector de modelo IA en chat**: dropdown en el header del chat permite al usuario elegir manualmente qué modelo usar (DeepSeek R1, Gemini Flash, Qwen QwQ, Llama 3.3) o dejar en modo "Auto" (ARIA elige)

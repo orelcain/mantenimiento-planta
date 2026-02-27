@@ -385,8 +385,12 @@ function expandWithSynonyms(terms: string[]): string[] {
   const expanded = new Set(terms)
   for (const term of terms) {
     for (const [, synonyms] of Object.entries(SYNONYM_MAP)) {
-      if (synonyms.some(s => normalizeText(s).includes(term) || term.includes(normalizeText(s)))) {
-        synonyms.forEach(s => expanded.add(normalizeText(s)))
+      // Solo expandir si el término es DIRECTAMENTE miembro del grupo.
+      // Evita expansión transitiva: "motor" → "motobomba" → grupo bomba → "pump"
+      const normSyns = synonyms.map(s => normalizeText(s))
+      const isDirectMember = normSyns.includes(term) || normSyns.some(ns => ns === term)
+      if (isDirectMember) {
+        normSyns.forEach(s => expanded.add(s))
       }
     }
   }
@@ -672,7 +676,9 @@ function fuzzyMatch(text: string, term: string): boolean {
   // Partial match: el term aparece como parte de una palabra en text
   const words = text.split(/\s+/)
   for (const word of words) {
-    if (word.includes(term) || term.includes(word)) return true
+    if (word.includes(term)) return true
+    // Reverso: la palabra es un substring del term (solo si la palabra es sustancial)
+    if (word.length >= 4 && term.includes(word)) return true
     // Levenshtein fuzzy: permite 1-2 errores según longitud
     if (term.length >= 4 && word.length >= 4) {
       const maxDist = term.length <= 5 ? 1 : 2
@@ -1221,7 +1227,7 @@ async function fetchRepuestosSummary(userQuery: string): Promise<string> {
           const cant = r.cantidadPorMaquina ?? 0
           const stockNote = cant === 0 ? ' [SIN STOCK - CATALOGADO]' : ` [${cant} en stock]`
           matchedRepuestos.push(
-            `  ✓ [${machine.nombre}] ${r.textoBreve} | SAP: ${r.codigoSAP} | Fab: ${r.codigoFabricante} | Cant: ${cant}${stockNote} | $${r.valorUnitario}`
+            `  ✓ [${machine.nombre}] ${r.textoBreve} | SAP: ${r.codigoSAP || 'pendiente'} | Fab: ${r.codigoFabricante || 'pendiente'} | Cant: ${cant}${stockNote} | $${r.valorUnitario ?? 0}`
           )
         })
         continue
@@ -1231,20 +1237,21 @@ async function fetchRepuestosSummary(userQuery: string): Promise<string> {
       if (expandedTerms.length > 0) {
         reps.forEach(r => {
           const text = normalizeText(
-            `${r.textoBreve} ${r.descripcion} ${r.codigoSAP} ${r.codigoFabricante} ${r.nombreManual || ''} ${r.ubicacionEnPlanta || ''}`
+            `${r.textoBreve || ''} ${r.descripcion || ''} ${r.codigoSAP || ''} ${r.codigoFabricante || ''} ${r.nombreManual || ''} ${r.ubicacionEnPlanta || ''}`
           )
 
           // #1 — Búsqueda fuzzy: match parcial + tolerancia a errores + sinónimos
           const matchedTerms = componentTerms.filter(term => {
             // Fuzzy match directo del término (incluye Levenshtein + substring parcial)
             if (fuzzyMatch(text, term)) return true
-            // Búsqueda por sinónimos expandidos con fuzzy
+            // Búsqueda por sinónimos DIRECTOS con fuzzy
+            // Solo acepta términos que estén en el MISMO grupo de sinónimos que el term original
             return expandedTerms.some(et => {
               if (et === term) return false
               const isSynonym = SYNONYM_MAP_ENTRIES.some(([, syns]) => {
                 const normSyns = syns.map(s => normalizeText(s))
-                const termInGroup = normSyns.includes(term) || normSyns.some(ns => term.includes(ns) || ns.includes(term))
-                const etInGroup = normSyns.includes(et) || normSyns.some(ns => et.includes(ns) || ns.includes(et))
+                const termInGroup = normSyns.includes(term)
+                const etInGroup = normSyns.includes(et)
                 return termInGroup && etInGroup
               })
               return isSynonym && fuzzyMatch(text, et)
@@ -1257,7 +1264,7 @@ async function fetchRepuestosSummary(userQuery: string): Promise<string> {
             const desc = r.descripcion ? ` | Desc: ${r.descripcion.slice(0, 60)}` : ''
             const ubic = r.ubicacionEnPlanta ? ` | Ubic: ${r.ubicacionEnPlanta}` : ''
             matchedRepuestos.push(
-              `  ✓ [${machine.nombre}] ${r.textoBreve}${desc} | SAP: ${r.codigoSAP} | Fab: ${r.codigoFabricante} | Cant: ${cant}${stockNote} | $${r.valorUnitario}${ubic}`
+              `  ✓ [${machine.nombre}] ${r.textoBreve}${desc} | SAP: ${r.codigoSAP || 'pendiente'} | Fab: ${r.codigoFabricante || 'pendiente'} | Cant: ${cant}${stockNote} | $${r.valorUnitario ?? 0}${ubic}`
             )
           } else {
             // Log para debugging: por qué no matchó
@@ -1288,7 +1295,7 @@ async function fetchRepuestosSummary(userQuery: string): Promise<string> {
             const desc = r.descripcion ? ` | Desc: ${r.descripcion.slice(0, 60)}` : ''
             const ubic = r.ubicacionEnPlanta ? ` | Ubic: ${r.ubicacionEnPlanta}` : ''
             matchedRepuestos.push(
-              `  ✓ [${machine.nombre}] ${r.textoBreve}${desc} | SAP: ${r.codigoSAP} | Fab: ${r.codigoFabricante} | Cant: ${cant}${stockNote} | $${r.valorUnitario}${ubic}`
+              `  ✓ [${machine.nombre}] ${r.textoBreve}${desc} | SAP: ${r.codigoSAP || 'pendiente'} | Fab: ${r.codigoFabricante || 'pendiente'} | Cant: ${cant}${stockNote} | $${r.valorUnitario ?? 0}${ubic}`
             )
             console.warn(`[ARIA-RAG] SAFETY-NET rescued: "${r.textoBreve}" (SAP: ${r.codigoSAP}) - missed by fuzzy matching!`)
           }
@@ -1356,7 +1363,7 @@ async function fetchRepuestosSummary(userQuery: string): Promise<string> {
               break
             }
             lines.push(
-              `  • [${machine.nombre}] ${r.textoBreve} | ${r.descripcion || ''} | SAP: ${r.codigoSAP} | Fab: ${r.codigoFabricante} | Cant: ${r.cantidadPorMaquina} | $${r.valorUnitario}`
+              `  • [${machine.nombre}] ${r.textoBreve} | ${r.descripcion || ''} | SAP: ${r.codigoSAP || 'pendiente'} | Fab: ${r.codigoFabricante || 'pendiente'} | Cant: ${r.cantidadPorMaquina ?? 0} | $${r.valorUnitario ?? 0}`
             )
             fallbackCount++
           }
@@ -1374,11 +1381,11 @@ async function fetchRepuestosSummary(userQuery: string): Promise<string> {
           const repSnap = await getDocs(collection(db, `machines/${machine.id}/repuestos`))
           const reps = repSnap.docs.map(d => ({ id: d.id, ...d.data() })) as Repuesto[]
           for (const r of reps) {
-            const rText = normalizeText(`${r.textoBreve} ${r.descripcion} ${r.codigoSAP} ${r.codigoFabricante} ${r.nombreManual || ''}`)
+            const rText = normalizeText(`${r.textoBreve || ''} ${r.descripcion || ''} ${r.codigoSAP || ''} ${r.codigoFabricante || ''} ${r.nombreManual || ''}`)
             const anyTermMatch = searchTerms.some(t => fuzzyMatch(rText, t)) || expandedTerms.some(t => fuzzyMatch(rText, t))
             if (anyTermMatch && fallbackMatches < 30) {
               const stockNote = (r.cantidadPorMaquina || 0) === 0 ? ' [SIN STOCK]' : ''
-              lines.push(`  ✓ [${machine.nombre}] ${r.textoBreve} | SAP: ${r.codigoSAP} | Fab: ${r.codigoFabricante} | Cant: ${r.cantidadPorMaquina} | $${r.valorUnitario}${stockNote}`)
+              lines.push(`  ✓ [${machine.nombre}] ${r.textoBreve} | SAP: ${r.codigoSAP || 'pendiente'} | Fab: ${r.codigoFabricante || 'pendiente'} | Cant: ${r.cantidadPorMaquina ?? 0} | $${r.valorUnitario ?? 0}${stockNote}`)
               fallbackMatches++
             }
           }
