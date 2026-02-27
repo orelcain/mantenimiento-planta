@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.67.1**
+## Versión Actual: **v2.67.2**
 
 **Fecha de lanzamiento**: 27 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -10,18 +10,22 @@
 
 ## 📋 Información de la Versión
 
+### v2.67.2 — Vinculación datos reales + LinkEntityDialog + useMapRuntimeData (27/02/2026)
+- 🔗 **LinkEntityDialog**: diálogo de búsqueda/selección de Equipment y Zone reales para vincular a nodos del mapa isométrico (tabs, search, badges de estado, desvincular)
+- 📊 **useMapRuntimeData**: hook que genera NodeRuntimeData desde datos reales de Firestore (Equipment.estado → OperationalStatus, conteo de incidencias activas por equipo)
+- 🏷️ **NodePropertiesPanel**: botón "Vincular con entidad real" reemplaza placeholder, muestra nombre resuelto de la entidad vinculada
+- 🔧 **CI fix**: hooks llamados condicionalmente corregidos (Rules of Hooks), useEffect deps completas, imports no usados eliminados
+
+### v2.67.1 — Modo Editor del Mapa Isométrico (27/02/2026)
+- ✏️ **Editor Mode**: toggle view/edit con hotkeys (V/M/A/G/T/Delete/Ctrl+Z/Y/D)
+- 🎯 **DraggableNode**: arrastrar equipos con raycasting a plano Y=0, snap to grid
+- 🛠️ **EditorToolbar**: HUD flotante con herramientas Select/Move/Add, snap toggle, undo/redo, save/cancel
+- 📝 **NodePropertiesPanel**: panel lateral con nombre, tipo, posición XYZ, tamaño, rotación, visibilidad
+- ➕ **AddEquipmentDialog**: modal con 10 presets de equipos, búsqueda, nombre custom
+- ↩️ **useEditorHistory**: undo/redo con 50 snapshots, deep clone
+- 🔍 **Zoom mejorado**: inicial 25 (antes 50), pasos ±10 (antes ±5), rango 5-200 (antes 15-120)
+
 ### v2.67.0 — Mapa Isométrico 3D: Three.js + Cámara FFT + Equipos interactivos (27/02/2026)
-- 🗺️ **Mapa Isométrico 3D**: nueva vista completa de planta con Three.js + cámara ortográfica, reemplazando el visor 2D anterior
-- 🎮 **Rotación FFT**: 4 ángulos de cámara estilo Final Fantasy Tactics (Q/E o botones), animados con spring interpolation
-- 📐 **Grilla 1m×1m**: escala real con líneas menores (1m) y mayores (10m), ejes centrales
-- 🏭 **10 tipos de equipo 3D**: bomba, motor, tanque, sensor, transportador, válvula, compresor, tubería, edificio, genérico — cada uno con geometría distinta
-- 🔴 **Status en tiempo real**: anillo pulsante por estado (ok/warning/critical/offline/maintenance)
-- 🏷️ **Labels flotantes HTML**: etiquetas interactivas con valores de sensores via @react-three/drei Html
-- 🔗 **Conectores animados**: tuberías, cables, flujo con partículas, señales entre equipos
-- 📍 **Áreas/zonas**: overlays coloreados sobre el suelo con labels de zona
-- 🎛️ **HUD de controles**: rotación, zoom, reset, filtros de visibilidad (etiquetas, áreas, conectores, alertas)
-- 📋 **Panel lateral incidencias**: lista interactiva con prioridad y estado (reutilizado del visor anterior)
-- 📦 **Lazy loading**: escena 3D cargada bajo demanda — IsometricScene.js (16 kB gzip ~5 kB)
 - 🎲 **Datos demo**: planta industrial con 25 equipos, 10 conectores, 5 áreas para visualización inmediata
 
 ### v2.66.5 — Fix permisos incidencias + feedback save (27/02/2026)

@@ -38,8 +38,6 @@ export function LinkEntityDialog({ isOpen, node, onLink, onUnlink, onClose }: Li
   const [activeTab, setActiveTab] = useState<EntityType>('equipment')
   const [search, setSearch] = useState('')
 
-  if (!isOpen) return null
-
   const filteredEquipment = useMemo(() => {
     if (!search) return equipment.filter(e => !e.deleted)
     const q = search.toLowerCase()
@@ -65,6 +63,8 @@ export function LinkEntityDialog({ isOpen, node, onLink, onUnlink, onClose }: Li
   }, [zones, search])
 
   const isLinked = !!node.linkedEntityId
+
+  if (!isOpen) return null
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">

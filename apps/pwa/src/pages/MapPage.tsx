@@ -222,94 +222,6 @@ export function MapPage() {
     }))
   }, [])
 
-  // Keyboard shortcuts (Q/E ya los maneja useIsometricRotation internamente)
-  useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
-
-      // Editor shortcuts
-      if (isEditMode) {
-        switch (e.key) {
-          case 'v':
-          case 'V':
-            e.preventDefault()
-            setEditorTool('select')
-            return
-          case 'm':
-          case 'M':
-            e.preventDefault()
-            setEditorTool('move')
-            return
-          case 'a':
-          case 'A':
-            e.preventDefault()
-            setEditorTool('add')
-            return
-          case 'g':
-          case 'G':
-            e.preventDefault()
-            setSnapEnabled((prev) => !prev)
-            return
-          case 't':
-          case 'T':
-            e.preventDefault()
-            handleRotateSelected()
-            return
-          case 'Delete':
-          case 'Backspace':
-            e.preventDefault()
-            handleDeleteSelected()
-            return
-          case 'z':
-          case 'Z':
-            if (e.ctrlKey || e.metaKey) {
-              e.preventDefault()
-              handleUndo()
-              return
-            }
-            break
-          case 'y':
-          case 'Y':
-            if (e.ctrlKey || e.metaKey) {
-              e.preventDefault()
-              handleRedo()
-              return
-            }
-            break
-          case 'd':
-          case 'D':
-            if (e.ctrlKey || e.metaKey) {
-              e.preventDefault()
-              handleDuplicateSelected()
-              return
-            }
-            break
-        }
-      }
-
-      switch (e.key) {
-        case '+':
-        case '=':
-          e.preventDefault()
-          zoomIn()
-          break
-        case '-':
-          e.preventDefault()
-          zoomOut()
-          break
-        case 'r':
-        case 'R':
-          if (!isEditMode) {
-            e.preventDefault()
-            resetView()
-          }
-          break
-      }
-    }
-    window.addEventListener('keydown', handleKey)
-    return () => window.removeEventListener('keydown', handleKey)
-  }, [zoomIn, zoomOut, resetView, isEditMode])
-
   // ── Handlers del editor ──
   const commitEditorChange = useCallback(
     (newNodes: MapNode[], newAreas?: MapArea[], newConnectors?: MapConnectorType[]) => {
@@ -516,6 +428,94 @@ export function MapPage() {
     handleNodeUpdate(nodeId, { linkedEntityType: undefined, linkedEntityId: undefined })
     setShowLinkDialog(false)
   }, [handleNodeUpdate])
+
+  // Keyboard shortcuts (Q/E ya los maneja useIsometricRotation internamente)
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+
+      // Editor shortcuts
+      if (isEditMode) {
+        switch (e.key) {
+          case 'v':
+          case 'V':
+            e.preventDefault()
+            setEditorTool('select')
+            return
+          case 'm':
+          case 'M':
+            e.preventDefault()
+            setEditorTool('move')
+            return
+          case 'a':
+          case 'A':
+            e.preventDefault()
+            setEditorTool('add')
+            return
+          case 'g':
+          case 'G':
+            e.preventDefault()
+            setSnapEnabled((prev) => !prev)
+            return
+          case 't':
+          case 'T':
+            e.preventDefault()
+            handleRotateSelected()
+            return
+          case 'Delete':
+          case 'Backspace':
+            e.preventDefault()
+            handleDeleteSelected()
+            return
+          case 'z':
+          case 'Z':
+            if (e.ctrlKey || e.metaKey) {
+              e.preventDefault()
+              handleUndo()
+              return
+            }
+            break
+          case 'y':
+          case 'Y':
+            if (e.ctrlKey || e.metaKey) {
+              e.preventDefault()
+              handleRedo()
+              return
+            }
+            break
+          case 'd':
+          case 'D':
+            if (e.ctrlKey || e.metaKey) {
+              e.preventDefault()
+              handleDuplicateSelected()
+              return
+            }
+            break
+        }
+      }
+
+      switch (e.key) {
+        case '+':
+        case '=':
+          e.preventDefault()
+          zoomIn()
+          break
+        case '-':
+          e.preventDefault()
+          zoomOut()
+          break
+        case 'r':
+        case 'R':
+          if (!isEditMode) {
+            e.preventDefault()
+            resetView()
+          }
+          break
+      }
+    }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [zoomIn, zoomOut, resetView, isEditMode, handleDeleteSelected, handleDuplicateSelected, handleRedo, handleRotateSelected, handleUndo])
 
   return (
     <div className="space-y-4">
