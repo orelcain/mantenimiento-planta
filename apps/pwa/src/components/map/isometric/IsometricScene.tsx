@@ -20,6 +20,7 @@ import * as THREE from 'three'
 import { IsometricCamera } from './IsometricCamera'
 import { PlantGrid } from './PlantGrid'
 import { EquipmentNode } from './EquipmentNode'
+import { DraggableNode } from './editor/DraggableNode'
 import { MapAreaOverlay } from './MapAreaOverlay'
 import { MapConnector } from './MapConnector'
 import type {
@@ -51,6 +52,10 @@ interface IsometricSceneProps {
   onAreaClick?: (areaId: string) => void
   onCameraAngleChange?: (angle: CameraAngle) => void
   onBackgroundClick?: () => void
+  /** Editor callbacks */
+  onNodeDragEnd?: (nodeId: string, newPosition: { x: number; y: number; z: number }) => void
+  /** Callback para agregar nodo al hacer click en suelo en modo 'add' */
+  onFloorClick?: (position: { x: number; z: number }) => void
 }
 
 /** Contenido de la escena (dentro del Canvas) */
@@ -66,6 +71,8 @@ function SceneContent({
   onAreaClick,
   onCameraAngleChange: _onCameraAngleChange,
   onBackgroundClick,
+  onNodeDragEnd,
+  onFloorClick,
 }: IsometricSceneProps) {
   // Centro de la planta
   const centerTarget = useMemo<[number, number, number]>(
@@ -162,9 +169,35 @@ function SceneContent({
         )
       })}
 
-      {/* Equipos/nodos */}
+      {/* Equipos/nodos (DraggableNode en edit, EquipmentNode en view) */}
       {visibleNodes.map((node) => {
         const runtime = runtimeData.get(node.id)
+        const isEditMode = viewerState.mode === 'edit'
+
+        if (isEditMode) {
+          return (
+            <DraggableNode
+              key={node.id}
+              node={node}
+              status={runtime?.status || 'ok'}
+              activeIncidents={runtime?.activeIncidents || 0}
+              sensorValue={
+                runtime?.sensorValue !== undefined
+                  ? `${runtime.sensorValue}${runtime.sensorUnit || ''}`
+                  : undefined
+              }
+              selected={viewerState.selectedNodeId === node.id}
+              hovered={viewerState.hoveredNodeId === node.id}
+              showLabel={viewerState.filters.showLabels}
+              viewerState={viewerState}
+              gridSnap={1}
+              onClick={onNodeClick}
+              onHover={onNodeHover}
+              onDragEnd={onNodeDragEnd}
+            />
+          )
+        }
+
         return (
           <EquipmentNode
             key={node.id}
@@ -185,11 +218,18 @@ function SceneContent({
         )
       })}
 
-      {/* Click en fondo para deseleccionar */}
+      {/* Click en fondo para deseleccionar / agregar equipo en modo add */}
       <mesh
         rotation-x={-Math.PI / 2}
         position={[0, -0.1, 0]}
-        onClick={() => onBackgroundClick?.()}
+        onClick={(e) => {
+          if (viewerState.mode === 'edit' && onFloorClick) {
+            const point = e.point
+            onFloorClick({ x: Math.round(point.x), z: Math.round(point.z) })
+          } else {
+            onBackgroundClick?.()
+          }
+        }}
         visible={false}
       >
         <planeGeometry args={[config.width * 2, config.depth * 2]} />

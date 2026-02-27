@@ -7,6 +7,33 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.67.1] - 2026-02-27
+### Agregado — Modo Editor del Mapa Isométrico
+- **Modo Editor**: botón "Editar Mapa" (solo admin) que activa la edición completa del layout 3D
+- **Drag & Drop 3D**: arrastra equipos en la escena con raycasting al plano del suelo y snap a grilla 1m
+- **DraggableNode**: envuelve EquipmentNode con soporte de arrastre via pointer events y raycasting
+- **EditorToolbar**: barra flotante central con herramientas Seleccionar (V), Mover (M), Agregar (A), toggle Grid snap (G)
+- **Agregar equipos**: click en suelo en modo Add o diálogo modal con los 10 tipos de equipo, presets de tamaño, nombre personalizado
+- **Eliminar/Duplicar/Rotar**: botones en toolbar y atajos (Delete, Ctrl+D, T) para manipular nodo seleccionado
+- **NodePropertiesPanel**: panel lateral derecho en modo editor — edición de nombre, tipo, posición XYZ, tamaño, rotación (slider 0-360°), visibilidad, vinculación
+- **Undo/Redo**: historial de hasta 50 snapshots con Ctrl+Z / Ctrl+Y
+- **Guardar en Firestore**: botón Save que persiste layout completo (nodos, conectores, áreas) vía `saveIsometricMap()`
+- **Keyboard shortcuts del editor**: V/M/A (herramientas), G (snap), T (rotar), Delete (eliminar), Ctrl+Z/Y (undo/redo), Ctrl+D (duplicar)
+- **Indicador visual**: badge "MODO EDITOR" con estado de cambios sin guardar
+- **Panel dual**: en modo vista muestra incidencias, en modo editor muestra propiedades del nodo seleccionado
+
+### Archivos nuevos
+- `components/map/isometric/editor/DraggableNode.tsx` — wrapper drag & drop con raycasting
+- `components/map/isometric/editor/EditorToolbar.tsx` — barra de herramientas flotante HUD
+- `components/map/isometric/editor/NodePropertiesPanel.tsx` — panel de propiedades editable
+- `components/map/isometric/editor/AddEquipmentDialog.tsx` — modal selector de tipo de equipo
+- `components/map/isometric/editor/useEditorHistory.ts` — hook undo/redo con snapshots
+- `components/map/isometric/editor/index.ts` — barrel exports
+
+### Modificado
+- `IsometricScene.tsx` — soporte para `onNodeDragEnd`, `onFloorClick`, rendering condicional DraggableNode vs EquipmentNode
+- `MapPage.tsx` — estado mutable de nodos/áreas/conectores, integración completa del editor, toggles admin
+
 ## [2.67.0] - 2026-02-27
 ### Agregado — Mapa Isométrico 3D
 - **Vista isométrica 3D de la planta**: MapPage reescrito completamente — reemplaza visor 2D por escena Three.js con cámara ortográfica
