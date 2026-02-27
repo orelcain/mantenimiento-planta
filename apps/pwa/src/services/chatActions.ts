@@ -40,6 +40,9 @@ export interface IncidentDraft {
   zoneId?: string
   hierarchyNodeId?: string
   needsPhoto?: boolean
+  // Asignación directa (admin/supervisor)
+  asignadoA?: string
+  asignadoANombre?: string
 }
 
 /** Una acción pendiente del chatbot */
@@ -350,6 +353,9 @@ export async function buildIncidentDraft(
     sintomas: extracted.sintomas.length > 0 ? extracted.sintomas : undefined,
     equipmentId: equipment?.id,
     equipmentName: equipment?.nombre,
+    // Heredar ubicación del equipo si existe
+    zoneId: equipment?.zoneId,
+    hierarchyNodeId: equipment?.hierarchyNodeId,
     needsPhoto: true,
   }
 
@@ -376,16 +382,18 @@ export async function executeCreateIncident(
       titulo: draft.titulo,
       descripcion: draft.descripcion,
       prioridad: draft.prioridad,
-      status: 'pendiente',
+      status: draft.asignadoA ? 'en_proceso' : 'pendiente',
       fotos: photoUrls && photoUrls.length > 0 ? photoUrls : [],
       reportadoPor: userId,
       creadoPor: userId,
       creadoPorNombre: userName,
-      requiresValidation: true,
+      requiresValidation: !draft.asignadoA,
       ...(draft.equipmentId && { equipmentId: draft.equipmentId }),
       ...(draft.sintomas && { sintomas: draft.sintomas }),
       ...(draft.zoneId && { zoneId: draft.zoneId }),
       ...(draft.hierarchyNodeId && { hierarchyNodeId: draft.hierarchyNodeId }),
+      ...(draft.asignadoA && { asignadoA: draft.asignadoA }),
+      ...(draft.asignadoANombre && { asignadoANombre: draft.asignadoANombre }),
     })
 
     logger.info('chatActions: incident created via ARIA', { incidentId: incident.id, photoCount: photoUrls?.length || 0 })
@@ -466,6 +474,10 @@ export function formatDraftForDisplay(draft: IncidentDraft): string {
     lines.push(`🏭 **Equipo:** ${draft.equipmentName} (${draft.equipmentId})`)
   } else {
     lines.push(`🏭 **Equipo:** No identificado (se puede asignar después)`)
+  }
+
+  if (draft.asignadoANombre) {
+    lines.push(`👷 **Asignado a:** ${draft.asignadoANombre}`)
   }
 
   if (draft.sintomas && draft.sintomas.length > 0) {

@@ -7,6 +7,20 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.66.2] - 2026-02-26
+### Corregido
+- **Creación de incidencias desde ARIA fallaba** con "Missing or insufficient permissions": faltaba la colección `ariaActions` en las reglas de Firestore — agregada con permisos read/create para autenticados y update/delete para admin
+- **Regla de zoneId/hierarchyNodeId obligaria** en incidencias: relajada para permitir creación sin zona (ARIA a menudo no tiene zona cuando crea desde texto libre)
+- **Ubicación del equipo se hereda al draft**: cuando ARIA encuentra un equipo candidato, su `zoneId` y `hierarchyNodeId` se copian automáticamente al borrador de incidencia
+- **Feedback de ARIA Learning vacío**: los intents se enviaban siempre como `[]` — ahora se auto-detectan del contenido del mensaje (equipos, incidencias, repuestos, mantenimiento, general)
+- **Equipment mentioned en feedback**: se extrae automáticamente el nombre del equipo mencionado en la consulta para mejorar el matching de correcciones y patrones
+
+### Agregado
+- **Selector de búsqueda de equipos mejorado**: el picker de equipos en el borrador ahora incluye un campo de búsqueda que filtra por nombre y código, y carga la lista completa de equipos (no solo los candidatos)
+- **Asignación de técnico desde ARIA** (admin/supervisor): dropdown desplegable en la barra de borrador que permite seleccionar un técnico para asignar directamente la incidencia al crearla — la incidencia se crea en estado `en_proceso` con el técnico asignado
+- **Buscador de técnicos**: el selector de técnicos incluye búsqueda por nombre y muestra rol (admin/supervisor/técnico) con iconos diferenciados
+- **Quitar asignación**: opción para remover la asignación de técnico antes de confirmar
+
 ## [2.66.1] - 2026-02-26
 ### Corregido
 - **Feedback/correcciones no se guardaban**: las colecciones `ariaFeedback`, `ariaKnowledge`, `ariaEquipmentPatterns` y `ariaCorrections` no tenían reglas de Firestore desplegadas — todas las escrituras eran rechazadas silenciosamente por permisos

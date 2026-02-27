@@ -2032,8 +2032,11 @@ export async function sendChatMessage(
             `📌 "${draft.titulo}"\n` +
             `⚡ Prioridad: ${draft.prioridad}\n` +
             (userName ? `👤 Creado por: **${userName}**\n` : '') +
+            (draft.asignadoANombre ? `👷 Asignado a: **${draft.asignadoANombre}**\n` : '') +
             (photoUrlsFromChat.length > 0 ? `📷 ${photoUrlsFromChat.length} foto${photoUrlsFromChat.length > 1 ? 's' : ''} adjuntada${photoUrlsFromChat.length > 1 ? 's' : ''}\n` : '') +
-            `\nLa incidencia quedó en estado **pendiente** y será revisada por un supervisor.` +
+            (draft.asignadoA
+              ? `\nLa incidencia quedó en estado **en proceso** y fue asignada directamente.`
+              : `\nLa incidencia quedó en estado **pendiente** y será revisada por un supervisor.`) +
             techSuggestion +
             `\n\n💡 ¿Necesitas algo más?`,
           context: '',
@@ -2099,6 +2102,9 @@ export async function sendChatMessage(
           ...pendingAction.data,
           equipmentId: equipment.id,
           equipmentName: equipment.nombre,
+          // Heredar ubicación del equipo
+          ...(equipment.zoneId && { zoneId: equipment.zoneId }),
+          ...(equipment.hierarchyNodeId && { hierarchyNodeId: equipment.hierarchyNodeId }),
         }
         const updatedDraft = updatedData as unknown as IncidentDraft
         const draftDisplay = formatDraftForDisplay(updatedDraft)
@@ -2113,6 +2119,30 @@ export async function sendChatMessage(
             data: updatedData,
             missingFields: pendingAction.missingFields.filter(f => f !== 'equipo'),
           },
+        }
+      }
+    }
+
+    // Asignación de técnico desde el picker de la UI
+    const techAssignMatch = lower.match(/^asignar?\s+(?:a\s+)?t[eé]cnico:\s*(.+)$/i)
+    if (techAssignMatch) {
+      const techName = techAssignMatch[1]!.trim()
+      // Formato esperado: "nombre|id"
+      const [nombre, techId] = techName.split('|')
+      if (nombre && techId) {
+        const updatedData = {
+          ...pendingAction.data,
+          asignadoA: techId.trim(),
+          asignadoANombre: nombre.trim(),
+        }
+        const updatedDraft = updatedData as unknown as IncidentDraft
+        const draftDisplay = formatDraftForDisplay(updatedDraft)
+        return {
+          reply: `✅ Técnico asignado: **${nombre.trim()}**.\n\n${draftDisplay}\n\n¿Confirmas la creación? (Sí / No / Modificar)`,
+          context: '',
+          actions: [],
+          typoCorrections: [],
+          pendingAction: { ...pendingAction, data: updatedData },
         }
       }
     }
