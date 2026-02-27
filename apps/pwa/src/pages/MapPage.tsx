@@ -42,8 +42,8 @@ import { IncidentDetail } from '@/components/incidents/IncidentDetail'
 import { useAppStore, useCanValidateIncidents, useIsAdmin } from '@/store'
 import { cn } from '@/lib/utils'
 import { formatRelativeTime } from '@/lib/utils'
-import { generateDemoMap, generateDemoRuntimeData, saveIsometricMap } from '@/services/isometricMap'
-import type { CameraAngle, IsometricViewerState, NodeRuntimeData, MapNode, MapArea, MapConnector as MapConnectorType } from '@/types/isometricMap'
+import { generateDemoMap, saveIsometricMap } from '@/services/isometricMap'
+import type { CameraAngle, IsometricViewerState, MapNode, MapArea, MapConnector as MapConnectorType } from '@/types/isometricMap'
 import { 
   DEFAULT_VIEWER_STATE,
   CAMERA_ANGLE_NAMES,
@@ -64,7 +64,9 @@ import { EditorToolbar } from '@/components/map/isometric/editor/EditorToolbar'
 import type { EditorTool } from '@/components/map/isometric/editor/EditorToolbar'
 import { NodePropertiesPanel } from '@/components/map/isometric/editor/NodePropertiesPanel'
 import { AddEquipmentDialog } from '@/components/map/isometric/editor/AddEquipmentDialog'
+import { LinkEntityDialog } from '@/components/map/isometric/editor/LinkEntityDialog'
 import { useEditorHistory } from '@/components/map/isometric/editor/useEditorHistory'
+import { useMapRuntimeData } from '@/components/map/isometric/editor/useMapRuntimeData'
 
 const PRIORITY_CONFIG: Record<IncidentPriority, { color: string; bg: string; label: string }> = {
   critica: { color: 'text-red-500', bg: 'bg-red-500', label: 'Crítica' },
@@ -116,15 +118,15 @@ export function MapPage() {
   const [nodes, setNodes] = useState<MapNode[]>(() => demoData.nodes)
   const [areas, setAreas] = useState<MapArea[]>(() => demoData.areas)
   const [connectors, setConnectors] = useState<MapConnectorType[]>(() => demoData.connectors)
-  const [runtimeData] = useState<Map<string, NodeRuntimeData>>(
-    () => generateDemoRuntimeData(demoData.nodes)
-  )
+  // Runtime data vinculado a datos reales (Equipment, Incidents)
+  const runtimeData = useMapRuntimeData(nodes)
 
   // ── Estado del editor ──
   const [editorTool, setEditorTool] = useState<EditorTool>('select')
   const [snapEnabled, setSnapEnabled] = useState(true)
   const [addEquipmentType, setAddEquipmentType] = useState<MapNode['type']>('pump')
   const [showAddDialog, setShowAddDialog] = useState(false)
+  const [showLinkDialog, setShowLinkDialog] = useState(false)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const history = useEditorHistory()
@@ -490,6 +492,31 @@ export function MapPage() {
     ? runtimeData.get(viewerState.selectedNodeId)
     : null
 
+  // Resolver nombre de entidad vinculada para el panel de propiedades
+  const linkedEntityName = useMemo(() => {
+    if (!selectedNode?.linkedEntityId) return undefined
+    if (selectedNode.linkedEntityType === 'equipment') {
+      const eq = useAppStore.getState().equipment.find((e) => e.id === selectedNode.linkedEntityId)
+      return eq ? `${eq.nombre} (${eq.codigo})` : undefined
+    }
+    if (selectedNode.linkedEntityType === 'zone') {
+      const z = useAppStore.getState().zones.find((z) => z.id === selectedNode.linkedEntityId)
+      return z ? `${z.nombre} (${z.codigo})` : undefined
+    }
+    return undefined
+  }, [selectedNode?.linkedEntityId, selectedNode?.linkedEntityType])
+
+  // Handlers de vinculación
+  const handleLinkEntity = useCallback((nodeId: string, entityType: MapNode['linkedEntityType'], entityId: string) => {
+    handleNodeUpdate(nodeId, { linkedEntityType: entityType, linkedEntityId: entityId })
+    setShowLinkDialog(false)
+  }, [handleNodeUpdate])
+
+  const handleUnlinkEntity = useCallback((nodeId: string) => {
+    handleNodeUpdate(nodeId, { linkedEntityType: undefined, linkedEntityId: undefined })
+    setShowLinkDialog(false)
+  }, [handleNodeUpdate])
+
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -754,6 +781,8 @@ export function MapPage() {
                     onUpdate={handleNodeUpdate}
                     onClose={handleBackgroundClick}
                     onDelete={() => handleDeleteSelected()}
+                    onOpenLinkDialog={() => setShowLinkDialog(true)}
+                    linkedEntityName={linkedEntityName}
                   />
                 )}
               </div>
@@ -850,6 +879,17 @@ export function MapPage() {
         onClose={() => setShowAddDialog(false)}
         onAdd={handleAddNode}
       />
+
+      {/* Diálogo de vincular entidad real (editor) */}
+      {selectedNode && (
+        <LinkEntityDialog
+          isOpen={showLinkDialog}
+          node={selectedNode}
+          onLink={handleLinkEntity}
+          onUnlink={handleUnlinkEntity}
+          onClose={() => setShowLinkDialog(false)}
+        />
+      )}
 
       {/* Diálogo de detalle de incidencia */}
       {selectedIncident && (

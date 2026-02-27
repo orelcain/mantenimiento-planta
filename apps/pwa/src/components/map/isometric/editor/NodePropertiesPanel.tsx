@@ -26,6 +26,10 @@ interface NodePropertiesPanelProps {
   onUpdate: (nodeId: string, updates: Partial<MapNode>) => void
   onClose: () => void
   onDelete: () => void
+  /** Abre el diálogo de vinculación con entidad real */
+  onOpenLinkDialog?: () => void
+  /** Nombre resuelto de la entidad vinculada (Equipment.nombre o Zone.nombre) */
+  linkedEntityName?: string
 }
 
 const ALL_EQUIPMENT_TYPES: EquipmentNodeType[] = [
@@ -69,6 +73,8 @@ export function NodePropertiesPanel({
   onUpdate,
   onClose,
   onDelete,
+  onOpenLinkDialog,
+  linkedEntityName,
 }: NodePropertiesPanelProps) {
   const [localLabel, setLocalLabel] = useState(node.label)
   const [showTypeSelector, setShowTypeSelector] = useState(false)
@@ -256,24 +262,45 @@ export function NodePropertiesPanel({
             Vinculación
           </div>
           {node.linkedEntityId ? (
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary" className="text-xs">
-                {node.linkedEntityType || 'entity'}
-              </Badge>
-              <span className="text-xs text-muted-foreground truncate">{node.linkedEntityId}</span>
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2 p-2 rounded-lg bg-primary/5 border border-primary/20">
+                <Badge variant="secondary" className="text-[10px] shrink-0">
+                  {node.linkedEntityType === 'equipment' ? 'Equipo' :
+                    node.linkedEntityType === 'zone' ? 'Zona' :
+                    node.linkedEntityType || 'entity'}
+                </Badge>
+                <span className="text-xs font-medium truncate flex-1">
+                  {linkedEntityName || node.linkedEntityId}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-5 w-5 shrink-0 text-destructive hover:text-destructive"
+                  onClick={() => onUpdate(node.id, { linkedEntityId: undefined, linkedEntityType: undefined })}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
               <Button
-                variant="ghost"
-                size="icon"
-                className="h-5 w-5 shrink-0"
-                onClick={() => onUpdate(node.id, { linkedEntityId: undefined, linkedEntityType: undefined })}
+                variant="outline"
+                size="sm"
+                className="w-full text-xs gap-1.5"
+                onClick={onOpenLinkDialog}
               >
-                <X className="h-3 w-3" />
+                <Link2 className="h-3 w-3" />
+                Cambiar vínculo
               </Button>
             </div>
           ) : (
-            <p className="text-xs text-muted-foreground/60 italic">
-              Sin vincular — Próximamente
-            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full text-xs gap-1.5"
+              onClick={onOpenLinkDialog}
+            >
+              <Link2 className="h-3 w-3" />
+              Vincular con entidad real
+            </Button>
           )}
         </div>
 
