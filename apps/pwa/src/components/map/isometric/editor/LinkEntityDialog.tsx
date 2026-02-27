@@ -6,12 +6,11 @@
  */
 
 import { useState, useMemo } from 'react'
-import { X, Search, Link2, Wrench, MapPin, Cpu, Unlink } from 'lucide-react'
+import { X, Search, Link2, Wrench, MapPin, Unlink } from 'lucide-react'
 import { Button, Badge } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/store'
 import type { MapNode } from '@/types/isometricMap'
-import type { Equipment, Zone } from '@/types'
 
 type EntityType = 'equipment' | 'zone'
 
