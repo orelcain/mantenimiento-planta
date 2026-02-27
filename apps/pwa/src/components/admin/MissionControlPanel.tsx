@@ -31,6 +31,11 @@ import {
   ArrowRightLeft,
   Radio,
   Key,
+  Brain,
+  TrendingUp,
+  MessageSquare,
+  AlertTriangle,
+  Trash2,
 } from 'lucide-react'
 import {
   getAllAgents,
@@ -43,6 +48,13 @@ import {
   type AgentsConfig,
   type MissionLog,
 } from '@/services/aiAgents'
+import {
+  getLearningStats,
+  deleteCorrection,
+  toggleCorrection,
+  type LearningStats,
+  type AriaCorrection,
+} from '@/services/ariaLearning'
 import { useAuthStore } from '@/store/authStore'
 import { useToast } from '@/hooks/useToast'
 
@@ -58,6 +70,40 @@ function statusColor(status: AIAgent['status']): string {
     case 'disabled': return 'bg-gray-400'
     default: return 'bg-gray-400'
   }
+}
+
+function CorrectionRow({ correction: c, onDelete, onToggle }: {
+  correction: AriaCorrection
+  onDelete: (id: string) => void
+  onToggle: (id: string, active: boolean) => void
+}) {
+  return (
+    <div className={`flex items-start gap-2 p-2 rounded border text-xs ${c.active ? 'border-amber-500/20 bg-amber-500/5' : 'border-border bg-muted/30 opacity-60'}`}>
+      <div className="flex-1 min-w-0">
+        <div className="text-muted-foreground truncate">❓ "{c.userQuery}"</div>
+        <div className="text-red-400 truncate text-[10px]">❌ {c.wrongResponse.slice(0, 80)}...</div>
+        <div className="text-green-400 text-[10px]">✅ {c.correctResponse.slice(0, 120)}</div>
+        {c.equipmentName && <div className="text-[9px] text-muted-foreground">🔧 {c.equipmentName}</div>}
+        <div className="text-[9px] text-muted-foreground mt-0.5">Usada {c.usageCount}x</div>
+      </div>
+      <div className="flex flex-col gap-1 shrink-0">
+        <button
+          onClick={() => onToggle(c.id!, !c.active)}
+          className="text-[9px] px-1.5 py-0.5 rounded border border-border hover:bg-muted"
+          title={c.active ? 'Desactivar' : 'Activar'}
+        >
+          {c.active ? 'Off' : 'On'}
+        </button>
+        <button
+          onClick={() => onDelete(c.id!)}
+          className="p-0.5 rounded hover:bg-red-500/20 text-red-400"
+          title="Eliminar corrección"
+        >
+          <Trash2 className="h-3 w-3" />
+        </button>
+      </div>
+    </div>
+  )
 }
 
 function statusLabel(status: AIAgent['status']): string {
@@ -105,15 +151,18 @@ export function MissionControlPanel() {
   const [isSaving, setIsSaving] = useState(false)
   const [autoRefresh, setAutoRefresh] = useState(true)
   const [keyInputs, setKeyInputs] = useState<Record<string, string>>({})
+  const [learningStats, setLearningStats] = useState<LearningStats | null>(null)
 
   const loadData = useCallback(async () => {
     try {
-      const [cfg, todayLogs] = await Promise.all([
+      const [cfg, todayLogs, lStats] = await Promise.all([
         getAgentsConfig(),
         loadTodayLogs(),
+        getLearningStats(),
       ])
       setConfig(cfg)
       setAgents(getAllAgents())
+      setLearningStats(lStats)
       // Init key inputs from config
       if (cfg.providerKeys) {
         setKeyInputs(prev => ({ ...cfg.providerKeys, ...prev }))
@@ -433,6 +482,153 @@ export function MissionControlPanel() {
       </Card>
 
       {/* ─── API Keys (admin) ─── */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <Brain className="h-4 w-4" />
+            Aprendizaje ARIA
+            {learningStats && learningStats.totalFeedback > 0 && (
+              <Badge variant="outline" className="ml-auto text-xs">
+                {learningStats.satisfactionRate}% satisfacción
+              </Badge>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {learningStats ? (
+            <>
+              {/* KPIs de aprendizaje */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                <div className="p-2 bg-muted/50 rounded-lg text-center">
+                  <div className="text-lg font-bold text-blue-500">{learningStats.totalFeedback}</div>
+                  <div className="text-[10px] text-muted-foreground">Feedback Total</div>
+                </div>
+                <div className="p-2 bg-muted/50 rounded-lg text-center">
+                  <div className={`text-lg font-bold ${learningStats.satisfactionRate >= 70 ? 'text-green-500' : learningStats.satisfactionRate >= 40 ? 'text-amber-500' : 'text-red-500'}`}>
+                    {learningStats.satisfactionRate}%
+                  </div>
+                  <div className="text-[10px] text-muted-foreground">Satisfacción</div>
+                </div>
+                <div className="p-2 bg-muted/50 rounded-lg text-center">
+                  <div className="text-lg font-bold text-purple-500">{learningStats.totalKnowledge}</div>
+                  <div className="text-[10px] text-muted-foreground">Conocimientos</div>
+                </div>
+                <div className="p-2 bg-muted/50 rounded-lg text-center">
+                  <div className="text-lg font-bold text-amber-500">{learningStats.activeCorrections}</div>
+                  <div className="text-[10px] text-muted-foreground">Correcciones</div>
+                </div>
+              </div>
+
+              {/* Gráfico de satisfacción por día (barras simples CSS) */}
+              {learningStats.feedbackByDay.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="text-xs font-medium">Tendencia de Satisfacción</span>
+                  </div>
+                  <div className="flex items-end gap-0.5 h-16">
+                    {learningStats.feedbackByDay.slice(-14).map((day, i) => {
+                      const total = day.positive + day.negative
+                      const rate = total > 0 ? (day.positive / total) * 100 : 100
+                      const height = total > 0 ? Math.max(8, (total / Math.max(...learningStats.feedbackByDay.map(d => d.positive + d.negative))) * 100) : 5
+                      return (
+                        <div key={i} className="flex-1 flex flex-col items-center gap-0.5 group relative">
+                          <div
+                            className={`w-full rounded-t ${rate >= 70 ? 'bg-green-500' : rate >= 40 ? 'bg-amber-500' : 'bg-red-500'} transition-all`}
+                            style={{ height: `${height}%`, minHeight: 2 }}
+                          />
+                          <div className="absolute -top-5 left-1/2 -translate-x-1/2 hidden group-hover:block bg-popover text-popover-foreground text-[9px] px-1 py-0.5 rounded shadow whitespace-nowrap z-10">
+                            {day.date.slice(5)}: {day.positive}👍 {day.negative}👎
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <div className="flex justify-between text-[8px] text-muted-foreground mt-0.5">
+                    <span>{learningStats.feedbackByDay.slice(-14)[0]?.date.slice(5) || ''}</span>
+                    <span>Hoy</span>
+                  </div>
+                  <div className="flex items-center gap-3 mt-1 text-[9px] text-muted-foreground">
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded bg-green-500" /> &ge;70%</span>
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded bg-amber-500" /> 40-69%</span>
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded bg-red-500" /> &lt;40%</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Desglose de métricas */}
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="flex items-center gap-2 p-2 bg-green-500/5 rounded border border-green-500/10">
+                  <MessageSquare className="h-3.5 w-3.5 text-green-500" />
+                  <div>
+                    <div className="font-medium">{learningStats.positiveFeedback} positivos</div>
+                    <div className="text-[10px] text-muted-foreground">Respuestas marcadas útiles</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 p-2 bg-red-500/5 rounded border border-red-500/10">
+                  <AlertTriangle className="h-3.5 w-3.5 text-red-500" />
+                  <div>
+                    <div className="font-medium">{learningStats.negativeFeedback} negativos</div>
+                    <div className="text-[10px] text-muted-foreground">Respuestas marcadas incorrectas</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Confianza promedio */}
+              {learningStats.totalKnowledge > 0 && (
+                <div>
+                  <div className="flex items-center justify-between text-xs mb-1">
+                    <span className="text-muted-foreground">Confianza promedio del knowledge base</span>
+                    <span className="font-medium">{learningStats.avgConfidence}%</span>
+                  </div>
+                  <div className="w-full bg-muted rounded-full h-1.5">
+                    <div
+                      className={`h-1.5 rounded-full transition-all ${
+                        learningStats.avgConfidence >= 70 ? 'bg-green-500'
+                          : learningStats.avgConfidence >= 40 ? 'bg-amber-500'
+                          : 'bg-red-500'
+                      }`}
+                      style={{ width: `${learningStats.avgConfidence}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Correcciones activas */}
+              {learningStats.topCorrections.length > 0 && (
+                <div>
+                  <div className="text-xs font-medium mb-1.5">Correcciones Activas ({learningStats.activeCorrections})</div>
+                  <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                    {learningStats.topCorrections.map((c) => (
+                      <CorrectionRow key={c.id} correction={c} onDelete={async (id) => {
+                        await deleteCorrection(id)
+                        loadData()
+                      }} onToggle={async (id, active) => {
+                        await toggleCorrection(id, active)
+                        loadData()
+                      }} />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {learningStats.totalFeedback === 0 && (
+                <div className="text-center py-4 text-xs text-muted-foreground">
+                  <Brain className="h-6 w-6 mx-auto mb-1.5 opacity-30" />
+                  Sin datos de aprendizaje aún.<br />
+                  <span className="text-[10px]">Los usuarios pueden dar 👍/👎 en las respuestas del chat para que ARIA aprenda.</span>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="flex items-center justify-center py-4">
+              <Spinner className="h-4 w-4" />
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ─── API Keys (admin) — original ─── */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-sm flex items-center gap-2">

@@ -252,17 +252,36 @@ function MessageBubble({
 }: {
   msg: ChatMessage
   onNavigate: (route: string) => void
-  onFeedback?: (msgId: string, rating: 'positive' | 'negative') => void
+  onFeedback?: (msgId: string, rating: 'positive' | 'negative', correction?: string) => void
 }) {
   const isUser = msg.role === 'user'
   const [feedbackGiven, setFeedbackGiven] = useState<'positive' | 'negative' | null>(null)
   const [copied, setCopied] = useState(false)
   const [isSpeaking, setIsSpeaking] = useState(false)
+  const [showCorrection, setShowCorrection] = useState(false)
+  const [correctionText, setCorrectionText] = useState('')
 
   const handleFeedback = (rating: 'positive' | 'negative') => {
     if (feedbackGiven) return
+    if (rating === 'negative') {
+      // Mostrar formulario de corrección en vez de enviar inmediatamente
+      setShowCorrection(true)
+      return
+    }
     setFeedbackGiven(rating)
     onFeedback?.(msg.id, rating)
+  }
+
+  const handleSubmitCorrection = () => {
+    setFeedbackGiven('negative')
+    setShowCorrection(false)
+    onFeedback?.(msg.id, 'negative', correctionText.trim() || undefined)
+  }
+
+  const handleSkipCorrection = () => {
+    setFeedbackGiven('negative')
+    setShowCorrection(false)
+    onFeedback?.(msg.id, 'negative')
   }
 
   // #6 — Copiar mensaje al clipboard
@@ -372,8 +391,8 @@ function MessageBubble({
                   </button>
                   <button
                     onClick={() => handleFeedback('negative')}
-                    className="p-0.5 rounded hover:bg-background/50 transition-colors"
-                    title="Respuesta no útil"
+                    className={`p-0.5 rounded hover:bg-background/50 transition-colors ${showCorrection ? 'text-amber-500' : ''}`}
+                    title="Respuesta incorrecta — corregir"
                   >
                     <ThumbsDown className="w-3 h-3" />
                   </button>
@@ -381,6 +400,40 @@ function MessageBubble({
               )
             )}
           </div>
+
+          {/* Formulario de corrección (se expande tras thumbs down) */}
+          {showCorrection && !feedbackGiven && (
+            <div className="mt-2 p-2 bg-amber-500/10 border border-amber-500/20 rounded-lg space-y-1.5">
+              <div className="text-[11px] font-medium text-amber-600 dark:text-amber-400">
+                ✏️ ¿Cuál era la respuesta correcta?
+              </div>
+              <textarea
+                value={correctionText}
+                onChange={e => setCorrectionText(e.target.value)}
+                placeholder="Ej: Solo hay 4 motores para la Baader 142, el AMPLIFICADOR ELECTRONICO no es un motor..."
+                className="w-full text-xs px-2 py-1.5 rounded-md border border-amber-500/30 bg-background resize-none focus:ring-1 focus:ring-amber-500/50 focus:outline-none"
+                rows={3}
+                autoFocus
+              />
+              <div className="flex gap-1.5">
+                <button
+                  onClick={handleSubmitCorrection}
+                  className="flex-1 text-[10px] py-1 px-2 rounded bg-amber-500 text-white hover:bg-amber-600 transition-colors font-medium"
+                >
+                  {correctionText.trim() ? 'Enviar corrección' : 'Marcar como incorrecto'}
+                </button>
+                <button
+                  onClick={handleSkipCorrection}
+                  className="text-[10px] py-1 px-2 rounded border border-border hover:bg-muted transition-colors text-muted-foreground"
+                >
+                  Omitir
+                </button>
+              </div>
+              <div className="text-[9px] text-muted-foreground">
+                Tu corrección ayuda a ARIA a mejorar. Se usa como contexto en futuras consultas similares.
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -900,7 +953,7 @@ export function ChatBot() {
     sendMessage(`Selecciono el equipo: ${equipmentName}`)
   }
 
-  const handleFeedback = useCallback((messageId: string, rating: 'positive' | 'negative') => {
+  const handleFeedback = useCallback((messageId: string, rating: 'positive' | 'negative', correction?: string) => {
     if (!userId) return
     // Encontrar el mensaje y el query del usuario anterior
     const msgIdx = messages.findIndex(m => m.id === messageId)
@@ -913,6 +966,7 @@ export function ChatBot() {
       userQuery: userMsg?.content || '',
       ariaResponse: ariaMsg?.content || '',
       rating,
+      correction,
       intents: [],
     }).catch(() => { /* non-blocking */ })
   }, [messages, userId])

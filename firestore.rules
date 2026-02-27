@@ -411,6 +411,34 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
+    // ARIA – Feedback (thumbs up/down)
+    match /ariaFeedback/{docId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAdmin();
+    }
+
+    // ARIA – Knowledge base
+    match /ariaKnowledge/{docId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAdmin();
+    }
+
+    // ARIA – Equipment problem patterns
+    match /ariaEquipmentPatterns/{docId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAdmin();
+    }
+
+    // ARIA – User corrections
+    match /ariaCorrections/{docId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAdmin();
+    }
+
     // ============================================
     // REPUESTOS - CATEGORÍAS DE MÁQUINAS
     // ============================================

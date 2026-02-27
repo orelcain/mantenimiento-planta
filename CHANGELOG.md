@@ -7,6 +7,30 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.66.0] - 2026-02-26
+### Agregado — ARIA Learning System (Aprendizaje Continuo)
+- **UI de Corrección en chat**: al dar 👎 en una respuesta, se expande un formulario donde el usuario puede escribir la respuesta correcta. La corrección se guarda como regla permanente en Firestore (`ariaCorrections`)
+- **Correcciones inyectadas en prompts**: `buildLearningContext()` ahora busca correcciones similares a la consulta actual y las inyecta como "⚠️ CORRECCIONES DEL USUARIO" con máxima prioridad, para que ARIA no repita el mismo error
+- **`AriaCorrection` type + CRUD**: `saveCorrection()`, `getCorrections()`, `findRelevantCorrections()`, `toggleCorrection()`, `deleteCorrection()` — correcciones activas con cache de 5 min
+- **Dashboard de Aprendizaje en Mission Control**: nuevo card con:
+  - 4 KPIs: feedback total, tasa de satisfacción, conocimientos aprendidos, correcciones activas
+  - Gráfico de tendencia de satisfacción (barras por día, últimos 14 días, con tooltip hover)
+  - Desglose positivos vs negativos
+  - Barra de confianza promedio del knowledge base
+  - Lista de correcciones activas con botones On/Off y eliminar
+- **`getLearningStats()`**: función completa que carga feedback, knowledge, corrections y patterns en paralelo y devuelve métricas agregadas con `feedbackByDay` para graficación
+- **`saveFeedback` mejorado**: si el rating es negativo y hay corrección, crea automáticamente una `AriaCorrection` permanente además de debilitar el knowledge existente
+- **Firestore rules**: reglas para `ariaFeedback`, `ariaKnowledge`, `ariaEquipmentPatterns`, `ariaCorrections` — auth users pueden read/create, admin puede update/delete
+- **Firestore indexes**: índices compuestos para `ariaCorrections` (active + createdAt), `ariaKnowledge` (confidence), `ariaFeedback` (createdAt)
+
+### Cómo funciona el aprendizaje
+1. Usuario pregunta algo → ARIA responde
+2. Si la respuesta es mala → usuario da 👎 → escribe corrección
+3. Corrección se guarda en Firestore como regla permanente
+4. La próxima vez que alguien haga una pregunta similar, ARIA recibe la corrección como contexto prioritario
+5. Con feedback positivo, el knowledge base gana confianza. Con negativo, pierde
+6. En Mission Control, el admin ve gráficamente cómo mejora la satisfacción con el tiempo
+
 ## [2.65.3] - 2026-02-26
 ### Corregido
 - **Log de Misiones se borra solo**: el auto-refresh cada 10s del panel Mission Control sobrescribía los logs con el array in-memory (vacío tras reload). Ahora `loadTodayLogs()` hidrata el array in-memory con los logs de Firestore, para que `getMissionLogs()` siempre los devuelva

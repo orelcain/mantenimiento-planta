@@ -25,9 +25,23 @@ export interface AriaFeedback {
   ariaResponse: string
   rating: 'positive' | 'negative'
   reason?: string            // Opcional: why it was bad/good
+  correction?: string        // Lo que el usuario dice que era la respuesta correcta
   intents: string[]
   equipmentMentioned?: string
   createdAt?: unknown        // serverTimestamp
+}
+
+export interface AriaCorrection {
+  id?: string
+  userQuery: string
+  wrongResponse: string      // Resumen de lo que ARIA dijo mal
+  correctResponse: string    // Lo que el usuario indicó como correcto
+  category: string           // repuestos, equipos, incidencias, general
+  equipmentName?: string
+  createdBy: string
+  usageCount: number         // Cuántas veces se ha inyectado como contexto
+  active: boolean            // admin puede desactivar
+  createdAt?: unknown
 }
 
 export interface AriaKnowledge {
@@ -65,6 +79,7 @@ export interface AriaEquipmentPattern {
 const FEEDBACK_COL = 'ariaFeedback'
 const KNOWLEDGE_COL = 'ariaKnowledge'
 const PATTERNS_COL = 'ariaEquipmentPatterns'
+const CORRECTIONS_COL = 'ariaCorrections'
 
 // ─── Caché local optimizado ──────────────────────────────────────────
 
@@ -76,6 +91,7 @@ interface LearningCache<T> {
 const CACHE_TTL = 5 * 60 * 1000  // 5 minutos
 const knowledgeCache: LearningCache<AriaKnowledge> = { data: [], timestamp: 0 }
 const patternsCache: LearningCache<AriaEquipmentPattern> = { data: [], timestamp: 0 }
+const correctionsCache: LearningCache<AriaCorrection> = { data: [], timestamp: 0 }
 
 function isCacheValid<T>(cache: LearningCache<T>): boolean {
   return cache.data.length > 0 && Date.now() - cache.timestamp < CACHE_TTL
@@ -99,6 +115,20 @@ export async function saveFeedback(feedback: Omit<AriaFeedback, 'id' | 'createdA
     // Si fue negativo, reducir confianza de knowledge similar
     if (feedback.rating === 'negative') {
       await weakenKnowledge(feedback.userQuery)
+
+      // Si incluyó corrección, crear una AriaCorrection permanente
+      if (feedback.correction && feedback.correction.trim().length > 5) {
+        await saveCorrection({
+          userQuery: feedback.userQuery,
+          wrongResponse: extractCompactAnswer(feedback.ariaResponse).slice(0, 300),
+          correctResponse: feedback.correction.trim().slice(0, 500),
+          category: feedback.intents[0] || 'general',
+          equipmentName: feedback.equipmentMentioned,
+          createdBy: feedback.userId,
+          usageCount: 0,
+          active: true,
+        })
+      }
     }
 
     logger.info(`ARIA Learning: feedback ${feedback.rating} saved for message ${feedback.messageId}`)
@@ -107,6 +137,82 @@ export async function saveFeedback(feedback: Omit<AriaFeedback, 'id' | 'createdA
     logger.error('ARIA Learning: error saving feedback', err instanceof Error ? err : undefined)
     throw err
   }
+}
+
+// ─── CORRECTIONS — Reglas de corrección persistentes ─────────────────
+
+/** Guardar una corrección explícita del usuario */
+export async function saveCorrection(correction: Omit<AriaCorrection, 'id' | 'createdAt'>): Promise<string> {
+  try {
+    const docRef = await addDoc(collection(db, CORRECTIONS_COL), {
+      ...correction,
+      createdAt: serverTimestamp(),
+    })
+    correctionsCache.timestamp = 0 // Invalidar caché
+    logger.info(`ARIA Learning: correction saved — "${correction.correctResponse.slice(0, 60)}..."`)
+    return docRef.id
+  } catch (err) {
+    logger.error('ARIA Learning: error saving correction', err instanceof Error ? err : undefined)
+    throw err
+  }
+}
+
+/** Obtener todas las correcciones activas (con caché) */
+export async function getCorrections(): Promise<AriaCorrection[]> {
+  if (isCacheValid(correctionsCache)) return correctionsCache.data
+
+  try {
+    const q = query(
+      collection(db, CORRECTIONS_COL),
+      where('active', '==', true),
+      orderBy('createdAt', 'desc'),
+      limit(100),
+    )
+    const snap = await getDocs(q)
+    const data = snap.docs.map((d) => ({ id: d.id, ...d.data() } as AriaCorrection))
+    correctionsCache.data = data
+    correctionsCache.timestamp = Date.now()
+    return data
+  } catch {
+    return correctionsCache.data
+  }
+}
+
+/** Buscar correcciones relevantes para una consulta */
+export async function findRelevantCorrections(userQuery: string, maxResults = 5): Promise<AriaCorrection[]> {
+  const allCorrections = await getCorrections()
+  const queryWords = userQuery.toLowerCase().split(/\s+/).filter(w => w.length > 2)
+
+  const scored = allCorrections.map((c) => {
+    const cWords = (c.userQuery + ' ' + c.correctResponse + ' ' + (c.equipmentName || '')).toLowerCase()
+    let score = 0
+    for (const w of queryWords) {
+      if (cWords.includes(w)) score += 10
+    }
+    // Bonus si la consulta original es muy similar
+    const origWords = c.userQuery.toLowerCase().split(/\s+/)
+    const overlap = queryWords.filter(w => origWords.some(ow => ow.includes(w) || w.includes(ow))).length
+    score += overlap * 15
+    return { correction: c, score }
+  })
+
+  return scored
+    .filter(s => s.score > 10)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, maxResults)
+    .map(s => s.correction)
+}
+
+/** Toggle activación de una corrección (admin) */
+export async function toggleCorrection(correctionId: string, active: boolean): Promise<void> {
+  await updateDoc(doc(db, CORRECTIONS_COL, correctionId), { active })
+  correctionsCache.timestamp = 0
+}
+
+/** Eliminar corrección (admin) */
+export async function deleteCorrection(correctionId: string): Promise<void> {
+  await deleteDoc(doc(db, CORRECTIONS_COL, correctionId))
+  correctionsCache.timestamp = 0
 }
 
 /** Obtener estadísticas de feedback para métricas */
@@ -395,6 +501,22 @@ export async function buildLearningContext(
   const lines: string[] = []
 
   try {
+    // 0. Correcciones del usuario (MÁXIMA PRIORIDAD — evitar repetir errores)
+    const relevantCorrections = await findRelevantCorrections(userQuery, 5)
+    if (relevantCorrections.length > 0) {
+      lines.push('⚠️ CORRECCIONES DEL USUARIO (respeta estas correcciones — el usuario ya indicó que estabas equivocado):')
+      for (const c of relevantCorrections) {
+        lines.push(`  ❌ Cuando preguntaron "${c.userQuery}", respondiste MAL: "${c.wrongResponse.slice(0, 100)}..."`)
+        lines.push(`  ✅ La respuesta CORRECTA es: ${c.correctResponse}`)
+        if (c.equipmentName) lines.push(`     Relacionado con: ${c.equipmentName}`)
+        // Incrementar uso async
+        if (c.id) {
+          updateDoc(doc(db, CORRECTIONS_COL, c.id), { usageCount: increment(1) }).catch(() => {})
+        }
+      }
+      lines.push('')
+    }
+
     // 1. Knowledge relevante
     const relevantKnowledge = await findRelevantKnowledge(userQuery, intents, 5)
     if (relevantKnowledge.length > 0) {
@@ -508,4 +630,97 @@ function classifyProblem(description: string): string {
     if (regex.test(lower)) return type
   }
   return 'general'
+}
+
+// ─── LEARNING STATS — Métricas para el dashboard ────────────────────
+
+export interface LearningStats {
+  totalFeedback: number
+  positiveFeedback: number
+  negativeFeedback: number
+  satisfactionRate: number     // 0-100
+  totalCorrections: number
+  activeCorrections: number
+  totalKnowledge: number
+  avgConfidence: number        // Confianza promedio del knowledge
+  totalPatterns: number
+  feedbackByDay: { date: string; positive: number; negative: number }[]
+  topCorrections: AriaCorrection[]
+  recentFeedback: AriaFeedback[]
+}
+
+/** Obtener estadísticas completas de aprendizaje para el dashboard */
+export async function getLearningStats(): Promise<LearningStats> {
+  try {
+    // Cargar todo en paralelo
+    const [feedbackSnap, knowledge, corrections, patterns] = await Promise.all([
+      getDocs(query(collection(db, FEEDBACK_COL), orderBy('createdAt', 'desc'), limit(500))),
+      getKnowledge(),
+      getCorrections(),
+      getEquipmentPatterns(),
+    ])
+
+    // Procesar feedback
+    const allFeedback: AriaFeedback[] = []
+    feedbackSnap.forEach(d => allFeedback.push({ id: d.id, ...d.data() } as AriaFeedback))
+
+    let positive = 0
+    let negative = 0
+    const byDay: Record<string, { positive: number; negative: number }> = {}
+
+    for (const f of allFeedback) {
+      if (f.rating === 'positive') positive++
+      else negative++
+
+      // Agrupar por día
+      const ts = f.createdAt && typeof f.createdAt === 'object' && 'seconds' in (f.createdAt as Record<string, unknown>)
+        ? new Date((f.createdAt as { seconds: number }).seconds * 1000)
+        : new Date()
+      const day = ts.toISOString().slice(0, 10)
+      if (!byDay[day]) byDay[day] = { positive: 0, negative: 0 }
+      if (f.rating === 'positive') byDay[day]!.positive++
+      else byDay[day]!.negative++
+    }
+
+    const total = positive + negative
+    const feedbackByDay = Object.entries(byDay)
+      .map(([date, counts]) => ({ date, ...counts }))
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .slice(-30) // Últimos 30 días
+
+    const avgConfidence = knowledge.length > 0
+      ? Math.round(knowledge.reduce((s, k) => s + k.confidence, 0) / knowledge.length)
+      : 0
+
+    return {
+      totalFeedback: total,
+      positiveFeedback: positive,
+      negativeFeedback: negative,
+      satisfactionRate: total > 0 ? Math.round((positive / total) * 100) : 100,
+      totalCorrections: corrections.length,
+      activeCorrections: corrections.filter(c => c.active).length,
+      totalKnowledge: knowledge.length,
+      avgConfidence,
+      totalPatterns: patterns.length,
+      feedbackByDay,
+      topCorrections: corrections.slice(0, 10),
+      recentFeedback: allFeedback.slice(0, 20),
+    }
+  } catch (err) {
+    logger.error('ARIA Learning: error getting stats', err instanceof Error ? err : undefined)
+    return {
+      totalFeedback: 0,
+      positiveFeedback: 0,
+      negativeFeedback: 0,
+      satisfactionRate: 100,
+      totalCorrections: 0,
+      activeCorrections: 0,
+      totalKnowledge: 0,
+      avgConfidence: 0,
+      totalPatterns: 0,
+      feedbackByDay: [],
+      topCorrections: [],
+      recentFeedback: [],
+    }
+  }
 }
