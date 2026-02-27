@@ -7,6 +7,13 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.66.5] - 2026-02-27
+### Corregido
+- **Creación de incidencias desde ARIA fallaba con permisos insuficientes**: reglas de Firestore excesivamente estrictas — `isActiveUser()` reemplazado por `isAuthenticated()` para creates, límite de título ampliado a 200 chars (era 100), límite de descripción ampliado a 5000 chars (era 1000), eliminada validación `isPastOrPresentTimestamp` que podía fallar con clock skew
+- **Feedback positivo/negativo no se reflejaba en Mission Control**: `saveFeedback()` mezclaba el guardado del feedback con operaciones de post-procesamiento (reinforceKnowledge/weakenKnowledge) — ahora el feedback se guarda PRIMERO y los errores de post-procesamiento no afectan el resultado
+- **Reglas de ariaKnowledge y ariaEquipmentPatterns**: `update` cambiado de `isAdmin()` a `isAuthenticated()` para que reinforceKnowledge (incrementar confianza) y weakenKnowledge funcionen para todos los usuarios, no solo admin
+- **Reglas Firestore desplegadas** (`firebase deploy --only firestore:rules`)
+
 ## [2.66.4] - 2026-02-27
 ### Corregido
 - **Dashboard de Aprendizaje ARIA no se actualizaba en tiempo real**: los likes/dislikes se guardaban correctamente en Firestore pero el panel de Mission Control solo leía las estadísticas una vez al montar — ahora re-lee `getLearningStats()` desde Firestore cada 30 segundos (cada 3er ciclo del auto-refresh)

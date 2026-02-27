@@ -164,10 +164,16 @@ service cloud.firestore {
     match /incidents/{incidentId} {
       allow read: if isActiveUser();
       
-      allow create: if isActiveUser()
+      // Regla de creación relajada para ARIA y UI
+      // isAuthenticated() en vez de isActiveUser() para evitar get() extra que falla en edge cases
+      allow create: if isAuthenticated()
         && isValidDocSize()
-        && isNonEmptyString(request.resource.data.titulo, 5, 100)
-        && isNonEmptyString(request.resource.data.descripcion, 10, 1000)
+        && request.resource.data.titulo is string
+        && request.resource.data.titulo.size() >= 3
+        && request.resource.data.titulo.size() <= 200
+        && request.resource.data.descripcion is string
+        && request.resource.data.descripcion.size() >= 5
+        && request.resource.data.descripcion.size() <= 5000
         && request.resource.data.prioridad in ['critica', 'alta', 'media', 'baja']
         && request.resource.data.status in ['pendiente', 'confirmada', 'rechazada', 'en_proceso', 'resuelta', 'cerrada']
         && request.resource.data.tipo in ['correctivo', 'preventivo', 'predictivo', 'proactivo']
@@ -176,7 +182,6 @@ service cloud.firestore {
         && request.resource.data.fotos is list
         && request.resource.data.fotos.size() <= 10
         && request.resource.data.createdAt is timestamp
-        && isPastOrPresentTimestamp(request.resource.data.createdAt)
         // zoneId o hierarchyNodeId opcionales (ARIA puede crear sin zona)
         && (!('zoneId' in request.resource.data) || request.resource.data.zoneId is string)
         && (!('hierarchyNodeId' in request.resource.data) || request.resource.data.hierarchyNodeId is string)
@@ -424,18 +429,18 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
-    // ARIA – Knowledge base
+    // ARIA – Knowledge base (reinforceKnowledge/weakenKnowledge necesita update para todos)
     match /ariaKnowledge/{docId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update, delete: if isAdmin();
+      allow create, update: if isAuthenticated();
+      allow delete: if isAdmin();
     }
 
-    // ARIA – Equipment problem patterns
+    // ARIA – Equipment problem patterns (trackEquipmentProblem necesita update para todos)
     match /ariaEquipmentPatterns/{docId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated();
-      allow update, delete: if isAdmin();
+      allow create, update: if isAuthenticated();
+      allow delete: if isAdmin();
     }
 
     // ARIA – User corrections

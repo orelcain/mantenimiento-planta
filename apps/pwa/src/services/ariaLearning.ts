@@ -101,22 +101,29 @@ function isCacheValid<T>(cache: LearningCache<T>): boolean {
 
 /** Guardar feedback (thumbs up/down) de una respuesta de ARIA */
 export async function saveFeedback(feedback: Omit<AriaFeedback, 'id' | 'createdAt'>): Promise<string> {
+  // 1. Guardar el feedback primero (operación crítica)
+  let docId: string
   try {
     const docRef = await addDoc(collection(db, FEEDBACK_COL), {
       ...feedback,
       createdAt: serverTimestamp(),
     })
+    docId = docRef.id
+    logger.info(`ARIA Learning: feedback ${feedback.rating} saved for message ${feedback.messageId} (doc=${docId})`)
+  } catch (err) {
+    logger.error('ARIA Learning: error saving feedback to Firestore', err instanceof Error ? err : undefined)
+    throw err
+  }
 
-    // Si fue positivo, buscar si hay knowledge similar y reforzar
+  // 2. Post-procesamiento (no-crítico, errores no afectan el resultado)
+  try {
     if (feedback.rating === 'positive') {
       await reinforceKnowledge(feedback.userQuery, feedback.ariaResponse, feedback.intents, feedback.userId)
     }
 
-    // Si fue negativo, reducir confianza de knowledge similar
     if (feedback.rating === 'negative') {
       await weakenKnowledge(feedback.userQuery)
 
-      // Si incluyó corrección, crear una AriaCorrection permanente
       if (feedback.correction && feedback.correction.trim().length > 5) {
         await saveCorrection({
           userQuery: feedback.userQuery,
@@ -130,13 +137,12 @@ export async function saveFeedback(feedback: Omit<AriaFeedback, 'id' | 'createdA
         })
       }
     }
-
-    logger.info(`ARIA Learning: feedback ${feedback.rating} saved for message ${feedback.messageId}`)
-    return docRef.id
-  } catch (err) {
-    logger.error('ARIA Learning: error saving feedback', err instanceof Error ? err : undefined)
-    throw err
+  } catch (postErr) {
+    // No propagar — el feedback ya fue guardado exitosamente
+    logger.error('ARIA Learning: post-save processing failed (feedback already saved)', postErr instanceof Error ? postErr : undefined)
   }
+
+  return docId
 }
 
 // ─── CORRECTIONS — Reglas de corrección persistentes ─────────────────
