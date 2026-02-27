@@ -1,0 +1,260 @@
+/**
+ * Tipos para el Mapa Isométrico de Planta
+ * 
+ * Sistema de visualización 3D isométrica con:
+ * - Three.js + Cámara Ortográfica
+ * - Grilla 1m × 1m a escala real
+ * - Rotación 4 ángulos estilo FFT (0°, 90°, 180°, 270°)
+ * - Overlay de datos en tiempo real
+ */
+
+// ============================================================
+// Configuración del Mapa
+// ============================================================
+
+/** Ángulos de rotación de cámara estilo Final Fantasy Tactics */
+export type CameraAngle = 0 | 1 | 2 | 3
+
+/** Nombres de las 4 vistas */
+export const CAMERA_ANGLE_NAMES: Record<CameraAngle, string> = {
+  0: 'Sur-Oeste',
+  1: 'Sur-Este',
+  2: 'Nor-Este',
+  3: 'Nor-Oeste',
+}
+
+/** Azimut en radianes para cada ángulo (cada 90°) */
+export const CAMERA_ANGLE_AZIMUTH: Record<CameraAngle, number> = {
+  0: Math.PI / 4,           // 45°  — Vista clásica isométrica
+  1: (3 * Math.PI) / 4,     // 135°
+  2: (5 * Math.PI) / 4,     // 225°
+  3: (7 * Math.PI) / 4,     // 315°
+}
+
+/** Elevación isométrica estándar (~35.264° = arctan(1/√2)) */
+export const ISO_ELEVATION = Math.atan(1 / Math.SQRT2)
+
+/** Configuración visual del mapa */
+export interface IsometricMapConfig {
+  /** Ancho de la planta en metros */
+  width: number
+  /** Profundidad de la planta en metros */
+  depth: number
+  /** Tamaño de cada celda de la grilla en metros (default: 1) */
+  cellSize: number
+  /** Color de fondo del suelo */
+  floorColor: string
+  /** Color de las líneas de la grilla */
+  gridColor: string
+  /** Opacidad de la grilla (0-1) */
+  gridOpacity: number
+  /** Mostrar grilla */
+  showGrid: boolean
+  /** Mostrar etiquetas de ejes */
+  showAxisLabels: boolean
+}
+
+export const DEFAULT_MAP_CONFIG: IsometricMapConfig = {
+  width: 80,
+  depth: 50,
+  cellSize: 1,
+  floorColor: '#1a1a2e',
+  gridColor: '#4a9eff',
+  gridOpacity: 0.15,
+  showGrid: true,
+  showAxisLabels: true,
+}
+
+// ============================================================
+// Elementos del Mapa
+// ============================================================
+
+/** Tipos de equipos que se pueden colocar en el mapa */
+export type EquipmentNodeType =
+  | 'pump'           // Bomba
+  | 'motor'          // Motor eléctrico
+  | 'conveyor'       // Cinta transportadora
+  | 'tank'           // Tanque/estanque
+  | 'compressor'     // Compresor
+  | 'valve'          // Válvula
+  | 'sensor'         // Sensor IoT
+  | 'pipe'           // Tubería
+  | 'building'       // Edificio/estructura
+  | 'generic'        // Genérico
+
+/** Colores por tipo de equipo */
+export const EQUIPMENT_TYPE_COLORS: Record<EquipmentNodeType, string> = {
+  pump: '#3b82f6',       // Azul
+  motor: '#f59e0b',      // Ámbar
+  conveyor: '#8b5cf6',   // Violeta
+  tank: '#06b6d4',       // Cyan
+  compressor: '#ec4899',  // Rosa
+  valve: '#10b981',      // Esmeralda
+  sensor: '#14b8a6',     // Teal
+  pipe: '#6b7280',       // Gris
+  building: '#78716c',   // Stone
+  generic: '#94a3b8',    // Slate
+}
+
+/** Etiquetas en español por tipo */
+export const EQUIPMENT_TYPE_LABELS: Record<EquipmentNodeType, string> = {
+  pump: 'Bomba',
+  motor: 'Motor',
+  conveyor: 'Transportador',
+  tank: 'Tanque',
+  compressor: 'Compresor',
+  valve: 'Válvula',
+  sensor: 'Sensor',
+  pipe: 'Tubería',
+  building: 'Edificio',
+  generic: 'Equipo',
+}
+
+/** Estado operativo visual */
+export type OperationalStatus = 'ok' | 'warning' | 'critical' | 'offline' | 'maintenance'
+
+export const STATUS_COLORS: Record<OperationalStatus, string> = {
+  ok: '#22c55e',
+  warning: '#f59e0b',
+  critical: '#ef4444',
+  offline: '#6b7280',
+  maintenance: '#3b82f6',
+}
+
+export const STATUS_LABELS: Record<OperationalStatus, string> = {
+  ok: 'Operativo',
+  warning: 'Advertencia',
+  critical: 'Crítico',
+  offline: 'Desconectado',
+  maintenance: 'En mantención',
+}
+
+/** Un elemento (equipo/sensor/zona) posicionado en el mapa */
+export interface MapNode {
+  id: string
+  /** Nombre visible */
+  label: string
+  /** Tipo de equipo para rendering */
+  type: EquipmentNodeType
+  /** Posición en metros (coordenada mundo) */
+  position: { x: number; y: number; z: number }
+  /** Tamaño en metros (ancho, alto, profundidad) */
+  size: { width: number; height: number; depth: number }
+  /** Rotación en grados (eje Y) */
+  rotation: number
+  /** Vinculación con entidad real en Firestore */
+  linkedEntityType?: 'equipment' | 'plantAsset' | 'iotDevice' | 'zone'
+  linkedEntityId?: string
+  /** Color override (si no, usa color del tipo) */
+  color?: string
+  /** Visible en el mapa */
+  visible: boolean
+  /** Metadatos extra */
+  metadata?: Record<string, unknown>
+}
+
+/** Conector entre dos nodos (tubería, cable, flujo) */
+export interface MapConnector {
+  id: string
+  fromNodeId: string
+  toNodeId: string
+  label?: string
+  style: 'pipe' | 'cable' | 'flow' | 'signal'
+  color?: string
+  /** Animación de flujo */
+  animated: boolean
+}
+
+/** Área rectangular en el mapa (zona lógica) */
+export interface MapArea {
+  id: string
+  label: string
+  position: { x: number; z: number }
+  size: { width: number; depth: number }
+  color: string
+  opacity: number
+  linkedZoneId?: string
+}
+
+// ============================================================
+// Documento del Mapa (Firestore)
+// ============================================================
+
+/** Mapa isométrico completo guardado en Firestore */
+export interface IsometricMap {
+  id: string
+  nombre: string
+  descripcion?: string
+  /** Versión del layout (para historial) */
+  version: number
+  /** Configuración del canvas */
+  config: IsometricMapConfig
+  /** Nodos (equipos, sensores) */
+  nodes: MapNode[]
+  /** Conectores (tuberías, cables) */
+  connectors: MapConnector[]
+  /** Áreas/zonas */
+  areas: MapArea[]
+  /** Metadatos */
+  createdBy: string
+  createdAt: Date
+  updatedAt: Date
+}
+
+// ============================================================
+// Runtime (no persistido)
+// ============================================================
+
+/** Data en tiempo real que se superpone al mapa */
+export interface NodeRuntimeData {
+  nodeId: string
+  status: OperationalStatus
+  /** Incidencias activas vinculadas */
+  activeIncidents: number
+  /** Último valor del sensor (si aplica) */
+  sensorValue?: number
+  sensorUnit?: string
+  /** Tooltip extra */
+  tooltip?: string
+}
+
+/** Estado global del visor isométrico */
+export interface IsometricViewerState {
+  /** Ángulo actual de la cámara (0-3) */
+  cameraAngle: CameraAngle
+  /** Nivel de zoom */
+  zoom: number
+  /** Nodo seleccionado */
+  selectedNodeId: string | null
+  /** Nodo hover */
+  hoveredNodeId: string | null
+  /** Modo del visor */
+  mode: 'view' | 'edit'
+  /** Filtros activos */
+  filters: {
+    showPumps: boolean
+    showMotors: boolean
+    showSensors: boolean
+    showConnectors: boolean
+    showAreas: boolean
+    showAlerts: boolean
+    showLabels: boolean
+  }
+}
+
+export const DEFAULT_VIEWER_STATE: IsometricViewerState = {
+  cameraAngle: 0,
+  zoom: 50,
+  selectedNodeId: null,
+  hoveredNodeId: null,
+  mode: 'view',
+  filters: {
+    showPumps: true,
+    showMotors: true,
+    showSensors: true,
+    showConnectors: true,
+    showAreas: true,
+    showAlerts: true,
+    showLabels: true,
+  },
+}

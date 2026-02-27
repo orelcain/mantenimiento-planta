@@ -1,38 +1,59 @@
-import { useState, useEffect, useRef } from 'react'
+/**
+ * MapPage — Visor de Mapas Isométrico 3D
+ * 
+ * Mapa isométrico interactivo de la planta con:
+ * - Vista 3D con cámara ortográfica y rotación FFT (Q/E o botones)
+ * - Equipos representados como nodos 3D con estado en tiempo real
+ * - Panel lateral de incidencias activas (reutilizado del visor anterior)
+ * - Leyenda de estados con colores
+ * - Controles de zoom, rotación y filtros
+ * 
+ * v2.67.0 — Mapa Isométrico
+ */
+
+import { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react'
 import {
   MapPin,
   ZoomIn,
   ZoomOut,
+  RotateCcw,
+  RotateCw,
   Maximize,
   AlertTriangle,
-  Settings,
-  Eye,
   X,
   ChevronRight,
+  Eye,
+  EyeOff,
+  Compass,
+  Activity,
+  CircleCheck,
+  Layers,
 } from 'lucide-react'
 import {
   Card,
   CardContent,
-  CardHeader,
-  CardTitle,
   Button,
   Badge,
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
 } from '@/components/ui'
 import { IncidentDetail } from '@/components/incidents/IncidentDetail'
 import { useAppStore, useAuthStore, useCanValidateIncidents } from '@/store'
-import { getZones } from '@/services/zones'
-import { PolygonZoneEditor, InteractiveSVGMap } from '@/components/map'
-import type { Zone, Incident, IncidentPriority, IncidentStatus } from '@/types'
 import { cn } from '@/lib/utils'
-import { getAssetUrl, isFirebaseStorageUrl } from '@/lib/config'
 import { formatRelativeTime } from '@/lib/utils'
-import { logger } from '@/lib/logger'
+import { generateDemoMap, generateDemoRuntimeData } from '@/services/isometricMap'
+import type { CameraAngle, IsometricViewerState, NodeRuntimeData } from '@/types/isometricMap'
+import { 
+  DEFAULT_VIEWER_STATE,
+  CAMERA_ANGLE_NAMES,
+  STATUS_LABELS,
+  STATUS_COLORS,
+  EQUIPMENT_TYPE_LABELS,
+} from '@/types/isometricMap'
+import type { Incident, IncidentPriority, IncidentStatus } from '@/types'
 
-type ViewMode = 'view' | 'edit'
+// Lazy load del componente 3D pesado
+const IsometricScene = lazy(() =>
+  import('@/components/map/isometric/IsometricScene').then((m) => ({ default: m.IsometricScene }))
+)
 
 const PRIORITY_CONFIG: Record<IncidentPriority, { color: string; bg: string; label: string }> = {
   critica: { color: 'text-red-500', bg: 'bg-red-500', label: 'Crítica' },
@@ -52,414 +73,354 @@ const STATUS_CONFIG: Record<IncidentStatus, { label: string; variant: string }> 
 
 export function MapPage() {
   const canValidate = useCanValidateIncidents()
-  const { user } = useAuthStore()
-  const { zones, setZones, setSelectedZone, incidents, mapImage } = useAppStore()
-  const [viewMode, setViewMode] = useState<ViewMode>('view')
+  const { incidents } = useAppStore()
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null)
-  const [selectedZoneForDetail, setSelectedZoneForDetail] = useState<Zone | null>(null)
   const [showIncidentPanel, setShowIncidentPanel] = useState(true)
-  // Si es URL de Firebase Storage, usarla directamente; si es local, agregar basePath
-  // Si no hay mapa, será null y se mostrará un placeholder
-  const mapUrl = mapImage 
-    ? (isFirebaseStorageUrl(mapImage) ? mapImage : getAssetUrl(mapImage))
-    : null
-  
-  // Detectar si el mapa es SVG
-  const isSVGMap = mapUrl?.toLowerCase().endsWith('.svg') || mapUrl?.toLowerCase().includes('.svg')
-  
-  const [scale, setScale] = useState(1)
-  const [position, setPosition] = useState({ x: 0, y: 0 })
-  const [isDragging, setIsDragging] = useState(false)
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
-  const containerRef = useRef<HTMLDivElement>(null)
-  // Refs para el zoom (evitar re-registrar el listener)
-  const scaleRef = useRef(scale)
-  const positionRef = useRef(position)
-  
-  // Mantener refs sincronizadas
-  useEffect(() => { scaleRef.current = scale }, [scale])
-  useEffect(() => { positionRef.current = position }, [position])
+  const [showFilters, setShowFilters] = useState(false)
 
-  const isAdmin = user?.rol === 'admin'
+  // Estado del visor isométrico
+  const [viewerState, setViewerState] = useState<IsometricViewerState>(DEFAULT_VIEWER_STATE)
 
-  // Cargar zonas
-  useEffect(() => {
-    getZones().then(setZones)
-  }, [setZones])
-
-  // Listener de wheel con passive: false para prevenir scroll (registrado una sola vez)
-  useEffect(() => {
-    const container = containerRef.current
-    if (!container) return
-
-    const handleWheelPassive = (e: WheelEvent) => {
-      e.preventDefault()
-      e.stopPropagation()
-      
-      const currentScale = scaleRef.current
-      const currentPosition = positionRef.current
-      
-      const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9
-      const newScale = Math.max(0.5, Math.min(10, currentScale * zoomFactor))
-      
-      const rect = container.getBoundingClientRect()
-      const mouseX = e.clientX - rect.left
-      const mouseY = e.clientY - rect.top
-      
-      const scaleRatio = newScale / currentScale
-      const newPosX = mouseX - (mouseX - currentPosition.x) * scaleRatio
-      const newPosY = mouseY - (mouseY - currentPosition.y) * scaleRatio
-      
-      setScale(newScale)
-      setPosition({ x: newPosX, y: newPosY })
-    }
-
-    container.addEventListener('wheel', handleWheelPassive, { passive: false })
-    return () => container.removeEventListener('wheel', handleWheelPassive)
-  }, []) // Sin dependencias - se registra una sola vez
-
-  // Incidencias activas derivadas del store global
-  const activeIncidents = incidents.filter((i) =>
-    i.status === 'pendiente' || i.status === 'confirmada' || i.status === 'en_proceso'
+  // Datos del mapa (demo por ahora, luego vendrá de Firestore)
+  const demoData = useMemo(() => generateDemoMap(), [])
+  const [runtimeData, setRuntimeData] = useState<Map<string, NodeRuntimeData>>(
+    () => generateDemoRuntimeData(demoData.nodes)
   )
 
-  // Incidencias por zona
-  const incidentsByZone = activeIncidents.reduce(
-    (acc, incident) => {
-      const zoneId = incident.zoneId || 'unknown'
-      if (!acc[zoneId]) {
-        acc[zoneId] = []
+  // Incidencias activas
+  const activeIncidents = useMemo(
+    () => incidents.filter((i) =>
+      i.status === 'pendiente' || i.status === 'confirmada' || i.status === 'en_proceso'
+    ),
+    [incidents]
+  )
+
+  // Resumen de estados para la leyenda
+  const statusSummary = useMemo(() => {
+    const summary = { ok: 0, warning: 0, critical: 0, offline: 0, maintenance: 0 }
+    for (const [, data] of runtimeData) {
+      summary[data.status]++
+    }
+    return summary
+  }, [runtimeData])
+
+  // ── Handlers de cámara ──
+  const rotateLeft = useCallback(() => {
+    setViewerState((prev) => ({
+      ...prev,
+      cameraAngle: ((prev.cameraAngle + 3) % 4) as CameraAngle,
+    }))
+  }, [])
+
+  const rotateRight = useCallback(() => {
+    setViewerState((prev) => ({
+      ...prev,
+      cameraAngle: ((prev.cameraAngle + 1) % 4) as CameraAngle,
+    }))
+  }, [])
+
+  const zoomIn = useCallback(() => {
+    setViewerState((prev) => ({
+      ...prev,
+      zoom: Math.min(prev.zoom + 5, 120),
+    }))
+  }, [])
+
+  const zoomOut = useCallback(() => {
+    setViewerState((prev) => ({
+      ...prev,
+      zoom: Math.max(prev.zoom - 5, 15),
+    }))
+  }, [])
+
+  const resetView = useCallback(() => {
+    setViewerState(DEFAULT_VIEWER_STATE)
+  }, [])
+
+  // ── Handlers de nodos ──
+  const handleNodeClick = useCallback((nodeId: string) => {
+    setViewerState((prev) => ({
+      ...prev,
+      selectedNodeId: prev.selectedNodeId === nodeId ? null : nodeId,
+    }))
+  }, [])
+
+  const handleNodeHover = useCallback((nodeId: string | null) => {
+    setViewerState((prev) => ({
+      ...prev,
+      hoveredNodeId: nodeId,
+    }))
+  }, [])
+
+  const handleBackgroundClick = useCallback(() => {
+    setViewerState((prev) => ({
+      ...prev,
+      selectedNodeId: null,
+    }))
+  }, [])
+
+  // ── Handlers de filtros ──
+  const toggleFilter = useCallback((key: keyof IsometricViewerState['filters']) => {
+    setViewerState((prev) => ({
+      ...prev,
+      filters: {
+        ...prev.filters,
+        [key]: !prev.filters[key],
+      },
+    }))
+  }, [])
+
+  // Keyboard shortcuts (Q/E ya los maneja useIsometricRotation internamente)
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+      switch (e.key) {
+        case '+':
+        case '=':
+          e.preventDefault()
+          zoomIn()
+          break
+        case '-':
+          e.preventDefault()
+          zoomOut()
+          break
+        case 'r':
+        case 'R':
+          e.preventDefault()
+          resetView()
+          break
       }
-      acc[zoneId].push(incident)
-      return acc
-    },
-    {} as Record<string, Incident[]>
-  )
-
-  // Control de zoom con límites optimizados para alta precisión
-  const handleZoom = (delta: number) => {
-    setScale((prev) => Math.max(0.5, Math.min(10, prev + delta)))
-  }
-
-  // Reset view
-  const handleReset = () => {
-    setScale(1)
-    setPosition({ x: 0, y: 0 })
-  }
-
-  // Drag handlers
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (e.button === 0) {
-      setIsDragging(true)
-      setDragStart({ x: e.clientX - position.x, y: e.clientY - position.y })
     }
-  }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [zoomIn, zoomOut, resetView])
 
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (isDragging) {
-      setPosition({
-        x: e.clientX - dragStart.x,
-        y: e.clientY - dragStart.y,
-      })
-    }
-  }
+  // Nodo seleccionado data
+  const selectedNode = viewerState.selectedNodeId
+    ? demoData.nodes.find((n) => n.id === viewerState.selectedNodeId)
+    : null
+  const selectedNodeRuntime = viewerState.selectedNodeId
+    ? runtimeData.get(viewerState.selectedNodeId)
+    : null
 
-  const handleMouseUp = () => {
-    setIsDragging(false)
-  }
-
-  // Touch handlers para móvil
-  const handleTouchStart = (e: React.TouchEvent) => {
-    const touch = e.touches[0]
-    if (e.touches.length === 1 && touch) {
-      setIsDragging(true)
-      setDragStart({
-        x: touch.clientX - position.x,
-        y: touch.clientY - position.y,
-      })
-    }
-  }
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    const touch = e.touches[0]
-    if (isDragging && e.touches.length === 1 && touch) {
-      setPosition({
-        x: touch.clientX - dragStart.x,
-        y: touch.clientY - dragStart.y,
-      })
-    }
-  }
-
-  const handleTouchEnd = () => {
-    setIsDragging(false)
-  }
-
-  // Efecto para resetear vista al cambiar de modo
-  useEffect(() => {
-    setScale(1)
-    setPosition({ x: 0, y: 0 })
-  }, [viewMode])
-
-  // Modo Editor - Usar el nuevo editor de polígonos
-  if (viewMode === 'edit') {
-    return (
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold">Editor de Zonas</h1>
-            <p className="text-muted-foreground">
-              Dibuja zonas poligonales punto a punto sobre el plano
-            </p>
-          </div>
-          <Button variant="outline" onClick={() => setViewMode('view')}>
-            <Eye className="h-4 w-4 mr-2" />
-            Volver a Vista
-          </Button>
-        </div>
-
-        <PolygonZoneEditor />
-      </div>
-    )
-  }
-  // Modo Vista
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold">Visor de Mapas</h1>
-          <p className="text-muted-foreground">
-            Vista general de zonas e incidencias sobre el plano
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <Compass className="h-6 w-6 text-primary" />
+            Mapa Isométrico
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Vista 3D de la planta — Rotar: Q/E · Zoom: +/- · Reset: R
           </p>
         </div>
-        <div className="flex gap-2">
-          {isAdmin && (
-            <Button variant="outline" onClick={() => setViewMode('edit')}>
-              <Settings className="h-4 w-4 mr-2" />
-              Editar Zonas
-            </Button>
-          )}
-          <Button variant="outline" size="icon" onClick={() => handleZoom(0.25)}>
-            <ZoomIn className="h-4 w-4" />
-          </Button>
-          <Button variant="outline" size="icon" onClick={() => handleZoom(-0.25)}>
-            <ZoomOut className="h-4 w-4" />
-          </Button>
-          <Button variant="outline" size="icon" onClick={handleReset}>
-            <Maximize className="h-4 w-4" />
-          </Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Ángulo actual */}
+          <Badge variant="outline" className="gap-1 font-normal">
+            <Compass className="h-3.5 w-3.5" />
+            {CAMERA_ANGLE_NAMES[viewerState.cameraAngle]}
+          </Badge>
+          {/* Zoom */}
+          <Badge variant="outline" className="gap-1 font-normal">
+            Zoom: {viewerState.zoom}
+          </Badge>
         </div>
       </div>
 
-      {/* Legend */}
+      {/* Status Legend */}
       <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-wrap gap-4 text-sm">
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded bg-destructive" />
-              <span>Incidencias críticas</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded bg-warning" />
-              <span>Incidencias altas</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded bg-primary" />
-              <span>Incidencias medias</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 rounded bg-success" />
-              <span>Sin incidencias</span>
+        <CardContent className="p-3">
+          <div className="flex flex-wrap items-center gap-4 text-xs">
+            {(Object.keys(STATUS_LABELS) as Array<keyof typeof STATUS_LABELS>).map((status) => (
+              <div key={status} className="flex items-center gap-1.5">
+                <div
+                  className="w-3 h-3 rounded-full"
+                  style={{ backgroundColor: STATUS_COLORS[status] }}
+                />
+                <span>{STATUS_LABELS[status]}</span>
+                <span className="font-semibold text-foreground">({statusSummary[status]})</span>
+              </div>
+            ))}
+            <div className="ml-auto flex items-center gap-1 text-muted-foreground">
+              <Activity className="h-3.5 w-3.5" />
+              <span>{demoData.nodes.length} equipos</span>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Map Container */}
+      {/* Main 3D Viewport + Controls */}
       <Card className="overflow-hidden">
         <CardContent className="p-0">
-          <div
-            ref={containerRef}
-            className="relative w-full h-[600px] md:h-[700px] overflow-hidden bg-muted cursor-grab active:cursor-grabbing select-none"
-            style={{ 
-              touchAction: 'none',
-              WebkitOverflowScrolling: 'touch',
-              overscrollBehavior: 'contain',
-            }}
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseUp}
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
-          >
-            <div
-              className="absolute transition-transform duration-100"
-              style={{
-                transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
-                transformOrigin: 'top left',
-                width: '100%',
-                height: '100%',
-              }}
-            >
-              {/* Plano de fondo */}
-              <div className="relative w-full h-full">
-                {/* Renderizado condicional: SVG interactivo o imagen estática */}
-                {mapUrl && isSVGMap ? (
-                  <InteractiveSVGMap
-                    svgUrl={mapUrl}
-                    zones={zones}
-                    incidents={activeIncidents}
-                    scale={scale}
-                    position={position}
-                    onZoneClick={(zoneId: string) => {
-                      const zone = zones.find(z => z.id === zoneId)
-                      if (zone) {
-                        setSelectedZone(zone)
-                        setSelectedZoneForDetail(zone)
-                      }
-                    }}
-                    onIncidentClick={setSelectedIncident}
-                  />
-                ) : mapUrl ? (
-                  <img
-                    key={mapUrl}
-                    src={mapUrl}
-                    alt="Plano de planta"
-                    className="absolute inset-0 w-full h-full"
-                    style={{
-                      imageRendering: 'crisp-edges' as const,
-                      objectFit: 'contain',
-                      maxWidth: 'none',
-                      maxHeight: 'none',
-                    }}
-                    loading="eager"
-                    decoding="sync"
-                    onLoad={(e) => {
-                      logger.info('Map image loaded', { url: mapUrl, width: e.currentTarget.naturalWidth, height: e.currentTarget.naturalHeight })
-                    }}
-                    onError={(e) => {
-                      logger.error('Map image failed to load', new Error(`Failed to load map: ${mapUrl}`))
-                      e.currentTarget.style.display = 'none'
-                    }}
-                  />
-                ) : null}
-
-                {/* Zonas sobre el plano */}
-                {zones.length > 0 ? (
-                  zones.map((zone) => (
-                    <ZoneOverlay
-                      key={zone.id}
-                      zone={zone}
-                      incidents={incidentsByZone[zone.id] || []}
-                      onClick={() => {
-                        setSelectedZone(zone)
-                        setSelectedZoneForDetail(zone)
-                      }}
-                      onIncidentClick={setSelectedIncident}
-                    />
-                  ))
-                ) : (
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="text-center text-muted-foreground">
-                      <MapPin className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                      <p>No hay zonas configuradas</p>
-                      {isAdmin && (
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="mt-2"
-                          onClick={() => setViewMode('edit')}
-                        >
-                          Configurar zonas
-                        </Button>
-                      )}
-                    </div>
+          <div className="relative w-full h-[550px] md:h-[650px] lg:h-[700px]">
+            {/* Three.js Scene */}
+            <Suspense
+              fallback={
+                <div className="w-full h-full flex items-center justify-center bg-[#0d1117]">
+                  <div className="text-center space-y-3">
+                    <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+                    <p className="text-sm text-muted-foreground">Cargando escena 3D...</p>
                   </div>
-                )}
+                </div>
+              }
+            >
+              <IsometricScene
+                config={demoData.config}
+                nodes={demoData.nodes}
+                connectors={demoData.connectors}
+                areas={demoData.areas}
+                runtimeData={runtimeData}
+                viewerState={viewerState}
+                onNodeClick={handleNodeClick}
+                onNodeHover={handleNodeHover}
+                onBackgroundClick={handleBackgroundClick}
+              />
+            </Suspense>
 
-                {/* Marcadores de incidencias individuales - Estilo Leaflet optimizado */}
-                {activeIncidents.map((incident) => {
-                  const zone = zones.find(z => z.id === incident.zoneId)
-                  if (!zone?.bounds) return null
-                  
-                  // Calcular posición dentro de la zona
-                  const centerX = (zone.bounds.minX + zone.bounds.maxX) / 2
-                  const centerY = (zone.bounds.minY + zone.bounds.maxY) / 2
-                  
-                  // Distribuir incidencias dentro de la zona con un pequeño offset
-                  const zoneIncidents = activeIncidents.filter(i => i.zoneId === incident.zoneId)
-                  const idx = zoneIncidents.findIndex(i => i.id === incident.id)
-                  const angle = (idx / zoneIncidents.length) * 2 * Math.PI
-                  const radius = Math.min(
-                    (zone.bounds.maxX - zone.bounds.minX) * 0.3,
-                    (zone.bounds.maxY - zone.bounds.minY) * 0.3
-                  )
-                  const offsetX = Math.cos(angle) * radius
-                  const offsetY = Math.sin(angle) * radius
-                  
-                  const x = (centerX + offsetX) * 100
-                  const y = (centerY + offsetY) * 100
-                  
-                  const priorityConfig = PRIORITY_CONFIG[incident.prioridad]
-                  
-                  return (
-                    <button
-                      key={incident.id}
-                      className={cn(
-                        'absolute w-8 h-8 -ml-4 -mt-4 rounded-full border-3 border-white shadow-xl cursor-pointer',
-                        'hover:scale-150 transition-all duration-200 z-10 group',
-                        'hover:shadow-2xl hover:ring-4 hover:ring-white/50',
-                        priorityConfig.bg,
-                        selectedIncident?.id === incident.id && 'ring-4 ring-white scale-150 z-20'
-                      )}
-                      style={{ left: `${x}%`, top: `${y}%` }}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setSelectedIncident(incident)
-                      }}
-                      aria-label={`Incidencia: ${incident.titulo}`}
-                      title={`${incident.titulo} - ${priorityConfig.label}`}
-                    >
-                      <AlertTriangle className="h-4 w-4 text-white mx-auto" />
-                      {/* Tooltip hover */}
-                      <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 hidden group-hover:block whitespace-nowrap z-30">
-                        <div className="bg-card text-card-foreground text-xs px-2 py-1 rounded shadow-lg border">
-                          {incident.titulo}
-                        </div>
-                      </div>
-                    </button>
-                  )
-                })}
+            {/* ─── HUD Overlay Controls ─── */}
+
+            {/* Camera rotation + zoom (izquierda abajo) */}
+            <div className="absolute bottom-4 left-4 flex flex-col gap-2">
+              <div className="flex items-center gap-1 bg-card/90 backdrop-blur rounded-lg p-1 shadow-lg border">
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={rotateLeft} title="Rotar izq (Q)">
+                    <RotateCcw className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={rotateRight} title="Rotar der (E)">
+                    <RotateCw className="h-4 w-4" />
+                  </Button>
+                  <div className="w-px h-6 bg-border" />
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={zoomIn} title="Acercar (+)">
+                    <ZoomIn className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={zoomOut} title="Alejar (-)">
+                    <ZoomOut className="h-4 w-4" />
+                  </Button>
+                  <div className="w-px h-6 bg-border" />
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={resetView} title="Resetear (R)">
+                    <Maximize className="h-4 w-4" />
+                  </Button>
               </div>
             </div>
 
-            {/* Panel lateral de incidencias */}
+            {/* Filter toggles (izquierda arriba) */}
+            <div className="absolute top-4 left-4">
+              <div className="bg-card/90 backdrop-blur rounded-lg shadow-lg border">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="gap-1.5 text-xs"
+                  onClick={() => setShowFilters(!showFilters)}
+                >
+                  <Layers className="h-3.5 w-3.5" />
+                  Filtros
+                </Button>
+                {showFilters && (
+                  <div className="p-2 border-t space-y-1">
+                    {[
+                      { key: 'showLabels' as const, icon: Eye, label: 'Etiquetas' },
+                      { key: 'showAreas' as const, icon: MapPin, label: 'Áreas' },
+                      { key: 'showConnectors' as const, icon: Activity, label: 'Conectores' },
+                      { key: 'showAlerts' as const, icon: AlertTriangle, label: 'Alertas' },
+                    ].map(({ key, icon: Icon, label }) => (
+                      <button
+                        key={key}
+                        className={cn(
+                          'flex items-center gap-2 w-full text-left text-xs px-2 py-1 rounded hover:bg-muted transition-colors',
+                          viewerState.filters[key] ? 'text-foreground' : 'text-muted-foreground'
+                        )}
+                        onClick={() => toggleFilter(key)}
+                      >
+                        {viewerState.filters[key] ? (
+                          <Eye className="h-3 w-3 text-primary" />
+                        ) : (
+                          <EyeOff className="h-3 w-3" />
+                        )}
+                        <Icon className="h-3 w-3" />
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Selected node info card (centro abajo) */}
+            {selectedNode && (
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 max-w-sm w-full px-4">
+                <Card className="bg-card/95 backdrop-blur shadow-xl border">
+                  <CardContent className="p-3">
+                    <div className="flex items-start gap-3">
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-semibold text-sm">{selectedNode.label}</h4>
+                        <p className="text-xs text-muted-foreground">
+                          {EQUIPMENT_TYPE_LABELS[selectedNode.type]} · Pos ({selectedNode.position.x}, {selectedNode.position.z})m
+                        </p>
+                        {selectedNodeRuntime && (
+                          <div className="flex items-center gap-2 mt-1.5">
+                            <div
+                              className="w-2 h-2 rounded-full"
+                              style={{ backgroundColor: STATUS_COLORS[selectedNodeRuntime.status] }}
+                            />
+                            <span className="text-xs font-medium">
+                              {STATUS_LABELS[selectedNodeRuntime.status]}
+                            </span>
+                            {selectedNodeRuntime.activeIncidents > 0 && (
+                              <Badge variant="destructive" className="text-xs h-5 gap-0.5">
+                                <AlertTriangle className="h-3 w-3" />
+                                {selectedNodeRuntime.activeIncidents}
+                              </Badge>
+                            )}
+                            {selectedNodeRuntime.sensorValue !== undefined && (
+                              <Badge variant="secondary" className="text-xs h-5">
+                                {selectedNodeRuntime.sensorValue}{selectedNodeRuntime.sensorUnit || ''}
+                              </Badge>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 shrink-0"
+                        onClick={handleBackgroundClick}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {/* Panel lateral de incidencias (derecha) */}
             <div className={cn(
               'absolute top-0 right-0 h-full bg-card/95 backdrop-blur border-l shadow-lg transition-all duration-300 overflow-hidden',
-              showIncidentPanel ? 'w-80' : 'w-0'
+              showIncidentPanel ? 'w-72 md:w-80' : 'w-0'
             )}>
               <div className="h-full flex flex-col">
                 <div className="p-3 border-b flex items-center justify-between">
-                  <h3 className="font-semibold">Incidencias Activas ({activeIncidents.length})</h3>
+                  <h3 className="font-semibold text-sm">
+                    Incidencias ({activeIncidents.length})
+                  </h3>
                   <Button 
                     variant="ghost" 
                     size="icon"
+                    className="h-7 w-7"
                     onClick={() => setShowIncidentPanel(false)}
                   >
                     <X className="h-4 w-4" />
                   </Button>
                 </div>
-                <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
                   {activeIncidents.length === 0 ? (
-                    <p className="text-center text-muted-foreground py-8">
-                      No hay incidencias activas
-                    </p>
+                    <div className="text-center text-muted-foreground py-8">
+                      <CircleCheck className="h-8 w-8 mx-auto mb-2 opacity-40" />
+                      <p className="text-sm">Sin incidencias activas</p>
+                    </div>
                   ) : (
                     activeIncidents.map((incident) => {
-                      const zone = zones.find(z => z.id === incident.zoneId)
                       const priorityConfig = PRIORITY_CONFIG[incident.prioridad]
                       const statusConfig = STATUS_CONFIG[incident.status]
                       
@@ -467,29 +428,25 @@ export function MapPage() {
                         <button
                           key={incident.id}
                           className={cn(
-                            'w-full text-left p-3 rounded-lg border bg-card hover:bg-muted transition-colors',
+                            'w-full text-left p-2.5 rounded-lg border bg-card hover:bg-muted transition-colors',
                             selectedIncident?.id === incident.id && 'ring-2 ring-primary'
                           )}
                           onClick={() => setSelectedIncident(incident)}
                         >
                           <div className="flex items-start gap-2">
-                            <div className={cn('w-2 h-2 rounded-full mt-2 flex-shrink-0', priorityConfig.bg)} />
+                            <div className={cn('w-2 h-2 rounded-full mt-1.5 flex-shrink-0', priorityConfig.bg)} />
                             <div className="flex-1 min-w-0">
-                              <p className="font-medium text-sm truncate">{incident.titulo}</p>
-                              <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                                <MapPin className="h-3 w-3" />
-                                <span className="truncate">{zone?.nombre || 'Sin zona'}</span>
-                              </div>
-                              <div className="flex items-center gap-2 mt-1">
-                                <Badge variant={statusConfig.variant as any} className="text-xs">
+                              <p className="font-medium text-xs truncate">{incident.titulo}</p>
+                              <div className="flex items-center gap-1.5 mt-1">
+                                <Badge variant={statusConfig.variant as any} className="text-[10px] h-4">
                                   {statusConfig.label}
                                 </Badge>
-                                <span className="text-xs text-muted-foreground">
+                                <span className="text-[10px] text-muted-foreground">
                                   {formatRelativeTime(incident.createdAt)}
                                 </span>
                               </div>
                             </div>
-                            <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0 mt-1" />
                           </div>
                         </button>
                       )
@@ -499,10 +456,10 @@ export function MapPage() {
               </div>
             </div>
 
-            {/* Botón para mostrar panel */}
+            {/* Botón para mostrar panel de incidencias */}
             {!showIncidentPanel && (
               <Button
-                className="absolute top-4 right-4"
+                className="absolute top-4 right-4 shadow-lg"
                 variant="secondary"
                 size="sm"
                 onClick={() => setShowIncidentPanel(true)}
@@ -512,9 +469,9 @@ export function MapPage() {
               </Button>
             )}
 
-            {/* Zoom indicator */}
-            <div className="absolute bottom-4 left-4 bg-card/80 backdrop-blur px-3 py-1 rounded text-sm">
-              Zoom: {Math.round(scale * 100)}%
+            {/* Help hint (bottom right) */}
+            <div className="absolute bottom-4 right-4 text-[10px] text-muted-foreground/60 select-none pointer-events-none hidden md:block">
+              Q/E: rotar · +/-: zoom · R: reset · Click: seleccionar
             </div>
           </div>
         </CardContent>
@@ -528,182 +485,6 @@ export function MapPage() {
           canValidate={canValidate}
         />
       )}
-
-      {/* Zone Detail Modal */}
-      <Dialog open={!!selectedZoneForDetail} onOpenChange={(open) => !open && setSelectedZoneForDetail(null)}>
-        <DialogContent className="max-w-md w-[98vw] md:w-full max-h-[92vh] p-0 gap-0 overflow-hidden flex flex-col rounded-xl">
-          <DialogHeader className="p-4 border-b shrink-0 bg-card z-10 sticky top-0">
-            <div className="flex items-center justify-between">
-              <DialogTitle className="flex items-center gap-2">
-                <MapPin className="h-5 w-5 text-primary" />
-                {selectedZoneForDetail?.nombre}
-              </DialogTitle>
-            </div>
-          </DialogHeader>
-
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {selectedZoneForDetail && (incidentsByZone[selectedZoneForDetail.id] || []).filter(i => i.status !== 'cerrada').length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <MapPin className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                <p>No hay incidencias activas en esta zona</p>
-              </div>
-            ) : (
-              selectedZoneForDetail && (incidentsByZone[selectedZoneForDetail.id] || [])
-                .filter(i => i.status !== 'cerrada')
-                .map(incident => (
-                  <div
-                    key={incident.id}
-                    className="flex items-center gap-3 cursor-pointer hover:bg-muted p-3 rounded-lg border bg-card/50"
-                    onClick={() => {
-                      setSelectedZoneForDetail(null)
-                      setSelectedIncident(incident)
-                    }}
-                  >
-                    <div className={cn(
-                      'w-3 h-3 rounded-full shrink-0',
-                      incident.prioridad === 'critica'
-                        ? 'bg-destructive'
-                        : incident.prioridad === 'alta'
-                        ? 'bg-warning'
-                        : 'bg-primary'
-                    )} />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate text-sm">{incident.titulo}</p>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <span className="capitalize">{incident.status.replace('_', ' ')}</span>
-                        <span>•</span>
-                        <span>{formatRelativeTime(incident.createdAt)}</span>
-                      </div>
-                    </div>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                ))
-            )}
-          </div>
-
-          <div className="p-4 border-t bg-card shrink-0">
-            <Button variant="outline" className="w-full" onClick={() => setSelectedZoneForDetail(null)}>
-              Cerrar
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Zone Stats */}
-      {zones.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {zones.map((zone) => {
-            const zoneIncidents = incidentsByZone[zone.id] || []
-            const criticalCount = zoneIncidents.filter(
-              (i) => i.prioridad === 'critica'
-            ).length
-
-            return (
-              <Card
-                key={zone.id}
-                className={cn(
-                  'cursor-pointer hover:border-primary/50 transition-colors',
-                  criticalCount > 0 && 'border-destructive'
-                )}
-                onClick={() => {
-                  setSelectedZone(zone)
-                  setSelectedZoneForDetail(zone)
-                }}
-              >
-                <CardHeader className="p-4 pb-2">
-                  <CardTitle className="text-sm font-medium flex items-center gap-2">
-                    <div
-                      className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: zone.color || '#2196f3' }}
-                    />
-                    {zone.nombre}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-4 pt-0">
-                  <div className="flex items-center justify-between">
-                    <span className="text-2xl font-bold">
-                      {zoneIncidents.length}
-                    </span>
-                    {criticalCount > 0 && (
-                      <Badge variant="destructive" className="gap-1">
-                        <AlertTriangle className="h-3 w-3" />
-                        {criticalCount}
-                      </Badge>
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    incidencias activas
-                  </p>
-                </CardContent>
-              </Card>
-            )
-          })}
-        </div>
-      )}
     </div>
   )
 }
-
-function ZoneOverlay({
-  zone,
-  incidents,
-  onClick,
-}: {
-  zone: Zone
-  incidents: Incident[]
-  onClick: () => void
-  onIncidentClick?: (incident: Incident) => void
-}) {
-  const criticalCount = incidents.filter((i) => i.prioridad === 'critica').length
-  const highCount = incidents.filter((i) => i.prioridad === 'alta').length
-
-  let statusColor = 'border-success/40 bg-success/8 hover:bg-success/15'
-  if (criticalCount > 0) {
-    statusColor = 'border-destructive/60 bg-destructive/15 hover:bg-destructive/25'
-  } else if (highCount > 0) {
-    statusColor = 'border-warning/60 bg-warning/15 hover:bg-warning/25'
-  } else if (incidents.length > 0) {
-    statusColor = 'border-primary/60 bg-primary/15 hover:bg-primary/25'
-  }
-
-  if (zone.bounds) {
-    const style = {
-      position: 'absolute' as const,
-      left: `${zone.bounds.minX * 100}%`,
-      top: `${zone.bounds.minY * 100}%`,
-      width: `${(zone.bounds.maxX - zone.bounds.minX) * 100}%`,
-      height: `${(zone.bounds.maxY - zone.bounds.minY) * 100}%`,
-      borderColor: zone.color,
-    }
-
-    return (
-      <div
-        className={cn(
-          'rounded-lg border-2 cursor-pointer transition-all hover:shadow-lg',
-          statusColor
-        )}
-        style={style}
-        onClick={onClick}
-      >
-        <div className="absolute top-1 left-1">
-          <div
-            className="px-2 py-0.5 rounded text-white text-xs font-semibold shadow-sm"
-            style={{ backgroundColor: zone.color }}
-          >
-            {zone.codigo || zone.nombre}
-          </div>
-        </div>
-        {incidents.length > 0 && (
-          <div className="absolute bottom-1 right-1">
-            <div className="bg-yellow-500 text-white px-1.5 py-0.5 rounded text-xs font-bold shadow-sm">
-              {incidents.length}
-            </div>
-          </div>
-        )}
-      </div>
-    )
-  }
-  return null
-}
-
-// Vista rápida de incidencia reemplazada por IncidentDetail

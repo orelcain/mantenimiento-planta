@@ -7,6 +7,36 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.67.0] - 2026-02-27
+### Agregado — Mapa Isométrico 3D
+- **Vista isométrica 3D de la planta**: MapPage reescrito completamente — reemplaza visor 2D por escena Three.js con cámara ortográfica
+- **Rotación FFT (4 ángulos)**: estilo Final Fantasy Tactics — Q/E o botones rotan la cámara entre Sur-Oeste, Sur-Este, Nor-Este, Nor-Oeste con animación spring
+- **Grilla 1m×1m a escala real**: líneas menores cada metro, mayores cada 10m, ejes centrales blancos
+- **10 tipos de equipo 3D**: bomba (cilindro horizontal), motor (caja+eje), tanque (cilindro vertical), sensor (esfera), transportador (cinta), válvula (toroide), compresor, tubería, edificio, genérico — cada uno con geometría única y materiales metálicos
+- **Status por equipo**: anillo pulsante en el suelo (ok=verde, warning=ámbar, critical=rojo, offline=gris, maintenance=azul)
+- **Labels flotantes HTML**: etiquetas con nombre del equipo + valor de sensor vía `@react-three/drei Html`
+- **Badge de incidencias**: contador rojo/ámbar flotante sobre equipos con incidencias activas
+- **Conectores animados**: tuberías, cables, flujo (partículas animadas), señales entre nodos
+- **Áreas/zonas**: overlays semi-transparentes sobre el suelo del mapa con labels zona
+- **HUD de controles**: barra de rotación/zoom/reset + panel plegable de filtros (etiquetas, áreas, conectores, alertas)
+- **Card de equipo seleccionado**: info del nodo al hacer click (tipo, posición, estado, incidencias, sensor)
+- **Panel lateral de incidencias**: reutilizado del visor anterior con lista interactiva
+- **Lazy loading**: `IsometricScene` cargado via `React.lazy()` — chunk separado de 16 kB
+- **Datos demo**: planta ETT con 25 equipos, 10 conectores, 5 áreas para testing inmediato
+- **Keyboard shortcuts**: Q/E rotar, +/- zoom, R resetear vista
+- **Service layer**: `isometricMapService.ts` con CRUD Firestore para colección `isometricMaps`
+
+### Archivos nuevos
+- `types/isometricMap.ts` — tipos completos (CameraAngle, MapNode, EquipmentNodeType, StatusColors, configs)
+- `components/map/isometric/IsometricCamera.tsx` — cámara ortográfica FFT con spring interpolation
+- `components/map/isometric/PlantGrid.tsx` — grilla métrica con líneas menores/mayores
+- `components/map/isometric/EquipmentNode.tsx` — 10 geometrías 3D con hover/select/status
+- `components/map/isometric/MapAreaOverlay.tsx` — zonas coloreadas en el suelo
+- `components/map/isometric/MapConnector.tsx` — conexiones con flujo animado
+- `components/map/isometric/IsometricScene.tsx` — Canvas R3F con iluminación, fog, filtros
+- `components/map/isometric/index.ts` — barrel exports
+- `services/isometricMap.ts` — CRUD Firestore + generador de datos demo
+
 ## [2.66.5] - 2026-02-27
 ### Corregido
 - **Creación de incidencias desde ARIA fallaba con permisos insuficientes**: reglas de Firestore excesivamente estrictas — `isActiveUser()` reemplazado por `isAuthenticated()` para creates, límite de título ampliado a 200 chars (era 100), límite de descripción ampliado a 5000 chars (era 1000), eliminada validación `isPastOrPresentTimestamp` que podía fallar con clock skew

@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.66.5**
+## Versión Actual: **v2.67.0**
 
 **Fecha de lanzamiento**: 27 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -10,7 +10,21 @@
 
 ## 📋 Información de la Versión
 
-### v2.64.5 — Fix: machine detection filtraba componentes como máquinas (26/02/2026)
+### v2.67.0 — Mapa Isométrico 3D: Three.js + Cámara FFT + Equipos interactivos (27/02/2026)
+- 🗺️ **Mapa Isométrico 3D**: nueva vista completa de planta con Three.js + cámara ortográfica, reemplazando el visor 2D anterior
+- 🎮 **Rotación FFT**: 4 ángulos de cámara estilo Final Fantasy Tactics (Q/E o botones), animados con spring interpolation
+- 📐 **Grilla 1m×1m**: escala real con líneas menores (1m) y mayores (10m), ejes centrales
+- 🏭 **10 tipos de equipo 3D**: bomba, motor, tanque, sensor, transportador, válvula, compresor, tubería, edificio, genérico — cada uno con geometría distinta
+- 🔴 **Status en tiempo real**: anillo pulsante por estado (ok/warning/critical/offline/maintenance)
+- 🏷️ **Labels flotantes HTML**: etiquetas interactivas con valores de sensores via @react-three/drei Html
+- 🔗 **Conectores animados**: tuberías, cables, flujo con partículas, señales entre equipos
+- 📍 **Áreas/zonas**: overlays coloreados sobre el suelo con labels de zona
+- 🎛️ **HUD de controles**: rotación, zoom, reset, filtros de visibilidad (etiquetas, áreas, conectores, alertas)
+- 📋 **Panel lateral incidencias**: lista interactiva con prioridad y estado (reutilizado del visor anterior)
+- 📦 **Lazy loading**: escena 3D cargada bajo demanda — IsometricScene.js (16 kB gzip ~5 kB)
+- 🎲 **Datos demo**: planta industrial con 25 equipos, 10 conectores, 5 áreas para visualización inmediata
+
+### v2.66.5 — Fix permisos incidencias + feedback save (27/02/2026)
 - 🔧 **COMPONENT_WORDS blocklist**: palabras genéricas (motor, bomba, sensor, filtro, etc.) ya no matchean como nombres de máquinas
 - 🔍 **Fix**: "motores para la grader" ahora retorna solo los 2 motores, no los 51 repuestos de 5 máquinas
 - 🧠 **Root cause**: "Motor bomba caseta agua mar" matcheaba por "motor" → eliminaba "motor" de componentTerms → listAllForMachine=true

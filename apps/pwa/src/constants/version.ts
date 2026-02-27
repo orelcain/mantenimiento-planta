@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.66.4' as const
+export const APP_VERSION = '2.67.0' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-02-27' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'ARIA v1.2: Gemini 2.0 Flash + auto-retry rate limit con countdown' as const
+export const VERSION_NAME = 'Mapa Isométrico 3D: Three.js + Cámara FFT + Equipos interactivos' as const
 
 /**
  * Nota:
