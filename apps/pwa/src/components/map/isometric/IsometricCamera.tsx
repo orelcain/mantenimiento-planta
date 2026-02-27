@@ -24,6 +24,8 @@ interface IsometricCameraProps {
   zoom: number
   /** Centro de la planta (target) */
   target: [number, number, number]
+  /** Offset de paneo adicional (plano XZ) */
+  panOffset?: { x: number; z: number }
   /** Distancia de la cámara al centro */
   distance?: number
   /** Callback cuando termina la animación de rotación */
@@ -52,6 +54,7 @@ export function IsometricCamera({
   angle,
   zoom,
   target,
+  panOffset,
   distance = 100,
   onRotationComplete,
 }: IsometricCameraProps) {
@@ -61,6 +64,7 @@ export function IsometricCamera({
   const currentZoom = useRef(zoom)
   const isAnimating = useRef(false)
   const targetVec = useRef(new THREE.Vector3(...target))
+  const currentPan = useRef({ x: panOffset?.x ?? 0, z: panOffset?.z ?? 0 })
 
   // Actualizar target del centro
   useEffect(() => {
@@ -104,16 +108,27 @@ export function IsometricCamera({
     // Interpolar zoom
     currentZoom.current = dampedLerp(currentZoom.current, zoom, DAMPING * 0.5, dt)
 
+    // Interpolar pan offset
+    const targetPanX = panOffset?.x ?? 0
+    const targetPanZ = panOffset?.z ?? 0
+    currentPan.current.x = dampedLerp(currentPan.current.x, targetPanX, DAMPING, dt)
+    currentPan.current.z = dampedLerp(currentPan.current.z, targetPanZ, DAMPING, dt)
+
+    // Calcular lookAt con pan offset aplicado
+    const lookAtX = targetVec.current.x + currentPan.current.x
+    const lookAtY = targetVec.current.y
+    const lookAtZ = targetVec.current.z + currentPan.current.z
+
     // Calcular posición de la cámara en coordenadas esféricas
     const azimuth = currentAzimuth.current
     const elevation = ISO_ELEVATION
 
-    const x = targetVec.current.x + distance * Math.cos(elevation) * Math.sin(azimuth)
-    const y = targetVec.current.y + distance * Math.sin(elevation)
-    const z = targetVec.current.z + distance * Math.cos(elevation) * Math.cos(azimuth)
+    const x = lookAtX + distance * Math.cos(elevation) * Math.sin(azimuth)
+    const y = lookAtY + distance * Math.sin(elevation)
+    const z = lookAtZ + distance * Math.cos(elevation) * Math.cos(azimuth)
 
     camera.position.set(x, y, z)
-    camera.lookAt(targetVec.current)
+    camera.lookAt(lookAtX, lookAtY, lookAtZ)
 
     // Actualizar frustum ortográfico basado en zoom y aspect ratio
     const aspect = size.width / size.height

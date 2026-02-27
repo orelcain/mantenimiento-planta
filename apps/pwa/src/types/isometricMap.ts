@@ -224,6 +224,8 @@ export interface IsometricViewerState {
   cameraAngle: CameraAngle
   /** Nivel de zoom */
   zoom: number
+  /** Offset de paneo (desplazamiento del centro de la cámara en el plano XZ) */
+  panOffset: { x: number; z: number }
   /** Nodo seleccionado */
   selectedNodeId: string | null
   /** Nodo hover */
@@ -245,6 +247,7 @@ export interface IsometricViewerState {
 export const DEFAULT_VIEWER_STATE: IsometricViewerState = {
   cameraAngle: 0,
   zoom: 25,
+  panOffset: { x: 0, z: 0 },
   selectedNodeId: null,
   hoveredNodeId: null,
   mode: 'view',

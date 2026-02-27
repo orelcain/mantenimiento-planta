@@ -137,6 +137,7 @@ function SceneContent({
         angle={viewerState.cameraAngle}
         zoom={viewerState.zoom}
         target={centerTarget}
+        panOffset={viewerState.panOffset}
         distance={60}
         onRotationComplete={handleRotationComplete}
       />

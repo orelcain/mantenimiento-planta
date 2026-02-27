@@ -12,7 +12,7 @@
  * v2.67.0 — Mapa Isométrico + Editor
  */
 
-import { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense } from 'react'
 import {
   MapPin,
   ZoomIn,
@@ -31,6 +31,7 @@ import {
   Layers,
   Pencil,
   Eye as EyeIcon,
+  Scan,
 } from 'lucide-react'
 import {
   Card,
@@ -187,6 +188,78 @@ export function MapPage() {
 
   const resetView = useCallback(() => {
     setViewerState(DEFAULT_VIEWER_STATE)
+  }, [])
+
+  // Fit all: zoom out + center para ver todo el mapa
+  const fitAll = useCallback(() => {
+    setViewerState((prev) => ({
+      ...prev,
+      zoom: 60,
+      panOffset: { x: 0, z: 0 },
+    }))
+  }, [])
+
+  // ── Wheel zoom (scroll) ──
+  const canvasContainerRef = useRef<HTMLDivElement>(null)
+
+  const handleWheel = useCallback((e: WheelEvent) => {
+    e.preventDefault()
+    const delta = e.deltaY
+    const zoomStep = 3 // más suave que los botones
+    setViewerState((prev) => {
+      const newZoom = delta > 0
+        ? Math.min(prev.zoom + zoomStep, 200)
+        : Math.max(prev.zoom - zoomStep, 3)
+      return { ...prev, zoom: newZoom }
+    })
+  }, [])
+
+  useEffect(() => {
+    const el = canvasContainerRef.current
+    if (!el) return
+    el.addEventListener('wheel', handleWheel, { passive: false })
+    return () => el.removeEventListener('wheel', handleWheel)
+  }, [handleWheel])
+
+  // ── Pan (middle-click o right-click drag) ──
+  const isPanning = useRef(false)
+  const panStart = useRef({ x: 0, y: 0 })
+
+  const handlePointerDownPan = useCallback((e: React.PointerEvent) => {
+    // Middle button (1) or right button (2)
+    if (e.button === 1 || e.button === 2) {
+      e.preventDefault()
+      isPanning.current = true
+      panStart.current = { x: e.clientX, y: e.clientY }
+      ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+    }
+  }, [])
+
+  const handlePointerMovePan = useCallback((e: React.PointerEvent) => {
+    if (!isPanning.current) return
+    const dx = e.clientX - panStart.current.x
+    const dy = e.clientY - panStart.current.y
+    panStart.current = { x: e.clientX, y: e.clientY }
+
+    // Convertir pixels a unidades mundo según zoom
+    // En ortográfica: 1 unidad mundo ≈ viewportPixels / (zoom * 2)
+    setViewerState((prev) => {
+      const sensitivity = prev.zoom / 400
+      return {
+        ...prev,
+        panOffset: {
+          x: prev.panOffset.x - dx * sensitivity,
+          z: prev.panOffset.z - dy * sensitivity,
+        },
+      }
+    })
+  }, [])
+
+  const handlePointerUpPan = useCallback((e: React.PointerEvent) => {
+    if (isPanning.current) {
+      isPanning.current = false
+      ;(e.target as HTMLElement).releasePointerCapture(e.pointerId)
+    }
   }, [])
 
   // ── Handlers de nodos ──
@@ -527,7 +600,7 @@ export function MapPage() {
             Mapa Isométrico
           </h1>
           <p className="text-sm text-muted-foreground">
-            Vista 3D de la planta — Rotar: Q/E · Zoom: +/- · Reset: R
+            Vista 3D de la planta — Rotar: Q/E · Zoom: scroll · Pan: click medio · Reset: R
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -589,7 +662,14 @@ export function MapPage() {
       {/* Main 3D Viewport + Controls */}
       <Card className="overflow-hidden">
         <CardContent className="p-0">
-          <div className="relative w-full h-[550px] md:h-[650px] lg:h-[700px]">
+          <div
+            ref={canvasContainerRef}
+            className="relative w-full h-[550px] md:h-[650px] lg:h-[700px]"
+            onPointerDown={handlePointerDownPan}
+            onPointerMove={handlePointerMovePan}
+            onPointerUp={handlePointerUpPan}
+            onContextMenu={(e) => e.preventDefault()}
+          >
             {/* Three.js Scene */}
             <Suspense
               fallback={
@@ -655,7 +735,7 @@ export function MapPage() {
               </div>
             )}
 
-            {/* Camera rotation + zoom (izquierda abajo) */}
+            {/* Camera rotation + zoom + pan (izquierda abajo) */}
             <div className="absolute bottom-4 left-4 flex flex-col gap-2">
               <div className="flex items-center gap-1 bg-card/90 backdrop-blur rounded-lg p-1 shadow-lg border">
                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={rotateLeft} title="Rotar izq (Q)">
@@ -665,13 +745,16 @@ export function MapPage() {
                     <RotateCw className="h-4 w-4" />
                   </Button>
                   <div className="w-px h-6 bg-border" />
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={zoomIn} title="Acercar (+)">
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={zoomIn} title="Acercar (scroll ↑)">
                     <ZoomIn className="h-4 w-4" />
                   </Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={zoomOut} title="Alejar (-)">
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={zoomOut} title="Alejar (scroll ↓)">
                     <ZoomOut className="h-4 w-4" />
                   </Button>
                   <div className="w-px h-6 bg-border" />
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={fitAll} title="Vista completa">
+                    <Scan className="h-4 w-4" />
+                  </Button>
                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={resetView} title="Resetear (R)">
                     <Maximize className="h-4 w-4" />
                   </Button>
@@ -867,7 +950,7 @@ export function MapPage() {
             <div className="absolute bottom-4 right-4 text-[10px] text-muted-foreground/60 select-none pointer-events-none hidden md:block">
               {isEditMode
                 ? 'V: seleccionar · M: mover · A: agregar · Del: eliminar · Ctrl+Z: deshacer'
-                : 'Q/E: rotar · +/-: zoom · R: reset · Click: seleccionar'}
+                : 'Q/E: rotar · Scroll: zoom · Click medio/der: paneo · R: reset · Click: seleccionar'}
             </div>
           </div>
         </CardContent>
