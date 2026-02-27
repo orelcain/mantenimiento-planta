@@ -7,6 +7,11 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.65.3] - 2026-02-26
+### Corregido
+- **Log de Misiones se borra solo**: el auto-refresh cada 10s del panel Mission Control sobrescribía los logs con el array in-memory (vacío tras reload). Ahora `loadTodayLogs()` hidrata el array in-memory con los logs de Firestore, para que `getMissionLogs()` siempre los devuelva
+- **Warning DOM "Password field not in form"**: inputs de API keys ahora tienen `autoComplete="off"` para suprimir la advertencia de Chrome
+
 ## [2.65.2] - 2026-02-26
 ### Corregido
 - **DeepSeek 402 Payment Required**: cuando la API de DeepSeek responde 402 (sin saldo), ahora se detecta específicamente y el agente se marca como `disabled` (no `offline`), con mensaje claro "sin saldo: 402 Payment Required"

@@ -456,6 +456,7 @@ export function MissionControlPanel() {
                 </div>
                 <input
                   type="password"
+                  autoComplete="off"
                   placeholder={hasSavedKey ? '••••••••••• (guardada)' : 'Pegar API key...'}
                   value={keyInputs[provider] || ''}
                   onChange={e => setKeyInputs(prev => ({ ...prev, [provider]: e.target.value }))}

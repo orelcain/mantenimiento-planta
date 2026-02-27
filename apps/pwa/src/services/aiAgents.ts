@@ -560,6 +560,16 @@ export async function loadTodayLogs(): Promise<MissionLog[]> {
     const logs: MissionLog[] = []
     snap.forEach(d => logs.push(d.data() as MissionLog))
     logs.sort((a, b) => b.timestamp - a.timestamp)
+
+    // Hidratar array in-memory para que getMissionLogs() los devuelva
+    // (evita que el auto-refresh del panel borre los logs de Firestore)
+    const existingIds = new Set(missionLogs.map(l => l.id))
+    for (const log of logs) {
+      if (!existingIds.has(log.id)) missionLogs.push(log)
+    }
+    missionLogs.sort((a, b) => b.timestamp - a.timestamp)
+    if (missionLogs.length > MAX_LOG_MEMORY) missionLogs.length = MAX_LOG_MEMORY
+
     return logs
   } catch {
     return []
