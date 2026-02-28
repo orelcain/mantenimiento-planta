@@ -35,6 +35,8 @@ import {
   Building2,
   Shapes,
   Grid3x3,
+  Trash2,
+  Settings2,
 } from 'lucide-react'
 import {
   Card,
@@ -92,6 +94,18 @@ const STATUS_CONFIG: Record<IncidentStatus, { label: string; variant: string }> 
   cerrada: { label: 'Cerrada', variant: 'outline' },
 }
 
+const FLOOR_OPTIONS = [
+  { floor: 0, full: 'Planta Baja' },
+  { floor: 1, full: 'Segundo Piso' },
+  { floor: 2, full: 'Techo' },
+] as const
+
+const FLOOR_LABELS: Record<number, string> = {
+  0: 'Planta Baja',
+  1: 'Segundo Piso',
+  2: 'Techo',
+}
+
 /** Tamaños por defecto para cada tipo de equipo */
 function getDefaultSize(type: MapNode['type']): MapNode['size'] {
   const sizes: Record<string, MapNode['size']> = {
@@ -143,6 +157,8 @@ export function MapPage() {
   const [showLinkDialog, setShowLinkDialog] = useState(false)
   const [showShapeEditor, setShowShapeEditor] = useState(false)
   const [showAreaEditor, setShowAreaEditor] = useState(false)
+  const [showAreaManager, setShowAreaManager] = useState(false)
+  const [areaManagerFloor, setAreaManagerFloor] = useState<'all' | 0 | 1 | 2>('all')
   const [editingArea, setEditingArea] = useState<MapArea | null>(null)
   const [selectedAreaId, setSelectedAreaId] = useState<string | null>(null)
   const [areaPaintState, setAreaPaintState] = useState<AreaPaintState>({
@@ -179,6 +195,13 @@ export function MapPage() {
     () => areas.filter((area) => (area.floor ?? 0) === viewerState.currentFloor),
     [areas, viewerState.currentFloor]
   )
+
+  const managedAreas = useMemo(() => {
+    const base = areaManagerFloor === 'all'
+      ? areas
+      : areas.filter((area) => (area.floor ?? 0) === areaManagerFloor)
+    return [...base].sort((a, b) => a.label.localeCompare(b.label, 'es'))
+  }, [areas, areaManagerFloor])
 
   // Resumen de estados para la leyenda
   const statusSummary = useMemo(() => {
@@ -662,6 +685,7 @@ export function MapPage() {
     setViewerState((prev) => ({ ...prev, mode: 'view', selectedNodeId: null }))
     setSelectedAreaId(null)
     setShowAreaEditor(false)
+    setShowAreaManager(false)
     setEditingArea(null)
     history.clear()
   }, [hasUnsavedChanges, history])
@@ -1064,11 +1088,7 @@ export function MapPage() {
               <div className="bg-card/90 backdrop-blur rounded-lg shadow-lg border p-1.5">
                 <p className="text-[10px] text-muted-foreground font-medium px-1 mb-1">PISO</p>
                 <div className="flex flex-col gap-0.5">
-                  {[
-                    { floor: 0, full: 'Planta Baja' },
-                    { floor: 1, full: 'Segundo Piso' },
-                    { floor: 2, full: 'Techo' },
-                  ].map(({ floor, full }) => (
+                  {FLOOR_OPTIONS.map(({ floor, full }) => (
                     <Button
                       key={floor}
                       variant={viewerState.currentFloor === floor ? 'default' : 'ghost'}
@@ -1115,6 +1135,16 @@ export function MapPage() {
                     >
                       <Grid3x3 className="h-3.5 w-3.5" />
                       2) Editar área seleccionada
+                    </Button>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5 text-xs justify-start w-full"
+                      onClick={() => setShowAreaManager(true)}
+                    >
+                      <Settings2 className="h-3.5 w-3.5" />
+                      Gestionar áreas
                     </Button>
                   </div>
 
@@ -1355,6 +1385,113 @@ export function MapPage() {
                 onDelete={handleDeleteArea}
                 onClose={closeAreaEditor}
               />
+            )}
+
+            {/* Gestor de áreas — vista centralizada */}
+            {showAreaManager && (
+              <div className="absolute inset-0 z-30 bg-background/70 backdrop-blur-sm flex items-center justify-center p-4">
+                <Card className="w-full max-w-2xl max-h-[80vh] overflow-hidden border shadow-2xl">
+                  <CardContent className="p-0 h-full flex flex-col">
+                    <div className="p-3 border-b flex items-center justify-between">
+                      <div>
+                        <h3 className="text-sm font-semibold">Gestionar Áreas</h3>
+                        <p className="text-[11px] text-muted-foreground">Edita o elimina áreas existentes desde un solo lugar</p>
+                      </div>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setShowAreaManager(false)}>
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+
+                    <div className="p-3 border-b flex items-center gap-1.5 flex-wrap">
+                      <Button
+                        size="sm"
+                        variant={areaManagerFloor === 'all' ? 'default' : 'outline'}
+                        className="h-7 text-xs"
+                        onClick={() => setAreaManagerFloor('all')}
+                      >
+                        Todos
+                      </Button>
+                      {FLOOR_OPTIONS.map(({ floor, full }) => (
+                        <Button
+                          key={floor}
+                          size="sm"
+                          variant={areaManagerFloor === floor ? 'default' : 'outline'}
+                          className="h-7 text-xs"
+                          onClick={() => setAreaManagerFloor(floor)}
+                        >
+                          {full}
+                        </Button>
+                      ))}
+                      <Badge variant="outline" className="ml-auto text-xs">
+                        {managedAreas.length} áreas
+                      </Badge>
+                    </div>
+
+                    <div className="p-3 overflow-y-auto space-y-2">
+                      {managedAreas.length === 0 ? (
+                        <div className="text-center text-xs text-muted-foreground py-8">No hay áreas para este filtro</div>
+                      ) : (
+                        managedAreas.map((area) => (
+                          <div key={area.id} className="border rounded-lg p-2.5 bg-card/70 flex items-center gap-2">
+                            <span className="w-3 h-3 rounded-sm border" style={{ backgroundColor: area.color }} />
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-medium truncate">{area.label}</p>
+                              <p className="text-[11px] text-muted-foreground">
+                                {FLOOR_LABELS[area.floor ?? 0] ?? `Piso ${area.floor ?? 0}`} · {area.tiles?.length ?? 0} tiles
+                              </p>
+                            </div>
+
+                            <div className="flex items-center gap-1">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 text-xs"
+                                onClick={() => {
+                                  setShowAreaManager(false)
+                                  setSelectedAreaId(area.id)
+                                  setViewerState((prev) => ({
+                                    ...prev,
+                                    currentFloor: area.floor ?? 0,
+                                    panOffset: { x: area.position.x, z: area.position.z },
+                                    zoom: Math.max(prev.zoom, 28),
+                                    filters: { ...prev.filters, showAreas: true },
+                                  }))
+                                }}
+                              >
+                                Ver
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 text-xs"
+                                onClick={() => {
+                                  setShowAreaManager(false)
+                                  openAreaEditor(area)
+                                }}
+                              >
+                                Editar
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 text-xs text-destructive hover:text-destructive"
+                                onClick={() => {
+                                  if (window.confirm(`¿Eliminar área "${area.label}"? Esta acción no se puede deshacer.`)) {
+                                    handleDeleteArea(area.id)
+                                  }
+                                }}
+                              >
+                                <Trash2 className="h-3.5 w-3.5 mr-1" />
+                                Eliminar
+                              </Button>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
             )}
           </div>
         </CardContent>
