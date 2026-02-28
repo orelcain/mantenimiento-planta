@@ -47,6 +47,7 @@ const DEFAULT_COLORS = [
 
 type SculptMode = 'primitives' | 'voxel'
 type VoxelTool = 'paint' | 'erase' | 'select'
+type FaceDirection = 'top' | 'bottom' | 'left' | 'right' | 'front' | 'back'
 
 function voxelKey(x: number, y: number, z: number) {
   return `${x},${y},${z}`
@@ -55,6 +56,99 @@ function voxelKey(x: number, y: number, z: number) {
 function parseVoxelKey(key: string) {
   const [x, y, z] = key.split(',').map(Number)
   return { x, y, z }
+}
+
+function getFaceNormal(face: FaceDirection) {
+  switch (face) {
+    case 'top': return { dx: 0, dy: 1, dz: 0 }
+    case 'bottom': return { dx: 0, dy: -1, dz: 0 }
+    case 'left': return { dx: -1, dy: 0, dz: 0 }
+    case 'right': return { dx: 1, dy: 0, dz: 0 }
+    case 'front': return { dx: 0, dy: 0, dz: 1 }
+    case 'back': return { dx: 0, dy: 0, dz: -1 }
+    default: return { dx: 0, dy: 1, dz: 0 }
+  }
+}
+
+function getVoxelBounds(cells: Set<string>) {
+  if (cells.size === 0) return null
+  let minX = Number.POSITIVE_INFINITY
+  let minY = Number.POSITIVE_INFINITY
+  let minZ = Number.POSITIVE_INFINITY
+  let maxX = Number.NEGATIVE_INFINITY
+  let maxY = Number.NEGATIVE_INFINITY
+  let maxZ = Number.NEGATIVE_INFINITY
+
+  for (const key of cells) {
+    const { x, y, z } = parseVoxelKey(key)
+    minX = Math.min(minX, x)
+    minY = Math.min(minY, y)
+    minZ = Math.min(minZ, z)
+    maxX = Math.max(maxX, x)
+    maxY = Math.max(maxY, y)
+    maxZ = Math.max(maxZ, z)
+  }
+
+  return { minX, minY, minZ, maxX, maxY, maxZ }
+}
+
+function voxelBelongsToFace(x: number, y: number, z: number, bounds: ReturnType<typeof getVoxelBounds>, face: FaceDirection) {
+  if (!bounds) return false
+  switch (face) {
+    case 'top': return y === bounds.maxY
+    case 'bottom': return y === bounds.minY
+    case 'left': return x === bounds.minX
+    case 'right': return x === bounds.maxX
+    case 'front': return z === bounds.maxZ
+    case 'back': return z === bounds.minZ
+    default: return false
+  }
+}
+
+function projectFaceCell(
+  x: number,
+  y: number,
+  z: number,
+  bounds: NonNullable<ReturnType<typeof getVoxelBounds>>,
+  face: FaceDirection,
+  subdivisions: number,
+) {
+  const width = Math.max(1, bounds.maxX - bounds.minX + 1)
+  const height = Math.max(1, bounds.maxY - bounds.minY + 1)
+  const depth = Math.max(1, bounds.maxZ - bounds.minZ + 1)
+
+  let axisU = 0
+  let axisV = 0
+  let lenU = 1
+  let lenV = 1
+
+  switch (face) {
+    case 'top':
+    case 'bottom':
+      axisU = x - bounds.minX
+      axisV = z - bounds.minZ
+      lenU = width
+      lenV = depth
+      break
+    case 'left':
+    case 'right':
+      axisU = z - bounds.minZ
+      axisV = y - bounds.minY
+      lenU = depth
+      lenV = height
+      break
+    case 'front':
+    case 'back':
+      axisU = x - bounds.minX
+      axisV = y - bounds.minY
+      lenU = width
+      lenV = height
+      break
+  }
+
+  const u = Math.min(subdivisions - 1, Math.floor((axisU * subdivisions) / lenU))
+  const v = Math.min(subdivisions - 1, Math.floor((axisV * subdivisions) / lenV))
+  return { u, v }
 }
 
 function buildDefaultVoxelsFromNode(node: MapNode, gridSize: number) {
@@ -266,6 +360,8 @@ export function ShapeEditorDialog({ isOpen, node, onSave, onClear, onClose }: Sh
   const [voxelGridSize] = useState(initialGridSize)
   const [voxelLayer, setVoxelLayer] = useState(0)
   const [voxelTool, setVoxelTool] = useState<VoxelTool>('paint')
+  const [activeFace, setActiveFace] = useState<FaceDirection>('top')
+  const [faceSubdivision, setFaceSubdivision] = useState(4)
   const [voxelColor, setVoxelColor] = useState(node.color || EQUIPMENT_TYPE_COLORS[node.type])
   const [voxelCells, setVoxelCells] = useState<Set<string>>(() => buildDefaultVoxelsFromNode(node, initialGridSize))
   const [voxelSelection, setVoxelSelection] = useState<Set<string>>(new Set())
@@ -290,6 +386,35 @@ export function ShapeEditorDialog({ isOpen, node, onSave, onClear, onClose }: Sh
     }
     return Math.max(maxY, 0)
   }, [voxelCells])
+
+  const voxelBounds = useMemo(() => getVoxelBounds(voxelCells), [voxelCells])
+
+  const faceBuckets = useMemo(() => {
+    const buckets = new Map<string, string[]>()
+    if (!voxelBounds) return buckets
+
+    for (const key of voxelCells) {
+      const { x, y, z } = parseVoxelKey(key)
+      if (!voxelBelongsToFace(x, y, z, voxelBounds, activeFace)) continue
+      const { u, v } = projectFaceCell(x, y, z, voxelBounds, activeFace, faceSubdivision)
+      const bucketKey = `${u},${v}`
+      const bucket = buckets.get(bucketKey)
+      if (bucket) bucket.push(key)
+      else buckets.set(bucketKey, [key])
+    }
+
+    return buckets
+  }, [voxelCells, voxelBounds, activeFace, faceSubdivision])
+
+  const activeFaceVoxels = useMemo(() => {
+    const out: string[] = []
+    if (!voxelBounds) return out
+    for (const key of voxelCells) {
+      const { x, y, z } = parseVoxelKey(key)
+      if (voxelBelongsToFace(x, y, z, voxelBounds, activeFace)) out.push(key)
+    }
+    return out
+  }, [voxelCells, voxelBounds, activeFace])
 
   const voxelPrimitives = useMemo<ShapePrimitive[]>(() => {
     const out: ShapePrimitive[] = []
@@ -420,6 +545,29 @@ export function ShapeEditorDialog({ isOpen, node, onSave, onClear, onClose }: Sh
     setSelectedPrimId(newPrim.id)
   }, [primitives])
 
+  const extrudeVoxelKeys = useCallback((keys: string[], face: FaceDirection) => {
+    if (keys.length === 0) return
+    const { dx, dy, dz } = getFaceNormal(face)
+    setVoxelCells((prev) => {
+      const next = new Set(prev)
+      const movedSelection: string[] = []
+
+      for (const key of keys) {
+        const { x, y, z } = parseVoxelKey(key)
+        const nx = x + dx
+        const ny = y + dy
+        const nz = z + dz
+        if (nx < 0 || nx >= voxelGridSize || nz < 0 || nz >= voxelGridSize || ny < 0 || ny > 40) continue
+        const target = voxelKey(nx, ny, nz)
+        next.add(target)
+        movedSelection.push(target)
+      }
+
+      setVoxelSelection(new Set(movedSelection))
+      return next
+    })
+  }, [voxelGridSize])
+
   const applyVoxelAction = useCallback((x: number, z: number) => {
     const key = voxelKey(x, voxelLayer, z)
 
@@ -473,6 +621,32 @@ export function ShapeEditorDialog({ isOpen, node, onSave, onClear, onClose }: Sh
       return next
     })
   }, [voxelSelection])
+
+  const selectFaceBucket = useCallback((u: number, v: number) => {
+    const bucket = faceBuckets.get(`${u},${v}`) ?? []
+    if (bucket.length === 0) return
+    setVoxelSelection((prev) => {
+      const next = new Set(prev)
+      const allSelected = bucket.every((key) => next.has(key))
+      if (allSelected) {
+        for (const key of bucket) next.delete(key)
+      } else {
+        for (const key of bucket) next.add(key)
+      }
+      return next
+    })
+  }, [faceBuckets])
+
+  const selectFullActiveFace = useCallback(() => {
+    setVoxelSelection(new Set(activeFaceVoxels))
+  }, [activeFaceVoxels])
+
+  const extrudeActiveFace = useCallback(() => {
+    const source = voxelSelection.size > 0
+      ? Array.from(voxelSelection)
+      : activeFaceVoxels
+    extrudeVoxelKeys(source, activeFace)
+  }, [voxelSelection, activeFaceVoxels, extrudeVoxelKeys, activeFace])
 
   const clearCurrentLayer = useCallback(() => {
     setVoxelCells((prev) => {
@@ -646,6 +820,81 @@ export function ShapeEditorDialog({ isOpen, node, onSave, onClear, onClose }: Sh
                     onChange={(e) => setVoxelColor(e.target.value)}
                     className="w-full h-8 cursor-pointer rounded border p-0"
                   />
+                </div>
+
+                <div className="space-y-1.5 border rounded-lg p-2">
+                  <p className="text-xs font-semibold">Editor por caras</p>
+                  <div className="grid grid-cols-3 gap-1">
+                    {([
+                      ['top', 'Top'],
+                      ['bottom', 'Bottom'],
+                      ['left', 'Left'],
+                      ['right', 'Right'],
+                      ['front', 'Front'],
+                      ['back', 'Back'],
+                    ] as [FaceDirection, string][]).map(([face, label]) => (
+                      <button
+                        key={face}
+                        className={cn('px-1.5 py-1 rounded border text-[10px]', activeFace === face ? 'border-primary bg-primary/10' : 'hover:bg-muted')}
+                        onClick={() => setActiveFace(face)}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div>
+                    <p className="text-[10px] text-muted-foreground mb-1">Subdivisión de cara</p>
+                    <div className="grid grid-cols-4 gap-1">
+                      {[2, 4, 6, 8].map((value) => (
+                        <button
+                          key={value}
+                          className={cn('px-1.5 py-1 rounded border text-[10px]', faceSubdivision === value ? 'border-primary bg-primary/10' : 'hover:bg-muted')}
+                          onClick={() => setFaceSubdivision(value)}
+                        >
+                          {value}×{value}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={selectFullActiveFace}>
+                      Selec. cara
+                    </Button>
+                    <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={extrudeActiveFace}>
+                      Extruir cara
+                    </Button>
+                  </div>
+
+                  <div>
+                    <p className="text-[10px] text-muted-foreground mb-1">Grilla de cara activa</p>
+                    <div
+                      className="grid gap-1"
+                      style={{ gridTemplateColumns: `repeat(${faceSubdivision}, minmax(0, 1fr))` }}
+                    >
+                      {Array.from({ length: faceSubdivision }).map((_, v) =>
+                        Array.from({ length: faceSubdivision }).map((_, u) => {
+                          const bucket = faceBuckets.get(`${u},${v}`) ?? []
+                          const hasVoxels = bucket.length > 0
+                          const selectedCount = bucket.filter((key) => voxelSelection.has(key)).length
+                          const selected = selectedCount > 0
+                          return (
+                            <button
+                              key={`face-${u}-${v}`}
+                              className={cn(
+                                'aspect-square rounded-sm border transition-colors',
+                                hasVoxels ? 'bg-primary/25 hover:bg-primary/40' : 'bg-muted/20',
+                                selected && 'ring-1 ring-primary border-primary'
+                              )}
+                              onClick={() => selectFaceBucket(u, v)}
+                              title={`u:${u} v:${v} ${hasVoxels ? `(${selectedCount}/${bucket.length})` : '(vacío)'}`}
+                            />
+                          )
+                        })
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 <div className="space-y-1.5">

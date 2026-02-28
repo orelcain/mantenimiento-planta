@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.69.5**
+## Versión Actual: **v2.69.6**
 
 **Fecha de lanzamiento**: 28 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,17 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.69.6 — Fase 2: editor por caras con subdivisión (28/02/2026)
+- 🧩 **Editor por caras**: selección de cara activa (`Top`, `Bottom`, `Left`, `Right`, `Front`, `Back`) en modo voxel
+- 🔲 **Subdivisión por cara**: grilla 2D configurable (`2×2`, `4×4`, `6×6`, `8×8`) para seleccionar zonas de la cara
+- ⬆️ **Extrusión por normal**: acción `Extruir cara` que proyecta la selección siguiendo la normal de la cara activa
+- 🎯 **Selección inteligente**: selección de cara completa y selección parcial por celdas de subdivisión
+
+### v2.69.5 — Fase 1 MVP: esculpido voxel (28/02/2026)
+- 🧱 **Modo voxel**: alternancia entre `Primitivas` y `Voxel` dentro de `ShapeEditorDialog`
+- 🛠️ **Herramientas base**: pintar, borrar, seleccionar por capa Y y extrusión vertical (`+Y/-Y`)
+- 👁️ **Preview y métricas unificadas**: visor 3D y guardado usan la geometría activa según modo de edición
 
 ### v2.69.4 — Editor de forma más amplio y mejor visual 3D (28/02/2026)
 - 🖥️ **Modal ampliado**: `ShapeEditorDialog` aumenta ancho máximo y altura útil para trabajar con mayor comodidad
