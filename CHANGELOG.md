@@ -7,6 +7,24 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.68.0] - 2026-02-27
+### Agregado — Zoom 500, Pan suave, 6 nuevos tipos, Mapa Planta Chonchi real
+- **Zoom ampliado a 500**: rango extendido de 200→500, stepping progresivo (6% del zoom actual por tick de scroll)
+- **Pan suave**: sensibilidad inversamente proporcional al zoom (`30/zoom`), movimiento fino cuando se está en zoom alto
+- **6 nuevos tipos de equipo 3D**: evaporador (carcasa + serpentín + ventiladores), condensador (cilindro horizontal + tapas), panel eléctrico (gabinete + LEDs indicadores), extractor (carcasa cilíndrica + hélice + ducto), transformador (tanque + radiadores + aisladores cerámicos), caldera (cilindro + chimenea + puerta de hogar)
+- **Color personalizable por nodo**: propiedad `node.color` como override sobre el color por defecto del tipo de equipo — se aplica a toda la geometría 3D
+- **Mapa Planta Chonchi completo**: 160×120m (antes 60×40m) con 30 zonas reales: Ingreso MP, Sacrificio, Eviscerado, Filete, Emparrillado, Empaque, Sellado, Lavado, Túneles Congelación, Cámaras Frío, Sala Máquinas, Sala Freon, Subestación, Caldera, Taller, Bodega, Casino, Acopio Pontón, Planta Yal, y más
+- **~80 equipos con códigos SAP reales**: IDs 720004xxx de la jerarquía completa de Planta Chonchi vinculados a nodos del mapa
+- **14 conectores reales**: flujo de proceso, circuito NH3, alimentación eléctrica entre zonas
+- **16 tipos de equipo en total**: pump, motor, conveyor, tank, compressor, valve, sensor, pipe, building, evaporator, condenser, panel, extractor, transformer, boiler, generic
+
+### Modificado
+- `EquipmentNode.tsx` — 6 nuevas geometrías 3D, `colorOverride` prop, variable `typeColor` reemplaza colores hardcoded
+- `types/isometricMap.ts` — 16 tipos en `EquipmentNodeType`, `EQUIPMENT_TYPE_COLORS`, `EQUIPMENT_TYPE_LABELS`; zoom default 12
+- `MapPage.tsx` — zoom max 500 progresivo, pan sensitivity `30/zoom`, fitAll zoom=15, 6 nuevos default sizes
+- `AddEquipmentDialog.tsx` — 16 presets de equipo (antes 10)
+- `services/isometricMap.ts` — `generateDemoMap()` reescrito completamente: Planta Chonchi 160×120m, 30 áreas, ~80 nodos, 14 conectores
+
 ## [2.67.1] - 2026-02-27
 ### Agregado — Modo Editor del Mapa Isométrico
 - **Modo Editor**: botón "Editar Mapa" (solo admin) que activa la edición completa del layout 3D

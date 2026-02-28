@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.67.2**
+## Versión Actual: **v2.68.0**
 
 **Fecha de lanzamiento**: 27 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,14 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.68.0 — Zoom 500 + Pan suave + 6 nuevos tipos equipo + Mapa Planta Chonchi real (27/02/2026)
+- 🔍 **Zoom ampliado**: rango extendido hasta 500 (antes 200), stepping progresivo 6% del zoom actual
+- 🖱️ **Pan suave**: sensibilidad inversamente proporcional al zoom (30/zoom), movimiento fino a zoom alto
+- 🏭 **6 nuevos tipos de equipo 3D**: evaporador (carcasa + serpentín + ventiladores), condensador (cilindro horizontal + tapas), panel eléctrico (gabinete + LEDs), extractor (carcasa + hélice + ducto), transformador (tanque + radiadores + aisladores), caldera (cilindro + chimenea + puerta hogar)
+- 🎨 **Color personalizable por nodo**: propiedad `node.color` override sobre color de tipo por defecto
+- 🗺️ **Mapa Planta Chonchi real**: 160×120m con 30 zonas (Proceso, Túneles, Frigorífico, Sala Máquinas, Acopio, Planta Yal, etc.), ~80 equipos con códigos SAP reales (720004xxx), 14 conectores de flujo/NH3/eléctricos
+- 📐 **16 tipos de equipo total**: bomba, motor, transportador, tanque, compresor, válvula, sensor, tubería, edificio, evaporador, condensador, panel, extractor, transformador, caldera, genérico
 
 ### v2.67.2 — Vinculación datos reales + LinkEntityDialog + useMapRuntimeData (27/02/2026)
 - 🔗 **LinkEntityDialog**: diálogo de búsqueda/selección de Equipment y Zone reales para vincular a nodos del mapa isométrico (tabs, search, badges de estado, desvincular)
