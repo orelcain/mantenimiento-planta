@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.69.1**
+## Versión Actual: **v2.69.2**
 
 **Fecha de lanzamiento**: 28 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,10 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.69.2 — Regla global de capas seguras para overlays 3D (28/02/2026)
+- 🛡️ **Blindaje global**: clase compartida `map-overlay-html` para todos los overlays `Html` del mapa isométrico
+- 🧱 **Prevención futura**: regla CSS centralizada en `index.css` para garantizar que labels/badges queden bajo cualquier modal
 
 ### v2.69.1 — Hotfix z-index labels sobre modales (28/02/2026)
 - 🧯 **Fix visual crítico**: labels/badges `Html` del mapa isométrico ya no se dibujan sobre modales y paneles

@@ -89,6 +89,14 @@
     @apply relative w-full h-full overflow-hidden touch-none;
   }
 
+  /* Seguridad de capas para labels 3D (drei Html) del mapa:
+     nunca deben superponerse a modales/paneles UI */
+  .map-overlay-html,
+  .map-overlay-html * {
+    z-index: 1 !important;
+    pointer-events: none !important;
+  }
+
   .zone-marker {
     @apply absolute cursor-pointer transition-all duration-200;
   }

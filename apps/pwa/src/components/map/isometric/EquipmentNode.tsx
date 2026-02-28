@@ -487,7 +487,13 @@ function IncidentBadge({ count, position: pos }: { count: number; position: [num
   if (count === 0) return null
 
   return (
-    <Html position={pos} center zIndexRange={[2, 0]} style={{ pointerEvents: 'none', zIndex: 1 }}>
+    <Html
+      position={pos}
+      center
+      wrapperClass="map-overlay-html"
+      zIndexRange={[2, 0]}
+      style={{ pointerEvents: 'none', zIndex: 1 }}
+    >
       <div
         style={{
           background: count > 2 ? '#ef4444' : '#f59e0b',
@@ -601,6 +607,7 @@ export function EquipmentNode({
         <Html
           position={[0, labelY, 0]}
           center
+          wrapperClass="map-overlay-html"
           zIndexRange={[2, 0]}
           style={{ pointerEvents: 'none', userSelect: 'none', zIndex: 1 }}
         >

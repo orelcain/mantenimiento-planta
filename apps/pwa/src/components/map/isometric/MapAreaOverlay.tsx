@@ -59,7 +59,9 @@ export function MapAreaOverlay({ area, selected = false, onClick }: MapAreaOverl
         <Html
           position={[area.position.x, 0.5, area.position.z]}
           center
-          style={{ pointerEvents: 'none', userSelect: 'none' }}
+          wrapperClass="map-overlay-html"
+          zIndexRange={[2, 0]}
+          style={{ pointerEvents: 'none', userSelect: 'none', zIndex: 1 }}
         >
           <div
             style={{
@@ -130,7 +132,9 @@ export function MapAreaOverlay({ area, selected = false, onClick }: MapAreaOverl
       <Html
         position={[0, 0.5, -area.size.depth / 2 + 0.5]}
         center
-        style={{ pointerEvents: 'none', userSelect: 'none' }}
+        wrapperClass="map-overlay-html"
+        zIndexRange={[2, 0]}
+        style={{ pointerEvents: 'none', userSelect: 'none', zIndex: 1 }}
       >
         <div
           style={{
