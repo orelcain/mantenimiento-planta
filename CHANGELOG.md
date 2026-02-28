@@ -7,6 +7,18 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.69.16] - 2026-02-28
+### Mejorado — Editor rápido con opciones dinámicas por selección
+- **Acciones contextuales por estado**: el panel muestra opciones distintas para `sin selección`, `área activa` y `equipo activo`
+- **Prioridad de flujo por selección**: con equipo seleccionado aparecen acciones de forma/vinculación/área del equipo; con área activa aparecen acciones de edición/alta y filtro de equipos del área
+- **Refactor de resolución de áreas**: agregado `areaById` en `MapPage` para lookup consistente y menos lógica repetida
+
+## [2.69.15] - 2026-02-28
+### Refactor — Flujo de editor de áreas desacoplado de MapPage
+- **Hook dedicado de áreas**: nuevo `useAreaEditorFlow` centraliza estado y handlers (`open/close/paint/save/delete`)
+- **MapPage simplificado**: removido bloque inline de edición de áreas para mejorar mantenibilidad
+- **Click de piso desacoplado**: el pintado de tiles ahora se resuelve en el hook (`paintAreaTileAt`) y mantiene el flujo actual
+
 ## [2.69.14] - 2026-02-28
 ### Refactor — Acciones y shortcuts del editor desacoplados de MapPage
 - **Hook dedicado de acciones**: nuevo `useMapEditorActions` centraliza `delete/duplicate/rotate/undo/redo`

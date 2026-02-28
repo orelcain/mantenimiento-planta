@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.69.14**
+## Versión Actual: **v2.69.16**
 
 **Fecha de lanzamiento**: 28 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,16 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.69.16 — Editor rápido dinámico por contexto área/equipo (28/02/2026)
+- 🧠 **Opciones contextuales**: el panel `Editor Rápido` ahora muestra acciones distintas según selección activa (sin selección, área seleccionada o equipo seleccionado)
+- 🧭 **Flujo guiado por contexto**: al seleccionar equipo se priorizan acciones de equipo (forma, vínculo, área asociada); al seleccionar área se prioriza edición/alta en área
+- 🧹 **Lógica simplificada**: uso de `areaById` para resolver áreas activas/asociadas y reducir búsquedas repetidas en render
+
+### v2.69.15 — Refactor flujo de editor de áreas extraído de MapPage (28/02/2026)
+- 🧩 **Nuevo hook dedicado**: `useAreaEditorFlow` encapsula estado y handlers de área (`paint/open/close/save/delete`)
+- 🧹 **MapPage más limpio**: se elimina lógica inline del ciclo de edición de áreas sin cambiar UX ni comportamiento
+- 🎯 **Interacción de piso consolidada**: `onFloorClick` delega el pintado de tiles al hook para reducir acoplamiento
 
 ### v2.69.8 — Hotfix CI/deploy TypeScript estricto (28/02/2026)
 - 🧯 **Corrección de build en Actions**: `parseVoxelKey` ahora garantiza `x/y/z` numéricos sin `undefined`

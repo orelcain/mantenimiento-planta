@@ -76,10 +76,10 @@ import { useMapRuntimeData } from '@/components/map/isometric/editor/useMapRunti
 import { MapSearchPanel } from '@/components/map/isometric/editor/MapSearchPanel'
 import { ShapeEditorDialog } from '@/components/map/isometric/editor/ShapeEditorDialog'
 import { AreaTileEditor } from '@/components/map/isometric/editor/AreaTileEditor'
-import type { AreaPaintState } from '@/components/map/isometric/editor/AreaTileEditor'
 import { useEditorOverlayState } from '@/components/map/isometric/editor/useEditorOverlayState'
 import { getAreaAtPosition, normalizeNodeForArea } from '@/components/map/isometric/editor/areaAssociation'
 import { useMapEditorActions } from '@/components/map/isometric/editor/useMapEditorActions'
+import { useAreaEditorFlow } from '@/components/map/isometric/editor/useAreaEditorFlow'
 
 const PRIORITY_CONFIG: Record<IncidentPriority, { color: string; bg: string; label: string }> = {
   critica: { color: 'text-red-500', bg: 'bg-red-500', label: 'Crítica' },
@@ -163,20 +163,9 @@ export function MapPage() {
   const showAreaEditor = overlayState.isOverlayOpen('area-editor')
   const showAreaManager = overlayState.isOverlayOpen('area-manager')
   const [areaManagerFloor, setAreaManagerFloor] = useState<'all' | 0 | 1 | 2>('all')
-  const [editingArea, setEditingArea] = useState<MapArea | null>(null)
   const [selectedAreaId, setSelectedAreaId] = useState<string | null>(null)
   const [hoveredAreaId, setHoveredAreaId] = useState<string | null>(null)
   const [showOnlyActiveAreaEquipment, setShowOnlyActiveAreaEquipment] = useState(false)
-  const [areaPaintState, setAreaPaintState] = useState<AreaPaintState>({
-    tiles: new Set<string>(),
-    tool: 'paint',
-    name: '',
-    color: '#3b82f6',
-    opacity: 0.3,
-    linkedZoneId: '',
-    editAreaId: null,
-  })
-  const prevFiltersRef = useRef<IsometricViewerState['filters'] | null>(null)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const history = useEditorHistory()
@@ -199,11 +188,6 @@ export function MapPage() {
       i.status === 'pendiente' || i.status === 'confirmada' || i.status === 'en_proceso'
     ),
     [incidents]
-  )
-
-  const currentFloorAreas = useMemo(
-    () => areas.filter((area) => (area.floor ?? 0) === viewerState.currentFloor),
-    [areas, viewerState.currentFloor]
   )
 
   const visibleNodeIds = useMemo(() => {
@@ -232,6 +216,10 @@ export function MapPage() {
       : areas.filter((area) => (area.floor ?? 0) === areaManagerFloor)
     return [...base].sort((a, b) => a.label.localeCompare(b.label, 'es'))
   }, [areas, areaManagerFloor])
+
+  const areaById = useMemo(() => {
+    return new Map(areas.map((area) => [area.id, area]))
+  }, [areas])
 
   // Resumen de estados para la leyenda
   const statusSummary = useMemo(() => {
@@ -465,6 +453,30 @@ export function MapPage() {
     [history, areas, connectors]
   )
 
+  const {
+    editingArea,
+    areaPaintState,
+    currentFloorAreas,
+    handleAreaPaintStateChange,
+    openAreaEditor,
+    closeAreaEditor,
+    paintAreaTileAt,
+    handleSaveArea,
+    handleDeleteArea,
+  } = useAreaEditorFlow({
+    areas,
+    nodes,
+    currentFloor: viewerState.currentFloor,
+    currentFilters: viewerState.filters,
+    showAreaEditor,
+    setViewerState,
+    setSelectedAreaId,
+    setEditorTool,
+    commitEditorChange,
+    openAreaOverlay: () => overlayState.openOverlay('area-editor'),
+    closeAreaOverlay: () => overlayState.closeOverlayIf('area-editor'),
+  })
+
   const handleToggleEditMode = useCallback(() => {
     setViewerState((prev) => ({
       ...prev,
@@ -519,75 +531,6 @@ export function MapPage() {
     handleAddNode(normalizedNode)
   }, [selectedAreaId, areas, resolveAreaAtPosition, viewerState.currentFloor, handleAddNode])
 
-  // ── Area paint state ──
-  const handleAreaPaintStateChange = useCallback((update: Partial<AreaPaintState>) => {
-    setAreaPaintState((prev) => {
-      // Si el update contiene tiles, reemplazar directamente (Set no se puede spread)
-      if ('tiles' in update && update.tiles) {
-        return { ...prev, ...update, tiles: update.tiles }
-      }
-      return { ...prev, ...update }
-    })
-  }, [])
-
-  // Abrir editor de áreas: guardar filtros previos y ocultar equipos/etiquetas
-  const openAreaEditor = useCallback((area?: MapArea | null) => {
-    overlayState.openOverlay('area-editor')
-    setSelectedAreaId(area?.id ?? null)
-    prevFiltersRef.current = { ...viewerState.filters }
-    setViewerState((prev) => ({
-      ...prev,
-      filters: { ...prev.filters, showEquipment: false, showLabels: false, showAreas: true },
-    }))
-    setEditingArea(area ?? null)
-    // Inicializar paint state desde el área existente o vacío
-    if (area?.tiles) {
-      const tileSet = new Set<string>(area.tiles.map((t) => `${t.x},${t.z}`))
-      setAreaPaintState({
-        tiles: tileSet,
-        tool: 'paint',
-        name: area.label,
-        color: area.color ?? '#3b82f6',
-        opacity: area.opacity ?? 0.3,
-        linkedZoneId: area.linkedZoneId ?? '',
-        editAreaId: area.id,
-      })
-    } else {
-      setAreaPaintState({
-        tiles: new Set<string>(),
-        tool: 'paint',
-        name: '',
-        color: '#3b82f6',
-        opacity: 0.3,
-        linkedZoneId: '',
-        editAreaId: null,
-      })
-    }
-    setEditorTool('select')
-  }, [viewerState.filters, overlayState])
-
-  // Cerrar editor de áreas: restaurar filtros previos
-  const closeAreaEditor = useCallback(() => {
-    if (prevFiltersRef.current) {
-      setViewerState((prev) => ({
-        ...prev,
-        filters: { ...prevFiltersRef.current! },
-      }))
-      prevFiltersRef.current = null
-    }
-    overlayState.closeOverlayIf('area-editor')
-    setEditingArea(null)
-    setAreaPaintState({
-      tiles: new Set<string>(),
-      tool: 'paint',
-      name: '',
-      color: '#3b82f6',
-      opacity: 0.3,
-      linkedZoneId: '',
-      editAreaId: null,
-    })
-  }, [overlayState])
-
   const handleAreaClick = useCallback((areaId: string) => {
     const area = areas.find((a) => a.id === areaId)
     if (!area) return
@@ -616,17 +559,7 @@ export function MapPage() {
       }
 
       // ── Area paint mode: toggle tiles ──
-      if (showAreaEditor) {
-        const key = `${position.x},${position.z}`
-        setAreaPaintState((prev) => {
-          const newTiles = new Set(prev.tiles)
-          if (prev.tool === 'paint') {
-            newTiles.add(key)
-          } else {
-            newTiles.delete(key)
-          }
-          return { ...prev, tiles: newTiles }
-        })
+      if (paintAreaTileAt(position)) {
         return
       }
 
@@ -649,7 +582,7 @@ export function MapPage() {
       }
       handleAddNode(newNode)
     },
-    [showAreaEditor, editorTool, addEquipmentType, handleAddNode, resolveAreaAtPosition, viewerState.currentFloor]
+    [paintAreaTileAt, editorTool, addEquipmentType, handleAddNode, resolveAreaAtPosition, viewerState.currentFloor]
   )
 
   const {
@@ -714,9 +647,9 @@ export function MapPage() {
     setViewerState((prev) => ({ ...prev, mode: 'view', selectedNodeId: null }))
     setSelectedAreaId(null)
     overlayState.closeOverlay()
-    setEditingArea(null)
+    closeAreaEditor()
     history.clear()
-  }, [hasUnsavedChanges, history, overlayState])
+  }, [hasUnsavedChanges, history, overlayState, closeAreaEditor])
 
   // Nodo seleccionado data
   const selectedNode = viewerState.selectedNodeId
@@ -760,29 +693,6 @@ export function MapPage() {
   const handleClearCustomShape = useCallback((nodeId: string) => {
     handleNodeUpdate(nodeId, { customShape: undefined })
   }, [handleNodeUpdate])
-
-  // Handler para guardar área del tile editor
-  const handleSaveArea = useCallback((area: MapArea) => {
-    const exists = areas.find((a) => a.id === area.id)
-    if (exists) {
-      const newAreas = areas.map((a) => a.id === area.id ? area : a)
-      commitEditorChange(nodes, newAreas)
-      setSelectedAreaId(area.id)
-      closeAreaEditor()
-    } else {
-      const newAreas = [...areas, area]
-      commitEditorChange(nodes, newAreas)
-      setSelectedAreaId(area.id)
-      openAreaEditor(area)
-    }
-  }, [areas, nodes, commitEditorChange, closeAreaEditor, openAreaEditor])
-
-  const handleDeleteArea = useCallback((areaId: string) => {
-    const newAreas = areas.filter((a) => a.id !== areaId)
-    commitEditorChange(nodes, newAreas)
-    setSelectedAreaId(null)
-    closeAreaEditor()
-  }, [areas, nodes, commitEditorChange, closeAreaEditor])
 
   return (
     <div className="space-y-4">
@@ -1065,7 +975,7 @@ export function MapPage() {
 
                   {selectedAreaId && (
                     <div className="px-2 py-1.5 rounded-md border bg-primary/5 border-primary/20 text-[11px] text-primary">
-                      Área activa: <span className="font-semibold">{areas.find((a) => a.id === selectedAreaId)?.label ?? selectedAreaId}</span>
+                      Área activa: <span className="font-semibold">{areaById.get(selectedAreaId)?.label ?? selectedAreaId}</span>
                       {selectedAreaEquipmentSummary && (
                         <span className="ml-1 text-primary/80">
                           · {selectedAreaEquipmentSummary.linked} asociados / {selectedAreaEquipmentSummary.unlinked} sin área
@@ -1074,55 +984,140 @@ export function MapPage() {
                     </div>
                   )}
 
+                  {selectedNode && (
+                    <div className="px-2 py-1.5 rounded-md border bg-amber-500/5 border-amber-500/20 text-[11px] text-amber-700 dark:text-amber-300">
+                      Equipo activo: <span className="font-semibold">{selectedNode.label}</span>
+                      {selectedNode.linkedAreaId && (
+                        <span className="ml-1 text-amber-700/80 dark:text-amber-300/80">
+                          · Área: {areaById.get(selectedNode.linkedAreaId)?.label ?? selectedNode.linkedAreaId}
+                        </span>
+                      )}
+                    </div>
+                  )}
+
                   <div className="space-y-1">
-                    <Button
-                      variant="default"
-                      size="sm"
-                      className="gap-1.5 text-xs justify-start w-full"
-                      onClick={() => openAreaEditor(null)}
-                    >
-                      <Grid3x3 className="h-3.5 w-3.5" />
-                      1) Crear área
-                    </Button>
+                    {!selectedNode && !selectedAreaId && (
+                      <>
+                        <Button
+                          variant="default"
+                          size="sm"
+                          className="gap-1.5 text-xs justify-start w-full"
+                          onClick={() => openAreaEditor(null)}
+                        >
+                          <Grid3x3 className="h-3.5 w-3.5" />
+                          Crear nueva área
+                        </Button>
 
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-1.5 text-xs justify-start w-full"
-                      onClick={() => {
-                        const selectedArea = selectedAreaId ? areas.find((a) => a.id === selectedAreaId) : null
-                        if (selectedArea) openAreaEditor(selectedArea)
-                      }}
-                      disabled={!selectedAreaId}
-                    >
-                      <Grid3x3 className="h-3.5 w-3.5" />
-                      2) Editar área activa
-                    </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1.5 text-xs justify-start w-full"
+                          onClick={() => {
+                            closeAreaEditor()
+                            setEditorTool('add')
+                            overlayState.openOverlay('add-equipment')
+                          }}
+                        >
+                          <Shapes className="h-3.5 w-3.5" />
+                          Agregar equipo
+                        </Button>
+                      </>
+                    )}
 
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-1.5 text-xs justify-start w-full"
-                      onClick={() => {
-                        closeAreaEditor()
-                        setEditorTool('add')
-                        overlayState.openOverlay('add-equipment')
-                      }}
-                    >
-                      <Shapes className="h-3.5 w-3.5" />
-                      3) Agregar equipo en área
-                    </Button>
+                    {selectedAreaId && (
+                      <>
+                        <Button
+                          variant="default"
+                          size="sm"
+                          className="gap-1.5 text-xs justify-start w-full"
+                          onClick={() => {
+                            const selectedArea = areaById.get(selectedAreaId)
+                            if (selectedArea) openAreaEditor(selectedArea)
+                          }}
+                        >
+                          <Grid3x3 className="h-3.5 w-3.5" />
+                          Editar área activa
+                        </Button>
 
-                    <Button
-                      variant={showOnlyActiveAreaEquipment ? 'default' : 'outline'}
-                      size="sm"
-                      className="gap-1.5 text-xs justify-start w-full"
-                      onClick={() => setShowOnlyActiveAreaEquipment((prev) => !prev)}
-                      disabled={!selectedAreaId}
-                    >
-                      <Eye className="h-3.5 w-3.5" />
-                      {showOnlyActiveAreaEquipment ? 'Mostrar todos los equipos' : 'Solo equipos del área activa'}
-                    </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1.5 text-xs justify-start w-full"
+                          onClick={() => {
+                            closeAreaEditor()
+                            setEditorTool('add')
+                            overlayState.openOverlay('add-equipment')
+                          }}
+                        >
+                          <Shapes className="h-3.5 w-3.5" />
+                          Agregar equipo en área
+                        </Button>
+
+                        <Button
+                          variant={showOnlyActiveAreaEquipment ? 'default' : 'outline'}
+                          size="sm"
+                          className="gap-1.5 text-xs justify-start w-full"
+                          onClick={() => setShowOnlyActiveAreaEquipment((prev) => !prev)}
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                          {showOnlyActiveAreaEquipment ? 'Mostrar todos los equipos' : 'Solo equipos del área activa'}
+                        </Button>
+                      </>
+                    )}
+
+                    {selectedNode && (
+                      <>
+                        <Button
+                          variant="default"
+                          size="sm"
+                          className="gap-1.5 text-xs justify-start w-full"
+                          onClick={() => overlayState.openOverlay('shape-editor')}
+                        >
+                          <Shapes className="h-3.5 w-3.5" />
+                          Editar forma del equipo
+                        </Button>
+
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1.5 text-xs justify-start w-full"
+                          onClick={() => setShowLinkDialog(true)}
+                        >
+                          <MapPin className="h-3.5 w-3.5" />
+                          Vincular entidad real
+                        </Button>
+
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1.5 text-xs justify-start w-full"
+                          onClick={() => {
+                            const linkedAreaId = selectedNode.linkedAreaId
+                            const linkedArea = linkedAreaId ? areaById.get(linkedAreaId) : null
+                            if (linkedArea) {
+                              setSelectedAreaId(linkedArea.id)
+                              openAreaEditor(linkedArea)
+                            }
+                          }}
+                          disabled={!selectedNode.linkedAreaId}
+                        >
+                          <Grid3x3 className="h-3.5 w-3.5" />
+                          {selectedNode.linkedAreaId ? 'Editar área del equipo' : 'Equipo sin área asociada'}
+                        </Button>
+
+                        {selectedAreaId && selectedAreaId !== selectedNode.linkedAreaId && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-1.5 text-xs justify-start w-full"
+                            onClick={() => handleNodeUpdate(selectedNode.id, { linkedAreaId: selectedAreaId })}
+                          >
+                            <Grid3x3 className="h-3.5 w-3.5" />
+                            Asociar equipo a área activa
+                          </Button>
+                        )}
+                      </>
+                    )}
 
                     <Button
                       variant="outline"
@@ -1180,19 +1175,8 @@ export function MapPage() {
                     {viewerState.filters.showAreas ? 'Ocultar áreas' : 'Mostrar áreas'}
                   </Button>
 
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-1.5 text-xs justify-start w-full"
-                    onClick={() => overlayState.openOverlay('shape-editor')}
-                    disabled={!selectedNode}
-                  >
-                    <Shapes className="h-3.5 w-3.5" />
-                      4) Editar forma equipo
-                  </Button>
-
                   <p className="text-[10px] text-muted-foreground px-1">
-                    Tip: click en un área para abrirla y editar/eliminar.
+                    Tip: las acciones cambian según selección activa (área o equipo).
                   </p>
                 </div>
               )}
@@ -1496,7 +1480,7 @@ export function MapPage() {
         isOpen={showAddDialog}
         onClose={() => overlayState.closeOverlayIf('add-equipment')}
         onAdd={handleAddNodeFromDialog}
-        selectedAreaLabel={selectedAreaId ? areas.find((area) => area.id === selectedAreaId)?.label ?? null : null}
+        selectedAreaLabel={selectedAreaId ? areaById.get(selectedAreaId)?.label ?? null : null}
       />
 
       {/* Diálogo de vincular entidad real (editor) */}
