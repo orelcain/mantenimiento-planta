@@ -1274,7 +1274,7 @@ export function MapPage() {
             {isEditMode ? (
               /* Panel de propiedades del nodo en modo editor */
               <div className={cn(
-                'absolute top-0 right-0 h-full border-l shadow-lg transition-all duration-300 overflow-hidden',
+                'absolute top-0 right-0 h-full border-l shadow-lg transition-all duration-300 overflow-hidden z-40',
                 selectedNode ? 'w-72 md:w-80' : 'w-0'
               )}>
                 {selectedNode && (
@@ -1291,7 +1291,7 @@ export function MapPage() {
             ) : (
               /* Panel lateral de incidencias (modo vista) */
               <div className={cn(
-                'absolute top-0 right-0 h-full bg-card/95 backdrop-blur border-l shadow-lg transition-all duration-300 overflow-hidden',
+                'absolute top-0 right-0 h-full bg-card/95 backdrop-blur border-l shadow-lg transition-all duration-300 overflow-hidden z-40',
                 showIncidentPanel ? 'w-72 md:w-80' : 'w-0'
               )}>
                 <div className="h-full flex flex-col">
@@ -1355,7 +1355,7 @@ export function MapPage() {
             {/* Botón para mostrar panel de incidencias (solo modo vista) */}
             {!isEditMode && !showIncidentPanel && (
               <Button
-                className="absolute top-4 right-4 shadow-lg"
+                className="absolute top-4 right-4 shadow-lg z-40"
                 variant="secondary"
                 size="sm"
                 onClick={() => setShowIncidentPanel(true)}

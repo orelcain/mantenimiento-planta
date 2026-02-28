@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.69.2**
+## Versión Actual: **v2.69.3**
 
 **Fecha de lanzamiento**: 28 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.69.3 — Hotfix definitivo: overlays bajo panel de incidencias (28/02/2026)
+- 🧯 **Fix definitivo de capas**: overlays `Html` de equipos/áreas forzados a `zIndexRange [0,0]` y `zIndex: 0`
+- 🧱 **Paneles UI reforzados**: panel de incidencias/propiedades y botón flotante con `z-40` explícito en el mapa
+- ✅ **Resultado**: nombres de equipos/áreas ya no se dibujan por encima del panel de incidencias ni otros overlays de UI
 
 ### v2.69.2 — Regla global de capas seguras para overlays 3D (28/02/2026)
 - 🛡️ **Blindaje global**: clase compartida `map-overlay-html` para todos los overlays `Html` del mapa isométrico

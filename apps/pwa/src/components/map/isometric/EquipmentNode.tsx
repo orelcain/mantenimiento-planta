@@ -491,8 +491,8 @@ function IncidentBadge({ count, position: pos }: { count: number; position: [num
       position={pos}
       center
       wrapperClass="map-overlay-html"
-      zIndexRange={[2, 0]}
-      style={{ pointerEvents: 'none', zIndex: 1 }}
+      zIndexRange={[0, 0]}
+      style={{ pointerEvents: 'none', zIndex: 0 }}
     >
       <div
         style={{
@@ -608,8 +608,8 @@ export function EquipmentNode({
           position={[0, labelY, 0]}
           center
           wrapperClass="map-overlay-html"
-          zIndexRange={[2, 0]}
-          style={{ pointerEvents: 'none', userSelect: 'none', zIndex: 1 }}
+          zIndexRange={[0, 0]}
+          style={{ pointerEvents: 'none', userSelect: 'none', zIndex: 0 }}
         >
           <div
             style={{

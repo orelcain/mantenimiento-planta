@@ -93,7 +93,7 @@
      nunca deben superponerse a modales/paneles UI */
   .map-overlay-html,
   .map-overlay-html * {
-    z-index: 1 !important;
+    z-index: 0 !important;
     pointer-events: none !important;
   }
 
