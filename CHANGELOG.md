@@ -7,6 +7,12 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.69.14] - 2026-02-28
+### Refactor — Acciones y shortcuts del editor desacoplados de MapPage
+- **Hook dedicado de acciones**: nuevo `useMapEditorActions` centraliza `delete/duplicate/rotate/undo/redo`
+- **Atajos de teclado encapsulados**: toda la lógica de hotkeys del editor (`V/M/A/G/T/Delete/Ctrl+Z/Y/D`) ahora vive en el hook
+- **MapPage más mantenible**: se elimina lógica operativa repetida del componente principal sin cambiar UX ni comportamiento
+
 ## [2.69.13] - 2026-02-28
 ### Agregado — Mejoras naturales de flujo en editor de mapa
 - **Hover contextual de área**: al pasar sobre un equipo se resalta automáticamente su área asociada
@@ -97,15 +103,15 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ## [2.67.1] - 2026-02-27
 ### Agregado — Modo Editor del Mapa Isométrico
-- **Modo Editor**: botón "Editar Mapa" (solo admin) que activa la edición completa del layout 3D
-- **Drag & Drop 3D**: arrastra equipos en la escena con raycasting al plano del suelo y snap a grilla 1m
-- **DraggableNode**: envuelve EquipmentNode con soporte de arrastre via pointer events y raycasting
-- **EditorToolbar**: barra flotante central con herramientas Seleccionar (V), Mover (M), Agregar (A), toggle Grid snap (G)
 - **Agregar equipos**: click en suelo en modo Add o diálogo modal con los 10 tipos de equipo, presets de tamaño, nombre personalizado
 - **Eliminar/Duplicar/Rotar**: botones en toolbar y atajos (Delete, Ctrl+D, T) para manipular nodo seleccionado
-- **NodePropertiesPanel**: panel lateral derecho en modo editor — edición de nombre, tipo, posición XYZ, tamaño, rotación (slider 0-360°), visibilidad, vinculación
-- **Undo/Redo**: historial de hasta 50 snapshots con Ctrl+Z / Ctrl+Y
-- **Guardar en Firestore**: botón Save que persiste layout completo (nodos, conectores, áreas) vía `saveIsometricMap()`
+
+## [2.69.14] - 2026-02-28
+### Refactor — Acciones y shortcuts del editor desacoplados de MapPage
+- **Hook dedicado de acciones**: nuevo `useMapEditorActions` centraliza `delete/duplicate/rotate/undo/redo`
+- **Atajos de teclado encapsulados**: toda la lógica de hotkeys del editor (`V/M/A/G/T/Delete/Ctrl+Z/Y/D`) ahora vive en el hook
+- **MapPage más mantenible**: se elimina lógica operativa repetida del componente principal sin cambiar UX ni comportamiento
+
 - **Keyboard shortcuts del editor**: V/M/A (herramientas), G (snap), T (rotar), Delete (eliminar), Ctrl+Z/Y (undo/redo), Ctrl+D (duplicar)
 - **Indicador visual**: badge "MODO EDITOR" con estado de cambios sin guardar
 - **Panel dual**: en modo vista muestra incidencias, en modo editor muestra propiedades del nodo seleccionado

@@ -79,6 +79,7 @@ import { AreaTileEditor } from '@/components/map/isometric/editor/AreaTileEditor
 import type { AreaPaintState } from '@/components/map/isometric/editor/AreaTileEditor'
 import { useEditorOverlayState } from '@/components/map/isometric/editor/useEditorOverlayState'
 import { getAreaAtPosition, normalizeNodeForArea } from '@/components/map/isometric/editor/areaAssociation'
+import { useMapEditorActions } from '@/components/map/isometric/editor/useMapEditorActions'
 
 const PRIORITY_CONFIG: Record<IncidentPriority, { color: string; bg: string; label: string }> = {
   critica: { color: 'text-red-500', bg: 'bg-red-500', label: 'Crítica' },
@@ -651,64 +652,30 @@ export function MapPage() {
     [showAreaEditor, editorTool, addEquipmentType, handleAddNode, resolveAreaAtPosition, viewerState.currentFloor]
   )
 
-  const handleDeleteSelected = useCallback(() => {
-    if (!viewerState.selectedNodeId) return
-    const newNodes = nodes.filter((n) => n.id !== viewerState.selectedNodeId)
-    // También eliminar conectores que referencien al nodo
-    const newConnectors = connectors.filter(
-      (c) => c.fromNodeId !== viewerState.selectedNodeId && c.toNodeId !== viewerState.selectedNodeId
-    )
-    commitEditorChange(newNodes, undefined, newConnectors)
-    setViewerState((prev) => ({ ...prev, selectedNodeId: null }))
-  }, [viewerState.selectedNodeId, nodes, connectors, commitEditorChange])
-
-  const handleDuplicateSelected = useCallback(() => {
-    if (!viewerState.selectedNodeId) return
-    const source = nodes.find((n) => n.id === viewerState.selectedNodeId)
-    if (!source) return
-    const newNode: MapNode = {
-      ...source,
-      id: `node-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-      label: `${source.label} (copia)`,
-      position: {
-        x: source.position.x + 2,
-        y: source.position.y,
-        z: source.position.z + 2,
-      },
-    }
-    commitEditorChange([...nodes, newNode])
-    setViewerState((prev) => ({ ...prev, selectedNodeId: newNode.id }))
-  }, [viewerState.selectedNodeId, nodes, commitEditorChange])
-
-  const handleRotateSelected = useCallback(() => {
-    if (!viewerState.selectedNodeId) return
-    const newNodes = nodes.map((n) =>
-      n.id === viewerState.selectedNodeId
-        ? { ...n, rotation: (n.rotation + 90) % 360 }
-        : n
-    )
-    commitEditorChange(newNodes)
-  }, [viewerState.selectedNodeId, nodes, commitEditorChange])
-
-  const handleUndo = useCallback(() => {
-    const snapshot = history.undo()
-    if (snapshot) {
-      setNodes(snapshot.nodes)
-      setAreas(snapshot.areas)
-      setConnectors(snapshot.connectors)
-      setHasUnsavedChanges(true)
-    }
-  }, [history])
-
-  const handleRedo = useCallback(() => {
-    const snapshot = history.redo()
-    if (snapshot) {
-      setNodes(snapshot.nodes)
-      setAreas(snapshot.areas)
-      setConnectors(snapshot.connectors)
-      setHasUnsavedChanges(true)
-    }
-  }, [history])
+  const {
+    handleDeleteSelected,
+    handleDuplicateSelected,
+    handleRotateSelected,
+    handleUndo,
+    handleRedo,
+  } = useMapEditorActions({
+    isEditMode,
+    selectedNodeId: viewerState.selectedNodeId,
+    nodes,
+    connectors,
+    commitEditorChange,
+    setViewerState,
+    setNodes,
+    setAreas,
+    setConnectors,
+    setHasUnsavedChanges,
+    setEditorTool,
+    setSnapEnabled,
+    history,
+    zoomIn,
+    zoomOut,
+    resetView,
+  })
 
   const handleSave = useCallback(async () => {
     if (isSaving) return
@@ -816,105 +783,6 @@ export function MapPage() {
     setSelectedAreaId(null)
     closeAreaEditor()
   }, [areas, nodes, commitEditorChange, closeAreaEditor])
-
-  // Keyboard shortcuts (Q/E ya los maneja useIsometricRotation internamente)
-  useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      if (isEditMode && (e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
-        e.preventDefault()
-        handleUndo()
-        return
-      }
-      if (isEditMode && (e.ctrlKey || e.metaKey) && (e.key === 'y' || e.key === 'Y')) {
-        e.preventDefault()
-        handleRedo()
-        return
-      }
-
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
-
-      // Editor shortcuts
-      if (isEditMode) {
-        switch (e.key) {
-          case 'v':
-          case 'V':
-            e.preventDefault()
-            setEditorTool('select')
-            return
-          case 'm':
-          case 'M':
-            e.preventDefault()
-            setEditorTool('move')
-            return
-          case 'a':
-          case 'A':
-            e.preventDefault()
-            setEditorTool('add')
-            return
-          case 'g':
-          case 'G':
-            e.preventDefault()
-            setSnapEnabled((prev) => !prev)
-            return
-          case 't':
-          case 'T':
-            e.preventDefault()
-            handleRotateSelected()
-            return
-          case 'Delete':
-          case 'Backspace':
-            e.preventDefault()
-            handleDeleteSelected()
-            return
-          case 'z':
-          case 'Z':
-            if (e.ctrlKey || e.metaKey) {
-              e.preventDefault()
-              handleUndo()
-              return
-            }
-            break
-          case 'y':
-          case 'Y':
-            if (e.ctrlKey || e.metaKey) {
-              e.preventDefault()
-              handleRedo()
-              return
-            }
-            break
-          case 'd':
-          case 'D':
-            if (e.ctrlKey || e.metaKey) {
-              e.preventDefault()
-              handleDuplicateSelected()
-              return
-            }
-            break
-        }
-      }
-
-      switch (e.key) {
-        case '+':
-        case '=':
-          e.preventDefault()
-          zoomIn()
-          break
-        case '-':
-          e.preventDefault()
-          zoomOut()
-          break
-        case 'r':
-        case 'R':
-          if (!isEditMode) {
-            e.preventDefault()
-            resetView()
-          }
-          break
-      }
-    }
-    window.addEventListener('keydown', handleKey)
-    return () => window.removeEventListener('keydown', handleKey)
-  }, [zoomIn, zoomOut, resetView, isEditMode, handleDeleteSelected, handleDuplicateSelected, handleRedo, handleRotateSelected, handleUndo])
 
   return (
     <div className="space-y-4">
