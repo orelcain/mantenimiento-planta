@@ -194,6 +194,8 @@ export interface MapNode {
   /** Vinculación con entidad real en Firestore */
   linkedEntityType?: 'equipment' | 'plantAsset' | 'iotDevice' | 'zone'
   linkedEntityId?: string
+  /** Vinculación opcional con área del mapa */
+  linkedAreaId?: string
   /** Color override (si no, usa color del tipo) */
   color?: string
   /** Primitivas custom (si se definen, reemplazan la geometría por defecto) */

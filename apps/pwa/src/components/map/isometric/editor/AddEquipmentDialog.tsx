@@ -16,6 +16,7 @@ interface AddEquipmentDialogProps {
   isOpen: boolean
   onClose: () => void
   onAdd: (node: MapNode) => void
+  selectedAreaLabel?: string | null
 }
 
 interface EquipmentPreset {
@@ -47,7 +48,7 @@ function generateNodeId(): string {
   return `node-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`
 }
 
-export function AddEquipmentDialog({ isOpen, onClose, onAdd }: AddEquipmentDialogProps) {
+export function AddEquipmentDialog({ isOpen, onClose, onAdd, selectedAreaLabel }: AddEquipmentDialogProps) {
   const [search, setSearch] = useState('')
   const [selectedPreset, setSelectedPreset] = useState<EquipmentPreset | null>(null)
   const [customLabel, setCustomLabel] = useState('')
@@ -108,6 +109,11 @@ export function AddEquipmentDialog({ isOpen, onClose, onAdd }: AddEquipmentDialo
 
         {/* Search */}
         <div className="px-4 pt-3">
+          {selectedAreaLabel && (
+            <div className="mb-2 text-xs rounded-lg border bg-primary/5 border-primary/20 px-2.5 py-1.5 text-primary">
+              Se agregará dentro de: <span className="font-semibold">{selectedAreaLabel}</span>
+            </div>
+          )}
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <input

@@ -7,6 +7,15 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.69.12] - 2026-02-28
+### Modificado — Flujo de edición de mapa más directo (estilo Sims)
+- **Asociación equipo↔área**: los equipos ahora guardan `linkedAreaId`, se asocian al área al crear/arrastrar y se pueden gestionar desde propiedades
+- **Alta de equipos contextual**: si hay área activa, el modal de alta la usa como destino por defecto y muestra contexto visual
+- **Crear área → editar área**: al crear una nueva área, el flujo continúa automáticamente en modo edición de esa misma área
+- **Panel de área ampliado y reubicado**: editor de tiles más grande en el lado izquierdo para trabajar sin tapar el flujo principal
+- **Selección de tiles más precisa**: click de suelo usando `Math.floor` (en lugar de `round`) para pintar/borrar celdas con mejor exactitud
+- **Undo/redo global en edición**: `Ctrl/Cmd+Z` y `Ctrl/Cmd+Y` capturados en todo el módulo de edición (incluyendo overlays/paneles)
+
 ## [2.69.11] - 2026-02-28
 ### Corregido — Visor voxel invisible y tamaño reducido
 - **Voxels visibles en formas pequeñas**: corregido redondeo que eliminaba todos los voxels en equipos chicos (1×1×2, 2×2×2, etc.); ahora solo redondea si remueve < 40% de celdas

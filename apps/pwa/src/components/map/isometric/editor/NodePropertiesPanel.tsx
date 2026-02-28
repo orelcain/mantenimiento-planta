@@ -30,6 +30,12 @@ interface NodePropertiesPanelProps {
   onOpenLinkDialog?: () => void
   /** Nombre resuelto de la entidad vinculada (Equipment.nombre o Zone.nombre) */
   linkedEntityName?: string
+  /** Nombre del área vinculada al equipo */
+  linkedAreaName?: string
+  /** Nombre del área seleccionada actualmente */
+  selectedAreaName?: string
+  /** Vincula el equipo al área seleccionada actualmente */
+  onAssignSelectedArea?: () => void
 }
 
 const ALL_EQUIPMENT_TYPES: EquipmentNodeType[] = [
@@ -75,6 +81,9 @@ export function NodePropertiesPanel({
   onDelete,
   onOpenLinkDialog,
   linkedEntityName,
+  linkedAreaName,
+  selectedAreaName,
+  onAssignSelectedArea,
 }: NodePropertiesPanelProps) {
   const [localLabel, setLocalLabel] = useState(node.label)
   const [showTypeSelector, setShowTypeSelector] = useState(false)
@@ -301,6 +310,54 @@ export function NodePropertiesPanel({
               <Link2 className="h-3 w-3" />
               Vincular con entidad real
             </Button>
+          )}
+        </div>
+
+        {/* Área asociada */}
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+            <MapPin className="h-3 w-3" />
+            Área asociada
+          </div>
+          {node.linkedAreaId ? (
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2 p-2 rounded-lg bg-primary/5 border border-primary/20">
+                <Badge variant="secondary" className="text-[10px] shrink-0">Área</Badge>
+                <span className="text-xs font-medium truncate flex-1">{linkedAreaName || node.linkedAreaId}</span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-5 w-5 shrink-0 text-destructive hover:text-destructive"
+                  onClick={() => onUpdate(node.id, { linkedAreaId: undefined })}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+              {selectedAreaName && onAssignSelectedArea && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full text-xs"
+                  onClick={onAssignSelectedArea}
+                >
+                  Cambiar a área seleccionada ({selectedAreaName})
+                </Button>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              <p className="text-xs text-muted-foreground">Sin área asociada</p>
+              {selectedAreaName && onAssignSelectedArea && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full text-xs"
+                  onClick={onAssignSelectedArea}
+                >
+                  Asociar a área seleccionada ({selectedAreaName})
+                </Button>
+              )}
+            </div>
           )}
         </div>
 

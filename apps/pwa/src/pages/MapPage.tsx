@@ -183,6 +183,26 @@ export function MapPage() {
 
   const isEditMode = viewerState.mode === 'edit'
 
+  const getAreaAtPosition = useCallback((x: number, z: number, floor: number): MapArea | null => {
+    const floorAreas = areas.filter((area) => (area.floor ?? 0) === floor)
+
+    const tileMatch = floorAreas.find((area) =>
+      area.tiles?.some((tile) => tile.x === x && tile.z === z)
+    )
+    if (tileMatch) return tileMatch
+
+    const boundsMatch = floorAreas.find((area) => {
+      if (area.tiles?.length) return false
+      const minX = area.position.x - area.size.width / 2
+      const maxX = area.position.x + area.size.width / 2
+      const minZ = area.position.z - area.size.depth / 2
+      const maxZ = area.position.z + area.size.depth / 2
+      return x >= minX && x <= maxX && z >= minZ && z <= maxZ
+    })
+
+    return boundsMatch ?? null
+  }, [areas])
+
   // Incidencias activas
   const activeIncidents = useMemo(
     () => incidents.filter((i) =>
@@ -376,11 +396,19 @@ export function MapPage() {
 
   // ── Handlers de nodos ──
   const handleNodeClick = useCallback((nodeId: string) => {
+    const node = nodes.find((n) => n.id === nodeId)
+    const nextSelected = viewerState.selectedNodeId === nodeId ? null : nodeId
+
     setViewerState((prev) => ({
       ...prev,
-      selectedNodeId: prev.selectedNodeId === nodeId ? null : nodeId,
+      selectedNodeId: nextSelected,
     }))
-  }, [])
+
+    if (!nextSelected) return
+    if (node?.linkedAreaId) {
+      setSelectedAreaId(node.linkedAreaId)
+    }
+  }, [nodes, viewerState.selectedNodeId])
 
   const handleNodeHover = useCallback((nodeId: string | null) => {
     setViewerState((prev) => ({
@@ -435,12 +463,19 @@ export function MapPage() {
 
   const handleNodeDragEnd = useCallback(
     (nodeId: string, newPosition: { x: number; y: number; z: number }) => {
+      const targetArea = getAreaAtPosition(newPosition.x, newPosition.z, viewerState.currentFloor)
       const newNodes = nodes.map((n) =>
-        n.id === nodeId ? { ...n, position: newPosition } : n
+        n.id === nodeId
+          ? {
+              ...n,
+              position: newPosition,
+              linkedAreaId: targetArea?.id,
+            }
+          : n
       )
       commitEditorChange(newNodes)
     },
-    [nodes, commitEditorChange]
+    [nodes, commitEditorChange, getAreaAtPosition, viewerState.currentFloor]
   )
 
   const handleNodeUpdate = useCallback(
@@ -463,6 +498,23 @@ export function MapPage() {
     [nodes, commitEditorChange]
   )
 
+  const handleAddNodeFromDialog = useCallback((newNode: MapNode) => {
+    const selectedArea = selectedAreaId ? areas.find((area) => area.id === selectedAreaId) : null
+    const areaForNode = selectedArea ?? getAreaAtPosition(newNode.position.x, newNode.position.z, viewerState.currentFloor)
+    const floor = areaForNode?.floor ?? viewerState.currentFloor
+
+    const normalizedNode: MapNode = {
+      ...newNode,
+      floor,
+      position: areaForNode
+        ? { x: areaForNode.position.x, y: newNode.position.y ?? 0, z: areaForNode.position.z }
+        : { ...newNode.position },
+      linkedAreaId: areaForNode?.id,
+    }
+
+    handleAddNode(normalizedNode)
+  }, [selectedAreaId, areas, getAreaAtPosition, viewerState.currentFloor, handleAddNode])
+
   // ── Area paint state ──
   const handleAreaPaintStateChange = useCallback((update: Partial<AreaPaintState>) => {
     setAreaPaintState((prev) => {
@@ -476,6 +528,9 @@ export function MapPage() {
 
   // Abrir editor de áreas: guardar filtros previos y ocultar equipos/etiquetas
   const openAreaEditor = useCallback((area?: MapArea | null) => {
+    setShowAddDialog(false)
+    setShowShapeEditor(false)
+    setShowAreaManager(false)
     setSelectedAreaId(area?.id ?? null)
     prevFiltersRef.current = { ...viewerState.filters }
     setViewerState((prev) => ({
@@ -506,6 +561,7 @@ export function MapPage() {
         editAreaId: null,
       })
     }
+    setEditorTool('select')
     setShowAreaEditor(true)
   }, [viewerState.filters])
 
@@ -553,6 +609,11 @@ export function MapPage() {
 
   const handleFloorClick = useCallback(
     (position: { x: number; z: number }) => {
+      const areaAtPoint = getAreaAtPosition(position.x, position.z, viewerState.currentFloor)
+      if (areaAtPoint) {
+        setSelectedAreaId(areaAtPoint.id)
+      }
+
       // ── Area paint mode: toggle tiles ──
       if (showAreaEditor) {
         const key = `${position.x},${position.z}`
@@ -582,11 +643,12 @@ export function MapPage() {
         size: getDefaultSize(addEquipmentType),
         rotation: 0,
         floor: viewerState.currentFloor,
+        linkedAreaId: areaAtPoint?.id,
         visible: true,
       }
       handleAddNode(newNode)
     },
-    [showAreaEditor, editorTool, addEquipmentType, handleAddNode, viewerState.currentFloor]
+    [showAreaEditor, editorTool, addEquipmentType, handleAddNode, getAreaAtPosition, viewerState.currentFloor]
   )
 
   const handleDeleteSelected = useCallback(() => {
@@ -739,12 +801,15 @@ export function MapPage() {
     if (exists) {
       const newAreas = areas.map((a) => a.id === area.id ? area : a)
       commitEditorChange(nodes, newAreas)
+      setSelectedAreaId(area.id)
+      closeAreaEditor()
     } else {
-      commitEditorChange(nodes, [...areas, area])
+      const newAreas = [...areas, area]
+      commitEditorChange(nodes, newAreas)
+      setSelectedAreaId(area.id)
+      openAreaEditor(area)
     }
-    setSelectedAreaId(area.id)
-    closeAreaEditor()
-  }, [areas, nodes, commitEditorChange, closeAreaEditor])
+  }, [areas, nodes, commitEditorChange, closeAreaEditor, openAreaEditor])
 
   const handleDeleteArea = useCallback((areaId: string) => {
     const newAreas = areas.filter((a) => a.id !== areaId)
@@ -756,6 +821,17 @@ export function MapPage() {
   // Keyboard shortcuts (Q/E ya los maneja useIsometricRotation internamente)
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
+      if (isEditMode && (e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
+        e.preventDefault()
+        handleUndo()
+        return
+      }
+      if (isEditMode && (e.ctrlKey || e.metaKey) && (e.key === 'y' || e.key === 'Y')) {
+        e.preventDefault()
+        handleRedo()
+        return
+      }
+
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
 
       // Editor shortcuts
@@ -973,7 +1049,10 @@ export function MapPage() {
                 snapEnabled={snapEnabled}
                 addEquipmentType={addEquipmentType}
                 onToolChange={setEditorTool}
-                onAddEquipment={() => setShowAddDialog(true)}
+                onAddEquipment={() => {
+                  closeAreaEditor()
+                  setShowAddDialog(true)
+                }}
                 onDeleteSelected={handleDeleteSelected}
                 onDuplicateSelected={handleDuplicateSelected}
                 onRotateSelected={handleRotateSelected}
@@ -983,7 +1062,10 @@ export function MapPage() {
                 onRedo={handleRedo}
                 onToggleSnap={() => setSnapEnabled((v) => !v)}
                 onChangeEquipmentType={setAddEquipmentType}
-                onShowAddDialog={() => setShowAddDialog(true)}
+                onShowAddDialog={() => {
+                  closeAreaEditor()
+                  setShowAddDialog(true)
+                }}
               />
             )}
 
@@ -1109,8 +1191,14 @@ export function MapPage() {
 
               {/* Area editor buttons (solo en modo editor) */}
               {isEditMode && (
-                <div className="bg-card/90 backdrop-blur rounded-lg shadow-lg border p-1.5 flex flex-col gap-1.5 w-[220px]">
+                <div className="bg-card/90 backdrop-blur rounded-lg shadow-lg border p-2 flex flex-col gap-2 w-[320px]">
                   <p className="text-[10px] text-muted-foreground font-medium px-1">EDITOR RÁPIDO</p>
+
+                  {selectedAreaId && (
+                    <div className="px-2 py-1.5 rounded-md border bg-primary/5 border-primary/20 text-[11px] text-primary">
+                      Área activa: <span className="font-semibold">{areas.find((a) => a.id === selectedAreaId)?.label ?? selectedAreaId}</span>
+                    </div>
+                  )}
 
                   <div className="space-y-1">
                     <Button
@@ -1120,7 +1208,7 @@ export function MapPage() {
                       onClick={() => openAreaEditor(null)}
                     >
                       <Grid3x3 className="h-3.5 w-3.5" />
-                      1) Nueva área
+                      1) Crear área
                     </Button>
 
                     <Button
@@ -1134,7 +1222,21 @@ export function MapPage() {
                       disabled={!selectedAreaId}
                     >
                       <Grid3x3 className="h-3.5 w-3.5" />
-                      2) Editar área seleccionada
+                      2) Editar área activa
+                    </Button>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5 text-xs justify-start w-full"
+                      onClick={() => {
+                        closeAreaEditor()
+                        setEditorTool('add')
+                        setShowAddDialog(true)
+                      }}
+                    >
+                      <Shapes className="h-3.5 w-3.5" />
+                      3) Agregar equipo en área
                     </Button>
 
                     <Button
@@ -1201,7 +1303,7 @@ export function MapPage() {
                     disabled={!selectedNode}
                   >
                     <Shapes className="h-3.5 w-3.5" />
-                    3) Editar forma equipo
+                      4) Editar forma equipo
                   </Button>
 
                   <p className="text-[10px] text-muted-foreground px-1">
@@ -1285,6 +1387,9 @@ export function MapPage() {
                     onDelete={() => handleDeleteSelected()}
                     onOpenLinkDialog={() => setShowLinkDialog(true)}
                     linkedEntityName={linkedEntityName}
+                    linkedAreaName={selectedNode.linkedAreaId ? areas.find((area) => area.id === selectedNode.linkedAreaId)?.label : undefined}
+                    selectedAreaName={selectedAreaId ? areas.find((area) => area.id === selectedAreaId)?.label : undefined}
+                    onAssignSelectedArea={selectedAreaId ? () => handleNodeUpdate(selectedNode.id, { linkedAreaId: selectedAreaId }) : undefined}
                   />
                 )}
               </div>
@@ -1500,7 +1605,8 @@ export function MapPage() {
       <AddEquipmentDialog
         isOpen={showAddDialog}
         onClose={() => setShowAddDialog(false)}
-        onAdd={handleAddNode}
+        onAdd={handleAddNodeFromDialog}
+        selectedAreaLabel={selectedAreaId ? areas.find((area) => area.id === selectedAreaId)?.label ?? null : null}
       />
 
       {/* Diálogo de vincular entidad real (editor) */}

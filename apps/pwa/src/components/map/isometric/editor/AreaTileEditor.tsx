@@ -119,7 +119,7 @@ export function AreaTileEditor({
   if (!isOpen) return null
 
   return (
-    <div className="absolute top-4 right-4 z-20 w-64 bg-card/95 backdrop-blur rounded-xl shadow-2xl border flex flex-col max-h-[calc(100%-2rem)] overflow-hidden">
+    <div className="absolute top-4 left-4 z-30 w-[22rem] md:w-[26rem] bg-card/95 backdrop-blur rounded-xl shadow-2xl border flex flex-col max-h-[calc(100%-2rem)] overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between p-3 border-b">
         <div>
@@ -128,7 +128,7 @@ export function AreaTileEditor({
             {editArea ? 'Editar Área' : 'Nueva Área'}
           </h3>
           <p className="text-[10px] text-muted-foreground mt-0.5">
-            {FLOOR_LABELS[currentFloor]} · Click en la grilla para pintar
+            {FLOOR_LABELS[currentFloor]} · Selecciona tiles directamente en el mapa
           </p>
         </div>
         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose}>

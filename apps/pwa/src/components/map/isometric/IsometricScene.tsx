@@ -263,7 +263,10 @@ function SceneContent({
         onClick={(e) => {
           if ((viewerState.mode === 'edit' || paintTiles) && onFloorClick) {
             const point = e.point
-            onFloorClick({ x: Math.round(point.x), z: Math.round(point.z) })
+            onFloorClick({
+              x: Math.floor(point.x + 0.0001),
+              z: Math.floor(point.z + 0.0001),
+            })
           } else {
             onBackgroundClick?.()
           }
