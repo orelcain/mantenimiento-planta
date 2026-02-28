@@ -144,6 +144,7 @@ export function MapPage() {
   const [showShapeEditor, setShowShapeEditor] = useState(false)
   const [showAreaEditor, setShowAreaEditor] = useState(false)
   const [editingArea, setEditingArea] = useState<MapArea | null>(null)
+  const [selectedAreaId, setSelectedAreaId] = useState<string | null>(null)
   const [areaPaintState, setAreaPaintState] = useState<AreaPaintState>({
     tiles: new Set<string>(),
     tool: 'paint',
@@ -172,6 +173,11 @@ export function MapPage() {
       i.status === 'pendiente' || i.status === 'confirmada' || i.status === 'en_proceso'
     ),
     [incidents]
+  )
+
+  const currentFloorAreas = useMemo(
+    () => areas.filter((area) => (area.floor ?? 0) === viewerState.currentFloor),
+    [areas, viewerState.currentFloor]
   )
 
   // Resumen de estados para la leyenda
@@ -269,6 +275,7 @@ export function MapPage() {
       ...prev,
       currentFloor: floor,
     }))
+    setSelectedAreaId(null)
   }, [])
 
   // Focus en un nodo (centrar cámara + seleccionar)
@@ -364,6 +371,7 @@ export function MapPage() {
       ...prev,
       selectedNodeId: null,
     }))
+    setSelectedAreaId(null)
   }, [])
 
   // ── Handlers de filtros ──
@@ -445,10 +453,11 @@ export function MapPage() {
 
   // Abrir editor de áreas: guardar filtros previos y ocultar equipos/etiquetas
   const openAreaEditor = useCallback((area?: MapArea | null) => {
+    setSelectedAreaId(area?.id ?? null)
     prevFiltersRef.current = { ...viewerState.filters }
     setViewerState((prev) => ({
       ...prev,
-      filters: { ...prev.filters, showEquipment: false, showLabels: false },
+      filters: { ...prev.filters, showEquipment: false, showLabels: false, showAreas: true },
     }))
     setEditingArea(area ?? null)
     // Inicializar paint state desde el área existente o vacío
@@ -498,6 +507,26 @@ export function MapPage() {
       editAreaId: null,
     })
   }, [])
+
+  const handleAreaClick = useCallback((areaId: string) => {
+    const area = areas.find((a) => a.id === areaId)
+    if (!area) return
+
+    setSelectedAreaId(areaId)
+
+    if (isEditMode) {
+      openAreaEditor(area)
+      return
+    }
+
+    setViewerState((prev) => ({
+      ...prev,
+      currentFloor: area.floor ?? 0,
+      filters: { ...prev.filters, showAreas: true },
+      panOffset: { x: area.position.x, z: area.position.z },
+      zoom: Math.max(prev.zoom, 30),
+    }))
+  }, [areas, isEditMode, openAreaEditor])
 
   const handleFloorClick = useCallback(
     (position: { x: number; z: number }) => {
@@ -631,6 +660,9 @@ export function MapPage() {
       setHasUnsavedChanges(false)
     }
     setViewerState((prev) => ({ ...prev, mode: 'view', selectedNodeId: null }))
+    setSelectedAreaId(null)
+    setShowAreaEditor(false)
+    setEditingArea(null)
     history.clear()
   }, [hasUnsavedChanges, history])
 
@@ -686,12 +718,14 @@ export function MapPage() {
     } else {
       commitEditorChange(nodes, [...areas, area])
     }
+    setSelectedAreaId(area.id)
     closeAreaEditor()
   }, [areas, nodes, commitEditorChange, closeAreaEditor])
 
   const handleDeleteArea = useCallback((areaId: string) => {
     const newAreas = areas.filter((a) => a.id !== areaId)
     commitEditorChange(nodes, newAreas)
+    setSelectedAreaId(null)
     closeAreaEditor()
   }, [areas, nodes, commitEditorChange, closeAreaEditor])
 
@@ -884,10 +918,12 @@ export function MapPage() {
                 nodes={nodes}
                 connectors={connectors}
                 areas={areas}
+                selectedAreaId={selectedAreaId}
                 runtimeData={runtimeData}
                 viewerState={viewerState}
                 onNodeClick={handleNodeClick}
                 onNodeHover={handleNodeHover}
+                onAreaClick={handleAreaClick}
                 onBackgroundClick={handleBackgroundClick}
                 onNodeDragEnd={handleNodeDragEnd}
                 onFloorClick={handleFloorClick}
@@ -1053,27 +1089,95 @@ export function MapPage() {
 
               {/* Area editor buttons (solo en modo editor) */}
               {isEditMode && (
-                <div className="bg-card/90 backdrop-blur rounded-lg shadow-lg border p-1 flex flex-col gap-0.5">
+                <div className="bg-card/90 backdrop-blur rounded-lg shadow-lg border p-1.5 flex flex-col gap-1.5 w-[220px]">
+                  <p className="text-[10px] text-muted-foreground font-medium px-1">EDITOR RÁPIDO</p>
+
+                  <div className="space-y-1">
+                    <Button
+                      variant="default"
+                      size="sm"
+                      className="gap-1.5 text-xs justify-start w-full"
+                      onClick={() => openAreaEditor(null)}
+                    >
+                      <Grid3x3 className="h-3.5 w-3.5" />
+                      1) Nueva área
+                    </Button>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5 text-xs justify-start w-full"
+                      onClick={() => {
+                        const selectedArea = selectedAreaId ? areas.find((a) => a.id === selectedAreaId) : null
+                        if (selectedArea) openAreaEditor(selectedArea)
+                      }}
+                      disabled={!selectedAreaId}
+                    >
+                      <Grid3x3 className="h-3.5 w-3.5" />
+                      2) Editar área seleccionada
+                    </Button>
+                  </div>
+
+                  <div className="border-t pt-1.5">
+                    <p className="text-[10px] text-muted-foreground px-1 mb-1">ÁREAS DEL PISO</p>
+                    <div className="max-h-28 overflow-y-auto space-y-1 px-0.5">
+                      {currentFloorAreas.length === 0 ? (
+                        <p className="text-[10px] text-muted-foreground px-1">Sin áreas en este piso</p>
+                      ) : (
+                        currentFloorAreas.map((area) => (
+                          <button
+                            key={area.id}
+                            className={cn(
+                              'w-full text-left px-2 py-1 rounded text-[11px] border flex items-center gap-2',
+                              selectedAreaId === area.id ? 'bg-primary/10 border-primary/50' : 'bg-muted/40 hover:bg-muted'
+                            )}
+                            onClick={() => {
+                              setSelectedAreaId(area.id)
+                              setViewerState((prev) => ({
+                                ...prev,
+                                panOffset: { x: area.position.x, z: area.position.z },
+                                zoom: Math.max(prev.zoom, 28),
+                                currentFloor: area.floor ?? 0,
+                                filters: { ...prev.filters, showAreas: true },
+                              }))
+                            }}
+                          >
+                            <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: area.color }} />
+                            <span className="truncate flex-1">{area.label}</span>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
                   <Button
-                    variant="ghost"
+                    variant="outline"
                     size="sm"
-                    className="gap-1.5 text-xs justify-start"
-                    onClick={() => openAreaEditor(null)}
+                    className="gap-1.5 text-xs justify-start w-full"
+                    onClick={() => setViewerState((prev) => ({
+                      ...prev,
+                      filters: { ...prev.filters, showAreas: !prev.filters.showAreas },
+                    }))}
                   >
-                    <Grid3x3 className="h-3.5 w-3.5" />
-                    Nueva área
+                    {viewerState.filters.showAreas ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                    {viewerState.filters.showAreas ? 'Ocultar áreas' : 'Mostrar áreas'}
                   </Button>
+
                   {selectedNode && (
                     <Button
-                      variant="ghost"
+                      variant="outline"
                       size="sm"
-                      className="gap-1.5 text-xs justify-start"
+                      className="gap-1.5 text-xs justify-start w-full"
                       onClick={() => setShowShapeEditor(true)}
                     >
                       <Shapes className="h-3.5 w-3.5" />
-                      Editar forma
+                      3) Editar forma equipo
                     </Button>
                   )}
+
+                  <p className="text-[10px] text-muted-foreground px-1">
+                    Tip: click en un área para abrirla y editar/eliminar.
+                  </p>
                 </div>
               )}
             </div>
@@ -1084,6 +1188,7 @@ export function MapPage() {
                 nodes={nodes}
                 areas={areas}
                 onSelectNode={(nodeId) => handleNodeClick(nodeId)}
+                onSelectArea={handleAreaClick}
                 onFocusNode={handleFocusNode}
               />
             </div>

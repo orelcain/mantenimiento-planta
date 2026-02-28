@@ -42,6 +42,8 @@ interface IsometricSceneProps {
   connectors: MapConnectorType[]
   /** Áreas/zonas */
   areas: MapArea[]
+  /** Área seleccionada */
+  selectedAreaId?: string | null
   /** Data runtime (estados, incidencias, sensores) */
   runtimeData: Map<string, NodeRuntimeData>
   /** Estado del visor */
@@ -66,6 +68,7 @@ function SceneContent({
   nodes,
   connectors,
   areas,
+  selectedAreaId,
   runtimeData,
   viewerState,
   onNodeClick,
@@ -158,7 +161,7 @@ function SceneContent({
         <MapAreaOverlay
           key={area.id}
           area={area}
-          selected={false}
+          selected={selectedAreaId === area.id}
           onClick={onAreaClick}
         />
       ))}

@@ -15,6 +15,7 @@ interface MapSearchPanelProps {
   nodes: MapNode[]
   areas?: MapArea[]
   onSelectNode: (nodeId: string) => void
+  onSelectArea?: (areaId: string) => void
   onFocusNode: (nodeId: string, position: { x: number; z: number }) => void
 }
 
@@ -35,7 +36,7 @@ const FLOOR_LABELS: Record<number, string> = {
   2: 'Techo',
 }
 
-export function MapSearchPanel({ nodes, areas, onSelectNode, onFocusNode }: MapSearchPanelProps) {
+export function MapSearchPanel({ nodes, areas, onSelectNode, onSelectArea, onFocusNode }: MapSearchPanelProps) {
   const { equipment } = useAppStore()
   const [search, setSearch] = useState('')
   const [isOpen, setIsOpen] = useState(false)
@@ -101,11 +102,12 @@ export function MapSearchPanel({ nodes, areas, onSelectNode, onFocusNode }: MapS
       onSelectNode(result.node.id)
       onFocusNode(result.node.id, { x: result.node.position.x, z: result.node.position.z })
     } else if (result.type === 'area' && result.area) {
+      onSelectArea?.(result.area.id)
       onFocusNode(result.area.id, { x: result.area.position.x, z: result.area.position.z })
     }
     setSearch('')
     setIsOpen(false)
-  }, [onSelectNode, onFocusNode])
+  }, [onSelectNode, onSelectArea, onFocusNode])
 
   // Close on click outside
   useEffect(() => {

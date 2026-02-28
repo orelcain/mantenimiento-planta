@@ -20,13 +20,14 @@ interface MapAreaOverlayProps {
 export function MapAreaOverlay({ area, selected = false, onClick }: MapAreaOverlayProps) {
   const meshRef = useRef<THREE.Mesh>(null)
   const hasTiles = area.tiles && area.tiles.length > 0
+  const effectiveOpacity = Math.max(0.18, area.opacity)
 
   // Borde pulsante si está seleccionada
   useFrame(({ clock }) => {
     if (meshRef.current && selected) {
       const t = clock.getElapsedTime()
       const material = meshRef.current.material as THREE.MeshBasicMaterial
-      material.opacity = area.opacity * (0.8 + Math.sin(t * 2) * 0.2)
+      material.opacity = effectiveOpacity * (0.8 + Math.sin(t * 2) * 0.2)
     }
   })
 
@@ -48,7 +49,7 @@ export function MapAreaOverlay({ area, selected = false, onClick }: MapAreaOverl
             <meshBasicMaterial
               color={area.color}
               transparent
-              opacity={area.opacity}
+              opacity={effectiveOpacity}
               side={THREE.DoubleSide}
               depthWrite={false}
             />
@@ -96,7 +97,7 @@ export function MapAreaOverlay({ area, selected = false, onClick }: MapAreaOverl
         <meshBasicMaterial
           color={area.color}
           transparent
-          opacity={area.opacity}
+          opacity={effectiveOpacity}
           side={THREE.DoubleSide}
           depthWrite={false}
         />
