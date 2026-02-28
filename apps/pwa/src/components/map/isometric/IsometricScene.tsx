@@ -89,11 +89,14 @@ function SceneContent({
     return map
   }, [nodes])
 
-  // Filtrar nodos visibles según filtros activos
+  // Filtrar nodos visibles según filtros activos y piso actual
   const visibleNodes = useMemo(() => {
-    const { filters } = viewerState
+    const { filters, currentFloor } = viewerState
+    if (!filters.showEquipment) return []
     return nodes.filter((node) => {
       if (!node.visible) return false
+      // Filtrar por piso (default 0 si no tiene)
+      if ((node.floor ?? 0) !== currentFloor) return false
       switch (node.type) {
         case 'pump': return filters.showPumps
         case 'motor': return filters.showMotors
@@ -101,7 +104,7 @@ function SceneContent({
         default: return true
       }
     })
-  }, [nodes, viewerState.filters])
+  }, [nodes, viewerState.filters, viewerState.currentFloor])
 
   const handleRotationComplete = useCallback(() => {
     // Notificación opcional al completar rotación
@@ -145,8 +148,10 @@ function SceneContent({
       {/* Grilla del suelo */}
       <PlantGrid config={config} />
 
-      {/* Áreas/zonas */}
-      {viewerState.filters.showAreas && areas.map((area) => (
+      {/* Áreas/zonas (filtradas por piso) */}
+      {viewerState.filters.showAreas && areas
+        .filter((a) => (a.floor ?? 0) === viewerState.currentFloor)
+        .map((area) => (
         <MapAreaOverlay
           key={area.id}
           area={area}

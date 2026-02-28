@@ -19,6 +19,7 @@ interface MapAreaOverlayProps {
 
 export function MapAreaOverlay({ area, selected = false, onClick }: MapAreaOverlayProps) {
   const meshRef = useRef<THREE.Mesh>(null)
+  const hasTiles = area.tiles && area.tiles.length > 0
 
   // Borde pulsante si está seleccionada
   useFrame(({ clock }) => {
@@ -29,6 +30,57 @@ export function MapAreaOverlay({ area, selected = false, onClick }: MapAreaOverl
     }
   })
 
+  // Tile-based rendering
+  if (hasTiles) {
+    return (
+      <group>
+        {area.tiles!.map((tile) => (
+          <mesh
+            key={`${tile.x},${tile.z}`}
+            rotation-x={-Math.PI / 2}
+            position={[tile.x + 0.5, 0.03, tile.z + 0.5]}
+            onClick={(e) => {
+              e.stopPropagation()
+              onClick?.(area.id)
+            }}
+          >
+            <planeGeometry args={[1, 1]} />
+            <meshBasicMaterial
+              color={area.color}
+              transparent
+              opacity={area.opacity}
+              side={THREE.DoubleSide}
+              depthWrite={false}
+            />
+          </mesh>
+        ))}
+        {/* Label centered */}
+        <Html
+          position={[area.position.x, 0.5, area.position.z]}
+          center
+          style={{ pointerEvents: 'none', userSelect: 'none' }}
+        >
+          <div
+            style={{
+              background: `${area.color}cc`,
+              color: 'white',
+              padding: '2px 8px',
+              borderRadius: 4,
+              fontSize: 10,
+              fontWeight: 600,
+              whiteSpace: 'nowrap',
+              letterSpacing: 0.5,
+              textTransform: 'uppercase',
+            }}
+          >
+            {area.label}
+          </div>
+        </Html>
+      </group>
+    )
+  }
+
+  // Rectangular area (original)
   return (
     <group position={[area.position.x, 0.03, area.position.z]}>
       {/* Superficie coloreada */}

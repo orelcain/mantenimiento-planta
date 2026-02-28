@@ -24,7 +24,7 @@ import { useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three'
-import type { MapNode, OperationalStatus } from '@/types/isometricMap'
+import type { MapNode, OperationalStatus, ShapePrimitive } from '@/types/isometricMap'
 import { EQUIPMENT_TYPE_COLORS, STATUS_COLORS } from '@/types/isometricMap'
 
 interface EquipmentNodeProps {
@@ -405,6 +405,55 @@ function EquipmentGeometry({ type, size, colorOverride }: { type: MapNode['type'
   }
 }
 
+/** Renderiza primitivas custom definidas por el usuario */
+function CustomShapeRenderer({ primitives }: { primitives: ShapePrimitive[] }) {
+  return (
+    <group>
+      {primitives.map((prim) => {
+        const rotX = (prim.rotation.x * Math.PI) / 180
+        const rotY = (prim.rotation.y * Math.PI) / 180
+        const rotZ = (prim.rotation.z * Math.PI) / 180
+
+        let geometry: JSX.Element
+        switch (prim.type) {
+          case 'box':
+            geometry = <boxGeometry args={[prim.size.x, prim.size.y, prim.size.z]} />
+            break
+          case 'cylinder':
+            geometry = <cylinderGeometry args={[prim.size.x, prim.size.x, prim.size.y, 24]} />
+            break
+          case 'sphere':
+            geometry = <sphereGeometry args={[prim.size.x, 24, 24]} />
+            break
+          case 'cone':
+            geometry = <coneGeometry args={[prim.size.x, prim.size.y, 24]} />
+            break
+          case 'torus':
+            geometry = <torusGeometry args={[prim.size.x, prim.size.y, 16, 32]} />
+            break
+          default:
+            geometry = <boxGeometry args={[prim.size.x, prim.size.y, prim.size.z]} />
+        }
+
+        return (
+          <mesh
+            key={prim.id}
+            position={[prim.position.x, prim.position.y, prim.position.z]}
+            rotation={[rotX, rotY, rotZ]}
+          >
+            {geometry}
+            <meshStandardMaterial
+              color={prim.color}
+              roughness={prim.roughness}
+              metalness={prim.metalness}
+            />
+          </mesh>
+        )
+      })}
+    </group>
+  )
+}
+
 /** Halo de estado que pulsa */
 function StatusIndicator({ status, size, pulse }: { status: OperationalStatus; size: number; pulse: boolean }) {
   const meshRef = useRef<THREE.Mesh>(null)
@@ -523,8 +572,12 @@ export function EquipmentNode({
         <StatusIndicator status={status} size={ringSize} pulse={shouldPulse} />
       )}
 
-      {/* Equipo 3D */}
-      <EquipmentGeometry type={node.type} size={node.size} colorOverride={node.color} />
+      {/* Equipo 3D — custom shapes o geometría por defecto */}
+      {node.customShape && node.customShape.length > 0 ? (
+        <CustomShapeRenderer primitives={node.customShape} />
+      ) : (
+        <EquipmentGeometry type={node.type} size={node.size} colorOverride={node.color} />
+      )}
 
       {/* Glow de selección */}
       {(selected || effectiveHover) && (

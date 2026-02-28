@@ -147,6 +147,35 @@ export const STATUS_LABELS: Record<OperationalStatus, string> = {
   maintenance: 'En mantención',
 }
 
+// ============================================================
+// Primitivas de forma 3D (para editor de formas custom)
+// ============================================================
+
+export type ShapePrimitiveType = 'box' | 'cylinder' | 'sphere' | 'cone' | 'torus'
+
+/** Una primitiva 3D posicionable dentro de un equipo */
+export interface ShapePrimitive {
+  id: string
+  type: ShapePrimitiveType
+  /** Posición relativa al centro del nodo (metros) */
+  position: { x: number; y: number; z: number }
+  /** Tamaño en metros — significado depende del tipo:
+   *  box: width, height, depth
+   *  cylinder: radius(x), height(y), radius(z)  (z ignored, uses x)
+   *  sphere: radius(x) (y,z ignored)
+   *  cone: radius(x), height(y)
+   *  torus: radius(x), tube(y) */
+  size: { x: number; y: number; z: number }
+  /** Rotación en grados (x, y, z) */
+  rotation: { x: number; y: number; z: number }
+  /** Color de la primitiva */
+  color: string
+  /** Metalness 0-1 */
+  metalness: number
+  /** Roughness 0-1 */
+  roughness: number
+}
+
 /** Un elemento (equipo/sensor/zona) posicionado en el mapa */
 export interface MapNode {
   id: string
@@ -160,11 +189,15 @@ export interface MapNode {
   size: { width: number; height: number; depth: number }
   /** Rotación en grados (eje Y) */
   rotation: number
+  /** Piso: 0=planta baja, 1=segundo piso, 2=techo */
+  floor: number
   /** Vinculación con entidad real en Firestore */
   linkedEntityType?: 'equipment' | 'plantAsset' | 'iotDevice' | 'zone'
   linkedEntityId?: string
   /** Color override (si no, usa color del tipo) */
   color?: string
+  /** Primitivas custom (si se definen, reemplazan la geometría por defecto) */
+  customShape?: ShapePrimitive[]
   /** Visible en el mapa */
   visible: boolean
   /** Metadatos extra */
@@ -183,14 +216,20 @@ export interface MapConnector {
   animated: boolean
 }
 
-/** Área rectangular en el mapa (zona lógica) */
+/** Área en el mapa (zona lógica) — puede ser rectangular o definida por tiles */
 export interface MapArea {
   id: string
   label: string
+  /** Posición centro (para áreas rectangulares) */
   position: { x: number; z: number }
+  /** Tamaño (para áreas rectangulares) */
   size: { width: number; depth: number }
   color: string
   opacity: number
+  /** Piso: 0=planta baja, 1=segundo piso, 2=techo */
+  floor: number
+  /** Tiles seleccionados al estilo FFT (coordenadas de grilla) — si se define, usa tiles en vez de rectángulo */
+  tiles?: { x: number; z: number }[]
   linkedZoneId?: string
 }
 
@@ -250,8 +289,11 @@ export interface IsometricViewerState {
   hoveredNodeId: string | null
   /** Modo del visor */
   mode: 'view' | 'edit'
+  /** Piso actual visualizado (0=planta baja, 1=segundo, 2=techo) */
+  currentFloor: number
   /** Filtros activos */
   filters: {
+    showEquipment: boolean
     showPumps: boolean
     showMotors: boolean
     showSensors: boolean
@@ -269,13 +311,15 @@ export const DEFAULT_VIEWER_STATE: IsometricViewerState = {
   selectedNodeId: null,
   hoveredNodeId: null,
   mode: 'view',
+  currentFloor: 0,
   filters: {
+    showEquipment: true,
     showPumps: true,
     showMotors: true,
     showSensors: true,
     showConnectors: true,
     showAreas: true,
     showAlerts: true,
-    showLabels: true,
+    showLabels: false,
   },
 }

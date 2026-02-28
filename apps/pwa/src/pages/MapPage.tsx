@@ -32,6 +32,9 @@ import {
   Pencil,
   Eye as EyeIcon,
   Scan,
+  Building2,
+  Shapes,
+  Grid3x3,
 } from 'lucide-react'
 import {
   Card,
@@ -68,6 +71,9 @@ import { AddEquipmentDialog } from '@/components/map/isometric/editor/AddEquipme
 import { LinkEntityDialog } from '@/components/map/isometric/editor/LinkEntityDialog'
 import { useEditorHistory } from '@/components/map/isometric/editor/useEditorHistory'
 import { useMapRuntimeData } from '@/components/map/isometric/editor/useMapRuntimeData'
+import { MapSearchPanel } from '@/components/map/isometric/editor/MapSearchPanel'
+import { ShapeEditorDialog } from '@/components/map/isometric/editor/ShapeEditorDialog'
+import { AreaTileEditor } from '@/components/map/isometric/editor/AreaTileEditor'
 
 const PRIORITY_CONFIG: Record<IncidentPriority, { color: string; bg: string; label: string }> = {
   critica: { color: 'text-red-500', bg: 'bg-red-500', label: 'Crítica' },
@@ -134,6 +140,9 @@ export function MapPage() {
   const [addEquipmentType, setAddEquipmentType] = useState<MapNode['type']>('pump')
   const [showAddDialog, setShowAddDialog] = useState(false)
   const [showLinkDialog, setShowLinkDialog] = useState(false)
+  const [showShapeEditor, setShowShapeEditor] = useState(false)
+  const [showAreaEditor, setShowAreaEditor] = useState(false)
+  const [editingArea, setEditingArea] = useState<MapArea | null>(null)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const history = useEditorHistory()
@@ -202,6 +211,23 @@ export function MapPage() {
       ...prev,
       zoom: 15,
       panOffset: { x: 0, z: 0 },
+    }))
+  }, [])
+
+  // Cambiar de piso
+  const setFloor = useCallback((floor: number) => {
+    setViewerState((prev) => ({
+      ...prev,
+      currentFloor: floor,
+    }))
+  }, [])
+
+  // Focus en un nodo (centrar cámara + seleccionar)
+  const handleFocusNode = useCallback((_nodeId: string, position: { x: number; z: number }) => {
+    setViewerState((prev) => ({
+      ...prev,
+      panOffset: { x: position.x, z: position.z },
+      zoom: Math.max(prev.zoom, 30), // Acercar si está muy lejos
     }))
   }, [])
 
@@ -372,6 +398,7 @@ export function MapPage() {
         position: { x: position.x, y: 0, z: position.z },
         size: getDefaultSize(addEquipmentType),
         rotation: 0,
+        floor: viewerState.currentFloor,
         visible: true,
       }
       handleAddNode(newNode)
@@ -509,6 +536,36 @@ export function MapPage() {
     setShowLinkDialog(false)
   }, [handleNodeUpdate])
 
+  // Handler para guardar forma custom
+  const handleSaveCustomShape = useCallback((nodeId: string, customShape: import('@/types/isometricMap').ShapePrimitive[]) => {
+    handleNodeUpdate(nodeId, { customShape })
+  }, [handleNodeUpdate])
+
+  // Handler para restaurar forma por defecto
+  const handleClearCustomShape = useCallback((nodeId: string) => {
+    handleNodeUpdate(nodeId, { customShape: undefined })
+  }, [handleNodeUpdate])
+
+  // Handler para guardar área del tile editor
+  const handleSaveArea = useCallback((area: MapArea) => {
+    const exists = areas.find((a) => a.id === area.id)
+    if (exists) {
+      const newAreas = areas.map((a) => a.id === area.id ? area : a)
+      commitEditorChange(nodes, newAreas)
+    } else {
+      commitEditorChange(nodes, [...areas, area])
+    }
+    setEditingArea(null)
+    setShowAreaEditor(false)
+  }, [areas, nodes, commitEditorChange])
+
+  const handleDeleteArea = useCallback((areaId: string) => {
+    const newAreas = areas.filter((a) => a.id !== areaId)
+    commitEditorChange(nodes, newAreas)
+    setEditingArea(null)
+    setShowAreaEditor(false)
+  }, [areas, nodes, commitEditorChange])
+
   // Keyboard shortcuts (Q/E ya los maneja useIsometricRotation internamente)
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -636,6 +693,11 @@ export function MapPage() {
           <Badge variant="outline" className="gap-1 font-normal">
             <Compass className="h-3.5 w-3.5" />
             {CAMERA_ANGLE_NAMES[viewerState.cameraAngle]}
+          </Badge>
+          {/* Piso */}
+          <Badge variant="outline" className="gap-1 font-normal">
+            <Building2 className="h-3.5 w-3.5" />
+            {viewerState.currentFloor === 0 ? 'PB' : viewerState.currentFloor === 1 ? '2° Piso' : 'Techo'}
           </Badge>
           {/* Zoom */}
           <Badge variant="outline" className="gap-1 font-normal">
@@ -769,7 +831,7 @@ export function MapPage() {
             </div>
 
             {/* Filter toggles (izquierda arriba) */}
-            <div className="absolute top-4 left-4">
+            <div className="absolute top-4 left-4 flex flex-col gap-2">
               <div className="bg-card/90 backdrop-blur rounded-lg shadow-lg border">
                 <Button
                   variant="ghost"
@@ -783,6 +845,7 @@ export function MapPage() {
                 {showFilters && (
                   <div className="p-2 border-t space-y-1">
                     {[
+                      { key: 'showEquipment' as const, icon: Shapes, label: 'Equipos' },
                       { key: 'showLabels' as const, icon: Eye, label: 'Etiquetas' },
                       { key: 'showAreas' as const, icon: MapPin, label: 'Áreas' },
                       { key: 'showConnectors' as const, icon: Activity, label: 'Conectores' },
@@ -808,6 +871,66 @@ export function MapPage() {
                   </div>
                 )}
               </div>
+
+              {/* Floor selector */}
+              <div className="bg-card/90 backdrop-blur rounded-lg shadow-lg border p-1">
+                <div className="flex items-center gap-0.5">
+                  <Building2 className="h-3.5 w-3.5 text-muted-foreground ml-1" />
+                  {[
+                    { floor: 0, label: 'PB' },
+                    { floor: 1, label: '2°' },
+                    { floor: 2, label: 'T' },
+                  ].map(({ floor, label }) => (
+                    <Button
+                      key={floor}
+                      variant={viewerState.currentFloor === floor ? 'default' : 'ghost'}
+                      size="sm"
+                      className={cn('h-7 w-8 text-xs p-0', viewerState.currentFloor === floor && 'text-xs font-bold')}
+                      onClick={() => setFloor(floor)}
+                      title={floor === 0 ? 'Planta Baja' : floor === 1 ? 'Segundo Piso' : 'Techo'}
+                    >
+                      {label}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Area editor buttons (solo en modo editor) */}
+              {isEditMode && (
+                <div className="bg-card/90 backdrop-blur rounded-lg shadow-lg border p-1 flex flex-col gap-0.5">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="gap-1.5 text-xs justify-start"
+                    onClick={() => { setEditingArea(null); setShowAreaEditor(true) }}
+                  >
+                    <Grid3x3 className="h-3.5 w-3.5" />
+                    Nueva área
+                  </Button>
+                  {selectedNode && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="gap-1.5 text-xs justify-start"
+                      onClick={() => setShowShapeEditor(true)}
+                    >
+                      <Shapes className="h-3.5 w-3.5" />
+                      Editar forma
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Search panel (center top) */}
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
+              {!isEditMode && (
+                <MapSearchPanel
+                  nodes={nodes}
+                  onSelectNode={(nodeId) => handleNodeClick(nodeId)}
+                  onFocusNode={handleFocusNode}
+                />
+              )}
             </div>
 
             {/* Selected node info card (centro abajo) — solo en modo vista */}
@@ -987,6 +1110,29 @@ export function MapPage() {
           incident={selectedIncident} 
           onClose={() => setSelectedIncident(null)} 
           canValidate={canValidate}
+        />
+      )}
+
+      {/* Editor de forma 3D */}
+      {showShapeEditor && selectedNode && (
+        <ShapeEditorDialog
+          isOpen={showShapeEditor}
+          node={selectedNode}
+          onSave={handleSaveCustomShape}
+          onClear={handleClearCustomShape}
+          onClose={() => setShowShapeEditor(false)}
+        />
+      )}
+
+      {/* Editor de áreas tipo FFT */}
+      {showAreaEditor && (
+        <AreaTileEditor
+          isOpen={showAreaEditor}
+          editArea={editingArea}
+          currentFloor={viewerState.currentFloor}
+          onSave={handleSaveArea}
+          onDelete={handleDeleteArea}
+          onClose={() => { setShowAreaEditor(false); setEditingArea(null) }}
         />
       )}
     </div>
