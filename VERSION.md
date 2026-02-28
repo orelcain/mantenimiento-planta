@@ -1,14 +1,23 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.68.0**
+## Versión Actual: **v2.69.0**
 
-**Fecha de lanzamiento**: 27 de febrero de 2026  \
+**Fecha de lanzamiento**: 28 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
 **Build**: ✅ Stable
 
 ---
 
 ## 📋 Información de la Versión
+
+### v2.69.0 — Gestión centralizada de áreas + editor de forma con preview 3D en vivo (28/02/2026)
+- 🗂️ **Gestor centralizado de áreas**: botón `Gestionar áreas` en Editor Rápido con listado único y filtro por piso (Todos/PB/2°/Techo)
+- ✏️ **Acciones directas por área**: `Ver`, `Editar`, `Eliminar` desde una sola vista para reducir fricción operativa
+- 🎯 **Selección de áreas mejorada**: selección por click en escena y desde buscador, con highlight visual del área activa
+- 🎨 **Visibilidad reforzada de superficies**: opacidad mínima para evitar áreas invisibles por configuración de color/opacidad
+- 🧱 **Editor de forma más intuitivo**: botón `Editar forma equipo` visible siempre (deshabilitado si no hay selección)
+- 👁️ **Preview 3D en vivo**: visor embebido en `ShapeEditorDialog` que refleja cambios de primitivas en tiempo real
+- 📐 **Métricas de ocupación**: caja envolvente y huella aproximada en m²/cuadros para ajustar dimensiones con precisión
 
 ### v2.68.0 — Zoom 500 + Pan suave + 6 nuevos tipos equipo + Mapa Planta Chonchi real (27/02/2026)
 - 🔍 **Zoom ampliado**: rango extendido hasta 500 (antes 200), stepping progresivo 6% del zoom actual
