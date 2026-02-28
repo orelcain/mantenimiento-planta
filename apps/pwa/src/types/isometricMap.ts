@@ -80,6 +80,12 @@ export type EquipmentNodeType =
   | 'sensor'         // Sensor IoT
   | 'pipe'           // Tubería
   | 'building'       // Edificio/estructura
+  | 'evaporator'     // Evaporador (serpentín + ventiladores)
+  | 'condenser'      // Condensador
+  | 'panel'          // Tablero eléctrico/control
+  | 'extractor'      // Extractor de aire / ventilador
+  | 'transformer'    // Transformador eléctrico
+  | 'boiler'         // Caldera
   | 'generic'        // Genérico
 
 /** Colores por tipo de equipo */
@@ -93,6 +99,12 @@ export const EQUIPMENT_TYPE_COLORS: Record<EquipmentNodeType, string> = {
   sensor: '#14b8a6',     // Teal
   pipe: '#6b7280',       // Gris
   building: '#78716c',   // Stone
+  evaporator: '#0ea5e9', // Sky
+  condenser: '#f97316',  // Orange
+  panel: '#a855f7',      // Purple
+  extractor: '#22d3ee',  // Cyan claro
+  transformer: '#eab308', // Yellow
+  boiler: '#dc2626',     // Rojo
   generic: '#94a3b8',    // Slate
 }
 
@@ -107,6 +119,12 @@ export const EQUIPMENT_TYPE_LABELS: Record<EquipmentNodeType, string> = {
   sensor: 'Sensor',
   pipe: 'Tubería',
   building: 'Edificio',
+  evaporator: 'Evaporador',
+  condenser: 'Condensador',
+  panel: 'Tablero',
+  extractor: 'Extractor',
+  transformer: 'Transformador',
+  boiler: 'Caldera',
   generic: 'Equipo',
 }
 
@@ -246,7 +264,7 @@ export interface IsometricViewerState {
 
 export const DEFAULT_VIEWER_STATE: IsometricViewerState = {
   cameraAngle: 0,
-  zoom: 25,
+  zoom: 12,
   panOffset: { x: 0, z: 0 },
   selectedNodeId: null,
   hoveredNodeId: null,

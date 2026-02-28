@@ -96,6 +96,12 @@ function getDefaultSize(type: MapNode['type']): MapNode['size'] {
     valve:      { width: 1,   height: 1.2, depth: 1 },
     sensor:     { width: 0.5, height: 1.5, depth: 0.5 },
     pipe:       { width: 4,   height: 0.5, depth: 0.5 },
+    evaporator: { width: 3,   height: 2.5, depth: 2 },
+    condenser:  { width: 3.5, height: 2,   depth: 2 },
+    panel:      { width: 1.5, height: 2,   depth: 0.5 },
+    extractor:  { width: 1.5, height: 2,   depth: 1.5 },
+    transformer:{ width: 2.5, height: 3,   depth: 2 },
+    boiler:     { width: 3,   height: 3.5, depth: 3 },
     building:   { width: 6,   height: 4,   depth: 5 },
     generic:    { width: 2,   height: 2,   depth: 2 },
   }
@@ -175,14 +181,14 @@ export function MapPage() {
   const zoomIn = useCallback(() => {
     setViewerState((prev) => ({
       ...prev,
-      zoom: Math.min(prev.zoom + 10, 200),
+      zoom: Math.min(prev.zoom + Math.max(2, Math.round(prev.zoom * 0.08)), 500),
     }))
   }, [])
 
   const zoomOut = useCallback(() => {
     setViewerState((prev) => ({
       ...prev,
-      zoom: Math.max(prev.zoom - 10, 5),
+      zoom: Math.max(prev.zoom - Math.max(2, Math.round(prev.zoom * 0.08)), 3),
     }))
   }, [])
 
@@ -194,7 +200,7 @@ export function MapPage() {
   const fitAll = useCallback(() => {
     setViewerState((prev) => ({
       ...prev,
-      zoom: 60,
+      zoom: 15,
       panOffset: { x: 0, z: 0 },
     }))
   }, [])
@@ -205,11 +211,12 @@ export function MapPage() {
   const handleWheel = useCallback((e: WheelEvent) => {
     e.preventDefault()
     const delta = e.deltaY
-    const zoomStep = 3 // más suave que los botones
     setViewerState((prev) => {
+      // Paso proporcional al zoom actual → aceleración natural
+      const step = Math.max(1, Math.round(prev.zoom * 0.06))
       const newZoom = delta > 0
-        ? Math.min(prev.zoom + zoomStep, 200)
-        : Math.max(prev.zoom - zoomStep, 3)
+        ? Math.min(prev.zoom + step, 500)
+        : Math.max(prev.zoom - step, 3)
       return { ...prev, zoom: newZoom }
     })
   }, [])
@@ -241,10 +248,10 @@ export function MapPage() {
     const dy = e.clientY - panStart.current.y
     panStart.current = { x: e.clientX, y: e.clientY }
 
-    // Convertir pixels a unidades mundo según zoom
-    // En ortográfica: 1 unidad mundo ≈ viewportPixels / (zoom * 2)
+    // Sensibilidad inversamente proporcional al zoom
+    // Zoom alto (cerca) → movimiento fino; Zoom bajo (lejos) → movimiento amplio
     setViewerState((prev) => {
-      const sensitivity = prev.zoom / 400
+      const sensitivity = 30 / prev.zoom
       return {
         ...prev,
         panOffset: {

@@ -33,6 +33,12 @@ const EQUIPMENT_PRESETS: EquipmentPreset[] = [
   { type: 'valve', defaultSize: { width: 1, height: 1.2, depth: 1 }, description: 'Válvula de control de flujo' },
   { type: 'sensor', defaultSize: { width: 0.5, height: 1.5, depth: 0.5 }, description: 'Sensor IoT (temperatura, presión, etc.)' },
   { type: 'pipe', defaultSize: { width: 4, height: 0.5, depth: 0.5 }, description: 'Tramo de tubería' },
+  { type: 'evaporator', defaultSize: { width: 3, height: 2.5, depth: 2 }, description: 'Evaporador con serpentín y ventiladores' },
+  { type: 'condenser', defaultSize: { width: 3.5, height: 2, depth: 2 }, description: 'Condensador térmico' },
+  { type: 'panel', defaultSize: { width: 1.5, height: 2, depth: 0.5 }, description: 'Tablero eléctrico o de control' },
+  { type: 'extractor', defaultSize: { width: 1.5, height: 2, depth: 1.5 }, description: 'Extractor o ventilador de aire' },
+  { type: 'transformer', defaultSize: { width: 2.5, height: 3, depth: 2 }, description: 'Transformador eléctrico' },
+  { type: 'boiler', defaultSize: { width: 3, height: 3.5, depth: 3 }, description: 'Caldera industrial' },
   { type: 'building', defaultSize: { width: 6, height: 4, depth: 5 }, description: 'Edificio o estructura' },
   { type: 'generic', defaultSize: { width: 2, height: 2, depth: 2 }, description: 'Equipo genérico' },
 ]

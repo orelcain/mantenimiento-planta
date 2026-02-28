@@ -40,8 +40,10 @@ interface EquipmentNodeProps {
 }
 
 // Geometrías por tipo de equipo
-function EquipmentGeometry({ type, size }: { type: MapNode['type']; size: MapNode['size'] }) {
+function EquipmentGeometry({ type, size, colorOverride }: { type: MapNode['type']; size: MapNode['size']; colorOverride?: string }) {
   const { width: w, height: h, depth: d } = size
+  // Si hay color custom, usarlo en vez del color del tipo
+  const typeColor = colorOverride || EQUIPMENT_TYPE_COLORS[type]
 
   switch (type) {
     case 'pump':
@@ -50,7 +52,7 @@ function EquipmentGeometry({ type, size }: { type: MapNode['type']; size: MapNod
           {/* Cuerpo cilíndrico horizontal */}
           <mesh rotation-z={Math.PI / 2} position={[0, h / 2, 0]}>
             <cylinderGeometry args={[Math.min(w, d) / 2.5, Math.min(w, d) / 2.5, w * 0.8, 16]} />
-            <meshStandardMaterial color={EQUIPMENT_TYPE_COLORS.pump} roughness={0.3} metalness={0.7} />
+            <meshStandardMaterial color={typeColor} roughness={0.3} metalness={0.7} />
           </mesh>
           {/* Entrada/salida */}
           <mesh position={[w * 0.4, h / 2, 0]} rotation-z={Math.PI / 2}>
@@ -71,7 +73,7 @@ function EquipmentGeometry({ type, size }: { type: MapNode['type']; size: MapNod
           {/* Cuerpo principal */}
           <mesh position={[0, h / 2, 0]}>
             <boxGeometry args={[w * 0.8, h * 0.7, d * 0.8]} />
-            <meshStandardMaterial color={EQUIPMENT_TYPE_COLORS.motor} roughness={0.3} metalness={0.6} />
+            <meshStandardMaterial color={typeColor} roughness={0.3} metalness={0.6} />
           </mesh>
           {/* Eje del motor */}
           <mesh position={[w * 0.45, h / 2, 0]} rotation-z={Math.PI / 2}>
@@ -94,7 +96,7 @@ function EquipmentGeometry({ type, size }: { type: MapNode['type']; size: MapNod
           {/* Cuerpo cilíndrico vertical */}
           <mesh position={[0, h / 2, 0]}>
             <cylinderGeometry args={[Math.min(w, d) / 2, Math.min(w, d) / 2, h, 24]} />
-            <meshStandardMaterial color={EQUIPMENT_TYPE_COLORS.tank} roughness={0.3} metalness={0.5} transparent opacity={0.85} />
+            <meshStandardMaterial color={typeColor} roughness={0.3} metalness={0.5} transparent opacity={0.85} />
           </mesh>
           {/* Tapa superior */}
           <mesh position={[0, h + 0.05, 0]}>
@@ -121,8 +123,8 @@ function EquipmentGeometry({ type, size }: { type: MapNode['type']; size: MapNod
           <mesh position={[0, h * 0.7, 0]}>
             <sphereGeometry args={[Math.min(w, d) / 3, 16, 16]} />
             <meshStandardMaterial
-              color={EQUIPMENT_TYPE_COLORS.sensor}
-              emissive={EQUIPMENT_TYPE_COLORS.sensor}
+              color={typeColor}
+              emissive={typeColor}
               emissiveIntensity={0.4}
               roughness={0.2}
               metalness={0.8}
@@ -160,7 +162,7 @@ function EquipmentGeometry({ type, size }: { type: MapNode['type']; size: MapNod
           {/* Cuerpo */}
           <mesh position={[0, h / 2, 0]}>
             <sphereGeometry args={[Math.min(w, d) / 2.5, 12, 12]} />
-            <meshStandardMaterial color={EQUIPMENT_TYPE_COLORS.valve} roughness={0.3} metalness={0.6} />
+            <meshStandardMaterial color={typeColor} roughness={0.3} metalness={0.6} />
           </mesh>
           {/* Volante */}
           <mesh position={[0, h * 0.8, 0]} rotation-x={Math.PI / 2}>
@@ -181,7 +183,7 @@ function EquipmentGeometry({ type, size }: { type: MapNode['type']; size: MapNod
           {/* Cuerpo principal */}
           <mesh position={[0, h / 2, 0]}>
             <boxGeometry args={[w * 0.9, h * 0.8, d * 0.9]} />
-            <meshStandardMaterial color={EQUIPMENT_TYPE_COLORS.compressor} roughness={0.3} metalness={0.5} />
+            <meshStandardMaterial color={typeColor} roughness={0.3} metalness={0.5} />
           </mesh>
           {/* Motor superior */}
           <mesh position={[0, h * 0.9, 0]}>
@@ -197,7 +199,7 @@ function EquipmentGeometry({ type, size }: { type: MapNode['type']; size: MapNod
           {/* Estructura */}
           <mesh position={[0, h / 2, 0]}>
             <boxGeometry args={[w, h, d]} />
-            <meshStandardMaterial color={EQUIPMENT_TYPE_COLORS.building} roughness={0.8} metalness={0.1} />
+            <meshStandardMaterial color={typeColor} roughness={0.8} metalness={0.1} />
           </mesh>
           {/* Techo */}
           <mesh position={[0, h + 0.1, 0]}>
@@ -211,8 +213,185 @@ function EquipmentGeometry({ type, size }: { type: MapNode['type']; size: MapNod
       return (
         <mesh position={[0, h / 2, 0]} rotation-z={Math.PI / 2}>
           <cylinderGeometry args={[d / 3, d / 3, w, 12]} />
-          <meshStandardMaterial color={EQUIPMENT_TYPE_COLORS.pipe} roughness={0.3} metalness={0.7} />
+          <meshStandardMaterial color={typeColor} roughness={0.3} metalness={0.7} />
         </mesh>
+      )
+
+    case 'evaporator':
+      return (
+        <group>
+          {/* Cuerpo rectangular (carcasa) */}
+          <mesh position={[0, h / 2, 0]}>
+            <boxGeometry args={[w, h * 0.85, d]} />
+            <meshStandardMaterial color={typeColor} roughness={0.4} metalness={0.5} />
+          </mesh>
+          {/* Serpentín interior (visible desde el frente) */}
+          {[0.2, 0.4, 0.6, 0.8].map((t, i) => (
+            <mesh key={i} position={[0, h * t, d * 0.52]}>
+              <cylinderGeometry args={[0.08, 0.08, w * 0.8, 8]} />
+              <meshStandardMaterial color="#bae6fd" roughness={0.2} metalness={0.8} />
+            </mesh>
+          ))}
+          {/* Ventiladores circulares (arriba) */}
+          {[-w / 4, w / 4].map((xOff, i) => (
+            <group key={i} position={[xOff, h * 0.95, 0]}>
+              <mesh rotation-x={-Math.PI / 2}>
+                <cylinderGeometry args={[d / 3, d / 3, 0.1, 16]} />
+                <meshStandardMaterial color="#1e3a5f" roughness={0.3} metalness={0.6} />
+              </mesh>
+              <mesh rotation-x={-Math.PI / 2} position={[0, 0.06, 0]}>
+                <ringGeometry args={[d / 8, d / 3 - 0.02, 16]} />
+                <meshStandardMaterial color="#64748b" roughness={0.5} metalness={0.4} side={THREE.DoubleSide} />
+              </mesh>
+            </group>
+          ))}
+        </group>
+      )
+
+    case 'condenser':
+      return (
+        <group>
+          {/* Cuerpo principal cilíndrico horizontal */}
+          <mesh position={[0, h / 2, 0]} rotation-z={Math.PI / 2}>
+            <cylinderGeometry args={[Math.min(h, d) / 2.2, Math.min(h, d) / 2.2, w * 0.9, 20]} />
+            <meshStandardMaterial color={typeColor} roughness={0.3} metalness={0.6} />
+          </mesh>
+          {/* Tapas laterales */}
+          {[-1, 1].map((dir, i) => (
+            <mesh key={i} position={[dir * w * 0.48, h / 2, 0]} rotation-z={Math.PI / 2}>
+              <cylinderGeometry args={[Math.min(h, d) / 2.2, Math.min(h, d) / 2.2, 0.08, 20]} />
+              <meshStandardMaterial color="#ea580c" roughness={0.4} metalness={0.7} />
+            </mesh>
+          ))}
+          {/* Conexiones de tubería */}
+          <mesh position={[0, h * 0.9, 0]}>
+            <cylinderGeometry args={[0.1, 0.1, h * 0.3, 8]} />
+            <meshStandardMaterial color="#d1d5db" roughness={0.3} metalness={0.8} />
+          </mesh>
+          {/* Soportes */}
+          {[-w / 3, w / 3].map((xOff, i) => (
+            <mesh key={i} position={[xOff, 0.05, 0]}>
+              <boxGeometry args={[0.3, 0.1, d * 0.6]} />
+              <meshStandardMaterial color="#374151" roughness={0.8} />
+            </mesh>
+          ))}
+        </group>
+      )
+
+    case 'panel':
+      return (
+        <group>
+          {/* Gabinete del tablero (caja vertical delgada) */}
+          <mesh position={[0, h / 2, 0]}>
+            <boxGeometry args={[w, h, d * 0.3]} />
+            <meshStandardMaterial color={typeColor} roughness={0.5} metalness={0.3} />
+          </mesh>
+          {/* Puerta del gabinete */}
+          <mesh position={[0, h / 2, d * 0.16]}>
+            <boxGeometry args={[w * 0.85, h * 0.85, 0.03]} />
+            <meshStandardMaterial color="#c084fc" roughness={0.6} metalness={0.2} />
+          </mesh>
+          {/* Indicadores LED (puntos) */}
+          {[0.3, 0.5, 0.7].map((yOff, i) => (
+            <mesh key={i} position={[w * 0.3, h * yOff, d * 0.18]}>
+              <sphereGeometry args={[0.04, 8, 8]} />
+              <meshStandardMaterial
+                color={i === 0 ? '#22c55e' : i === 1 ? '#f59e0b' : '#ef4444'}
+                emissive={i === 0 ? '#22c55e' : i === 1 ? '#f59e0b' : '#ef4444'}
+                emissiveIntensity={0.6}
+              />
+            </mesh>
+          ))}
+        </group>
+      )
+
+    case 'extractor':
+      return (
+        <group>
+          {/* Carcasa cilíndrica */}
+          <mesh position={[0, h / 2, 0]}>
+            <cylinderGeometry args={[Math.min(w, d) / 2, Math.min(w, d) / 2, h * 0.6, 20]} />
+            <meshStandardMaterial color={typeColor} roughness={0.3} metalness={0.5} transparent opacity={0.7} />
+          </mesh>
+          {/* Hélice central */}
+          <mesh position={[0, h / 2, 0]} rotation-x={Math.PI / 2}>
+            <torusGeometry args={[Math.min(w, d) / 4, 0.06, 6, 16]} />
+            <meshStandardMaterial color="#0e7490" roughness={0.3} metalness={0.7} />
+          </mesh>
+          {/* Motor superior */}
+          <mesh position={[0, h * 0.85, 0]}>
+            <cylinderGeometry args={[w / 6, w / 6, h * 0.2, 10]} />
+            <meshStandardMaterial color="#6b7280" roughness={0.4} metalness={0.6} />
+          </mesh>
+          {/* Ducto de salida */}
+          <mesh position={[0, h + 0.1, 0]}>
+            <cylinderGeometry args={[w / 4, Math.min(w, d) / 2.5, 0.3, 12]} />
+            <meshStandardMaterial color="#334155" roughness={0.5} metalness={0.4} />
+          </mesh>
+        </group>
+      )
+
+    case 'transformer':
+      return (
+        <group>
+          {/* Tanque principal */}
+          <mesh position={[0, h * 0.4, 0]}>
+            <boxGeometry args={[w * 0.85, h * 0.7, d * 0.7]} />
+            <meshStandardMaterial color={typeColor} roughness={0.4} metalness={0.5} />
+          </mesh>
+          {/* Radiadores laterales */}
+          {[-1, 1].map((dir, i) => (
+            <mesh key={i} position={[dir * w * 0.47, h * 0.35, 0]}>
+              <boxGeometry args={[0.08, h * 0.5, d * 0.5]} />
+              <meshStandardMaterial color="#a16207" roughness={0.5} metalness={0.4} />
+            </mesh>
+          ))}
+          {/* Aisladores superiores (3 postes cerámicos) */}
+          {[-w / 4, 0, w / 4].map((xOff, i) => (
+            <group key={i} position={[xOff, h * 0.75, 0]}>
+              <mesh>
+                <cylinderGeometry args={[0.08, 0.12, h * 0.4, 8]} />
+                <meshStandardMaterial color="#f5f5f4" roughness={0.8} metalness={0.1} />
+              </mesh>
+              {/* Tope del aislador */}
+              <mesh position={[0, h * 0.22, 0]}>
+                <sphereGeometry args={[0.06, 8, 8]} />
+                <meshStandardMaterial color="#dc2626" roughness={0.3} metalness={0.5} />
+              </mesh>
+            </group>
+          ))}
+        </group>
+      )
+
+    case 'boiler':
+      return (
+        <group>
+          {/* Cuerpo cilíndrico principal */}
+          <mesh position={[0, h * 0.45, 0]}>
+            <cylinderGeometry args={[Math.min(w, d) / 2, Math.min(w, d) / 2, h * 0.8, 20]} />
+            <meshStandardMaterial color={typeColor} roughness={0.4} metalness={0.5} />
+          </mesh>
+          {/* Tapa superior */}
+          <mesh position={[0, h * 0.86, 0]}>
+            <sphereGeometry args={[Math.min(w, d) / 2, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
+            <meshStandardMaterial color="#b91c1c" roughness={0.4} metalness={0.5} />
+          </mesh>
+          {/* Chimenea */}
+          <mesh position={[w * 0.2, h * 1.1, 0]}>
+            <cylinderGeometry args={[w / 10, w / 8, h * 0.5, 10]} />
+            <meshStandardMaterial color="#374151" roughness={0.6} metalness={0.4} />
+          </mesh>
+          {/* Puerta del hogar */}
+          <mesh position={[0, h * 0.2, Math.min(w, d) / 2 + 0.01]}>
+            <circleGeometry args={[Math.min(w, d) / 5, 12]} />
+            <meshStandardMaterial color="#1c1917" roughness={0.9} />
+          </mesh>
+          {/* Base/soporte */}
+          <mesh position={[0, 0.05, 0]}>
+            <boxGeometry args={[w * 0.7, 0.1, d * 0.7]} />
+            <meshStandardMaterial color="#374151" roughness={0.8} />
+          </mesh>
+        </group>
       )
 
     case 'generic':
@@ -220,7 +399,7 @@ function EquipmentGeometry({ type, size }: { type: MapNode['type']; size: MapNod
       return (
         <mesh position={[0, h / 2, 0]}>
           <boxGeometry args={[w, h, d]} />
-          <meshStandardMaterial color={EQUIPMENT_TYPE_COLORS.generic} roughness={0.5} metalness={0.3} />
+          <meshStandardMaterial color={typeColor} roughness={0.5} metalness={0.3} />
         </mesh>
       )
   }
@@ -345,7 +524,7 @@ export function EquipmentNode({
       )}
 
       {/* Equipo 3D */}
-      <EquipmentGeometry type={node.type} size={node.size} />
+      <EquipmentGeometry type={node.type} size={node.size} colorOverride={node.color} />
 
       {/* Glow de selección */}
       {(selected || effectiveHover) && (
