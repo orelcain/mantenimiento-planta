@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.69.6**
+## Versión Actual: **v2.69.7**
 
 **Fecha de lanzamiento**: 28 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,12 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.69.7 — Fase 3 MVP: importación externa y exportación de formas (28/02/2026)
+- 📥 **Importación externa en editor**: nuevo flujo `Importar` en `ShapeEditorDialog` para archivos `.json`, `.glb` y `.gltf`
+- 🧱 **Conversión GLB/GLTF a voxel**: el modelo importado se voxeliza automáticamente en la grilla para continuar esculpido interno
+- 📤 **Exportación de forma**: nuevo botón `Exportar` que descarga la forma activa en JSON (primitivas + estado voxel)
+- 🧭 **Feedback de importación**: mensajes de estado en cabecera para éxito/error de importación
 
 ### v2.69.6 — Fase 2: editor por caras con subdivisión (28/02/2026)
 - 🧩 **Editor por caras**: selección de cara activa (`Top`, `Bottom`, `Left`, `Right`, `Front`, `Back`) en modo voxel

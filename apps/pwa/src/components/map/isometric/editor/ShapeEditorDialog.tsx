@@ -9,14 +9,15 @@
  * Las cotas se muestran en metros.
  */
 
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useRef, type ChangeEvent } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import * as THREE from 'three'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { 
   X, Trash2, Copy, Box, Circle, Triangle, 
   RotateCw, Palette, ChevronDown, ChevronUp, Save, 
-  Undo2, Layers, Plus, Minus, Eraser, MousePointer2, Grid3X3
+  Undo2, Layers, Plus, Minus, Eraser, MousePointer2, Grid3X3, Upload, Download
 } from 'lucide-react'
 import { Button, Badge } from '@/components/ui'
 import { cn } from '@/lib/utils'
@@ -168,6 +169,58 @@ function buildDefaultVoxelsFromNode(node: MapNode, gridSize: number) {
   }
 
   return cells
+}
+
+function clampVoxelValue(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value))
+}
+
+function worldToVoxelCoordinate(value: number, min: number, max: number, gridSize: number) {
+  if (max - min <= 0) return 0
+  const normalized = (value - min) / (max - min)
+  return clampVoxelValue(Math.floor(normalized * (gridSize - 1)), 0, gridSize - 1)
+}
+
+function voxelizeSceneBounds(scene: THREE.Object3D, gridSize: number) {
+  const sceneBounds = new THREE.Box3().setFromObject(scene)
+  if (sceneBounds.isEmpty()) return new Set<string>()
+
+  const sceneMin = sceneBounds.min
+  const sceneMax = sceneBounds.max
+  const voxels = new Set<string>()
+
+  scene.updateWorldMatrix(true, true)
+  scene.traverse((obj) => {
+    const mesh = obj as THREE.Mesh
+    if (!mesh.isMesh || !mesh.geometry) return
+
+    const meshBounds = new THREE.Box3().setFromObject(mesh)
+    if (meshBounds.isEmpty()) return
+
+    const x0 = worldToVoxelCoordinate(meshBounds.min.x, sceneMin.x, sceneMax.x, gridSize)
+    const x1 = worldToVoxelCoordinate(meshBounds.max.x, sceneMin.x, sceneMax.x, gridSize)
+    const z0 = worldToVoxelCoordinate(meshBounds.min.z, sceneMin.z, sceneMax.z, gridSize)
+    const z1 = worldToVoxelCoordinate(meshBounds.max.z, sceneMin.z, sceneMax.z, gridSize)
+    const y0 = clampVoxelValue(Math.floor((meshBounds.min.y - sceneMin.y) * 2), 0, 40)
+    const y1 = clampVoxelValue(Math.ceil((meshBounds.max.y - sceneMin.y) * 2), 0, 40)
+
+    for (let x = x0; x <= x1; x++) {
+      for (let y = y0; y <= y1; y++) {
+        for (let z = z0; z <= z1; z++) {
+          voxels.add(voxelKey(x, y, z))
+        }
+      }
+    }
+  })
+
+  return voxels
+}
+
+function parseGltfFile(fileBuffer: ArrayBuffer): Promise<{ scene: THREE.Object3D }> {
+  return new Promise((resolve, reject) => {
+    const loader = new GLTFLoader()
+    loader.parse(fileBuffer, '', (gltf) => resolve(gltf), (error) => reject(error))
+  })
 }
 
 function createDefaultPrimitive(type: ShapePrimitiveType, color: string): ShapePrimitive {
@@ -336,6 +389,7 @@ function DimensionInput({
 
 export function ShapeEditorDialog({ isOpen, node, onSave, onClear, onClose }: ShapeEditorDialogProps) {
   const initialGridSize = Math.max(8, Math.min(20, Math.ceil(Math.max(node.size.width, node.size.depth)) + 4))
+  const importInputRef = useRef<HTMLInputElement | null>(null)
 
   // Initialize primitives from node's existing custom shape or generate from default type
   const [primitives, setPrimitives] = useState<ShapePrimitive[]>(() => {
@@ -365,6 +419,8 @@ export function ShapeEditorDialog({ isOpen, node, onSave, onClear, onClose }: Sh
   const [voxelColor, setVoxelColor] = useState(node.color || EQUIPMENT_TYPE_COLORS[node.type])
   const [voxelCells, setVoxelCells] = useState<Set<string>>(() => buildDefaultVoxelsFromNode(node, initialGridSize))
   const [voxelSelection, setVoxelSelection] = useState<Set<string>>(new Set())
+  const [isImporting, setIsImporting] = useState(false)
+  const [importMessage, setImportMessage] = useState<string | null>(null)
 
   const [selectedPrimId, setSelectedPrimId] = useState<string | null>(
     primitives.length > 0 ? primitives[0]?.id ?? null : null
@@ -679,6 +735,106 @@ export function ShapeEditorDialog({ isOpen, node, onSave, onClear, onClose }: Sh
     onClose()
   }, [node.id, activePrimitives, onSave, onClose])
 
+  const exportCurrentShape = useCallback(() => {
+    const payload = {
+      nodeId: node.id,
+      mode: sculptMode,
+      primitives,
+      voxelColor,
+      voxelGridSize,
+      voxelCells: Array.from(voxelCells),
+    }
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `${node.label.replace(/\s+/g, '_').toLowerCase()}-shape.json`
+    anchor.click()
+    URL.revokeObjectURL(url)
+  }, [node.id, node.label, sculptMode, primitives, voxelColor, voxelGridSize, voxelCells])
+
+  const importShapeFromFile = useCallback(async (file: File) => {
+    const extension = file.name.split('.').pop()?.toLowerCase() ?? ''
+    setImportMessage(null)
+    setIsImporting(true)
+
+    try {
+      if (extension === 'json') {
+        const text = await file.text()
+        const parsed = JSON.parse(text)
+
+        if (Array.isArray(parsed)) {
+          setPrimitives(parsed as ShapePrimitive[])
+          setSelectedPrimId(parsed[0]?.id ?? null)
+          setSculptMode('primitives')
+          setImportMessage(`Importado JSON con ${parsed.length} primitivas`)
+          return
+        }
+
+        if (Array.isArray(parsed?.primitives)) {
+          const importedPrimitives = parsed.primitives as ShapePrimitive[]
+          setPrimitives(importedPrimitives)
+          setSelectedPrimId(importedPrimitives[0]?.id ?? null)
+          if (Array.isArray(parsed?.voxelCells)) {
+            setVoxelCells(new Set<string>(parsed.voxelCells))
+          }
+          if (typeof parsed?.voxelColor === 'string') {
+            setVoxelColor(parsed.voxelColor)
+          }
+          setSculptMode(parsed?.mode === 'voxel' ? 'voxel' : 'primitives')
+          setImportMessage(`Importado JSON (${importedPrimitives.length} primitivas)`)
+          return
+        }
+
+        if (Array.isArray(parsed?.voxelCells)) {
+          setVoxelCells(new Set<string>(parsed.voxelCells))
+          setVoxelSelection(new Set())
+          if (typeof parsed?.voxelColor === 'string') {
+            setVoxelColor(parsed.voxelColor)
+          }
+          setSculptMode('voxel')
+          setImportMessage(`Importado JSON con ${parsed.voxelCells.length} voxeles`)
+          return
+        }
+
+        throw new Error('Formato JSON no compatible')
+      }
+
+      if (extension === 'glb' || extension === 'gltf') {
+        const buffer = await file.arrayBuffer()
+        const gltf = await parseGltfFile(buffer)
+        const importedVoxels = voxelizeSceneBounds(gltf.scene, voxelGridSize)
+        if (importedVoxels.size === 0) {
+          throw new Error('No se detectó geometría en el modelo')
+        }
+        setVoxelCells(importedVoxels)
+        setVoxelSelection(new Set())
+        setVoxelLayer(0)
+        setSculptMode('voxel')
+        setImportMessage(`Modelo ${extension.toUpperCase()} convertido a ${importedVoxels.size} voxeles`)
+        return
+      }
+
+      throw new Error('Formato no soportado. Usa JSON, GLB o GLTF')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Error desconocido importando archivo'
+      setImportMessage(message)
+    } finally {
+      setIsImporting(false)
+    }
+  }, [voxelGridSize])
+
+  const handleImportClick = useCallback(() => {
+    importInputRef.current?.click()
+  }, [])
+
+  const handleImportInputChange = useCallback(async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    await importShapeFromFile(file)
+    e.target.value = ''
+  }, [importShapeFromFile])
+
   const handleClearCustom = useCallback(() => {
     onClear(node.id)
     onClose()
@@ -691,6 +847,14 @@ export function ShapeEditorDialog({ isOpen, node, onSave, onClear, onClose }: Sh
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
       <div className="relative bg-card border rounded-xl shadow-2xl w-full max-w-[1280px] mx-4 max-h-[92vh] flex flex-col">
+        <input
+          ref={importInputRef}
+          type="file"
+          accept=".json,.glb,.gltf"
+          className="hidden"
+          onChange={handleImportInputChange}
+        />
+
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b">
           <div>
@@ -701,10 +865,23 @@ export function ShapeEditorDialog({ isOpen, node, onSave, onClear, onClose }: Sh
             <p className="text-xs text-muted-foreground mt-0.5">
               Cada cuadro de la grilla = 1m × 1m · Modo Primitivas o Esculpido Voxel
             </p>
+            {importMessage && (
+              <p className="text-[11px] mt-1 text-muted-foreground">{importMessage}</p>
+            )}
           </div>
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onClose}>
-            <X className="h-4 w-4" />
-          </Button>
+          <div className="flex items-center gap-1.5">
+            <Button variant="outline" size="sm" className="gap-1" onClick={handleImportClick} disabled={isImporting}>
+              <Upload className="h-3.5 w-3.5" />
+              {isImporting ? 'Importando...' : 'Importar'}
+            </Button>
+            <Button variant="outline" size="sm" className="gap-1" onClick={exportCurrentShape}>
+              <Download className="h-3.5 w-3.5" />
+              Exportar
+            </Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onClose}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
 
         <div className="flex-1 flex overflow-hidden min-h-0">
