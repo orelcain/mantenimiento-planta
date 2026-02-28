@@ -403,7 +403,7 @@ export function MapPage() {
       }
       handleAddNode(newNode)
     },
-    [editorTool, addEquipmentType, handleAddNode]
+    [editorTool, addEquipmentType, handleAddNode, viewerState.currentFloor]
   )
 
   const handleDeleteSelected = useCallback(() => {

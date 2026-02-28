@@ -437,7 +437,7 @@ function TrendSparkline({
     }] : [])
   ] : undefined
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   const option: EChartsOption = {
     ...(visualMapConfig ? { visualMap: visualMapConfig as any } : {}),
     animation: true,
