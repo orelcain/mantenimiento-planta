@@ -189,8 +189,8 @@ export interface MapNode {
   size: { width: number; height: number; depth: number }
   /** Rotación en grados (eje Y) */
   rotation: number
-  /** Piso: 0=planta baja, 1=segundo piso, 2=techo */
-  floor: number
+  /** Piso: 0=planta baja, 1=segundo piso, 2=techo (default 0) */
+  floor?: number
   /** Vinculación con entidad real en Firestore */
   linkedEntityType?: 'equipment' | 'plantAsset' | 'iotDevice' | 'zone'
   linkedEntityId?: string
@@ -226,8 +226,8 @@ export interface MapArea {
   size: { width: number; depth: number }
   color: string
   opacity: number
-  /** Piso: 0=planta baja, 1=segundo piso, 2=techo */
-  floor: number
+  /** Piso: 0=planta baja, 1=segundo piso, 2=techo (default 0) */
+  floor?: number
   /** Tiles seleccionados al estilo FFT (coordenadas de grilla) — si se define, usa tiles en vez de rectángulo */
   tiles?: { x: number; z: number }[]
   linkedZoneId?: string
