@@ -18,7 +18,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { 
   X, Trash2, Copy, Box, Circle, Triangle, 
   RotateCw, Palette, ChevronDown, ChevronUp, Save, 
-  Undo2, Layers, Plus, Minus, Eraser, MousePointer2, Grid3X3, Upload, Download
+  Undo2, Layers, Upload, Download
 } from 'lucide-react'
 import { Button, Badge } from '@/components/ui'
 import { cn } from '@/lib/utils'
@@ -48,7 +48,6 @@ const DEFAULT_COLORS = [
 ]
 
 type SculptMode = 'primitives' | 'voxel'
-type VoxelTool = 'paint' | 'erase' | 'select'
 type FaceDirection = 'top' | 'bottom' | 'left' | 'right' | 'front' | 'back'
 
 const MATTE_MATERIAL = { metalness: 0.05, roughness: 0.95 } as const
@@ -189,7 +188,12 @@ function buildDefaultVoxelsFromNode(node: MapNode, gridSize: number) {
     }
   }
 
-  return cells
+  const roundedKeys = computeRoundedCornerRemoval(cells, cells)
+  if (roundedKeys.length === 0) return cells
+
+  const rounded = new Set(cells)
+  for (const key of roundedKeys) rounded.delete(key)
+  return rounded
 }
 
 function clampVoxelValue(value: number, min: number, max: number) {
@@ -237,26 +241,25 @@ function voxelizeSceneBounds(scene: THREE.Object3D, gridSize: number) {
   return voxels
 }
 
-function computeRoundedCornerRemoval(sourceKeys: Set<string>) {
+function computeRoundedCornerRemoval(allCells: Set<string>, scopeKeys: Set<string>) {
   const removals: string[] = []
-  const dirs = [
-    [1, 0, 0], [-1, 0, 0],
-    [0, 1, 0], [0, -1, 0],
-    [0, 0, 1], [0, 0, -1],
-  ] as const
 
-  for (const key of sourceKeys) {
+  for (const key of scopeKeys) {
+    if (!allCells.has(key)) continue
+
     const { x, y, z } = parseVoxelKey(key)
-    let present = 0
-    let missing = 0
+    const hasXP = allCells.has(voxelKey(x + 1, y, z))
+    const hasXN = allCells.has(voxelKey(x - 1, y, z))
+    const hasYP = allCells.has(voxelKey(x, y + 1, z))
+    const hasYN = allCells.has(voxelKey(x, y - 1, z))
+    const hasZP = allCells.has(voxelKey(x, y, z + 1))
+    const hasZN = allCells.has(voxelKey(x, y, z - 1))
 
-    for (const [dx, dy, dz] of dirs) {
-      const hasNeighbor = sourceKeys.has(voxelKey(x + dx, y + dy, z + dz))
-      if (hasNeighbor) present++
-      else missing++
-    }
+    const missingCount = Number(!hasXP) + Number(!hasXN) + Number(!hasYP) + Number(!hasYN) + Number(!hasZP) + Number(!hasZN)
+    const isExterior = missingCount > 0
+    const hasMissingOnEachAxis = (!hasXP || !hasXN) && (!hasYP || !hasYN) && (!hasZP || !hasZN)
 
-    if (missing >= 3 && present >= 2) {
+    if (isExterior && hasMissingOnEachAxis && missingCount >= 3) {
       removals.push(key)
     }
   }
@@ -401,7 +404,7 @@ function ShapePreviewScene({
             {voxelSelection?.has(prim.id.replace('voxel-', '')) && (
               <mesh>
                 {getPrimitiveGeometry(prim)}
-                <meshBasicMaterial color="#38bdf8" wireframe transparent opacity={0.55} />
+                <meshBasicMaterial color="#38bdf8" transparent opacity={0.22} />
               </mesh>
             )}
           </group>
@@ -486,8 +489,6 @@ export function ShapeEditorDialog({ isOpen, node, onSave, onClear, onClose }: Sh
 
   const [sculptMode, setSculptMode] = useState<SculptMode>('primitives')
   const [voxelGridSize] = useState(initialGridSize)
-  const [voxelLayer, setVoxelLayer] = useState(0)
-  const [voxelTool, setVoxelTool] = useState<VoxelTool>('paint')
   const [activeFace, setActiveFace] = useState<FaceDirection>('top')
   const [faceSubdivision, setFaceSubdivision] = useState(8)
   const [voxelColor, setVoxelColor] = useState(node.color || EQUIPMENT_TYPE_COLORS[node.type])
@@ -507,15 +508,6 @@ export function ShapeEditorDialog({ isOpen, node, onSave, onClear, onClose }: Sh
     () => primitives.find((p) => p.id === selectedPrimId) ?? null,
     [primitives, selectedPrimId]
   )
-
-  const voxelMaxLayer = useMemo(() => {
-    let maxY = 0
-    for (const key of voxelCells) {
-      const { y } = parseVoxelKey(key)
-      maxY = Math.max(maxY, y)
-    }
-    return Math.max(maxY, 0)
-  }, [voxelCells])
 
   const voxelBounds = useMemo(() => getVoxelBounds(voxelCells), [voxelCells])
 
@@ -698,75 +690,6 @@ export function ShapeEditorDialog({ isOpen, node, onSave, onClear, onClose }: Sh
     })
   }, [voxelGridSize])
 
-  const applyVoxelAction = useCallback((x: number, z: number) => {
-    const key = voxelKey(x, voxelLayer, z)
-
-    if (voxelTool === 'paint') {
-      setVoxelCells((prev) => {
-        const next = new Set(prev)
-        next.add(key)
-        return next
-      })
-      return
-    }
-
-    if (voxelTool === 'erase') {
-      setVoxelCells((prev) => {
-        const next = new Set(prev)
-        next.delete(key)
-        return next
-      })
-      setVoxelSelection((prev) => {
-        const next = new Set(prev)
-        next.delete(key)
-        return next
-      })
-      return
-    }
-
-    // select tool
-    if (!voxelCells.has(key)) return
-    setVoxelSelection((prev) => {
-      const next = new Set(prev)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
-      return next
-    })
-  }, [voxelCells, voxelLayer, voxelTool])
-
-  const extrudeSelection = useCallback((direction: 1 | -1) => {
-    if (voxelSelection.size === 0) return
-    setVoxelCells((prev) => {
-      const next = new Set(prev)
-      const moved: string[] = []
-      for (const key of voxelSelection) {
-        const { x, y, z } = parseVoxelKey(key)
-        const ny = y + direction
-        if (ny < 0 || ny > 40) continue
-        const target = voxelKey(x, ny, z)
-        next.add(target)
-        moved.push(target)
-      }
-      setVoxelSelection(new Set(moved))
-      return next
-    })
-  }, [voxelSelection])
-
-  const selectFaceBucket = useCallback((u: number, v: number) => {
-    const bucket = faceBuckets.get(`${u},${v}`) ?? []
-    if (bucket.length === 0) return
-    setVoxelSelection((prev) => {
-      const next = new Set(prev)
-      const allSelected = bucket.every((key) => next.has(key))
-      if (allSelected) {
-        for (const key of bucket) next.delete(key)
-      } else {
-        for (const key of bucket) next.add(key)
-      }
-      return next
-    })
-  }, [faceBuckets])
-
   const selectFullActiveFace = useCallback(() => {
     setVoxelSelection(new Set(activeFaceVoxels))
   }, [activeFaceVoxels])
@@ -784,7 +707,7 @@ export function ShapeEditorDialog({ isOpen, node, onSave, onClear, onClose }: Sh
         ? new Set(Array.from(voxelSelection).filter((key) => prev.has(key)))
         : new Set(prev)
 
-      const toRemove = computeRoundedCornerRemoval(scope)
+      const toRemove = computeRoundedCornerRemoval(prev, scope)
       if (toRemove.length === 0) {
         setImportMessage('No se detectaron esquinas para redondear en la selección actual')
         return prev
@@ -819,30 +742,10 @@ export function ShapeEditorDialog({ isOpen, node, onSave, onClear, onClose }: Sh
     })
   }, [voxelBounds, voxelCells, faceSubdivision, faceBuckets])
 
-  const clearCurrentLayer = useCallback(() => {
-    setVoxelCells((prev) => {
-      const next = new Set<string>()
-      for (const key of prev) {
-        const { y } = parseVoxelKey(key)
-        if (y !== voxelLayer) next.add(key)
-      }
-      return next
-    })
-    setVoxelSelection((prev) => {
-      const next = new Set<string>()
-      for (const key of prev) {
-        const { y } = parseVoxelKey(key)
-        if (y !== voxelLayer) next.add(key)
-      }
-      return next
-    })
-  }, [voxelLayer])
-
   const resetVoxelFromNode = useCallback(() => {
     const rebuilt = buildDefaultVoxelsFromNode(node, voxelGridSize)
     setVoxelCells(rebuilt)
     setVoxelSelection(new Set())
-    setVoxelLayer(0)
   }, [node, voxelGridSize])
 
   const handleSave = useCallback(() => {
@@ -933,7 +836,6 @@ export function ShapeEditorDialog({ isOpen, node, onSave, onClear, onClose }: Sh
         }
         setVoxelCells(importedVoxels)
         setVoxelSelection(new Set())
-        setVoxelLayer(0)
         setSculptMode('voxel')
         setImportMessage(`Modelo ${extension.toUpperCase()} convertido a ${importedVoxels.size} voxeles`)
         return
@@ -1096,24 +998,6 @@ export function ShapeEditorDialog({ isOpen, node, onSave, onClear, onClose }: Sh
             ) : (
               <div className="flex-1 overflow-y-auto p-3 space-y-3">
                 <div>
-                  <p className="text-xs font-semibold mb-1.5">Herramienta</p>
-                  <div className="grid grid-cols-3 gap-1.5">
-                    <button className={cn('p-2 rounded border text-xs flex items-center justify-center gap-1', voxelTool === 'paint' ? 'border-primary bg-primary/10' : 'hover:bg-muted')} onClick={() => setVoxelTool('paint')}><Plus className="h-3.5 w-3.5" />Pintar</button>
-                    <button className={cn('p-2 rounded border text-xs flex items-center justify-center gap-1', voxelTool === 'erase' ? 'border-primary bg-primary/10' : 'hover:bg-muted')} onClick={() => setVoxelTool('erase')}><Eraser className="h-3.5 w-3.5" />Borrar</button>
-                    <button className={cn('p-2 rounded border text-xs flex items-center justify-center gap-1', voxelTool === 'select' ? 'border-primary bg-primary/10' : 'hover:bg-muted')} onClick={() => setVoxelTool('select')}><MousePointer2 className="h-3.5 w-3.5" />Selec.</button>
-                  </div>
-                </div>
-
-                <div>
-                  <p className="text-xs font-semibold mb-1.5">Capa</p>
-                  <div className="flex items-center gap-1.5">
-                    <Button variant="outline" size="sm" className="h-7 px-2" onClick={() => setVoxelLayer((v) => Math.max(0, v - 1))}><Minus className="h-3.5 w-3.5" /></Button>
-                    <div className="text-xs px-2 py-1 rounded border min-w-[80px] text-center">Y {voxelLayer}</div>
-                    <Button variant="outline" size="sm" className="h-7 px-2" onClick={() => setVoxelLayer((v) => Math.min(Math.max(voxelMaxLayer + 1, v + 1), 40))}><Plus className="h-3.5 w-3.5" /></Button>
-                  </div>
-                </div>
-
-                <div>
                   <p className="text-xs font-semibold mb-1.5">Color voxel</p>
                   <input
                     type="color"
@@ -1124,28 +1008,13 @@ export function ShapeEditorDialog({ isOpen, node, onSave, onClear, onClose }: Sh
                 </div>
 
                 <div className="space-y-1.5 border rounded-lg p-2">
-                  <p className="text-xs font-semibold">Editor por caras</p>
-                  <div className="grid grid-cols-3 gap-1">
-                    {([
-                      ['top', 'Top'],
-                      ['bottom', 'Bottom'],
-                      ['left', 'Left'],
-                      ['right', 'Right'],
-                      ['front', 'Front'],
-                      ['back', 'Back'],
-                    ] as [FaceDirection, string][]).map(([face, label]) => (
-                      <button
-                        key={face}
-                        className={cn('px-1.5 py-1 rounded border text-[10px]', activeFace === face ? 'border-primary bg-primary/10' : 'hover:bg-muted')}
-                        onClick={() => setActiveFace(face)}
-                      >
-                        {label}
-                      </button>
-                    ))}
+                  <p className="text-xs font-semibold">Selección directa</p>
+                  <div className="rounded border px-2 py-1.5 text-[10px]">
+                    Cara activa: <span className="font-semibold uppercase">{activeFace}</span>
                   </div>
 
                   <div>
-                    <p className="text-[10px] text-muted-foreground mb-1">Subdivisión de cara</p>
+                    <p className="text-[10px] text-muted-foreground mb-1">Nivel de detalle de selección</p>
                     <div className="grid grid-cols-3 gap-1">
                       {[2, 4, 6, 8, 12, 16].map((value) => (
                         <button
@@ -1161,88 +1030,29 @@ export function ShapeEditorDialog({ isOpen, node, onSave, onClear, onClose }: Sh
 
                   <div className="grid grid-cols-2 gap-1.5">
                     <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={selectFullActiveFace}>
-                      Selec. cara
+                      Selec. exterior
                     </Button>
                     <Button variant="outline" size="sm" className="h-7 text-[10px]" onClick={extrudeActiveFace}>
-                      Extruir cara
+                      Extruir selección
                     </Button>
                   </div>
 
                   <Button variant="outline" size="sm" className="h-7 text-[10px] w-full" onClick={applyCornerRounding}>
                     Redondear esquinas
                   </Button>
-
-                  <div>
-                    <p className="text-[10px] text-muted-foreground mb-1">Grilla de cara activa</p>
-                    <div
-                      className="grid gap-1"
-                      style={{ gridTemplateColumns: `repeat(${faceSubdivision}, minmax(0, 1fr))` }}
-                    >
-                      {Array.from({ length: faceSubdivision }).map((_, v) =>
-                        Array.from({ length: faceSubdivision }).map((_, u) => {
-                          const bucket = faceBuckets.get(`${u},${v}`) ?? []
-                          const hasVoxels = bucket.length > 0
-                          const selectedCount = bucket.filter((key) => voxelSelection.has(key)).length
-                          const selected = selectedCount > 0
-                          return (
-                            <button
-                              key={`face-${u}-${v}`}
-                              className={cn(
-                                'aspect-square rounded-sm border transition-colors',
-                                hasVoxels ? 'bg-primary/25 hover:bg-primary/40' : 'bg-muted/20',
-                                selected && 'ring-1 ring-primary border-primary'
-                              )}
-                              onClick={() => selectFaceBucket(u, v)}
-                              title={`u:${u} v:${v} ${hasVoxels ? `(${selectedCount}/${bucket.length})` : '(vacío)'}`}
-                            />
-                          )
-                        })
-                      )}
-                    </div>
-                  </div>
                 </div>
 
                 <div className="space-y-1.5">
-                  <Button variant="outline" size="sm" className="w-full justify-start gap-1" onClick={() => extrudeSelection(1)}>
-                    <Plus className="h-3.5 w-3.5" /> Extruir selección +Y
-                  </Button>
-                  <Button variant="outline" size="sm" className="w-full justify-start gap-1" onClick={() => extrudeSelection(-1)}>
-                    <Minus className="h-3.5 w-3.5" /> Extruir selección -Y
-                  </Button>
-                  <Button variant="outline" size="sm" className="w-full justify-start gap-1" onClick={clearCurrentLayer}>
-                    <Trash2 className="h-3.5 w-3.5" /> Limpiar capa actual
+                  <Button variant="outline" size="sm" className="w-full justify-start gap-1" onClick={() => setVoxelSelection(new Set())}>
+                    <Trash2 className="h-3.5 w-3.5" /> Limpiar selección
                   </Button>
                   <Button variant="outline" size="sm" className="w-full justify-start gap-1" onClick={resetVoxelFromNode}>
                     <Undo2 className="h-3.5 w-3.5" /> Reiniciar voxel
                   </Button>
                 </div>
 
-                <div>
-                  <p className="text-xs font-semibold mb-1.5 flex items-center gap-1"><Grid3X3 className="h-3.5 w-3.5" /> Grilla capa Y={voxelLayer}</p>
-                  <div
-                    className="grid gap-1"
-                    style={{ gridTemplateColumns: `repeat(${voxelGridSize}, minmax(0, 1fr))` }}
-                  >
-                    {Array.from({ length: voxelGridSize }).map((_, z) =>
-                      Array.from({ length: voxelGridSize }).map((_, x) => {
-                        const key = voxelKey(x, voxelLayer, z)
-                        const exists = voxelCells.has(key)
-                        const selected = voxelSelection.has(key)
-                        return (
-                          <button
-                            key={key}
-                            className={cn(
-                              'aspect-square rounded-sm border transition-colors',
-                              selected && 'border-primary ring-1 ring-primary',
-                              exists ? 'bg-primary/35 hover:bg-primary/50' : 'bg-muted/30 hover:bg-muted/60'
-                            )}
-                            onClick={() => applyVoxelAction(x, z)}
-                            title={`x:${x} z:${z}`}
-                          />
-                        )
-                      })
-                    )}
-                  </div>
+                <div className="rounded border px-2 py-1.5 text-[10px] text-muted-foreground">
+                  Clic en el modelo para seleccionar cara/zona. Usa Shift para acumular y luego extruye o redondea.
                 </div>
               </div>
             )}
@@ -1290,7 +1100,7 @@ export function ShapeEditorDialog({ isOpen, node, onSave, onClear, onClose }: Sh
                 </div>
 
                 <div className="border rounded-lg p-3 text-xs text-muted-foreground">
-                  Haz clic directo en el modelo para seleccionar caras o zonas (Shift para acumular). La extrusión mueve la selección según la cara activa.
+                  Cara activa: <span className="font-semibold uppercase">{activeFace}</span>. Voxel seleccionados: <span className="font-semibold">{voxelSelection.size}</span>.
                 </div>
               </div>
             ) : selectedPrim ? (

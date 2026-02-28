@@ -7,6 +7,18 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.69.10] - 2026-02-28
+### Modificado — Editor voxel más directo y menos confuso
+- **Grillas laterales removidas**: se elimina la grilla de cara activa y la grilla por capa Y para liberar espacio visual y reducir ruido
+- **Flujo directo en visor 3D**: selección por clic sobre el modelo + `Shift` para acumular, con extrusión centrada en la selección actual
+- **Cara activa visible**: indicador explícito de cara activa y resaltado visual sólido de la selección en el modelo
+- **Controles simplificados**: panel reducido a acciones útiles (`Selec. exterior`, `Extruir selección`, `Redondear esquinas`, `Limpiar selección`, `Reiniciar voxel`)
+- **Ayuda reubicada**: texto de instrucciones movido fuera del bloque de vista principal para dar más espacio al modelo
+
+### Corregido — Redondeo en exterior
+- **Redondeo exterior real**: el algoritmo ahora detecta y redondea esquinas convexas exteriores (no caras internas)
+- **Cubo base redondeado**: al crear/reiniciar forma base, el bloque inicial ya aplica redondeo exterior por defecto
+
 ## [2.69.9] - 2026-02-28
 ### Agregado — Modelado directo sobre el visor 3D + acabado mate
 - **Selección de cara directa en modelo**: clic en el voxel del visor 3D selecciona automáticamente la cara (`Top/Bottom/Left/Right/Front/Back`) y su zona de subdivisión
