@@ -14,10 +14,11 @@ import type { MapArea } from '@/types/isometricMap'
 interface MapAreaOverlayProps {
   area: MapArea
   selected?: boolean
+  highlighted?: boolean
   onClick?: (areaId: string) => void
 }
 
-export function MapAreaOverlay({ area, selected = false, onClick }: MapAreaOverlayProps) {
+export function MapAreaOverlay({ area, selected = false, highlighted = false, onClick }: MapAreaOverlayProps) {
   const meshRef = useRef<THREE.Mesh>(null)
   const hasTiles = area.tiles && area.tiles.length > 0
   const effectiveOpacity = Math.max(0.18, area.opacity)
@@ -49,7 +50,7 @@ export function MapAreaOverlay({ area, selected = false, onClick }: MapAreaOverl
             <meshBasicMaterial
               color={area.color}
               transparent
-              opacity={effectiveOpacity}
+              opacity={selected ? Math.min(effectiveOpacity + 0.12, 0.9) : highlighted ? Math.min(effectiveOpacity + 0.07, 0.85) : effectiveOpacity}
               side={THREE.DoubleSide}
               depthWrite={false}
             />
@@ -121,9 +122,9 @@ export function MapAreaOverlay({ area, selected = false, onClick }: MapAreaOverl
           />
         </bufferGeometry>
         <lineBasicMaterial
-          color={selected ? '#ffffff' : area.color}
+          color={selected ? '#ffffff' : highlighted ? '#cbd5e1' : area.color}
           transparent
-          opacity={selected ? 0.9 : 0.5}
+          opacity={selected ? 0.9 : highlighted ? 0.75 : 0.5}
           linewidth={1}
         />
       </lineLoop>

@@ -77,6 +77,8 @@ import { MapSearchPanel } from '@/components/map/isometric/editor/MapSearchPanel
 import { ShapeEditorDialog } from '@/components/map/isometric/editor/ShapeEditorDialog'
 import { AreaTileEditor } from '@/components/map/isometric/editor/AreaTileEditor'
 import type { AreaPaintState } from '@/components/map/isometric/editor/AreaTileEditor'
+import { useEditorOverlayState } from '@/components/map/isometric/editor/useEditorOverlayState'
+import { getAreaAtPosition, normalizeNodeForArea } from '@/components/map/isometric/editor/areaAssociation'
 
 const PRIORITY_CONFIG: Record<IncidentPriority, { color: string; bg: string; label: string }> = {
   critica: { color: 'text-red-500', bg: 'bg-red-500', label: 'Crítica' },
@@ -153,14 +155,17 @@ export function MapPage() {
   const [editorTool, setEditorTool] = useState<EditorTool>('select')
   const [snapEnabled, setSnapEnabled] = useState(true)
   const [addEquipmentType, setAddEquipmentType] = useState<MapNode['type']>('pump')
-  const [showAddDialog, setShowAddDialog] = useState(false)
   const [showLinkDialog, setShowLinkDialog] = useState(false)
-  const [showShapeEditor, setShowShapeEditor] = useState(false)
-  const [showAreaEditor, setShowAreaEditor] = useState(false)
-  const [showAreaManager, setShowAreaManager] = useState(false)
+  const overlayState = useEditorOverlayState()
+  const showAddDialog = overlayState.isOverlayOpen('add-equipment')
+  const showShapeEditor = overlayState.isOverlayOpen('shape-editor')
+  const showAreaEditor = overlayState.isOverlayOpen('area-editor')
+  const showAreaManager = overlayState.isOverlayOpen('area-manager')
   const [areaManagerFloor, setAreaManagerFloor] = useState<'all' | 0 | 1 | 2>('all')
   const [editingArea, setEditingArea] = useState<MapArea | null>(null)
   const [selectedAreaId, setSelectedAreaId] = useState<string | null>(null)
+  const [hoveredAreaId, setHoveredAreaId] = useState<string | null>(null)
+  const [showOnlyActiveAreaEquipment, setShowOnlyActiveAreaEquipment] = useState(false)
   const [areaPaintState, setAreaPaintState] = useState<AreaPaintState>({
     tiles: new Set<string>(),
     tool: 'paint',
@@ -183,24 +188,8 @@ export function MapPage() {
 
   const isEditMode = viewerState.mode === 'edit'
 
-  const getAreaAtPosition = useCallback((x: number, z: number, floor: number): MapArea | null => {
-    const floorAreas = areas.filter((area) => (area.floor ?? 0) === floor)
-
-    const tileMatch = floorAreas.find((area) =>
-      area.tiles?.some((tile) => tile.x === x && tile.z === z)
-    )
-    if (tileMatch) return tileMatch
-
-    const boundsMatch = floorAreas.find((area) => {
-      if (area.tiles?.length) return false
-      const minX = area.position.x - area.size.width / 2
-      const maxX = area.position.x + area.size.width / 2
-      const minZ = area.position.z - area.size.depth / 2
-      const maxZ = area.position.z + area.size.depth / 2
-      return x >= minX && x <= maxX && z >= minZ && z <= maxZ
-    })
-
-    return boundsMatch ?? null
+  const resolveAreaAtPosition = useCallback((x: number, z: number, floor: number) => {
+    return getAreaAtPosition(areas, x, z, floor)
   }, [areas])
 
   // Incidencias activas
@@ -215,6 +204,26 @@ export function MapPage() {
     () => areas.filter((area) => (area.floor ?? 0) === viewerState.currentFloor),
     [areas, viewerState.currentFloor]
   )
+
+  const visibleNodeIds = useMemo(() => {
+    if (!showOnlyActiveAreaEquipment || !selectedAreaId) return undefined
+    return new Set(
+      nodes
+        .filter((node) => node.linkedAreaId === selectedAreaId)
+        .map((node) => node.id)
+    )
+  }, [showOnlyActiveAreaEquipment, selectedAreaId, nodes])
+
+  const selectedAreaEquipmentSummary = useMemo(() => {
+    if (!selectedAreaId) return null
+    const selectedArea = areas.find((area) => area.id === selectedAreaId)
+    if (!selectedArea) return null
+    const floor = selectedArea.floor ?? viewerState.currentFloor
+    const floorNodes = nodes.filter((node) => (node.floor ?? 0) === floor)
+    const linked = floorNodes.filter((node) => node.linkedAreaId === selectedAreaId).length
+    const unlinked = floorNodes.filter((node) => !node.linkedAreaId).length
+    return { linked, unlinked, floor }
+  }, [selectedAreaId, areas, nodes, viewerState.currentFloor])
 
   const managedAreas = useMemo(() => {
     const base = areaManagerFloor === 'all'
@@ -411,11 +420,13 @@ export function MapPage() {
   }, [nodes, viewerState.selectedNodeId])
 
   const handleNodeHover = useCallback((nodeId: string | null) => {
+    const node = nodeId ? nodes.find((n) => n.id === nodeId) : null
     setViewerState((prev) => ({
       ...prev,
       hoveredNodeId: nodeId,
     }))
-  }, [])
+    setHoveredAreaId(node?.linkedAreaId ?? null)
+  }, [nodes])
 
   const handleBackgroundClick = useCallback(() => {
     setViewerState((prev) => ({
@@ -423,6 +434,7 @@ export function MapPage() {
       selectedNodeId: null,
     }))
     setSelectedAreaId(null)
+    setHoveredAreaId(null)
   }, [])
 
   // ── Handlers de filtros ──
@@ -463,7 +475,7 @@ export function MapPage() {
 
   const handleNodeDragEnd = useCallback(
     (nodeId: string, newPosition: { x: number; y: number; z: number }) => {
-      const targetArea = getAreaAtPosition(newPosition.x, newPosition.z, viewerState.currentFloor)
+      const targetArea = resolveAreaAtPosition(newPosition.x, newPosition.z, viewerState.currentFloor)
       const newNodes = nodes.map((n) =>
         n.id === nodeId
           ? {
@@ -475,7 +487,7 @@ export function MapPage() {
       )
       commitEditorChange(newNodes)
     },
-    [nodes, commitEditorChange, getAreaAtPosition, viewerState.currentFloor]
+    [nodes, commitEditorChange, resolveAreaAtPosition, viewerState.currentFloor]
   )
 
   const handleNodeUpdate = useCallback(
@@ -491,29 +503,20 @@ export function MapPage() {
   const handleAddNode = useCallback(
     (newNode: MapNode) => {
       commitEditorChange([...nodes, newNode])
-      setShowAddDialog(false)
+      overlayState.closeOverlayIf('add-equipment')
       // Seleccionar el nodo recién agregado
       setViewerState((prev) => ({ ...prev, selectedNodeId: newNode.id }))
     },
-    [nodes, commitEditorChange]
+    [nodes, commitEditorChange, overlayState]
   )
 
   const handleAddNodeFromDialog = useCallback((newNode: MapNode) => {
     const selectedArea = selectedAreaId ? areas.find((area) => area.id === selectedAreaId) : null
-    const areaForNode = selectedArea ?? getAreaAtPosition(newNode.position.x, newNode.position.z, viewerState.currentFloor)
-    const floor = areaForNode?.floor ?? viewerState.currentFloor
-
-    const normalizedNode: MapNode = {
-      ...newNode,
-      floor,
-      position: areaForNode
-        ? { x: areaForNode.position.x, y: newNode.position.y ?? 0, z: areaForNode.position.z }
-        : { ...newNode.position },
-      linkedAreaId: areaForNode?.id,
-    }
+    const areaForNode = selectedArea ?? resolveAreaAtPosition(newNode.position.x, newNode.position.z, viewerState.currentFloor)
+    const normalizedNode = normalizeNodeForArea(newNode, areaForNode, viewerState.currentFloor)
 
     handleAddNode(normalizedNode)
-  }, [selectedAreaId, areas, getAreaAtPosition, viewerState.currentFloor, handleAddNode])
+  }, [selectedAreaId, areas, resolveAreaAtPosition, viewerState.currentFloor, handleAddNode])
 
   // ── Area paint state ──
   const handleAreaPaintStateChange = useCallback((update: Partial<AreaPaintState>) => {
@@ -528,9 +531,7 @@ export function MapPage() {
 
   // Abrir editor de áreas: guardar filtros previos y ocultar equipos/etiquetas
   const openAreaEditor = useCallback((area?: MapArea | null) => {
-    setShowAddDialog(false)
-    setShowShapeEditor(false)
-    setShowAreaManager(false)
+    overlayState.openOverlay('area-editor')
     setSelectedAreaId(area?.id ?? null)
     prevFiltersRef.current = { ...viewerState.filters }
     setViewerState((prev) => ({
@@ -562,8 +563,7 @@ export function MapPage() {
       })
     }
     setEditorTool('select')
-    setShowAreaEditor(true)
-  }, [viewerState.filters])
+  }, [viewerState.filters, overlayState])
 
   // Cerrar editor de áreas: restaurar filtros previos
   const closeAreaEditor = useCallback(() => {
@@ -574,7 +574,7 @@ export function MapPage() {
       }))
       prevFiltersRef.current = null
     }
-    setShowAreaEditor(false)
+    overlayState.closeOverlayIf('area-editor')
     setEditingArea(null)
     setAreaPaintState({
       tiles: new Set<string>(),
@@ -585,7 +585,7 @@ export function MapPage() {
       linkedZoneId: '',
       editAreaId: null,
     })
-  }, [])
+  }, [overlayState])
 
   const handleAreaClick = useCallback((areaId: string) => {
     const area = areas.find((a) => a.id === areaId)
@@ -609,7 +609,7 @@ export function MapPage() {
 
   const handleFloorClick = useCallback(
     (position: { x: number; z: number }) => {
-      const areaAtPoint = getAreaAtPosition(position.x, position.z, viewerState.currentFloor)
+      const areaAtPoint = resolveAreaAtPosition(position.x, position.z, viewerState.currentFloor)
       if (areaAtPoint) {
         setSelectedAreaId(areaAtPoint.id)
       }
@@ -648,7 +648,7 @@ export function MapPage() {
       }
       handleAddNode(newNode)
     },
-    [showAreaEditor, editorTool, addEquipmentType, handleAddNode, getAreaAtPosition, viewerState.currentFloor]
+    [showAreaEditor, editorTool, addEquipmentType, handleAddNode, resolveAreaAtPosition, viewerState.currentFloor]
   )
 
   const handleDeleteSelected = useCallback(() => {
@@ -746,11 +746,10 @@ export function MapPage() {
     }
     setViewerState((prev) => ({ ...prev, mode: 'view', selectedNodeId: null }))
     setSelectedAreaId(null)
-    setShowAreaEditor(false)
-    setShowAreaManager(false)
+    overlayState.closeOverlay()
     setEditingArea(null)
     history.clear()
-  }, [hasUnsavedChanges, history])
+  }, [hasUnsavedChanges, history, overlayState])
 
   // Nodo seleccionado data
   const selectedNode = viewerState.selectedNodeId
@@ -1019,8 +1018,10 @@ export function MapPage() {
                 connectors={connectors}
                 areas={areas}
                 selectedAreaId={selectedAreaId}
+                highlightedAreaId={hoveredAreaId}
                 runtimeData={runtimeData}
                 viewerState={viewerState}
+                visibleNodeIds={visibleNodeIds}
                 onNodeClick={handleNodeClick}
                 onNodeHover={handleNodeHover}
                 onAreaClick={handleAreaClick}
@@ -1051,7 +1052,7 @@ export function MapPage() {
                 onToolChange={setEditorTool}
                 onAddEquipment={() => {
                   closeAreaEditor()
-                  setShowAddDialog(true)
+                  overlayState.openOverlay('add-equipment')
                 }}
                 onDeleteSelected={handleDeleteSelected}
                 onDuplicateSelected={handleDuplicateSelected}
@@ -1064,7 +1065,7 @@ export function MapPage() {
                 onChangeEquipmentType={setAddEquipmentType}
                 onShowAddDialog={() => {
                   closeAreaEditor()
-                  setShowAddDialog(true)
+                  overlayState.openOverlay('add-equipment')
                 }}
               />
             )}
@@ -1197,6 +1198,11 @@ export function MapPage() {
                   {selectedAreaId && (
                     <div className="px-2 py-1.5 rounded-md border bg-primary/5 border-primary/20 text-[11px] text-primary">
                       Área activa: <span className="font-semibold">{areas.find((a) => a.id === selectedAreaId)?.label ?? selectedAreaId}</span>
+                      {selectedAreaEquipmentSummary && (
+                        <span className="ml-1 text-primary/80">
+                          · {selectedAreaEquipmentSummary.linked} asociados / {selectedAreaEquipmentSummary.unlinked} sin área
+                        </span>
+                      )}
                     </div>
                   )}
 
@@ -1232,7 +1238,7 @@ export function MapPage() {
                       onClick={() => {
                         closeAreaEditor()
                         setEditorTool('add')
-                        setShowAddDialog(true)
+                        overlayState.openOverlay('add-equipment')
                       }}
                     >
                       <Shapes className="h-3.5 w-3.5" />
@@ -1240,10 +1246,21 @@ export function MapPage() {
                     </Button>
 
                     <Button
+                      variant={showOnlyActiveAreaEquipment ? 'default' : 'outline'}
+                      size="sm"
+                      className="gap-1.5 text-xs justify-start w-full"
+                      onClick={() => setShowOnlyActiveAreaEquipment((prev) => !prev)}
+                      disabled={!selectedAreaId}
+                    >
+                      <Eye className="h-3.5 w-3.5" />
+                      {showOnlyActiveAreaEquipment ? 'Mostrar todos los equipos' : 'Solo equipos del área activa'}
+                    </Button>
+
+                    <Button
                       variant="outline"
                       size="sm"
                       className="gap-1.5 text-xs justify-start w-full"
-                      onClick={() => setShowAreaManager(true)}
+                      onClick={() => overlayState.openOverlay('area-manager')}
                     >
                       <Settings2 className="h-3.5 w-3.5" />
                       Gestionar áreas
@@ -1299,7 +1316,7 @@ export function MapPage() {
                     variant="outline"
                     size="sm"
                     className="gap-1.5 text-xs justify-start w-full"
-                    onClick={() => setShowShapeEditor(true)}
+                    onClick={() => overlayState.openOverlay('shape-editor')}
                     disabled={!selectedNode}
                   >
                     <Shapes className="h-3.5 w-3.5" />
@@ -1487,6 +1504,11 @@ export function MapPage() {
                 currentFloor={viewerState.currentFloor}
                 onSave={handleSaveArea}
                 onDelete={handleDeleteArea}
+                onCreateAndAddEquipment={() => {
+                  closeAreaEditor()
+                  setEditorTool('add')
+                  overlayState.openOverlay('add-equipment')
+                }}
                 onClose={closeAreaEditor}
               />
             )}
@@ -1501,7 +1523,7 @@ export function MapPage() {
                         <h3 className="text-sm font-semibold">Gestionar Áreas</h3>
                         <p className="text-[11px] text-muted-foreground">Edita o elimina áreas existentes desde un solo lugar</p>
                       </div>
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setShowAreaManager(false)}>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => overlayState.closeOverlayIf('area-manager')}>
                         <X className="h-4 w-4" />
                       </Button>
                     </div>
@@ -1551,7 +1573,7 @@ export function MapPage() {
                                 size="sm"
                                 className="h-7 text-xs"
                                 onClick={() => {
-                                  setShowAreaManager(false)
+                                  overlayState.closeOverlayIf('area-manager')
                                   setSelectedAreaId(area.id)
                                   setViewerState((prev) => ({
                                     ...prev,
@@ -1569,7 +1591,7 @@ export function MapPage() {
                                 size="sm"
                                 className="h-7 text-xs"
                                 onClick={() => {
-                                  setShowAreaManager(false)
+                                  overlayState.closeOverlayIf('area-manager')
                                   openAreaEditor(area)
                                 }}
                               >
@@ -1604,7 +1626,7 @@ export function MapPage() {
       {/* Diálogo de agregar equipo (editor) */}
       <AddEquipmentDialog
         isOpen={showAddDialog}
-        onClose={() => setShowAddDialog(false)}
+        onClose={() => overlayState.closeOverlayIf('add-equipment')}
         onAdd={handleAddNodeFromDialog}
         selectedAreaLabel={selectedAreaId ? areas.find((area) => area.id === selectedAreaId)?.label ?? null : null}
       />
@@ -1636,7 +1658,7 @@ export function MapPage() {
           node={selectedNode}
           onSave={handleSaveCustomShape}
           onClear={handleClearCustomShape}
-          onClose={() => setShowShapeEditor(false)}
+          onClose={() => overlayState.closeOverlayIf('shape-editor')}
         />
       )}
 

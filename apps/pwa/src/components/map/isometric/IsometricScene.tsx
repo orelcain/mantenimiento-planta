@@ -44,6 +44,8 @@ interface IsometricSceneProps {
   areas: MapArea[]
   /** Área seleccionada */
   selectedAreaId?: string | null
+  /** Área resaltada por contexto (hover/preview) */
+  highlightedAreaId?: string | null
   /** Data runtime (estados, incidencias, sensores) */
   runtimeData: Map<string, NodeRuntimeData>
   /** Estado del visor */
@@ -60,6 +62,8 @@ interface IsometricSceneProps {
   onFloorClick?: (position: { x: number; z: number }) => void
   /** Tiles de pintura para el editor de áreas (overlay en el suelo) */
   paintTiles?: { tiles: Set<string>; color: string; opacity: number }
+  /** Filtro adicional de nodos visibles */
+  visibleNodeIds?: Set<string>
 }
 
 /** Contenido de la escena (dentro del Canvas) */
@@ -69,6 +73,7 @@ function SceneContent({
   connectors,
   areas,
   selectedAreaId,
+  highlightedAreaId,
   runtimeData,
   viewerState,
   onNodeClick,
@@ -79,6 +84,7 @@ function SceneContent({
   onNodeDragEnd,
   onFloorClick,
   paintTiles,
+  visibleNodeIds,
 }: IsometricSceneProps) {
   // Centro de la planta
   const centerTarget = useMemo<[number, number, number]>(
@@ -103,14 +109,19 @@ function SceneContent({
       if (!node.visible) return false
       // Filtrar por piso (default 0 si no tiene)
       if ((node.floor ?? 0) !== currentFloor) return false
-      switch (node.type) {
-        case 'pump': return filters.showPumps
-        case 'motor': return filters.showMotors
-        case 'sensor': return filters.showSensors
-        default: return true
-      }
+      const typeAllowed = (() => {
+        switch (node.type) {
+          case 'pump': return filters.showPumps
+          case 'motor': return filters.showMotors
+          case 'sensor': return filters.showSensors
+          default: return true
+        }
+      })()
+      if (!typeAllowed) return false
+      if (visibleNodeIds && !visibleNodeIds.has(node.id)) return false
+      return true
     })
-  }, [nodes, viewerState.filters, viewerState.currentFloor])
+  }, [nodes, viewerState.filters, viewerState.currentFloor, visibleNodeIds])
 
   const handleRotationComplete = useCallback(() => {
     // Notificación opcional al completar rotación
@@ -162,6 +173,7 @@ function SceneContent({
           key={area.id}
           area={area}
           selected={selectedAreaId === area.id}
+          highlighted={highlightedAreaId === area.id}
           onClick={onAreaClick}
         />
       ))}

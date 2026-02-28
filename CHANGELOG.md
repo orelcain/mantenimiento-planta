@@ -7,6 +7,18 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.69.13] - 2026-02-28
+### Agregado — Mejoras naturales de flujo en editor de mapa
+- **Hover contextual de área**: al pasar sobre un equipo se resalta automáticamente su área asociada
+- **Botón directo en editor de área**: nueva acción `Crear y agregar equipo` para continuar el flujo sin salir del contexto
+- **Filtro rápido por área activa**: opción `Solo equipos del área activa` en el panel rápido del editor
+- **Resumen operativo por área**: contador `asociados / sin área` visible cuando hay un área activa
+
+### Refactor — Simplificación estructural del módulo
+- **Estado unificado de overlays**: nuevo `useEditorOverlayState` para centralizar apertura/cierre de `add/area/shape/manager`
+- **Reglas de asociación centralizadas**: nuevo helper `areaAssociation.ts` (`getAreaAtPosition`, `normalizeNodeForArea`) reutilizado en click/drag/alta
+- **IsometricScene más extensible**: soporte de `highlightedAreaId` y `visibleNodeIds` para separar visualización de lógica de página
+
 ## [2.69.12] - 2026-02-28
 ### Modificado — Flujo de edición de mapa más directo (estilo Sims)
 - **Asociación equipo↔área**: los equipos ahora guardan `linkedAreaId`, se asocian al área al crear/arrastrar y se pueden gestionar desde propiedades

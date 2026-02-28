@@ -6,7 +6,7 @@
  */
 
 import { useState, useCallback, useMemo } from 'react'
-import { X, Save, Paintbrush, Eraser, Trash2, Link2, Tag } from 'lucide-react'
+import { X, Save, Paintbrush, Eraser, Trash2, Link2, Tag, Plus } from 'lucide-react'
 import { Button, Badge } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/store'
@@ -30,6 +30,7 @@ interface AreaTileEditorProps {
   editArea?: MapArea | null
   onSave: (area: MapArea) => void
   onDelete?: (areaId: string) => void
+  onCreateAndAddEquipment?: () => void
   onClose: () => void
 }
 
@@ -60,6 +61,7 @@ export function AreaTileEditor({
   editArea,
   onSave,
   onDelete,
+  onCreateAndAddEquipment,
   onClose,
 }: AreaTileEditorProps) {
   const { zones } = useAppStore()
@@ -284,6 +286,17 @@ export function AreaTileEditor({
 
       {/* Footer */}
       <div className="p-3 border-t space-y-2">
+        {onCreateAndAddEquipment && (
+          <Button
+            variant="secondary"
+            size="sm"
+            className="w-full gap-1 text-xs"
+            onClick={onCreateAndAddEquipment}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Crear y agregar equipo
+          </Button>
+        )}
         {editArea && onDelete && (
           <Button
             variant="outline"
