@@ -844,6 +844,24 @@ export function MapPage() {
 
             {/* Camera rotation + zoom + pan (izquierda abajo) */}
             <div className="absolute bottom-4 left-4 flex flex-col gap-2">
+              {/* Toggle equipos: botón prominente */}
+              <Button
+                variant={viewerState.filters.showEquipment ? 'outline' : 'default'}
+                size="sm"
+                className={cn(
+                  'gap-1.5 text-xs shadow-lg backdrop-blur',
+                  !viewerState.filters.showEquipment && 'bg-amber-500 hover:bg-amber-600 text-white border-amber-600'
+                )}
+                onClick={() => toggleFilter('showEquipment')}
+                title={viewerState.filters.showEquipment ? 'Ocultar equipos (ver solo planta)' : 'Mostrar equipos'}
+              >
+                {viewerState.filters.showEquipment ? (
+                  <><EyeOff className="h-3.5 w-3.5" /> Ocultar Equipos</>
+                ) : (
+                  <><Eye className="h-3.5 w-3.5" /> Solo Planta</>
+                )}
+              </Button>
+
               <div className="flex items-center gap-1 bg-card/90 backdrop-blur rounded-lg p-1 shadow-lg border">
                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={rotateLeft} title="Rotar izq (Q)">
                     <RotateCcw className="h-4 w-4" />
