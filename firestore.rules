@@ -503,7 +503,7 @@ service cloud.firestore {
 
     match /plantMaps/{mapId} {
       allow read: if isAuthenticated();
-      allow create, update, delete: if isAdmin();
+      allow create, update, delete: if isSupervisor();
     }
 
     // ============================================

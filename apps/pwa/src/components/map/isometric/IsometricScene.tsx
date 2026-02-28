@@ -56,6 +56,8 @@ interface IsometricSceneProps {
   onNodeDragEnd?: (nodeId: string, newPosition: { x: number; y: number; z: number }) => void
   /** Callback para agregar nodo al hacer click en suelo en modo 'add' */
   onFloorClick?: (position: { x: number; z: number }) => void
+  /** Tiles de pintura para el editor de áreas (overlay en el suelo) */
+  paintTiles?: { tiles: Set<string>; color: string; opacity: number }
 }
 
 /** Contenido de la escena (dentro del Canvas) */
@@ -73,6 +75,7 @@ function SceneContent({
   onBackgroundClick,
   onNodeDragEnd,
   onFloorClick,
+  paintTiles,
 }: IsometricSceneProps) {
   // Centro de la planta
   const centerTarget = useMemo<[number, number, number]>(
@@ -160,6 +163,32 @@ function SceneContent({
         />
       ))}
 
+      {/* Paint tiles overlay (editor de áreas) */}
+      {paintTiles && paintTiles.tiles.size > 0 && (
+        <group>
+          {Array.from(paintTiles.tiles).map((key) => {
+            const parts = key.split(',')
+            const px = Number(parts[0])
+            const pz = Number(parts[1])
+            return (
+              <mesh
+                key={key}
+                rotation-x={-Math.PI / 2}
+                position={[px + 0.5, 0.02, pz + 0.5]}
+              >
+                <planeGeometry args={[0.95, 0.95]} />
+                <meshBasicMaterial
+                  color={paintTiles.color}
+                  transparent
+                  opacity={Math.min(paintTiles.opacity + 0.2, 0.8)}
+                  depthWrite={false}
+                />
+              </mesh>
+            )
+          })}
+        </group>
+      )}
+
       {/* Conectores */}
       {viewerState.filters.showConnectors && connectors.map((connector) => {
         const fromNode = nodeMap.get(connector.fromNodeId)
@@ -224,12 +253,12 @@ function SceneContent({
         )
       })}
 
-      {/* Click en fondo para deseleccionar / agregar equipo en modo add */}
+      {/* Click en fondo para deseleccionar / agregar equipo en modo add / pintar área */}
       <mesh
         rotation-x={-Math.PI / 2}
         position={[0, -0.1, 0]}
         onClick={(e) => {
-          if (viewerState.mode === 'edit' && onFloorClick) {
+          if ((viewerState.mode === 'edit' || paintTiles) && onFloorClick) {
             const point = e.point
             onFloorClick({ x: Math.round(point.x), z: Math.round(point.z) })
           } else {

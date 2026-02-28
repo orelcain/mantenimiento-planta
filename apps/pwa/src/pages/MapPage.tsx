@@ -74,6 +74,7 @@ import { useMapRuntimeData } from '@/components/map/isometric/editor/useMapRunti
 import { MapSearchPanel } from '@/components/map/isometric/editor/MapSearchPanel'
 import { ShapeEditorDialog } from '@/components/map/isometric/editor/ShapeEditorDialog'
 import { AreaTileEditor } from '@/components/map/isometric/editor/AreaTileEditor'
+import type { AreaPaintState } from '@/components/map/isometric/editor/AreaTileEditor'
 
 const PRIORITY_CONFIG: Record<IncidentPriority, { color: string; bg: string; label: string }> = {
   critica: { color: 'text-red-500', bg: 'bg-red-500', label: 'Crítica' },
@@ -143,6 +144,16 @@ export function MapPage() {
   const [showShapeEditor, setShowShapeEditor] = useState(false)
   const [showAreaEditor, setShowAreaEditor] = useState(false)
   const [editingArea, setEditingArea] = useState<MapArea | null>(null)
+  const [areaPaintState, setAreaPaintState] = useState<AreaPaintState>({
+    tiles: new Set<string>(),
+    tool: 'paint',
+    name: '',
+    color: '#3b82f6',
+    opacity: 0.3,
+    linkedZoneId: '',
+    editAreaId: null,
+  })
+  const prevFiltersRef = useRef<IsometricViewerState['filters'] | null>(null)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const history = useEditorHistory()
@@ -421,8 +432,90 @@ export function MapPage() {
     [nodes, commitEditorChange]
   )
 
+  // ── Area paint state ──
+  const handleAreaPaintStateChange = useCallback((update: Partial<AreaPaintState>) => {
+    setAreaPaintState((prev) => {
+      // Si el update contiene tiles, reemplazar directamente (Set no se puede spread)
+      if ('tiles' in update && update.tiles) {
+        return { ...prev, ...update, tiles: update.tiles }
+      }
+      return { ...prev, ...update }
+    })
+  }, [])
+
+  // Abrir editor de áreas: guardar filtros previos y ocultar equipos/etiquetas
+  const openAreaEditor = useCallback((area?: MapArea | null) => {
+    prevFiltersRef.current = { ...viewerState.filters }
+    setViewerState((prev) => ({
+      ...prev,
+      filters: { ...prev.filters, showEquipment: false, showLabels: false },
+    }))
+    setEditingArea(area ?? null)
+    // Inicializar paint state desde el área existente o vacío
+    if (area?.tiles) {
+      const tileSet = new Set<string>(area.tiles.map((t) => `${t.x},${t.z}`))
+      setAreaPaintState({
+        tiles: tileSet,
+        tool: 'paint',
+        name: area.label,
+        color: area.color ?? '#3b82f6',
+        opacity: area.opacity ?? 0.3,
+        linkedZoneId: area.linkedZoneId ?? '',
+        editAreaId: area.id,
+      })
+    } else {
+      setAreaPaintState({
+        tiles: new Set<string>(),
+        tool: 'paint',
+        name: '',
+        color: '#3b82f6',
+        opacity: 0.3,
+        linkedZoneId: '',
+        editAreaId: null,
+      })
+    }
+    setShowAreaEditor(true)
+  }, [viewerState.filters])
+
+  // Cerrar editor de áreas: restaurar filtros previos
+  const closeAreaEditor = useCallback(() => {
+    if (prevFiltersRef.current) {
+      setViewerState((prev) => ({
+        ...prev,
+        filters: { ...prevFiltersRef.current! },
+      }))
+      prevFiltersRef.current = null
+    }
+    setShowAreaEditor(false)
+    setEditingArea(null)
+    setAreaPaintState({
+      tiles: new Set<string>(),
+      tool: 'paint',
+      name: '',
+      color: '#3b82f6',
+      opacity: 0.3,
+      linkedZoneId: '',
+      editAreaId: null,
+    })
+  }, [])
+
   const handleFloorClick = useCallback(
     (position: { x: number; z: number }) => {
+      // ── Area paint mode: toggle tiles ──
+      if (showAreaEditor) {
+        const key = `${position.x},${position.z}`
+        setAreaPaintState((prev) => {
+          const newTiles = new Set(prev.tiles)
+          if (prev.tool === 'paint') {
+            newTiles.add(key)
+          } else {
+            newTiles.delete(key)
+          }
+          return { ...prev, tiles: newTiles }
+        })
+        return
+      }
+
       if (editorTool !== 'add') {
         // En modo select/move, deseleccionar
         setViewerState((prev) => ({ ...prev, selectedNodeId: null }))
@@ -441,7 +534,7 @@ export function MapPage() {
       }
       handleAddNode(newNode)
     },
-    [editorTool, addEquipmentType, handleAddNode, viewerState.currentFloor]
+    [showAreaEditor, editorTool, addEquipmentType, handleAddNode, viewerState.currentFloor]
   )
 
   const handleDeleteSelected = useCallback(() => {
@@ -593,16 +686,14 @@ export function MapPage() {
     } else {
       commitEditorChange(nodes, [...areas, area])
     }
-    setEditingArea(null)
-    setShowAreaEditor(false)
-  }, [areas, nodes, commitEditorChange])
+    closeAreaEditor()
+  }, [areas, nodes, commitEditorChange, closeAreaEditor])
 
   const handleDeleteArea = useCallback((areaId: string) => {
     const newAreas = areas.filter((a) => a.id !== areaId)
     commitEditorChange(nodes, newAreas)
-    setEditingArea(null)
-    setShowAreaEditor(false)
-  }, [areas, nodes, commitEditorChange])
+    closeAreaEditor()
+  }, [areas, nodes, commitEditorChange, closeAreaEditor])
 
   // Keyboard shortcuts (Q/E ya los maneja useIsometricRotation internamente)
   useEffect(() => {
@@ -800,6 +891,11 @@ export function MapPage() {
                 onBackgroundClick={handleBackgroundClick}
                 onNodeDragEnd={handleNodeDragEnd}
                 onFloorClick={handleFloorClick}
+                paintTiles={showAreaEditor ? {
+                  tiles: areaPaintState.tiles,
+                  color: areaPaintState.color,
+                  opacity: areaPaintState.opacity,
+                } : undefined}
               />
             </Suspense>
 
@@ -962,7 +1058,7 @@ export function MapPage() {
                     variant="ghost"
                     size="sm"
                     className="gap-1.5 text-xs justify-start"
-                    onClick={() => { setEditingArea(null); setShowAreaEditor(true) }}
+                    onClick={() => openAreaEditor(null)}
                   >
                     <Grid3x3 className="h-3.5 w-3.5" />
                     Nueva área
@@ -1141,6 +1237,20 @@ export function MapPage() {
                 ? 'V: seleccionar · M: mover · A: agregar · Del: eliminar · Ctrl+Z: deshacer'
                 : 'Q/E: rotar · Scroll: zoom · Click medio/der: paneo · R: reset · Click: seleccionar'}
             </div>
+
+            {/* Editor de áreas — panel lateral sobre la escena 3D */}
+            {showAreaEditor && (
+              <AreaTileEditor
+                isOpen={showAreaEditor}
+                paintState={areaPaintState}
+                onPaintStateChange={handleAreaPaintStateChange}
+                editArea={editingArea}
+                currentFloor={viewerState.currentFloor}
+                onSave={handleSaveArea}
+                onDelete={handleDeleteArea}
+                onClose={closeAreaEditor}
+              />
+            )}
           </div>
         </CardContent>
       </Card>
@@ -1183,17 +1293,6 @@ export function MapPage() {
         />
       )}
 
-      {/* Editor de áreas tipo FFT */}
-      {showAreaEditor && (
-        <AreaTileEditor
-          isOpen={showAreaEditor}
-          editArea={editingArea}
-          currentFloor={viewerState.currentFloor}
-          onSave={handleSaveArea}
-          onDelete={handleDeleteArea}
-          onClose={() => { setShowAreaEditor(false); setEditingArea(null) }}
-        />
-      )}
     </div>
   )
 }
