@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.69.7**
+## Versión Actual: **v2.69.8**
 
 **Fecha de lanzamiento**: 28 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.69.8 — Hotfix CI/deploy TypeScript estricto (28/02/2026)
+- 🧯 **Corrección de build en Actions**: `parseVoxelKey` ahora garantiza `x/y/z` numéricos sin `undefined`
+- ✅ **Compatibilidad strict TS**: eliminados errores `number | undefined` en cálculos de voxel/caras dentro de `ShapeEditorDialog`
+- 🚀 **Deploy desbloqueado**: la cadena `release:pwa:verify + tsc + lint + build` vuelve a pasar completa
 
 ### v2.69.7 — Fase 3 MVP: importación externa y exportación de formas (28/02/2026)
 - 📥 **Importación externa en editor**: nuevo flujo `Importar` en `ShapeEditorDialog` para archivos `.json`, `.glb` y `.gltf`

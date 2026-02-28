@@ -54,9 +54,17 @@ function voxelKey(x: number, y: number, z: number) {
   return `${x},${y},${z}`
 }
 
-function parseVoxelKey(key: string) {
-  const [x, y, z] = key.split(',').map(Number)
-  return { x, y, z }
+function parseVoxelKey(key: string): { x: number; y: number; z: number } {
+  const parts = key.split(',')
+  const parsedX = Number(parts[0] ?? 0)
+  const parsedY = Number(parts[1] ?? 0)
+  const parsedZ = Number(parts[2] ?? 0)
+
+  return {
+    x: Number.isFinite(parsedX) ? parsedX : 0,
+    y: Number.isFinite(parsedY) ? parsedY : 0,
+    z: Number.isFinite(parsedZ) ? parsedZ : 0,
+  }
 }
 
 function getFaceNormal(face: FaceDirection) {

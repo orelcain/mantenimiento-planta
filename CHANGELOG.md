@@ -7,6 +7,28 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.69.8] - 2026-02-28
+### Corregido — Hotfix CI/deploy en ShapeEditorDialog
+- **TypeScript estricto (CI) corregido**: `parseVoxelKey()` ahora retorna `{ x, y, z }` tipados y normalizados como `number` garantizado (sin `undefined`)
+- **Root cause del fallo en GitHub Actions**: con `noUncheckedIndexedAccess`, la desestructuración previa infería `number | undefined` y rompía build en `Math.min/Math.max` y cálculos de voxel
+- **Resultado**: se eliminan los errores `Argument of type 'number | undefined' is not assignable to parameter of type 'number'`
+
+## [2.69.7] - 2026-02-28
+### Agregado — Fase 3 MVP: importación/exportación de formas
+- **Importar formas** en `ShapeEditorDialog`: soporte `.json`, `.glb`, `.gltf`
+- **Voxelización de GLB/GLTF**: conversión automática del modelo importado a grilla voxel editable
+- **Exportar formas**: descarga JSON con primitivas y estado voxel activo
+
+## [2.69.6] - 2026-02-28
+### Agregado — Fase 2: editor por caras en voxel
+- **Selección por cara** (`Top/Bottom/Left/Right/Front/Back`) y extrusión según normal de cara
+- **Subdivisión por cara** en grillas 2×2, 4×4, 6×6 y 8×8 para selección parcial
+
+## [2.69.5] - 2026-02-28
+### Agregado — Fase 1 MVP: modo voxel en editor de forma
+- **Modo dual** `Primitivas/Voxel` en `ShapeEditorDialog`
+- **Herramientas voxel base**: pintar, borrar, seleccionar y extrusión vertical
+
 ## [2.68.0] - 2026-02-27
 ### Agregado — Zoom 500, Pan suave, 6 nuevos tipos, Mapa Planta Chonchi real
 - **Zoom ampliado a 500**: rango extendido de 200→500, stepping progresivo (6% del zoom actual por tick de scroll)
