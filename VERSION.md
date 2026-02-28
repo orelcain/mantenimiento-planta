@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.69.3**
+## Versión Actual: **v2.69.4**
 
 **Fecha de lanzamiento**: 28 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.69.4 — Editor de forma más amplio y mejor visual 3D (28/02/2026)
+- 🖥️ **Modal ampliado**: `ShapeEditorDialog` aumenta ancho máximo y altura útil para trabajar con mayor comodidad
+- 👁️ **Preview 3D más grande**: visor en vivo con más área para inspeccionar volumen y proporciones al editar
+- 🧭 **Ayuda de interacción**: indicaciones visibles de controles de órbita/zoom/pan dentro del visor
 
 ### v2.69.3 — Hotfix definitivo: overlays bajo panel de incidencias (28/02/2026)
 - 🧯 **Fix definitivo de capas**: overlays `Html` de equipos/áreas forzados a `zIndexRange [0,0]` y `zIndex: 0`

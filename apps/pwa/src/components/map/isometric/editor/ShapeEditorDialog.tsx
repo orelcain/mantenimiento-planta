@@ -362,7 +362,7 @@ export function ShapeEditorDialog({ isOpen, node, onSave, onClear, onClose }: Sh
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
-      <div className="relative bg-card border rounded-xl shadow-2xl w-full max-w-3xl mx-4 max-h-[85vh] flex flex-col">
+      <div className="relative bg-card border rounded-xl shadow-2xl w-full max-w-[1280px] mx-4 max-h-[92vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b">
           <div>
@@ -379,9 +379,9 @@ export function ShapeEditorDialog({ isOpen, node, onSave, onClear, onClose }: Sh
           </Button>
         </div>
 
-        <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 flex overflow-hidden min-h-0">
           {/* Left: Primitive palette + list */}
-          <div className="w-60 border-r flex flex-col">
+          <div className="w-72 border-r flex flex-col shrink-0">
             {/* Add primitives */}
             <div className="p-3 border-b">
               <p className="text-xs font-semibold mb-2">Agregar primitiva</p>
@@ -448,16 +448,19 @@ export function ShapeEditorDialog({ isOpen, node, onSave, onClear, onClose }: Sh
           </div>
 
           {/* Right: Properties panel */}
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto min-w-0">
             {selectedPrim ? (
               <div className="p-4 space-y-3">
                 {/* Live preview */}
                 <div className="border rounded-lg overflow-hidden">
                   <div className="px-3 py-2 border-b bg-muted/30 flex items-center justify-between">
                     <span className="text-xs font-semibold">Visor 3D en vivo</span>
-                    <Badge variant="secondary" className="text-[10px]">1 cuadro = 1m</Badge>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-muted-foreground hidden sm:inline">Arrastrar: rotar · Rueda: zoom · Shift+arrastrar: mover</span>
+                      <Badge variant="secondary" className="text-[10px]">1 cuadro = 1m</Badge>
+                    </div>
                   </div>
-                  <div className="h-56">
+                  <div className="h-[360px] lg:h-[420px]">
                     <Canvas
                       camera={{
                         position: [shapeMetrics.center[0] + 6, shapeMetrics.center[1] + 4, shapeMetrics.center[2] + 6],
