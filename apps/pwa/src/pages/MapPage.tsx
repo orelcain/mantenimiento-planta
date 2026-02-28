@@ -1193,17 +1193,16 @@ export function MapPage() {
                     {viewerState.filters.showAreas ? 'Ocultar áreas' : 'Mostrar áreas'}
                   </Button>
 
-                  {selectedNode && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-1.5 text-xs justify-start w-full"
-                      onClick={() => setShowShapeEditor(true)}
-                    >
-                      <Shapes className="h-3.5 w-3.5" />
-                      3) Editar forma equipo
-                    </Button>
-                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 text-xs justify-start w-full"
+                    onClick={() => setShowShapeEditor(true)}
+                    disabled={!selectedNode}
+                  >
+                    <Shapes className="h-3.5 w-3.5" />
+                    3) Editar forma equipo
+                  </Button>
 
                   <p className="text-[10px] text-muted-foreground px-1">
                     Tip: click en un área para abrirla y editar/eliminar.

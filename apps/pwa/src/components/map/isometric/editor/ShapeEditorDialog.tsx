@@ -10,6 +10,9 @@
  */
 
 import { useState, useCallback, useMemo } from 'react'
+import { Canvas } from '@react-three/fiber'
+import { OrbitControls } from '@react-three/drei'
+import * as THREE from 'three'
 import { 
   X, Trash2, Copy, Box, Circle, Triangle, 
   RotateCw, Palette, ChevronDown, ChevronUp, Save, 
@@ -61,6 +64,105 @@ function createDefaultPrimitive(type: ShapePrimitiveType, color: string): ShapeP
     metalness: 0.5,
     roughness: 0.4,
   }
+}
+
+function getPrimitiveGeometry(prim: ShapePrimitive) {
+  switch (prim.type) {
+    case 'box':
+      return <boxGeometry args={[prim.size.x, prim.size.y, prim.size.z]} />
+    case 'cylinder':
+      return <cylinderGeometry args={[prim.size.x, prim.size.x, prim.size.y, 24]} />
+    case 'sphere':
+      return <sphereGeometry args={[prim.size.x, 24, 24]} />
+    case 'cone':
+      return <coneGeometry args={[prim.size.x, prim.size.y, 24]} />
+    case 'torus':
+      return <torusGeometry args={[prim.size.x, prim.size.y, 16, 32]} />
+    default:
+      return <boxGeometry args={[prim.size.x, prim.size.y, prim.size.z]} />
+  }
+}
+
+function primitiveLocalBounds(prim: ShapePrimitive): THREE.Box3 {
+  switch (prim.type) {
+    case 'box':
+      return new THREE.Box3(
+        new THREE.Vector3(-prim.size.x / 2, -prim.size.y / 2, -prim.size.z / 2),
+        new THREE.Vector3(prim.size.x / 2, prim.size.y / 2, prim.size.z / 2)
+      )
+    case 'cylinder':
+      return new THREE.Box3(
+        new THREE.Vector3(-prim.size.x, -prim.size.y / 2, -prim.size.x),
+        new THREE.Vector3(prim.size.x, prim.size.y / 2, prim.size.x)
+      )
+    case 'sphere':
+      return new THREE.Box3(
+        new THREE.Vector3(-prim.size.x, -prim.size.x, -prim.size.x),
+        new THREE.Vector3(prim.size.x, prim.size.x, prim.size.x)
+      )
+    case 'cone':
+      return new THREE.Box3(
+        new THREE.Vector3(-prim.size.x, -prim.size.y / 2, -prim.size.x),
+        new THREE.Vector3(prim.size.x, prim.size.y / 2, prim.size.x)
+      )
+    case 'torus': {
+      const major = prim.size.x
+      const tube = prim.size.y
+      return new THREE.Box3(
+        new THREE.Vector3(-(major + tube), -(major + tube), -tube),
+        new THREE.Vector3(major + tube, major + tube, tube)
+      )
+    }
+    default:
+      return new THREE.Box3(
+        new THREE.Vector3(-prim.size.x / 2, -prim.size.y / 2, -prim.size.z / 2),
+        new THREE.Vector3(prim.size.x / 2, prim.size.y / 2, prim.size.z / 2)
+      )
+  }
+}
+
+function ShapePreviewScene({
+  primitives,
+  selectedPrimId,
+}: {
+  primitives: ShapePrimitive[]
+  selectedPrimId: string | null
+}) {
+  return (
+    <>
+      <color attach="background" args={['#0b1220']} />
+      <ambientLight intensity={0.55} />
+      <directionalLight position={[8, 12, 6]} intensity={0.9} />
+      <directionalLight position={[-6, 8, -6]} intensity={0.35} />
+
+      <gridHelper args={[30, 30, '#334155', '#1e293b']} position={[0, 0, 0]} />
+      <axesHelper args={[3]} />
+
+      {primitives.map((prim) => {
+        const rotX = (prim.rotation.x * Math.PI) / 180
+        const rotY = (prim.rotation.y * Math.PI) / 180
+        const rotZ = (prim.rotation.z * Math.PI) / 180
+        const isSelected = selectedPrimId === prim.id
+
+        return (
+          <group key={prim.id} position={[prim.position.x, prim.position.y, prim.position.z]} rotation={[rotX, rotY, rotZ]}>
+            <mesh>
+              {getPrimitiveGeometry(prim)}
+              <meshStandardMaterial color={prim.color} roughness={prim.roughness} metalness={prim.metalness} />
+            </mesh>
+            {isSelected && (
+              <mesh>
+                {getPrimitiveGeometry(prim)}
+                <meshBasicMaterial color="#ffffff" wireframe transparent opacity={0.35} />
+              </mesh>
+            )}
+          </group>
+        )
+      })}
+
+      <OrbitControls makeDefault enablePan enableZoom enableRotate />
+    </>
+  )
 }
 
 /** Slider para un valor numérico con label y cotas */
@@ -138,6 +240,61 @@ export function ShapeEditorDialog({ isOpen, node, onSave, onClear, onClose }: Sh
     () => primitives.find((p) => p.id === selectedPrimId) ?? null,
     [primitives, selectedPrimId]
   )
+
+  const shapeMetrics = useMemo(() => {
+    if (primitives.length === 0) {
+      return {
+        width: 0,
+        height: 0,
+        depth: 0,
+        footprint: 0,
+        footprintTiles: 0,
+        center: [0, 1.5, 0] as [number, number, number],
+      }
+    }
+
+    const globalBox = new THREE.Box3()
+    let initialized = false
+
+    for (const prim of primitives) {
+      const localBounds = primitiveLocalBounds(prim)
+      const rotX = (prim.rotation.x * Math.PI) / 180
+      const rotY = (prim.rotation.y * Math.PI) / 180
+      const rotZ = (prim.rotation.z * Math.PI) / 180
+      const matrix = new THREE.Matrix4()
+      matrix.compose(
+        new THREE.Vector3(prim.position.x, prim.position.y, prim.position.z),
+        new THREE.Quaternion().setFromEuler(new THREE.Euler(rotX, rotY, rotZ)),
+        new THREE.Vector3(1, 1, 1)
+      )
+      const worldBounds = localBounds.clone().applyMatrix4(matrix)
+      if (!initialized) {
+        globalBox.copy(worldBounds)
+        initialized = true
+      } else {
+        globalBox.union(worldBounds)
+      }
+    }
+
+    const size = new THREE.Vector3()
+    const center = new THREE.Vector3()
+    globalBox.getSize(size)
+    globalBox.getCenter(center)
+
+    const width = Number(size.x.toFixed(2))
+    const height = Number(size.y.toFixed(2))
+    const depth = Number(size.z.toFixed(2))
+    const footprint = Number((width * depth).toFixed(2))
+
+    return {
+      width,
+      height,
+      depth,
+      footprint,
+      footprintTiles: Math.ceil(width) * Math.ceil(depth),
+      center: [center.x, Math.max(center.y, 1.5), center.z] as [number, number, number],
+    }
+  }, [primitives])
 
   const toggleSection = (key: string) => {
     setExpandedSections((prev) => ({ ...prev, [key]: !prev[key] }))
@@ -294,6 +451,42 @@ export function ShapeEditorDialog({ isOpen, node, onSave, onClear, onClose }: Sh
           <div className="flex-1 overflow-y-auto">
             {selectedPrim ? (
               <div className="p-4 space-y-3">
+                {/* Live preview */}
+                <div className="border rounded-lg overflow-hidden">
+                  <div className="px-3 py-2 border-b bg-muted/30 flex items-center justify-between">
+                    <span className="text-xs font-semibold">Visor 3D en vivo</span>
+                    <Badge variant="secondary" className="text-[10px]">1 cuadro = 1m</Badge>
+                  </div>
+                  <div className="h-56">
+                    <Canvas
+                      camera={{
+                        position: [shapeMetrics.center[0] + 6, shapeMetrics.center[1] + 4, shapeMetrics.center[2] + 6],
+                        fov: 40,
+                        near: 0.1,
+                        far: 1000,
+                      }}
+                    >
+                      <ShapePreviewScene primitives={primitives} selectedPrimId={selectedPrimId} />
+                    </Canvas>
+                  </div>
+                </div>
+
+                {/* Global metrics */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="border rounded-lg p-2">
+                    <p className="text-[10px] text-muted-foreground">Caja envolvente</p>
+                    <p className="text-xs font-semibold">
+                      {shapeMetrics.width} × {shapeMetrics.height} × {shapeMetrics.depth} m
+                    </p>
+                  </div>
+                  <div className="border rounded-lg p-2">
+                    <p className="text-[10px] text-muted-foreground">Huella aprox. suelo</p>
+                    <p className="text-xs font-semibold">
+                      {shapeMetrics.footprint} m² ({shapeMetrics.footprintTiles} cuadros)
+                    </p>
+                  </div>
+                </div>
+
                 {/* Type badge */}
                 <div className="flex items-center gap-2">
                   <Badge variant="outline" className="capitalize">{selectedPrim.type}</Badge>
