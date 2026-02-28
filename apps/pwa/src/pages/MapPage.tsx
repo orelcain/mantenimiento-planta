@@ -205,14 +205,52 @@ export function MapPage() {
     setViewerState(DEFAULT_VIEWER_STATE)
   }, [])
 
-  // Fit all: zoom out + center para ver todo el mapa
+  // Fit all: calcular zoom para que todo el mapa quepa en pantalla
   const fitAll = useCallback(() => {
+    // Calcular bounding box de todos los nodos visibles
+    const visibleNodes = nodes.filter(n => n.visible && (n.floor ?? 0) === viewerState.currentFloor)
+    if (visibleNodes.length === 0) {
+      // Si no hay nodos, usar config del mapa
+      const mapHalf = Math.max(demoData.config.width, demoData.config.depth) / 2
+      setViewerState((prev) => ({
+        ...prev,
+        zoom: mapHalf * 1.15,
+        panOffset: { x: 0, z: 0 },
+      }))
+      return
+    }
+    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity
+    for (const n of visibleNodes) {
+      const hw = (n.size.width ?? 2) / 2
+      const hd = (n.size.depth ?? 2) / 2
+      minX = Math.min(minX, n.position.x - hw)
+      maxX = Math.max(maxX, n.position.x + hw)
+      minZ = Math.min(minZ, n.position.z - hd)
+      maxZ = Math.max(maxZ, n.position.z + hd)
+    }
+    // También incluir áreas
+    for (const a of areas.filter(a => (a.floor ?? 0) === viewerState.currentFloor)) {
+      minX = Math.min(minX, a.position.x - a.size.width / 2)
+      maxX = Math.max(maxX, a.position.x + a.size.width / 2)
+      minZ = Math.min(minZ, a.position.z - a.size.depth / 2)
+      maxZ = Math.max(maxZ, a.position.z + a.size.depth / 2)
+    }
+    const cx = (minX + maxX) / 2
+    const cz = (minZ + maxZ) / 2
+    const spanX = maxX - minX
+    const spanZ = maxZ - minZ
+    // Zoom = half-height del frustum ortográfico; aspect ~16:9 → width = zoom * aspect
+    // Necesitamos que spanZ <= 2*zoom y spanX <= 2*zoom*aspect
+    // Asumimos aspect ~1.6 y agregamos 15% de padding
+    const zoomForHeight = (spanZ / 2) * 1.15
+    const zoomForWidth = (spanX / 2 / 1.6) * 1.15
+    const idealZoom = Math.max(zoomForHeight, zoomForWidth, 10)
     setViewerState((prev) => ({
       ...prev,
-      zoom: 15,
-      panOffset: { x: 0, z: 0 },
+      zoom: Math.min(idealZoom, 500),
+      panOffset: { x: cx, z: cz },
     }))
-  }, [])
+  }, [nodes, areas, viewerState.currentFloor, demoData.config])
 
   // Cambiar de piso
   const setFloor = useCallback((floor: number) => {
@@ -873,23 +911,27 @@ export function MapPage() {
               </div>
 
               {/* Floor selector */}
-              <div className="bg-card/90 backdrop-blur rounded-lg shadow-lg border p-1">
-                <div className="flex items-center gap-0.5">
-                  <Building2 className="h-3.5 w-3.5 text-muted-foreground ml-1" />
+              <div className="bg-card/90 backdrop-blur rounded-lg shadow-lg border p-1.5">
+                <p className="text-[10px] text-muted-foreground font-medium px-1 mb-1">PISO</p>
+                <div className="flex flex-col gap-0.5">
                   {[
-                    { floor: 0, label: 'PB' },
-                    { floor: 1, label: '2°' },
-                    { floor: 2, label: 'T' },
-                  ].map(({ floor, label }) => (
+                    { floor: 0, full: 'Planta Baja' },
+                    { floor: 1, full: 'Segundo Piso' },
+                    { floor: 2, full: 'Techo' },
+                  ].map(({ floor, full }) => (
                     <Button
                       key={floor}
                       variant={viewerState.currentFloor === floor ? 'default' : 'ghost'}
                       size="sm"
-                      className={cn('h-7 w-8 text-xs p-0', viewerState.currentFloor === floor && 'text-xs font-bold')}
+                      className={cn(
+                        'h-8 text-xs px-3 justify-start gap-2',
+                        viewerState.currentFloor === floor && 'font-bold'
+                      )}
                       onClick={() => setFloor(floor)}
-                      title={floor === 0 ? 'Planta Baja' : floor === 1 ? 'Segundo Piso' : 'Techo'}
+                      title={full}
                     >
-                      {label}
+                      <Building2 className="h-3.5 w-3.5" />
+                      {full}
                     </Button>
                   ))}
                 </div>
@@ -922,15 +964,14 @@ export function MapPage() {
               )}
             </div>
 
-            {/* Search panel (center top) */}
+            {/* Search panel (center top) — visible siempre */}
             <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
-              {!isEditMode && (
-                <MapSearchPanel
-                  nodes={nodes}
-                  onSelectNode={(nodeId) => handleNodeClick(nodeId)}
-                  onFocusNode={handleFocusNode}
-                />
-              )}
+              <MapSearchPanel
+                nodes={nodes}
+                areas={areas}
+                onSelectNode={(nodeId) => handleNodeClick(nodeId)}
+                onFocusNode={handleFocusNode}
+              />
             </div>
 
             {/* Selected node info card (centro abajo) — solo en modo vista */}

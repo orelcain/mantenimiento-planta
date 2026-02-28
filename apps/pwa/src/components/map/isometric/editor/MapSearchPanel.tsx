@@ -6,19 +6,22 @@
  */
 
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
-import { Search, X, MapPin, ChevronRight, Building2 } from 'lucide-react'
+import { Search, X, MapPin, ChevronRight, Building2, Layers } from 'lucide-react'
 import { useAppStore } from '@/store'
-import type { MapNode } from '@/types/isometricMap'
+import type { MapNode, MapArea } from '@/types/isometricMap'
 import { EQUIPMENT_TYPE_LABELS, EQUIPMENT_TYPE_COLORS } from '@/types/isometricMap'
 
 interface MapSearchPanelProps {
   nodes: MapNode[]
+  areas?: MapArea[]
   onSelectNode: (nodeId: string) => void
   onFocusNode: (nodeId: string, position: { x: number; z: number }) => void
 }
 
 interface SearchResult {
-  node: MapNode
+  type: 'node' | 'area'
+  node?: MapNode
+  area?: MapArea
   /** Nombre del equipo vinculado en Firestore (si existe) */
   linkedName?: string
   /** Código SAP */
@@ -32,7 +35,7 @@ const FLOOR_LABELS: Record<number, string> = {
   2: 'Techo',
 }
 
-export function MapSearchPanel({ nodes, onSelectNode, onFocusNode }: MapSearchPanelProps) {
+export function MapSearchPanel({ nodes, areas, onSelectNode, onFocusNode }: MapSearchPanelProps) {
   const { equipment } = useAppStore()
   const [search, setSearch] = useState('')
   const [isOpen, setIsOpen] = useState(false)
@@ -54,38 +57,52 @@ export function MapSearchPanel({ nodes, onSelectNode, onFocusNode }: MapSearchPa
   const results = useMemo<SearchResult[]>(() => {
     if (!search || search.length < 2) return []
     const q = search.toLowerCase()
+    const out: SearchResult[] = []
 
-    return nodes
-      .filter((n) => n.visible)
-      .map((node) => {
-        // Check label
-        if (node.label.toLowerCase().includes(q)) {
-          const linked = node.linkedEntityId ? equipmentMap.get(node.linkedEntityId) : undefined
-          return { node, linkedName: linked?.nombre, linkedCode: linked?.codigo, matchField: 'label' as const }
+    // Search in nodes
+    for (const node of nodes) {
+      if (!node.visible) continue
+      // Check label
+      if (node.label.toLowerCase().includes(q)) {
+        const linked = node.linkedEntityId ? equipmentMap.get(node.linkedEntityId) : undefined
+        out.push({ type: 'node', node, linkedName: linked?.nombre, linkedCode: linked?.codigo, matchField: 'label' })
+        continue
+      }
+      // Check linked entity name/code
+      if (node.linkedEntityId) {
+        const linked = equipmentMap.get(node.linkedEntityId)
+        if (linked && (linked.nombre.toLowerCase().includes(q) || linked.codigo.toLowerCase().includes(q))) {
+          out.push({ type: 'node', node, linkedName: linked.nombre, linkedCode: linked.codigo, matchField: 'linked' })
+          continue
         }
-        // Check linked entity name/code
-        if (node.linkedEntityId) {
-          const linked = equipmentMap.get(node.linkedEntityId)
-          if (linked) {
-            if (linked.nombre.toLowerCase().includes(q) || linked.codigo.toLowerCase().includes(q)) {
-              return { node, linkedName: linked.nombre, linkedCode: linked.codigo, matchField: 'linked' as const }
-            }
-          }
+      }
+      // Check type label
+      const typeLabel = EQUIPMENT_TYPE_LABELS[node.type]
+      if (typeLabel.toLowerCase().includes(q)) {
+        const linked = node.linkedEntityId ? equipmentMap.get(node.linkedEntityId) : undefined
+        out.push({ type: 'node', node, linkedName: linked?.nombre, linkedCode: linked?.codigo, matchField: 'type' })
+      }
+    }
+
+    // Search in areas
+    if (areas) {
+      for (const area of areas) {
+        if (area.label.toLowerCase().includes(q)) {
+          out.push({ type: 'area', area, matchField: 'label' })
         }
-        // Check type label
-        const typeLabel = EQUIPMENT_TYPE_LABELS[node.type]
-        if (typeLabel.toLowerCase().includes(q)) {
-          const linked = node.linkedEntityId ? equipmentMap.get(node.linkedEntityId) : undefined
-          return { node, linkedName: linked?.nombre, linkedCode: linked?.codigo, matchField: 'type' as const }
-        }
-        return null
-      })
-      .filter(Boolean) as SearchResult[]
-  }, [search, nodes, equipmentMap])
+      }
+    }
+
+    return out
+  }, [search, nodes, areas, equipmentMap])
 
   const handleSelect = useCallback((result: SearchResult) => {
-    onSelectNode(result.node.id)
-    onFocusNode(result.node.id, { x: result.node.position.x, z: result.node.position.z })
+    if (result.type === 'node' && result.node) {
+      onSelectNode(result.node.id)
+      onFocusNode(result.node.id, { x: result.node.position.x, z: result.node.position.z })
+    } else if (result.type === 'area' && result.area) {
+      onFocusNode(result.area.id, { x: result.area.position.x, z: result.area.position.z })
+    }
     setSearch('')
     setIsOpen(false)
   }, [onSelectNode, onFocusNode])
@@ -130,7 +147,7 @@ export function MapSearchPanel({ nodes, onSelectNode, onFocusNode }: MapSearchPa
           }}
         >
           <Search className="h-3.5 w-3.5" />
-          Buscar equipo...
+          Buscar equipo o área...
           <kbd className="ml-2 bg-muted px-1 rounded text-[10px] font-mono">/</kbd>
         </button>
       ) : (
@@ -163,31 +180,40 @@ export function MapSearchPanel({ nodes, onSelectNode, onFocusNode }: MapSearchPa
           {/* Results */}
           {results.length > 0 && (
             <div className="max-h-[300px] overflow-y-auto py-1">
-              {results.slice(0, 20).map((result) => (
+              {results.slice(0, 20).map((result) => {
+                const isArea = result.type === 'area'
+                const label = isArea ? result.area!.label : result.node!.label
+                const key = isArea ? result.area!.id : result.node!.id
+                const floor = isArea ? (result.area!.floor ?? 0) : (result.node!.floor ?? 0)
+                return (
                 <button
-                  key={result.node.id}
+                  key={key}
                   className="w-full text-left px-3 py-2 hover:bg-muted/80 transition-colors flex items-center gap-2"
                   onClick={() => handleSelect(result)}
                 >
-                  <div
-                    className="w-2.5 h-2.5 rounded-sm shrink-0"
-                    style={{ backgroundColor: EQUIPMENT_TYPE_COLORS[result.node.type] }}
-                  />
+                  {isArea ? (
+                    <Layers className="w-2.5 h-2.5 shrink-0 text-muted-foreground" />
+                  ) : (
+                    <div
+                      className="w-2.5 h-2.5 rounded-sm shrink-0"
+                      style={{ backgroundColor: EQUIPMENT_TYPE_COLORS[result.node!.type] }}
+                    />
+                  )}
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium truncate">{result.node.label}</p>
+                    <p className="text-xs font-medium truncate">{label}</p>
                     <div className="flex items-center gap-1.5 mt-0.5">
                       <span className="text-[10px] text-muted-foreground">
-                        {EQUIPMENT_TYPE_LABELS[result.node.type]}
+                        {isArea ? 'Área' : EQUIPMENT_TYPE_LABELS[result.node!.type]}
                       </span>
                       {result.linkedCode && (
                         <span className="text-[10px] text-muted-foreground font-mono">
                           {result.linkedCode}
                         </span>
                       )}
-                      {(result.node.floor ?? 0) > 0 && (
+                      {floor > 0 && (
                         <span className="text-[10px] bg-muted px-1 rounded">
                           <Building2 className="inline h-2.5 w-2.5 mr-0.5" />
-                          {FLOOR_LABELS[result.node.floor ?? 0] ?? `P${result.node.floor}`}
+                          {FLOOR_LABELS[floor] ?? `P${floor}`}
                         </span>
                       )}
                     </div>
@@ -197,7 +223,8 @@ export function MapSearchPanel({ nodes, onSelectNode, onFocusNode }: MapSearchPa
                     <ChevronRight className="h-3 w-3" />
                   </div>
                 </button>
-              ))}
+                )
+              })}
               {results.length > 20 && (
                 <p className="text-center text-[10px] text-muted-foreground py-1">
                   +{results.length - 20} más...
