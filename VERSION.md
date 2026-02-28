@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.69.0**
+## Versión Actual: **v2.69.1**
 
 **Fecha de lanzamiento**: 28 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,10 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.69.1 — Hotfix z-index labels sobre modales (28/02/2026)
+- 🧯 **Fix visual crítico**: labels/badges `Html` del mapa isométrico ya no se dibujan sobre modales y paneles
+- 🧱 **Stacking consistente**: ajuste de `zIndexRange`/`zIndex` en overlays de equipos y áreas para respetar la jerarquía UI
 
 ### v2.69.0 — Gestión centralizada de áreas + editor de forma con preview 3D en vivo (28/02/2026)
 - 🗂️ **Gestor centralizado de áreas**: botón `Gestionar áreas` en Editor Rápido con listado único y filtro por piso (Todos/PB/2°/Techo)
