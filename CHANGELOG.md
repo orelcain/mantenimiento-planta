@@ -7,6 +7,13 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.69.11] - 2026-02-28
+### Corregido — Visor voxel invisible y tamaño reducido
+- **Voxels visibles en formas pequeñas**: corregido redondeo que eliminaba todos los voxels en equipos chicos (1×1×2, 2×2×2, etc.); ahora solo redondea si remueve < 40% de celdas
+- **Visor 3D ampliado**: el canvas 3D ahora usa `flex-1` con min-height, ocupando toda la altura disponible en lugar de altura fija de 360px
+- **Cámara voxel más cerca**: la cámara del modo voxel usa la misma distancia que el modo primitivas para consistencia visual
+- **Info compactada**: métricas de caja envolvente y selección mostradas como strip compacto, maximizando espacio para el modelo
+
 ## [2.69.10] - 2026-02-28
 ### Modificado — Editor voxel más directo y menos confuso
 - **Grillas laterales removidas**: se elimina la grilla de cara activa y la grilla por capa Y para liberar espacio visual y reducir ruido

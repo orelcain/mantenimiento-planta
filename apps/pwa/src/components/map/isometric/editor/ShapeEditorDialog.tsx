@@ -188,8 +188,9 @@ function buildDefaultVoxelsFromNode(node: MapNode, gridSize: number) {
     }
   }
 
+  // Solo aplicar redondeo si no elimina más del 40% de los voxels
   const roundedKeys = computeRoundedCornerRemoval(cells, cells)
-  if (roundedKeys.length === 0) return cells
+  if (roundedKeys.length === 0 || roundedKeys.length > cells.size * 0.4) return cells
 
   const rounded = new Set(cells)
   for (const key of roundedKeys) rounded.delete(key)
@@ -1061,16 +1062,19 @@ export function ShapeEditorDialog({ isOpen, node, onSave, onClear, onClose }: Sh
           {/* Right: Properties panel */}
           <div className="flex-1 overflow-y-auto min-w-0">
             {sculptMode === 'voxel' ? (
-              <div className="p-4 space-y-3">
-                <div className="border rounded-lg overflow-hidden">
-                  <div className="px-3 py-2 border-b bg-muted/30 flex items-center justify-between">
+              <div className="flex flex-col h-full p-2 gap-2">
+                <div className="border rounded-lg overflow-hidden flex-1 flex flex-col min-h-0">
+                  <div className="px-3 py-1.5 border-b bg-muted/30 flex items-center justify-between shrink-0">
                     <span className="text-xs font-semibold">Visor 3D voxel</span>
-                    <Badge variant="secondary" className="text-[10px]">{voxelCells.size} voxel{voxelCells.size !== 1 ? 's' : ''}</Badge>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-muted-foreground">{shapeMetrics.width}×{shapeMetrics.height}×{shapeMetrics.depth}m</span>
+                      <Badge variant="secondary" className="text-[10px]">{voxelCells.size} voxel{voxelCells.size !== 1 ? 's' : ''}</Badge>
+                    </div>
                   </div>
-                  <div className="h-[360px] lg:h-[420px]">
+                  <div className="flex-1 min-h-[300px]">
                     <Canvas
                       camera={{
-                        position: [shapeMetrics.center[0] + 8, shapeMetrics.center[1] + 6, shapeMetrics.center[2] + 8],
+                        position: [shapeMetrics.center[0] + 6, shapeMetrics.center[1] + 4, shapeMetrics.center[2] + 6],
                         fov: 40,
                         near: 0.1,
                         far: 1000,
@@ -1085,36 +1089,22 @@ export function ShapeEditorDialog({ isOpen, node, onSave, onClear, onClose }: Sh
                     </Canvas>
                   </div>
                 </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="border rounded-lg p-2">
-                    <p className="text-[10px] text-muted-foreground">Caja envolvente</p>
-                    <p className="text-xs font-semibold">
-                      {shapeMetrics.width} × {shapeMetrics.height} × {shapeMetrics.depth} m
-                    </p>
-                  </div>
-                  <div className="border rounded-lg p-2">
-                    <p className="text-[10px] text-muted-foreground">Selección actual</p>
-                    <p className="text-xs font-semibold">{voxelSelection.size} voxel{voxelSelection.size !== 1 ? 's' : ''}</p>
-                  </div>
-                </div>
-
-                <div className="border rounded-lg p-3 text-xs text-muted-foreground">
-                  Cara activa: <span className="font-semibold uppercase">{activeFace}</span>. Voxel seleccionados: <span className="font-semibold">{voxelSelection.size}</span>.
+                <div className="shrink-0 text-[10px] text-muted-foreground text-center">
+                  Cara: <span className="font-semibold uppercase">{activeFace}</span> · Selección: <span className="font-semibold">{voxelSelection.size}</span> voxel{voxelSelection.size !== 1 ? 's' : ''}
                 </div>
               </div>
             ) : selectedPrim ? (
-              <div className="p-4 space-y-3">
+              <div className="flex flex-col h-full p-2 gap-2">
                 {/* Live preview */}
-                <div className="border rounded-lg overflow-hidden">
-                  <div className="px-3 py-2 border-b bg-muted/30 flex items-center justify-between">
+                <div className="border rounded-lg overflow-hidden flex-1 flex flex-col min-h-0">
+                  <div className="px-3 py-1.5 border-b bg-muted/30 flex items-center justify-between shrink-0">
                     <span className="text-xs font-semibold">Visor 3D en vivo</span>
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] text-muted-foreground hidden sm:inline">Arrastrar: rotar · Rueda: zoom · Shift+arrastrar: mover</span>
+                      <span className="text-[10px] text-muted-foreground hidden sm:inline">Arrastrar: rotar · Rueda: zoom</span>
                       <Badge variant="secondary" className="text-[10px]">1 cuadro = 1m</Badge>
                     </div>
                   </div>
-                  <div className="h-[360px] lg:h-[420px]">
+                  <div className="flex-1 min-h-[300px]">
                     <Canvas
                       camera={{
                         position: [shapeMetrics.center[0] + 6, shapeMetrics.center[1] + 4, shapeMetrics.center[2] + 6],
@@ -1128,32 +1118,17 @@ export function ShapeEditorDialog({ isOpen, node, onSave, onClear, onClose }: Sh
                   </div>
                 </div>
 
-                {/* Global metrics */}
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="border rounded-lg p-2">
-                    <p className="text-[10px] text-muted-foreground">Caja envolvente</p>
-                    <p className="text-xs font-semibold">
-                      {shapeMetrics.width} × {shapeMetrics.height} × {shapeMetrics.depth} m
-                    </p>
-                  </div>
-                  <div className="border rounded-lg p-2">
-                    <p className="text-[10px] text-muted-foreground">Huella aprox. suelo</p>
-                    <p className="text-xs font-semibold">
-                      {shapeMetrics.footprint} m² ({shapeMetrics.footprintTiles} cuadros)
-                    </p>
-                  </div>
+                {/* Compact info strip */}
+                <div className="shrink-0 flex items-center gap-2 px-1">
+                  <Badge variant="outline" className="capitalize text-[10px]">{selectedPrim.type}</Badge>
+                  <div className="w-3 h-3 rounded-sm border" style={{ backgroundColor: selectedPrim.color }} />
+                  <span className="text-[10px] text-muted-foreground">
+                    {shapeMetrics.width}×{shapeMetrics.height}×{shapeMetrics.depth}m · {shapeMetrics.footprint}m²
+                  </span>
                 </div>
 
-                {/* Type badge */}
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="capitalize">{selectedPrim.type}</Badge>
-                  <div
-                    className="w-4 h-4 rounded border"
-                    style={{ backgroundColor: selectedPrim.color }}
-                  />
-                </div>
-
-                {/* Position section */}
+                {/* Scrollable property editors */}
+                <div className="shrink-0 overflow-y-auto max-h-[40vh] space-y-2 pr-1">
                 <div className="border rounded-lg">
                   <button
                     className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold hover:bg-muted/50"
@@ -1270,6 +1245,7 @@ export function ShapeEditorDialog({ isOpen, node, onSave, onClear, onClose }: Sh
                       </div>
                     </div>
                   )}
+                </div>
                 </div>
               </div>
             ) : (
