@@ -11,6 +11,7 @@
 
 import { useState, useCallback, useMemo, useRef, type ChangeEvent } from 'react'
 import { Canvas } from '@react-three/fiber'
+import type { ThreeEvent } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
@@ -41,14 +42,16 @@ const PRIMITIVE_PRESETS: { type: ShapePrimitiveType; label: string; icon: typeof
 ]
 
 const DEFAULT_COLORS = [
-  '#3b82f6', '#ef4444', '#22c55e', '#f59e0b', '#8b5cf6',
-  '#ec4899', '#06b6d4', '#f97316', '#6b7280', '#d1d5db',
-  '#1e293b', '#78716c', '#0ea5e9', '#a855f7', '#14b8a6',
+  '#5b7ea6', '#b46565', '#5f8f72', '#b08e5a', '#7b6ea8',
+  '#a56f8e', '#5d95a1', '#b37b57', '#7b7f87', '#b6b4af',
+  '#4e5968', '#7f776c', '#6d8fb8', '#8b72a8', '#5f9b92',
 ]
 
 type SculptMode = 'primitives' | 'voxel'
 type VoxelTool = 'paint' | 'erase' | 'select'
 type FaceDirection = 'top' | 'bottom' | 'left' | 'right' | 'front' | 'back'
+
+const MATTE_MATERIAL = { metalness: 0.05, roughness: 0.95 } as const
 
 function voxelKey(x: number, y: number, z: number) {
   return `${x},${y},${z}`
@@ -77,6 +80,16 @@ function getFaceNormal(face: FaceDirection) {
     case 'back': return { dx: 0, dy: 0, dz: -1 }
     default: return { dx: 0, dy: 1, dz: 0 }
   }
+}
+
+function faceDirectionFromNormal(normal: THREE.Vector3): FaceDirection {
+  const absX = Math.abs(normal.x)
+  const absY = Math.abs(normal.y)
+  const absZ = Math.abs(normal.z)
+
+  if (absY >= absX && absY >= absZ) return normal.y >= 0 ? 'top' : 'bottom'
+  if (absX >= absY && absX >= absZ) return normal.x >= 0 ? 'right' : 'left'
+  return normal.z >= 0 ? 'front' : 'back'
 }
 
 function getVoxelBounds(cells: Set<string>) {
@@ -224,6 +237,33 @@ function voxelizeSceneBounds(scene: THREE.Object3D, gridSize: number) {
   return voxels
 }
 
+function computeRoundedCornerRemoval(sourceKeys: Set<string>) {
+  const removals: string[] = []
+  const dirs = [
+    [1, 0, 0], [-1, 0, 0],
+    [0, 1, 0], [0, -1, 0],
+    [0, 0, 1], [0, 0, -1],
+  ] as const
+
+  for (const key of sourceKeys) {
+    const { x, y, z } = parseVoxelKey(key)
+    let present = 0
+    let missing = 0
+
+    for (const [dx, dy, dz] of dirs) {
+      const hasNeighbor = sourceKeys.has(voxelKey(x + dx, y + dy, z + dz))
+      if (hasNeighbor) present++
+      else missing++
+    }
+
+    if (missing >= 3 && present >= 2) {
+      removals.push(key)
+    }
+  }
+
+  return removals
+}
+
 function parseGltfFile(fileBuffer: ArrayBuffer): Promise<{ scene: THREE.Object3D }> {
   return new Promise((resolve, reject) => {
     const loader = new GLTFLoader()
@@ -247,8 +287,8 @@ function createDefaultPrimitive(type: ShapePrimitiveType, color: string): ShapeP
     size: defaults[type].size!,
     rotation: { x: 0, y: 0, z: 0 },
     color,
-    metalness: 0.5,
-    roughness: 0.4,
+    metalness: MATTE_MATERIAL.metalness,
+    roughness: MATTE_MATERIAL.roughness,
   }
 }
 
@@ -310,10 +350,26 @@ function primitiveLocalBounds(prim: ShapePrimitive): THREE.Box3 {
 function ShapePreviewScene({
   primitives,
   selectedPrimId,
+  voxelSelection,
+  onVoxelFacePick,
 }: {
   primitives: ShapePrimitive[]
   selectedPrimId: string | null
+  voxelSelection?: Set<string>
+  onVoxelFacePick?: (voxelId: string, face: FaceDirection, append: boolean) => void
 }) {
+  const handleVoxelPointerDown = useCallback((primId: string, event: ThreeEvent<PointerEvent>) => {
+    if (!onVoxelFacePick || !primId.startsWith('voxel-')) return
+    event.stopPropagation()
+    const rawId = primId.replace('voxel-', '')
+
+    const worldNormal = event.face?.normal
+      ? event.face.normal.clone().transformDirection(event.object.matrixWorld)
+      : new THREE.Vector3(0, 1, 0)
+    const face = faceDirectionFromNormal(worldNormal)
+    onVoxelFacePick(rawId, face, event.nativeEvent.shiftKey)
+  }, [onVoxelFacePick])
+
   return (
     <>
       <color attach="background" args={['#0b1220']} />
@@ -332,14 +388,20 @@ function ShapePreviewScene({
 
         return (
           <group key={prim.id} position={[prim.position.x, prim.position.y, prim.position.z]} rotation={[rotX, rotY, rotZ]}>
-            <mesh>
+            <mesh onPointerDown={(event) => handleVoxelPointerDown(prim.id, event)}>
               {getPrimitiveGeometry(prim)}
-              <meshStandardMaterial color={prim.color} roughness={prim.roughness} metalness={prim.metalness} />
+              <meshStandardMaterial color={prim.color} roughness={MATTE_MATERIAL.roughness} metalness={MATTE_MATERIAL.metalness} />
             </mesh>
             {isSelected && (
               <mesh>
                 {getPrimitiveGeometry(prim)}
                 <meshBasicMaterial color="#ffffff" wireframe transparent opacity={0.35} />
+              </mesh>
+            )}
+            {voxelSelection?.has(prim.id.replace('voxel-', '')) && (
+              <mesh>
+                {getPrimitiveGeometry(prim)}
+                <meshBasicMaterial color="#38bdf8" wireframe transparent opacity={0.55} />
               </mesh>
             )}
           </group>
@@ -402,7 +464,11 @@ export function ShapeEditorDialog({ isOpen, node, onSave, onClear, onClose }: Sh
   // Initialize primitives from node's existing custom shape or generate from default type
   const [primitives, setPrimitives] = useState<ShapePrimitive[]>(() => {
     if (node.customShape && node.customShape.length > 0) {
-      return [...node.customShape]
+      return node.customShape.map((prim) => ({
+        ...prim,
+        metalness: MATTE_MATERIAL.metalness,
+        roughness: MATTE_MATERIAL.roughness,
+      }))
     }
     // Generate a single box primitive matching the node's current size
     const baseColor = node.color || EQUIPMENT_TYPE_COLORS[node.type]
@@ -413,8 +479,8 @@ export function ShapeEditorDialog({ isOpen, node, onSave, onClear, onClose }: Sh
       size: { x: node.size.width, y: node.size.height, z: node.size.depth },
       rotation: { x: 0, y: 0, z: 0 },
       color: baseColor,
-      metalness: 0.5,
-      roughness: 0.4,
+      metalness: MATTE_MATERIAL.metalness,
+      roughness: MATTE_MATERIAL.roughness,
     }]
   })
 
@@ -423,7 +489,7 @@ export function ShapeEditorDialog({ isOpen, node, onSave, onClear, onClose }: Sh
   const [voxelLayer, setVoxelLayer] = useState(0)
   const [voxelTool, setVoxelTool] = useState<VoxelTool>('paint')
   const [activeFace, setActiveFace] = useState<FaceDirection>('top')
-  const [faceSubdivision, setFaceSubdivision] = useState(4)
+  const [faceSubdivision, setFaceSubdivision] = useState(8)
   const [voxelColor, setVoxelColor] = useState(node.color || EQUIPMENT_TYPE_COLORS[node.type])
   const [voxelCells, setVoxelCells] = useState<Set<string>>(() => buildDefaultVoxelsFromNode(node, initialGridSize))
   const [voxelSelection, setVoxelSelection] = useState<Set<string>>(new Set())
@@ -495,8 +561,8 @@ export function ShapeEditorDialog({ isOpen, node, onSave, onClear, onClose }: Sh
         size: { x: 1, y: 1, z: 1 },
         rotation: { x: 0, y: 0, z: 0 },
         color: voxelColor,
-        metalness: 0.35,
-        roughness: 0.55,
+        metalness: MATTE_MATERIAL.metalness,
+        roughness: MATTE_MATERIAL.roughness,
       })
     }
     return out
@@ -712,6 +778,47 @@ export function ShapeEditorDialog({ isOpen, node, onSave, onClear, onClose }: Sh
     extrudeVoxelKeys(source, activeFace)
   }, [voxelSelection, activeFaceVoxels, extrudeVoxelKeys, activeFace])
 
+  const applyCornerRounding = useCallback(() => {
+    setVoxelCells((prev) => {
+      const scope = voxelSelection.size > 0
+        ? new Set(Array.from(voxelSelection).filter((key) => prev.has(key)))
+        : new Set(prev)
+
+      const toRemove = computeRoundedCornerRemoval(scope)
+      if (toRemove.length === 0) {
+        setImportMessage('No se detectaron esquinas para redondear en la selección actual')
+        return prev
+      }
+
+      const next = new Set(prev)
+      for (const key of toRemove) next.delete(key)
+      setVoxelSelection(new Set())
+      setImportMessage(`Redondeo aplicado: ${toRemove.length} voxel(es) suavizados`)
+      return next
+    })
+  }, [voxelSelection])
+
+  const handleVoxelFacePick = useCallback((rawVoxelId: string, face: FaceDirection, append: boolean) => {
+    if (!voxelBounds || !voxelCells.has(rawVoxelId)) return
+    const { x, y, z } = parseVoxelKey(rawVoxelId)
+    const { u, v } = projectFaceCell(x, y, z, voxelBounds, face, faceSubdivision)
+    const bucket = faceBuckets.get(`${u},${v}`) ?? [rawVoxelId]
+
+    setActiveFace(face)
+    setVoxelSelection((prev) => {
+      const next = append ? new Set(prev) : new Set<string>()
+      const allSelected = bucket.every((key) => next.has(key))
+
+      if (allSelected && append) {
+        for (const key of bucket) next.delete(key)
+      } else {
+        for (const key of bucket) next.add(key)
+      }
+
+      return next
+    })
+  }, [voxelBounds, voxelCells, faceSubdivision, faceBuckets])
+
   const clearCurrentLayer = useCallback(() => {
     setVoxelCells((prev) => {
       const next = new Set<string>()
@@ -772,15 +879,24 @@ export function ShapeEditorDialog({ isOpen, node, onSave, onClear, onClose }: Sh
         const parsed = JSON.parse(text)
 
         if (Array.isArray(parsed)) {
-          setPrimitives(parsed as ShapePrimitive[])
-          setSelectedPrimId(parsed[0]?.id ?? null)
+          const importedPrimitives = (parsed as ShapePrimitive[]).map((prim) => ({
+            ...prim,
+            metalness: MATTE_MATERIAL.metalness,
+            roughness: MATTE_MATERIAL.roughness,
+          }))
+          setPrimitives(importedPrimitives)
+          setSelectedPrimId(importedPrimitives[0]?.id ?? null)
           setSculptMode('primitives')
           setImportMessage(`Importado JSON con ${parsed.length} primitivas`)
           return
         }
 
         if (Array.isArray(parsed?.primitives)) {
-          const importedPrimitives = parsed.primitives as ShapePrimitive[]
+          const importedPrimitives = (parsed.primitives as ShapePrimitive[]).map((prim) => ({
+            ...prim,
+            metalness: MATTE_MATERIAL.metalness,
+            roughness: MATTE_MATERIAL.roughness,
+          }))
           setPrimitives(importedPrimitives)
           setSelectedPrimId(importedPrimitives[0]?.id ?? null)
           if (Array.isArray(parsed?.voxelCells)) {
@@ -1030,8 +1146,8 @@ export function ShapeEditorDialog({ isOpen, node, onSave, onClear, onClose }: Sh
 
                   <div>
                     <p className="text-[10px] text-muted-foreground mb-1">Subdivisión de cara</p>
-                    <div className="grid grid-cols-4 gap-1">
-                      {[2, 4, 6, 8].map((value) => (
+                    <div className="grid grid-cols-3 gap-1">
+                      {[2, 4, 6, 8, 12, 16].map((value) => (
                         <button
                           key={value}
                           className={cn('px-1.5 py-1 rounded border text-[10px]', faceSubdivision === value ? 'border-primary bg-primary/10' : 'hover:bg-muted')}
@@ -1051,6 +1167,10 @@ export function ShapeEditorDialog({ isOpen, node, onSave, onClear, onClose }: Sh
                       Extruir cara
                     </Button>
                   </div>
+
+                  <Button variant="outline" size="sm" className="h-7 text-[10px] w-full" onClick={applyCornerRounding}>
+                    Redondear esquinas
+                  </Button>
 
                   <div>
                     <p className="text-[10px] text-muted-foreground mb-1">Grilla de cara activa</p>
@@ -1146,7 +1266,12 @@ export function ShapeEditorDialog({ isOpen, node, onSave, onClear, onClose }: Sh
                         far: 1000,
                       }}
                     >
-                      <ShapePreviewScene primitives={activePrimitives} selectedPrimId={null} />
+                      <ShapePreviewScene
+                        primitives={activePrimitives}
+                        selectedPrimId={null}
+                        voxelSelection={voxelSelection}
+                        onVoxelFacePick={handleVoxelFacePick}
+                      />
                     </Canvas>
                   </div>
                 </div>
@@ -1165,7 +1290,7 @@ export function ShapeEditorDialog({ isOpen, node, onSave, onClear, onClose }: Sh
                 </div>
 
                 <div className="border rounded-lg p-3 text-xs text-muted-foreground">
-                  Usa la grilla 2D por capa para pintar, borrar o seleccionar. La extrusión mueve la selección hacia arriba o abajo una capa.
+                  Haz clic directo en el modelo para seleccionar caras o zonas (Shift para acumular). La extrusión mueve la selección según la cara activa.
                 </div>
               </div>
             ) : selectedPrim ? (
@@ -1188,7 +1313,7 @@ export function ShapeEditorDialog({ isOpen, node, onSave, onClear, onClose }: Sh
                         far: 1000,
                       }}
                     >
-                      <ShapePreviewScene primitives={activePrimitives} selectedPrimId={selectedPrimId} />
+                      <ShapePreviewScene primitives={activePrimitives} selectedPrimId={selectedPrimId} voxelSelection={voxelSelection} />
                     </Canvas>
                   </div>
                 </div>
@@ -1330,8 +1455,9 @@ export function ShapeEditorDialog({ isOpen, node, onSave, onClear, onClose }: Sh
                           />
                         </div>
                       </div>
-                      <DimensionInput label="Met" value={selectedPrim.metalness} min={0} max={1} step={0.05} unit="" onChange={(v) => updatePrimitive(selectedPrim.id, { metalness: v })} />
-                      <DimensionInput label="Rug" value={selectedPrim.roughness} min={0} max={1} step={0.05} unit="" onChange={(v) => updatePrimitive(selectedPrim.id, { roughness: v })} />
+                      <div className="rounded border px-2 py-1.5 text-[10px] text-muted-foreground">
+                        Acabado fijo: mate (sin brillo)
+                      </div>
                     </div>
                   )}
                 </div>

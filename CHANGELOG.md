@@ -7,6 +7,14 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.69.9] - 2026-02-28
+### Agregado — Modelado directo sobre el visor 3D + acabado mate
+- **Selección de cara directa en modelo**: clic en el voxel del visor 3D selecciona automáticamente la cara (`Top/Bottom/Left/Right/Front/Back`) y su zona de subdivisión
+- **Selección múltiple para extrusión**: `Shift+clic` permite acumular zonas/caras directamente sobre el modelo para extruir por lotes
+- **Más subdivisiones de cara**: ampliado a `2×2`, `4×4`, `6×6`, `8×8`, `12×12` y `16×16` para modelado más fino
+- **Redondeo de esquinas**: nueva acción `Redondear esquinas` para suavizar esquinas convexas del volumen voxel
+- **Materiales y paleta mate**: colores del editor ajustados a versión mate y acabado fijo sin brillo (metalness bajo, roughness alto)
+
 ## [2.69.8] - 2026-02-28
 ### Corregido — Hotfix CI/deploy en ShapeEditorDialog
 - **TypeScript estricto (CI) corregido**: `parseVoxelKey()` ahora retorna `{ x, y, z }` tipados y normalizados como `number` garantizado (sin `undefined`)
