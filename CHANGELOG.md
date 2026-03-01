@@ -7,6 +7,12 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.69.17] - 2026-02-28
+### Mejorado — Editor rápido sensible al modo de herramienta
+- **Prioridad dinámica por herramienta**: acciones reordenadas según `select/move/add` dentro de cada contexto (sin selección, área activa, equipo activo)
+- **Indicador de modo activo**: nuevo estado visual en panel para confirmar herramienta actual y reducir errores operativos
+- **Acciones de transición rápida**: se agregan atajos para salir de `add`, finalizar `move` y mantener flujo continuo de edición
+
 ## [2.69.16] - 2026-02-28
 ### Mejorado — Editor rápido con opciones dinámicas por selección
 - **Acciones contextuales por estado**: el panel muestra opciones distintas para `sin selección`, `área activa` y `equipo activo`
