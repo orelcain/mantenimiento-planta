@@ -513,7 +513,7 @@ export function IncidentForm({ onClose, onSuccess, preselectedZoneId, incident }
               )}
               
               <Dialog open={isLocationModalOpen} onOpenChange={setIsLocationModalOpen}>
-                  <DialogContent className="max-w-md h-[80vh] flex flex-col p-0 gap-0">
+                  <DialogContent className="max-w-md h-[80vh] flex flex-col p-0 gap-0 z-[55]" overlayClassName="z-[55] bg-black/60">
                       <DialogHeader className="p-4 pb-2 border-b">
                           <DialogTitle>Seleccionar Ubicación</DialogTitle>
                       </DialogHeader>

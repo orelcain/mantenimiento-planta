@@ -259,7 +259,7 @@ export function PhotoAnnotationEditor({
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[70] bg-black/90 flex items-center justify-center p-4">
       <div className="w-full max-w-7xl h-full flex flex-col gap-4">
         {/* Barra de herramientas */}
         <Card className="flex-shrink-0">

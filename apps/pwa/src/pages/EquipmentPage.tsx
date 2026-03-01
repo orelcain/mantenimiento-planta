@@ -2302,10 +2302,10 @@ function EquipmentDetailDialog({
         </DialogFooter>
       </DialogContent>
 
-      {/* Photo preview modal */}
+      {/* Photo preview modal — z-[60] para estar encima del dialog padre z-50 */}
       {selectedPhotoIndex !== null && equipment.photos && equipment.photos[selectedPhotoIndex] && (
         <Dialog open onOpenChange={() => onPhotoSelect(null)}>
-          <DialogContent className="max-w-5xl h-[90vh] flex flex-col">
+          <DialogContent className="max-w-5xl h-[90vh] flex flex-col z-[60]" overlayClassName="z-[60]">
             <DialogHeader>
               <DialogTitle>
                 Foto {selectedPhotoIndex + 1} de {equipment.photos.length}

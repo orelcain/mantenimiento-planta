@@ -1039,10 +1039,10 @@ export function IncidentDetail({ incident, onClose, canValidate }: IncidentDetai
         />
       )}
 
-      {/* Modal de foto ampliada */}
+      {/* Modal de foto ampliada — z-[60] para estar encima del dialog padre z-50 */}
       {selectedPhoto && (
         <Dialog open onOpenChange={() => setSelectedPhoto(null)}>
-          <DialogContent className="max-w-4xl p-0">
+          <DialogContent className="max-w-4xl p-0 z-[60]" overlayClassName="z-[60] bg-black/60">
             <button
               onClick={() => setSelectedPhoto(null)}
               className="absolute top-2 right-2 z-10 bg-background/80 rounded-full p-2"

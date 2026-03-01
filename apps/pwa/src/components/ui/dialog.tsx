@@ -3,6 +3,18 @@ import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
+/**
+ * ─── Escala de z-index para modales ───────────────────────
+ *  z-40          ChatBot panel / FAB
+ *  z-50          Modales primarios (base)
+ *  z-[55]        Modales anidados (segundo nivel)
+ *  z-[60]        Lightboxes / galerías dentro de modales
+ *  z-[70]        Editores full-screen (ShapeEditor, PhotoAnnotation)
+ *  z-[100]       Toast, paneles full-screen especiales
+ *  z-[9999]      ImageLightbox global, dropdowns, tooltips
+ * ──────────────────────────────────────────────────────────
+ */
+
 const Dialog = DialogPrimitive.Root
 
 const DialogTrigger = DialogPrimitive.Trigger
@@ -26,12 +38,18 @@ const DialogOverlay = React.forwardRef<
 ))
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 
+interface DialogContentProps
+  extends React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> {
+  /** Clases extra para el overlay (útil para subir z-index en modales anidados) */
+  overlayClassName?: string
+}
+
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => (
+  DialogContentProps
+>(({ className, overlayClassName, children, ...props }, ref) => (
   <DialogPortal>
-    <DialogOverlay />
+    <DialogOverlay className={overlayClassName} />
     <DialogPrimitive.Content
       ref={ref}
       aria-describedby={undefined}

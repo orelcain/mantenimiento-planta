@@ -115,9 +115,9 @@ export function RepuestoPhotosModal({
         </DialogContent>
       </Dialog>
 
-      {/* Visor de foto ampliada */}
+      {/* Visor de foto ampliada — z-[60] para estar encima del dialog padre z-50 */}
       {selectedPhoto && (
-        <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center">
+        <div className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center">
           <div className="relative w-full h-full flex items-center justify-center p-4">
             {/* Botón cerrar */}
             <button

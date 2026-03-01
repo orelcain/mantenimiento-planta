@@ -243,7 +243,7 @@ export function ImageGallery({
       {/* Lightbox */}
       {lightboxImage && (
         <div
-          className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black/90 z-[60] flex items-center justify-center p-4"
           onClick={() => setLightboxImage(null)}
         >
           <div className="max-w-4xl max-h-full">

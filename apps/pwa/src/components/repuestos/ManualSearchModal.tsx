@@ -1260,7 +1260,7 @@ export function ManualSearchModal({
       <DialogContent
         ref={dialogRef}
         className={isFullscreen
-          ? 'fixed inset-0 max-w-none max-h-none w-screen h-screen rounded-none flex flex-col overflow-hidden p-0 z-50'
+          ? 'fixed inset-0 max-w-none max-h-none w-screen h-screen rounded-none flex flex-col overflow-hidden p-0 z-[70]'
           : 'max-w-5xl max-h-[95vh] flex flex-col overflow-hidden p-0'
         }
         style={isFullscreen ? { transform: 'none', left: 0, top: 0 } : undefined}
