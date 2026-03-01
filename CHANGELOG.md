@@ -7,6 +7,12 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.69.19] - 2026-02-28
+### Mejorado — Presets de flujo en Editor Rápido
+- **Selector de flujo**: nuevas opciones `Diseñar áreas`, `Poblar equipos` y `Ajuste fino`
+- **Orden de acciones por preset**: prioridad contextual de botones ajustada según preset + selección activa
+- **Recomendación más inteligente**: `Siguiente recomendado` incorpora el preset para guiar mejor la operación
+
 ## [2.69.18] - 2026-02-28
 ### Mejorado — Orden y usabilidad intuitiva en Editor Rápido
 - **Guía de siguiente paso**: nuevo bloque `Siguiente recomendado` adaptado al contexto actual del editor

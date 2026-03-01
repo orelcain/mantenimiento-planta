@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.69.18**
+## Versión Actual: **v2.69.19**
 
 **Fecha de lanzamiento**: 28 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.69.19 — Presets de flujo para orden y usabilidad intuitiva (28/02/2026)
+- 🧩 **Preset selector en editor**: `Diseñar áreas`, `Poblar equipos`, `Ajuste fino` dentro del panel `Editor Rápido`
+- 🔀 **Prioridad real por preset**: reordenamiento de acciones según contexto (sin selección, área activa, equipo activo)
+- 🧠 **Guía adaptativa**: el bloque `Siguiente recomendado` ahora considera el preset elegido para orientar el próximo paso
 
 ### v2.69.18 — Orden y usabilidad intuitiva del Editor Rápido (28/02/2026)
 - 🧭 **Guía operativa contextual**: nueva tarjeta `Siguiente recomendado` que indica el próximo paso según selección y modo activo
