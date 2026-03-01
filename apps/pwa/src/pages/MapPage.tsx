@@ -703,6 +703,22 @@ export function MapPage() {
     overlayState.openOverlay('add-equipment')
   }, [closeAreaEditor, overlayState])
 
+  const quickActionHint = useMemo(() => {
+    if (selectedNode) {
+      if (isMoveToolActive) return 'Arrastra el equipo a su nueva posición y luego finaliza movimiento.'
+      if (isAddToolActive) return 'Estás en modo agregar: crea otro equipo o vuelve a selección para editar.'
+      return 'Edita forma o vínculo del equipo, o salta a su área asociada para continuar el flujo.'
+    }
+
+    if (selectedAreaId) {
+      if (isAddToolActive) return 'Agrega equipos dentro del área activa y luego vuelve a modo selección.'
+      return 'Edita el área activa o agrega equipos directamente dentro de esta zona.'
+    }
+
+    if (isAddToolActive) return 'Define y agrega un equipo nuevo en el mapa, o sal de modo agregar.'
+    return 'Comienza creando un área o agregando un equipo para iniciar el diseño del piso.'
+  }, [selectedNode, isMoveToolActive, isAddToolActive, selectedAreaId])
+
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -1015,20 +1031,30 @@ export function MapPage() {
                     Modo activo: <span className="font-semibold uppercase">{editorTool}</span>
                   </div>
 
+                  <div className="px-2 py-1.5 rounded-md border bg-muted/30 border-border text-[11px]">
+                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Siguiente recomendado</p>
+                    <p className="text-[11px] text-foreground leading-snug mt-0.5">{quickActionHint}</p>
+                  </div>
+
+                  <p className="text-[10px] text-muted-foreground font-medium px-1">ACCIONES CONTEXTUALES</p>
+
                   <div className="space-y-1">
                     {!selectedNode && !selectedAreaId && (
                       <>
                         {isAddToolActive ? (
                           <>
-                            <Button
-                              variant="default"
-                              size="sm"
-                              className="gap-1.5 text-xs justify-start w-full"
-                              onClick={startAddEquipmentFlow}
-                            >
-                              <Shapes className="h-3.5 w-3.5" />
-                              Configurar equipo a agregar
-                            </Button>
+                            <div className="space-y-0.5">
+                              <Button
+                                variant="default"
+                                size="sm"
+                                className="gap-1.5 text-xs justify-start w-full"
+                                onClick={startAddEquipmentFlow}
+                              >
+                                <Shapes className="h-3.5 w-3.5" />
+                                Configurar equipo a agregar
+                              </Button>
+                              <p className="text-[10px] text-muted-foreground px-1">Ajusta tipo y datos antes de ubicarlo en el mapa.</p>
+                            </div>
 
                             <Button
                               variant="outline"
@@ -1041,40 +1067,49 @@ export function MapPage() {
                             </Button>
                           </>
                         ) : (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="gap-1.5 text-xs justify-start w-full"
-                            onClick={startAddEquipmentFlow}
-                          >
-                            <Shapes className="h-3.5 w-3.5" />
-                            Agregar equipo
-                          </Button>
+                          <div className="space-y-0.5">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="gap-1.5 text-xs justify-start w-full"
+                              onClick={startAddEquipmentFlow}
+                            >
+                              <Shapes className="h-3.5 w-3.5" />
+                              Agregar equipo
+                            </Button>
+                            <p className="text-[10px] text-muted-foreground px-1">Recomendado si ya tienes ubicación en mente.</p>
+                          </div>
                         )}
 
-                        <Button
-                          variant={isAddToolActive ? 'outline' : 'default'}
-                          size="sm"
-                          className="gap-1.5 text-xs justify-start w-full"
-                          onClick={() => openAreaEditor(null)}
-                        >
-                          <Grid3x3 className="h-3.5 w-3.5" />
-                          Crear nueva área
-                        </Button>
+                        <div className="space-y-0.5">
+                          <Button
+                            variant={isAddToolActive ? 'outline' : 'default'}
+                            size="sm"
+                            className="gap-1.5 text-xs justify-start w-full"
+                            onClick={() => openAreaEditor(null)}
+                          >
+                            <Grid3x3 className="h-3.5 w-3.5" />
+                            Crear nueva área
+                          </Button>
+                          <p className="text-[10px] text-muted-foreground px-1">Útil para delimitar zonas antes de asociar equipos.</p>
+                        </div>
                       </>
                     )}
 
                     {selectedAreaId && (
                       <>
-                        <Button
-                          variant={isAddToolActive ? 'default' : 'outline'}
-                          size="sm"
-                          className="gap-1.5 text-xs justify-start w-full"
-                          onClick={startAddEquipmentFlow}
-                        >
-                          <Shapes className="h-3.5 w-3.5" />
-                          Agregar equipo en área
-                        </Button>
+                        <div className="space-y-0.5">
+                          <Button
+                            variant={isAddToolActive ? 'default' : 'outline'}
+                            size="sm"
+                            className="gap-1.5 text-xs justify-start w-full"
+                            onClick={startAddEquipmentFlow}
+                          >
+                            <Shapes className="h-3.5 w-3.5" />
+                            Agregar equipo en área
+                          </Button>
+                          <p className="text-[10px] text-muted-foreground px-1">El nuevo equipo quedará asociado a esta área activa.</p>
+                        </div>
 
                         {isAddToolActive && (
                           <Button
@@ -1088,18 +1123,21 @@ export function MapPage() {
                           </Button>
                         )}
 
-                        <Button
-                          variant={isAddToolActive ? 'outline' : 'default'}
-                          size="sm"
-                          className="gap-1.5 text-xs justify-start w-full"
-                          onClick={() => {
-                            const selectedArea = areaById.get(selectedAreaId)
-                            if (selectedArea) openAreaEditor(selectedArea)
-                          }}
-                        >
-                          <Grid3x3 className="h-3.5 w-3.5" />
-                          Editar área activa
-                        </Button>
+                        <div className="space-y-0.5">
+                          <Button
+                            variant={isAddToolActive ? 'outline' : 'default'}
+                            size="sm"
+                            className="gap-1.5 text-xs justify-start w-full"
+                            onClick={() => {
+                              const selectedArea = areaById.get(selectedAreaId)
+                              if (selectedArea) openAreaEditor(selectedArea)
+                            }}
+                          >
+                            <Grid3x3 className="h-3.5 w-3.5" />
+                            Editar área activa
+                          </Button>
+                          <p className="text-[10px] text-muted-foreground px-1">Pinta/borrar tiles y ajusta propiedades del área.</p>
+                        </div>
 
                         <Button
                           variant={showOnlyActiveAreaEquipment ? 'default' : 'outline'}
@@ -1137,15 +1175,18 @@ export function MapPage() {
                           </Button>
                         )}
 
-                        <Button
-                          variant={isMoveToolActive ? 'outline' : 'default'}
-                          size="sm"
-                          className="gap-1.5 text-xs justify-start w-full"
-                          onClick={() => overlayState.openOverlay('shape-editor')}
-                        >
-                          <Shapes className="h-3.5 w-3.5" />
-                          Editar forma del equipo
-                        </Button>
+                        <div className="space-y-0.5">
+                          <Button
+                            variant={isMoveToolActive ? 'outline' : 'default'}
+                            size="sm"
+                            className="gap-1.5 text-xs justify-start w-full"
+                            onClick={() => overlayState.openOverlay('shape-editor')}
+                          >
+                            <Shapes className="h-3.5 w-3.5" />
+                            Editar forma del equipo
+                          </Button>
+                          <p className="text-[10px] text-muted-foreground px-1">Ideal cuando el equipo ya está posicionado y asociado.</p>
+                        </div>
 
                         <Button
                           variant="outline"
@@ -1189,15 +1230,18 @@ export function MapPage() {
                       </>
                     )}
 
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-1.5 text-xs justify-start w-full"
-                      onClick={() => overlayState.openOverlay('area-manager')}
-                    >
-                      <Settings2 className="h-3.5 w-3.5" />
-                      Gestionar áreas
-                    </Button>
+                    <div className="border-t pt-1.5 mt-1">
+                      <p className="text-[10px] text-muted-foreground font-medium px-1 mb-1">UTILIDADES GLOBALES</p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5 text-xs justify-start w-full"
+                        onClick={() => overlayState.openOverlay('area-manager')}
+                      >
+                        <Settings2 className="h-3.5 w-3.5" />
+                        Gestionar áreas
+                      </Button>
+                    </div>
                   </div>
 
                   <div className="border-t pt-1.5">

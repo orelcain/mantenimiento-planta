@@ -7,6 +7,12 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.69.18] - 2026-02-28
+### Mejorado — Orden y usabilidad intuitiva en Editor Rápido
+- **Guía de siguiente paso**: nuevo bloque `Siguiente recomendado` adaptado al contexto actual del editor
+- **Agrupación de acciones**: separación visual entre `Acciones contextuales` y `Utilidades globales` para navegación más clara
+- **Micro-ayudas inline**: descripciones breves bajo botones principales para facilitar adopción por usuarios nuevos
+
 ## [2.69.17] - 2026-02-28
 ### Mejorado — Editor rápido sensible al modo de herramienta
 - **Prioridad dinámica por herramienta**: acciones reordenadas según `select/move/add` dentro de cada contexto (sin selección, área activa, equipo activo)

@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.69.17**
+## Versión Actual: **v2.69.18**
 
 **Fecha de lanzamiento**: 28 de febrero de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.69.18 — Orden y usabilidad intuitiva del Editor Rápido (28/02/2026)
+- 🧭 **Guía operativa contextual**: nueva tarjeta `Siguiente recomendado` que indica el próximo paso según selección y modo activo
+- 🧱 **Estructura más clara**: separación explícita entre `Acciones contextuales` y `Utilidades globales`
+- 💬 **Micro-ayudas por acción**: textos breves bajo botones clave para reducir curva de aprendizaje en terreno
 
 ### v2.69.17 — Editor rápido dinámico por modo activo (28/02/2026)
 - 🔀 **Prioridad por modo**: el panel reordena acciones según `select/move/add` además del contexto área/equipo
