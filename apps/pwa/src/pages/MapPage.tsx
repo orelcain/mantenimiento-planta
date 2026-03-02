@@ -153,6 +153,62 @@ function getRotatedFootprint(size: MapNode['size'], rotation: number): { width: 
   return { width: size.width, depth: size.depth }
 }
 
+function getSmartSnappedPlacement(
+  rawPosition: { x: number; z: number },
+  candidateSize: { width: number; depth: number },
+  floor: number,
+  nodes: MapNode[],
+  enabled: boolean
+): { x: number; z: number } {
+  if (!enabled) return rawPosition
+
+  const SNAP_THRESHOLD = 0.9
+  const candidateHalfW = candidateSize.width / 2
+  const candidateHalfD = candidateSize.depth / 2
+
+  let snappedX = rawPosition.x
+  let snappedZ = rawPosition.z
+  let bestDX = SNAP_THRESHOLD + 1
+  let bestDZ = SNAP_THRESHOLD + 1
+
+  for (const node of nodes) {
+    const nodeFloor = clampElevation(node.floor ?? node.position.y ?? SEA_LEVEL_ELEVATION)
+    if (nodeFloor !== floor) continue
+
+    const nodeFootprint = getRotatedFootprint(node.size, node.rotation)
+    const nodeHalfW = nodeFootprint.width / 2
+    const nodeHalfD = nodeFootprint.depth / 2
+
+    const xTargets = [
+      node.position.x - (nodeHalfW + candidateHalfW),
+      node.position.x + (nodeHalfW + candidateHalfW),
+    ]
+
+    for (const targetX of xTargets) {
+      const distance = Math.abs(rawPosition.x - targetX)
+      if (distance <= SNAP_THRESHOLD && distance < bestDX) {
+        bestDX = distance
+        snappedX = targetX
+      }
+    }
+
+    const zTargets = [
+      node.position.z - (nodeHalfD + candidateHalfD),
+      node.position.z + (nodeHalfD + candidateHalfD),
+    ]
+
+    for (const targetZ of zTargets) {
+      const distance = Math.abs(rawPosition.z - targetZ)
+      if (distance <= SNAP_THRESHOLD && distance < bestDZ) {
+        bestDZ = distance
+        snappedZ = targetZ
+      }
+    }
+  }
+
+  return { x: snappedX, z: snappedZ }
+}
+
 export function MapPage() {
   const canValidate = useCanValidateIncidents()
   const isAdmin = useIsAdmin()
@@ -947,13 +1003,21 @@ export function MapPage() {
 
     const candidateSize = getDefaultSize(effectiveAddType)
     const rotatedFootprint = getRotatedFootprint(candidateSize, addPlacementRotation)
+    const snappedPosition = getSmartSnappedPlacement(
+      terrainHoverPosition,
+      rotatedFootprint,
+      viewerState.currentFloor,
+      nodes,
+      snapEnabled
+    )
+
     const collides = nodes.some((node) => {
       const nodeFloor = clampElevation(node.floor ?? node.position.y ?? SEA_LEVEL_ELEVATION)
       if (nodeFloor !== viewerState.currentFloor) return false
       return isOverlapping2D(
         {
-          x: terrainHoverPosition.x,
-          z: terrainHoverPosition.z,
+          x: snappedPosition.x,
+          z: snappedPosition.z,
           width: rotatedFootprint.width,
           depth: rotatedFootprint.depth,
         },
@@ -967,7 +1031,7 @@ export function MapPage() {
     })
 
     return {
-      position: { x: terrainHoverPosition.x, z: terrainHoverPosition.z },
+      position: snappedPosition,
       floor: viewerState.currentFloor,
       size: {
         ...candidateSize,
@@ -977,7 +1041,7 @@ export function MapPage() {
       rotation: addPlacementRotation,
       valid: !collides,
     }
-  }, [isEditMode, editorTool, buildMode, terrainHoverPosition, effectiveAddType, nodes, viewerState.currentFloor, addPlacementRotation])
+  }, [isEditMode, editorTool, buildMode, terrainHoverPosition, effectiveAddType, nodes, viewerState.currentFloor, addPlacementRotation, snapEnabled])
 
   const handleFloorClick = useCallback(
     (position: { x: number; z: number }) => {
@@ -997,7 +1061,8 @@ export function MapPage() {
         return
       }
 
-      const areaAtPoint = resolveAreaAtPosition(position.x, position.z, viewerState.currentFloor)
+      const placementPosition = placementPreview?.position ?? position
+      const areaAtPoint = resolveAreaAtPosition(placementPosition.x, placementPosition.z, viewerState.currentFloor)
       if (areaAtPoint) {
         setSelectedAreaId(areaAtPoint.id)
       }
@@ -1022,7 +1087,7 @@ export function MapPage() {
         id: `node-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
         label: `${EQUIPMENT_TYPE_LABELS[effectiveAddType]} nuevo`,
         type: effectiveAddType,
-        position: { x: position.x, y: viewerState.currentFloor, z: position.z },
+        position: { x: placementPosition.x, y: viewerState.currentFloor, z: placementPosition.z },
         size: getDefaultSize(effectiveAddType),
         rotation: addPlacementRotation,
         floor: viewerState.currentFloor,
@@ -1045,6 +1110,7 @@ export function MapPage() {
       buildMode,
       findNodeAtPosition,
       handleDeleteNodeById,
+      placementPreview?.position,
       placementPreview?.valid,
       addPlacementRotation,
       terrainEditEnabled,
