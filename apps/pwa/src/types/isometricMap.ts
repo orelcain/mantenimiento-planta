@@ -34,6 +34,28 @@ export const CAMERA_ANGLE_AZIMUTH: Record<CameraAngle, number> = {
 /** Elevación isométrica estándar (~35.264° = arctan(1/√2)) */
 export const ISO_ELEVATION = Math.atan(1 / Math.SQRT2)
 
+/** Escala base: cada cuadrante equivale a 1m × 1m × 1m */
+export const GRID_CELL_METERS = 1
+export const VERTICAL_UNIT_METERS = 1
+
+/** Nivel del mar y límites de elevación construible (en metros) */
+export const SEA_LEVEL_ELEVATION = 0
+export const MIN_TERRAIN_ELEVATION = -50
+export const MAX_TERRAIN_ELEVATION = 200
+
+/** Niveles rápidos para navegación de pisos/elevación */
+export const ELEVATION_PRESET_LEVELS = [-50, 0, 50, 100, 150, 200] as const
+
+export function clampElevation(value: number): number {
+  return Math.max(MIN_TERRAIN_ELEVATION, Math.min(MAX_TERRAIN_ELEVATION, Math.round(value)))
+}
+
+export function formatElevationLabel(level: number): string {
+  const normalized = clampElevation(level)
+  if (normalized === SEA_LEVEL_ELEVATION) return 'Nivel del mar (0 m)'
+  return `${normalized > 0 ? '+' : ''}${normalized} m`
+}
+
 /** Configuración visual del mapa */
 export interface IsometricMapConfig {
   /** Ancho de la planta en metros */
@@ -57,7 +79,7 @@ export interface IsometricMapConfig {
 export const DEFAULT_MAP_CONFIG: IsometricMapConfig = {
   width: 80,
   depth: 50,
-  cellSize: 1,
+  cellSize: GRID_CELL_METERS,
   floorColor: '#1a1a2e',
   gridColor: '#4a9eff',
   gridOpacity: 0.15,
@@ -189,7 +211,7 @@ export interface MapNode {
   size: { width: number; height: number; depth: number }
   /** Rotación en grados (eje Y) */
   rotation: number
-  /** Piso: 0=planta baja, 1=segundo piso, 2=techo (default 0) */
+  /** Nivel de elevación base (metros respecto a nivel del mar, default 0) */
   floor?: number
   /** Vinculación con entidad real en Firestore */
   linkedEntityType?: 'equipment' | 'plantAsset' | 'iotDevice' | 'zone'
@@ -228,7 +250,7 @@ export interface MapArea {
   size: { width: number; depth: number }
   color: string
   opacity: number
-  /** Piso: 0=planta baja, 1=segundo piso, 2=techo (default 0) */
+  /** Nivel de elevación del área (metros respecto a nivel del mar, default 0) */
   floor?: number
   /** Tiles seleccionados al estilo FFT (coordenadas de grilla) — si se define, usa tiles en vez de rectángulo */
   tiles?: { x: number; z: number }[]
@@ -291,7 +313,7 @@ export interface IsometricViewerState {
   hoveredNodeId: string | null
   /** Modo del visor */
   mode: 'view' | 'edit'
-  /** Piso actual visualizado (0=planta baja, 1=segundo, 2=techo) */
+  /** Nivel de elevación actual visualizado (metros respecto a nivel del mar) */
   currentFloor: number
   /** Filtros activos */
   filters: {
@@ -319,7 +341,7 @@ export const DEFAULT_VIEWER_STATE: IsometricViewerState = {
   selectedNodeId: null,
   hoveredNodeId: null,
   mode: 'view',
-  currentFloor: 0,
+  currentFloor: SEA_LEVEL_ELEVATION,
   filters: {
     showEquipment: true,
     showPumps: true,

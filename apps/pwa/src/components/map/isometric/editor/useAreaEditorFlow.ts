@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
 import type { IsometricViewerState, MapArea, MapConnector, MapNode } from '@/types/isometricMap'
+import { SEA_LEVEL_ELEVATION } from '@/types/isometricMap'
 import type { AreaPaintState } from './AreaTileEditor'
 
 interface UseAreaEditorFlowParams {
@@ -45,7 +46,7 @@ export function useAreaEditorFlow({
   const prevFiltersRef = useRef<IsometricViewerState['filters'] | null>(null)
 
   const currentFloorAreas = useMemo(
-    () => areas.filter((area) => (area.floor ?? 0) === currentFloor),
+    () => areas.filter((area) => (area.floor ?? SEA_LEVEL_ELEVATION) === currentFloor),
     [areas, currentFloor]
   )
 

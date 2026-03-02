@@ -9,7 +9,12 @@ import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { Search, X, MapPin, ChevronRight, Building2, Layers } from 'lucide-react'
 import { useAppStore } from '@/store'
 import type { MapNode, MapArea } from '@/types/isometricMap'
-import { EQUIPMENT_TYPE_LABELS, EQUIPMENT_TYPE_COLORS } from '@/types/isometricMap'
+import {
+  EQUIPMENT_TYPE_LABELS,
+  EQUIPMENT_TYPE_COLORS,
+  SEA_LEVEL_ELEVATION,
+  formatElevationLabel,
+} from '@/types/isometricMap'
 
 interface MapSearchPanelProps {
   nodes: MapNode[]
@@ -28,12 +33,6 @@ interface SearchResult {
   /** Código SAP */
   linkedCode?: string
   matchField: 'label' | 'code' | 'linked' | 'type'
-}
-
-const FLOOR_LABELS: Record<number, string> = {
-  0: 'PB',
-  1: '2°P',
-  2: 'Techo',
 }
 
 export function MapSearchPanel({ nodes, areas, onSelectNode, onSelectArea, onFocusNode }: MapSearchPanelProps) {
@@ -186,7 +185,9 @@ export function MapSearchPanel({ nodes, areas, onSelectNode, onSelectArea, onFoc
                 const isArea = result.type === 'area'
                 const label = isArea ? result.area!.label : result.node!.label
                 const key = isArea ? result.area!.id : result.node!.id
-                const floor = isArea ? (result.area!.floor ?? 0) : (result.node!.floor ?? 0)
+                const floor = isArea
+                  ? (result.area!.floor ?? SEA_LEVEL_ELEVATION)
+                  : (result.node!.floor ?? SEA_LEVEL_ELEVATION)
                 return (
                 <button
                   key={key}
@@ -212,10 +213,10 @@ export function MapSearchPanel({ nodes, areas, onSelectNode, onSelectArea, onFoc
                           {result.linkedCode}
                         </span>
                       )}
-                      {floor > 0 && (
+                      {floor !== SEA_LEVEL_ELEVATION && (
                         <span className="text-[10px] bg-muted px-1 rounded">
                           <Building2 className="inline h-2.5 w-2.5 mr-0.5" />
-                          {FLOOR_LABELS[floor] ?? `P${floor}`}
+                          {formatElevationLabel(floor)}
                         </span>
                       )}
                     </div>

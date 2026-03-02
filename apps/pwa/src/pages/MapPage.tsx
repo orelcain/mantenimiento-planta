@@ -55,6 +55,12 @@ import {
   MAX_VIEWER_ZOOM,
   CAMERA_ANGLE_AZIMUTH,
   CAMERA_ANGLE_NAMES,
+  ELEVATION_PRESET_LEVELS,
+  SEA_LEVEL_ELEVATION,
+  MIN_TERRAIN_ELEVATION,
+  MAX_TERRAIN_ELEVATION,
+  clampElevation,
+  formatElevationLabel,
   STATUS_LABELS,
   STATUS_COLORS,
   EQUIPMENT_TYPE_LABELS,
@@ -99,17 +105,10 @@ const STATUS_CONFIG: Record<IncidentStatus, { label: string; variant: string }> 
   cerrada: { label: 'Cerrada', variant: 'outline' },
 }
 
-const FLOOR_OPTIONS = [
-  { floor: 0, full: 'Planta Baja' },
-  { floor: 1, full: 'Segundo Piso' },
-  { floor: 2, full: 'Techo' },
-] as const
-
-const FLOOR_LABELS: Record<number, string> = {
-  0: 'Planta Baja',
-  1: 'Segundo Piso',
-  2: 'Techo',
-}
+const ELEVATION_OPTIONS = ELEVATION_PRESET_LEVELS.map((level) => ({
+  floor: level,
+  full: formatElevationLabel(level),
+}))
 
 /** Tamaños por defecto para cada tipo de equipo */
 function getDefaultSize(type: MapNode['type']): MapNode['size'] {
@@ -164,7 +163,7 @@ export function MapPage() {
   const showShapeEditor = overlayState.isOverlayOpen('shape-editor')
   const showAreaEditor = overlayState.isOverlayOpen('area-editor')
   const showAreaManager = overlayState.isOverlayOpen('area-manager')
-  const [areaManagerFloor, setAreaManagerFloor] = useState<'all' | 0 | 1 | 2>('all')
+  const [areaManagerFloor, setAreaManagerFloor] = useState<'all' | number>('all')
   const [selectedAreaId, setSelectedAreaId] = useState<string | null>(null)
   const [hoveredAreaId, setHoveredAreaId] = useState<string | null>(null)
   const [showOnlyActiveAreaEquipment, setShowOnlyActiveAreaEquipment] = useState(false)
@@ -207,7 +206,7 @@ export function MapPage() {
     const selectedArea = areas.find((area) => area.id === selectedAreaId)
     if (!selectedArea) return null
     const floor = selectedArea.floor ?? viewerState.currentFloor
-    const floorNodes = nodes.filter((node) => (node.floor ?? 0) === floor)
+    const floorNodes = nodes.filter((node) => (node.floor ?? SEA_LEVEL_ELEVATION) === floor)
     const linked = floorNodes.filter((node) => node.linkedAreaId === selectedAreaId).length
     const unlinked = floorNodes.filter((node) => !node.linkedAreaId).length
     return { linked, unlinked, floor }
@@ -216,7 +215,7 @@ export function MapPage() {
   const managedAreas = useMemo(() => {
     const base = areaManagerFloor === 'all'
       ? areas
-      : areas.filter((area) => (area.floor ?? 0) === areaManagerFloor)
+      : areas.filter((area) => (area.floor ?? SEA_LEVEL_ELEVATION) === areaManagerFloor)
     return [...base].sort((a, b) => a.label.localeCompare(b.label, 'es'))
   }, [areas, areaManagerFloor])
 
@@ -270,7 +269,7 @@ export function MapPage() {
 
     // Priorizar nodos para calcular centro: reflejan mejor el contenido real visible
     // y evitan que áreas fuera de escala arrastren el encuadre.
-    const floorNodes = nodes.filter((n) => (n.floor ?? 0) === viewerState.currentFloor)
+    const floorNodes = nodes.filter((n) => (n.floor ?? SEA_LEVEL_ELEVATION) === viewerState.currentFloor)
     for (const node of floorNodes) {
       const halfWidth = (node.size.width ?? 2) / 2
       const halfDepth = (node.size.depth ?? 2) / 2
@@ -292,7 +291,7 @@ export function MapPage() {
     minZ = Number.POSITIVE_INFINITY
     maxZ = Number.NEGATIVE_INFINITY
 
-    const floorAreas = areas.filter((a) => (a.floor ?? 0) === viewerState.currentFloor)
+    const floorAreas = areas.filter((a) => (a.floor ?? SEA_LEVEL_ELEVATION) === viewerState.currentFloor)
     for (const area of floorAreas) {
       minX = Math.min(minX, area.position.x - area.size.width / 2)
       maxX = Math.max(maxX, area.position.x + area.size.width / 2)
@@ -330,9 +329,10 @@ export function MapPage() {
 
   // Cambiar de piso
   const setFloor = useCallback((floor: number) => {
+    const normalizedFloor = clampElevation(floor)
     setViewerState((prev) => ({
       ...prev,
-      currentFloor: floor,
+      currentFloor: normalizedFloor,
     }))
     setSelectedAreaId(null)
   }, [])
@@ -606,9 +606,32 @@ export function MapPage() {
 
   const handleNodeUpdate = useCallback(
     (nodeId: string, updates: Partial<MapNode>) => {
-      const newNodes = nodes.map((n) =>
-        n.id === nodeId ? { ...n, ...updates } : n
-      )
+      const newNodes = nodes.map((n) => {
+        if (n.id !== nodeId) return n
+
+        const hasFloorUpdate = Object.prototype.hasOwnProperty.call(updates, 'floor')
+        const incomingFloor = updates.floor
+        const incomingY = updates.position?.y
+
+        const resolvedElevation = hasFloorUpdate && typeof incomingFloor === 'number'
+          ? clampElevation(incomingFloor)
+          : typeof incomingY === 'number'
+            ? clampElevation(incomingY)
+            : clampElevation(n.floor ?? n.position.y ?? SEA_LEVEL_ELEVATION)
+
+        const mergedPosition = {
+          ...n.position,
+          ...(updates.position ?? {}),
+          y: resolvedElevation,
+        }
+
+        return {
+          ...n,
+          ...updates,
+          floor: resolvedElevation,
+          position: mergedPosition,
+        }
+      })
       commitEditorChange(newNodes)
     },
     [nodes, commitEditorChange]
@@ -647,7 +670,7 @@ export function MapPage() {
 
     setViewerState((prev) => ({
       ...prev,
-      currentFloor: area.floor ?? 0,
+      currentFloor: area.floor ?? SEA_LEVEL_ELEVATION,
       filters: { ...prev.filters, showAreas: true },
       panOffset: { x: area.position.x, z: area.position.z },
       zoom: prev.zoom,
@@ -678,7 +701,7 @@ export function MapPage() {
         id: `node-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
         label: `${EQUIPMENT_TYPE_LABELS[addEquipmentType]} nuevo`,
         type: addEquipmentType,
-        position: { x: position.x, y: 0, z: position.z },
+        position: { x: position.x, y: viewerState.currentFloor, z: position.z },
         size: getDefaultSize(addEquipmentType),
         rotation: 0,
         floor: viewerState.currentFloor,
@@ -883,7 +906,7 @@ export function MapPage() {
           {/* Piso */}
           <Badge variant="outline" className="gap-1 font-normal">
             <Building2 className="h-3.5 w-3.5" />
-            {viewerState.currentFloor === 0 ? 'PB' : viewerState.currentFloor === 1 ? '2° Piso' : 'Techo'}
+            {formatElevationLabel(viewerState.currentFloor)}
           </Badge>
           {/* Zoom */}
           <Badge variant="outline" className="gap-1 font-normal">
@@ -1090,9 +1113,38 @@ export function MapPage() {
 
               {/* Floor selector */}
               <div className="bg-card/90 backdrop-blur rounded-lg shadow-lg border p-1.5">
-                <p className="text-[10px] text-muted-foreground font-medium px-1 mb-1">PISO</p>
+                <p className="text-[10px] text-muted-foreground font-medium px-1 mb-1">NIVEL (m)</p>
+                <div className="flex items-center gap-1 mb-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    onClick={() => setFloor(viewerState.currentFloor - 1)}
+                    title="Bajar 1 metro"
+                  >
+                    -1
+                  </Button>
+                  <input
+                    type="number"
+                    min={MIN_TERRAIN_ELEVATION}
+                    max={MAX_TERRAIN_ELEVATION}
+                    step={1}
+                    value={viewerState.currentFloor}
+                    onChange={(e) => setFloor(parseFloat(e.target.value) || SEA_LEVEL_ELEVATION)}
+                    className="w-20 h-7 text-xs bg-muted border rounded px-2 text-right font-mono focus:outline-none focus:ring-1 focus:ring-primary"
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    onClick={() => setFloor(viewerState.currentFloor + 1)}
+                    title="Subir 1 metro"
+                  >
+                    +1
+                  </Button>
+                </div>
                 <div className="flex flex-col gap-0.5">
-                  {FLOOR_OPTIONS.map(({ floor, full }) => (
+                  {ELEVATION_OPTIONS.map(({ floor, full }) => (
                     <Button
                       key={floor}
                       variant={viewerState.currentFloor === floor ? 'default' : 'ghost'}
@@ -1481,7 +1533,7 @@ export function MapPage() {
                                 ...prev,
                                 panOffset: { x: area.position.x, z: area.position.z },
                                 zoom: prev.zoom,
-                                currentFloor: area.floor ?? 0,
+                                currentFloor: area.floor ?? SEA_LEVEL_ELEVATION,
                                 filters: { ...prev.filters, showAreas: true },
                               }))
                             }}
@@ -1721,7 +1773,7 @@ export function MapPage() {
                       >
                         Todos
                       </Button>
-                      {FLOOR_OPTIONS.map(({ floor, full }) => (
+                      {ELEVATION_OPTIONS.map(({ floor, full }) => (
                         <Button
                           key={floor}
                           size="sm"
@@ -1747,7 +1799,7 @@ export function MapPage() {
                             <div className="min-w-0 flex-1">
                               <p className="text-sm font-medium truncate">{area.label}</p>
                               <p className="text-[11px] text-muted-foreground">
-                                {FLOOR_LABELS[area.floor ?? 0] ?? `Piso ${area.floor ?? 0}`} · {area.tiles?.length ?? 0} tiles
+                                {formatElevationLabel(area.floor ?? SEA_LEVEL_ELEVATION)} · {area.tiles?.length ?? 0} tiles
                               </p>
                             </div>
 
@@ -1761,7 +1813,7 @@ export function MapPage() {
                                   setSelectedAreaId(area.id)
                                   setViewerState((prev) => ({
                                     ...prev,
-                                    currentFloor: area.floor ?? 0,
+                                    currentFloor: area.floor ?? SEA_LEVEL_ELEVATION,
                                     panOffset: { x: area.position.x, z: area.position.z },
                                     zoom: prev.zoom,
                                     filters: { ...prev.filters, showAreas: true },

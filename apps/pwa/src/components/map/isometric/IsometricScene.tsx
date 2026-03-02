@@ -32,6 +32,7 @@ import type {
   NodeRuntimeData,
   IsometricViewerState,
 } from '@/types/isometricMap'
+import { SEA_LEVEL_ELEVATION } from '@/types/isometricMap'
 
 interface IsometricSceneProps {
   /** Configuración del mapa (dimensiones, colores, grid) */
@@ -108,7 +109,7 @@ function SceneContent({
     return nodes.filter((node) => {
       if (!node.visible) return false
       // Filtrar por piso (default 0 si no tiene)
-      if ((node.floor ?? 0) !== currentFloor) return false
+      if ((node.floor ?? SEA_LEVEL_ELEVATION) !== currentFloor) return false
       const typeAllowed = (() => {
         switch (node.type) {
           case 'pump': return filters.showPumps
@@ -167,7 +168,7 @@ function SceneContent({
 
       {/* Áreas/zonas (filtradas por piso) */}
       {viewerState.filters.showAreas && areas
-        .filter((a) => (a.floor ?? 0) === viewerState.currentFloor)
+        .filter((a) => (a.floor ?? SEA_LEVEL_ELEVATION) === viewerState.currentFloor)
         .map((area) => (
         <MapAreaOverlay
           key={area.id}
@@ -240,7 +241,7 @@ function SceneContent({
               hovered={viewerState.hoveredNodeId === node.id}
               showLabel={viewerState.filters.showLabels}
               viewerState={viewerState}
-              gridSnap={1}
+              gridSnap={config.cellSize}
               onClick={onNodeClick}
               onHover={onNodeHover}
               onDragEnd={onNodeDragEnd}

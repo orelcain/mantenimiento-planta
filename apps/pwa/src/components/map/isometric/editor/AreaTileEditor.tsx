@@ -11,6 +11,7 @@ import { Button, Badge } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/store'
 import type { MapArea } from '@/types/isometricMap'
+import { formatElevationLabel } from '@/types/isometricMap'
 
 export interface AreaPaintState {
   tiles: Set<string>
@@ -46,12 +47,6 @@ const AREA_COLORS = [
   { color: '#14b8a6', label: 'Teal' },
   { color: '#78716c', label: 'Piedra' },
 ]
-
-const FLOOR_LABELS: Record<number, string> = {
-  0: 'Planta Baja',
-  1: 'Segundo Piso',
-  2: 'Techo',
-}
 
 export function AreaTileEditor({
   isOpen,
@@ -130,7 +125,7 @@ export function AreaTileEditor({
             {editArea ? 'Editar Área' : 'Nueva Área'}
           </h3>
           <p className="text-[10px] text-muted-foreground mt-0.5">
-            {FLOOR_LABELS[currentFloor]} · Selecciona tiles directamente en el mapa
+            {formatElevationLabel(currentFloor)} · Selecciona tiles directamente en el mapa
           </p>
         </div>
         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose}>

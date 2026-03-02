@@ -19,7 +19,13 @@ import {
 import { Button, Badge } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import type { MapNode, EquipmentNodeType } from '@/types/isometricMap'
-import { EQUIPMENT_TYPE_LABELS, EQUIPMENT_TYPE_COLORS } from '@/types/isometricMap'
+import {
+  EQUIPMENT_TYPE_LABELS,
+  EQUIPMENT_TYPE_COLORS,
+  MIN_TERRAIN_ELEVATION,
+  MAX_TERRAIN_ELEVATION,
+  clampElevation,
+} from '@/types/isometricMap'
 
 interface NodePropertiesPanelProps {
   node: MapNode
@@ -100,8 +106,20 @@ export function NodePropertiesPanel({
 
   const updatePosition = useCallback(
     (axis: 'x' | 'y' | 'z', value: number) => {
+      const sanitizedValue = axis === 'y' ? clampElevation(value) : Math.round(value)
       onUpdate(node.id, {
-        position: { ...node.position, [axis]: value },
+        position: { ...node.position, [axis]: sanitizedValue },
+      })
+    },
+    [node.id, node.position, onUpdate]
+  )
+
+  const updateFloor = useCallback(
+    (value: number) => {
+      const elevation = clampElevation(value)
+      onUpdate(node.id, {
+        floor: elevation,
+        position: { ...node.position, y: elevation },
       })
     },
     [node.id, node.position, onUpdate]
@@ -203,12 +221,27 @@ export function NodePropertiesPanel({
         <div className="space-y-1.5">
           <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
             <MapPin className="h-3 w-3" />
-            Posición (m)
+            Posición / Elevación (m)
           </div>
           <div className="space-y-1">
             <NumberInput label="X" value={node.position.x} onChange={(v) => updatePosition('x', v)} step={1} />
-            <NumberInput label="Y" value={node.position.y} onChange={(v) => updatePosition('y', v)} step={0.5} min={0} />
+            <NumberInput
+              label="Y"
+              value={node.position.y}
+              onChange={(v) => updatePosition('y', v)}
+              step={1}
+              min={MIN_TERRAIN_ELEVATION}
+              max={MAX_TERRAIN_ELEVATION}
+            />
             <NumberInput label="Z" value={node.position.z} onChange={(v) => updatePosition('z', v)} step={1} />
+            <NumberInput
+              label="Nivel"
+              value={node.floor ?? node.position.y}
+              onChange={updateFloor}
+              step={1}
+              min={MIN_TERRAIN_ELEVATION}
+              max={MAX_TERRAIN_ELEVATION}
+            />
           </div>
         </div>
 
