@@ -169,9 +169,10 @@ export function MapPage() {
   const [hoveredAreaId, setHoveredAreaId] = useState<string | null>(null)
   const [showOnlyActiveAreaEquipment, setShowOnlyActiveAreaEquipment] = useState(false)
   const [terrainEditEnabled, setTerrainEditEnabled] = useState(false)
-  const [terrainTool, setTerrainTool] = useState<'raise' | 'lower' | 'flatten' | 'smooth'>('raise')
+  const [terrainTool, setTerrainTool] = useState<'raise' | 'lower' | 'flatten' | 'smooth' | 'sample'>('raise')
   const [terrainBrushSize, setTerrainBrushSize] = useState<1 | 3 | 5>(1)
   const [terrainFlattenTarget, setTerrainFlattenTarget] = useState<number>(SEA_LEVEL_ELEVATION)
+  const [terrainHoverPosition, setTerrainHoverPosition] = useState<{ x: number; z: number } | null>(null)
   const lastTerrainStrokeKeyRef = useRef<string | null>(null)
   const [workflowPreset, setWorkflowPreset] = useState<'areas' | 'equipos' | 'ajuste'>('equipos')
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
@@ -695,6 +696,17 @@ export function MapPage() {
   const applyTerrainBrushAt = useCallback((position: { x: number; z: number }, source: 'click' | 'drag') => {
     if (!isEditMode || !terrainEditEnabled) return
 
+    if (terrainTool === 'sample') {
+      if (source !== 'click') return
+      const x = Math.round(position.x)
+      const z = Math.round(position.z)
+      const key = `${x},${z}`
+      const sampled = terrainTiles.find((tile) => `${tile.x},${tile.z}` === key)?.elevation ?? SEA_LEVEL_ELEVATION
+      setTerrainFlattenTarget(clampElevation(sampled))
+      setTerrainTool('flatten')
+      return
+    }
+
     const centerX = Math.round(position.x)
     const centerZ = Math.round(position.z)
     const strokeKey = `${centerX},${centerZ}|${terrainTool}|${terrainBrushSize}|${terrainFlattenTarget}`
@@ -759,7 +771,18 @@ export function MapPage() {
         return { x: Number(xs), z: Number(zs), elevation }
       })
     })
-  }, [isEditMode, terrainEditEnabled, terrainTool, terrainBrushSize, terrainFlattenTarget])
+  }, [
+    isEditMode,
+    terrainEditEnabled,
+    terrainTool,
+    terrainBrushSize,
+    terrainFlattenTarget,
+    terrainTiles,
+  ])
+
+  const handleFloorHover = useCallback((position: { x: number; z: number } | null) => {
+    setTerrainHoverPosition(position)
+  }, [])
 
   const handleFloorDrag = useCallback((position: { x: number; z: number }) => {
     applyTerrainBrushAt(position, 'drag')
@@ -1083,6 +1106,14 @@ export function MapPage() {
                 onNodeDragEnd={handleNodeDragEnd}
                 onFloorClick={handleFloorClick}
                 onFloorDrag={handleFloorDrag}
+                onFloorHover={handleFloorHover}
+                terrainBrushPreview={terrainEditEnabled && terrainHoverPosition
+                  ? {
+                      center: terrainHoverPosition,
+                      size: terrainBrushSize,
+                      mode: terrainTool,
+                    }
+                  : null}
                 paintTiles={showAreaEditor ? {
                   tiles: areaPaintState.tiles,
                   color: areaPaintState.color,
@@ -1135,7 +1166,7 @@ export function MapPage() {
                 </Badge>
                 {terrainEditEnabled && (
                   <Badge variant="default" className="ml-2 bg-emerald-600 text-white gap-1 text-xs">
-                    Terreno {terrainTool === 'raise' ? 'Subir' : terrainTool === 'lower' ? 'Bajar' : terrainTool === 'flatten' ? 'Aplanar' : 'Suavizar'}
+                    Terreno {terrainTool === 'raise' ? 'Subir' : terrainTool === 'lower' ? 'Bajar' : terrainTool === 'flatten' ? 'Aplanar' : terrainTool === 'smooth' ? 'Suavizar' : 'Muestrear'}
                   </Badge>
                 )}
               </div>
@@ -1633,6 +1664,7 @@ export function MapPage() {
                           <Button size="sm" variant={terrainTool === 'lower' ? 'default' : 'outline'} className="h-7 text-xs" onClick={() => setTerrainTool('lower')}>Bajar</Button>
                           <Button size="sm" variant={terrainTool === 'flatten' ? 'default' : 'outline'} className="h-7 text-xs" onClick={() => setTerrainTool('flatten')}>Aplanar</Button>
                           <Button size="sm" variant={terrainTool === 'smooth' ? 'default' : 'outline'} className="h-7 text-xs" onClick={() => setTerrainTool('smooth')}>Suavizar</Button>
+                          <Button size="sm" variant={terrainTool === 'sample' ? 'default' : 'outline'} className="h-7 text-xs" onClick={() => setTerrainTool('sample')}>Muestrear</Button>
                         </div>
                         <div className="flex items-center gap-1 mb-1.5">
                           <span className="text-[10px] text-muted-foreground">Brocha</span>

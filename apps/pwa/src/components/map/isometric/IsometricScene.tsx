@@ -66,6 +66,14 @@ interface IsometricSceneProps {
   onFloorClick?: (position: { x: number; z: number }) => void
   /** Callback para pintar/editar en arrastre sobre suelo */
   onFloorDrag?: (position: { x: number; z: number }) => void
+  /** Callback de hover sobre suelo para preview de brocha */
+  onFloorHover?: (position: { x: number; z: number } | null) => void
+  /** Preview de brocha de terreno */
+  terrainBrushPreview?: {
+    center: { x: number; z: number }
+    size: 1 | 3 | 5
+    mode: 'raise' | 'lower' | 'flatten' | 'smooth' | 'sample'
+  } | null
   /** Tiles de pintura para el editor de áreas (overlay en el suelo) */
   paintTiles?: { tiles: Set<string>; color: string; opacity: number }
   /** Filtro adicional de nodos visibles */
@@ -91,6 +99,8 @@ function SceneContent({
   onNodeDragEnd,
   onFloorClick,
   onFloorDrag,
+  onFloorHover,
+  terrainBrushPreview,
   paintTiles,
   visibleNodeIds,
 }: IsometricSceneProps) {
@@ -191,6 +201,49 @@ function SceneContent({
               />
             </mesh>
           ))}
+        </group>
+      )}
+
+      {/* Preview de brocha de terreno */}
+      {terrainBrushPreview && (
+        <group>
+          {(() => {
+            const cells: Array<{ x: number; z: number }> = []
+            const radius = Math.floor(terrainBrushPreview.size / 2)
+            for (let dx = -radius; dx <= radius; dx++) {
+              for (let dz = -radius; dz <= radius; dz++) {
+                cells.push({
+                  x: terrainBrushPreview.center.x + dx,
+                  z: terrainBrushPreview.center.z + dz,
+                })
+              }
+            }
+            return cells.map((cell) => (
+              <mesh
+                key={`preview-${cell.x},${cell.z}`}
+                rotation-x={-Math.PI / 2}
+                position={[cell.x + 0.5, 0.06, cell.z + 0.5]}
+              >
+                <planeGeometry args={[0.94, 0.94]} />
+                <meshBasicMaterial
+                  color={
+                    terrainBrushPreview.mode === 'raise'
+                      ? '#22c55e'
+                      : terrainBrushPreview.mode === 'lower'
+                        ? '#ef4444'
+                        : terrainBrushPreview.mode === 'flatten'
+                          ? '#3b82f6'
+                          : terrainBrushPreview.mode === 'smooth'
+                            ? '#a855f7'
+                            : '#f59e0b'
+                  }
+                  transparent
+                  opacity={0.35}
+                  depthWrite={false}
+                />
+              </mesh>
+            ))
+          })()}
         </group>
       )}
 
@@ -313,14 +366,20 @@ function SceneContent({
           }
         }}
         onPointerMove={(e) => {
+          const point = e.point
+          onFloorHover?.({
+            x: Math.floor(point.x + 0.0001),
+            z: Math.floor(point.z + 0.0001),
+          })
+
           if (!onFloorDrag) return
           if (e.buttons !== 1) return
-          const point = e.point
           onFloorDrag({
             x: Math.floor(point.x + 0.0001),
             z: Math.floor(point.z + 0.0001),
           })
         }}
+        onPointerOut={() => onFloorHover?.(null)}
         visible={false}
       >
         <planeGeometry args={[config.width * 2, config.depth * 2]} />
