@@ -464,8 +464,8 @@ export function MapPage() {
       const acceleration = Math.min(3, 1 + elapsedMs / 450)
       const keyPixels = 22 * acceleration
 
-      const virtualDx = key === 'ArrowLeft' ? -keyPixels : key === 'ArrowRight' ? keyPixels : 0
-      const virtualDy = key === 'ArrowUp' ? -keyPixels : key === 'ArrowDown' ? keyPixels : 0
+      const virtualDx = key === 'ArrowLeft' ? keyPixels : key === 'ArrowRight' ? -keyPixels : 0
+      const virtualDy = key === 'ArrowUp' ? keyPixels : key === 'ArrowDown' ? -keyPixels : 0
 
       setViewerState((prev) => {
         const sensitivity = Math.min(0.55, Math.max(0.04, prev.zoom / 600))
