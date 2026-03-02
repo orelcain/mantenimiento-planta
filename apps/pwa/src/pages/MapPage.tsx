@@ -439,17 +439,31 @@ export function MapPage() {
   const isClickSuppressedAfterDrag = useCallback(() => Date.now() < suppressClickUntil.current, [])
 
   // ── Pan con teclado (flechas) ──
+  const arrowHoldStartRef = useRef<number | null>(null)
+  const arrowHoldKeyRef = useRef<'ArrowLeft' | 'ArrowRight' | 'ArrowUp' | 'ArrowDown' | null>(null)
+
   useEffect(() => {
+    const isArrowKey = (key: string): key is 'ArrowLeft' | 'ArrowRight' | 'ArrowUp' | 'ArrowDown' =>
+      key === 'ArrowLeft' || key === 'ArrowRight' || key === 'ArrowUp' || key === 'ArrowDown'
+
     const handleArrowPan = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
       if (e.target instanceof HTMLSelectElement) return
       if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return
 
       const key = e.key
-      if (key !== 'ArrowLeft' && key !== 'ArrowRight' && key !== 'ArrowUp' && key !== 'ArrowDown') return
+      if (!isArrowKey(key)) return
       e.preventDefault()
 
-      const keyPixels = 22
+      if (!e.repeat || arrowHoldKeyRef.current !== key) {
+        arrowHoldKeyRef.current = key
+        arrowHoldStartRef.current = Date.now()
+      }
+
+      const elapsedMs = arrowHoldStartRef.current ? Date.now() - arrowHoldStartRef.current : 0
+      const acceleration = Math.min(3, 1 + elapsedMs / 450)
+      const keyPixels = 22 * acceleration
+
       const virtualDx = key === 'ArrowLeft' ? -keyPixels : key === 'ArrowRight' ? keyPixels : 0
       const virtualDy = key === 'ArrowUp' ? -keyPixels : key === 'ArrowDown' ? keyPixels : 0
 
@@ -475,8 +489,20 @@ export function MapPage() {
       })
     }
 
+    const handleArrowUp = (e: KeyboardEvent) => {
+      if (!isArrowKey(e.key)) return
+      if (arrowHoldKeyRef.current === e.key) {
+        arrowHoldKeyRef.current = null
+        arrowHoldStartRef.current = null
+      }
+    }
+
     window.addEventListener('keydown', handleArrowPan)
-    return () => window.removeEventListener('keydown', handleArrowPan)
+    window.addEventListener('keyup', handleArrowUp)
+    return () => {
+      window.removeEventListener('keydown', handleArrowPan)
+      window.removeEventListener('keyup', handleArrowUp)
+    }
   }, [])
 
   // ── Handlers de nodos ──
