@@ -69,8 +69,6 @@ export function AddEquipmentDialog({
   const [selectedPreset, setSelectedPreset] = useState<EquipmentPreset | null>(null)
   const [customLabel, setCustomLabel] = useState('')
 
-  if (!isOpen) return null
-
   const availablePresets = allowedTypes?.length
     ? EQUIPMENT_PRESETS.filter((preset) => allowedTypes.includes(preset.type))
     : EQUIPMENT_PRESETS
