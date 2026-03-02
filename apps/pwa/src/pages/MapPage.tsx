@@ -375,6 +375,27 @@ export function MapPage() {
   const draggedDuringPan = useRef(false)
   const suppressClickUntil = useRef(0)
 
+  const applyScreenPanDelta = useCallback((state: IsometricViewerState, dx: number, dy: number) => {
+    const sensitivity = Math.min(0.55, Math.max(0.04, state.zoom / 600))
+
+    const azimuth = CAMERA_ANGLE_AZIMUTH[state.cameraAngle]
+    const rightX = Math.cos(azimuth)
+    const rightZ = -Math.sin(azimuth)
+    const forwardX = -Math.sin(azimuth)
+    const forwardZ = -Math.cos(azimuth)
+
+    const panDeltaX = (-dx * rightX + dy * forwardX) * sensitivity
+    const panDeltaZ = (-dx * rightZ + dy * forwardZ) * sensitivity
+
+    return {
+      ...state,
+      panOffset: {
+        x: state.panOffset.x + panDeltaX,
+        z: state.panOffset.z + panDeltaZ,
+      },
+    }
+  }, [])
+
   const handlePointerDownPan = useCallback((e: React.PointerEvent) => {
     const targetEl = e.target as HTMLElement | null
     const isUiControl = !!targetEl?.closest('button,input,textarea,select,a,[role="button"],[data-no-pan="true"]')
@@ -401,29 +422,8 @@ export function MapPage() {
 
     panStart.current = { x: e.clientX, y: e.clientY }
 
-    // Paneo orientado a cámara (estilo moderno):
-    // el arrastre sigue la dirección de la vista actual (incluye rotación Q/E)
-    setViewerState((prev) => {
-      const sensitivity = Math.min(0.55, Math.max(0.04, prev.zoom / 600))
-
-      const azimuth = CAMERA_ANGLE_AZIMUTH[prev.cameraAngle]
-      const rightX = Math.cos(azimuth)
-      const rightZ = -Math.sin(azimuth)
-      const forwardX = -Math.sin(azimuth)
-      const forwardZ = -Math.cos(azimuth)
-
-      const panDeltaX = (-dx * rightX + dy * forwardX) * sensitivity
-      const panDeltaZ = (-dx * rightZ + dy * forwardZ) * sensitivity
-
-      return {
-        ...prev,
-        panOffset: {
-          x: prev.panOffset.x + panDeltaX,
-          z: prev.panOffset.z + panDeltaZ,
-        },
-      }
-    })
-  }, [])
+    setViewerState((prev) => applyScreenPanDelta(prev, dx, dy))
+  }, [applyScreenPanDelta])
 
   const handlePointerUpPan = useCallback((e: React.PointerEvent) => {
     if (isPanning.current) {
@@ -469,24 +469,7 @@ export function MapPage() {
       const virtualDy = key === 'ArrowUp' ? -keyPixels : key === 'ArrowDown' ? keyPixels : 0
 
       setViewerState((prev) => {
-        const sensitivity = Math.min(0.55, Math.max(0.04, prev.zoom / 600))
-
-        const azimuth = CAMERA_ANGLE_AZIMUTH[prev.cameraAngle]
-        const rightX = Math.cos(azimuth)
-        const rightZ = -Math.sin(azimuth)
-        const forwardX = -Math.sin(azimuth)
-        const forwardZ = -Math.cos(azimuth)
-
-        const panDeltaX = (-virtualDx * rightX + virtualDy * forwardX) * sensitivity
-        const panDeltaZ = (-virtualDx * rightZ + virtualDy * forwardZ) * sensitivity
-
-        return {
-          ...prev,
-          panOffset: {
-            x: prev.panOffset.x + panDeltaX,
-            z: prev.panOffset.z + panDeltaZ,
-          },
-        }
+        return applyScreenPanDelta(prev, virtualDx, virtualDy)
       })
     }
 
@@ -504,7 +487,7 @@ export function MapPage() {
       window.removeEventListener('keydown', handleArrowPan)
       window.removeEventListener('keyup', handleArrowUp)
     }
-  }, [])
+  }, [applyScreenPanDelta])
 
   // ── Handlers de nodos ──
   const handleNodeClick = useCallback((nodeId: string) => {
