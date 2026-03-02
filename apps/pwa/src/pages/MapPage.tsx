@@ -1407,7 +1407,7 @@ export function MapPage() {
                               setViewerState((prev) => ({
                                 ...prev,
                                 panOffset: { x: area.position.x, z: area.position.z },
-                                zoom: Math.max(prev.zoom, 28),
+                                zoom: prev.zoom,
                                 currentFloor: area.floor ?? 0,
                                 filters: { ...prev.filters, showAreas: true },
                               }))
@@ -1690,7 +1690,7 @@ export function MapPage() {
                                     ...prev,
                                     currentFloor: area.floor ?? 0,
                                     panOffset: { x: area.position.x, z: area.position.z },
-                                    zoom: Math.max(prev.zoom, 28),
+                                    zoom: prev.zoom,
                                     filters: { ...prev.filters, showAreas: true },
                                   }))
                                 }}
