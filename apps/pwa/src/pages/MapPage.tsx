@@ -260,15 +260,57 @@ export function MapPage() {
     }))
   }, [])
 
+  const getCurrentFloorCenter = useCallback(() => {
+    let minX = Number.POSITIVE_INFINITY
+    let maxX = Number.NEGATIVE_INFINITY
+    let minZ = Number.POSITIVE_INFINITY
+    let maxZ = Number.NEGATIVE_INFINITY
+
+    const floorNodes = nodes.filter((n) => (n.floor ?? 0) === viewerState.currentFloor && n.visible)
+    for (const node of floorNodes) {
+      const halfWidth = (node.size.width ?? 2) / 2
+      const halfDepth = (node.size.depth ?? 2) / 2
+      minX = Math.min(minX, node.position.x - halfWidth)
+      maxX = Math.max(maxX, node.position.x + halfWidth)
+      minZ = Math.min(minZ, node.position.z - halfDepth)
+      maxZ = Math.max(maxZ, node.position.z + halfDepth)
+    }
+
+    const floorAreas = areas.filter((a) => (a.floor ?? 0) === viewerState.currentFloor)
+    for (const area of floorAreas) {
+      minX = Math.min(minX, area.position.x - area.size.width / 2)
+      maxX = Math.max(maxX, area.position.x + area.size.width / 2)
+      minZ = Math.min(minZ, area.position.z - area.size.depth / 2)
+      maxZ = Math.max(maxZ, area.position.z + area.size.depth / 2)
+    }
+
+    if (!Number.isFinite(minX) || !Number.isFinite(maxX) || !Number.isFinite(minZ) || !Number.isFinite(maxZ)) {
+      return { x: 0, z: 0 }
+    }
+
+    return {
+      x: (minX + maxX) / 2,
+      z: (minZ + maxZ) / 2,
+    }
+  }, [nodes, areas, viewerState.currentFloor])
+
   const fitMapComplete = useCallback(() => {
+    const center = getCurrentFloorCenter()
     setViewerState((prev) => ({
       ...prev,
       zoom: FULL_MAP_VIEW_ZOOM,
-      panOffset: { x: 0, z: 0 },
+      panOffset: center,
     }))
-  }, [])
+  }, [getCurrentFloorCenter])
 
   const resetView = fitMapComplete
+
+  const didApplyInitialFullView = useRef(false)
+  useEffect(() => {
+    if (didApplyInitialFullView.current) return
+    didApplyInitialFullView.current = true
+    fitMapComplete()
+  }, [fitMapComplete])
 
   // Cambiar de piso
   const setFloor = useCallback((floor: number) => {
