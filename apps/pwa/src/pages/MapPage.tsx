@@ -52,6 +52,7 @@ import type { CameraAngle, IsometricViewerState, MapNode, MapArea, MapConnector 
 import { 
   DEFAULT_VIEWER_STATE,
   FULL_MAP_VIEW_ZOOM,
+  MAX_VIEWER_ZOOM,
   CAMERA_ANGLE_NAMES,
   STATUS_LABELS,
   STATUS_COLORS,
@@ -249,7 +250,7 @@ export function MapPage() {
   const zoomIn = useCallback(() => {
     setViewerState((prev) => ({
       ...prev,
-      zoom: Math.min(prev.zoom + Math.max(2, Math.round(prev.zoom * 0.08)), FULL_MAP_VIEW_ZOOM),
+      zoom: Math.min(prev.zoom + Math.max(2, Math.round(prev.zoom * 0.08)), MAX_VIEWER_ZOOM),
     }))
   }, [])
 
@@ -354,7 +355,7 @@ export function MapPage() {
       // Paso proporcional al zoom actual → aceleración natural
       const step = Math.max(1, Math.round(prev.zoom * 0.06))
       const newZoom = delta > 0
-        ? Math.min(prev.zoom + step, FULL_MAP_VIEW_ZOOM)
+        ? Math.min(prev.zoom + step, MAX_VIEWER_ZOOM)
         : Math.max(prev.zoom - step, 3)
       return { ...prev, zoom: newZoom }
     })
