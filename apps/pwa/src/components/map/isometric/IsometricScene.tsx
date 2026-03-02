@@ -78,6 +78,15 @@ interface IsometricSceneProps {
   paintTiles?: { tiles: Set<string>; color: string; opacity: number }
   /** Filtro adicional de nodos visibles */
   visibleNodeIds?: Set<string>
+  /** Preview fantasma para colocación de nodos */
+  placementPreview?: {
+    position: { x: number; z: number }
+    floor: number
+    size: { width: number; height: number; depth: number }
+    valid: boolean
+  } | null
+  /** Preview de bulldozer sobre celda de piso */
+  bulldozerPreview?: { x: number; z: number } | null
 }
 
 /** Contenido de la escena (dentro del Canvas) */
@@ -103,6 +112,8 @@ function SceneContent({
   terrainBrushPreview,
   paintTiles,
   visibleNodeIds,
+  placementPreview,
+  bulldozerPreview,
 }: IsometricSceneProps) {
   // Centro de la planta
   const centerTarget = useMemo<[number, number, number]>(
@@ -245,6 +256,54 @@ function SceneContent({
             ))
           })()}
         </group>
+      )}
+
+      {/* Preview fantasma de colocación (verde válido / rojo inválido) */}
+      {placementPreview && (
+        <group>
+          <mesh
+            position={[
+              placementPreview.position.x,
+              placementPreview.floor + placementPreview.size.height / 2,
+              placementPreview.position.z,
+            ]}
+          >
+            <boxGeometry args={[
+              placementPreview.size.width,
+              placementPreview.size.height,
+              placementPreview.size.depth,
+            ]} />
+            <meshStandardMaterial
+              color={placementPreview.valid ? '#22c55e' : '#ef4444'}
+              transparent
+              opacity={0.35}
+              depthWrite={false}
+            />
+          </mesh>
+          <mesh
+            rotation-x={-Math.PI / 2}
+            position={[placementPreview.position.x, placementPreview.floor + 0.05, placementPreview.position.z]}
+          >
+            <planeGeometry args={[placementPreview.size.width, placementPreview.size.depth]} />
+            <meshBasicMaterial
+              color={placementPreview.valid ? '#22c55e' : '#ef4444'}
+              transparent
+              opacity={0.25}
+              depthWrite={false}
+            />
+          </mesh>
+        </group>
+      )}
+
+      {/* Preview de bulldozer */}
+      {bulldozerPreview && (
+        <mesh
+          rotation-x={-Math.PI / 2}
+          position={[bulldozerPreview.x, viewerState.currentFloor + 0.06, bulldozerPreview.z]}
+        >
+          <planeGeometry args={[1, 1]} />
+          <meshBasicMaterial color="#ef4444" transparent opacity={0.3} depthWrite={false} />
+        </mesh>
       )}
 
       {/* Áreas/zonas (filtradas por piso) */}

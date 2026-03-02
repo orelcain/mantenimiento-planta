@@ -139,6 +139,11 @@ export function useMapEditorActions({
             e.preventDefault()
             setEditorTool('add')
             return
+          case 'b':
+          case 'B':
+            e.preventDefault()
+            setEditorTool('bulldozer')
+            return
           case 'g':
           case 'G':
             e.preventDefault()

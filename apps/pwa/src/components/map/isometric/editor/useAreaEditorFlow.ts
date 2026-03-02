@@ -3,6 +3,7 @@ import type { Dispatch, SetStateAction } from 'react'
 import type { IsometricViewerState, MapArea, MapConnector, MapNode } from '@/types/isometricMap'
 import { SEA_LEVEL_ELEVATION } from '@/types/isometricMap'
 import type { AreaPaintState } from './AreaTileEditor'
+import type { EditorTool } from './EditorToolbar'
 
 interface UseAreaEditorFlowParams {
   areas: MapArea[]
@@ -12,7 +13,7 @@ interface UseAreaEditorFlowParams {
   showAreaEditor: boolean
   setViewerState: Dispatch<SetStateAction<IsometricViewerState>>
   setSelectedAreaId: Dispatch<SetStateAction<string | null>>
-  setEditorTool: Dispatch<SetStateAction<'select' | 'move' | 'add'>>
+  setEditorTool: Dispatch<SetStateAction<EditorTool>>
   commitEditorChange: (newNodes: MapNode[], newAreas?: MapArea[], newConnectors?: MapConnector[]) => void
   openAreaOverlay: () => void
   closeAreaOverlay: () => void

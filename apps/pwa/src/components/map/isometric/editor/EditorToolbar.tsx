@@ -17,13 +17,14 @@ import {
   Grid3X3,
   MousePointer2,
   Move,
+  Hammer,
 } from 'lucide-react'
 import { Button } from '@/components/ui'
 import { cn } from '@/lib/utils'
 import type { EquipmentNodeType } from '@/types/isometricMap'
 import { EQUIPMENT_TYPE_LABELS, EQUIPMENT_TYPE_COLORS } from '@/types/isometricMap'
 
-export type EditorTool = 'select' | 'move' | 'add'
+export type EditorTool = 'select' | 'move' | 'add' | 'bulldozer'
 
 interface EditorToolbarProps {
   /** Herramienta activa */
@@ -61,6 +62,7 @@ const TOOLS: { id: EditorTool; icon: typeof MousePointer2; label: string; shortc
   { id: 'select', icon: MousePointer2, label: 'Seleccionar', shortcut: 'V' },
   { id: 'move', icon: Move, label: 'Mover', shortcut: 'M' },
   { id: 'add', icon: Plus, label: 'Agregar', shortcut: 'A' },
+  { id: 'bulldozer', icon: Hammer, label: 'Bulldozer', shortcut: 'B' },
 ]
 
 export function EditorToolbar({

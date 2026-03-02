@@ -135,6 +135,15 @@ function getDefaultSize(type: MapNode['type']): MapNode['size'] {
   return sizes[type] ?? { width: 2, height: 2, depth: 2 }
 }
 
+function isOverlapping2D(
+  a: { x: number; z: number; width: number; depth: number },
+  b: { x: number; z: number; width: number; depth: number }
+): boolean {
+  const dx = Math.abs(a.x - b.x)
+  const dz = Math.abs(a.z - b.z)
+  return dx < (a.width + b.width) / 2 && dz < (a.depth + b.depth) / 2
+}
+
 export function MapPage() {
   const canValidate = useCanValidateIncidents()
   const isAdmin = useIsAdmin()
@@ -191,6 +200,11 @@ export function MapPage() {
 
   const isEditMode = viewerState.mode === 'edit'
   const activeTerrainTool = terrainEditEnabled && isShiftPressed ? 'smooth' : terrainTool
+  const effectiveAddType = useMemo<MapNode['type']>(() => {
+    if (buildMode === 'structures') return 'building'
+    if (buildMode === 'elements' && addEquipmentType === 'building') return 'pump'
+    return addEquipmentType
+  }, [buildMode, addEquipmentType])
 
   const availableAddTypes = useMemo(() => {
     if (buildMode === 'structures') return STRUCTURE_NODE_TYPES
@@ -547,8 +561,32 @@ export function MapPage() {
   }, [applyScreenPanDelta])
 
   // ── Handlers de nodos ──
+  const handleDeleteNodeById = useCallback((nodeId: string) => {
+    const newNodes = nodes.filter((node) => node.id !== nodeId)
+    if (newNodes.length === nodes.length) return
+
+    const newConnectors = connectors.filter(
+      (connector) => connector.fromNodeId !== nodeId && connector.toNodeId !== nodeId
+    )
+
+    setNodes(newNodes)
+    setConnectors(newConnectors)
+    setHasUnsavedChanges(true)
+    history.pushSnapshot({
+      nodes: newNodes,
+      areas,
+      connectors: newConnectors,
+    })
+    setViewerState((prev) => ({ ...prev, selectedNodeId: null }))
+  }, [nodes, connectors, areas, history])
+
   const handleNodeClick = useCallback((nodeId: string) => {
     if (isClickSuppressedAfterDrag()) return
+
+    if (isEditMode && editorTool === 'bulldozer') {
+      handleDeleteNodeById(nodeId)
+      return
+    }
 
     const node = nodes.find((n) => n.id === nodeId)
     const nextSelected = viewerState.selectedNodeId === nodeId ? null : nodeId
@@ -562,7 +600,7 @@ export function MapPage() {
     if (node?.linkedAreaId) {
       setSelectedAreaId(node.linkedAreaId)
     }
-  }, [nodes, viewerState.selectedNodeId, isClickSuppressedAfterDrag])
+  }, [nodes, viewerState.selectedNodeId, isClickSuppressedAfterDrag, isEditMode, editorTool, handleDeleteNodeById])
 
   const handleNodeHover = useCallback((nodeId: string | null) => {
     const node = nodeId ? nodes.find((n) => n.id === nodeId) : null
@@ -828,12 +866,74 @@ export function MapPage() {
     applyTerrainBrushAt(position, 'drag')
   }, [applyTerrainBrushAt])
 
+  const findNodeAtPosition = useCallback((position: { x: number; z: number }) => {
+    for (let index = nodes.length - 1; index >= 0; index--) {
+      const node = nodes[index]
+      if (!node) continue
+      const nodeFloor = clampElevation(node.floor ?? node.position.y ?? SEA_LEVEL_ELEVATION)
+      if (nodeFloor !== viewerState.currentFloor) continue
+
+      const halfWidth = node.size.width / 2
+      const halfDepth = node.size.depth / 2
+      if (
+        position.x >= node.position.x - halfWidth &&
+        position.x <= node.position.x + halfWidth &&
+        position.z >= node.position.z - halfDepth &&
+        position.z <= node.position.z + halfDepth
+      ) {
+        return node
+      }
+    }
+    return null
+  }, [nodes, viewerState.currentFloor])
+
+  const placementPreview = useMemo(() => {
+    if (!isEditMode || editorTool !== 'add') return null
+    if (buildMode === 'terrain') return null
+    if (!terrainHoverPosition) return null
+
+    const candidateSize = getDefaultSize(effectiveAddType)
+    const collides = nodes.some((node) => {
+      const nodeFloor = clampElevation(node.floor ?? node.position.y ?? SEA_LEVEL_ELEVATION)
+      if (nodeFloor !== viewerState.currentFloor) return false
+      return isOverlapping2D(
+        {
+          x: terrainHoverPosition.x,
+          z: terrainHoverPosition.z,
+          width: candidateSize.width,
+          depth: candidateSize.depth,
+        },
+        {
+          x: node.position.x,
+          z: node.position.z,
+          width: node.size.width,
+          depth: node.size.depth,
+        }
+      )
+    })
+
+    return {
+      position: { x: terrainHoverPosition.x, z: terrainHoverPosition.z },
+      floor: viewerState.currentFloor,
+      size: candidateSize,
+      valid: !collides,
+    }
+  }, [isEditMode, editorTool, buildMode, terrainHoverPosition, effectiveAddType, nodes, viewerState.currentFloor])
+
   const handleFloorClick = useCallback(
     (position: { x: number; z: number }) => {
       if (isClickSuppressedAfterDrag()) return
 
       if (isEditMode && buildMode === 'terrain' && terrainEditEnabled) {
         applyTerrainBrushAt(position, 'click')
+        return
+      }
+
+      if (isEditMode && editorTool === 'bulldozer') {
+        const targetNode = findNodeAtPosition(position)
+        if (targetNode) {
+          handleDeleteNodeById(targetNode.id)
+        }
         return
       }
 
@@ -852,27 +952,22 @@ export function MapPage() {
         setViewerState((prev) => ({ ...prev, selectedNodeId: null }))
         return
       }
+
+      if (!placementPreview?.valid) {
+        return
+      }
+
       // Crear nuevo nodo en la posición donde se hizo click
       const newNode: MapNode = {
         id: `node-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-        label: `${EQUIPMENT_TYPE_LABELS[addEquipmentType]} nuevo`,
-        type: addEquipmentType,
+        label: `${EQUIPMENT_TYPE_LABELS[effectiveAddType]} nuevo`,
+        type: effectiveAddType,
         position: { x: position.x, y: viewerState.currentFloor, z: position.z },
-        size: getDefaultSize(addEquipmentType),
+        size: getDefaultSize(effectiveAddType),
         rotation: 0,
         floor: viewerState.currentFloor,
         linkedAreaId: areaAtPoint?.id,
         visible: true,
-      }
-
-      if (buildMode === 'structures' && newNode.type !== 'building') {
-        newNode.type = 'building'
-        newNode.size = getDefaultSize('building')
-      }
-
-      if (buildMode === 'elements' && newNode.type === 'building') {
-        newNode.type = 'pump'
-        newNode.size = getDefaultSize('pump')
       }
 
       handleAddNode(newNode)
@@ -880,14 +975,17 @@ export function MapPage() {
     [
       paintAreaTileAt,
       editorTool,
-      addEquipmentType,
+      effectiveAddType,
       handleAddNode,
       resolveAreaAtPosition,
       viewerState.currentFloor,
       isClickSuppressedAfterDrag,
       isEditMode,
-      terrainEditEnabled,
       buildMode,
+      findNodeAtPosition,
+      handleDeleteNodeById,
+      placementPreview?.valid,
+      terrainEditEnabled,
       applyTerrainBrushAt,
     ]
   )
@@ -1134,6 +1232,10 @@ export function MapPage() {
                       mode: activeTerrainTool,
                     }
                   : null}
+                placementPreview={placementPreview}
+                bulldozerPreview={isEditMode && editorTool === 'bulldozer' && terrainHoverPosition
+                  ? { x: terrainHoverPosition.x, z: terrainHoverPosition.z }
+                  : null}
                 paintTiles={showAreaEditor ? {
                   tiles: areaPaintState.tiles,
                   color: areaPaintState.color,
@@ -1250,6 +1352,14 @@ export function MapPage() {
                           onClick={startAddEquipmentFlow}
                         >
                           {buildMode === 'structures' ? 'Agregar estructura' : 'Agregar elemento'}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={editorTool === 'bulldozer' ? 'destructive' : 'outline'}
+                          className="h-8 text-xs"
+                          onClick={() => setEditorTool((tool) => (tool === 'bulldozer' ? 'select' : 'bulldozer'))}
+                        >
+                          Bulldozer
                         </Button>
                         <Badge variant="outline" className="text-[10px]">
                           {buildMode === 'structures' ? 'Solo edificios' : 'Máquinas y equipos'}
@@ -1594,7 +1704,7 @@ export function MapPage() {
             {/* Help hint (bottom right) */}
             <div className="absolute bottom-4 right-4 text-[10px] text-muted-foreground/60 select-none pointer-events-none hidden md:block">
               {isEditMode
-                ? 'V: seleccionar · M: mover · A: agregar · Del: eliminar · Ctrl+Z: deshacer'
+                ? 'V: seleccionar · M: mover · A: agregar · B: bulldozer · Del: eliminar · Ctrl+Z: deshacer'
                 : 'Q/E: rotar · Scroll: zoom · Arrastrar clic izq/Flechas: paneo · R: reset · Click: seleccionar'}
             </div>
 
