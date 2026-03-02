@@ -310,7 +310,7 @@ export function IsometricScene(props: IsometricSceneProps) {
         orthographic
         camera={{
           position: [40, 40, 40],
-          zoom: props.viewerState.zoom,
+          zoom: 1,
           near: 0.1,
           far: 1000,
         }}

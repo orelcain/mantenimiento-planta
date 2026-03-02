@@ -85,6 +85,8 @@ export function IsometricCamera({
     if (camera instanceof THREE.OrthographicCamera) {
       camera.near = 0.1
       camera.far = 1000
+      camera.zoom = 1
+      camera.updateProjectionMatrix()
     }
   }, [camera])
 
@@ -139,6 +141,7 @@ export function IsometricCamera({
     camera.right = halfWidth
     camera.top = halfHeight
     camera.bottom = -halfHeight
+    camera.zoom = 1
     camera.updateProjectionMatrix()
   })
 
