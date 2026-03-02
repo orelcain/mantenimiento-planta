@@ -266,7 +266,9 @@ export function MapPage() {
     let minZ = Number.POSITIVE_INFINITY
     let maxZ = Number.NEGATIVE_INFINITY
 
-    const floorNodes = nodes.filter((n) => (n.floor ?? 0) === viewerState.currentFloor && n.visible)
+    // Priorizar nodos para calcular centro: reflejan mejor el contenido real visible
+    // y evitan que áreas fuera de escala arrastren el encuadre.
+    const floorNodes = nodes.filter((n) => (n.floor ?? 0) === viewerState.currentFloor)
     for (const node of floorNodes) {
       const halfWidth = (node.size.width ?? 2) / 2
       const halfDepth = (node.size.depth ?? 2) / 2
@@ -275,6 +277,18 @@ export function MapPage() {
       minZ = Math.min(minZ, node.position.z - halfDepth)
       maxZ = Math.max(maxZ, node.position.z + halfDepth)
     }
+
+    if (floorNodes.length > 0 && Number.isFinite(minX) && Number.isFinite(maxX) && Number.isFinite(minZ) && Number.isFinite(maxZ)) {
+      return {
+        x: (minX + maxX) / 2,
+        z: (minZ + maxZ) / 2,
+      }
+    }
+
+    minX = Number.POSITIVE_INFINITY
+    maxX = Number.NEGATIVE_INFINITY
+    minZ = Number.POSITIVE_INFINITY
+    maxZ = Number.NEGATIVE_INFINITY
 
     const floorAreas = areas.filter((a) => (a.floor ?? 0) === viewerState.currentFloor)
     for (const area of floorAreas) {
