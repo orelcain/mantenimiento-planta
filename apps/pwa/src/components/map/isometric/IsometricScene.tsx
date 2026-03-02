@@ -139,7 +139,7 @@ function SceneContent({
       if (visibleNodeIds && !visibleNodeIds.has(node.id)) return false
       return true
     })
-  }, [nodes, viewerState.filters, viewerState.currentFloor, visibleNodeIds])
+  }, [nodes, viewerState, visibleNodeIds])
 
   const handleRotationComplete = useCallback(() => {
     // Notificación opcional al completar rotación

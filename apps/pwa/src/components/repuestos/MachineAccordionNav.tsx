@@ -194,7 +194,7 @@ export function MachineAccordionNav({
       setActiveCatId(rootId)
       setActiveSubcatId(sub?.id || null)
     }
-  }, [currentMachine, categories])
+  }, [currentMachine, categories, activeCatId])
 
   if (rootCategories.length === 0) {
     return (

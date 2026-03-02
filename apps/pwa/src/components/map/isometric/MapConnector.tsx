@@ -4,7 +4,7 @@
  * Dibuja líneas/tubos entre dos nodos del mapa con animación de flujo opcional.
  */
 
-import { useRef, useMemo } from 'react'
+import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { MapConnector as MapConnectorType, MapNode } from '@/types/isometricMap'
@@ -43,12 +43,10 @@ export function MapConnector({ connector, fromNode, toNode }: MapConnectorProps)
   const midpoint = from.clone().add(to).multiplyScalar(0.5)
 
   // Calcular ángulo de rotación
-  const direction = to.clone().sub(from).normalize()
-  const quaternion = useMemo(() => {
-    const q = new THREE.Quaternion()
-    q.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction)
-    return q
-  }, [direction.x, direction.y, direction.z])
+  const quaternion = new THREE.Quaternion().setFromUnitVectors(
+    new THREE.Vector3(0, 1, 0),
+    to.clone().sub(from).normalize()
+  )
 
   // Animación de flujo (dash offset)
   useFrame(() => {

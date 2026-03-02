@@ -165,6 +165,7 @@ export function useChatBot() {
 
     // Verificar alertas proactivas + seguimiento de incidencias
     triggerProactiveChecks()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId])
 
   // #5 — Alertas proactivas + #10 Auto-seguimiento
@@ -446,7 +447,7 @@ export function useChatBot() {
         setIsLoading(false)
       }
     }
-  }, [messages, isLoading, userId, pendingAction])
+  }, [messages, isLoading, userId, pendingAction, canThink, selectedAgent, thinkingEnabled, user?.rol, userName])
 
   const clearHistory = useCallback(() => {
     setMessages([WELCOME_MESSAGE])

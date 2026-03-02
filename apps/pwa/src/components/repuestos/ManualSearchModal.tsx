@@ -607,7 +607,7 @@ export function ManualSearchModal({
       setManualUrl(null)
       setMatchPages(new Set())
     }
-  }, [open, loadManualOptions, initialVinculo])
+  }, [open, loadManualOptions, initialVinculo, repuesto.codigoFabricante])
 
   useEffect(() => {
     if (!manualUrl || step !== 'viewing') return

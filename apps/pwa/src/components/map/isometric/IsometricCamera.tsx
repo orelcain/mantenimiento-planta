@@ -11,6 +11,8 @@
  * Animación suave GSAP-style con spring interpolation entre ángulos.
  */
 
+/* eslint-disable react-refresh/only-export-components */
+
 import { useRef, useEffect, useCallback } from 'react'
 import { useThree, useFrame } from '@react-three/fiber'
 import * as THREE from 'three'

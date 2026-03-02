@@ -406,7 +406,7 @@ export function EquipmentNavigator({
     const rootId = sub?.parentId || catId
     if (rootId !== activeCatId) setActiveCatId(rootId)
     if (sub && sub.id !== activeSubcatId) setActiveSubcatId(sub.id)
-  }, [currentMachine, categories])
+  }, [currentMachine, categories, activeCatId, activeSubcatId])
 
   // ── Derived ──
   const activeCat = rootCategories.find(c => c.id === activeCatId)
