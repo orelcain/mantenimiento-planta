@@ -61,7 +61,11 @@ interface IsometricSceneProps {
   onCameraAngleChange?: (angle: CameraAngle) => void
   onBackgroundClick?: () => void
   /** Editor callbacks */
-  onNodeDragEnd?: (nodeId: string, newPosition: { x: number; y: number; z: number }) => void
+  onNodeDragEnd?: (
+    nodeId: string,
+    newPosition: { x: number; y: number; z: number },
+    options?: { duplicate?: boolean }
+  ) => void
   /** Callback para agregar nodo al hacer click en suelo en modo 'add' */
   onFloorClick?: (position: { x: number; z: number }) => void
   /** Callback para pintar/editar en arrastre sobre suelo */
@@ -83,6 +87,7 @@ interface IsometricSceneProps {
     position: { x: number; z: number }
     floor: number
     size: { width: number; height: number; depth: number }
+    rotation: number
     valid: boolean
   } | null
   /** Preview de bulldozer sobre celda de piso */
@@ -267,6 +272,7 @@ function SceneContent({
               placementPreview.floor + placementPreview.size.height / 2,
               placementPreview.position.z,
             ]}
+            rotation-y={(placementPreview.rotation * Math.PI) / 180}
           >
             <boxGeometry args={[
               placementPreview.size.width,

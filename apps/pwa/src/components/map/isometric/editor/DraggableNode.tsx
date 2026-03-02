@@ -26,7 +26,11 @@ interface DraggableNodeProps {
   onClick?: (nodeId: string) => void
   onHover?: (nodeId: string | null) => void
   /** Llamado al completar un drag con la nueva posición */
-  onDragEnd?: (nodeId: string, newPosition: { x: number; y: number; z: number }) => void
+  onDragEnd?: (
+    nodeId: string,
+    newPosition: { x: number; y: number; z: number },
+    options?: { duplicate?: boolean }
+  ) => void
 }
 
 const raycaster = new THREE.Raycaster()
@@ -51,6 +55,7 @@ export function DraggableNode({
   const isDragging = useRef(false)
   const dragStartPos = useRef<THREE.Vector3>(new THREE.Vector3())
   const nodeStartPos = useRef<{ x: number; y: number; z: number }>({ x: 0, y: 0, z: 0 })
+  const duplicateOnDrop = useRef(false)
   const [dragOffset, setDragOffset] = useState<{ x: number; z: number } | null>(null)
   const hasMoved = useRef(false)
 
@@ -92,6 +97,7 @@ export function DraggableNode({
       hasMoved.current = false
       dragStartPos.current.copy(point)
       nodeStartPos.current = { ...node.position }
+      duplicateOnDrop.current = !!e.nativeEvent.altKey
 
       // Capturar pointer para seguir recibiendo eventos
       gl.domElement.setPointerCapture(e.nativeEvent.pointerId)
@@ -140,12 +146,13 @@ export function DraggableNode({
           y: node.position.y,
           z: node.position.z + dragOffset.z,
         }
-        onDragEnd?.(node.id, newPos)
+        onDragEnd?.(node.id, newPos, { duplicate: duplicateOnDrop.current })
       } else if (!hasMoved.current) {
         // Si no hubo movimiento real, tratar como click
         onClick?.(node.id)
       }
 
+      duplicateOnDrop.current = false
       setDragOffset(null)
       hasMoved.current = false
     },

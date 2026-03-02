@@ -144,6 +144,15 @@ function isOverlapping2D(
   return dx < (a.width + b.width) / 2 && dz < (a.depth + b.depth) / 2
 }
 
+function getRotatedFootprint(size: MapNode['size'], rotation: number): { width: number; depth: number } {
+  const normalized = ((rotation % 360) + 360) % 360
+  const quarterTurns = Math.round(normalized / 90) % 4
+  if (quarterTurns % 2 === 1) {
+    return { width: size.depth, depth: size.width }
+  }
+  return { width: size.width, depth: size.depth }
+}
+
 export function MapPage() {
   const canValidate = useCanValidateIncidents()
   const isAdmin = useIsAdmin()
@@ -187,6 +196,7 @@ export function MapPage() {
   const [terrainHoverPosition, setTerrainHoverPosition] = useState<{ x: number; z: number } | null>(null)
   const [showTerrainModal, setShowTerrainModal] = useState(false)
   const [isShiftPressed, setIsShiftPressed] = useState(false)
+  const [addPlacementRotation, setAddPlacementRotation] = useState(0)
   const lastTerrainStrokeKeyRef = useRef<string | null>(null)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -230,6 +240,19 @@ export function MapPage() {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Shift') setIsShiftPressed(true)
+
+      if (
+        isEditMode &&
+        editorTool === 'add' &&
+        buildMode !== 'terrain' &&
+        (event.key === 'r' || event.key === 'R') &&
+        !(event.target instanceof HTMLInputElement) &&
+        !(event.target instanceof HTMLTextAreaElement) &&
+        !(event.target instanceof HTMLSelectElement)
+      ) {
+        event.preventDefault()
+        setAddPlacementRotation((prev) => (prev + 90) % 360)
+      }
     }
     const onKeyUp = (event: KeyboardEvent) => {
       if (event.key === 'Shift') setIsShiftPressed(false)
@@ -241,7 +264,7 @@ export function MapPage() {
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
     }
-  }, [])
+  }, [isEditMode, editorTool, buildMode])
 
   const resolveAreaAtPosition = useCallback((x: number, z: number, floor: number) => {
     return getAreaAtPosition(areas, x, z, floor)
@@ -682,7 +705,24 @@ export function MapPage() {
   }, [])
 
   const handleNodeDragEnd = useCallback(
-    (nodeId: string, newPosition: { x: number; y: number; z: number }) => {
+    (nodeId: string, newPosition: { x: number; y: number; z: number }, options?: { duplicate?: boolean }) => {
+      const sourceNode = nodes.find((node) => node.id === nodeId)
+      if (!sourceNode) return
+
+      if (options?.duplicate) {
+        const targetArea = resolveAreaAtPosition(newPosition.x, newPosition.z, viewerState.currentFloor)
+        const duplicatedNode: MapNode = {
+          ...sourceNode,
+          id: `node-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+          label: `${sourceNode.label} (copia)`,
+          position: newPosition,
+          linkedAreaId: targetArea?.id,
+        }
+        commitEditorChange([...nodes, duplicatedNode])
+        setViewerState((prev) => ({ ...prev, selectedNodeId: duplicatedNode.id }))
+        return
+      }
+
       const targetArea = resolveAreaAtPosition(newPosition.x, newPosition.z, viewerState.currentFloor)
       const newNodes = nodes.map((n) =>
         n.id === nodeId
@@ -893,6 +933,7 @@ export function MapPage() {
     if (!terrainHoverPosition) return null
 
     const candidateSize = getDefaultSize(effectiveAddType)
+    const rotatedFootprint = getRotatedFootprint(candidateSize, addPlacementRotation)
     const collides = nodes.some((node) => {
       const nodeFloor = clampElevation(node.floor ?? node.position.y ?? SEA_LEVEL_ELEVATION)
       if (nodeFloor !== viewerState.currentFloor) return false
@@ -900,8 +941,8 @@ export function MapPage() {
         {
           x: terrainHoverPosition.x,
           z: terrainHoverPosition.z,
-          width: candidateSize.width,
-          depth: candidateSize.depth,
+          width: rotatedFootprint.width,
+          depth: rotatedFootprint.depth,
         },
         {
           x: node.position.x,
@@ -915,10 +956,15 @@ export function MapPage() {
     return {
       position: { x: terrainHoverPosition.x, z: terrainHoverPosition.z },
       floor: viewerState.currentFloor,
-      size: candidateSize,
+      size: {
+        ...candidateSize,
+        width: rotatedFootprint.width,
+        depth: rotatedFootprint.depth,
+      },
+      rotation: addPlacementRotation,
       valid: !collides,
     }
-  }, [isEditMode, editorTool, buildMode, terrainHoverPosition, effectiveAddType, nodes, viewerState.currentFloor])
+  }, [isEditMode, editorTool, buildMode, terrainHoverPosition, effectiveAddType, nodes, viewerState.currentFloor, addPlacementRotation])
 
   const handleFloorClick = useCallback(
     (position: { x: number; z: number }) => {
@@ -964,7 +1010,7 @@ export function MapPage() {
         type: effectiveAddType,
         position: { x: position.x, y: viewerState.currentFloor, z: position.z },
         size: getDefaultSize(effectiveAddType),
-        rotation: 0,
+        rotation: addPlacementRotation,
         floor: viewerState.currentFloor,
         linkedAreaId: areaAtPoint?.id,
         visible: true,
@@ -985,6 +1031,7 @@ export function MapPage() {
       findNodeAtPosition,
       handleDeleteNodeById,
       placementPreview?.valid,
+      addPlacementRotation,
       terrainEditEnabled,
       applyTerrainBrushAt,
     ]
@@ -1364,6 +1411,7 @@ export function MapPage() {
                         <Badge variant="outline" className="text-[10px]">
                           {buildMode === 'structures' ? 'Solo edificios' : 'Máquinas y equipos'}
                         </Badge>
+                        <Badge variant="outline" className="text-[10px]">Rotación {addPlacementRotation}° (R)</Badge>
                       </>
                     )}
 
@@ -1704,7 +1752,7 @@ export function MapPage() {
             {/* Help hint (bottom right) */}
             <div className="absolute bottom-4 right-4 text-[10px] text-muted-foreground/60 select-none pointer-events-none hidden md:block">
               {isEditMode
-                ? 'V: seleccionar · M: mover · A: agregar · B: bulldozer · Del: eliminar · Ctrl+Z: deshacer'
+                ? 'V: seleccionar · M: mover · A: agregar · B: bulldozer · R: rotar preview · Alt+drag: duplicar · Del: eliminar · Ctrl+Z: deshacer'
                 : 'Q/E: rotar · Scroll: zoom · Arrastrar clic izq/Flechas: paneo · R: reset · Click: seleccionar'}
             </div>
 
