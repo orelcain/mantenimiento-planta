@@ -24,6 +24,7 @@ import type {
   MapNode,
   MapConnector,
   MapArea,
+  TerrainTile,
   NodeRuntimeData,
 } from '@/types/isometricMap'
 import { DEFAULT_MAP_CONFIG } from '@/types/isometricMap'
@@ -120,6 +121,7 @@ export function generateDemoMap(): {
   nodes: MapNode[]
   connectors: MapConnector[]
   areas: MapArea[]
+  terrain: TerrainTile[]
 } {
   const config: IsometricMapConfig = {
     ...DEFAULT_MAP_CONFIG,
@@ -1015,7 +1017,9 @@ export function generateDemoMap(): {
     { id: 'c-yal-stunner-bdr', fromNodeId: 'yal-stunner', toNodeId: 'yal-baader-n1', style: 'flow', animated: true },
   ]
 
-  return { config, nodes, connectors, areas }
+  const terrain: TerrainTile[] = []
+
+  return { config, nodes, connectors, areas, terrain }
 }
 
 /** 

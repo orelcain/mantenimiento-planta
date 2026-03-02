@@ -48,7 +48,7 @@ import { useAppStore, useCanValidateIncidents, useIsAdmin } from '@/store'
 import { cn } from '@/lib/utils'
 import { formatRelativeTime } from '@/lib/utils'
 import { generateDemoMap, saveIsometricMap } from '@/services/isometricMap'
-import type { CameraAngle, IsometricViewerState, MapNode, MapArea, MapConnector as MapConnectorType } from '@/types/isometricMap'
+import type { CameraAngle, IsometricViewerState, MapNode, MapArea, TerrainTile, MapConnector as MapConnectorType } from '@/types/isometricMap'
 import { 
   DEFAULT_VIEWER_STATE,
   FULL_MAP_VIEW_ZOOM,
@@ -150,6 +150,7 @@ export function MapPage() {
   const [nodes, setNodes] = useState<MapNode[]>(() => demoData.nodes)
   const [areas, setAreas] = useState<MapArea[]>(() => demoData.areas)
   const [connectors, setConnectors] = useState<MapConnectorType[]>(() => demoData.connectors)
+  const [terrainTiles, setTerrainTiles] = useState<TerrainTile[]>(() => demoData.terrain ?? [])
   // Runtime data vinculado a datos reales (Equipment, Incidents)
   const runtimeData = useMapRuntimeData(nodes)
 
@@ -167,6 +168,9 @@ export function MapPage() {
   const [selectedAreaId, setSelectedAreaId] = useState<string | null>(null)
   const [hoveredAreaId, setHoveredAreaId] = useState<string | null>(null)
   const [showOnlyActiveAreaEquipment, setShowOnlyActiveAreaEquipment] = useState(false)
+  const [terrainEditEnabled, setTerrainEditEnabled] = useState(false)
+  const [terrainTool, setTerrainTool] = useState<'raise' | 'lower' | 'flatten'>('raise')
+  const [terrainFlattenTarget, setTerrainFlattenTarget] = useState<number>(SEA_LEVEL_ELEVATION)
   const [workflowPreset, setWorkflowPreset] = useState<'areas' | 'equipos' | 'ajuste'>('equipos')
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -681,6 +685,37 @@ export function MapPage() {
     (position: { x: number; z: number }) => {
       if (isClickSuppressedAfterDrag()) return
 
+      if (isEditMode && terrainEditEnabled) {
+        const x = Math.round(position.x)
+        const z = Math.round(position.z)
+
+        setTerrainTiles((prev) => {
+          const key = `${x},${z}`
+          const current = prev.find((tile) => `${tile.x},${tile.z}` === key)
+          const currentElevation = current?.elevation ?? SEA_LEVEL_ELEVATION
+
+          const targetElevation = clampElevation(
+            terrainTool === 'raise'
+              ? currentElevation + 1
+              : terrainTool === 'lower'
+                ? currentElevation - 1
+                : terrainFlattenTarget
+          )
+
+          if (targetElevation === currentElevation) return prev
+
+          const next = prev.filter((tile) => !(tile.x === x && tile.z === z))
+          if (targetElevation !== SEA_LEVEL_ELEVATION) {
+            next.push({ x, z, elevation: targetElevation })
+          }
+
+          setHasUnsavedChanges(true)
+          return next
+        })
+
+        return
+      }
+
       const areaAtPoint = resolveAreaAtPosition(position.x, position.z, viewerState.currentFloor)
       if (areaAtPoint) {
         setSelectedAreaId(areaAtPoint.id)
@@ -710,7 +745,19 @@ export function MapPage() {
       }
       handleAddNode(newNode)
     },
-    [paintAreaTileAt, editorTool, addEquipmentType, handleAddNode, resolveAreaAtPosition, viewerState.currentFloor, isClickSuppressedAfterDrag]
+    [
+      paintAreaTileAt,
+      editorTool,
+      addEquipmentType,
+      handleAddNode,
+      resolveAreaAtPosition,
+      viewerState.currentFloor,
+      isClickSuppressedAfterDrag,
+      isEditMode,
+      terrainEditEnabled,
+      terrainTool,
+      terrainFlattenTarget,
+    ]
   )
 
   const {
@@ -751,6 +798,7 @@ export function MapPage() {
           nodes,
           connectors,
           areas,
+          terrain: terrainTiles,
           createdBy: user?.id || 'system',
         },
         user?.id || 'system'
@@ -761,7 +809,7 @@ export function MapPage() {
     } finally {
       setIsSaving(false)
     }
-  }, [isSaving, nodes, connectors, areas, demoData.config, user])
+  }, [isSaving, nodes, connectors, areas, terrainTiles, demoData.config, user])
 
   const handleCancelEdit = useCallback(() => {
     // Revertir a datos iniciales del demo si hay cambios sin guardar
@@ -770,6 +818,7 @@ export function MapPage() {
       setNodes(initial.nodes)
       setAreas(initial.areas)
       setConnectors(initial.connectors)
+      setTerrainTiles(initial.terrain ?? [])
       setHasUnsavedChanges(false)
     }
     setViewerState((prev) => ({ ...prev, mode: 'view', selectedNodeId: null }))
@@ -964,6 +1013,7 @@ export function MapPage() {
                 nodes={nodes}
                 connectors={connectors}
                 areas={areas}
+                terrain={terrainTiles}
                 selectedAreaId={selectedAreaId}
                 highlightedAreaId={hoveredAreaId}
                 runtimeData={runtimeData}
@@ -1025,6 +1075,11 @@ export function MapPage() {
                   MODO EDITOR
                   {hasUnsavedChanges && ' • Sin guardar'}
                 </Badge>
+                {terrainEditEnabled && (
+                  <Badge variant="default" className="ml-2 bg-emerald-600 text-white gap-1 text-xs">
+                    Terreno {terrainTool === 'raise' ? 'Subir' : terrainTool === 'lower' ? 'Bajar' : 'Aplanar'}
+                  </Badge>
+                )}
               </div>
             )}
 
@@ -1502,6 +1557,40 @@ export function MapPage() {
 
                     <div className="border-t pt-1.5 mt-1">
                       <p className="text-[10px] text-muted-foreground font-medium px-1 mb-1">UTILIDADES GLOBALES</p>
+                      <div className="rounded-md border p-2 mb-2 bg-muted/30">
+                        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">Terreno (Sims-like)</p>
+                        <div className="flex items-center gap-1 mb-1.5">
+                          <Button
+                            size="sm"
+                            variant={terrainEditEnabled ? 'default' : 'outline'}
+                            className="h-7 text-xs"
+                            onClick={() => setTerrainEditEnabled((v) => !v)}
+                          >
+                            {terrainEditEnabled ? 'Editar terreno: ON' : 'Editar terreno: OFF'}
+                          </Button>
+                          <Badge variant="outline" className="text-[10px]">1m³</Badge>
+                        </div>
+                        <div className="flex items-center gap-1 mb-1.5">
+                          <Button size="sm" variant={terrainTool === 'raise' ? 'default' : 'outline'} className="h-7 text-xs" onClick={() => setTerrainTool('raise')}>Subir</Button>
+                          <Button size="sm" variant={terrainTool === 'lower' ? 'default' : 'outline'} className="h-7 text-xs" onClick={() => setTerrainTool('lower')}>Bajar</Button>
+                          <Button size="sm" variant={terrainTool === 'flatten' ? 'default' : 'outline'} className="h-7 text-xs" onClick={() => setTerrainTool('flatten')}>Aplanar</Button>
+                        </div>
+                        {terrainTool === 'flatten' && (
+                          <div className="flex items-center gap-1">
+                            <span className="text-[10px] text-muted-foreground">Meta</span>
+                            <input
+                              type="number"
+                              min={MIN_TERRAIN_ELEVATION}
+                              max={MAX_TERRAIN_ELEVATION}
+                              step={1}
+                              value={terrainFlattenTarget}
+                              onChange={(e) => setTerrainFlattenTarget(clampElevation(parseFloat(e.target.value) || SEA_LEVEL_ELEVATION))}
+                              className="w-20 h-7 text-xs bg-muted border rounded px-2 text-right font-mono focus:outline-none focus:ring-1 focus:ring-primary"
+                            />
+                            <span className="text-[10px] text-muted-foreground">m</span>
+                          </div>
+                        )}
+                      </div>
                       <Button
                         variant="outline"
                         size="sm"

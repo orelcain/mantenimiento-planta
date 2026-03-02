@@ -257,6 +257,14 @@ export interface MapArea {
   linkedZoneId?: string
 }
 
+/** Celda de terreno editable (cuadrante 1m x 1m con elevación en metros) */
+export interface TerrainTile {
+  x: number
+  z: number
+  /** Cota del terreno en metros respecto a nivel del mar */
+  elevation: number
+}
+
 // ============================================================
 // Documento del Mapa (Firestore)
 // ============================================================
@@ -276,6 +284,8 @@ export interface IsometricMap {
   connectors: MapConnector[]
   /** Áreas/zonas */
   areas: MapArea[]
+  /** Terreno voxel por cuadrantes de 1m */
+  terrain?: TerrainTile[]
   /** Metadatos */
   createdBy: string
   createdAt: Date

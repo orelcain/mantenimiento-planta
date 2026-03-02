@@ -29,6 +29,7 @@ import type {
   MapNode,
   MapConnector as MapConnectorType,
   MapArea,
+  TerrainTile,
   NodeRuntimeData,
   IsometricViewerState,
 } from '@/types/isometricMap'
@@ -49,6 +50,8 @@ interface IsometricSceneProps {
   highlightedAreaId?: string | null
   /** Data runtime (estados, incidencias, sensores) */
   runtimeData: Map<string, NodeRuntimeData>
+  /** Terreno editable (celdas 1m x 1m con elevación) */
+  terrain?: TerrainTile[]
   /** Estado del visor */
   viewerState: IsometricViewerState
   /** Callbacks */
@@ -76,6 +79,7 @@ function SceneContent({
   selectedAreaId,
   highlightedAreaId,
   runtimeData,
+  terrain,
   viewerState,
   onNodeClick,
   onNodeHover,
@@ -165,6 +169,27 @@ function SceneContent({
 
       {/* Grilla del suelo */}
       <PlantGrid config={config} />
+
+      {/* Terreno voxel simplificado (estilo construcción por cuadrante) */}
+      {terrain && terrain.length > 0 && (
+        <group>
+          {terrain.map((tile) => (
+            <mesh
+              key={`${tile.x},${tile.z}`}
+              position={[tile.x + 0.5, tile.elevation - 0.125, tile.z + 0.5]}
+              castShadow
+              receiveShadow
+            >
+              <boxGeometry args={[0.96, 0.25, 0.96]} />
+              <meshStandardMaterial
+                color={tile.elevation >= SEA_LEVEL_ELEVATION ? '#6b8e5a' : '#3b82f6'}
+                roughness={0.85}
+                metalness={0.05}
+              />
+            </mesh>
+          ))}
+        </group>
+      )}
 
       {/* Áreas/zonas (filtradas por piso) */}
       {viewerState.filters.showAreas && areas
