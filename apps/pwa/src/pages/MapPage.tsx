@@ -243,6 +243,18 @@ export function MapPage() {
 
       if (
         isEditMode &&
+        event.key === 'Escape' &&
+        !(event.target instanceof HTMLInputElement) &&
+        !(event.target instanceof HTMLTextAreaElement) &&
+        !(event.target instanceof HTMLSelectElement)
+      ) {
+        event.preventDefault()
+        setEditorTool('select')
+        overlayState.closeOverlayIf('add-equipment')
+      }
+
+      if (
+        isEditMode &&
         editorTool === 'add' &&
         buildMode !== 'terrain' &&
         (event.key === 'r' || event.key === 'R') &&
@@ -264,7 +276,7 @@ export function MapPage() {
       window.removeEventListener('keydown', onKeyDown)
       window.removeEventListener('keyup', onKeyUp)
     }
-  }, [isEditMode, editorTool, buildMode])
+  }, [isEditMode, editorTool, buildMode, overlayState])
 
   const resolveAreaAtPosition = useCallback((x: number, z: number, floor: number) => {
     return getAreaAtPosition(areas, x, z, floor)
@@ -608,6 +620,7 @@ export function MapPage() {
 
     if (isEditMode && editorTool === 'bulldozer') {
       handleDeleteNodeById(nodeId)
+      setEditorTool('select')
       return
     }
 
@@ -979,6 +992,7 @@ export function MapPage() {
         const targetNode = findNodeAtPosition(position)
         if (targetNode) {
           handleDeleteNodeById(targetNode.id)
+          setEditorTool('select')
         }
         return
       }
@@ -1017,6 +1031,7 @@ export function MapPage() {
       }
 
       handleAddNode(newNode)
+      setEditorTool('select')
     },
     [
       paintAreaTileAt,
@@ -1034,6 +1049,7 @@ export function MapPage() {
       addPlacementRotation,
       terrainEditEnabled,
       applyTerrainBrushAt,
+      setEditorTool,
     ]
   )
 
