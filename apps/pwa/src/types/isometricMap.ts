@@ -307,7 +307,7 @@ export interface IsometricViewerState {
 }
 
 /** Zoom objetivo para acción "Ver mapa completo" */
-export const FULL_MAP_VIEW_ZOOM = 70
+export const FULL_MAP_VIEW_ZOOM = 40
 
 /** Zoom máximo permitido al alejar manualmente */
 export const MAX_VIEWER_ZOOM = 500

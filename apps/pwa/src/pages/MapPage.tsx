@@ -392,11 +392,11 @@ export function MapPage() {
     const dy = e.clientY - panStart.current.y
     panStart.current = { x: e.clientX, y: e.clientY }
 
-    // Sensibilidad proporcional al zoom para mejorar usabilidad:
-    // zoom bajo (ej: 30)  -> paneo más lento/preciso
-    // zoom alto (ej: 200+) -> paneo más fluido
+    // Sensibilidad proporcional al zoom (recalibrada):
+    // zoom ~40  -> paneo cómodo (antes quedaba muy corto)
+    // zoom alto -> paneo más amplio para recorrer rápido
     setViewerState((prev) => {
-      const sensitivity = Math.min(0.2, Math.max(0.01, prev.zoom / 3000))
+      const sensitivity = Math.min(0.55, Math.max(0.04, prev.zoom / 600))
       return {
         ...prev,
         panOffset: {
