@@ -404,8 +404,8 @@ export function MapPage() {
       const forwardX = -Math.sin(azimuth)
       const forwardZ = -Math.cos(azimuth)
 
-      const panDeltaX = (-dx * rightX - dy * forwardX) * sensitivity
-      const panDeltaZ = (-dx * rightZ - dy * forwardZ) * sensitivity
+      const panDeltaX = (-dx * rightX + dy * forwardX) * sensitivity
+      const panDeltaZ = (-dx * rightZ + dy * forwardZ) * sensitivity
 
       return {
         ...prev,
