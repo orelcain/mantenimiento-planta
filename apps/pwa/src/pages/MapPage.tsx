@@ -51,6 +51,7 @@ import { generateDemoMap, saveIsometricMap } from '@/services/isometricMap'
 import type { CameraAngle, IsometricViewerState, MapNode, MapArea, MapConnector as MapConnectorType } from '@/types/isometricMap'
 import { 
   DEFAULT_VIEWER_STATE,
+  FULL_MAP_VIEW_ZOOM,
   CAMERA_ANGLE_NAMES,
   STATUS_LABELS,
   STATUS_COLORS,
@@ -248,7 +249,7 @@ export function MapPage() {
   const zoomIn = useCallback(() => {
     setViewerState((prev) => ({
       ...prev,
-      zoom: Math.min(prev.zoom + Math.max(2, Math.round(prev.zoom * 0.08)), 500),
+      zoom: Math.min(prev.zoom + Math.max(2, Math.round(prev.zoom * 0.08)), FULL_MAP_VIEW_ZOOM),
     }))
   }, [])
 
@@ -262,7 +263,7 @@ export function MapPage() {
   const fitMapComplete = useCallback(() => {
     setViewerState((prev) => ({
       ...prev,
-      zoom: 500,
+      zoom: FULL_MAP_VIEW_ZOOM,
       panOffset: { x: 0, z: 0 },
     }))
   }, [])
@@ -297,7 +298,7 @@ export function MapPage() {
       // Paso proporcional al zoom actual → aceleración natural
       const step = Math.max(1, Math.round(prev.zoom * 0.06))
       const newZoom = delta > 0
-        ? Math.min(prev.zoom + step, 500)
+        ? Math.min(prev.zoom + step, FULL_MAP_VIEW_ZOOM)
         : Math.max(prev.zoom - step, 3)
       return { ...prev, zoom: newZoom }
     })
@@ -894,7 +895,7 @@ export function MapPage() {
                     <ZoomOut className="h-4 w-4" />
                   </Button>
                   <div className="w-px h-6 bg-border" />
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={fitMapComplete} title="Ver mapa completo (zoom 500)">
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={fitMapComplete} title={`Ver mapa completo (zoom ${FULL_MAP_VIEW_ZOOM})`}>
                     <Maximize className="h-4 w-4" />
                   </Button>
               </div>
