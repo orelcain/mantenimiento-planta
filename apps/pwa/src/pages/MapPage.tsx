@@ -169,8 +169,10 @@ export function MapPage() {
   const [hoveredAreaId, setHoveredAreaId] = useState<string | null>(null)
   const [showOnlyActiveAreaEquipment, setShowOnlyActiveAreaEquipment] = useState(false)
   const [terrainEditEnabled, setTerrainEditEnabled] = useState(false)
-  const [terrainTool, setTerrainTool] = useState<'raise' | 'lower' | 'flatten'>('raise')
+  const [terrainTool, setTerrainTool] = useState<'raise' | 'lower' | 'flatten' | 'smooth'>('raise')
+  const [terrainBrushSize, setTerrainBrushSize] = useState<1 | 3 | 5>(1)
   const [terrainFlattenTarget, setTerrainFlattenTarget] = useState<number>(SEA_LEVEL_ELEVATION)
+  const lastTerrainStrokeKeyRef = useRef<string | null>(null)
   const [workflowPreset, setWorkflowPreset] = useState<'areas' | 'equipos' | 'ajuste'>('equipos')
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -401,6 +403,11 @@ export function MapPage() {
   }, [])
 
   const handlePointerDownPan = useCallback((e: React.PointerEvent) => {
+    if (isEditMode && terrainEditEnabled) {
+      lastTerrainStrokeKeyRef.current = null
+      return
+    }
+
     const targetEl = e.target as HTMLElement | null
     const isUiControl = !!targetEl?.closest('button,input,textarea,select,a,[role="button"],[data-no-pan="true"]')
     if (isUiControl) return
@@ -413,9 +420,11 @@ export function MapPage() {
     draggedDuringPan.current = false
     panStart.current = { x: e.clientX, y: e.clientY }
     targetEl?.setPointerCapture(e.pointerId)
-  }, [])
+  }, [isEditMode, terrainEditEnabled])
 
   const handlePointerMovePan = useCallback((e: React.PointerEvent) => {
+    if (isEditMode && terrainEditEnabled) return
+
     if (!isPanning.current) return
     const dx = e.clientX - panStart.current.x
     const dy = e.clientY - panStart.current.y
@@ -427,9 +436,11 @@ export function MapPage() {
     panStart.current = { x: e.clientX, y: e.clientY }
 
     setViewerState((prev) => applyScreenPanDelta(prev, dx, dy))
-  }, [applyScreenPanDelta])
+  }, [applyScreenPanDelta, isEditMode, terrainEditEnabled])
 
   const handlePointerUpPan = useCallback((e: React.PointerEvent) => {
+    lastTerrainStrokeKeyRef.current = null
+
     if (isPanning.current) {
       isPanning.current = false
       if (draggedDuringPan.current) {
@@ -681,38 +692,85 @@ export function MapPage() {
     }))
   }, [areas, isEditMode, openAreaEditor, isClickSuppressedAfterDrag])
 
+  const applyTerrainBrushAt = useCallback((position: { x: number; z: number }, source: 'click' | 'drag') => {
+    if (!isEditMode || !terrainEditEnabled) return
+
+    const centerX = Math.round(position.x)
+    const centerZ = Math.round(position.z)
+    const strokeKey = `${centerX},${centerZ}|${terrainTool}|${terrainBrushSize}|${terrainFlattenTarget}`
+
+    if (source === 'drag' && lastTerrainStrokeKeyRef.current === strokeKey) return
+    lastTerrainStrokeKeyRef.current = strokeKey
+
+    setTerrainTiles((prev) => {
+      const map = new Map<string, number>()
+      for (const tile of prev) {
+        map.set(`${tile.x},${tile.z}`, tile.elevation)
+      }
+
+      const radius = Math.floor(terrainBrushSize / 2)
+      let changed = false
+
+      for (let dx = -radius; dx <= radius; dx++) {
+        for (let dz = -radius; dz <= radius; dz++) {
+          const x = centerX + dx
+          const z = centerZ + dz
+          const key = `${x},${z}`
+          const currentElevation = map.get(key) ?? SEA_LEVEL_ELEVATION
+
+          let targetElevation = currentElevation
+          if (terrainTool === 'raise') {
+            targetElevation = clampElevation(currentElevation + 1)
+          } else if (terrainTool === 'lower') {
+            targetElevation = clampElevation(currentElevation - 1)
+          } else if (terrainTool === 'flatten') {
+            targetElevation = clampElevation(terrainFlattenTarget)
+          } else {
+            const neighborValues: number[] = []
+            for (let nx = -1; nx <= 1; nx++) {
+              for (let nz = -1; nz <= 1; nz++) {
+                if (nx === 0 && nz === 0) continue
+                const nKey = `${x + nx},${z + nz}`
+                neighborValues.push(map.get(nKey) ?? SEA_LEVEL_ELEVATION)
+              }
+            }
+            const avg = neighborValues.length
+              ? neighborValues.reduce((sum, val) => sum + val, 0) / neighborValues.length
+              : currentElevation
+            targetElevation = clampElevation(Math.round((currentElevation + avg) / 2))
+          }
+
+          if (targetElevation === currentElevation) continue
+          changed = true
+
+          if (targetElevation === SEA_LEVEL_ELEVATION) {
+            map.delete(key)
+          } else {
+            map.set(key, targetElevation)
+          }
+        }
+      }
+
+      if (!changed) return prev
+
+      setHasUnsavedChanges(true)
+      return Array.from(map.entries()).map(([key, elevation]) => {
+        const [xs, zs] = key.split(',')
+        return { x: Number(xs), z: Number(zs), elevation }
+      })
+    })
+  }, [isEditMode, terrainEditEnabled, terrainTool, terrainBrushSize, terrainFlattenTarget])
+
+  const handleFloorDrag = useCallback((position: { x: number; z: number }) => {
+    applyTerrainBrushAt(position, 'drag')
+  }, [applyTerrainBrushAt])
+
   const handleFloorClick = useCallback(
     (position: { x: number; z: number }) => {
       if (isClickSuppressedAfterDrag()) return
 
       if (isEditMode && terrainEditEnabled) {
-        const x = Math.round(position.x)
-        const z = Math.round(position.z)
-
-        setTerrainTiles((prev) => {
-          const key = `${x},${z}`
-          const current = prev.find((tile) => `${tile.x},${tile.z}` === key)
-          const currentElevation = current?.elevation ?? SEA_LEVEL_ELEVATION
-
-          const targetElevation = clampElevation(
-            terrainTool === 'raise'
-              ? currentElevation + 1
-              : terrainTool === 'lower'
-                ? currentElevation - 1
-                : terrainFlattenTarget
-          )
-
-          if (targetElevation === currentElevation) return prev
-
-          const next = prev.filter((tile) => !(tile.x === x && tile.z === z))
-          if (targetElevation !== SEA_LEVEL_ELEVATION) {
-            next.push({ x, z, elevation: targetElevation })
-          }
-
-          setHasUnsavedChanges(true)
-          return next
-        })
-
+        applyTerrainBrushAt(position, 'click')
         return
       }
 
@@ -755,8 +813,7 @@ export function MapPage() {
       isClickSuppressedAfterDrag,
       isEditMode,
       terrainEditEnabled,
-      terrainTool,
-      terrainFlattenTarget,
+      applyTerrainBrushAt,
     ]
   )
 
@@ -1025,6 +1082,7 @@ export function MapPage() {
                 onBackgroundClick={handleBackgroundClick}
                 onNodeDragEnd={handleNodeDragEnd}
                 onFloorClick={handleFloorClick}
+                onFloorDrag={handleFloorDrag}
                 paintTiles={showAreaEditor ? {
                   tiles: areaPaintState.tiles,
                   color: areaPaintState.color,
@@ -1077,7 +1135,7 @@ export function MapPage() {
                 </Badge>
                 {terrainEditEnabled && (
                   <Badge variant="default" className="ml-2 bg-emerald-600 text-white gap-1 text-xs">
-                    Terreno {terrainTool === 'raise' ? 'Subir' : terrainTool === 'lower' ? 'Bajar' : 'Aplanar'}
+                    Terreno {terrainTool === 'raise' ? 'Subir' : terrainTool === 'lower' ? 'Bajar' : terrainTool === 'flatten' ? 'Aplanar' : 'Suavizar'}
                   </Badge>
                 )}
               </div>
@@ -1574,6 +1632,13 @@ export function MapPage() {
                           <Button size="sm" variant={terrainTool === 'raise' ? 'default' : 'outline'} className="h-7 text-xs" onClick={() => setTerrainTool('raise')}>Subir</Button>
                           <Button size="sm" variant={terrainTool === 'lower' ? 'default' : 'outline'} className="h-7 text-xs" onClick={() => setTerrainTool('lower')}>Bajar</Button>
                           <Button size="sm" variant={terrainTool === 'flatten' ? 'default' : 'outline'} className="h-7 text-xs" onClick={() => setTerrainTool('flatten')}>Aplanar</Button>
+                          <Button size="sm" variant={terrainTool === 'smooth' ? 'default' : 'outline'} className="h-7 text-xs" onClick={() => setTerrainTool('smooth')}>Suavizar</Button>
+                        </div>
+                        <div className="flex items-center gap-1 mb-1.5">
+                          <span className="text-[10px] text-muted-foreground">Brocha</span>
+                          <Button size="sm" variant={terrainBrushSize === 1 ? 'default' : 'outline'} className="h-7 text-xs" onClick={() => setTerrainBrushSize(1)}>1x1</Button>
+                          <Button size="sm" variant={terrainBrushSize === 3 ? 'default' : 'outline'} className="h-7 text-xs" onClick={() => setTerrainBrushSize(3)}>3x3</Button>
+                          <Button size="sm" variant={terrainBrushSize === 5 ? 'default' : 'outline'} className="h-7 text-xs" onClick={() => setTerrainBrushSize(5)}>5x5</Button>
                         </div>
                         {terrainTool === 'flatten' && (
                           <div className="flex items-center gap-1">

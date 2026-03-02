@@ -64,6 +64,8 @@ interface IsometricSceneProps {
   onNodeDragEnd?: (nodeId: string, newPosition: { x: number; y: number; z: number }) => void
   /** Callback para agregar nodo al hacer click en suelo en modo 'add' */
   onFloorClick?: (position: { x: number; z: number }) => void
+  /** Callback para pintar/editar en arrastre sobre suelo */
+  onFloorDrag?: (position: { x: number; z: number }) => void
   /** Tiles de pintura para el editor de áreas (overlay en el suelo) */
   paintTiles?: { tiles: Set<string>; color: string; opacity: number }
   /** Filtro adicional de nodos visibles */
@@ -88,6 +90,7 @@ function SceneContent({
   onBackgroundClick,
   onNodeDragEnd,
   onFloorClick,
+  onFloorDrag,
   paintTiles,
   visibleNodeIds,
 }: IsometricSceneProps) {
@@ -308,6 +311,15 @@ function SceneContent({
           } else {
             onBackgroundClick?.()
           }
+        }}
+        onPointerMove={(e) => {
+          if (!onFloorDrag) return
+          if (e.buttons !== 1) return
+          const point = e.point
+          onFloorDrag({
+            x: Math.floor(point.x + 0.0001),
+            z: Math.floor(point.z + 0.0001),
+          })
         }}
         visible={false}
       >
