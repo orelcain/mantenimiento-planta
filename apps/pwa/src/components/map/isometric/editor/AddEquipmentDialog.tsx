@@ -6,8 +6,15 @@
  */
 
 import { useEffect, useState } from 'react'
-import { X, Plus, Search } from 'lucide-react'
+import { Plus, Search } from 'lucide-react'
 import { Button } from '@/components/ui'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 import type { EquipmentNodeType, MapNode } from '@/types/isometricMap'
 import { EQUIPMENT_TYPE_LABELS, EQUIPMENT_TYPE_COLORS } from '@/types/isometricMap'
@@ -106,25 +113,17 @@ export function AddEquipmentDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-        onClick={onClose}
-      />
-
-      {/* Dialog */}
-      <div className="relative bg-card border rounded-xl shadow-2xl w-full max-w-lg mx-4 max-h-[80vh] flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b">
-          <h2 className="text-lg font-semibold flex items-center gap-2">
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose() }}>
+      <DialogContent className="max-w-2xl p-0 overflow-hidden">
+        <DialogHeader className="p-4 border-b">
+          <DialogTitle className="text-lg flex items-center gap-2">
             <Plus className="h-5 w-5 text-primary" />
             {title ?? 'Agregar equipo'}
-          </h2>
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onClose}>
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
+          </DialogTitle>
+          <DialogDescription className="text-xs text-muted-foreground">
+            Selecciona una categoría y tipo para ubicarlo en el mapa.
+          </DialogDescription>
+        </DialogHeader>
 
         {/* Search */}
         <div className="px-4 pt-3">
@@ -147,7 +146,7 @@ export function AddEquipmentDialog({
         </div>
 
         {/* Equipment grid */}
-        <div className="flex-1 overflow-y-auto p-4">
+        <div className="max-h-[48vh] overflow-y-auto p-4">
           <div className="grid grid-cols-2 gap-2">
             {filteredPresets.map((preset) => (
               <button
@@ -215,7 +214,7 @@ export function AddEquipmentDialog({
             </Button>
           </div>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }

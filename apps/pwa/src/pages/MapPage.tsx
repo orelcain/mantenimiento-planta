@@ -33,7 +33,6 @@ import {
   Eye as EyeIcon,
   Building2,
   Shapes,
-  Grid3x3,
   Trash2,
   Settings2,
 } from 'lucide-react'
@@ -170,7 +169,7 @@ export function MapPage() {
   const [areaManagerFloor, setAreaManagerFloor] = useState<'all' | number>('all')
   const [selectedAreaId, setSelectedAreaId] = useState<string | null>(null)
   const [hoveredAreaId, setHoveredAreaId] = useState<string | null>(null)
-  const [showOnlyActiveAreaEquipment, setShowOnlyActiveAreaEquipment] = useState(false)
+  const showOnlyActiveAreaEquipment = false
   const [buildMode, setBuildMode] = useState<BuildEditMode>('elements')
   const [terrainEditEnabled, setTerrainEditEnabled] = useState(false)
   const [terrainTool, setTerrainTool] = useState<'raise' | 'lower' | 'flatten' | 'smooth' | 'sample'>('raise')
@@ -180,7 +179,6 @@ export function MapPage() {
   const [showTerrainModal, setShowTerrainModal] = useState(false)
   const [isShiftPressed, setIsShiftPressed] = useState(false)
   const lastTerrainStrokeKeyRef = useRef<string | null>(null)
-  const [workflowPreset, setWorkflowPreset] = useState<'areas' | 'equipos' | 'ajuste'>('equipos')
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const history = useEditorHistory()
@@ -261,17 +259,6 @@ export function MapPage() {
     if (filtered.length === nodes.length) return undefined
     return new Set(filtered.map((node) => node.id))
   }, [nodes, isEditMode, buildMode, showOnlyActiveAreaEquipment, selectedAreaId])
-
-  const selectedAreaEquipmentSummary = useMemo(() => {
-    if (!selectedAreaId) return null
-    const selectedArea = areas.find((area) => area.id === selectedAreaId)
-    if (!selectedArea) return null
-    const floor = selectedArea.floor ?? viewerState.currentFloor
-    const floorNodes = nodes.filter((node) => (node.floor ?? SEA_LEVEL_ELEVATION) === floor)
-    const linked = floorNodes.filter((node) => node.linkedAreaId === selectedAreaId).length
-    const unlinked = floorNodes.filter((node) => !node.linkedAreaId).length
-    return { linked, unlinked, floor }
-  }, [selectedAreaId, areas, nodes, viewerState.currentFloor])
 
   const managedAreas = useMemo(() => {
     const base = areaManagerFloor === 'all'
@@ -627,7 +614,6 @@ export function MapPage() {
   const {
     editingArea,
     areaPaintState,
-    currentFloorAreas,
     handleAreaPaintStateChange,
     openAreaEditor,
     closeAreaEditor,
@@ -1017,12 +1003,6 @@ export function MapPage() {
     handleNodeUpdate(nodeId, { customShape: undefined })
   }, [handleNodeUpdate])
 
-  const isAddToolActive = editorTool === 'add'
-  const isMoveToolActive = editorTool === 'move'
-  const preferAreaFlow = workflowPreset === 'areas'
-  const preferEquipmentFlow = workflowPreset === 'equipos'
-  const preferFineTuneFlow = workflowPreset === 'ajuste'
-
   const startAddEquipmentFlow = useCallback(() => {
     closeAreaEditor()
     if (buildMode === 'terrain') {
@@ -1031,35 +1011,6 @@ export function MapPage() {
     setEditorTool('add')
     overlayState.openOverlay('add-equipment')
   }, [closeAreaEditor, overlayState, buildMode])
-
-  const quickActionHint = useMemo(() => {
-    if (selectedNode) {
-      if (isMoveToolActive) return 'Arrastra el equipo a su nueva posición y luego finaliza movimiento.'
-      if (preferAreaFlow && selectedNode.linkedAreaId) return 'Flujo áreas: abre el área del equipo para ajustar tiles y asociación.'
-      if (preferFineTuneFlow) return 'Ajuste fino: prioriza editar forma, rotación y vínculo del equipo actual.'
-      if (isAddToolActive) return 'Estás en modo agregar: crea otro equipo o vuelve a selección para editar.'
-      return 'Edita forma o vínculo del equipo, o salta a su área asociada para continuar el flujo.'
-    }
-
-    if (selectedAreaId) {
-      if (preferEquipmentFlow) return 'Flujo equipos: agrega rápidamente equipos dentro de esta área activa.'
-      if (isAddToolActive) return 'Agrega equipos dentro del área activa y luego vuelve a modo selección.'
-      return 'Edita el área activa o agrega equipos directamente dentro de esta zona.'
-    }
-
-    if (preferAreaFlow) return 'Flujo áreas: delimita primero zonas y luego asigna equipos por contexto.'
-    if (preferFineTuneFlow) return 'Ajuste fino: selecciona un equipo o área existente para modificar detalles.'
-    if (isAddToolActive) return 'Define y agrega un equipo nuevo en el mapa, o sal de modo agregar.'
-    return 'Comienza creando un área o agregando un equipo para iniciar el diseño del piso.'
-  }, [
-    selectedNode,
-    isMoveToolActive,
-    isAddToolActive,
-    selectedAreaId,
-    preferAreaFlow,
-    preferEquipmentFlow,
-    preferFineTuneFlow,
-  ])
 
   return (
     <div className="space-y-4">
@@ -1244,6 +1195,81 @@ export function MapPage() {
               </div>
             )}
 
+            {/* Sims-like Build Dock (centro inferior) */}
+            {isEditMode && (
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20">
+                <div className="bg-card/95 backdrop-blur rounded-xl border shadow-2xl p-2 min-w-[560px]">
+                  <div className="grid grid-cols-3 gap-1 mb-2">
+                    <Button
+                      size="sm"
+                      variant={buildMode === 'terrain' ? 'default' : 'outline'}
+                      className="h-8 text-xs"
+                      onClick={() => setBuildMode('terrain')}
+                    >
+                      Terreno
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={buildMode === 'structures' ? 'default' : 'outline'}
+                      className="h-8 text-xs"
+                      onClick={() => setBuildMode('structures')}
+                    >
+                      Estructuras
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={buildMode === 'elements' ? 'default' : 'outline'}
+                      className="h-8 text-xs"
+                      onClick={() => setBuildMode('elements')}
+                    >
+                      Elementos
+                    </Button>
+                  </div>
+
+                  <div className="flex items-center gap-1">
+                    {buildMode === 'terrain' ? (
+                      <>
+                        <Button
+                          size="sm"
+                          className="h-8 text-xs"
+                          onClick={() => {
+                            setTerrainEditEnabled(true)
+                            setShowTerrainModal(true)
+                          }}
+                        >
+                          Editor de terreno
+                        </Button>
+                        <Badge variant="outline" className="text-[10px]">Brocha {terrainBrushSize}×{terrainBrushSize}</Badge>
+                        <Badge variant="outline" className="text-[10px]">{activeTerrainTool}</Badge>
+                      </>
+                    ) : (
+                      <>
+                        <Button
+                          size="sm"
+                          className="h-8 text-xs"
+                          onClick={startAddEquipmentFlow}
+                        >
+                          {buildMode === 'structures' ? 'Agregar estructura' : 'Agregar elemento'}
+                        </Button>
+                        <Badge variant="outline" className="text-[10px]">
+                          {buildMode === 'structures' ? 'Solo edificios' : 'Máquinas y equipos'}
+                        </Badge>
+                      </>
+                    )}
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-xs ml-auto"
+                      onClick={() => overlayState.openOverlay('area-manager')}
+                    >
+                      Áreas
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Camera rotation + zoom + pan (izquierda abajo) */}
             <div className="absolute bottom-4 left-4 flex flex-col gap-2">
               {/* Toggle equipos: botón prominente */}
@@ -1379,464 +1405,31 @@ export function MapPage() {
                 </div>
               </div>
 
-              {/* Area editor buttons (solo en modo editor) */}
+              {/* Panel auxiliar compacto (modo editor) */}
               {isEditMode && (
-                <div className="bg-card/90 backdrop-blur rounded-lg shadow-lg border p-2 flex flex-col gap-2 w-[320px]">
-                  <p className="text-[10px] text-muted-foreground font-medium px-1">EDITOR RÁPIDO</p>
-
-                  {selectedAreaId && (
-                    <div className="px-2 py-1.5 rounded-md border bg-primary/5 border-primary/20 text-[11px] text-primary">
-                      Área activa: <span className="font-semibold">{areaById.get(selectedAreaId)?.label ?? selectedAreaId}</span>
-                      {selectedAreaEquipmentSummary && (
-                        <span className="ml-1 text-primary/80">
-                          · {selectedAreaEquipmentSummary.linked} asociados / {selectedAreaEquipmentSummary.unlinked} sin área
-                        </span>
-                      )}
-                    </div>
-                  )}
-
-                  {selectedNode && (
-                    <div className="px-2 py-1.5 rounded-md border bg-amber-500/5 border-amber-500/20 text-[11px] text-amber-700 dark:text-amber-300">
-                      Equipo activo: <span className="font-semibold">{selectedNode.label}</span>
-                      {selectedNode.linkedAreaId && (
-                        <span className="ml-1 text-amber-700/80 dark:text-amber-300/80">
-                          · Área: {areaById.get(selectedNode.linkedAreaId)?.label ?? selectedNode.linkedAreaId}
-                        </span>
-                      )}
-                    </div>
-                  )}
-
-                  <div className={cn(
-                    'px-2 py-1 rounded-md border text-[11px]',
-                    isAddToolActive
-                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-300'
-                      : isMoveToolActive
-                        ? 'bg-blue-500/10 border-blue-500/30 text-blue-700 dark:text-blue-300'
-                        : 'bg-muted/40 border-border text-muted-foreground'
-                  )}>
-                    Modo activo: <span className="font-semibold uppercase">{editorTool}</span>
-                  </div>
-
-                  <div className="px-2 py-1.5 rounded-md border bg-muted/30 border-border text-[11px]">
-                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Siguiente recomendado</p>
-                    <p className="text-[11px] text-foreground leading-snug mt-0.5">{quickActionHint}</p>
-                  </div>
-
-                  <div className="px-1 space-y-1">
-                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Preset de flujo</p>
-                    <div className="grid grid-cols-3 gap-1">
-                      <Button
-                        size="sm"
-                        variant={workflowPreset === 'areas' ? 'default' : 'outline'}
-                        className="h-7 text-[10px] px-1"
-                        onClick={() => setWorkflowPreset('areas')}
-                      >
-                        Diseñar áreas
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant={workflowPreset === 'equipos' ? 'default' : 'outline'}
-                        className="h-7 text-[10px] px-1"
-                        onClick={() => setWorkflowPreset('equipos')}
-                      >
-                        Poblar equipos
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant={workflowPreset === 'ajuste' ? 'default' : 'outline'}
-                        className="h-7 text-[10px] px-1"
-                        onClick={() => setWorkflowPreset('ajuste')}
-                      >
-                        Ajuste fino
-                      </Button>
-                    </div>
-                  </div>
-
-                  <p className="text-[10px] text-muted-foreground font-medium px-1">ACCIONES CONTEXTUALES</p>
-
-                  <div className="space-y-1">
-                    {!selectedNode && !selectedAreaId && (
-                      <>
-                        {preferAreaFlow && !isAddToolActive ? (
-                          <>
-                            <div className="space-y-0.5">
-                              <Button
-                                variant="default"
-                                size="sm"
-                                className="gap-1.5 text-xs justify-start w-full"
-                                onClick={() => openAreaEditor(null)}
-                              >
-                                <Grid3x3 className="h-3.5 w-3.5" />
-                                Crear nueva área
-                              </Button>
-                              <p className="text-[10px] text-muted-foreground px-1">Prioridad del preset actual.</p>
-                            </div>
-
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="gap-1.5 text-xs justify-start w-full"
-                              onClick={startAddEquipmentFlow}
-                            >
-                              <Shapes className="h-3.5 w-3.5" />
-                              Agregar equipo
-                            </Button>
-                          </>
-                        ) : isAddToolActive ? (
-                          <>
-                            <div className="space-y-0.5">
-                              <Button
-                                variant="default"
-                                size="sm"
-                                className="gap-1.5 text-xs justify-start w-full"
-                                onClick={startAddEquipmentFlow}
-                              >
-                                <Shapes className="h-3.5 w-3.5" />
-                                Configurar equipo a agregar
-                              </Button>
-                              <p className="text-[10px] text-muted-foreground px-1">Ajusta tipo y datos antes de ubicarlo en el mapa.</p>
-                            </div>
-
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="gap-1.5 text-xs justify-start w-full"
-                              onClick={() => setEditorTool('select')}
-                            >
-                              <Pencil className="h-3.5 w-3.5" />
-                              Salir de modo agregar
-                            </Button>
-                          </>
-                        ) : (
-                          <div className="space-y-0.5">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="gap-1.5 text-xs justify-start w-full"
-                              onClick={startAddEquipmentFlow}
-                            >
-                              <Shapes className="h-3.5 w-3.5" />
-                              Agregar equipo
-                            </Button>
-                            <p className="text-[10px] text-muted-foreground px-1">Recomendado si ya tienes ubicación en mente.</p>
-                          </div>
-                        )}
-
-                        {(!preferAreaFlow || isAddToolActive) && (
-                          <div className="space-y-0.5">
-                            <Button
-                              variant={isAddToolActive ? 'outline' : 'default'}
-                              size="sm"
-                              className="gap-1.5 text-xs justify-start w-full"
-                              onClick={() => openAreaEditor(null)}
-                            >
-                              <Grid3x3 className="h-3.5 w-3.5" />
-                              Crear nueva área
-                            </Button>
-                            <p className="text-[10px] text-muted-foreground px-1">Útil para delimitar zonas antes de asociar equipos.</p>
-                          </div>
-                        )}
-                      </>
-                    )}
-
-                    {selectedAreaId && (
-                      <>
-                        {preferAreaFlow && !isAddToolActive ? (
-                          <div className="space-y-0.5">
-                            <Button
-                              variant="default"
-                              size="sm"
-                              className="gap-1.5 text-xs justify-start w-full"
-                              onClick={() => {
-                                const selectedArea = areaById.get(selectedAreaId)
-                                if (selectedArea) openAreaEditor(selectedArea)
-                              }}
-                            >
-                              <Grid3x3 className="h-3.5 w-3.5" />
-                              Editar área activa
-                            </Button>
-                            <p className="text-[10px] text-muted-foreground px-1">Prioridad del preset actual.</p>
-                          </div>
-                        ) : (
-                          <div className="space-y-0.5">
-                            <Button
-                              variant={isAddToolActive ? 'default' : 'outline'}
-                              size="sm"
-                              className="gap-1.5 text-xs justify-start w-full"
-                              onClick={startAddEquipmentFlow}
-                            >
-                              <Shapes className="h-3.5 w-3.5" />
-                              Agregar equipo en área
-                            </Button>
-                            <p className="text-[10px] text-muted-foreground px-1">El nuevo equipo quedará asociado a esta área activa.</p>
-                          </div>
-                        )}
-
-                        {isAddToolActive && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="gap-1.5 text-xs justify-start w-full"
-                            onClick={() => setEditorTool('select')}
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                            Volver a modo seleccionar
-                          </Button>
-                        )}
-
-                        {(!preferAreaFlow || isAddToolActive) && (
-                          <div className="space-y-0.5">
-                            <Button
-                              variant={isAddToolActive ? 'outline' : 'default'}
-                              size="sm"
-                              className="gap-1.5 text-xs justify-start w-full"
-                              onClick={() => {
-                                const selectedArea = areaById.get(selectedAreaId)
-                                if (selectedArea) openAreaEditor(selectedArea)
-                              }}
-                            >
-                              <Grid3x3 className="h-3.5 w-3.5" />
-                              Editar área activa
-                            </Button>
-                            <p className="text-[10px] text-muted-foreground px-1">Pinta/borrar tiles y ajusta propiedades del área.</p>
-                          </div>
-                        )}
-
-                        <Button
-                          variant={showOnlyActiveAreaEquipment ? 'default' : 'outline'}
-                          size="sm"
-                          className="gap-1.5 text-xs justify-start w-full"
-                          onClick={() => setShowOnlyActiveAreaEquipment((prev) => !prev)}
-                        >
-                          <Eye className="h-3.5 w-3.5" />
-                          {showOnlyActiveAreaEquipment ? 'Mostrar todos los equipos' : 'Solo equipos del área activa'}
-                        </Button>
-                      </>
-                    )}
-
-                    {selectedNode && (
-                      <>
-                        {isMoveToolActive ? (
-                          <Button
-                            variant="default"
-                            size="sm"
-                            className="gap-1.5 text-xs justify-start w-full"
-                            onClick={() => setEditorTool('select')}
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                            Finalizar movimiento
-                          </Button>
-                        ) : (
-                          <Button
-                            variant={isAddToolActive ? 'default' : 'outline'}
-                            size="sm"
-                            className="gap-1.5 text-xs justify-start w-full"
-                            onClick={startAddEquipmentFlow}
-                          >
-                            <Shapes className="h-3.5 w-3.5" />
-                            Agregar otro equipo
-                          </Button>
-                        )}
-
-                        {preferAreaFlow && selectedNode.linkedAreaId ? (
-                          <div className="space-y-0.5">
-                            <Button
-                              variant="default"
-                              size="sm"
-                              className="gap-1.5 text-xs justify-start w-full"
-                              onClick={() => {
-                                const linkedArea = areaById.get(selectedNode.linkedAreaId!)
-                                if (linkedArea) {
-                                  setSelectedAreaId(linkedArea.id)
-                                  openAreaEditor(linkedArea)
-                                }
-                              }}
-                            >
-                              <Grid3x3 className="h-3.5 w-3.5" />
-                              Editar área del equipo
-                            </Button>
-                            <p className="text-[10px] text-muted-foreground px-1">Prioridad del preset actual.</p>
-                          </div>
-                        ) : (
-                          <div className="space-y-0.5">
-                            <Button
-                              variant={isMoveToolActive ? 'outline' : 'default'}
-                              size="sm"
-                              className="gap-1.5 text-xs justify-start w-full"
-                              onClick={() => overlayState.openOverlay('shape-editor')}
-                            >
-                              <Shapes className="h-3.5 w-3.5" />
-                              Editar forma del equipo
-                            </Button>
-                            <p className="text-[10px] text-muted-foreground px-1">Ideal cuando el equipo ya está posicionado y asociado.</p>
-                          </div>
-                        )}
-
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="gap-1.5 text-xs justify-start w-full"
-                          onClick={() => setShowLinkDialog(true)}
-                        >
-                          <MapPin className="h-3.5 w-3.5" />
-                          Vincular entidad real
-                        </Button>
-
-                        {(!preferAreaFlow || !selectedNode.linkedAreaId) && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="gap-1.5 text-xs justify-start w-full"
-                            onClick={() => {
-                              const linkedAreaId = selectedNode.linkedAreaId
-                              const linkedArea = linkedAreaId ? areaById.get(linkedAreaId) : null
-                              if (linkedArea) {
-                                setSelectedAreaId(linkedArea.id)
-                                openAreaEditor(linkedArea)
-                              }
-                            }}
-                            disabled={!selectedNode.linkedAreaId}
-                          >
-                            <Grid3x3 className="h-3.5 w-3.5" />
-                            {selectedNode.linkedAreaId ? 'Editar área del equipo' : 'Equipo sin área asociada'}
-                          </Button>
-                        )}
-
-                        {selectedAreaId && selectedAreaId !== selectedNode.linkedAreaId && (
-                          <Button
-                            variant={isAddToolActive ? 'default' : 'outline'}
-                            size="sm"
-                            className="gap-1.5 text-xs justify-start w-full"
-                            onClick={() => handleNodeUpdate(selectedNode.id, { linkedAreaId: selectedAreaId })}
-                          >
-                            <Grid3x3 className="h-3.5 w-3.5" />
-                            Asociar equipo a área activa
-                          </Button>
-                        )}
-                      </>
-                    )}
-
-                    <div className="border-t pt-1.5 mt-1">
-                      <p className="text-[10px] text-muted-foreground font-medium px-1 mb-1">UTILIDADES GLOBALES</p>
-                      <div className="rounded-md border p-2 mb-2 bg-muted/30">
-                        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">Modo de edición</p>
-                        <div className="grid grid-cols-3 gap-1">
-                          <Button
-                            size="sm"
-                            variant={buildMode === 'terrain' ? 'default' : 'outline'}
-                            className="h-7 text-xs"
-                            onClick={() => setBuildMode('terrain')}
-                          >
-                            Terreno
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant={buildMode === 'structures' ? 'default' : 'outline'}
-                            className="h-7 text-xs"
-                            onClick={() => setBuildMode('structures')}
-                          >
-                            Estructuras
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant={buildMode === 'elements' ? 'default' : 'outline'}
-                            className="h-7 text-xs"
-                            onClick={() => setBuildMode('elements')}
-                          >
-                            Elementos
-                          </Button>
-                        </div>
-                      </div>
-
-                      <div className="rounded-md border p-2 mb-2 bg-muted/30">
-                        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">Terreno (Sims-like)</p>
-                        <div className="flex items-center gap-1 mb-1.5">
-                          <Button
-                            size="sm"
-                            variant={terrainEditEnabled ? 'default' : 'outline'}
-                            className="h-7 text-xs"
-                            onClick={() => {
-                              setBuildMode('terrain')
-                              setTerrainEditEnabled((v) => !v)
-                            }}
-                          >
-                            {terrainEditEnabled ? 'Editar terreno: ON' : 'Editar terreno: OFF'}
-                          </Button>
-                          <Badge variant="outline" className="text-[10px]">{terrainBrushSize}×{terrainBrushSize}</Badge>
-                          <Badge variant="outline" className="text-[10px]">{activeTerrainTool}</Badge>
-                        </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-7 text-xs w-full"
-                          onClick={() => {
-                            setBuildMode('terrain')
-                            setShowTerrainModal(true)
-                          }}
-                        >
-                          Opciones de terreno…
-                        </Button>
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-1.5 text-xs justify-start w-full"
-                        onClick={() => overlayState.openOverlay('area-manager')}
-                      >
-                        <Settings2 className="h-3.5 w-3.5" />
-                        Gestionar áreas
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="border-t pt-1.5">
-                    <p className="text-[10px] text-muted-foreground px-1 mb-1">ÁREAS DEL PISO</p>
-                    <div className="max-h-28 overflow-y-auto space-y-1 px-0.5">
-                      {currentFloorAreas.length === 0 ? (
-                        <p className="text-[10px] text-muted-foreground px-1">Sin áreas en este piso</p>
-                      ) : (
-                        currentFloorAreas.map((area) => (
-                          <button
-                            key={area.id}
-                            className={cn(
-                              'w-full text-left px-2 py-1 rounded text-[11px] border flex items-center gap-2',
-                              selectedAreaId === area.id ? 'bg-primary/10 border-primary/50' : 'bg-muted/40 hover:bg-muted'
-                            )}
-                            onClick={() => {
-                              setSelectedAreaId(area.id)
-                              setViewerState((prev) => ({
-                                ...prev,
-                                panOffset: { x: area.position.x, z: area.position.z },
-                                zoom: prev.zoom,
-                                currentFloor: area.floor ?? SEA_LEVEL_ELEVATION,
-                                filters: { ...prev.filters, showAreas: true },
-                              }))
-                            }}
-                          >
-                            <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: area.color }} />
-                            <span className="truncate flex-1">{area.label}</span>
-                          </button>
-                        ))
-                      )}
-                    </div>
-                  </div>
-
+                <div className="bg-card/90 backdrop-blur rounded-lg shadow-lg border p-2 flex flex-col gap-2 w-[260px]">
+                  <p className="text-[10px] text-muted-foreground font-medium px-1">PANELES</p>
                   <Button
                     variant="outline"
                     size="sm"
-                    className="gap-1.5 text-xs justify-start w-full"
+                    className="h-8 text-xs justify-start"
+                    onClick={() => overlayState.openOverlay('area-manager')}
+                  >
+                    <Settings2 className="h-3.5 w-3.5 mr-1" />
+                    Gestionar áreas
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-xs justify-start"
                     onClick={() => setViewerState((prev) => ({
                       ...prev,
                       filters: { ...prev.filters, showAreas: !prev.filters.showAreas },
                     }))}
                   >
-                    {viewerState.filters.showAreas ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                    {viewerState.filters.showAreas ? <EyeOff className="h-3.5 w-3.5 mr-1" /> : <Eye className="h-3.5 w-3.5 mr-1" />}
                     {viewerState.filters.showAreas ? 'Ocultar áreas' : 'Mostrar áreas'}
                   </Button>
-
-                  <p className="text-[10px] text-muted-foreground px-1">
-                    Tip: las acciones cambian según selección activa (área o equipo).
-                  </p>
                 </div>
               )}
             </div>
