@@ -53,6 +53,7 @@ import {
   DEFAULT_VIEWER_STATE,
   FULL_MAP_VIEW_ZOOM,
   MAX_VIEWER_ZOOM,
+  CAMERA_ANGLE_AZIMUTH,
   CAMERA_ANGLE_NAMES,
   STATUS_LABELS,
   STATUS_COLORS,
@@ -392,16 +393,25 @@ export function MapPage() {
     const dy = e.clientY - panStart.current.y
     panStart.current = { x: e.clientX, y: e.clientY }
 
-    // Sensibilidad proporcional al zoom (recalibrada):
-    // zoom ~40  -> paneo cómodo (antes quedaba muy corto)
-    // zoom alto -> paneo más amplio para recorrer rápido
+    // Paneo orientado a cámara (estilo moderno):
+    // el arrastre sigue la dirección de la vista actual (incluye rotación Q/E)
     setViewerState((prev) => {
       const sensitivity = Math.min(0.55, Math.max(0.04, prev.zoom / 600))
+
+      const azimuth = CAMERA_ANGLE_AZIMUTH[prev.cameraAngle]
+      const rightX = Math.cos(azimuth)
+      const rightZ = -Math.sin(azimuth)
+      const forwardX = -Math.sin(azimuth)
+      const forwardZ = -Math.cos(azimuth)
+
+      const panDeltaX = (-dx * rightX - dy * forwardX) * sensitivity
+      const panDeltaZ = (-dx * rightZ - dy * forwardZ) * sensitivity
+
       return {
         ...prev,
         panOffset: {
-          x: prev.panOffset.x - dx * sensitivity,
-          z: prev.panOffset.z - dy * sensitivity,
+          x: prev.panOffset.x + panDeltaX,
+          z: prev.panOffset.z + panDeltaZ,
         },
       }
     })
