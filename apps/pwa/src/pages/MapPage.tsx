@@ -31,7 +31,6 @@ import {
   Layers,
   Pencil,
   Eye as EyeIcon,
-  Scan,
   Building2,
   Shapes,
   Grid3x3,
@@ -261,83 +260,14 @@ export function MapPage() {
   }, [])
 
   const fitMapComplete = useCallback(() => {
-    const container = canvasContainerRef.current
-    const aspect = container && container.clientHeight > 0
-      ? container.clientWidth / container.clientHeight
-      : 16 / 9
-
-    const mapSpanX = Math.max(demoData.config.width, 1)
-    const mapSpanZ = Math.max(demoData.config.depth, 1)
-    const padding = 1.1
-
-    const zoomForHeight = (mapSpanZ / 2) * padding
-    const zoomForWidth = (mapSpanX / 2 / Math.max(aspect, 0.1)) * padding
-    const idealZoom = Math.max(zoomForHeight, zoomForWidth, 10)
-
     setViewerState((prev) => ({
       ...prev,
-      zoom: Math.min(Math.max(idealZoom, 3), 500),
+      zoom: 500,
       panOffset: { x: 0, z: 0 },
     }))
-  }, [demoData.config.width, demoData.config.depth])
+  }, [])
 
   const resetView = fitMapComplete
-
-  // Fit all: calcular zoom para que todo el mapa quepa en pantalla
-  const fitAll = useCallback(() => {
-    const container = canvasContainerRef.current
-    const aspect = container && container.clientHeight > 0
-      ? container.clientWidth / container.clientHeight
-      : 16 / 9
-
-    // Calcular bounding box de todos los nodos visibles
-    const visibleNodes = nodes.filter(n => n.visible && (n.floor ?? 0) === viewerState.currentFloor)
-    if (visibleNodes.length === 0) {
-      // Si no hay nodos, usar config del mapa
-      const mapSpanX = Math.max(demoData.config.width, 1)
-      const mapSpanZ = Math.max(demoData.config.depth, 1)
-      const zoomForHeight = (mapSpanZ / 2) * 1.1
-      const zoomForWidth = (mapSpanX / 2 / Math.max(aspect, 0.1)) * 1.1
-      const mapZoom = Math.max(zoomForHeight, zoomForWidth, 10)
-      setViewerState((prev) => ({
-        ...prev,
-        zoom: Math.min(Math.max(mapZoom, 3), 500),
-        panOffset: { x: 0, z: 0 },
-      }))
-      return
-    }
-    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity
-    for (const n of visibleNodes) {
-      const hw = (n.size.width ?? 2) / 2
-      const hd = (n.size.depth ?? 2) / 2
-      minX = Math.min(minX, n.position.x - hw)
-      maxX = Math.max(maxX, n.position.x + hw)
-      minZ = Math.min(minZ, n.position.z - hd)
-      maxZ = Math.max(maxZ, n.position.z + hd)
-    }
-    // También incluir áreas
-    for (const a of areas.filter(a => (a.floor ?? 0) === viewerState.currentFloor)) {
-      minX = Math.min(minX, a.position.x - a.size.width / 2)
-      maxX = Math.max(maxX, a.position.x + a.size.width / 2)
-      minZ = Math.min(minZ, a.position.z - a.size.depth / 2)
-      maxZ = Math.max(maxZ, a.position.z + a.size.depth / 2)
-    }
-    const cx = (minX + maxX) / 2
-    const cz = (minZ + maxZ) / 2
-    const spanX = maxX - minX
-    const spanZ = maxZ - minZ
-    // Zoom = half-height del frustum ortográfico; width = zoom * aspect
-    // Necesitamos que spanZ <= 2*zoom y spanX <= 2*zoom*aspect
-    // Usamos aspect real del contenedor + 15% de padding
-    const zoomForHeight = (spanZ / 2) * 1.15
-    const zoomForWidth = (spanX / 2 / Math.max(aspect, 0.1)) * 1.15
-    const idealZoom = Math.max(zoomForHeight, zoomForWidth, 10)
-    setViewerState((prev) => ({
-      ...prev,
-      zoom: Math.min(Math.max(idealZoom, 3), 500),
-      panOffset: { x: cx, z: cz },
-    }))
-  }, [nodes, areas, viewerState.currentFloor, demoData.config])
 
   // Cambiar de piso
   const setFloor = useCallback((floor: number) => {
@@ -964,10 +894,7 @@ export function MapPage() {
                     <ZoomOut className="h-4 w-4" />
                   </Button>
                   <div className="w-px h-6 bg-border" />
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={fitAll} title="Vista completa">
-                    <Scan className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={fitMapComplete} title="Ver mapa completo">
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={fitMapComplete} title="Ver mapa completo (zoom 500)">
                     <Maximize className="h-4 w-4" />
                   </Button>
               </div>
