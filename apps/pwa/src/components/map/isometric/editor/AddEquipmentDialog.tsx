@@ -5,7 +5,7 @@
  * Al seleccionar uno, crea un nuevo nodo en la posición central del viewport.
  */
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { X, Plus, Search } from 'lucide-react'
 import { Button } from '@/components/ui'
 import { cn } from '@/lib/utils'
@@ -17,6 +17,8 @@ interface AddEquipmentDialogProps {
   onClose: () => void
   onAdd: (node: MapNode) => void
   selectedAreaLabel?: string | null
+  allowedTypes?: EquipmentNodeType[]
+  title?: string
 }
 
 interface EquipmentPreset {
@@ -48,20 +50,37 @@ function generateNodeId(): string {
   return `node-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`
 }
 
-export function AddEquipmentDialog({ isOpen, onClose, onAdd, selectedAreaLabel }: AddEquipmentDialogProps) {
+export function AddEquipmentDialog({
+  isOpen,
+  onClose,
+  onAdd,
+  selectedAreaLabel,
+  allowedTypes,
+  title,
+}: AddEquipmentDialogProps) {
   const [search, setSearch] = useState('')
   const [selectedPreset, setSelectedPreset] = useState<EquipmentPreset | null>(null)
   const [customLabel, setCustomLabel] = useState('')
 
   if (!isOpen) return null
 
+  const availablePresets = allowedTypes?.length
+    ? EQUIPMENT_PRESETS.filter((preset) => allowedTypes.includes(preset.type))
+    : EQUIPMENT_PRESETS
+
+  useEffect(() => {
+    if (selectedPreset && !availablePresets.some((preset) => preset.type === selectedPreset.type)) {
+      setSelectedPreset(null)
+    }
+  }, [availablePresets, selectedPreset])
+
   const filteredPresets = search
-    ? EQUIPMENT_PRESETS.filter(
+    ? availablePresets.filter(
         (p) =>
           EQUIPMENT_TYPE_LABELS[p.type].toLowerCase().includes(search.toLowerCase()) ||
           p.description.toLowerCase().includes(search.toLowerCase())
       )
-    : EQUIPMENT_PRESETS
+    : availablePresets
 
   const handleAdd = () => {
     const preset: EquipmentPreset = selectedPreset
@@ -100,7 +119,7 @@ export function AddEquipmentDialog({ isOpen, onClose, onAdd, selectedAreaLabel }
         <div className="flex items-center justify-between p-4 border-b">
           <h2 className="text-lg font-semibold flex items-center gap-2">
             <Plus className="h-5 w-5 text-primary" />
-            Agregar equipo
+            {title ?? 'Agregar equipo'}
           </h2>
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onClose}>
             <X className="h-4 w-4" />

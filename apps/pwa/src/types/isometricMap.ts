@@ -110,6 +110,31 @@ export type EquipmentNodeType =
   | 'boiler'         // Caldera
   | 'generic'        // Genérico
 
+/** Modos de edición tipo construcción (estilo Sims) */
+export type BuildEditMode = 'terrain' | 'structures' | 'elements'
+
+/** Tipos que se consideran estructura/contenedor */
+export const STRUCTURE_NODE_TYPES: EquipmentNodeType[] = ['building']
+
+/** Tipos que se consideran elementos/equipos dentro-fuera de estructuras */
+export const ELEMENT_NODE_TYPES: EquipmentNodeType[] = [
+  'pump',
+  'motor',
+  'conveyor',
+  'tank',
+  'compressor',
+  'valve',
+  'sensor',
+  'pipe',
+  'evaporator',
+  'condenser',
+  'panel',
+  'extractor',
+  'transformer',
+  'boiler',
+  'generic',
+]
+
 /** Colores por tipo de equipo */
 export const EQUIPMENT_TYPE_COLORS: Record<EquipmentNodeType, string> = {
   pump: '#3b82f6',       // Azul

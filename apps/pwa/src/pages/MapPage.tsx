@@ -48,7 +48,7 @@ import { useAppStore, useCanValidateIncidents, useIsAdmin } from '@/store'
 import { cn } from '@/lib/utils'
 import { formatRelativeTime } from '@/lib/utils'
 import { generateDemoMap, saveIsometricMap } from '@/services/isometricMap'
-import type { CameraAngle, IsometricViewerState, MapNode, MapArea, TerrainTile, MapConnector as MapConnectorType } from '@/types/isometricMap'
+import type { CameraAngle, IsometricViewerState, MapNode, MapArea, TerrainTile, BuildEditMode, MapConnector as MapConnectorType } from '@/types/isometricMap'
 import { 
   DEFAULT_VIEWER_STATE,
   FULL_MAP_VIEW_ZOOM,
@@ -64,6 +64,8 @@ import {
   STATUS_LABELS,
   STATUS_COLORS,
   EQUIPMENT_TYPE_LABELS,
+  STRUCTURE_NODE_TYPES,
+  ELEMENT_NODE_TYPES,
 } from '@/types/isometricMap'
 import type { Incident, IncidentPriority, IncidentStatus } from '@/types'
 import { useAuthStore } from '@/store'
@@ -169,6 +171,7 @@ export function MapPage() {
   const [selectedAreaId, setSelectedAreaId] = useState<string | null>(null)
   const [hoveredAreaId, setHoveredAreaId] = useState<string | null>(null)
   const [showOnlyActiveAreaEquipment, setShowOnlyActiveAreaEquipment] = useState(false)
+  const [buildMode, setBuildMode] = useState<BuildEditMode>('elements')
   const [terrainEditEnabled, setTerrainEditEnabled] = useState(false)
   const [terrainTool, setTerrainTool] = useState<'raise' | 'lower' | 'flatten' | 'smooth' | 'sample'>('raise')
   const [terrainBrushSize, setTerrainBrushSize] = useState<1 | 3 | 5>(1)
@@ -190,6 +193,27 @@ export function MapPage() {
 
   const isEditMode = viewerState.mode === 'edit'
   const activeTerrainTool = terrainEditEnabled && isShiftPressed ? 'smooth' : terrainTool
+
+  const availableAddTypes = useMemo(() => {
+    if (buildMode === 'structures') return STRUCTURE_NODE_TYPES
+    if (buildMode === 'elements') return ELEMENT_NODE_TYPES
+    return []
+  }, [buildMode])
+
+  useEffect(() => {
+    if (buildMode === 'terrain') {
+      setTerrainEditEnabled(true)
+      return
+    }
+
+    setTerrainEditEnabled(false)
+    if (buildMode === 'structures' && addEquipmentType !== 'building') {
+      setAddEquipmentType('building')
+    }
+    if (buildMode === 'elements' && addEquipmentType === 'building') {
+      setAddEquipmentType('pump')
+    }
+  }, [buildMode, addEquipmentType])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -220,13 +244,23 @@ export function MapPage() {
   )
 
   const visibleNodeIds = useMemo(() => {
-    if (!showOnlyActiveAreaEquipment || !selectedAreaId) return undefined
-    return new Set(
-      nodes
-        .filter((node) => node.linkedAreaId === selectedAreaId)
-        .map((node) => node.id)
-    )
-  }, [showOnlyActiveAreaEquipment, selectedAreaId, nodes])
+    let filtered = nodes
+
+    if (isEditMode && buildMode === 'structures') {
+      filtered = filtered.filter((node) => STRUCTURE_NODE_TYPES.includes(node.type))
+    }
+
+    if (isEditMode && buildMode === 'elements') {
+      filtered = filtered.filter((node) => ELEMENT_NODE_TYPES.includes(node.type))
+    }
+
+    if (showOnlyActiveAreaEquipment && selectedAreaId) {
+      filtered = filtered.filter((node) => node.linkedAreaId === selectedAreaId)
+    }
+
+    if (filtered.length === nodes.length) return undefined
+    return new Set(filtered.map((node) => node.id))
+  }, [nodes, isEditMode, buildMode, showOnlyActiveAreaEquipment, selectedAreaId])
 
   const selectedAreaEquipmentSummary = useMemo(() => {
     if (!selectedAreaId) return null
@@ -812,7 +846,7 @@ export function MapPage() {
     (position: { x: number; z: number }) => {
       if (isClickSuppressedAfterDrag()) return
 
-      if (isEditMode && terrainEditEnabled) {
+      if (isEditMode && buildMode === 'terrain' && terrainEditEnabled) {
         applyTerrainBrushAt(position, 'click')
         return
       }
@@ -844,6 +878,17 @@ export function MapPage() {
         linkedAreaId: areaAtPoint?.id,
         visible: true,
       }
+
+      if (buildMode === 'structures' && newNode.type !== 'building') {
+        newNode.type = 'building'
+        newNode.size = getDefaultSize('building')
+      }
+
+      if (buildMode === 'elements' && newNode.type === 'building') {
+        newNode.type = 'pump'
+        newNode.size = getDefaultSize('pump')
+      }
+
       handleAddNode(newNode)
     },
     [
@@ -856,6 +901,7 @@ export function MapPage() {
       isClickSuppressedAfterDrag,
       isEditMode,
       terrainEditEnabled,
+      buildMode,
       applyTerrainBrushAt,
     ]
   )
@@ -979,9 +1025,12 @@ export function MapPage() {
 
   const startAddEquipmentFlow = useCallback(() => {
     closeAreaEditor()
+    if (buildMode === 'terrain') {
+      setBuildMode('elements')
+    }
     setEditorTool('add')
     overlayState.openOverlay('add-equipment')
-  }, [closeAreaEditor, overlayState])
+  }, [closeAreaEditor, overlayState, buildMode])
 
   const quickActionHint = useMemo(() => {
     if (selectedNode) {
@@ -1157,8 +1206,7 @@ export function MapPage() {
                 addEquipmentType={addEquipmentType}
                 onToolChange={setEditorTool}
                 onAddEquipment={() => {
-                  closeAreaEditor()
-                  overlayState.openOverlay('add-equipment')
+                  startAddEquipmentFlow()
                 }}
                 onDeleteSelected={handleDeleteSelected}
                 onDuplicateSelected={handleDuplicateSelected}
@@ -1170,8 +1218,7 @@ export function MapPage() {
                 onToggleSnap={() => setSnapEnabled((v) => !v)}
                 onChangeEquipmentType={setAddEquipmentType}
                 onShowAddDialog={() => {
-                  closeAreaEditor()
-                  overlayState.openOverlay('add-equipment')
+                  startAddEquipmentFlow()
                 }}
               />
             )}
@@ -1187,6 +1234,11 @@ export function MapPage() {
                 {terrainEditEnabled && (
                   <Badge variant="default" className="ml-2 bg-emerald-600 text-white gap-1 text-xs">
                     Terreno {activeTerrainTool === 'raise' ? 'Subir' : activeTerrainTool === 'lower' ? 'Bajar' : activeTerrainTool === 'flatten' ? 'Aplanar' : activeTerrainTool === 'smooth' ? 'Suavizar' : 'Muestrear'}
+                  </Badge>
+                )}
+                {isEditMode && (
+                  <Badge variant="secondary" className="ml-2 text-xs">
+                    {buildMode === 'terrain' ? 'Modo Terreno' : buildMode === 'structures' ? 'Modo Estructuras' : 'Modo Elementos'}
                   </Badge>
                 )}
               </div>
@@ -1667,13 +1719,46 @@ export function MapPage() {
                     <div className="border-t pt-1.5 mt-1">
                       <p className="text-[10px] text-muted-foreground font-medium px-1 mb-1">UTILIDADES GLOBALES</p>
                       <div className="rounded-md border p-2 mb-2 bg-muted/30">
+                        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">Modo de edición</p>
+                        <div className="grid grid-cols-3 gap-1">
+                          <Button
+                            size="sm"
+                            variant={buildMode === 'terrain' ? 'default' : 'outline'}
+                            className="h-7 text-xs"
+                            onClick={() => setBuildMode('terrain')}
+                          >
+                            Terreno
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant={buildMode === 'structures' ? 'default' : 'outline'}
+                            className="h-7 text-xs"
+                            onClick={() => setBuildMode('structures')}
+                          >
+                            Estructuras
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant={buildMode === 'elements' ? 'default' : 'outline'}
+                            className="h-7 text-xs"
+                            onClick={() => setBuildMode('elements')}
+                          >
+                            Elementos
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="rounded-md border p-2 mb-2 bg-muted/30">
                         <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">Terreno (Sims-like)</p>
                         <div className="flex items-center gap-1 mb-1.5">
                           <Button
                             size="sm"
                             variant={terrainEditEnabled ? 'default' : 'outline'}
                             className="h-7 text-xs"
-                            onClick={() => setTerrainEditEnabled((v) => !v)}
+                            onClick={() => {
+                              setBuildMode('terrain')
+                              setTerrainEditEnabled((v) => !v)
+                            }}
                           >
                             {terrainEditEnabled ? 'Editar terreno: ON' : 'Editar terreno: OFF'}
                           </Button>
@@ -1684,7 +1769,10 @@ export function MapPage() {
                           variant="outline"
                           size="sm"
                           className="h-7 text-xs w-full"
-                          onClick={() => setShowTerrainModal(true)}
+                          onClick={() => {
+                            setBuildMode('terrain')
+                            setShowTerrainModal(true)
+                          }}
                         >
                           Opciones de terreno…
                         </Button>
@@ -1928,9 +2016,7 @@ export function MapPage() {
                 onSave={handleSaveArea}
                 onDelete={handleDeleteArea}
                 onCreateAndAddEquipment={() => {
-                  closeAreaEditor()
-                  setEditorTool('add')
-                  overlayState.openOverlay('add-equipment')
+                  startAddEquipmentFlow()
                 }}
                 onClose={closeAreaEditor}
               />
@@ -1940,7 +2026,10 @@ export function MapPage() {
               isOpen={showTerrainModal}
               onOpenChange={setShowTerrainModal}
               terrainEditEnabled={terrainEditEnabled}
-              onToggleTerrainEdit={() => setTerrainEditEnabled((value) => !value)}
+              onToggleTerrainEdit={() => {
+                setBuildMode('terrain')
+                setTerrainEditEnabled((value) => !value)
+              }}
               tool={terrainTool}
               onToolChange={setTerrainTool}
               brushSize={terrainBrushSize}
@@ -2064,6 +2153,8 @@ export function MapPage() {
         isOpen={showAddDialog}
         onClose={() => overlayState.closeOverlayIf('add-equipment')}
         onAdd={handleAddNodeFromDialog}
+        allowedTypes={availableAddTypes}
+        title={buildMode === 'structures' ? 'Agregar estructura' : buildMode === 'elements' ? 'Agregar elemento' : 'Agregar'}
         selectedAreaLabel={selectedAreaId ? areaById.get(selectedAreaId)?.label ?? null : null}
       />
 
