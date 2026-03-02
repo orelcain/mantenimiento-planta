@@ -307,7 +307,7 @@ export interface IsometricViewerState {
 }
 
 /** Zoom objetivo para acción "Ver mapa completo" */
-export const FULL_MAP_VIEW_ZOOM = 500
+export const FULL_MAP_VIEW_ZOOM = 600
 
 export const DEFAULT_VIEWER_STATE: IsometricViewerState = {
   cameraAngle: 0,
