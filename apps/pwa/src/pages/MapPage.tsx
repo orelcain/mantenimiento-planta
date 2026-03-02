@@ -311,18 +311,22 @@ export function MapPage() {
     return () => el.removeEventListener('wheel', handleWheel)
   }, [handleWheel])
 
-  // ── Pan (middle-click o right-click drag) ──
+  // ── Pan (left-click drag) ──
   const isPanning = useRef(false)
   const panStart = useRef({ x: 0, y: 0 })
 
   const handlePointerDownPan = useCallback((e: React.PointerEvent) => {
-    // Middle button (1) or right button (2)
-    if (e.button === 1 || e.button === 2) {
-      e.preventDefault()
-      isPanning.current = true
-      panStart.current = { x: e.clientX, y: e.clientY }
-      ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
-    }
+    const targetEl = e.target as HTMLElement | null
+    const isUiControl = !!targetEl?.closest('button,input,textarea,select,a,[role="button"],[data-no-pan="true"]')
+    if (isUiControl) return
+
+    // Left button (0)
+    if (e.button !== 0) return
+
+    e.preventDefault()
+    isPanning.current = true
+    panStart.current = { x: e.clientX, y: e.clientY }
+    targetEl?.setPointerCapture(e.pointerId)
   }, [])
 
   const handlePointerMovePan = useCallback((e: React.PointerEvent) => {
@@ -331,10 +335,11 @@ export function MapPage() {
     const dy = e.clientY - panStart.current.y
     panStart.current = { x: e.clientX, y: e.clientY }
 
-    // Sensibilidad inversamente proporcional al zoom
-    // Zoom alto (cerca) → movimiento fino; Zoom bajo (lejos) → movimiento amplio
+    // Sensibilidad proporcional al zoom para mejorar usabilidad:
+    // zoom bajo (ej: 30)  -> paneo más lento/preciso
+    // zoom alto (ej: 200+) -> paneo más fluido
     setViewerState((prev) => {
-      const sensitivity = 30 / prev.zoom
+      const sensitivity = Math.min(0.2, Math.max(0.01, prev.zoom / 3000))
       return {
         ...prev,
         panOffset: {
@@ -705,7 +710,7 @@ export function MapPage() {
             Mapa Isométrico
           </h1>
           <p className="text-sm text-muted-foreground">
-            Vista 3D de la planta — Rotar: Q/E · Zoom: scroll · Pan: click medio · Reset: R
+            Vista 3D de la planta — Rotar: Q/E · Zoom: scroll · Pan: arrastrar clic izquierdo · Reset: R
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -1530,7 +1535,7 @@ export function MapPage() {
             <div className="absolute bottom-4 right-4 text-[10px] text-muted-foreground/60 select-none pointer-events-none hidden md:block">
               {isEditMode
                 ? 'V: seleccionar · M: mover · A: agregar · Del: eliminar · Ctrl+Z: deshacer'
-                : 'Q/E: rotar · Scroll: zoom · Click medio/der: paneo · R: reset · Click: seleccionar'}
+                : 'Q/E: rotar · Scroll: zoom · Arrastrar clic izq: paneo · R: reset · Click: seleccionar'}
             </div>
 
             {/* Editor de áreas — panel lateral sobre la escena 3D */}
