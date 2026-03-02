@@ -372,6 +372,8 @@ export function MapPage() {
   // ── Pan (left-click drag) ──
   const isPanning = useRef(false)
   const panStart = useRef({ x: 0, y: 0 })
+  const draggedDuringPan = useRef(false)
+  const suppressClickUntil = useRef(0)
 
   const handlePointerDownPan = useCallback((e: React.PointerEvent) => {
     const targetEl = e.target as HTMLElement | null
@@ -383,6 +385,7 @@ export function MapPage() {
 
     e.preventDefault()
     isPanning.current = true
+    draggedDuringPan.current = false
     panStart.current = { x: e.clientX, y: e.clientY }
     targetEl?.setPointerCapture(e.pointerId)
   }, [])
@@ -391,6 +394,11 @@ export function MapPage() {
     if (!isPanning.current) return
     const dx = e.clientX - panStart.current.x
     const dy = e.clientY - panStart.current.y
+
+    if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
+      draggedDuringPan.current = true
+    }
+
     panStart.current = { x: e.clientX, y: e.clientY }
 
     // Paneo orientado a cámara (estilo moderno):
@@ -420,12 +428,61 @@ export function MapPage() {
   const handlePointerUpPan = useCallback((e: React.PointerEvent) => {
     if (isPanning.current) {
       isPanning.current = false
+      if (draggedDuringPan.current) {
+        suppressClickUntil.current = Date.now() + 220
+      }
+      draggedDuringPan.current = false
       ;(e.target as HTMLElement).releasePointerCapture(e.pointerId)
     }
   }, [])
 
+  const isClickSuppressedAfterDrag = useCallback(() => Date.now() < suppressClickUntil.current, [])
+
+  // ── Pan con teclado (flechas) ──
+  useEffect(() => {
+    const handleArrowPan = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
+      if (e.target instanceof HTMLSelectElement) return
+      if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return
+
+      const key = e.key
+      if (key !== 'ArrowLeft' && key !== 'ArrowRight' && key !== 'ArrowUp' && key !== 'ArrowDown') return
+      e.preventDefault()
+
+      const keyPixels = 22
+      const virtualDx = key === 'ArrowLeft' ? -keyPixels : key === 'ArrowRight' ? keyPixels : 0
+      const virtualDy = key === 'ArrowUp' ? -keyPixels : key === 'ArrowDown' ? keyPixels : 0
+
+      setViewerState((prev) => {
+        const sensitivity = Math.min(0.55, Math.max(0.04, prev.zoom / 600))
+
+        const azimuth = CAMERA_ANGLE_AZIMUTH[prev.cameraAngle]
+        const rightX = Math.cos(azimuth)
+        const rightZ = -Math.sin(azimuth)
+        const forwardX = -Math.sin(azimuth)
+        const forwardZ = -Math.cos(azimuth)
+
+        const panDeltaX = (-virtualDx * rightX + virtualDy * forwardX) * sensitivity
+        const panDeltaZ = (-virtualDx * rightZ + virtualDy * forwardZ) * sensitivity
+
+        return {
+          ...prev,
+          panOffset: {
+            x: prev.panOffset.x + panDeltaX,
+            z: prev.panOffset.z + panDeltaZ,
+          },
+        }
+      })
+    }
+
+    window.addEventListener('keydown', handleArrowPan)
+    return () => window.removeEventListener('keydown', handleArrowPan)
+  }, [])
+
   // ── Handlers de nodos ──
   const handleNodeClick = useCallback((nodeId: string) => {
+    if (isClickSuppressedAfterDrag()) return
+
     const node = nodes.find((n) => n.id === nodeId)
     const nextSelected = viewerState.selectedNodeId === nodeId ? null : nodeId
 
@@ -438,7 +495,7 @@ export function MapPage() {
     if (node?.linkedAreaId) {
       setSelectedAreaId(node.linkedAreaId)
     }
-  }, [nodes, viewerState.selectedNodeId])
+  }, [nodes, viewerState.selectedNodeId, isClickSuppressedAfterDrag])
 
   const handleNodeHover = useCallback((nodeId: string | null) => {
     const node = nodeId ? nodes.find((n) => n.id === nodeId) : null
@@ -450,13 +507,15 @@ export function MapPage() {
   }, [nodes])
 
   const handleBackgroundClick = useCallback(() => {
+    if (isClickSuppressedAfterDrag()) return
+
     setViewerState((prev) => ({
       ...prev,
       selectedNodeId: null,
     }))
     setSelectedAreaId(null)
     setHoveredAreaId(null)
-  }, [])
+  }, [isClickSuppressedAfterDrag])
 
   // ── Handlers de filtros ──
   const toggleFilter = useCallback((key: keyof IsometricViewerState['filters']) => {
@@ -564,6 +623,8 @@ export function MapPage() {
   }, [selectedAreaId, areas, resolveAreaAtPosition, viewerState.currentFloor, handleAddNode])
 
   const handleAreaClick = useCallback((areaId: string) => {
+    if (isClickSuppressedAfterDrag()) return
+
     const area = areas.find((a) => a.id === areaId)
     if (!area) return
 
@@ -581,10 +642,12 @@ export function MapPage() {
       panOffset: { x: area.position.x, z: area.position.z },
       zoom: prev.zoom,
     }))
-  }, [areas, isEditMode, openAreaEditor])
+  }, [areas, isEditMode, openAreaEditor, isClickSuppressedAfterDrag])
 
   const handleFloorClick = useCallback(
     (position: { x: number; z: number }) => {
+      if (isClickSuppressedAfterDrag()) return
+
       const areaAtPoint = resolveAreaAtPosition(position.x, position.z, viewerState.currentFloor)
       if (areaAtPoint) {
         setSelectedAreaId(areaAtPoint.id)
@@ -614,7 +677,7 @@ export function MapPage() {
       }
       handleAddNode(newNode)
     },
-    [paintAreaTileAt, editorTool, addEquipmentType, handleAddNode, resolveAreaAtPosition, viewerState.currentFloor]
+    [paintAreaTileAt, editorTool, addEquipmentType, handleAddNode, resolveAreaAtPosition, viewerState.currentFloor, isClickSuppressedAfterDrag]
   )
 
   const {
@@ -777,7 +840,7 @@ export function MapPage() {
             Mapa Isométrico
           </h1>
           <p className="text-sm text-muted-foreground">
-            Vista 3D de la planta — Rotar: Q/E · Zoom: scroll · Pan: arrastrar clic izquierdo · Reset: R
+            Vista 3D de la planta — Rotar: Q/E · Zoom: scroll · Pan: arrastrar clic izquierdo o flechas · Reset: R
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -1602,7 +1665,7 @@ export function MapPage() {
             <div className="absolute bottom-4 right-4 text-[10px] text-muted-foreground/60 select-none pointer-events-none hidden md:block">
               {isEditMode
                 ? 'V: seleccionar · M: mover · A: agregar · Del: eliminar · Ctrl+Z: deshacer'
-                : 'Q/E: rotar · Scroll: zoom · Arrastrar clic izq: paneo · R: reset · Click: seleccionar'}
+                : 'Q/E: rotar · Scroll: zoom · Arrastrar clic izq/Flechas: paneo · R: reset · Click: seleccionar'}
             </div>
 
             {/* Editor de áreas — panel lateral sobre la escena 3D */}
