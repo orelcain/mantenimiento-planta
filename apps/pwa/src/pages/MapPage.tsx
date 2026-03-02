@@ -159,8 +159,11 @@ function getSmartSnappedPlacement(
   floor: number,
   nodes: MapNode[],
   enabled: boolean
-): { x: number; z: number } {
-  if (!enabled) return rawPosition
+): {
+  position: { x: number; z: number }
+  guides: Array<{ axis: 'x' | 'z'; from: { x: number; z: number }; to: { x: number; z: number } }>
+} {
+  if (!enabled) return { position: rawPosition, guides: [] }
 
   const SNAP_THRESHOLD = 0.9
   const candidateHalfW = candidateSize.width / 2
@@ -170,6 +173,8 @@ function getSmartSnappedPlacement(
   let snappedZ = rawPosition.z
   let bestDX = SNAP_THRESHOLD + 1
   let bestDZ = SNAP_THRESHOLD + 1
+  let bestXGuide: { from: { x: number; z: number }; to: { x: number; z: number } } | null = null
+  let bestZGuide: { from: { x: number; z: number }; to: { x: number; z: number } } | null = null
 
   for (const node of nodes) {
     const nodeFloor = clampElevation(node.floor ?? node.position.y ?? SEA_LEVEL_ELEVATION)
@@ -189,6 +194,11 @@ function getSmartSnappedPlacement(
       if (distance <= SNAP_THRESHOLD && distance < bestDX) {
         bestDX = distance
         snappedX = targetX
+        const guideHalfLength = nodeHalfD + candidateHalfD + 0.6
+        bestXGuide = {
+          from: { x: targetX, z: node.position.z - guideHalfLength },
+          to: { x: targetX, z: node.position.z + guideHalfLength },
+        }
       }
     }
 
@@ -202,11 +212,20 @@ function getSmartSnappedPlacement(
       if (distance <= SNAP_THRESHOLD && distance < bestDZ) {
         bestDZ = distance
         snappedZ = targetZ
+        const guideHalfLength = nodeHalfW + candidateHalfW + 0.6
+        bestZGuide = {
+          from: { x: node.position.x - guideHalfLength, z: targetZ },
+          to: { x: node.position.x + guideHalfLength, z: targetZ },
+        }
       }
     }
   }
 
-  return { x: snappedX, z: snappedZ }
+  const guides: Array<{ axis: 'x' | 'z'; from: { x: number; z: number }; to: { x: number; z: number } }> = []
+  if (bestXGuide) guides.push({ axis: 'x', ...bestXGuide })
+  if (bestZGuide) guides.push({ axis: 'z', ...bestZGuide })
+
+  return { position: { x: snappedX, z: snappedZ }, guides }
 }
 
 export function MapPage() {
@@ -1003,13 +1022,14 @@ export function MapPage() {
 
     const candidateSize = getDefaultSize(effectiveAddType)
     const rotatedFootprint = getRotatedFootprint(candidateSize, addPlacementRotation)
-    const snappedPosition = getSmartSnappedPlacement(
+    const snappedPlacement = getSmartSnappedPlacement(
       terrainHoverPosition,
       rotatedFootprint,
       viewerState.currentFloor,
       nodes,
       snapEnabled
     )
+    const snappedPosition = snappedPlacement.position
 
     const collides = nodes.some((node) => {
       const nodeFloor = clampElevation(node.floor ?? node.position.y ?? SEA_LEVEL_ELEVATION)
@@ -1040,6 +1060,7 @@ export function MapPage() {
       },
       rotation: addPlacementRotation,
       valid: !collides,
+      snapGuides: snappedPlacement.guides,
     }
   }, [isEditMode, editorTool, buildMode, terrainHoverPosition, effectiveAddType, nodes, viewerState.currentFloor, addPlacementRotation, snapEnabled])
 

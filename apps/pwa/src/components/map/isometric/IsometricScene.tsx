@@ -89,6 +89,7 @@ interface IsometricSceneProps {
     size: { width: number; height: number; depth: number }
     rotation: number
     valid: boolean
+    snapGuides?: Array<{ axis: 'x' | 'z'; from: { x: number; z: number }; to: { x: number; z: number } }>
   } | null
   /** Preview de bulldozer sobre celda de piso */
   bulldozerPreview?: { x: number; z: number } | null
@@ -298,6 +299,32 @@ function SceneContent({
               depthWrite={false}
             />
           </mesh>
+
+          {placementPreview.snapGuides?.map((guide, index) => {
+            const centerX = (guide.from.x + guide.to.x) / 2
+            const centerZ = (guide.from.z + guide.to.z) / 2
+            const width = Math.abs(guide.to.x - guide.from.x)
+            const depth = Math.abs(guide.to.z - guide.from.z)
+
+            return (
+              <mesh
+                key={`snap-guide-${index}`}
+                rotation-x={-Math.PI / 2}
+                position={[centerX, placementPreview.floor + 0.08, centerZ]}
+              >
+                <planeGeometry args={[
+                  guide.axis === 'z' ? Math.max(width, 0.08) : 0.08,
+                  guide.axis === 'x' ? Math.max(depth, 0.08) : 0.08,
+                ]} />
+                <meshBasicMaterial
+                  color={placementPreview.valid ? '#22c55e' : '#ef4444'}
+                  transparent
+                  opacity={0.6}
+                  depthWrite={false}
+                />
+              </mesh>
+            )
+          })}
         </group>
       )}
 
