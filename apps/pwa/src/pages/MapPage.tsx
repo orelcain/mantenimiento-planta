@@ -464,19 +464,12 @@ export function MapPage() {
       const acceleration = Math.min(3, 1 + elapsedMs / 450)
       const keyPixels = 22 * acceleration
 
-      // Mapeo base de flechas (calibrado con la vista actual)
-      let virtualDx = key === 'ArrowLeft' ? keyPixels : key === 'ArrowRight' ? -keyPixels : 0
-      let virtualDy = key === 'ArrowUp' ? keyPixels : key === 'ArrowDown' ? -keyPixels : 0
+      // Mapeo base de flechas (dirección intuitiva)
+      const virtualDx = key === 'ArrowLeft' ? -keyPixels : key === 'ArrowRight' ? keyPixels : 0
+      const virtualDy = key === 'ArrowUp' ? -keyPixels : key === 'ArrowDown' ? keyPixels : 0
 
       setViewerState((prev) => {
         const sensitivity = Math.min(0.55, Math.max(0.04, prev.zoom / 600))
-
-        // Ajuste adaptativo por ángulo: en vistas 90°/270° la percepción
-        // de dirección se invierte respecto al arrastre, por eso compensamos.
-        if (prev.cameraAngle === 1 || prev.cameraAngle === 3) {
-          virtualDx = -virtualDx
-          virtualDy = -virtualDy
-        }
 
         const azimuth = CAMERA_ANGLE_AZIMUTH[prev.cameraAngle]
         const rightX = Math.cos(azimuth)
