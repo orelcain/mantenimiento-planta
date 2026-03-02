@@ -342,7 +342,7 @@ export function MapPage() {
     setViewerState((prev) => ({
       ...prev,
       panOffset: { x: position.x, z: position.z },
-      zoom: Math.max(prev.zoom, 30), // Acercar si está muy lejos
+      zoom: prev.zoom,
     }))
   }, [])
 
@@ -579,7 +579,7 @@ export function MapPage() {
       currentFloor: area.floor ?? 0,
       filters: { ...prev.filters, showAreas: true },
       panOffset: { x: area.position.x, z: area.position.z },
-      zoom: Math.max(prev.zoom, 30),
+      zoom: prev.zoom,
     }))
   }, [areas, isEditMode, openAreaEditor])
 
