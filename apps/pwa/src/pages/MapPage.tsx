@@ -260,20 +260,48 @@ export function MapPage() {
     }))
   }, [])
 
-  const resetView = useCallback(() => {
-    setViewerState(DEFAULT_VIEWER_STATE)
-  }, [])
+  const fitMapComplete = useCallback(() => {
+    const container = canvasContainerRef.current
+    const aspect = container && container.clientHeight > 0
+      ? container.clientWidth / container.clientHeight
+      : 16 / 9
+
+    const mapSpanX = Math.max(demoData.config.width, 1)
+    const mapSpanZ = Math.max(demoData.config.depth, 1)
+    const padding = 1.1
+
+    const zoomForHeight = (mapSpanZ / 2) * padding
+    const zoomForWidth = (mapSpanX / 2 / Math.max(aspect, 0.1)) * padding
+    const idealZoom = Math.max(zoomForHeight, zoomForWidth, 10)
+
+    setViewerState((prev) => ({
+      ...prev,
+      zoom: Math.min(Math.max(idealZoom, 3), 500),
+      panOffset: { x: 0, z: 0 },
+    }))
+  }, [demoData.config.width, demoData.config.depth])
+
+  const resetView = fitMapComplete
 
   // Fit all: calcular zoom para que todo el mapa quepa en pantalla
   const fitAll = useCallback(() => {
+    const container = canvasContainerRef.current
+    const aspect = container && container.clientHeight > 0
+      ? container.clientWidth / container.clientHeight
+      : 16 / 9
+
     // Calcular bounding box de todos los nodos visibles
     const visibleNodes = nodes.filter(n => n.visible && (n.floor ?? 0) === viewerState.currentFloor)
     if (visibleNodes.length === 0) {
       // Si no hay nodos, usar config del mapa
-      const mapHalf = Math.max(demoData.config.width, demoData.config.depth) / 2
+      const mapSpanX = Math.max(demoData.config.width, 1)
+      const mapSpanZ = Math.max(demoData.config.depth, 1)
+      const zoomForHeight = (mapSpanZ / 2) * 1.1
+      const zoomForWidth = (mapSpanX / 2 / Math.max(aspect, 0.1)) * 1.1
+      const mapZoom = Math.max(zoomForHeight, zoomForWidth, 10)
       setViewerState((prev) => ({
         ...prev,
-        zoom: mapHalf * 1.15,
+        zoom: Math.min(Math.max(mapZoom, 3), 500),
         panOffset: { x: 0, z: 0 },
       }))
       return
@@ -298,15 +326,15 @@ export function MapPage() {
     const cz = (minZ + maxZ) / 2
     const spanX = maxX - minX
     const spanZ = maxZ - minZ
-    // Zoom = half-height del frustum ortográfico; aspect ~16:9 → width = zoom * aspect
+    // Zoom = half-height del frustum ortográfico; width = zoom * aspect
     // Necesitamos que spanZ <= 2*zoom y spanX <= 2*zoom*aspect
-    // Asumimos aspect ~1.6 y agregamos 15% de padding
+    // Usamos aspect real del contenedor + 15% de padding
     const zoomForHeight = (spanZ / 2) * 1.15
-    const zoomForWidth = (spanX / 2 / 1.6) * 1.15
+    const zoomForWidth = (spanX / 2 / Math.max(aspect, 0.1)) * 1.15
     const idealZoom = Math.max(zoomForHeight, zoomForWidth, 10)
     setViewerState((prev) => ({
       ...prev,
-      zoom: Math.min(idealZoom, 500),
+      zoom: Math.min(Math.max(idealZoom, 3), 500),
       panOffset: { x: cx, z: cz },
     }))
   }, [nodes, areas, viewerState.currentFloor, demoData.config])
@@ -939,7 +967,7 @@ export function MapPage() {
                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={fitAll} title="Vista completa">
                     <Scan className="h-4 w-4" />
                   </Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={resetView} title="Resetear (R)">
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={fitMapComplete} title="Ver mapa completo">
                     <Maximize className="h-4 w-4" />
                   </Button>
               </div>
