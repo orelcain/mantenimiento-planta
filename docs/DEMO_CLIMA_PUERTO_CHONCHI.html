@@ -651,6 +651,17 @@
     .port-closure-headline.yes { color: var(--bad); }
     .port-closure-headline.no { color: var(--good); }
 
+    .port-closure-secondary {
+      font-size: 0.86rem;
+      font-weight: 800;
+      letter-spacing: 0.3px;
+      margin-bottom: 6px;
+      color: var(--mid);
+    }
+
+    .port-closure-secondary.yes { color: var(--mid); }
+    .port-closure-secondary.no { color: var(--muted); }
+
     .port-closure-sub {
       font-size: 0.82rem;
       color: var(--muted);
@@ -661,6 +672,12 @@
       margin-top: -2px;
       margin-bottom: 8px;
       font-size: 0.75rem;
+      color: var(--muted);
+    }
+
+    .port-closure-uncertainty {
+      margin-bottom: 8px;
+      font-size: 0.74rem;
       color: var(--muted);
     }
 
@@ -1019,7 +1036,9 @@
                 <div class="pdl">Decisión rápida (próx. 24h)</div>
                 <div class="port-closure-box">
                   <div class="port-closure-headline" id="closureHeadline">Calculando cierre probable...</div>
+                  <div class="port-closure-secondary" id="restrictionHeadline">Calculando restricción probable...</div>
                   <div class="port-closure-sub" id="closureSub">Analizando viento, rachas, lluvia y oleaje.</div>
+                  <div class="port-closure-uncertainty" id="closureUncertainty">Incertidumbre del modelo: ±--%</div>
                   <div class="port-closure-why" id="closureWhy" title="El porcentaje se calcula SOLO con las próximas 24h, usando datos horarios y umbrales marítimos.">¿Por qué este porcentaje?</div>
                   <div class="port-closure-drivers" id="closureDrivers"><span class="port-reason-tag">Cargando...</span></div>
                   <div class="preventive-alert" id="preventiveAlert">
@@ -1977,7 +1996,10 @@
       if (samples.length <= 0) {
         return {
           closeLikely: portNow?.status === 'CERRADO',
-          probability: portNow?.status === 'CERRADO' ? 90 : 25,
+          restrictLikely: portNow?.status !== 'ABIERTO',
+          closeProbability: portNow?.status === 'CERRADO' ? 90 : 25,
+          restrictProbability: portNow?.status === 'ABIERTO' ? 35 : 72,
+          uncertainty: 16,
           topRisk: 'MEDIO',
           drivers: ['Sin ventana horaria suficiente en API'],
           summary: 'Sin datos suficientes para proyección 24h',
@@ -2006,15 +2028,33 @@
         highHours >= 3 ||
         stormHours >= 2;
 
-      let probability =
+      let closeProbability =
         maxIndex * 0.52 +
         avgIndex * 0.28 +
         highHours * 5 +
         mediumHours * 2.2;
-      if (portNow?.status === 'CERRADO') probability = Math.max(probability, 85);
-      probability = Math.max(3, Math.min(97, Math.round(probability)));
+      if (portNow?.status === 'CERRADO') closeProbability = Math.max(closeProbability, 85);
+      closeProbability = Math.max(3, Math.min(97, Math.round(closeProbability)));
 
-      const closeLikely = hardTrigger || probability >= 60;
+      let restrictProbability =
+        avgIndex * 0.62 +
+        maxIndex * 0.18 +
+        mediumHours * 3.5 +
+        highHours * 2.4 +
+        (maxWind >= 35 ? 8 : 0) +
+        (maxWave >= 1.8 ? 8 : 0) +
+        (minVisibility <= 5000 ? 6 : 0);
+      if (portNow?.status === 'RESTRINGIDO') restrictProbability = Math.max(restrictProbability, 75);
+      if (portNow?.status === 'CERRADO') restrictProbability = Math.max(restrictProbability, 92);
+      restrictProbability = Math.max(closeProbability, Math.min(99, Math.round(restrictProbability)));
+
+      const closeLikely = hardTrigger || closeProbability >= 60;
+      const restrictLikely = closeLikely || restrictProbability >= 58;
+
+      const variance = samples.reduce((acc, sample) => acc + Math.pow((sample.riskIndex ?? 0) - avgIndex, 2), 0) / samples.length;
+      const stdDev = Math.sqrt(variance);
+      let uncertainty = Math.round(6 + stdDev * 0.16 + (samples.length < 20 ? 3 : 0));
+      uncertainty = Math.max(6, Math.min(18, uncertainty));
 
       const drivers = [];
       if (maxGust >= 55) drivers.push(`Rachas máx ${num(maxGust, 0)} km/h`);
@@ -2030,30 +2070,46 @@
       const topRisk = maxIndex >= 65 ? 'ALTO' : maxIndex >= 45 ? 'MEDIO' : 'BAJO';
       const summary = closeLikely
         ? `Cierre probable en próximas 24h (riesgo ${topRisk.toLowerCase()}, índice máx ${num(maxIndex, 0)}).`
-        : `No se proyecta cierre en próximas 24h (índice promedio ${num(avgIndex, 0)}).`;
+        : restrictLikely
+          ? `No se proyecta cierre, pero sí restricción operativa probable en 24h.`
+          : `No se proyecta cierre ni restricción relevante en próximas 24h.`;
 
-      const why = `Probabilidad basada en 24h horarias: índice máx ${num(maxIndex, 0)}, promedio ${num(avgIndex, 0)}, horas críticas ${highHours}, horas de atención ${mediumHours}. Regla de decisión: cierre probable con ${num(probability, 0)}% o gatillo duro.`;
+      const why = `24h horarias: índice máx ${num(maxIndex, 0)}, promedio ${num(avgIndex, 0)}, horas críticas ${highHours}, atención ${mediumHours}. Cierre usa umbral ${num(closeProbability, 0)}% (o gatillo duro); restricción usa ${num(restrictProbability, 0)}%.`;
 
-      return { closeLikely, probability, topRisk, drivers, summary, why, samples };
+      return { closeLikely, restrictLikely, closeProbability, restrictProbability, uncertainty, topRisk, drivers, summary, why, samples };
     }
 
     function renderClosureOutlook(outlook) {
       const headlineEl = document.getElementById('closureHeadline');
+      const restrictionEl = document.getElementById('restrictionHeadline');
       const subEl = document.getElementById('closureSub');
+      const uncertaintyEl = document.getElementById('closureUncertainty');
       const whyEl = document.getElementById('closureWhy');
       const driversEl = document.getElementById('closureDrivers');
 
       headlineEl.classList.remove('yes', 'no');
+      restrictionEl.classList.remove('yes', 'no');
       if (outlook.closeLikely) {
         headlineEl.classList.add('yes');
-        headlineEl.textContent = `CIERRE PROBABLE: SÍ (${outlook.probability}%)`;
+        headlineEl.textContent = `CIERRE PROBABLE: SÍ (${outlook.closeProbability}%)`;
       } else {
         headlineEl.classList.add('no');
-        headlineEl.textContent = `CIERRE PROBABLE: NO (${outlook.probability}%)`;
+        headlineEl.textContent = `CIERRE PROBABLE: NO (${outlook.closeProbability}%)`;
       }
+
+      if (outlook.restrictLikely) {
+        restrictionEl.classList.add('yes');
+        restrictionEl.textContent = `RESTRICCIÓN PROBABLE: SÍ (${outlook.restrictProbability}%)`;
+      } else {
+        restrictionEl.classList.add('no');
+        restrictionEl.textContent = `RESTRICCIÓN PROBABLE: NO (${outlook.restrictProbability}%)`;
+      }
+
       headlineEl.title = 'Probabilidad de cierre calculada para próximas 24 horas con datos horarios multivariable.';
+      restrictionEl.title = 'Probabilidad de restricción operativa (aunque no cierre total) para próximas 24 horas.';
 
       subEl.textContent = `${outlook.summary} Ventana evaluada: próximas 24 horas.`;
+      uncertaintyEl.textContent = `Incertidumbre del modelo: ±${outlook.uncertainty}% (variabilidad de señales en 24h).`;
       whyEl.textContent = `¿Por qué este porcentaje? ${outlook.why}`;
       whyEl.title = outlook.why;
       driversEl.innerHTML = outlook.drivers
@@ -2101,6 +2157,8 @@
 
       if (outlook.closeLikely) {
         actions.push('🚨 Activar plan de contingencia de faena y reducir salidas no críticas.');
+      } else if (outlook.restrictLikely) {
+        actions.push('⚠️ Preparar operación restringida y revisar cartas de zarpe preventivas.');
       } else {
         actions.push('🟡 Mantener monitoreo cada 60 minutos durante la ventana preventiva.');
       }
@@ -2124,7 +2182,7 @@
       if (outlook.closeLikely) {
         alertEl.classList.add('high');
         alertTitleEl.textContent = 'ALERTA PREVENTIVA ALTA';
-      } else if (outlook.topRisk === 'BAJO') {
+      } else if (!outlook.restrictLikely && outlook.topRisk === 'BAJO') {
         alertEl.classList.add('low');
         alertTitleEl.textContent = 'ALERTA PREVENTIVA BAJA';
       } else {
