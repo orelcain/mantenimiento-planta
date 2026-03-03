@@ -127,6 +127,23 @@
       transform: scale(1.04);
     }
 
+    .btn-map-focus {
+      background: rgba(255,255,255,0.08);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,0.16);
+      border-radius: 4px;
+      padding: 7px 14px;
+      font-size: 0.83rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.15s;
+    }
+
+    .btn-map-focus:hover {
+      background: rgba(255,255,255,0.16);
+      transform: scale(1.03);
+    }
+
     /* ─── HERO ─── */
     .hero {
       position: relative;
@@ -211,6 +228,41 @@
       border-radius: 50%;
       background: #fff;
       animation: pulseDot 2s ease-in-out infinite;
+    }
+
+    .windy-focus {
+      overflow: hidden;
+    }
+
+    .windy-focus .navbar {
+      z-index: 140;
+      background: rgba(5, 26, 45, 0.98);
+      box-shadow: 0 2px 20px rgba(0,0,0,0.5);
+    }
+
+    .windy-focus .hero {
+      position: relative;
+      z-index: 130;
+    }
+
+    .windy-focus .hero-map-wrap {
+      position: fixed;
+      top: 72px;
+      left: 2%;
+      right: 2%;
+      bottom: 2%;
+      border-radius: 10px;
+      box-shadow: 0 20px 80px rgba(0,0,0,0.78);
+    }
+
+    .windy-focus .map-frame {
+      height: 100%;
+    }
+
+    .windy-focus .layer-bar,
+    .windy-focus .content {
+      visibility: hidden;
+      pointer-events: none;
     }
 
     @keyframes pulseDot {
@@ -755,6 +807,18 @@
       .port-icon { font-size: 2.5rem; }
       .fines-table { font-size: 0.74rem; }
       .fines-table th, .fines-table td { padding: 6px 6px; }
+
+      .btn-map-focus {
+        padding: 6px 10px;
+        font-size: 0.75rem;
+      }
+
+      .windy-focus .hero-map-wrap {
+        top: 60px;
+        left: 1%;
+        right: 1%;
+        bottom: 1%;
+      }
     }
   </style>
 </head>
@@ -771,6 +835,7 @@
     </div>
     <div class="nav-right">
       <span class="nav-badge" id="bgMode">--</span>
+      <button class="btn-map-focus" id="focusMapBtn" aria-pressed="false">⤢ Mapa amplio</button>
       <button class="btn-reload" id="reloadBtn">⟳ Actualizar</button>
     </div>
   </nav>
@@ -1014,6 +1079,26 @@
     const navbar = document.getElementById('navbar');
     window.addEventListener('scroll', () => {
       navbar.classList.toggle('scrolled', window.scrollY > 40);
+    });
+
+    const focusMapBtn = document.getElementById('focusMapBtn');
+    let isMapFocused = false;
+
+    function setMapFocus(next) {
+      isMapFocused = next;
+      document.body.classList.toggle('windy-focus', next);
+      focusMapBtn.textContent = next ? '🗗 Cerrar mapa' : '⤢ Mapa amplio';
+      focusMapBtn.setAttribute('aria-pressed', next ? 'true' : 'false');
+    }
+
+    focusMapBtn.addEventListener('click', () => {
+      setMapFocus(!isMapFocused);
+    });
+
+    window.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && isMapFocused) {
+        setMapFocus(false);
+      }
     });
 
     /* ─── RAIN / PARTICLE FX ─── */
