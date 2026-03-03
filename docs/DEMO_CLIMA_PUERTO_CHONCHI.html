@@ -681,6 +681,33 @@
       color: var(--muted);
     }
 
+    .decision-now {
+      margin-bottom: 8px;
+      padding: 8px 10px;
+      border-radius: 6px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.04);
+      font-size: 0.82rem;
+      font-weight: 800;
+      letter-spacing: 0.3px;
+      color: var(--text-bright);
+    }
+
+    .decision-now.ok {
+      border-left: 4px solid var(--good);
+      background: rgba(76,215,160,0.12);
+    }
+
+    .decision-now.warn {
+      border-left: 4px solid var(--mid);
+      background: rgba(244,201,93,0.12);
+    }
+
+    .decision-now.danger {
+      border-left: 4px solid var(--bad);
+      background: rgba(255,107,107,0.12);
+    }
+
     .port-closure-drivers {
       display: flex;
       flex-wrap: wrap;
@@ -1035,6 +1062,7 @@
               <div class="port-detail-item">
                 <div class="pdl">Decisión rápida (próx. 24h)</div>
                 <div class="port-closure-box">
+                  <div class="decision-now" id="decisionNow">DECISIÓN RECOMENDADA AHORA: evaluando...</div>
                   <div class="port-closure-headline" id="closureHeadline">Calculando cierre probable...</div>
                   <div class="port-closure-secondary" id="restrictionHeadline">Calculando restricción probable...</div>
                   <div class="port-closure-sub" id="closureSub">Analizando viento, rachas, lluvia y oleaje.</div>
@@ -2004,6 +2032,7 @@
           drivers: ['Sin ventana horaria suficiente en API'],
           summary: 'Sin datos suficientes para proyección 24h',
           why: 'Sin datos horarios suficientes para un cálculo estable.',
+          nowStatus: portNow?.status ?? 'ABIERTO',
           samples: []
         };
       }
@@ -2076,16 +2105,30 @@
 
       const why = `24h horarias: índice máx ${num(maxIndex, 0)}, promedio ${num(avgIndex, 0)}, horas críticas ${highHours}, atención ${mediumHours}. Cierre usa umbral ${num(closeProbability, 0)}% (o gatillo duro); restricción usa ${num(restrictProbability, 0)}%.`;
 
-      return { closeLikely, restrictLikely, closeProbability, restrictProbability, uncertainty, topRisk, drivers, summary, why, samples };
+      return { closeLikely, restrictLikely, closeProbability, restrictProbability, uncertainty, topRisk, drivers, summary, why, nowStatus: portNow?.status ?? 'ABIERTO', samples };
     }
 
     function renderClosureOutlook(outlook) {
+      const decisionEl = document.getElementById('decisionNow');
       const headlineEl = document.getElementById('closureHeadline');
       const restrictionEl = document.getElementById('restrictionHeadline');
       const subEl = document.getElementById('closureSub');
       const uncertaintyEl = document.getElementById('closureUncertainty');
       const whyEl = document.getElementById('closureWhy');
       const driversEl = document.getElementById('closureDrivers');
+
+      decisionEl.classList.remove('ok', 'warn', 'danger');
+      if (outlook.closeLikely || outlook.nowStatus === 'CERRADO') {
+        decisionEl.classList.add('danger');
+        decisionEl.textContent = 'DECISIÓN RECOMENDADA AHORA: ⛔ Preparar cierre y limitar salidas';
+      } else if (outlook.restrictLikely || outlook.nowStatus === 'RESTRINGIDO') {
+        decisionEl.classList.add('warn');
+        decisionEl.textContent = 'DECISIÓN RECOMENDADA AHORA: ⚠ Operar con restricción y carta';
+      } else {
+        decisionEl.classList.add('ok');
+        decisionEl.textContent = 'DECISIÓN RECOMENDADA AHORA: ✅ Operar normal con monitoreo';
+      }
+      decisionEl.title = 'Recomendación táctica inmediata basada en estado actual + probabilidad 24h.';
 
       headlineEl.classList.remove('yes', 'no');
       restrictionEl.classList.remove('yes', 'no');
