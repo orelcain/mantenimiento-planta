@@ -2620,151 +2620,129 @@
     }
 
     /* ═══════════════════════════════════════════════════════════════
-       DIRECTEMAR SITPORT — scraping en vivo del estado oficial
+       DIRECTEMAR SITPORT — API JSON oficial en vivo
        ═══════════════════════════════════════════════════════════════ */
-    const SITPORT_URL = 'https://sitport.directemar.cl/';
-    /* Cloud Function proxy propio (prioridad 1, sin CORS) */
+    /* API REST oficial de SITPORT (CORS: Access-Control-Allow-Origin: *) */
+    const SITPORT_API = 'https://orion.directemar.cl/sitport/back/users/Totalgeneral';
+    /* Cloud Function como fallback si la API directa falla */
     const CF_PROXY = 'https://us-central1-mantenimiento-planta-771a3.cloudfunctions.net/sitportProxy';
-    /* CORS proxies de terceros como fallback */
-    const CORS_PROXIES = [
-      url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-      url => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
-      url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
-      url => `https://thingproxy.freeboard.io/fetch/${url}`,
-    ];
-    let _dmCache = null;  // cache para no golpear el proxy en cada reload
+    /* Puertos cercanos a monitorear */
+    const NEARBY_PORTS = ['CASTRO', 'QUELLÓN', 'QUELLON', 'ANCUD', 'PUERTO MONTT', 'CALBUCO'];
+    let _dmCache = null;
     let _dmTimer = null;
 
-    async function fetchSitportHTML() {
-      /* 1) Intentar Cloud Function propia (más rápido y confiable) */
+    /**
+     * Obtiene datos de TODOS los puertos desde la API SITPORT.
+     * Prioridad 1: API directa (CORS habilitado).
+     * Prioridad 2: Cloud Function proxy.
+     * Retorna: Array de objetos {reparticion, restricciones, medicionMeteo, observacionCapuerto}
+     */
+    async function fetchSitportData() {
+      /* 1) API directa */
       try {
         const ctrl = new AbortController();
         const timer = setTimeout(() => ctrl.abort(), 15000);
-        const resp = await fetch(CF_PROXY, { signal: ctrl.signal });
+        const resp = await fetch(SITPORT_API, { signal: ctrl.signal });
         clearTimeout(timer);
         if (resp.ok) {
           const data = await resp.json();
-          if (data.ok && data.html && data.html.length > 500 && data.html.includes('CAPITAN')) {
-            console.log('✅ SITPORT via Cloud Function');
-            return data.html;
+          if (Array.isArray(data) && data.length > 10) {
+            console.log('✅ SITPORT API directa OK —', data.length, 'puertos');
+            return data;
           }
         }
-      } catch (_) { console.warn('Cloud Function proxy falló, intentando CORS proxies...'); }
+      } catch (e) { console.warn('API directa falló:', e.message); }
 
-      /* 2) Fallback: CORS proxies de terceros */
-      for (const makeUrl of CORS_PROXIES) {
-        try {
-          const ctrl = new AbortController();
-          const timer = setTimeout(() => ctrl.abort(), 18000);
-          const resp = await fetch(makeUrl(SITPORT_URL), { signal: ctrl.signal });
-          clearTimeout(timer);
-          if (!resp.ok) continue;
-          const text = await resp.text();
-          if (text.length < 500 || !text.includes('CAPITAN')) continue;
-          console.log('✅ SITPORT via CORS proxy');
-          return text;
-        } catch (_) { /* next proxy */ }
-      }
+      /* 2) Fallback: Cloud Function proxy */
+      try {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 20000);
+        const resp = await fetch(CF_PROXY, { signal: ctrl.signal });
+        clearTimeout(timer);
+        if (resp.ok) {
+          const json = await resp.json();
+          if (json.ok && Array.isArray(json.data) && json.data.length > 10) {
+            console.log('✅ SITPORT via Cloud Function —', json.data.length, 'puertos');
+            return json.data;
+          }
+        }
+      } catch (e) { console.warn('Cloud Function proxy falló:', e.message); }
+
       return null;
     }
 
     /**
-     * Parsea el HTML del SITPORT para extraer datos de Chonchi y puertos cercanos.
-     * Retorna: { found, restricciones, estado, medicion, nearby[], timestamp }
+     * Extrae datos de Chonchi y puertos cercanos del array de puertos.
+     * Retorna: { found, restricciones, estado, navesMayores, navesMenores,
+     *            restriccionBahia, medicion, nearby[], timestamp }
      */
-    function parseSitportChonchi(html) {
+    function extractChonchiData(ports) {
       const result = {
         found: false,
         restricciones: 0,
         estado: 'DESCONOCIDO',
+        navesMayores: false,
+        navesMenores: false,
+        restriccionBahia: false,
         medicion: null,
         nearby: [],
         timestamp: new Date().toISOString(),
       };
 
-      try {
-        const doc = new DOMParser().parseFromString(html, 'text/html');
-        // Buscar todos los elementos que contienen nombres de capitanías
-        const allText = doc.body?.textContent ?? html;
+      if (!Array.isArray(ports)) return result;
 
-        // Extraer Chonchi — patrón: "CAPITANÍA DE PUERTO CHONCHI" seguido de un número
-        const capRx = /CAPITAN[ÍI]A\s+DE\s+PUERTO\s+CHONCHI\s*(?:<[^>]*>\s*)*(\d+)/i;
-        const capMatch = html.match(capRx);
-        if (!capMatch) {
-          // Fallback: buscar en texto plano
-          const textMatch = allText.match(/CAPITAN[ÍI]A\s+DE\s+PUERTO\s+CHONCHI\D*(\d+)/i);
-          if (textMatch) {
-            result.found = true;
-            result.restricciones = parseInt(textMatch[1], 10);
-          }
-        } else {
-          result.found = true;
-          result.restricciones = parseInt(capMatch[1], 10);
-        }
+      // Buscar Chonchi
+      const chonchi = ports.find(p => p.reparticion?.nombre?.includes('CHONCHI'));
+      if (!chonchi) return result;
 
-        if (result.found) {
-          result.estado = result.restricciones > 0 ? 'CON RESTRICCIÓN' : 'SIN RESTRICCIÓN';
-        }
+      result.found = true;
+      const r = chonchi.restricciones ?? {};
+      result.restricciones = r.numeroRestricciones ?? 0;
+      result.navesMayores = r.navesMayores ?? false;
+      result.navesMenores = r.navesMenores ?? false;
+      result.restriccionBahia = r.restriccionBahia ?? false;
+      result.estado = result.restricciones > 0 ? 'CON RESTRICCIÓN' : 'SIN RESTRICCIÓN';
 
-        // Extraer medición meteorológica cercana a CHONCHI
-        // El HTML de SITPORT tiene: "MEDICIÓN METEOROLÓGICA: 14.1 ºC →7 nds N ◎ 1007.28 hPa (03/03/2026 12:12)"
-        const meteoRx = /CHONCHI[\s\S]{0,500}?MEDICI[ÓO]N\s+METEOROL[ÓO]GICA[:\s]*([\s\S]{0,200}?\d{2}:\d{2}\s*\))/i;
-        const meteoMatch = html.match(meteoRx);
-        if (meteoMatch) {
-          const raw = meteoMatch[1].replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-          result.medicion = parseMeteoString(raw);
-        } else {
-          // Fallback: buscar en texto plano
-          const textMeteo = allText.match(/CHONCHI[\s\S]{0,400}?MEDICI[ÓO]N\s+METEOROL[ÓO]GICA[:\s]*([\s\S]{0,200}?\d{2}:\d{2})/i);
-          if (textMeteo) {
-            result.medicion = parseMeteoString(textMeteo[1].trim());
-          }
-        }
-
-        // Puertos cercanos relevantes (Castro, Quellón, Ancud, Puerto Montt, Calbuco)
-        const nearbyNames = ['CASTRO', 'QUELL[ÓO]N', 'ANCUD', 'PUERTO MONTT', 'CALBUCO'];
-        for (const name of nearbyNames) {
-          const rx = new RegExp('CAPITAN[ÍI]A\\s+DE\\s+PUERTO\\s+' + name + '\\D*(\\d+)', 'i');
-          const m = allText.match(rx);
-          if (m) {
-            const count = parseInt(m[1], 10);
-            result.nearby.push({
-              nombre: m[0].replace(/\d+$/, '').replace(/CAPITAN[ÍI]A DE PUERTO /i, '').trim(),
-              restricciones: count,
-              estado: count > 0 ? 'RESTRICCIÓN' : 'ABIERTO'
-            });
-          }
-        }
-      } catch (e) {
-        console.warn('Error parseando SITPORT:', e);
+      // Medición meteorológica
+      const m = chonchi.medicionMeteo;
+      if (m) {
+        result.medicion = {
+          temp: m.temperatura,
+          windSpeed: m.velocidadViento,
+          windDir: m.textoDireccionViento ?? null,
+          windDeg: m.direccionViento ?? null,
+          pressure: m.presion,
+          rain: m.lluviaUltimaHora ?? 0,
+          date: m.fecha ? new Date(m.fecha).toLocaleString('es-CL', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }) : null,
+          unidadViento: m.unidadViento ?? 'nds',
+          unidadPresion: m.unidadPresion ?? 'hPa',
+        };
       }
-      return result;
-    }
 
-    function parseMeteoString(raw) {
-      // Ejemplos: "14.1 ºC →7 nds N ◎ 1007.28 hPa (03/03/2026 12:12 )"
-      //           "14.2 ºC  9.8 nds N  1007.45 hPa (03/03/2026 12:17)"
-      // Limpiamos caracteres especiales (flechas, símbolos)
-      const clean = raw.replace(/[→←↑↓◎●○■□▲▼☀☁☂⚡\uD83C-\uDBFF\uDC00-\uDFFF]/g, ' ').replace(/\s+/g, ' ');
-      const tempMatch = clean.match(/([\d.]+)\s*[°ºo]?\s*C/i);
-      const windMatch = clean.match(/([\d.]+)\s*nds\s*([NSEW]{1,3})/i);
-      const pressMatch = clean.match(/([\d.]+)\s*(?:hPa|mb)/i);
-      const dateMatch = clean.match(/(\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2})/);
-      return {
-        raw,
-        temp: tempMatch ? parseFloat(tempMatch[1]) : null,
-        windSpeed: windMatch ? parseFloat(windMatch[1]) : null,
-        windDir: windMatch ? windMatch[2] : null,
-        pressure: pressMatch ? parseFloat(pressMatch[1]) : null,
-        date: dateMatch ? dateMatch[1] : null,
-      };
+      // Puertos cercanos
+      for (const port of ports) {
+        const name = port.reparticion?.nombre ?? '';
+        if (NEARBY_PORTS.some(n => name.toUpperCase().includes(n))) {
+          const nr = port.restricciones ?? {};
+          const pm = port.medicionMeteo;
+          result.nearby.push({
+            nombre: name.replace(/CAPITAN[ÍI]A DE PUERTO /i, '').trim(),
+            restricciones: nr.numeroRestricciones ?? 0,
+            estado: (nr.numeroRestricciones ?? 0) > 0 ? 'RESTRICCIÓN' : 'ABIERTO',
+            viento: pm?.velocidadViento ?? null,
+            dirViento: pm?.textoDireccionViento ?? null,
+          });
+        }
+      }
+
+      return result;
     }
 
     async function fetchDirectemarStatus(force = false) {
       if (!force && _dmCache && (Date.now() - _dmCache._ts < 120000)) return _dmCache;
-      const html = await fetchSitportHTML();
-      if (!html) return null;
-      const parsed = parseSitportChonchi(html);
+      const ports = await fetchSitportData();
+      if (!ports) return null;
+      const parsed = extractChonchiData(ports);
       parsed._ts = Date.now();
       _dmCache = parsed;
       return parsed;
@@ -2790,8 +2768,8 @@
         status.className = 'dm-big-status loading';
         status.textContent = 'NO DISPONIBLE';
         restr.className = 'dm-restricciones none';
-        restr.textContent = 'Sin conexión a SITPORT';
-        medicion.innerHTML = 'No se pudo consultar DIRECTEMAR. <span style="color:var(--muted)">Los proxies CORS pueden estar bloqueados o SITPORT fuera de línea.</span>';
+        restr.textContent = 'Sin conexión a API SITPORT';
+        medicion.innerHTML = 'No se pudo consultar la API de DIRECTEMAR. <span style="color:var(--muted)">Verifique conectividad o intente más tarde.</span>';
         restrTags.innerHTML = '<span class="dm-restriccion-tag warn">Sin datos</span>';
         nearby.textContent = 'No disponible';
         ts.textContent = 'Última consulta: ' + new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }) + ' — sin respuesta';
@@ -2811,35 +2789,41 @@
         ? `${dm.restricciones} restriccion${dm.restricciones > 1 ? 'es' : ''} activa${dm.restricciones > 1 ? 's' : ''}`
         : 'Sin restricciones';
 
-      // Medición
+      // Medición meteorológica
       if (dm.medicion && dm.medicion.temp !== null) {
         const m = dm.medicion;
         const wind_kmh = m.windSpeed !== null ? (m.windSpeed * 1.852).toFixed(1) : '—';
-        medicion.innerHTML = `🌡️ <strong>${m.temp}°C</strong> · 💨 <strong>${m.windSpeed ?? '—'} nds ${m.windDir ?? ''}</strong> (${wind_kmh} km/h) · 📊 <strong>${m.pressure ?? '—'} hPa</strong>` +
+        const rainHtml = m.rain > 0 ? ` · 🌧️ <strong>${m.rain} mm/h</strong>` : '';
+        medicion.innerHTML = `🌡️ <strong>${m.temp}°C</strong> · 💨 <strong>${m.windSpeed ?? '—'} ${m.unidadViento ?? 'nds'} ${m.windDir ?? ''}</strong> (${wind_kmh} km/h) · 📊 <strong>${m.pressure ?? '—'} ${m.unidadPresion ?? 'hPa'}</strong>${rainHtml}` +
           (m.date ? ` · 📅 ${m.date}` : '');
       } else {
         medicion.innerHTML = '<span style="color:var(--muted)">Sin medición automática reportada</span>';
       }
 
-      // Restricciones tags
+      // Restricciones tags detallados
       if (hasRestr) {
-        restrTags.innerHTML = `<span class="dm-restriccion-tag">${dm.restricciones} restriccion${dm.restricciones > 1 ? 'es' : ''} informada${dm.restricciones > 1 ? 's' : ''} por Capitanía</span>`;
+        let tags = `<span class="dm-restriccion-tag">${dm.restricciones} restriccion${dm.restricciones > 1 ? 'es' : ''}</span>`;
+        if (dm.navesMayores) tags += '<span class="dm-restriccion-tag" style="background:rgba(255,107,107,0.15);color:#ff6b6b">🚢 Naves Mayores</span>';
+        if (dm.navesMenores) tags += '<span class="dm-restriccion-tag" style="background:rgba(255,107,107,0.15);color:#ff6b6b">⛵ Naves Menores</span>';
+        if (dm.restriccionBahia) tags += '<span class="dm-restriccion-tag" style="background:rgba(244,201,93,0.2);color:#f4c95d">🌊 Bahía</span>';
+        restrTags.innerHTML = tags;
       } else {
         restrTags.innerHTML = '<span class="dm-restriccion-tag" style="color:var(--good);background:rgba(70,211,105,0.1)">Sin restricciones</span>';
       }
 
-      // Puertos cercanos
+      // Puertos cercanos con viento
       if (dm.nearby.length > 0) {
         nearby.innerHTML = dm.nearby.map(p => {
           const color = p.restricciones > 0 ? '#ff6b6b' : '#4cd7a0';
           const ico = p.restricciones > 0 ? '🔴' : '🟢';
-          return `${ico} <strong style="color:${color}">${p.nombre}</strong> (${p.restricciones})`;
+          const windInfo = p.viento !== null ? ` 💨${p.viento}nds ${p.dirViento ?? ''}` : '';
+          return `${ico} <strong style="color:${color}">${p.nombre}</strong> (${p.restricciones})${windInfo}`;
         }).join(' · ');
       } else {
         nearby.textContent = 'Sin datos de puertos cercanos';
       }
 
-      ts.textContent = 'Consulta: ' + new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }) + ' hrs';
+      ts.textContent = 'Consulta API SITPORT: ' + new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }) + ' hrs';
     }
 
     /**

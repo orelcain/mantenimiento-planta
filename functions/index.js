@@ -838,13 +838,16 @@ exports.purgeSensorReadingsManual = onCall(
 
 // ==================== PROXY SITPORT DIRECTEMAR ====================
 /**
- * Proxy HTTP para consultar el portal SITPORT de DIRECTEMAR.
- * Evita problemas de CORS al hacer la petición servidor-a-servidor.
+ * Proxy/fallback para consultar la API oficial de SITPORT (DIRECTEMAR).
+ * La API principal (orion.directemar.cl) tiene CORS abierto (*) así que
+ * el frontend la llama directo. Esta Cloud Function sirve como fallback
+ * por si CORS deja de funcionar o la API cambia de dominio.
  *
  * Uso: GET https://<region>-<project>.cloudfunctions.net/sitportProxy
- * Retorna: JSON con { ok, html, timestamp, error? }
+ * Retorna: JSON con { ok, data[], timestamp } donde data es el array
+ *          completo de Totalgeneral de SITPORT.
  *
- * Cache: respuesta con Cache-Control 2 min para no saturar SITPORT.
+ * Cache: 2 min CDN / 1 min browser.
  */
 exports.sitportProxy = onRequest(
   {
@@ -859,46 +862,46 @@ exports.sitportProxy = onRequest(
       return
     }
 
-    // Cache 2 min en CDN, 1 min en browser
     res.set('Cache-Control', 'public, max-age=60, s-maxage=120')
 
+    const SITPORT_API = 'https://orion.directemar.cl/sitport/back/users/Totalgeneral'
+
     try {
-      // Node 20 tiene fetch global nativo
       const controller = new AbortController()
       const timeout = setTimeout(() => controller.abort(), 20000)
 
-      const response = await fetch('https://sitport.directemar.cl/', {
+      const response = await fetch(SITPORT_API, {
         signal: controller.signal,
         headers: {
           'User-Agent': 'Mozilla/5.0 (compatible; MantenimientoApp/1.0)',
-          'Accept': 'text/html',
+          'Accept': 'application/json',
         },
       })
       clearTimeout(timeout)
 
       if (!response.ok) {
-        logger.warn('SITPORT responded with status', response.status)
+        logger.warn('SITPORT API responded with status', response.status)
         res.status(502).json({
           ok: false,
-          error: `SITPORT HTTP ${response.status}`,
+          error: `SITPORT API HTTP ${response.status}`,
           timestamp: new Date().toISOString(),
         })
         return
       }
 
-      const html = await response.text()
-      logger.info('SITPORT fetched OK', { bytes: html.length })
+      const data = await response.json()
+      logger.info('SITPORT API fetched OK', { ports: data.length })
 
       res.json({
         ok: true,
-        html,
+        data,
         timestamp: new Date().toISOString(),
       })
     } catch (err) {
-      logger.error('SITPORT fetch error', err)
+      logger.error('SITPORT API fetch error', err)
       res.status(502).json({
         ok: false,
-        error: err.message || 'Failed to fetch SITPORT',
+        error: err.message || 'Failed to fetch SITPORT API',
         timestamp: new Date().toISOString(),
       })
     }
