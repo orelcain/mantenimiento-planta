@@ -2623,15 +2623,35 @@
        DIRECTEMAR SITPORT — scraping en vivo del estado oficial
        ═══════════════════════════════════════════════════════════════ */
     const SITPORT_URL = 'https://sitport.directemar.cl/';
+    /* Cloud Function proxy propio (prioridad 1, sin CORS) */
+    const CF_PROXY = 'https://us-central1-mantenimiento-planta-771a3.cloudfunctions.net/sitportProxy';
+    /* CORS proxies de terceros como fallback */
     const CORS_PROXIES = [
       url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
       url => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
       url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+      url => `https://thingproxy.freeboard.io/fetch/${url}`,
     ];
     let _dmCache = null;  // cache para no golpear el proxy en cada reload
     let _dmTimer = null;
 
     async function fetchSitportHTML() {
+      /* 1) Intentar Cloud Function propia (más rápido y confiable) */
+      try {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 15000);
+        const resp = await fetch(CF_PROXY, { signal: ctrl.signal });
+        clearTimeout(timer);
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data.ok && data.html && data.html.length > 500 && data.html.includes('CAPITAN')) {
+            console.log('✅ SITPORT via Cloud Function');
+            return data.html;
+          }
+        }
+      } catch (_) { console.warn('Cloud Function proxy falló, intentando CORS proxies...'); }
+
+      /* 2) Fallback: CORS proxies de terceros */
       for (const makeUrl of CORS_PROXIES) {
         try {
           const ctrl = new AbortController();
@@ -2641,6 +2661,7 @@
           if (!resp.ok) continue;
           const text = await resp.text();
           if (text.length < 500 || !text.includes('CAPITAN')) continue;
+          console.log('✅ SITPORT via CORS proxy');
           return text;
         } catch (_) { /* next proxy */ }
       }
@@ -2686,11 +2707,18 @@
         }
 
         // Extraer medición meteorológica cercana a CHONCHI
-        const meteoRx = /CHONCHI[\s\S]{0,300}?MEDICI[ÓO]N\s+METEOROL[ÓO]GICA[:\s]*(.*?)(?:<\/|\n)/i;
+        // El HTML de SITPORT tiene: "MEDICIÓN METEOROLÓGICA: 14.1 ºC →7 nds N ◎ 1007.28 hPa (03/03/2026 12:12)"
+        const meteoRx = /CHONCHI[\s\S]{0,500}?MEDICI[ÓO]N\s+METEOROL[ÓO]GICA[:\s]*([\s\S]{0,200}?\d{2}:\d{2}\s*\))/i;
         const meteoMatch = html.match(meteoRx);
         if (meteoMatch) {
-          const raw = meteoMatch[1].replace(/<[^>]*>/g, '').trim();
+          const raw = meteoMatch[1].replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
           result.medicion = parseMeteoString(raw);
+        } else {
+          // Fallback: buscar en texto plano
+          const textMeteo = allText.match(/CHONCHI[\s\S]{0,400}?MEDICI[ÓO]N\s+METEOROL[ÓO]GICA[:\s]*([\s\S]{0,200}?\d{2}:\d{2})/i);
+          if (textMeteo) {
+            result.medicion = parseMeteoString(textMeteo[1].trim());
+          }
         }
 
         // Puertos cercanos relevantes (Castro, Quellón, Ancud, Puerto Montt, Calbuco)
@@ -2714,11 +2742,14 @@
     }
 
     function parseMeteoString(raw) {
-      // "14.2 ºC  9.8 nds N  1007.45 hPa (03/03/2026 12:17 )"
-      const tempMatch = raw.match(/([\d.]+)\s*[°º]?\s*C/i);
-      const windMatch = raw.match(/([\d.]+)\s*nds\s*([NSEW]{1,3})/i);
-      const pressMatch = raw.match(/([\d.]+)\s*(?:hPa|mb)/i);
-      const dateMatch = raw.match(/(\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2})/);
+      // Ejemplos: "14.1 ºC →7 nds N ◎ 1007.28 hPa (03/03/2026 12:12 )"
+      //           "14.2 ºC  9.8 nds N  1007.45 hPa (03/03/2026 12:17)"
+      // Limpiamos caracteres especiales (flechas, símbolos)
+      const clean = raw.replace(/[→←↑↓◎●○■□▲▼☀☁☂⚡\uD83C-\uDBFF\uDC00-\uDFFF]/g, ' ').replace(/\s+/g, ' ');
+      const tempMatch = clean.match(/([\d.]+)\s*[°ºo]?\s*C/i);
+      const windMatch = clean.match(/([\d.]+)\s*nds\s*([NSEW]{1,3})/i);
+      const pressMatch = clean.match(/([\d.]+)\s*(?:hPa|mb)/i);
+      const dateMatch = clean.match(/(\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2})/);
       return {
         raw,
         temp: tempMatch ? parseFloat(tempMatch[1]) : null,

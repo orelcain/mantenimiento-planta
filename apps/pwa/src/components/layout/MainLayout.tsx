@@ -326,12 +326,11 @@ export function MainLayout() {
         role="navigation"
         aria-label="Menú principal"
         aria-expanded={sidebarOpen}
+        style={isClimaRoute ? { transform: 'translateX(0)' } : undefined}
         className={cn(
           'fixed inset-y-0 left-0 z-50 w-64 bg-card border-r transform transition-transform duration-200 ease-in-out',
-          isClimaRoute
-            ? 'translate-x-0'   // clima: sidebar visible en TODA resolución
-            : sidebarOpen ? 'translate-x-0' : '-translate-x-full',
-          !isClimaRoute && (shouldHideDesktopSidebar ? 'lg:-translate-x-full' : 'lg:translate-x-0')
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full',
+          shouldHideDesktopSidebar ? 'lg:-translate-x-full' : 'lg:translate-x-0'
         )}
         onMouseLeave={() => {
           if (isGanttRoute && ganttFocusMode) {
@@ -491,7 +490,10 @@ export function MainLayout() {
       )}
 
       {/* Main content */}
-      <div className={cn('transition-[padding] duration-200 ease-in-out', isClimaRoute ? 'pl-64' : (!shouldHideDesktopSidebar && 'lg:pl-64'))}>
+      <div
+        style={isClimaRoute ? { paddingLeft: '16rem' } : undefined}
+        className={cn('transition-[padding] duration-200 ease-in-out', !shouldHideDesktopSidebar && 'lg:pl-64')}
+      >
         {/* Top bar */}
         <header className="sticky top-0 z-30 flex items-center h-16 px-4 bg-background/80 backdrop-blur border-b">
           {!isClimaRoute && (

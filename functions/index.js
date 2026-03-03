@@ -1,5 +1,5 @@
 const { onDocumentCreated, onDocumentUpdated } = require('firebase-functions/v2/firestore')
-const { onCall } = require('firebase-functions/v2/https')
+const { onCall, onRequest } = require('firebase-functions/v2/https')
 const { onSchedule } = require('firebase-functions/v2/scheduler')
 const { logger } = require('firebase-functions')
 const { initializeApp } = require('firebase-admin/app')
@@ -832,6 +832,75 @@ exports.purgeSensorReadingsManual = onCall(
       retentionDays,
       cutoff: new Date(cutoffMs).toISOString(),
       message: `Eliminadas ${totalDeleted} lecturas de ${totalEquipments} equipos (retención: ${retentionDays} días)`,
+    }
+  }
+)
+
+// ==================== PROXY SITPORT DIRECTEMAR ====================
+/**
+ * Proxy HTTP para consultar el portal SITPORT de DIRECTEMAR.
+ * Evita problemas de CORS al hacer la petición servidor-a-servidor.
+ *
+ * Uso: GET https://<region>-<project>.cloudfunctions.net/sitportProxy
+ * Retorna: JSON con { ok, html, timestamp, error? }
+ *
+ * Cache: respuesta con Cache-Control 2 min para no saturar SITPORT.
+ */
+exports.sitportProxy = onRequest(
+  {
+    region: 'us-central1',
+    cors: true,
+    timeoutSeconds: 30,
+    memory: '256MiB',
+  },
+  async (req, res) => {
+    if (req.method !== 'GET') {
+      res.status(405).json({ ok: false, error: 'Method not allowed' })
+      return
+    }
+
+    // Cache 2 min en CDN, 1 min en browser
+    res.set('Cache-Control', 'public, max-age=60, s-maxage=120')
+
+    try {
+      // Node 20 tiene fetch global nativo
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 20000)
+
+      const response = await fetch('https://sitport.directemar.cl/', {
+        signal: controller.signal,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; MantenimientoApp/1.0)',
+          'Accept': 'text/html',
+        },
+      })
+      clearTimeout(timeout)
+
+      if (!response.ok) {
+        logger.warn('SITPORT responded with status', response.status)
+        res.status(502).json({
+          ok: false,
+          error: `SITPORT HTTP ${response.status}`,
+          timestamp: new Date().toISOString(),
+        })
+        return
+      }
+
+      const html = await response.text()
+      logger.info('SITPORT fetched OK', { bytes: html.length })
+
+      res.json({
+        ok: true,
+        html,
+        timestamp: new Date().toISOString(),
+      })
+    } catch (err) {
+      logger.error('SITPORT fetch error', err)
+      res.status(502).json({
+        ok: false,
+        error: err.message || 'Failed to fetch SITPORT',
+        timestamp: new Date().toISOString(),
+      })
     }
   }
 )
