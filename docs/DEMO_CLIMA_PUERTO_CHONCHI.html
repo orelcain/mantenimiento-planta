@@ -3,24 +3,24 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Puerto Chonchi · Clima en Vivo</title>
+  <title>Puerto Chonchi · Centro Meteo Operativo</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
   <style>
     :root {
       color-scheme: dark;
-      --bg: #141414;
-      --surface: #1a1a1a;
-      --card: #232323;
-      --card-hover: #2a2a2a;
-      --netflix-red: #E50914;
-      --netflix-red-dark: #B20710;
+      --bg: #051a2d;
+      --surface: #0a273d;
+      --card: #10344e;
+      --card-hover: #174b6f;
+      --brand-primary: #00a6b2;
+      --brand-primary-dark: #007e86;
       --text: #e5e5e5;
       --text-bright: #ffffff;
-      --muted: #808080;
-      --good: #46d369;
-      --mid: #f5c518;
-      --bad: #E50914;
+      --muted: #90a4b8;
+      --good: #4cd7a0;
+      --mid: #f4c95d;
+      --bad: #ff6b6b;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -54,12 +54,12 @@
       justify-content: space-between;
       padding: 0 4%;
       height: 64px;
-      background: linear-gradient(180deg, rgba(0,0,0,0.85) 0%, transparent 100%);
+      background: linear-gradient(180deg, rgba(2, 20, 34, 0.9) 0%, transparent 100%);
       transition: background 0.3s;
     }
 
     .navbar.scrolled {
-      background: rgba(20, 20, 20, 0.97);
+      background: rgba(5, 26, 45, 0.97);
       box-shadow: 0 2px 20px rgba(0,0,0,0.5);
     }
 
@@ -70,11 +70,17 @@
     }
 
     .nav-logo {
-      font-size: 1.6rem;
-      font-weight: 900;
-      letter-spacing: -0.5px;
-      color: var(--netflix-red);
-      text-transform: uppercase;
+      font-size: 1.1rem;
+      font-weight: 800;
+      letter-spacing: 0.2px;
+      color: var(--brand-primary);
+      text-transform: none;
+    }
+
+    .nav-logo-img {
+      height: 28px;
+      width: auto;
+      display: block;
     }
 
     .nav-divider {
@@ -105,7 +111,7 @@
     }
 
     .btn-reload {
-      background: var(--netflix-red);
+      background: var(--brand-primary);
       color: #fff;
       border: none;
       border-radius: 4px;
@@ -117,7 +123,7 @@
     }
 
     .btn-reload:hover {
-      background: var(--netflix-red-dark);
+      background: var(--brand-primary-dark);
       transform: scale(1.04);
     }
 
@@ -144,7 +150,7 @@
       pointer-events: none;
       background:
         linear-gradient(0deg, var(--bg) 0%, transparent 30%),
-        linear-gradient(180deg, rgba(20,20,20,0.4) 0%, transparent 20%);
+        linear-gradient(180deg, rgba(5, 26, 45, 0.35) 0%, transparent 20%);
       z-index: 2;
     }
 
@@ -162,6 +168,7 @@
       right: 0;
       z-index: 3;
       padding: 32px 32px 24px;
+      pointer-events: none;
     }
 
     .hero-title {
@@ -186,11 +193,12 @@
       margin-top: 14px;
       padding: 8px 18px;
       border-radius: 4px;
-      background: rgba(229,9,20,0.85);
+      background: rgba(0, 166, 178, 0.82);
       color: #fff;
       font-weight: 700;
       font-size: 0.92rem;
       backdrop-filter: blur(4px);
+      pointer-events: none;
     }
 
     .hero-condition .cond-dot {
@@ -236,9 +244,9 @@
     }
 
     .layer-pill.active {
-      background: var(--netflix-red);
+      background: var(--brand-primary);
       color: #fff;
-      border-color: var(--netflix-red);
+      border-color: var(--brand-primary);
     }
 
     /* ─── SECTION ROWS ─── */
@@ -265,7 +273,7 @@
     .row-title .accent-bar {
       width: 4px;
       height: 22px;
-      background: var(--netflix-red);
+      background: var(--brand-primary);
       border-radius: 2px;
     }
 
@@ -301,7 +309,7 @@
       left: 0;
       right: 0;
       height: 3px;
-      background: var(--netflix-red);
+      background: var(--brand-primary);
       opacity: 0;
       transition: opacity 0.25s;
     }
@@ -389,7 +397,7 @@
       background: rgba(0,0,0,0.4);
       position: sticky;
       top: 0;
-      border-bottom: 2px solid var(--netflix-red);
+      border-bottom: 2px solid var(--brand-primary);
     }
 
     td {
@@ -413,7 +421,7 @@
 
     .risk-low { color: #46d369; background: rgba(70, 211, 105, 0.15); }
     .risk-mid { color: #f5c518; background: rgba(245, 197, 24, 0.15); }
-    .risk-high { color: #E50914; background: rgba(229, 9, 20, 0.15); }
+    .risk-high { color: var(--bad); background: rgba(255, 107, 107, 0.2); }
 
     /* ─── PORT STATUS PANEL ─── */
     .port-status-card {
@@ -539,7 +547,7 @@
     }
 
     .port-reason-tag.warn { color: var(--mid); background: rgba(245,197,24,0.1); }
-    .port-reason-tag.danger { color: var(--bad); background: rgba(229,9,20,0.1); }
+    .port-reason-tag.danger { color: var(--bad); background: rgba(255, 107, 107, 0.16); }
     .port-reason-tag.ok { color: var(--good); background: rgba(70,211,105,0.1); }
 
     .port-link-row {
@@ -562,11 +570,11 @@
     }
 
     .port-link-primary {
-      background: var(--netflix-red);
+      background: var(--brand-primary);
       color: #fff;
     }
 
-    .port-link-primary:hover { background: var(--netflix-red-dark); }
+    .port-link-primary:hover { background: var(--brand-primary-dark); }
 
     .port-link-secondary {
       background: rgba(255,255,255,0.1);
@@ -624,7 +632,7 @@
 
     .info-panel li::before {
       content: '›';
-      color: var(--netflix-red);
+      color: var(--brand-primary);
       font-weight: 800;
       margin-right: 8px;
     }
@@ -645,7 +653,7 @@
       color: var(--muted);
       font-weight: 700;
       background: rgba(0,0,0,0.3);
-      border-bottom: 2px solid var(--netflix-red);
+      border-bottom: 2px solid var(--brand-primary);
     }
 
     .fines-table td {
@@ -658,22 +666,22 @@
 
     .fine-amount {
       font-weight: 800;
-      color: var(--netflix-red);
+      color: var(--brand-primary);
     }
 
     .legal-ref {
       margin-top: 12px;
       padding: 10px 14px;
       border-radius: 6px;
-      background: rgba(229,9,20,0.06);
-      border-left: 3px solid var(--netflix-red);
+      background: rgba(0, 166, 178, 0.08);
+      border-left: 3px solid var(--brand-primary);
       font-size: 0.78rem;
       color: #999;
       line-height: 1.5;
     }
 
     .legal-ref a {
-      color: var(--netflix-red);
+      color: var(--brand-primary);
       text-decoration: underline;
     }
 
@@ -746,7 +754,8 @@
   <!-- NAVBAR -->
   <nav class="navbar" id="navbar">
     <div class="nav-brand">
-      <span class="nav-logo">PUERTO</span>
+      <img class="nav-logo-img" src="./assets/aquachile-logo.svg" alt="AquaChile" />
+      <span class="nav-logo">AquaChile</span>
       <div class="nav-divider"></div>
       <span class="nav-title">Chonchi · Chiloé</span>
     </div>
@@ -762,7 +771,7 @@
       <iframe
         id="windyMap"
         class="map-frame"
-        src="https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=mm&metricTemp=%C2%B0C&metricWind=km%2Fh&zoom=8&overlay=wind&product=ecmwf&level=surface&lat=-42.62&lon=-73.77&detailLat=-42.62&detailLon=-73.77&marker=true&message=true"
+        src="https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=mm&metricTemp=%C2%B0C&metricWind=km%2Fh&zoom=8&overlay=wind&product=ecmwf&level=surface&lat=-42.62&lon=-73.77&detailLat=-42.62&detailLon=-73.77&marker=true&message=false"
         allowfullscreen
         loading="lazy"
       ></iframe>
@@ -842,7 +851,7 @@
             <li><strong>Requisitos:</strong> embarcación en buen estado, tripulación con licencias vigentes, radio VHF operativa, elementos de seguridad al día</li>
             <li><strong>Restricción horaria:</strong> puede limitar navegación a horarios diurnos (06:00–18:00)</li>
             <li><strong>Zona limitada:</strong> navegación solo en aguas interiores protegidas, prohibido mar abierto</li>
-            <li><strong>Puerto cerrado =</strong> <span style="color:#E50914;font-weight:800">NO se puede zarpar bajo ninguna circunstancia</span>, ni con carta</li>
+            <li><strong>Puerto cerrado =</strong> <span style="color:#ff6b6b;font-weight:800">NO se puede zarpar bajo ninguna circunstancia</span>, ni con carta</li>
           </ul>
           <div class="legal-ref">
             <strong>Base legal:</strong> D.L. N° 2.222 (Ley de Navegación), Art. 6° y 64°. Reglamento de Orden, Seguridad y Disciplina en Naves y Litoral de la República (D.S. N° 1.340 bis). La Capitanía de Puerto tiene potestad exclusiva para autorizar/denegar zarpes.
@@ -1105,7 +1114,7 @@
       } else {
         for (const p of fx.particles) {
           ctx.beginPath();
-          ctx.fillStyle = 'rgba(229, 9, 20, 0.06)';
+          ctx.fillStyle = 'rgba(0, 166, 178, 0.09)';
           ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
           ctx.fill();
           p.x += p.vx;
@@ -1118,19 +1127,19 @@
       }
     }
 
-    /* ─── CHARTS (Netflix palette) ─── */
+    /* ─── CHARTS (Marine palette) ─── */
     const NF = {
-      red: '#E50914',
-      redAlpha: 'rgba(229,9,20,0.4)',
-      green: '#46d369',
-      greenAlpha: 'rgba(70,211,105,0.2)',
-      blue: '#4ea8de',
-      blueAlpha: 'rgba(78,168,222,0.25)',
-      yellow: '#f5c518',
-      cyan: '#71d4e0',
-      ticks: '#808080',
+      red: '#ff6b6b',
+      redAlpha: 'rgba(255,107,107,0.35)',
+      green: '#4cd7a0',
+      greenAlpha: 'rgba(76,215,160,0.2)',
+      blue: '#46b5c3',
+      blueAlpha: 'rgba(70,181,195,0.26)',
+      yellow: '#f4c95d',
+      cyan: '#82d7de',
+      ticks: '#90a4b8',
       grid: 'rgba(255,255,255,0.06)',
-      tooltipBg: 'rgba(20,20,20,0.97)',
+      tooltipBg: 'rgba(7, 30, 48, 0.97)',
       tooltipBorder: 'rgba(255,255,255,0.12)',
     };
 
@@ -1326,11 +1335,11 @@
 
       // Carta info
       if (port.status === 'CERRADO') {
-        cartaEl.innerHTML = '<span style="color:#E50914;font-weight:800">❌ NO PERMITIDO</span> — Puerto cerrado, no se emiten cartas. Navegación <strong>totalmente prohibida</strong>.';
+        cartaEl.innerHTML = '<span style="color:#ff6b6b;font-weight:800">❌ NO PERMITIDO</span> — Puerto cerrado, no se emiten cartas. Navegación <strong>totalmente prohibida</strong>.';
       } else if (port.status === 'RESTRINGIDO') {
-        cartaEl.innerHTML = '<span style="color:#f5c518;font-weight:800">📋 CON AUTORIZACIÓN</span> — Zarpe posible con carta de la Capitanía de Puerto de Castro. Solo aguas interiores protegidas, horario diurno.';
+        cartaEl.innerHTML = '<span style="color:#f4c95d;font-weight:800">📋 CON AUTORIZACIÓN</span> — Zarpe posible con carta de la Capitanía de Puerto de Castro. Solo aguas interiores protegidas, horario diurno.';
       } else {
-        cartaEl.innerHTML = '<span style="color:#46d369;font-weight:800">✅ LIBRE</span> — Zarpe habilitado con documentación regular. Carta estándar vigente.';
+        cartaEl.innerHTML = '<span style="color:#4cd7a0;font-weight:800">✅ LIBRE</span> — Zarpe habilitado con documentación regular. Carta estándar vigente.';
       }
 
       // Reasons
@@ -1392,7 +1401,7 @@
     }
 
     /* ─── WINDY MAP LAYER TOGGLE ─── */
-    const WINDY_BASE = 'https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=mm&metricTemp=%C2%B0C&metricWind=km%2Fh&zoom=8&product=ecmwf&level=surface&lat=-42.62&lon=-73.77&detailLat=-42.62&detailLon=-73.77&marker=true&message=true';
+    const WINDY_BASE = 'https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=mm&metricTemp=%C2%B0C&metricWind=km%2Fh&zoom=8&product=ecmwf&level=surface&lat=-42.62&lon=-73.77&detailLat=-42.62&detailLon=-73.77&marker=true&message=false';
 
     function setWindyLayer(layer) {
       const iframe = document.getElementById('windyMap');

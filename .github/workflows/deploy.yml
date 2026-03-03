@@ -55,6 +55,12 @@ jobs:
         run: pnpm build
         # Firebase config está hardcodeada en el código (segura para cliente)
 
+      - name: Include Chonchi weather demo
+        run: |
+          mkdir -p apps/pwa/dist/demo/assets
+          cp docs/DEMO_CLIMA_PUERTO_CHONCHI.html apps/pwa/dist/demo/clima-puerto-chonchi.html
+          cp -R docs/assets/. apps/pwa/dist/demo/assets/
+
       - name: Setup Pages
         uses: actions/configure-pages@v4
 

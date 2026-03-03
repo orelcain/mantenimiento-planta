@@ -95,6 +95,7 @@ pnpm dev
 
 2. Push a `main` branch
 3. GitHub Actions construirá y desplegará automáticamente
+4. Demo clima Puerto Chonchi publicada en `.../demo/clima-puerto-chonchi.html`
 
 ### Manual
 

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="220" height="48" viewBox="0 0 220 48" role="img" aria-labelledby="title desc">
+  <title id="title">AquaChile</title>
+  <desc id="desc">Logotipo estilo marino para demo operativa</desc>
+  <defs>
+    <linearGradient id="g" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#00A6B2"/>
+      <stop offset="1" stop-color="#007E86"/>
+    </linearGradient>
+  </defs>
+  <rect width="220" height="48" rx="8" fill="none"/>
+  <g transform="translate(8,8)">
+    <path d="M22 4c8 0 14 5 16 12-2 7-8 12-16 12-6 0-11-2-15-6l-5 2 2-5c-1-2-2-4-2-7C4 8 12 4 22 4Z" fill="url(#g)"/>
+    <circle cx="26" cy="14" r="1.8" fill="#e7f9fb"/>
+    <path d="M9 16c5-3 9-4 14-3" stroke="#d6f3f6" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  </g>
+  <text x="58" y="31" font-family="Inter, Arial, sans-serif" font-size="24" font-weight="700" fill="#00A6B2">AquaChile</text>
+</svg>
