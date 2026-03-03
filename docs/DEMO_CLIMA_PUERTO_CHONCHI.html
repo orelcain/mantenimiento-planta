@@ -169,6 +169,7 @@
       z-index: 3;
       padding: 32px 32px 24px;
       pointer-events: none;
+      min-height: 190px;
     }
 
     .hero-title {
@@ -190,7 +191,7 @@
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      margin-top: 14px;
+      margin-top: 0;
       padding: 8px 18px;
       border-radius: 4px;
       background: rgba(0, 166, 178, 0.82);
@@ -199,6 +200,10 @@
       font-size: 0.92rem;
       backdrop-filter: blur(4px);
       pointer-events: none;
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      z-index: 4;
     }
 
     .hero-condition .cond-dot {
@@ -735,6 +740,12 @@
     @media (max-width: 640px) {
       .hero-title { font-size: 1.5rem; }
       .hero-overlay { padding: 16px; }
+      .hero-condition {
+        top: 12px;
+        right: 12px;
+        font-size: 0.8rem;
+        padding: 6px 12px;
+      }
       .map-frame { height: 320px; }
       .kpi-card { flex: 0 0 160px; padding: 14px 12px; }
       .kpi-value { font-size: 1.2rem; }
