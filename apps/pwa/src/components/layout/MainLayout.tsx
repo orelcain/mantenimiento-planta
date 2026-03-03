@@ -328,8 +328,10 @@ export function MainLayout() {
         aria-expanded={sidebarOpen}
         className={cn(
           'fixed inset-y-0 left-0 z-50 w-64 bg-card border-r transform transition-transform duration-200 ease-in-out',
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full',
-          shouldHideDesktopSidebar ? 'lg:-translate-x-full' : 'lg:translate-x-0'
+          isClimaRoute
+            ? 'translate-x-0'   // clima: sidebar visible en TODA resolución
+            : sidebarOpen ? 'translate-x-0' : '-translate-x-full',
+          !isClimaRoute && (shouldHideDesktopSidebar ? 'lg:-translate-x-full' : 'lg:translate-x-0')
         )}
         onMouseLeave={() => {
           if (isGanttRoute && ganttFocusMode) {
@@ -347,21 +349,25 @@ export function MainLayout() {
               <span className="font-semibold">Mantenimiento</span>
             </div>
             <div className="flex items-center gap-1">
-              <button
-                onClick={toggleSidebarCollapse}
-                className="hidden lg:flex p-1.5 hover:bg-muted rounded-md transition-colors"
-                aria-label="Contraer menú"
-                title="Contraer menú"
-              >
-                <ChevronLeft className="h-4 w-4 text-muted-foreground" />
-              </button>
-              <button
-                onClick={() => setSidebarOpen(false)}
-                className="lg:hidden p-1 hover:bg-muted rounded"
-                aria-label="Cerrar menú"
-              >
-                <X className="h-5 w-5" />
-              </button>
+              {!isClimaRoute && (
+                <button
+                  onClick={toggleSidebarCollapse}
+                  className="hidden lg:flex p-1.5 hover:bg-muted rounded-md transition-colors"
+                  aria-label="Contraer menú"
+                  title="Contraer menú"
+                >
+                  <ChevronLeft className="h-4 w-4 text-muted-foreground" />
+                </button>
+              )}
+              {!isClimaRoute && (
+                <button
+                  onClick={() => setSidebarOpen(false)}
+                  className="lg:hidden p-1 hover:bg-muted rounded"
+                  aria-label="Cerrar menú"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              )}
             </div>
           </div>
 
@@ -485,17 +491,19 @@ export function MainLayout() {
       )}
 
       {/* Main content */}
-      <div className={cn('transition-[padding] duration-200 ease-in-out', !shouldHideDesktopSidebar && 'lg:pl-64')}>
+      <div className={cn('transition-[padding] duration-200 ease-in-out', isClimaRoute ? 'pl-64' : (!shouldHideDesktopSidebar && 'lg:pl-64'))}>
         {/* Top bar */}
         <header className="sticky top-0 z-30 flex items-center h-16 px-4 bg-background/80 backdrop-blur border-b">
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="lg:hidden p-2 -ml-2 hover:bg-muted rounded-lg"
-            aria-label="Abrir menú"
-            aria-expanded={sidebarOpen}
-          >
-            <Menu className="h-5 w-5" />
-          </button>
+          {!isClimaRoute && (
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="lg:hidden p-2 -ml-2 hover:bg-muted rounded-lg"
+              aria-label="Abrir menú"
+              aria-expanded={sidebarOpen}
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+          )}
 
           <div className="flex-1" />
 
