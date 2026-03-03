@@ -242,9 +242,9 @@ export function MapPage() {
 
   // ── Datos del mapa (mutables para editor) ──
   const demoData = useMemo(() => generateDemoMap(), [])
-  const [nodes, setNodes] = useState<MapNode[]>(() => demoData.nodes)
-  const [areas, setAreas] = useState<MapArea[]>(() => demoData.areas)
-  const [connectors, setConnectors] = useState<MapConnectorType[]>(() => demoData.connectors)
+  const [nodes, setNodes] = useState<MapNode[]>([])
+  const [areas, setAreas] = useState<MapArea[]>([])
+  const [connectors, setConnectors] = useState<MapConnectorType[]>([])
   const [terrainTiles, setTerrainTiles] = useState<TerrainTile[]>(() => demoData.terrain ?? [])
   // Runtime data vinculado a datos reales (Equipment, Incidents)
   const runtimeData = useMapRuntimeData(nodes)
@@ -1192,13 +1192,12 @@ export function MapPage() {
   }, [isSaving, nodes, connectors, areas, terrainTiles, demoData.config, user])
 
   const handleCancelEdit = useCallback(() => {
-    // Revertir a datos iniciales del demo si hay cambios sin guardar
+    // Revertir a lienzo limpio si hay cambios sin guardar
     if (hasUnsavedChanges) {
-      const initial = generateDemoMap()
-      setNodes(initial.nodes)
-      setAreas(initial.areas)
-      setConnectors(initial.connectors)
-      setTerrainTiles(initial.terrain ?? [])
+      setNodes([])
+      setAreas([])
+      setConnectors([])
+      setTerrainTiles([])
       setHasUnsavedChanges(false)
     }
     setViewerState((prev) => ({ ...prev, mode: 'view', selectedNodeId: null }))
