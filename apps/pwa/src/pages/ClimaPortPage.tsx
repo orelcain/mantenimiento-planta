@@ -3,7 +3,7 @@ import { useMemo } from 'react'
 /**
  * Módulo Clima Puerto — Dashboard meteorológico del Puerto de Chonchi.
  *
- * Carga el HTML standalone (public/clima-puerto.html) dentro de un iframe
+ * Carga el HTML standalone (public/clima-puerto-embed.html) dentro de un iframe
  * que ocupa todo el espacio disponible dentro del MainLayout.
  *
  * Sin toolbar propia: el dashboard embebido ya tiene controles propios
@@ -14,7 +14,7 @@ import { useMemo } from 'react'
 export function ClimaPortPage() {
   const iframeSrc = useMemo(() => {
     const basePath = import.meta.env.BASE_URL || '/'
-    return `${basePath}clima-puerto.html`
+    return `${basePath}clima-puerto-embed.html`
   }, [])
 
   return (
