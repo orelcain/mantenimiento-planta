@@ -1238,6 +1238,7 @@
               <th>Racha máx.</th>
               <th>Ola máx.</th>
               <th>Riesgo Puerto</th>
+              <th>Riesgo Cierre (día)</th>
             </tr>
           </thead>
           <tbody id="tbody"></tbody>
@@ -1353,6 +1354,28 @@
       if (score >= 5) return { level: 'ALTO', cls: 'risk-high', pct, reason: `Riesgo diario alto (${pct}%). Alta probabilidad de restricción operativa.` };
       if (score >= 3) return { level: 'MEDIO', cls: 'risk-mid', pct, reason: `Riesgo diario medio (${pct}%). Requiere monitoreo y validación táctica.` };
       return { level: 'BAJO', cls: 'risk-low', pct, reason: `Riesgo diario bajo (${pct}%). Condiciones generalmente operables.` };
+    }
+
+    function calcDailyCloseRisk({ gust, wind, wave, rain, weatherCode }) {
+      let score = 0;
+      if (gust >= 70) score += 4;
+      else if (gust >= 60) score += 3;
+      else if (gust >= 55) score += 2;
+
+      if (wind >= 45) score += 3;
+      else if (wind >= 40) score += 2;
+
+      if (wave >= 3.5) score += 4;
+      else if (wave >= 2.8) score += 3;
+      else if (wave >= 2.5) score += 2;
+
+      if (rain >= 25) score += 1;
+      if ([95, 96, 99].includes(weatherCode)) score += 3;
+
+      const pct = Math.max(2, Math.min(98, Math.round((score / 15) * 100)));
+      if (pct >= 60) return { level: 'ALTO', cls: 'risk-high', pct, reason: `Probabilidad alta de cierre ese día (${pct}%).` };
+      if (pct >= 35) return { level: 'MEDIO', cls: 'risk-mid', pct, reason: `Probabilidad media de cierre ese día (${pct}%).` };
+      return { level: 'BAJO', cls: 'risk-low', pct, reason: `Probabilidad baja de cierre ese día (${pct}%).` };
     }
 
     function initFxCanvas() {
@@ -1915,6 +1938,7 @@
           <td>${num(d.gust)} km/h</td>
           <td>${num(d.wave)} m</td>
           <td><span class="chip ${d.risk.cls}" title="${d.risk.reason}">${d.risk.level} · ${d.risk.pct}%</span></td>
+          <td><span class="chip ${d.closeRisk.cls}" title="${d.closeRisk.reason}">${d.closeRisk.level} · ${d.closeRisk.pct}%</span></td>
         `;
         tbody.appendChild(tr);
       }
@@ -2316,7 +2340,8 @@
           const wave = waveByDay[date] ?? 0;
           const weatherCode = weather.daily.weather_code?.[i];
           const risk = calcRisk({ gust, wind, wave, rain, weatherCode });
-          return { date, weatherCode, tMin: weather.daily.temperature_2m_min?.[i], tMax: weather.daily.temperature_2m_max?.[i], rain, wind, gust, wave, risk };
+          const closeRisk = calcDailyCloseRisk({ gust, wind, wave, rain, weatherCode });
+          return { date, weatherCode, tMin: weather.daily.temperature_2m_min?.[i], tMax: weather.daily.temperature_2m_max?.[i], rain, wind, gust, wave, risk, closeRisk };
         });
         const portNow = renderPortStatus(current, days[0]?.risk?.level ?? 'BAJO');
         const closureOutlook = calcClosureOutlook24h(current, weather, marine, portNow);
