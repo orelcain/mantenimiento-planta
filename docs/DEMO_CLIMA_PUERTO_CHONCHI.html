@@ -649,6 +649,54 @@
       gap: 6px;
     }
 
+    .preventive-alert {
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: 6px;
+      border-left: 4px solid var(--mid);
+      background: rgba(244,201,93,0.12);
+    }
+
+    .preventive-alert.high {
+      border-left-color: var(--bad);
+      background: rgba(255,107,107,0.12);
+    }
+
+    .preventive-alert.low {
+      border-left-color: var(--good);
+      background: rgba(76,215,160,0.12);
+    }
+
+    .preventive-alert-title {
+      font-size: 0.78rem;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+      color: var(--text-bright);
+    }
+
+    .preventive-alert-text {
+      font-size: 0.86rem;
+      color: var(--text);
+      line-height: 1.35;
+    }
+
+    .preventive-actions {
+      margin-top: 8px;
+      display: grid;
+      gap: 6px;
+    }
+
+    .preventive-action {
+      font-size: 0.8rem;
+      color: var(--text);
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 4px;
+      padding: 6px 8px;
+    }
+
     .port-link-row {
       display: flex;
       gap: 10px;
@@ -952,6 +1000,11 @@
                   <div class="port-closure-headline" id="closureHeadline">Calculando cierre probable...</div>
                   <div class="port-closure-sub" id="closureSub">Analizando viento, rachas, lluvia y oleaje.</div>
                   <div class="port-closure-drivers" id="closureDrivers"><span class="port-reason-tag">Cargando...</span></div>
+                  <div class="preventive-alert" id="preventiveAlert">
+                    <div class="preventive-alert-title" id="preventiveAlertTitle">Prevención operativa</div>
+                    <div class="preventive-alert-text" id="preventiveAlertText">Calculando ventana preventiva...</div>
+                  </div>
+                  <div class="preventive-actions" id="preventiveActions"><div class="preventive-action">Cargando acciones...</div></div>
                 </div>
               </div>
               <div class="port-detail-item">
@@ -1974,6 +2027,87 @@
         .join('');
     }
 
+    function formatHourLabel(isoTime) {
+      if (!isoTime) return '--:--';
+      return new Date(isoTime).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function computeCriticalWindow(samples) {
+      let bestStart = -1;
+      let bestEnd = -1;
+      let currentStart = -1;
+      for (let i = 0; i < samples.length; i++) {
+        const risky = (samples[i].riskIndex ?? 0) >= 45;
+        if (risky && currentStart === -1) currentStart = i;
+        if (!risky && currentStart !== -1) {
+          if ((i - 1) - currentStart > bestEnd - bestStart) {
+            bestStart = currentStart;
+            bestEnd = i - 1;
+          }
+          currentStart = -1;
+        }
+      }
+      if (currentStart !== -1 && (samples.length - 1) - currentStart > bestEnd - bestStart) {
+        bestStart = currentStart;
+        bestEnd = samples.length - 1;
+      }
+      if (bestStart === -1) return null;
+      return { start: samples[bestStart], end: samples[bestEnd] };
+    }
+
+    function buildPreventiveActions(outlook) {
+      const samples = outlook.samples ?? [];
+      const actions = [];
+      const maxGust = Math.max(...samples.map((s) => s.gust ?? 0), 0);
+      const maxWave = Math.max(...samples.map((s) => s.wave ?? 0), 0);
+      const minVisibility = Math.min(...samples.map((s) => s.visibility ?? 10000), 10000);
+      const minPressure = Math.min(...samples.map((s) => s.pressure ?? 1015), 1015);
+
+      actions.push('✅ Confirmar estado oficial DIRECTEMAR antes de cada zarpe.');
+
+      if (outlook.closeLikely) {
+        actions.push('🚨 Activar plan de contingencia de faena y reducir salidas no críticas.');
+      } else {
+        actions.push('🟡 Mantener monitoreo cada 60 minutos durante la ventana preventiva.');
+      }
+
+      if (maxGust >= 50) actions.push('💨 Reforzar amarras, cabos y fondeo por rachas elevadas.');
+      if (maxWave >= 2.2) actions.push('🌊 Limitar maniobras en borda y evitar cruces expuestos al oleaje.');
+      if (minVisibility <= 5000) actions.push('🌫️ Elevar protocolo de navegación con baja visibilidad (radar/VHF permanente).');
+      if (minPressure <= 1003) actions.push('📉 Preparar escalamiento por caída de presión y deterioro rápido del tiempo.');
+
+      return actions.slice(0, 5);
+    }
+
+    function renderPreventiveSupport(outlook) {
+      const alertEl = document.getElementById('preventiveAlert');
+      const alertTitleEl = document.getElementById('preventiveAlertTitle');
+      const alertTextEl = document.getElementById('preventiveAlertText');
+      const actionsEl = document.getElementById('preventiveActions');
+      const samples = outlook.samples ?? [];
+
+      alertEl.classList.remove('low', 'high');
+      if (outlook.closeLikely) {
+        alertEl.classList.add('high');
+        alertTitleEl.textContent = 'ALERTA PREVENTIVA ALTA';
+      } else if (outlook.topRisk === 'BAJO') {
+        alertEl.classList.add('low');
+        alertTitleEl.textContent = 'ALERTA PREVENTIVA BAJA';
+      } else {
+        alertTitleEl.textContent = 'ALERTA PREVENTIVA MEDIA';
+      }
+
+      const window = computeCriticalWindow(samples);
+      if (window) {
+        alertTextEl.textContent = `Ventana de mayor riesgo estimada: ${formatHourLabel(window.start.time)} a ${formatHourLabel(window.end.time)}. Reforzar control operacional en este tramo.`;
+      } else {
+        alertTextEl.textContent = 'Sin ventana crítica marcada en próximas 24h. Mantener vigilancia periódica.';
+      }
+
+      const actions = buildPreventiveActions(outlook);
+      actionsEl.innerHTML = actions.map((action) => `<div class="preventive-action">${action}</div>`).join('');
+    }
+
     function renderKPIs(days, current) {
       const highDays = days.filter((d) => d.risk.level === 'ALTO').length;
       const maxGust = Math.max(...days.map((d) => d.gust || 0), 0);
@@ -2019,6 +2153,7 @@
         const portNow = renderPortStatus(current, days[0]?.risk?.level ?? 'BAJO');
         const closureOutlook = calcClosureOutlook24h(current, weather, marine, portNow);
         renderClosureOutlook(closureOutlook);
+        renderPreventiveSupport(closureOutlook);
         renderKPIs(days, current);
         renderTable(days);
         buildWeekChart(days);
