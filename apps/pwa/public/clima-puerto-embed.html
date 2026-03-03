@@ -1536,11 +1536,11 @@
             <span style="font-weight:800;font-size:0.88rem;color:var(--text-bright);letter-spacing:0.3px">LÍNEA TEMPORAL · ESTADO DEL PUERTO</span>
           </div>
           <div class="ptl-legend">
+            <div class="ptl-legend-item"><div style="width:24px;height:0;border-top:2.5px solid #ff6b6b"></div>Historial real</div>
+            <div class="ptl-legend-item"><div style="width:24px;height:0;border-top:2px dashed #ff6b6b"></div>Pronóstico</div>
             <div class="ptl-legend-item"><div class="ptl-legend-dot" style="background:var(--good)"></div>Abierto (&lt;40)</div>
             <div class="ptl-legend-item"><div class="ptl-legend-dot" style="background:var(--mid)"></div>Restricción (40-65)</div>
             <div class="ptl-legend-item"><div class="ptl-legend-dot" style="background:var(--bad)"></div>Cierre (&gt;65)</div>
-            <div class="ptl-legend-item"><div class="ptl-legend-line" style="border-color:#ff6b6b"></div>Límite cierre</div>
-            <div class="ptl-legend-item"><div class="ptl-legend-line" style="border-color:#f4c95d"></div>Límite restricción</div>
           </div>
         </div>
         <div class="ptl-body">
@@ -3681,9 +3681,23 @@
     /* ─── DIRECTEMAR OVERRIDE: hace que todo "cuadre" ─── */
     function applyDirectemarOverride(dm, portNow) {
       if (!dm || !dm.found) return portNow;
-      _dmGlobalStatus = dm; // guardar globalmente para otros paneles
+      _dmGlobalStatus = dm;
 
       const dmRestr = dm.restricciones > 0;
+      // Determinar estado real según DIRECTEMAR:
+      // restriccionBahia O (navesMayores Y navesMenores) → CERRADO
+      // solo navesMenores → RESTRINGIDO
+      // algunas restricciones → RESTRINGIDO
+      // sin restricciones → ABIERTO
+      let dmStatus;
+      if (dm.restriccionBahia || (dm.navesMayores && dm.navesMenores)) {
+        dmStatus = 'CERRADO';
+      } else if (dmRestr) {
+        dmStatus = 'RESTRINGIDO';
+      } else {
+        dmStatus = 'ABIERTO';
+      }
+
       const card = document.getElementById('portCard');
       const statusEl = document.getElementById('portStatus');
       const iconEl = document.getElementById('portIcon');
@@ -3692,22 +3706,47 @@
       const cartaEl = document.getElementById('portCarta');
       const reasonsEl = document.getElementById('portReasons');
 
-      if (dmRestr && portNow?.status === 'ABIERTO') {
-        // DIRECTEMAR prevalece: override a RESTRINGIDO
-        card.className = 'port-status-card status-restricted';
-        statusEl.className = 'port-big-status restricted';
-        dotEl.className = 'port-live-dot restricted';
-        statusEl.textContent = '⚠️ RESTRINGIDO';
-        iconEl.textContent = '⚠️';
+      // Si el estado DIRECTEMAR es más restrictivo que el modelo → override
+      const severity = { 'ABIERTO': 0, 'RESTRINGIDO': 1, 'CERRADO': 2 };
+      const dmSev = severity[dmStatus] ?? 0;
+      const modelSev = severity[portNow?.status] ?? 0;
+
+      if (dmSev > modelSev) {
+        // DIRECTEMAR prevalece siempre
+        card.className = 'port-status-card';
+        statusEl.className = 'port-big-status';
+        dotEl.className = 'port-live-dot';
+
+        let dmReasonTags = '';
+        if (dm.restriccionBahia) dmReasonTags += '<span class="port-reason-tag danger">🌊 Bahía cerrada</span>';
+        if (dm.navesMayores) dmReasonTags += '<span class="port-reason-tag danger">🚢 Naves mayores restringidas</span>';
+        if (dm.navesMenores) dmReasonTags += '<span class="port-reason-tag danger">⛵ Naves menores restringidas</span>';
+        if (!dm.restriccionBahia && !dm.navesMayores && !dm.navesMenores && dmRestr) {
+          dmReasonTags += `<span class="port-reason-tag danger">DIRECTEMAR: ${dm.restricciones} restricción(es)</span>`;
+        }
+        const modelReasons = (portNow?.reasons || []).filter(r => r.cls !== 'ok').map(r => `<span class="port-reason-tag ${r.cls}">${r.text}</span>`).join('');
+
+        if (dmStatus === 'CERRADO') {
+          card.classList.add('status-closed');
+          statusEl.classList.add('closed');
+          dotEl.classList.add('closed');
+          statusEl.textContent = '🚫 PUERTO CERRADO';
+          iconEl.textContent = '⛔';
+          cartaEl.innerHTML = '<span style="color:#ff6b6b;font-weight:800">❌ NO PERMITIDO</span> — Puerto cerrado por DIRECTEMAR. Navegación <strong>totalmente prohibida</strong>.';
+        } else {
+          card.classList.add('status-restricted');
+          statusEl.classList.add('restricted');
+          dotEl.classList.add('restricted');
+          statusEl.textContent = '⚠️ RESTRINGIDO';
+          iconEl.textContent = '⚠️';
+          cartaEl.innerHTML = '<span style="color:#f4c95d;font-weight:800">📋 CON AUTORIZACIÓN</span> — Zarpe posible con carta de la Capitanía de Puerto de Castro. Solo aguas interiores protegidas, horario diurno.';
+        }
+
         timeEl.textContent = 'Evaluado: ' + new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }) + ' hrs — estado oficial DIRECTEMAR';
-        cartaEl.innerHTML = '<span style="color:#f4c95d;font-weight:800">📋 CON AUTORIZACIÓN</span> — Zarpe posible con carta de la Capitanía de Puerto de Castro. Solo aguas interiores protegidas, horario diurno.';
-        reasonsEl.innerHTML = `<span class="port-reason-tag danger">DIRECTEMAR: ${dm.restricciones} restricción(es) activa(s)</span>` +
-          (portNow.reasons || []).filter(r => r.cls !== 'ok').map(r => `<span class="port-reason-tag ${r.cls}">${r.text}</span>`).join('');
-        return { status: 'RESTRINGIDO', carta: true, reasons: [{ text: `DIRECTEMAR: ${dm.restricciones} restricción(es)`, cls: 'danger' }] };
+        reasonsEl.innerHTML = dmReasonTags + modelReasons;
+        return { status: dmStatus, carta: dmStatus !== 'CERRADO', reasons: [{ text: `DIRECTEMAR: ${dmStatus}`, cls: 'danger' }] };
       } else if (!dmRestr && portNow?.status !== 'ABIERTO') {
         // DIRECTEMAR sin restricciones pero modelo dice cerrado/restringido
-        // Mantener estado del modelo pero añadir nota de DM
-        const existingReasons = reasonsEl.innerHTML;
         reasonsEl.innerHTML += '<span class="port-reason-tag ok">DIRECTEMAR: Sin restricciones oficiales</span>';
       }
       return portNow;
@@ -3772,6 +3811,22 @@
         renderDirectemarPanel(dm);
         const portFinal = applyDirectemarOverride(dm, portNow);
         checkDirectemarConflict(dm, portFinal);
+
+        // Si DM escaló el estado, recalcular outlook con estado correcto
+        if (portFinal.status !== portNow.status) {
+          closureOutlook.nowStatus = portFinal.status;
+          if (portFinal.status === 'CERRADO') {
+            closureOutlook.closeLikely = true;
+            closureOutlook.closeProbability = Math.max(closureOutlook.closeProbability, 85);
+            closureOutlook.restrictLikely = true;
+            closureOutlook.restrictProbability = Math.max(closureOutlook.restrictProbability, 90);
+          } else if (portFinal.status === 'RESTRINGIDO') {
+            closureOutlook.restrictLikely = true;
+            closureOutlook.restrictProbability = Math.max(closureOutlook.restrictProbability, 75);
+          }
+          renderClosureOutlook(closureOutlook);
+        }
+
         renderOpeningProbability(dm, closureOutlook);
         renderMeteoScheduleBlock(dm, closureOutlook);
         buildPortTimeline(weather, marine, dm);
