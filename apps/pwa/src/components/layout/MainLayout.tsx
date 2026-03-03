@@ -100,6 +100,7 @@ export function MainLayout() {
   const { hasUpdate, newVersion, reload } = useAppVersion()
   const { setZones, setEquipment, setIncidents } = useAppStore()
   const isGanttRoute = location.pathname.startsWith('/gantt')
+  const isClimaRoute = location.pathname.startsWith('/clima-puerto')
   const shouldHideDesktopSidebar = sidebarCollapsed || (isGanttRoute && ganttFocusMode && !sidebarPeekOpen)
 
   const toggleSidebarCollapse = () => {
@@ -772,7 +773,11 @@ export function MainLayout() {
         {/* Page content */}
         <main
           id="main-content"
-          className={`p-3 lg:p-6 w-full max-w-[100vw] overflow-x-hidden ${
+          className={`${
+            isClimaRoute
+              ? 'h-[calc(100vh-4rem)] p-0 overflow-hidden'
+              : 'p-3 lg:p-6 w-full max-w-[100vw] overflow-x-hidden'
+          } ${
             isReadOnly ? 'pointer-events-none opacity-70' : ''
           }`}
         >

@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from 'react'
+import { useMemo } from 'react'
 
 /**
  * Módulo Clima Puerto — Dashboard meteorológico del Puerto de Chonchi.
@@ -12,26 +12,14 @@ import { useRef, useEffect, useState } from 'react'
  * Acceso: protegido por AdminRoute en App.tsx.
  */
 export function ClimaPortPage() {
-  const iframeRef = useRef<HTMLIFrameElement>(null)
-  const [_isFullscreen, setIsFullscreen] = useState(false)
-
-  const basePath = import.meta.env.BASE_URL || '/'
-  const iframeSrc = `${basePath}clima-puerto.html`
-
-  useEffect(() => {
-    const handleFsChange = () => {
-      setIsFullscreen(!!document.fullscreenElement)
-    }
-    document.addEventListener('fullscreenchange', handleFsChange)
-    return () => document.removeEventListener('fullscreenchange', handleFsChange)
+  const iframeSrc = useMemo(() => {
+    const basePath = import.meta.env.BASE_URL || '/'
+    return `${basePath}clima-puerto.html`
   }, [])
 
   return (
-    // Márgenes negativos anulan el p-3/lg:p-6 del <main> padre.
-    // h-[calc(100vh-4rem)] = viewport - header sticky (h-16 = 4rem).
-    <div className="-m-3 lg:-m-6 h-[calc(100vh-4rem)]">
+    <div className="h-full w-full">
       <iframe
-        ref={iframeRef}
         src={iframeSrc}
         title="Dashboard Clima Puerto Chonchi"
         className="w-full h-full border-0"
