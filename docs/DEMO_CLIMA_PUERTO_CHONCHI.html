@@ -3092,16 +3092,18 @@
       document.querySelectorAll('.msc-time-slot').forEach(slot => {
         const h = parseInt(slot.dataset.hour, 10);
         slot.classList.remove('past', 'current', 'next');
-        if (h < currentHour || (h === currentHour && currentMin > 30)) {
+        if (h < currentHour || (h === currentHour && currentMin > 0)) {
           slot.classList.add('past');
         }
       });
 
       // Find current and next meteo hour (hora Chile)
-      let nextMeteoHour = METEO_HOURS.find(h => h > currentHour || (h === currentHour && currentMin <= 30));
+      // Boletín de las H:00 ya fue emitido una vez que pasa H:00
+      let nextMeteoHour = METEO_HOURS.find(h => h > currentHour);
+      // Último boletín emitido = hora más reciente que ya pasó
       let currentMeteoHour = null;
       for (let i = METEO_HOURS.length - 1; i >= 0; i--) {
-        if (METEO_HOURS[i] < currentHour || (METEO_HOURS[i] === currentHour && currentMin > 0)) {
+        if (METEO_HOURS[i] <= currentHour) {
           currentMeteoHour = METEO_HOURS[i];
           break;
         }
@@ -3143,7 +3145,7 @@
         // Si el countdown pasa de 0, recalcular siguiente hora
         if (diff <= 0) {
           const cl = getChileNow();
-          const newNext = METEO_HOURS.find(hr => hr > cl.hour || (hr === cl.hour && cl.minute <= 30)) ?? METEO_HOURS[0];
+          const newNext = METEO_HOURS.find(hr => hr > cl.hour) ?? METEO_HOURS[0];
           if (newNext !== nextHour) {
             nextHour = newNext;
           }
