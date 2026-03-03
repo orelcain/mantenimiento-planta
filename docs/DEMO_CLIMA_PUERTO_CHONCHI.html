@@ -415,6 +415,274 @@
     .risk-mid { color: #f5c518; background: rgba(245, 197, 24, 0.15); }
     .risk-high { color: #E50914; background: rgba(229, 9, 20, 0.15); }
 
+    /* ─── PORT STATUS PANEL ─── */
+    .port-status-card {
+      background: var(--card);
+      border-radius: 10px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .port-status-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 4px;
+    }
+
+    .port-status-card.status-open::before { background: var(--good); }
+    .port-status-card.status-restricted::before { background: var(--mid); }
+    .port-status-card.status-closed::before { background: var(--bad); }
+
+    .port-grid {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      min-height: 260px;
+    }
+
+    .port-hero-side {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 28px 24px;
+      text-align: center;
+      gap: 10px;
+      border-right: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .port-icon {
+      font-size: 3.5rem;
+      line-height: 1;
+    }
+
+    .port-big-status {
+      font-size: 2rem;
+      font-weight: 900;
+      letter-spacing: 1px;
+    }
+
+    .port-big-status.open { color: var(--good); }
+    .port-big-status.restricted { color: var(--mid); }
+    .port-big-status.closed { color: var(--bad); }
+
+    .port-updated {
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+
+    .port-live-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 4px;
+      animation: pulseDot 2s ease-in-out infinite;
+    }
+
+    .port-live-dot.open { background: var(--good); }
+    .port-live-dot.restricted { background: var(--mid); }
+    .port-live-dot.closed { background: var(--bad); }
+
+    .port-detail-side {
+      padding: 20px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .port-detail-row {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .port-detail-item {
+      flex: 1 1 200px;
+    }
+
+    .port-detail-item .pdl {
+      font-size: 0.7rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .port-detail-item .pdv {
+      font-size: 0.92rem;
+      color: var(--text);
+      line-height: 1.4;
+    }
+
+    .port-detail-item .pdv strong {
+      color: var(--text-bright);
+    }
+
+    .port-reasons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .port-reason-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 0.76rem;
+      font-weight: 700;
+      background: rgba(255,255,255,0.06);
+      color: var(--text);
+    }
+
+    .port-reason-tag.warn { color: var(--mid); background: rgba(245,197,24,0.1); }
+    .port-reason-tag.danger { color: var(--bad); background: rgba(229,9,20,0.1); }
+    .port-reason-tag.ok { color: var(--good); background: rgba(70,211,105,0.1); }
+
+    .port-link-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: auto;
+    }
+
+    .port-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 14px;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+
+    .port-link-primary {
+      background: var(--netflix-red);
+      color: #fff;
+    }
+
+    .port-link-primary:hover { background: var(--netflix-red-dark); }
+
+    .port-link-secondary {
+      background: rgba(255,255,255,0.1);
+      color: var(--text);
+    }
+
+    .port-link-secondary:hover { background: rgba(255,255,255,0.16); }
+
+    /* ─── CARTA & FINES SECTION ─── */
+    .info-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    .info-panel {
+      background: var(--card);
+      border-radius: 8px;
+      padding: 22px 20px;
+      transition: transform 0.25s, box-shadow 0.25s;
+    }
+
+    .info-panel:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 10px 36px rgba(0,0,0,0.4);
+    }
+
+    .info-panel h3 {
+      font-size: 1rem;
+      font-weight: 800;
+      color: var(--text-bright);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .info-panel p, .info-panel li {
+      font-size: 0.85rem;
+      color: #bbb;
+      line-height: 1.6;
+    }
+
+    .info-panel ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    .info-panel li {
+      padding: 5px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .info-panel li:last-child { border-bottom: none; }
+
+    .info-panel li::before {
+      content: '›';
+      color: var(--netflix-red);
+      font-weight: 800;
+      margin-right: 8px;
+    }
+
+    .fines-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      font-size: 0.82rem;
+    }
+
+    .fines-table th {
+      text-align: left;
+      padding: 8px 10px;
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.7px;
+      color: var(--muted);
+      font-weight: 700;
+      background: rgba(0,0,0,0.3);
+      border-bottom: 2px solid var(--netflix-red);
+    }
+
+    .fines-table td {
+      padding: 8px 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      color: var(--text);
+    }
+
+    .fines-table tr:last-child td { border-bottom: none; }
+
+    .fine-amount {
+      font-weight: 800;
+      color: var(--netflix-red);
+    }
+
+    .legal-ref {
+      margin-top: 12px;
+      padding: 10px 14px;
+      border-radius: 6px;
+      background: rgba(229,9,20,0.06);
+      border-left: 3px solid var(--netflix-red);
+      font-size: 0.78rem;
+      color: #999;
+      line-height: 1.5;
+    }
+
+    .legal-ref a {
+      color: var(--netflix-red);
+      text-decoration: underline;
+    }
+
+    @media (max-width: 1024px) {
+      .port-grid { grid-template-columns: 1fr; }
+      .port-hero-side { border-right: none; border-bottom: 1px solid rgba(255,255,255,0.06); padding: 20px; }
+      .info-grid { grid-template-columns: 1fr; }
+    }
+
     /* ─── FOOTER ─── */
     .footer {
       margin-top: 20px;
@@ -465,6 +733,10 @@
       .navbar { padding: 0 3%; height: 56px; }
       .nav-logo { font-size: 1.2rem; }
       .layer-pill { padding: 6px 14px; font-size: 0.76rem; }
+      .port-big-status { font-size: 1.4rem; }
+      .port-icon { font-size: 2.5rem; }
+      .fines-table { font-size: 0.74rem; }
+      .fines-table th, .fines-table td { padding: 6px 6px; }
     }
   </style>
 </head>
@@ -516,6 +788,111 @@
   </div>
 
   <main class="content">
+
+    <!-- ═══════════════ ESTADO DEL PUERTO ═══════════════ -->
+    <section class="row">
+      <div class="row-title"><span class="accent-bar"></span>Estado del Puerto · Chonchi</div>
+      <div class="port-status-card status-open" id="portCard">
+        <div class="port-grid">
+          <div class="port-hero-side">
+            <div class="port-icon" id="portIcon">⚓</div>
+            <div class="port-big-status open" id="portStatus">CONSULTANDO...</div>
+            <div class="port-updated"><span class="port-live-dot open" id="portDot"></span> <span id="portTime">Calculando...</span></div>
+          </div>
+          <div class="port-detail-side">
+            <div class="port-detail-row">
+              <div class="port-detail-item">
+                <div class="pdl">Condiciones actuales</div>
+                <div class="pdv" id="portConditions">Evaluando datos meteorológicos...</div>
+              </div>
+              <div class="port-detail-item">
+                <div class="pdl">Navegación con carta</div>
+                <div class="pdv" id="portCarta">—</div>
+              </div>
+            </div>
+            <div class="port-detail-row">
+              <div class="port-detail-item">
+                <div class="pdl">Restricciones vigentes</div>
+                <div class="port-reasons" id="portReasons"><span class="port-reason-tag">Cargando...</span></div>
+              </div>
+              <div class="port-detail-item">
+                <div class="pdl">Jurisdicción</div>
+                <div class="pdv">Capitanía de Puerto de <strong>Castro</strong> · Gobernación Marítima de <strong>Puerto Montt</strong></div>
+              </div>
+            </div>
+            <div class="port-link-row">
+              <a class="port-link port-link-primary" href="https://www.directemar.cl/directemar/site/edic/base/port/condiciones-de-barra.html" target="_blank" rel="noopener">📡 Ver estado oficial DIRECTEMAR</a>
+              <a class="port-link port-link-secondary" href="https://meteoarmada.directemar.cl/" target="_blank" rel="noopener">🌊 MeteoArmada</a>
+              <a class="port-link port-link-secondary" href="https://www.shoa.cl/" target="_blank" rel="noopener">📊 SHOA</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════ CARTA NAVEGACIÓN & MULTAS ═══════════════ -->
+    <section class="row">
+      <div class="row-title"><span class="accent-bar"></span>Normativa Marítima · Multas y Autorizaciones</div>
+      <div class="info-grid">
+        <div class="info-panel">
+          <h3>📜 Navegación con Carta (Zarpe Restringido)</h3>
+          <p style="margin-bottom:10px;color:#999">Cuando el puerto tiene restricciones parciales, el Capitán de Puerto puede autorizar zarpe bajo condiciones:</p>
+          <ul>
+            <li><strong>Carta de zarpe con restricción:</strong> autorización especial emitida por la Capitanía de Puerto para navegar bajo condiciones meteorológicas adversas parciales</li>
+            <li><strong>Requisitos:</strong> embarcación en buen estado, tripulación con licencias vigentes, radio VHF operativa, elementos de seguridad al día</li>
+            <li><strong>Restricción horaria:</strong> puede limitar navegación a horarios diurnos (06:00–18:00)</li>
+            <li><strong>Zona limitada:</strong> navegación solo en aguas interiores protegidas, prohibido mar abierto</li>
+            <li><strong>Puerto cerrado =</strong> <span style="color:#E50914;font-weight:800">NO se puede zarpar bajo ninguna circunstancia</span>, ni con carta</li>
+          </ul>
+          <div class="legal-ref">
+            <strong>Base legal:</strong> D.L. N° 2.222 (Ley de Navegación), Art. 6° y 64°. Reglamento de Orden, Seguridad y Disciplina en Naves y Litoral de la República (D.S. N° 1.340 bis). La Capitanía de Puerto tiene potestad exclusiva para autorizar/denegar zarpes.
+          </div>
+        </div>
+        <div class="info-panel">
+          <h3>⚠️ Multas por Infracción Marítima</h3>
+          <p style="margin-bottom:10px;color:#999">Sanciones aplicables por DIRECTEMAR según la Ley de Navegación (DL 2.222) y Código Penal. <strong>Valor UTM marzo 2026 ≈ $67.000 CLP</strong></p>
+          <table class="fines-table">
+            <thead>
+              <tr>
+                <th>Infracción</th>
+                <th>Sanción</th>
+                <th>Monto aprox.</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Zarpar sin autorización (puerto cerrado)</td>
+                <td>5 – 100 UTM</td>
+                <td class="fine-amount">$335.000 – $6.700.000</td>
+              </tr>
+              <tr>
+                <td>Zarpar sin carta/zarpe vigente</td>
+                <td>3 – 50 UTM</td>
+                <td class="fine-amount">$201.000 – $3.350.000</td>
+              </tr>
+              <tr>
+                <td>No respetar restricciones de la carta</td>
+                <td>5 – 50 UTM</td>
+                <td class="fine-amount">$335.000 – $3.350.000</td>
+              </tr>
+              <tr>
+                <td>Poner en riesgo la vida humana en el mar</td>
+                <td>Hasta 1.000 UTM + penal</td>
+                <td class="fine-amount">Hasta $67.000.000</td>
+              </tr>
+              <tr>
+                <td>Reincidencia (cualquier infracción)</td>
+                <td>Doble de multa + suspensión licencia</td>
+                <td class="fine-amount">Según caso</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="legal-ref">
+            <strong>Además:</strong> Retención de la embarcación, suspensión/cancelación de matrícula y licencias de tripulación, responsabilidad penal en caso de lesiones o muerte (Art. 313 y ss. del Código Penal). El Capitán de Puerto puede ordenar <strong>comiso de la nave</strong> en casos graves. Consulta: <a href="https://www.directemar.cl" target="_blank">directemar.cl</a>
+          </div>
+        </div>
+      </div>
+    </section>
 
     <!-- KPI ROW -->
     <section class="row">
@@ -852,6 +1229,114 @@
       }
     }
 
+    /* ─── PORT STATUS LOGIC ─── */
+    function calcPortStatus(current, todayRisk) {
+      const wind = current.wind_speed_10m ?? 0;
+      const gust = current.wind_gusts_10m ?? 0;
+      const rain = current.precipitation ?? 0;
+      const code = current.weather_code ?? 0;
+      const isStorm = [95, 96, 99].includes(code);
+      const reasons = [];
+      let status = 'ABIERTO';
+      let carta = true;
+
+      // Evaluate current conditions against DIRECTEMAR criteria
+      if (gust >= 70 || isStorm) {
+        status = 'CERRADO';
+        carta = false;
+        if (gust >= 70) reasons.push({ text: `Rachas ${num(gust,0)} km/h (≥70)`, cls: 'danger' });
+        if (isStorm) reasons.push({ text: 'Tormenta activa', cls: 'danger' });
+      } else if (gust >= 55 || wind >= 45) {
+        status = 'CERRADO';
+        carta = false;
+        if (gust >= 55) reasons.push({ text: `Rachas ${num(gust,0)} km/h (≥55)`, cls: 'danger' });
+        if (wind >= 45) reasons.push({ text: `Viento ${num(wind,0)} km/h (≥45)`, cls: 'danger' });
+      } else if (gust >= 45 || wind >= 35) {
+        status = 'RESTRINGIDO';
+        if (gust >= 45) reasons.push({ text: `Rachas ${num(gust,0)} km/h (≥45)`, cls: 'warn' });
+        if (wind >= 35) reasons.push({ text: `Viento ${num(wind,0)} km/h (≥35)`, cls: 'warn' });
+      }
+
+      if (rain >= 10) {
+        if (status === 'ABIERTO') status = 'RESTRINGIDO';
+        reasons.push({ text: `Lluvia intensa ${num(rain,1)} mm/h`, cls: 'warn' });
+      }
+
+      const fogCodes = [45, 48];
+      if (fogCodes.includes(code)) {
+        if (status === 'ABIERTO') status = 'RESTRINGIDO';
+        reasons.push({ text: 'Visibilidad reducida (niebla)', cls: 'warn' });
+      }
+
+      // If today's forecast risk is ALTO and current is just restricted, escalate
+      if (todayRisk === 'ALTO' && status === 'RESTRINGIDO') {
+        status = 'CERRADO';
+        carta = false;
+        reasons.push({ text: 'Pronóstico de alto riesgo hoy', cls: 'danger' });
+      }
+
+      if (reasons.length === 0) {
+        reasons.push({ text: 'Sin restricciones', cls: 'ok' });
+      }
+
+      return { status, carta, reasons };
+    }
+
+    function renderPortStatus(current, todayRisk) {
+      const port = calcPortStatus(current, todayRisk);
+      const card = document.getElementById('portCard');
+      const statusEl = document.getElementById('portStatus');
+      const iconEl = document.getElementById('portIcon');
+      const dotEl = document.getElementById('portDot');
+      const timeEl = document.getElementById('portTime');
+      const condEl = document.getElementById('portConditions');
+      const cartaEl = document.getElementById('portCarta');
+      const reasonsEl = document.getElementById('portReasons');
+
+      // Status class
+      card.className = 'port-status-card';
+      statusEl.className = 'port-big-status';
+      dotEl.className = 'port-live-dot';
+
+      if (port.status === 'CERRADO') {
+        card.classList.add('status-closed');
+        statusEl.classList.add('closed');
+        dotEl.classList.add('closed');
+        statusEl.textContent = '🚫 PUERTO CERRADO';
+        iconEl.textContent = '⛔';
+      } else if (port.status === 'RESTRINGIDO') {
+        card.classList.add('status-restricted');
+        statusEl.classList.add('restricted');
+        dotEl.classList.add('restricted');
+        statusEl.textContent = '⚠️ RESTRINGIDO';
+        iconEl.textContent = '⚠️';
+      } else {
+        card.classList.add('status-open');
+        statusEl.classList.add('open');
+        dotEl.classList.add('open');
+        statusEl.textContent = '✅ ABIERTO';
+        iconEl.textContent = '⚓';
+      }
+
+      timeEl.textContent = 'Evaluado: ' + new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }) + ' hrs — basado en datos meteorológicos en tiempo real';
+
+      // Current conditions text
+      const condText = `Viento: <strong>${num(current.wind_speed_10m ?? 0, 0)} km/h</strong> · Rachas: <strong>${num(current.wind_gusts_10m ?? 0, 0)} km/h</strong> · Lluvia: <strong>${num(current.precipitation ?? 0, 1)} mm/h</strong> · ${weatherCodeMap[current.weather_code] ?? 'N/D'}`;
+      condEl.innerHTML = condText;
+
+      // Carta info
+      if (port.status === 'CERRADO') {
+        cartaEl.innerHTML = '<span style="color:#E50914;font-weight:800">❌ NO PERMITIDO</span> — Puerto cerrado, no se emiten cartas. Navegación <strong>totalmente prohibida</strong>.';
+      } else if (port.status === 'RESTRINGIDO') {
+        cartaEl.innerHTML = '<span style="color:#f5c518;font-weight:800">📋 CON AUTORIZACIÓN</span> — Zarpe posible con carta de la Capitanía de Puerto de Castro. Solo aguas interiores protegidas, horario diurno.';
+      } else {
+        cartaEl.innerHTML = '<span style="color:#46d369;font-weight:800">✅ LIBRE</span> — Zarpe habilitado con documentación regular. Carta estándar vigente.';
+      }
+
+      // Reasons
+      reasonsEl.innerHTML = port.reasons.map(r => `<span class="port-reason-tag ${r.cls}">${r.text}</span>`).join('');
+    }
+
     function renderKPIs(days, current) {
       const highDays = days.filter((d) => d.risk.level === 'ALTO').length;
       const maxGust = Math.max(...days.map((d) => d.gust || 0), 0);
@@ -894,6 +1379,7 @@
           const risk = calcRisk({ gust, wind, wave, rain });
           return { date, weatherCode: weather.daily.weather_code?.[i], tMin: weather.daily.temperature_2m_min?.[i], tMax: weather.daily.temperature_2m_max?.[i], rain, wind, gust, wave, risk };
         });
+        renderPortStatus(current, days[0]?.risk?.level ?? 'BAJO');
         renderKPIs(days, current);
         renderTable(days);
         buildWeekChart(days);
