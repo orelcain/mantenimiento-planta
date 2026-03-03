@@ -612,6 +612,36 @@
     .port-reason-tag.danger { color: var(--bad); background: rgba(255, 107, 107, 0.16); }
     .port-reason-tag.ok { color: var(--good); background: rgba(70,211,105,0.1); }
 
+    .port-closure-box {
+      margin-top: 4px;
+      padding: 10px 12px;
+      border-radius: 6px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .port-closure-headline {
+      font-size: 1rem;
+      font-weight: 900;
+      letter-spacing: 0.4px;
+      margin-bottom: 6px;
+    }
+
+    .port-closure-headline.yes { color: var(--bad); }
+    .port-closure-headline.no { color: var(--good); }
+
+    .port-closure-sub {
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .port-closure-drivers {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
     .port-link-row {
       display: flex;
       gap: 10px;
@@ -908,6 +938,14 @@
               <div class="port-detail-item">
                 <div class="pdl">Restricciones vigentes</div>
                 <div class="port-reasons" id="portReasons"><span class="port-reason-tag">Cargando...</span></div>
+              </div>
+              <div class="port-detail-item">
+                <div class="pdl">Decisión rápida (próx. 24h)</div>
+                <div class="port-closure-box">
+                  <div class="port-closure-headline" id="closureHeadline">Calculando cierre probable...</div>
+                  <div class="port-closure-sub" id="closureSub">Analizando viento, rachas, lluvia y oleaje.</div>
+                  <div class="port-closure-drivers" id="closureDrivers"><span class="port-reason-tag">Cargando...</span></div>
+                </div>
               </div>
               <div class="port-detail-item">
                 <div class="pdl">Jurisdicción</div>
@@ -1449,6 +1487,125 @@
 
       // Reasons
       reasonsEl.innerHTML = port.reasons.map(r => `<span class="port-reason-tag ${r.cls}">${r.text}</span>`).join('');
+
+      return port;
+    }
+
+    function calcClosureOutlook24h(current, weather, marine, portNow) {
+      const weatherTimes = weather.hourly?.time ?? [];
+      const marineTimes = marine.hourly?.time ?? [];
+      const gusts = weather.hourly?.wind_gusts_10m ?? [];
+      const winds = weather.hourly?.wind_speed_10m ?? [];
+      const rains = weather.hourly?.precipitation ?? [];
+      const codes = weather.hourly?.weather_code ?? [];
+      const waves = marine.hourly?.wave_height ?? [];
+
+      const currentTime = current.time;
+      const startWeather = Math.max(weatherTimes.indexOf(currentTime), 0);
+      const startMarine = Math.max(marineTimes.indexOf(currentTime), 0);
+      const hours = Math.min(24, weatherTimes.length - startWeather, marineTimes.length - startMarine);
+
+      if (hours <= 0) {
+        return {
+          closeLikely: portNow?.status === 'CERRADO',
+          confidence: portNow?.status === 'CERRADO' ? 90 : 45,
+          topRisk: 'MEDIO',
+          drivers: ['Sin ventana horaria suficiente en API'],
+          summary: 'Sin datos suficientes para proyección 24h'
+        };
+      }
+
+      let maxScore = 0;
+      let highHours = 0;
+      let mediumHours = 0;
+      let maxGust = 0;
+      let maxWind = 0;
+      let maxWave = 0;
+      let maxRain = 0;
+      let stormHours = 0;
+      let fogHours = 0;
+
+      for (let i = 0; i < hours; i++) {
+        const gust = Number(gusts[startWeather + i] ?? 0);
+        const wind = Number(winds[startWeather + i] ?? 0);
+        const rain = Number(rains[startWeather + i] ?? 0);
+        const wave = Number(waves[startMarine + i] ?? 0);
+        const code = Number(codes[startWeather + i] ?? 0);
+
+        maxGust = Math.max(maxGust, gust);
+        maxWind = Math.max(maxWind, wind);
+        maxWave = Math.max(maxWave, wave);
+        maxRain = Math.max(maxRain, rain);
+
+        if ([95, 96, 99].includes(code)) stormHours += 1;
+        if ([45, 48].includes(code)) fogHours += 1;
+
+        let score = 0;
+        if (gust >= 70) score += 4;
+        else if (gust >= 55) score += 3;
+        else if (gust >= 45) score += 1;
+
+        if (wind >= 45) score += 2;
+        else if (wind >= 35) score += 1;
+
+        if (wave >= 3.5) score += 3;
+        else if (wave >= 2.5) score += 2;
+        else if (wave >= 1.8) score += 1;
+
+        if (rain >= 10) score += 1;
+        if ([95, 96, 99].includes(code)) score += 3;
+        if ([45, 48].includes(code)) score += 1;
+
+        maxScore = Math.max(maxScore, score);
+        if (score >= 6) highHours += 1;
+        else if (score >= 3) mediumHours += 1;
+      }
+
+      const closeLikely =
+        portNow?.status === 'CERRADO' ||
+        maxScore >= 6 ||
+        highHours >= 2 ||
+        (highHours >= 1 && mediumHours >= 3);
+
+      let confidence = 25 + (maxScore * 8) + (highHours * 7) + (mediumHours * 2);
+      if (!closeLikely) confidence = Math.max(55, 100 - confidence);
+      confidence = Math.max(35, Math.min(96, Math.round(confidence)));
+
+      const drivers = [];
+      if (maxGust >= 55) drivers.push(`Rachas máx ${num(maxGust, 0)} km/h`);
+      if (maxWind >= 40) drivers.push(`Viento máx ${num(maxWind, 0)} km/h`);
+      if (maxWave >= 2.5) drivers.push(`Oleaje máx ${num(maxWave, 1)} m`);
+      if (maxRain >= 8) drivers.push(`Lluvia horaria máx ${num(maxRain, 1)} mm/h`);
+      if (stormHours > 0) drivers.push(`Tormenta prevista (${stormHours} h)`);
+      if (fogHours >= 2) drivers.push(`Niebla prevista (${fogHours} h)`);
+      if (drivers.length === 0) drivers.push('Sin señales críticas en 24h');
+
+      const topRisk = maxScore >= 6 ? 'ALTO' : maxScore >= 3 ? 'MEDIO' : 'BAJO';
+      const summary = closeLikely
+        ? `Cierre probable en próximas 24h (riesgo ${topRisk.toLowerCase()}).`
+        : 'No se proyecta cierre en próximas 24h.';
+
+      return { closeLikely, confidence, topRisk, drivers, summary };
+    }
+
+    function renderClosureOutlook(outlook) {
+      const headlineEl = document.getElementById('closureHeadline');
+      const subEl = document.getElementById('closureSub');
+      const driversEl = document.getElementById('closureDrivers');
+
+      headlineEl.classList.remove('yes', 'no');
+      if (outlook.closeLikely) {
+        headlineEl.classList.add('yes');
+        headlineEl.textContent = `CIERRE PROBABLE: SÍ (${outlook.confidence}%)`;
+      } else {
+        headlineEl.classList.add('no');
+        headlineEl.textContent = `CIERRE PROBABLE: NO (${outlook.confidence}%)`;
+      }
+
+      subEl.textContent = `${outlook.summary} Ventana evaluada: próximas 24 horas.`;
+      driversEl.innerHTML = outlook.drivers
+        .map((driver) => `<span class="port-reason-tag">${driver}</span>`)
+        .join('');
     }
 
     function renderKPIs(days, current) {
@@ -1475,7 +1632,7 @@
       errorEl.style.display = 'none';
       document.getElementById('weeklyStatus').textContent = 'Cargando...';
       try {
-        const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${CHONCHI.lat}&longitude=${CHONCHI.lon}&timezone=America/Santiago&current=temperature_2m,precipitation,weather_code,wind_speed_10m,wind_gusts_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,wind_gusts_10m_max&forecast_days=7`;
+        const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${CHONCHI.lat}&longitude=${CHONCHI.lon}&timezone=America/Santiago&current=temperature_2m,precipitation,weather_code,wind_speed_10m,wind_gusts_10m&hourly=precipitation,weather_code,wind_speed_10m,wind_gusts_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,wind_gusts_10m_max&forecast_days=7`;
         const marineUrl = `https://marine-api.open-meteo.com/v1/marine?latitude=${CHONCHI.lat}&longitude=${CHONCHI.lon}&timezone=America/Santiago&hourly=wave_height&forecast_days=7`;
         const [weatherRes, marineRes] = await Promise.all([fetch(weatherUrl), fetch(marineUrl)]);
         if (!weatherRes.ok || !marineRes.ok) throw new Error('No se pudo consultar una de las APIs de pronóstico.');
@@ -1493,7 +1650,9 @@
           const risk = calcRisk({ gust, wind, wave, rain });
           return { date, weatherCode: weather.daily.weather_code?.[i], tMin: weather.daily.temperature_2m_min?.[i], tMax: weather.daily.temperature_2m_max?.[i], rain, wind, gust, wave, risk };
         });
-        renderPortStatus(current, days[0]?.risk?.level ?? 'BAJO');
+        const portNow = renderPortStatus(current, days[0]?.risk?.level ?? 'BAJO');
+        const closureOutlook = calcClosureOutlook24h(current, weather, marine, portNow);
+        renderClosureOutlook(closureOutlook);
         renderKPIs(days, current);
         renderTable(days);
         buildWeekChart(days);
