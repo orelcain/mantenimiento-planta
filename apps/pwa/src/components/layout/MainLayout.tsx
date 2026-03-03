@@ -102,10 +102,9 @@ export function MainLayout() {
   const isGanttRoute = location.pathname.startsWith('/gantt')
   const isClimaRoute = location.pathname.startsWith('/clima-puerto')
   const shouldHideDesktopSidebar =
-    !isClimaRoute && (sidebarCollapsed || (isGanttRoute && ganttFocusMode && !sidebarPeekOpen))
+    sidebarCollapsed || (isGanttRoute && ganttFocusMode && !sidebarPeekOpen)
 
   const toggleSidebarCollapse = () => {
-    if (isClimaRoute) return
     setSidebarCollapsed((prev) => {
       const next = !prev
       localStorage.setItem('sidebar_collapsed', next ? '1' : '0')
@@ -201,13 +200,6 @@ export function MainLayout() {
       setSidebarPeekOpen(false)
     }
   }, [isGanttRoute])
-
-  useEffect(() => {
-    if (!isClimaRoute) return
-    if (!sidebarCollapsed) return
-    setSidebarCollapsed(false)
-    localStorage.setItem('sidebar_collapsed', '0')
-  }, [isClimaRoute, sidebarCollapsed])
 
   useEffect(() => {
     initUploadQueue()
@@ -326,7 +318,6 @@ export function MainLayout() {
         role="navigation"
         aria-label="Menú principal"
         aria-expanded={sidebarOpen}
-        style={isClimaRoute ? { transform: 'translateX(0)' } : undefined}
         className={cn(
           'fixed inset-y-0 left-0 z-50 w-64 bg-card border-r transform transition-transform duration-200 ease-in-out',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full',
@@ -348,25 +339,21 @@ export function MainLayout() {
               <span className="font-semibold">Mantenimiento</span>
             </div>
             <div className="flex items-center gap-1">
-              {!isClimaRoute && (
-                <button
-                  onClick={toggleSidebarCollapse}
-                  className="hidden lg:flex p-1.5 hover:bg-muted rounded-md transition-colors"
-                  aria-label="Contraer menú"
-                  title="Contraer menú"
-                >
-                  <ChevronLeft className="h-4 w-4 text-muted-foreground" />
-                </button>
-              )}
-              {!isClimaRoute && (
-                <button
-                  onClick={() => setSidebarOpen(false)}
-                  className="lg:hidden p-1 hover:bg-muted rounded"
-                  aria-label="Cerrar menú"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              )}
+              <button
+                onClick={toggleSidebarCollapse}
+                className="hidden lg:flex p-1.5 hover:bg-muted rounded-md transition-colors"
+                aria-label="Contraer menú"
+                title="Contraer menú"
+              >
+                <ChevronLeft className="h-4 w-4 text-muted-foreground" />
+              </button>
+              <button
+                onClick={() => setSidebarOpen(false)}
+                className="lg:hidden p-1 hover:bg-muted rounded"
+                aria-label="Cerrar menú"
+              >
+                <X className="h-5 w-5" />
+              </button>
             </div>
           </div>
 
@@ -491,21 +478,18 @@ export function MainLayout() {
 
       {/* Main content */}
       <div
-        style={isClimaRoute ? { paddingLeft: '16rem' } : undefined}
         className={cn('transition-[padding] duration-200 ease-in-out', !shouldHideDesktopSidebar && 'lg:pl-64')}
       >
         {/* Top bar */}
         <header className="sticky top-0 z-30 flex items-center h-16 px-4 bg-background/80 backdrop-blur border-b">
-          {!isClimaRoute && (
-            <button
-              onClick={() => setSidebarOpen(true)}
-              className="lg:hidden p-2 -ml-2 hover:bg-muted rounded-lg"
-              aria-label="Abrir menú"
-              aria-expanded={sidebarOpen}
-            >
-              <Menu className="h-5 w-5" />
-            </button>
-          )}
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="lg:hidden p-2 -ml-2 hover:bg-muted rounded-lg"
+            aria-label="Abrir menú"
+            aria-expanded={sidebarOpen}
+          >
+            <Menu className="h-5 w-5" />
+          </button>
 
           <div className="flex-1" />
 
