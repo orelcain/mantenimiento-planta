@@ -3,40 +3,37 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Meteograma Puerto · Chonchi (Chiloé)</title>
+  <title>Puerto Chonchi · Clima en Vivo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
   <style>
     :root {
       color-scheme: dark;
-      --bg1: #07101d;
-      --bg2: #0a1424;
-      --card: rgba(10, 22, 39, 0.82);
-      --card-border: rgba(100, 145, 210, 0.2);
-      --text: #e8f2ff;
-      --muted: #9bb3d6;
-      --accent: #55b2ff;
-      --good: #22c55e;
-      --mid: #f59e0b;
-      --bad: #ef4444;
-      --line: rgba(142, 175, 226, 0.22);
+      --bg: #141414;
+      --surface: #1a1a1a;
+      --card: #232323;
+      --card-hover: #2a2a2a;
+      --netflix-red: #E50914;
+      --netflix-red-dark: #B20710;
+      --text: #e5e5e5;
+      --text-bright: #ffffff;
+      --muted: #808080;
+      --good: #46d369;
+      --mid: #f5c518;
+      --bad: #E50914;
     }
 
-    * { box-sizing: border-box; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
 
     body {
-      margin: 0;
       min-height: 100vh;
-      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
       color: var(--text);
-      background: radial-gradient(1200px 900px at 20% -10%, #15345f 0%, transparent 50%),
-                  radial-gradient(1000px 700px at 120% 0%, #0f2f54 0%, transparent 45%),
-                  linear-gradient(180deg, var(--bg1), var(--bg2));
+      background: var(--bg);
       overflow-x: hidden;
-    }
-
-    body.rain {
-      background: radial-gradient(1200px 900px at 20% -10%, #243f63 0%, transparent 50%),
-                  radial-gradient(1000px 700px at 120% 0%, #1a3557 0%, transparent 45%),
-                  linear-gradient(180deg, #050b15, #0a1220);
+      -webkit-font-smoothing: antialiased;
     }
 
     #fxCanvas {
@@ -44,307 +41,532 @@
       inset: 0;
       pointer-events: none;
       z-index: 0;
-      opacity: 0.85;
+      opacity: 0.5;
     }
 
-    .wrap {
+    /* ─── NAVBAR ─── */
+    .navbar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 4%;
+      height: 64px;
+      background: linear-gradient(180deg, rgba(0,0,0,0.85) 0%, transparent 100%);
+      transition: background 0.3s;
+    }
+
+    .navbar.scrolled {
+      background: rgba(20, 20, 20, 0.97);
+      box-shadow: 0 2px 20px rgba(0,0,0,0.5);
+    }
+
+    .nav-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .nav-logo {
+      font-size: 1.6rem;
+      font-weight: 900;
+      letter-spacing: -0.5px;
+      color: var(--netflix-red);
+      text-transform: uppercase;
+    }
+
+    .nav-divider {
+      width: 1px;
+      height: 24px;
+      background: #444;
+    }
+
+    .nav-title {
+      font-size: 0.88rem;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .nav-right {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .nav-badge {
+      padding: 5px 12px;
+      border-radius: 4px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--text);
+      background: rgba(255,255,255,0.1);
+    }
+
+    .btn-reload {
+      background: var(--netflix-red);
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      padding: 7px 16px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.15s;
+    }
+
+    .btn-reload:hover {
+      background: var(--netflix-red-dark);
+      transform: scale(1.04);
+    }
+
+    /* ─── HERO ─── */
+    .hero {
       position: relative;
       z-index: 1;
-      width: min(1320px, calc(100% - 24px));
-      margin: 12px auto 28px;
+      padding: 0 4%;
+      margin-top: -64px;
+      padding-top: 64px;
     }
 
-    .glass {
-      background: var(--card);
-      border: 1px solid var(--card-border);
-      border-radius: 16px;
-      backdrop-filter: blur(7px);
-      box-shadow: 0 8px 34px rgba(0, 0, 0, 0.28);
-    }
-
-    .topbar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      padding: 14px;
-    }
-
-    .title {
-      margin: 0;
-      font-size: 1.2rem;
-      letter-spacing: 0.2px;
-    }
-
-    .subtitle {
-      margin: 2px 0 0;
-      color: var(--muted);
-      font-size: 0.87rem;
-    }
-
-    .toolbar {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-      flex-wrap: wrap;
-    }
-
-    .badge {
-      border-radius: 999px;
-      border: 1px solid var(--line);
-      padding: 5px 10px;
-      font-size: 0.78rem;
-      color: #cfe3ff;
-      background: rgba(12, 30, 54, 0.8);
-    }
-
-    button {
-      border: 1px solid #2d4e79;
-      color: #edf5ff;
-      background: linear-gradient(180deg, #20406b, #163053);
-      border-radius: 10px;
-      padding: 8px 12px;
-      cursor: pointer;
-      font-weight: 600;
-    }
-
-    button:hover { filter: brightness(1.08); }
-
-    .grid {
-      margin-top: 12px;
-      display: grid;
-      grid-template-columns: repeat(12, 1fr);
-      gap: 12px;
-    }
-
-    .gadgets {
-      grid-column: span 12;
-      display: grid;
-      gap: 10px;
-      grid-template-columns: repeat(6, minmax(120px, 1fr));
-      padding: 12px;
-    }
-
-    .gadget {
-      padding: 10px;
-      border-radius: 12px;
-      background: rgba(12, 26, 44, 0.75);
-      border: 1px solid rgba(116, 153, 214, 0.2);
-    }
-
-    .gadget .k { color: var(--muted); font-size: 0.78rem; }
-    .gadget .v { font-size: 1.05rem; font-weight: 700; margin-top: 3px; }
-
-    .map-section {
-      grid-column: span 12;
-      padding: 0;
-      overflow: hidden;
-      border-radius: 16px;
-    }
-
-    .map-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 8px;
-      padding: 12px 14px;
-    }
-
-    .map-header h2 {
-      margin: 0;
-      font-size: 1rem;
-      color: #d7e9ff;
-    }
-
-    .layer-btns {
-      display: flex;
-      gap: 6px;
-      flex-wrap: wrap;
-    }
-
-    .layer-btn {
-      border: 1px solid rgba(100, 160, 240, 0.35);
-      color: #b8d4f5;
-      background: rgba(20, 40, 70, 0.6);
+    .hero-map-wrap {
+      position: relative;
       border-radius: 8px;
-      padding: 5px 11px;
-      cursor: pointer;
-      font-size: 0.8rem;
-      font-weight: 600;
-      transition: all 0.2s;
+      overflow: hidden;
+      box-shadow: 0 12px 60px rgba(0,0,0,0.7);
     }
 
-    .layer-btn:hover { background: rgba(40, 80, 140, 0.5); }
-    .layer-btn.active {
-      background: linear-gradient(135deg, #1e6ddb, #3b8bff);
-      color: #fff;
-      border-color: #5ea4ff;
-      box-shadow: 0 0 10px rgba(60, 140, 255, 0.35);
+    .hero-map-wrap::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        linear-gradient(0deg, var(--bg) 0%, transparent 30%),
+        linear-gradient(180deg, rgba(20,20,20,0.4) 0%, transparent 20%);
+      z-index: 2;
     }
 
     .map-frame {
       width: 100%;
-      height: 480px;
+      height: 520px;
       border: none;
       display: block;
     }
 
-    .panel {
-      padding: 12px;
-      min-height: 330px;
+    .hero-overlay {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 3;
+      padding: 32px 32px 24px;
     }
 
-    .panel h2 {
-      margin: 0 0 8px;
-      font-size: 0.98rem;
-      color: #d7e9ff;
+    .hero-title {
+      font-size: 2.8rem;
+      font-weight: 900;
+      color: var(--text-bright);
+      text-shadow: 0 2px 20px rgba(0,0,0,0.8);
+      line-height: 1.1;
     }
 
-    .panel.main { grid-column: span 8; }
-    .panel.side { grid-column: span 4; }
+    .hero-subtitle {
+      font-size: 1rem;
+      color: #aaa;
+      margin-top: 6px;
+      font-weight: 400;
+    }
 
-    .chart-wrap { position: relative; height: 270px; }
+    .hero-condition {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 14px;
+      padding: 8px 18px;
+      border-radius: 4px;
+      background: rgba(229,9,20,0.85);
+      color: #fff;
+      font-weight: 700;
+      font-size: 0.92rem;
+      backdrop-filter: blur(4px);
+    }
 
-    .table-panel {
-      grid-column: span 12;
-      padding: 8px;
-      overflow: auto;
+    .hero-condition .cond-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #fff;
+      animation: pulseDot 2s ease-in-out infinite;
+    }
+
+    @keyframes pulseDot {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    /* ─── LAYER PILLS ─── */
+    .layer-bar {
+      display: flex;
+      gap: 8px;
+      padding: 16px 4%;
+      overflow-x: auto;
+      position: relative;
+      z-index: 2;
+    }
+
+    .layer-pill {
+      white-space: nowrap;
+      border: 2px solid transparent;
+      color: var(--text);
+      background: var(--card);
+      border-radius: 999px;
+      padding: 8px 20px;
+      cursor: pointer;
+      font-size: 0.82rem;
+      font-weight: 700;
+      transition: all 0.2s;
+      flex-shrink: 0;
+    }
+
+    .layer-pill:hover {
+      background: var(--card-hover);
+      border-color: #555;
+    }
+
+    .layer-pill.active {
+      background: var(--netflix-red);
+      color: #fff;
+      border-color: var(--netflix-red);
+    }
+
+    /* ─── SECTION ROWS ─── */
+    .content {
+      position: relative;
+      z-index: 1;
+      padding: 0 4%;
+    }
+
+    .row {
+      margin-bottom: 28px;
+    }
+
+    .row-title {
+      font-size: 1.3rem;
+      font-weight: 800;
+      color: var(--text-bright);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .row-title .accent-bar {
+      width: 4px;
+      height: 22px;
+      background: var(--netflix-red);
+      border-radius: 2px;
+    }
+
+    /* ─── KPI CARDS ─── */
+    .kpi-scroll {
+      display: flex;
+      gap: 12px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+      scroll-snap-type: x mandatory;
+    }
+
+    .kpi-scroll::-webkit-scrollbar { height: 4px; }
+    .kpi-scroll::-webkit-scrollbar-track { background: transparent; }
+    .kpi-scroll::-webkit-scrollbar-thumb { background: #444; border-radius: 2px; }
+
+    .kpi-card {
+      flex: 0 0 200px;
+      scroll-snap-align: start;
+      background: var(--card);
+      border-radius: 6px;
+      padding: 18px 16px;
+      transition: transform 0.25s, background 0.25s, box-shadow 0.25s;
+      cursor: default;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .kpi-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: var(--netflix-red);
+      opacity: 0;
+      transition: opacity 0.25s;
+    }
+
+    .kpi-card:hover {
+      transform: scale(1.05);
+      background: var(--card-hover);
+      box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+      z-index: 2;
+    }
+
+    .kpi-card:hover::before { opacity: 1; }
+
+    .kpi-label {
+      font-size: 0.75rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 600;
+    }
+
+    .kpi-value {
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: var(--text-bright);
+      margin-top: 6px;
+    }
+
+    /* ─── CHART PANELS ─── */
+    .charts-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    .chart-card {
+      background: var(--card);
+      border-radius: 8px;
+      padding: 20px;
+      transition: transform 0.25s, box-shadow 0.25s;
+    }
+
+    .chart-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+    }
+
+    .chart-card h3 {
+      font-size: 0.92rem;
+      font-weight: 700;
+      color: var(--text-bright);
+      margin-bottom: 12px;
+    }
+
+    .chart-wrap {
+      position: relative;
+      height: 280px;
+    }
+
+    /* ─── TABLE ─── */
+    .table-card {
+      background: var(--card);
+      border-radius: 8px;
+      overflow: hidden;
     }
 
     table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 0.9rem;
-      overflow: hidden;
-      border-radius: 12px;
+      font-size: 0.88rem;
     }
 
     th, td {
       text-align: left;
-      padding: 9px 10px;
-      border-bottom: 1px solid rgba(123, 160, 219, 0.17);
+      padding: 12px 14px;
       white-space: nowrap;
     }
 
     th {
-      color: #d7e8ff;
-      background: rgba(12, 28, 48, 0.8);
+      color: var(--muted);
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      font-weight: 700;
+      background: rgba(0,0,0,0.4);
       position: sticky;
       top: 0;
+      border-bottom: 2px solid var(--netflix-red);
     }
 
+    td {
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      color: var(--text);
+    }
+
+    tr { transition: background 0.15s; }
+    tr:hover td { background: rgba(255,255,255,0.04); }
     tr:last-child td { border-bottom: none; }
 
     .chip {
       display: inline-block;
-      border-radius: 999px;
-      font-size: 0.75rem;
-      padding: 3px 8px;
-      border: 1px solid transparent;
-      font-weight: 600;
+      border-radius: 4px;
+      font-size: 0.72rem;
+      padding: 4px 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
     }
 
-    .risk-low { color: #8df8b8; background: rgba(20, 78, 48, 0.5); border-color: rgba(87, 213, 146, 0.4); }
-    .risk-mid { color: #fde68a; background: rgba(121, 66, 13, 0.45); border-color: rgba(245, 195, 100, 0.4); }
-    .risk-high { color: #fecaca; background: rgba(120, 33, 43, 0.45); border-color: rgba(252, 132, 147, 0.4); }
+    .risk-low { color: #46d369; background: rgba(70, 211, 105, 0.15); }
+    .risk-mid { color: #f5c518; background: rgba(245, 197, 24, 0.15); }
+    .risk-high { color: #E50914; background: rgba(229, 9, 20, 0.15); }
 
-    .warn {
-      margin-top: 12px;
-      border-left: 3px solid var(--mid);
-      border-radius: 10px;
-      padding: 10px 12px;
-      color: #fef3c7;
-      background: rgba(55, 40, 19, 0.65);
-      font-size: 0.86rem;
+    /* ─── FOOTER ─── */
+    .footer {
+      margin-top: 20px;
+      padding: 20px 0 32px;
+      border-top: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .footer-warn {
+      padding: 12px 16px;
+      border-radius: 6px;
+      background: rgba(245, 197, 24, 0.08);
+      border-left: 4px solid var(--mid);
+      color: #ccc;
+      font-size: 0.82rem;
+      line-height: 1.5;
+    }
+
+    .footer-meta {
+      margin-top: 10px;
+      font-size: 0.75rem;
+      color: var(--muted);
     }
 
     .err {
-      margin-top: 10px;
+      margin-top: 12px;
       display: none;
-      border-left: 3px solid var(--bad);
-      border-radius: 10px;
-      padding: 10px 12px;
-      color: #fecdd3;
-      background: rgba(73, 21, 30, 0.65);
-      font-size: 0.86rem;
+      padding: 12px 16px;
+      border-radius: 6px;
+      background: rgba(229, 9, 20, 0.1);
+      border-left: 4px solid var(--bad);
+      color: #f88;
+      font-size: 0.84rem;
     }
 
-    .small { color: var(--muted); font-size: 0.8rem; }
-
+    /* ─── RESPONSIVE ─── */
     @media (max-width: 1024px) {
-      .panel.main, .panel.side { grid-column: span 12; }
-      .gadgets { grid-template-columns: repeat(3, minmax(120px, 1fr)); }
-      .map-frame { height: 400px; }
+      .charts-grid { grid-template-columns: 1fr; }
+      .hero-title { font-size: 2rem; }
+      .map-frame { height: 420px; }
     }
 
     @media (max-width: 640px) {
-      .gadgets { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
+      .hero-title { font-size: 1.5rem; }
+      .hero-overlay { padding: 16px; }
       .map-frame { height: 320px; }
-      .layer-btns { gap: 4px; }
-      .layer-btn { padding: 4px 8px; font-size: 0.72rem; }
+      .kpi-card { flex: 0 0 160px; padding: 14px 12px; }
+      .kpi-value { font-size: 1.2rem; }
+      .navbar { padding: 0 3%; height: 56px; }
+      .nav-logo { font-size: 1.2rem; }
+      .layer-pill { padding: 6px 14px; font-size: 0.76rem; }
     }
   </style>
 </head>
 <body>
   <canvas id="fxCanvas"></canvas>
 
-  <main class="wrap">
-    <section class="glass topbar">
-      <div>
-        <h1 class="title">Meteograma operativo · Puerto Chonchi</h1>
-        <p class="subtitle">Estilo Windguru · Open‑Meteo Weather + Marine · Chiloé, Chile</p>
+  <!-- NAVBAR -->
+  <nav class="navbar" id="navbar">
+    <div class="nav-brand">
+      <span class="nav-logo">PUERTO</span>
+      <div class="nav-divider"></div>
+      <span class="nav-title">Chonchi · Chiloé</span>
+    </div>
+    <div class="nav-right">
+      <span class="nav-badge" id="bgMode">--</span>
+      <button class="btn-reload" id="reloadBtn">⟳ Actualizar</button>
+    </div>
+  </nav>
+
+  <!-- HERO — LIVE MAP -->
+  <section class="hero">
+    <div class="hero-map-wrap">
+      <iframe
+        id="windyMap"
+        class="map-frame"
+        src="https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=mm&metricTemp=%C2%B0C&metricWind=km%2Fh&zoom=8&overlay=wind&product=ecmwf&level=surface&lat=-42.62&lon=-73.77&detailLat=-42.62&detailLon=-73.77&marker=true&message=true"
+        allowfullscreen
+        loading="lazy"
+      ></iframe>
+      <div class="hero-overlay">
+        <h1 class="hero-title">Clima en Tiempo Real</h1>
+        <p class="hero-subtitle">Meteograma operativo · Open-Meteo Weather + Marine · ECMWF</p>
+        <div class="hero-condition" id="heroCondition">
+          <span class="cond-dot"></span>
+          <span id="nowCode">Cargando...</span>
+        </div>
       </div>
-      <div class="toolbar">
-        <span class="badge" id="bgMode">Fondo: --</span>
-        <span class="badge" id="nowCode">Condición actual: --</span>
-        <button id="reloadBtn">Actualizar</button>
+    </div>
+  </section>
+
+  <!-- LAYER SELECTOR -->
+  <div class="layer-bar">
+    <button class="layer-pill active" data-layer="wind">💨 Viento</button>
+    <button class="layer-pill" data-layer="rain">🌧️ Lluvia</button>
+    <button class="layer-pill" data-layer="waves">🌊 Oleaje</button>
+    <button class="layer-pill" data-layer="temp">🌡️ Temperatura</button>
+    <button class="layer-pill" data-layer="clouds">☁️ Nubes</button>
+    <button class="layer-pill" data-layer="pressure">📊 Presión</button>
+  </div>
+
+  <main class="content">
+
+    <!-- KPI ROW -->
+    <section class="row">
+      <div class="row-title"><span class="accent-bar"></span>Resumen de la Semana</div>
+      <div class="kpi-scroll">
+        <article class="kpi-card">
+          <div class="kpi-label">Estado Semanal</div>
+          <div class="kpi-value" id="weeklyStatus">Cargando...</div>
+        </article>
+        <article class="kpi-card">
+          <div class="kpi-label">Días Riesgo Alto</div>
+          <div class="kpi-value" id="highDays">-</div>
+        </article>
+        <article class="kpi-card">
+          <div class="kpi-label">Lluvia Ahora</div>
+          <div class="kpi-value" id="nowRain">-</div>
+        </article>
+        <article class="kpi-card">
+          <div class="kpi-label">Viento Ahora</div>
+          <div class="kpi-value" id="nowWind">-</div>
+        </article>
+        <article class="kpi-card">
+          <div class="kpi-label">Racha Máx Semanal</div>
+          <div class="kpi-value" id="maxGust">-</div>
+        </article>
+        <article class="kpi-card">
+          <div class="kpi-label">Ola Máx Semanal</div>
+          <div class="kpi-value" id="maxWave">-</div>
+        </article>
       </div>
     </section>
 
-    <section class="grid">
-      <section class="glass gadgets">
-        <article class="gadget"><div class="k">Estado semanal</div><div class="v" id="weeklyStatus">Cargando...</div></article>
-        <article class="gadget"><div class="k">Riesgo alto (días)</div><div class="v" id="highDays">-</div></article>
-        <article class="gadget"><div class="k">Lluvia ahora</div><div class="v" id="nowRain">-</div></article>
-        <article class="gadget"><div class="k">Viento ahora</div><div class="v" id="nowWind">-</div></article>
-        <article class="gadget"><div class="k">Racha semanal máx</div><div class="v" id="maxGust">-</div></article>
-        <article class="gadget"><div class="k">Ola semanal máx</div><div class="v" id="maxWave">-</div></article>
-      </section>
-
-      <!-- MAPA EN VIVO ESTILO WINDGURU -->
-      <section class="glass map-section">
-        <div class="map-header">
-          <h2>🌊 Mapa en vivo · Chiloé / Golfo de Corcovado</h2>
-          <div class="layer-btns">
-            <button class="layer-btn active" data-layer="wind" title="Ver viento en tiempo real">💨 Viento</button>
-            <button class="layer-btn" data-layer="rain" title="Precipitación/lluvia">🌧️ Lluvia</button>
-            <button class="layer-btn" data-layer="waves" title="Oleaje marino">🌊 Oleaje</button>
-            <button class="layer-btn" data-layer="temp" title="Temperatura superficial">🌡️ Temperatura</button>
-            <button class="layer-btn" data-layer="clouds" title="Cobertura nubosa">☁️ Nubes</button>
-            <button class="layer-btn" data-layer="pressure" title="Presión atmosférica">📊 Presión</button>
-          </div>
+    <!-- CHARTS ROW -->
+    <section class="row">
+      <div class="row-title"><span class="accent-bar"></span>Gráficos del Pronóstico</div>
+      <div class="charts-grid">
+        <div class="chart-card">
+          <h3>Meteograma 7 Días · Viento / Racha / Lluvia</h3>
+          <div class="chart-wrap"><canvas id="weekChart"></canvas></div>
         </div>
-        <iframe
-          id="windyMap"
-          class="map-frame"
-          src="https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=mm&metricTemp=%C2%B0C&metricWind=km%2Fh&zoom=8&overlay=wind&product=ecmwf&level=surface&lat=-42.62&lon=-73.77&detailLat=-42.62&detailLon=-73.77&marker=true&message=true"
-          allowfullscreen
-          loading="lazy"
-        ></iframe>
-      </section>
+        <div class="chart-card">
+          <h3>Mar + Temperatura · 7 Días</h3>
+          <div class="chart-wrap"><canvas id="marineChart"></canvas></div>
+        </div>
+      </div>
+    </section>
 
-      <section class="glass panel main">
-        <h2>Meteograma 7 días (viento / racha / lluvia)</h2>
-        <div class="chart-wrap"><canvas id="weekChart"></canvas></div>
-      </section>
-
-      <section class="glass panel side">
-        <h2>Mar + temperatura (7 días)</h2>
-        <div class="chart-wrap"><canvas id="marineChart"></canvas></div>
-      </section>
-
-      <section class="glass table-panel">
+    <!-- TABLE ROW -->
+    <section class="row">
+      <div class="row-title"><span class="accent-bar"></span>Pronóstico Detallado</div>
+      <div class="table-card">
         <table>
           <thead>
             <tr>
@@ -355,17 +577,20 @@
               <th>Viento máx.</th>
               <th>Racha máx.</th>
               <th>Ola máx.</th>
-              <th>Riesgo puerto</th>
+              <th>Riesgo Puerto</th>
             </tr>
           </thead>
           <tbody id="tbody"></tbody>
         </table>
-      </section>
+      </div>
     </section>
 
-    <p class="small" id="updatedAt"></p>
-    <div class="warn">
-      Estimación orientativa para planificación. El cierre real de puerto debe validarse con DIRECTEMAR / Capitanía de Puerto y avisos oficiales vigentes.
+    <!-- FOOTER -->
+    <div class="footer">
+      <div class="footer-warn">
+        ⚠ Estimación orientativa para planificación. El cierre real de puerto debe validarse con DIRECTEMAR / Capitanía de Puerto y avisos oficiales vigentes.
+      </div>
+      <p class="footer-meta" id="updatedAt"></p>
     </div>
     <div id="error" class="err"></div>
   </main>
@@ -389,6 +614,13 @@
     let weekChart;
     let marineChart;
 
+    /* ─── NAVBAR SCROLL EFFECT ─── */
+    const navbar = document.getElementById('navbar');
+    window.addEventListener('scroll', () => {
+      navbar.classList.toggle('scrolled', window.scrollY > 40);
+    });
+
+    /* ─── RAIN / PARTICLE FX ─── */
     const fx = {
       mode: 'clear',
       canvas: null,
@@ -427,16 +659,12 @@
       if (gust >= 70) score += 3;
       else if (gust >= 55) score += 2;
       else if (gust >= 45) score += 1;
-
       if (wind >= 45) score += 2;
       else if (wind >= 35) score += 1;
-
       if (wave >= 3.5) score += 3;
       else if (wave >= 2.5) score += 2;
       else if (wave >= 1.8) score += 1;
-
       if (rain >= 30) score += 1;
-
       if (score >= 5) return { level: 'ALTO', cls: 'risk-high', reason: 'Alta probabilidad de restricción operativa' };
       if (score >= 3) return { level: 'MEDIO', cls: 'risk-mid', reason: 'Requiere monitoreo y validación táctica' };
       return { level: 'BAJO', cls: 'risk-low', reason: 'Condiciones generalmente operables' };
@@ -459,25 +687,24 @@
     }
 
     function seedFx() {
-      fx.drops = Array.from({ length: 180 }, () => ({
+      fx.drops = Array.from({ length: 140 }, () => ({
         x: Math.random() * fx.w,
         y: Math.random() * fx.h,
         len: 8 + Math.random() * 14,
         speed: 9 + Math.random() * 10,
       }));
-      fx.particles = Array.from({ length: 80 }, () => ({
+      fx.particles = Array.from({ length: 50 }, () => ({
         x: Math.random() * fx.w,
         y: Math.random() * fx.h,
-        r: 0.7 + Math.random() * 2.1,
-        vx: -0.2 + Math.random() * 0.5,
-        vy: -0.15 + Math.random() * 0.35,
+        r: 0.5 + Math.random() * 1.5,
+        vx: -0.15 + Math.random() * 0.3,
+        vy: -0.1 + Math.random() * 0.25,
       }));
     }
 
     function setFxMode(mode) {
       fx.mode = mode;
-      document.body.classList.toggle('rain', mode === 'rain');
-      document.getElementById('bgMode').textContent = mode === 'rain' ? 'Fondo: lluvia activa' : 'Fondo: cielo operativo';
+      document.getElementById('bgMode').textContent = mode === 'rain' ? '🌧 Lluvia activa' : '☀ Cielo operativo';
       if (!fx.rafId) animateFx();
     }
 
@@ -485,9 +712,8 @@
       fx.rafId = requestAnimationFrame(animateFx);
       const ctx = fx.ctx;
       ctx.clearRect(0, 0, fx.w, fx.h);
-
       if (fx.mode === 'rain') {
-        ctx.strokeStyle = 'rgba(170, 212, 255, 0.42)';
+        ctx.strokeStyle = 'rgba(180, 200, 230, 0.25)';
         ctx.lineWidth = 1;
         ctx.beginPath();
         for (const d of fx.drops) {
@@ -495,20 +721,16 @@
           ctx.lineTo(d.x - d.len * 0.22, d.y + d.len);
           d.x -= 1.2;
           d.y += d.speed;
-          if (d.y > fx.h + 30) {
-            d.y = -10;
-            d.x = Math.random() * fx.w;
-          }
+          if (d.y > fx.h + 30) { d.y = -10; d.x = Math.random() * fx.w; }
           if (d.x < -30) d.x = fx.w + 20;
         }
         ctx.stroke();
       } else {
         for (const p of fx.particles) {
           ctx.beginPath();
-          ctx.fillStyle = 'rgba(128, 179, 255, 0.22)';
+          ctx.fillStyle = 'rgba(229, 9, 20, 0.06)';
           ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
           ctx.fill();
-
           p.x += p.vx;
           p.y += p.vy;
           if (p.x < -6) p.x = fx.w + 6;
@@ -519,80 +741,61 @@
       }
     }
 
+    /* ─── CHARTS (Netflix palette) ─── */
+    const NF = {
+      red: '#E50914',
+      redAlpha: 'rgba(229,9,20,0.4)',
+      green: '#46d369',
+      greenAlpha: 'rgba(70,211,105,0.2)',
+      blue: '#4ea8de',
+      blueAlpha: 'rgba(78,168,222,0.25)',
+      yellow: '#f5c518',
+      cyan: '#71d4e0',
+      ticks: '#808080',
+      grid: 'rgba(255,255,255,0.06)',
+      tooltipBg: 'rgba(20,20,20,0.97)',
+      tooltipBorder: 'rgba(255,255,255,0.12)',
+    };
+
     function buildWeekChart(days) {
       const labels = days.map((d) => toCLDate(d.date));
       const rain = days.map((d) => Number(d.rain ?? 0));
       const wind = days.map((d) => Number(d.wind ?? 0));
       const gust = days.map((d) => Number(d.gust ?? 0));
-
       if (weekChart) weekChart.destroy();
-
       weekChart = new Chart(document.getElementById('weekChart'), {
         type: 'bar',
         data: {
           labels,
           datasets: [
             {
-              type: 'bar',
-              label: 'Lluvia (mm)',
-              data: rain,
-              yAxisID: 'yRain',
-              backgroundColor: 'rgba(74, 163, 255, 0.45)',
-              borderColor: 'rgba(122, 195, 255, 0.9)',
-              borderWidth: 1,
-              borderRadius: 6,
+              type: 'bar', label: 'Lluvia (mm)', data: rain, yAxisID: 'yRain',
+              backgroundColor: NF.blueAlpha, borderColor: NF.blue, borderWidth: 1, borderRadius: 4,
             },
             {
-              type: 'line',
-              label: 'Viento máx (km/h)',
-              data: wind,
-              yAxisID: 'yWind',
-              borderColor: '#7ef0a8',
-              backgroundColor: 'rgba(126, 240, 168, 0.2)',
-              tension: 0.32,
-              pointRadius: 3,
-              pointHoverRadius: 5,
+              type: 'line', label: 'Viento máx (km/h)', data: wind, yAxisID: 'yWind',
+              borderColor: NF.green, backgroundColor: NF.greenAlpha,
+              tension: 0.35, pointRadius: 4, pointHoverRadius: 6, pointBackgroundColor: NF.green,
             },
             {
-              type: 'line',
-              label: 'Racha máx (km/h)',
-              data: gust,
-              yAxisID: 'yWind',
-              borderColor: '#ff8aa8',
-              backgroundColor: 'rgba(255, 138, 168, 0.2)',
-              tension: 0.28,
-              pointRadius: 3,
-              pointHoverRadius: 5,
-              borderDash: [5, 5],
+              type: 'line', label: 'Racha máx (km/h)', data: gust, yAxisID: 'yWind',
+              borderColor: NF.red, backgroundColor: NF.redAlpha,
+              tension: 0.3, pointRadius: 4, pointHoverRadius: 6, pointBackgroundColor: NF.red,
+              borderDash: [6, 4],
             }
           ]
         },
         options: {
-          responsive: true,
-          maintainAspectRatio: false,
+          responsive: true, maintainAspectRatio: false,
           interaction: { mode: 'index', intersect: false },
           plugins: {
-            legend: { labels: { color: '#d6e8ff' } },
-            tooltip: {
-              backgroundColor: 'rgba(8,16,30,0.96)',
-              borderColor: 'rgba(120,160,220,0.45)',
-              borderWidth: 1,
-            }
+            legend: { labels: { color: '#e5e5e5', font: { weight: 600 } } },
+            tooltip: { backgroundColor: NF.tooltipBg, borderColor: NF.tooltipBorder, borderWidth: 1, titleColor: '#fff', bodyColor: '#ccc' }
           },
           scales: {
-            x: { ticks: { color: '#bcd1ef' }, grid: { color: 'rgba(108,145,196,0.12)' } },
-            yRain: {
-              position: 'left',
-              ticks: { color: '#8fd0ff' },
-              grid: { color: 'rgba(108,145,196,0.15)' },
-              title: { display: true, text: 'Lluvia', color: '#8fd0ff' }
-            },
-            yWind: {
-              position: 'right',
-              ticks: { color: '#96f3be' },
-              grid: { drawOnChartArea: false },
-              title: { display: true, text: 'Viento/Racha', color: '#96f3be' }
-            }
+            x: { ticks: { color: NF.ticks }, grid: { color: NF.grid } },
+            yRain: { position: 'left', ticks: { color: NF.blue }, grid: { color: NF.grid }, title: { display: true, text: 'Lluvia (mm)', color: NF.blue } },
+            yWind: { position: 'right', ticks: { color: NF.green }, grid: { drawOnChartArea: false }, title: { display: true, text: 'Viento/Racha', color: NF.green } }
           }
         }
       });
@@ -603,68 +806,28 @@
       const wave = days.map((d) => Number(d.wave ?? 0));
       const tmax = days.map((d) => Number(d.tMax ?? 0));
       const tmin = days.map((d) => Number(d.tMin ?? 0));
-
       if (marineChart) marineChart.destroy();
-
       marineChart = new Chart(document.getElementById('marineChart'), {
         type: 'line',
         data: {
           labels,
           datasets: [
-            {
-              label: 'Ola máx (m)',
-              data: wave,
-              yAxisID: 'yWave',
-              borderColor: '#55b2ff',
-              backgroundColor: 'rgba(85, 178, 255, 0.2)',
-              fill: true,
-              tension: 0.28,
-              pointRadius: 3,
-            },
-            {
-              label: 'T° máxima',
-              data: tmax,
-              yAxisID: 'yTemp',
-              borderColor: '#ffb76b',
-              tension: 0.3,
-              pointRadius: 2,
-            },
-            {
-              label: 'T° mínima',
-              data: tmin,
-              yAxisID: 'yTemp',
-              borderColor: '#77f0ff',
-              tension: 0.3,
-              pointRadius: 2,
-            }
+            { label: 'Ola máx (m)', data: wave, yAxisID: 'yWave', borderColor: NF.blue, backgroundColor: NF.blueAlpha, fill: true, tension: 0.3, pointRadius: 4, pointBackgroundColor: NF.blue },
+            { label: 'T° máxima', data: tmax, yAxisID: 'yTemp', borderColor: NF.red, tension: 0.3, pointRadius: 3, pointBackgroundColor: NF.red },
+            { label: 'T° mínima', data: tmin, yAxisID: 'yTemp', borderColor: NF.cyan, tension: 0.3, pointRadius: 3, pointBackgroundColor: NF.cyan }
           ]
         },
         options: {
-          responsive: true,
-          maintainAspectRatio: false,
+          responsive: true, maintainAspectRatio: false,
           interaction: { mode: 'index', intersect: false },
           plugins: {
-            legend: { labels: { color: '#d6e8ff' } },
-            tooltip: {
-              backgroundColor: 'rgba(8,16,30,0.96)',
-              borderColor: 'rgba(120,160,220,0.45)',
-              borderWidth: 1,
-            }
+            legend: { labels: { color: '#e5e5e5', font: { weight: 600 } } },
+            tooltip: { backgroundColor: NF.tooltipBg, borderColor: NF.tooltipBorder, borderWidth: 1, titleColor: '#fff', bodyColor: '#ccc' }
           },
           scales: {
-            x: { ticks: { color: '#bcd1ef' }, grid: { color: 'rgba(108,145,196,0.12)' } },
-            yWave: {
-              position: 'left',
-              ticks: { color: '#8fd0ff' },
-              title: { display: true, text: 'Ola (m)', color: '#8fd0ff' },
-              grid: { color: 'rgba(108,145,196,0.15)' }
-            },
-            yTemp: {
-              position: 'right',
-              ticks: { color: '#ffd79b' },
-              title: { display: true, text: 'Temp (°C)', color: '#ffd79b' },
-              grid: { drawOnChartArea: false }
-            }
+            x: { ticks: { color: NF.ticks }, grid: { color: NF.grid } },
+            yWave: { position: 'left', ticks: { color: NF.blue }, title: { display: true, text: 'Ola (m)', color: NF.blue }, grid: { color: NF.grid } },
+            yTemp: { position: 'right', ticks: { color: NF.red }, title: { display: true, text: 'Temp (°C)', color: NF.red }, grid: { drawOnChartArea: false } }
           }
         }
       });
@@ -694,18 +857,17 @@
       const maxGust = Math.max(...days.map((d) => d.gust || 0), 0);
       const maxWave = Math.max(...days.map((d) => d.wave || 0), 0);
       const weeklyStatus = highDays >= 3
-        ? 'Semana compleja'
+        ? '⛔ Semana compleja'
         : highDays >= 1
-          ? 'Semana mixta'
-          : 'Semana favorable';
-
+          ? '⚠ Semana mixta'
+          : '✅ Semana favorable';
       document.getElementById('weeklyStatus').textContent = weeklyStatus;
       document.getElementById('highDays').textContent = `${highDays} / ${days.length}`;
       document.getElementById('nowRain').textContent = `${num(current.precipitation, 1)} mm/h`;
       document.getElementById('nowWind').textContent = `${num(current.wind_speed_10m, 1)} km/h`;
       document.getElementById('maxGust').textContent = `${num(maxGust, 1)} km/h`;
       document.getElementById('maxWave').textContent = `${num(maxWave, 2)} m`;
-      document.getElementById('nowCode').textContent = `Condición actual: ${weatherCodeMap[current.weather_code] ?? 'N/D'}`;
+      document.getElementById('nowCode').textContent = weatherCodeMap[current.weather_code] ?? 'N/D';
       document.getElementById('updatedAt').textContent = `Actualizado: ${new Date().toLocaleString('es-CL')}`;
     }
 
@@ -713,23 +875,16 @@
       const errorEl = document.getElementById('error');
       errorEl.style.display = 'none';
       document.getElementById('weeklyStatus').textContent = 'Cargando...';
-
       try {
         const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${CHONCHI.lat}&longitude=${CHONCHI.lon}&timezone=America/Santiago&current=temperature_2m,precipitation,weather_code,wind_speed_10m,wind_gusts_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,wind_gusts_10m_max&forecast_days=7`;
         const marineUrl = `https://marine-api.open-meteo.com/v1/marine?latitude=${CHONCHI.lat}&longitude=${CHONCHI.lon}&timezone=America/Santiago&hourly=wave_height&forecast_days=7`;
-
         const [weatherRes, marineRes] = await Promise.all([fetch(weatherUrl), fetch(marineUrl)]);
-        if (!weatherRes.ok || !marineRes.ok) {
-          throw new Error('No se pudo consultar una de las APIs de pronóstico.');
-        }
-
+        if (!weatherRes.ok || !marineRes.ok) throw new Error('No se pudo consultar una de las APIs de pronóstico.');
         const weather = await weatherRes.json();
         const marine = await marineRes.json();
-
         const current = weather.current ?? {};
         const isRainingNow = (current.precipitation ?? 0) > 0.15 || rainyCodes.has(current.weather_code);
         setFxMode(isRainingNow ? 'rain' : 'clear');
-
         const waveByDay = aggregateHourlyMaxByDay(marine.hourly?.time ?? [], marine.hourly?.wave_height ?? []);
         const days = weather.daily.time.map((date, i) => {
           const gust = weather.daily.wind_gusts_10m_max?.[i] ?? 0;
@@ -737,19 +892,8 @@
           const rain = weather.daily.precipitation_sum?.[i] ?? 0;
           const wave = waveByDay[date] ?? 0;
           const risk = calcRisk({ gust, wind, wave, rain });
-          return {
-            date,
-            weatherCode: weather.daily.weather_code?.[i],
-            tMin: weather.daily.temperature_2m_min?.[i],
-            tMax: weather.daily.temperature_2m_max?.[i],
-            rain,
-            wind,
-            gust,
-            wave,
-            risk,
-          };
+          return { date, weatherCode: weather.daily.weather_code?.[i], tMin: weather.daily.temperature_2m_min?.[i], tMax: weather.daily.temperature_2m_max?.[i], rain, wind, gust, wave, risk };
         });
-
         renderKPIs(days, current);
         renderTable(days);
         buildWeekChart(days);
@@ -761,18 +905,18 @@
       }
     }
 
-    // ─── WINDY MAP LAYER TOGGLE ───
+    /* ─── WINDY MAP LAYER TOGGLE ─── */
     const WINDY_BASE = 'https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=mm&metricTemp=%C2%B0C&metricWind=km%2Fh&zoom=8&product=ecmwf&level=surface&lat=-42.62&lon=-73.77&detailLat=-42.62&detailLon=-73.77&marker=true&message=true';
 
     function setWindyLayer(layer) {
       const iframe = document.getElementById('windyMap');
       iframe.src = WINDY_BASE + '&overlay=' + layer;
-      document.querySelectorAll('.layer-btn').forEach(btn => {
+      document.querySelectorAll('.layer-pill').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.layer === layer);
       });
     }
 
-    document.querySelectorAll('.layer-btn').forEach(btn => {
+    document.querySelectorAll('.layer-pill').forEach(btn => {
       btn.addEventListener('click', () => setWindyLayer(btn.dataset.layer));
     });
 
