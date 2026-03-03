@@ -506,6 +506,181 @@
     .risk-mid { color: #f5c518; background: rgba(245, 197, 24, 0.15); }
     .risk-high { color: var(--bad); background: rgba(255, 107, 107, 0.2); }
 
+    /* ─── DIRECTEMAR OFFICIAL PANEL ─── */
+    .directemar-panel {
+      background: var(--card);
+      border-radius: 10px;
+      overflow: hidden;
+      position: relative;
+      margin-bottom: 16px;
+    }
+    .directemar-panel::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 4px;
+    }
+    .directemar-panel.dm-open::before { background: var(--good); }
+    .directemar-panel.dm-restricted::before { background: var(--bad); }
+    .directemar-panel.dm-loading::before { background: var(--muted); }
+    .directemar-panel.dm-error::before { background: #666; }
+
+    .dm-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 14px 20px 0;
+    }
+    .dm-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 12px;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      font-weight: 800;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      background: rgba(255,255,255,0.08);
+      color: var(--muted);
+    }
+    .dm-badge.live {
+      background: rgba(255,70,70,0.2);
+      color: #ff6b6b;
+      animation: pulseDot 2s ease-in-out infinite;
+    }
+    .dm-badge.live.ok {
+      background: rgba(70,211,105,0.2);
+      color: #4cd7a0;
+    }
+    .dm-refresh {
+      background: none;
+      border: 1px solid rgba(255,255,255,0.15);
+      color: var(--muted);
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 0.72rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .dm-refresh:hover { background: rgba(255,255,255,0.08); color: var(--text-bright); }
+
+    .dm-body {
+      padding: 14px 20px 18px;
+    }
+    .dm-grid {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      gap: 20px;
+      align-items: center;
+    }
+    .dm-status-side {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 6px;
+    }
+    .dm-big-icon { font-size: 3rem; line-height: 1; }
+    .dm-big-status {
+      font-size: 1.6rem;
+      font-weight: 900;
+      letter-spacing: 1px;
+    }
+    .dm-big-status.open { color: var(--good); }
+    .dm-big-status.restricted { color: var(--bad); }
+    .dm-big-status.loading { color: var(--muted); }
+    .dm-restricciones {
+      font-size: 0.85rem;
+      font-weight: 700;
+      padding: 3px 12px;
+      border-radius: 20px;
+    }
+    .dm-restricciones.has {
+      background: rgba(255,107,107,0.2);
+      color: #ff6b6b;
+    }
+    .dm-restricciones.none {
+      background: rgba(70,211,105,0.15);
+      color: #4cd7a0;
+    }
+    .dm-detail-side {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .dm-detail-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .dm-detail-item {
+      flex: 1 1 180px;
+    }
+    .dm-detail-item .dml {
+      font-size: 0.68rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      font-weight: 700;
+      margin-bottom: 2px;
+    }
+    .dm-detail-item .dmv {
+      font-size: 0.88rem;
+      color: var(--text);
+      line-height: 1.35;
+    }
+    .dm-detail-item .dmv strong { color: var(--text-bright); }
+    .dm-restriccion-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 0.76rem;
+      font-weight: 700;
+      background: rgba(255,107,107,0.14);
+      color: #ff6b6b;
+    }
+    .dm-restriccion-tag.warn { color: var(--mid); background: rgba(245,197,24,0.12); }
+    .dm-source {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 4px;
+      font-size: 0.7rem;
+      color: var(--muted);
+    }
+    .dm-source a {
+      color: var(--brand-primary);
+      text-decoration: none;
+      font-weight: 700;
+    }
+    .dm-source a:hover { text-decoration: underline; }
+    .dm-conflict {
+      margin-top: 8px;
+      padding: 8px 12px;
+      border-radius: 6px;
+      border-left: 4px solid var(--bad);
+      background: rgba(255,107,107,0.1);
+      font-size: 0.82rem;
+      color: var(--text);
+    }
+    .dm-conflict strong { color: #ff6b6b; }
+    .dm-model-note {
+      font-size: 0.72rem;
+      color: var(--muted);
+      font-style: italic;
+      margin-top: 2px;
+    }
+    @media (max-width: 700px) {
+      .dm-grid { grid-template-columns: 1fr; }
+      .dm-status-side { flex-direction: row; gap: 12px; }
+      .dm-big-icon { font-size: 2rem; }
+      .dm-big-status { font-size: 1.2rem; }
+    }
+
     /* ─── PORT STATUS PANEL ─── */
     .port-status-card {
       background: var(--card);
@@ -1043,6 +1218,62 @@
     <!-- ═══════════════ ESTADO DEL PUERTO ═══════════════ -->
     <section class="row">
       <div class="row-title"><span class="accent-bar"></span>Estado del Puerto · Chonchi</div>
+
+      <!-- DIRECTEMAR OFICIAL — datos en vivo desde SITPORT -->
+      <div class="directemar-panel dm-loading" id="dmPanel">
+        <div class="dm-header">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:1.1rem">🛡️</span>
+            <span style="font-weight:800;font-size:0.88rem;color:var(--text-bright);letter-spacing:0.3px">DIRECTEMAR OFICIAL · SITPORT</span>
+            <span class="dm-badge" id="dmBadge">CONSULTANDO</span>
+          </div>
+          <button class="dm-refresh" id="dmRefreshBtn" title="Consultar SITPORT ahora">⟳ Consultar</button>
+        </div>
+        <div class="dm-body">
+          <div class="dm-grid">
+            <div class="dm-status-side">
+              <div class="dm-big-icon" id="dmIcon">⏳</div>
+              <div class="dm-big-status loading" id="dmStatus">CONSULTANDO...</div>
+              <div class="dm-restricciones none" id="dmRestricciones">—</div>
+            </div>
+            <div class="dm-detail-side">
+              <div class="dm-detail-row">
+                <div class="dm-detail-item">
+                  <div class="dml">Medición Estación Chonchi</div>
+                  <div class="dmv" id="dmMedicion">Consultando datos de sensores DIRECTEMAR...</div>
+                </div>
+                <div class="dm-detail-item">
+                  <div class="dml">Restricciones activas</div>
+                  <div id="dmRestrTags"><span class="dm-restriccion-tag warn">Consultando...</span></div>
+                </div>
+              </div>
+              <div class="dm-detail-row">
+                <div class="dm-detail-item">
+                  <div class="dml">Capitanía jurisdiccional</div>
+                  <div class="dmv">Capitanía de Puerto de <strong>Castro</strong> · QUINZONA</div>
+                </div>
+                <div class="dm-detail-item">
+                  <div class="dml">Puertos cercanos</div>
+                  <div class="dmv" id="dmNearby">Consultando...</div>
+                </div>
+              </div>
+              <div id="dmConflict"></div>
+              <div class="dm-source">
+                <span id="dmTimestamp">Consultando SITPORT...</span>
+                <span>·</span>
+                <a href="https://sitport.directemar.cl" target="_blank" rel="noopener">Abrir SITPORT ↗</a>
+                <span>·</span>
+                <span id="dmAutoRefresh">Auto-refresh: 5 min</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Proyección por modelo meteorológico -->
+      <div style="margin-bottom:6px;display:flex;align-items:center;gap:8px">
+        <span style="font-size:0.78rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px">📊 Proyección por modelo meteorológico (Open-Meteo / ECMWF)</span>
+      </div>
       <div class="port-status-card status-open" id="portCard">
         <div class="port-grid">
           <div class="port-hero-side">
@@ -2388,10 +2619,243 @@
       document.getElementById('updatedAt').textContent = `Actualizado: ${new Date().toLocaleString('es-CL')}`;
     }
 
+    /* ═══════════════════════════════════════════════════════════════
+       DIRECTEMAR SITPORT — scraping en vivo del estado oficial
+       ═══════════════════════════════════════════════════════════════ */
+    const SITPORT_URL = 'https://sitport.directemar.cl/';
+    const CORS_PROXIES = [
+      url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+      url => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
+      url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+    ];
+    let _dmCache = null;  // cache para no golpear el proxy en cada reload
+    let _dmTimer = null;
+
+    async function fetchSitportHTML() {
+      for (const makeUrl of CORS_PROXIES) {
+        try {
+          const ctrl = new AbortController();
+          const timer = setTimeout(() => ctrl.abort(), 18000);
+          const resp = await fetch(makeUrl(SITPORT_URL), { signal: ctrl.signal });
+          clearTimeout(timer);
+          if (!resp.ok) continue;
+          const text = await resp.text();
+          if (text.length < 500 || !text.includes('CAPITAN')) continue;
+          return text;
+        } catch (_) { /* next proxy */ }
+      }
+      return null;
+    }
+
+    /**
+     * Parsea el HTML del SITPORT para extraer datos de Chonchi y puertos cercanos.
+     * Retorna: { found, restricciones, estado, medicion, nearby[], timestamp }
+     */
+    function parseSitportChonchi(html) {
+      const result = {
+        found: false,
+        restricciones: 0,
+        estado: 'DESCONOCIDO',
+        medicion: null,
+        nearby: [],
+        timestamp: new Date().toISOString(),
+      };
+
+      try {
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        // Buscar todos los elementos que contienen nombres de capitanías
+        const allText = doc.body?.textContent ?? html;
+
+        // Extraer Chonchi — patrón: "CAPITANÍA DE PUERTO CHONCHI" seguido de un número
+        const capRx = /CAPITAN[ÍI]A\s+DE\s+PUERTO\s+CHONCHI\s*(?:<[^>]*>\s*)*(\d+)/i;
+        const capMatch = html.match(capRx);
+        if (!capMatch) {
+          // Fallback: buscar en texto plano
+          const textMatch = allText.match(/CAPITAN[ÍI]A\s+DE\s+PUERTO\s+CHONCHI\D*(\d+)/i);
+          if (textMatch) {
+            result.found = true;
+            result.restricciones = parseInt(textMatch[1], 10);
+          }
+        } else {
+          result.found = true;
+          result.restricciones = parseInt(capMatch[1], 10);
+        }
+
+        if (result.found) {
+          result.estado = result.restricciones > 0 ? 'CON RESTRICCIÓN' : 'SIN RESTRICCIÓN';
+        }
+
+        // Extraer medición meteorológica cercana a CHONCHI
+        const meteoRx = /CHONCHI[\s\S]{0,300}?MEDICI[ÓO]N\s+METEOROL[ÓO]GICA[:\s]*(.*?)(?:<\/|\n)/i;
+        const meteoMatch = html.match(meteoRx);
+        if (meteoMatch) {
+          const raw = meteoMatch[1].replace(/<[^>]*>/g, '').trim();
+          result.medicion = parseMeteoString(raw);
+        }
+
+        // Puertos cercanos relevantes (Castro, Quellón, Ancud, Puerto Montt, Calbuco)
+        const nearbyNames = ['CASTRO', 'QUELL[ÓO]N', 'ANCUD', 'PUERTO MONTT', 'CALBUCO'];
+        for (const name of nearbyNames) {
+          const rx = new RegExp('CAPITAN[ÍI]A\\s+DE\\s+PUERTO\\s+' + name + '\\D*(\\d+)', 'i');
+          const m = allText.match(rx);
+          if (m) {
+            const count = parseInt(m[1], 10);
+            result.nearby.push({
+              nombre: m[0].replace(/\d+$/, '').replace(/CAPITAN[ÍI]A DE PUERTO /i, '').trim(),
+              restricciones: count,
+              estado: count > 0 ? 'RESTRICCIÓN' : 'ABIERTO'
+            });
+          }
+        }
+      } catch (e) {
+        console.warn('Error parseando SITPORT:', e);
+      }
+      return result;
+    }
+
+    function parseMeteoString(raw) {
+      // "14.2 ºC  9.8 nds N  1007.45 hPa (03/03/2026 12:17 )"
+      const tempMatch = raw.match(/([\d.]+)\s*[°º]?\s*C/i);
+      const windMatch = raw.match(/([\d.]+)\s*nds\s*([NSEW]{1,3})/i);
+      const pressMatch = raw.match(/([\d.]+)\s*(?:hPa|mb)/i);
+      const dateMatch = raw.match(/(\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2})/);
+      return {
+        raw,
+        temp: tempMatch ? parseFloat(tempMatch[1]) : null,
+        windSpeed: windMatch ? parseFloat(windMatch[1]) : null,
+        windDir: windMatch ? windMatch[2] : null,
+        pressure: pressMatch ? parseFloat(pressMatch[1]) : null,
+        date: dateMatch ? dateMatch[1] : null,
+      };
+    }
+
+    async function fetchDirectemarStatus(force = false) {
+      if (!force && _dmCache && (Date.now() - _dmCache._ts < 120000)) return _dmCache;
+      const html = await fetchSitportHTML();
+      if (!html) return null;
+      const parsed = parseSitportChonchi(html);
+      parsed._ts = Date.now();
+      _dmCache = parsed;
+      return parsed;
+    }
+
+    function renderDirectemarPanel(dm) {
+      const panel = document.getElementById('dmPanel');
+      const badge = document.getElementById('dmBadge');
+      const icon = document.getElementById('dmIcon');
+      const status = document.getElementById('dmStatus');
+      const restr = document.getElementById('dmRestricciones');
+      const medicion = document.getElementById('dmMedicion');
+      const restrTags = document.getElementById('dmRestrTags');
+      const nearby = document.getElementById('dmNearby');
+      const ts = document.getElementById('dmTimestamp');
+      const conflict = document.getElementById('dmConflict');
+
+      if (!dm || !dm.found) {
+        panel.className = 'directemar-panel dm-error';
+        badge.className = 'dm-badge';
+        badge.textContent = 'ERROR';
+        icon.textContent = '❌';
+        status.className = 'dm-big-status loading';
+        status.textContent = 'NO DISPONIBLE';
+        restr.className = 'dm-restricciones none';
+        restr.textContent = 'Sin conexión a SITPORT';
+        medicion.innerHTML = 'No se pudo consultar DIRECTEMAR. <span style="color:var(--muted)">Los proxies CORS pueden estar bloqueados o SITPORT fuera de línea.</span>';
+        restrTags.innerHTML = '<span class="dm-restriccion-tag warn">Sin datos</span>';
+        nearby.textContent = 'No disponible';
+        ts.textContent = 'Última consulta: ' + new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }) + ' — sin respuesta';
+        conflict.innerHTML = '';
+        return;
+      }
+
+      const hasRestr = dm.restricciones > 0;
+      panel.className = 'directemar-panel ' + (hasRestr ? 'dm-restricted' : 'dm-open');
+      badge.className = 'dm-badge live' + (hasRestr ? '' : ' ok');
+      badge.textContent = hasRestr ? '🔴 EN VIVO' : '🟢 EN VIVO';
+      icon.textContent = hasRestr ? '⛔' : '⚓';
+      status.className = 'dm-big-status ' + (hasRestr ? 'restricted' : 'open');
+      status.textContent = hasRestr ? '🚫 CON RESTRICCIÓN' : '✅ ABIERTO';
+      restr.className = 'dm-restricciones ' + (hasRestr ? 'has' : 'none');
+      restr.textContent = hasRestr
+        ? `${dm.restricciones} restriccion${dm.restricciones > 1 ? 'es' : ''} activa${dm.restricciones > 1 ? 's' : ''}`
+        : 'Sin restricciones';
+
+      // Medición
+      if (dm.medicion && dm.medicion.temp !== null) {
+        const m = dm.medicion;
+        const wind_kmh = m.windSpeed !== null ? (m.windSpeed * 1.852).toFixed(1) : '—';
+        medicion.innerHTML = `🌡️ <strong>${m.temp}°C</strong> · 💨 <strong>${m.windSpeed ?? '—'} nds ${m.windDir ?? ''}</strong> (${wind_kmh} km/h) · 📊 <strong>${m.pressure ?? '—'} hPa</strong>` +
+          (m.date ? ` · 📅 ${m.date}` : '');
+      } else {
+        medicion.innerHTML = '<span style="color:var(--muted)">Sin medición automática reportada</span>';
+      }
+
+      // Restricciones tags
+      if (hasRestr) {
+        restrTags.innerHTML = `<span class="dm-restriccion-tag">${dm.restricciones} restriccion${dm.restricciones > 1 ? 'es' : ''} informada${dm.restricciones > 1 ? 's' : ''} por Capitanía</span>`;
+      } else {
+        restrTags.innerHTML = '<span class="dm-restriccion-tag" style="color:var(--good);background:rgba(70,211,105,0.1)">Sin restricciones</span>';
+      }
+
+      // Puertos cercanos
+      if (dm.nearby.length > 0) {
+        nearby.innerHTML = dm.nearby.map(p => {
+          const color = p.restricciones > 0 ? '#ff6b6b' : '#4cd7a0';
+          const ico = p.restricciones > 0 ? '🔴' : '🟢';
+          return `${ico} <strong style="color:${color}">${p.nombre}</strong> (${p.restricciones})`;
+        }).join(' · ');
+      } else {
+        nearby.textContent = 'Sin datos de puertos cercanos';
+      }
+
+      ts.textContent = 'Consulta: ' + new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }) + ' hrs';
+    }
+
+    /**
+     * Si DIRECTEMAR dice CON RESTRICCIÓN pero el modelo dice ABIERTO,
+     * mostramos alerta de conflicto y sobreescribimos.
+     */
+    function checkDirectemarConflict(dm, portModel) {
+      const conflict = document.getElementById('dmConflict');
+      if (!dm || !dm.found) { conflict.innerHTML = ''; return; }
+
+      const dmRestr = dm.restricciones > 0;
+      const modelOpen = portModel?.status === 'ABIERTO';
+
+      if (dmRestr && modelOpen) {
+        conflict.innerHTML = `<div class="dm-conflict">
+          <strong>⚠️ CONFLICTO:</strong> DIRECTEMAR reporta <strong>${dm.restricciones} restricción(es)</strong> activa(s), pero el modelo meteorológico indica condiciones dentro de umbrales normales.
+          <div class="dm-model-note">El estado oficial DIRECTEMAR prevalece siempre. Las restricciones pueden deberse a avisos anticipados, marejadas lejanas, operaciones especiales o umbrales locales no capturados por el modelo.</div>
+        </div>`;
+      } else if (!dmRestr && !modelOpen) {
+        conflict.innerHTML = `<div class="dm-conflict" style="border-left-color:var(--mid);background:rgba(244,201,93,0.1)">
+          <strong>ℹ️ NOTA:</strong> DIRECTEMAR reporta sin restricciones, pero el modelo detecta condiciones ${portModel?.status === 'CERRADO' ? 'de cierre' : 'de restricción'}.
+          <div class="dm-model-note">Puede que DIRECTEMAR no haya actualizado aún, o las condiciones están en el límite. Monitorear de cerca.</div>
+        </div>`;
+      } else {
+        conflict.innerHTML = '';
+      }
+    }
+
+    // Auto-refresh DIRECTEMAR cada 5 minutos
+    function startDirectemarAutoRefresh() {
+      if (_dmTimer) clearInterval(_dmTimer);
+      _dmTimer = setInterval(async () => {
+        try {
+          const dm = await fetchDirectemarStatus(true);
+          renderDirectemarPanel(dm);
+        } catch (_) {}
+      }, 5 * 60 * 1000);
+    }
+
     async function loadData() {
       const errorEl = document.getElementById('error');
       errorEl.style.display = 'none';
       document.getElementById('weeklyStatus').textContent = 'Cargando...';
+
+      // Lanzar consulta DIRECTEMAR en paralelo con APIs meteorológicas
+      const dmPromise = fetchDirectemarStatus().catch(() => null);
+
       try {
         const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${CHONCHI.lat}&longitude=${CHONCHI.lon}&timezone=America/Santiago&current=temperature_2m,precipitation,weather_code,wind_speed_10m,wind_gusts_10m&hourly=precipitation,weather_code,wind_speed_10m,wind_gusts_10m,pressure_msl,cloud_cover,relative_humidity_2m,visibility&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,wind_gusts_10m_max&forecast_days=7`;
         const marineUrl = `https://marine-api.open-meteo.com/v1/marine?latitude=${CHONCHI.lat}&longitude=${CHONCHI.lon}&timezone=America/Santiago&hourly=wave_height,wave_period,wave_direction&forecast_days=7`;
@@ -2423,10 +2887,18 @@
         buildMarineChart(days);
         buildClosureTimelineChart(closureOutlook.samples ?? []);
         buildClosureDriversChart(closureOutlook.samples ?? []);
+
+        // Renderizar estado DIRECTEMAR (puede llegar después)
+        const dm = await dmPromise;
+        renderDirectemarPanel(dm);
+        checkDirectemarConflict(dm, portNow);
       } catch (error) {
         errorEl.textContent = `Error: ${error instanceof Error ? error.message : 'fallo desconocido'}`;
         errorEl.style.display = 'block';
         document.getElementById('weeklyStatus').textContent = 'Sin datos';
+        // Aun así intentar mostrar DIRECTEMAR si se pudo obtener
+        const dm = await dmPromise;
+        renderDirectemarPanel(dm);
       }
     }
 
@@ -2446,8 +2918,15 @@
     });
 
     document.getElementById('reloadBtn').addEventListener('click', loadData);
+    document.getElementById('dmRefreshBtn').addEventListener('click', async () => {
+      document.getElementById('dmStatus').textContent = 'CONSULTANDO...';
+      document.getElementById('dmBadge').textContent = 'CONSULTANDO';
+      const dm = await fetchDirectemarStatus(true);
+      renderDirectemarPanel(dm);
+    });
     initFxCanvas();
     loadData();
+    startDirectemarAutoRefresh();
   </script>
 </body>
 </html>
