@@ -33,6 +33,7 @@ export const APP_MODULES = [
   'analisisGrader',
   'gantt',
   'aria',
+  'climaPuerto',
 ] as const
 
 export type AppModule = typeof APP_MODULES[number]
@@ -268,6 +269,14 @@ export const MODULES_CONFIG: ModuleConfig[] = [
     icono: 'Bot',
     accionesDisponibles: ['ver', 'configurar'],
   },
+  {
+    id: 'climaPuerto',
+    nombre: 'Clima Puerto',
+    descripcion: 'Dashboard meteorológico y predicción de cierre del Puerto de Chonchi',
+    icono: 'CloudSun',
+    accionesDisponibles: ['ver', 'configurar'],
+    requiereAdmin: true,
+  },
 ]
 
 // ============================================================================
@@ -311,6 +320,7 @@ const SUPERVISOR_PERMISSIONS: PermissionsMap = {
   analisisGrader: { visible: true, actions: ['ver', 'crear', 'editar', 'exportar', 'configurar'] },
   gantt: { visible: true, actions: ['ver', 'crear', 'editar', 'eliminar', 'asignar', 'exportar'] },
   aria: { visible: false, actions: [] },
+  climaPuerto: { visible: false, actions: [] },
 }
 
 /**
@@ -337,6 +347,7 @@ const TECNICO_PERMISSIONS: PermissionsMap = {
   analisisGrader: { visible: true, actions: ['ver'] },
   gantt: { visible: true, actions: ['ver', 'editar', 'asignar'] },
   aria: { visible: false, actions: [] },
+  climaPuerto: { visible: false, actions: [] },
 }
 
 /**
@@ -363,6 +374,7 @@ const USUARIO_PERMISSIONS: PermissionsMap = {
   analisisGrader: { visible: false, actions: [] },
   gantt: { visible: false, actions: [] },
   aria: { visible: false, actions: [] },
+  climaPuerto: { visible: false, actions: [] },
 }
 
 export const DEFAULT_ROLE_PERMISSIONS: Record<string, PermissionsMap> = {

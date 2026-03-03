@@ -27,6 +27,7 @@ import {
   Box,
   BarChart3,
   Bot,
+  CloudSun,
 } from 'lucide-react'
 import { Avatar, AvatarFallback, Button } from '@/components/ui'
 import { useAuthStore, useIsAdmin, useAppStore, usePermissionsStore } from '@/store'
@@ -69,6 +70,7 @@ const adminNavigation = [
   { name: 'Jerarquías', href: '/hierarchy', icon: FolderTree },
   { name: 'Mapas', href: '/admin/maps', icon: MapPin },
   { name: 'ETT', href: '/admin/ett', icon: FileText },
+  { name: 'Clima Puerto', href: '/clima-puerto', icon: CloudSun, module: 'climaPuerto' as AppModule },
 ]
 
 export function MainLayout() {
@@ -259,7 +261,10 @@ export function MainLayout() {
   })
 
   const allNavigation = isAdmin
-    ? [...filteredNavigation, ...adminNavigation]
+    ? [...filteredNavigation, ...adminNavigation.filter((item) => {
+        if (!item.module) return true
+        return canSee(item.module)
+      })]
     : filteredNavigation
 
   const readOnlyPrefixes = ['/settings', '/admin', '/hierarchy']

@@ -71,6 +71,7 @@ const AnalisisGraderSessionsListPage = lazyWithReload(() => import('@/pages/Anal
 const AnalisisGraderCalendarPage = lazyWithReload(() => import('@/pages/AnalisisGrader/AnalisisGraderCalendarPage').then((mod) => ({ default: mod.AnalisisGraderCalendarPage })))
 const GanttModulePage = lazyWithReload(() => import('@/pages/gantt/GanttModulePage').then((mod) => ({ default: mod.GanttModulePage })))
 const AriaActionsPage = lazyWithReload(() => import('@/pages/AriaActionsPage').then((mod) => ({ default: mod.AriaActionsPage })))
+const ClimaPortPage = lazyWithReload(() => import('@/pages/ClimaPortPage').then((mod) => ({ default: mod.ClimaPortPage })))
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuthStore()
@@ -334,6 +335,13 @@ export function App() {
               <Suspense fallback={<LoadingScreen />}>
                 <AriaActionsPage />
               </Suspense>
+            } />
+            <Route path="clima-puerto" element={
+              <AdminRoute>
+                <Suspense fallback={<LoadingScreen />}>
+                  <ClimaPortPage />
+                </Suspense>
+              </AdminRoute>
             } />
             <Route path="gantt/dashboard" element={<Navigate to="/gantt?tab=ejecutivo" replace />} />
             <Route path="gantt/mobile" element={<Navigate to="/gantt?tab=movil" replace />} />

@@ -1,0 +1,2453 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Puerto Chonchi · Centro Meteo Operativo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #051a2d;
+      --surface: #0a273d;
+      --card: #10344e;
+      --card-hover: #174b6f;
+      --brand-primary: #00a6b2;
+      --brand-primary-dark: #007e86;
+      --text: #e5e5e5;
+      --text-bright: #ffffff;
+      --muted: #90a4b8;
+      --good: #4cd7a0;
+      --mid: #f4c95d;
+      --bad: #ff6b6b;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      min-height: 100vh;
+      font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    #fxCanvas {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.5;
+    }
+
+    /* ─── NAVBAR ─── */
+    .navbar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 4%;
+      height: 64px;
+      background: linear-gradient(180deg, rgba(2, 20, 34, 0.9) 0%, transparent 100%);
+      transition: background 0.3s;
+    }
+
+    .navbar.scrolled {
+      background: rgba(5, 26, 45, 0.97);
+      box-shadow: 0 2px 20px rgba(0,0,0,0.5);
+    }
+
+    .nav-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .nav-logo {
+      font-size: 1.1rem;
+      font-weight: 800;
+      letter-spacing: 0.2px;
+      color: var(--brand-primary);
+      text-transform: none;
+    }
+
+    .nav-logo-img {
+      height: 28px;
+      width: auto;
+      display: block;
+    }
+
+    .nav-divider {
+      width: 1px;
+      height: 24px;
+      background: #444;
+    }
+
+    .nav-title {
+      font-size: 0.88rem;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .nav-right {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .nav-badge {
+      padding: 5px 12px;
+      border-radius: 4px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--text);
+      background: rgba(255,255,255,0.1);
+    }
+
+    .btn-reload {
+      background: var(--brand-primary);
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      padding: 7px 16px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.15s;
+    }
+
+    .btn-reload:hover {
+      background: var(--brand-primary-dark);
+      transform: scale(1.04);
+    }
+
+    .btn-map-focus {
+      background: rgba(255,255,255,0.08);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,0.16);
+      border-radius: 4px;
+      padding: 7px 14px;
+      font-size: 0.83rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.15s;
+    }
+
+    .btn-map-focus:hover {
+      background: rgba(255,255,255,0.16);
+      transform: scale(1.03);
+    }
+
+    /* ─── HERO ─── */
+    .hero {
+      position: relative;
+      z-index: 1;
+      padding: 0 4%;
+      margin-top: -64px;
+      padding-top: 64px;
+    }
+
+    .hero-map-wrap {
+      position: relative;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 12px 60px rgba(0,0,0,0.7);
+    }
+
+    .hero-map-wrap::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: transparent;
+      z-index: 2;
+    }
+
+    .map-frame {
+      width: 100%;
+      height: 640px;
+      border: none;
+      display: block;
+    }
+
+    .hero-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 3;
+      padding: 24px 32px;
+      pointer-events: none;
+    }
+
+    .hero-title {
+      font-size: 2.8rem;
+      font-weight: 900;
+      color: var(--text-bright);
+      text-shadow: 0 2px 20px rgba(0,0,0,0.8);
+      line-height: 1.1;
+    }
+
+    .hero-subtitle {
+      font-size: 1rem;
+      color: #aaa;
+      margin-top: 6px;
+      font-weight: 400;
+    }
+
+    .hero-condition {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 0;
+      padding: 8px 18px;
+      border-radius: 4px;
+      background: rgba(0, 166, 178, 0.82);
+      color: #fff;
+      font-weight: 700;
+      font-size: 0.92rem;
+      backdrop-filter: blur(4px);
+      pointer-events: none;
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      z-index: 4;
+    }
+
+    .hero-condition .cond-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #fff;
+      animation: pulseDot 2s ease-in-out infinite;
+    }
+
+    .windy-focus {
+      overflow: hidden;
+    }
+
+    .windy-focus .navbar {
+      z-index: 140;
+      background: rgba(5, 26, 45, 0.98);
+      box-shadow: 0 2px 20px rgba(0,0,0,0.5);
+    }
+
+    .windy-focus .hero {
+      position: relative;
+      z-index: 130;
+    }
+
+    .windy-focus .hero-map-wrap {
+      position: fixed;
+      top: 64px;
+      left: 2%;
+      right: 2%;
+      bottom: 2%;
+      border-radius: 10px;
+      box-shadow: 0 20px 80px rgba(0,0,0,0.78);
+    }
+
+    .windy-focus .hero-map-wrap::after {
+      display: none;
+    }
+
+    .windy-focus .hero-overlay {
+      display: none;
+    }
+
+    .windy-focus .map-frame {
+      height: 100%;
+    }
+
+    .windy-focus .layer-bar,
+    .windy-focus .content {
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    @keyframes pulseDot {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    /* ─── LAYER PILLS ─── */
+    .layer-bar {
+      display: flex;
+      gap: 8px;
+      padding: 16px 4%;
+      overflow-x: auto;
+      position: relative;
+      z-index: 2;
+    }
+
+    .layer-pill {
+      white-space: nowrap;
+      border: 2px solid transparent;
+      color: var(--text);
+      background: var(--card);
+      border-radius: 999px;
+      padding: 8px 20px;
+      cursor: pointer;
+      font-size: 0.82rem;
+      font-weight: 700;
+      transition: all 0.2s;
+      flex-shrink: 0;
+    }
+
+    .layer-pill:hover {
+      background: var(--card-hover);
+      border-color: #555;
+    }
+
+    .layer-pill.active {
+      background: var(--brand-primary);
+      color: #fff;
+      border-color: var(--brand-primary);
+    }
+
+    /* ─── SECTION ROWS ─── */
+    .content {
+      position: relative;
+      z-index: 1;
+      padding: 0 4%;
+    }
+
+    .row {
+      margin-bottom: 28px;
+    }
+
+    .row-title {
+      font-size: 1.3rem;
+      font-weight: 800;
+      color: var(--text-bright);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .row-title .accent-bar {
+      width: 4px;
+      height: 22px;
+      background: var(--brand-primary);
+      border-radius: 2px;
+    }
+
+    /* ─── KPI CARDS ─── */
+    .kpi-scroll {
+      display: flex;
+      gap: 12px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+      scroll-snap-type: x mandatory;
+    }
+
+    .kpi-scroll::-webkit-scrollbar { height: 4px; }
+    .kpi-scroll::-webkit-scrollbar-track { background: transparent; }
+    .kpi-scroll::-webkit-scrollbar-thumb { background: #444; border-radius: 2px; }
+
+    .kpi-card {
+      flex: 0 0 200px;
+      scroll-snap-align: start;
+      background: var(--card);
+      border-radius: 6px;
+      padding: 18px 16px;
+      transition: transform 0.25s, background 0.25s, box-shadow 0.25s;
+      cursor: default;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .kpi-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: var(--brand-primary);
+      opacity: 0;
+      transition: opacity 0.25s;
+    }
+
+    .kpi-card:hover {
+      transform: scale(1.05);
+      background: var(--card-hover);
+      box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+      z-index: 2;
+    }
+
+    .kpi-card:hover::before { opacity: 1; }
+
+    .kpi-label {
+      font-size: 0.75rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 600;
+    }
+
+    .kpi-sub {
+      margin-top: 4px;
+      font-size: 0.72rem;
+      color: var(--muted);
+      line-height: 1.2;
+    }
+
+    .kpi-value {
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: var(--text-bright);
+      margin-top: 6px;
+    }
+
+    /* ─── CHART PANELS ─── */
+    .charts-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    .chart-card {
+      background: var(--card);
+      border-radius: 8px;
+      padding: 20px;
+      transition: transform 0.25s, box-shadow 0.25s;
+    }
+
+    .chart-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+    }
+
+    .chart-card h3 {
+      font-size: 0.92rem;
+      font-weight: 700;
+      color: var(--text-bright);
+      margin-bottom: 12px;
+    }
+
+    .chart-range-hint {
+      margin: -4px 0 10px;
+      font-size: 0.74rem;
+      color: var(--muted);
+      letter-spacing: 0.2px;
+    }
+
+    .help-tip {
+      display: inline-block;
+      border-bottom: 1px dashed rgba(255,255,255,0.45);
+      cursor: help;
+      color: #b8c7d6;
+    }
+
+    .chart-wrap {
+      position: relative;
+      height: 280px;
+    }
+
+    /* ─── TABLE ─── */
+    .table-card {
+      background: var(--card);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 12px 14px;
+      white-space: nowrap;
+    }
+
+    th {
+      color: var(--muted);
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      font-weight: 700;
+      background: rgba(0,0,0,0.4);
+      position: sticky;
+      top: 0;
+      border-bottom: 2px solid var(--brand-primary);
+    }
+
+    td {
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      color: var(--text);
+    }
+
+    tr { transition: background 0.15s; }
+    tr:hover td { background: rgba(255,255,255,0.04); }
+    tr:last-child td { border-bottom: none; }
+
+    .chip {
+      display: inline-block;
+      border-radius: 4px;
+      font-size: 0.72rem;
+      padding: 4px 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+
+    .risk-low { color: #46d369; background: rgba(70, 211, 105, 0.15); }
+    .risk-mid { color: #f5c518; background: rgba(245, 197, 24, 0.15); }
+    .risk-high { color: var(--bad); background: rgba(255, 107, 107, 0.2); }
+
+    /* ─── PORT STATUS PANEL ─── */
+    .port-status-card {
+      background: var(--card);
+      border-radius: 10px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .port-status-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 4px;
+    }
+
+    .port-status-card.status-open::before { background: var(--good); }
+    .port-status-card.status-restricted::before { background: var(--mid); }
+    .port-status-card.status-closed::before { background: var(--bad); }
+
+    .port-grid {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      min-height: 260px;
+    }
+
+    .port-hero-side {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 28px 24px;
+      text-align: center;
+      gap: 10px;
+      border-right: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .port-icon {
+      font-size: 3.5rem;
+      line-height: 1;
+    }
+
+    .port-big-status {
+      font-size: 2rem;
+      font-weight: 900;
+      letter-spacing: 1px;
+    }
+
+    .port-big-status.open { color: var(--good); }
+    .port-big-status.restricted { color: var(--mid); }
+    .port-big-status.closed { color: var(--bad); }
+
+    .port-updated {
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+
+    .port-live-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 4px;
+      animation: pulseDot 2s ease-in-out infinite;
+    }
+
+    .port-live-dot.open { background: var(--good); }
+    .port-live-dot.restricted { background: var(--mid); }
+    .port-live-dot.closed { background: var(--bad); }
+
+    .port-detail-side {
+      padding: 20px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .port-detail-row {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .port-detail-item {
+      flex: 1 1 200px;
+    }
+
+    .port-detail-item .pdl {
+      font-size: 0.7rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .port-detail-item .pdv {
+      font-size: 0.92rem;
+      color: var(--text);
+      line-height: 1.4;
+    }
+
+    .port-detail-item .pdv strong {
+      color: var(--text-bright);
+    }
+
+    .port-reasons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .port-reason-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 0.76rem;
+      font-weight: 700;
+      background: rgba(255,255,255,0.06);
+      color: var(--text);
+    }
+
+    .port-reason-tag.warn { color: var(--mid); background: rgba(245,197,24,0.1); }
+    .port-reason-tag.danger { color: var(--bad); background: rgba(255, 107, 107, 0.16); }
+    .port-reason-tag.ok { color: var(--good); background: rgba(70,211,105,0.1); }
+
+    .port-closure-box {
+      margin-top: 4px;
+      padding: 10px 12px;
+      border-radius: 6px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .port-closure-headline {
+      font-size: 1rem;
+      font-weight: 900;
+      letter-spacing: 0.4px;
+      margin-bottom: 6px;
+    }
+
+    .port-closure-headline.yes { color: var(--bad); }
+    .port-closure-headline.no { color: var(--good); }
+
+    .port-closure-secondary {
+      font-size: 0.86rem;
+      font-weight: 800;
+      letter-spacing: 0.3px;
+      margin-bottom: 6px;
+      color: var(--mid);
+    }
+
+    .port-closure-secondary.yes { color: var(--mid); }
+    .port-closure-secondary.no { color: var(--muted); }
+
+    .port-closure-sub {
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .port-closure-why {
+      margin-top: -2px;
+      margin-bottom: 8px;
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+
+    .port-closure-uncertainty {
+      margin-bottom: 8px;
+      font-size: 0.74rem;
+      color: var(--muted);
+    }
+
+    .decision-now {
+      margin-bottom: 8px;
+      padding: 8px 10px;
+      border-radius: 6px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.04);
+      font-size: 0.82rem;
+      font-weight: 800;
+      letter-spacing: 0.3px;
+      color: var(--text-bright);
+    }
+
+    .decision-now.ok {
+      border-left: 4px solid var(--good);
+      background: rgba(76,215,160,0.12);
+    }
+
+    .decision-now.warn {
+      border-left: 4px solid var(--mid);
+      background: rgba(244,201,93,0.12);
+    }
+
+    .decision-now.danger {
+      border-left: 4px solid var(--bad);
+      background: rgba(255,107,107,0.12);
+    }
+
+    .decision-review {
+      margin-top: -2px;
+      margin-bottom: 8px;
+      font-size: 0.74rem;
+      color: var(--muted);
+    }
+
+    .port-closure-drivers {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .preventive-alert {
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: 6px;
+      border-left: 4px solid var(--mid);
+      background: rgba(244,201,93,0.12);
+    }
+
+    .preventive-alert.high {
+      border-left-color: var(--bad);
+      background: rgba(255,107,107,0.12);
+    }
+
+    .preventive-alert.low {
+      border-left-color: var(--good);
+      background: rgba(76,215,160,0.12);
+    }
+
+    .preventive-alert-title {
+      font-size: 0.78rem;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+      color: var(--text-bright);
+    }
+
+    .preventive-alert-text {
+      font-size: 0.86rem;
+      color: var(--text);
+      line-height: 1.35;
+    }
+
+    .preventive-actions {
+      margin-top: 8px;
+      display: grid;
+      gap: 6px;
+    }
+
+    .preventive-action {
+      font-size: 0.8rem;
+      color: var(--text);
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 4px;
+      padding: 6px 8px;
+    }
+
+    .port-link-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: auto;
+    }
+
+    .port-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 14px;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+
+    .port-link-primary {
+      background: var(--brand-primary);
+      color: #fff;
+    }
+
+    .port-link-primary:hover { background: var(--brand-primary-dark); }
+
+    .port-link-secondary {
+      background: rgba(255,255,255,0.1);
+      color: var(--text);
+    }
+
+    .port-link-secondary:hover { background: rgba(255,255,255,0.16); }
+
+    /* ─── CARTA & FINES SECTION ─── */
+    .info-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    .info-panel {
+      background: var(--card);
+      border-radius: 8px;
+      padding: 22px 20px;
+      transition: transform 0.25s, box-shadow 0.25s;
+    }
+
+    .info-panel:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 10px 36px rgba(0,0,0,0.4);
+    }
+
+    .info-panel h3 {
+      font-size: 1rem;
+      font-weight: 800;
+      color: var(--text-bright);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .info-panel p, .info-panel li {
+      font-size: 0.85rem;
+      color: #bbb;
+      line-height: 1.6;
+    }
+
+    .info-panel ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    .info-panel li {
+      padding: 5px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .info-panel li:last-child { border-bottom: none; }
+
+    .info-panel li::before {
+      content: '›';
+      color: var(--brand-primary);
+      font-weight: 800;
+      margin-right: 8px;
+    }
+
+    .fines-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      font-size: 0.82rem;
+    }
+
+    .fines-table th {
+      text-align: left;
+      padding: 8px 10px;
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.7px;
+      color: var(--muted);
+      font-weight: 700;
+      background: rgba(0,0,0,0.3);
+      border-bottom: 2px solid var(--brand-primary);
+    }
+
+    .fines-table td {
+      padding: 8px 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+      color: var(--text);
+    }
+
+    .fines-table tr:last-child td { border-bottom: none; }
+
+    .fine-amount {
+      font-weight: 800;
+      color: var(--brand-primary);
+    }
+
+    .legal-ref {
+      margin-top: 12px;
+      padding: 10px 14px;
+      border-radius: 6px;
+      background: rgba(0, 166, 178, 0.08);
+      border-left: 3px solid var(--brand-primary);
+      font-size: 0.78rem;
+      color: #999;
+      line-height: 1.5;
+    }
+
+    .legal-ref a {
+      color: var(--brand-primary);
+      text-decoration: underline;
+    }
+
+    @media (max-width: 1024px) {
+      .port-grid { grid-template-columns: 1fr; }
+      .port-hero-side { border-right: none; border-bottom: 1px solid rgba(255,255,255,0.06); padding: 20px; }
+      .info-grid { grid-template-columns: 1fr; }
+    }
+
+    /* ─── FOOTER ─── */
+    .footer {
+      margin-top: 20px;
+      padding: 20px 0 32px;
+      border-top: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .footer-warn {
+      padding: 12px 16px;
+      border-radius: 6px;
+      background: rgba(245, 197, 24, 0.08);
+      border-left: 4px solid var(--mid);
+      color: #ccc;
+      font-size: 0.82rem;
+      line-height: 1.5;
+    }
+
+    .footer-meta {
+      margin-top: 10px;
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+
+    .err {
+      margin-top: 12px;
+      display: none;
+      padding: 12px 16px;
+      border-radius: 6px;
+      background: rgba(229, 9, 20, 0.1);
+      border-left: 4px solid var(--bad);
+      color: #f88;
+      font-size: 0.84rem;
+    }
+
+    /* ─── RESPONSIVE ─── */
+    @media (max-width: 1024px) {
+      .charts-grid { grid-template-columns: 1fr; }
+      .hero-title { font-size: 2rem; }
+      .map-frame { height: 520px; }
+    }
+
+    @media (max-width: 640px) {
+      .hero-title { font-size: 1.5rem; }
+      .hero-overlay { padding: 12px 16px; }
+      .hero-condition {
+        top: 12px;
+        right: 12px;
+        font-size: 0.8rem;
+        padding: 6px 12px;
+      }
+      .map-frame { height: 420px; }
+      .kpi-card { flex: 0 0 160px; padding: 14px 12px; }
+      .kpi-value { font-size: 1.2rem; }
+      .navbar { padding: 0 3%; height: 56px; }
+      .nav-logo { font-size: 1.2rem; }
+      .layer-pill { padding: 6px 14px; font-size: 0.76rem; }
+      .port-big-status { font-size: 1.4rem; }
+      .port-icon { font-size: 2.5rem; }
+      .fines-table { font-size: 0.74rem; }
+      .fines-table th, .fines-table td { padding: 6px 6px; }
+
+      .btn-map-focus {
+        padding: 6px 10px;
+        font-size: 0.75rem;
+      }
+
+      .windy-focus .hero-map-wrap {
+        top: 60px;
+        left: 1%;
+        right: 1%;
+        bottom: 1%;
+      }
+
+      .windy-focus .navbar {
+        padding: 0 2%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="fxCanvas"></canvas>
+
+  <!-- NAVBAR -->
+  <nav class="navbar" id="navbar">
+    <div class="nav-brand">
+      <img class="nav-logo-img" src="./assets/aquachile-logo.svg" alt="AquaChile" />
+      <span class="nav-logo">AquaChile</span>
+      <div class="nav-divider"></div>
+      <span class="nav-title">Chonchi · Chiloé</span>
+    </div>
+    <div class="nav-right">
+      <span class="nav-badge" id="bgMode">--</span>
+      <button class="btn-map-focus" id="focusMapBtn" aria-pressed="false">⤢ Mapa amplio</button>
+      <button class="btn-reload" id="reloadBtn">⟳ Actualizar</button>
+    </div>
+  </nav>
+
+  <!-- HERO — LIVE MAP -->
+  <section class="hero">
+    <div class="hero-map-wrap">
+      <iframe
+        id="windyMap"
+        class="map-frame"
+        src="https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=mm&metricTemp=%C2%B0C&metricWind=km%2Fh&zoom=8&overlay=wind&product=ecmwf&level=surface&lat=-42.62&lon=-73.77&detailLat=-42.62&detailLon=-73.77&marker=false&message=false"
+        allowfullscreen
+        loading="lazy"
+      ></iframe>
+      <div class="hero-overlay">
+        <h1 class="hero-title">Clima en Tiempo Real</h1>
+        <p class="hero-subtitle">Meteograma operativo · Open-Meteo Weather + Marine · ECMWF</p>
+        <div class="hero-condition" id="heroCondition">
+          <span class="cond-dot"></span>
+          <span id="nowCode">Cargando...</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- LAYER SELECTOR -->
+  <div class="layer-bar">
+    <button class="layer-pill active" data-layer="wind">💨 Viento</button>
+    <button class="layer-pill" data-layer="rain">🌧️ Lluvia</button>
+    <button class="layer-pill" data-layer="waves">🌊 Oleaje</button>
+    <button class="layer-pill" data-layer="temp">🌡️ Temperatura</button>
+    <button class="layer-pill" data-layer="clouds">☁️ Nubes</button>
+    <button class="layer-pill" data-layer="pressure">📊 Presión</button>
+  </div>
+
+  <main class="content">
+
+    <!-- ═══════════════ ESTADO DEL PUERTO ═══════════════ -->
+    <section class="row">
+      <div class="row-title"><span class="accent-bar"></span>Estado del Puerto · Chonchi</div>
+      <div class="port-status-card status-open" id="portCard">
+        <div class="port-grid">
+          <div class="port-hero-side">
+            <div class="port-icon" id="portIcon">⚓</div>
+            <div class="port-big-status open" id="portStatus">CONSULTANDO...</div>
+            <div class="port-updated"><span class="port-live-dot open" id="portDot"></span> <span id="portTime">Calculando...</span></div>
+          </div>
+          <div class="port-detail-side">
+            <div class="port-detail-row">
+              <div class="port-detail-item">
+                <div class="pdl">Condiciones actuales</div>
+                <div class="pdv" id="portConditions">Evaluando datos meteorológicos...</div>
+              </div>
+              <div class="port-detail-item">
+                <div class="pdl">Navegación con carta</div>
+                <div class="pdv" id="portCarta">—</div>
+              </div>
+            </div>
+            <div class="port-detail-row">
+              <div class="port-detail-item">
+                <div class="pdl">Restricciones vigentes</div>
+                <div class="port-reasons" id="portReasons"><span class="port-reason-tag">Cargando...</span></div>
+              </div>
+              <div class="port-detail-item">
+                <div class="pdl">Decisión rápida (próx. 24h)</div>
+                <div class="port-closure-box">
+                  <div class="decision-now" id="decisionNow">DECISIÓN RECOMENDADA AHORA: evaluando...</div>
+                  <div class="decision-review" id="decisionReview">Próxima revisión recomendada: calculando...</div>
+                  <div class="port-closure-headline" id="closureHeadline">Calculando cierre probable...</div>
+                  <div class="port-closure-secondary" id="restrictionHeadline">Calculando restricción probable...</div>
+                  <div class="port-closure-sub" id="closureSub">Analizando viento, rachas, lluvia y oleaje.</div>
+                  <div class="port-closure-uncertainty" id="closureUncertainty">Incertidumbre del modelo: ±--%</div>
+                  <div class="port-closure-why" id="closureWhy" title="El porcentaje se calcula SOLO con las próximas 24h, usando datos horarios y umbrales marítimos.">¿Por qué este porcentaje?</div>
+                  <div class="port-closure-drivers" id="closureDrivers"><span class="port-reason-tag">Cargando...</span></div>
+                  <div class="preventive-alert" id="preventiveAlert">
+                    <div class="preventive-alert-title" id="preventiveAlertTitle">Prevención operativa</div>
+                    <div class="preventive-alert-text" id="preventiveAlertText">Calculando ventana preventiva...</div>
+                  </div>
+                  <div class="preventive-actions" id="preventiveActions"><div class="preventive-action">Cargando acciones...</div></div>
+                </div>
+              </div>
+              <div class="port-detail-item">
+                <div class="pdl">Jurisdicción</div>
+                <div class="pdv">Capitanía de Puerto de <strong>Castro</strong> · Gobernación Marítima de <strong>Puerto Montt</strong></div>
+              </div>
+            </div>
+            <div class="port-link-row">
+              <a class="port-link port-link-primary" href="https://www.directemar.cl/directemar/site/edic/base/port/condiciones-de-barra.html" target="_blank" rel="noopener">📡 Ver estado oficial DIRECTEMAR</a>
+              <a class="port-link port-link-secondary" href="https://meteoarmada.directemar.cl/" target="_blank" rel="noopener">🌊 MeteoArmada</a>
+              <a class="port-link port-link-secondary" href="https://www.shoa.cl/" target="_blank" rel="noopener">📊 SHOA</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════ CARTA NAVEGACIÓN & MULTAS ═══════════════ -->
+    <section class="row">
+      <div class="row-title"><span class="accent-bar"></span>Normativa Marítima · Multas y Autorizaciones</div>
+      <div class="info-grid">
+        <div class="info-panel">
+          <h3>📜 Navegación con Carta (Zarpe Restringido)</h3>
+          <p style="margin-bottom:10px;color:#999">Cuando el puerto tiene restricciones parciales, el Capitán de Puerto puede autorizar zarpe bajo condiciones:</p>
+          <ul>
+            <li><strong>Carta de zarpe con restricción:</strong> autorización especial emitida por la Capitanía de Puerto para navegar bajo condiciones meteorológicas adversas parciales</li>
+            <li><strong>Requisitos:</strong> embarcación en buen estado, tripulación con licencias vigentes, radio VHF operativa, elementos de seguridad al día</li>
+            <li><strong>Restricción horaria:</strong> puede limitar navegación a horarios diurnos (06:00–18:00)</li>
+            <li><strong>Zona limitada:</strong> navegación solo en aguas interiores protegidas, prohibido mar abierto</li>
+            <li><strong>Puerto cerrado =</strong> <span style="color:#ff6b6b;font-weight:800">NO se puede zarpar bajo ninguna circunstancia</span>, ni con carta</li>
+          </ul>
+          <div class="legal-ref">
+            <strong>Base legal:</strong> D.L. N° 2.222 (Ley de Navegación), Art. 6° y 64°. Reglamento de Orden, Seguridad y Disciplina en Naves y Litoral de la República (D.S. N° 1.340 bis). La Capitanía de Puerto tiene potestad exclusiva para autorizar/denegar zarpes.
+          </div>
+        </div>
+        <div class="info-panel">
+          <h3>⚠️ Multas por Infracción Marítima</h3>
+          <p style="margin-bottom:10px;color:#999">Sanciones aplicables por DIRECTEMAR según la Ley de Navegación (DL 2.222) y Código Penal. <strong>Valor UTM marzo 2026 ≈ $67.000 CLP</strong></p>
+          <table class="fines-table">
+            <thead>
+              <tr>
+                <th>Infracción</th>
+                <th>Sanción</th>
+                <th>Monto aprox.</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Zarpar sin autorización (puerto cerrado)</td>
+                <td>5 – 100 UTM</td>
+                <td class="fine-amount">$335.000 – $6.700.000</td>
+              </tr>
+              <tr>
+                <td>Zarpar sin carta/zarpe vigente</td>
+                <td>3 – 50 UTM</td>
+                <td class="fine-amount">$201.000 – $3.350.000</td>
+              </tr>
+              <tr>
+                <td>No respetar restricciones de la carta</td>
+                <td>5 – 50 UTM</td>
+                <td class="fine-amount">$335.000 – $3.350.000</td>
+              </tr>
+              <tr>
+                <td>Poner en riesgo la vida humana en el mar</td>
+                <td>Hasta 1.000 UTM + penal</td>
+                <td class="fine-amount">Hasta $67.000.000</td>
+              </tr>
+              <tr>
+                <td>Reincidencia (cualquier infracción)</td>
+                <td>Doble de multa + suspensión licencia</td>
+                <td class="fine-amount">Según caso</td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="legal-ref">
+            <strong>Además:</strong> Retención de la embarcación, suspensión/cancelación de matrícula y licencias de tripulación, responsabilidad penal en caso de lesiones o muerte (Art. 313 y ss. del Código Penal). El Capitán de Puerto puede ordenar <strong>comiso de la nave</strong> en casos graves. Consulta: <a href="https://www.directemar.cl" target="_blank">directemar.cl</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- KPI ROW -->
+    <section class="row">
+      <div class="row-title"><span class="accent-bar"></span>Resumen de la Semana</div>
+      <div class="kpi-scroll">
+        <article class="kpi-card">
+          <div class="kpi-label">Estado Semanal</div>
+          <div class="kpi-value" id="weeklyStatus">Cargando...</div>
+        </article>
+        <article class="kpi-card">
+          <div class="kpi-label" title="Cantidad de días dentro de los próximos 7 con riesgo ALTO por pronóstico diario.">Días Riesgo Alto</div>
+          <div class="kpi-value" id="highDays">-</div>
+        </article>
+        <article class="kpi-card">
+          <div class="kpi-label">Lluvia Ahora</div>
+          <div class="kpi-value" id="nowRain">-</div>
+        </article>
+        <article class="kpi-card">
+          <div class="kpi-label">Viento Ahora</div>
+          <div class="kpi-value" id="nowWind">-</div>
+        </article>
+        <article class="kpi-card">
+          <div class="kpi-label" title="Máxima racha pronosticada en 7 días. Puede no ocurrir en las próximas 24h.">Racha Máx Semanal</div>
+          <div class="kpi-value" id="maxGust">-</div>
+          <div class="kpi-sub" id="maxGustScope">Ventana: próximos 7 días</div>
+        </article>
+        <article class="kpi-card">
+          <div class="kpi-label" title="Altura de ola máxima pronosticada en 7 días. No implica cierre inmediato por sí sola.">Ola Máx Semanal</div>
+          <div class="kpi-value" id="maxWave">-</div>
+          <div class="kpi-sub" id="maxWaveScope">Ventana: próximos 7 días</div>
+        </article>
+      </div>
+    </section>
+
+    <!-- CHARTS ROW -->
+    <section class="row">
+      <div class="row-title"><span class="accent-bar"></span>Gráficos del Pronóstico</div>
+      <div class="charts-grid">
+        <div class="chart-card">
+          <h3>Meteograma 7 Días · Viento / Racha / Lluvia</h3>
+          <div class="chart-range-hint">Rangos viento/racha: <strong>0–34 normal</strong> · <strong>35–54 atención</strong> · <strong>55+ alerta alta diaria</strong> · <span class="help-tip" title="Este gráfico es diario (7 días). La decisión de cierre usa principalmente el semáforo horario de próximas 24h.">ⓘ cómo leer</span></div>
+          <div class="chart-wrap"><canvas id="weekChart"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>Mar + Temperatura · 7 Días</h3>
+          <div class="chart-range-hint">Rangos oleaje: <strong>0–1.79 m normal</strong> · <strong>1.8–2.49 m atención</strong> · <strong>2.5+ alerta alta diaria</strong> · <span class="help-tip" title="El oleaje alto aumenta riesgo, pero el cierre real depende de combinación con viento/racha, visibilidad y condición actual.">ⓘ combinación de factores</span></div>
+          <div class="chart-wrap"><canvas id="marineChart"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>Semáforo Horario · Cierre Próx. 24h</h3>
+          <div class="chart-range-hint">Índice cierre: <strong>0–44 bajo</strong> · <strong>45–64 atención</strong> · <strong>65+ cierre probable</strong> · <span class="help-tip" title="Este es el gráfico principal para decidir cierre probable: datos horarios de próximas 24h.">ⓘ principal para decisión</span></div>
+          <div class="chart-wrap"><canvas id="closureTimelineChart"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>Impacto por Variable · Próx. 24h</h3>
+          <div class="chart-range-hint">Mayor barra = mayor aporte al riesgo de cierre (normalizado 0–100) · <span class="help-tip" title="No es valor físico directo; es contribución relativa al riesgo para comparar variables entre sí.">ⓘ escala normalizada</span></div>
+          <div class="chart-wrap"><canvas id="closureDriversChart"></canvas></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TABLE ROW -->
+    <section class="row">
+      <div class="row-title"><span class="accent-bar"></span>Pronóstico Detallado</div>
+      <div class="table-card">
+        <table>
+          <thead>
+            <tr>
+              <th>Día</th>
+              <th>Tiempo</th>
+              <th>T° min/max</th>
+              <th>Lluvia</th>
+              <th>Viento máx.</th>
+              <th>Racha máx.</th>
+              <th>Ola máx.</th>
+              <th>Riesgo Puerto</th>
+              <th>Riesgo Cierre (día)</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- FOOTER -->
+    <div class="footer">
+      <div class="footer-warn">
+        ⚠ Estimación orientativa para planificación. El cierre real de puerto debe validarse con DIRECTEMAR / Capitanía de Puerto y avisos oficiales vigentes.
+      </div>
+      <p class="footer-meta" id="updatedAt"></p>
+    </div>
+    <div id="error" class="err"></div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
+  <script>
+    const CHONCHI = { lat: -42.62, lon: -73.77 };
+
+    const weatherCodeMap = {
+      0: 'Despejado', 1: 'Mayormente despejado', 2: 'Parcial nublado', 3: 'Nublado',
+      45: 'Niebla', 48: 'Niebla con escarcha',
+      51: 'Llovizna leve', 53: 'Llovizna', 55: 'Llovizna intensa',
+      61: 'Lluvia leve', 63: 'Lluvia', 65: 'Lluvia intensa',
+      71: 'Nieve leve', 73: 'Nieve', 75: 'Nieve intensa',
+      80: 'Chubascos leves', 81: 'Chubascos', 82: 'Chubascos intensos',
+      95: 'Tormenta', 96: 'Tormenta con granizo', 99: 'Tormenta severa'
+    };
+
+    const rainyCodes = new Set([51, 53, 55, 61, 63, 65, 80, 81, 82, 95, 96, 99]);
+
+    let weekChart;
+    let marineChart;
+    let closureTimelineChart;
+    let closureDriversChart;
+
+    /* ─── NAVBAR SCROLL EFFECT ─── */
+    const navbar = document.getElementById('navbar');
+    window.addEventListener('scroll', () => {
+      navbar.classList.toggle('scrolled', window.scrollY > 40);
+    });
+
+    const focusMapBtn = document.getElementById('focusMapBtn');
+    let isMapFocused = false;
+
+    function setMapFocus(next) {
+      isMapFocused = next;
+      document.body.classList.toggle('windy-focus', next);
+      focusMapBtn.textContent = next ? '🗗 Cerrar mapa' : '⤢ Mapa amplio';
+      focusMapBtn.setAttribute('aria-pressed', next ? 'true' : 'false');
+    }
+
+    focusMapBtn.addEventListener('click', () => {
+      setMapFocus(!isMapFocused);
+    });
+
+    window.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && isMapFocused) {
+        setMapFocus(false);
+      }
+    });
+
+    /* ─── RAIN / PARTICLE FX ─── */
+    const fx = {
+      mode: 'clear',
+      canvas: null,
+      ctx: null,
+      w: 0,
+      h: 0,
+      drops: [],
+      particles: [],
+      rafId: 0,
+    };
+
+    function toCLDate(isoDate) {
+      return new Date(isoDate + 'T12:00:00').toLocaleDateString('es-CL', {
+        weekday: 'short', day: '2-digit', month: '2-digit'
+      });
+    }
+
+    function num(value, digits = 1) {
+      if (value === null || value === undefined || Number.isNaN(value)) return '—';
+      return Number(value).toFixed(digits);
+    }
+
+    function aggregateHourlyMaxByDay(times, values) {
+      const byDay = {};
+      for (let i = 0; i < times.length; i++) {
+        const date = times[i].slice(0, 10);
+        const value = values[i];
+        if (value === null || value === undefined || Number.isNaN(value)) continue;
+        byDay[date] = Math.max(byDay[date] ?? -Infinity, value);
+      }
+      return byDay;
+    }
+
+    function calcRisk({ gust, wind, wave, rain, weatherCode }) {
+      /* Riesgo operativo diario: cada factor DIRECTEMAR mapea independiente-
+         mente a una probabilidad; el factor dominante define el piso y los
+         demás componen hasta un 20 % adicional.  */
+      let gustR = 0;
+      if (gust >= 70) gustR = 95;
+      else if (gust >= 60) gustR = 82;
+      else if (gust >= 55) gustR = 72;   // umbral cierre DIRECTEMAR
+      else if (gust >= 50) gustR = 55;
+      else if (gust >= 45) gustR = 42;   // umbral restricción
+      else if (gust >= 35) gustR = 22;
+
+      let windR = 0;
+      if (wind >= 55) windR = 88;
+      else if (wind >= 45) windR = 72;   // cierre viento sostenido
+      else if (wind >= 40) windR = 50;
+      else if (wind >= 35) windR = 35;   // restricción
+      else if (wind >= 25) windR = 14;
+
+      let waveR = 0;
+      if (wave >= 3.5) waveR = 90;
+      else if (wave >= 2.8) waveR = 70;
+      else if (wave >= 2.5) waveR = 55;  // cierre oleaje
+      else if (wave >= 2.0) waveR = 38;
+      else if (wave >= 1.8) waveR = 25;  // restricción
+      else if (wave >= 1.2) waveR = 10;
+
+      let otherR = 0;
+      if ([95, 96, 99].includes(weatherCode)) otherR = 60;
+      if (rain >= 30) otherR = Math.max(otherR, 30);
+      else if (rain >= 15) otherR = Math.max(otherR, 15);
+
+      const sorted = [gustR, windR, waveR, otherR].sort((a, b) => b - a);
+      const pct = Math.max(4, Math.min(96, Math.round(sorted[0] + (sorted[1] || 0) * 0.20 + (sorted[2] || 0) * 0.08)));
+
+      if (pct >= 55) return { level: 'ALTO', cls: 'risk-high', pct, reason: `Riesgo operativo ALTO (${pct}%). Se recomienda restricción o cierre.` };
+      if (pct >= 30) return { level: 'MEDIO', cls: 'risk-mid', pct, reason: `Riesgo operativo medio (${pct}%). Monitoreo activo y validación táctica.` };
+      return { level: 'BAJO', cls: 'risk-low', pct, reason: `Riesgo bajo (${pct}%). Condiciones generalmente operables.` };
+    }
+
+    function calcDailyCloseRisk({ gust, wind, wave, rain, weatherCode }) {
+      /* Probabilidad de CIERRE de puerto: un solo factor sobre el umbral
+         DIRECTEMAR ya genera alta probabilidad; factores secundarios
+         componen/aumentan el valor final.  */
+      let gustP = 0;
+      if (gust >= 70) gustP = 94;
+      else if (gust >= 65) gustP = 86;
+      else if (gust >= 60) gustP = 78;
+      else if (gust >= 55) gustP = 68;   // ← UMBRAL CIERRE DIRECTEMAR
+      else if (gust >= 50) gustP = 48;   // muy cerca del umbral
+      else if (gust >= 45) gustP = 32;   // umbral restricción
+
+      let windP = 0;
+      if (wind >= 55) windP = 90;
+      else if (wind >= 45) windP = 70;   // cierre viento sostenido
+      else if (wind >= 40) windP = 48;
+      else if (wind >= 35) windP = 28;   // restricción
+
+      let waveP = 0;
+      if (wave >= 3.5) waveP = 92;
+      else if (wave >= 3.0) waveP = 76;
+      else if (wave >= 2.5) waveP = 58;  // cierre oleaje
+      else if (wave >= 2.0) waveP = 36;
+      else if (wave >= 1.8) waveP = 22;  // restricción
+
+      let otherP = 0;
+      if ([95, 96, 99].includes(weatherCode)) otherP = 55;
+      if (rain >= 30) otherP = Math.max(otherP, 28);
+      else if (rain >= 15) otherP = Math.max(otherP, 14);
+
+      const sorted = [gustP, windP, waveP, otherP].sort((a, b) => b - a);
+      const pct = Math.max(2, Math.min(98,
+        Math.round(sorted[0] + (sorted[1] || 0) * 0.22 + (sorted[2] || 0) * 0.08)));
+
+      if (pct >= 55) return { level: 'ALTO', cls: 'risk-high', pct, reason: `Probabilidad ALTA de cierre (${pct}%). Condiciones sobre umbrales DIRECTEMAR.` };
+      if (pct >= 30) return { level: 'MEDIO', cls: 'risk-mid', pct, reason: `Probabilidad media de cierre (${pct}%). Condiciones cercanas a umbrales.` };
+      return { level: 'BAJO', cls: 'risk-low', pct, reason: `Probabilidad baja de cierre (${pct}%).` };
+    }
+
+    function initFxCanvas() {
+      fx.canvas = document.getElementById('fxCanvas');
+      fx.ctx = fx.canvas.getContext('2d');
+      resizeFxCanvas();
+      window.addEventListener('resize', resizeFxCanvas);
+    }
+
+    function resizeFxCanvas() {
+      fx.w = window.innerWidth;
+      fx.h = window.innerHeight;
+      fx.canvas.width = Math.floor(fx.w * devicePixelRatio);
+      fx.canvas.height = Math.floor(fx.h * devicePixelRatio);
+      fx.ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+      seedFx();
+    }
+
+    function seedFx() {
+      fx.drops = Array.from({ length: 140 }, () => ({
+        x: Math.random() * fx.w,
+        y: Math.random() * fx.h,
+        len: 8 + Math.random() * 14,
+        speed: 9 + Math.random() * 10,
+      }));
+      fx.particles = Array.from({ length: 50 }, () => ({
+        x: Math.random() * fx.w,
+        y: Math.random() * fx.h,
+        r: 0.5 + Math.random() * 1.5,
+        vx: -0.15 + Math.random() * 0.3,
+        vy: -0.1 + Math.random() * 0.25,
+      }));
+    }
+
+    function setFxMode(mode) {
+      fx.mode = mode;
+      document.getElementById('bgMode').textContent = mode === 'rain' ? '🌧 Lluvia activa' : '☀ Cielo operativo';
+      if (!fx.rafId) animateFx();
+    }
+
+    function animateFx() {
+      fx.rafId = requestAnimationFrame(animateFx);
+      const ctx = fx.ctx;
+      ctx.clearRect(0, 0, fx.w, fx.h);
+      if (fx.mode === 'rain') {
+        ctx.strokeStyle = 'rgba(180, 200, 230, 0.25)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (const d of fx.drops) {
+          ctx.moveTo(d.x, d.y);
+          ctx.lineTo(d.x - d.len * 0.22, d.y + d.len);
+          d.x -= 1.2;
+          d.y += d.speed;
+          if (d.y > fx.h + 30) { d.y = -10; d.x = Math.random() * fx.w; }
+          if (d.x < -30) d.x = fx.w + 20;
+        }
+        ctx.stroke();
+      } else {
+        for (const p of fx.particles) {
+          ctx.beginPath();
+          ctx.fillStyle = 'rgba(0, 166, 178, 0.09)';
+          ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+          ctx.fill();
+          p.x += p.vx;
+          p.y += p.vy;
+          if (p.x < -6) p.x = fx.w + 6;
+          if (p.x > fx.w + 6) p.x = -6;
+          if (p.y < -6) p.y = fx.h + 6;
+          if (p.y > fx.h + 6) p.y = -6;
+        }
+      }
+    }
+
+    /* ─── CHARTS (Marine palette) ─── */
+    const NF = {
+      red: '#ff6b6b',
+      redAlpha: 'rgba(255,107,107,0.35)',
+      green: '#4cd7a0',
+      greenAlpha: 'rgba(76,215,160,0.2)',
+      blue: '#46b5c3',
+      blueAlpha: 'rgba(70,181,195,0.26)',
+      yellow: '#f4c95d',
+      cyan: '#82d7de',
+      ticks: '#90a4b8',
+      grid: 'rgba(255,255,255,0.06)',
+      tooltipBg: 'rgba(7, 30, 48, 0.97)',
+      tooltipBorder: 'rgba(255,255,255,0.12)',
+    };
+
+    const PORT_LIMITS = {
+      windAttention: 35,
+      windCloseLikely: 55,
+      gustClose: 55,
+      windCloseHard: 45,
+      waveAttention: 1.8,
+      waveCloseLikely: 2.5,
+      waveHard: 3.5,
+    };
+
+    const rangeBandPlugin = {
+      id: 'rangeBandPlugin',
+      beforeDatasetsDraw(chart, _args, options) {
+        if (!options?.enabled) return;
+        const axis = chart.scales?.[options.axisId];
+        if (!axis) return;
+        const { ctx, chartArea } = chart;
+        if (!chartArea) return;
+
+        const drawBand = (from, to, color) => {
+          const safeFrom = Math.max(from, axis.min);
+          const safeTo = Math.min(to, axis.max);
+          if (safeFrom >= safeTo) return;
+          const yFrom = axis.getPixelForValue(safeFrom);
+          const yTo = axis.getPixelForValue(safeTo);
+          const top = Math.min(yFrom, yTo);
+          const height = Math.abs(yTo - yFrom);
+          if (height <= 0) return;
+          ctx.save();
+          ctx.fillStyle = color;
+          ctx.fillRect(chartArea.left, top, chartArea.right - chartArea.left, height);
+          ctx.restore();
+        };
+
+        for (const band of options.bands ?? []) {
+          drawBand(band.from, band.to, band.color);
+        }
+      },
+      afterDraw(chart, _args, options) {
+        if (!options?.enabled) return;
+        const axis = chart.scales?.[options.axisId];
+        const { ctx, chartArea } = chart;
+        if (!axis || !chartArea) return;
+
+        for (const marker of options.markers ?? []) {
+          if (marker.value < axis.min || marker.value > axis.max) continue;
+          const y = axis.getPixelForValue(marker.value);
+          ctx.save();
+          ctx.strokeStyle = marker.color;
+          ctx.lineWidth = 1.2;
+          ctx.setLineDash([5, 4]);
+          ctx.beginPath();
+          ctx.moveTo(chartArea.left, y);
+          ctx.lineTo(chartArea.right, y);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.fillStyle = marker.color;
+          ctx.font = '700 11px Inter';
+          ctx.textAlign = 'right';
+          ctx.fillText(marker.label, chartArea.right - 6, y - 4);
+          ctx.restore();
+        }
+      }
+    };
+
+    Chart.register(rangeBandPlugin);
+
+    function remainingToThreshold(value, threshold, unit, decimals = 0) {
+      const numeric = Number(value ?? 0);
+      if (!Number.isFinite(numeric)) return 'sin dato';
+      if (numeric >= threshold) return `umbral superado (${threshold}${unit})`;
+      return `faltan ${num(threshold - numeric, decimals)}${unit} para ${threshold}${unit}`;
+    }
+
+    function clamp01(value) {
+      return Math.max(0, Math.min(1, value));
+    }
+
+    function normalizeRange(value, start, end) {
+      if (!Number.isFinite(value) || end <= start) return 0;
+      return clamp01((value - start) / (end - start));
+    }
+
+    function riskComponentScores(sample) {
+      const isStorm = [95, 96, 99].includes(sample.code);
+      const isFog = [45, 48].includes(sample.code);
+
+      /* Rangos de normalización ajustados a umbrales DIRECTEMAR:
+         - Racha: 30-60 (antes 35-75). Así 45 km/h = 50 %, 55 km/h = 83 %.
+         - Viento: 20-45 (antes 25-50). Así 35 km/h = 60 %, 45 km/h = 100 %.
+         - Oleaje: 1.0-3.0 (antes 1.2-3.5). Así 1.8 = 40 %, 2.5 = 75 %.  */
+      return {
+        gust: normalizeRange(sample.gust, 30, 60) * 100,
+        wind: normalizeRange(sample.wind, 20, 45) * 100,
+        wave: normalizeRange(sample.wave, 1.0, 3.0) * 100,
+        rain: normalizeRange(sample.rain, 1, 10) * 100,
+        pressure: normalizeRange(1015 - sample.pressure, 3, 25) * 100,
+        visibility: normalizeRange(5000 - sample.visibility, 500, 4500) * 100,
+        cloud: normalizeRange(sample.cloud, 65, 100) * 100,
+        humidity: normalizeRange(sample.humidity, 78, 100) * 100,
+        wavePeriod: normalizeRange(8 - sample.wavePeriod, 0.5, 6) * 100,
+        storm: isStorm ? 100 : 0,
+        fog: isFog ? 90 : 0,
+      };
+    }
+
+    function aggregateRiskIndex(components) {
+      /* Pesos recalibrados: rachas y oleaje pesan más porque son los
+         gatillos principales de cierre DIRECTEMAR.  Suma pesos = 1.0 */
+      const weighted =
+        components.gust * 0.26 +
+        components.wind * 0.16 +
+        components.wave * 0.20 +
+        components.rain * 0.06 +
+        components.pressure * 0.05 +
+        components.visibility * 0.07 +
+        components.cloud * 0.04 +
+        components.humidity * 0.03 +
+        components.wavePeriod * 0.05 +
+        components.storm * 0.06 +
+        components.fog * 0.02;
+      return Math.max(0, Math.min(100, weighted));
+    }
+
+    function extractHourlyWindow24h(current, weather, marine) {
+      const weatherTimes = weather.hourly?.time ?? [];
+      const marineTimes = marine.hourly?.time ?? [];
+      const gusts = weather.hourly?.wind_gusts_10m ?? [];
+      const winds = weather.hourly?.wind_speed_10m ?? [];
+      const rains = weather.hourly?.precipitation ?? [];
+      const codes = weather.hourly?.weather_code ?? [];
+      const pressures = weather.hourly?.pressure_msl ?? [];
+      const clouds = weather.hourly?.cloud_cover ?? [];
+      const humidity = weather.hourly?.relative_humidity_2m ?? [];
+      const visibility = weather.hourly?.visibility ?? [];
+      const waves = marine.hourly?.wave_height ?? [];
+      const wavePeriods = marine.hourly?.wave_period ?? [];
+
+      const currentTime = current.time;
+      const startWeather = Math.max(weatherTimes.indexOf(currentTime), 0);
+      const startMarine = Math.max(marineTimes.indexOf(currentTime), 0);
+      const hours = Math.min(24, weatherTimes.length - startWeather, marineTimes.length - startMarine);
+      const samples = [];
+
+      for (let i = 0; i < hours; i++) {
+        const sample = {
+          time: weatherTimes[startWeather + i],
+          wind: Number(winds[startWeather + i] ?? 0),
+          gust: Number(gusts[startWeather + i] ?? 0),
+          rain: Number(rains[startWeather + i] ?? 0),
+          code: Number(codes[startWeather + i] ?? 0),
+          pressure: Number(pressures[startWeather + i] ?? 1015),
+          cloud: Number(clouds[startWeather + i] ?? 0),
+          humidity: Number(humidity[startWeather + i] ?? 0),
+          visibility: Number(visibility[startWeather + i] ?? 10000),
+          wave: Number(waves[startMarine + i] ?? 0),
+          wavePeriod: Number(wavePeriods[startMarine + i] ?? 8),
+        };
+        const components = riskComponentScores(sample);
+        sample.riskIndex = aggregateRiskIndex(components);
+        sample.components = components;
+        samples.push(sample);
+      }
+
+      return samples;
+    }
+
+    function buildWeekChart(days) {
+      const labels = days.map((d) => toCLDate(d.date));
+      const rain = days.map((d) => Number(d.rain ?? 0));
+      const wind = days.map((d) => Number(d.wind ?? 0));
+      const gust = days.map((d) => Number(d.gust ?? 0));
+      if (weekChart) weekChart.destroy();
+      weekChart = new Chart(document.getElementById('weekChart'), {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [
+            {
+              type: 'bar', label: 'Lluvia (mm)', data: rain, yAxisID: 'yRain',
+              backgroundColor: NF.blueAlpha, borderColor: NF.blue, borderWidth: 1, borderRadius: 4,
+            },
+            {
+              type: 'line', label: 'Viento máx (km/h)', data: wind, yAxisID: 'yWind',
+              borderColor: NF.green, backgroundColor: NF.greenAlpha,
+              tension: 0.35, pointRadius: 4, pointHoverRadius: 6, pointBackgroundColor: NF.green,
+            },
+            {
+              type: 'line', label: 'Racha máx (km/h)', data: gust, yAxisID: 'yWind',
+              borderColor: NF.red, backgroundColor: NF.redAlpha,
+              tension: 0.3, pointRadius: 4, pointHoverRadius: 6, pointBackgroundColor: NF.red,
+              borderDash: [6, 4],
+            }
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { labels: { color: '#e5e5e5', font: { weight: 600 } } },
+            tooltip: {
+              backgroundColor: NF.tooltipBg,
+              borderColor: NF.tooltipBorder,
+              borderWidth: 1,
+              titleColor: '#fff',
+              bodyColor: '#ccc',
+              callbacks: {
+                afterLabel(context) {
+                  const label = context.dataset.label ?? '';
+                  const value = context.parsed.y;
+                  if (label.includes('Viento máx')) {
+                    return `Alerta diaria: ${remainingToThreshold(value, PORT_LIMITS.windCloseHard, ' km/h')}`;
+                  }
+                  if (label.includes('Racha máx')) {
+                    return `Alerta alta: ${remainingToThreshold(value, PORT_LIMITS.gustClose, ' km/h')}`;
+                  }
+                  return '';
+                }
+              }
+            },
+            rangeBandPlugin: {
+              enabled: true,
+              axisId: 'yWind',
+              bands: [
+                { from: 0, to: PORT_LIMITS.windAttention, color: 'rgba(76,215,160,0.07)' },
+                { from: PORT_LIMITS.windAttention, to: PORT_LIMITS.windCloseLikely, color: 'rgba(244,201,93,0.08)' },
+                { from: PORT_LIMITS.windCloseLikely, to: 90, color: 'rgba(255,107,107,0.10)' },
+              ],
+              markers: [
+                { value: PORT_LIMITS.windAttention, color: '#f4c95d', label: 'Atención 35' },
+                { value: PORT_LIMITS.windCloseLikely, color: '#ff6b6b', label: 'Alerta 55' },
+              ]
+            }
+          },
+          scales: {
+            x: { ticks: { color: NF.ticks }, grid: { color: NF.grid } },
+            yRain: { position: 'left', ticks: { color: NF.blue }, grid: { color: NF.grid }, title: { display: true, text: 'Lluvia (mm)', color: NF.blue } },
+            yWind: { position: 'right', ticks: { color: NF.green }, grid: { drawOnChartArea: false }, title: { display: true, text: 'Viento/Racha', color: NF.green } }
+          }
+        }
+      });
+    }
+
+    function buildMarineChart(days) {
+      const labels = days.map((d) => toCLDate(d.date));
+      const wave = days.map((d) => Number(d.wave ?? 0));
+      const tmax = days.map((d) => Number(d.tMax ?? 0));
+      const tmin = days.map((d) => Number(d.tMin ?? 0));
+      if (marineChart) marineChart.destroy();
+      marineChart = new Chart(document.getElementById('marineChart'), {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            { label: 'Ola máx (m)', data: wave, yAxisID: 'yWave', borderColor: NF.blue, backgroundColor: NF.blueAlpha, fill: true, tension: 0.3, pointRadius: 4, pointBackgroundColor: NF.blue },
+            { label: 'T° máxima', data: tmax, yAxisID: 'yTemp', borderColor: NF.red, tension: 0.3, pointRadius: 3, pointBackgroundColor: NF.red },
+            { label: 'T° mínima', data: tmin, yAxisID: 'yTemp', borderColor: NF.cyan, tension: 0.3, pointRadius: 3, pointBackgroundColor: NF.cyan }
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { labels: { color: '#e5e5e5', font: { weight: 600 } } },
+            tooltip: {
+              backgroundColor: NF.tooltipBg,
+              borderColor: NF.tooltipBorder,
+              borderWidth: 1,
+              titleColor: '#fff',
+              bodyColor: '#ccc',
+              callbacks: {
+                afterLabel(context) {
+                  const label = context.dataset.label ?? '';
+                  const value = context.parsed.y;
+                  if (label.includes('Ola máx')) {
+                    const toProbable = remainingToThreshold(value, PORT_LIMITS.waveCloseLikely, ' m', 2);
+                    const toHard = remainingToThreshold(value, PORT_LIMITS.waveHard, ' m', 2);
+                    return [`Alerta alta diaria: ${toProbable}`, `Crítico alto: ${toHard}`];
+                  }
+                  return '';
+                }
+              }
+            },
+            rangeBandPlugin: {
+              enabled: true,
+              axisId: 'yWave',
+              bands: [
+                { from: 0, to: PORT_LIMITS.waveAttention, color: 'rgba(76,215,160,0.07)' },
+                { from: PORT_LIMITS.waveAttention, to: PORT_LIMITS.waveCloseLikely, color: 'rgba(244,201,93,0.08)' },
+                { from: PORT_LIMITS.waveCloseLikely, to: 5, color: 'rgba(255,107,107,0.10)' },
+              ],
+              markers: [
+                { value: PORT_LIMITS.waveAttention, color: '#f4c95d', label: 'Atención 1.8m' },
+                { value: PORT_LIMITS.waveCloseLikely, color: '#ff6b6b', label: 'Alerta 2.5m' },
+              ]
+            }
+          },
+          scales: {
+            x: { ticks: { color: NF.ticks }, grid: { color: NF.grid } },
+            yWave: { position: 'left', ticks: { color: NF.blue }, title: { display: true, text: 'Ola (m)', color: NF.blue }, grid: { color: NF.grid } },
+            yTemp: { position: 'right', ticks: { color: NF.red }, title: { display: true, text: 'Temp (°C)', color: NF.red }, grid: { drawOnChartArea: false } }
+          }
+        }
+      });
+    }
+
+    function buildClosureTimelineChart(samples) {
+      const labels = samples.map((s) => new Date(s.time).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }));
+      const index = samples.map((s) => Number(s.riskIndex ?? 0));
+      const gust = samples.map((s) => Number(s.gust ?? 0));
+      const wave = samples.map((s) => Number(s.wave ?? 0));
+
+      if (closureTimelineChart) closureTimelineChart.destroy();
+      closureTimelineChart = new Chart(document.getElementById('closureTimelineChart'), {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            {
+              type: 'line',
+              label: 'Índice cierre (0-100)',
+              data: index,
+              yAxisID: 'yIndex',
+              borderColor: '#ff6b6b',
+              backgroundColor: 'rgba(255,107,107,0.18)',
+              fill: true,
+              tension: 0.3,
+              pointRadius: 3,
+              pointBackgroundColor: '#ff6b6b',
+            },
+            {
+              type: 'line',
+              label: 'Racha (km/h)',
+              data: gust,
+              yAxisID: 'yMeteo',
+              borderColor: '#4cd7a0',
+              tension: 0.25,
+              pointRadius: 0,
+              borderDash: [5, 4],
+            },
+            {
+              type: 'line',
+              label: 'Ola (m)',
+              data: wave,
+              yAxisID: 'yWave',
+              borderColor: '#46b5c3',
+              tension: 0.25,
+              pointRadius: 0,
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { labels: { color: '#e5e5e5', font: { weight: 600 } } },
+            tooltip: {
+              backgroundColor: NF.tooltipBg,
+              borderColor: NF.tooltipBorder,
+              borderWidth: 1,
+              titleColor: '#fff',
+              bodyColor: '#ccc',
+              callbacks: {
+                afterLabel(context) {
+                  if ((context.dataset.label ?? '').includes('Índice cierre')) {
+                    const value = context.parsed.y;
+                    if (value >= 65) return 'Estado horario: cierre probable';
+                    if (value >= 45) return 'Estado horario: atención';
+                    return 'Estado horario: operativo';
+                  }
+                  return '';
+                }
+              }
+            },
+            rangeBandPlugin: {
+              enabled: true,
+              axisId: 'yIndex',
+              bands: [
+                { from: 0, to: 45, color: 'rgba(76,215,160,0.07)' },
+                { from: 45, to: 65, color: 'rgba(244,201,93,0.08)' },
+                { from: 65, to: 100, color: 'rgba(255,107,107,0.10)' },
+              ],
+              markers: [
+                { value: 45, color: '#f4c95d', label: 'Atención 45' },
+                { value: 65, color: '#ff6b6b', label: 'Cierre 65' },
+              ]
+            }
+          },
+          scales: {
+            x: { ticks: { color: NF.ticks, maxTicksLimit: 8 }, grid: { color: NF.grid } },
+            yIndex: { position: 'left', min: 0, max: 100, ticks: { color: '#ff9b9b' }, title: { display: true, text: 'Índice', color: '#ff9b9b' }, grid: { color: NF.grid } },
+            yMeteo: { position: 'right', min: 0, max: 90, ticks: { color: NF.green }, title: { display: true, text: 'Racha km/h', color: NF.green }, grid: { drawOnChartArea: false } },
+            yWave: { position: 'right', min: 0, max: 5, ticks: { color: NF.blue }, title: { display: true, text: 'Ola m', color: NF.blue }, grid: { drawOnChartArea: false } }
+          }
+        }
+      });
+    }
+
+    function buildClosureDriversChart(samples) {
+      const keys = [
+        ['gust', 'Racha'],
+        ['wind', 'Viento'],
+        ['wave', 'Oleaje'],
+        ['rain', 'Lluvia'],
+        ['pressure', 'Baja presión'],
+        ['visibility', 'Baja visib.'],
+        ['cloud', 'Nubosidad'],
+        ['humidity', 'Humedad'],
+        ['wavePeriod', 'Período ola'],
+        ['storm', 'Tormenta'],
+        ['fog', 'Niebla'],
+      ];
+
+      const averageByKey = keys.map(([key]) => {
+        if (!samples.length) return 0;
+        const total = samples.reduce((acc, sample) => acc + Number(sample.components?.[key] ?? 0), 0);
+        return total / samples.length;
+      });
+
+      if (closureDriversChart) closureDriversChart.destroy();
+      closureDriversChart = new Chart(document.getElementById('closureDriversChart'), {
+        type: 'bar',
+        data: {
+          labels: keys.map(([, label]) => label),
+          datasets: [
+            {
+              label: 'Impacto promedio (0-100)',
+              data: averageByKey,
+              borderWidth: 1,
+              borderRadius: 4,
+              backgroundColor: averageByKey.map((v) => (v >= 65 ? 'rgba(255,107,107,0.55)' : v >= 45 ? 'rgba(244,201,93,0.55)' : 'rgba(76,215,160,0.55)')),
+              borderColor: averageByKey.map((v) => (v >= 65 ? '#ff6b6b' : v >= 45 ? '#f4c95d' : '#4cd7a0')),
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { labels: { color: '#e5e5e5', font: { weight: 600 } } },
+            tooltip: {
+              backgroundColor: NF.tooltipBg,
+              borderColor: NF.tooltipBorder,
+              borderWidth: 1,
+              titleColor: '#fff',
+              bodyColor: '#ccc',
+              callbacks: {
+                afterLabel(context) {
+                  const value = Number(context.parsed.y ?? 0);
+                  if (value >= 65) return 'Impacto crítico';
+                  if (value >= 45) return 'Impacto medio';
+                  return 'Impacto bajo';
+                }
+              }
+            }
+          },
+          scales: {
+            x: { ticks: { color: NF.ticks }, grid: { display: false } },
+            y: { min: 0, max: 100, ticks: { color: NF.ticks }, grid: { color: NF.grid }, title: { display: true, text: 'Contribución al cierre', color: NF.ticks } }
+          }
+        }
+      });
+    }
+
+    function renderTable(days) {
+      const tbody = document.getElementById('tbody');
+      tbody.innerHTML = '';
+      for (const d of days) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${toCLDate(d.date)}</td>
+          <td>${weatherCodeMap[d.weatherCode] ?? '—'}</td>
+          <td>${num(d.tMin)}° / ${num(d.tMax)}°</td>
+          <td>${num(d.rain)} mm</td>
+          <td>${num(d.wind)} km/h</td>
+          <td>${num(d.gust)} km/h</td>
+          <td>${num(d.wave)} m</td>
+          <td><span class="chip ${d.risk.cls}" title="${d.risk.reason}">${d.risk.level} · ${d.risk.pct}%</span></td>
+          <td><span class="chip ${d.closeRisk.cls}" title="${d.closeRisk.reason}">${d.closeRisk.level} · ${d.closeRisk.pct}%</span></td>
+        `;
+        tbody.appendChild(tr);
+      }
+    }
+
+    function computeNextReviewSuggestion(outlook) {
+      const samples = outlook.samples ?? [];
+      if (!samples.length) return 'Próxima revisión recomendada: en 60 min (sin datos horarios robustos).';
+
+      const first = samples[0].riskIndex ?? 0;
+      const triggerLevel = outlook.closeLikely ? 65 : outlook.restrictLikely ? 52 : 45;
+
+      let target = samples.find((sample, index) => index > 0 && ((sample.riskIndex ?? 0) >= triggerLevel || (sample.riskIndex ?? 0) - first >= 10));
+      if (!target) target = samples[Math.min(3, samples.length - 1)];
+
+      const hour = formatHourLabel(target?.time);
+      return `Próxima revisión recomendada: ${hour} (o antes si cambia aviso DIRECTEMAR).`;
+    }
+
+    /* ─── PORT STATUS LOGIC ─── */
+    function calcPortStatus(current, todayRisk) {
+      const wind = current.wind_speed_10m ?? 0;
+      const gust = current.wind_gusts_10m ?? 0;
+      const rain = current.precipitation ?? 0;
+      const code = current.weather_code ?? 0;
+      const isStorm = [95, 96, 99].includes(code);
+      const reasons = [];
+      let status = 'ABIERTO';
+      let carta = true;
+
+      // Evaluate current conditions against DIRECTEMAR criteria
+      if (gust >= 70 || isStorm) {
+        status = 'CERRADO';
+        carta = false;
+        if (gust >= 70) reasons.push({ text: `Rachas ${num(gust,0)} km/h (≥70)`, cls: 'danger' });
+        if (isStorm) reasons.push({ text: 'Tormenta activa', cls: 'danger' });
+      } else if (gust >= 55 || wind >= 45) {
+        status = 'CERRADO';
+        carta = false;
+        if (gust >= 55) reasons.push({ text: `Rachas ${num(gust,0)} km/h (≥55)`, cls: 'danger' });
+        if (wind >= 45) reasons.push({ text: `Viento ${num(wind,0)} km/h (≥45)`, cls: 'danger' });
+      } else if (gust >= 45 || wind >= 35) {
+        status = 'RESTRINGIDO';
+        if (gust >= 45) reasons.push({ text: `Rachas ${num(gust,0)} km/h (≥45)`, cls: 'warn' });
+        if (wind >= 35) reasons.push({ text: `Viento ${num(wind,0)} km/h (≥35)`, cls: 'warn' });
+      }
+
+      if (rain >= 10) {
+        if (status === 'ABIERTO') status = 'RESTRINGIDO';
+        reasons.push({ text: `Lluvia intensa ${num(rain,1)} mm/h`, cls: 'warn' });
+      }
+
+      const fogCodes = [45, 48];
+      if (fogCodes.includes(code)) {
+        if (status === 'ABIERTO') status = 'RESTRINGIDO';
+        reasons.push({ text: 'Visibilidad reducida (niebla)', cls: 'warn' });
+      }
+
+      // If today's forecast risk is ALTO and current is just restricted, escalate
+      if (todayRisk === 'ALTO' && status === 'RESTRINGIDO') {
+        status = 'CERRADO';
+        carta = false;
+        reasons.push({ text: 'Pronóstico de alto riesgo hoy', cls: 'danger' });
+      }
+
+      if (reasons.length === 0) {
+        reasons.push({ text: 'Sin restricciones', cls: 'ok' });
+      }
+
+      return { status, carta, reasons };
+    }
+
+    function renderPortStatus(current, todayRisk) {
+      const port = calcPortStatus(current, todayRisk);
+      const card = document.getElementById('portCard');
+      const statusEl = document.getElementById('portStatus');
+      const iconEl = document.getElementById('portIcon');
+      const dotEl = document.getElementById('portDot');
+      const timeEl = document.getElementById('portTime');
+      const condEl = document.getElementById('portConditions');
+      const cartaEl = document.getElementById('portCarta');
+      const reasonsEl = document.getElementById('portReasons');
+
+      // Status class
+      card.className = 'port-status-card';
+      statusEl.className = 'port-big-status';
+      dotEl.className = 'port-live-dot';
+
+      if (port.status === 'CERRADO') {
+        card.classList.add('status-closed');
+        statusEl.classList.add('closed');
+        dotEl.classList.add('closed');
+        statusEl.textContent = '🚫 PUERTO CERRADO';
+        iconEl.textContent = '⛔';
+      } else if (port.status === 'RESTRINGIDO') {
+        card.classList.add('status-restricted');
+        statusEl.classList.add('restricted');
+        dotEl.classList.add('restricted');
+        statusEl.textContent = '⚠️ RESTRINGIDO';
+        iconEl.textContent = '⚠️';
+      } else {
+        card.classList.add('status-open');
+        statusEl.classList.add('open');
+        dotEl.classList.add('open');
+        statusEl.textContent = '✅ ABIERTO';
+        iconEl.textContent = '⚓';
+      }
+
+      timeEl.textContent = 'Evaluado: ' + new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }) + ' hrs — basado en datos meteorológicos en tiempo real';
+
+      // Current conditions text
+      const condText = `Viento: <strong>${num(current.wind_speed_10m ?? 0, 0)} km/h</strong> · Rachas: <strong>${num(current.wind_gusts_10m ?? 0, 0)} km/h</strong> · Lluvia: <strong>${num(current.precipitation ?? 0, 1)} mm/h</strong> · ${weatherCodeMap[current.weather_code] ?? 'N/D'}`;
+      condEl.innerHTML = condText;
+
+      // Carta info
+      if (port.status === 'CERRADO') {
+        cartaEl.innerHTML = '<span style="color:#ff6b6b;font-weight:800">❌ NO PERMITIDO</span> — Puerto cerrado, no se emiten cartas. Navegación <strong>totalmente prohibida</strong>.';
+      } else if (port.status === 'RESTRINGIDO') {
+        cartaEl.innerHTML = '<span style="color:#f4c95d;font-weight:800">📋 CON AUTORIZACIÓN</span> — Zarpe posible con carta de la Capitanía de Puerto de Castro. Solo aguas interiores protegidas, horario diurno.';
+      } else {
+        cartaEl.innerHTML = '<span style="color:#4cd7a0;font-weight:800">✅ LIBRE</span> — Zarpe habilitado con documentación regular. Carta estándar vigente.';
+      }
+
+      // Reasons
+      reasonsEl.innerHTML = port.reasons.map(r => `<span class="port-reason-tag ${r.cls}">${r.text}</span>`).join('');
+
+      return port;
+    }
+
+    function calcClosureOutlook24h(current, weather, marine, portNow) {
+      const samples = extractHourlyWindow24h(current, weather, marine);
+      if (samples.length <= 0) {
+        return {
+          closeLikely: portNow?.status === 'CERRADO',
+          restrictLikely: portNow?.status !== 'ABIERTO',
+          closeProbability: portNow?.status === 'CERRADO' ? 90 : 25,
+          restrictProbability: portNow?.status === 'ABIERTO' ? 35 : 72,
+          uncertainty: 16,
+          topRisk: 'MEDIO',
+          drivers: ['Sin ventana horaria suficiente en API'],
+          summary: 'Sin datos suficientes para proyección 24h',
+          why: 'Sin datos horarios suficientes para un cálculo estable.',
+          nowStatus: portNow?.status ?? 'ABIERTO',
+          samples: []
+        };
+      }
+
+      const maxIndex = Math.max(...samples.map((s) => s.riskIndex), 0);
+      const highHours = samples.filter((s) => s.riskIndex >= 65).length;
+      const mediumHours = samples.filter((s) => s.riskIndex >= 45 && s.riskIndex < 65).length;
+      const avgIndex = samples.reduce((acc, s) => acc + s.riskIndex, 0) / samples.length;
+
+      const maxGust = Math.max(...samples.map((s) => s.gust), 0);
+      const maxWind = Math.max(...samples.map((s) => s.wind), 0);
+      const maxWave = Math.max(...samples.map((s) => s.wave), 0);
+      const maxRain = Math.max(...samples.map((s) => s.rain), 0);
+      const minPressure = Math.min(...samples.map((s) => s.pressure), 2000);
+      const minVisibility = Math.min(...samples.map((s) => s.visibility), 100000);
+      const stormHours = samples.filter((s) => [95, 96, 99].includes(s.code)).length;
+      const fogHours = samples.filter((s) => [45, 48].includes(s.code)).length;
+
+      const hardTrigger =
+        portNow?.status === 'CERRADO' ||
+        maxIndex >= 68 ||
+        highHours >= 3 ||
+        stormHours >= 2 ||
+        maxGust >= 55 ||      // ← umbral cierre DIRECTEMAR
+        maxWind >= 45 ||      // ← cierre viento sostenido
+        maxWave >= 2.5;       // ← cierre oleaje
+
+      /* --- closeProbability con pisos por umbrales DIRECTEMAR directos --- */
+      let closeProbability =
+        maxIndex * 0.52 +
+        avgIndex * 0.28 +
+        highHours * 5 +
+        mediumHours * 2.2;
+
+      // Pisos impuestos por umbrales físicos (rachas, viento, oleaje)
+      if (maxGust >= 70) closeProbability = Math.max(closeProbability, 90);
+      else if (maxGust >= 60) closeProbability = Math.max(closeProbability, 78);
+      else if (maxGust >= 55) closeProbability = Math.max(closeProbability, 65);
+      else if (maxGust >= 50) closeProbability = Math.max(closeProbability, 45);
+      else if (maxGust >= 45) closeProbability = Math.max(closeProbability, 30);
+
+      if (maxWind >= 45) closeProbability = Math.max(closeProbability, 68);
+      else if (maxWind >= 40) closeProbability = Math.max(closeProbability, 42);
+
+      if (maxWave >= 3.5) closeProbability = Math.max(closeProbability, 85);
+      else if (maxWave >= 2.5) closeProbability = Math.max(closeProbability, 55);
+
+      if (portNow?.status === 'CERRADO') closeProbability = Math.max(closeProbability, 85);
+      closeProbability = Math.max(3, Math.min(97, Math.round(closeProbability)));
+
+      /* --- restrictProbability --- */
+      let restrictProbability =
+        avgIndex * 0.62 +
+        maxIndex * 0.18 +
+        mediumHours * 3.5 +
+        highHours * 2.4 +
+        (maxWind >= 35 ? 12 : 0) +
+        (maxWave >= 1.8 ? 12 : 0) +
+        (maxGust >= 45 ? 15 : 0) +
+        (minVisibility <= 5000 ? 6 : 0);
+
+      // Pisos restricción por umbrales DIRECTEMAR
+      if (maxGust >= 45) restrictProbability = Math.max(restrictProbability, 65);
+      if (maxWind >= 35) restrictProbability = Math.max(restrictProbability, 60);
+      if (maxWave >= 1.8) restrictProbability = Math.max(restrictProbability, 55);
+
+      if (portNow?.status === 'RESTRINGIDO') restrictProbability = Math.max(restrictProbability, 75);
+      if (portNow?.status === 'CERRADO') restrictProbability = Math.max(restrictProbability, 92);
+      restrictProbability = Math.max(closeProbability, Math.min(99, Math.round(restrictProbability)));
+
+      const closeLikely = hardTrigger || closeProbability >= 60;
+      const restrictLikely = closeLikely || restrictProbability >= 58;
+
+      const variance = samples.reduce((acc, sample) => acc + Math.pow((sample.riskIndex ?? 0) - avgIndex, 2), 0) / samples.length;
+      const stdDev = Math.sqrt(variance);
+      let uncertainty = Math.round(6 + stdDev * 0.16 + (samples.length < 20 ? 3 : 0));
+      uncertainty = Math.max(6, Math.min(18, uncertainty));
+
+      const drivers = [];
+      if (maxGust >= 55) drivers.push(`Rachas máx ${num(maxGust, 0)} km/h`);
+      if (maxWind >= 40) drivers.push(`Viento máx ${num(maxWind, 0)} km/h`);
+      if (maxWave >= 2.5) drivers.push(`Oleaje máx ${num(maxWave, 1)} m`);
+      if (maxRain >= 8) drivers.push(`Lluvia horaria máx ${num(maxRain, 1)} mm/h`);
+      if (minPressure <= 1000) drivers.push(`Presión mínima ${num(minPressure, 0)} hPa`);
+      if (minVisibility <= 4000) drivers.push(`Visibilidad mínima ${num(minVisibility / 1000, 1)} km`);
+      if (stormHours > 0) drivers.push(`Tormenta prevista (${stormHours} h)`);
+      if (fogHours >= 2) drivers.push(`Niebla prevista (${fogHours} h)`);
+      if (drivers.length === 0) drivers.push('Sin señales críticas en 24h');
+
+      const topRisk = maxIndex >= 65 ? 'ALTO' : maxIndex >= 45 ? 'MEDIO' : 'BAJO';
+      const summary = closeLikely
+        ? `Cierre probable en próximas 24h (riesgo ${topRisk.toLowerCase()}, índice máx ${num(maxIndex, 0)}).`
+        : restrictLikely
+          ? `No se proyecta cierre, pero sí restricción operativa probable en 24h.`
+          : `No se proyecta cierre ni restricción relevante en próximas 24h.`;
+
+      const why = `24h horarias: índice máx ${num(maxIndex, 0)}, promedio ${num(avgIndex, 0)}, horas críticas ${highHours}, atención ${mediumHours}. Cierre usa umbral ${num(closeProbability, 0)}% (o gatillo duro); restricción usa ${num(restrictProbability, 0)}%.`;
+
+      return { closeLikely, restrictLikely, closeProbability, restrictProbability, uncertainty, topRisk, drivers, summary, why, nowStatus: portNow?.status ?? 'ABIERTO', samples };
+    }
+
+    function renderClosureOutlook(outlook) {
+      const decisionEl = document.getElementById('decisionNow');
+      const decisionReviewEl = document.getElementById('decisionReview');
+      const headlineEl = document.getElementById('closureHeadline');
+      const restrictionEl = document.getElementById('restrictionHeadline');
+      const subEl = document.getElementById('closureSub');
+      const uncertaintyEl = document.getElementById('closureUncertainty');
+      const whyEl = document.getElementById('closureWhy');
+      const driversEl = document.getElementById('closureDrivers');
+
+      decisionEl.classList.remove('ok', 'warn', 'danger');
+      if (outlook.closeLikely || outlook.nowStatus === 'CERRADO') {
+        decisionEl.classList.add('danger');
+        decisionEl.textContent = 'DECISIÓN RECOMENDADA AHORA: ⛔ Preparar cierre y limitar salidas';
+      } else if (outlook.restrictLikely || outlook.nowStatus === 'RESTRINGIDO') {
+        decisionEl.classList.add('warn');
+        decisionEl.textContent = 'DECISIÓN RECOMENDADA AHORA: ⚠ Operar con restricción y carta';
+      } else {
+        decisionEl.classList.add('ok');
+        decisionEl.textContent = 'DECISIÓN RECOMENDADA AHORA: ✅ Operar normal con monitoreo';
+      }
+      decisionEl.title = 'Recomendación táctica inmediata basada en estado actual + probabilidad 24h.';
+      decisionReviewEl.textContent = computeNextReviewSuggestion(outlook);
+      decisionReviewEl.title = 'Hora sugerida para reevaluar por evolución del índice horario de riesgo.';
+
+      headlineEl.classList.remove('yes', 'no');
+      restrictionEl.classList.remove('yes', 'no');
+      if (outlook.closeLikely) {
+        headlineEl.classList.add('yes');
+        headlineEl.textContent = `CIERRE PROBABLE: SÍ (${outlook.closeProbability}%)`;
+      } else {
+        headlineEl.classList.add('no');
+        headlineEl.textContent = `CIERRE PROBABLE: NO (${outlook.closeProbability}%)`;
+      }
+
+      if (outlook.restrictLikely) {
+        restrictionEl.classList.add('yes');
+        restrictionEl.textContent = `RESTRICCIÓN PROBABLE: SÍ (${outlook.restrictProbability}%)`;
+      } else {
+        restrictionEl.classList.add('no');
+        restrictionEl.textContent = `RESTRICCIÓN PROBABLE: NO (${outlook.restrictProbability}%)`;
+      }
+
+      headlineEl.title = 'Probabilidad de cierre calculada para próximas 24 horas con datos horarios multivariable.';
+      restrictionEl.title = 'Probabilidad de restricción operativa (aunque no cierre total) para próximas 24 horas.';
+
+      subEl.textContent = `${outlook.summary} Ventana evaluada: próximas 24 horas.`;
+      uncertaintyEl.textContent = `Incertidumbre del modelo: ±${outlook.uncertainty}% (variabilidad de señales en 24h).`;
+      whyEl.textContent = `¿Por qué este porcentaje? ${outlook.why}`;
+      whyEl.title = outlook.why;
+      driversEl.innerHTML = outlook.drivers
+        .map((driver) => `<span class="port-reason-tag">${driver}</span>`)
+        .join('');
+    }
+
+    function formatHourLabel(isoTime) {
+      if (!isoTime) return '--:--';
+      return new Date(isoTime).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function computeCriticalWindow(samples) {
+      let bestStart = -1;
+      let bestEnd = -1;
+      let currentStart = -1;
+      for (let i = 0; i < samples.length; i++) {
+        const risky = (samples[i].riskIndex ?? 0) >= 45;
+        if (risky && currentStart === -1) currentStart = i;
+        if (!risky && currentStart !== -1) {
+          if ((i - 1) - currentStart > bestEnd - bestStart) {
+            bestStart = currentStart;
+            bestEnd = i - 1;
+          }
+          currentStart = -1;
+        }
+      }
+      if (currentStart !== -1 && (samples.length - 1) - currentStart > bestEnd - bestStart) {
+        bestStart = currentStart;
+        bestEnd = samples.length - 1;
+      }
+      if (bestStart === -1) return null;
+      return { start: samples[bestStart], end: samples[bestEnd] };
+    }
+
+    function buildPreventiveActions(outlook) {
+      const samples = outlook.samples ?? [];
+      const actions = [];
+      const maxGust = Math.max(...samples.map((s) => s.gust ?? 0), 0);
+      const maxWave = Math.max(...samples.map((s) => s.wave ?? 0), 0);
+      const minVisibility = Math.min(...samples.map((s) => s.visibility ?? 10000), 10000);
+      const minPressure = Math.min(...samples.map((s) => s.pressure ?? 1015), 1015);
+
+      actions.push('✅ Confirmar estado oficial DIRECTEMAR antes de cada zarpe.');
+
+      if (outlook.closeLikely) {
+        actions.push('🚨 Activar plan de contingencia de faena y reducir salidas no críticas.');
+      } else if (outlook.restrictLikely) {
+        actions.push('⚠️ Preparar operación restringida y revisar cartas de zarpe preventivas.');
+      } else {
+        actions.push('🟡 Mantener monitoreo cada 60 minutos durante la ventana preventiva.');
+      }
+
+      if (maxGust >= 50) actions.push('💨 Reforzar amarras, cabos y fondeo por rachas elevadas.');
+      if (maxWave >= 2.2) actions.push('🌊 Limitar maniobras en borda y evitar cruces expuestos al oleaje.');
+      if (minVisibility <= 5000) actions.push('🌫️ Elevar protocolo de navegación con baja visibilidad (radar/VHF permanente).');
+      if (minPressure <= 1003) actions.push('📉 Preparar escalamiento por caída de presión y deterioro rápido del tiempo.');
+
+      return actions.slice(0, 5);
+    }
+
+    function renderPreventiveSupport(outlook) {
+      const alertEl = document.getElementById('preventiveAlert');
+      const alertTitleEl = document.getElementById('preventiveAlertTitle');
+      const alertTextEl = document.getElementById('preventiveAlertText');
+      const actionsEl = document.getElementById('preventiveActions');
+      const samples = outlook.samples ?? [];
+
+      alertEl.classList.remove('low', 'high');
+      if (outlook.closeLikely) {
+        alertEl.classList.add('high');
+        alertTitleEl.textContent = 'ALERTA PREVENTIVA ALTA';
+      } else if (!outlook.restrictLikely && outlook.topRisk === 'BAJO') {
+        alertEl.classList.add('low');
+        alertTitleEl.textContent = 'ALERTA PREVENTIVA BAJA';
+      } else {
+        alertTitleEl.textContent = 'ALERTA PREVENTIVA MEDIA';
+      }
+
+      const window = computeCriticalWindow(samples);
+      if (window) {
+        alertTextEl.textContent = `Ventana de mayor riesgo estimada: ${formatHourLabel(window.start.time)} a ${formatHourLabel(window.end.time)}. Reforzar control operacional en este tramo.`;
+      } else {
+        alertTextEl.textContent = 'Sin ventana crítica marcada en próximas 24h. Mantener vigilancia periódica.';
+      }
+
+      const actions = buildPreventiveActions(outlook);
+      actionsEl.innerHTML = actions.map((action) => `<div class="preventive-action">${action}</div>`).join('');
+    }
+
+    function renderKPIs(days, current, closureOutlook) {
+      const highDays = days.filter((d) => d.risk.level === 'ALTO').length;
+      const maxGust = Math.max(...days.map((d) => d.gust || 0), 0);
+      const maxWave = Math.max(...days.map((d) => d.wave || 0), 0);
+      const maxGust24h = Math.max(...(closureOutlook?.samples ?? []).map((s) => s.gust || 0), 0);
+      const maxWave24h = Math.max(...(closureOutlook?.samples ?? []).map((s) => s.wave || 0), 0);
+      const weeklyStatus = highDays >= 3
+        ? '⛔ Semana compleja'
+        : highDays >= 1
+          ? '⚠ Semana mixta'
+          : '✅ Semana favorable';
+      document.getElementById('weeklyStatus').textContent = weeklyStatus;
+      document.getElementById('highDays').textContent = `${highDays} / ${days.length}`;
+      document.getElementById('nowRain').textContent = `${num(current.precipitation, 1)} mm/h`;
+      document.getElementById('nowWind').textContent = `${num(current.wind_speed_10m, 1)} km/h`;
+      document.getElementById('maxGust').textContent = `${num(maxGust, 1)} km/h`;
+      document.getElementById('maxWave').textContent = `${num(maxWave, 2)} m`;
+      document.getElementById('maxGustScope').textContent = `7d: ${num(maxGust, 0)} km/h · 24h: ${num(maxGust24h, 0)} km/h`;
+      document.getElementById('maxWaveScope').textContent = `7d: ${num(maxWave, 2)} m · 24h: ${num(maxWave24h, 2)} m`;
+      document.getElementById('nowCode').textContent = weatherCodeMap[current.weather_code] ?? 'N/D';
+      document.getElementById('updatedAt').textContent = `Actualizado: ${new Date().toLocaleString('es-CL')}`;
+    }
+
+    async function loadData() {
+      const errorEl = document.getElementById('error');
+      errorEl.style.display = 'none';
+      document.getElementById('weeklyStatus').textContent = 'Cargando...';
+      try {
+        const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${CHONCHI.lat}&longitude=${CHONCHI.lon}&timezone=America/Santiago&current=temperature_2m,precipitation,weather_code,wind_speed_10m,wind_gusts_10m&hourly=precipitation,weather_code,wind_speed_10m,wind_gusts_10m,pressure_msl,cloud_cover,relative_humidity_2m,visibility&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,wind_gusts_10m_max&forecast_days=7`;
+        const marineUrl = `https://marine-api.open-meteo.com/v1/marine?latitude=${CHONCHI.lat}&longitude=${CHONCHI.lon}&timezone=America/Santiago&hourly=wave_height,wave_period,wave_direction&forecast_days=7`;
+        const [weatherRes, marineRes] = await Promise.all([fetch(weatherUrl), fetch(marineUrl)]);
+        if (!weatherRes.ok || !marineRes.ok) throw new Error('No se pudo consultar una de las APIs de pronóstico.');
+        const weather = await weatherRes.json();
+        const marine = await marineRes.json();
+        const current = weather.current ?? {};
+        const isRainingNow = (current.precipitation ?? 0) > 0.15 || rainyCodes.has(current.weather_code);
+        setFxMode(isRainingNow ? 'rain' : 'clear');
+        const waveByDay = aggregateHourlyMaxByDay(marine.hourly?.time ?? [], marine.hourly?.wave_height ?? []);
+        const days = weather.daily.time.map((date, i) => {
+          const gust = weather.daily.wind_gusts_10m_max?.[i] ?? 0;
+          const wind = weather.daily.wind_speed_10m_max?.[i] ?? 0;
+          const rain = weather.daily.precipitation_sum?.[i] ?? 0;
+          const wave = waveByDay[date] ?? 0;
+          const weatherCode = weather.daily.weather_code?.[i];
+          const risk = calcRisk({ gust, wind, wave, rain, weatherCode });
+          const closeRisk = calcDailyCloseRisk({ gust, wind, wave, rain, weatherCode });
+          return { date, weatherCode, tMin: weather.daily.temperature_2m_min?.[i], tMax: weather.daily.temperature_2m_max?.[i], rain, wind, gust, wave, risk, closeRisk };
+        });
+        const portNow = renderPortStatus(current, days[0]?.risk?.level ?? 'BAJO');
+        const closureOutlook = calcClosureOutlook24h(current, weather, marine, portNow);
+        renderClosureOutlook(closureOutlook);
+        renderPreventiveSupport(closureOutlook);
+        renderKPIs(days, current, closureOutlook);
+        renderTable(days);
+        buildWeekChart(days);
+        buildMarineChart(days);
+        buildClosureTimelineChart(closureOutlook.samples ?? []);
+        buildClosureDriversChart(closureOutlook.samples ?? []);
+      } catch (error) {
+        errorEl.textContent = `Error: ${error instanceof Error ? error.message : 'fallo desconocido'}`;
+        errorEl.style.display = 'block';
+        document.getElementById('weeklyStatus').textContent = 'Sin datos';
+      }
+    }
+
+    /* ─── WINDY MAP LAYER TOGGLE ─── */
+    const WINDY_BASE = 'https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=mm&metricTemp=%C2%B0C&metricWind=km%2Fh&zoom=8&product=ecmwf&level=surface&lat=-42.62&lon=-73.77&detailLat=-42.62&detailLon=-73.77&marker=true&message=false';
+
+    function setWindyLayer(layer) {
+      const iframe = document.getElementById('windyMap');
+      iframe.src = WINDY_BASE + '&overlay=' + layer;
+      document.querySelectorAll('.layer-pill').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.layer === layer);
+      });
+    }
+
+    document.querySelectorAll('.layer-pill').forEach(btn => {
+      btn.addEventListener('click', () => setWindyLayer(btn.dataset.layer));
+    });
+
+    document.getElementById('reloadBtn').addEventListener('click', loadData);
+    initFxCanvas();
+    loadData();
+  </script>
+</body>
+</html>
