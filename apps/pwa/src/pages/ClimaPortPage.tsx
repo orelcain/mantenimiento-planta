@@ -20,11 +20,6 @@ export function ClimaPortPage() {
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [iframeKey, setIframeKey] = useState(0)
 
-  // Si no tiene permiso, redirigir
-  if (!canSee && !isAdmin) {
-    return <Navigate to="/" replace />
-  }
-
   const basePath = import.meta.env.BASE_URL || '/'
   const iframeSrc = `${basePath}clima-puerto.html`
 
@@ -54,6 +49,11 @@ export function ClimaPortPage() {
     document.addEventListener('fullscreenchange', handleFsChange)
     return () => document.removeEventListener('fullscreenchange', handleFsChange)
   }, [])
+
+  // Guard después de todos los hooks
+  if (!canSee && !isAdmin) {
+    return <Navigate to="/" replace />
+  }
 
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)]">
