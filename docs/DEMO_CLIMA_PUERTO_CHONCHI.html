@@ -393,6 +393,13 @@
       font-weight: 600;
     }
 
+    .kpi-sub {
+      margin-top: 4px;
+      font-size: 0.72rem;
+      color: var(--muted);
+      line-height: 1.2;
+    }
+
     .kpi-value {
       font-size: 1.5rem;
       font-weight: 800;
@@ -431,6 +438,13 @@
       font-size: 0.74rem;
       color: var(--muted);
       letter-spacing: 0.2px;
+    }
+
+    .help-tip {
+      display: inline-block;
+      border-bottom: 1px dashed rgba(255,255,255,0.45);
+      cursor: help;
+      color: #b8c7d6;
     }
 
     .chart-wrap {
@@ -641,6 +655,13 @@
       font-size: 0.82rem;
       color: var(--muted);
       margin-bottom: 8px;
+    }
+
+    .port-closure-why {
+      margin-top: -2px;
+      margin-bottom: 8px;
+      font-size: 0.75rem;
+      color: var(--muted);
     }
 
     .port-closure-drivers {
@@ -999,6 +1020,7 @@
                 <div class="port-closure-box">
                   <div class="port-closure-headline" id="closureHeadline">Calculando cierre probable...</div>
                   <div class="port-closure-sub" id="closureSub">Analizando viento, rachas, lluvia y oleaje.</div>
+                  <div class="port-closure-why" id="closureWhy" title="El porcentaje se calcula SOLO con las próximas 24h, usando datos horarios y umbrales marítimos.">¿Por qué este porcentaje?</div>
                   <div class="port-closure-drivers" id="closureDrivers"><span class="port-reason-tag">Cargando...</span></div>
                   <div class="preventive-alert" id="preventiveAlert">
                     <div class="preventive-alert-title" id="preventiveAlertTitle">Prevención operativa</div>
@@ -1095,7 +1117,7 @@
           <div class="kpi-value" id="weeklyStatus">Cargando...</div>
         </article>
         <article class="kpi-card">
-          <div class="kpi-label">Días Riesgo Alto</div>
+          <div class="kpi-label" title="Cantidad de días dentro de los próximos 7 con riesgo ALTO por pronóstico diario.">Días Riesgo Alto</div>
           <div class="kpi-value" id="highDays">-</div>
         </article>
         <article class="kpi-card">
@@ -1107,12 +1129,14 @@
           <div class="kpi-value" id="nowWind">-</div>
         </article>
         <article class="kpi-card">
-          <div class="kpi-label">Racha Máx Semanal</div>
+          <div class="kpi-label" title="Máxima racha pronosticada en 7 días. Puede no ocurrir en las próximas 24h.">Racha Máx Semanal</div>
           <div class="kpi-value" id="maxGust">-</div>
+          <div class="kpi-sub" id="maxGustScope">Ventana: próximos 7 días</div>
         </article>
         <article class="kpi-card">
-          <div class="kpi-label">Ola Máx Semanal</div>
+          <div class="kpi-label" title="Altura de ola máxima pronosticada en 7 días. No implica cierre inmediato por sí sola.">Ola Máx Semanal</div>
           <div class="kpi-value" id="maxWave">-</div>
+          <div class="kpi-sub" id="maxWaveScope">Ventana: próximos 7 días</div>
         </article>
       </div>
     </section>
@@ -1123,22 +1147,22 @@
       <div class="charts-grid">
         <div class="chart-card">
           <h3>Meteograma 7 Días · Viento / Racha / Lluvia</h3>
-          <div class="chart-range-hint">Rangos viento/racha: <strong>0–34 normal</strong> · <strong>35–54 atención</strong> · <strong>55+ cierre probable</strong></div>
+          <div class="chart-range-hint">Rangos viento/racha: <strong>0–34 normal</strong> · <strong>35–54 atención</strong> · <strong>55+ alerta alta diaria</strong> · <span class="help-tip" title="Este gráfico es diario (7 días). La decisión de cierre usa principalmente el semáforo horario de próximas 24h.">ⓘ cómo leer</span></div>
           <div class="chart-wrap"><canvas id="weekChart"></canvas></div>
         </div>
         <div class="chart-card">
           <h3>Mar + Temperatura · 7 Días</h3>
-          <div class="chart-range-hint">Rangos oleaje: <strong>0–1.79 m normal</strong> · <strong>1.8–2.49 m atención</strong> · <strong>2.5+ cierre probable</strong></div>
+          <div class="chart-range-hint">Rangos oleaje: <strong>0–1.79 m normal</strong> · <strong>1.8–2.49 m atención</strong> · <strong>2.5+ alerta alta diaria</strong> · <span class="help-tip" title="El oleaje alto aumenta riesgo, pero el cierre real depende de combinación con viento/racha, visibilidad y condición actual.">ⓘ combinación de factores</span></div>
           <div class="chart-wrap"><canvas id="marineChart"></canvas></div>
         </div>
         <div class="chart-card">
           <h3>Semáforo Horario · Cierre Próx. 24h</h3>
-          <div class="chart-range-hint">Índice cierre: <strong>0–44 bajo</strong> · <strong>45–64 atención</strong> · <strong>65+ cierre probable</strong></div>
+          <div class="chart-range-hint">Índice cierre: <strong>0–44 bajo</strong> · <strong>45–64 atención</strong> · <strong>65+ cierre probable</strong> · <span class="help-tip" title="Este es el gráfico principal para decidir cierre probable: datos horarios de próximas 24h.">ⓘ principal para decisión</span></div>
           <div class="chart-wrap"><canvas id="closureTimelineChart"></canvas></div>
         </div>
         <div class="chart-card">
           <h3>Impacto por Variable · Próx. 24h</h3>
-          <div class="chart-range-hint">Mayor barra = mayor aporte al riesgo de cierre (normalizado 0–100).</div>
+          <div class="chart-range-hint">Mayor barra = mayor aporte al riesgo de cierre (normalizado 0–100) · <span class="help-tip" title="No es valor físico directo; es contribución relativa al riesgo para comparar variables entre sí.">ⓘ escala normalizada</span></div>
           <div class="chart-wrap"><canvas id="closureDriversChart"></canvas></div>
         </div>
       </div>
@@ -1453,7 +1477,7 @@
         wave: normalizeRange(sample.wave, 1.2, 3.5) * 100,
         rain: normalizeRange(sample.rain, 1, 10) * 100,
         pressure: normalizeRange(1015 - sample.pressure, 3, 25) * 100,
-        visibility: normalizeRange(10000 - sample.visibility, 1500, 9000) * 100,
+        visibility: normalizeRange(5000 - sample.visibility, 500, 4500) * 100,
         cloud: normalizeRange(sample.cloud, 65, 100) * 100,
         humidity: normalizeRange(sample.humidity, 78, 100) * 100,
         wavePeriod: normalizeRange(8 - sample.wavePeriod, 0.5, 6) * 100,
@@ -1565,10 +1589,10 @@
                   const label = context.dataset.label ?? '';
                   const value = context.parsed.y;
                   if (label.includes('Viento máx')) {
-                    return `Cierre técnico: ${remainingToThreshold(value, PORT_LIMITS.windCloseHard, ' km/h')}`;
+                    return `Alerta diaria: ${remainingToThreshold(value, PORT_LIMITS.windCloseHard, ' km/h')}`;
                   }
                   if (label.includes('Racha máx')) {
-                    return `Cierre probable: ${remainingToThreshold(value, PORT_LIMITS.gustClose, ' km/h')}`;
+                    return `Alerta alta: ${remainingToThreshold(value, PORT_LIMITS.gustClose, ' km/h')}`;
                   }
                   return '';
                 }
@@ -1584,7 +1608,7 @@
               ],
               markers: [
                 { value: PORT_LIMITS.windAttention, color: '#f4c95d', label: 'Atención 35' },
-                { value: PORT_LIMITS.windCloseLikely, color: '#ff6b6b', label: 'Cierre 55' },
+                { value: PORT_LIMITS.windCloseLikely, color: '#ff6b6b', label: 'Alerta 55' },
               ]
             }
           },
@@ -1631,7 +1655,7 @@
                   if (label.includes('Ola máx')) {
                     const toProbable = remainingToThreshold(value, PORT_LIMITS.waveCloseLikely, ' m', 2);
                     const toHard = remainingToThreshold(value, PORT_LIMITS.waveHard, ' m', 2);
-                    return [`Cierre probable: ${toProbable}`, `Crítico alto: ${toHard}`];
+                    return [`Alerta alta diaria: ${toProbable}`, `Crítico alto: ${toHard}`];
                   }
                   return '';
                 }
@@ -1647,7 +1671,7 @@
               ],
               markers: [
                 { value: PORT_LIMITS.waveAttention, color: '#f4c95d', label: 'Atención 1.8m' },
-                { value: PORT_LIMITS.waveCloseLikely, color: '#ff6b6b', label: 'Cierre 2.5m' },
+                { value: PORT_LIMITS.waveCloseLikely, color: '#ff6b6b', label: 'Alerta 2.5m' },
               ]
             }
           },
@@ -1953,10 +1977,11 @@
       if (samples.length <= 0) {
         return {
           closeLikely: portNow?.status === 'CERRADO',
-          confidence: portNow?.status === 'CERRADO' ? 90 : 45,
+          probability: portNow?.status === 'CERRADO' ? 90 : 25,
           topRisk: 'MEDIO',
           drivers: ['Sin ventana horaria suficiente en API'],
           summary: 'Sin datos suficientes para proyección 24h',
+          why: 'Sin datos horarios suficientes para un cálculo estable.',
           samples: []
         };
       }
@@ -1975,18 +2000,21 @@
       const stormHours = samples.filter((s) => [95, 96, 99].includes(s.code)).length;
       const fogHours = samples.filter((s) => [45, 48].includes(s.code)).length;
 
-      const closeLikely =
+      const hardTrigger =
         portNow?.status === 'CERRADO' ||
-        maxIndex >= 65 ||
-        highHours >= 2 ||
-        (highHours >= 1 && mediumHours >= 4) ||
-        avgIndex >= 55;
+        maxIndex >= 72 ||
+        highHours >= 3 ||
+        stormHours >= 2;
 
-      let confidence = closeLikely
-        ? 35 + maxIndex * 0.5 + highHours * 4 + mediumHours * 1.5
-        : 68 - (avgIndex * 0.4) - (highHours * 2);
-      if (!closeLikely) confidence = Math.max(55, 100 - confidence);
-      confidence = Math.max(35, Math.min(96, Math.round(confidence)));
+      let probability =
+        maxIndex * 0.52 +
+        avgIndex * 0.28 +
+        highHours * 5 +
+        mediumHours * 2.2;
+      if (portNow?.status === 'CERRADO') probability = Math.max(probability, 85);
+      probability = Math.max(3, Math.min(97, Math.round(probability)));
+
+      const closeLikely = hardTrigger || probability >= 60;
 
       const drivers = [];
       if (maxGust >= 55) drivers.push(`Rachas máx ${num(maxGust, 0)} km/h`);
@@ -2004,24 +2032,30 @@
         ? `Cierre probable en próximas 24h (riesgo ${topRisk.toLowerCase()}, índice máx ${num(maxIndex, 0)}).`
         : `No se proyecta cierre en próximas 24h (índice promedio ${num(avgIndex, 0)}).`;
 
-      return { closeLikely, confidence, topRisk, drivers, summary, samples };
+      const why = `Probabilidad basada en 24h horarias: índice máx ${num(maxIndex, 0)}, promedio ${num(avgIndex, 0)}, horas críticas ${highHours}, horas de atención ${mediumHours}. Regla de decisión: cierre probable con ${num(probability, 0)}% o gatillo duro.`;
+
+      return { closeLikely, probability, topRisk, drivers, summary, why, samples };
     }
 
     function renderClosureOutlook(outlook) {
       const headlineEl = document.getElementById('closureHeadline');
       const subEl = document.getElementById('closureSub');
+      const whyEl = document.getElementById('closureWhy');
       const driversEl = document.getElementById('closureDrivers');
 
       headlineEl.classList.remove('yes', 'no');
       if (outlook.closeLikely) {
         headlineEl.classList.add('yes');
-        headlineEl.textContent = `CIERRE PROBABLE: SÍ (${outlook.confidence}%)`;
+        headlineEl.textContent = `CIERRE PROBABLE: SÍ (${outlook.probability}%)`;
       } else {
         headlineEl.classList.add('no');
-        headlineEl.textContent = `CIERRE PROBABLE: NO (${outlook.confidence}%)`;
+        headlineEl.textContent = `CIERRE PROBABLE: NO (${outlook.probability}%)`;
       }
+      headlineEl.title = 'Probabilidad de cierre calculada para próximas 24 horas con datos horarios multivariable.';
 
       subEl.textContent = `${outlook.summary} Ventana evaluada: próximas 24 horas.`;
+      whyEl.textContent = `¿Por qué este porcentaje? ${outlook.why}`;
+      whyEl.title = outlook.why;
       driversEl.innerHTML = outlook.drivers
         .map((driver) => `<span class="port-reason-tag">${driver}</span>`)
         .join('');
@@ -2108,10 +2142,12 @@
       actionsEl.innerHTML = actions.map((action) => `<div class="preventive-action">${action}</div>`).join('');
     }
 
-    function renderKPIs(days, current) {
+    function renderKPIs(days, current, closureOutlook) {
       const highDays = days.filter((d) => d.risk.level === 'ALTO').length;
       const maxGust = Math.max(...days.map((d) => d.gust || 0), 0);
       const maxWave = Math.max(...days.map((d) => d.wave || 0), 0);
+      const maxGust24h = Math.max(...(closureOutlook?.samples ?? []).map((s) => s.gust || 0), 0);
+      const maxWave24h = Math.max(...(closureOutlook?.samples ?? []).map((s) => s.wave || 0), 0);
       const weeklyStatus = highDays >= 3
         ? '⛔ Semana compleja'
         : highDays >= 1
@@ -2123,6 +2159,8 @@
       document.getElementById('nowWind').textContent = `${num(current.wind_speed_10m, 1)} km/h`;
       document.getElementById('maxGust').textContent = `${num(maxGust, 1)} km/h`;
       document.getElementById('maxWave').textContent = `${num(maxWave, 2)} m`;
+      document.getElementById('maxGustScope').textContent = `7d: ${num(maxGust, 0)} km/h · 24h: ${num(maxGust24h, 0)} km/h`;
+      document.getElementById('maxWaveScope').textContent = `7d: ${num(maxWave, 2)} m · 24h: ${num(maxWave24h, 2)} m`;
       document.getElementById('nowCode').textContent = weatherCodeMap[current.weather_code] ?? 'N/D';
       document.getElementById('updatedAt').textContent = `Actualizado: ${new Date().toLocaleString('es-CL')}`;
     }
@@ -2154,7 +2192,7 @@
         const closureOutlook = calcClosureOutlook24h(current, weather, marine, portNow);
         renderClosureOutlook(closureOutlook);
         renderPreventiveSupport(closureOutlook);
-        renderKPIs(days, current);
+        renderKPIs(days, current, closureOutlook);
         renderTable(days);
         buildWeekChart(days);
         buildMarineChart(days);
