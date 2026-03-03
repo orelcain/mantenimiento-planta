@@ -1078,6 +1078,16 @@
           <div class="chart-range-hint">Rangos oleaje: <strong>0–1.79 m normal</strong> · <strong>1.8–2.49 m atención</strong> · <strong>2.5+ cierre probable</strong></div>
           <div class="chart-wrap"><canvas id="marineChart"></canvas></div>
         </div>
+        <div class="chart-card">
+          <h3>Semáforo Horario · Cierre Próx. 24h</h3>
+          <div class="chart-range-hint">Índice cierre: <strong>0–44 bajo</strong> · <strong>45–64 atención</strong> · <strong>65+ cierre probable</strong></div>
+          <div class="chart-wrap"><canvas id="closureTimelineChart"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>Impacto por Variable · Próx. 24h</h3>
+          <div class="chart-range-hint">Mayor barra = mayor aporte al riesgo de cierre (normalizado 0–100).</div>
+          <div class="chart-wrap"><canvas id="closureDriversChart"></canvas></div>
+        </div>
       </div>
     </section>
 
@@ -1131,6 +1141,8 @@
 
     let weekChart;
     let marineChart;
+    let closureTimelineChart;
+    let closureDriversChart;
 
     /* ─── NAVBAR SCROLL EFFECT ─── */
     const navbar = document.getElementById('navbar');
@@ -1369,6 +1381,93 @@
       return `faltan ${num(threshold - numeric, decimals)}${unit} para ${threshold}${unit}`;
     }
 
+    function clamp01(value) {
+      return Math.max(0, Math.min(1, value));
+    }
+
+    function normalizeRange(value, start, end) {
+      if (!Number.isFinite(value) || end <= start) return 0;
+      return clamp01((value - start) / (end - start));
+    }
+
+    function riskComponentScores(sample) {
+      const isStorm = [95, 96, 99].includes(sample.code);
+      const isFog = [45, 48].includes(sample.code);
+
+      return {
+        gust: normalizeRange(sample.gust, 35, 75) * 100,
+        wind: normalizeRange(sample.wind, 25, 50) * 100,
+        wave: normalizeRange(sample.wave, 1.2, 3.5) * 100,
+        rain: normalizeRange(sample.rain, 1, 10) * 100,
+        pressure: normalizeRange(1015 - sample.pressure, 3, 25) * 100,
+        visibility: normalizeRange(10000 - sample.visibility, 1500, 9000) * 100,
+        cloud: normalizeRange(sample.cloud, 65, 100) * 100,
+        humidity: normalizeRange(sample.humidity, 78, 100) * 100,
+        wavePeriod: normalizeRange(8 - sample.wavePeriod, 0.5, 6) * 100,
+        storm: isStorm ? 100 : 0,
+        fog: isFog ? 90 : 0,
+      };
+    }
+
+    function aggregateRiskIndex(components) {
+      const weighted =
+        components.gust * 0.2 +
+        components.wind * 0.14 +
+        components.wave * 0.18 +
+        components.rain * 0.08 +
+        components.pressure * 0.07 +
+        components.visibility * 0.1 +
+        components.cloud * 0.05 +
+        components.humidity * 0.04 +
+        components.wavePeriod * 0.06 +
+        components.storm * 0.06 +
+        components.fog * 0.02;
+      return Math.max(0, Math.min(100, weighted));
+    }
+
+    function extractHourlyWindow24h(current, weather, marine) {
+      const weatherTimes = weather.hourly?.time ?? [];
+      const marineTimes = marine.hourly?.time ?? [];
+      const gusts = weather.hourly?.wind_gusts_10m ?? [];
+      const winds = weather.hourly?.wind_speed_10m ?? [];
+      const rains = weather.hourly?.precipitation ?? [];
+      const codes = weather.hourly?.weather_code ?? [];
+      const pressures = weather.hourly?.pressure_msl ?? [];
+      const clouds = weather.hourly?.cloud_cover ?? [];
+      const humidity = weather.hourly?.relative_humidity_2m ?? [];
+      const visibility = weather.hourly?.visibility ?? [];
+      const waves = marine.hourly?.wave_height ?? [];
+      const wavePeriods = marine.hourly?.wave_period ?? [];
+
+      const currentTime = current.time;
+      const startWeather = Math.max(weatherTimes.indexOf(currentTime), 0);
+      const startMarine = Math.max(marineTimes.indexOf(currentTime), 0);
+      const hours = Math.min(24, weatherTimes.length - startWeather, marineTimes.length - startMarine);
+      const samples = [];
+
+      for (let i = 0; i < hours; i++) {
+        const sample = {
+          time: weatherTimes[startWeather + i],
+          wind: Number(winds[startWeather + i] ?? 0),
+          gust: Number(gusts[startWeather + i] ?? 0),
+          rain: Number(rains[startWeather + i] ?? 0),
+          code: Number(codes[startWeather + i] ?? 0),
+          pressure: Number(pressures[startWeather + i] ?? 1015),
+          cloud: Number(clouds[startWeather + i] ?? 0),
+          humidity: Number(humidity[startWeather + i] ?? 0),
+          visibility: Number(visibility[startWeather + i] ?? 10000),
+          wave: Number(waves[startMarine + i] ?? 0),
+          wavePeriod: Number(wavePeriods[startMarine + i] ?? 8),
+        };
+        const components = riskComponentScores(sample);
+        sample.riskIndex = aggregateRiskIndex(components);
+        sample.components = components;
+        samples.push(sample);
+      }
+
+      return samples;
+    }
+
     function buildWeekChart(days) {
       const labels = days.map((d) => toCLDate(d.date));
       const rain = days.map((d) => Number(d.rain ?? 0));
@@ -1508,6 +1607,165 @@
       });
     }
 
+    function buildClosureTimelineChart(samples) {
+      const labels = samples.map((s) => new Date(s.time).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }));
+      const index = samples.map((s) => Number(s.riskIndex ?? 0));
+      const gust = samples.map((s) => Number(s.gust ?? 0));
+      const wave = samples.map((s) => Number(s.wave ?? 0));
+
+      if (closureTimelineChart) closureTimelineChart.destroy();
+      closureTimelineChart = new Chart(document.getElementById('closureTimelineChart'), {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            {
+              type: 'line',
+              label: 'Índice cierre (0-100)',
+              data: index,
+              yAxisID: 'yIndex',
+              borderColor: '#ff6b6b',
+              backgroundColor: 'rgba(255,107,107,0.18)',
+              fill: true,
+              tension: 0.3,
+              pointRadius: 3,
+              pointBackgroundColor: '#ff6b6b',
+            },
+            {
+              type: 'line',
+              label: 'Racha (km/h)',
+              data: gust,
+              yAxisID: 'yMeteo',
+              borderColor: '#4cd7a0',
+              tension: 0.25,
+              pointRadius: 0,
+              borderDash: [5, 4],
+            },
+            {
+              type: 'line',
+              label: 'Ola (m)',
+              data: wave,
+              yAxisID: 'yWave',
+              borderColor: '#46b5c3',
+              tension: 0.25,
+              pointRadius: 0,
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { labels: { color: '#e5e5e5', font: { weight: 600 } } },
+            tooltip: {
+              backgroundColor: NF.tooltipBg,
+              borderColor: NF.tooltipBorder,
+              borderWidth: 1,
+              titleColor: '#fff',
+              bodyColor: '#ccc',
+              callbacks: {
+                afterLabel(context) {
+                  if ((context.dataset.label ?? '').includes('Índice cierre')) {
+                    const value = context.parsed.y;
+                    if (value >= 65) return 'Estado horario: cierre probable';
+                    if (value >= 45) return 'Estado horario: atención';
+                    return 'Estado horario: operativo';
+                  }
+                  return '';
+                }
+              }
+            },
+            rangeBandPlugin: {
+              enabled: true,
+              axisId: 'yIndex',
+              bands: [
+                { from: 0, to: 45, color: 'rgba(76,215,160,0.07)' },
+                { from: 45, to: 65, color: 'rgba(244,201,93,0.08)' },
+                { from: 65, to: 100, color: 'rgba(255,107,107,0.10)' },
+              ],
+              markers: [
+                { value: 45, color: '#f4c95d', label: 'Atención 45' },
+                { value: 65, color: '#ff6b6b', label: 'Cierre 65' },
+              ]
+            }
+          },
+          scales: {
+            x: { ticks: { color: NF.ticks, maxTicksLimit: 8 }, grid: { color: NF.grid } },
+            yIndex: { position: 'left', min: 0, max: 100, ticks: { color: '#ff9b9b' }, title: { display: true, text: 'Índice', color: '#ff9b9b' }, grid: { color: NF.grid } },
+            yMeteo: { position: 'right', min: 0, max: 90, ticks: { color: NF.green }, title: { display: true, text: 'Racha km/h', color: NF.green }, grid: { drawOnChartArea: false } },
+            yWave: { position: 'right', min: 0, max: 5, ticks: { color: NF.blue }, title: { display: true, text: 'Ola m', color: NF.blue }, grid: { drawOnChartArea: false } }
+          }
+        }
+      });
+    }
+
+    function buildClosureDriversChart(samples) {
+      const keys = [
+        ['gust', 'Racha'],
+        ['wind', 'Viento'],
+        ['wave', 'Oleaje'],
+        ['rain', 'Lluvia'],
+        ['pressure', 'Baja presión'],
+        ['visibility', 'Baja visib.'],
+        ['cloud', 'Nubosidad'],
+        ['humidity', 'Humedad'],
+        ['wavePeriod', 'Período ola'],
+        ['storm', 'Tormenta'],
+        ['fog', 'Niebla'],
+      ];
+
+      const averageByKey = keys.map(([key]) => {
+        if (!samples.length) return 0;
+        const total = samples.reduce((acc, sample) => acc + Number(sample.components?.[key] ?? 0), 0);
+        return total / samples.length;
+      });
+
+      if (closureDriversChart) closureDriversChart.destroy();
+      closureDriversChart = new Chart(document.getElementById('closureDriversChart'), {
+        type: 'bar',
+        data: {
+          labels: keys.map(([, label]) => label),
+          datasets: [
+            {
+              label: 'Impacto promedio (0-100)',
+              data: averageByKey,
+              borderWidth: 1,
+              borderRadius: 4,
+              backgroundColor: averageByKey.map((v) => (v >= 65 ? 'rgba(255,107,107,0.55)' : v >= 45 ? 'rgba(244,201,93,0.55)' : 'rgba(76,215,160,0.55)')),
+              borderColor: averageByKey.map((v) => (v >= 65 ? '#ff6b6b' : v >= 45 ? '#f4c95d' : '#4cd7a0')),
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { labels: { color: '#e5e5e5', font: { weight: 600 } } },
+            tooltip: {
+              backgroundColor: NF.tooltipBg,
+              borderColor: NF.tooltipBorder,
+              borderWidth: 1,
+              titleColor: '#fff',
+              bodyColor: '#ccc',
+              callbacks: {
+                afterLabel(context) {
+                  const value = Number(context.parsed.y ?? 0);
+                  if (value >= 65) return 'Impacto crítico';
+                  if (value >= 45) return 'Impacto medio';
+                  return 'Impacto bajo';
+                }
+              }
+            }
+          },
+          scales: {
+            x: { ticks: { color: NF.ticks }, grid: { display: false } },
+            y: { min: 0, max: 100, ticks: { color: NF.ticks }, grid: { color: NF.grid }, title: { display: true, text: 'Contribución al cierre', color: NF.ticks } }
+          }
+        }
+      });
+    }
+
     function renderTable(days) {
       const tbody = document.getElementById('tbody');
       tbody.innerHTML = '';
@@ -1638,82 +1896,42 @@
     }
 
     function calcClosureOutlook24h(current, weather, marine, portNow) {
-      const weatherTimes = weather.hourly?.time ?? [];
-      const marineTimes = marine.hourly?.time ?? [];
-      const gusts = weather.hourly?.wind_gusts_10m ?? [];
-      const winds = weather.hourly?.wind_speed_10m ?? [];
-      const rains = weather.hourly?.precipitation ?? [];
-      const codes = weather.hourly?.weather_code ?? [];
-      const waves = marine.hourly?.wave_height ?? [];
-
-      const currentTime = current.time;
-      const startWeather = Math.max(weatherTimes.indexOf(currentTime), 0);
-      const startMarine = Math.max(marineTimes.indexOf(currentTime), 0);
-      const hours = Math.min(24, weatherTimes.length - startWeather, marineTimes.length - startMarine);
-
-      if (hours <= 0) {
+      const samples = extractHourlyWindow24h(current, weather, marine);
+      if (samples.length <= 0) {
         return {
           closeLikely: portNow?.status === 'CERRADO',
           confidence: portNow?.status === 'CERRADO' ? 90 : 45,
           topRisk: 'MEDIO',
           drivers: ['Sin ventana horaria suficiente en API'],
-          summary: 'Sin datos suficientes para proyección 24h'
+          summary: 'Sin datos suficientes para proyección 24h',
+          samples: []
         };
       }
 
-      let maxScore = 0;
-      let highHours = 0;
-      let mediumHours = 0;
-      let maxGust = 0;
-      let maxWind = 0;
-      let maxWave = 0;
-      let maxRain = 0;
-      let stormHours = 0;
-      let fogHours = 0;
+      const maxIndex = Math.max(...samples.map((s) => s.riskIndex), 0);
+      const highHours = samples.filter((s) => s.riskIndex >= 65).length;
+      const mediumHours = samples.filter((s) => s.riskIndex >= 45 && s.riskIndex < 65).length;
+      const avgIndex = samples.reduce((acc, s) => acc + s.riskIndex, 0) / samples.length;
 
-      for (let i = 0; i < hours; i++) {
-        const gust = Number(gusts[startWeather + i] ?? 0);
-        const wind = Number(winds[startWeather + i] ?? 0);
-        const rain = Number(rains[startWeather + i] ?? 0);
-        const wave = Number(waves[startMarine + i] ?? 0);
-        const code = Number(codes[startWeather + i] ?? 0);
-
-        maxGust = Math.max(maxGust, gust);
-        maxWind = Math.max(maxWind, wind);
-        maxWave = Math.max(maxWave, wave);
-        maxRain = Math.max(maxRain, rain);
-
-        if ([95, 96, 99].includes(code)) stormHours += 1;
-        if ([45, 48].includes(code)) fogHours += 1;
-
-        let score = 0;
-        if (gust >= 70) score += 4;
-        else if (gust >= 55) score += 3;
-        else if (gust >= 45) score += 1;
-
-        if (wind >= 45) score += 2;
-        else if (wind >= 35) score += 1;
-
-        if (wave >= 3.5) score += 3;
-        else if (wave >= 2.5) score += 2;
-        else if (wave >= 1.8) score += 1;
-
-        if (rain >= 10) score += 1;
-        if ([95, 96, 99].includes(code)) score += 3;
-        if ([45, 48].includes(code)) score += 1;
-
-        maxScore = Math.max(maxScore, score);
-        if (score >= 6) highHours += 1;
-        else if (score >= 3) mediumHours += 1;
-      }
+      const maxGust = Math.max(...samples.map((s) => s.gust), 0);
+      const maxWind = Math.max(...samples.map((s) => s.wind), 0);
+      const maxWave = Math.max(...samples.map((s) => s.wave), 0);
+      const maxRain = Math.max(...samples.map((s) => s.rain), 0);
+      const minPressure = Math.min(...samples.map((s) => s.pressure), 2000);
+      const minVisibility = Math.min(...samples.map((s) => s.visibility), 100000);
+      const stormHours = samples.filter((s) => [95, 96, 99].includes(s.code)).length;
+      const fogHours = samples.filter((s) => [45, 48].includes(s.code)).length;
 
       const closeLikely =
         portNow?.status === 'CERRADO' ||
-        maxScore >= 6 ||
+        maxIndex >= 65 ||
         highHours >= 2 ||
-        (highHours >= 1 && mediumHours >= 3);
+        (highHours >= 1 && mediumHours >= 4) ||
+        avgIndex >= 55;
 
-      let confidence = 25 + (maxScore * 8) + (highHours * 7) + (mediumHours * 2);
+      let confidence = closeLikely
+        ? 35 + maxIndex * 0.5 + highHours * 4 + mediumHours * 1.5
+        : 68 - (avgIndex * 0.4) - (highHours * 2);
       if (!closeLikely) confidence = Math.max(55, 100 - confidence);
       confidence = Math.max(35, Math.min(96, Math.round(confidence)));
 
@@ -1722,16 +1940,18 @@
       if (maxWind >= 40) drivers.push(`Viento máx ${num(maxWind, 0)} km/h`);
       if (maxWave >= 2.5) drivers.push(`Oleaje máx ${num(maxWave, 1)} m`);
       if (maxRain >= 8) drivers.push(`Lluvia horaria máx ${num(maxRain, 1)} mm/h`);
+      if (minPressure <= 1000) drivers.push(`Presión mínima ${num(minPressure, 0)} hPa`);
+      if (minVisibility <= 4000) drivers.push(`Visibilidad mínima ${num(minVisibility / 1000, 1)} km`);
       if (stormHours > 0) drivers.push(`Tormenta prevista (${stormHours} h)`);
       if (fogHours >= 2) drivers.push(`Niebla prevista (${fogHours} h)`);
       if (drivers.length === 0) drivers.push('Sin señales críticas en 24h');
 
-      const topRisk = maxScore >= 6 ? 'ALTO' : maxScore >= 3 ? 'MEDIO' : 'BAJO';
+      const topRisk = maxIndex >= 65 ? 'ALTO' : maxIndex >= 45 ? 'MEDIO' : 'BAJO';
       const summary = closeLikely
-        ? `Cierre probable en próximas 24h (riesgo ${topRisk.toLowerCase()}).`
-        : 'No se proyecta cierre en próximas 24h.';
+        ? `Cierre probable en próximas 24h (riesgo ${topRisk.toLowerCase()}, índice máx ${num(maxIndex, 0)}).`
+        : `No se proyecta cierre en próximas 24h (índice promedio ${num(avgIndex, 0)}).`;
 
-      return { closeLikely, confidence, topRisk, drivers, summary };
+      return { closeLikely, confidence, topRisk, drivers, summary, samples };
     }
 
     function renderClosureOutlook(outlook) {
@@ -1778,8 +1998,8 @@
       errorEl.style.display = 'none';
       document.getElementById('weeklyStatus').textContent = 'Cargando...';
       try {
-        const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${CHONCHI.lat}&longitude=${CHONCHI.lon}&timezone=America/Santiago&current=temperature_2m,precipitation,weather_code,wind_speed_10m,wind_gusts_10m&hourly=precipitation,weather_code,wind_speed_10m,wind_gusts_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,wind_gusts_10m_max&forecast_days=7`;
-        const marineUrl = `https://marine-api.open-meteo.com/v1/marine?latitude=${CHONCHI.lat}&longitude=${CHONCHI.lon}&timezone=America/Santiago&hourly=wave_height&forecast_days=7`;
+        const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${CHONCHI.lat}&longitude=${CHONCHI.lon}&timezone=America/Santiago&current=temperature_2m,precipitation,weather_code,wind_speed_10m,wind_gusts_10m&hourly=precipitation,weather_code,wind_speed_10m,wind_gusts_10m,pressure_msl,cloud_cover,relative_humidity_2m,visibility&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,wind_gusts_10m_max&forecast_days=7`;
+        const marineUrl = `https://marine-api.open-meteo.com/v1/marine?latitude=${CHONCHI.lat}&longitude=${CHONCHI.lon}&timezone=America/Santiago&hourly=wave_height,wave_period,wave_direction&forecast_days=7`;
         const [weatherRes, marineRes] = await Promise.all([fetch(weatherUrl), fetch(marineUrl)]);
         if (!weatherRes.ok || !marineRes.ok) throw new Error('No se pudo consultar una de las APIs de pronóstico.');
         const weather = await weatherRes.json();
@@ -1803,6 +2023,8 @@
         renderTable(days);
         buildWeekChart(days);
         buildMarineChart(days);
+        buildClosureTimelineChart(closureOutlook.samples ?? []);
+        buildClosureDriversChart(closureOutlook.samples ?? []);
       } catch (error) {
         errorEl.textContent = `Error: ${error instanceof Error ? error.message : 'fallo desconocido'}`;
         errorEl.style.display = 'block';
