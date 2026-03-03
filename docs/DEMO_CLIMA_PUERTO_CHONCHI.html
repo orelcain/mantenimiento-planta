@@ -681,6 +681,146 @@
       .dm-big-status { font-size: 1.2rem; }
     }
 
+    /* ─── METEO SCHEDULE + COUNTDOWN + OPENING PROBABILITY ─── */
+    .meteo-schedule-card {
+      background: var(--card);
+      border-radius: 10px;
+      overflow: hidden;
+      position: relative;
+      margin-bottom: 16px;
+      border: 1px solid rgba(0,166,178,0.15);
+    }
+    .meteo-schedule-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--brand-primary), var(--brand-primary-dark));
+    }
+    .msc-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 20px 0;
+    }
+    .msc-body { padding: 14px 20px 18px; }
+    .msc-grid {
+      display: grid;
+      grid-template-columns: 200px 1fr 220px;
+      gap: 20px;
+      align-items: start;
+    }
+    .msc-label {
+      font-size: 0.68rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    /* Countdown */
+    .msc-countdown-side { text-align: center; }
+    .msc-countdown {
+      font-size: 2.2rem;
+      font-weight: 900;
+      color: var(--brand-primary);
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 2px;
+      line-height: 1.1;
+    }
+    .msc-countdown.urgent { color: var(--mid); }
+    .msc-countdown.imminent { color: var(--good); animation: pulseDot 1.5s ease-in-out infinite; }
+    .msc-countdown-sub {
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+    /* Schedule grid */
+    .msc-schedule-grid {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+    .msc-time-slot {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 8px 4px;
+      border-radius: 6px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.06);
+      transition: all 0.3s;
+    }
+    .msc-time-slot.past { opacity: 0.4; }
+    .msc-time-slot.current {
+      background: rgba(0,166,178,0.15);
+      border-color: var(--brand-primary);
+      box-shadow: 0 0 8px rgba(0,166,178,0.3);
+    }
+    .msc-time-slot.next {
+      background: rgba(244,201,93,0.1);
+      border-color: var(--mid);
+    }
+    .msc-time { font-size: 0.9rem; font-weight: 800; color: var(--text-bright); }
+    .msc-slot-label { font-size: 0.6rem; color: var(--muted); margin-top: 2px; }
+    .msc-note { font-size: 0.68rem; color: var(--muted); font-style: italic; }
+    .msc-last-update {
+      font-size: 0.72rem;
+      color: var(--brand-primary);
+      margin-top: 4px;
+      font-weight: 600;
+    }
+    /* Opening probability gauge */
+    .msc-opening-side { text-align: center; }
+    .msc-opening-gauge { display: flex; justify-content: center; margin-bottom: 6px; }
+    .msc-opening-ring { position: relative; width: 110px; height: 110px; }
+    .msc-ring-svg { width: 100%; height: 100%; }
+    .msc-opening-pct {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.6rem;
+      font-weight: 900;
+      color: var(--text-bright);
+    }
+    .msc-opening-label {
+      font-size: 0.82rem;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+    .msc-opening-label.open { color: var(--good); }
+    .msc-opening-label.restricted { color: var(--mid); }
+    .msc-opening-label.closed { color: var(--bad); }
+    .msc-opening-detail {
+      font-size: 0.72rem;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+    .msc-opening-windows {
+      margin-top: 6px;
+      font-size: 0.72rem;
+      color: var(--text);
+    }
+    .msc-window-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      margin: 2px;
+    }
+    .msc-window-tag.favorable { background: rgba(76,215,160,0.15); color: var(--good); }
+    .msc-window-tag.marginal { background: rgba(244,201,93,0.15); color: var(--mid); }
+    @media (max-width: 900px) {
+      .msc-grid { grid-template-columns: 1fr; }
+      .msc-schedule-grid { grid-template-columns: repeat(3, 1fr); }
+    }
+
     /* ─── PORT STATUS PANEL ─── */
     .port-status-card {
       background: var(--card);
@@ -1173,7 +1313,7 @@
       <img class="nav-logo-img" src="https://es.aquachile.com/wp-content/uploads/2024/05/Logo-Aqua.png" alt="AquaChile" />
       <span class="nav-logo">AquaChile</span>
       <div class="nav-divider"></div>
-      <span class="nav-title">Chonchi · Chiloé</span>
+      <span class="nav-title">Chonchi · Bahía de Yal · Chiloé</span>
     </div>
     <div class="nav-right">
       <span class="nav-badge" id="bgMode">--</span>
@@ -1217,7 +1357,10 @@
 
     <!-- ═══════════════ ESTADO DEL PUERTO ═══════════════ -->
     <section class="row">
-      <div class="row-title"><span class="accent-bar"></span>Estado del Puerto · Chonchi</div>
+      <div class="row-title"><span class="accent-bar"></span>Estado del Puerto · Chonchi — Bahía de Yal</div>
+      <div style="margin-bottom:12px;padding:8px 14px;background:rgba(0,166,178,0.08);border-left:3px solid var(--brand-primary);border-radius:0 6px 6px 0;font-size:0.82rem;color:var(--muted);line-height:1.4">
+        📍 <strong style="color:var(--text-bright)">Bahía de Yal, Chonchi</strong> — Centro de Acopio <strong style="color:var(--brand-primary)">Antarfood</strong> · Chiloé, Región de Los Lagos
+      </div>
 
       <!-- DIRECTEMAR OFICIAL — datos en vivo desde SITPORT -->
       <div class="directemar-panel dm-loading" id="dmPanel">
@@ -1265,6 +1408,56 @@
                 <span>·</span>
                 <span id="dmAutoRefresh">Auto-refresh: 5 min</span>
               </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Horario Meteo, Countdown & Probabilidad de Apertura -->
+      <div class="meteo-schedule-card" id="meteoScheduleCard">
+        <div class="msc-header">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:1.1rem">⏱️</span>
+            <span style="font-weight:800;font-size:0.88rem;color:var(--text-bright);letter-spacing:0.3px">HORARIO METEO · CAPITANÍA DE PUERTO</span>
+          </div>
+        </div>
+        <div class="msc-body">
+          <div class="msc-grid">
+            <!-- Countdown al próximo meteo -->
+            <div class="msc-countdown-side">
+              <div class="msc-label">Próxima actualización meteo</div>
+              <div class="msc-countdown" id="meteoCountdown">--:--:--</div>
+              <div class="msc-countdown-sub" id="meteoCountdownSub">Calculando...</div>
+            </div>
+            <!-- Horarios oficiales -->
+            <div class="msc-schedule-side">
+              <div class="msc-label">Horarios de observación — Estación Chonchi</div>
+              <div class="msc-schedule-grid" id="meteoScheduleGrid">
+                <div class="msc-time-slot" data-hour="6"><span class="msc-time">06:00</span><span class="msc-slot-label">Matutino</span></div>
+                <div class="msc-time-slot" data-hour="9"><span class="msc-time">09:00</span><span class="msc-slot-label">Media mañana</span></div>
+                <div class="msc-time-slot" data-hour="12"><span class="msc-time">12:00</span><span class="msc-slot-label">Mediodía</span></div>
+                <div class="msc-time-slot" data-hour="15"><span class="msc-time">15:00</span><span class="msc-slot-label">Tarde</span></div>
+                <div class="msc-time-slot" data-hour="18"><span class="msc-time">18:00</span><span class="msc-slot-label">Vespertino</span></div>
+                <div class="msc-time-slot" data-hour="21"><span class="msc-time">21:00</span><span class="msc-slot-label">Nocturno</span></div>
+              </div>
+              <div class="msc-note">Estación automática actualiza ~cada 30-60 min. Boletines oficiales en horarios sinópticos.</div>
+              <div class="msc-last-update" id="meteoLastUpdate">Última medición: consultando...</div>
+            </div>
+            <!-- Probabilidad de apertura -->
+            <div class="msc-opening-side" id="openingForecastSide">
+              <div class="msc-label">Probabilidad de apertura del puerto</div>
+              <div class="msc-opening-gauge">
+                <div class="msc-opening-ring" id="openingRing">
+                  <svg viewBox="0 0 120 120" class="msc-ring-svg">
+                    <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="10"/>
+                    <circle cx="60" cy="60" r="52" fill="none" stroke="var(--good)" stroke-width="10" stroke-linecap="round" stroke-dasharray="326.7" stroke-dashoffset="326.7" id="openingArc" transform="rotate(-90 60 60)"/>
+                  </svg>
+                  <div class="msc-opening-pct" id="openingPct">--%</div>
+                </div>
+              </div>
+              <div class="msc-opening-label" id="openingLabel">Evaluando condiciones...</div>
+              <div class="msc-opening-detail" id="openingDetail"></div>
+              <div class="msc-opening-windows" id="openingWindows"></div>
             </div>
           </div>
         </div>
@@ -2714,6 +2907,7 @@
           pressure: m.presion,
           rain: m.lluviaUltimaHora ?? 0,
           date: m.fecha ? new Date(m.fecha).toLocaleString('es-CL', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }) : null,
+          rawFecha: m.fecha ?? null,
           unidadViento: m.unidadViento ?? 'nds',
           unidadPresion: m.unidadPresion ?? 'hPa',
         };
@@ -2748,6 +2942,241 @@
       return parsed;
     }
 
+    /* ═══════════════════════════════════════════════════════════════
+       METEO SCHEDULE, COUNTDOWN & OPENING PROBABILITY
+       ═══════════════════════════════════════════════════════════════ */
+    const METEO_HOURS = [6, 9, 12, 15, 18, 21]; // Horas sinópticas locales estándar Capitanía
+    let _countdownInterval = null;
+    let _lastMeteoDate = null;
+
+    /**
+     * Calcula horarios del schedule meteo y destaca el slot actual/siguiente.
+     */
+    function updateMeteoScheduleUI(dm) {
+      const now = new Date();
+      const currentHour = now.getHours();
+      const currentMin = now.getMinutes();
+
+      // Actualizar última medición
+      const lastUpdateEl = document.getElementById('meteoLastUpdate');
+      if (dm && dm.medicion && dm.medicion.date) {
+        lastUpdateEl.innerHTML = `📡 Última medición estación: <strong>${dm.medicion.date}</strong>`;
+        _lastMeteoDate = dm.medicion.rawFecha ?? null;
+      } else {
+        lastUpdateEl.textContent = 'Última medición: sin datos';
+      }
+
+      // Highlight schedule slots
+      document.querySelectorAll('.msc-time-slot').forEach(slot => {
+        const h = parseInt(slot.dataset.hour, 10);
+        slot.classList.remove('past', 'current', 'next');
+        if (h < currentHour || (h === currentHour && currentMin > 30)) {
+          slot.classList.add('past');
+        }
+      });
+
+      // Find current and next meteo hour
+      let nextMeteoHour = METEO_HOURS.find(h => h > currentHour || (h === currentHour && currentMin <= 30));
+      let currentMeteoHour = null;
+      for (let i = METEO_HOURS.length - 1; i >= 0; i--) {
+        if (METEO_HOURS[i] < currentHour || (METEO_HOURS[i] === currentHour && currentMin > 0)) {
+          currentMeteoHour = METEO_HOURS[i];
+          break;
+        }
+      }
+
+      if (currentMeteoHour !== null) {
+        const slot = document.querySelector(`.msc-time-slot[data-hour="${currentMeteoHour}"]`);
+        if (slot) slot.classList.add('current');
+      }
+
+      if (!nextMeteoHour) nextMeteoHour = METEO_HOURS[0]; // Wrap to next day
+      const nextSlot = document.querySelector(`.msc-time-slot[data-hour="${nextMeteoHour}"]`);
+      if (nextSlot) {
+        nextSlot.classList.remove('past');
+        nextSlot.classList.add('next');
+      }
+
+      return nextMeteoHour;
+    }
+
+    /**
+     * Inicia countdown en vivo al próximo horario meteo.
+     */
+    function startMeteoCountdown(nextHour) {
+      if (_countdownInterval) clearInterval(_countdownInterval);
+
+      function tick() {
+        const now = new Date();
+        const target = new Date(now);
+        target.setHours(nextHour, 0, 0, 0);
+        if (target <= now) target.setDate(target.getDate() + 1);
+
+        const diff = target - now;
+        const h = Math.floor(diff / 3600000);
+        const m = Math.floor((diff % 3600000) / 60000);
+        const s = Math.floor((diff % 60000) / 1000);
+
+        const countdownEl = document.getElementById('meteoCountdown');
+        const subEl = document.getElementById('meteoCountdownSub');
+
+        const timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+        countdownEl.textContent = timeStr;
+
+        // Visual urgency
+        countdownEl.classList.remove('urgent', 'imminent');
+        if (diff < 600000) { // < 10 min
+          countdownEl.classList.add('imminent');
+          subEl.textContent = '¡Actualización meteo inminente!';
+        } else if (diff < 1800000) { // < 30 min
+          countdownEl.classList.add('urgent');
+          subEl.textContent = `Próximo boletín: ${String(nextHour).padStart(2, '0')}:00 hrs`;
+        } else {
+          subEl.textContent = `Próximo boletín: ${String(nextHour).padStart(2, '0')}:00 hrs`;
+        }
+      }
+
+      tick();
+      _countdownInterval = setInterval(tick, 1000);
+    }
+
+    /**
+     * Calcula y renderiza la probabilidad de apertura del puerto.
+     * Inverso de la probabilidad de cierre, enriquecido con DIRECTEMAR data.
+     */
+    function renderOpeningProbability(dm, closureOutlook) {
+      const pctEl = document.getElementById('openingPct');
+      const arcEl = document.getElementById('openingArc');
+      const labelEl = document.getElementById('openingLabel');
+      const detailEl = document.getElementById('openingDetail');
+      const windowsEl = document.getElementById('openingWindows');
+      const circumference = 2 * Math.PI * 52; // ~326.7
+
+      const dmRestricted = dm && dm.found && dm.restricciones > 0;
+      const dmOpen = dm && dm.found && dm.restricciones === 0;
+
+      let openProb;
+      let statusClass;
+      let labelText;
+      let detailText;
+
+      if (!closureOutlook) {
+        // No weather data yet
+        openProb = dmOpen ? 75 : dmRestricted ? 25 : 50;
+        statusClass = dmOpen ? 'open' : dmRestricted ? 'restricted' : '';
+        labelText = dmOpen ? 'Puerto actualmente ABIERTO' : dmRestricted ? 'Puerto con RESTRICCIÓN' : 'Evaluando...';
+        detailText = 'Sin datos de pronóstico disponibles para calcular probabilidad.';
+      } else if (dmRestricted) {
+        // Puerto cerrado/restringido — calcular probabilidad de que ABRA
+        const closePct = closureOutlook.closeProbability;
+        const restrictPct = closureOutlook.restrictProbability;
+        // La probabilidad de apertura es inversa: cuanto menor sea la prob de cierre, más probable que abra
+        openProb = Math.max(3, Math.min(85, 100 - restrictPct));
+        statusClass = openProb >= 50 ? 'open' : openProb >= 25 ? 'restricted' : 'closed';
+
+        if (openProb >= 50) {
+          labelText = '🟢 Condiciones mejorando';
+          detailText = `Pronóstico indica mejoría. Prob. cierre: ${closePct}%, restricción: ${restrictPct}%. La Capitanía podría levantar restricciones en próximo boletín.`;
+        } else if (openProb >= 25) {
+          labelText = '🟡 Apertura parcial posible';
+          detailText = `Condiciones aún adversas. Prob. cierre: ${closePct}%, restricción: ${restrictPct}%. Monitorear próximo boletín DIRECTEMAR.`;
+        } else {
+          labelText = '🔴 Apertura poco probable';
+          detailText = `Condiciones severas persisten. Prob. cierre: ${closePct}%, restricción: ${restrictPct}%. Esperar mejoría significativa.`;
+        }
+      } else {
+        // Puerto abierto — probabilidad de que siga abierto
+        const closePct = closureOutlook.closeProbability;
+        const restrictPct = closureOutlook.restrictProbability;
+        openProb = Math.max(5, Math.min(97, 100 - closePct));
+        statusClass = openProb >= 60 ? 'open' : openProb >= 35 ? 'restricted' : 'closed';
+
+        if (openProb >= 60) {
+          labelText = '✅ Se mantiene abierto';
+          detailText = `Condiciones estables. Prob. cierre próx 24h: ${closePct}%. Operación normal.`;
+        } else if (openProb >= 35) {
+          labelText = '⚠️ Cierre posible próximas horas';
+          detailText = `Deterioro esperado. Prob. cierre: ${closePct}%, restricción: ${restrictPct}%. Planificar contingencia.`;
+        } else {
+          labelText = '🚨 Cierre probable pronto';
+          detailText = `Deterioro inminente. Prob. cierre: ${closePct}%. Limitar salidas y preparar plan de cierre.`;
+        }
+      }
+
+      // Render gauge arc
+      const offset = circumference - (circumference * openProb / 100);
+      arcEl.style.strokeDashoffset = offset;
+      const arcColor = openProb >= 60 ? 'var(--good)' : openProb >= 30 ? 'var(--mid)' : 'var(--bad)';
+      arcEl.style.stroke = arcColor;
+
+      pctEl.textContent = openProb + '%';
+      pctEl.style.color = arcColor;
+      labelEl.textContent = labelText;
+      labelEl.className = 'msc-opening-label ' + statusClass;
+      detailEl.textContent = detailText;
+
+      // Ventanas de navegación favorables
+      if (closureOutlook && closureOutlook.samples && closureOutlook.samples.length > 0) {
+        const goodWindows = findFavorableWindows(closureOutlook.samples);
+        if (goodWindows.length > 0) {
+          windowsEl.innerHTML = '<div style="font-size:0.65rem;color:var(--muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.5px;font-weight:700">Ventanas favorables (próx. 24h)</div>' +
+            goodWindows.map(w => {
+              const cls = w.quality === 'buena' ? 'favorable' : 'marginal';
+              return `<span class="msc-window-tag ${cls}">${w.icon} ${w.from}–${w.to}</span>`;
+            }).join('');
+        } else {
+          windowsEl.innerHTML = '<div style="font-size:0.68rem;color:var(--muted);font-style:italic">Sin ventanas favorables en próximas 24h</div>';
+        }
+      } else {
+        windowsEl.innerHTML = '';
+      }
+    }
+
+    /**
+     * Encuentra ventanas horarias con riesgo bajo/medio en las próximas 24h.
+     */
+    function findFavorableWindows(samples) {
+      const windows = [];
+      let currentWindow = null;
+
+      for (const s of samples) {
+        const favorable = (s.riskIndex ?? 100) < 40;
+        const marginal = !favorable && (s.riskIndex ?? 100) < 55;
+
+        if (favorable || marginal) {
+          if (!currentWindow) {
+            currentWindow = {
+              from: formatHourLabel(s.time),
+              to: formatHourLabel(s.time),
+              quality: favorable ? 'buena' : 'marginal',
+              icon: favorable ? '🟢' : '🟡',
+              count: 1
+            };
+          } else {
+            currentWindow.to = formatHourLabel(s.time);
+            currentWindow.count++;
+            if (favorable) { currentWindow.quality = 'buena'; currentWindow.icon = '🟢'; }
+          }
+        } else {
+          if (currentWindow && currentWindow.count >= 2) {
+            windows.push(currentWindow);
+          }
+          currentWindow = null;
+        }
+      }
+      if (currentWindow && currentWindow.count >= 2) windows.push(currentWindow);
+      return windows.slice(0, 4);
+    }
+
+    /**
+     * Renderiza todo el bloque de horario meteo + countdown + apertura
+     */
+    function renderMeteoScheduleBlock(dm, closureOutlook) {
+      const nextHour = updateMeteoScheduleUI(dm);
+      startMeteoCountdown(nextHour);
+      renderOpeningProbability(dm, closureOutlook);
+    }
+
     function renderDirectemarPanel(dm) {
       const panel = document.getElementById('dmPanel');
       const badge = document.getElementById('dmBadge');
@@ -2755,6 +3184,9 @@
       const status = document.getElementById('dmStatus');
       const restr = document.getElementById('dmRestricciones');
       const medicion = document.getElementById('dmMedicion');
+
+      // Bahía de Yal subtitle under status
+      const locationHtml = '<div style="font-size:0.72rem;color:var(--muted);margin-top:2px">📍 Bahía de Yal · Centro de Acopio Antarfood</div>';
       const restrTags = document.getElementById('dmRestrTags');
       const nearby = document.getElementById('dmNearby');
       const ts = document.getElementById('dmTimestamp');
@@ -2783,7 +3215,7 @@
       badge.textContent = hasRestr ? '🔴 EN VIVO' : '🟢 EN VIVO';
       icon.textContent = hasRestr ? '⛔' : '⚓';
       status.className = 'dm-big-status ' + (hasRestr ? 'restricted' : 'open');
-      status.textContent = hasRestr ? '🚫 CON RESTRICCIÓN' : '✅ ABIERTO';
+      status.innerHTML = (hasRestr ? '🚫 CON RESTRICCIÓN' : '✅ ABIERTO') + locationHtml;
       restr.className = 'dm-restricciones ' + (hasRestr ? 'has' : 'none');
       restr.textContent = hasRestr
         ? `${dm.restricciones} restriccion${dm.restricciones > 1 ? 'es' : ''} activa${dm.restricciones > 1 ? 's' : ''}`
@@ -2859,6 +3291,7 @@
         try {
           const dm = await fetchDirectemarStatus(true);
           renderDirectemarPanel(dm);
+          renderMeteoScheduleBlock(dm, null);
         } catch (_) {}
       }, 5 * 60 * 1000);
     }
@@ -2907,6 +3340,7 @@
         const dm = await dmPromise;
         renderDirectemarPanel(dm);
         checkDirectemarConflict(dm, portNow);
+        renderMeteoScheduleBlock(dm, closureOutlook);
       } catch (error) {
         errorEl.textContent = `Error: ${error instanceof Error ? error.message : 'fallo desconocido'}`;
         errorEl.style.display = 'block';
@@ -2914,6 +3348,7 @@
         // Aun así intentar mostrar DIRECTEMAR si se pudo obtener
         const dm = await dmPromise;
         renderDirectemarPanel(dm);
+        renderMeteoScheduleBlock(dm, null);
       }
     }
 
