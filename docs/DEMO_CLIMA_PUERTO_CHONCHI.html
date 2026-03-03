@@ -3037,17 +3037,47 @@
     /* ═══════════════════════════════════════════════════════════════
        METEO SCHEDULE, COUNTDOWN & OPENING PROBABILITY
        ═══════════════════════════════════════════════════════════════ */
-    const METEO_HOURS = [6, 9, 12, 15, 18, 21]; // Horas sinópticas locales estándar Capitanía
+    const METEO_HOURS = [6, 9, 12, 15, 18, 21]; // Horas sinópticas locales Chile estándar Capitanía
     let _countdownInterval = null;
     let _lastMeteoDate = null;
+
+    /** Obtiene hora actual en zona Chile (America/Santiago) */
+    function getChileNow() {
+      const fmt = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/Santiago',
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit',
+        hour12: false
+      });
+      const parts = {};
+      fmt.formatToParts(new Date()).forEach(p => { parts[p.type] = p.value; });
+      return {
+        hour: parseInt(parts.hour, 10),
+        minute: parseInt(parts.minute, 10),
+        second: parseInt(parts.second, 10),
+        year: parseInt(parts.year, 10),
+        month: parseInt(parts.month, 10) - 1,
+        day: parseInt(parts.day, 10),
+      };
+    }
+
+    /** Calcula ms hasta la próxima hora meteo en zona Chile */
+    function msUntilNextMeteoHour(nextHour) {
+      const cl = getChileNow();
+      // ms transcurridos hoy en Chile
+      const nowMs = (cl.hour * 3600 + cl.minute * 60 + cl.second) * 1000;
+      let targetMs = nextHour * 3600 * 1000;
+      if (targetMs <= nowMs) targetMs += 24 * 3600 * 1000; // mañana
+      return targetMs - nowMs;
+    }
 
     /**
      * Calcula horarios del schedule meteo y destaca el slot actual/siguiente.
      */
     function updateMeteoScheduleUI(dm) {
-      const now = new Date();
-      const currentHour = now.getHours();
-      const currentMin = now.getMinutes();
+      const cl = getChileNow();
+      const currentHour = cl.hour;
+      const currentMin = cl.minute;
 
       // Actualizar última medición
       const lastUpdateEl = document.getElementById('meteoLastUpdate');
@@ -3067,7 +3097,7 @@
         }
       });
 
-      // Find current and next meteo hour
+      // Find current and next meteo hour (hora Chile)
       let nextMeteoHour = METEO_HOURS.find(h => h > currentHour || (h === currentHour && currentMin <= 30));
       let currentMeteoHour = null;
       for (let i = METEO_HOURS.length - 1; i >= 0; i--) {
@@ -3099,12 +3129,7 @@
       if (_countdownInterval) clearInterval(_countdownInterval);
 
       function tick() {
-        const now = new Date();
-        const target = new Date(now);
-        target.setHours(nextHour, 0, 0, 0);
-        if (target <= now) target.setDate(target.getDate() + 1);
-
-        const diff = target - now;
+        const diff = msUntilNextMeteoHour(nextHour);
         const h = Math.floor(diff / 3600000);
         const m = Math.floor((diff % 3600000) / 60000);
         const s = Math.floor((diff % 60000) / 1000);
@@ -3115,6 +3140,15 @@
         const timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
         countdownEl.textContent = timeStr;
 
+        // Si el countdown pasa de 0, recalcular siguiente hora
+        if (diff <= 0) {
+          const cl = getChileNow();
+          const newNext = METEO_HOURS.find(hr => hr > cl.hour || (hr === cl.hour && cl.minute <= 30)) ?? METEO_HOURS[0];
+          if (newNext !== nextHour) {
+            nextHour = newNext;
+          }
+        }
+
         // Visual urgency
         countdownEl.classList.remove('urgent', 'imminent');
         if (diff < 600000) { // < 10 min
@@ -3122,9 +3156,9 @@
           subEl.textContent = '¡Actualización meteo inminente!';
         } else if (diff < 1800000) { // < 30 min
           countdownEl.classList.add('urgent');
-          subEl.textContent = `Próximo boletín: ${String(nextHour).padStart(2, '0')}:00 hrs`;
+          subEl.textContent = `Próximo boletín: ${String(nextHour).padStart(2, '0')}:00 hrs (Chile)`;
         } else {
-          subEl.textContent = `Próximo boletín: ${String(nextHour).padStart(2, '0')}:00 hrs`;
+          subEl.textContent = `Próximo boletín: ${String(nextHour).padStart(2, '0')}:00 hrs (Chile)`;
         }
       }
 
@@ -3258,15 +3292,6 @@
       }
       if (currentWindow && currentWindow.count >= 2) windows.push(currentWindow);
       return windows.slice(0, 4);
-    }
-
-    /**
-     * Renderiza todo el bloque de horario meteo + countdown + apertura
-     */
-    function renderMeteoScheduleBlock(dm, closureOutlook) {
-      const nextHour = updateMeteoScheduleUI(dm);
-      startMeteoCountdown(nextHour);
-      renderOpeningProbability(dm, closureOutlook);
     }
 
     /**
