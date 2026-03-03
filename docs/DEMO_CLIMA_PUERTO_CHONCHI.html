@@ -426,6 +426,13 @@
       margin-bottom: 12px;
     }
 
+    .chart-range-hint {
+      margin: -4px 0 10px;
+      font-size: 0.74rem;
+      color: var(--muted);
+      letter-spacing: 0.2px;
+    }
+
     .chart-wrap {
       position: relative;
       height: 280px;
@@ -1063,10 +1070,12 @@
       <div class="charts-grid">
         <div class="chart-card">
           <h3>Meteograma 7 Días · Viento / Racha / Lluvia</h3>
+          <div class="chart-range-hint">Rangos viento/racha: <strong>0–34 normal</strong> · <strong>35–54 atención</strong> · <strong>55+ cierre probable</strong></div>
           <div class="chart-wrap"><canvas id="weekChart"></canvas></div>
         </div>
         <div class="chart-card">
           <h3>Mar + Temperatura · 7 Días</h3>
+          <div class="chart-range-hint">Rangos oleaje: <strong>0–1.79 m normal</strong> · <strong>1.8–2.49 m atención</strong> · <strong>2.5+ cierre probable</strong></div>
           <div class="chart-wrap"><canvas id="marineChart"></canvas></div>
         </div>
       </div>
@@ -1286,6 +1295,80 @@
       tooltipBorder: 'rgba(255,255,255,0.12)',
     };
 
+    const PORT_LIMITS = {
+      windAttention: 35,
+      windCloseLikely: 55,
+      gustClose: 55,
+      windCloseHard: 45,
+      waveAttention: 1.8,
+      waveCloseLikely: 2.5,
+      waveHard: 3.5,
+    };
+
+    const rangeBandPlugin = {
+      id: 'rangeBandPlugin',
+      beforeDatasetsDraw(chart, _args, options) {
+        if (!options?.enabled) return;
+        const axis = chart.scales?.[options.axisId];
+        if (!axis) return;
+        const { ctx, chartArea } = chart;
+        if (!chartArea) return;
+
+        const drawBand = (from, to, color) => {
+          const safeFrom = Math.max(from, axis.min);
+          const safeTo = Math.min(to, axis.max);
+          if (safeFrom >= safeTo) return;
+          const yFrom = axis.getPixelForValue(safeFrom);
+          const yTo = axis.getPixelForValue(safeTo);
+          const top = Math.min(yFrom, yTo);
+          const height = Math.abs(yTo - yFrom);
+          if (height <= 0) return;
+          ctx.save();
+          ctx.fillStyle = color;
+          ctx.fillRect(chartArea.left, top, chartArea.right - chartArea.left, height);
+          ctx.restore();
+        };
+
+        for (const band of options.bands ?? []) {
+          drawBand(band.from, band.to, band.color);
+        }
+      },
+      afterDraw(chart, _args, options) {
+        if (!options?.enabled) return;
+        const axis = chart.scales?.[options.axisId];
+        const { ctx, chartArea } = chart;
+        if (!axis || !chartArea) return;
+
+        for (const marker of options.markers ?? []) {
+          if (marker.value < axis.min || marker.value > axis.max) continue;
+          const y = axis.getPixelForValue(marker.value);
+          ctx.save();
+          ctx.strokeStyle = marker.color;
+          ctx.lineWidth = 1.2;
+          ctx.setLineDash([5, 4]);
+          ctx.beginPath();
+          ctx.moveTo(chartArea.left, y);
+          ctx.lineTo(chartArea.right, y);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.fillStyle = marker.color;
+          ctx.font = '700 11px Inter';
+          ctx.textAlign = 'right';
+          ctx.fillText(marker.label, chartArea.right - 6, y - 4);
+          ctx.restore();
+        }
+      }
+    };
+
+    Chart.register(rangeBandPlugin);
+
+    function remainingToThreshold(value, threshold, unit, decimals = 0) {
+      const numeric = Number(value ?? 0);
+      if (!Number.isFinite(numeric)) return 'sin dato';
+      if (numeric >= threshold) return `umbral superado (${threshold}${unit})`;
+      return `faltan ${num(threshold - numeric, decimals)}${unit} para ${threshold}${unit}`;
+    }
+
     function buildWeekChart(days) {
       const labels = days.map((d) => toCLDate(d.date));
       const rain = days.map((d) => Number(d.rain ?? 0));
@@ -1319,7 +1402,39 @@
           interaction: { mode: 'index', intersect: false },
           plugins: {
             legend: { labels: { color: '#e5e5e5', font: { weight: 600 } } },
-            tooltip: { backgroundColor: NF.tooltipBg, borderColor: NF.tooltipBorder, borderWidth: 1, titleColor: '#fff', bodyColor: '#ccc' }
+            tooltip: {
+              backgroundColor: NF.tooltipBg,
+              borderColor: NF.tooltipBorder,
+              borderWidth: 1,
+              titleColor: '#fff',
+              bodyColor: '#ccc',
+              callbacks: {
+                afterLabel(context) {
+                  const label = context.dataset.label ?? '';
+                  const value = context.parsed.y;
+                  if (label.includes('Viento máx')) {
+                    return `Cierre técnico: ${remainingToThreshold(value, PORT_LIMITS.windCloseHard, ' km/h')}`;
+                  }
+                  if (label.includes('Racha máx')) {
+                    return `Cierre probable: ${remainingToThreshold(value, PORT_LIMITS.gustClose, ' km/h')}`;
+                  }
+                  return '';
+                }
+              }
+            },
+            rangeBandPlugin: {
+              enabled: true,
+              axisId: 'yWind',
+              bands: [
+                { from: 0, to: PORT_LIMITS.windAttention, color: 'rgba(76,215,160,0.07)' },
+                { from: PORT_LIMITS.windAttention, to: PORT_LIMITS.windCloseLikely, color: 'rgba(244,201,93,0.08)' },
+                { from: PORT_LIMITS.windCloseLikely, to: 90, color: 'rgba(255,107,107,0.10)' },
+              ],
+              markers: [
+                { value: PORT_LIMITS.windAttention, color: '#f4c95d', label: 'Atención 35' },
+                { value: PORT_LIMITS.windCloseLikely, color: '#ff6b6b', label: 'Cierre 55' },
+              ]
+            }
           },
           scales: {
             x: { ticks: { color: NF.ticks }, grid: { color: NF.grid } },
@@ -1351,7 +1466,38 @@
           interaction: { mode: 'index', intersect: false },
           plugins: {
             legend: { labels: { color: '#e5e5e5', font: { weight: 600 } } },
-            tooltip: { backgroundColor: NF.tooltipBg, borderColor: NF.tooltipBorder, borderWidth: 1, titleColor: '#fff', bodyColor: '#ccc' }
+            tooltip: {
+              backgroundColor: NF.tooltipBg,
+              borderColor: NF.tooltipBorder,
+              borderWidth: 1,
+              titleColor: '#fff',
+              bodyColor: '#ccc',
+              callbacks: {
+                afterLabel(context) {
+                  const label = context.dataset.label ?? '';
+                  const value = context.parsed.y;
+                  if (label.includes('Ola máx')) {
+                    const toProbable = remainingToThreshold(value, PORT_LIMITS.waveCloseLikely, ' m', 2);
+                    const toHard = remainingToThreshold(value, PORT_LIMITS.waveHard, ' m', 2);
+                    return [`Cierre probable: ${toProbable}`, `Crítico alto: ${toHard}`];
+                  }
+                  return '';
+                }
+              }
+            },
+            rangeBandPlugin: {
+              enabled: true,
+              axisId: 'yWave',
+              bands: [
+                { from: 0, to: PORT_LIMITS.waveAttention, color: 'rgba(76,215,160,0.07)' },
+                { from: PORT_LIMITS.waveAttention, to: PORT_LIMITS.waveCloseLikely, color: 'rgba(244,201,93,0.08)' },
+                { from: PORT_LIMITS.waveCloseLikely, to: 5, color: 'rgba(255,107,107,0.10)' },
+              ],
+              markers: [
+                { value: PORT_LIMITS.waveAttention, color: '#f4c95d', label: 'Atención 1.8m' },
+                { value: PORT_LIMITS.waveCloseLikely, color: '#ff6b6b', label: 'Cierre 2.5m' },
+              ]
+            }
           },
           scales: {
             x: { ticks: { color: NF.ticks }, grid: { color: NF.grid } },
