@@ -135,6 +135,61 @@
     .gadget .k { color: var(--muted); font-size: 0.78rem; }
     .gadget .v { font-size: 1.05rem; font-weight: 700; margin-top: 3px; }
 
+    .map-section {
+      grid-column: span 12;
+      padding: 0;
+      overflow: hidden;
+      border-radius: 16px;
+    }
+
+    .map-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 12px 14px;
+    }
+
+    .map-header h2 {
+      margin: 0;
+      font-size: 1rem;
+      color: #d7e9ff;
+    }
+
+    .layer-btns {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .layer-btn {
+      border: 1px solid rgba(100, 160, 240, 0.35);
+      color: #b8d4f5;
+      background: rgba(20, 40, 70, 0.6);
+      border-radius: 8px;
+      padding: 5px 11px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+
+    .layer-btn:hover { background: rgba(40, 80, 140, 0.5); }
+    .layer-btn.active {
+      background: linear-gradient(135deg, #1e6ddb, #3b8bff);
+      color: #fff;
+      border-color: #5ea4ff;
+      box-shadow: 0 0 10px rgba(60, 140, 255, 0.35);
+    }
+
+    .map-frame {
+      width: 100%;
+      height: 480px;
+      border: none;
+      display: block;
+    }
+
     .panel {
       padding: 12px;
       min-height: 330px;
@@ -220,10 +275,14 @@
     @media (max-width: 1024px) {
       .panel.main, .panel.side { grid-column: span 12; }
       .gadgets { grid-template-columns: repeat(3, minmax(120px, 1fr)); }
+      .map-frame { height: 400px; }
     }
 
     @media (max-width: 640px) {
       .gadgets { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
+      .map-frame { height: 320px; }
+      .layer-btns { gap: 4px; }
+      .layer-btn { padding: 4px 8px; font-size: 0.72rem; }
     }
   </style>
 </head>
@@ -251,6 +310,28 @@
         <article class="gadget"><div class="k">Viento ahora</div><div class="v" id="nowWind">-</div></article>
         <article class="gadget"><div class="k">Racha semanal máx</div><div class="v" id="maxGust">-</div></article>
         <article class="gadget"><div class="k">Ola semanal máx</div><div class="v" id="maxWave">-</div></article>
+      </section>
+
+      <!-- MAPA EN VIVO ESTILO WINDGURU -->
+      <section class="glass map-section">
+        <div class="map-header">
+          <h2>🌊 Mapa en vivo · Chiloé / Golfo de Corcovado</h2>
+          <div class="layer-btns">
+            <button class="layer-btn active" data-layer="wind" title="Ver viento en tiempo real">💨 Viento</button>
+            <button class="layer-btn" data-layer="rain" title="Precipitación/lluvia">🌧️ Lluvia</button>
+            <button class="layer-btn" data-layer="waves" title="Oleaje marino">🌊 Oleaje</button>
+            <button class="layer-btn" data-layer="temp" title="Temperatura superficial">🌡️ Temperatura</button>
+            <button class="layer-btn" data-layer="clouds" title="Cobertura nubosa">☁️ Nubes</button>
+            <button class="layer-btn" data-layer="pressure" title="Presión atmosférica">📊 Presión</button>
+          </div>
+        </div>
+        <iframe
+          id="windyMap"
+          class="map-frame"
+          src="https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=mm&metricTemp=%C2%B0C&metricWind=km%2Fh&zoom=8&overlay=wind&product=ecmwf&level=surface&lat=-42.62&lon=-73.77&detailLat=-42.62&detailLon=-73.77&marker=true&message=true"
+          allowfullscreen
+          loading="lazy"
+        ></iframe>
       </section>
 
       <section class="glass panel main">
@@ -679,6 +760,21 @@
         document.getElementById('weeklyStatus').textContent = 'Sin datos';
       }
     }
+
+    // ─── WINDY MAP LAYER TOGGLE ───
+    const WINDY_BASE = 'https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=mm&metricTemp=%C2%B0C&metricWind=km%2Fh&zoom=8&product=ecmwf&level=surface&lat=-42.62&lon=-73.77&detailLat=-42.62&detailLon=-73.77&marker=true&message=true';
+
+    function setWindyLayer(layer) {
+      const iframe = document.getElementById('windyMap');
+      iframe.src = WINDY_BASE + '&overlay=' + layer;
+      document.querySelectorAll('.layer-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.layer === layer);
+      });
+    }
+
+    document.querySelectorAll('.layer-btn').forEach(btn => {
+      btn.addEventListener('click', () => setWindyLayer(btn.dataset.layer));
+    });
 
     document.getElementById('reloadBtn').addEventListener('click', loadData);
     initFxCanvas();
