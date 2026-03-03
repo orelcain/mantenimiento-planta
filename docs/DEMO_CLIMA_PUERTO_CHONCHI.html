@@ -1,0 +1,688 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Meteograma Puerto · Chonchi (Chiloé)</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg1: #07101d;
+      --bg2: #0a1424;
+      --card: rgba(10, 22, 39, 0.82);
+      --card-border: rgba(100, 145, 210, 0.2);
+      --text: #e8f2ff;
+      --muted: #9bb3d6;
+      --accent: #55b2ff;
+      --good: #22c55e;
+      --mid: #f59e0b;
+      --bad: #ef4444;
+      --line: rgba(142, 175, 226, 0.22);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      color: var(--text);
+      background: radial-gradient(1200px 900px at 20% -10%, #15345f 0%, transparent 50%),
+                  radial-gradient(1000px 700px at 120% 0%, #0f2f54 0%, transparent 45%),
+                  linear-gradient(180deg, var(--bg1), var(--bg2));
+      overflow-x: hidden;
+    }
+
+    body.rain {
+      background: radial-gradient(1200px 900px at 20% -10%, #243f63 0%, transparent 50%),
+                  radial-gradient(1000px 700px at 120% 0%, #1a3557 0%, transparent 45%),
+                  linear-gradient(180deg, #050b15, #0a1220);
+    }
+
+    #fxCanvas {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      opacity: 0.85;
+    }
+
+    .wrap {
+      position: relative;
+      z-index: 1;
+      width: min(1320px, calc(100% - 24px));
+      margin: 12px auto 28px;
+    }
+
+    .glass {
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      backdrop-filter: blur(7px);
+      box-shadow: 0 8px 34px rgba(0, 0, 0, 0.28);
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px;
+    }
+
+    .title {
+      margin: 0;
+      font-size: 1.2rem;
+      letter-spacing: 0.2px;
+    }
+
+    .subtitle {
+      margin: 2px 0 0;
+      color: var(--muted);
+      font-size: 0.87rem;
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .badge {
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      padding: 5px 10px;
+      font-size: 0.78rem;
+      color: #cfe3ff;
+      background: rgba(12, 30, 54, 0.8);
+    }
+
+    button {
+      border: 1px solid #2d4e79;
+      color: #edf5ff;
+      background: linear-gradient(180deg, #20406b, #163053);
+      border-radius: 10px;
+      padding: 8px 12px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    button:hover { filter: brightness(1.08); }
+
+    .grid {
+      margin-top: 12px;
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 12px;
+    }
+
+    .gadgets {
+      grid-column: span 12;
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(6, minmax(120px, 1fr));
+      padding: 12px;
+    }
+
+    .gadget {
+      padding: 10px;
+      border-radius: 12px;
+      background: rgba(12, 26, 44, 0.75);
+      border: 1px solid rgba(116, 153, 214, 0.2);
+    }
+
+    .gadget .k { color: var(--muted); font-size: 0.78rem; }
+    .gadget .v { font-size: 1.05rem; font-weight: 700; margin-top: 3px; }
+
+    .panel {
+      padding: 12px;
+      min-height: 330px;
+    }
+
+    .panel h2 {
+      margin: 0 0 8px;
+      font-size: 0.98rem;
+      color: #d7e9ff;
+    }
+
+    .panel.main { grid-column: span 8; }
+    .panel.side { grid-column: span 4; }
+
+    .chart-wrap { position: relative; height: 270px; }
+
+    .table-panel {
+      grid-column: span 12;
+      padding: 8px;
+      overflow: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+      overflow: hidden;
+      border-radius: 12px;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 9px 10px;
+      border-bottom: 1px solid rgba(123, 160, 219, 0.17);
+      white-space: nowrap;
+    }
+
+    th {
+      color: #d7e8ff;
+      background: rgba(12, 28, 48, 0.8);
+      position: sticky;
+      top: 0;
+    }
+
+    tr:last-child td { border-bottom: none; }
+
+    .chip {
+      display: inline-block;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      padding: 3px 8px;
+      border: 1px solid transparent;
+      font-weight: 600;
+    }
+
+    .risk-low { color: #8df8b8; background: rgba(20, 78, 48, 0.5); border-color: rgba(87, 213, 146, 0.4); }
+    .risk-mid { color: #fde68a; background: rgba(121, 66, 13, 0.45); border-color: rgba(245, 195, 100, 0.4); }
+    .risk-high { color: #fecaca; background: rgba(120, 33, 43, 0.45); border-color: rgba(252, 132, 147, 0.4); }
+
+    .warn {
+      margin-top: 12px;
+      border-left: 3px solid var(--mid);
+      border-radius: 10px;
+      padding: 10px 12px;
+      color: #fef3c7;
+      background: rgba(55, 40, 19, 0.65);
+      font-size: 0.86rem;
+    }
+
+    .err {
+      margin-top: 10px;
+      display: none;
+      border-left: 3px solid var(--bad);
+      border-radius: 10px;
+      padding: 10px 12px;
+      color: #fecdd3;
+      background: rgba(73, 21, 30, 0.65);
+      font-size: 0.86rem;
+    }
+
+    .small { color: var(--muted); font-size: 0.8rem; }
+
+    @media (max-width: 1024px) {
+      .panel.main, .panel.side { grid-column: span 12; }
+      .gadgets { grid-template-columns: repeat(3, minmax(120px, 1fr)); }
+    }
+
+    @media (max-width: 640px) {
+      .gadgets { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="fxCanvas"></canvas>
+
+  <main class="wrap">
+    <section class="glass topbar">
+      <div>
+        <h1 class="title">Meteograma operativo · Puerto Chonchi</h1>
+        <p class="subtitle">Estilo Windguru · Open‑Meteo Weather + Marine · Chiloé, Chile</p>
+      </div>
+      <div class="toolbar">
+        <span class="badge" id="bgMode">Fondo: --</span>
+        <span class="badge" id="nowCode">Condición actual: --</span>
+        <button id="reloadBtn">Actualizar</button>
+      </div>
+    </section>
+
+    <section class="grid">
+      <section class="glass gadgets">
+        <article class="gadget"><div class="k">Estado semanal</div><div class="v" id="weeklyStatus">Cargando...</div></article>
+        <article class="gadget"><div class="k">Riesgo alto (días)</div><div class="v" id="highDays">-</div></article>
+        <article class="gadget"><div class="k">Lluvia ahora</div><div class="v" id="nowRain">-</div></article>
+        <article class="gadget"><div class="k">Viento ahora</div><div class="v" id="nowWind">-</div></article>
+        <article class="gadget"><div class="k">Racha semanal máx</div><div class="v" id="maxGust">-</div></article>
+        <article class="gadget"><div class="k">Ola semanal máx</div><div class="v" id="maxWave">-</div></article>
+      </section>
+
+      <section class="glass panel main">
+        <h2>Meteograma 7 días (viento / racha / lluvia)</h2>
+        <div class="chart-wrap"><canvas id="weekChart"></canvas></div>
+      </section>
+
+      <section class="glass panel side">
+        <h2>Mar + temperatura (7 días)</h2>
+        <div class="chart-wrap"><canvas id="marineChart"></canvas></div>
+      </section>
+
+      <section class="glass table-panel">
+        <table>
+          <thead>
+            <tr>
+              <th>Día</th>
+              <th>Tiempo</th>
+              <th>T° min/max</th>
+              <th>Lluvia</th>
+              <th>Viento máx.</th>
+              <th>Racha máx.</th>
+              <th>Ola máx.</th>
+              <th>Riesgo puerto</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </section>
+    </section>
+
+    <p class="small" id="updatedAt"></p>
+    <div class="warn">
+      Estimación orientativa para planificación. El cierre real de puerto debe validarse con DIRECTEMAR / Capitanía de Puerto y avisos oficiales vigentes.
+    </div>
+    <div id="error" class="err"></div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
+  <script>
+    const CHONCHI = { lat: -42.62, lon: -73.77 };
+
+    const weatherCodeMap = {
+      0: 'Despejado', 1: 'Mayormente despejado', 2: 'Parcial nublado', 3: 'Nublado',
+      45: 'Niebla', 48: 'Niebla con escarcha',
+      51: 'Llovizna leve', 53: 'Llovizna', 55: 'Llovizna intensa',
+      61: 'Lluvia leve', 63: 'Lluvia', 65: 'Lluvia intensa',
+      71: 'Nieve leve', 73: 'Nieve', 75: 'Nieve intensa',
+      80: 'Chubascos leves', 81: 'Chubascos', 82: 'Chubascos intensos',
+      95: 'Tormenta', 96: 'Tormenta con granizo', 99: 'Tormenta severa'
+    };
+
+    const rainyCodes = new Set([51, 53, 55, 61, 63, 65, 80, 81, 82, 95, 96, 99]);
+
+    let weekChart;
+    let marineChart;
+
+    const fx = {
+      mode: 'clear',
+      canvas: null,
+      ctx: null,
+      w: 0,
+      h: 0,
+      drops: [],
+      particles: [],
+      rafId: 0,
+    };
+
+    function toCLDate(isoDate) {
+      return new Date(isoDate + 'T12:00:00').toLocaleDateString('es-CL', {
+        weekday: 'short', day: '2-digit', month: '2-digit'
+      });
+    }
+
+    function num(value, digits = 1) {
+      if (value === null || value === undefined || Number.isNaN(value)) return '—';
+      return Number(value).toFixed(digits);
+    }
+
+    function aggregateHourlyMaxByDay(times, values) {
+      const byDay = {};
+      for (let i = 0; i < times.length; i++) {
+        const date = times[i].slice(0, 10);
+        const value = values[i];
+        if (value === null || value === undefined || Number.isNaN(value)) continue;
+        byDay[date] = Math.max(byDay[date] ?? -Infinity, value);
+      }
+      return byDay;
+    }
+
+    function calcRisk({ gust, wind, wave, rain }) {
+      let score = 0;
+      if (gust >= 70) score += 3;
+      else if (gust >= 55) score += 2;
+      else if (gust >= 45) score += 1;
+
+      if (wind >= 45) score += 2;
+      else if (wind >= 35) score += 1;
+
+      if (wave >= 3.5) score += 3;
+      else if (wave >= 2.5) score += 2;
+      else if (wave >= 1.8) score += 1;
+
+      if (rain >= 30) score += 1;
+
+      if (score >= 5) return { level: 'ALTO', cls: 'risk-high', reason: 'Alta probabilidad de restricción operativa' };
+      if (score >= 3) return { level: 'MEDIO', cls: 'risk-mid', reason: 'Requiere monitoreo y validación táctica' };
+      return { level: 'BAJO', cls: 'risk-low', reason: 'Condiciones generalmente operables' };
+    }
+
+    function initFxCanvas() {
+      fx.canvas = document.getElementById('fxCanvas');
+      fx.ctx = fx.canvas.getContext('2d');
+      resizeFxCanvas();
+      window.addEventListener('resize', resizeFxCanvas);
+    }
+
+    function resizeFxCanvas() {
+      fx.w = window.innerWidth;
+      fx.h = window.innerHeight;
+      fx.canvas.width = Math.floor(fx.w * devicePixelRatio);
+      fx.canvas.height = Math.floor(fx.h * devicePixelRatio);
+      fx.ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+      seedFx();
+    }
+
+    function seedFx() {
+      fx.drops = Array.from({ length: 180 }, () => ({
+        x: Math.random() * fx.w,
+        y: Math.random() * fx.h,
+        len: 8 + Math.random() * 14,
+        speed: 9 + Math.random() * 10,
+      }));
+      fx.particles = Array.from({ length: 80 }, () => ({
+        x: Math.random() * fx.w,
+        y: Math.random() * fx.h,
+        r: 0.7 + Math.random() * 2.1,
+        vx: -0.2 + Math.random() * 0.5,
+        vy: -0.15 + Math.random() * 0.35,
+      }));
+    }
+
+    function setFxMode(mode) {
+      fx.mode = mode;
+      document.body.classList.toggle('rain', mode === 'rain');
+      document.getElementById('bgMode').textContent = mode === 'rain' ? 'Fondo: lluvia activa' : 'Fondo: cielo operativo';
+      if (!fx.rafId) animateFx();
+    }
+
+    function animateFx() {
+      fx.rafId = requestAnimationFrame(animateFx);
+      const ctx = fx.ctx;
+      ctx.clearRect(0, 0, fx.w, fx.h);
+
+      if (fx.mode === 'rain') {
+        ctx.strokeStyle = 'rgba(170, 212, 255, 0.42)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (const d of fx.drops) {
+          ctx.moveTo(d.x, d.y);
+          ctx.lineTo(d.x - d.len * 0.22, d.y + d.len);
+          d.x -= 1.2;
+          d.y += d.speed;
+          if (d.y > fx.h + 30) {
+            d.y = -10;
+            d.x = Math.random() * fx.w;
+          }
+          if (d.x < -30) d.x = fx.w + 20;
+        }
+        ctx.stroke();
+      } else {
+        for (const p of fx.particles) {
+          ctx.beginPath();
+          ctx.fillStyle = 'rgba(128, 179, 255, 0.22)';
+          ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+          ctx.fill();
+
+          p.x += p.vx;
+          p.y += p.vy;
+          if (p.x < -6) p.x = fx.w + 6;
+          if (p.x > fx.w + 6) p.x = -6;
+          if (p.y < -6) p.y = fx.h + 6;
+          if (p.y > fx.h + 6) p.y = -6;
+        }
+      }
+    }
+
+    function buildWeekChart(days) {
+      const labels = days.map((d) => toCLDate(d.date));
+      const rain = days.map((d) => Number(d.rain ?? 0));
+      const wind = days.map((d) => Number(d.wind ?? 0));
+      const gust = days.map((d) => Number(d.gust ?? 0));
+
+      if (weekChart) weekChart.destroy();
+
+      weekChart = new Chart(document.getElementById('weekChart'), {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [
+            {
+              type: 'bar',
+              label: 'Lluvia (mm)',
+              data: rain,
+              yAxisID: 'yRain',
+              backgroundColor: 'rgba(74, 163, 255, 0.45)',
+              borderColor: 'rgba(122, 195, 255, 0.9)',
+              borderWidth: 1,
+              borderRadius: 6,
+            },
+            {
+              type: 'line',
+              label: 'Viento máx (km/h)',
+              data: wind,
+              yAxisID: 'yWind',
+              borderColor: '#7ef0a8',
+              backgroundColor: 'rgba(126, 240, 168, 0.2)',
+              tension: 0.32,
+              pointRadius: 3,
+              pointHoverRadius: 5,
+            },
+            {
+              type: 'line',
+              label: 'Racha máx (km/h)',
+              data: gust,
+              yAxisID: 'yWind',
+              borderColor: '#ff8aa8',
+              backgroundColor: 'rgba(255, 138, 168, 0.2)',
+              tension: 0.28,
+              pointRadius: 3,
+              pointHoverRadius: 5,
+              borderDash: [5, 5],
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { labels: { color: '#d6e8ff' } },
+            tooltip: {
+              backgroundColor: 'rgba(8,16,30,0.96)',
+              borderColor: 'rgba(120,160,220,0.45)',
+              borderWidth: 1,
+            }
+          },
+          scales: {
+            x: { ticks: { color: '#bcd1ef' }, grid: { color: 'rgba(108,145,196,0.12)' } },
+            yRain: {
+              position: 'left',
+              ticks: { color: '#8fd0ff' },
+              grid: { color: 'rgba(108,145,196,0.15)' },
+              title: { display: true, text: 'Lluvia', color: '#8fd0ff' }
+            },
+            yWind: {
+              position: 'right',
+              ticks: { color: '#96f3be' },
+              grid: { drawOnChartArea: false },
+              title: { display: true, text: 'Viento/Racha', color: '#96f3be' }
+            }
+          }
+        }
+      });
+    }
+
+    function buildMarineChart(days) {
+      const labels = days.map((d) => toCLDate(d.date));
+      const wave = days.map((d) => Number(d.wave ?? 0));
+      const tmax = days.map((d) => Number(d.tMax ?? 0));
+      const tmin = days.map((d) => Number(d.tMin ?? 0));
+
+      if (marineChart) marineChart.destroy();
+
+      marineChart = new Chart(document.getElementById('marineChart'), {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            {
+              label: 'Ola máx (m)',
+              data: wave,
+              yAxisID: 'yWave',
+              borderColor: '#55b2ff',
+              backgroundColor: 'rgba(85, 178, 255, 0.2)',
+              fill: true,
+              tension: 0.28,
+              pointRadius: 3,
+            },
+            {
+              label: 'T° máxima',
+              data: tmax,
+              yAxisID: 'yTemp',
+              borderColor: '#ffb76b',
+              tension: 0.3,
+              pointRadius: 2,
+            },
+            {
+              label: 'T° mínima',
+              data: tmin,
+              yAxisID: 'yTemp',
+              borderColor: '#77f0ff',
+              tension: 0.3,
+              pointRadius: 2,
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { labels: { color: '#d6e8ff' } },
+            tooltip: {
+              backgroundColor: 'rgba(8,16,30,0.96)',
+              borderColor: 'rgba(120,160,220,0.45)',
+              borderWidth: 1,
+            }
+          },
+          scales: {
+            x: { ticks: { color: '#bcd1ef' }, grid: { color: 'rgba(108,145,196,0.12)' } },
+            yWave: {
+              position: 'left',
+              ticks: { color: '#8fd0ff' },
+              title: { display: true, text: 'Ola (m)', color: '#8fd0ff' },
+              grid: { color: 'rgba(108,145,196,0.15)' }
+            },
+            yTemp: {
+              position: 'right',
+              ticks: { color: '#ffd79b' },
+              title: { display: true, text: 'Temp (°C)', color: '#ffd79b' },
+              grid: { drawOnChartArea: false }
+            }
+          }
+        }
+      });
+    }
+
+    function renderTable(days) {
+      const tbody = document.getElementById('tbody');
+      tbody.innerHTML = '';
+      for (const d of days) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${toCLDate(d.date)}</td>
+          <td>${weatherCodeMap[d.weatherCode] ?? '—'}</td>
+          <td>${num(d.tMin)}° / ${num(d.tMax)}°</td>
+          <td>${num(d.rain)} mm</td>
+          <td>${num(d.wind)} km/h</td>
+          <td>${num(d.gust)} km/h</td>
+          <td>${num(d.wave)} m</td>
+          <td><span class="chip ${d.risk.cls}" title="${d.risk.reason}">${d.risk.level}</span></td>
+        `;
+        tbody.appendChild(tr);
+      }
+    }
+
+    function renderKPIs(days, current) {
+      const highDays = days.filter((d) => d.risk.level === 'ALTO').length;
+      const maxGust = Math.max(...days.map((d) => d.gust || 0), 0);
+      const maxWave = Math.max(...days.map((d) => d.wave || 0), 0);
+      const weeklyStatus = highDays >= 3
+        ? 'Semana compleja'
+        : highDays >= 1
+          ? 'Semana mixta'
+          : 'Semana favorable';
+
+      document.getElementById('weeklyStatus').textContent = weeklyStatus;
+      document.getElementById('highDays').textContent = `${highDays} / ${days.length}`;
+      document.getElementById('nowRain').textContent = `${num(current.precipitation, 1)} mm/h`;
+      document.getElementById('nowWind').textContent = `${num(current.wind_speed_10m, 1)} km/h`;
+      document.getElementById('maxGust').textContent = `${num(maxGust, 1)} km/h`;
+      document.getElementById('maxWave').textContent = `${num(maxWave, 2)} m`;
+      document.getElementById('nowCode').textContent = `Condición actual: ${weatherCodeMap[current.weather_code] ?? 'N/D'}`;
+      document.getElementById('updatedAt').textContent = `Actualizado: ${new Date().toLocaleString('es-CL')}`;
+    }
+
+    async function loadData() {
+      const errorEl = document.getElementById('error');
+      errorEl.style.display = 'none';
+      document.getElementById('weeklyStatus').textContent = 'Cargando...';
+
+      try {
+        const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${CHONCHI.lat}&longitude=${CHONCHI.lon}&timezone=America/Santiago&current=temperature_2m,precipitation,weather_code,wind_speed_10m,wind_gusts_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,wind_gusts_10m_max&forecast_days=7`;
+        const marineUrl = `https://marine-api.open-meteo.com/v1/marine?latitude=${CHONCHI.lat}&longitude=${CHONCHI.lon}&timezone=America/Santiago&hourly=wave_height&forecast_days=7`;
+
+        const [weatherRes, marineRes] = await Promise.all([fetch(weatherUrl), fetch(marineUrl)]);
+        if (!weatherRes.ok || !marineRes.ok) {
+          throw new Error('No se pudo consultar una de las APIs de pronóstico.');
+        }
+
+        const weather = await weatherRes.json();
+        const marine = await marineRes.json();
+
+        const current = weather.current ?? {};
+        const isRainingNow = (current.precipitation ?? 0) > 0.15 || rainyCodes.has(current.weather_code);
+        setFxMode(isRainingNow ? 'rain' : 'clear');
+
+        const waveByDay = aggregateHourlyMaxByDay(marine.hourly?.time ?? [], marine.hourly?.wave_height ?? []);
+        const days = weather.daily.time.map((date, i) => {
+          const gust = weather.daily.wind_gusts_10m_max?.[i] ?? 0;
+          const wind = weather.daily.wind_speed_10m_max?.[i] ?? 0;
+          const rain = weather.daily.precipitation_sum?.[i] ?? 0;
+          const wave = waveByDay[date] ?? 0;
+          const risk = calcRisk({ gust, wind, wave, rain });
+          return {
+            date,
+            weatherCode: weather.daily.weather_code?.[i],
+            tMin: weather.daily.temperature_2m_min?.[i],
+            tMax: weather.daily.temperature_2m_max?.[i],
+            rain,
+            wind,
+            gust,
+            wave,
+            risk,
+          };
+        });
+
+        renderKPIs(days, current);
+        renderTable(days);
+        buildWeekChart(days);
+        buildMarineChart(days);
+      } catch (error) {
+        errorEl.textContent = `Error: ${error instanceof Error ? error.message : 'fallo desconocido'}`;
+        errorEl.style.display = 'block';
+        document.getElementById('weeklyStatus').textContent = 'Sin datos';
+      }
+    }
+
+    document.getElementById('reloadBtn').addEventListener('click', loadData);
+    initFxCanvas();
+    loadData();
+  </script>
+</body>
+</html>
