@@ -101,9 +101,11 @@ export function MainLayout() {
   const { setZones, setEquipment, setIncidents } = useAppStore()
   const isGanttRoute = location.pathname.startsWith('/gantt')
   const isClimaRoute = location.pathname.startsWith('/clima-puerto')
-  const shouldHideDesktopSidebar = sidebarCollapsed || (isGanttRoute && ganttFocusMode && !sidebarPeekOpen)
+  const shouldHideDesktopSidebar =
+    !isClimaRoute && (sidebarCollapsed || (isGanttRoute && ganttFocusMode && !sidebarPeekOpen))
 
   const toggleSidebarCollapse = () => {
+    if (isClimaRoute) return
     setSidebarCollapsed((prev) => {
       const next = !prev
       localStorage.setItem('sidebar_collapsed', next ? '1' : '0')
@@ -199,6 +201,13 @@ export function MainLayout() {
       setSidebarPeekOpen(false)
     }
   }, [isGanttRoute])
+
+  useEffect(() => {
+    if (!isClimaRoute) return
+    if (!sidebarCollapsed) return
+    setSidebarCollapsed(false)
+    localStorage.setItem('sidebar_collapsed', '0')
+  }, [isClimaRoute, sidebarCollapsed])
 
   useEffect(() => {
     initUploadQueue()
