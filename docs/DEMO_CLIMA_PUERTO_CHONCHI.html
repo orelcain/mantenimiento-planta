@@ -1338,44 +1338,82 @@
     }
 
     function calcRisk({ gust, wind, wave, rain, weatherCode }) {
-      let score = 0;
-      if (gust >= 70) score += 3;
-      else if (gust >= 55) score += 2;
-      else if (gust >= 45) score += 1;
-      if (wind >= 45) score += 2;
-      else if (wind >= 35) score += 1;
-      if (wave >= 3.5) score += 3;
-      else if (wave >= 2.5) score += 2;
-      else if (wave >= 1.8) score += 1;
-      if (rain >= 30) score += 1;
-      if ([95, 96, 99].includes(weatherCode)) score += 2;
+      /* Riesgo operativo diario: cada factor DIRECTEMAR mapea independiente-
+         mente a una probabilidad; el factor dominante define el piso y los
+         demás componen hasta un 20 % adicional.  */
+      let gustR = 0;
+      if (gust >= 70) gustR = 95;
+      else if (gust >= 60) gustR = 82;
+      else if (gust >= 55) gustR = 72;   // umbral cierre DIRECTEMAR
+      else if (gust >= 50) gustR = 55;
+      else if (gust >= 45) gustR = 42;   // umbral restricción
+      else if (gust >= 35) gustR = 22;
 
-      const pct = Math.max(4, Math.min(96, Math.round((score / 11) * 100)));
-      if (score >= 5) return { level: 'ALTO', cls: 'risk-high', pct, reason: `Riesgo diario alto (${pct}%). Alta probabilidad de restricción operativa.` };
-      if (score >= 3) return { level: 'MEDIO', cls: 'risk-mid', pct, reason: `Riesgo diario medio (${pct}%). Requiere monitoreo y validación táctica.` };
-      return { level: 'BAJO', cls: 'risk-low', pct, reason: `Riesgo diario bajo (${pct}%). Condiciones generalmente operables.` };
+      let windR = 0;
+      if (wind >= 55) windR = 88;
+      else if (wind >= 45) windR = 72;   // cierre viento sostenido
+      else if (wind >= 40) windR = 50;
+      else if (wind >= 35) windR = 35;   // restricción
+      else if (wind >= 25) windR = 14;
+
+      let waveR = 0;
+      if (wave >= 3.5) waveR = 90;
+      else if (wave >= 2.8) waveR = 70;
+      else if (wave >= 2.5) waveR = 55;  // cierre oleaje
+      else if (wave >= 2.0) waveR = 38;
+      else if (wave >= 1.8) waveR = 25;  // restricción
+      else if (wave >= 1.2) waveR = 10;
+
+      let otherR = 0;
+      if ([95, 96, 99].includes(weatherCode)) otherR = 60;
+      if (rain >= 30) otherR = Math.max(otherR, 30);
+      else if (rain >= 15) otherR = Math.max(otherR, 15);
+
+      const sorted = [gustR, windR, waveR, otherR].sort((a, b) => b - a);
+      const pct = Math.max(4, Math.min(96, Math.round(sorted[0] + (sorted[1] || 0) * 0.20 + (sorted[2] || 0) * 0.08)));
+
+      if (pct >= 55) return { level: 'ALTO', cls: 'risk-high', pct, reason: `Riesgo operativo ALTO (${pct}%). Se recomienda restricción o cierre.` };
+      if (pct >= 30) return { level: 'MEDIO', cls: 'risk-mid', pct, reason: `Riesgo operativo medio (${pct}%). Monitoreo activo y validación táctica.` };
+      return { level: 'BAJO', cls: 'risk-low', pct, reason: `Riesgo bajo (${pct}%). Condiciones generalmente operables.` };
     }
 
     function calcDailyCloseRisk({ gust, wind, wave, rain, weatherCode }) {
-      let score = 0;
-      if (gust >= 70) score += 4;
-      else if (gust >= 60) score += 3;
-      else if (gust >= 55) score += 2;
+      /* Probabilidad de CIERRE de puerto: un solo factor sobre el umbral
+         DIRECTEMAR ya genera alta probabilidad; factores secundarios
+         componen/aumentan el valor final.  */
+      let gustP = 0;
+      if (gust >= 70) gustP = 94;
+      else if (gust >= 65) gustP = 86;
+      else if (gust >= 60) gustP = 78;
+      else if (gust >= 55) gustP = 68;   // ← UMBRAL CIERRE DIRECTEMAR
+      else if (gust >= 50) gustP = 48;   // muy cerca del umbral
+      else if (gust >= 45) gustP = 32;   // umbral restricción
 
-      if (wind >= 45) score += 3;
-      else if (wind >= 40) score += 2;
+      let windP = 0;
+      if (wind >= 55) windP = 90;
+      else if (wind >= 45) windP = 70;   // cierre viento sostenido
+      else if (wind >= 40) windP = 48;
+      else if (wind >= 35) windP = 28;   // restricción
 
-      if (wave >= 3.5) score += 4;
-      else if (wave >= 2.8) score += 3;
-      else if (wave >= 2.5) score += 2;
+      let waveP = 0;
+      if (wave >= 3.5) waveP = 92;
+      else if (wave >= 3.0) waveP = 76;
+      else if (wave >= 2.5) waveP = 58;  // cierre oleaje
+      else if (wave >= 2.0) waveP = 36;
+      else if (wave >= 1.8) waveP = 22;  // restricción
 
-      if (rain >= 25) score += 1;
-      if ([95, 96, 99].includes(weatherCode)) score += 3;
+      let otherP = 0;
+      if ([95, 96, 99].includes(weatherCode)) otherP = 55;
+      if (rain >= 30) otherP = Math.max(otherP, 28);
+      else if (rain >= 15) otherP = Math.max(otherP, 14);
 
-      const pct = Math.max(2, Math.min(98, Math.round((score / 15) * 100)));
-      if (pct >= 60) return { level: 'ALTO', cls: 'risk-high', pct, reason: `Probabilidad alta de cierre ese día (${pct}%).` };
-      if (pct >= 35) return { level: 'MEDIO', cls: 'risk-mid', pct, reason: `Probabilidad media de cierre ese día (${pct}%).` };
-      return { level: 'BAJO', cls: 'risk-low', pct, reason: `Probabilidad baja de cierre ese día (${pct}%).` };
+      const sorted = [gustP, windP, waveP, otherP].sort((a, b) => b - a);
+      const pct = Math.max(2, Math.min(98,
+        Math.round(sorted[0] + (sorted[1] || 0) * 0.22 + (sorted[2] || 0) * 0.08)));
+
+      if (pct >= 55) return { level: 'ALTO', cls: 'risk-high', pct, reason: `Probabilidad ALTA de cierre (${pct}%). Condiciones sobre umbrales DIRECTEMAR.` };
+      if (pct >= 30) return { level: 'MEDIO', cls: 'risk-mid', pct, reason: `Probabilidad media de cierre (${pct}%). Condiciones cercanas a umbrales.` };
+      return { level: 'BAJO', cls: 'risk-low', pct, reason: `Probabilidad baja de cierre (${pct}%).` };
     }
 
     function initFxCanvas() {
@@ -1552,10 +1590,14 @@
       const isStorm = [95, 96, 99].includes(sample.code);
       const isFog = [45, 48].includes(sample.code);
 
+      /* Rangos de normalización ajustados a umbrales DIRECTEMAR:
+         - Racha: 30-60 (antes 35-75). Así 45 km/h = 50 %, 55 km/h = 83 %.
+         - Viento: 20-45 (antes 25-50). Así 35 km/h = 60 %, 45 km/h = 100 %.
+         - Oleaje: 1.0-3.0 (antes 1.2-3.5). Así 1.8 = 40 %, 2.5 = 75 %.  */
       return {
-        gust: normalizeRange(sample.gust, 35, 75) * 100,
-        wind: normalizeRange(sample.wind, 25, 50) * 100,
-        wave: normalizeRange(sample.wave, 1.2, 3.5) * 100,
+        gust: normalizeRange(sample.gust, 30, 60) * 100,
+        wind: normalizeRange(sample.wind, 20, 45) * 100,
+        wave: normalizeRange(sample.wave, 1.0, 3.0) * 100,
         rain: normalizeRange(sample.rain, 1, 10) * 100,
         pressure: normalizeRange(1015 - sample.pressure, 3, 25) * 100,
         visibility: normalizeRange(5000 - sample.visibility, 500, 4500) * 100,
@@ -1568,16 +1610,18 @@
     }
 
     function aggregateRiskIndex(components) {
+      /* Pesos recalibrados: rachas y oleaje pesan más porque son los
+         gatillos principales de cierre DIRECTEMAR.  Suma pesos = 1.0 */
       const weighted =
-        components.gust * 0.2 +
-        components.wind * 0.14 +
-        components.wave * 0.18 +
-        components.rain * 0.08 +
-        components.pressure * 0.07 +
-        components.visibility * 0.1 +
-        components.cloud * 0.05 +
-        components.humidity * 0.04 +
-        components.wavePeriod * 0.06 +
+        components.gust * 0.26 +
+        components.wind * 0.16 +
+        components.wave * 0.20 +
+        components.rain * 0.06 +
+        components.pressure * 0.05 +
+        components.visibility * 0.07 +
+        components.cloud * 0.04 +
+        components.humidity * 0.03 +
+        components.wavePeriod * 0.05 +
         components.storm * 0.06 +
         components.fog * 0.02;
       return Math.max(0, Math.min(100, weighted));
@@ -2102,26 +2146,52 @@
 
       const hardTrigger =
         portNow?.status === 'CERRADO' ||
-        maxIndex >= 72 ||
+        maxIndex >= 68 ||
         highHours >= 3 ||
-        stormHours >= 2;
+        stormHours >= 2 ||
+        maxGust >= 55 ||      // ← umbral cierre DIRECTEMAR
+        maxWind >= 45 ||      // ← cierre viento sostenido
+        maxWave >= 2.5;       // ← cierre oleaje
 
+      /* --- closeProbability con pisos por umbrales DIRECTEMAR directos --- */
       let closeProbability =
         maxIndex * 0.52 +
         avgIndex * 0.28 +
         highHours * 5 +
         mediumHours * 2.2;
+
+      // Pisos impuestos por umbrales físicos (rachas, viento, oleaje)
+      if (maxGust >= 70) closeProbability = Math.max(closeProbability, 90);
+      else if (maxGust >= 60) closeProbability = Math.max(closeProbability, 78);
+      else if (maxGust >= 55) closeProbability = Math.max(closeProbability, 65);
+      else if (maxGust >= 50) closeProbability = Math.max(closeProbability, 45);
+      else if (maxGust >= 45) closeProbability = Math.max(closeProbability, 30);
+
+      if (maxWind >= 45) closeProbability = Math.max(closeProbability, 68);
+      else if (maxWind >= 40) closeProbability = Math.max(closeProbability, 42);
+
+      if (maxWave >= 3.5) closeProbability = Math.max(closeProbability, 85);
+      else if (maxWave >= 2.5) closeProbability = Math.max(closeProbability, 55);
+
       if (portNow?.status === 'CERRADO') closeProbability = Math.max(closeProbability, 85);
       closeProbability = Math.max(3, Math.min(97, Math.round(closeProbability)));
 
+      /* --- restrictProbability --- */
       let restrictProbability =
         avgIndex * 0.62 +
         maxIndex * 0.18 +
         mediumHours * 3.5 +
         highHours * 2.4 +
-        (maxWind >= 35 ? 8 : 0) +
-        (maxWave >= 1.8 ? 8 : 0) +
+        (maxWind >= 35 ? 12 : 0) +
+        (maxWave >= 1.8 ? 12 : 0) +
+        (maxGust >= 45 ? 15 : 0) +
         (minVisibility <= 5000 ? 6 : 0);
+
+      // Pisos restricción por umbrales DIRECTEMAR
+      if (maxGust >= 45) restrictProbability = Math.max(restrictProbability, 65);
+      if (maxWind >= 35) restrictProbability = Math.max(restrictProbability, 60);
+      if (maxWave >= 1.8) restrictProbability = Math.max(restrictProbability, 55);
+
       if (portNow?.status === 'RESTRINGIDO') restrictProbability = Math.max(restrictProbability, 75);
       if (portNow?.status === 'CERRADO') restrictProbability = Math.max(restrictProbability, 92);
       restrictProbability = Math.max(closeProbability, Math.min(99, Math.round(restrictProbability)));
