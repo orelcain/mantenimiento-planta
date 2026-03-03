@@ -247,12 +247,20 @@
 
     .windy-focus .hero-map-wrap {
       position: fixed;
-      top: 72px;
+      top: 64px;
       left: 2%;
       right: 2%;
       bottom: 2%;
       border-radius: 10px;
       box-shadow: 0 20px 80px rgba(0,0,0,0.78);
+    }
+
+    .windy-focus .hero-map-wrap::after {
+      display: none;
+    }
+
+    .windy-focus .hero-overlay {
+      display: none;
     }
 
     .windy-focus .map-frame {
@@ -818,6 +826,10 @@
         left: 1%;
         right: 1%;
         bottom: 1%;
+      }
+
+      .windy-focus .navbar {
+        padding: 0 2%;
       }
     }
   </style>
