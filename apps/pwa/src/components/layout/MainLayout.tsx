@@ -298,38 +298,20 @@ export function MainLayout() {
   }, [user?.id, setZones, setEquipment, setIncidents])
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex">
       {/* Skip to content - accesibilidad */}
       <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:z-[100] focus:top-4 focus:left-4 focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-md">
         Ir al contenido principal
       </a>
 
-      {/* Mobile sidebar backdrop */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-          aria-hidden="true"
-        />
-      )}
-
-      {/* Sidebar */}
-      <aside
-        role="navigation"
-        aria-label="Menú principal"
-        aria-expanded={sidebarOpen}
+      {/* ══════ DESKTOP SIDEBAR (static flex item, in document flow) ══════ */}
+      <div
         className={cn(
-          'fixed inset-y-0 left-0 z-50 w-64 bg-card border-r transform transition-transform duration-200 ease-in-out',
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full',
-          shouldHideDesktopSidebar ? 'lg:-translate-x-full' : 'lg:translate-x-0'
+          'hidden lg:flex flex-col flex-shrink-0 bg-card border-r transition-[width] duration-200 overflow-hidden',
+          shouldHideDesktopSidebar ? 'w-0' : 'w-64'
         )}
-        onMouseLeave={() => {
-          if (isGanttRoute && ganttFocusMode) {
-            setSidebarPeekOpen(false)
-          }
-        }}
       >
-        <div className="flex flex-col h-full">
+        <div className="w-64 min-w-[16rem] flex flex-col h-screen sticky top-0">
           {/* Logo */}
           <div className="flex items-center justify-between h-16 px-4 border-b">
             <div className="flex items-center gap-2">
@@ -338,23 +320,14 @@ export function MainLayout() {
               </div>
               <span className="font-semibold">Mantenimiento</span>
             </div>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={toggleSidebarCollapse}
-                className="hidden lg:flex p-1.5 hover:bg-muted rounded-md transition-colors"
-                aria-label="Contraer menú"
-                title="Contraer menú"
-              >
-                <ChevronLeft className="h-4 w-4 text-muted-foreground" />
-              </button>
-              <button
-                onClick={() => setSidebarOpen(false)}
-                className="lg:hidden p-1 hover:bg-muted rounded"
-                aria-label="Cerrar menú"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+            <button
+              onClick={toggleSidebarCollapse}
+              className="p-1.5 hover:bg-muted rounded-md transition-colors"
+              aria-label="Contraer menú"
+              title="Contraer menú"
+            >
+              <ChevronLeft className="h-4 w-4 text-muted-foreground" />
+            </button>
           </div>
 
           {/* Navigation */}
@@ -451,8 +424,115 @@ export function MainLayout() {
             </div>
           </div>
         </div>
-      </aside>
+      </div>
 
+      {/* ══════ MOBILE SIDEBAR (fixed overlay, only on small screens) ══════ */}
+      {sidebarOpen && (
+        <div className="lg:hidden">
+          <div
+            className="fixed inset-0 z-40 bg-black/50"
+            onClick={() => setSidebarOpen(false)}
+            aria-hidden="true"
+          />
+          <aside
+            role="navigation"
+            aria-label="Menú principal"
+            className="fixed inset-y-0 left-0 z-50 w-64 bg-card border-r"
+          >
+            <div className="flex flex-col h-full">
+              {/* Logo */}
+              <div className="flex items-center justify-between h-16 px-4 border-b">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-primary/10 rounded-lg">
+                    <Wrench className="h-5 w-5 text-primary" />
+                  </div>
+                  <span className="font-semibold">Mantenimiento</span>
+                </div>
+                <button
+                  onClick={() => setSidebarOpen(false)}
+                  className="p-1 hover:bg-muted rounded"
+                  aria-label="Cerrar menú"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Navigation */}
+              <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+                {allNavigation.map((item) => (
+                  <NavLink
+                    key={item.href}
+                    to={item.href}
+                    onClick={() => {
+                      setSidebarOpen(false)
+                      setSidebarPeekOpen(false)
+                    }}
+                    className={({ isActive }) =>
+                      cn(
+                        'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+                        isActive
+                          ? 'bg-primary text-primary-foreground'
+                          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                      )
+                    }
+                  >
+                    <item.icon className="h-5 w-5" />
+                    {item.name}
+                  </NavLink>
+                ))}
+              </nav>
+
+              {/* Version label */}
+              <div className="px-4 pb-2">
+                <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground py-1.5 px-2 bg-muted/50 rounded">
+                  <span>v{APP_VERSION}</span>
+                </div>
+              </div>
+
+              {/* User section */}
+              <div className="p-4 border-t">
+                <div className="relative">
+                  <button
+                    onClick={() => setUserMenuOpen(!userMenuOpen)}
+                    className="flex items-center gap-3 w-full p-2 rounded-lg hover:bg-muted transition-colors"
+                  >
+                    <Avatar className="h-8 w-8">
+                      <AvatarFallback className="bg-primary/10 text-primary text-xs">
+                        {userInitials}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 text-left">
+                      <div className="flex items-center gap-1">
+                        <p className="text-sm font-medium">{displayName}</p>
+                        {user?.authProvider === 'google' && (
+                          <Mail className="h-3.5 w-3.5 text-muted-foreground" aria-label="Cuenta Google" />
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">{user?.email}</p>
+                      <p className="text-xs text-muted-foreground capitalize">{user?.rol}</p>
+                    </div>
+                    <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', userMenuOpen && 'rotate-180')} />
+                  </button>
+
+                  {userMenuOpen && (
+                    <div className="absolute bottom-full left-0 right-0 mb-2 bg-card border rounded-lg shadow-lg overflow-hidden">
+                      <button
+                        onClick={handleSignOut}
+                        className="flex items-center gap-2 w-full px-4 py-2 text-sm text-destructive hover:bg-muted transition-colors"
+                      >
+                        <LogOut className="h-4 w-4" />
+                        Cerrar sesión
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </aside>
+        </div>
+      )}
+
+      {/* Gantt peek hover zone (desktop, when focus mode hides sidebar) */}
       {isGanttRoute && ganttFocusMode && !sidebarCollapsed && (
         <button
           type="button"
@@ -464,7 +544,7 @@ export function MainLayout() {
       )}
 
       {/* Sidebar expand edge tab (desktop, when collapsed) */}
-      {sidebarCollapsed && (
+      {shouldHideDesktopSidebar && (
         <button
           type="button"
           className="hidden lg:flex fixed left-0 top-1/2 -translate-y-1/2 z-40 items-center justify-center w-6 h-14 bg-card/80 backdrop-blur-sm border border-l-0 rounded-r-lg shadow-md hover:bg-muted hover:w-8 transition-all duration-200 group"
@@ -476,10 +556,8 @@ export function MainLayout() {
         </button>
       )}
 
-      {/* Main content */}
-      <div
-        className={cn('transition-[padding] duration-200 ease-in-out', !shouldHideDesktopSidebar && 'lg:pl-64')}
-      >
+      {/* ══════ MAIN CONTENT AREA ══════ */}
+      <div className="flex-1 min-w-0 flex flex-col min-h-screen">
         {/* Top bar */}
         <header className="sticky top-0 z-30 flex items-center h-16 px-4 bg-background/80 backdrop-blur border-b">
           <button
