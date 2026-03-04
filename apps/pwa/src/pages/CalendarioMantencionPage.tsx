@@ -43,6 +43,8 @@ type HoursConfig = {
   useFixedDaily: boolean
   dayReductionHours: number
   vacationBusinessDaysOnly: boolean
+  holidayAsNonWorking: boolean
+  holidayBusinessDaysOnly: boolean
 }
 
 const WEEKDAY_HEADER = new Set(['lunes', 'martes', 'miércoles', 'miercoles', 'jueves', 'viernes', 'sábado', 'sabado', 'domingo'])
@@ -87,6 +89,8 @@ function defaultHoursConfig(): HoursConfig {
     useFixedDaily: true,
     dayReductionHours: 1,
     vacationBusinessDaysOnly: true,
+    holidayAsNonWorking: true,
+    holidayBusinessDaysOnly: true,
   }
 }
 
@@ -287,6 +291,8 @@ export function CalendarioMantencionPage() {
       useFixedDaily: stored.useFixedDaily !== false,
       dayReductionHours: toNumberOr(stored.dayReductionHours, 1),
       vacationBusinessDaysOnly: stored.vacationBusinessDaysOnly !== false,
+      holidayAsNonWorking: stored.holidayAsNonWorking !== false,
+      holidayBusinessDaysOnly: stored.holidayBusinessDaysOnly !== false,
     }
   })
 
@@ -802,6 +808,7 @@ export function CalendarioMantencionPage() {
   function classifyShift(value: string): string {
     const v = value.toLowerCase()
     const reduced = isReducedShift(value)
+    if (v.includes('feriado')) return 'bg-fuchsia-100 text-fuchsia-900 dark:bg-fuchsia-900/25 dark:text-fuchsia-200'
     if (!v || v.includes('libre') || v.includes('descanso') || v.includes('vacaciones') || v.includes('licencia')) return 'bg-rose-100 text-rose-900 dark:bg-rose-900/25 dark:text-rose-200'
     const nocheStart = shiftConfig.nocheInicio.toLowerCase()
     const nocheEnd = shiftConfig.nocheFin.toLowerCase()
@@ -831,11 +838,15 @@ export function CalendarioMantencionPage() {
   function isWorkingShift(shiftText: string): boolean {
     const text = shiftText.trim().toLowerCase()
     if (!text) return false
-    return !(text.includes('libre') || text.includes('descanso') || text.includes('vacaciones') || text.includes('licencia'))
+    return !(text.includes('libre') || text.includes('descanso') || text.includes('vacaciones') || text.includes('licencia') || text.includes('feriado'))
   }
 
   function isVacationShift(shiftText: string): boolean {
     return shiftText.trim().toLowerCase().includes('vacaciones')
+  }
+
+  function isHolidayShift(shiftText: string): boolean {
+    return shiftText.trim().toLowerCase().includes('feriado')
   }
 
   function isBusinessDay(date: Date): boolean {
@@ -902,26 +913,54 @@ export function CalendarioMantencionPage() {
       if (hoursConfig.vacationBusinessDaysOnly && !isBusinessDay(d.dateObj)) return sum
       return sum + 1
     }, 0)
+    const weekHolidayDays = weekDays.reduce((sum, d) => {
+      if (!d.dateObj || !isHolidayShift(t.shifts[d.c] || '')) return sum
+      if (hoursConfig.holidayBusinessDaysOnly && !isBusinessDay(d.dateObj)) return sum
+      return sum + 1
+    }, 0)
+    const monthHolidayDays = monthDays.reduce((sum, d) => {
+      if (!d.dateObj || !isHolidayShift(t.shifts[d.c] || '')) return sum
+      if (hoursConfig.holidayBusinessDaysOnly && !isBusinessDay(d.dateObj)) return sum
+      return sum + 1
+    }, 0)
+
+    const weekExpectedAdjusted = Math.max(
+      0,
+      hoursConfig.expectedWeek - (
+        (weekVacationDays + (hoursConfig.holidayAsNonWorking ? weekHolidayDays : 0))
+        * effectiveDaily
+      )
+    )
+    const monthExpectedAdjusted = Math.max(
+      0,
+      hoursConfig.expectedMonth - (
+        (monthVacationDays + (hoursConfig.holidayAsNonWorking ? monthHolidayDays : 0))
+        * effectiveDaily
+      )
+    )
+
     const weekFreeDays = Math.max(0, weekDays.length - weekWorkedDays)
     const monthFreeDays = Math.max(0, monthDays.length - monthWorkedDays)
     const weekBreakHours = weekWorkedDays * hoursConfig.breakHours
     const monthBreakHours = monthWorkedDays * hoursConfig.breakHours
     const weekFreeHours = weekFreeDays * effectiveDaily
     const monthFreeHours = monthFreeDays * effectiveDaily
-    const deltaWeek = weekHours - hoursConfig.expectedWeek
-    const deltaMonth = monthHours - hoursConfig.expectedMonth
+    const deltaWeek = weekHours - weekExpectedAdjusted
+    const deltaMonth = monthHours - monthExpectedAdjusted
     return {
       tech: t,
       weekHours,
       monthHours,
-      weekExpected: hoursConfig.expectedWeek,
-      monthExpected: hoursConfig.expectedMonth,
+      weekExpected: weekExpectedAdjusted,
+      monthExpected: monthExpectedAdjusted,
       weekFreeHours,
       monthFreeHours,
       weekBreakHours,
       monthBreakHours,
       weekVacationDays,
       monthVacationDays,
+      weekHolidayDays,
+      monthHolidayDays,
       totalVacationDays,
       deltaWeek,
       deltaMonth,
@@ -949,6 +988,8 @@ export function CalendarioMantencionPage() {
       toleranceHours: clampMin(toNumberOr(hoursConfig.toleranceHours, 0.5), 0),
       dayReductionHours: clampMin(toNumberOr(hoursConfig.dayReductionHours, 1), 0),
       vacationBusinessDaysOnly: hoursConfig.vacationBusinessDaysOnly !== false,
+      holidayAsNonWorking: hoursConfig.holidayAsNonWorking !== false,
+      holidayBusinessDaysOnly: hoursConfig.holidayBusinessDaysOnly !== false,
     }
     setHoursConfig(next)
     safeStorageSet(HOURS_CONFIG_KEY, next)
@@ -1067,6 +1108,27 @@ export function CalendarioMantencionPage() {
     } else {
       setStatus(`Vacaciones aplicadas a ${updated} día(s).`)
     }
+  }
+
+  function handleApplyHolidayToDay() {
+    if (selectedCol === null) {
+      setStatus('Selecciona un día para marcar feriado.')
+      return
+    }
+    const day = dayCols.find((d) => d.c === selectedCol)
+    if (!day) {
+      setStatus('Día inválido para feriado.')
+      return
+    }
+
+    const holidayLabel = 'FERIADO'
+    setTechRows((prev) => prev.map((tech) => {
+      const nextShifts = { ...tech.shifts, [selectedCol]: holidayLabel }
+      setCellValue(tech.r, selectedCol, holidayLabel)
+      return { ...tech, shifts: nextShifts }
+    }))
+    setSelectedShift(holidayLabel)
+    setStatus(`Feriado aplicado para ${day.dayLabel} ${formatDate(day.dateObj)} en todos los técnicos.`)
   }
 
   function handleUpdateTechDraft(row: number, nextGroup: string, nextArea: string) {
@@ -1239,6 +1301,7 @@ export function CalendarioMantencionPage() {
                 <button className="h-7 rounded border" onClick={() => selectedRow && selectedCol !== null && applyShift(selectedRow, selectedCol, shortcuts.libre)}>L</button>
                 <button className="h-7 rounded border" onClick={() => selectedRow && selectedCol !== null && applyShift(selectedRow, selectedCol, 'VACACIONES')}>V</button>
               </div>
+              <button className="h-7 rounded border text-[11px]" onClick={handleApplyHolidayToDay}>Marcar feriado (día)</button>
             </div>
           </div>
         )}
@@ -1291,6 +1354,14 @@ export function CalendarioMantencionPage() {
             <label className="col-span-2 flex items-center gap-2">
               <input type="checkbox" checked={hoursConfig.vacationBusinessDaysOnly} onChange={(e) => setHoursConfig((p) => ({ ...p, vacationBusinessDaysOnly: e.target.checked }))} />
               Vacaciones contabilizan solo días hábiles
+            </label>
+            <label className="col-span-2 flex items-center gap-2">
+              <input type="checkbox" checked={hoursConfig.holidayAsNonWorking} onChange={(e) => setHoursConfig((p) => ({ ...p, holidayAsNonWorking: e.target.checked }))} />
+              Feriados como no hábil en métricas
+            </label>
+            <label className="col-span-2 flex items-center gap-2">
+              <input type="checkbox" checked={hoursConfig.holidayBusinessDaysOnly} onChange={(e) => setHoursConfig((p) => ({ ...p, holidayBusinessDaysOnly: e.target.checked }))} />
+              Feriados descuentan solo días hábiles
             </label>
             <div className="col-span-2 sm:col-span-4">
               <button className="mt-1 h-8 w-full rounded bg-primary text-primary-foreground text-xs" onClick={handleHoursConfigApply}>Aplicar parámetros</button>
@@ -1475,11 +1546,13 @@ export function CalendarioMantencionPage() {
                     <th className="px-2 py-1 text-right w-16">Libres S</th>
                     <th className="px-2 py-1 text-right w-16">Colación S</th>
                     <th className="px-2 py-1 text-right w-16">Vac S</th>
+                    <th className="px-2 py-1 text-right w-16">Fer S</th>
                     <th className="px-2 py-1 text-right w-24">Mes (Real/Esp)</th>
                     <th className="px-2 py-1 w-24">Δ Mes</th>
                     <th className="px-2 py-1 text-right w-16">Libres M</th>
                     <th className="px-2 py-1 text-right w-16">Colación M</th>
                     <th className="px-2 py-1 text-right w-16">Vac M</th>
+                    <th className="px-2 py-1 text-right w-16">Fer M</th>
                     <th className="px-2 py-1 text-right w-16">Vac Tot</th>
                   </tr>
                 </thead>
@@ -1504,6 +1577,7 @@ export function CalendarioMantencionPage() {
                         <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.weekFreeHours.toFixed(1)}</td>
                         <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.weekBreakHours.toFixed(1)}</td>
                         <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.weekVacationDays}</td>
+                        <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.weekHolidayDays}</td>
                         <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.monthHours.toFixed(1)} / {row.monthExpected.toFixed(1)}</td>
                         <td className="px-2 py-1">
                           <div className="flex items-center gap-1">
@@ -1516,6 +1590,7 @@ export function CalendarioMantencionPage() {
                         <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.monthFreeHours.toFixed(1)}</td>
                         <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.monthBreakHours.toFixed(1)}</td>
                         <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.monthVacationDays}</td>
+                        <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.monthHolidayDays}</td>
                         <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.totalVacationDays}</td>
                       </tr>
                     )
@@ -1553,7 +1628,7 @@ export function CalendarioMantencionPage() {
             </button>
           </div>
         </div>
-        <div className="text-xs text-muted-foreground mb-1">Atajos sobre celda seleccionada: D = Día, Ctrl+D = Día reducido, T = Tarde, N = Noche, L = Libre, V = Vacaciones.</div>
+        <div className="text-xs text-muted-foreground mb-1">Atajos sobre celda seleccionada: D = Día, Ctrl+D = Día reducido, T = Tarde, N = Noche, L = Libre, V = Vacaciones. Para feriado usa “Marcar feriado (día)”.</div>
         <div ref={calendarScrollRef} className="relative h-[calc(100%-2.5rem)] overflow-auto rounded border">
           <table className="border-collapse text-[11px] min-w-max">
             <thead>
@@ -1561,14 +1636,14 @@ export function CalendarioMantencionPage() {
                 {visibleMetaIndices.map((gi, vi) => (
                   <th
                     key={`head1-${META_COLS[gi]}`}
-                    className="sticky top-0 z-[50] border border-primary/70 bg-primary px-1 py-1"
+                    className="sticky top-0 z-[60] border border-primary/70 !bg-primary bg-opacity-100 px-1 py-1 backdrop-blur-none"
                     style={{ left: `${metaLeftFiltered(vi, visibleMetaIndices)}px`, minWidth: `${META_COL_WIDTHS[gi]}px`, maxWidth: `${META_COL_WIDTHS[gi]}px` }}
                   >
                     {gi === 0 ? 'PLANTA' : ''}
                   </th>
                 ))}
                 {dayCols.map((d, idx) => (
-                  <th key={`day-${d.c}`} className={`sticky top-0 z-20 border border-primary/70 bg-primary px-1 py-1 ${isSameDate(d.dateObj, todayDayCol?.dateObj ?? null) ? 'border-x-2 border-yellow-300' : ''} ${isWeekStart(idx) ? 'border-l-2 border-l-cyan-300' : ''}`} style={{ minWidth: `${DAY_COL_WIDTH}px`, maxWidth: `${DAY_COL_WIDTH}px` }}>
+                  <th key={`day-${d.c}`} className={`sticky top-0 z-20 border border-primary/70 !bg-primary bg-opacity-100 px-1 py-1 backdrop-blur-none ${isSameDate(d.dateObj, todayDayCol?.dateObj ?? null) ? 'border-x-2 border-yellow-300' : ''} ${isWeekStart(idx) ? 'border-l-2 border-l-cyan-300' : ''}`} style={{ minWidth: `${DAY_COL_WIDTH}px`, maxWidth: `${DAY_COL_WIDTH}px` }}>
                     <div className="flex items-center justify-between gap-1">
                       <span>{d.dayLabel}</span>
                       {isWeekStart(idx) ? <span className="rounded bg-cyan-100/20 px-1 text-[9px]">{weekNumberLabel(d.dateObj)}</span> : null}
@@ -1580,14 +1655,14 @@ export function CalendarioMantencionPage() {
                 {visibleMetaIndices.map((gi, vi) => (
                   <th
                     key={`head2-${META_COLS[gi]}`}
-                    className="sticky top-[30px] z-[50] border border-primary/70 bg-primary px-1 py-1"
+                    className="sticky top-[30px] z-[60] border border-primary/70 !bg-primary bg-opacity-100 px-1 py-1 backdrop-blur-none"
                     style={{ left: `${metaLeftFiltered(vi, visibleMetaIndices)}px`, minWidth: `${META_COL_WIDTHS[gi]}px`, maxWidth: `${META_COL_WIDTHS[gi]}px` }}
                   >
                     {META_COLS[gi]}
                   </th>
                 ))}
                 {dayCols.map((d, idx) => (
-                  <th key={`date-${d.c}`} className={`sticky top-[30px] z-20 border border-primary/70 bg-primary px-1 py-1 ${isSameDate(d.dateObj, todayDayCol?.dateObj ?? null) ? 'border-x-2 border-b-2 border-yellow-300 font-semibold' : ''} ${isWeekStart(idx) ? 'border-l-2 border-l-cyan-300' : ''}`} style={{ minWidth: `${DAY_COL_WIDTH}px`, maxWidth: `${DAY_COL_WIDTH}px` }}>{formatDate(d.dateObj) || d.dateRaw}</th>
+                  <th key={`date-${d.c}`} className={`sticky top-[30px] z-20 border border-primary/70 !bg-primary bg-opacity-100 px-1 py-1 backdrop-blur-none ${isSameDate(d.dateObj, todayDayCol?.dateObj ?? null) ? 'border-x-2 border-b-2 border-yellow-300 font-semibold' : ''} ${isWeekStart(idx) ? 'border-l-2 border-l-cyan-300' : ''}`} style={{ minWidth: `${DAY_COL_WIDTH}px`, maxWidth: `${DAY_COL_WIDTH}px` }}>{formatDate(d.dateObj) || d.dateRaw}</th>
                 ))}
               </tr>
             </thead>
@@ -1600,7 +1675,7 @@ export function CalendarioMantencionPage() {
                     {visibleMetaIndices.map((gi, vi) => (
                       <td
                         key={`meta-${tech.r}-${gi}`}
-                        className="sticky z-[35] border bg-card px-1 py-1 text-left truncate text-foreground"
+                        className="sticky z-[35] border !bg-card bg-opacity-100 px-1 py-1 text-left truncate text-foreground backdrop-blur-none"
                         style={{ left: `${metaLeftFiltered(vi, visibleMetaIndices)}px`, minWidth: `${META_COL_WIDTHS[gi]}px`, maxWidth: `${META_COL_WIDTHS[gi]}px` }}
                         title={metaValues[gi]}
                       >
