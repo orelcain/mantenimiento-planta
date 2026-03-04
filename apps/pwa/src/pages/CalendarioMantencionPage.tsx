@@ -69,8 +69,6 @@ type ShiftStyleSamples = {
   nocheReducido?: number
 }
 
-type ShiftColorSamples = Record<string, { bg: string; fg: string }>
-
 type PersistedCalendarState = {
   version: number
   originalFilename?: string
@@ -341,7 +339,6 @@ export function CalendarioMantencionPage() {
   const hasLoadedCalendarRef = useRef(false)
   const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const shiftStyleSamplesRef = useRef<ShiftStyleSamples>({})
-  const shiftColorSamplesRef = useRef<ShiftColorSamples>({})
   const [calendarShortcutsActive, setCalendarShortcutsActive] = useState(false)
 
   const shortcuts = useMemo(() => {
@@ -943,11 +940,6 @@ export function CalendarioMantencionPage() {
 
   function inferShiftStyleSamples(sheet: XLSX.WorkSheet, techs: TechRow[], cols: DayCol[]): void {
     const samples: ShiftStyleSamples = {}
-    const colors: ShiftColorSamples = {}
-    const wbAny = (wb as unknown) as Record<string, unknown> | null
-    const stylesObj = (wbAny?.Styles ?? wbAny?.styles ?? {}) as Record<string, unknown[]>
-    const wbStyles = (stylesObj?.Fills ?? []) as Record<string, unknown>[]
-    const cellXfs = (stylesObj?.CellXf ?? []) as Record<string, unknown>[]
     for (const tech of techs) {
       for (const d of cols) {
         const value = tech.shifts[d.c] || ''
@@ -958,22 +950,10 @@ export function CalendarioMantencionPage() {
         const styleId = typeof cell?.s === 'number' ? cell.s : undefined
         if (styleId !== undefined) {
           samples[key] = styleId
-          // Extract actual RGB fill color from workbook styles
-          const xf = cellXfs[styleId] as Record<string, unknown> | undefined
-          const fillId = (xf?.fillId ?? xf?.fill) as number | undefined
-          if (fillId !== undefined && wbStyles[fillId]) {
-            const fill = wbStyles[fillId] as Record<string, Record<string, unknown> | undefined>
-            const fgColor = (fill?.fgColor?.rgb ?? fill?.bgColor?.rgb) as string | undefined
-            if (fgColor) {
-              const hex = fgColor.length === 8 ? '#' + fgColor.slice(2) : '#' + fgColor
-              colors[key] = { bg: hex, fg: '#000000' }
-            }
-          }
         }
       }
     }
     shiftStyleSamplesRef.current = samples
-    shiftColorSamplesRef.current = colors
   }
 
   function styleIdForShift(value: string): number | undefined {
@@ -989,30 +969,27 @@ export function CalendarioMantencionPage() {
   }
 
   function shiftCellStyle(value: string): { className: string; style?: React.CSSProperties } {
-    const key = detectShiftStyleKey(value)
-    const colors = shiftColorSamplesRef.current
-    if (key && colors[key]) {
-      return { className: 'text-black font-medium', style: { backgroundColor: colors[key].bg } }
+    const v = value.trim().toLowerCase()
+    if (!v) return { className: '' }
+
+    // FERIADO → Salmon/orange background (Excel match)
+    if (v.includes('feriado')) return { className: 'font-medium', style: { backgroundColor: '#FCD5B4', color: '#000000' } }
+
+    // LIBRE / DESCANSO → Green background (Excel #92D050)
+    if (v.includes('libre') || v.includes('descanso')) return { className: 'font-medium', style: { backgroundColor: '#92D050', color: '#000000' } }
+
+    // VACACIONES → Light blue background (Excel match)
+    if (v.includes('vacaciones')) return { className: 'font-medium', style: { backgroundColor: '#8DB4E2', color: '#000000' } }
+
+    // LICENCIA → Light teal background
+    if (v.includes('licencia')) return { className: 'font-medium', style: { backgroundColor: '#B7DEE8', color: '#000000' } }
+
+    // Tarde/evening shift (starts at 16:xx, 14:xx, 13:xx) → RED text, no background
+    if (/^(16|14|13):\d{2}/.test(v)) {
+      return { className: 'font-medium', style: { color: '#FF0000' } }
     }
-    // Fallback defaults when no Excel template colors available
-    const v = value.toLowerCase()
-    const reduced = isReducedShift(value)
-    if (v.includes('feriado')) return { className: 'bg-fuchsia-100 text-fuchsia-900 dark:bg-fuchsia-900/25 dark:text-fuchsia-200' }
-    if (!v || v.includes('libre') || v.includes('descanso') || v.includes('vacaciones') || v.includes('licencia')) return { className: 'bg-rose-100 text-rose-900 dark:bg-rose-900/25 dark:text-rose-200' }
-    const nocheStart = shiftConfig.nocheInicio.toLowerCase()
-    const nocheEnd = shiftConfig.nocheFin.toLowerCase()
-    if (v.includes(`${nocheStart} - ${nocheEnd}`) || (v.includes(nocheStart) && v.includes(nocheEnd)) || v.includes('00:00 - 08:00')) {
-      return { className: reduced ? 'bg-sky-100 text-sky-800 dark:bg-sky-500/20 dark:text-sky-100' : 'bg-sky-200/80 text-sky-900 dark:bg-sky-500/35 dark:text-sky-100' }
-    }
-    if (v.includes(shiftConfig.diaInicio.toLowerCase()) || v.includes('08:00') || v.includes('07:00')) {
-      return { className: reduced ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-900/15 dark:text-emerald-100' : 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/25 dark:text-emerald-200' }
-    }
-    if (v.includes(shiftConfig.tardeInicio.toLowerCase()) || v.includes('16:00') || v.includes('14:00') || v.includes('13:00')) {
-      return { className: reduced ? 'bg-amber-50 text-amber-800 dark:bg-amber-900/15 dark:text-amber-100' : 'bg-amber-100 text-amber-900 dark:bg-amber-900/25 dark:text-amber-200' }
-    }
-    if (v.includes('00:00')) {
-      return { className: reduced ? 'bg-sky-100 text-sky-800 dark:bg-sky-500/20 dark:text-sky-100' : 'bg-sky-200/80 text-sky-900 dark:bg-sky-500/35 dark:text-sky-100' }
-    }
+
+    // Day (08:xx, 07:xx) and Night (00:xx) → no special styling (default text color)
     return { className: '' }
   }
 
@@ -1295,6 +1272,13 @@ export function CalendarioMantencionPage() {
     }
 
     const wbExport = XLSX.utils.book_new()
+
+    // Copy styles & themes from original workbook so exported file preserves cell formatting
+    const wbSrc = wb as unknown as Record<string, unknown>
+    const wbDst = wbExport as unknown as Record<string, unknown>
+    if (wbSrc.Styles) wbDst.Styles = wbSrc.Styles
+    if (wbSrc.Themes) wbDst.Themes = wbSrc.Themes
+
     const horarioName = wb.SheetNames.find((n) => n.toLowerCase() === 'horario') ?? wb.SheetNames[0]
     if (!horarioName) return
     const horarioSheet = wb.Sheets[horarioName]
