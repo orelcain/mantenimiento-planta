@@ -348,7 +348,15 @@ export function CalendarioMantencionPage() {
       nocheReducido = `${shiftConfig.nocheInicio} - ${reducedNightEnd}`
     }
 
-    return { dia, tarde, noche, libre, diaReducido, nocheReducido }
+    const normalAfternoonDuration = rangeDurationMinutes(shiftConfig.tardeInicio, shiftConfig.tardeFin)
+    const afternoonStartMinutes = hhmmToMinutes(shiftConfig.tardeInicio)
+    let tardeReducido = tarde
+    if (normalAfternoonDuration !== null && afternoonStartMinutes !== null && reductionMinutes > 0 && normalAfternoonDuration > reductionMinutes) {
+      const reducedAfternoonEnd = minutesToHHMM(afternoonStartMinutes + (normalAfternoonDuration - reductionMinutes))
+      tardeReducido = `${shiftConfig.tardeInicio} - ${reducedAfternoonEnd}`
+    }
+
+    return { dia, tarde, noche, libre, diaReducido, tardeReducido, nocheReducido }
   }, [hoursConfig.dayReductionHours, shiftConfig])
 
   const weeks = useMemo(() => {
@@ -502,6 +510,11 @@ export function CalendarioMantencionPage() {
       if (event.shiftKey && key === 'n') {
         event.preventDefault()
         applyShiftRef.current(selectedRow, selectedCol, shortcuts.nocheReducido)
+        return
+      }
+      if (event.shiftKey && key === 't') {
+        event.preventDefault()
+        applyShiftRef.current(selectedRow, selectedCol, shortcuts.tardeReducido)
         return
       }
       if (event.shiftKey) return
@@ -936,10 +949,21 @@ export function CalendarioMantencionPage() {
     if (!m) return false
     const shiftStart = m[1] ?? ''
     const shiftDuration = rangeDurationMinutes(m[1] ?? '', m[2] ?? '')
-    const normalDuration = rangeDurationMinutes(shiftConfig.diaInicio, shiftConfig.diaFin)
     const reductionMinutes = Math.max(0, Math.round(toNumberOr(hoursConfig.dayReductionHours, 1) * 60))
-    if (shiftDuration === null || normalDuration === null || reductionMinutes <= 0) return false
-    return shiftStart === shiftConfig.diaInicio && shiftDuration === (normalDuration - reductionMinutes)
+    if (shiftDuration === null || reductionMinutes <= 0) return false
+
+    const normalDayDuration = rangeDurationMinutes(shiftConfig.diaInicio, shiftConfig.diaFin)
+    const normalAfternoonDuration = rangeDurationMinutes(shiftConfig.tardeInicio, shiftConfig.tardeFin)
+    const normalNightDuration = rangeDurationMinutes(shiftConfig.nocheInicio, shiftConfig.nocheFin)
+
+    const matchesReducedRange = (start: string, normalDuration: number | null): boolean => {
+      if (normalDuration === null || normalDuration <= reductionMinutes) return false
+      return shiftStart === start && shiftDuration === (normalDuration - reductionMinutes)
+    }
+
+    return matchesReducedRange(shiftConfig.diaInicio, normalDayDuration)
+      || matchesReducedRange(shiftConfig.tardeInicio, normalAfternoonDuration)
+      || matchesReducedRange(shiftConfig.nocheInicio, normalNightDuration)
   }
 
   const visibleMetaIndices = useMemo(() => {
@@ -1068,7 +1092,7 @@ export function CalendarioMantencionPage() {
     }
     setShiftConfig(next)
     safeStorageSet(SHIFT_CONFIG_KEY, next)
-    setStatus('Plantillas de turno actualizadas. Atajos en calendario: D=Dia, T=Tarde, N=Noche, L=Libre, V=Vacaciones, Shift+D=Dia reducida, Shift+N=Noche reducida.')
+    setStatus('Plantillas de turno actualizadas. Atajos en calendario: D=Dia, T=Tarde, N=Noche, L=Libre, V=Vacaciones, Shift+D=Dia reducida, Shift+T=Tarde reducida, Shift+N=Noche reducida.')
   }
 
   function handleFileUpload(file: File | null) {
@@ -1694,7 +1718,7 @@ export function CalendarioMantencionPage() {
           </div>
         </div>
         <div className="mb-1 flex items-center justify-between gap-2">
-          <div className="text-xs text-muted-foreground">Atajos sobre celda seleccionada (solo tras click en calendario): D = Día, T = Tarde, N = Noche, L = Libre, V = Vacaciones, Shift+D = Día reducido, Shift+N = Noche reducida. Para feriado usa “Marcar feriado (día)”.</div>
+          <div className="text-xs text-muted-foreground">Atajos sobre celda seleccionada (solo tras click en calendario): D = Día, T = Tarde, N = Noche, L = Libre, V = Vacaciones, Shift+D = Día reducido, Shift+T = Tarde reducida, Shift+N = Noche reducida. Para feriado usa “Marcar feriado (día)”.</div>
           <div className={`shrink-0 rounded border px-2 py-0.5 text-[11px] ${calendarShortcutsActive ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-300' : 'border-border bg-muted text-muted-foreground'}`}>
             Atajos: {calendarShortcutsActive ? 'Activos' : 'Inactivos'}
           </div>
