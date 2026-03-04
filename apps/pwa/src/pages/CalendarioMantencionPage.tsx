@@ -56,6 +56,19 @@ const CALENDAR_FIRESTORE_PATH = ['calendario_mantencion_state', 'current'] as co
 type TabId = 'edicion' | 'plantillas' | 'horas' | 'tecnicos' | 'control'
 type SyncState = 'idle' | 'saving' | 'synced' | 'error'
 type ControlSortKey = 'name' | 'deltaWeek' | 'deltaMonth' | 'weekHours' | 'monthHours'
+type ExportScope = 'all' | 'week' | 'month' | 'weeks' | 'months'
+
+type ShiftStyleSamples = {
+  dia?: number
+  tarde?: number
+  noche?: number
+  libre?: number
+  vacaciones?: number
+  feriado?: number
+  diaReducido?: number
+  tardeReducido?: number
+  nocheReducido?: number
+}
 
 type PersistedCalendarState = {
   version: number
@@ -285,6 +298,8 @@ export function CalendarioMantencionPage() {
   const [selectedShift, setSelectedShift] = useState('')
   const [selectedWeek, setSelectedWeek] = useState('')
   const [selectedMonth, setSelectedMonth] = useState('')
+  const [exportScope, setExportScope] = useState<ExportScope>('month')
+  const [exportSpanCount, setExportSpanCount] = useState(2)
   const [showAllCols, setShowAllCols] = useState(false)
   const [activeTab, setActiveTab] = useState<TabId>('edicion')
   const [newTechName, setNewTechName] = useState('')
@@ -326,6 +341,7 @@ export function CalendarioMantencionPage() {
   const isHydratingRemoteRef = useRef(false)
   const hasLoadedCalendarRef = useRef(false)
   const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const shiftStyleSamplesRef = useRef<ShiftStyleSamples>({})
   const [calendarShortcutsActive, setCalendarShortcutsActive] = useState(false)
 
   const shortcuts = useMemo(() => {
@@ -558,6 +574,7 @@ export function CalendarioMantencionPage() {
     setDayCols(finalCols)
     setTechRows(techs)
     setTurnosCatalog(Array.from(new Set([...catalog, 'LIBRE'])))
+    inferShiftStyleSamples(horarioSheet, techs, finalCols)
 
     const firstTech = techs[0]
     const firstDay = finalCols[0]
@@ -838,10 +855,12 @@ export function CalendarioMantencionPage() {
 
     const addr = XLSX.utils.encode_cell({ r, c })
     const current = sheet[addr]
-    if (!current) sheet[addr] = { t: 's', v: value }
+    const styleId = c >= 7 ? styleIdForShift(value) : undefined
+    if (!current) sheet[addr] = styleId !== undefined ? { t: 's', v: value, s: styleId } : { t: 's', v: value }
     else {
       current.t = 's'
       current.v = value
+      if (styleId !== undefined) current.s = styleId
       delete current.w
     }
   }
@@ -866,6 +885,51 @@ export function CalendarioMantencionPage() {
   function normalizeWeekdayLabel(label: string): string {
     if (!label) return label
     return label.charAt(0).toUpperCase() + label.slice(1)
+  }
+
+  function detectShiftStyleKey(value: string): keyof ShiftStyleSamples | null {
+    const text = value.trim().toLowerCase()
+    if (!text) return null
+    if (text.includes('feriado')) return 'feriado'
+    if (text.includes('vacaciones')) return 'vacaciones'
+    if (text.includes('libre') || text.includes('descanso') || text.includes('licencia')) return 'libre'
+    if (isReducedShift(value)) {
+      if (text.includes(shiftConfig.diaInicio.toLowerCase()) || text.includes('08:00') || text.includes('07:00')) return 'diaReducido'
+      if (text.includes(shiftConfig.tardeInicio.toLowerCase()) || text.includes('16:00') || text.includes('14:00') || text.includes('13:00')) return 'tardeReducido'
+      if (text.includes(shiftConfig.nocheInicio.toLowerCase()) || text.includes('00:00')) return 'nocheReducido'
+    }
+    if (text.includes(shiftConfig.diaInicio.toLowerCase()) || text.includes('08:00') || text.includes('07:00')) return 'dia'
+    if (text.includes(shiftConfig.tardeInicio.toLowerCase()) || text.includes('16:00') || text.includes('14:00') || text.includes('13:00')) return 'tarde'
+    if (text.includes(shiftConfig.nocheInicio.toLowerCase()) || text.includes('00:00')) return 'noche'
+    return null
+  }
+
+  function inferShiftStyleSamples(sheet: XLSX.WorkSheet, techs: TechRow[], cols: DayCol[]): void {
+    const samples: ShiftStyleSamples = {}
+    for (const tech of techs) {
+      for (const d of cols) {
+        const value = tech.shifts[d.c] || ''
+        const key = detectShiftStyleKey(value)
+        if (!key || samples[key] !== undefined) continue
+        const addr = XLSX.utils.encode_cell({ r: tech.r, c: d.c })
+        const cell = sheet[addr]
+        const styleId = typeof cell?.s === 'number' ? cell.s : undefined
+        if (styleId !== undefined) samples[key] = styleId
+      }
+    }
+    shiftStyleSamplesRef.current = samples
+  }
+
+  function styleIdForShift(value: string): number | undefined {
+    const key = detectShiftStyleKey(value)
+    if (!key) return undefined
+    const samples = shiftStyleSamplesRef.current
+    if (samples[key] !== undefined) return samples[key]
+    if (key === 'diaReducido') return samples.dia
+    if (key === 'tardeReducido') return samples.tarde
+    if (key === 'nocheReducido') return samples.noche
+    if (key === 'feriado') return samples.libre
+    return undefined
   }
 
   function classifyShift(value: string): string {
@@ -1122,11 +1186,108 @@ export function CalendarioMantencionPage() {
     })
   }
 
+  function selectedExportCols(): DayCol[] {
+    if (exportScope === 'all') return [...dayCols]
+    if (exportScope === 'week') return dayCols.filter((d) => d.dateObj && isoWeekKey(d.dateObj) === selectedWeek)
+    if (exportScope === 'month') return dayCols.filter((d) => d.dateObj && monthKey(d.dateObj) === selectedMonth)
+
+    const count = Math.max(1, Math.floor(exportSpanCount || 1))
+    if (exportScope === 'weeks') {
+      const weekOrder = Array.from(new Set(dayCols.map((d) => (d.dateObj ? isoWeekKey(d.dateObj) : '')).filter(Boolean)))
+      const startIndex = Math.max(0, weekOrder.indexOf(selectedWeek))
+      const selectedWeeks = new Set(weekOrder.slice(startIndex, startIndex + count))
+      return dayCols.filter((d) => d.dateObj && selectedWeeks.has(isoWeekKey(d.dateObj)))
+    }
+
+    const monthOrder = Array.from(new Set(dayCols.map((d) => (d.dateObj ? monthKey(d.dateObj) : '')).filter(Boolean)))
+    const startIndex = Math.max(0, monthOrder.indexOf(selectedMonth))
+    const selectedMonths = new Set(monthOrder.slice(startIndex, startIndex + count))
+    return dayCols.filter((d) => d.dateObj && selectedMonths.has(monthKey(d.dateObj)))
+  }
+
+  function buildExportSheet(source: XLSX.WorkSheet, colsToExport: DayCol[]): XLSX.WorkSheet {
+    const range = XLSX.utils.decode_range(source['!ref'] || 'A1:A1')
+    const keptCols = [...Array.from({ length: 7 }, (_, i) => i), ...colsToExport.map((d) => d.c)]
+    const colMap = new Map<number, number>()
+    keptCols.forEach((oldCol, index) => colMap.set(oldCol, index))
+
+    const out: XLSX.WorkSheet = {}
+    for (let r = 0; r <= range.e.r; r++) {
+      keptCols.forEach((oldCol) => {
+        const newCol = colMap.get(oldCol)
+        if (newCol === undefined) return
+        const srcAddr = XLSX.utils.encode_cell({ r, c: oldCol })
+        const srcCell = source[srcAddr]
+        if (!srcCell) return
+        const dstAddr = XLSX.utils.encode_cell({ r, c: newCol })
+        out[dstAddr] = { ...srcCell }
+      })
+    }
+
+    out['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: range.e.r, c: Math.max(0, keptCols.length - 1) } })
+    if (source['!rows']) out['!rows'] = source['!rows']
+    if (source['!cols']) {
+      out['!cols'] = keptCols.map((oldCol) => {
+        const colCfg = source['!cols']?.[oldCol]
+        return colCfg ? { ...colCfg } : { wpx: oldCol < 7 ? META_COL_WIDTHS[oldCol] : DAY_COL_WIDTH }
+      })
+    }
+
+    const merges = source['!merges'] || []
+    if (merges.length > 0) {
+      const outMerges: XLSX.Range[] = []
+      merges.forEach((m) => {
+        const overlapCols = keptCols.filter((col) => col >= m.s.c && col <= m.e.c)
+        if (overlapCols.length === 0) return
+        const firstOverlap = overlapCols[0]
+        const lastOverlap = overlapCols[overlapCols.length - 1]
+        if (firstOverlap === undefined || lastOverlap === undefined) return
+        const startCol = colMap.get(firstOverlap)
+        const endCol = colMap.get(lastOverlap)
+        if (startCol === undefined || endCol === undefined) return
+        outMerges.push({ s: { r: m.s.r, c: startCol }, e: { r: m.e.r, c: endCol } })
+      })
+      if (outMerges.length > 0) out['!merges'] = outMerges
+    }
+
+    return out
+  }
+
   function exportWorkbook() {
     if (!wb) return
-    const outputName = originalFilename.replace(/\.xlsx$/i, '') + '_editado.xlsx'
-    XLSX.writeFile(wb, outputName, { bookType: 'xlsx', compression: true })
-    setStatus(`Archivo exportado: ${outputName}`)
+    const exportCols = selectedExportCols()
+    if (exportCols.length === 0) {
+      setStatus('No hay días para el rango de exportación seleccionado.')
+      return
+    }
+
+    const wbExport = XLSX.utils.book_new()
+    const horarioName = wb.SheetNames.find((n) => n.toLowerCase() === 'horario') ?? wb.SheetNames[0]
+    if (!horarioName) return
+    const horarioSheet = wb.Sheets[horarioName]
+    if (!horarioSheet) return
+
+    wb.SheetNames.forEach((name) => {
+      if (name.toLowerCase() === 'horario') return
+      const sheet = wb.Sheets[name]
+      if (sheet) XLSX.utils.book_append_sheet(wbExport, { ...sheet }, name)
+    })
+
+    XLSX.utils.book_append_sheet(wbExport, buildExportSheet(horarioSheet, exportCols), horarioName)
+
+    const suffix = exportScope === 'all'
+      ? 'completo'
+      : exportScope === 'week'
+        ? 'semana'
+        : exportScope === 'month'
+          ? 'mes'
+          : exportScope === 'weeks'
+            ? `${exportSpanCount}semanas`
+            : `${exportSpanCount}meses`
+
+    const outputName = originalFilename.replace(/\.xlsx$/i, '') + `_editado_${suffix}.xlsx`
+    XLSX.writeFile(wbExport, outputName, { bookType: 'xlsx', compression: true })
+    setStatus(`Archivo exportado (${exportCols.length} días): ${outputName}`)
   }
 
   function handleAddTechnician() {
@@ -1401,6 +1562,28 @@ export function CalendarioMantencionPage() {
               <div className="grid grid-cols-2 gap-1">
                 <button className="h-8 rounded bg-primary text-primary-foreground text-xs" onClick={handleAssignSelected}>Asignar</button>
                 <button className="h-8 rounded border text-xs" onClick={exportWorkbook}>Exportar</button>
+              </div>
+              <div className="grid grid-cols-3 gap-1 text-[11px]">
+                <select className={CONTROL_CLASS + ' h-7'} value={exportScope} onChange={(e) => setExportScope(e.target.value as ExportScope)}>
+                  <option value="month">Mes actual</option>
+                  <option value="week">Semana actual</option>
+                  <option value="months">N meses</option>
+                  <option value="weeks">N semanas</option>
+                  <option value="all">Todo</option>
+                </select>
+                <input
+                  className={CONTROL_CLASS + ' h-7'}
+                  type="number"
+                  min={1}
+                  max={12}
+                  value={exportSpanCount}
+                  onChange={(e) => setExportSpanCount(Math.max(1, Math.floor(toNumberOr(e.target.value, exportSpanCount))))}
+                  disabled={!(exportScope === 'weeks' || exportScope === 'months')}
+                  title="Cantidad para N semanas/N meses"
+                />
+                <div className="h-7 rounded border border-border px-2 flex items-center text-muted-foreground">
+                  {selectedExportCols().length} días
+                </div>
               </div>
               <div className="grid grid-cols-5 gap-1 text-[11px]">
                 <button className="h-7 rounded border" onClick={() => selectedRow && selectedCol !== null && applyShift(selectedRow, selectedCol, shortcuts.dia)}>D</button>
