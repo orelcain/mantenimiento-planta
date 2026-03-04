@@ -69,6 +69,8 @@ type ShiftStyleSamples = {
   nocheReducido?: number
 }
 
+type ShiftColorSamples = Record<string, { bg: string; fg: string }>
+
 type PersistedCalendarState = {
   version: number
   originalFilename?: string
@@ -339,6 +341,7 @@ export function CalendarioMantencionPage() {
   const hasLoadedCalendarRef = useRef(false)
   const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const shiftStyleSamplesRef = useRef<ShiftStyleSamples>({})
+  const shiftColorSamplesRef = useRef<ShiftColorSamples>({})
   const [calendarShortcutsActive, setCalendarShortcutsActive] = useState(false)
 
   const shortcuts = useMemo(() => {
@@ -940,6 +943,11 @@ export function CalendarioMantencionPage() {
 
   function inferShiftStyleSamples(sheet: XLSX.WorkSheet, techs: TechRow[], cols: DayCol[]): void {
     const samples: ShiftStyleSamples = {}
+    const colors: ShiftColorSamples = {}
+    const wbAny = (wb as unknown) as Record<string, unknown> | null
+    const stylesObj = (wbAny?.Styles ?? wbAny?.styles ?? {}) as Record<string, unknown[]>
+    const wbStyles = (stylesObj?.Fills ?? []) as Record<string, unknown>[]
+    const cellXfs = (stylesObj?.CellXf ?? []) as Record<string, unknown>[]
     for (const tech of techs) {
       for (const d of cols) {
         const value = tech.shifts[d.c] || ''
@@ -948,10 +956,24 @@ export function CalendarioMantencionPage() {
         const addr = XLSX.utils.encode_cell({ r: tech.r, c: d.c })
         const cell = sheet[addr]
         const styleId = typeof cell?.s === 'number' ? cell.s : undefined
-        if (styleId !== undefined) samples[key] = styleId
+        if (styleId !== undefined) {
+          samples[key] = styleId
+          // Extract actual RGB fill color from workbook styles
+          const xf = cellXfs[styleId] as Record<string, unknown> | undefined
+          const fillId = (xf?.fillId ?? xf?.fill) as number | undefined
+          if (fillId !== undefined && wbStyles[fillId]) {
+            const fill = wbStyles[fillId] as Record<string, Record<string, unknown> | undefined>
+            const fgColor = (fill?.fgColor?.rgb ?? fill?.bgColor?.rgb) as string | undefined
+            if (fgColor) {
+              const hex = fgColor.length === 8 ? '#' + fgColor.slice(2) : '#' + fgColor
+              colors[key] = { bg: hex, fg: '#000000' }
+            }
+          }
+        }
       }
     }
     shiftStyleSamplesRef.current = samples
+    shiftColorSamplesRef.current = colors
   }
 
   function styleIdForShift(value: string): number | undefined {
@@ -966,34 +988,32 @@ export function CalendarioMantencionPage() {
     return undefined
   }
 
-  function classifyShift(value: string): string {
+  function shiftCellStyle(value: string): { className: string; style?: React.CSSProperties } {
+    const key = detectShiftStyleKey(value)
+    const colors = shiftColorSamplesRef.current
+    if (key && colors[key]) {
+      return { className: 'text-black font-medium', style: { backgroundColor: colors[key].bg } }
+    }
+    // Fallback defaults when no Excel template colors available
     const v = value.toLowerCase()
     const reduced = isReducedShift(value)
-    if (v.includes('feriado')) return 'bg-fuchsia-100 text-fuchsia-900 dark:bg-fuchsia-900/25 dark:text-fuchsia-200'
-    if (!v || v.includes('libre') || v.includes('descanso') || v.includes('vacaciones') || v.includes('licencia')) return 'bg-rose-100 text-rose-900 dark:bg-rose-900/25 dark:text-rose-200'
+    if (v.includes('feriado')) return { className: 'bg-fuchsia-100 text-fuchsia-900 dark:bg-fuchsia-900/25 dark:text-fuchsia-200' }
+    if (!v || v.includes('libre') || v.includes('descanso') || v.includes('vacaciones') || v.includes('licencia')) return { className: 'bg-rose-100 text-rose-900 dark:bg-rose-900/25 dark:text-rose-200' }
     const nocheStart = shiftConfig.nocheInicio.toLowerCase()
     const nocheEnd = shiftConfig.nocheFin.toLowerCase()
     if (v.includes(`${nocheStart} - ${nocheEnd}`) || (v.includes(nocheStart) && v.includes(nocheEnd)) || v.includes('00:00 - 08:00')) {
-      return reduced
-        ? 'bg-sky-100 text-sky-800 dark:bg-sky-500/20 dark:text-sky-100'
-        : 'bg-sky-200/80 text-sky-900 dark:bg-sky-500/35 dark:text-sky-100'
+      return { className: reduced ? 'bg-sky-100 text-sky-800 dark:bg-sky-500/20 dark:text-sky-100' : 'bg-sky-200/80 text-sky-900 dark:bg-sky-500/35 dark:text-sky-100' }
     }
     if (v.includes(shiftConfig.diaInicio.toLowerCase()) || v.includes('08:00') || v.includes('07:00')) {
-      return reduced
-        ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-900/15 dark:text-emerald-100'
-        : 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/25 dark:text-emerald-200'
+      return { className: reduced ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-900/15 dark:text-emerald-100' : 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/25 dark:text-emerald-200' }
     }
     if (v.includes(shiftConfig.tardeInicio.toLowerCase()) || v.includes('16:00') || v.includes('14:00') || v.includes('13:00')) {
-      return reduced
-        ? 'bg-amber-50 text-amber-800 dark:bg-amber-900/15 dark:text-amber-100'
-        : 'bg-amber-100 text-amber-900 dark:bg-amber-900/25 dark:text-amber-200'
+      return { className: reduced ? 'bg-amber-50 text-amber-800 dark:bg-amber-900/15 dark:text-amber-100' : 'bg-amber-100 text-amber-900 dark:bg-amber-900/25 dark:text-amber-200' }
     }
     if (v.includes('00:00')) {
-      return reduced
-        ? 'bg-sky-100 text-sky-800 dark:bg-sky-500/20 dark:text-sky-100'
-        : 'bg-sky-200/80 text-sky-900 dark:bg-sky-500/35 dark:text-sky-100'
+      return { className: reduced ? 'bg-sky-100 text-sky-800 dark:bg-sky-500/20 dark:text-sky-100' : 'bg-sky-200/80 text-sky-900 dark:bg-sky-500/35 dark:text-sky-100' }
     }
-    return ''
+    return { className: '' }
   }
 
   function isWorkingShift(shiftText: string): boolean {
@@ -1983,11 +2003,12 @@ export function CalendarioMantencionPage() {
                     {dayCols.map((d, idx) => {
                       const value = tech.shifts[d.c] || ''
                       const isSelectedCell = selectedRow === tech.r && selectedCol === d.c
+                      const cellStyle = shiftCellStyle(value)
                       return (
                         <td
                           key={`shift-${tech.r}-${d.c}`}
-                          className={`border px-1 py-1 text-center cursor-pointer ${classifyShift(value)} ${isSelectedCell ? 'ring-2 ring-primary ring-inset' : ''} ${isSameDate(d.dateObj, todayDayCol?.dateObj ?? null) ? 'border-x-2 border-yellow-300/80' : ''} ${isWeekStart(idx) ? 'border-l-2 border-l-cyan-300/80' : ''}`}
-                          style={{ minWidth: `${DAY_COL_WIDTH}px`, maxWidth: `${DAY_COL_WIDTH}px` }}
+                          className={`border px-1 py-1 text-center cursor-pointer ${cellStyle.className} ${isSelectedCell ? 'ring-2 ring-primary ring-inset' : ''} ${isSameDate(d.dateObj, todayDayCol?.dateObj ?? null) ? 'border-x-2 border-yellow-300/80' : ''} ${isWeekStart(idx) ? 'border-l-2 border-l-cyan-300/80' : ''}`}
+                          style={{ minWidth: `${DAY_COL_WIDTH}px`, maxWidth: `${DAY_COL_WIDTH}px`, ...cellStyle.style }}
                           title={value}
                           onClick={() => {
                             setSelectedRow(tech.r)
