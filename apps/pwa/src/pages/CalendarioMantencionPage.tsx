@@ -153,6 +153,22 @@ function hhmmToMinutes(hhmm: string): number | null {
   return h * 60 + m
 }
 
+function minutesToHHMM(totalMinutes: number): string {
+  const normalized = ((totalMinutes % (24 * 60)) + (24 * 60)) % (24 * 60)
+  const h = Math.floor(normalized / 60)
+  const m = normalized % 60
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
+
+function rangeDurationMinutes(startHHMM: string, endHHMM: string): number | null {
+  const start = hhmmToMinutes(startHHMM)
+  const end = hhmmToMinutes(endHHMM)
+  if (start === null || end === null) return null
+  let diff = end - start
+  if (diff <= 0) diff += 24 * 60
+  return diff
+}
+
 function toNumberOr(value: unknown, fallback: number): number {
   const n = Number(value)
   return Number.isFinite(n) ? n : fallback
@@ -313,9 +329,16 @@ export function CalendarioMantencionPage() {
     const tarde = `${shiftConfig.tardeInicio} - ${shiftConfig.tardeFin}`
     const noche = `${shiftConfig.nocheInicio} - ${shiftConfig.nocheFin}`
     const libre = shiftConfig.libreLabel || 'LIBRE'
-    const diaReducido = `${dia} [RED]`
+    const reductionMinutes = Math.max(0, Math.round(toNumberOr(hoursConfig.dayReductionHours, 1) * 60))
+    const normalDuration = rangeDurationMinutes(shiftConfig.diaInicio, shiftConfig.diaFin)
+    const dayStartMinutes = hhmmToMinutes(shiftConfig.diaInicio)
+    let diaReducido = dia
+    if (normalDuration !== null && dayStartMinutes !== null && reductionMinutes > 0 && normalDuration > reductionMinutes) {
+      const reducedEnd = minutesToHHMM(dayStartMinutes + (normalDuration - reductionMinutes))
+      diaReducido = `${shiftConfig.diaInicio} - ${reducedEnd}`
+    }
     return { dia, tarde, noche, libre, diaReducido }
-  }, [shiftConfig])
+  }, [hoursConfig.dayReductionHours, shiftConfig])
 
   const weeks = useMemo(() => {
     const map: Record<string, string> = {}
@@ -870,11 +893,22 @@ export function CalendarioMantencionPage() {
     if (start === null || end === null) return Math.max(0, effectiveDailyHours() - reduction)
     let diff = end - start
     if (diff <= 0) diff += 24 * 60
-    return Math.max(0, diff / 60 - hoursConfig.breakHours - reduction)
+    return Math.max(0, diff / 60 - hoursConfig.breakHours)
   }
 
   function isReducedShift(shiftText: string): boolean {
-    return shiftText.toUpperCase().includes('[RED]')
+    const text = shiftText.trim()
+    if (!text) return false
+    if (text.toUpperCase().includes('[RED]')) return true
+
+    const m = text.match(/(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/)
+    if (!m) return false
+    const shiftStart = m[1] ?? ''
+    const shiftDuration = rangeDurationMinutes(m[1] ?? '', m[2] ?? '')
+    const normalDuration = rangeDurationMinutes(shiftConfig.diaInicio, shiftConfig.diaFin)
+    const reductionMinutes = Math.max(0, Math.round(toNumberOr(hoursConfig.dayReductionHours, 1) * 60))
+    if (shiftDuration === null || normalDuration === null || reductionMinutes <= 0) return false
+    return shiftStart === shiftConfig.diaInicio && shiftDuration === (normalDuration - reductionMinutes)
   }
 
   const visibleMetaIndices = useMemo(() => {
