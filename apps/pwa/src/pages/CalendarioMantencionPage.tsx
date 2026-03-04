@@ -298,6 +298,7 @@ export function CalendarioMantencionPage() {
     if (groups.length === 0) return ['A', 'B', 'C']
     return groups
   }, [techRows])
+  const baseGroupOptions = useMemo(() => Array.from(new Set([...techGroups, 'A', 'B', 'C'])), [techGroups])
 
   useEffect(() => {
     if (!techGroups.includes(newTechGroup)) {
@@ -736,6 +737,22 @@ export function CalendarioMantencionPage() {
     setStatus(`Vacaciones aplicadas a ${updated} día(s).`)
   }
 
+  function handleUpdateTechnicianMeta(row: number, nextGroup: string, nextArea: string) {
+    const groupValue = (nextGroup || '').trim().toUpperCase()
+    const areaValue = (nextArea || '').trim()
+    setTechRows((prev) => prev.map((tech) => {
+      if (tech.r !== row) return tech
+      const updated = {
+        ...tech,
+        turno: groupValue || tech.turno,
+        area: areaValue || tech.area,
+      }
+      setCellValue(row, 0, updated.turno)
+      setCellValue(row, 1, updated.area)
+      return updated
+    }))
+  }
+
   function scrollToToday() {
     const container = calendarScrollRef.current
     const todayCol = todayDayCol
@@ -942,8 +959,24 @@ export function CalendarioMantencionPage() {
                     <tr key={tech.r} className="border-t border-border hover:bg-muted/30">
                       <td className="px-2 py-1">{tech.name}</td>
                       <td className="px-2 py-1">{tech.rut || '-'}</td>
-                      <td className="px-2 py-1">{tech.turno || '-'}</td>
-                      <td className="px-2 py-1">{tech.area || '-'}</td>
+                      <td className="px-2 py-1">
+                        <select
+                          className={CONTROL_CLASS + ' h-7 text-[11px]'}
+                          value={tech.turno || ''}
+                          onChange={(e) => handleUpdateTechnicianMeta(tech.r, e.target.value, tech.area)}
+                        >
+                          {Array.from(new Set([...baseGroupOptions, tech.turno].filter(Boolean))).map((group) => (
+                            <option key={group} value={group}>{group}</option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="px-2 py-1">
+                        <input
+                          className={CONTROL_CLASS + ' h-7 text-[11px]'}
+                          value={tech.area || ''}
+                          onChange={(e) => handleUpdateTechnicianMeta(tech.r, tech.turno, e.target.value)}
+                        />
+                      </td>
                     </tr>
                   ))}
                 </tbody>
