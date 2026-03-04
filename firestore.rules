@@ -666,6 +666,12 @@ service cloud.firestore {
     // ============================================
     // GANTT - Planificación de mantenimiento
     // ============================================
+    match /calendario_mantencion_state/{docId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
     match /ganttTasks/{taskId} {
       allow read: if isAuthenticated();
       allow create, update, delete: if isAuthenticated();

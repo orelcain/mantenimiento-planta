@@ -73,6 +73,7 @@ type PersistedCalendarState = {
 const DAY_COL_WIDTH = 88
 const HOURS_CONFIG_KEY = 'calendario_mantencion_hours_config_v1'
 const SHIFT_CONFIG_KEY = 'calendario_mantencion_shift_config_v1'
+const CALENDAR_LOCAL_CACHE_KEY = 'calendario_mantencion_state_local_v1'
 const CONTROL_CLASS = 'h-8 rounded border border-border bg-background px-2 text-xs text-foreground [color-scheme:dark]'
 
 function defaultHoursConfig(): HoursConfig {
@@ -492,61 +493,75 @@ export function CalendarioMantencionPage() {
   }
 
   async function hydrateCalendarFromFirebase(sheet: XLSX.WorkSheet, filename: string): Promise<void> {
-    try {
-      isHydratingRemoteRef.current = true
-      const snap = await getDoc(doc(db, CALENDAR_FIRESTORE_PATH[0], CALENDAR_FIRESTORE_PATH[1]))
-      if (!snap.exists()) {
-        hasLoadedCalendarRef.current = true
-        return
-      }
-
-      const data = snap.data() as PersistedCalendarState
+    const applyPersistedState = (data: PersistedCalendarState): boolean => {
       const persistedRows = Array.isArray(data.techRows) ? data.techRows : []
 
       if (data.hoursConfig) setHoursConfig({ ...defaultHoursConfig(), ...data.hoursConfig })
       if (data.shiftConfig) setShiftConfig({ ...defaultShiftConfig(), ...data.shiftConfig })
       if (data.originalFilename) setOriginalFilename(data.originalFilename)
 
-      if (persistedRows.length > 0) {
-        const restored: TechRow[] = persistedRows.map((row) => {
-          const shifts: Record<number, string> = {}
-          Object.entries(row.shifts || {}).forEach(([k, v]) => {
-            const col = Number(k)
-            if (!Number.isNaN(col)) shifts[col] = String(v || '')
-          })
-          return {
-            r: Number(row.r),
-            turno: String(row.turno || ''),
-            area: String(row.area || ''),
-            ceco: String(row.ceco || ''),
-            cargo: String(row.cargo || ''),
-            direccion: String(row.direccion || ''),
-            rut: String(row.rut || ''),
-            name: String(row.name || ''),
-            shifts,
-          }
-        })
+      if (persistedRows.length === 0) return false
 
-        restored.forEach((tech) => {
-          setCellValue(tech.r, 0, tech.turno, sheet)
-          setCellValue(tech.r, 1, tech.area, sheet)
-          setCellValue(tech.r, 2, tech.ceco, sheet)
-          setCellValue(tech.r, 3, tech.cargo, sheet)
-          setCellValue(tech.r, 4, tech.direccion, sheet)
-          setCellValue(tech.r, 5, tech.rut, sheet)
-          setCellValue(tech.r, 6, tech.name, sheet)
-          Object.entries(tech.shifts).forEach(([col, value]) => {
-            setCellValue(tech.r, Number(col), value, sheet)
-          })
+      const restored: TechRow[] = persistedRows.map((row) => {
+        const shifts: Record<number, string> = {}
+        Object.entries(row.shifts || {}).forEach(([k, v]) => {
+          const col = Number(k)
+          if (!Number.isNaN(col)) shifts[col] = String(v || '')
         })
+        return {
+          r: Number(row.r),
+          turno: String(row.turno || ''),
+          area: String(row.area || ''),
+          ceco: String(row.ceco || ''),
+          cargo: String(row.cargo || ''),
+          direccion: String(row.direccion || ''),
+          rut: String(row.rut || ''),
+          name: String(row.name || ''),
+          shifts,
+        }
+      })
 
-        setTechRows(restored)
-        setSelectedRow(restored[0]?.r ?? null)
+      restored.forEach((tech) => {
+        setCellValue(tech.r, 0, tech.turno, sheet)
+        setCellValue(tech.r, 1, tech.area, sheet)
+        setCellValue(tech.r, 2, tech.ceco, sheet)
+        setCellValue(tech.r, 3, tech.cargo, sheet)
+        setCellValue(tech.r, 4, tech.direccion, sheet)
+        setCellValue(tech.r, 5, tech.rut, sheet)
+        setCellValue(tech.r, 6, tech.name, sheet)
+        Object.entries(tech.shifts).forEach(([col, value]) => {
+          setCellValue(tech.r, Number(col), value, sheet)
+        })
+      })
+
+      setTechRows(restored)
+      setSelectedRow(restored[0]?.r ?? null)
+      return true
+    }
+
+    try {
+      isHydratingRemoteRef.current = true
+      const snap = await getDoc(doc(db, CALENDAR_FIRESTORE_PATH[0], CALENDAR_FIRESTORE_PATH[1]))
+      if (!snap.exists()) {
+        const cached = safeStorageGet<PersistedCalendarState | null>(CALENDAR_LOCAL_CACHE_KEY, null)
+        if (cached && applyPersistedState(cached)) {
+          setStatus(`Plantilla cargada con respaldo local: ${filename}`)
+        }
+        hasLoadedCalendarRef.current = true
+        return
       }
+
+      const data = snap.data() as PersistedCalendarState
+      applyPersistedState(data)
 
       setStatus(`Plantilla cargada y sincronizada desde Firebase: ${filename}`)
     } catch (error) {
-      setStatus(`Plantilla cargada localmente (sin sync Firebase): ${filename}`)
+      const cached = safeStorageGet<PersistedCalendarState | null>(CALENDAR_LOCAL_CACHE_KEY, null)
+      if (cached && applyPersistedState(cached)) {
+        setStatus(`Plantilla cargada con respaldo local (sin permisos Firebase): ${filename}`)
+      } else {
+        setStatus(`Plantilla cargada localmente (sin sync Firebase): ${filename}`)
+      }
       console.warn('No se pudo hidratar calendario desde Firebase', error)
     } finally {
       isHydratingRemoteRef.current = false
@@ -559,10 +574,9 @@ export function CalendarioMantencionPage() {
       setSyncState('saving')
       setSyncErrorText('')
       const currentUser = getCurrentUser()
-      const payload = {
+      const localPayload: PersistedCalendarState = {
         version: 1,
         originalFilename,
-        reason,
         techRows: techRows.map((t) => ({
           r: t.r,
           turno: t.turno,
@@ -576,6 +590,12 @@ export function CalendarioMantencionPage() {
         })),
         hoursConfig,
         shiftConfig,
+      }
+      safeStorageSet(CALENDAR_LOCAL_CACHE_KEY, localPayload)
+
+      const payload = {
+        ...localPayload,
+        reason,
         updatedAt: serverTimestamp(),
         updatedAtClient: Date.now(),
         updatedBy: currentUser?.uid ?? 'anon',
@@ -587,6 +607,7 @@ export function CalendarioMantencionPage() {
       console.warn('No se pudo sincronizar calendario en Firebase', error)
       setSyncState('error')
       setSyncErrorText(error instanceof Error ? error.message : 'Error desconocido')
+      setStatus('Cambios guardados en este navegador, pero sin permisos para sincronizar en Firebase.')
     }
   }, [hoursConfig, originalFilename, shiftConfig, techRows])
 
