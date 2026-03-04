@@ -20,6 +20,14 @@
   body {
     @apply bg-background text-foreground antialiased;
     font-feature-settings: "rlig" 1, "calt" 1;
+    color-scheme: dark;
+  }
+
+  /* Form controls nativos (select, input) respetan dark mode */
+  select,
+  option {
+    color-scheme: dark;
+    background-color: var(--tw-bg-opacity, #1e1e1e);
   }
 
   /* Evitar problemas de passive event listener en contenedores de zoom/pan */

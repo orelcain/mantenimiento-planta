@@ -45,7 +45,7 @@ const META_COL_WIDTHS = [56, 80, 100, 108, 98, 100, 220]
 const DAY_COL_WIDTH = 88
 const HOURS_CONFIG_KEY = 'calendario_mantencion_hours_config_v1'
 const SHIFT_CONFIG_KEY = 'calendario_mantencion_shift_config_v1'
-const CONTROL_CLASS = 'h-8 rounded border border-border bg-background px-2 text-xs text-foreground'
+const CONTROL_CLASS = 'h-8 rounded border border-border bg-background px-2 text-xs text-foreground [color-scheme:dark]'
 
 function defaultHoursConfig(): HoursConfig {
   return {
@@ -787,7 +787,7 @@ export function CalendarioMantencionPage() {
                 {META_COLS.map((h, i) => (
                   <th
                     key={`head1-${h}`}
-                    className="sticky top-0 z-40 border border-primary/70 bg-primary px-1 py-1"
+                    className="sticky top-0 z-[50] border border-primary/70 bg-primary px-1 py-1"
                     style={{ left: `${metaLeft(i)}px`, minWidth: `${META_COL_WIDTHS[i]}px`, maxWidth: `${META_COL_WIDTHS[i]}px` }}
                   >
                     {i === 0 ? 'PLANTA' : ''}
@@ -797,18 +797,18 @@ export function CalendarioMantencionPage() {
                   <th key={`day-${d.c}`} className="sticky top-0 z-20 border border-primary/70 bg-primary px-1 py-1" style={{ minWidth: `${DAY_COL_WIDTH}px`, maxWidth: `${DAY_COL_WIDTH}px` }}>{d.dayLabel}</th>
                 ))}
               </tr>
-              <tr className="bg-primary/90 text-primary-foreground">
+              <tr className="bg-primary text-primary-foreground">
                 {META_COLS.map((h, i) => (
                   <th
                     key={`head2-${h}`}
-                    className="sticky top-[30px] z-40 border border-primary/70 bg-primary/95 px-1 py-1"
+                    className="sticky top-[30px] z-[50] border border-primary/70 bg-primary px-1 py-1"
                     style={{ left: `${metaLeft(i)}px`, minWidth: `${META_COL_WIDTHS[i]}px`, maxWidth: `${META_COL_WIDTHS[i]}px` }}
                   >
                     {h}
                   </th>
                 ))}
                 {dayCols.map((d) => (
-                  <th key={`date-${d.c}`} className="sticky top-[30px] z-20 border border-primary/70 bg-primary/95 px-1 py-1" style={{ minWidth: `${DAY_COL_WIDTH}px`, maxWidth: `${DAY_COL_WIDTH}px` }}>{formatDate(d.dateObj) || d.dateRaw}</th>
+                  <th key={`date-${d.c}`} className="sticky top-[30px] z-20 border border-primary/70 bg-primary px-1 py-1" style={{ minWidth: `${DAY_COL_WIDTH}px`, maxWidth: `${DAY_COL_WIDTH}px` }}>{formatDate(d.dateObj) || d.dateRaw}</th>
                 ))}
               </tr>
             </thead>
@@ -820,7 +820,7 @@ export function CalendarioMantencionPage() {
                     {[tech.turno, tech.area, tech.ceco, tech.cargo, tech.direccion, tech.rut, tech.name].map((m, i) => (
                       <td
                         key={`meta-${tech.r}-${i}`}
-                        className="sticky z-30 border bg-card px-1 py-1 text-left truncate text-foreground"
+                        className="sticky z-[35] border bg-card px-1 py-1 text-left truncate text-foreground"
                         style={{ left: `${metaLeft(i)}px`, minWidth: `${META_COL_WIDTHS[i]}px`, maxWidth: `${META_COL_WIDTHS[i]}px` }}
                         title={m}
                       >
