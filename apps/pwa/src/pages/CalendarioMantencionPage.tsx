@@ -55,6 +55,7 @@ const CALENDAR_FIRESTORE_PATH = ['calendario_mantencion_state', 'current'] as co
 
 type TabId = 'edicion' | 'plantillas' | 'horas' | 'tecnicos' | 'control'
 type SyncState = 'idle' | 'saving' | 'synced' | 'error'
+type ControlSortKey = 'name' | 'deltaWeek' | 'deltaMonth' | 'weekHours' | 'monthHours'
 
 type PersistedCalendarState = {
   version: number
@@ -295,6 +296,8 @@ export function CalendarioMantencionPage() {
   const [vacationEnd, setVacationEnd] = useState('')
   const [techDrafts, setTechDrafts] = useState<Record<number, { turno: string; area: string }>>({})
   const [controlTechRow, setControlTechRow] = useState<number | null>(null)
+  const [controlSortKey, setControlSortKey] = useState<ControlSortKey>('deltaWeek')
+  const [controlSortDir, setControlSortDir] = useState<'asc' | 'desc'>('asc')
 
   const [hoursConfig, setHoursConfig] = useState<HoursConfig>(() => {
     const stored = safeStorageGet<HoursConfig>(HOURS_CONFIG_KEY, defaultHoursConfig())
@@ -1065,6 +1068,33 @@ export function CalendarioMantencionPage() {
     return focused ?? hoursRows[0]
   }, [controlTechRow, hoursRows])
 
+  const controlSummary = useMemo(() => {
+    const total = hoursRows.length
+    const weekOk = hoursRows.filter((row) => row.deltaWeek >= -hoursConfig.toleranceHours).length
+    const monthOk = hoursRows.filter((row) => row.deltaMonth >= -hoursConfig.toleranceHours).length
+    const risk = hoursRows.filter((row) => row.deltaWeek < -hoursConfig.toleranceHours || row.deltaMonth < -hoursConfig.toleranceHours).length
+    return {
+      total,
+      weekOk,
+      monthOk,
+      risk,
+    }
+  }, [hoursConfig.toleranceHours, hoursRows])
+
+  const sortedHoursRows = useMemo(() => {
+    const rows = [...hoursRows]
+    rows.sort((a, b) => {
+      let cmp = 0
+      if (controlSortKey === 'name') cmp = a.tech.name.localeCompare(b.tech.name)
+      if (controlSortKey === 'deltaWeek') cmp = a.deltaWeek - b.deltaWeek
+      if (controlSortKey === 'deltaMonth') cmp = a.deltaMonth - b.deltaMonth
+      if (controlSortKey === 'weekHours') cmp = a.weekHours - b.weekHours
+      if (controlSortKey === 'monthHours') cmp = a.monthHours - b.monthHours
+      return controlSortDir === 'asc' ? cmp : -cmp
+    })
+    return rows
+  }, [controlSortDir, controlSortKey, hoursRows])
+
   function handleAssignSelected() {
     if (!selectedRow || selectedCol === null || !selectedShift) return
     applyShift(selectedRow, selectedCol, selectedShift)
@@ -1610,12 +1640,49 @@ export function CalendarioMantencionPage() {
                 </select>
               </div>
             </div>
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 text-xs">
+              <div className="rounded border bg-emerald-500/10 border-emerald-500/30 p-2">
+                <div className="text-muted-foreground">Cumplen Semana</div>
+                <div className="font-semibold tabular-nums">{controlSummary.weekOk} / {controlSummary.total}</div>
+              </div>
+              <div className="rounded border bg-emerald-500/10 border-emerald-500/30 p-2">
+                <div className="text-muted-foreground">Cumplen Mes</div>
+                <div className="font-semibold tabular-nums">{controlSummary.monthOk} / {controlSummary.total}</div>
+              </div>
+              <div className="rounded border bg-red-500/10 border-red-500/30 p-2">
+                <div className="text-muted-foreground">En Riesgo</div>
+                <div className="font-semibold tabular-nums">{controlSummary.risk}</div>
+              </div>
+              <div className="rounded border p-2">
+                <div className="text-muted-foreground">Tolerancia activa</div>
+                <div className="font-semibold tabular-nums">± {hoursConfig.toleranceHours.toFixed(1)} h</div>
+              </div>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px]">
               <div className="rounded border bg-muted/20 px-2 py-1">
                 <span className="text-muted-foreground">Semana seleccionada:</span> <span className="font-semibold">{weeks[selectedWeek] || '-'}</span>
               </div>
               <div className="rounded border bg-muted/20 px-2 py-1">
                 <span className="text-muted-foreground">Mes seleccionado:</span> <span className="font-semibold">{months[selectedMonth] || '-'}</span>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+              <div>
+                <label className="text-muted-foreground">Ordenar por</label>
+                <select className={CONTROL_CLASS + ' w-full mt-0.5'} value={controlSortKey} onChange={(e) => setControlSortKey(e.target.value as ControlSortKey)}>
+                  <option value="deltaWeek">Δ Semana</option>
+                  <option value="deltaMonth">Δ Mes</option>
+                  <option value="weekHours">Horas Semana</option>
+                  <option value="monthHours">Horas Mes</option>
+                  <option value="name">Nombre</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-muted-foreground">Dirección</label>
+                <select className={CONTROL_CLASS + ' w-full mt-0.5'} value={controlSortDir} onChange={(e) => setControlSortDir(e.target.value as 'asc' | 'desc')}>
+                  <option value="asc">Ascendente</option>
+                  <option value="desc">Descendente</option>
+                </select>
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-2 text-xs">
@@ -1644,11 +1711,12 @@ export function CalendarioMantencionPage() {
               <table className="w-full text-[11px]">
                 <thead className="bg-muted text-foreground sticky top-0 z-10">
                   <tr className="border-b border-border/70 bg-muted/60">
-                    <th className="px-2 py-1 text-left">Técnico</th>
+                    <th className="px-2 py-1 text-left" colSpan={2}>Técnico</th>
                     <th className="px-2 py-1 text-center" colSpan={6}>Semana</th>
                     <th className="px-2 py-1 text-center" colSpan={7}>Mes</th>
                   </tr>
                   <tr>
+                    <th className="px-2 py-1 text-left w-14">Estado</th>
                     <th className="px-2 py-1 text-left">Técnico</th>
                     <th className="px-2 py-1 text-right w-24">Sem (Real/Esp)</th>
                     <th className="px-2 py-1 w-24">Δ Sem</th>
@@ -1666,13 +1734,19 @@ export function CalendarioMantencionPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {hoursRows.map((row) => {
+                  {sortedHoursRows.map((row) => {
                     const pctW = pctBar(row.weekHours, row.weekExpected)
                     const pctM = pctBar(row.monthHours, row.monthExpected)
                     const barColorW = row.deltaWeek >= -hoursConfig.toleranceHours ? 'bg-emerald-500' : 'bg-red-500'
                     const barColorM = row.deltaMonth >= -hoursConfig.toleranceHours ? 'bg-emerald-500' : 'bg-red-500'
+                    const rowRisk = row.deltaWeek < -hoursConfig.toleranceHours || row.deltaMonth < -hoursConfig.toleranceHours
                     return (
-                      <tr key={row.tech.r} className="border-t border-border hover:bg-muted/40 transition-colors">
+                      <tr key={row.tech.r} className={`border-t border-border transition-colors ${rowRisk ? 'bg-red-500/5 hover:bg-red-500/10' : 'hover:bg-muted/40'}`}>
+                        <td className="px-2 py-1 text-left">
+                          <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${rowRisk ? 'bg-red-500/20 text-red-300' : 'bg-emerald-500/20 text-emerald-300'}`}>
+                            {rowRisk ? 'Riesgo' : 'OK'}
+                          </span>
+                        </td>
                         <td className="px-2 py-1 text-left truncate max-w-[180px]" title={row.tech.name}>{row.tech.name}</td>
                         <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.weekHours.toFixed(1)} / {row.weekExpected.toFixed(1)}</td>
                         <td className="px-2 py-1">
