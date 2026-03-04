@@ -225,6 +225,7 @@ export function CalendarioMantencionPage() {
   const [vacationTechRow, setVacationTechRow] = useState<number | null>(null)
   const [vacationStart, setVacationStart] = useState('')
   const [vacationEnd, setVacationEnd] = useState('')
+  const [techDrafts, setTechDrafts] = useState<Record<number, { turno: string; area: string }>>({})
 
   const [hoursConfig, setHoursConfig] = useState<HoursConfig>(() => {
     const stored = safeStorageGet<HoursConfig>(HOURS_CONFIG_KEY, defaultHoursConfig())
@@ -305,6 +306,20 @@ export function CalendarioMantencionPage() {
       setNewTechGroup(techGroups[0] || 'A')
     }
   }, [newTechGroup, techGroups])
+
+  useEffect(() => {
+    setTechDrafts((prev) => {
+      const next: Record<number, { turno: string; area: string }> = {}
+      techRows.forEach((tech) => {
+        const existing = prev[tech.r]
+        next[tech.r] = {
+          turno: existing?.turno ?? tech.turno,
+          area: existing?.area ?? tech.area,
+        }
+      })
+      return next
+    })
+  }, [techRows])
 
   loadWorkbookRef.current = loadWorkbook
   applyShiftRef.current = applyShift
@@ -737,20 +752,63 @@ export function CalendarioMantencionPage() {
     setStatus(`Vacaciones aplicadas a ${updated} día(s).`)
   }
 
-  function handleUpdateTechnicianMeta(row: number, nextGroup: string, nextArea: string) {
-    const groupValue = (nextGroup || '').trim().toUpperCase()
-    const areaValue = (nextArea || '').trim()
-    setTechRows((prev) => prev.map((tech) => {
-      if (tech.r !== row) return tech
-      const updated = {
-        ...tech,
-        turno: groupValue || tech.turno,
-        area: areaValue || tech.area,
-      }
-      setCellValue(row, 0, updated.turno)
-      setCellValue(row, 1, updated.area)
-      return updated
+  function handleUpdateTechDraft(row: number, nextGroup: string, nextArea: string) {
+    setTechDrafts((prev) => ({
+      ...prev,
+      [row]: {
+        turno: nextGroup,
+        area: nextArea,
+      },
     }))
+  }
+
+  function hasTechDraftChanges(): boolean {
+    return techRows.some((tech) => {
+      const draft = techDrafts[tech.r]
+      if (!draft) return false
+      return draft.turno !== tech.turno || draft.area !== tech.area
+    })
+  }
+
+  function handleDiscardTechDrafts() {
+    const reset: Record<number, { turno: string; area: string }> = {}
+    techRows.forEach((tech) => {
+      reset[tech.r] = { turno: tech.turno, area: tech.area }
+    })
+    setTechDrafts(reset)
+    setStatus('Cambios de técnicos descartados.')
+  }
+
+  function handleSaveTechDrafts() {
+    const updates: Array<{ row: number; turno: string; area: string }> = []
+    const updatedRows = techRows.map((tech) => {
+      const draft = techDrafts[tech.r]
+      if (!draft) return tech
+
+      const nextTurno = (draft.turno || tech.turno).trim().toUpperCase()
+      const nextArea = (draft.area || tech.area).trim()
+      if (nextTurno === tech.turno && nextArea === tech.area) return tech
+
+      updates.push({ row: tech.r, turno: nextTurno, area: nextArea })
+      return {
+        ...tech,
+        turno: nextTurno,
+        area: nextArea,
+      }
+    })
+
+    if (updates.length === 0) {
+      setStatus('No hay cambios de técnicos para guardar.')
+      return
+    }
+
+    updates.forEach((u) => {
+      setCellValue(u.row, 0, u.turno)
+      setCellValue(u.row, 1, u.area)
+    })
+
+    setTechRows(updatedRows)
+    setStatus(`Cambios de técnicos guardados: ${updates.length}.`)
   }
 
   function scrollToToday() {
@@ -944,6 +1002,23 @@ export function CalendarioMantencionPage() {
               <button className="h-8 rounded bg-primary px-3 text-xs text-primary-foreground" onClick={handleAddTechnician}>Agregar técnico</button>
             </div>
 
+            <div className="flex items-center justify-end gap-2">
+              <button
+                className="h-8 rounded border px-3 text-xs disabled:opacity-50"
+                onClick={handleDiscardTechDrafts}
+                disabled={!hasTechDraftChanges()}
+              >
+                Descartar cambios
+              </button>
+              <button
+                className="h-8 rounded bg-primary px-3 text-xs text-primary-foreground disabled:opacity-50"
+                onClick={handleSaveTechDrafts}
+                disabled={!hasTechDraftChanges()}
+              >
+                Guardar cambios masivos
+              </button>
+            </div>
+
             <div className="rounded border overflow-auto">
               <table className="w-full text-[11px]">
                 <thead className="bg-muted text-foreground">
@@ -955,15 +1030,17 @@ export function CalendarioMantencionPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {techRows.map((tech) => (
+                  {techRows.map((tech) => {
+                    const draft = techDrafts[tech.r] ?? { turno: tech.turno, area: tech.area }
+                    return (
                     <tr key={tech.r} className="border-t border-border hover:bg-muted/30">
                       <td className="px-2 py-1">{tech.name}</td>
                       <td className="px-2 py-1">{tech.rut || '-'}</td>
                       <td className="px-2 py-1">
                         <select
                           className={CONTROL_CLASS + ' h-7 text-[11px]'}
-                          value={tech.turno || ''}
-                          onChange={(e) => handleUpdateTechnicianMeta(tech.r, e.target.value, tech.area)}
+                          value={draft.turno || ''}
+                          onChange={(e) => handleUpdateTechDraft(tech.r, e.target.value, draft.area)}
                         >
                           {Array.from(new Set([...baseGroupOptions, tech.turno].filter(Boolean))).map((group) => (
                             <option key={group} value={group}>{group}</option>
@@ -973,12 +1050,12 @@ export function CalendarioMantencionPage() {
                       <td className="px-2 py-1">
                         <input
                           className={CONTROL_CLASS + ' h-7 text-[11px]'}
-                          value={tech.area || ''}
-                          onChange={(e) => handleUpdateTechnicianMeta(tech.r, tech.turno, e.target.value)}
+                          value={draft.area || ''}
+                          onChange={(e) => handleUpdateTechDraft(tech.r, draft.turno, e.target.value)}
                         />
                       </td>
                     </tr>
-                  ))}
+                  )})}
                 </tbody>
               </table>
             </div>
