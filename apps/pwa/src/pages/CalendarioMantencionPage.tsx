@@ -125,6 +125,11 @@ function clampMin(value: number, min: number): number {
   return value < min ? min : value
 }
 
+function getChileToday(): Date {
+  const nowChile = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Santiago' }))
+  return new Date(nowChile.getFullYear(), nowChile.getMonth(), nowChile.getDate())
+}
+
 function isoWeekKey(date: Date): string {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
   d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7))
@@ -145,8 +150,8 @@ function monthKey(date: Date): string {
 }
 
 function deltaClass(delta: number): string {
-  if (Math.abs(delta) < 0.001) return 'text-slate-600 font-semibold'
-  return delta > 0 ? 'text-emerald-700 font-semibold' : 'text-red-700 font-semibold'
+  if (Math.abs(delta) < 0.001) return 'text-muted-foreground font-semibold'
+  return delta > 0 ? 'text-emerald-700 dark:text-emerald-300 font-semibold' : 'text-red-700 dark:text-red-300 font-semibold'
 }
 
 function formatDelta(delta: number): string {
@@ -155,9 +160,9 @@ function formatDelta(delta: number): string {
 }
 
 function rowClass(deltaWeek: number, deltaMonth: number, tolerance: number): string {
-  if (deltaWeek < -tolerance || deltaMonth < -tolerance) return 'bg-red-50'
-  if (Math.abs(deltaWeek) <= tolerance && Math.abs(deltaMonth) <= tolerance) return 'bg-emerald-50'
-  return 'bg-amber-50'
+  if (deltaWeek < -tolerance || deltaMonth < -tolerance) return 'bg-red-50 dark:bg-red-900/25'
+  if (Math.abs(deltaWeek) <= tolerance && Math.abs(deltaMonth) <= tolerance) return 'bg-emerald-50 dark:bg-emerald-900/20'
+  return 'bg-amber-50 dark:bg-amber-900/20'
 }
 
 function metaLeft(index: number): number {
@@ -326,7 +331,8 @@ export function CalendarioMantencionPage() {
     setOriginalFilename(filename)
 
     const ref = XLSX.utils.decode_range(horarioSheet['!ref'] || 'A1:A1')
-    const cols = detectDayColumns(horarioSheet, ref)
+    const colsDetected = detectDayColumns(horarioSheet, ref)
+    const cols = normalizeLegacyTemplateDates(colsDetected, horarioSheet)
     const techs = detectTechnicians(horarioSheet, ref, cols)
     const catalog = readTurnosCatalog(workbook)
 
@@ -341,7 +347,7 @@ export function CalendarioMantencionPage() {
     if (firstTech && firstDay) setSelectedShift(firstTech.shifts[firstDay.c] || '')
 
     inferShiftConfig(catalog, techs)
-    setStatus(`Plantilla cargada: ${filename}. Técnicos: ${techs.length}. Días: ${cols.length}.`)
+    setStatus(`Plantilla cargada: ${filename}. Técnicos: ${techs.length}. Días: ${cols.length}. Fechas alineadas a calendario actual.`)
   }
 
   function getCellValue(sheet: XLSX.WorkSheet, r: number, c: number): string {
@@ -361,6 +367,38 @@ export function CalendarioMantencionPage() {
       }
     }
     return cols
+  }
+
+  function normalizeLegacyTemplateDates(cols: DayCol[], sheet: XLSX.WorkSheet): DayCol[] {
+    const withDates = cols.filter((c) => c.dateObj)
+    if (withDates.length === 0) return cols
+
+    const currentYear = getChileToday().getFullYear()
+    const hasLegacyYear = withDates.some((c) => {
+      const y = c.dateObj?.getFullYear() ?? currentYear
+      return y < currentYear - 1 || y === 2001
+    })
+
+    if (!hasLegacyYear) return cols
+
+    const startDate = getChileToday()
+    return cols.map((col, idx) => {
+      const d = new Date(startDate)
+      d.setDate(startDate.getDate() + idx)
+
+      const dayLabel = normalizeWeekdayLabel(d.toLocaleDateString('es-CL', { weekday: 'long' }))
+      const dateRaw = formatDate(d)
+
+      const addr = XLSX.utils.encode_cell({ r: 2, c: col.c })
+      sheet[addr] = { t: 'd', v: d, w: dateRaw }
+
+      return {
+        ...col,
+        dayLabel,
+        dateRaw,
+        dateObj: d,
+      }
+    })
   }
 
   function detectTechnicians(sheet: XLSX.WorkSheet, ref: XLSX.Range, cols: DayCol[]): TechRow[] {
@@ -457,12 +495,17 @@ export function CalendarioMantencionPage() {
     return `${d.dayLabel} ${formatDate(d.dateObj)}`.trim()
   }
 
+  function normalizeWeekdayLabel(label: string): string {
+    if (!label) return label
+    return label.charAt(0).toUpperCase() + label.slice(1)
+  }
+
   function classifyShift(value: string): string {
     const v = value.toLowerCase()
-    if (!v || v.includes('libre') || v.includes('descanso') || v.includes('vacaciones') || v.includes('licencia')) return 'bg-rose-100'
-    if (v.includes(shiftConfig.diaInicio.toLowerCase()) || v.includes('08:00') || v.includes('07:00')) return 'bg-emerald-100'
-    if (v.includes(shiftConfig.tardeInicio.toLowerCase()) || v.includes('16:00') || v.includes('14:00') || v.includes('13:00')) return 'bg-amber-100'
-    if (v.includes(shiftConfig.nocheInicio.toLowerCase()) || v.includes('00:00')) return 'bg-sky-100'
+    if (!v || v.includes('libre') || v.includes('descanso') || v.includes('vacaciones') || v.includes('licencia')) return 'bg-rose-100 text-rose-900 dark:bg-rose-900/25 dark:text-rose-200'
+    if (v.includes(shiftConfig.diaInicio.toLowerCase()) || v.includes('08:00') || v.includes('07:00')) return 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/25 dark:text-emerald-200'
+    if (v.includes(shiftConfig.tardeInicio.toLowerCase()) || v.includes('16:00') || v.includes('14:00') || v.includes('13:00')) return 'bg-amber-100 text-amber-900 dark:bg-amber-900/25 dark:text-amber-200'
+    if (v.includes(shiftConfig.nocheInicio.toLowerCase()) || v.includes('00:00')) return 'bg-sky-100 text-sky-900 dark:bg-sky-900/25 dark:text-sky-200'
     return ''
   }
 
@@ -673,7 +716,7 @@ export function CalendarioMantencionPage() {
             </div>
             <div className="mt-1.5 max-h-32 overflow-auto rounded border">
               <table className="w-full text-[10px]">
-                <thead className="bg-slate-800 text-white sticky top-0">
+                <thead className="bg-muted text-foreground sticky top-0">
                   <tr>
                     <th className="px-1 text-left">Técnico</th>
                     <th className="px-1">Δ Sem</th>
@@ -702,7 +745,7 @@ export function CalendarioMantencionPage() {
         <div className="h-[calc(100%-2.5rem)] overflow-auto rounded border">
           <table className="border-collapse text-[11px] min-w-max">
             <thead>
-              <tr className="bg-blue-700 text-white">
+              <tr className="bg-primary text-primary-foreground">
                 {META_COLS.map((h, i) => (
                   <th
                     key={`head1-${h}`}
@@ -716,7 +759,7 @@ export function CalendarioMantencionPage() {
                   <th key={`day-${d.c}`} className="sticky top-0 z-10 border px-1 py-1" style={{ minWidth: `${DAY_COL_WIDTH}px`, maxWidth: `${DAY_COL_WIDTH}px` }}>{d.dayLabel}</th>
                 ))}
               </tr>
-              <tr className="bg-blue-900 text-white">
+              <tr className="bg-primary/90 text-primary-foreground">
                 {META_COLS.map((h, i) => (
                   <th
                     key={`head2-${h}`}
@@ -739,7 +782,7 @@ export function CalendarioMantencionPage() {
                     {[tech.turno, tech.area, tech.ceco, tech.cargo, tech.direccion, tech.rut, tech.name].map((m, i) => (
                       <td
                         key={`meta-${tech.r}-${i}`}
-                        className="sticky z-[5] border bg-slate-100 px-1 py-1 text-left truncate"
+                        className="sticky z-[5] border bg-muted/90 px-1 py-1 text-left truncate text-foreground"
                         style={{ left: `${metaLeft(i)}px`, minWidth: `${META_COL_WIDTHS[i]}px`, maxWidth: `${META_COL_WIDTHS[i]}px` }}
                         title={m}
                       >
@@ -752,7 +795,7 @@ export function CalendarioMantencionPage() {
                       return (
                         <td
                           key={`shift-${tech.r}-${d.c}`}
-                          className={`border px-1 py-1 text-center cursor-pointer ${classifyShift(value)} ${isSelectedCell ? 'ring-2 ring-blue-600 ring-inset' : ''}`}
+                          className={`border px-1 py-1 text-center cursor-pointer ${classifyShift(value)} ${isSelectedCell ? 'ring-2 ring-primary ring-inset' : ''}`}
                           style={{ minWidth: `${DAY_COL_WIDTH}px`, maxWidth: `${DAY_COL_WIDTH}px` }}
                           title={value}
                           onClick={() => {

@@ -332,6 +332,11 @@ export function App() {
                 <GanttModulePage />
               </Suspense>
             } />
+            <Route path="calendario-mantencion" element={
+              <Suspense fallback={<LoadingScreen />}>
+                <CalendarioMantencionPage />
+              </Suspense>
+            } />
             <Route path="aria-actions" element={
               <Suspense fallback={<LoadingScreen />}>
                 <AriaActionsPage />
@@ -343,11 +348,6 @@ export function App() {
                   <ClimaPortPage />
                 </Suspense>
               </AdminRoute>
-            } />
-            <Route path="calendario-mantencion" element={
-              <Suspense fallback={<LoadingScreen />}>
-                <CalendarioMantencionPage />
-              </Suspense>
             } />
             <Route path="gantt/dashboard" element={<Navigate to="/gantt?tab=ejecutivo" replace />} />
             <Route path="gantt/mobile" element={<Navigate to="/gantt?tab=movil" replace />} />
