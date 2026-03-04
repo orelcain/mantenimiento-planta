@@ -55,7 +55,6 @@ const CALENDAR_FIRESTORE_PATH = ['calendario_mantencion_state', 'current'] as co
 
 type TabId = 'edicion' | 'plantillas' | 'horas' | 'tecnicos' | 'control'
 type SyncState = 'idle' | 'saving' | 'synced' | 'error'
-type ControlSortKey = 'name' | 'deltaWeek' | 'deltaMonth' | 'weekHours' | 'monthHours'
 type ExportScope = 'all' | 'week' | 'month' | 'weeks' | 'months'
 
 type ShiftStyleSamples = {
@@ -310,8 +309,6 @@ export function CalendarioMantencionPage() {
   const [vacationStart, setVacationStart] = useState('')
   const [vacationEnd, setVacationEnd] = useState('')
   const [techDrafts, setTechDrafts] = useState<Record<number, { turno: string; area: string }>>({})
-  const [controlSortKey, setControlSortKey] = useState<ControlSortKey>('deltaWeek')
-  const [controlSortDir, setControlSortDir] = useState<'asc' | 'desc'>('asc')
 
   const [hoursConfig, setHoursConfig] = useState<HoursConfig>(() => {
     const stored = safeStorageGet<HoursConfig>(HOURS_CONFIG_KEY, defaultHoursConfig())
@@ -1155,32 +1152,11 @@ export function CalendarioMantencionPage() {
     }
   })
 
-  const controlSummary = useMemo(() => {
-    const total = hoursRows.length
-    const weekOk = hoursRows.filter((row) => row.deltaWeek >= -hoursConfig.toleranceHours).length
-    const monthOk = hoursRows.filter((row) => row.deltaMonth >= -hoursConfig.toleranceHours).length
-    const risk = hoursRows.filter((row) => row.deltaWeek < -hoursConfig.toleranceHours || row.deltaMonth < -hoursConfig.toleranceHours).length
-    return {
-      total,
-      weekOk,
-      monthOk,
-      risk,
-    }
-  }, [hoursConfig.toleranceHours, hoursRows])
-
   const sortedHoursRows = useMemo(() => {
     const rows = [...hoursRows]
-    rows.sort((a, b) => {
-      let cmp = 0
-      if (controlSortKey === 'name') cmp = a.tech.name.localeCompare(b.tech.name)
-      if (controlSortKey === 'deltaWeek') cmp = a.deltaWeek - b.deltaWeek
-      if (controlSortKey === 'deltaMonth') cmp = a.deltaMonth - b.deltaMonth
-      if (controlSortKey === 'weekHours') cmp = a.weekHours - b.weekHours
-      if (controlSortKey === 'monthHours') cmp = a.monthHours - b.monthHours
-      return controlSortDir === 'asc' ? cmp : -cmp
-    })
+    rows.sort((a, b) => a.deltaWeek - b.deltaWeek)
     return rows
-  }, [controlSortDir, controlSortKey, hoursRows])
+  }, [hoursRows])
 
   function handleAssignSelected() {
     if (!selectedRow || selectedCol === null || !selectedShift) return
@@ -1837,43 +1813,6 @@ export function CalendarioMantencionPage() {
                 <label className="text-muted-foreground">Mes</label>
                 <select className={CONTROL_CLASS + ' w-full mt-0.5'} value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)}>
                   {Object.entries(months).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
-                </select>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 text-xs">
-              <div className="rounded border bg-emerald-500/10 border-emerald-500/30 p-2">
-                <div className="text-muted-foreground">Cumplen Semana</div>
-                <div className="font-semibold tabular-nums">{controlSummary.weekOk} / {controlSummary.total}</div>
-              </div>
-              <div className="rounded border bg-emerald-500/10 border-emerald-500/30 p-2">
-                <div className="text-muted-foreground">Cumplen Mes</div>
-                <div className="font-semibold tabular-nums">{controlSummary.monthOk} / {controlSummary.total}</div>
-              </div>
-              <div className="rounded border bg-red-500/10 border-red-500/30 p-2">
-                <div className="text-muted-foreground">En Riesgo</div>
-                <div className="font-semibold tabular-nums">{controlSummary.risk}</div>
-              </div>
-              <div className="rounded border p-2">
-                <div className="text-muted-foreground">Tolerancia activa</div>
-                <div className="font-semibold tabular-nums">± {hoursConfig.toleranceHours.toFixed(1)} h</div>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-              <div>
-                <label className="text-muted-foreground">Ordenar por</label>
-                <select className={CONTROL_CLASS + ' w-full mt-0.5'} value={controlSortKey} onChange={(e) => setControlSortKey(e.target.value as ControlSortKey)}>
-                  <option value="deltaWeek">Δ Semana</option>
-                  <option value="deltaMonth">Δ Mes</option>
-                  <option value="weekHours">Horas Semana</option>
-                  <option value="monthHours">Horas Mes</option>
-                  <option value="name">Nombre</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-muted-foreground">Dirección</label>
-                <select className={CONTROL_CLASS + ' w-full mt-0.5'} value={controlSortDir} onChange={(e) => setControlSortDir(e.target.value as 'asc' | 'desc')}>
-                  <option value="asc">Ascendente</option>
-                  <option value="desc">Descendente</option>
                 </select>
               </div>
             </div>
