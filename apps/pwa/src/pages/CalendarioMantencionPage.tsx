@@ -58,15 +58,15 @@ type SyncState = 'idle' | 'saving' | 'synced' | 'error'
 type ExportScope = 'all' | 'week' | 'month' | 'weeks' | 'months'
 
 type ShiftStyleSamples = {
-  dia?: number
-  tarde?: number
-  noche?: number
-  libre?: number
-  vacaciones?: number
-  feriado?: number
-  diaReducido?: number
-  tardeReducido?: number
-  nocheReducido?: number
+  dia?: unknown
+  tarde?: unknown
+  noche?: unknown
+  libre?: unknown
+  vacaciones?: unknown
+  feriado?: unknown
+  diaReducido?: unknown
+  tardeReducido?: unknown
+  nocheReducido?: unknown
 }
 
 type PersistedCalendarState = {
@@ -889,12 +889,12 @@ export function CalendarioMantencionPage() {
 
     const addr = XLSX.utils.encode_cell({ r, c })
     const current = sheet[addr]
-    const styleId = c >= 7 ? styleIdForShift(value) : undefined
-    if (!current) sheet[addr] = styleId !== undefined ? { t: 's', v: value, s: styleId } : { t: 's', v: value }
+    const styleSample = c >= 7 ? styleForShift(value) : undefined
+    if (!current) sheet[addr] = styleSample !== undefined ? { t: 's', v: value, s: styleSample } : { t: 's', v: value }
     else {
       current.t = 's'
       current.v = value
-      if (styleId !== undefined) current.s = styleId
+      if (styleSample !== undefined) current.s = styleSample
       delete current.w
     }
   }
@@ -947,16 +947,15 @@ export function CalendarioMantencionPage() {
         if (!key || samples[key] !== undefined) continue
         const addr = XLSX.utils.encode_cell({ r: tech.r, c: d.c })
         const cell = sheet[addr]
-        const styleId = typeof cell?.s === 'number' ? cell.s : undefined
-        if (styleId !== undefined) {
-          samples[key] = styleId
+        if (cell?.s !== undefined) {
+          samples[key] = JSON.parse(JSON.stringify(cell.s))
         }
       }
     }
     shiftStyleSamplesRef.current = samples
   }
 
-  function styleIdForShift(value: string): number | undefined {
+  function styleForShift(value: string): unknown | undefined {
     const key = detectShiftStyleKey(value)
     if (!key) return undefined
     const samples = shiftStyleSamplesRef.current
@@ -972,11 +971,10 @@ export function CalendarioMantencionPage() {
     const v = value.trim().toLowerCase()
     if (!v) return { className: '' }
 
-    // FERIADO → Salmon/orange background (Excel match)
-    if (v.includes('feriado')) return { className: 'font-medium', style: { backgroundColor: '#FCD5B4', color: '#000000' } }
-
-    // LIBRE / DESCANSO → Green background (Excel #92D050)
-    if (v.includes('libre') || v.includes('descanso')) return { className: 'font-medium', style: { backgroundColor: '#92D050', color: '#000000' } }
+    // In template, LIBRE / DESCANSO / FERIADO are red text without fill
+    if (v.includes('feriado') || v.includes('libre') || v.includes('descanso')) {
+      return { className: 'font-medium', style: { color: '#FF0000' } }
+    }
 
     // VACACIONES → Light blue background (Excel match)
     if (v.includes('vacaciones')) return { className: 'font-medium', style: { backgroundColor: '#8DB4E2', color: '#000000' } }
@@ -984,12 +982,11 @@ export function CalendarioMantencionPage() {
     // LICENCIA → Light teal background
     if (v.includes('licencia')) return { className: 'font-medium', style: { backgroundColor: '#B7DEE8', color: '#000000' } }
 
-    // Tarde/evening shift (starts at 16:xx, 14:xx, 13:xx) → RED text, no background
-    if (/^(16|14|13):\d{2}/.test(v)) {
-      return { className: 'font-medium', style: { color: '#FF0000' } }
-    }
+    // Template colors by shift range
+    if (/^(08|07):\d{2}/.test(v)) return { className: 'font-medium', style: { backgroundColor: '#92D050', color: '#000000' } }
+    if (/^(16|14|13):\d{2}/.test(v)) return { className: 'font-medium', style: { backgroundColor: '#FFC000', color: '#000000' } }
+    if (/^00:\d{2}/.test(v)) return { className: 'font-medium', style: { backgroundColor: '#61CBF4', color: '#000000' } }
 
-    // Day (08:xx, 07:xx) and Night (00:xx) → no special styling (default text color)
     return { className: '' }
   }
 
