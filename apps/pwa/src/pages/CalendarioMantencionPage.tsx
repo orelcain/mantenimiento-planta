@@ -801,15 +801,30 @@ export function CalendarioMantencionPage() {
 
   function classifyShift(value: string): string {
     const v = value.toLowerCase()
+    const reduced = isReducedShift(value)
     if (!v || v.includes('libre') || v.includes('descanso') || v.includes('vacaciones') || v.includes('licencia')) return 'bg-rose-100 text-rose-900 dark:bg-rose-900/25 dark:text-rose-200'
     const nocheStart = shiftConfig.nocheInicio.toLowerCase()
     const nocheEnd = shiftConfig.nocheFin.toLowerCase()
     if (v.includes(`${nocheStart} - ${nocheEnd}`) || (v.includes(nocheStart) && v.includes(nocheEnd)) || v.includes('00:00 - 08:00')) {
-      return 'bg-sky-200/80 text-sky-900 dark:bg-sky-500/35 dark:text-sky-100'
+      return reduced
+        ? 'bg-sky-100 text-sky-800 dark:bg-sky-500/20 dark:text-sky-100'
+        : 'bg-sky-200/80 text-sky-900 dark:bg-sky-500/35 dark:text-sky-100'
     }
-    if (v.includes(shiftConfig.diaInicio.toLowerCase()) || v.includes('08:00') || v.includes('07:00')) return 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/25 dark:text-emerald-200'
-    if (v.includes(shiftConfig.tardeInicio.toLowerCase()) || v.includes('16:00') || v.includes('14:00') || v.includes('13:00')) return 'bg-amber-100 text-amber-900 dark:bg-amber-900/25 dark:text-amber-200'
-    if (v.includes('00:00')) return 'bg-sky-200/80 text-sky-900 dark:bg-sky-500/35 dark:text-sky-100'
+    if (v.includes(shiftConfig.diaInicio.toLowerCase()) || v.includes('08:00') || v.includes('07:00')) {
+      return reduced
+        ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-900/15 dark:text-emerald-100'
+        : 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/25 dark:text-emerald-200'
+    }
+    if (v.includes(shiftConfig.tardeInicio.toLowerCase()) || v.includes('16:00') || v.includes('14:00') || v.includes('13:00')) {
+      return reduced
+        ? 'bg-amber-50 text-amber-800 dark:bg-amber-900/15 dark:text-amber-100'
+        : 'bg-amber-100 text-amber-900 dark:bg-amber-900/25 dark:text-amber-200'
+    }
+    if (v.includes('00:00')) {
+      return reduced
+        ? 'bg-sky-100 text-sky-800 dark:bg-sky-500/20 dark:text-sky-100'
+        : 'bg-sky-200/80 text-sky-900 dark:bg-sky-500/35 dark:text-sky-100'
+    }
     return ''
   }
 
