@@ -971,8 +971,13 @@ export function CalendarioMantencionPage() {
     const v = value.trim().toLowerCase()
     if (!v) return { className: '' }
 
-    // In template, LIBRE / DESCANSO / FERIADO are red text without fill
-    if (v.includes('feriado') || v.includes('libre') || v.includes('descanso')) {
+    // LIBRE / DESCANSO with gray background
+    if (v.includes('libre') || v.includes('descanso')) {
+      return { className: 'font-medium', style: { backgroundColor: '#D9D9D9', color: '#FF0000' } }
+    }
+
+    // FERIADO as red text
+    if (v.includes('feriado')) {
       return { className: 'font-medium', style: { color: '#FF0000' } }
     }
 
