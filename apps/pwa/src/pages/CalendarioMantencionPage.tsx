@@ -43,8 +43,9 @@ const WEEKDAY_HEADER = new Set(['lunes', 'martes', 'miércoles', 'miercoles', 'j
 const META_COLS = ['TURNO', 'Área', 'CeCo', 'Cargo', 'DIRECCIÓN', 'RUT', 'Personal']
 const META_COL_WIDTHS = [56, 80, 100, 108, 98, 100, 220]
 const HIDEABLE_COLS = new Set([2, 3, 4, 5]) // CeCo, Cargo, DIRECCIÓN, RUT
+const LEGACY_PREVIOUS_DAYS = 7
 
-type TabId = 'edicion' | 'plantillas' | 'horas' | 'control'
+type TabId = 'edicion' | 'plantillas' | 'horas' | 'tecnicos' | 'control'
 const DAY_COL_WIDTH = 88
 const HOURS_CONFIG_KEY = 'calendario_mantencion_hours_config_v1'
 const SHIFT_CONFIG_KEY = 'calendario_mantencion_shift_config_v1'
@@ -153,6 +154,11 @@ function monthKey(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
 }
 
+function isSameDate(a: Date | null, b: Date | null): boolean {
+  if (!a || !b) return false
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
+}
+
 function deltaClass(delta: number): string {
   if (Math.abs(delta) < 0.001) return 'text-muted-foreground font-semibold'
   return delta > 0 ? 'text-emerald-700 dark:text-emerald-300 font-semibold' : 'text-red-700 dark:text-red-300 font-semibold'
@@ -212,6 +218,13 @@ export function CalendarioMantencionPage() {
   const [selectedMonth, setSelectedMonth] = useState('')
   const [showAllCols, setShowAllCols] = useState(false)
   const [activeTab, setActiveTab] = useState<TabId>('edicion')
+  const [newTechName, setNewTechName] = useState('')
+  const [newTechRut, setNewTechRut] = useState('')
+  const [newTechGroup, setNewTechGroup] = useState('A')
+  const [newTechArea, setNewTechArea] = useState('Mantención')
+  const [vacationTechRow, setVacationTechRow] = useState<number | null>(null)
+  const [vacationStart, setVacationStart] = useState('')
+  const [vacationEnd, setVacationEnd] = useState('')
 
   const [hoursConfig, setHoursConfig] = useState<HoursConfig>(() => {
     const stored = safeStorageGet<HoursConfig>(HOURS_CONFIG_KEY, defaultHoursConfig())
@@ -279,6 +292,18 @@ export function CalendarioMantencionPage() {
         && d.dateObj.getDate() === today.getDate()
     })
   }, [dayCols])
+
+  const techGroups = useMemo(() => {
+    const groups = Array.from(new Set(techRows.map((t) => t.turno).filter(Boolean)))
+    if (groups.length === 0) return ['A', 'B', 'C']
+    return groups
+  }, [techRows])
+
+  useEffect(() => {
+    if (!techGroups.includes(newTechGroup)) {
+      setNewTechGroup(techGroups[0] || 'A')
+    }
+  }, [newTechGroup, techGroups])
 
   loadWorkbookRef.current = loadWorkbook
   applyShiftRef.current = applyShift
@@ -402,6 +427,7 @@ export function CalendarioMantencionPage() {
     if (!hasLegacyYear) return cols
 
     const startDate = getChileToday()
+    startDate.setDate(startDate.getDate() - LEGACY_PREVIOUS_DAYS)
     return cols.map((col, idx) => {
       const d = new Date(startDate)
       d.setDate(startDate.getDate() + idx)
@@ -488,6 +514,18 @@ export function CalendarioMantencionPage() {
 
   function setCellValue(r: number, c: number, value: string) {
     if (!ws) return
+    const currentRef = XLSX.utils.decode_range(ws['!ref'] || 'A1:A1')
+    if (r > currentRef.e.r || c > currentRef.e.c) {
+      const nextRange = {
+        s: currentRef.s,
+        e: {
+          r: Math.max(currentRef.e.r, r),
+          c: Math.max(currentRef.e.c, c),
+        },
+      }
+      ws['!ref'] = XLSX.utils.encode_range(nextRange)
+    }
+
     const addr = XLSX.utils.encode_cell({ r, c })
     const current = ws[addr]
     if (!current) ws[addr] = { t: 's', v: value }
@@ -617,6 +655,87 @@ export function CalendarioMantencionPage() {
     setStatus(`Archivo exportado: ${outputName}`)
   }
 
+  function handleAddTechnician() {
+    const name = newTechName.trim().toUpperCase()
+    const rut = newTechRut.trim().toUpperCase()
+    if (!name) {
+      setStatus('Debes ingresar nombre del técnico.')
+      return
+    }
+
+    const nextRow = (techRows.reduce((max, t) => Math.max(max, t.r), 2) || 2) + 1
+    const shifts: Record<number, string> = {}
+    dayCols.forEach((d) => {
+      shifts[d.c] = shiftConfig.libreLabel || 'LIBRE'
+    })
+
+    const newTech: TechRow = {
+      r: nextRow,
+      turno: newTechGroup || 'A',
+      area: newTechArea || 'Mantención',
+      ceco: '',
+      cargo: 'TÉCNICO MANTENCIÓN',
+      direccion: '',
+      rut,
+      name,
+      shifts,
+    }
+
+    setTechRows((prev) => [...prev, newTech])
+    setCellValue(nextRow, 0, newTech.turno)
+    setCellValue(nextRow, 1, newTech.area)
+    setCellValue(nextRow, 2, newTech.ceco)
+    setCellValue(nextRow, 3, newTech.cargo)
+    setCellValue(nextRow, 4, newTech.direccion)
+    setCellValue(nextRow, 5, newTech.rut)
+    setCellValue(nextRow, 6, newTech.name)
+    dayCols.forEach((d) => setCellValue(nextRow, d.c, shifts[d.c] ?? (shiftConfig.libreLabel || 'LIBRE')))
+
+    if (!turnosCatalog.includes(shiftConfig.libreLabel || 'LIBRE')) {
+      setTurnosCatalog((prev) => Array.from(new Set([...prev, shiftConfig.libreLabel || 'LIBRE'])))
+    }
+
+    setVacationTechRow(nextRow)
+    setSelectedRow(nextRow)
+    if (todayDayCol) setSelectedCol(todayDayCol.c)
+    setNewTechName('')
+    setNewTechRut('')
+    setStatus(`Técnico agregado: ${name} (Grupo ${newTech.turno}).`) 
+  }
+
+  function handleApplyVacation() {
+    if (!vacationTechRow || !vacationStart || !vacationEnd) {
+      setStatus('Selecciona técnico y rango de vacaciones.')
+      return
+    }
+
+    const start = new Date(`${vacationStart}T00:00:00`)
+    const end = new Date(`${vacationEnd}T00:00:00`)
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) {
+      setStatus('Rango de vacaciones inválido.')
+      return
+    }
+
+    const vacationLabel = 'VACACIONES'
+    let updated = 0
+    setTechRows((prev) => prev.map((t) => {
+      if (t.r !== vacationTechRow) return t
+      const nextShifts = { ...t.shifts }
+      dayCols.forEach((d) => {
+        if (!d.dateObj) return
+        const current = new Date(d.dateObj.getFullYear(), d.dateObj.getMonth(), d.dateObj.getDate())
+        if (current >= start && current <= end) {
+          nextShifts[d.c] = vacationLabel
+          setCellValue(t.r, d.c, vacationLabel)
+          updated += 1
+        }
+      })
+      return { ...t, shifts: nextShifts }
+    }))
+
+    setStatus(`Vacaciones aplicadas a ${updated} día(s).`)
+  }
+
   function scrollToToday() {
     const container = calendarScrollRef.current
     const todayCol = todayDayCol
@@ -638,6 +757,7 @@ export function CalendarioMantencionPage() {
     { id: 'edicion', label: 'Edición' },
     { id: 'plantillas', label: 'Turnos' },
     { id: 'horas', label: 'Horas' },
+    { id: 'tecnicos', label: 'Técnicos' },
     { id: 'control', label: 'Control' },
   ]
 
@@ -779,6 +899,79 @@ export function CalendarioMantencionPage() {
           </div>
         )}
 
+        {/* ── Tab: Técnicos ── */}
+        {activeTab === 'tecnicos' && (
+          <div className="space-y-2">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-2 text-xs">
+              <div className="grid gap-1">
+                <label className="text-muted-foreground">Nombre técnico</label>
+                <input className={CONTROL_CLASS} value={newTechName} onChange={(e) => setNewTechName(e.target.value)} placeholder="Nombre completo" />
+              </div>
+              <div className="grid gap-1">
+                <label className="text-muted-foreground">RUT</label>
+                <input className={CONTROL_CLASS} value={newTechRut} onChange={(e) => setNewTechRut(e.target.value)} placeholder="12.345.678-9" />
+              </div>
+              <div className="grid gap-1">
+                <label className="text-muted-foreground">Grupo/Equipo</label>
+                <select className={CONTROL_CLASS} value={newTechGroup} onChange={(e) => setNewTechGroup(e.target.value)}>
+                  {techGroups.map((group) => <option key={group} value={group}>{group}</option>)}
+                </select>
+              </div>
+              <div className="grid gap-1">
+                <label className="text-muted-foreground">Área</label>
+                <input className={CONTROL_CLASS} value={newTechArea} onChange={(e) => setNewTechArea(e.target.value)} placeholder="Mantención" />
+              </div>
+            </div>
+
+            <div className="flex justify-end">
+              <button className="h-8 rounded bg-primary px-3 text-xs text-primary-foreground" onClick={handleAddTechnician}>Agregar técnico</button>
+            </div>
+
+            <div className="rounded border overflow-auto">
+              <table className="w-full text-[11px]">
+                <thead className="bg-muted text-foreground">
+                  <tr>
+                    <th className="px-2 py-1 text-left">Técnico</th>
+                    <th className="px-2 py-1 text-left">RUT</th>
+                    <th className="px-2 py-1 text-left">Grupo</th>
+                    <th className="px-2 py-1 text-left">Área/Equipo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {techRows.map((tech) => (
+                    <tr key={tech.r} className="border-t border-border hover:bg-muted/30">
+                      <td className="px-2 py-1">{tech.name}</td>
+                      <td className="px-2 py-1">{tech.rut || '-'}</td>
+                      <td className="px-2 py-1">{tech.turno || '-'}</td>
+                      <td className="px-2 py-1">{tech.area || '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-2 text-xs rounded border p-2">
+              <div className="grid gap-1 md:col-span-2">
+                <label className="text-muted-foreground">Técnico</label>
+                <select className={CONTROL_CLASS} value={vacationTechRow ?? ''} onChange={(e) => setVacationTechRow(Number(e.target.value) || null)}>
+                  {techRows.map((tech) => <option key={tech.r} value={tech.r}>{tech.name}</option>)}
+                </select>
+              </div>
+              <div className="grid gap-1">
+                <label className="text-muted-foreground">Vacaciones desde</label>
+                <input className={CONTROL_CLASS} type="date" value={vacationStart} onChange={(e) => setVacationStart(e.target.value)} />
+              </div>
+              <div className="grid gap-1">
+                <label className="text-muted-foreground">Vacaciones hasta</label>
+                <input className={CONTROL_CLASS} type="date" value={vacationEnd} onChange={(e) => setVacationEnd(e.target.value)} />
+              </div>
+              <div className="md:col-span-4 flex justify-end">
+                <button className="h-8 rounded border px-3 text-xs" onClick={handleApplyVacation}>Aplicar vacaciones</button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ── Tab: Control semanal y mensual ── */}
         {activeTab === 'control' && (
           <div className="space-y-2">
@@ -796,7 +989,7 @@ export function CalendarioMantencionPage() {
                 </select>
               </div>
             </div>
-            <div className="rounded border overflow-auto max-h-52">
+            <div className="rounded border">
               <table className="w-full text-[11px]">
                 <thead className="bg-muted text-foreground sticky top-0 z-10">
                   <tr>
@@ -854,7 +1047,7 @@ export function CalendarioMantencionPage() {
               className="h-7 rounded border px-2 text-xs"
               onClick={() => setShowAllCols((p) => !p)}
             >
-              {showAllCols ? 'Ocultar columnas' : 'Mostrar columnas'}
+              {showAllCols ? 'Ocultar CeCo/Cargo/Dirección/RUT' : 'Mostrar CeCo/Cargo/Dirección/RUT'}
             </button>
             <button
               className="h-7 rounded border px-2 text-xs disabled:opacity-50"
@@ -880,7 +1073,7 @@ export function CalendarioMantencionPage() {
                   </th>
                 ))}
                 {dayCols.map((d) => (
-                  <th key={`day-${d.c}`} className="sticky top-0 z-20 border border-primary/70 bg-primary px-1 py-1" style={{ minWidth: `${DAY_COL_WIDTH}px`, maxWidth: `${DAY_COL_WIDTH}px` }}>{d.dayLabel}</th>
+                  <th key={`day-${d.c}`} className={`sticky top-0 z-20 border border-primary/70 bg-primary px-1 py-1 ${isSameDate(d.dateObj, todayDayCol?.dateObj ?? null) ? 'border-x-2 border-yellow-300' : ''}`} style={{ minWidth: `${DAY_COL_WIDTH}px`, maxWidth: `${DAY_COL_WIDTH}px` }}>{d.dayLabel}</th>
                 ))}
               </tr>
               <tr className="bg-primary text-primary-foreground">
@@ -894,7 +1087,7 @@ export function CalendarioMantencionPage() {
                   </th>
                 ))}
                 {dayCols.map((d) => (
-                  <th key={`date-${d.c}`} className="sticky top-[30px] z-20 border border-primary/70 bg-primary px-1 py-1" style={{ minWidth: `${DAY_COL_WIDTH}px`, maxWidth: `${DAY_COL_WIDTH}px` }}>{formatDate(d.dateObj) || d.dateRaw}</th>
+                  <th key={`date-${d.c}`} className={`sticky top-[30px] z-20 border border-primary/70 bg-primary px-1 py-1 ${isSameDate(d.dateObj, todayDayCol?.dateObj ?? null) ? 'border-x-2 border-b-2 border-yellow-300 font-semibold' : ''}`} style={{ minWidth: `${DAY_COL_WIDTH}px`, maxWidth: `${DAY_COL_WIDTH}px` }}>{formatDate(d.dateObj) || d.dateRaw}</th>
                 ))}
               </tr>
             </thead>
@@ -920,7 +1113,7 @@ export function CalendarioMantencionPage() {
                       return (
                         <td
                           key={`shift-${tech.r}-${d.c}`}
-                          className={`border px-1 py-1 text-center cursor-pointer ${classifyShift(value)} ${isSelectedCell ? 'ring-2 ring-primary ring-inset' : ''}`}
+                          className={`border px-1 py-1 text-center cursor-pointer ${classifyShift(value)} ${isSelectedCell ? 'ring-2 ring-primary ring-inset' : ''} ${isSameDate(d.dateObj, todayDayCol?.dateObj ?? null) ? 'border-x-2 border-yellow-300/80' : ''}`}
                           style={{ minWidth: `${DAY_COL_WIDTH}px`, maxWidth: `${DAY_COL_WIDTH}px` }}
                           title={value}
                           onClick={() => {
