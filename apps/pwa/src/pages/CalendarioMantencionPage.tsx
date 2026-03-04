@@ -39,6 +39,7 @@ type HoursConfig = {
   breakHours: number
   expectedWeek: number
   expectedMonth: number
+  autoLegalWeek: boolean
   toleranceHours: number
   useFixedDaily: boolean
   dayReductionHours: number
@@ -103,8 +104,9 @@ function defaultHoursConfig(): HoursConfig {
   return {
     workHours: 8,
     breakHours: 0.5,
-    expectedWeek: 45,
+    expectedWeek: 44,
     expectedMonth: 180,
+    autoLegalWeek: true,
     toleranceHours: 0.5,
     useFixedDaily: true,
     dayReductionHours: 1,
@@ -203,6 +205,28 @@ function clampMin(value: number, min: number): number {
 function getChileToday(): Date {
   const nowChile = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Santiago' }))
   return new Date(nowChile.getFullYear(), nowChile.getMonth(), nowChile.getDate())
+}
+
+function getChileLegalWeeklyHours(referenceDate: Date): number {
+  const ref = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), referenceDate.getDate()).getTime()
+  const start40h = new Date(2028, 3, 26).getTime()
+  const start42h = new Date(2026, 3, 26).getTime()
+  const start44h = new Date(2024, 3, 26).getTime()
+  if (ref >= start40h) return 40
+  if (ref >= start42h) return 42
+  if (ref >= start44h) return 44
+  return 45
+}
+
+function getChileLegalWeeklyLabel(referenceDate: Date): string {
+  const ref = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), referenceDate.getDate()).getTime()
+  const start40h = new Date(2028, 3, 26).getTime()
+  const start42h = new Date(2026, 3, 26).getTime()
+  const start44h = new Date(2024, 3, 26).getTime()
+  if (ref >= start40h) return 'Tramo legal vigente desde 26-04-2028 (40 h/semana)'
+  if (ref >= start42h) return 'Tramo legal vigente desde 26-04-2026 (42 h/semana)'
+  if (ref >= start44h) return 'Tramo legal vigente desde 26-04-2024 (44 h/semana)'
+  return 'Tramo previo a reducción gradual (45 h/semana)'
 }
 
 function getPlanningMonthStart(): Date {
@@ -319,8 +343,9 @@ export function CalendarioMantencionPage() {
     return {
       workHours: toNumberOr(stored.workHours, 8),
       breakHours: toNumberOr(stored.breakHours, 0.5),
-      expectedWeek: toNumberOr(stored.expectedWeek, 45),
+      expectedWeek: toNumberOr(stored.expectedWeek, 44),
       expectedMonth: toNumberOr(stored.expectedMonth, 180),
+      autoLegalWeek: stored.autoLegalWeek !== false,
       toleranceHours: toNumberOr(stored.toleranceHours, 0.5),
       useFixedDaily: stored.useFixedDaily !== false,
       dayReductionHours: toNumberOr(stored.dayReductionHours, 1),
@@ -1143,8 +1168,12 @@ export function CalendarioMantencionPage() {
   const weekDays = dayCols.filter((d) => d.dateObj && isoWeekKey(d.dateObj) === selectedWeek)
   const monthDays = dayCols.filter((d) => d.dateObj && monthKey(d.dateObj) === selectedMonth)
   const effectiveDaily = effectiveDailyHours()
-  const monthBusinessDays = monthDays.reduce((sum, d) => (d.dateObj && isBusinessDay(d.dateObj) ? sum + 1 : sum), 0)
-  const expectedMonthAutoBase = hoursConfig.expectedWeek * (monthBusinessDays / 5)
+  const monthCalendarDays = monthDays.length
+  const periodReferenceDate = monthDays.find((d) => d.dateObj)?.dateObj || getChileToday()
+  const legalWeekByLaw = getChileLegalWeeklyHours(periodReferenceDate)
+  const legalWeekLabel = getChileLegalWeeklyLabel(periodReferenceDate)
+  const expectedWeekBase = Math.max(0, hoursConfig.autoLegalWeek ? legalWeekByLaw : hoursConfig.expectedWeek)
+  const expectedMonthAutoBase = expectedWeekBase * (monthCalendarDays / 7)
 
   function isWeekStart(index: number): boolean {
     if (index === 0) return true
@@ -1193,7 +1222,7 @@ export function CalendarioMantencionPage() {
     const weekHours = weekWorkedHours + weekVacationPaidHours + weekHolidayPaidHours
     const monthHours = monthWorkedHours + monthVacationPaidHours + monthHolidayPaidHours
 
-    const weekExpectedAdjusted = Math.max(0, hoursConfig.expectedWeek)
+    const weekExpectedAdjusted = Math.max(0, expectedWeekBase * (weekDays.length / 7))
     const monthExpectedAdjusted = Math.max(0, expectedMonthAutoBase)
 
     const weekFreeDays = Math.max(0, weekDays.length - weekWorkedDays)
@@ -1239,8 +1268,9 @@ export function CalendarioMantencionPage() {
       ...hoursConfig,
       workHours: clampMin(toNumberOr(hoursConfig.workHours, 8), 0),
       breakHours: clampMin(toNumberOr(hoursConfig.breakHours, 0.5), 0),
-      expectedWeek: clampMin(toNumberOr(hoursConfig.expectedWeek, 45), 0),
+      expectedWeek: clampMin(toNumberOr(hoursConfig.expectedWeek, 44), 0),
       expectedMonth: clampMin(toNumberOr(expectedMonthAutoBase, 180), 0),
+      autoLegalWeek: hoursConfig.autoLegalWeek !== false,
       toleranceHours: clampMin(toNumberOr(hoursConfig.toleranceHours, 0.5), 0),
       dayReductionHours: clampMin(toNumberOr(hoursConfig.dayReductionHours, 1), 0),
       afternoonReductionHours: clampMin(toNumberOr(hoursConfig.afternoonReductionHours, 1), 0),
@@ -1251,7 +1281,7 @@ export function CalendarioMantencionPage() {
     }
     setHoursConfig(next)
     safeStorageSet(HOURS_CONFIG_KEY, next)
-    setStatus(`Parámetros aplicados. Horas efectivas por día: ${effectiveDailyHours().toFixed(2)}h. Meta mensual auto: ${expectedMonthAutoBase.toFixed(1)}h`)
+    setStatus(`Parámetros aplicados. Jornada semanal objetivo: ${expectedWeekBase.toFixed(1)}h. Meta mensual auto: ${expectedMonthAutoBase.toFixed(1)}h`)
   }
 
   function handleShiftConfigApply() {
@@ -1565,12 +1595,19 @@ export function CalendarioMantencionPage() {
             <input className={CONTROL_CLASS} type="number" step="0.25" value={hoursConfig.workHours} onChange={(e) => setHoursConfig((p) => ({ ...p, workHours: toNumberOr(e.target.value, p.workHours) }))} />
             <label className="text-muted-foreground self-center" title="Tiempo de colación diario. Se descuenta del cálculo de horas trabajadas.">Colación (h)</label>
             <input className={CONTROL_CLASS} type="number" step="0.25" value={hoursConfig.breakHours} onChange={(e) => setHoursConfig((p) => ({ ...p, breakHours: toNumberOr(e.target.value, p.breakHours) }))} />
-            <label className="text-muted-foreground self-center" title="Meta semanal legal/operativa de horas trabajadas.">Esperadas semana</label>
-            <input className={CONTROL_CLASS} type="number" step="0.5" value={hoursConfig.expectedWeek} onChange={(e) => setHoursConfig((p) => ({ ...p, expectedWeek: toNumberOr(e.target.value, p.expectedWeek) }))} />
+            <label className="text-muted-foreground self-center" title="Meta semanal legal. En modo automático usa el tramo vigente en Chile según fecha del período.">Jornada objetivo semanal (h)</label>
+            <input
+              className={CONTROL_CLASS}
+              type="number"
+              step="0.5"
+              value={hoursConfig.autoLegalWeek ? expectedWeekBase : hoursConfig.expectedWeek}
+              disabled={hoursConfig.autoLegalWeek}
+              onChange={(e) => setHoursConfig((p) => ({ ...p, expectedWeek: toNumberOr(e.target.value, p.expectedWeek) }))}
+            />
             <label className="text-muted-foreground self-center">Esperadas mes (auto)</label>
             <div className={CONTROL_CLASS + ' flex items-center justify-between'}>
               <span className="font-medium tabular-nums">{expectedMonthAutoBase.toFixed(1)} h</span>
-              <span className="text-[10px] text-muted-foreground">{monthBusinessDays} días hábiles</span>
+              <span className="text-[10px] text-muted-foreground">{monthCalendarDays} días calendario</span>
             </div>
             <label className="text-muted-foreground self-center" title="Margen permitido bajo la meta esperada sin activar alerta visual en Control.">Tolerancia (h)</label>
             <input className={CONTROL_CLASS} type="number" step="0.25" value={hoursConfig.toleranceHours} onChange={(e) => setHoursConfig((p) => ({ ...p, toleranceHours: toNumberOr(e.target.value, p.toleranceHours) }))} />
@@ -1583,6 +1620,10 @@ export function CalendarioMantencionPage() {
             <label className="col-span-2 flex items-center gap-2">
               <input type="checkbox" checked={hoursConfig.useFixedDaily} onChange={(e) => setHoursConfig((p) => ({ ...p, useFixedDaily: e.target.checked }))} />
               <span title="Activado: cada día trabajado usa Jornada total - Colación. Desactivado: calcula horas desde el rango del turno (hora inicio/fin).">Horas fijas por día trabajado</span>
+            </label>
+            <label className="col-span-2 flex items-center gap-2">
+              <input type="checkbox" checked={hoursConfig.autoLegalWeek} onChange={(e) => setHoursConfig((p) => ({ ...p, autoLegalWeek: e.target.checked }))} />
+              <span title="Activado: usa tramo legal chileno según fecha del período (44h hasta 25-04-2026, 42h desde 26-04-2026, 40h desde 26-04-2028).">Usar jornada legal automática de Chile</span>
             </label>
             <label className="col-span-2 flex items-center gap-2">
               <input type="checkbox" checked={hoursConfig.vacationBusinessDaysOnly} onChange={(e) => setHoursConfig((p) => ({ ...p, vacationBusinessDaysOnly: e.target.checked }))} />
@@ -1600,7 +1641,13 @@ export function CalendarioMantencionPage() {
               Jornada trabajada diaria usada en cálculos = Jornada total diaria - Colación.
             </div>
             <div className="col-span-2 sm:col-span-4 rounded border border-border/80 bg-muted/20 px-2 py-1 text-[11px] text-muted-foreground">
-              Mensual esperado (auto) = Esperadas semana × (días hábiles del mes / 5). En este período: {hoursConfig.expectedWeek.toFixed(1)} × ({monthBusinessDays}/5) = {expectedMonthAutoBase.toFixed(1)} h.
+              Semanal esperado (auto) = Jornada semanal legal × (días de la semana visibles / 7). En esta semana: {expectedWeekBase.toFixed(1)} × ({weekDays.length}/7).
+            </div>
+            <div className="col-span-2 sm:col-span-4 rounded border border-border/80 bg-muted/20 px-2 py-1 text-[11px] text-muted-foreground">
+              Mensual esperado (auto) = Jornada semanal legal × (días calendario del mes / 7). En este período: {expectedWeekBase.toFixed(1)} × ({monthCalendarDays}/7) = {expectedMonthAutoBase.toFixed(1)} h.
+            </div>
+            <div className="col-span-2 sm:col-span-4 rounded border border-border/80 bg-muted/20 px-2 py-1 text-[11px] text-muted-foreground">
+              {legalWeekLabel}
             </div>
             <div className="col-span-2 sm:col-span-4">
               <button className="mt-1 h-8 w-full rounded bg-primary text-primary-foreground text-xs" onClick={handleHoursConfigApply}>Aplicar parámetros</button>
