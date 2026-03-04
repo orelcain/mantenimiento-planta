@@ -159,6 +159,13 @@ function isSameDate(a: Date | null, b: Date | null): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
 }
 
+function weekNumberLabel(date: Date | null): string {
+  if (!date) return ''
+  const key = isoWeekKey(date)
+  const weekPart = key.split('-W')[1] ?? ''
+  return weekPart ? `W${weekPart}` : ''
+}
+
 function deltaClass(delta: number): string {
   if (Math.abs(delta) < 0.001) return 'text-muted-foreground font-semibold'
   return delta > 0 ? 'text-emerald-700 dark:text-emerald-300 font-semibold' : 'text-red-700 dark:text-red-300 font-semibold'
@@ -579,7 +586,7 @@ export function CalendarioMantencionPage() {
     if (!v || v.includes('libre') || v.includes('descanso') || v.includes('vacaciones') || v.includes('licencia')) return 'bg-rose-100 text-rose-900 dark:bg-rose-900/25 dark:text-rose-200'
     if (v.includes(shiftConfig.diaInicio.toLowerCase()) || v.includes('08:00') || v.includes('07:00')) return 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/25 dark:text-emerald-200'
     if (v.includes(shiftConfig.tardeInicio.toLowerCase()) || v.includes('16:00') || v.includes('14:00') || v.includes('13:00')) return 'bg-amber-100 text-amber-900 dark:bg-amber-900/25 dark:text-amber-200'
-    if (v.includes(shiftConfig.nocheInicio.toLowerCase()) || v.includes('00:00')) return 'bg-sky-100 text-sky-900 dark:bg-sky-900/25 dark:text-sky-200'
+    if (v.includes(shiftConfig.nocheInicio.toLowerCase()) || v.includes('00:00')) return 'bg-sky-200/80 text-sky-900 dark:bg-sky-500/35 dark:text-sky-100'
     return ''
   }
 
@@ -613,19 +620,66 @@ export function CalendarioMantencionPage() {
 
   const weekDays = dayCols.filter((d) => d.dateObj && isoWeekKey(d.dateObj) === selectedWeek)
   const monthDays = dayCols.filter((d) => d.dateObj && monthKey(d.dateObj) === selectedMonth)
+  const effectiveDaily = effectiveDailyHours()
+
+  function isWeekStart(index: number): boolean {
+    if (index === 0) return true
+    const curr = dayCols[index]?.dateObj ?? null
+    const prev = dayCols[index - 1]?.dateObj ?? null
+    if (!curr || !prev) return false
+    return isoWeekKey(curr) !== isoWeekKey(prev)
+  }
+
   const hoursRows = techRows.map((t) => {
     const weekHours = weekDays.reduce((sum, d) => sum + workedHoursForShift(t.shifts[d.c] || ''), 0)
     const monthHours = monthDays.reduce((sum, d) => sum + workedHoursForShift(t.shifts[d.c] || ''), 0)
+    const weekWorkedDays = weekDays.reduce((sum, d) => sum + (isWorkingShift(t.shifts[d.c] || '') ? 1 : 0), 0)
+    const monthWorkedDays = monthDays.reduce((sum, d) => sum + (isWorkingShift(t.shifts[d.c] || '') ? 1 : 0), 0)
+    const weekFreeDays = Math.max(0, weekDays.length - weekWorkedDays)
+    const monthFreeDays = Math.max(0, monthDays.length - monthWorkedDays)
+    const weekBreakHours = weekWorkedDays * hoursConfig.breakHours
+    const monthBreakHours = monthWorkedDays * hoursConfig.breakHours
+    const weekFreeHours = weekFreeDays * effectiveDaily
+    const monthFreeHours = monthFreeDays * effectiveDaily
     const deltaWeek = weekHours - hoursConfig.expectedWeek
     const deltaMonth = monthHours - hoursConfig.expectedMonth
     return {
       tech: t,
       weekHours,
       monthHours,
+      weekExpected: hoursConfig.expectedWeek,
+      monthExpected: hoursConfig.expectedMonth,
+      weekFreeHours,
+      monthFreeHours,
+      weekBreakHours,
+      monthBreakHours,
       deltaWeek,
       deltaMonth,
     }
   })
+
+  const controlTotals = useMemo(() => {
+    return hoursRows.reduce((acc, row) => {
+      acc.weekWorked += row.weekHours
+      acc.monthWorked += row.monthHours
+      acc.weekExpected += row.weekExpected
+      acc.monthExpected += row.monthExpected
+      acc.weekFree += row.weekFreeHours
+      acc.monthFree += row.monthFreeHours
+      acc.weekBreak += row.weekBreakHours
+      acc.monthBreak += row.monthBreakHours
+      return acc
+    }, {
+      weekWorked: 0,
+      monthWorked: 0,
+      weekExpected: 0,
+      monthExpected: 0,
+      weekFree: 0,
+      monthFree: 0,
+      weekBreak: 0,
+      monthBreak: 0,
+    })
+  }, [hoursRows])
 
   function handleAssignSelected() {
     if (!selectedRow || selectedCol === null || !selectedShift) return
@@ -1099,15 +1153,41 @@ export function CalendarioMantencionPage() {
                 </select>
               </div>
             </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-2 text-xs">
+              <div className="rounded border p-2">
+                <div className="text-muted-foreground">Semana (real / esperada)</div>
+                <div className="font-semibold tabular-nums">{controlTotals.weekWorked.toFixed(1)} / {controlTotals.weekExpected.toFixed(1)} h</div>
+                <div className={deltaClass(controlTotals.weekWorked - controlTotals.weekExpected)}>Δ {formatDelta(controlTotals.weekWorked - controlTotals.weekExpected)} h</div>
+              </div>
+              <div className="rounded border p-2">
+                <div className="text-muted-foreground">Mes (real / esperada)</div>
+                <div className="font-semibold tabular-nums">{controlTotals.monthWorked.toFixed(1)} / {controlTotals.monthExpected.toFixed(1)} h</div>
+                <div className={deltaClass(controlTotals.monthWorked - controlTotals.monthExpected)}>Δ {formatDelta(controlTotals.monthWorked - controlTotals.monthExpected)} h</div>
+              </div>
+              <div className="rounded border p-2">
+                <div className="text-muted-foreground">Horas libres</div>
+                <div className="tabular-nums">Semana: {controlTotals.weekFree.toFixed(1)} h</div>
+                <div className="tabular-nums">Mes: {controlTotals.monthFree.toFixed(1)} h</div>
+              </div>
+              <div className="rounded border p-2">
+                <div className="text-muted-foreground">Horas colación</div>
+                <div className="tabular-nums">Semana: {controlTotals.weekBreak.toFixed(1)} h</div>
+                <div className="tabular-nums">Mes: {controlTotals.monthBreak.toFixed(1)} h</div>
+              </div>
+            </div>
             <div className="rounded border">
               <table className="w-full text-[11px]">
                 <thead className="bg-muted text-foreground sticky top-0 z-10">
                   <tr>
                     <th className="px-2 py-1 text-left">Técnico</th>
-                    <th className="px-2 py-1 text-right w-16">Sem</th>
+                    <th className="px-2 py-1 text-right w-24">Sem (Real/Esp)</th>
                     <th className="px-2 py-1 w-24">Δ Sem</th>
-                    <th className="px-2 py-1 text-right w-16">Mes</th>
+                    <th className="px-2 py-1 text-right w-16">Libres S</th>
+                    <th className="px-2 py-1 text-right w-16">Colación S</th>
+                    <th className="px-2 py-1 text-right w-24">Mes (Real/Esp)</th>
                     <th className="px-2 py-1 w-24">Δ Mes</th>
+                    <th className="px-2 py-1 text-right w-16">Libres M</th>
+                    <th className="px-2 py-1 text-right w-16">Colación M</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1119,7 +1199,7 @@ export function CalendarioMantencionPage() {
                     return (
                       <tr key={row.tech.r} className="border-t border-border hover:bg-muted/40 transition-colors">
                         <td className="px-2 py-1 text-left truncate max-w-[180px]" title={row.tech.name}>{row.tech.name}</td>
-                        <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.weekHours.toFixed(1)}</td>
+                        <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.weekHours.toFixed(1)} / {row.weekExpected.toFixed(1)}</td>
                         <td className="px-2 py-1">
                           <div className="flex items-center gap-1">
                             <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
@@ -1128,7 +1208,9 @@ export function CalendarioMantencionPage() {
                             <span className={`text-[10px] w-8 text-right tabular-nums ${deltaClass(row.deltaWeek)}`}>{formatDelta(row.deltaWeek)}</span>
                           </div>
                         </td>
-                        <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.monthHours.toFixed(1)}</td>
+                        <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.weekFreeHours.toFixed(1)}</td>
+                        <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.weekBreakHours.toFixed(1)}</td>
+                        <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.monthHours.toFixed(1)} / {row.monthExpected.toFixed(1)}</td>
                         <td className="px-2 py-1">
                           <div className="flex items-center gap-1">
                             <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
@@ -1137,6 +1219,8 @@ export function CalendarioMantencionPage() {
                             <span className={`text-[10px] w-8 text-right tabular-nums ${deltaClass(row.deltaMonth)}`}>{formatDelta(row.deltaMonth)}</span>
                           </div>
                         </td>
+                        <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.monthFreeHours.toFixed(1)}</td>
+                        <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.monthBreakHours.toFixed(1)}</td>
                       </tr>
                     )
                   })}
@@ -1182,8 +1266,13 @@ export function CalendarioMantencionPage() {
                     {gi === 0 ? 'PLANTA' : ''}
                   </th>
                 ))}
-                {dayCols.map((d) => (
-                  <th key={`day-${d.c}`} className={`sticky top-0 z-20 border border-primary/70 bg-primary px-1 py-1 ${isSameDate(d.dateObj, todayDayCol?.dateObj ?? null) ? 'border-x-2 border-yellow-300' : ''}`} style={{ minWidth: `${DAY_COL_WIDTH}px`, maxWidth: `${DAY_COL_WIDTH}px` }}>{d.dayLabel}</th>
+                {dayCols.map((d, idx) => (
+                  <th key={`day-${d.c}`} className={`sticky top-0 z-20 border border-primary/70 bg-primary px-1 py-1 ${isSameDate(d.dateObj, todayDayCol?.dateObj ?? null) ? 'border-x-2 border-yellow-300' : ''} ${isWeekStart(idx) ? 'border-l-2 border-l-cyan-300' : ''}`} style={{ minWidth: `${DAY_COL_WIDTH}px`, maxWidth: `${DAY_COL_WIDTH}px` }}>
+                    <div className="flex items-center justify-between gap-1">
+                      <span>{d.dayLabel}</span>
+                      {isWeekStart(idx) ? <span className="rounded bg-cyan-100/20 px-1 text-[9px]">{weekNumberLabel(d.dateObj)}</span> : null}
+                    </div>
+                  </th>
                 ))}
               </tr>
               <tr className="bg-primary text-primary-foreground">
@@ -1196,8 +1285,8 @@ export function CalendarioMantencionPage() {
                     {META_COLS[gi]}
                   </th>
                 ))}
-                {dayCols.map((d) => (
-                  <th key={`date-${d.c}`} className={`sticky top-[30px] z-20 border border-primary/70 bg-primary px-1 py-1 ${isSameDate(d.dateObj, todayDayCol?.dateObj ?? null) ? 'border-x-2 border-b-2 border-yellow-300 font-semibold' : ''}`} style={{ minWidth: `${DAY_COL_WIDTH}px`, maxWidth: `${DAY_COL_WIDTH}px` }}>{formatDate(d.dateObj) || d.dateRaw}</th>
+                {dayCols.map((d, idx) => (
+                  <th key={`date-${d.c}`} className={`sticky top-[30px] z-20 border border-primary/70 bg-primary px-1 py-1 ${isSameDate(d.dateObj, todayDayCol?.dateObj ?? null) ? 'border-x-2 border-b-2 border-yellow-300 font-semibold' : ''} ${isWeekStart(idx) ? 'border-l-2 border-l-cyan-300' : ''}`} style={{ minWidth: `${DAY_COL_WIDTH}px`, maxWidth: `${DAY_COL_WIDTH}px` }}>{formatDate(d.dateObj) || d.dateRaw}</th>
                 ))}
               </tr>
             </thead>
@@ -1217,13 +1306,13 @@ export function CalendarioMantencionPage() {
                         {metaValues[gi]}
                       </td>
                     ))}
-                    {dayCols.map((d) => {
+                    {dayCols.map((d, idx) => {
                       const value = tech.shifts[d.c] || ''
                       const isSelectedCell = selectedRow === tech.r && selectedCol === d.c
                       return (
                         <td
                           key={`shift-${tech.r}-${d.c}`}
-                          className={`border px-1 py-1 text-center cursor-pointer ${classifyShift(value)} ${isSelectedCell ? 'ring-2 ring-primary ring-inset' : ''} ${isSameDate(d.dateObj, todayDayCol?.dateObj ?? null) ? 'border-x-2 border-yellow-300/80' : ''}`}
+                          className={`border px-1 py-1 text-center cursor-pointer ${classifyShift(value)} ${isSelectedCell ? 'ring-2 ring-primary ring-inset' : ''} ${isSameDate(d.dateObj, todayDayCol?.dateObj ?? null) ? 'border-x-2 border-yellow-300/80' : ''} ${isWeekStart(idx) ? 'border-l-2 border-l-cyan-300/80' : ''}`}
                           style={{ minWidth: `${DAY_COL_WIDTH}px`, maxWidth: `${DAY_COL_WIDTH}px` }}
                           title={value}
                           onClick={() => {
