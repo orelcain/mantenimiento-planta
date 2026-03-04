@@ -41,6 +41,7 @@ type HoursConfig = {
   expectedMonth: number
   toleranceHours: number
   useFixedDaily: boolean
+  vacationBusinessDaysOnly: boolean
 }
 
 const WEEKDAY_HEADER = new Set(['lunes', 'martes', 'miércoles', 'miercoles', 'jueves', 'viernes', 'sábado', 'sabado', 'domingo'])
@@ -82,6 +83,7 @@ function defaultHoursConfig(): HoursConfig {
     expectedMonth: 180,
     toleranceHours: 0.5,
     useFixedDaily: true,
+    vacationBusinessDaysOnly: true,
   }
 }
 
@@ -156,6 +158,11 @@ function clampMin(value: number, min: number): number {
 function getChileToday(): Date {
   const nowChile = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Santiago' }))
   return new Date(nowChile.getFullYear(), nowChile.getMonth(), nowChile.getDate())
+}
+
+function getPlanningMonthStart(): Date {
+  const today = getChileToday()
+  return new Date(today.getFullYear(), 2, 1)
 }
 
 function isoWeekKey(date: Date): string {
@@ -270,6 +277,7 @@ export function CalendarioMantencionPage() {
       expectedMonth: toNumberOr(stored.expectedMonth, 180),
       toleranceHours: toNumberOr(stored.toleranceHours, 0.5),
       useFixedDaily: stored.useFixedDaily !== false,
+      vacationBusinessDaysOnly: stored.vacationBusinessDaysOnly !== false,
     }
   })
 
@@ -410,13 +418,14 @@ export function CalendarioMantencionPage() {
       if (target && (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable)) return
 
       const key = event.key.toLowerCase()
-      if (!['d', 't', 'n', 'l'].includes(key)) return
+      if (!['d', 't', 'n', 'l', 'v'].includes(key)) return
 
       event.preventDefault()
       if (key === 'd') applyShiftRef.current(selectedRow, selectedCol, shortcuts.dia)
       if (key === 't') applyShiftRef.current(selectedRow, selectedCol, shortcuts.tarde)
       if (key === 'n') applyShiftRef.current(selectedRow, selectedCol, shortcuts.noche)
       if (key === 'l') applyShiftRef.current(selectedRow, selectedCol, shortcuts.libre)
+      if (key === 'v') applyShiftRef.current(selectedRow, selectedCol, 'VACACIONES')
     }
 
     window.addEventListener('keydown', onKey)
@@ -606,7 +615,7 @@ export function CalendarioMantencionPage() {
 
     if (!hasLegacyYear) return cols
 
-    const startDate = getChileToday()
+    const startDate = getPlanningMonthStart()
     return cols.map((col, idx) => {
       const d = new Date(startDate)
       d.setDate(startDate.getDate() + idx)
@@ -758,6 +767,15 @@ export function CalendarioMantencionPage() {
     return !(text.includes('libre') || text.includes('descanso') || text.includes('vacaciones') || text.includes('licencia'))
   }
 
+  function isVacationShift(shiftText: string): boolean {
+    return shiftText.trim().toLowerCase().includes('vacaciones')
+  }
+
+  function isBusinessDay(date: Date): boolean {
+    const day = date.getDay()
+    return day !== 0 && day !== 6
+  }
+
   function effectiveDailyHours(): number {
     return Math.max(0, hoursConfig.workHours - hoursConfig.breakHours)
   }
@@ -797,6 +815,21 @@ export function CalendarioMantencionPage() {
     const monthHours = monthDays.reduce((sum, d) => sum + workedHoursForShift(t.shifts[d.c] || ''), 0)
     const weekWorkedDays = weekDays.reduce((sum, d) => sum + (isWorkingShift(t.shifts[d.c] || '') ? 1 : 0), 0)
     const monthWorkedDays = monthDays.reduce((sum, d) => sum + (isWorkingShift(t.shifts[d.c] || '') ? 1 : 0), 0)
+    const weekVacationDays = weekDays.reduce((sum, d) => {
+      if (!d.dateObj || !isVacationShift(t.shifts[d.c] || '')) return sum
+      if (hoursConfig.vacationBusinessDaysOnly && !isBusinessDay(d.dateObj)) return sum
+      return sum + 1
+    }, 0)
+    const monthVacationDays = monthDays.reduce((sum, d) => {
+      if (!d.dateObj || !isVacationShift(t.shifts[d.c] || '')) return sum
+      if (hoursConfig.vacationBusinessDaysOnly && !isBusinessDay(d.dateObj)) return sum
+      return sum + 1
+    }, 0)
+    const totalVacationDays = dayCols.reduce((sum, d) => {
+      if (!d.dateObj || !isVacationShift(t.shifts[d.c] || '')) return sum
+      if (hoursConfig.vacationBusinessDaysOnly && !isBusinessDay(d.dateObj)) return sum
+      return sum + 1
+    }, 0)
     const weekFreeDays = Math.max(0, weekDays.length - weekWorkedDays)
     const monthFreeDays = Math.max(0, monthDays.length - monthWorkedDays)
     const weekBreakHours = weekWorkedDays * hoursConfig.breakHours
@@ -815,6 +848,9 @@ export function CalendarioMantencionPage() {
       monthFreeHours,
       weekBreakHours,
       monthBreakHours,
+      weekVacationDays,
+      monthVacationDays,
+      totalVacationDays,
       deltaWeek,
       deltaMonth,
     }
@@ -839,6 +875,7 @@ export function CalendarioMantencionPage() {
       expectedWeek: clampMin(toNumberOr(hoursConfig.expectedWeek, 45), 0),
       expectedMonth: clampMin(toNumberOr(hoursConfig.expectedMonth, 180), 0),
       toleranceHours: clampMin(toNumberOr(hoursConfig.toleranceHours, 0.5), 0),
+      vacationBusinessDaysOnly: hoursConfig.vacationBusinessDaysOnly !== false,
     }
     setHoursConfig(next)
     safeStorageSet(HOURS_CONFIG_KEY, next)
@@ -852,7 +889,7 @@ export function CalendarioMantencionPage() {
     }
     setShiftConfig(next)
     safeStorageSet(SHIFT_CONFIG_KEY, next)
-    setStatus('Plantillas de turno actualizadas. Atajos activos: D=Dia, T=Tarde, N=Noche, L=Libre.')
+    setStatus('Plantillas de turno actualizadas. Atajos activos: D=Dia, T=Tarde, N=Noche, L=Libre, V=Vacaciones.')
   }
 
   function handleFileUpload(file: File | null) {
@@ -933,6 +970,7 @@ export function CalendarioMantencionPage() {
 
     const vacationLabel = 'VACACIONES'
     let updated = 0
+    let vacationBusinessDays = 0
     setTechRows((prev) => prev.map((t) => {
       if (t.r !== vacationTechRow) return t
       const nextShifts = { ...t.shifts }
@@ -943,12 +981,19 @@ export function CalendarioMantencionPage() {
           nextShifts[d.c] = vacationLabel
           setCellValue(t.r, d.c, vacationLabel)
           updated += 1
+          if (!hoursConfig.vacationBusinessDaysOnly || isBusinessDay(current)) {
+            vacationBusinessDays += 1
+          }
         }
       })
       return { ...t, shifts: nextShifts }
     }))
 
-    setStatus(`Vacaciones aplicadas a ${updated} día(s).`)
+    if (hoursConfig.vacationBusinessDaysOnly) {
+      setStatus(`Vacaciones aplicadas: ${updated} día(s) marcados, ${vacationBusinessDays} día(s) hábiles contabilizados.`)
+    } else {
+      setStatus(`Vacaciones aplicadas a ${updated} día(s).`)
+    }
   }
 
   function handleUpdateTechDraft(row: number, nextGroup: string, nextArea: string) {
@@ -1114,11 +1159,12 @@ export function CalendarioMantencionPage() {
                 <button className="h-8 rounded bg-primary text-primary-foreground text-xs" onClick={handleAssignSelected}>Asignar</button>
                 <button className="h-8 rounded border text-xs" onClick={exportWorkbook}>Exportar</button>
               </div>
-              <div className="grid grid-cols-4 gap-1 text-[11px]">
+              <div className="grid grid-cols-5 gap-1 text-[11px]">
                 <button className="h-7 rounded border" onClick={() => selectedRow && selectedCol !== null && applyShift(selectedRow, selectedCol, shortcuts.dia)}>D</button>
                 <button className="h-7 rounded border" onClick={() => selectedRow && selectedCol !== null && applyShift(selectedRow, selectedCol, shortcuts.tarde)}>T</button>
                 <button className="h-7 rounded border" onClick={() => selectedRow && selectedCol !== null && applyShift(selectedRow, selectedCol, shortcuts.noche)}>N</button>
                 <button className="h-7 rounded border" onClick={() => selectedRow && selectedCol !== null && applyShift(selectedRow, selectedCol, shortcuts.libre)}>L</button>
+                <button className="h-7 rounded border" onClick={() => selectedRow && selectedCol !== null && applyShift(selectedRow, selectedCol, 'VACACIONES')}>V</button>
               </div>
             </div>
           </div>
@@ -1166,6 +1212,10 @@ export function CalendarioMantencionPage() {
             <label className="col-span-2 flex items-center gap-2">
               <input type="checkbox" checked={hoursConfig.useFixedDaily} onChange={(e) => setHoursConfig((p) => ({ ...p, useFixedDaily: e.target.checked }))} />
               Horas fijas por día trabajado
+            </label>
+            <label className="col-span-2 flex items-center gap-2">
+              <input type="checkbox" checked={hoursConfig.vacationBusinessDaysOnly} onChange={(e) => setHoursConfig((p) => ({ ...p, vacationBusinessDaysOnly: e.target.checked }))} />
+              Vacaciones contabilizan solo días hábiles
             </label>
             <div className="col-span-2 sm:col-span-4">
               <button className="mt-1 h-8 w-full rounded bg-primary text-primary-foreground text-xs" onClick={handleHoursConfigApply}>Aplicar parámetros</button>
@@ -1277,6 +1327,20 @@ export function CalendarioMantencionPage() {
               <div className="md:col-span-4 flex justify-end">
                 <button className="h-8 rounded border px-3 text-xs" onClick={handleApplyVacation}>Aplicar vacaciones</button>
               </div>
+              <div className="md:col-span-4 text-[11px] text-muted-foreground">
+                {(() => {
+                  const selectedTech = techRows.find((tech) => tech.r === vacationTechRow)
+                  if (!selectedTech) return 'Selecciona técnico para ver días de vacaciones.'
+                  const totalVac = dayCols.reduce((sum, d) => {
+                    if (!d.dateObj) return sum
+                    const text = selectedTech.shifts[d.c] || ''
+                    if (!isVacationShift(text)) return sum
+                    if (hoursConfig.vacationBusinessDaysOnly && !isBusinessDay(d.dateObj)) return sum
+                    return sum + 1
+                  }, 0)
+                  return `Vacaciones acumuladas del técnico en calendario: ${totalVac} día(s)${hoursConfig.vacationBusinessDaysOnly ? ' hábiles' : ''}.`
+                })()}
+              </div>
             </div>
           </div>
         )}
@@ -1335,10 +1399,13 @@ export function CalendarioMantencionPage() {
                     <th className="px-2 py-1 w-24">Δ Sem</th>
                     <th className="px-2 py-1 text-right w-16">Libres S</th>
                     <th className="px-2 py-1 text-right w-16">Colación S</th>
+                    <th className="px-2 py-1 text-right w-16">Vac S</th>
                     <th className="px-2 py-1 text-right w-24">Mes (Real/Esp)</th>
                     <th className="px-2 py-1 w-24">Δ Mes</th>
                     <th className="px-2 py-1 text-right w-16">Libres M</th>
                     <th className="px-2 py-1 text-right w-16">Colación M</th>
+                    <th className="px-2 py-1 text-right w-16">Vac M</th>
+                    <th className="px-2 py-1 text-right w-16">Vac Tot</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1361,6 +1428,7 @@ export function CalendarioMantencionPage() {
                         </td>
                         <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.weekFreeHours.toFixed(1)}</td>
                         <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.weekBreakHours.toFixed(1)}</td>
+                        <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.weekVacationDays}</td>
                         <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.monthHours.toFixed(1)} / {row.monthExpected.toFixed(1)}</td>
                         <td className="px-2 py-1">
                           <div className="flex items-center gap-1">
@@ -1372,6 +1440,8 @@ export function CalendarioMantencionPage() {
                         </td>
                         <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.monthFreeHours.toFixed(1)}</td>
                         <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.monthBreakHours.toFixed(1)}</td>
+                        <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.monthVacationDays}</td>
+                        <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.totalVacationDays}</td>
                       </tr>
                     )
                   })}
@@ -1408,7 +1478,7 @@ export function CalendarioMantencionPage() {
             </button>
           </div>
         </div>
-        <div className="text-xs text-muted-foreground mb-1">Atajos sobre celda seleccionada: D = Día, T = Tarde, N = Noche, L = Libre.</div>
+        <div className="text-xs text-muted-foreground mb-1">Atajos sobre celda seleccionada: D = Día, T = Tarde, N = Noche, L = Libre, V = Vacaciones.</div>
         <div ref={calendarScrollRef} className="relative h-[calc(100%-2.5rem)] overflow-auto rounded border">
           <table className="border-collapse text-[11px] min-w-max">
             <thead>
