@@ -320,9 +320,11 @@ export function CalendarioMantencionPage() {
   const loadWorkbookRef = useRef<(workbook: XLSX.WorkBook, filename: string) => void>(() => {})
   const applyShiftRef = useRef<(r: number, c: number, shift: string) => void>(() => {})
   const calendarScrollRef = useRef<HTMLDivElement | null>(null)
+  const calendarSectionRef = useRef<HTMLDivElement | null>(null)
   const isHydratingRemoteRef = useRef(false)
   const hasLoadedCalendarRef = useRef(false)
   const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [calendarShortcutsActive, setCalendarShortcutsActive] = useState(false)
 
   const shortcuts = useMemo(() => {
     const dia = `${shiftConfig.diaInicio} - ${shiftConfig.diaFin}`
@@ -337,7 +339,16 @@ export function CalendarioMantencionPage() {
       const reducedEnd = minutesToHHMM(dayStartMinutes + (normalDuration - reductionMinutes))
       diaReducido = `${shiftConfig.diaInicio} - ${reducedEnd}`
     }
-    return { dia, tarde, noche, libre, diaReducido }
+
+    const normalNightDuration = rangeDurationMinutes(shiftConfig.nocheInicio, shiftConfig.nocheFin)
+    const nightStartMinutes = hhmmToMinutes(shiftConfig.nocheInicio)
+    let nocheReducido = noche
+    if (normalNightDuration !== null && nightStartMinutes !== null && reductionMinutes > 0 && normalNightDuration > reductionMinutes) {
+      const reducedNightEnd = minutesToHHMM(nightStartMinutes + (normalNightDuration - reductionMinutes))
+      nocheReducido = `${shiftConfig.nocheInicio} - ${reducedNightEnd}`
+    }
+
+    return { dia, tarde, noche, libre, diaReducido, nocheReducido }
   }, [hoursConfig.dayReductionHours, shiftConfig])
 
   const weeks = useMemo(() => {
@@ -463,7 +474,19 @@ export function CalendarioMantencionPage() {
   }, [months, selectedMonth])
 
   useEffect(() => {
+    const onPointerDown = (event: MouseEvent) => {
+      const target = event.target as Node | null
+      const insideCalendar = !!(target && calendarSectionRef.current?.contains(target))
+      setCalendarShortcutsActive(insideCalendar)
+    }
+
+    document.addEventListener('mousedown', onPointerDown)
+    return () => document.removeEventListener('mousedown', onPointerDown)
+  }, [])
+
+  useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      if (!calendarShortcutsActive) return
       if (!selectedRow || selectedCol === null) return
       const target = event.target as HTMLElement | null
       if (target && (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable)) return
@@ -472,6 +495,11 @@ export function CalendarioMantencionPage() {
       if (event.ctrlKey && key === 'd') {
         event.preventDefault()
         applyShiftRef.current(selectedRow, selectedCol, shortcuts.diaReducido)
+        return
+      }
+      if (event.ctrlKey && key === 'n') {
+        event.preventDefault()
+        applyShiftRef.current(selectedRow, selectedCol, shortcuts.nocheReducido)
         return
       }
       if (!['d', 't', 'n', 'l', 'v'].includes(key)) return
@@ -486,7 +514,7 @@ export function CalendarioMantencionPage() {
 
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [selectedRow, selectedCol, shortcuts])
+  }, [calendarShortcutsActive, selectedRow, selectedCol, shortcuts])
 
   function loadWorkbook(workbook: XLSX.WorkBook, filename: string) {
     const horario = workbook.SheetNames.find((name) => name.toLowerCase() === 'horario') ?? workbook.SheetNames[0]
@@ -1037,7 +1065,7 @@ export function CalendarioMantencionPage() {
     }
     setShiftConfig(next)
     safeStorageSet(SHIFT_CONFIG_KEY, next)
-    setStatus('Plantillas de turno actualizadas. Atajos activos: D=Dia, Ctrl+D=Dia reducido, T=Tarde, N=Noche, L=Libre, V=Vacaciones.')
+    setStatus('Plantillas de turno actualizadas. Atajos activos en calendario: D=Dia, Ctrl+D=Dia reducido, N=Noche, Ctrl+N=Noche reducida, T=Tarde, L=Libre, V=Vacaciones.')
   }
 
   function handleFileUpload(file: File | null) {
@@ -1662,7 +1690,8 @@ export function CalendarioMantencionPage() {
             </button>
           </div>
         </div>
-        <div className="text-xs text-muted-foreground mb-1">Atajos sobre celda seleccionada: D = Día, Ctrl+D = Día reducido, T = Tarde, N = Noche, L = Libre, V = Vacaciones. Para feriado usa “Marcar feriado (día)”.</div>
+        <div className="text-xs text-muted-foreground mb-1">Atajos sobre celda seleccionada (solo tras click en calendario): D = Día, Ctrl+D = Día reducido, N = Noche, Ctrl+N = Noche reducida, T = Tarde, L = Libre, V = Vacaciones. Para feriado usa “Marcar feriado (día)”.</div>
+        <div ref={calendarSectionRef}>
         <div ref={calendarScrollRef} className="relative h-[calc(100%-2.5rem)] overflow-auto rounded border">
           <table className="border-collapse text-[11px] min-w-max">
             <thead>
@@ -1740,6 +1769,7 @@ export function CalendarioMantencionPage() {
               })}
             </tbody>
           </table>
+        </div>
         </div>
       </section>
     </div>
