@@ -165,6 +165,11 @@ function getPlanningMonthStart(): Date {
   return new Date(today.getFullYear(), 2, 1)
 }
 
+function isInPlanningMonth(date: Date): boolean {
+  const start = getPlanningMonthStart()
+  return date.getFullYear() === start.getFullYear() && date.getMonth() === start.getMonth()
+}
+
 function isoWeekKey(date: Date): string {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
   d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7))
@@ -399,6 +404,13 @@ export function CalendarioMantencionPage() {
 
   useEffect(() => {
     if (!selectedWeek) {
+      const start = getPlanningMonthStart()
+      const week10Start = new Date(start.getFullYear(), start.getMonth(), 2)
+      const preferred = isoWeekKey(week10Start)
+      if (weeks[preferred]) {
+        setSelectedWeek(preferred)
+        return
+      }
       const first = Object.keys(weeks)[0]
       if (first) setSelectedWeek(first)
     }
@@ -406,6 +418,11 @@ export function CalendarioMantencionPage() {
 
   useEffect(() => {
     if (!selectedMonth) {
+      const preferredMonth = monthKey(getPlanningMonthStart())
+      if (months[preferredMonth]) {
+        setSelectedMonth(preferredMonth)
+        return
+      }
       const first = Object.keys(months)[0]
       if (first) setSelectedMonth(first)
     }
@@ -450,16 +467,21 @@ export function CalendarioMantencionPage() {
 
     const ref = XLSX.utils.decode_range(horarioSheet['!ref'] || 'A1:A1')
     const colsDetected = detectDayColumns(horarioSheet, ref)
-    const cols = normalizeLegacyTemplateDates(colsDetected, horarioSheet)
-    const techs = detectTechnicians(horarioSheet, ref, cols)
+    const colsNormalized = normalizeLegacyTemplateDates(colsDetected, horarioSheet)
+    const cols = colsNormalized.filter((col) => {
+      if (!col.dateObj) return false
+      return isInPlanningMonth(col.dateObj)
+    })
+    const finalCols = cols.length > 0 ? cols : colsNormalized
+    const techs = detectTechnicians(horarioSheet, ref, finalCols)
     const catalog = readTurnosCatalog(workbook)
 
-    setDayCols(cols)
+    setDayCols(finalCols)
     setTechRows(techs)
     setTurnosCatalog(Array.from(new Set([...catalog, 'LIBRE'])))
 
     const firstTech = techs[0]
-    const firstDay = cols[0]
+    const firstDay = finalCols[0]
     if (firstTech) setSelectedRow(firstTech.r)
     if (firstDay) setSelectedCol(firstDay.c)
     if (firstTech && firstDay) setSelectedShift(firstTech.shifts[firstDay.c] || '')
