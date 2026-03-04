@@ -1,5 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as XLSX from 'xlsx'
+import { doc, getDoc, serverTimestamp } from 'firebase/firestore'
+import { db } from '../services/firebase'
+import { setDoc as trackedSetDoc } from '../services/firestoreTracked'
+import { getCurrentUser } from '../services/auth'
 
 type DayCol = {
   c: number
@@ -43,9 +47,27 @@ const WEEKDAY_HEADER = new Set(['lunes', 'martes', 'miércoles', 'miercoles', 'j
 const META_COLS = ['TURNO', 'Área', 'CeCo', 'Cargo', 'DIRECCIÓN', 'RUT', 'Personal']
 const META_COL_WIDTHS = [56, 80, 100, 108, 98, 100, 220]
 const HIDEABLE_COLS = new Set([2, 3, 4, 5]) // CeCo, Cargo, DIRECCIÓN, RUT
-const LEGACY_PREVIOUS_DAYS = 7
+const CALENDAR_FIRESTORE_PATH = ['calendario_mantencion_state', 'current'] as const
 
 type TabId = 'edicion' | 'plantillas' | 'horas' | 'tecnicos' | 'control'
+
+type PersistedCalendarState = {
+  version: number
+  originalFilename?: string
+  techRows?: Array<{
+    r: number
+    turno: string
+    area: string
+    ceco: string
+    cargo: string
+    direccion: string
+    rut: string
+    name: string
+    shifts: Record<string, string>
+  }>
+  hoursConfig?: HoursConfig
+  shiftConfig?: ShiftConfig
+}
 const DAY_COL_WIDTH = 88
 const HOURS_CONFIG_KEY = 'calendario_mantencion_hours_config_v1'
 const SHIFT_CONFIG_KEY = 'calendario_mantencion_shift_config_v1'
@@ -233,6 +255,7 @@ export function CalendarioMantencionPage() {
   const [vacationStart, setVacationStart] = useState('')
   const [vacationEnd, setVacationEnd] = useState('')
   const [techDrafts, setTechDrafts] = useState<Record<number, { turno: string; area: string }>>({})
+  const [controlTechRow, setControlTechRow] = useState<number | null>(null)
 
   const [hoursConfig, setHoursConfig] = useState<HoursConfig>(() => {
     const stored = safeStorageGet<HoursConfig>(HOURS_CONFIG_KEY, defaultHoursConfig())
@@ -254,6 +277,9 @@ export function CalendarioMantencionPage() {
   const loadWorkbookRef = useRef<(workbook: XLSX.WorkBook, filename: string) => void>(() => {})
   const applyShiftRef = useRef<(r: number, c: number, shift: string) => void>(() => {})
   const calendarScrollRef = useRef<HTMLDivElement | null>(null)
+  const isHydratingRemoteRef = useRef(false)
+  const hasLoadedCalendarRef = useRef(false)
+  const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const shortcuts = useMemo(() => {
     const dia = `${shiftConfig.diaInicio} - ${shiftConfig.diaFin}`
@@ -315,6 +341,11 @@ export function CalendarioMantencionPage() {
   }, [newTechGroup, techGroups])
 
   useEffect(() => {
+    if (controlTechRow && techRows.some((tech) => tech.r === controlTechRow)) return
+    setControlTechRow(techRows[0]?.r ?? null)
+  }, [controlTechRow, techRows])
+
+  useEffect(() => {
     setTechDrafts((prev) => {
       const next: Record<number, { turno: string; area: string }> = {}
       techRows.forEach((tech) => {
@@ -330,6 +361,12 @@ export function CalendarioMantencionPage() {
 
   loadWorkbookRef.current = loadWorkbook
   applyShiftRef.current = applyShift
+
+  useEffect(() => {
+    return () => {
+      if (syncTimerRef.current) clearTimeout(syncTimerRef.current)
+    }
+  }, [])
 
   useEffect(() => {
     const run = async () => {
@@ -416,7 +453,109 @@ export function CalendarioMantencionPage() {
 
     inferShiftConfig(catalog, techs)
     setStatus(`Plantilla cargada: ${filename}. Técnicos: ${techs.length}. Días: ${cols.length}. Fechas alineadas a calendario actual.`)
+    void hydrateCalendarFromFirebase(horarioSheet, filename)
   }
+
+  async function hydrateCalendarFromFirebase(sheet: XLSX.WorkSheet, filename: string): Promise<void> {
+    try {
+      isHydratingRemoteRef.current = true
+      const snap = await getDoc(doc(db, CALENDAR_FIRESTORE_PATH[0], CALENDAR_FIRESTORE_PATH[1]))
+      if (!snap.exists()) {
+        hasLoadedCalendarRef.current = true
+        return
+      }
+
+      const data = snap.data() as PersistedCalendarState
+      const persistedRows = Array.isArray(data.techRows) ? data.techRows : []
+
+      if (data.hoursConfig) setHoursConfig({ ...defaultHoursConfig(), ...data.hoursConfig })
+      if (data.shiftConfig) setShiftConfig({ ...defaultShiftConfig(), ...data.shiftConfig })
+      if (data.originalFilename) setOriginalFilename(data.originalFilename)
+
+      if (persistedRows.length > 0) {
+        const restored: TechRow[] = persistedRows.map((row) => {
+          const shifts: Record<number, string> = {}
+          Object.entries(row.shifts || {}).forEach(([k, v]) => {
+            const col = Number(k)
+            if (!Number.isNaN(col)) shifts[col] = String(v || '')
+          })
+          return {
+            r: Number(row.r),
+            turno: String(row.turno || ''),
+            area: String(row.area || ''),
+            ceco: String(row.ceco || ''),
+            cargo: String(row.cargo || ''),
+            direccion: String(row.direccion || ''),
+            rut: String(row.rut || ''),
+            name: String(row.name || ''),
+            shifts,
+          }
+        })
+
+        restored.forEach((tech) => {
+          setCellValue(tech.r, 0, tech.turno, sheet)
+          setCellValue(tech.r, 1, tech.area, sheet)
+          setCellValue(tech.r, 2, tech.ceco, sheet)
+          setCellValue(tech.r, 3, tech.cargo, sheet)
+          setCellValue(tech.r, 4, tech.direccion, sheet)
+          setCellValue(tech.r, 5, tech.rut, sheet)
+          setCellValue(tech.r, 6, tech.name, sheet)
+          Object.entries(tech.shifts).forEach(([col, value]) => {
+            setCellValue(tech.r, Number(col), value, sheet)
+          })
+        })
+
+        setTechRows(restored)
+        setSelectedRow(restored[0]?.r ?? null)
+      }
+
+      setStatus(`Plantilla cargada y sincronizada desde Firebase: ${filename}`)
+    } catch (error) {
+      setStatus(`Plantilla cargada localmente (sin sync Firebase): ${filename}`)
+      console.warn('No se pudo hidratar calendario desde Firebase', error)
+    } finally {
+      isHydratingRemoteRef.current = false
+      hasLoadedCalendarRef.current = true
+    }
+  }
+
+  const syncCalendarToFirebase = useCallback(async (reason: string): Promise<void> => {
+    try {
+      const currentUser = getCurrentUser()
+      const payload = {
+        version: 1,
+        originalFilename,
+        reason,
+        techRows: techRows.map((t) => ({
+          r: t.r,
+          turno: t.turno,
+          area: t.area,
+          ceco: t.ceco,
+          cargo: t.cargo,
+          direccion: t.direccion,
+          rut: t.rut,
+          name: t.name,
+          shifts: Object.fromEntries(Object.entries(t.shifts).map(([k, v]) => [String(k), v])),
+        })),
+        hoursConfig,
+        shiftConfig,
+        updatedAt: serverTimestamp(),
+        updatedAtClient: Date.now(),
+        updatedBy: currentUser?.uid ?? 'anon',
+      }
+      await trackedSetDoc(doc(db, CALENDAR_FIRESTORE_PATH[0], CALENDAR_FIRESTORE_PATH[1]), payload, { merge: true })
+    } catch (error) {
+      console.warn('No se pudo sincronizar calendario en Firebase', error)
+    }
+  }, [hoursConfig, originalFilename, shiftConfig, techRows])
+
+  useEffect(() => {
+    if (!hasLoadedCalendarRef.current || isHydratingRemoteRef.current) return
+    if (syncTimerRef.current) clearTimeout(syncTimerRef.current)
+    syncTimerRef.current = setTimeout(() => {
+      void syncCalendarToFirebase('state-change')
+    }, 200)
+  }, [dayCols, syncCalendarToFirebase])
 
   function getCellValue(sheet: XLSX.WorkSheet, r: number, c: number): string {
     const addr = XLSX.utils.encode_cell({ r, c })
@@ -450,7 +589,6 @@ export function CalendarioMantencionPage() {
     if (!hasLegacyYear) return cols
 
     const startDate = getChileToday()
-    startDate.setDate(startDate.getDate() - LEGACY_PREVIOUS_DAYS)
     return cols.map((col, idx) => {
       const d = new Date(startDate)
       d.setDate(startDate.getDate() + idx)
@@ -535,9 +673,10 @@ export function CalendarioMantencionPage() {
     safeStorageSet(SHIFT_CONFIG_KEY, next)
   }
 
-  function setCellValue(r: number, c: number, value: string) {
-    if (!ws) return
-    const currentRef = XLSX.utils.decode_range(ws['!ref'] || 'A1:A1')
+  function setCellValue(r: number, c: number, value: string, targetSheet?: XLSX.WorkSheet) {
+    const sheet = targetSheet ?? ws
+    if (!sheet) return
+    const currentRef = XLSX.utils.decode_range(sheet['!ref'] || 'A1:A1')
     if (r > currentRef.e.r || c > currentRef.e.c) {
       const nextRange = {
         s: currentRef.s,
@@ -546,12 +685,12 @@ export function CalendarioMantencionPage() {
           c: Math.max(currentRef.e.c, c),
         },
       }
-      ws['!ref'] = XLSX.utils.encode_range(nextRange)
+      sheet['!ref'] = XLSX.utils.encode_range(nextRange)
     }
 
     const addr = XLSX.utils.encode_cell({ r, c })
-    const current = ws[addr]
-    if (!current) ws[addr] = { t: 's', v: value }
+    const current = sheet[addr]
+    if (!current) sheet[addr] = { t: 's', v: value }
     else {
       current.t = 's'
       current.v = value
@@ -584,9 +723,14 @@ export function CalendarioMantencionPage() {
   function classifyShift(value: string): string {
     const v = value.toLowerCase()
     if (!v || v.includes('libre') || v.includes('descanso') || v.includes('vacaciones') || v.includes('licencia')) return 'bg-rose-100 text-rose-900 dark:bg-rose-900/25 dark:text-rose-200'
+    const nocheStart = shiftConfig.nocheInicio.toLowerCase()
+    const nocheEnd = shiftConfig.nocheFin.toLowerCase()
+    if (v.includes(`${nocheStart} - ${nocheEnd}`) || (v.includes(nocheStart) && v.includes(nocheEnd)) || v.includes('00:00 - 08:00')) {
+      return 'bg-sky-200/80 text-sky-900 dark:bg-sky-500/35 dark:text-sky-100'
+    }
     if (v.includes(shiftConfig.diaInicio.toLowerCase()) || v.includes('08:00') || v.includes('07:00')) return 'bg-emerald-100 text-emerald-900 dark:bg-emerald-900/25 dark:text-emerald-200'
     if (v.includes(shiftConfig.tardeInicio.toLowerCase()) || v.includes('16:00') || v.includes('14:00') || v.includes('13:00')) return 'bg-amber-100 text-amber-900 dark:bg-amber-900/25 dark:text-amber-200'
-    if (v.includes(shiftConfig.nocheInicio.toLowerCase()) || v.includes('00:00')) return 'bg-sky-200/80 text-sky-900 dark:bg-sky-500/35 dark:text-sky-100'
+    if (v.includes('00:00')) return 'bg-sky-200/80 text-sky-900 dark:bg-sky-500/35 dark:text-sky-100'
     return ''
   }
 
@@ -658,28 +802,11 @@ export function CalendarioMantencionPage() {
     }
   })
 
-  const controlTotals = useMemo(() => {
-    return hoursRows.reduce((acc, row) => {
-      acc.weekWorked += row.weekHours
-      acc.monthWorked += row.monthHours
-      acc.weekExpected += row.weekExpected
-      acc.monthExpected += row.monthExpected
-      acc.weekFree += row.weekFreeHours
-      acc.monthFree += row.monthFreeHours
-      acc.weekBreak += row.weekBreakHours
-      acc.monthBreak += row.monthBreakHours
-      return acc
-    }, {
-      weekWorked: 0,
-      monthWorked: 0,
-      weekExpected: 0,
-      monthExpected: 0,
-      weekFree: 0,
-      monthFree: 0,
-      weekBreak: 0,
-      monthBreak: 0,
-    })
-  }, [hoursRows])
+  const controlFocusRow = useMemo(() => {
+    if (hoursRows.length === 0) return null
+    const focused = hoursRows.find((row) => row.tech.r === controlTechRow)
+    return focused ?? hoursRows[0]
+  }, [controlTechRow, hoursRows])
 
   function handleAssignSelected() {
     if (!selectedRow || selectedCol === null || !selectedShift) return
@@ -1139,7 +1266,7 @@ export function CalendarioMantencionPage() {
         {/* ── Tab: Control semanal y mensual ── */}
         {activeTab === 'control' && (
           <div className="space-y-2">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
               <div>
                 <label className="text-muted-foreground">Semana</label>
                 <select className={CONTROL_CLASS + ' w-full mt-0.5'} value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)}>
@@ -1152,27 +1279,33 @@ export function CalendarioMantencionPage() {
                   {Object.entries(months).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
                 </select>
               </div>
+              <div>
+                <label className="text-muted-foreground">Técnico foco</label>
+                <select className={CONTROL_CLASS + ' w-full mt-0.5'} value={controlTechRow ?? ''} onChange={(e) => setControlTechRow(Number(e.target.value) || null)}>
+                  {hoursRows.map((row) => <option key={row.tech.r} value={row.tech.r}>{row.tech.name}</option>)}
+                </select>
+              </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-2 text-xs">
               <div className="rounded border p-2">
                 <div className="text-muted-foreground">Semana (real / esperada)</div>
-                <div className="font-semibold tabular-nums">{controlTotals.weekWorked.toFixed(1)} / {controlTotals.weekExpected.toFixed(1)} h</div>
-                <div className={deltaClass(controlTotals.weekWorked - controlTotals.weekExpected)}>Δ {formatDelta(controlTotals.weekWorked - controlTotals.weekExpected)} h</div>
+                <div className="font-semibold tabular-nums">{controlFocusRow?.weekHours.toFixed(1) ?? '0.0'} / {controlFocusRow?.weekExpected.toFixed(1) ?? '0.0'} h</div>
+                <div className={deltaClass((controlFocusRow?.weekHours ?? 0) - (controlFocusRow?.weekExpected ?? 0))}>Δ {formatDelta((controlFocusRow?.weekHours ?? 0) - (controlFocusRow?.weekExpected ?? 0))} h</div>
               </div>
               <div className="rounded border p-2">
                 <div className="text-muted-foreground">Mes (real / esperada)</div>
-                <div className="font-semibold tabular-nums">{controlTotals.monthWorked.toFixed(1)} / {controlTotals.monthExpected.toFixed(1)} h</div>
-                <div className={deltaClass(controlTotals.monthWorked - controlTotals.monthExpected)}>Δ {formatDelta(controlTotals.monthWorked - controlTotals.monthExpected)} h</div>
+                <div className="font-semibold tabular-nums">{controlFocusRow?.monthHours.toFixed(1) ?? '0.0'} / {controlFocusRow?.monthExpected.toFixed(1) ?? '0.0'} h</div>
+                <div className={deltaClass((controlFocusRow?.monthHours ?? 0) - (controlFocusRow?.monthExpected ?? 0))}>Δ {formatDelta((controlFocusRow?.monthHours ?? 0) - (controlFocusRow?.monthExpected ?? 0))} h</div>
               </div>
               <div className="rounded border p-2">
                 <div className="text-muted-foreground">Horas libres</div>
-                <div className="tabular-nums">Semana: {controlTotals.weekFree.toFixed(1)} h</div>
-                <div className="tabular-nums">Mes: {controlTotals.monthFree.toFixed(1)} h</div>
+                <div className="tabular-nums">Semana: {controlFocusRow?.weekFreeHours.toFixed(1) ?? '0.0'} h</div>
+                <div className="tabular-nums">Mes: {controlFocusRow?.monthFreeHours.toFixed(1) ?? '0.0'} h</div>
               </div>
               <div className="rounded border p-2">
                 <div className="text-muted-foreground">Horas colación</div>
-                <div className="tabular-nums">Semana: {controlTotals.weekBreak.toFixed(1)} h</div>
-                <div className="tabular-nums">Mes: {controlTotals.monthBreak.toFixed(1)} h</div>
+                <div className="tabular-nums">Semana: {controlFocusRow?.weekBreakHours.toFixed(1) ?? '0.0'} h</div>
+                <div className="tabular-nums">Mes: {controlFocusRow?.monthBreakHours.toFixed(1) ?? '0.0'} h</div>
               </div>
             </div>
             <div className="rounded border">
