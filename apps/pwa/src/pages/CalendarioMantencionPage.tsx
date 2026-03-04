@@ -295,7 +295,6 @@ export function CalendarioMantencionPage() {
   const [vacationStart, setVacationStart] = useState('')
   const [vacationEnd, setVacationEnd] = useState('')
   const [techDrafts, setTechDrafts] = useState<Record<number, { turno: string; area: string }>>({})
-  const [controlTechRow, setControlTechRow] = useState<number | null>(null)
   const [controlSortKey, setControlSortKey] = useState<ControlSortKey>('deltaWeek')
   const [controlSortDir, setControlSortDir] = useState<'asc' | 'desc'>('asc')
 
@@ -414,11 +413,6 @@ export function CalendarioMantencionPage() {
   }, [newTechGroup, techGroups])
 
   useEffect(() => {
-    if (controlTechRow && techRows.some((tech) => tech.r === controlTechRow)) return
-    setControlTechRow(techRows[0]?.r ?? null)
-  }, [controlTechRow, techRows])
-
-  useEffect(() => {
     setTechDrafts((prev) => {
       const next: Record<number, { turno: string; area: string }> = {}
       techRows.forEach((tech) => {
@@ -459,29 +453,27 @@ export function CalendarioMantencionPage() {
   }, [])
 
   useEffect(() => {
-    if (!selectedWeek) {
-      const start = getPlanningMonthStart()
-      const week10Start = new Date(start.getFullYear(), start.getMonth(), 2)
-      const preferred = isoWeekKey(week10Start)
-      if (weeks[preferred]) {
-        setSelectedWeek(preferred)
-        return
-      }
-      const first = Object.keys(weeks)[0]
-      if (first) setSelectedWeek(first)
+    const today = getChileToday()
+    const preferred = isoWeekKey(today)
+    if (selectedWeek && weeks[selectedWeek]) return
+    if (weeks[preferred]) {
+      setSelectedWeek(preferred)
+      return
     }
+    const first = Object.keys(weeks)[0]
+    if (first) setSelectedWeek(first)
   }, [weeks, selectedWeek])
 
   useEffect(() => {
-    if (!selectedMonth) {
-      const preferredMonth = monthKey(getPlanningMonthStart())
-      if (months[preferredMonth]) {
-        setSelectedMonth(preferredMonth)
-        return
-      }
-      const first = Object.keys(months)[0]
-      if (first) setSelectedMonth(first)
+    const today = getChileToday()
+    const preferredMonth = monthKey(today)
+    if (selectedMonth && months[selectedMonth]) return
+    if (months[preferredMonth]) {
+      setSelectedMonth(preferredMonth)
+      return
     }
+    const first = Object.keys(months)[0]
+    if (first) setSelectedMonth(first)
   }, [months, selectedMonth])
 
   useEffect(() => {
@@ -1062,12 +1054,6 @@ export function CalendarioMantencionPage() {
     }
   })
 
-  const controlFocusRow = useMemo(() => {
-    if (hoursRows.length === 0) return null
-    const focused = hoursRows.find((row) => row.tech.r === controlTechRow)
-    return focused ?? hoursRows[0]
-  }, [controlTechRow, hoursRows])
-
   const controlSummary = useMemo(() => {
     const total = hoursRows.length
     const weekOk = hoursRows.filter((row) => row.deltaWeek >= -hoursConfig.toleranceHours).length
@@ -1620,7 +1606,7 @@ export function CalendarioMantencionPage() {
         {/* ── Tab: Control semanal y mensual ── */}
         {activeTab === 'control' && (
           <div className="space-y-2">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
               <div>
                 <label className="text-muted-foreground">Semana</label>
                 <select className={CONTROL_CLASS + ' w-full mt-0.5'} value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)}>
@@ -1631,12 +1617,6 @@ export function CalendarioMantencionPage() {
                 <label className="text-muted-foreground">Mes</label>
                 <select className={CONTROL_CLASS + ' w-full mt-0.5'} value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)}>
                   {Object.entries(months).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="text-muted-foreground">Técnico foco</label>
-                <select className={CONTROL_CLASS + ' w-full mt-0.5'} value={controlTechRow ?? ''} onChange={(e) => setControlTechRow(Number(e.target.value) || null)}>
-                  {hoursRows.map((row) => <option key={row.tech.r} value={row.tech.r}>{row.tech.name}</option>)}
                 </select>
               </div>
             </div>
@@ -1658,14 +1638,6 @@ export function CalendarioMantencionPage() {
                 <div className="font-semibold tabular-nums">± {hoursConfig.toleranceHours.toFixed(1)} h</div>
               </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px]">
-              <div className="rounded border bg-muted/20 px-2 py-1">
-                <span className="text-muted-foreground">Semana seleccionada:</span> <span className="font-semibold">{weeks[selectedWeek] || '-'}</span>
-              </div>
-              <div className="rounded border bg-muted/20 px-2 py-1">
-                <span className="text-muted-foreground">Mes seleccionado:</span> <span className="font-semibold">{months[selectedMonth] || '-'}</span>
-              </div>
-            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
               <div>
                 <label className="text-muted-foreground">Ordenar por</label>
@@ -1683,28 +1655,6 @@ export function CalendarioMantencionPage() {
                   <option value="asc">Ascendente</option>
                   <option value="desc">Descendente</option>
                 </select>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-2 text-xs">
-              <div className="rounded border p-2">
-                <div className="text-muted-foreground">Semana (real / esperada)</div>
-                <div className="font-semibold tabular-nums">{controlFocusRow?.weekHours.toFixed(1) ?? '0.0'} / {controlFocusRow?.weekExpected.toFixed(1) ?? '0.0'} h</div>
-                <div className={deltaClass((controlFocusRow?.weekHours ?? 0) - (controlFocusRow?.weekExpected ?? 0))}>Δ {formatDelta((controlFocusRow?.weekHours ?? 0) - (controlFocusRow?.weekExpected ?? 0))} h</div>
-              </div>
-              <div className="rounded border p-2">
-                <div className="text-muted-foreground">Mes (real / esperada)</div>
-                <div className="font-semibold tabular-nums">{controlFocusRow?.monthHours.toFixed(1) ?? '0.0'} / {controlFocusRow?.monthExpected.toFixed(1) ?? '0.0'} h</div>
-                <div className={deltaClass((controlFocusRow?.monthHours ?? 0) - (controlFocusRow?.monthExpected ?? 0))}>Δ {formatDelta((controlFocusRow?.monthHours ?? 0) - (controlFocusRow?.monthExpected ?? 0))} h</div>
-              </div>
-              <div className="rounded border p-2">
-                <div className="text-muted-foreground">Horas libres</div>
-                <div className="tabular-nums">Semana: {controlFocusRow?.weekFreeHours.toFixed(1) ?? '0.0'} h</div>
-                <div className="tabular-nums">Mes: {controlFocusRow?.monthFreeHours.toFixed(1) ?? '0.0'} h</div>
-              </div>
-              <div className="rounded border p-2">
-                <div className="text-muted-foreground">Horas colación</div>
-                <div className="tabular-nums">Semana: {controlFocusRow?.weekBreakHours.toFixed(1) ?? '0.0'} h</div>
-                <div className="tabular-nums">Mes: {controlFocusRow?.monthBreakHours.toFixed(1) ?? '0.0'} h</div>
               </div>
             </div>
             <div className="rounded border">

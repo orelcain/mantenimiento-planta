@@ -219,14 +219,10 @@ export function MainLayout() {
   useEffect(() => {
     const prev = prevPendingRef.current
     if (prev > 0 && pendingWrites === 0 && isOnline) {
-      toast({
-        title: 'Sincronizado',
-        description: 'Tus cambios se guardaron correctamente',
-      })
       setLastSyncAt(Date.now())
     }
     prevPendingRef.current = pendingWrites
-  }, [pendingWrites, isOnline, setLastSyncAt, toast])
+  }, [pendingWrites, isOnline, setLastSyncAt])
 
   const { canSee } = usePermissionsStore()
 
