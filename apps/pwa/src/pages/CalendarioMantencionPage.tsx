@@ -42,6 +42,8 @@ type HoursConfig = {
   toleranceHours: number
   useFixedDaily: boolean
   dayReductionHours: number
+  afternoonReductionHours: number
+  nightReductionHours: number
   vacationBusinessDaysOnly: boolean
   holidayAsNonWorking: boolean
   holidayBusinessDaysOnly: boolean
@@ -86,6 +88,11 @@ type PersistedCalendarState = {
   hoursConfig?: HoursConfig
   shiftConfig?: ShiftConfig
 }
+
+type CalendarSnapshot = {
+  techRows: TechRow[]
+}
+
 const DAY_COL_WIDTH = 88
 const HOURS_CONFIG_KEY = 'calendario_mantencion_hours_config_v1'
 const SHIFT_CONFIG_KEY = 'calendario_mantencion_shift_config_v1'
@@ -101,6 +108,8 @@ function defaultHoursConfig(): HoursConfig {
     toleranceHours: 0.5,
     useFixedDaily: true,
     dayReductionHours: 1,
+    afternoonReductionHours: 1,
+    nightReductionHours: 1,
     vacationBusinessDaysOnly: true,
     holidayAsNonWorking: true,
     holidayBusinessDaysOnly: true,
@@ -294,7 +303,6 @@ export function CalendarioMantencionPage() {
 
   const [selectedRow, setSelectedRow] = useState<number | null>(null)
   const [selectedCol, setSelectedCol] = useState<number | null>(null)
-  const [selectedShift, setSelectedShift] = useState('')
   const [selectedWeek, setSelectedWeek] = useState('')
   const [selectedMonth, setSelectedMonth] = useState('')
   const [exportScope, setExportScope] = useState<ExportScope>('month')
@@ -305,10 +313,6 @@ export function CalendarioMantencionPage() {
   const [newTechRut, setNewTechRut] = useState('')
   const [newTechGroup, setNewTechGroup] = useState('A')
   const [newTechArea, setNewTechArea] = useState('Mantención')
-  const [vacationTechRow, setVacationTechRow] = useState<number | null>(null)
-  const [vacationStart, setVacationStart] = useState('')
-  const [vacationEnd, setVacationEnd] = useState('')
-  const [techDrafts, setTechDrafts] = useState<Record<number, { turno: string; area: string }>>({})
 
   const [hoursConfig, setHoursConfig] = useState<HoursConfig>(() => {
     const stored = safeStorageGet<HoursConfig>(HOURS_CONFIG_KEY, defaultHoursConfig())
@@ -320,6 +324,8 @@ export function CalendarioMantencionPage() {
       toleranceHours: toNumberOr(stored.toleranceHours, 0.5),
       useFixedDaily: stored.useFixedDaily !== false,
       dayReductionHours: toNumberOr(stored.dayReductionHours, 1),
+      afternoonReductionHours: toNumberOr(stored.afternoonReductionHours, 1),
+      nightReductionHours: toNumberOr(stored.nightReductionHours, 1),
       vacationBusinessDaysOnly: stored.vacationBusinessDaysOnly !== false,
       holidayAsNonWorking: stored.holidayAsNonWorking !== false,
       holidayBusinessDaysOnly: stored.holidayBusinessDaysOnly !== false,
@@ -339,6 +345,11 @@ export function CalendarioMantencionPage() {
   const hasLoadedCalendarRef = useRef(false)
   const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const shiftStyleSamplesRef = useRef<ShiftStyleSamples>({})
+  const undoStackRef = useRef<CalendarSnapshot[]>([])
+  const redoStackRef = useRef<CalendarSnapshot[]>([])
+  const undoRef = useRef<() => void>(() => {})
+  const redoRef = useRef<() => void>(() => {})
+  const [historyVersion, setHistoryVersion] = useState(0)
   const [calendarShortcutsActive, setCalendarShortcutsActive] = useState(false)
 
   const shortcuts = useMemo(() => {
@@ -346,33 +357,35 @@ export function CalendarioMantencionPage() {
     const tarde = `${shiftConfig.tardeInicio} - ${shiftConfig.tardeFin}`
     const noche = `${shiftConfig.nocheInicio} - ${shiftConfig.nocheFin}`
     const libre = shiftConfig.libreLabel || 'LIBRE'
-    const reductionMinutes = Math.max(0, Math.round(toNumberOr(hoursConfig.dayReductionHours, 1) * 60))
+    const reductionMinutesDay = Math.max(0, Math.round(toNumberOr(hoursConfig.dayReductionHours, 1) * 60))
+    const reductionMinutesAfternoon = Math.max(0, Math.round(toNumberOr(hoursConfig.afternoonReductionHours, 1) * 60))
+    const reductionMinutesNight = Math.max(0, Math.round(toNumberOr(hoursConfig.nightReductionHours, 1) * 60))
     const normalDuration = rangeDurationMinutes(shiftConfig.diaInicio, shiftConfig.diaFin)
     const dayStartMinutes = hhmmToMinutes(shiftConfig.diaInicio)
     let diaReducido = dia
-    if (normalDuration !== null && dayStartMinutes !== null && reductionMinutes > 0 && normalDuration > reductionMinutes) {
-      const reducedEnd = minutesToHHMM(dayStartMinutes + (normalDuration - reductionMinutes))
+    if (normalDuration !== null && dayStartMinutes !== null && reductionMinutesDay > 0 && normalDuration > reductionMinutesDay) {
+      const reducedEnd = minutesToHHMM(dayStartMinutes + (normalDuration - reductionMinutesDay))
       diaReducido = `${shiftConfig.diaInicio} - ${reducedEnd}`
     }
 
     const normalNightDuration = rangeDurationMinutes(shiftConfig.nocheInicio, shiftConfig.nocheFin)
     const nightStartMinutes = hhmmToMinutes(shiftConfig.nocheInicio)
     let nocheReducido = noche
-    if (normalNightDuration !== null && nightStartMinutes !== null && reductionMinutes > 0 && normalNightDuration > reductionMinutes) {
-      const reducedNightEnd = minutesToHHMM(nightStartMinutes + (normalNightDuration - reductionMinutes))
+    if (normalNightDuration !== null && nightStartMinutes !== null && reductionMinutesNight > 0 && normalNightDuration > reductionMinutesNight) {
+      const reducedNightEnd = minutesToHHMM(nightStartMinutes + (normalNightDuration - reductionMinutesNight))
       nocheReducido = `${shiftConfig.nocheInicio} - ${reducedNightEnd}`
     }
 
     const normalAfternoonDuration = rangeDurationMinutes(shiftConfig.tardeInicio, shiftConfig.tardeFin)
     const afternoonStartMinutes = hhmmToMinutes(shiftConfig.tardeInicio)
     let tardeReducido = tarde
-    if (normalAfternoonDuration !== null && afternoonStartMinutes !== null && reductionMinutes > 0 && normalAfternoonDuration > reductionMinutes) {
-      const reducedAfternoonEnd = minutesToHHMM(afternoonStartMinutes + (normalAfternoonDuration - reductionMinutes))
+    if (normalAfternoonDuration !== null && afternoonStartMinutes !== null && reductionMinutesAfternoon > 0 && normalAfternoonDuration > reductionMinutesAfternoon) {
+      const reducedAfternoonEnd = minutesToHHMM(afternoonStartMinutes + (normalAfternoonDuration - reductionMinutesAfternoon))
       tardeReducido = `${shiftConfig.tardeInicio} - ${reducedAfternoonEnd}`
     }
 
     return { dia, tarde, noche, libre, diaReducido, tardeReducido, nocheReducido }
-  }, [hoursConfig.dayReductionHours, shiftConfig])
+  }, [hoursConfig.dayReductionHours, hoursConfig.afternoonReductionHours, hoursConfig.nightReductionHours, shiftConfig])
 
   const weeks = useMemo(() => {
     const map: Record<string, string> = {}
@@ -425,22 +438,10 @@ export function CalendarioMantencionPage() {
     }
   }, [newTechGroup, techGroups])
 
-  useEffect(() => {
-    setTechDrafts((prev) => {
-      const next: Record<number, { turno: string; area: string }> = {}
-      techRows.forEach((tech) => {
-        const existing = prev[tech.r]
-        next[tech.r] = {
-          turno: existing?.turno ?? tech.turno,
-          area: existing?.area ?? tech.area,
-        }
-      })
-      return next
-    })
-  }, [techRows])
-
   loadWorkbookRef.current = loadWorkbook
   applyShiftRef.current = applyShift
+  undoRef.current = undoChange
+  redoRef.current = redoChange
 
   useEffect(() => {
     return () => {
@@ -502,10 +503,31 @@ export function CalendarioMantencionPage() {
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null
+      const editingField = !!(target && (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable))
+
+      if ((event.ctrlKey || event.metaKey) && !editingField) {
+        const key = event.key.toLowerCase()
+        if (key === 'z' && event.shiftKey) {
+          event.preventDefault()
+          redoRef.current()
+          return
+        }
+        if (key === 'z') {
+          event.preventDefault()
+          undoRef.current()
+          return
+        }
+        if (key === 'y') {
+          event.preventDefault()
+          redoRef.current()
+          return
+        }
+      }
+
       if (!calendarShortcutsActive) return
       if (!selectedRow || selectedCol === null) return
-      const target = event.target as HTMLElement | null
-      if (target && (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable)) return
+      if (editingField) return
 
       if (event.ctrlKey || event.altKey || event.metaKey) return
 
@@ -517,30 +539,24 @@ export function CalendarioMantencionPage() {
           const nextDayCol = curIdx >= 0 ? dayCols[curIdx + 1] : undefined
           if (nextDayCol) {
             setSelectedCol(nextDayCol.c)
-            const tech = techRows.find((t) => t.r === selectedRow)
-            if (tech) setSelectedShift(tech.shifts[nextDayCol.c] || '')
           }
         } else if (event.key === 'ArrowLeft') {
           const curIdx = dayCols.findIndex((d) => d.c === selectedCol)
           const prevDayCol = curIdx > 0 ? dayCols[curIdx - 1] : undefined
           if (prevDayCol) {
             setSelectedCol(prevDayCol.c)
-            const tech = techRows.find((t) => t.r === selectedRow)
-            if (tech) setSelectedShift(tech.shifts[prevDayCol.c] || '')
           }
         } else if (event.key === 'ArrowDown') {
           const curRowIdx = techRows.findIndex((t) => t.r === selectedRow)
           const nextRow = curRowIdx >= 0 ? techRows[curRowIdx + 1] : undefined
           if (nextRow) {
             setSelectedRow(nextRow.r)
-            setSelectedShift(nextRow.shifts[selectedCol] || '')
           }
         } else if (event.key === 'ArrowUp') {
           const curRowIdx = techRows.findIndex((t) => t.r === selectedRow)
           const prevRow = curRowIdx > 0 ? techRows[curRowIdx - 1] : undefined
           if (prevRow) {
             setSelectedRow(prevRow.r)
-            setSelectedShift(prevRow.shifts[selectedCol] || '')
           }
         }
         return
@@ -608,13 +624,15 @@ export function CalendarioMantencionPage() {
     setDayCols(finalCols)
     setTechRows(techs)
     setTurnosCatalog(Array.from(new Set([...catalog, 'LIBRE'])))
+    undoStackRef.current = []
+    redoStackRef.current = []
+    setHistoryVersion((v) => v + 1)
     inferShiftStyleSamples(horarioSheet, techs, finalCols)
 
     const firstTech = techs[0]
     const firstDay = finalCols[0]
     if (firstTech) setSelectedRow(firstTech.r)
     if (firstDay) setSelectedCol(firstDay.c)
-    if (firstTech && firstDay) setSelectedShift(firstTech.shifts[firstDay.c] || '')
 
     inferShiftConfig(catalog, techs)
     setStatus(`Plantilla cargada: ${filename}. Técnicos: ${techs.length}. Días: ${cols.length}. Fechas alineadas a calendario actual.`)
@@ -899,14 +917,63 @@ export function CalendarioMantencionPage() {
     }
   }
 
+  function snapshotCurrentState(): CalendarSnapshot {
+    return {
+      techRows: techRows.map((tech) => ({
+        ...tech,
+        shifts: { ...tech.shifts },
+      })),
+    }
+  }
+
+  function applySnapshot(snapshot: CalendarSnapshot) {
+    const nextRows = snapshot.techRows.map((tech) => ({
+      ...tech,
+      shifts: { ...tech.shifts },
+    }))
+    setTechRows(nextRows)
+    nextRows.forEach((tech) => {
+      setCellValue(tech.r, 0, tech.turno)
+      setCellValue(tech.r, 1, tech.area)
+      dayCols.forEach((d) => {
+        setCellValue(tech.r, d.c, tech.shifts[d.c] || '')
+      })
+    })
+  }
+
+  function pushUndoSnapshot() {
+    undoStackRef.current.push(snapshotCurrentState())
+    if (undoStackRef.current.length > 150) undoStackRef.current.shift()
+    redoStackRef.current = []
+    setHistoryVersion((v) => v + 1)
+  }
+
+  function undoChange() {
+    const previous = undoStackRef.current.pop()
+    if (!previous) return
+    redoStackRef.current.push(snapshotCurrentState())
+    applySnapshot(previous)
+    setStatus('Deshacer aplicado (Ctrl+Z).')
+    setHistoryVersion((v) => v + 1)
+  }
+
+  function redoChange() {
+    const next = redoStackRef.current.pop()
+    if (!next) return
+    undoStackRef.current.push(snapshotCurrentState())
+    applySnapshot(next)
+    setStatus('Rehacer aplicado (Ctrl+Y / Ctrl+Shift+Z).')
+    setHistoryVersion((v) => v + 1)
+  }
+
   function applyShift(r: number, c: number, shift: string) {
     const normalized = shift.trim()
     if (!normalized) return
+    pushUndoSnapshot()
     setTechRows((prev) => prev.map((t) => (t.r !== r ? t : { ...t, shifts: { ...t.shifts, [c]: normalized } })))
     setCellValue(r, c, normalized)
     setSelectedRow(r)
     setSelectedCol(c)
-    setSelectedShift(normalized)
     setStatus(`Turno actualizado (${dayLabelByCol(c)}): ${normalized}`)
   }
 
@@ -1018,9 +1085,19 @@ export function CalendarioMantencionPage() {
     return Math.max(0, hoursConfig.workHours - hoursConfig.breakHours)
   }
 
+  function reductionHoursForShift(shiftText: string): number {
+    const m = shiftText.match(/(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/)
+    if (!m) return 0
+    const start = m[1] ?? ''
+    if (start === shiftConfig.diaInicio) return clampMin(toNumberOr(hoursConfig.dayReductionHours, 1), 0)
+    if (start === shiftConfig.tardeInicio) return clampMin(toNumberOr(hoursConfig.afternoonReductionHours, 1), 0)
+    if (start === shiftConfig.nocheInicio) return clampMin(toNumberOr(hoursConfig.nightReductionHours, 1), 0)
+    return 0
+  }
+
   function workedHoursForShift(shiftText: string): number {
     if (!isWorkingShift(shiftText)) return 0
-    const reduction = isReducedShift(shiftText) ? clampMin(toNumberOr(hoursConfig.dayReductionHours, 1), 0) : 0
+    const reduction = isReducedShift(shiftText) ? reductionHoursForShift(shiftText) : 0
     if (hoursConfig.useFixedDaily) return Math.max(0, effectiveDailyHours() - reduction)
 
     const m = shiftText.match(/(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/)
@@ -1042,21 +1119,21 @@ export function CalendarioMantencionPage() {
     if (!m) return false
     const shiftStart = m[1] ?? ''
     const shiftDuration = rangeDurationMinutes(m[1] ?? '', m[2] ?? '')
-    const reductionMinutes = Math.max(0, Math.round(toNumberOr(hoursConfig.dayReductionHours, 1) * 60))
-    if (shiftDuration === null || reductionMinutes <= 0) return false
+    if (shiftDuration === null) return false
 
     const normalDayDuration = rangeDurationMinutes(shiftConfig.diaInicio, shiftConfig.diaFin)
     const normalAfternoonDuration = rangeDurationMinutes(shiftConfig.tardeInicio, shiftConfig.tardeFin)
     const normalNightDuration = rangeDurationMinutes(shiftConfig.nocheInicio, shiftConfig.nocheFin)
 
-    const matchesReducedRange = (start: string, normalDuration: number | null): boolean => {
+    const matchesReducedRange = (start: string, normalDuration: number | null, reductionHours: number): boolean => {
+      const reductionMinutes = Math.max(0, Math.round(reductionHours * 60))
       if (normalDuration === null || normalDuration <= reductionMinutes) return false
       return shiftStart === start && shiftDuration === (normalDuration - reductionMinutes)
     }
 
-    return matchesReducedRange(shiftConfig.diaInicio, normalDayDuration)
-      || matchesReducedRange(shiftConfig.tardeInicio, normalAfternoonDuration)
-      || matchesReducedRange(shiftConfig.nocheInicio, normalNightDuration)
+    return matchesReducedRange(shiftConfig.diaInicio, normalDayDuration, clampMin(toNumberOr(hoursConfig.dayReductionHours, 1), 0))
+      || matchesReducedRange(shiftConfig.tardeInicio, normalAfternoonDuration, clampMin(toNumberOr(hoursConfig.afternoonReductionHours, 1), 0))
+      || matchesReducedRange(shiftConfig.nocheInicio, normalNightDuration, clampMin(toNumberOr(hoursConfig.nightReductionHours, 1), 0))
   }
 
   const visibleMetaIndices = useMemo(() => {
@@ -1078,8 +1155,8 @@ export function CalendarioMantencionPage() {
   }
 
   const hoursRows = techRows.map((t) => {
-    const weekHours = weekDays.reduce((sum, d) => sum + workedHoursForShift(t.shifts[d.c] || ''), 0)
-    const monthHours = monthDays.reduce((sum, d) => sum + workedHoursForShift(t.shifts[d.c] || ''), 0)
+    const weekWorkedHours = weekDays.reduce((sum, d) => sum + workedHoursForShift(t.shifts[d.c] || ''), 0)
+    const monthWorkedHours = monthDays.reduce((sum, d) => sum + workedHoursForShift(t.shifts[d.c] || ''), 0)
     const weekWorkedDays = weekDays.reduce((sum, d) => sum + (isWorkingShift(t.shifts[d.c] || '') ? 1 : 0), 0)
     const monthWorkedDays = monthDays.reduce((sum, d) => sum + (isWorkingShift(t.shifts[d.c] || '') ? 1 : 0), 0)
     const weekVacationDays = weekDays.reduce((sum, d) => {
@@ -1108,20 +1185,16 @@ export function CalendarioMantencionPage() {
       return sum + 1
     }, 0)
 
-    const weekExpectedAdjusted = Math.max(
-      0,
-      hoursConfig.expectedWeek - (
-        (weekVacationDays + (hoursConfig.holidayAsNonWorking ? weekHolidayDays : 0))
-        * effectiveDaily
-      )
-    )
-    const monthExpectedAdjusted = Math.max(
-      0,
-      expectedMonthAutoBase - (
-        (monthVacationDays + (hoursConfig.holidayAsNonWorking ? monthHolidayDays : 0))
-        * effectiveDaily
-      )
-    )
+    const weekVacationPaidHours = weekVacationDays * effectiveDaily
+    const monthVacationPaidHours = monthVacationDays * effectiveDaily
+    const weekHolidayPaidHours = weekHolidayDays * effectiveDaily
+    const monthHolidayPaidHours = monthHolidayDays * effectiveDaily
+
+    const weekHours = weekWorkedHours + weekVacationPaidHours + weekHolidayPaidHours
+    const monthHours = monthWorkedHours + monthVacationPaidHours + monthHolidayPaidHours
+
+    const weekExpectedAdjusted = Math.max(0, hoursConfig.expectedWeek)
+    const monthExpectedAdjusted = Math.max(0, expectedMonthAutoBase)
 
     const weekFreeDays = Math.max(0, weekDays.length - weekWorkedDays)
     const monthFreeDays = Math.max(0, monthDays.length - monthWorkedDays)
@@ -1146,6 +1219,10 @@ export function CalendarioMantencionPage() {
       weekHolidayDays,
       monthHolidayDays,
       totalVacationDays,
+      weekVacationPaidHours,
+      monthVacationPaidHours,
+      weekHolidayPaidHours,
+      monthHolidayPaidHours,
       deltaWeek,
       deltaMonth,
     }
@@ -1157,11 +1234,6 @@ export function CalendarioMantencionPage() {
     return rows
   }, [hoursRows])
 
-  function handleAssignSelected() {
-    if (!selectedRow || selectedCol === null || !selectedShift) return
-    applyShift(selectedRow, selectedCol, selectedShift)
-  }
-
   function handleHoursConfigApply() {
     const next = {
       ...hoursConfig,
@@ -1171,6 +1243,8 @@ export function CalendarioMantencionPage() {
       expectedMonth: clampMin(toNumberOr(expectedMonthAutoBase, 180), 0),
       toleranceHours: clampMin(toNumberOr(hoursConfig.toleranceHours, 0.5), 0),
       dayReductionHours: clampMin(toNumberOr(hoursConfig.dayReductionHours, 1), 0),
+      afternoonReductionHours: clampMin(toNumberOr(hoursConfig.afternoonReductionHours, 1), 0),
+      nightReductionHours: clampMin(toNumberOr(hoursConfig.nightReductionHours, 1), 0),
       vacationBusinessDaysOnly: hoursConfig.vacationBusinessDaysOnly !== false,
       holidayAsNonWorking: hoursConfig.holidayAsNonWorking !== false,
       holidayBusinessDaysOnly: hoursConfig.holidayBusinessDaysOnly !== false,
@@ -1349,7 +1423,6 @@ export function CalendarioMantencionPage() {
       setTurnosCatalog((prev) => Array.from(new Set([...prev, shiftConfig.libreLabel || 'LIBRE'])))
     }
 
-    setVacationTechRow(nextRow)
     setSelectedRow(nextRow)
     if (todayDayCol) setSelectedCol(todayDayCol.c)
     setNewTechName('')
@@ -1357,125 +1430,20 @@ export function CalendarioMantencionPage() {
     setStatus(`Técnico agregado: ${name} (Grupo ${newTech.turno}).`) 
   }
 
-  function handleApplyVacation() {
-    if (!vacationTechRow || !vacationStart || !vacationEnd) {
-      setStatus('Selecciona técnico y rango de vacaciones.')
-      return
-    }
-
-    const start = new Date(`${vacationStart}T00:00:00`)
-    const end = new Date(`${vacationEnd}T00:00:00`)
-    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) {
-      setStatus('Rango de vacaciones inválido.')
-      return
-    }
-
-    const vacationLabel = 'VACACIONES'
-    let updated = 0
-    let vacationBusinessDays = 0
-    setTechRows((prev) => prev.map((t) => {
-      if (t.r !== vacationTechRow) return t
-      const nextShifts = { ...t.shifts }
-      dayCols.forEach((d) => {
-        if (!d.dateObj) return
-        const current = new Date(d.dateObj.getFullYear(), d.dateObj.getMonth(), d.dateObj.getDate())
-        if (current >= start && current <= end) {
-          nextShifts[d.c] = vacationLabel
-          setCellValue(t.r, d.c, vacationLabel)
-          updated += 1
-          if (!hoursConfig.vacationBusinessDaysOnly || isBusinessDay(current)) {
-            vacationBusinessDays += 1
-          }
-        }
-      })
-      return { ...t, shifts: nextShifts }
-    }))
-
-    if (hoursConfig.vacationBusinessDaysOnly) {
-      setStatus(`Vacaciones aplicadas: ${updated} día(s) marcados, ${vacationBusinessDays} día(s) hábiles contabilizados.`)
-    } else {
-      setStatus(`Vacaciones aplicadas a ${updated} día(s).`)
-    }
-  }
-
-  function handleApplyHolidayToDay() {
-    if (selectedCol === null) {
-      setStatus('Selecciona un día para marcar feriado.')
-      return
-    }
-    const day = dayCols.find((d) => d.c === selectedCol)
-    if (!day) {
-      setStatus('Día inválido para feriado.')
-      return
-    }
-
-    const holidayLabel = 'FERIADO'
+  function handleUpdateTechnicianField(row: number, field: 'turno' | 'area', value: string) {
+    const normalizedValue = field === 'turno' ? value.trim().toUpperCase() : value.trim()
+    const current = techRows.find((tech) => tech.r === row)
+    if (!current) return
+    if (current[field] === normalizedValue) return
+    pushUndoSnapshot()
     setTechRows((prev) => prev.map((tech) => {
-      const nextShifts = { ...tech.shifts, [selectedCol]: holidayLabel }
-      setCellValue(tech.r, selectedCol, holidayLabel)
-      return { ...tech, shifts: nextShifts }
+      if (tech.r !== row) return tech
+      const next = { ...tech, [field]: normalizedValue }
+      if (field === 'turno') setCellValue(row, 0, next.turno)
+      if (field === 'area') setCellValue(row, 1, next.area)
+      return next
     }))
-    setSelectedShift(holidayLabel)
-    setStatus(`Feriado aplicado para ${day.dayLabel} ${formatDate(day.dateObj)} en todos los técnicos.`)
-  }
-
-  function handleUpdateTechDraft(row: number, nextGroup: string, nextArea: string) {
-    setTechDrafts((prev) => ({
-      ...prev,
-      [row]: {
-        turno: nextGroup,
-        area: nextArea,
-      },
-    }))
-  }
-
-  function hasTechDraftChanges(): boolean {
-    return techRows.some((tech) => {
-      const draft = techDrafts[tech.r]
-      if (!draft) return false
-      return draft.turno !== tech.turno || draft.area !== tech.area
-    })
-  }
-
-  function handleDiscardTechDrafts() {
-    const reset: Record<number, { turno: string; area: string }> = {}
-    techRows.forEach((tech) => {
-      reset[tech.r] = { turno: tech.turno, area: tech.area }
-    })
-    setTechDrafts(reset)
-    setStatus('Cambios de técnicos descartados.')
-  }
-
-  function handleSaveTechDrafts() {
-    const updates: Array<{ row: number; turno: string; area: string }> = []
-    const updatedRows = techRows.map((tech) => {
-      const draft = techDrafts[tech.r]
-      if (!draft) return tech
-
-      const nextTurno = (draft.turno || tech.turno).trim().toUpperCase()
-      const nextArea = (draft.area || tech.area).trim()
-      if (nextTurno === tech.turno && nextArea === tech.area) return tech
-
-      updates.push({ row: tech.r, turno: nextTurno, area: nextArea })
-      return {
-        ...tech,
-        turno: nextTurno,
-        area: nextArea,
-      }
-    })
-
-    if (updates.length === 0) {
-      setStatus('No hay cambios de técnicos para guardar.')
-      return
-    }
-
-    updates.forEach((u) => {
-      setCellValue(u.row, 0, u.turno)
-      setCellValue(u.row, 1, u.area)
-    })
-
-    setTechRows(updatedRows)
-    setStatus(`Cambios de técnicos guardados: ${updates.length}.`)
+    setStatus(`Técnico actualizado (${field === 'turno' ? 'grupo' : 'área'}).`)
   }
 
   function scrollToToday() {
@@ -1525,7 +1493,7 @@ export function CalendarioMantencionPage() {
 
         {/* ── Tab: Edición ── */}
         {activeTab === 'edicion' && (
-          <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
             <div className="grid gap-1.5">
               <label className="text-xs text-muted-foreground">Plantilla Excel opcional</label>
               <input
@@ -1536,52 +1504,8 @@ export function CalendarioMantencionPage() {
               />
             </div>
             <div className="grid gap-1.5">
-              <label className="text-xs text-muted-foreground">Técnico</label>
-              <select
-                className={CONTROL_CLASS}
-                value={selectedRow ?? ''}
-                onChange={(e) => {
-                  const row = Number(e.target.value)
-                  setSelectedRow(row)
-                  if (selectedCol !== null) {
-                    const tech = techRows.find((t) => t.r === row)
-                    if (tech) setSelectedShift(tech.shifts[selectedCol] || '')
-                  }
-                }}
-              >
-                {techRows.map((t) => (
-                  <option key={t.r} value={t.r}>{t.name}</option>
-                ))}
-              </select>
-              <label className="text-xs text-muted-foreground">Día</label>
-              <select
-                className={CONTROL_CLASS}
-                value={selectedCol ?? ''}
-                onChange={(e) => {
-                  const col = Number(e.target.value)
-                  setSelectedCol(col)
-                  if (selectedRow) {
-                    const tech = techRows.find((t) => t.r === selectedRow)
-                    if (tech) setSelectedShift(tech.shifts[col] || '')
-                  }
-                }}
-              >
-                {dayCols.map((d) => (
-                  <option key={d.c} value={d.c}>{`${d.dayLabel} ${formatDate(d.dateObj)}`.trim()}</option>
-                ))}
-              </select>
-            </div>
-            <div className="grid gap-1.5">
-              <label className="text-xs text-muted-foreground">Turno</label>
-              <select className={CONTROL_CLASS} value={selectedShift} onChange={(e) => setSelectedShift(e.target.value)}>
-                {Array.from(new Set([...turnosCatalog, shortcuts.dia, shortcuts.tarde, shortcuts.noche, shortcuts.libre, 'VACACIONES', 'FERIADO'])).map((t) => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
-              </select>
-              <div className="grid grid-cols-2 gap-1">
-                <button className="h-8 rounded bg-primary text-primary-foreground text-xs" onClick={handleAssignSelected}>Asignar</button>
-                <button className="h-8 rounded border text-xs" onClick={exportWorkbook}>Exportar</button>
-              </div>
+              <label className="text-xs text-muted-foreground">Exportar calendario</label>
+              <button className="h-8 rounded border text-xs" onClick={exportWorkbook}>Exportar</button>
               <div className="grid grid-cols-3 gap-1 text-[11px]">
                 <select className={CONTROL_CLASS + ' h-7'} value={exportScope} onChange={(e) => setExportScope(e.target.value as ExportScope)}>
                   <option value="month">Mes actual</option>
@@ -1604,15 +1528,6 @@ export function CalendarioMantencionPage() {
                   {selectedExportCols().length} días
                 </div>
               </div>
-              <div className="grid grid-cols-5 gap-1 text-[11px]">
-                <button className="h-7 rounded border" onClick={() => selectedRow && selectedCol !== null && applyShift(selectedRow, selectedCol, shortcuts.dia)}>D</button>
-                <button className="h-7 rounded border" onClick={() => selectedRow && selectedCol !== null && applyShift(selectedRow, selectedCol, shortcuts.tarde)}>T</button>
-                <button className="h-7 rounded border" onClick={() => selectedRow && selectedCol !== null && applyShift(selectedRow, selectedCol, shortcuts.noche)}>N</button>
-                <button className="h-7 rounded border" onClick={() => selectedRow && selectedCol !== null && applyShift(selectedRow, selectedCol, shortcuts.libre)}>L</button>
-                <button className="h-7 rounded border" onClick={() => selectedRow && selectedCol !== null && applyShift(selectedRow, selectedCol, 'VACACIONES')}>V</button>
-              </div>
-              <button className="h-7 rounded border text-[11px]" onClick={() => selectedRow && selectedCol !== null && applyShift(selectedRow, selectedCol, 'FERIADO')}>F (celda)</button>
-              <button className="h-7 rounded border text-[11px]" onClick={handleApplyHolidayToDay}>Marcar feriado (día)</button>
             </div>
           </div>
         )}
@@ -1646,37 +1561,47 @@ export function CalendarioMantencionPage() {
         {/* ── Tab: Horas ── */}
         {activeTab === 'horas' && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1.5 text-xs">
-            <label className="text-muted-foreground self-center">Jornada (h)</label>
+            <label className="text-muted-foreground self-center" title="Horas totales del turno diario (incluye colación).">Jornada total diaria (h)</label>
             <input className={CONTROL_CLASS} type="number" step="0.25" value={hoursConfig.workHours} onChange={(e) => setHoursConfig((p) => ({ ...p, workHours: toNumberOr(e.target.value, p.workHours) }))} />
-            <label className="text-muted-foreground self-center">Colación (h)</label>
+            <label className="text-muted-foreground self-center" title="Tiempo de colación diario. Se descuenta del cálculo de horas trabajadas.">Colación (h)</label>
             <input className={CONTROL_CLASS} type="number" step="0.25" value={hoursConfig.breakHours} onChange={(e) => setHoursConfig((p) => ({ ...p, breakHours: toNumberOr(e.target.value, p.breakHours) }))} />
-            <label className="text-muted-foreground self-center">Esperadas semana</label>
+            <label className="text-muted-foreground self-center" title="Meta semanal legal/operativa de horas trabajadas.">Esperadas semana</label>
             <input className={CONTROL_CLASS} type="number" step="0.5" value={hoursConfig.expectedWeek} onChange={(e) => setHoursConfig((p) => ({ ...p, expectedWeek: toNumberOr(e.target.value, p.expectedWeek) }))} />
             <label className="text-muted-foreground self-center">Esperadas mes (auto)</label>
             <div className={CONTROL_CLASS + ' flex items-center justify-between'}>
               <span className="font-medium tabular-nums">{expectedMonthAutoBase.toFixed(1)} h</span>
               <span className="text-[10px] text-muted-foreground">{monthBusinessDays} días hábiles</span>
             </div>
-            <label className="text-muted-foreground self-center">Tolerancia (h)</label>
+            <label className="text-muted-foreground self-center" title="Margen permitido bajo la meta esperada sin activar alerta visual en Control.">Tolerancia (h)</label>
             <input className={CONTROL_CLASS} type="number" step="0.25" value={hoursConfig.toleranceHours} onChange={(e) => setHoursConfig((p) => ({ ...p, toleranceHours: toNumberOr(e.target.value, p.toleranceHours) }))} />
-            <label className="text-muted-foreground self-center">Reducción turno día (h)</label>
+            <label className="text-muted-foreground self-center" title="Reducción de horas por Ley de 40h para turno día (atajo Shift + D).">Reducción por ley 40h - Día (h)</label>
             <input className={CONTROL_CLASS} type="number" step="0.25" min="0" value={hoursConfig.dayReductionHours} onChange={(e) => setHoursConfig((p) => ({ ...p, dayReductionHours: toNumberOr(e.target.value, p.dayReductionHours) }))} />
+            <label className="text-muted-foreground self-center" title="Reducción de horas por Ley de 40h para turno tarde (atajo Shift + T).">Reducción por ley 40h - Tarde (h)</label>
+            <input className={CONTROL_CLASS} type="number" step="0.25" min="0" value={hoursConfig.afternoonReductionHours} onChange={(e) => setHoursConfig((p) => ({ ...p, afternoonReductionHours: toNumberOr(e.target.value, p.afternoonReductionHours) }))} />
+            <label className="text-muted-foreground self-center" title="Reducción de horas por Ley de 40h para turno noche (atajo Shift + N).">Reducción por ley 40h - Noche (h)</label>
+            <input className={CONTROL_CLASS} type="number" step="0.25" min="0" value={hoursConfig.nightReductionHours} onChange={(e) => setHoursConfig((p) => ({ ...p, nightReductionHours: toNumberOr(e.target.value, p.nightReductionHours) }))} />
             <label className="col-span-2 flex items-center gap-2">
               <input type="checkbox" checked={hoursConfig.useFixedDaily} onChange={(e) => setHoursConfig((p) => ({ ...p, useFixedDaily: e.target.checked }))} />
-              Horas fijas por día trabajado
+              <span title="Activado: cada día trabajado usa Jornada total - Colación. Desactivado: calcula horas desde el rango del turno (hora inicio/fin).">Horas fijas por día trabajado</span>
             </label>
             <label className="col-span-2 flex items-center gap-2">
               <input type="checkbox" checked={hoursConfig.vacationBusinessDaysOnly} onChange={(e) => setHoursConfig((p) => ({ ...p, vacationBusinessDaysOnly: e.target.checked }))} />
-              Vacaciones contabilizan solo días hábiles
+              <span title="Activado: vacaciones solo cuentan en días hábiles. Desactivado: cuentan todos los días del rango.">Vacaciones contabilizan solo días hábiles</span>
             </label>
             <label className="col-span-2 flex items-center gap-2">
               <input type="checkbox" checked={hoursConfig.holidayAsNonWorking} onChange={(e) => setHoursConfig((p) => ({ ...p, holidayAsNonWorking: e.target.checked }))} />
-              Feriados como no hábil en métricas
+              <span title="Activado: feriado puede tratarse como día no hábil en algunas métricas de meta. Desactivado: se evalúa como día normal.">Feriados como no hábil en métricas</span>
             </label>
             <label className="col-span-2 flex items-center gap-2">
               <input type="checkbox" checked={hoursConfig.holidayBusinessDaysOnly} onChange={(e) => setHoursConfig((p) => ({ ...p, holidayBusinessDaysOnly: e.target.checked }))} />
-              Feriados descuentan solo días hábiles
+              <span title="Activado: el feriado solo se considera en días hábiles. Desactivado: se considera sin restricción de día.">Feriados descuentan solo días hábiles</span>
             </label>
+            <div className="col-span-2 sm:col-span-4 rounded border border-border/80 bg-muted/20 px-2 py-1 text-[11px] text-muted-foreground">
+              Jornada trabajada diaria usada en cálculos = Jornada total diaria - Colación.
+            </div>
+            <div className="col-span-2 sm:col-span-4 rounded border border-border/80 bg-muted/20 px-2 py-1 text-[11px] text-muted-foreground">
+              Mensual esperado (auto) = Esperadas semana × (días hábiles del mes / 5). En este período: {hoursConfig.expectedWeek.toFixed(1)} × ({monthBusinessDays}/5) = {expectedMonthAutoBase.toFixed(1)} h.
+            </div>
             <div className="col-span-2 sm:col-span-4">
               <button className="mt-1 h-8 w-full rounded bg-primary text-primary-foreground text-xs" onClick={handleHoursConfigApply}>Aplicar parámetros</button>
             </div>
@@ -1711,23 +1636,6 @@ export function CalendarioMantencionPage() {
               <button className="h-8 rounded bg-primary px-3 text-xs text-primary-foreground" onClick={handleAddTechnician}>Agregar técnico</button>
             </div>
 
-            <div className="flex items-center justify-end gap-2">
-              <button
-                className="h-8 rounded border px-3 text-xs disabled:opacity-50"
-                onClick={handleDiscardTechDrafts}
-                disabled={!hasTechDraftChanges()}
-              >
-                Descartar cambios
-              </button>
-              <button
-                className="h-8 rounded bg-primary px-3 text-xs text-primary-foreground disabled:opacity-50"
-                onClick={handleSaveTechDrafts}
-                disabled={!hasTechDraftChanges()}
-              >
-                Guardar cambios masivos
-              </button>
-            </div>
-
             <div className="rounded border overflow-auto">
               <table className="w-full text-[11px]">
                 <thead className="bg-muted text-foreground">
@@ -1740,7 +1648,6 @@ export function CalendarioMantencionPage() {
                 </thead>
                 <tbody>
                   {techRows.map((tech) => {
-                    const draft = techDrafts[tech.r] ?? { turno: tech.turno, area: tech.area }
                     return (
                     <tr key={tech.r} className="border-t border-border hover:bg-muted/30">
                       <td className="px-2 py-1">{tech.name}</td>
@@ -1748,8 +1655,8 @@ export function CalendarioMantencionPage() {
                       <td className="px-2 py-1">
                         <select
                           className={CONTROL_CLASS + ' h-7 text-[11px]'}
-                          value={draft.turno || ''}
-                          onChange={(e) => handleUpdateTechDraft(tech.r, e.target.value, draft.area)}
+                          value={tech.turno || ''}
+                          onChange={(e) => handleUpdateTechnicianField(tech.r, 'turno', e.target.value)}
                         >
                           {Array.from(new Set([...baseGroupOptions, tech.turno].filter(Boolean))).map((group) => (
                             <option key={group} value={group}>{group}</option>
@@ -1759,48 +1666,14 @@ export function CalendarioMantencionPage() {
                       <td className="px-2 py-1">
                         <input
                           className={CONTROL_CLASS + ' h-7 text-[11px]'}
-                          value={draft.area || ''}
-                          onChange={(e) => handleUpdateTechDraft(tech.r, draft.turno, e.target.value)}
+                          value={tech.area || ''}
+                          onChange={(e) => handleUpdateTechnicianField(tech.r, 'area', e.target.value)}
                         />
                       </td>
                     </tr>
                   )})}
                 </tbody>
               </table>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-2 text-xs rounded border p-2">
-              <div className="grid gap-1 md:col-span-2">
-                <label className="text-muted-foreground">Técnico</label>
-                <select className={CONTROL_CLASS} value={vacationTechRow ?? ''} onChange={(e) => setVacationTechRow(Number(e.target.value) || null)}>
-                  {techRows.map((tech) => <option key={tech.r} value={tech.r}>{tech.name}</option>)}
-                </select>
-              </div>
-              <div className="grid gap-1">
-                <label className="text-muted-foreground">Vacaciones desde</label>
-                <input className={CONTROL_CLASS} type="date" value={vacationStart} onChange={(e) => setVacationStart(e.target.value)} />
-              </div>
-              <div className="grid gap-1">
-                <label className="text-muted-foreground">Vacaciones hasta</label>
-                <input className={CONTROL_CLASS} type="date" value={vacationEnd} onChange={(e) => setVacationEnd(e.target.value)} />
-              </div>
-              <div className="md:col-span-4 flex justify-end">
-                <button className="h-8 rounded border px-3 text-xs" onClick={handleApplyVacation}>Aplicar vacaciones</button>
-              </div>
-              <div className="md:col-span-4 text-[11px] text-muted-foreground">
-                {(() => {
-                  const selectedTech = techRows.find((tech) => tech.r === vacationTechRow)
-                  if (!selectedTech) return 'Selecciona técnico para ver días de vacaciones.'
-                  const totalVac = dayCols.reduce((sum, d) => {
-                    if (!d.dateObj) return sum
-                    const text = selectedTech.shifts[d.c] || ''
-                    if (!isVacationShift(text)) return sum
-                    if (hoursConfig.vacationBusinessDaysOnly && !isBusinessDay(d.dateObj)) return sum
-                    return sum + 1
-                  }, 0)
-                  return `Vacaciones acumuladas del técnico en calendario: ${totalVac} día(s)${hoursConfig.vacationBusinessDaysOnly ? ' hábiles' : ''}.`
-                })()}
-              </div>
             </div>
           </div>
         )}
@@ -1826,23 +1699,26 @@ export function CalendarioMantencionPage() {
               <table className="w-full text-[11px]">
                 <thead className="bg-muted text-foreground sticky top-0 z-10">
                   <tr className="border-b border-border/70 bg-muted/60">
-                    <th className="px-2 py-1 text-left" colSpan={2}>Técnico</th>
-                    <th className="px-2 py-1 text-center" colSpan={6}>Semana</th>
-                    <th className="px-2 py-1 text-center" colSpan={7}>Mes</th>
+                    <th className="px-2 py-1 text-left" colSpan={1}>Técnico</th>
+                    <th className="px-2 py-1 text-center" colSpan={7}>Semana</th>
+                    <th className="px-2 py-1 text-center border-l border-border/60" colSpan={8}>Mes</th>
                   </tr>
                   <tr>
-                    <th className="px-2 py-1 text-left w-14">Estado</th>
                     <th className="px-2 py-1 text-left">Técnico</th>
                     <th className="px-2 py-1 text-right w-24">Sem (Real/Esp)</th>
                     <th className="px-2 py-1 w-24">Δ Sem</th>
                     <th className="px-2 py-1 text-right w-16">Libres S</th>
                     <th className="px-2 py-1 text-right w-16">Colación S</th>
+                    <th className="px-2 py-1 text-right w-16">Vac H S</th>
+                    <th className="px-2 py-1 text-right w-16">Fer H S</th>
                     <th className="px-2 py-1 text-right w-16">Vac S</th>
                     <th className="px-2 py-1 text-right w-16">Fer S</th>
-                    <th className="px-2 py-1 text-right w-24">Mes (Real/Esp)</th>
+                    <th className="px-2 py-1 text-right w-24 border-l border-border/60">Mes (Real/Esp)</th>
                     <th className="px-2 py-1 w-24">Δ Mes</th>
                     <th className="px-2 py-1 text-right w-16">Libres M</th>
                     <th className="px-2 py-1 text-right w-16">Colación M</th>
+                    <th className="px-2 py-1 text-right w-16">Vac H M</th>
+                    <th className="px-2 py-1 text-right w-16">Fer H M</th>
                     <th className="px-2 py-1 text-right w-16">Vac M</th>
                     <th className="px-2 py-1 text-right w-16">Fer M</th>
                     <th className="px-2 py-1 text-right w-16">Vac Tot</th>
@@ -1857,11 +1733,6 @@ export function CalendarioMantencionPage() {
                     const rowRisk = row.deltaWeek < -hoursConfig.toleranceHours || row.deltaMonth < -hoursConfig.toleranceHours
                     return (
                       <tr key={row.tech.r} className={`border-t border-border transition-colors ${rowRisk ? 'bg-red-500/5 hover:bg-red-500/10' : 'hover:bg-muted/40'}`}>
-                        <td className="px-2 py-1 text-left">
-                          <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${rowRisk ? 'bg-red-500/20 text-red-300' : 'bg-emerald-500/20 text-emerald-300'}`}>
-                            {rowRisk ? 'Riesgo' : 'OK'}
-                          </span>
-                        </td>
                         <td className="px-2 py-1 text-left truncate max-w-[180px]" title={row.tech.name}>{row.tech.name}</td>
                         <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.weekHours.toFixed(1)} / {row.weekExpected.toFixed(1)}</td>
                         <td className="px-2 py-1">
@@ -1874,9 +1745,11 @@ export function CalendarioMantencionPage() {
                         </td>
                         <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.weekFreeHours.toFixed(1)}</td>
                         <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.weekBreakHours.toFixed(1)}</td>
+                        <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.weekVacationPaidHours.toFixed(1)}</td>
+                        <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.weekHolidayPaidHours.toFixed(1)}</td>
                         <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.weekVacationDays}</td>
                         <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.weekHolidayDays}</td>
-                        <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.monthHours.toFixed(1)} / {row.monthExpected.toFixed(1)}</td>
+                        <td className="px-2 py-1 text-right tabular-nums text-muted-foreground border-l border-border/60">{row.monthHours.toFixed(1)} / {row.monthExpected.toFixed(1)}</td>
                         <td className="px-2 py-1">
                           <div className="flex items-center gap-1">
                             <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
@@ -1887,6 +1760,8 @@ export function CalendarioMantencionPage() {
                         </td>
                         <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.monthFreeHours.toFixed(1)}</td>
                         <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.monthBreakHours.toFixed(1)}</td>
+                        <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.monthVacationPaidHours.toFixed(1)}</td>
+                        <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.monthHolidayPaidHours.toFixed(1)}</td>
                         <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.monthVacationDays}</td>
                         <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.monthHolidayDays}</td>
                         <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.totalVacationDays}</td>
@@ -1927,9 +1802,14 @@ export function CalendarioMantencionPage() {
           </div>
         </div>
         <div className="mb-1 flex items-center justify-between gap-2">
-          <div className="text-xs text-muted-foreground">Atajos (click en calendario para activar): D/T/N/L/V/F = Día/Tarde/Noche/Libre/Vacaciones/Feriado · Shift+D/T/N = Reducido · Flechas ←↑↓→ = Navegar celdas</div>
-          <div className={`shrink-0 rounded border px-2 py-0.5 text-[11px] ${calendarShortcutsActive ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-300' : 'border-border bg-muted text-muted-foreground'}`}>
-            Atajos: {calendarShortcutsActive ? 'Activos' : 'Inactivos'}
+          <div className="text-xs text-muted-foreground">Atajos (click en calendario para activar): D/T/N/L/V/F = Día/Tarde/Noche/Libre/Vacaciones/Feriado · Shift+D/T/N = Turno reducido · Flechas ←↑↓→ = Navegar · Ctrl+Z = Deshacer · Ctrl+Y / Ctrl+Shift+Z = Rehacer</div>
+          <div className="flex items-center gap-1">
+            <div className="shrink-0 rounded border border-border bg-muted px-2 py-0.5 text-[11px] text-muted-foreground" title={`Historial de cambios (actualizado: ${historyVersion})`}>
+              Undo {undoStackRef.current.length} · Redo {redoStackRef.current.length}
+            </div>
+            <div className={`shrink-0 rounded border px-2 py-0.5 text-[11px] ${calendarShortcutsActive ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-300' : 'border-border bg-muted text-muted-foreground'}`}>
+              Atajos: {calendarShortcutsActive ? 'Activos' : 'Inactivos'}
+            </div>
           </div>
         </div>
         <div ref={calendarSectionRef}>
@@ -1999,7 +1879,6 @@ export function CalendarioMantencionPage() {
                           onClick={() => {
                             setSelectedRow(tech.r)
                             setSelectedCol(d.c)
-                            setSelectedShift(value)
                           }}
                         >
                           {value}
