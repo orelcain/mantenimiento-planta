@@ -491,19 +491,20 @@ export function CalendarioMantencionPage() {
       const target = event.target as HTMLElement | null
       if (target && (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable)) return
 
-      if (!event.shiftKey || event.ctrlKey || event.altKey || event.metaKey) return
+      if (event.ctrlKey || event.altKey || event.metaKey) return
 
       const key = event.key.toLowerCase()
-      if (key === 'r') {
+      if (event.shiftKey && key === 'd') {
         event.preventDefault()
         applyShiftRef.current(selectedRow, selectedCol, shortcuts.diaReducido)
         return
       }
-      if (key === 'm') {
+      if (event.shiftKey && key === 'n') {
         event.preventDefault()
         applyShiftRef.current(selectedRow, selectedCol, shortcuts.nocheReducido)
         return
       }
+      if (event.shiftKey) return
       if (!['d', 't', 'n', 'l', 'v'].includes(key)) return
 
       event.preventDefault()
@@ -1067,7 +1068,7 @@ export function CalendarioMantencionPage() {
     }
     setShiftConfig(next)
     safeStorageSet(SHIFT_CONFIG_KEY, next)
-    setStatus('Plantillas de turno actualizadas. Atajos activos en calendario: Shift+D=Dia, Shift+R=Dia reducida, Shift+N=Noche, Shift+M=Noche reducida, Shift+T=Tarde, Shift+L=Libre, Shift+V=Vacaciones.')
+    setStatus('Plantillas de turno actualizadas. Atajos en calendario: D=Dia, T=Tarde, N=Noche, L=Libre, V=Vacaciones, Shift+D=Dia reducida, Shift+N=Noche reducida.')
   }
 
   function handleFileUpload(file: File | null) {
@@ -1693,7 +1694,7 @@ export function CalendarioMantencionPage() {
           </div>
         </div>
         <div className="mb-1 flex items-center justify-between gap-2">
-          <div className="text-xs text-muted-foreground">Atajos sobre celda seleccionada (solo tras click en calendario): Shift+D = Día, Shift+R = Día reducido, Shift+N = Noche, Shift+M = Noche reducida, Shift+T = Tarde, Shift+L = Libre, Shift+V = Vacaciones. Para feriado usa “Marcar feriado (día)”.</div>
+          <div className="text-xs text-muted-foreground">Atajos sobre celda seleccionada (solo tras click en calendario): D = Día, T = Tarde, N = Noche, L = Libre, V = Vacaciones, Shift+D = Día reducido, Shift+N = Noche reducida. Para feriado usa “Marcar feriado (día)”.</div>
           <div className={`shrink-0 rounded border px-2 py-0.5 text-[11px] ${calendarShortcutsActive ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-300' : 'border-border bg-muted text-muted-foreground'}`}>
             Atajos: {calendarShortcutsActive ? 'Activos' : 'Inactivos'}
           </div>
