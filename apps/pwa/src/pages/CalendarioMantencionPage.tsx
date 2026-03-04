@@ -41,6 +41,7 @@ type HoursConfig = {
   expectedMonth: number
   toleranceHours: number
   useFixedDaily: boolean
+  dayReductionHours: number
   vacationBusinessDaysOnly: boolean
 }
 
@@ -84,6 +85,7 @@ function defaultHoursConfig(): HoursConfig {
     expectedMonth: 180,
     toleranceHours: 0.5,
     useFixedDaily: true,
+    dayReductionHours: 1,
     vacationBusinessDaysOnly: true,
   }
 }
@@ -283,6 +285,7 @@ export function CalendarioMantencionPage() {
       expectedMonth: toNumberOr(stored.expectedMonth, 180),
       toleranceHours: toNumberOr(stored.toleranceHours, 0.5),
       useFixedDaily: stored.useFixedDaily !== false,
+      dayReductionHours: toNumberOr(stored.dayReductionHours, 1),
       vacationBusinessDaysOnly: stored.vacationBusinessDaysOnly !== false,
     }
   })
@@ -304,7 +307,8 @@ export function CalendarioMantencionPage() {
     const tarde = `${shiftConfig.tardeInicio} - ${shiftConfig.tardeFin}`
     const noche = `${shiftConfig.nocheInicio} - ${shiftConfig.nocheFin}`
     const libre = shiftConfig.libreLabel || 'LIBRE'
-    return { dia, tarde, noche, libre }
+    const diaReducido = `${dia} [RED]`
+    return { dia, tarde, noche, libre, diaReducido }
   }, [shiftConfig])
 
   const weeks = useMemo(() => {
@@ -436,6 +440,11 @@ export function CalendarioMantencionPage() {
       if (target && (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable)) return
 
       const key = event.key.toLowerCase()
+      if (event.ctrlKey && key === 'd') {
+        event.preventDefault()
+        applyShiftRef.current(selectedRow, selectedCol, shortcuts.diaReducido)
+        return
+      }
       if (!['d', 't', 'n', 'l', 'v'].includes(key)) return
 
       event.preventDefault()
@@ -825,16 +834,21 @@ export function CalendarioMantencionPage() {
 
   function workedHoursForShift(shiftText: string): number {
     if (!isWorkingShift(shiftText)) return 0
-    if (hoursConfig.useFixedDaily) return effectiveDailyHours()
+    const reduction = isReducedShift(shiftText) ? clampMin(toNumberOr(hoursConfig.dayReductionHours, 1), 0) : 0
+    if (hoursConfig.useFixedDaily) return Math.max(0, effectiveDailyHours() - reduction)
 
     const m = shiftText.match(/(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/)
-    if (!m) return effectiveDailyHours()
+    if (!m) return Math.max(0, effectiveDailyHours() - reduction)
     const start = hhmmToMinutes(m[1] ?? '')
     const end = hhmmToMinutes(m[2] ?? '')
-    if (start === null || end === null) return effectiveDailyHours()
+    if (start === null || end === null) return Math.max(0, effectiveDailyHours() - reduction)
     let diff = end - start
     if (diff <= 0) diff += 24 * 60
-    return Math.max(0, diff / 60 - hoursConfig.breakHours)
+    return Math.max(0, diff / 60 - hoursConfig.breakHours - reduction)
+  }
+
+  function isReducedShift(shiftText: string): boolean {
+    return shiftText.toUpperCase().includes('[RED]')
   }
 
   const visibleMetaIndices = useMemo(() => {
@@ -918,6 +932,7 @@ export function CalendarioMantencionPage() {
       expectedWeek: clampMin(toNumberOr(hoursConfig.expectedWeek, 45), 0),
       expectedMonth: clampMin(toNumberOr(hoursConfig.expectedMonth, 180), 0),
       toleranceHours: clampMin(toNumberOr(hoursConfig.toleranceHours, 0.5), 0),
+      dayReductionHours: clampMin(toNumberOr(hoursConfig.dayReductionHours, 1), 0),
       vacationBusinessDaysOnly: hoursConfig.vacationBusinessDaysOnly !== false,
     }
     setHoursConfig(next)
@@ -932,7 +947,7 @@ export function CalendarioMantencionPage() {
     }
     setShiftConfig(next)
     safeStorageSet(SHIFT_CONFIG_KEY, next)
-    setStatus('Plantillas de turno actualizadas. Atajos activos: D=Dia, T=Tarde, N=Noche, L=Libre, V=Vacaciones.')
+    setStatus('Plantillas de turno actualizadas. Atajos activos: D=Dia, Ctrl+D=Dia reducido, T=Tarde, N=Noche, L=Libre, V=Vacaciones.')
   }
 
   function handleFileUpload(file: File | null) {
@@ -1252,6 +1267,8 @@ export function CalendarioMantencionPage() {
             <input className={CONTROL_CLASS} type="number" step="0.5" value={hoursConfig.expectedMonth} onChange={(e) => setHoursConfig((p) => ({ ...p, expectedMonth: toNumberOr(e.target.value, p.expectedMonth) }))} />
             <label className="text-muted-foreground self-center">Tolerancia (h)</label>
             <input className={CONTROL_CLASS} type="number" step="0.25" value={hoursConfig.toleranceHours} onChange={(e) => setHoursConfig((p) => ({ ...p, toleranceHours: toNumberOr(e.target.value, p.toleranceHours) }))} />
+            <label className="text-muted-foreground self-center">Reducción turno día (h)</label>
+            <input className={CONTROL_CLASS} type="number" step="0.25" min="0" value={hoursConfig.dayReductionHours} onChange={(e) => setHoursConfig((p) => ({ ...p, dayReductionHours: toNumberOr(e.target.value, p.dayReductionHours) }))} />
             <label className="col-span-2 flex items-center gap-2">
               <input type="checkbox" checked={hoursConfig.useFixedDaily} onChange={(e) => setHoursConfig((p) => ({ ...p, useFixedDaily: e.target.checked }))} />
               Horas fijas por día trabajado
@@ -1521,7 +1538,7 @@ export function CalendarioMantencionPage() {
             </button>
           </div>
         </div>
-        <div className="text-xs text-muted-foreground mb-1">Atajos sobre celda seleccionada: D = Día, T = Tarde, N = Noche, L = Libre, V = Vacaciones.</div>
+        <div className="text-xs text-muted-foreground mb-1">Atajos sobre celda seleccionada: D = Día, Ctrl+D = Día reducido, T = Tarde, N = Noche, L = Libre, V = Vacaciones.</div>
         <div ref={calendarScrollRef} className="relative h-[calc(100%-2.5rem)] overflow-auto rounded border">
           <table className="border-collapse text-[11px] min-w-max">
             <thead>
