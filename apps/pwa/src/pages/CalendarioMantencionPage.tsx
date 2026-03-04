@@ -42,6 +42,9 @@ type HoursConfig = {
 const WEEKDAY_HEADER = new Set(['lunes', 'martes', 'miércoles', 'miercoles', 'jueves', 'viernes', 'sábado', 'sabado', 'domingo'])
 const META_COLS = ['TURNO', 'Área', 'CeCo', 'Cargo', 'DIRECCIÓN', 'RUT', 'Personal']
 const META_COL_WIDTHS = [56, 80, 100, 108, 98, 100, 220]
+const HIDEABLE_COLS = new Set([2, 3, 4, 5]) // CeCo, Cargo, DIRECCIÓN, RUT
+
+type TabId = 'edicion' | 'plantillas' | 'horas' | 'control'
 const DAY_COL_WIDTH = 88
 const HOURS_CONFIG_KEY = 'calendario_mantencion_hours_config_v1'
 const SHIFT_CONFIG_KEY = 'calendario_mantencion_shift_config_v1'
@@ -160,16 +163,18 @@ function formatDelta(delta: number): string {
   return `${delta > 0 ? '+' : ''}${delta.toFixed(1)}`
 }
 
-function rowClass(deltaWeek: number, deltaMonth: number, tolerance: number): string {
-  if (deltaWeek < -tolerance || deltaMonth < -tolerance) return 'bg-red-50 dark:bg-red-900/25'
-  if (Math.abs(deltaWeek) <= tolerance && Math.abs(deltaMonth) <= tolerance) return 'bg-emerald-50 dark:bg-emerald-900/20'
-  return 'bg-amber-50 dark:bg-amber-900/20'
+function metaLeftFiltered(index: number, visibleIndices: number[]): number {
+  let total = 0
+  for (let i = 0; i < visibleIndices.length; i++) {
+    if (i >= index) break
+    total += META_COL_WIDTHS[visibleIndices[i]] || 90
+  }
+  return total
 }
 
-function metaLeft(index: number): number {
-  let total = 0
-  for (let i = 0; i < index; i++) total += META_COL_WIDTHS[i] || 90
-  return total
+function pctBar(value: number, expected: number): number {
+  if (expected <= 0) return 0
+  return Math.min(100, Math.max(0, (value / expected) * 100))
 }
 
 function safeStorageGet<T>(key: string, fallback: T): T {
@@ -204,6 +209,8 @@ export function CalendarioMantencionPage() {
   const [selectedShift, setSelectedShift] = useState('')
   const [selectedWeek, setSelectedWeek] = useState('')
   const [selectedMonth, setSelectedMonth] = useState('')
+  const [showAllCols, setShowAllCols] = useState(false)
+  const [activeTab, setActiveTab] = useState<TabId>('edicion')
 
   const [hoursConfig, setHoursConfig] = useState<HoursConfig>(() => {
     const stored = safeStorageGet<HoursConfig>(HOURS_CONFIG_KEY, defaultHoursConfig())
@@ -545,6 +552,10 @@ export function CalendarioMantencionPage() {
     return Math.max(0, diff / 60 - hoursConfig.breakHours)
   }
 
+  const visibleMetaIndices = useMemo(() => {
+    return META_COLS.map((_, i) => i).filter((i) => showAllCols || !HIDEABLE_COLS.has(i))
+  }, [showAllCols])
+
   const weekDays = dayCols.filter((d) => d.dateObj && isoWeekKey(d.dateObj) === selectedWeek)
   const monthDays = dayCols.filter((d) => d.dateObj && monthKey(d.dateObj) === selectedMonth)
   const hoursRows = techRows.map((t) => {
@@ -613,7 +624,7 @@ export function CalendarioMantencionPage() {
     const dayIndex = dayCols.findIndex((d) => d.c === todayCol.c)
     if (dayIndex < 0) return
 
-    const metaWidth = META_COL_WIDTHS.reduce((sum, width) => sum + width, 0)
+    const metaWidth = visibleMetaIndices.reduce((sum, gi) => sum + (META_COL_WIDTHS[gi] || 90), 0)
     const colStart = metaWidth + (dayIndex * DAY_COL_WIDTH)
     const targetLeft = Math.max(0, colStart - ((container.clientWidth - DAY_COL_WIDTH) / 2))
 
@@ -622,12 +633,36 @@ export function CalendarioMantencionPage() {
     setStatus(`Vista centrada en hoy: ${todayCol.dayLabel} ${formatDate(todayCol.dateObj)}`)
   }
 
+  const TAB_ITEMS: { id: TabId; label: string }[] = [
+    { id: 'edicion', label: 'Edición' },
+    { id: 'plantillas', label: 'Turnos' },
+    { id: 'horas', label: 'Horas' },
+    { id: 'control', label: 'Control' },
+  ]
+
   return (
     <div className="h-full min-h-0 flex flex-col gap-2">
       <section className="sticky top-0 z-20 rounded-lg border bg-card p-2">
-        <div className="grid grid-cols-1 gap-2 xl:grid-cols-4">
-          <div className="rounded-md border p-2">
-            <h3 className="font-semibold text-sm mb-1">Archivo y edición</h3>
+        {/* ── Tab bar ── */}
+        <div className="flex items-center gap-1 border-b border-border pb-1 mb-2">
+          {TAB_ITEMS.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-3 py-1 rounded-t text-xs font-medium transition-colors ${
+                activeTab === tab.id
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* ── Tab: Edición ── */}
+        {activeTab === 'edicion' && (
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
             <div className="grid gap-1.5">
               <label className="text-xs text-muted-foreground">Plantilla Excel opcional</label>
               <input
@@ -636,6 +671,8 @@ export function CalendarioMantencionPage() {
                 className="text-xs"
                 onChange={(e) => handleFileUpload(e.target.files?.[0] || null)}
               />
+            </div>
+            <div className="grid gap-1.5">
               <label className="text-xs text-muted-foreground">Técnico</label>
               <select
                 className={CONTROL_CLASS}
@@ -670,6 +707,8 @@ export function CalendarioMantencionPage() {
                   <option key={d.c} value={d.c}>{`${d.dayLabel} ${formatDate(d.dateObj)}`.trim()}</option>
                 ))}
               </select>
+            </div>
+            <div className="grid gap-1.5">
               <label className="text-xs text-muted-foreground">Turno</label>
               <select className={CONTROL_CLASS} value={selectedShift} onChange={(e) => setSelectedShift(e.target.value)}>
                 {Array.from(new Set([...turnosCatalog, shortcuts.dia, shortcuts.tarde, shortcuts.noche, shortcuts.libre])).map((t) => (
@@ -680,117 +719,163 @@ export function CalendarioMantencionPage() {
                 <button className="h-8 rounded bg-primary text-primary-foreground text-xs" onClick={handleAssignSelected}>Asignar</button>
                 <button className="h-8 rounded border text-xs" onClick={exportWorkbook}>Exportar</button>
               </div>
+              <div className="grid grid-cols-4 gap-1 text-[11px]">
+                <button className="h-7 rounded border" onClick={() => selectedRow && selectedCol !== null && applyShift(selectedRow, selectedCol, shortcuts.dia)}>D</button>
+                <button className="h-7 rounded border" onClick={() => selectedRow && selectedCol !== null && applyShift(selectedRow, selectedCol, shortcuts.tarde)}>T</button>
+                <button className="h-7 rounded border" onClick={() => selectedRow && selectedCol !== null && applyShift(selectedRow, selectedCol, shortcuts.noche)}>N</button>
+                <button className="h-7 rounded border" onClick={() => selectedRow && selectedCol !== null && applyShift(selectedRow, selectedCol, shortcuts.libre)}>L</button>
+              </div>
             </div>
           </div>
+        )}
 
-          <div className="rounded-md border p-2">
-            <h3 className="font-semibold text-sm mb-1">Plantillas y atajos</h3>
-            <div className="grid grid-cols-2 gap-1.5 text-xs">
-              <label className="text-muted-foreground">Día inicio</label>
-              <input className={CONTROL_CLASS} type="time" value={shiftConfig.diaInicio} onChange={(e) => setShiftConfig((p) => ({ ...p, diaInicio: e.target.value }))} />
-              <label className="text-muted-foreground">Día fin</label>
-              <input className={CONTROL_CLASS} type="time" value={shiftConfig.diaFin} onChange={(e) => setShiftConfig((p) => ({ ...p, diaFin: e.target.value }))} />
-              <label className="text-muted-foreground">Tarde inicio</label>
-              <input className={CONTROL_CLASS} type="time" value={shiftConfig.tardeInicio} onChange={(e) => setShiftConfig((p) => ({ ...p, tardeInicio: e.target.value }))} />
-              <label className="text-muted-foreground">Tarde fin</label>
-              <input className={CONTROL_CLASS} type="time" value={shiftConfig.tardeFin} onChange={(e) => setShiftConfig((p) => ({ ...p, tardeFin: e.target.value }))} />
-              <label className="text-muted-foreground">Noche inicio</label>
-              <input className={CONTROL_CLASS} type="time" value={shiftConfig.nocheInicio} onChange={(e) => setShiftConfig((p) => ({ ...p, nocheInicio: e.target.value }))} />
-              <label className="text-muted-foreground">Noche fin</label>
-              <input className={CONTROL_CLASS} type="time" value={shiftConfig.nocheFin} onChange={(e) => setShiftConfig((p) => ({ ...p, nocheFin: e.target.value }))} />
-              <label className="text-muted-foreground">Libre</label>
-              <input className={CONTROL_CLASS} value={shiftConfig.libreLabel} onChange={(e) => setShiftConfig((p) => ({ ...p, libreLabel: e.target.value }))} />
+        {/* ── Tab: Turnos ── */}
+        {activeTab === 'plantillas' && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1.5 text-xs">
+            <label className="text-muted-foreground self-center">Día</label>
+            <div className="flex gap-1">
+              <input className={CONTROL_CLASS + ' flex-1'} type="time" value={shiftConfig.diaInicio} onChange={(e) => setShiftConfig((p) => ({ ...p, diaInicio: e.target.value }))} />
+              <input className={CONTROL_CLASS + ' flex-1'} type="time" value={shiftConfig.diaFin} onChange={(e) => setShiftConfig((p) => ({ ...p, diaFin: e.target.value }))} />
             </div>
-            <button className="mt-1.5 h-8 w-full rounded bg-primary text-primary-foreground text-xs" onClick={handleShiftConfigApply}>Aplicar plantillas</button>
-            <div className="mt-1 grid grid-cols-4 gap-1 text-[11px]">
-              <button className="h-7 rounded border" onClick={() => selectedRow && selectedCol !== null && applyShift(selectedRow, selectedCol, shortcuts.dia)}>D</button>
-              <button className="h-7 rounded border" onClick={() => selectedRow && selectedCol !== null && applyShift(selectedRow, selectedCol, shortcuts.tarde)}>T</button>
-              <button className="h-7 rounded border" onClick={() => selectedRow && selectedCol !== null && applyShift(selectedRow, selectedCol, shortcuts.noche)}>N</button>
-              <button className="h-7 rounded border" onClick={() => selectedRow && selectedCol !== null && applyShift(selectedRow, selectedCol, shortcuts.libre)}>L</button>
+            <label className="text-muted-foreground self-center">Tarde</label>
+            <div className="flex gap-1">
+              <input className={CONTROL_CLASS + ' flex-1'} type="time" value={shiftConfig.tardeInicio} onChange={(e) => setShiftConfig((p) => ({ ...p, tardeInicio: e.target.value }))} />
+              <input className={CONTROL_CLASS + ' flex-1'} type="time" value={shiftConfig.tardeFin} onChange={(e) => setShiftConfig((p) => ({ ...p, tardeFin: e.target.value }))} />
+            </div>
+            <label className="text-muted-foreground self-center">Noche</label>
+            <div className="flex gap-1">
+              <input className={CONTROL_CLASS + ' flex-1'} type="time" value={shiftConfig.nocheInicio} onChange={(e) => setShiftConfig((p) => ({ ...p, nocheInicio: e.target.value }))} />
+              <input className={CONTROL_CLASS + ' flex-1'} type="time" value={shiftConfig.nocheFin} onChange={(e) => setShiftConfig((p) => ({ ...p, nocheFin: e.target.value }))} />
+            </div>
+            <label className="text-muted-foreground self-center">Libre</label>
+            <input className={CONTROL_CLASS} value={shiftConfig.libreLabel} onChange={(e) => setShiftConfig((p) => ({ ...p, libreLabel: e.target.value }))} />
+            <div className="col-span-2 sm:col-span-4">
+              <button className="mt-1 h-8 w-full rounded bg-primary text-primary-foreground text-xs" onClick={handleShiftConfigApply}>Aplicar plantillas</button>
             </div>
           </div>
+        )}
 
-          <div className="rounded-md border p-2">
-            <h3 className="font-semibold text-sm mb-1">Parámetros de horas</h3>
-            <div className="grid grid-cols-2 gap-1.5 text-xs">
-              <label className="text-muted-foreground">Jornada (h)</label>
-              <input className={CONTROL_CLASS} type="number" step="0.25" value={hoursConfig.workHours} onChange={(e) => setHoursConfig((p) => ({ ...p, workHours: toNumberOr(e.target.value, p.workHours) }))} />
-              <label className="text-muted-foreground">Colación (h)</label>
-              <input className={CONTROL_CLASS} type="number" step="0.25" value={hoursConfig.breakHours} onChange={(e) => setHoursConfig((p) => ({ ...p, breakHours: toNumberOr(e.target.value, p.breakHours) }))} />
-              <label className="text-muted-foreground">Esperadas semana</label>
-              <input className={CONTROL_CLASS} type="number" step="0.5" value={hoursConfig.expectedWeek} onChange={(e) => setHoursConfig((p) => ({ ...p, expectedWeek: toNumberOr(e.target.value, p.expectedWeek) }))} />
-              <label className="text-muted-foreground">Esperadas mes</label>
-              <input className={CONTROL_CLASS} type="number" step="0.5" value={hoursConfig.expectedMonth} onChange={(e) => setHoursConfig((p) => ({ ...p, expectedMonth: toNumberOr(e.target.value, p.expectedMonth) }))} />
-              <label className="text-muted-foreground">Tolerancia (h)</label>
-              <input className={CONTROL_CLASS} type="number" step="0.25" value={hoursConfig.toleranceHours} onChange={(e) => setHoursConfig((p) => ({ ...p, toleranceHours: toNumberOr(e.target.value, p.toleranceHours) }))} />
-              <label className="col-span-2 flex items-center gap-2">
-                <input type="checkbox" checked={hoursConfig.useFixedDaily} onChange={(e) => setHoursConfig((p) => ({ ...p, useFixedDaily: e.target.checked }))} />
-                Horas fijas por día trabajado
-              </label>
+        {/* ── Tab: Horas ── */}
+        {activeTab === 'horas' && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1.5 text-xs">
+            <label className="text-muted-foreground self-center">Jornada (h)</label>
+            <input className={CONTROL_CLASS} type="number" step="0.25" value={hoursConfig.workHours} onChange={(e) => setHoursConfig((p) => ({ ...p, workHours: toNumberOr(e.target.value, p.workHours) }))} />
+            <label className="text-muted-foreground self-center">Colación (h)</label>
+            <input className={CONTROL_CLASS} type="number" step="0.25" value={hoursConfig.breakHours} onChange={(e) => setHoursConfig((p) => ({ ...p, breakHours: toNumberOr(e.target.value, p.breakHours) }))} />
+            <label className="text-muted-foreground self-center">Esperadas semana</label>
+            <input className={CONTROL_CLASS} type="number" step="0.5" value={hoursConfig.expectedWeek} onChange={(e) => setHoursConfig((p) => ({ ...p, expectedWeek: toNumberOr(e.target.value, p.expectedWeek) }))} />
+            <label className="text-muted-foreground self-center">Esperadas mes</label>
+            <input className={CONTROL_CLASS} type="number" step="0.5" value={hoursConfig.expectedMonth} onChange={(e) => setHoursConfig((p) => ({ ...p, expectedMonth: toNumberOr(e.target.value, p.expectedMonth) }))} />
+            <label className="text-muted-foreground self-center">Tolerancia (h)</label>
+            <input className={CONTROL_CLASS} type="number" step="0.25" value={hoursConfig.toleranceHours} onChange={(e) => setHoursConfig((p) => ({ ...p, toleranceHours: toNumberOr(e.target.value, p.toleranceHours) }))} />
+            <label className="col-span-2 flex items-center gap-2">
+              <input type="checkbox" checked={hoursConfig.useFixedDaily} onChange={(e) => setHoursConfig((p) => ({ ...p, useFixedDaily: e.target.checked }))} />
+              Horas fijas por día trabajado
+            </label>
+            <div className="col-span-2 sm:col-span-4">
+              <button className="mt-1 h-8 w-full rounded bg-primary text-primary-foreground text-xs" onClick={handleHoursConfigApply}>Aplicar parámetros</button>
             </div>
-            <button className="mt-1.5 h-8 w-full rounded bg-primary text-primary-foreground text-xs" onClick={handleHoursConfigApply}>Aplicar parámetros</button>
           </div>
+        )}
 
-          <div className="rounded-md border p-2">
-            <h3 className="font-semibold text-sm mb-1">Control semanal y mensual</h3>
-            <div className="grid gap-1.5 text-xs">
-              <label className="text-muted-foreground">Semana</label>
-              <select className={CONTROL_CLASS} value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)}>
-                {Object.entries(weeks).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
-              </select>
-              <label className="text-muted-foreground">Mes</label>
-              <select className={CONTROL_CLASS} value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)}>
-                {Object.entries(months).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
-              </select>
+        {/* ── Tab: Control semanal y mensual ── */}
+        {activeTab === 'control' && (
+          <div className="space-y-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+              <div>
+                <label className="text-muted-foreground">Semana</label>
+                <select className={CONTROL_CLASS + ' w-full mt-0.5'} value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)}>
+                  {Object.entries(weeks).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-muted-foreground">Mes</label>
+                <select className={CONTROL_CLASS + ' w-full mt-0.5'} value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)}>
+                  {Object.entries(months).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+                </select>
+              </div>
             </div>
-            <div className="mt-1.5 max-h-32 overflow-auto rounded border">
-              <table className="w-full text-[10px]">
-                <thead className="bg-muted text-foreground sticky top-0">
+            <div className="rounded border overflow-auto max-h-52">
+              <table className="w-full text-[11px]">
+                <thead className="bg-muted text-foreground sticky top-0 z-10">
                   <tr>
-                    <th className="px-1 text-left">Técnico</th>
-                    <th className="px-1">Δ Sem</th>
-                    <th className="px-1">Δ Mes</th>
+                    <th className="px-2 py-1 text-left">Técnico</th>
+                    <th className="px-2 py-1 text-right w-16">Sem</th>
+                    <th className="px-2 py-1 w-24">Δ Sem</th>
+                    <th className="px-2 py-1 text-right w-16">Mes</th>
+                    <th className="px-2 py-1 w-24">Δ Mes</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {hoursRows.map((row) => (
-                    <tr key={row.tech.r} className={rowClass(row.deltaWeek, row.deltaMonth, hoursConfig.toleranceHours)}>
-                      <td className="px-1 py-0.5 text-left">{row.tech.name}</td>
-                      <td className={`px-1 py-0.5 ${deltaClass(row.deltaWeek)}`}>{formatDelta(row.deltaWeek)}</td>
-                      <td className={`px-1 py-0.5 ${deltaClass(row.deltaMonth)}`}>{formatDelta(row.deltaMonth)}</td>
-                    </tr>
-                  ))}
+                  {hoursRows.map((row) => {
+                    const pctW = pctBar(row.weekHours, hoursConfig.expectedWeek)
+                    const pctM = pctBar(row.monthHours, hoursConfig.expectedMonth)
+                    const barColorW = row.deltaWeek >= -hoursConfig.toleranceHours ? 'bg-emerald-500' : 'bg-red-500'
+                    const barColorM = row.deltaMonth >= -hoursConfig.toleranceHours ? 'bg-emerald-500' : 'bg-red-500'
+                    return (
+                      <tr key={row.tech.r} className="border-t border-border hover:bg-muted/40 transition-colors">
+                        <td className="px-2 py-1 text-left truncate max-w-[180px]" title={row.tech.name}>{row.tech.name}</td>
+                        <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.weekHours.toFixed(1)}</td>
+                        <td className="px-2 py-1">
+                          <div className="flex items-center gap-1">
+                            <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
+                              <div className={`h-full rounded-full ${barColorW} transition-all`} style={{ width: `${pctW}%` }} />
+                            </div>
+                            <span className={`text-[10px] w-8 text-right tabular-nums ${deltaClass(row.deltaWeek)}`}>{formatDelta(row.deltaWeek)}</span>
+                          </div>
+                        </td>
+                        <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.monthHours.toFixed(1)}</td>
+                        <td className="px-2 py-1">
+                          <div className="flex items-center gap-1">
+                            <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
+                              <div className={`h-full rounded-full ${barColorM} transition-all`} style={{ width: `${pctM}%` }} />
+                            </div>
+                            <span className={`text-[10px] w-8 text-right tabular-nums ${deltaClass(row.deltaMonth)}`}>{formatDelta(row.deltaMonth)}</span>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
           </div>
-        </div>
+        )}
+
         <div className="text-xs text-muted-foreground mt-1">{status}</div>
       </section>
 
       <section className="min-h-0 flex-1 rounded-lg border bg-card p-2">
         <div className="mb-1 flex items-center justify-between gap-2">
           <div className="text-sm font-semibold">Calendario Mantención</div>
-          <button
-            className="h-7 rounded border px-2 text-xs disabled:opacity-50"
-            onClick={scrollToToday}
-            disabled={!todayDayCol}
-          >
-            Ir a hoy
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              className="h-7 rounded border px-2 text-xs"
+              onClick={() => setShowAllCols((p) => !p)}
+            >
+              {showAllCols ? 'Ocultar columnas' : 'Mostrar columnas'}
+            </button>
+            <button
+              className="h-7 rounded border px-2 text-xs disabled:opacity-50"
+              onClick={scrollToToday}
+              disabled={!todayDayCol}
+            >
+              Ir a hoy
+            </button>
+          </div>
         </div>
         <div className="text-xs text-muted-foreground mb-1">Atajos sobre celda seleccionada: D = Día, T = Tarde, N = Noche, L = Libre.</div>
         <div ref={calendarScrollRef} className="relative h-[calc(100%-2.5rem)] overflow-auto rounded border">
           <table className="border-collapse text-[11px] min-w-max">
             <thead>
               <tr className="bg-primary text-primary-foreground">
-                {META_COLS.map((h, i) => (
+                {visibleMetaIndices.map((gi, vi) => (
                   <th
-                    key={`head1-${h}`}
+                    key={`head1-${META_COLS[gi]}`}
                     className="sticky top-0 z-[50] border border-primary/70 bg-primary px-1 py-1"
-                    style={{ left: `${metaLeft(i)}px`, minWidth: `${META_COL_WIDTHS[i]}px`, maxWidth: `${META_COL_WIDTHS[i]}px` }}
+                    style={{ left: `${metaLeftFiltered(vi, visibleMetaIndices)}px`, minWidth: `${META_COL_WIDTHS[gi]}px`, maxWidth: `${META_COL_WIDTHS[gi]}px` }}
                   >
-                    {i === 0 ? 'PLANTA' : ''}
+                    {gi === 0 ? 'PLANTA' : ''}
                   </th>
                 ))}
                 {dayCols.map((d) => (
@@ -798,13 +883,13 @@ export function CalendarioMantencionPage() {
                 ))}
               </tr>
               <tr className="bg-primary text-primary-foreground">
-                {META_COLS.map((h, i) => (
+                {visibleMetaIndices.map((gi, vi) => (
                   <th
-                    key={`head2-${h}`}
+                    key={`head2-${META_COLS[gi]}`}
                     className="sticky top-[30px] z-[50] border border-primary/70 bg-primary px-1 py-1"
-                    style={{ left: `${metaLeft(i)}px`, minWidth: `${META_COL_WIDTHS[i]}px`, maxWidth: `${META_COL_WIDTHS[i]}px` }}
+                    style={{ left: `${metaLeftFiltered(vi, visibleMetaIndices)}px`, minWidth: `${META_COL_WIDTHS[gi]}px`, maxWidth: `${META_COL_WIDTHS[gi]}px` }}
                   >
-                    {h}
+                    {META_COLS[gi]}
                   </th>
                 ))}
                 {dayCols.map((d) => (
@@ -815,16 +900,17 @@ export function CalendarioMantencionPage() {
             <tbody>
               {techRows.map((tech) => {
                 const isSelectedRow = selectedRow === tech.r
+                const metaValues = [tech.turno, tech.area, tech.ceco, tech.cargo, tech.direccion, tech.rut, tech.name]
                 return (
                   <tr key={tech.r} className={isSelectedRow ? 'outline outline-2 outline-blue-500 -outline-offset-2' : ''}>
-                    {[tech.turno, tech.area, tech.ceco, tech.cargo, tech.direccion, tech.rut, tech.name].map((m, i) => (
+                    {visibleMetaIndices.map((gi, vi) => (
                       <td
-                        key={`meta-${tech.r}-${i}`}
+                        key={`meta-${tech.r}-${gi}`}
                         className="sticky z-[35] border bg-card px-1 py-1 text-left truncate text-foreground"
-                        style={{ left: `${metaLeft(i)}px`, minWidth: `${META_COL_WIDTHS[i]}px`, maxWidth: `${META_COL_WIDTHS[i]}px` }}
-                        title={m}
+                        style={{ left: `${metaLeftFiltered(vi, visibleMetaIndices)}px`, minWidth: `${META_COL_WIDTHS[gi]}px`, maxWidth: `${META_COL_WIDTHS[gi]}px` }}
+                        title={metaValues[gi]}
                       >
-                        {m}
+                        {metaValues[gi]}
                       </td>
                     ))}
                     {dayCols.map((d) => {
