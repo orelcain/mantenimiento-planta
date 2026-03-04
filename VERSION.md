@@ -1,14 +1,21 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.69.19**
+## Versión Actual: **v2.70.0**
 
-**Fecha de lanzamiento**: 28 de febrero de 2026  \
+**Fecha de lanzamiento**: 04 de marzo de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
 **Build**: ✅ Stable
 
 ---
 
 ## 📋 Información de la Versión
+
+### v2.70.0 — Calendario Mantención integrado en PWA con turnos configurables (04/03/2026)
+- 📅 **Nuevo módulo PWA**: `Calendario Mantención` integrado con ruta, menú y permisos por rol
+- ⌨️ **Edición operativa rápida**: atajos por celda `D/T/N/L` para asignación de turnos
+- 🧮 **Control de horas**: cálculo semanal y mensual con tolerancia y semáforo visual
+- ⚙️ **Configuración flexible**: plantillas de turnos, jornada, colación y horas esperadas editables
+- 📤 **Continuidad con Excel**: carga automática de plantilla base y exportación del calendario actualizado
 
 ### v2.69.19 — Presets de flujo para orden y usabilidad intuitiva (28/02/2026)
 - 🧩 **Preset selector en editor**: `Diseñar áreas`, `Poblar equipos`, `Ajuste fino` dentro del panel `Editor Rápido`

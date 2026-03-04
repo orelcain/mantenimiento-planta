@@ -1,7 +1,7 @@
 {
-  "version": "2.69.19",
-  "buildDate": "2026-02-28",
-  "buildTimestamp": 1772320479791,
+  "version": "2.70.0",
+  "buildDate": "2026-03-04",
+  "buildTimestamp": 1772592490000,
   "features": [
     "Mapa Isométrico 3D: vista de planta completa con Three.js + cámara ortográfica",
     "Rotación FFT: 4 ángulos de cámara estilo Final Fantasy Tactics (Q/E o botones)",

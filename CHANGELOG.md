@@ -7,6 +7,15 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.70.0] - 2026-03-04
+### Agregado — Módulo Calendario Mantención en PWA
+- **Módulo dedicado en app**: nueva sección `Calendario Mantención` integrada en rutas, menú lateral y permisos
+- **Plantilla base embebida**: carga por defecto del calendario sin necesidad de subir Excel en cada uso
+- **Atajos de turnos**: asignación rápida por celda con teclado (`D`, `T`, `N`, `L`)
+- **Turnos configurables**: edición de horarios por tipo de turno y parámetros de jornada/colación
+- **Control operativo de horas**: cálculo semanal/mensual con metas esperadas, tolerancia y semáforo de desvío
+- **Exportación equivalente**: descarga del calendario actualizado en formato Excel
+
 ## [2.69.19] - 2026-02-28
 ### Mejorado — Presets de flujo en Editor Rápido
 - **Selector de flujo**: nuevas opciones `Diseñar áreas`, `Poblar equipos` y `Ajuste fino`

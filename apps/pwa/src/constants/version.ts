@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.69.19' as const
+export const APP_VERSION = '2.70.0' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -11,12 +11,12 @@ export const APP_VERSION = '2.69.19' as const
 /**
  * Fecha de la versión actual
  */
-export const VERSION_DATE = '2026-03-03' as const
+export const VERSION_DATE = '2026-03-04' as const
 
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Mapa Isométrico 3D: Three.js + Cámara FFT + Equipos interactivos' as const
+export const VERSION_NAME = 'Calendario Mantención integrado con turnos y horas configurables' as const
 
 /**
  * Nota:
