@@ -50,6 +50,7 @@ const HIDEABLE_COLS = new Set([2, 3, 4, 5]) // CeCo, Cargo, DIRECCIÓN, RUT
 const CALENDAR_FIRESTORE_PATH = ['calendario_mantencion_state', 'current'] as const
 
 type TabId = 'edicion' | 'plantillas' | 'horas' | 'tecnicos' | 'control'
+type SyncState = 'idle' | 'saving' | 'synced' | 'error'
 
 type PersistedCalendarState = {
   version: number
@@ -238,6 +239,9 @@ export function CalendarioMantencionPage() {
   const [techRows, setTechRows] = useState<TechRow[]>([])
   const [turnosCatalog, setTurnosCatalog] = useState<string[]>([])
   const [status, setStatus] = useState('Cargando plantilla base...')
+  const [syncState, setSyncState] = useState<SyncState>('idle')
+  const [lastSyncAt, setLastSyncAt] = useState<Date | null>(null)
+  const [syncErrorText, setSyncErrorText] = useState('')
   const [originalFilename, setOriginalFilename] = useState('calendario-mantencion-base.xlsx')
 
   const [selectedRow, setSelectedRow] = useState<number | null>(null)
@@ -521,6 +525,8 @@ export function CalendarioMantencionPage() {
 
   const syncCalendarToFirebase = useCallback(async (reason: string): Promise<void> => {
     try {
+      setSyncState('saving')
+      setSyncErrorText('')
       const currentUser = getCurrentUser()
       const payload = {
         version: 1,
@@ -544,18 +550,30 @@ export function CalendarioMantencionPage() {
         updatedBy: currentUser?.uid ?? 'anon',
       }
       await trackedSetDoc(doc(db, CALENDAR_FIRESTORE_PATH[0], CALENDAR_FIRESTORE_PATH[1]), payload, { merge: true })
+      setLastSyncAt(new Date())
+      setSyncState('synced')
     } catch (error) {
       console.warn('No se pudo sincronizar calendario en Firebase', error)
+      setSyncState('error')
+      setSyncErrorText(error instanceof Error ? error.message : 'Error desconocido')
     }
   }, [hoursConfig, originalFilename, shiftConfig, techRows])
 
   useEffect(() => {
     if (!hasLoadedCalendarRef.current || isHydratingRemoteRef.current) return
     if (syncTimerRef.current) clearTimeout(syncTimerRef.current)
+    setSyncState('saving')
     syncTimerRef.current = setTimeout(() => {
       void syncCalendarToFirebase('state-change')
     }, 200)
   }, [dayCols, syncCalendarToFirebase])
+
+  const syncIndicator = useMemo(() => {
+    if (syncState === 'saving') return { label: 'Guardando…', className: 'bg-amber-500/15 text-amber-300 border-amber-500/40' }
+    if (syncState === 'synced') return { label: `Sincronizado${lastSyncAt ? ` ${lastSyncAt.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' })}` : ''}`, className: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40' }
+    if (syncState === 'error') return { label: `Error de sync${syncErrorText ? `: ${syncErrorText}` : ''}`, className: 'bg-red-500/15 text-red-300 border-red-500/40' }
+    return { label: 'Sin cambios', className: 'bg-muted text-muted-foreground border-border' }
+  }, [lastSyncAt, syncErrorText, syncState])
 
   function getCellValue(sheet: XLSX.WorkSheet, r: number, c: number): string {
     const addr = XLSX.utils.encode_cell({ r, c })
@@ -1363,7 +1381,12 @@ export function CalendarioMantencionPage() {
           </div>
         )}
 
-        <div className="text-xs text-muted-foreground mt-1">{status}</div>
+        <div className="mt-1 flex items-center justify-between gap-2">
+          <div className="text-xs text-muted-foreground">{status}</div>
+          <div className={`max-w-[55%] truncate rounded border px-2 py-0.5 text-[11px] ${syncIndicator.className}`} title={syncIndicator.label}>
+            {syncIndicator.label}
+          </div>
+        </div>
       </section>
 
       <section className="min-h-0 flex-1 rounded-lg border bg-card p-2">
