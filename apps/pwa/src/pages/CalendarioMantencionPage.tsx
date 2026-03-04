@@ -165,9 +165,10 @@ function formatDelta(delta: number): string {
 
 function metaLeftFiltered(index: number, visibleIndices: number[]): number {
   let total = 0
-  for (let i = 0; i < visibleIndices.length; i++) {
-    if (i >= index) break
-    total += META_COL_WIDTHS[visibleIndices[i]] || 90
+  for (let i = 0; i < index; i++) {
+    const colIndex = visibleIndices[i]
+    if (colIndex === undefined) break
+    total += META_COL_WIDTHS[colIndex] ?? 90
   }
   return total
 }
