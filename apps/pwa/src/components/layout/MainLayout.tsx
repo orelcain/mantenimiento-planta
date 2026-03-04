@@ -208,13 +208,10 @@ export function MainLayout() {
 
   useEffect(() => {
     if (!lastSyncError) return
-    toast({
-      title: 'Error al sincronizar',
-      description: lastSyncError,
-      variant: 'destructive',
-    })
+    // Solo loguear en consola, sin toast emergente para no molestar al usuario
+    console.warn('[sync]', lastSyncError)
     setSyncError(null)
-  }, [lastSyncError, setSyncError, toast])
+  }, [lastSyncError, setSyncError])
 
   useEffect(() => {
     const prev = prevPendingRef.current

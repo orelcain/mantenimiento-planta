@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as XLSX from 'xlsx'
 import { doc, getDoc, serverTimestamp } from 'firebase/firestore'
 import { db } from '../services/firebase'
@@ -512,6 +512,43 @@ export function CalendarioMantencionPage() {
 
       if (event.ctrlKey || event.altKey || event.metaKey) return
 
+      // Arrow key navigation
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+        event.preventDefault()
+        if (event.key === 'ArrowRight') {
+          const curIdx = dayCols.findIndex((d) => d.c === selectedCol)
+          const nextDayCol = curIdx >= 0 ? dayCols[curIdx + 1] : undefined
+          if (nextDayCol) {
+            setSelectedCol(nextDayCol.c)
+            const tech = techRows.find((t) => t.r === selectedRow)
+            if (tech) setSelectedShift(tech.shifts[nextDayCol.c] || '')
+          }
+        } else if (event.key === 'ArrowLeft') {
+          const curIdx = dayCols.findIndex((d) => d.c === selectedCol)
+          const prevDayCol = curIdx > 0 ? dayCols[curIdx - 1] : undefined
+          if (prevDayCol) {
+            setSelectedCol(prevDayCol.c)
+            const tech = techRows.find((t) => t.r === selectedRow)
+            if (tech) setSelectedShift(tech.shifts[prevDayCol.c] || '')
+          }
+        } else if (event.key === 'ArrowDown') {
+          const curRowIdx = techRows.findIndex((t) => t.r === selectedRow)
+          const nextRow = curRowIdx >= 0 ? techRows[curRowIdx + 1] : undefined
+          if (nextRow) {
+            setSelectedRow(nextRow.r)
+            setSelectedShift(nextRow.shifts[selectedCol] || '')
+          }
+        } else if (event.key === 'ArrowUp') {
+          const curRowIdx = techRows.findIndex((t) => t.r === selectedRow)
+          const prevRow = curRowIdx > 0 ? techRows[curRowIdx - 1] : undefined
+          if (prevRow) {
+            setSelectedRow(prevRow.r)
+            setSelectedShift(prevRow.shifts[selectedCol] || '')
+          }
+        }
+        return
+      }
+
       const key = event.key.toLowerCase()
       if (event.shiftKey && key === 'd') {
         event.preventDefault()
@@ -542,7 +579,7 @@ export function CalendarioMantencionPage() {
 
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [calendarShortcutsActive, selectedRow, selectedCol, shortcuts])
+  }, [calendarShortcutsActive, selectedRow, selectedCol, shortcuts, dayCols, techRows])
 
   function loadWorkbook(workbook: XLSX.WorkBook, filename: string) {
     const horario = workbook.SheetNames.find((name) => name.toLowerCase() === 'horario') ?? workbook.SheetNames[0]
@@ -1945,7 +1982,7 @@ export function CalendarioMantencionPage() {
           </div>
         </div>
         <div className="mb-1 flex items-center justify-between gap-2">
-          <div className="text-xs text-muted-foreground">Atajos sobre celda seleccionada (solo tras click en calendario): D = Día, T = Tarde, N = Noche, L = Libre, V = Vacaciones, F = Feriado, Shift+D = Día reducido, Shift+T = Tarde reducida, Shift+N = Noche reducida. Para feriado masivo usa “Marcar feriado (día)”.</div>
+          <div className="text-xs text-muted-foreground">Atajos (click en calendario para activar): D/T/N/L/V/F = Día/Tarde/Noche/Libre/Vacaciones/Feriado · Shift+D/T/N = Reducido · Flechas ←↑↓→ = Navegar celdas</div>
           <div className={`shrink-0 rounded border px-2 py-0.5 text-[11px] ${calendarShortcutsActive ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-300' : 'border-border bg-muted text-muted-foreground'}`}>
             Atajos: {calendarShortcutsActive ? 'Activos' : 'Inactivos'}
           </div>
