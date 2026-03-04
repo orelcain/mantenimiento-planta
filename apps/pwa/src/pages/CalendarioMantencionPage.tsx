@@ -45,6 +45,7 @@ const META_COL_WIDTHS = [56, 80, 100, 108, 98, 100, 220]
 const DAY_COL_WIDTH = 88
 const HOURS_CONFIG_KEY = 'calendario_mantencion_hours_config_v1'
 const SHIFT_CONFIG_KEY = 'calendario_mantencion_shift_config_v1'
+const CONTROL_CLASS = 'h-8 rounded border border-border bg-background px-2 text-xs text-foreground'
 
 function defaultHoursConfig(): HoursConfig {
   return {
@@ -223,6 +224,7 @@ export function CalendarioMantencionPage() {
 
   const loadWorkbookRef = useRef<(workbook: XLSX.WorkBook, filename: string) => void>(() => {})
   const applyShiftRef = useRef<(r: number, c: number, shift: string) => void>(() => {})
+  const calendarScrollRef = useRef<HTMLDivElement | null>(null)
 
   const shortcuts = useMemo(() => {
     const dia = `${shiftConfig.diaInicio} - ${shiftConfig.diaFin}`
@@ -258,6 +260,16 @@ export function CalendarioMantencionPage() {
       }
     })
     return map
+  }, [dayCols])
+
+  const todayDayCol = useMemo(() => {
+    const today = getChileToday()
+    return dayCols.find((d) => {
+      if (!d.dateObj) return false
+      return d.dateObj.getFullYear() === today.getFullYear()
+        && d.dateObj.getMonth() === today.getMonth()
+        && d.dateObj.getDate() === today.getDate()
+    })
   }, [dayCols])
 
   loadWorkbookRef.current = loadWorkbook
@@ -593,6 +605,23 @@ export function CalendarioMantencionPage() {
     setStatus(`Archivo exportado: ${outputName}`)
   }
 
+  function scrollToToday() {
+    const container = calendarScrollRef.current
+    const todayCol = todayDayCol
+    if (!container || !todayCol) return
+
+    const dayIndex = dayCols.findIndex((d) => d.c === todayCol.c)
+    if (dayIndex < 0) return
+
+    const metaWidth = META_COL_WIDTHS.reduce((sum, width) => sum + width, 0)
+    const colStart = metaWidth + (dayIndex * DAY_COL_WIDTH)
+    const targetLeft = Math.max(0, colStart - ((container.clientWidth - DAY_COL_WIDTH) / 2))
+
+    container.scrollTo({ left: targetLeft, behavior: 'smooth' })
+    setSelectedCol(todayCol.c)
+    setStatus(`Vista centrada en hoy: ${todayCol.dayLabel} ${formatDate(todayCol.dateObj)}`)
+  }
+
   return (
     <div className="h-full min-h-0 flex flex-col gap-2">
       <section className="sticky top-0 z-20 rounded-lg border bg-card p-2">
@@ -609,7 +638,7 @@ export function CalendarioMantencionPage() {
               />
               <label className="text-xs text-muted-foreground">Técnico</label>
               <select
-                className="h-8 rounded border px-2 text-xs"
+                className={CONTROL_CLASS}
                 value={selectedRow ?? ''}
                 onChange={(e) => {
                   const row = Number(e.target.value)
@@ -626,7 +655,7 @@ export function CalendarioMantencionPage() {
               </select>
               <label className="text-xs text-muted-foreground">Día</label>
               <select
-                className="h-8 rounded border px-2 text-xs"
+                className={CONTROL_CLASS}
                 value={selectedCol ?? ''}
                 onChange={(e) => {
                   const col = Number(e.target.value)
@@ -642,7 +671,7 @@ export function CalendarioMantencionPage() {
                 ))}
               </select>
               <label className="text-xs text-muted-foreground">Turno</label>
-              <select className="h-8 rounded border px-2 text-xs" value={selectedShift} onChange={(e) => setSelectedShift(e.target.value)}>
+              <select className={CONTROL_CLASS} value={selectedShift} onChange={(e) => setSelectedShift(e.target.value)}>
                 {Array.from(new Set([...turnosCatalog, shortcuts.dia, shortcuts.tarde, shortcuts.noche, shortcuts.libre])).map((t) => (
                   <option key={t} value={t}>{t}</option>
                 ))}
@@ -658,19 +687,19 @@ export function CalendarioMantencionPage() {
             <h3 className="font-semibold text-sm mb-1">Plantillas y atajos</h3>
             <div className="grid grid-cols-2 gap-1.5 text-xs">
               <label className="text-muted-foreground">Día inicio</label>
-              <input className="h-8 rounded border px-2" type="time" value={shiftConfig.diaInicio} onChange={(e) => setShiftConfig((p) => ({ ...p, diaInicio: e.target.value }))} />
+              <input className={CONTROL_CLASS} type="time" value={shiftConfig.diaInicio} onChange={(e) => setShiftConfig((p) => ({ ...p, diaInicio: e.target.value }))} />
               <label className="text-muted-foreground">Día fin</label>
-              <input className="h-8 rounded border px-2" type="time" value={shiftConfig.diaFin} onChange={(e) => setShiftConfig((p) => ({ ...p, diaFin: e.target.value }))} />
+              <input className={CONTROL_CLASS} type="time" value={shiftConfig.diaFin} onChange={(e) => setShiftConfig((p) => ({ ...p, diaFin: e.target.value }))} />
               <label className="text-muted-foreground">Tarde inicio</label>
-              <input className="h-8 rounded border px-2" type="time" value={shiftConfig.tardeInicio} onChange={(e) => setShiftConfig((p) => ({ ...p, tardeInicio: e.target.value }))} />
+              <input className={CONTROL_CLASS} type="time" value={shiftConfig.tardeInicio} onChange={(e) => setShiftConfig((p) => ({ ...p, tardeInicio: e.target.value }))} />
               <label className="text-muted-foreground">Tarde fin</label>
-              <input className="h-8 rounded border px-2" type="time" value={shiftConfig.tardeFin} onChange={(e) => setShiftConfig((p) => ({ ...p, tardeFin: e.target.value }))} />
+              <input className={CONTROL_CLASS} type="time" value={shiftConfig.tardeFin} onChange={(e) => setShiftConfig((p) => ({ ...p, tardeFin: e.target.value }))} />
               <label className="text-muted-foreground">Noche inicio</label>
-              <input className="h-8 rounded border px-2" type="time" value={shiftConfig.nocheInicio} onChange={(e) => setShiftConfig((p) => ({ ...p, nocheInicio: e.target.value }))} />
+              <input className={CONTROL_CLASS} type="time" value={shiftConfig.nocheInicio} onChange={(e) => setShiftConfig((p) => ({ ...p, nocheInicio: e.target.value }))} />
               <label className="text-muted-foreground">Noche fin</label>
-              <input className="h-8 rounded border px-2" type="time" value={shiftConfig.nocheFin} onChange={(e) => setShiftConfig((p) => ({ ...p, nocheFin: e.target.value }))} />
+              <input className={CONTROL_CLASS} type="time" value={shiftConfig.nocheFin} onChange={(e) => setShiftConfig((p) => ({ ...p, nocheFin: e.target.value }))} />
               <label className="text-muted-foreground">Libre</label>
-              <input className="h-8 rounded border px-2" value={shiftConfig.libreLabel} onChange={(e) => setShiftConfig((p) => ({ ...p, libreLabel: e.target.value }))} />
+              <input className={CONTROL_CLASS} value={shiftConfig.libreLabel} onChange={(e) => setShiftConfig((p) => ({ ...p, libreLabel: e.target.value }))} />
             </div>
             <button className="mt-1.5 h-8 w-full rounded bg-primary text-primary-foreground text-xs" onClick={handleShiftConfigApply}>Aplicar plantillas</button>
             <div className="mt-1 grid grid-cols-4 gap-1 text-[11px]">
@@ -685,15 +714,15 @@ export function CalendarioMantencionPage() {
             <h3 className="font-semibold text-sm mb-1">Parámetros de horas</h3>
             <div className="grid grid-cols-2 gap-1.5 text-xs">
               <label className="text-muted-foreground">Jornada (h)</label>
-              <input className="h-8 rounded border px-2" type="number" step="0.25" value={hoursConfig.workHours} onChange={(e) => setHoursConfig((p) => ({ ...p, workHours: toNumberOr(e.target.value, p.workHours) }))} />
+              <input className={CONTROL_CLASS} type="number" step="0.25" value={hoursConfig.workHours} onChange={(e) => setHoursConfig((p) => ({ ...p, workHours: toNumberOr(e.target.value, p.workHours) }))} />
               <label className="text-muted-foreground">Colación (h)</label>
-              <input className="h-8 rounded border px-2" type="number" step="0.25" value={hoursConfig.breakHours} onChange={(e) => setHoursConfig((p) => ({ ...p, breakHours: toNumberOr(e.target.value, p.breakHours) }))} />
+              <input className={CONTROL_CLASS} type="number" step="0.25" value={hoursConfig.breakHours} onChange={(e) => setHoursConfig((p) => ({ ...p, breakHours: toNumberOr(e.target.value, p.breakHours) }))} />
               <label className="text-muted-foreground">Esperadas semana</label>
-              <input className="h-8 rounded border px-2" type="number" step="0.5" value={hoursConfig.expectedWeek} onChange={(e) => setHoursConfig((p) => ({ ...p, expectedWeek: toNumberOr(e.target.value, p.expectedWeek) }))} />
+              <input className={CONTROL_CLASS} type="number" step="0.5" value={hoursConfig.expectedWeek} onChange={(e) => setHoursConfig((p) => ({ ...p, expectedWeek: toNumberOr(e.target.value, p.expectedWeek) }))} />
               <label className="text-muted-foreground">Esperadas mes</label>
-              <input className="h-8 rounded border px-2" type="number" step="0.5" value={hoursConfig.expectedMonth} onChange={(e) => setHoursConfig((p) => ({ ...p, expectedMonth: toNumberOr(e.target.value, p.expectedMonth) }))} />
+              <input className={CONTROL_CLASS} type="number" step="0.5" value={hoursConfig.expectedMonth} onChange={(e) => setHoursConfig((p) => ({ ...p, expectedMonth: toNumberOr(e.target.value, p.expectedMonth) }))} />
               <label className="text-muted-foreground">Tolerancia (h)</label>
-              <input className="h-8 rounded border px-2" type="number" step="0.25" value={hoursConfig.toleranceHours} onChange={(e) => setHoursConfig((p) => ({ ...p, toleranceHours: toNumberOr(e.target.value, p.toleranceHours) }))} />
+              <input className={CONTROL_CLASS} type="number" step="0.25" value={hoursConfig.toleranceHours} onChange={(e) => setHoursConfig((p) => ({ ...p, toleranceHours: toNumberOr(e.target.value, p.toleranceHours) }))} />
               <label className="col-span-2 flex items-center gap-2">
                 <input type="checkbox" checked={hoursConfig.useFixedDaily} onChange={(e) => setHoursConfig((p) => ({ ...p, useFixedDaily: e.target.checked }))} />
                 Horas fijas por día trabajado
@@ -706,11 +735,11 @@ export function CalendarioMantencionPage() {
             <h3 className="font-semibold text-sm mb-1">Control semanal y mensual</h3>
             <div className="grid gap-1.5 text-xs">
               <label className="text-muted-foreground">Semana</label>
-              <select className="h-8 rounded border px-2" value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)}>
+              <select className={CONTROL_CLASS} value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)}>
                 {Object.entries(weeks).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
               </select>
               <label className="text-muted-foreground">Mes</label>
-              <select className="h-8 rounded border px-2" value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)}>
+              <select className={CONTROL_CLASS} value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)}>
                 {Object.entries(months).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
               </select>
             </div>
@@ -740,37 +769,46 @@ export function CalendarioMantencionPage() {
       </section>
 
       <section className="min-h-0 flex-1 rounded-lg border bg-card p-2">
-        <div className="text-sm font-semibold mb-1">Calendario Mantención</div>
+        <div className="mb-1 flex items-center justify-between gap-2">
+          <div className="text-sm font-semibold">Calendario Mantención</div>
+          <button
+            className="h-7 rounded border px-2 text-xs disabled:opacity-50"
+            onClick={scrollToToday}
+            disabled={!todayDayCol}
+          >
+            Ir a hoy
+          </button>
+        </div>
         <div className="text-xs text-muted-foreground mb-1">Atajos sobre celda seleccionada: D = Día, T = Tarde, N = Noche, L = Libre.</div>
-        <div className="h-[calc(100%-2.5rem)] overflow-auto rounded border">
+        <div ref={calendarScrollRef} className="relative h-[calc(100%-2.5rem)] overflow-auto rounded border">
           <table className="border-collapse text-[11px] min-w-max">
             <thead>
               <tr className="bg-primary text-primary-foreground">
                 {META_COLS.map((h, i) => (
                   <th
                     key={`head1-${h}`}
-                    className="sticky top-0 z-20 border px-1 py-1"
+                    className="sticky top-0 z-40 border border-primary/70 bg-primary px-1 py-1"
                     style={{ left: `${metaLeft(i)}px`, minWidth: `${META_COL_WIDTHS[i]}px`, maxWidth: `${META_COL_WIDTHS[i]}px` }}
                   >
                     {i === 0 ? 'PLANTA' : ''}
                   </th>
                 ))}
                 {dayCols.map((d) => (
-                  <th key={`day-${d.c}`} className="sticky top-0 z-10 border px-1 py-1" style={{ minWidth: `${DAY_COL_WIDTH}px`, maxWidth: `${DAY_COL_WIDTH}px` }}>{d.dayLabel}</th>
+                  <th key={`day-${d.c}`} className="sticky top-0 z-20 border border-primary/70 bg-primary px-1 py-1" style={{ minWidth: `${DAY_COL_WIDTH}px`, maxWidth: `${DAY_COL_WIDTH}px` }}>{d.dayLabel}</th>
                 ))}
               </tr>
               <tr className="bg-primary/90 text-primary-foreground">
                 {META_COLS.map((h, i) => (
                   <th
                     key={`head2-${h}`}
-                    className="sticky top-7 z-20 border px-1 py-1"
+                    className="sticky top-[30px] z-40 border border-primary/70 bg-primary/95 px-1 py-1"
                     style={{ left: `${metaLeft(i)}px`, minWidth: `${META_COL_WIDTHS[i]}px`, maxWidth: `${META_COL_WIDTHS[i]}px` }}
                   >
                     {h}
                   </th>
                 ))}
                 {dayCols.map((d) => (
-                  <th key={`date-${d.c}`} className="sticky top-7 z-10 border px-1 py-1" style={{ minWidth: `${DAY_COL_WIDTH}px`, maxWidth: `${DAY_COL_WIDTH}px` }}>{formatDate(d.dateObj) || d.dateRaw}</th>
+                  <th key={`date-${d.c}`} className="sticky top-[30px] z-20 border border-primary/70 bg-primary/95 px-1 py-1" style={{ minWidth: `${DAY_COL_WIDTH}px`, maxWidth: `${DAY_COL_WIDTH}px` }}>{formatDate(d.dateObj) || d.dateRaw}</th>
                 ))}
               </tr>
             </thead>
@@ -782,7 +820,7 @@ export function CalendarioMantencionPage() {
                     {[tech.turno, tech.area, tech.ceco, tech.cargo, tech.direccion, tech.rut, tech.name].map((m, i) => (
                       <td
                         key={`meta-${tech.r}-${i}`}
-                        className="sticky z-[5] border bg-muted/90 px-1 py-1 text-left truncate text-foreground"
+                        className="sticky z-30 border bg-card px-1 py-1 text-left truncate text-foreground"
                         style={{ left: `${metaLeft(i)}px`, minWidth: `${META_COL_WIDTHS[i]}px`, maxWidth: `${META_COL_WIDTHS[i]}px` }}
                         title={m}
                       >
