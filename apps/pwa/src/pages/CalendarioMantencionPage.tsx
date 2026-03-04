@@ -518,7 +518,7 @@ export function CalendarioMantencionPage() {
         return
       }
       if (event.shiftKey) return
-      if (!['d', 't', 'n', 'l', 'v'].includes(key)) return
+      if (!['d', 't', 'n', 'l', 'v', 'f'].includes(key)) return
 
       event.preventDefault()
       if (key === 'd') applyShiftRef.current(selectedRow, selectedCol, shortcuts.dia)
@@ -526,6 +526,7 @@ export function CalendarioMantencionPage() {
       if (key === 'n') applyShiftRef.current(selectedRow, selectedCol, shortcuts.noche)
       if (key === 'l') applyShiftRef.current(selectedRow, selectedCol, shortcuts.libre)
       if (key === 'v') applyShiftRef.current(selectedRow, selectedCol, 'VACACIONES')
+      if (key === 'f') applyShiftRef.current(selectedRow, selectedCol, 'FERIADO')
     }
 
     window.addEventListener('keydown', onKey)
@@ -973,6 +974,8 @@ export function CalendarioMantencionPage() {
   const weekDays = dayCols.filter((d) => d.dateObj && isoWeekKey(d.dateObj) === selectedWeek)
   const monthDays = dayCols.filter((d) => d.dateObj && monthKey(d.dateObj) === selectedMonth)
   const effectiveDaily = effectiveDailyHours()
+  const monthBusinessDays = monthDays.reduce((sum, d) => (d.dateObj && isBusinessDay(d.dateObj) ? sum + 1 : sum), 0)
+  const expectedMonthAutoBase = hoursConfig.expectedWeek * (monthBusinessDays / 5)
 
   function isWeekStart(index: number): boolean {
     if (index === 0) return true
@@ -1022,7 +1025,7 @@ export function CalendarioMantencionPage() {
     )
     const monthExpectedAdjusted = Math.max(
       0,
-      hoursConfig.expectedMonth - (
+      expectedMonthAutoBase - (
         (monthVacationDays + (hoursConfig.holidayAsNonWorking ? monthHolidayDays : 0))
         * effectiveDaily
       )
@@ -1073,7 +1076,7 @@ export function CalendarioMantencionPage() {
       workHours: clampMin(toNumberOr(hoursConfig.workHours, 8), 0),
       breakHours: clampMin(toNumberOr(hoursConfig.breakHours, 0.5), 0),
       expectedWeek: clampMin(toNumberOr(hoursConfig.expectedWeek, 45), 0),
-      expectedMonth: clampMin(toNumberOr(hoursConfig.expectedMonth, 180), 0),
+      expectedMonth: clampMin(toNumberOr(expectedMonthAutoBase, 180), 0),
       toleranceHours: clampMin(toNumberOr(hoursConfig.toleranceHours, 0.5), 0),
       dayReductionHours: clampMin(toNumberOr(hoursConfig.dayReductionHours, 1), 0),
       vacationBusinessDaysOnly: hoursConfig.vacationBusinessDaysOnly !== false,
@@ -1082,7 +1085,7 @@ export function CalendarioMantencionPage() {
     }
     setHoursConfig(next)
     safeStorageSet(HOURS_CONFIG_KEY, next)
-    setStatus(`Parámetros aplicados. Horas efectivas por día: ${effectiveDailyHours().toFixed(2)}h`)
+    setStatus(`Parámetros aplicados. Horas efectivas por día: ${effectiveDailyHours().toFixed(2)}h. Meta mensual auto: ${expectedMonthAutoBase.toFixed(1)}h`)
   }
 
   function handleShiftConfigApply() {
@@ -1092,7 +1095,7 @@ export function CalendarioMantencionPage() {
     }
     setShiftConfig(next)
     safeStorageSet(SHIFT_CONFIG_KEY, next)
-    setStatus('Plantillas de turno actualizadas. Atajos en calendario: D=Dia, T=Tarde, N=Noche, L=Libre, V=Vacaciones, Shift+D=Dia reducida, Shift+T=Tarde reducida, Shift+N=Noche reducida.')
+    setStatus('Plantillas de turno actualizadas. Atajos en calendario: D=Dia, T=Tarde, N=Noche, L=Libre, V=Vacaciones, F=Feriado, Shift+D=Dia reducida, Shift+T=Tarde reducida, Shift+N=Noche reducida.')
   }
 
   function handleFileUpload(file: File | null) {
@@ -1375,7 +1378,7 @@ export function CalendarioMantencionPage() {
             <div className="grid gap-1.5">
               <label className="text-xs text-muted-foreground">Turno</label>
               <select className={CONTROL_CLASS} value={selectedShift} onChange={(e) => setSelectedShift(e.target.value)}>
-                {Array.from(new Set([...turnosCatalog, shortcuts.dia, shortcuts.tarde, shortcuts.noche, shortcuts.libre])).map((t) => (
+                {Array.from(new Set([...turnosCatalog, shortcuts.dia, shortcuts.tarde, shortcuts.noche, shortcuts.libre, 'VACACIONES', 'FERIADO'])).map((t) => (
                   <option key={t} value={t}>{t}</option>
                 ))}
               </select>
@@ -1390,6 +1393,7 @@ export function CalendarioMantencionPage() {
                 <button className="h-7 rounded border" onClick={() => selectedRow && selectedCol !== null && applyShift(selectedRow, selectedCol, shortcuts.libre)}>L</button>
                 <button className="h-7 rounded border" onClick={() => selectedRow && selectedCol !== null && applyShift(selectedRow, selectedCol, 'VACACIONES')}>V</button>
               </div>
+              <button className="h-7 rounded border text-[11px]" onClick={() => selectedRow && selectedCol !== null && applyShift(selectedRow, selectedCol, 'FERIADO')}>F (celda)</button>
               <button className="h-7 rounded border text-[11px]" onClick={handleApplyHolidayToDay}>Marcar feriado (día)</button>
             </div>
           </div>
@@ -1430,8 +1434,11 @@ export function CalendarioMantencionPage() {
             <input className={CONTROL_CLASS} type="number" step="0.25" value={hoursConfig.breakHours} onChange={(e) => setHoursConfig((p) => ({ ...p, breakHours: toNumberOr(e.target.value, p.breakHours) }))} />
             <label className="text-muted-foreground self-center">Esperadas semana</label>
             <input className={CONTROL_CLASS} type="number" step="0.5" value={hoursConfig.expectedWeek} onChange={(e) => setHoursConfig((p) => ({ ...p, expectedWeek: toNumberOr(e.target.value, p.expectedWeek) }))} />
-            <label className="text-muted-foreground self-center">Esperadas mes</label>
-            <input className={CONTROL_CLASS} type="number" step="0.5" value={hoursConfig.expectedMonth} onChange={(e) => setHoursConfig((p) => ({ ...p, expectedMonth: toNumberOr(e.target.value, p.expectedMonth) }))} />
+            <label className="text-muted-foreground self-center">Esperadas mes (auto)</label>
+            <div className={CONTROL_CLASS + ' flex items-center justify-between'}>
+              <span className="font-medium tabular-nums">{expectedMonthAutoBase.toFixed(1)} h</span>
+              <span className="text-[10px] text-muted-foreground">{monthBusinessDays} días hábiles</span>
+            </div>
             <label className="text-muted-foreground self-center">Tolerancia (h)</label>
             <input className={CONTROL_CLASS} type="number" step="0.25" value={hoursConfig.toleranceHours} onChange={(e) => setHoursConfig((p) => ({ ...p, toleranceHours: toNumberOr(e.target.value, p.toleranceHours) }))} />
             <label className="text-muted-foreground self-center">Reducción turno día (h)</label>
@@ -1603,6 +1610,14 @@ export function CalendarioMantencionPage() {
                 </select>
               </div>
             </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px]">
+              <div className="rounded border bg-muted/20 px-2 py-1">
+                <span className="text-muted-foreground">Semana seleccionada:</span> <span className="font-semibold">{weeks[selectedWeek] || '-'}</span>
+              </div>
+              <div className="rounded border bg-muted/20 px-2 py-1">
+                <span className="text-muted-foreground">Mes seleccionado:</span> <span className="font-semibold">{months[selectedMonth] || '-'}</span>
+              </div>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-2 text-xs">
               <div className="rounded border p-2">
                 <div className="text-muted-foreground">Semana (real / esperada)</div>
@@ -1628,6 +1643,11 @@ export function CalendarioMantencionPage() {
             <div className="rounded border">
               <table className="w-full text-[11px]">
                 <thead className="bg-muted text-foreground sticky top-0 z-10">
+                  <tr className="border-b border-border/70 bg-muted/60">
+                    <th className="px-2 py-1 text-left">Técnico</th>
+                    <th className="px-2 py-1 text-center" colSpan={6}>Semana</th>
+                    <th className="px-2 py-1 text-center" colSpan={7}>Mes</th>
+                  </tr>
                   <tr>
                     <th className="px-2 py-1 text-left">Técnico</th>
                     <th className="px-2 py-1 text-right w-24">Sem (Real/Esp)</th>
@@ -1647,8 +1667,8 @@ export function CalendarioMantencionPage() {
                 </thead>
                 <tbody>
                   {hoursRows.map((row) => {
-                    const pctW = pctBar(row.weekHours, hoursConfig.expectedWeek)
-                    const pctM = pctBar(row.monthHours, hoursConfig.expectedMonth)
+                    const pctW = pctBar(row.weekHours, row.weekExpected)
+                    const pctM = pctBar(row.monthHours, row.monthExpected)
                     const barColorW = row.deltaWeek >= -hoursConfig.toleranceHours ? 'bg-emerald-500' : 'bg-red-500'
                     const barColorM = row.deltaMonth >= -hoursConfig.toleranceHours ? 'bg-emerald-500' : 'bg-red-500'
                     return (
@@ -1718,7 +1738,7 @@ export function CalendarioMantencionPage() {
           </div>
         </div>
         <div className="mb-1 flex items-center justify-between gap-2">
-          <div className="text-xs text-muted-foreground">Atajos sobre celda seleccionada (solo tras click en calendario): D = Día, T = Tarde, N = Noche, L = Libre, V = Vacaciones, Shift+D = Día reducido, Shift+T = Tarde reducida, Shift+N = Noche reducida. Para feriado usa “Marcar feriado (día)”.</div>
+          <div className="text-xs text-muted-foreground">Atajos sobre celda seleccionada (solo tras click en calendario): D = Día, T = Tarde, N = Noche, L = Libre, V = Vacaciones, F = Feriado, Shift+D = Día reducido, Shift+T = Tarde reducida, Shift+N = Noche reducida. Para feriado masivo usa “Marcar feriado (día)”.</div>
           <div className={`shrink-0 rounded border px-2 py-0.5 text-[11px] ${calendarShortcutsActive ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-300' : 'border-border bg-muted text-muted-foreground'}`}>
             Atajos: {calendarShortcutsActive ? 'Activos' : 'Inactivos'}
           </div>
