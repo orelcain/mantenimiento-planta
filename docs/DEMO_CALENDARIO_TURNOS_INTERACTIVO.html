@@ -1,0 +1,1173 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Calendario Turnos Interactivo</title>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    :root {
+      --bg: #f5f7fa;
+      --panel: #ffffff;
+      --line: #dbe3ec;
+      --text: #1d2a3a;
+      --muted: #5c6b7a;
+      --header: #0f3b66;
+      --header2: #2d70b3;
+      --libre: #f6c3cf;
+      --manana: #d7f7d9;
+      --tarde: #ffd7a8;
+      --noche: #d5e8ff;
+      --meta: #e9eef5;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      overflow: hidden;
+    }
+
+    .wrap {
+      display: grid;
+      grid-template-columns: 1fr;
+      grid-template-rows: auto minmax(0, 1fr);
+      gap: 8px;
+      padding: 8px;
+      height: 100vh;
+      max-width: 100vw;
+    }
+
+    .top-panel {
+      min-width: 0;
+      display: grid;
+      grid-auto-flow: column;
+      grid-auto-columns: minmax(260px, 1fr);
+      gap: 8px;
+      overflow-x: auto;
+      overflow-y: hidden;
+      align-items: stretch;
+      position: sticky;
+      top: 0;
+      z-index: 25;
+    }
+
+    .main {
+      min-width: 0;
+      display: grid;
+      gap: 8px;
+      overflow: hidden;
+      min-height: 0;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 9px;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+      align-items: end;
+    }
+
+    .buttons-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .span-2 { grid-column: span 2; }
+
+    label {
+      display: grid;
+      gap: 4px;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    input, select, button {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      min-height: 30px;
+      padding: 4px 8px;
+      font-size: 12px;
+      background: #fff;
+      color: var(--text);
+    }
+
+    button {
+      background: #104e85;
+      color: #fff;
+      cursor: pointer;
+      border-color: #104e85;
+    }
+
+    button.secondary {
+      background: #fff;
+      color: #104e85;
+      border-color: #104e85;
+    }
+
+    .hint { font-size: 11px; color: var(--muted); margin: 6px 0 0; }
+    .status { font-size: 11px; color: var(--muted); }
+
+    .table-wrap {
+      overflow: auto;
+      max-height: 100%;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+      width: 100%;
+    }
+
+    table {
+      border-collapse: collapse;
+      min-width: 1100px;
+      width: max-content;
+      table-layout: fixed;
+      font-size: 11px;
+    }
+
+    th, td {
+      border: 1px solid #cfd8e3;
+      padding: 3px 4px;
+      text-align: center;
+      white-space: nowrap;
+      vertical-align: middle;
+    }
+
+    thead tr:first-child th { background: var(--header2); color: #fff; }
+    thead tr:nth-child(2) th { background: var(--header); color: #fff; }
+
+    .sticky { position: sticky; left: 0; background: #fff; z-index: 2; }
+    .sticky.meta { background: var(--meta); }
+
+    td.meta {
+      text-align: left;
+      background: #f7f9fc;
+      color: #25374a;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    td.turno-libre { background: var(--libre); }
+    td.turno-manana { background: var(--manana); }
+    td.turno-tarde { background: var(--tarde); }
+    td.turno-noche { background: var(--noche); }
+
+    td.shift-cell {
+      cursor: pointer;
+      min-width: 82px;
+    }
+
+    tr.selected td { outline: 2px solid #1f6fb5; outline-offset: -2px; }
+
+    .hours-table {
+      width: 100%;
+      min-width: 320px;
+    }
+    .hours-table th { background: #0f3b66; color: #fff; }
+
+    .calendar-card {
+      height: 100%;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      overflow: hidden;
+    }
+
+    .top-panel .card {
+      min-height: 100%;
+    }
+
+    .hours-card .table-wrap {
+      max-height: 150px !important;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+      display: inline-block;
+      vertical-align: middle;
+      margin-right: 4px;
+    }
+
+    .sticky-note {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+
+    .hours-compact {
+      font-size: 10.5px;
+    }
+
+    .settings-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .check-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .delta-pos { color: #0b7a22; font-weight: 600; }
+    .delta-neg { color: #b42318; font-weight: 600; }
+    .delta-zero { color: #475467; font-weight: 600; }
+
+    tr.row-ok td {
+      background: #ecfdf3;
+    }
+
+    tr.row-deficit td {
+      background: #fef3f2;
+    }
+
+    tr.row-excess td {
+      background: #fff8eb;
+    }
+
+    @media (max-width: 1200px) {
+      .top-panel {
+        grid-auto-columns: minmax(240px, 88vw);
+      }
+      .calendar-card {
+        height: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="top-panel">
+      <div class="card">
+        <div class="controls">
+          <label>
+            Archivo Excel de turnos
+            <input id="fileInput" type="file" accept=".xlsx,.xls" />
+          </label>
+          <label>
+            Técnico
+            <select id="techSelect"></select>
+          </label>
+          <label>
+            Día
+            <select id="daySelect"></select>
+          </label>
+          <label>
+            Turno
+            <select id="shiftSelect"></select>
+          </label>
+          <div class="buttons-row">
+            <button id="assignBtn">Asignar turno</button>
+            <button id="exportBtn" class="secondary">Exportar Excel</button>
+          </div>
+        </div>
+        <p class="hint">Click en una celda para seleccionar técnico y día. Doble click para edición rápida de turno.</p>
+        <div class="status" id="status">Carga el archivo “Calendario Mantencion planta 2.xlsx”.</div>
+      </div>
+
+      <div class="card">
+        <strong>Técnicos y grupos</strong>
+        <div class="form-grid" style="margin-top:8px;">
+          <label>
+            Técnico seleccionado
+            <select id="groupTechSelect"></select>
+          </label>
+          <label>
+            Grupo
+            <select id="groupSelect">
+              <option value="A">A</option>
+              <option value="B">B</option>
+              <option value="C">C</option>
+            </select>
+          </label>
+          <button id="changeGroupBtn" class="span-2">Cambiar grupo</button>
+        </div>
+
+        <div class="form-grid" style="margin-top:10px;">
+          <label class="span-2">
+            Nombre nuevo técnico
+            <input id="newTechName" placeholder="APELLIDO, NOMBRE" />
+          </label>
+          <label>
+            RUT
+            <input id="newTechRut" placeholder="12.345.678-9" />
+          </label>
+          <label>
+            Grupo
+            <select id="newTechGroup">
+              <option value="A">A</option>
+              <option value="B">B</option>
+              <option value="C">C</option>
+            </select>
+          </label>
+          <button id="addTechBtn" class="span-2">Agregar técnico</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <strong>Parámetros de horas</strong>
+        <div class="settings-grid">
+          <label>
+            Jornada diaria (h)
+            <input id="workHoursInput" type="number" min="0" step="0.25" value="8" />
+          </label>
+          <label>
+            Colación (h)
+            <input id="breakHoursInput" type="number" min="0" step="0.25" value="0.5" />
+          </label>
+          <label>
+            Horas esperadas semana
+            <input id="expectedWeekInput" type="number" min="0" step="0.5" value="45" />
+          </label>
+          <label>
+            Horas esperadas mes
+            <input id="expectedMonthInput" type="number" min="0" step="0.5" value="180" />
+          </label>
+          <label>
+            Margen tolerancia (h)
+            <input id="toleranceHoursInput" type="number" min="0" step="0.25" value="0.5" />
+          </label>
+          <label class="span-2 check-row">
+            <input id="useFixedDailyInput" type="checkbox" checked />
+            Usar horas fijas por día trabajado (jornada - colación)
+          </label>
+          <button id="applyHoursConfigBtn" class="span-2">Aplicar parámetros</button>
+        </div>
+      </div>
+
+      <div class="card hours-card">
+        <strong>Horas por técnico (semanal y mensual)</strong>
+        <div class="controls" style="margin-top:8px;">
+          <label>
+            Semana
+            <select id="weekSelect"></select>
+          </label>
+          <label>
+            Mes
+            <select id="monthSelect"></select>
+          </label>
+        </div>
+        <div class="table-wrap" style="max-height: 220px; margin-top:8px;">
+          <table class="hours-table hours-compact">
+            <thead>
+              <tr><th>Técnico</th><th>Hrs semana</th><th>Esp semana</th><th>Δ semana</th><th>Hrs mes</th><th>Esp mes</th><th>Δ mes</th></tr>
+            </thead>
+            <tbody id="hoursBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <main class="main">
+      <div class="card calendar-card">
+        <div>
+          <strong>Calendario</strong>
+          <div class="legend">
+            <span><span class="dot" style="background: var(--manana);"></span>Mañana</span>
+            <span><span class="dot" style="background: var(--tarde);"></span>Tarde</span>
+            <span><span class="dot" style="background: var(--noche);"></span>Noche</span>
+            <span><span class="dot" style="background: var(--libre);"></span>Libre/Descanso</span>
+          </div>
+          <div class="sticky-note">Columnas de identificación de técnico quedan fijas a la izquierda mientras desplazas el calendario.</div>
+        </div>
+
+        <div class="table-wrap" style="margin-top:10px;">
+          <table id="calendarTable"></table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const DAY_NAMES = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+    const WEEKDAY_HEADER = new Set(['lunes', 'martes', 'miércoles', 'miercoles', 'jueves', 'viernes', 'sábado', 'sabado', 'domingo']);
+    const META_COLS = ['TURNO', 'Area', 'CeCo', 'Cargo', 'DIRECCIÓN', 'RUT', 'Personal'];
+    const META_COL_WIDTHS = [48, 72, 88, 102, 92, 96, 210];
+    const DAY_COL_WIDTH = 84;
+    const HOURS_CONFIG_KEY = 'calendario_turnos_hours_config_v1';
+
+    const state = {
+      wb: null,
+      ws: null,
+      sheetName: null,
+      ref: null,
+      dayCols: [],
+      techRows: [],
+      turnos: [],
+      selectedRow: null,
+      selectedCol: null,
+      originalFilename: 'calendario_turnos.xlsx',
+      hoursConfig: loadHoursConfig()
+    };
+
+    const fileInput = document.getElementById('fileInput');
+    const techSelect = document.getElementById('techSelect');
+    const daySelect = document.getElementById('daySelect');
+    const shiftSelect = document.getElementById('shiftSelect');
+    const assignBtn = document.getElementById('assignBtn');
+    const exportBtn = document.getElementById('exportBtn');
+    const groupTechSelect = document.getElementById('groupTechSelect');
+    const groupSelect = document.getElementById('groupSelect');
+    const changeGroupBtn = document.getElementById('changeGroupBtn');
+    const newTechName = document.getElementById('newTechName');
+    const newTechRut = document.getElementById('newTechRut');
+    const newTechGroup = document.getElementById('newTechGroup');
+    const addTechBtn = document.getElementById('addTechBtn');
+    const workHoursInput = document.getElementById('workHoursInput');
+    const breakHoursInput = document.getElementById('breakHoursInput');
+    const expectedWeekInput = document.getElementById('expectedWeekInput');
+    const expectedMonthInput = document.getElementById('expectedMonthInput');
+    const toleranceHoursInput = document.getElementById('toleranceHoursInput');
+    const useFixedDailyInput = document.getElementById('useFixedDailyInput');
+    const applyHoursConfigBtn = document.getElementById('applyHoursConfigBtn');
+    const statusEl = document.getElementById('status');
+    const weekSelect = document.getElementById('weekSelect');
+    const monthSelect = document.getElementById('monthSelect');
+    const hoursBody = document.getElementById('hoursBody');
+    const calendarTable = document.getElementById('calendarTable');
+
+    fileInput.addEventListener('change', async (event) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      state.originalFilename = file.name;
+      const data = await file.arrayBuffer();
+      const wb = XLSX.read(data, { cellDates: true, cellStyles: true });
+      loadWorkbook(wb);
+    });
+
+    assignBtn.addEventListener('click', assignShiftFromControls);
+    exportBtn.addEventListener('click', exportWorkbook);
+    weekSelect.addEventListener('change', renderHoursTable);
+    monthSelect.addEventListener('change', renderHoursTable);
+    changeGroupBtn.addEventListener('click', changeTechnicianGroup);
+    addTechBtn.addEventListener('click', addTechnician);
+    applyHoursConfigBtn.addEventListener('click', applyHoursConfig);
+    techSelect.addEventListener('change', () => {
+      groupTechSelect.value = techSelect.value;
+      const tech = state.techRows.find((t) => String(t.r) === techSelect.value);
+      if (tech) groupSelect.value = (tech.turno || 'A').trim();
+    });
+    groupTechSelect.addEventListener('change', () => {
+      techSelect.value = groupTechSelect.value;
+      const tech = state.techRows.find((t) => String(t.r) === groupTechSelect.value);
+      if (tech) groupSelect.value = (tech.turno || 'A').trim();
+    });
+    applyHoursConfigToUI();
+
+    function loadWorkbook(wb) {
+      const horarioName = wb.SheetNames.find((name) => name.toLowerCase() === 'horario') || wb.SheetNames[0];
+      state.wb = wb;
+      state.sheetName = horarioName;
+      state.ws = wb.Sheets[horarioName];
+      state.ref = XLSX.utils.decode_range(state.ws['!ref']);
+      state.dayCols = detectDayColumns();
+      state.techRows = detectTechnicians();
+      state.turnos = readTurnosCatalog();
+
+      buildControls();
+      renderCalendar();
+      buildWeekOptions();
+      buildMonthOptions();
+      renderHoursTable();
+      status(`Archivo cargado: ${state.originalFilename}. Técnicos: ${state.techRows.length}. Días: ${state.dayCols.length}.`);
+    }
+
+    function loadHoursConfig() {
+      const defaults = {
+        workHours: 8,
+        breakHours: 0.5,
+        expectedWeek: 45,
+        expectedMonth: 180,
+        toleranceHours: 0.5,
+        useFixedDaily: true
+      };
+      try {
+        const raw = localStorage.getItem(HOURS_CONFIG_KEY);
+        if (!raw) return defaults;
+        const parsed = JSON.parse(raw);
+        return {
+          workHours: toNumberOr(parsed.workHours, defaults.workHours),
+          breakHours: toNumberOr(parsed.breakHours, defaults.breakHours),
+          expectedWeek: toNumberOr(parsed.expectedWeek, defaults.expectedWeek),
+          expectedMonth: toNumberOr(parsed.expectedMonth, defaults.expectedMonth),
+          toleranceHours: toNumberOr(parsed.toleranceHours, defaults.toleranceHours),
+          useFixedDaily: parsed.useFixedDaily !== false
+        };
+      } catch {
+        return defaults;
+      }
+    }
+
+    function applyHoursConfigToUI() {
+      workHoursInput.value = String(state.hoursConfig.workHours);
+      breakHoursInput.value = String(state.hoursConfig.breakHours);
+      expectedWeekInput.value = String(state.hoursConfig.expectedWeek);
+      expectedMonthInput.value = String(state.hoursConfig.expectedMonth);
+      toleranceHoursInput.value = String(state.hoursConfig.toleranceHours);
+      useFixedDailyInput.checked = !!state.hoursConfig.useFixedDaily;
+    }
+
+    function applyHoursConfig() {
+      state.hoursConfig = {
+        workHours: clampMin(toNumberOr(workHoursInput.value, 8), 0),
+        breakHours: clampMin(toNumberOr(breakHoursInput.value, 0.5), 0),
+        expectedWeek: clampMin(toNumberOr(expectedWeekInput.value, 45), 0),
+        expectedMonth: clampMin(toNumberOr(expectedMonthInput.value, 180), 0),
+        toleranceHours: clampMin(toNumberOr(toleranceHoursInput.value, 0.5), 0),
+        useFixedDaily: !!useFixedDailyInput.checked
+      };
+
+      localStorage.setItem(HOURS_CONFIG_KEY, JSON.stringify(state.hoursConfig));
+      renderHoursTable();
+      const dailyEffective = effectiveDailyHours().toFixed(2);
+      status(`Parámetros aplicados. Horas efectivas por día: ${dailyEffective}h.`);
+    }
+
+    function status(text) {
+      statusEl.textContent = text;
+    }
+
+    function getCellValue(r, c) {
+      const addr = XLSX.utils.encode_cell({ r, c });
+      const cell = state.ws[addr];
+      return cell ? (cell.w ?? cell.v ?? '') : '';
+    }
+
+    function setCellValue(r, c, value) {
+      const addr = XLSX.utils.encode_cell({ r, c });
+      if (!state.ws[addr]) state.ws[addr] = { t: 's', v: value };
+      else {
+        state.ws[addr].t = 's';
+        state.ws[addr].v = value;
+        delete state.ws[addr].w;
+      }
+    }
+
+    function detectDayColumns() {
+      const cols = [];
+      for (let c = 7; c <= state.ref.e.c; c++) {
+        const dayLabel = String(getCellValue(1, c) || '').trim().toLowerCase();
+        const dateVal = getCellValue(2, c);
+        const looksDay = WEEKDAY_HEADER.has(dayLabel);
+        const looksDate = !!parseDateFromExcelCell(dateVal);
+        if (looksDay || looksDate) {
+          cols.push({
+            c,
+            dayLabel: getCellValue(1, c),
+            dateRaw: getCellValue(2, c),
+            dateObj: parseDateFromExcelCell(getCellValue(2, c))
+          });
+        }
+      }
+      return cols;
+    }
+
+    function detectTechnicians() {
+      const rows = [];
+      for (let r = 3; r <= state.ref.e.r; r++) {
+        const name = String(getCellValue(r, 6) || '').trim();
+        const rut = String(getCellValue(r, 5) || '').trim();
+        if (!name) continue;
+        const shifts = {};
+        state.dayCols.forEach((d) => {
+          shifts[d.c] = String(getCellValue(r, d.c) || '').trim();
+        });
+        rows.push({
+          r,
+          turno: getCellValue(r, 0),
+          area: getCellValue(r, 1),
+          ceco: getCellValue(r, 2),
+          cargo: getCellValue(r, 3),
+          direccion: getCellValue(r, 4),
+          rut,
+          name,
+          shifts
+        });
+      }
+      return rows;
+    }
+
+    function readTurnosCatalog() {
+      const turnosSheetName = state.wb.SheetNames.find((name) => name.toLowerCase() === 'turnos');
+      if (!turnosSheetName) {
+        return ['08:00 - 16:00', '16:00 - 00:00', '00:00 - 08:00', 'LIBRE'];
+      }
+      const ws = state.wb.Sheets[turnosSheetName];
+      const range = XLSX.utils.decode_range(ws['!ref']);
+      const list = [];
+      for (let r = 2; r <= range.e.r; r++) {
+        const code = String(readCell(ws, r, 1) || '').trim();
+        const desc = String(readCell(ws, r, 2) || '').trim();
+        if (!code && !desc) continue;
+        if (desc) list.push(desc);
+      }
+      list.push('LIBRE');
+      return Array.from(new Set(list));
+    }
+
+    function readCell(ws, r, c) {
+      const addr = XLSX.utils.encode_cell({ r, c });
+      const cell = ws[addr];
+      return cell ? (cell.w ?? cell.v ?? '') : '';
+    }
+
+    function buildControls() {
+      techSelect.innerHTML = '';
+      groupTechSelect.innerHTML = '';
+      state.techRows.forEach((t) => {
+        const op = document.createElement('option');
+        op.value = String(t.r);
+        op.textContent = t.name;
+        techSelect.appendChild(op);
+
+        const opGroup = document.createElement('option');
+        opGroup.value = String(t.r);
+        opGroup.textContent = `${t.name} (${t.turno || '-'})`;
+        groupTechSelect.appendChild(opGroup);
+      });
+
+      daySelect.innerHTML = '';
+      state.dayCols.forEach((d) => {
+        const op = document.createElement('option');
+        op.value = String(d.c);
+        op.textContent = `${d.dayLabel || ''} ${formatDate(d.dateObj)}`.trim();
+        daySelect.appendChild(op);
+      });
+
+      shiftSelect.innerHTML = '';
+      state.turnos.forEach((s) => {
+        const op = document.createElement('option');
+        op.value = s;
+        op.textContent = s;
+        shiftSelect.appendChild(op);
+      });
+
+      if (state.techRows.length) {
+        techSelect.value = String(state.techRows[0].r);
+        groupTechSelect.value = String(state.techRows[0].r);
+        groupSelect.value = String(state.techRows[0].turno || 'A').trim();
+      }
+    }
+
+    function renderCalendar() {
+      calendarTable.innerHTML = '';
+      const thead = document.createElement('thead');
+      const trDay = document.createElement('tr');
+      const trDate = document.createElement('tr');
+
+      META_COLS.forEach((h, i) => {
+        const left = metaLeft(i);
+        const width = META_COL_WIDTHS[i] || 90;
+        const th1 = document.createElement('th');
+        th1.textContent = i === 0 ? 'PLANTA' : '';
+        th1.className = 'sticky meta';
+        th1.style.left = `${left}px`;
+        th1.style.minWidth = `${width}px`;
+        th1.style.maxWidth = `${width}px`;
+        trDay.appendChild(th1);
+
+        const th2 = document.createElement('th');
+        th2.textContent = h;
+        th2.title = h;
+        th2.className = 'sticky meta';
+        th2.style.left = `${left}px`;
+        th2.style.minWidth = `${width}px`;
+        th2.style.maxWidth = `${width}px`;
+        trDate.appendChild(th2);
+      });
+
+      state.dayCols.forEach((d) => {
+        const thDay = document.createElement('th');
+        thDay.textContent = d.dayLabel || dayNameFromDate(d.dateObj);
+        thDay.style.minWidth = `${DAY_COL_WIDTH}px`;
+        thDay.style.maxWidth = `${DAY_COL_WIDTH}px`;
+        trDay.appendChild(thDay);
+
+        const thDate = document.createElement('th');
+        thDate.textContent = formatDate(d.dateObj) || d.dateRaw;
+        thDate.style.minWidth = `${DAY_COL_WIDTH}px`;
+        thDate.style.maxWidth = `${DAY_COL_WIDTH}px`;
+        trDate.appendChild(thDate);
+      });
+
+      thead.appendChild(trDay);
+      thead.appendChild(trDate);
+      calendarTable.appendChild(thead);
+
+      const tbody = document.createElement('tbody');
+      state.techRows.forEach((tech) => {
+        const tr = document.createElement('tr');
+        tr.dataset.row = String(tech.r);
+
+        const metas = [tech.turno, tech.area, tech.ceco, tech.cargo, tech.direccion, tech.rut, tech.name];
+        metas.forEach((m, i) => {
+          const left = metaLeft(i);
+          const width = META_COL_WIDTHS[i] || 90;
+          const td = document.createElement('td');
+          td.textContent = m || '';
+          td.title = m || '';
+          td.className = 'meta sticky';
+          td.style.left = `${left}px`;
+          td.style.minWidth = `${width}px`;
+          td.style.maxWidth = `${width}px`;
+          tr.appendChild(td);
+        });
+
+        state.dayCols.forEach((d) => {
+          const value = String(tech.shifts[d.c] || '').trim();
+          const td = document.createElement('td');
+          td.className = `shift-cell ${classifyShift(value)}`;
+          td.dataset.row = String(tech.r);
+          td.dataset.col = String(d.c);
+          td.textContent = value;
+          td.title = value;
+          td.style.minWidth = `${DAY_COL_WIDTH}px`;
+          td.style.maxWidth = `${DAY_COL_WIDTH}px`;
+          td.addEventListener('click', () => selectCell(tech.r, d.c));
+          td.addEventListener('dblclick', () => quickEditShift(tech.r, d.c));
+          tr.appendChild(td);
+        });
+
+        tbody.appendChild(tr);
+      });
+
+      calendarTable.appendChild(tbody);
+      selectCell(state.techRows[0]?.r, state.dayCols[0]?.c);
+    }
+
+    function classifyShift(value) {
+      const v = String(value || '').toLowerCase();
+      if (!v || v.includes('libre') || v.includes('descanso') || v.includes('vacaciones') || v.includes('licencia')) return 'turno-libre';
+      if (v.includes('08:00') || v.includes('07:00')) return 'turno-manana';
+      if (v.includes('16:00') || v.includes('14:00') || v.includes('13:00')) return 'turno-tarde';
+      if (v.includes('00:00')) return 'turno-noche';
+      return '';
+    }
+
+    function selectCell(r, c) {
+      if (!r || c === undefined) return;
+      state.selectedRow = r;
+      state.selectedCol = c;
+
+      document.querySelectorAll('#calendarTable tbody tr').forEach((tr) => tr.classList.remove('selected'));
+      const rowEl = document.querySelector(`#calendarTable tbody tr[data-row="${r}"]`);
+      if (rowEl) rowEl.classList.add('selected');
+
+      techSelect.value = String(r);
+      groupTechSelect.value = String(r);
+      daySelect.value = String(c);
+      const tech = state.techRows.find((t) => t.r === r);
+      if (tech) {
+        groupSelect.value = String(tech.turno || 'A').trim();
+        const current = tech.shifts[c] || '';
+        if (state.turnos.includes(current)) shiftSelect.value = current;
+      }
+    }
+
+    function assignShiftFromControls() {
+      const r = Number(techSelect.value);
+      const c = Number(daySelect.value);
+      const shift = String(shiftSelect.value || '').trim();
+      if (!r || Number.isNaN(c)) return;
+
+      const tech = state.techRows.find((t) => t.r === r);
+      if (!tech) return;
+      applyShift(r, c, shift);
+      status(`Turno asignado a ${tech.name}: ${dayLabelByCol(c)} -> ${shift}`);
+    }
+
+    function quickEditShift(r, c) {
+      const tech = state.techRows.find((t) => t.r === r);
+      if (!tech) return;
+      const current = String(tech.shifts[c] || '').trim();
+      const options = state.turnos.join(' | ');
+      const typed = window.prompt(`Editar turno de ${tech.name}\nOpciones: ${options}`, current || state.turnos[0] || 'LIBRE');
+      if (typed === null) return;
+      const shift = typed.trim();
+      if (!shift) return;
+      if (!state.turnos.includes(shift)) {
+        state.turnos.push(shift);
+        buildControls();
+      }
+      applyShift(r, c, shift);
+      status(`Turno actualizado por celda: ${tech.name} -> ${dayLabelByCol(c)} = ${shift}`);
+    }
+
+    function applyShift(r, c, shift) {
+      const tech = state.techRows.find((t) => t.r === r);
+      if (!tech) return;
+      tech.shifts[c] = shift;
+      setCellValue(r, c, shift);
+
+      const td = document.querySelector(`td.shift-cell[data-row="${r}"][data-col="${c}"]`);
+      if (td) {
+        td.textContent = shift;
+        td.className = `shift-cell ${classifyShift(shift)}`;
+      }
+      renderHoursTable();
+    }
+
+    function changeTechnicianGroup() {
+      const r = Number(groupTechSelect.value || techSelect.value);
+      const group = String(groupSelect.value || '').trim().toUpperCase();
+      if (!r || !group) return;
+      const tech = state.techRows.find((t) => t.r === r);
+      if (!tech) return;
+      tech.turno = group;
+      setCellValue(r, 0, group);
+      renderCalendar();
+      buildControls();
+      selectCell(r, state.selectedCol ?? state.dayCols[0]?.c);
+      status(`Grupo actualizado: ${tech.name} -> Grupo ${group}`);
+    }
+
+    function addTechnician() {
+      if (!state.ws || !state.ref) return;
+      const name = String(newTechName.value || '').trim().toUpperCase();
+      if (!name) {
+        status('Para agregar técnico debes indicar un nombre.');
+        return;
+      }
+
+      const rut = String(newTechRut.value || '').trim();
+      const group = String(newTechGroup.value || 'A').trim().toUpperCase();
+      const source = state.techRows[state.techRows.length - 1] || null;
+      const newRow = state.ref.e.r + 1;
+      ensureSheetRangeForRow(newRow);
+      if (source) copyRowStyle(source.r, newRow);
+
+      const baseArea = source?.area || 'Mantención';
+      const baseCeco = source?.ceco || 'Mantencion PL CHO';
+      const baseCargo = source?.cargo || 'TECNICO MANTENCION';
+      const baseDireccion = source?.direccion || 'PARTICULAR';
+
+      setCellValue(newRow, 0, group);
+      setCellValue(newRow, 1, baseArea);
+      setCellValue(newRow, 2, baseCeco);
+      setCellValue(newRow, 3, baseCargo);
+      setCellValue(newRow, 4, baseDireccion);
+      setCellValue(newRow, 5, rut);
+      setCellValue(newRow, 6, name);
+
+      const shifts = {};
+      state.dayCols.forEach((d) => {
+        setCellValue(newRow, d.c, 'LIBRE');
+        shifts[d.c] = 'LIBRE';
+      });
+
+      state.techRows.push({
+        r: newRow,
+        turno: group,
+        area: baseArea,
+        ceco: baseCeco,
+        cargo: baseCargo,
+        direccion: baseDireccion,
+        rut,
+        name,
+        shifts
+      });
+
+      if (!state.turnos.includes('LIBRE')) state.turnos.push('LIBRE');
+      buildControls();
+      renderCalendar();
+      renderHoursTable();
+      selectCell(newRow, state.dayCols[0]?.c);
+
+      newTechName.value = '';
+      newTechRut.value = '';
+      status(`Técnico agregado: ${name} (Grupo ${group}).`);
+    }
+
+    function ensureSheetRangeForRow(rowIndex) {
+      if (rowIndex <= state.ref.e.r) return;
+      state.ref.e.r = rowIndex;
+      state.ws['!ref'] = XLSX.utils.encode_range(state.ref);
+    }
+
+    function copyRowStyle(sourceRow, targetRow) {
+      for (let c = 0; c <= state.ref.e.c; c++) {
+        const src = XLSX.utils.encode_cell({ r: sourceRow, c });
+        const dst = XLSX.utils.encode_cell({ r: targetRow, c });
+        if (!state.ws[src]) continue;
+        if (!state.ws[dst]) state.ws[dst] = { t: 's', v: '' };
+        if (state.ws[src].s !== undefined) state.ws[dst].s = state.ws[src].s;
+      }
+    }
+
+    function metaLeft(index) {
+      let total = 0;
+      for (let i = 0; i < index; i++) total += META_COL_WIDTHS[i] || 90;
+      return total;
+    }
+
+    function buildWeekOptions() {
+      const weekMap = collectWeeks();
+      weekSelect.innerHTML = '';
+      Object.entries(weekMap).forEach(([k, label], idx) => {
+        const op = document.createElement('option');
+        op.value = k;
+        op.textContent = label;
+        if (idx === 0) op.selected = true;
+        weekSelect.appendChild(op);
+      });
+    }
+
+    function buildMonthOptions() {
+      const monthMap = collectMonths();
+      monthSelect.innerHTML = '';
+      Object.entries(monthMap).forEach(([k, label], idx) => {
+        const op = document.createElement('option');
+        op.value = k;
+        op.textContent = label;
+        if (idx === 0) op.selected = true;
+        monthSelect.appendChild(op);
+      });
+    }
+
+    function collectWeeks() {
+      const weeks = {};
+      state.dayCols.forEach((d) => {
+        if (!d.dateObj) return;
+        const key = isoWeekKey(d.dateObj);
+        if (!weeks[key]) {
+          const monday = startOfISOWeek(d.dateObj);
+          const sunday = new Date(monday);
+          sunday.setDate(sunday.getDate() + 6);
+          weeks[key] = `Semana ${key} (${formatDate(monday)} - ${formatDate(sunday)})`;
+        }
+      });
+      return weeks;
+    }
+
+    function collectMonths() {
+      const months = {};
+      state.dayCols.forEach((d) => {
+        if (!d.dateObj) return;
+        const key = monthKey(d.dateObj);
+        if (!months[key]) {
+          const label = d.dateObj.toLocaleDateString('es-CL', { month: 'long', year: 'numeric' });
+          months[key] = label.charAt(0).toUpperCase() + label.slice(1);
+        }
+      });
+      return months;
+    }
+
+    function renderHoursTable() {
+      const weekKey = weekSelect.value || Object.keys(collectWeeks())[0];
+      const monthKeySelected = monthSelect.value || Object.keys(collectMonths())[0];
+      const weekDays = state.dayCols.filter((d) => d.dateObj && isoWeekKey(d.dateObj) === weekKey);
+      const monthDays = state.dayCols.filter((d) => d.dateObj && monthKey(d.dateObj) === monthKeySelected);
+      hoursBody.innerHTML = '';
+
+      const expectedWeek = state.hoursConfig.expectedWeek;
+      const expectedMonth = state.hoursConfig.expectedMonth;
+      const tolerance = state.hoursConfig.toleranceHours;
+
+      state.techRows.forEach((t) => {
+        let weekHours = 0;
+        let monthHours = 0;
+
+        weekDays.forEach((d) => {
+          const value = String(t.shifts[d.c] || '').trim();
+          const h = workedHoursForShift(value);
+          weekHours += h;
+        });
+
+        monthDays.forEach((d) => {
+          const value = String(t.shifts[d.c] || '').trim();
+          const h = workedHoursForShift(value);
+          monthHours += h;
+        });
+
+        const deltaWeek = weekHours - expectedWeek;
+        const deltaMonth = monthHours - expectedMonth;
+        const clsWeek = deltaClass(deltaWeek);
+        const clsMonth = deltaClass(deltaMonth);
+        const rowClass = evaluateRowClass(deltaWeek, deltaMonth, tolerance);
+
+        const tr = document.createElement('tr');
+        tr.className = rowClass;
+        tr.innerHTML = `<td style="text-align:left;" title="${t.name}">${t.name}</td><td>${weekHours.toFixed(1)}</td><td>${expectedWeek.toFixed(1)}</td><td class="${clsWeek}">${formatDelta(deltaWeek)}</td><td>${monthHours.toFixed(1)}</td><td>${expectedMonth.toFixed(1)}</td><td class="${clsMonth}">${formatDelta(deltaMonth)}</td>`;
+        hoursBody.appendChild(tr);
+      });
+    }
+
+    function evaluateRowClass(deltaWeek, deltaMonth, tolerance) {
+      const hasDeficit = deltaWeek < -tolerance || deltaMonth < -tolerance;
+      if (hasDeficit) return 'row-deficit';
+
+      const inRangeWeek = Math.abs(deltaWeek) <= tolerance;
+      const inRangeMonth = Math.abs(deltaMonth) <= tolerance;
+      if (inRangeWeek && inRangeMonth) return 'row-ok';
+
+      return 'row-excess';
+    }
+
+    function workedHoursForShift(shiftText) {
+      if (!isWorkingShift(shiftText)) return 0;
+
+      if (state.hoursConfig.useFixedDaily) {
+        return effectiveDailyHours();
+      }
+
+      const text = String(shiftText || '').trim().toLowerCase();
+      const m = text.match(/(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/);
+      if (!m) return effectiveDailyHours();
+      const start = hhmmToMinutes(m[1]);
+      const end = hhmmToMinutes(m[2]);
+      if (start === null || end === null) return effectiveDailyHours();
+      let diff = end - start;
+      if (diff <= 0) diff += 24 * 60;
+      const rawHours = diff / 60;
+      return Math.max(0, rawHours - state.hoursConfig.breakHours);
+    }
+
+    function isWorkingShift(shiftText) {
+      const text = String(shiftText || '').trim().toLowerCase();
+      if (!text) return false;
+      return !(text.includes('libre') || text.includes('descanso') || text.includes('vacaciones') || text.includes('licencia'));
+    }
+
+    function effectiveDailyHours() {
+      return Math.max(0, state.hoursConfig.workHours - state.hoursConfig.breakHours);
+    }
+
+    function toNumberOr(value, fallback) {
+      const n = Number(value);
+      return Number.isFinite(n) ? n : fallback;
+    }
+
+    function clampMin(value, min) {
+      return value < min ? min : value;
+    }
+
+    function formatDelta(delta) {
+      if (Math.abs(delta) < 0.001) return '0.0';
+      return `${delta > 0 ? '+' : ''}${delta.toFixed(1)}`;
+    }
+
+    function deltaClass(delta) {
+      if (Math.abs(delta) < 0.001) return 'delta-zero';
+      return delta > 0 ? 'delta-pos' : 'delta-neg';
+    }
+
+    function monthKey(date) {
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    }
+
+    function shiftHours(shiftText) {
+      const text = String(shiftText || '').trim().toLowerCase();
+      if (!text || text.includes('libre') || text.includes('descanso') || text.includes('vacaciones') || text.includes('licencia')) return 0;
+      const m = text.match(/(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/);
+      if (!m) return 0;
+      const start = hhmmToMinutes(m[1]);
+      const end = hhmmToMinutes(m[2]);
+      if (start === null || end === null) return 0;
+      let diff = end - start;
+      if (diff <= 0) diff += 24 * 60;
+      return diff / 60;
+    }
+
+    function hhmmToMinutes(hhmm) {
+      const [h, m] = hhmm.split(':').map(Number);
+      if (Number.isNaN(h) || Number.isNaN(m)) return null;
+      return h * 60 + m;
+    }
+
+    function parseDateFromExcelCell(value) {
+      if (value instanceof Date && !Number.isNaN(value.getTime())) return value;
+      if (typeof value === 'number') return excelSerialToDate(value);
+      if (typeof value === 'string') {
+        if (/^\d+$/.test(value)) return excelSerialToDate(Number(value));
+        const d = new Date(value);
+        if (!Number.isNaN(d.getTime())) return d;
+      }
+      return null;
+    }
+
+    function excelSerialToDate(serial) {
+      const utcDays = Math.floor(serial - 25569);
+      const utcValue = utcDays * 86400;
+      const dateInfo = new Date(utcValue * 1000);
+      const fractional = serial - Math.floor(serial) + 1e-7;
+      let totalSeconds = Math.floor(86400 * fractional);
+      const seconds = totalSeconds % 60;
+      totalSeconds -= seconds;
+      const hours = Math.floor(totalSeconds / 3600);
+      const minutes = Math.floor(totalSeconds / 60) % 60;
+      dateInfo.setHours(hours, minutes, seconds);
+      return dateInfo;
+    }
+
+    function formatDate(d) {
+      if (!d || Number.isNaN(d.getTime?.())) return '';
+      const dd = String(d.getDate()).padStart(2, '0');
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const yy = d.getFullYear();
+      return `${dd}/${mm}/${yy}`;
+    }
+
+    function dayNameFromDate(d) {
+      if (!d || Number.isNaN(d.getTime?.())) return '';
+      return DAY_NAMES[d.getDay()];
+    }
+
+    function dayLabelByCol(c) {
+      const d = state.dayCols.find((x) => x.c === c);
+      if (!d) return '';
+      return `${d.dayLabel || dayNameFromDate(d.dateObj)} ${formatDate(d.dateObj)}`.trim();
+    }
+
+    function startOfISOWeek(date) {
+      const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+      const dayNum = d.getUTCDay() || 7;
+      if (dayNum !== 1) d.setUTCDate(d.getUTCDate() - dayNum + 1);
+      return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+    }
+
+    function isoWeekKey(date) {
+      const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+      d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+      const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+      const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+      return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
+    }
+
+    function exportWorkbook() {
+      if (!state.wb) return;
+      const outputName = state.originalFilename.replace(/\.xlsx$/i, '') + '_editado.xlsx';
+      XLSX.writeFile(state.wb, outputName, { bookType: 'xlsx', compression: true });
+      status(`Archivo exportado: ${outputName}`);
+    }
+  </script>
+</body>
+</html>

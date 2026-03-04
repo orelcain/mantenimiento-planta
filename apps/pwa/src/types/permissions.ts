@@ -32,6 +32,7 @@ export const APP_MODULES = [
   'reportes',
   'analisisGrader',
   'gantt',
+  'calendarioMantencion',
   'aria',
   'climaPuerto',
 ] as const
@@ -263,6 +264,13 @@ export const MODULES_CONFIG: ModuleConfig[] = [
     accionesDisponibles: ['ver', 'crear', 'editar', 'eliminar', 'asignar', 'exportar'],
   },
   {
+    id: 'calendarioMantencion',
+    nombre: 'Calendario Mantención',
+    descripcion: 'Planificación y control de turnos rotativos de mantención',
+    icono: 'CalendarClock',
+    accionesDisponibles: ['ver', 'crear', 'editar', 'asignar', 'exportar', 'configurar'],
+  },
+  {
     id: 'aria',
     nombre: 'ARIA Asistente',
     descripcion: 'Asistente de IA para reportes, consultas e incidencias',
@@ -319,6 +327,7 @@ const SUPERVISOR_PERMISSIONS: PermissionsMap = {
   reportes: { visible: true, actions: ['ver', 'exportar'] },
   analisisGrader: { visible: true, actions: ['ver', 'crear', 'editar', 'exportar', 'configurar'] },
   gantt: { visible: true, actions: ['ver', 'crear', 'editar', 'eliminar', 'asignar', 'exportar'] },
+  calendarioMantencion: { visible: true, actions: ['ver', 'crear', 'editar', 'asignar', 'exportar', 'configurar'] },
   aria: { visible: false, actions: [] },
   climaPuerto: { visible: false, actions: [] },
 }
@@ -346,6 +355,7 @@ const TECNICO_PERMISSIONS: PermissionsMap = {
   reportes: { visible: true, actions: ['ver'] },
   analisisGrader: { visible: true, actions: ['ver'] },
   gantt: { visible: true, actions: ['ver', 'editar', 'asignar'] },
+  calendarioMantencion: { visible: true, actions: ['ver', 'editar', 'asignar', 'exportar'] },
   aria: { visible: false, actions: [] },
   climaPuerto: { visible: false, actions: [] },
 }
@@ -373,6 +383,7 @@ const USUARIO_PERMISSIONS: PermissionsMap = {
   reportes: { visible: false, actions: [] },
   analisisGrader: { visible: false, actions: [] },
   gantt: { visible: false, actions: [] },
+  calendarioMantencion: { visible: false, actions: [] },
   aria: { visible: false, actions: [] },
   climaPuerto: { visible: false, actions: [] },
 }

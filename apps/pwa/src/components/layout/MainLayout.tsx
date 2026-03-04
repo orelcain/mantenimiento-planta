@@ -55,6 +55,7 @@ const navigation: Array<{ name: string; href: string; icon: React.ElementType; m
   { name: 'Inspecciones', href: '/inspections', icon: Route, module: 'inspecciones' },
   { name: 'Preventivo', href: '/preventive', icon: CalendarClock, module: 'preventivo' },
   { name: 'Planificador Gantt', href: '/gantt', icon: CalendarClock, module: 'gantt' },
+  { name: 'Calendario Mantención', href: '/calendario-mantencion', icon: CalendarClock, module: 'calendarioMantencion' },
   { name: 'Predictivo', href: '/predictive', icon: Activity },
   { name: 'Sensores', href: '/sensors', icon: Cpu, module: 'sensores' },
   { name: 'Panel Sensores', href: '/sensors/monitor', icon: Activity, module: 'sensores' },
