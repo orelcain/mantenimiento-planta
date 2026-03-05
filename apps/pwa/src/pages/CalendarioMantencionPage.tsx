@@ -1319,14 +1319,17 @@ export function CalendarioMantencionPage() {
     const monthWorkedDays = monthDays.reduce((sum, d) => sum + (isWorkingShift(t.shifts[d.c] || '') ? 1 : 0), 0)
     const weekVacationDays = weekDays.reduce((sum, d) => {
       if (!d.dateObj || !isVacationShift(t.shifts[d.c] || '')) return sum
+      if (hoursConfig.vacationBusinessDaysOnly && !isBusinessDay(d.dateObj)) return sum
       return sum + 1
     }, 0)
     const monthVacationDays = monthDays.reduce((sum, d) => {
       if (!d.dateObj || !isVacationShift(t.shifts[d.c] || '')) return sum
+      if (hoursConfig.vacationBusinessDaysOnly && !isBusinessDay(d.dateObj)) return sum
       return sum + 1
     }, 0)
     const totalVacationDays = dayCols.reduce((sum, d) => {
       if (!d.dateObj || !isVacationShift(t.shifts[d.c] || '')) return sum
+      if (hoursConfig.vacationBusinessDaysOnly && !isBusinessDay(d.dateObj)) return sum
       return sum + 1
     }, 0)
     const weekHolidayDays = weekDays.reduce((sum, d) => {
@@ -1947,7 +1950,16 @@ export function CalendarioMantencionPage() {
                     const rowRisk = row.deltaWeek < -hoursConfig.toleranceHours || row.deltaMonth < -hoursConfig.toleranceHours
                     return (
                       <tr key={row.tech.r} className={`border-t border-border transition-colors ${rowRisk ? 'bg-red-500/5 hover:bg-red-500/10' : 'hover:bg-muted/40'}`}>
-                        <td className="px-2 py-1 text-left truncate max-w-[180px]" title={row.tech.name}>{row.tech.name}</td>
+                        <td className="px-2 py-1 text-left max-w-[220px]" title={row.tech.name}>
+                          <div className="flex items-center gap-1">
+                            <span className="truncate">{row.tech.name}</span>
+                            {(row.weekVacationDays > 0 || row.monthVacationDays > 0) && (
+                              <span className="shrink-0 rounded border border-sky-500/40 bg-sky-500/15 px-1 text-[10px] text-sky-200">
+                                VAC S:{row.weekVacationDays} M:{row.monthVacationDays}
+                              </span>
+                            )}
+                          </div>
+                        </td>
                         <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.weekHours.toFixed(1)} / {row.weekExpected.toFixed(1)}</td>
                         <td className="px-2 py-1">
                           <div className="flex items-center gap-1">

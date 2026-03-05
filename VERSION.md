@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.70.5**
+## Versión Actual: **v2.70.6**
 
 **Fecha de lanzamiento**: 05 de marzo de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.70.6 — Hotfix vacaciones hábiles + badge visible en control (05/03/2026)
+- 📅 **Vacaciones según regla hábil**: `Vac S/M` y `Vac H S/M` vuelven a respetar la opción `Vacaciones contabilizan solo días hábiles`
+- 🏖️ **Motivo del 49h corregido**: ya no suma 7 días de vacaciones cuando la regla está en hábiles (evita semanas de 49h por vacaciones corridas)
+- 🏷️ **Badge operativo en Control**: cada técnico con vacaciones muestra `VAC S:x M:y` junto al nombre
 
 ### v2.70.5 — Hotfix extensión vacía y vacaciones en control (05/03/2026)
 - ⬜ **Extensión limpia**: al agregar semanas/meses nuevos, las celdas quedan vacías (no prellenadas como `LIBRE`)

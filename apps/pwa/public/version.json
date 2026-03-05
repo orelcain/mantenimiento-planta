@@ -1,8 +1,9 @@
 {
-  "version": "2.70.5",
+  "version": "2.70.6",
   "buildDate": "2026-03-05",
-  "buildTimestamp": 1772685890000,
+  "buildTimestamp": 1772686790000,
   "features": [
+    "Hotfix vacaciones en Control: horas/días respetan configuración de solo hábiles y se agrega badge VAC por técnico (semana/mes)",
     "Hotfix calendario: al extender días quedan vacíos (no LIBRE) y vacaciones se reconocen en variantes VAC/VACACIÓN/VACACIONES para el Control",
     "Hotfix calendario: parseo de fechas dd/mm/yyyy estable, extensión de semanas/meses consistente y semana/mes sincronizados al hacer click en día",
     "Calendario mantención extendible (+4 semanas / +1 mes), selección sincronizada semana/mes y mejoras visuales de hoy/celda/grupos",

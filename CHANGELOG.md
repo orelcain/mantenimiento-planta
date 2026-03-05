@@ -7,6 +7,12 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.70.6] - 2026-03-05
+### Corregido — 49h en semana de vacaciones y visibilidad en Control
+- **Respeta días hábiles en vacaciones**: cuando está activa la opción de hábiles, `Vac S/M` y `Vac H S/M` no consideran sábado/domingo
+- **Fin del caso 49h por vacaciones corridas**: evita inflar horas de vacaciones en semanas completas con 7 marcas
+- **Badge VAC por técnico**: nueva señal visual `VAC S:x M:y` junto al nombre en tabla Control
+
 ## [2.70.5] - 2026-03-05
 ### Corregido — Extensión vacía y vacaciones reflejadas en Control
 - **Extensión sin autollenado**: columnas nuevas quedan vacías en vez de `LIBRE`
