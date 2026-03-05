@@ -7,6 +7,13 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.70.10] - 2026-03-05
+### Corregido — Vacaciones en horario administrativo Lun-Vie
+- **Días de vacación = solo Lun-Vie**: nueva función `isVacationBusinessDay()` siempre usa horario administrativo (Lun-Vie), independiente de jornada 6x1
+- **Horas vacación = jornada legal ÷ 5**: cada día de vacación cuenta como `expectedWeekBase / 5` (ej: 44h/5 = 8.8h/día), para que una semana completa de vacaciones sume exactamente la jornada legal
+- **Gallardo: 14 días corridos → 10 días legales**: solo cuentan los Lun-Vie, Sáb-Dom no descuentan vacaciones
+- **Eliminada fila Promedio/Total**: removida del panel Control por no aportar valor operativo
+
 ## [2.70.9] - 2026-03-05
 ### Mejorado — ARIA accede a Calendario Mantención y Clima Puerto
 - **Nuevo intent `calendarioMantencion`**: ARIA puede responder sobre turnos rotativos 6x1, horas semanales/mensuales, vacaciones por técnico, grupos A/B/C

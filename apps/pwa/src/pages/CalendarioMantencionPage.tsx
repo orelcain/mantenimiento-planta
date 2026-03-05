@@ -1223,6 +1223,13 @@ export function CalendarioMantencionPage() {
     return day !== 0 && day !== 6
   }
 
+  // Vacaciones siempre cuentan en horario administrativo: solo Lun-Vie
+  // Independiente de si la jornada laboral es 6x1 o 5x2
+  function isVacationBusinessDay(date: Date): boolean {
+    const day = date.getDay()
+    return day >= 1 && day <= 5 // Lunes(1) a Viernes(5)
+  }
+
   function effectiveDailyHours(): number {
     return Math.max(0, hoursConfig.workHours - hoursConfig.breakHours)
   }
@@ -1315,19 +1322,20 @@ export function CalendarioMantencionPage() {
     const monthWorkedHours = monthDays.reduce((sum, d) => sum + workedHoursForShift(t.shifts[d.c] || ''), 0)
     const weekWorkedDays = weekDays.reduce((sum, d) => sum + (isWorkingShift(t.shifts[d.c] || '') ? 1 : 0), 0)
     const monthWorkedDays = monthDays.reduce((sum, d) => sum + (isWorkingShift(t.shifts[d.c] || '') ? 1 : 0), 0)
+    // Vacaciones: horario administrativo Lun-Vie (independiente de jornada 6x1)
     const weekVacationDays = weekDays.reduce((sum, d) => {
       if (!d.dateObj || !isVacationShift(t.shifts[d.c] || '')) return sum
-      if (hoursConfig.vacationBusinessDaysOnly && !isBusinessDay(d.dateObj)) return sum
+      if (hoursConfig.vacationBusinessDaysOnly && !isVacationBusinessDay(d.dateObj)) return sum
       return sum + 1
     }, 0)
     const monthVacationDays = monthDays.reduce((sum, d) => {
       if (!d.dateObj || !isVacationShift(t.shifts[d.c] || '')) return sum
-      if (hoursConfig.vacationBusinessDaysOnly && !isBusinessDay(d.dateObj)) return sum
+      if (hoursConfig.vacationBusinessDaysOnly && !isVacationBusinessDay(d.dateObj)) return sum
       return sum + 1
     }, 0)
     const totalVacationDays = dayCols.reduce((sum, d) => {
       if (!d.dateObj || !isVacationShift(t.shifts[d.c] || '')) return sum
-      if (hoursConfig.vacationBusinessDaysOnly && !isBusinessDay(d.dateObj)) return sum
+      if (hoursConfig.vacationBusinessDaysOnly && !isVacationBusinessDay(d.dateObj)) return sum
       return sum + 1
     }, 0)
     const weekHolidayDays = weekDays.reduce((sum, d) => {
@@ -1341,8 +1349,10 @@ export function CalendarioMantencionPage() {
       return sum + 1
     }, 0)
 
-    const weekVacationPaidHours = weekVacationDays * effectiveDaily
-    const monthVacationPaidHours = monthVacationDays * effectiveDaily
+    // Horas vacación = jornada legal semanal ÷ 5 días admin (ej: 44h/5 = 8.8h/día)
+    const vacationDailyHours = expectedWeekBase / 5
+    const weekVacationPaidHours = weekVacationDays * vacationDailyHours
+    const monthVacationPaidHours = monthVacationDays * vacationDailyHours
     const weekHolidayPaidHours = weekHolidayDays * effectiveDaily
     const monthHolidayPaidHours = monthHolidayDays * effectiveDaily
 
@@ -1398,20 +1408,6 @@ export function CalendarioMantencionPage() {
   })
 
   const sortedHoursRows = hoursRows
-
-  const controlTotals = sortedHoursRows.reduce(
-    (a, r) => ({
-      wH: a.wH + r.weekHours, wE: a.wE + r.weekExpected,
-      mH: a.mH + r.monthHours, mE: a.mE + r.monthExpected,
-      wWD: a.wWD + r.weekWorkedDays, mWD: a.mWD + r.monthWorkedDays,
-      wFD: a.wFD + r.weekFreeDays, mFD: a.mFD + r.monthFreeDays,
-      wVD: a.wVD + r.weekVacationDays, mVD: a.mVD + r.monthVacationDays,
-      wHD: a.wHD + r.weekHolidayDays, mHD: a.mHD + r.monthHolidayDays,
-      tVD: a.tVD + r.totalVacationDays,
-    }),
-    { wH: 0, wE: 0, mH: 0, mE: 0, wWD: 0, mWD: 0, wFD: 0, mFD: 0, wVD: 0, mVD: 0, wHD: 0, mHD: 0, tVD: 0 },
-  )
-  const controlN = sortedHoursRows.length || 1
 
   function turnoBadgeClass(turno: string): string {
     const key = turno.trim().toUpperCase()
@@ -2071,41 +2067,6 @@ export function CalendarioMantencionPage() {
                       </tr>
                     )
                   })}
-                  {/* Fila resumen / totales */}
-                  <tr className="border-t-2 border-border/40 bg-zinc-800/70">
-                    <td className="sticky left-0 z-10 border-r border-border/20 bg-zinc-800/70 px-3 py-1.5 text-xs font-semibold text-foreground">
-                      Promedio / Total <span className="font-normal text-zinc-500">({sortedHoursRows.length})</span>
-                    </td>
-                    <td className="border-l border-border/15 px-1.5 py-1 text-right tabular-nums text-zinc-300 font-semibold whitespace-nowrap">
-                      {(controlTotals.wH / controlN).toFixed(1)} / {(controlTotals.wE / controlN).toFixed(1)}
-                    </td>
-                    <td className="px-1 py-1">
-                      <div className="flex items-center justify-end">
-                        <span className={`inline-block rounded-md px-1.5 py-[1px] text-[10px] tabular-nums font-bold ${(controlTotals.wH - controlTotals.wE) >= 0 ? 'bg-emerald-500/15 text-emerald-400' : 'bg-red-500/15 text-red-400'}`}>
-                          Σ {formatDelta(controlTotals.wH - controlTotals.wE)}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-1.5 py-1 text-center tabular-nums text-zinc-300 font-semibold">{controlTotals.wWD}</td>
-                    <td className="px-1.5 py-1 text-center tabular-nums text-zinc-500 font-semibold">{controlTotals.wFD}</td>
-                    <td className="px-1 py-1 text-center tabular-nums font-semibold text-sky-400">{controlTotals.wVD > 0 ? controlTotals.wVD : '–'}</td>
-                    <td className="px-1 py-1 text-center tabular-nums font-semibold text-amber-400">{controlTotals.wHD > 0 ? controlTotals.wHD : '–'}</td>
-                    <td className="border-l-2 border-border/25 px-1.5 py-1 text-right tabular-nums text-zinc-300 font-semibold whitespace-nowrap">
-                      {(controlTotals.mH / controlN).toFixed(1)} / {(controlTotals.mE / controlN).toFixed(1)}
-                    </td>
-                    <td className="px-1 py-1">
-                      <div className="flex items-center justify-end">
-                        <span className={`inline-block rounded-md px-1.5 py-[1px] text-[10px] tabular-nums font-bold ${(controlTotals.mH - controlTotals.mE) >= 0 ? 'bg-emerald-500/15 text-emerald-400' : 'bg-red-500/15 text-red-400'}`}>
-                          Σ {formatDelta(controlTotals.mH - controlTotals.mE)}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-1.5 py-1 text-center tabular-nums text-zinc-300 font-semibold">{controlTotals.mWD}</td>
-                    <td className="px-1.5 py-1 text-center tabular-nums text-zinc-500 font-semibold">{controlTotals.mFD}</td>
-                    <td className="px-1 py-1 text-center tabular-nums font-semibold text-sky-400">{controlTotals.mVD > 0 ? controlTotals.mVD : '–'}</td>
-                    <td className="px-1 py-1 text-center tabular-nums font-semibold text-amber-400">{controlTotals.mHD > 0 ? controlTotals.mHD : '–'}</td>
-                    <td className="border-l-2 border-border/25 px-1.5 py-1 text-center tabular-nums text-sky-300 font-bold">{controlTotals.tVD}</td>
-                  </tr>
                 </tbody>
               </table>
               </div>
