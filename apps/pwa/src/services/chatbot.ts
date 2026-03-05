@@ -65,6 +65,8 @@ type IntentType =
   | 'modelos3d'
   | 'evidencias'
   | 'grader'
+  | 'calendarioMantencion'
+  | 'climaPuerto'
   | 'general'
 
 // ─── Memoria por usuario (Firestore + localStorage fallback) ────────
@@ -411,6 +413,8 @@ const INTENT_KEYWORDS: Record<IntentType, string[]> = {
   modelos3d: ['3d', 'modelo 3d', 'modelos 3d', 'visor 3d', 'glb', 'gltf', 'obj', 'fbx', 'anotación 3d', 'anotacion 3d', 'tridimensional'],
   evidencias: ['evidencia', 'evidencias', 'foto', 'fotos', 'antes después', 'antes despues', 'antes y después', 'fotografía', 'fotografia', 'comparación', 'comparacion'],
   grader: ['grader', 'análisis grader', 'analisis grader', 'clasificadora', 'session grader', 'calibración', 'calibracion'],
+  calendarioMantencion: ['calendario', 'calendario mantención', 'calendario mantencion', 'turno', 'turnos', 'rotativo', 'rotativos', '6x1', 'jornada', 'vacaciones técnico', 'vacaciones tecnico', 'semana técnico', 'control semanal', 'control mensual', 'horas semanales', 'horas mensuales', 'días trabajados', 'dias trabajados', 'libre', 'libres', 'descanso'],
+  climaPuerto: ['clima', 'tiempo', 'weather', 'puerto', 'chonchi', 'viento', 'olas', 'oleaje', 'marejada', 'lluvia', 'pronóstico', 'pronostico', 'meteorológico', 'meteorologico', 'temporal', 'cierre puerto', 'bahía', 'bahia', 'directemar'],
   resumen: ['resumen', 'resúmeme', 'resumeme', 'estadística', 'estadísticas', 'estadistica', 'cuántos', 'cuantos', 'cuántas', 'cuantas', 'total', 'totales', 'semana', 'mes', 'hoy', 'dashboard', 'panorama', 'overview'],
   ayuda: ['ayuda', 'help', 'cómo', 'como', 'qué puedes', 'que puedes', 'funciones', 'qué haces', 'que haces'],
   general: [],
@@ -482,6 +486,12 @@ function suggestActions(intents: IntentType[]): ChatAction[] {
   if (intents.includes('grader')) {
     actions.push({ label: 'Análisis Grader', route: '/grader-analysis', icon: 'BarChart' })
   }
+  if (intents.includes('calendarioMantencion')) {
+    actions.push({ label: 'Calendario Mantención', route: '/calendario-mantencion', icon: 'CalendarClock' })
+  }
+  if (intents.includes('climaPuerto')) {
+    actions.push({ label: 'Clima Puerto Chonchi', route: '/clima-puerto', icon: 'CloudSun' })
+  }
   return actions
 }
 
@@ -513,7 +523,7 @@ Responde SOLO con JSON válido (sin markdown, sin comentarios):
 }
 
 CAMPOS:
-- intents: array de categorías detectadas. Valores posibles: "repuestos", "incidencias", "equipos", "sensores", "preventivo", "gantt", "ett", "mapas", "inspecciones", "modelos3d", "evidencias", "grader", "resumen", "ayuda", "general"
+- intents: array de categorías detectadas. Valores posibles: "repuestos", "incidencias", "equipos", "sensores", "preventivo", "gantt", "ett", "mapas", "inspecciones", "modelos3d", "evidencias", "grader", "calendarioMantencion", "climaPuerto", "resumen", "ayuda", "general"
 - entities.machines: nombres de máquinas/equipos mencionados o implícitos por contexto (ej: "Grader", "Baader 200", "Marel I-Cut")
 - entities.components: componentes mencionados (ej: "motor", "rodamiento", "bomba", "filtro", "cuchillo")
 - entities.statuses: estados mencionados (ej: "pendiente", "resuelto", "crítica")
@@ -1121,6 +1131,189 @@ async function fetchSensorsSummary(): Promise<string> {
   }
 }
 
+// ─── Calendario Mantención ───────────────────────────────────────────
+
+async function fetchCalendarioMantencionSummary(): Promise<string> {
+  const cached = getCached('calendario_mantencion_summary')
+  if (cached) return cached
+
+  try {
+    const snap = await getDoc(doc(db, 'calendario_mantencion_state', 'current'))
+    if (!snap.exists()) {
+      return 'CALENDARIO MANTENCIÓN:\nNo hay datos de calendario cargados aún. Se puede cargar una plantilla Excel desde /calendario-mantencion.'
+    }
+
+    const data = snap.data()
+    const techs: any[] = data.techRows || []
+    const dayCols: any[] = data.dayCols || []
+    const hoursConfig = data.hoursConfig || {}
+    const shiftConfig = data.shiftConfig || {}
+    const filename = data.originalFilename || '(sin nombre)'
+
+    // Build summary of current week
+    const today = new Date()
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+
+    // Parse dates from dayCols
+    const parsedCols = dayCols.map((col: any) => {
+      const raw = col.dateRaw || ''
+      let dateObj: Date | null = null
+      const ddmmyyyy = raw.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/)
+      const yyyymmdd = raw.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})$/)
+      if (ddmmyyyy) dateObj = new Date(+ddmmyyyy[3], +ddmmyyyy[2] - 1, +ddmmyyyy[1])
+      else if (yyyymmdd) dateObj = new Date(+yyyymmdd[1], +yyyymmdd[2] - 1, +yyyymmdd[3])
+      return { ...col, dateObj }
+    })
+
+    // ISO week key
+    function isoWk(d: Date): string {
+      const u = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()))
+      u.setUTCDate(u.getUTCDate() + 4 - (u.getUTCDay() || 7))
+      const y = new Date(Date.UTC(u.getUTCFullYear(), 0, 1))
+      const w = Math.ceil((((u.getTime() - y.getTime()) / 86400000) + 1) / 7)
+      return `${u.getUTCFullYear()}-W${String(w).padStart(2, '0')}`
+    }
+
+    const currentWeek = isoWk(today)
+    const currentMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`
+
+    const weekCols = parsedCols.filter((c: any) => c.dateObj && isoWk(c.dateObj) === currentWeek)
+    const monthCols = parsedCols.filter((c: any) => c.dateObj && `${c.dateObj.getFullYear()}-${String(c.dateObj.getMonth() + 1).padStart(2, '0')}` === currentMonth)
+
+    // Turnos per-group count
+    const groups: Record<string, string[]> = {}
+    for (const t of techs) {
+      const g = t.turno || 'Sin grupo'
+      if (!groups[g]) groups[g] = []
+      groups[g].push(t.name)
+    }
+
+    // Build current-week shift summary per tech
+    const weekSummary = techs.slice(0, 20).map((t: any) => {
+      const shifts = weekCols.map((c: any) => {
+        const val = (t.shifts || {})[String(c.c)] || ''
+        return val || '–'
+      })
+      return `  ${t.name} (${t.turno || '?'}): ${shifts.join(' | ')}`
+    })
+
+    const vacNorm = (v: string) => v.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    const techsOnVacation = techs.filter((t: any) => {
+      return weekCols.some((c: any) => {
+        const v = vacNorm((t.shifts || {})[String(c.c)] || '')
+        return v.startsWith('vac') || v.includes('vacacion')
+      })
+    }).map((t: any) => t.name)
+
+    const effectiveDaily = Math.max(0, (hoursConfig.workHours || 8) - (hoursConfig.breakHours || 0.5))
+
+    const result = [
+      `CALENDARIO MANTENCIÓN — Datos actuales:`,
+      `Plantilla: ${filename}`,
+      `Técnicos: ${techs.length} | Días en calendario: ${dayCols.length}`,
+      `Grupos: ${Object.entries(groups).map(([g, names]) => `${g}(${names.length})`).join(', ')}`,
+      `Jornada configurada: ${hoursConfig.workHours || 8}h total - ${hoursConfig.breakHours || 0.5}h colación = ${effectiveDaily}h efectivas/día`,
+      `Jornada semanal legal: ${hoursConfig.autoLegalWeek !== false ? 'Automática Chile' : `${hoursConfig.expectedWeek || 44}h`}`,
+      `Días laborales: ${hoursConfig.workDaysPerWeek || 6}x1`,
+      `Vacaciones: solo días hábiles = ${hoursConfig.vacationBusinessDaysOnly !== false ? 'Sí' : 'No'}`,
+      ``,
+      `Semana actual (${currentWeek}): ${weekCols.length} días`,
+      `Fecha de hoy: ${todayStr}`,
+      weekSummary.length > 0 ? `Turnos esta semana:\n${weekSummary.join('\n')}` : 'Sin datos para esta semana.',
+      techsOnVacation.length > 0 ? `\nTécnicos en vacaciones esta semana: ${techsOnVacation.join(', ')}` : '',
+      `\nMes actual (${currentMonth}): ${monthCols.length} días`,
+      `\nTurnos configurados: Día ${shiftConfig.diaInicio || '08:00'}-${shiftConfig.diaFin || '16:00'} | Tarde ${shiftConfig.tardeInicio || '16:00'}-${shiftConfig.tardeFin || '00:00'} | Noche ${shiftConfig.nocheInicio || '00:00'}-${shiftConfig.nocheFin || '08:00'}`,
+      `\nPágina: /calendario-mantencion`,
+    ].join('\n')
+
+    setCache('calendario_mantencion_summary', result)
+    return result
+  } catch (err: unknown) {
+    logger.error('Chatbot: error fetching calendario mantencion', err instanceof Error ? err : undefined)
+    return 'No se pudieron cargar datos del Calendario Mantención.'
+  }
+}
+
+// ─── Clima Puerto Chonchi ────────────────────────────────────────────
+
+async function fetchClimaPuertoSummary(): Promise<string> {
+  const cached = getCached('clima_puerto_summary')
+  if (cached) return cached
+
+  try {
+    const lat = -42.62
+    const lon = -73.77
+    const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&timezone=America/Santiago&current=temperature_2m,precipitation,weather_code,wind_speed_10m,wind_gusts_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,wind_gusts_10m_max&forecast_days=3`
+    const marineUrl = `https://marine-api.open-meteo.com/v1/marine?latitude=${lat}&longitude=${lon}&timezone=America/Santiago&hourly=wave_height&forecast_days=2`
+
+    const [weatherRes, marineRes] = await Promise.all([fetch(weatherUrl), fetch(marineUrl)])
+
+    const weather = weatherRes.ok ? await weatherRes.json() : null
+    const marine = marineRes.ok ? await marineRes.json() : null
+
+    const current = weather?.current || {}
+    const daily = weather?.daily || {}
+
+    const waveHeights: number[] = marine?.hourly?.wave_height || []
+    const maxWave = waveHeights.length > 0 ? Math.max(...waveHeights) : null
+    const currentWave = waveHeights.length > 0 ? waveHeights[waveHeights.length - 1] : null
+
+    const weatherCodes: Record<number, string> = {
+      0: 'Despejado', 1: 'Mayormente despejado', 2: 'Parcialmente nublado', 3: 'Nublado',
+      45: 'Niebla', 48: 'Niebla con escarcha',
+      51: 'Llovizna leve', 53: 'Llovizna moderada', 55: 'Llovizna intensa',
+      61: 'Lluvia leve', 63: 'Lluvia moderada', 65: 'Lluvia intensa',
+      71: 'Nieve leve', 73: 'Nieve moderada', 75: 'Nieve intensa',
+      80: 'Chubascos leves', 81: 'Chubascos moderados', 82: 'Chubascos intensos',
+      95: 'Tormenta', 96: 'Tormenta con granizo', 99: 'Tormenta fuerte con granizo',
+    }
+
+    const currentDesc = weatherCodes[current.weather_code] || `Código ${current.weather_code}`
+    const windKmh = current.wind_speed_10m || 0
+    const gustKmh = current.wind_gusts_10m || 0
+
+    // Simple port risk assessment
+    const riskFactors: string[] = []
+    if (gustKmh > 60) riskFactors.push(`Ráfagas fuertes (${gustKmh} km/h)`)
+    if (maxWave && maxWave > 2.5) riskFactors.push(`Oleaje alto (${maxWave.toFixed(1)}m)`)
+    if (current.precipitation > 5) riskFactors.push(`Precipitación alta (${current.precipitation}mm)`)
+    const riskLevel = riskFactors.length >= 2 ? 'ALTO — probable cierre de puerto' : riskFactors.length === 1 ? 'MODERADO — precaución' : 'BAJO — condiciones favorables'
+
+    // Forecast 3 days
+    const forecastLines = (daily.time || []).slice(0, 3).map((date: string, i: number) => {
+      const desc = weatherCodes[daily.weather_code?.[i]] || '?'
+      return `  ${date}: ${desc}, ${daily.temperature_2m_min?.[i] ?? '?'}–${daily.temperature_2m_max?.[i] ?? '?'}°C, lluvia ${daily.precipitation_sum?.[i] ?? 0}mm, viento máx ${daily.wind_speed_10m_max?.[i] ?? '?'}km/h (ráfagas ${daily.wind_gusts_10m_max?.[i] ?? '?'}km/h)`
+    })
+
+    const result = [
+      `CLIMA PUERTO CHONCHI — Datos en tiempo real:`,
+      `Ubicación: Bahía de Yal, Chonchi, Chiloé (${lat}°S, ${Math.abs(lon)}°O)`,
+      `Planta: Centro de Acopio Antarfood`,
+      ``,
+      `CONDICIONES ACTUALES:`,
+      `  Clima: ${currentDesc}`,
+      `  Temperatura: ${current.temperature_2m ?? '?'}°C`,
+      `  Viento: ${windKmh} km/h | Ráfagas: ${gustKmh} km/h`,
+      `  Precipitación: ${current.precipitation ?? 0} mm`,
+      currentWave != null ? `  Oleaje actual: ~${currentWave.toFixed(1)}m | Máx próximas 48h: ${maxWave?.toFixed(1)}m` : '',
+      ``,
+      `RIESGO DE CIERRE: ${riskLevel}`,
+      riskFactors.length > 0 ? `Factores: ${riskFactors.join(', ')}` : '',
+      ``,
+      `PRONÓSTICO 3 DÍAS:`,
+      ...forecastLines,
+      ``,
+      `Fuente: Open-Meteo API + Marine API | Dashboard completo: /clima-puerto`,
+    ].filter(Boolean).join('\n')
+
+    setCache('clima_puerto_summary', result)
+    return result
+  } catch (err: unknown) {
+    logger.error('Chatbot: error fetching clima puerto', err instanceof Error ? err : undefined)
+    return 'CLIMA PUERTO CHONCHI:\nNo se pudieron obtener datos meteorológicos en este momento. Puedes ver el dashboard completo en /clima-puerto.'
+  }
+}
+
 async function fetchRepuestosSummary(userQuery: string): Promise<string> {
   // #2 — Cache semántico: normaliza query para reutilizar resultados
   const cacheKey = normalizeCacheKey('repuestos', userQuery)
@@ -1516,6 +1709,12 @@ async function buildRAGContext(intents: IntentType[], userQuery: string, origina
   if (loadAll || intents.includes('sensores')) {
     promises.push(fetchSensorsSummary())
   }
+  if (loadAll || intents.includes('calendarioMantencion')) {
+    promises.push(fetchCalendarioMantencionSummary())
+  }
+  if (loadAll || intents.includes('climaPuerto')) {
+    promises.push(fetchClimaPuertoSummary())
+  }
   if (intents.includes('incidencias') && !intents.includes('resumen')) {
     promises.push(fetchIncidentsByFilter(userQuery))
   }
@@ -1530,7 +1729,7 @@ const SYSTEM_PROMPT = `Eres ARIA (Asistente de Reportes e Incidencias Automatiza
 Tu nombre es "ARIA". Eres inteligente, eficiente y proactiva. Tienes acceso completo a TODOS los módulos de la app como administradora.
 
 Tu rol:
-- Responder preguntas sobre CUALQUIER módulo de la app: incidencias, equipos, repuestos, sensores, usuarios, ETT, planificación Gantt, mapas, inspecciones, modelos 3D, evidencias, análisis Grader, mantenimiento preventivo
+- Responder preguntas sobre CUALQUIER módulo de la app: incidencias, equipos, repuestos, sensores, usuarios, ETT, planificación Gantt, mapas, inspecciones, modelos 3D, evidencias, análisis Grader, mantenimiento preventivo, calendario de mantención/turnos, clima y condiciones marítimas
 - Usar EXCLUSIVAMENTE los DATOS REALES proporcionados como contexto para dar respuestas precisas
 - NUNCA inventar datos. Si la información no está en el contexto, dilo claramente
 - Ser conciso pero útil, con formato claro (usa **negritas** para destacar)
@@ -1588,6 +1787,8 @@ MÓDULOS DE LA APP (tienes acceso completo a todos):
 🤖 **Análisis Predictivo** (/predictive) — IA para predecir fallas antes de que ocurran.
 ⚙️ **Configuración** (/settings) — Ajustes de la app, permisos, y preferencias.
 🏗️ **Jerarquía** (/hierarchy) — Estructura jerárquica de la planta (plantas > líneas > equipos).
+📅 **Calendario Mantención** (/calendario-mantencion) — Planificación de turnos rotativos 6x1, control semanal/mensual de horas trabajadas, vacaciones, feriados, días libres por técnico. Datos bajo "CALENDARIO MANTENCIÓN".
+🌤️ **Clima Puerto** (/clima-puerto) — Dashboard meteorológico en tiempo real de Chonchi/Chiloé: temperatura, viento, precipitación, oleaje, pronóstico 3 días y riesgo de cierre de puerto. Datos bajo "CLIMA PUERTO CHONCHI".
 
 Cuando el usuario pregunte sobre CUALQUIER módulo, usa los datos del contexto correspondiente. Si no tienes datos específicos, describe las capacidades del módulo y sugiere navegar a la sección apropiada.
 

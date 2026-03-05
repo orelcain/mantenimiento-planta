@@ -7,6 +7,15 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.70.9] - 2026-03-05
+### Mejorado — ARIA accede a Calendario Mantención y Clima Puerto
+- **Nuevo intent `calendarioMantencion`**: ARIA puede responder sobre turnos rotativos 6x1, horas semanales/mensuales, vacaciones por técnico, grupos A/B/C
+- **Nuevo intent `climaPuerto`**: ARIA brinda temperatura, viento, ráfagas, precipitación, oleaje y riesgo de cierre de puerto (Chonchi/Chiloé) en tiempo real
+- **`fetchCalendarioMantencionSummary()`**: lee Firestore `calendario_mantencion_state/current` y genera resumen RAG con técnicos, turnos semana/mes, jornada configurada
+- **`fetchClimaPuertoSummary()`**: consulta Open-Meteo API + Marine API para condiciones actuales y pronóstico 3 días
+- **SYSTEM_PROMPT actualizado**: incluye 📅 Calendario Mantención y 🌤️ Clima Puerto en lista de módulos
+- **Keywords y detección**: turnos, vacaciones, 6x1, jornada, clima, viento, olas, pronóstico, chonchi, directemar, etc.
+
 ## [2.70.8] - 2026-03-05
 ### Corregido — Vacaciones en jornada 6x1 (Lun-Sáb)
 - **Días hábiles respetan jornada 6x1**: `isBusinessDay()` ahora considera Lun-Sáb como hábiles cuando `workDaysPerWeek >= 6`, solo Domingo es descanso legal
