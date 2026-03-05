@@ -294,11 +294,6 @@ function weekNumberLabel(date: Date | null): string {
   return weekPart ? `W${weekPart}` : ''
 }
 
-function deltaClass(delta: number): string {
-  if (Math.abs(delta) < 0.001) return 'text-muted-foreground font-semibold'
-  return delta > 0 ? 'text-emerald-700 dark:text-emerald-300 font-semibold' : 'text-red-700 dark:text-red-300 font-semibold'
-}
-
 function formatDelta(delta: number): string {
   if (Math.abs(delta) < 0.001) return '0.0'
   return `${delta > 0 ? '+' : ''}${delta.toFixed(1)}`
@@ -1361,8 +1356,8 @@ export function CalendarioMantencionPage() {
       ? Math.max(0, monthExpectedDays * legalDailyTarget)
       : Math.max(0, expectedMonthAutoBase)
 
-    const weekFreeDays = Math.max(0, weekDays.length - weekWorkedDays)
-    const monthFreeDays = Math.max(0, monthDays.length - monthWorkedDays)
+    const weekFreeDays = Math.max(0, weekDays.length - weekWorkedDays - weekVacationDays - weekHolidayDays)
+    const monthFreeDays = Math.max(0, monthDays.length - monthWorkedDays - monthVacationDays - monthHolidayDays)
     const weekBreakHours = weekWorkedDays * hoursConfig.breakHours
     const monthBreakHours = monthWorkedDays * hoursConfig.breakHours
     const weekFreeHours = weekFreeDays * effectiveDaily
@@ -1373,8 +1368,14 @@ export function CalendarioMantencionPage() {
       tech: t,
       weekHours,
       monthHours,
+      weekWorkedHours,
+      monthWorkedHours,
       weekExpected: weekExpectedAdjusted,
       monthExpected: monthExpectedAdjusted,
+      weekWorkedDays,
+      monthWorkedDays,
+      weekFreeDays,
+      monthFreeDays,
       weekFreeHours,
       monthFreeHours,
       weekBreakHours,
@@ -1394,6 +1395,20 @@ export function CalendarioMantencionPage() {
   })
 
   const sortedHoursRows = hoursRows
+
+  const controlTotals = sortedHoursRows.reduce(
+    (a, r) => ({
+      wH: a.wH + r.weekHours, wE: a.wE + r.weekExpected,
+      mH: a.mH + r.monthHours, mE: a.mE + r.monthExpected,
+      wWD: a.wWD + r.weekWorkedDays, mWD: a.mWD + r.monthWorkedDays,
+      wFD: a.wFD + r.weekFreeDays, mFD: a.mFD + r.monthFreeDays,
+      wVD: a.wVD + r.weekVacationDays, mVD: a.mVD + r.monthVacationDays,
+      wHD: a.wHD + r.weekHolidayDays, mHD: a.mHD + r.monthHolidayDays,
+      tVD: a.tVD + r.totalVacationDays,
+    }),
+    { wH: 0, wE: 0, mH: 0, mE: 0, wWD: 0, mWD: 0, wFD: 0, mFD: 0, wVD: 0, mVD: 0, wHD: 0, mHD: 0, tVD: 0 },
+  )
+  const controlN = sortedHoursRows.length || 1
 
   function turnoBadgeClass(turno: string): string {
     const key = turno.trim().toUpperCase()
@@ -1898,104 +1913,199 @@ export function CalendarioMantencionPage() {
         {/* ── Tab: Control semanal y mensual ── */}
         {activeTab === 'control' && (
           <div className="space-y-2">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-              <div>
-                <label className="text-muted-foreground">Semana</label>
-                <select className={CONTROL_CLASS + ' w-full mt-0.5'} value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="inline-block h-2 w-2 rounded-full bg-blue-500" />
+                  <label className="font-medium text-foreground">Semana</label>
+                  <span className="text-[10px] text-muted-foreground">({weekDays.length} días)</span>
+                </div>
+                <select className={CONTROL_CLASS + ' w-full'} value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)}>
                   {Object.entries(weeks).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
                 </select>
               </div>
-              <div>
-                <label className="text-muted-foreground">Mes</label>
-                <select className={CONTROL_CLASS + ' w-full mt-0.5'} value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)}>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="inline-block h-2 w-2 rounded-full bg-indigo-500" />
+                  <label className="font-medium text-foreground">Mes</label>
+                  <span className="text-[10px] text-muted-foreground">({monthDays.length} días)</span>
+                </div>
+                <select className={CONTROL_CLASS + ' w-full'} value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)}>
                   {Object.entries(months).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
                 </select>
               </div>
             </div>
-            <div className="rounded border">
-              <table className="w-full text-[11px]">
-                <thead className="bg-muted text-foreground sticky top-0 z-10">
-                  <tr className="border-b border-border/70 bg-muted/60">
-                    <th className="px-2 py-1 text-left" colSpan={1}>Técnico</th>
-                    <th className="px-2 py-1 text-center" colSpan={7}>Semana</th>
-                    <th className="px-2 py-1 text-center border-l border-border/60" colSpan={8}>Mes</th>
-                  </tr>
+            <div className="rounded-lg border border-border/40 overflow-hidden">
+              <div className="overflow-x-auto">
+              <table className="w-full text-[11px] border-collapse">
+                <thead>
                   <tr>
-                    <th className="px-2 py-1 text-left">Técnico</th>
-                    <th className="px-2 py-1 text-right w-24">Sem (Real/Esp)</th>
-                    <th className="px-2 py-1 w-24">Δ Sem</th>
-                    <th className="px-2 py-1 text-right w-16">Libres S</th>
-                    <th className="px-2 py-1 text-right w-16">Colación S</th>
-                    <th className="px-2 py-1 text-right w-16">Vac H S</th>
-                    <th className="px-2 py-1 text-right w-16">Fer H S</th>
-                    <th className="px-2 py-1 text-right w-16">Vac S</th>
-                    <th className="px-2 py-1 text-right w-16">Fer S</th>
-                    <th className="px-2 py-1 text-right w-24 border-l border-border/60">Mes (Real/Esp)</th>
-                    <th className="px-2 py-1 w-24">Δ Mes</th>
-                    <th className="px-2 py-1 text-right w-16">Libres M</th>
-                    <th className="px-2 py-1 text-right w-16">Colación M</th>
-                    <th className="px-2 py-1 text-right w-16">Vac H M</th>
-                    <th className="px-2 py-1 text-right w-16">Fer H M</th>
-                    <th className="px-2 py-1 text-right w-16">Vac M</th>
-                    <th className="px-2 py-1 text-right w-16">Fer M</th>
-                    <th className="px-2 py-1 text-right w-16">Vac Tot</th>
+                    <th rowSpan={2} className="sticky left-0 z-20 border-b border-r border-border/30 bg-zinc-900 px-3 py-2 text-left text-xs font-semibold text-foreground" style={{ minWidth: 200 }}>
+                      Técnico
+                    </th>
+                    <th colSpan={6} className="border-b border-l border-border/30 bg-gradient-to-r from-blue-950/80 to-blue-900/40 px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider text-blue-300">
+                      <span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-blue-400" />Resumen Semanal</span>
+                    </th>
+                    <th colSpan={6} className="border-b border-l-2 border-border/30 bg-gradient-to-r from-indigo-950/80 to-indigo-900/40 px-2 py-1.5 text-center text-[10px] font-bold uppercase tracking-wider text-indigo-300">
+                      <span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-indigo-400" />Resumen Mensual</span>
+                    </th>
+                    <th rowSpan={2} className="border-b border-l-2 border-border/30 bg-zinc-800/80 px-2 py-1.5 text-center" style={{ minWidth: 44 }} title="Total de días de vacaciones acumulados en todo el calendario">
+                      <div className="text-[10px] font-bold text-zinc-300">Vac.</div>
+                      <div className="text-[9px] font-normal text-zinc-500">Acum.</div>
+                    </th>
+                  </tr>
+                  <tr className="bg-zinc-900/60">
+                    <th className="border-l border-border/20 px-1.5 py-1 text-right text-[10px] font-semibold text-blue-400/90" title="Horas totales (trabajadas + vacaciones pagadas + feriados pagados) / Horas esperadas según jornada legal">
+                      <div>Horas</div><div className="font-normal text-[9px] text-zinc-500">Real / Esp</div>
+                    </th>
+                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-blue-400/90" style={{ minWidth: 90 }} title="Diferencia = Horas reales − Horas esperadas. Verde = cumple, Rojo = déficit">Diferencia</th>
+                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-blue-400/90" title="Días efectivamente trabajados (turnos asignados)">
+                      <div>Días</div><div className="font-normal text-[9px] text-zinc-500">Trab.</div>
+                    </th>
+                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-blue-400/90" title="Días de descanso / libres (NO incluye vacaciones ni feriados)">
+                      <div>Días</div><div className="font-normal text-[9px] text-zinc-500">Libres</div>
+                    </th>
+                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-blue-400/90" title="Días de vacaciones (horas pagadas incluidas en Horas Reales)">Vac.</th>
+                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-blue-400/90" title="Días feriados (horas pagadas incluidas en Horas Reales)">Fer.</th>
+                    <th className="border-l-2 border-border/30 px-1.5 py-1 text-right text-[10px] font-semibold text-indigo-400/90" title="Horas totales del mes (trabajadas + vacaciones + feriados pagados) / Horas esperadas">
+                      <div>Horas</div><div className="font-normal text-[9px] text-zinc-500">Real / Esp</div>
+                    </th>
+                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-indigo-400/90" style={{ minWidth: 90 }} title="Diferencia mensual = Horas reales − Horas esperadas">Diferencia</th>
+                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-indigo-400/90" title="Días efectivamente trabajados en el mes">
+                      <div>Días</div><div className="font-normal text-[9px] text-zinc-500">Trab.</div>
+                    </th>
+                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-indigo-400/90" title="Días de descanso del mes (NO incluye vacaciones ni feriados)">
+                      <div>Días</div><div className="font-normal text-[9px] text-zinc-500">Libres</div>
+                    </th>
+                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-indigo-400/90" title="Días de vacaciones del mes">Vac.</th>
+                    <th className="px-1 py-1 text-center text-[10px] font-semibold text-indigo-400/90" title="Días feriados del mes">Fer.</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedHoursRows.map((row) => {
+                  {sortedHoursRows.map((row, idx) => {
                     const pctW = pctBar(row.weekHours, row.weekExpected)
                     const pctM = pctBar(row.monthHours, row.monthExpected)
-                    const barColorW = row.deltaWeek >= -hoursConfig.toleranceHours ? 'bg-emerald-500' : 'bg-red-500'
-                    const barColorM = row.deltaMonth >= -hoursConfig.toleranceHours ? 'bg-emerald-500' : 'bg-red-500'
-                    const rowRisk = row.deltaWeek < -hoursConfig.toleranceHours || row.deltaMonth < -hoursConfig.toleranceHours
+                    const riskW = row.deltaWeek < -hoursConfig.toleranceHours
+                    const riskM = row.deltaMonth < -hoursConfig.toleranceHours
+                    const isRisk = riskW || riskM
+                    const zebra = idx % 2 === 1 ? 'bg-zinc-900/30' : ''
+                    const rowBg = isRisk ? 'bg-red-950/15 hover:bg-red-950/25' : `${zebra} hover:bg-zinc-800/50`
                     return (
-                      <tr key={row.tech.r} className={`border-t border-border transition-colors ${rowRisk ? 'bg-red-500/5 hover:bg-red-500/10' : 'hover:bg-muted/40'}`}>
-                        <td className="px-2 py-1 text-left max-w-[220px]" title={row.tech.name}>
-                          <div className="flex items-center gap-1">
-                            <span className="truncate">{row.tech.name}</span>
-                            {(row.weekVacationDays > 0 || row.monthVacationDays > 0) && (
-                              <span className="shrink-0 rounded border border-sky-500/40 bg-sky-500/15 px-1 text-[10px] text-sky-200">
-                                VAC S:{row.weekVacationDays} M:{row.monthVacationDays}
+                      <tr key={row.tech.r} className={`border-t border-border/20 transition-colors ${rowBg}`}>
+                        <td className="sticky left-0 z-10 border-r border-border/20 bg-inherit px-3 py-1.5" style={{ minWidth: 200, maxWidth: 240 }}>
+                          <div className="flex items-center gap-1.5">
+                            {row.tech.turno && (
+                              <span className={`shrink-0 inline-flex h-[18px] w-[18px] items-center justify-center rounded text-[9px] font-bold border ${turnoBadgeClass(row.tech.turno)}`}>
+                                {row.tech.turno}
                               </span>
                             )}
+                            <span className="truncate font-medium text-foreground" title={row.tech.name}>{row.tech.name}</span>
                           </div>
                         </td>
-                        <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.weekHours.toFixed(1)} / {row.weekExpected.toFixed(1)}</td>
-                        <td className="px-2 py-1">
+                        <td className="border-l border-border/15 px-1.5 py-1 text-right tabular-nums whitespace-nowrap" title={`Trabajo: ${row.weekWorkedHours.toFixed(1)}h · Vac pagadas: ${row.weekVacationPaidHours.toFixed(1)}h · Fer pagados: ${row.weekHolidayPaidHours.toFixed(1)}h · Colación: ${row.weekBreakHours.toFixed(1)}h`}>
+                          <span className="text-foreground font-medium">{row.weekHours.toFixed(1)}</span>
+                          <span className="text-zinc-600 mx-0.5">/</span>
+                          <span className="text-zinc-400">{row.weekExpected.toFixed(1)}</span>
+                        </td>
+                        <td className="px-1 py-1" style={{ minWidth: 90 }}>
                           <div className="flex items-center gap-1">
-                            <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
-                              <div className={`h-full rounded-full ${barColorW} transition-all`} style={{ width: `${pctW}%` }} />
+                            <div className="flex-1 h-[5px] rounded-full bg-zinc-800 overflow-hidden">
+                              <div className={`h-full rounded-full transition-all ${riskW ? 'bg-red-500' : 'bg-emerald-500'}`} style={{ width: `${pctW}%` }} />
                             </div>
-                            <span className={`text-[10px] w-8 text-right tabular-nums ${deltaClass(row.deltaWeek)}`}>{formatDelta(row.deltaWeek)}</span>
+                            <span className={`shrink-0 inline-block min-w-[38px] rounded-md px-1 py-[1px] text-center text-[10px] tabular-nums font-bold ${riskW ? 'bg-red-500/15 text-red-400' : row.deltaWeek > 0 ? 'bg-emerald-500/15 text-emerald-400' : 'bg-zinc-800 text-zinc-400'}`}>
+                              {formatDelta(row.deltaWeek)}
+                            </span>
                           </div>
                         </td>
-                        <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.weekFreeHours.toFixed(1)}</td>
-                        <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.weekBreakHours.toFixed(1)}</td>
-                        <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.weekVacationPaidHours.toFixed(1)}</td>
-                        <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.weekHolidayPaidHours.toFixed(1)}</td>
-                        <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.weekVacationDays}</td>
-                        <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.weekHolidayDays}</td>
-                        <td className="px-2 py-1 text-right tabular-nums text-muted-foreground border-l border-border/60">{row.monthHours.toFixed(1)} / {row.monthExpected.toFixed(1)}</td>
-                        <td className="px-2 py-1">
+                        <td className="px-1.5 py-1 text-center tabular-nums">
+                          <span className={`font-semibold ${row.weekWorkedDays > 0 ? 'text-emerald-400' : 'text-zinc-600'}`}>{row.weekWorkedDays}</span>
+                        </td>
+                        <td className="px-1.5 py-1 text-center tabular-nums text-zinc-500">{row.weekFreeDays > 0 ? row.weekFreeDays : <span className="text-zinc-700">–</span>}</td>
+                        <td className="px-1 py-1 text-center">
+                          {row.weekVacationDays > 0
+                            ? <span className="inline-block rounded-full border border-sky-500/30 bg-sky-500/15 px-1.5 py-[1px] text-[10px] font-bold tabular-nums text-sky-300" title={`${row.weekVacationPaidHours.toFixed(1)}h pagadas`}>{row.weekVacationDays}d</span>
+                            : <span className="text-zinc-700">–</span>}
+                        </td>
+                        <td className="px-1 py-1 text-center">
+                          {row.weekHolidayDays > 0
+                            ? <span className="inline-block rounded-full border border-amber-500/30 bg-amber-500/15 px-1.5 py-[1px] text-[10px] font-bold tabular-nums text-amber-300" title={`${row.weekHolidayPaidHours.toFixed(1)}h pagadas`}>{row.weekHolidayDays}d</span>
+                            : <span className="text-zinc-700">–</span>}
+                        </td>
+                        <td className="border-l-2 border-border/25 px-1.5 py-1 text-right tabular-nums whitespace-nowrap" title={`Trabajo: ${row.monthWorkedHours.toFixed(1)}h · Vac pagadas: ${row.monthVacationPaidHours.toFixed(1)}h · Fer pagados: ${row.monthHolidayPaidHours.toFixed(1)}h · Colación: ${row.monthBreakHours.toFixed(1)}h`}>
+                          <span className="text-foreground font-medium">{row.monthHours.toFixed(1)}</span>
+                          <span className="text-zinc-600 mx-0.5">/</span>
+                          <span className="text-zinc-400">{row.monthExpected.toFixed(1)}</span>
+                        </td>
+                        <td className="px-1 py-1" style={{ minWidth: 90 }}>
                           <div className="flex items-center gap-1">
-                            <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
-                              <div className={`h-full rounded-full ${barColorM} transition-all`} style={{ width: `${pctM}%` }} />
+                            <div className="flex-1 h-[5px] rounded-full bg-zinc-800 overflow-hidden">
+                              <div className={`h-full rounded-full transition-all ${riskM ? 'bg-red-500' : 'bg-emerald-500'}`} style={{ width: `${pctM}%` }} />
                             </div>
-                            <span className={`text-[10px] w-8 text-right tabular-nums ${deltaClass(row.deltaMonth)}`}>{formatDelta(row.deltaMonth)}</span>
+                            <span className={`shrink-0 inline-block min-w-[38px] rounded-md px-1 py-[1px] text-center text-[10px] tabular-nums font-bold ${riskM ? 'bg-red-500/15 text-red-400' : row.deltaMonth > 0 ? 'bg-emerald-500/15 text-emerald-400' : 'bg-zinc-800 text-zinc-400'}`}>
+                              {formatDelta(row.deltaMonth)}
+                            </span>
                           </div>
                         </td>
-                        <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.monthFreeHours.toFixed(1)}</td>
-                        <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.monthBreakHours.toFixed(1)}</td>
-                        <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.monthVacationPaidHours.toFixed(1)}</td>
-                        <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.monthHolidayPaidHours.toFixed(1)}</td>
-                        <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.monthVacationDays}</td>
-                        <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.monthHolidayDays}</td>
-                        <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{row.totalVacationDays}</td>
+                        <td className="px-1.5 py-1 text-center tabular-nums">
+                          <span className={`font-semibold ${row.monthWorkedDays > 0 ? 'text-emerald-400' : 'text-zinc-600'}`}>{row.monthWorkedDays}</span>
+                        </td>
+                        <td className="px-1.5 py-1 text-center tabular-nums text-zinc-500">{row.monthFreeDays > 0 ? row.monthFreeDays : <span className="text-zinc-700">–</span>}</td>
+                        <td className="px-1 py-1 text-center">
+                          {row.monthVacationDays > 0
+                            ? <span className="inline-block rounded-full border border-sky-500/30 bg-sky-500/15 px-1.5 py-[1px] text-[10px] font-bold tabular-nums text-sky-300" title={`${row.monthVacationPaidHours.toFixed(1)}h pagadas`}>{row.monthVacationDays}d</span>
+                            : <span className="text-zinc-700">–</span>}
+                        </td>
+                        <td className="px-1 py-1 text-center">
+                          {row.monthHolidayDays > 0
+                            ? <span className="inline-block rounded-full border border-amber-500/30 bg-amber-500/15 px-1.5 py-[1px] text-[10px] font-bold tabular-nums text-amber-300" title={`${row.monthHolidayPaidHours.toFixed(1)}h pagadas`}>{row.monthHolidayDays}d</span>
+                            : <span className="text-zinc-700">–</span>}
+                        </td>
+                        <td className="border-l-2 border-border/25 px-1.5 py-1 text-center tabular-nums">
+                          {row.totalVacationDays > 0
+                            ? <span className="font-bold text-sky-300">{row.totalVacationDays}</span>
+                            : <span className="text-zinc-600">0</span>}
+                        </td>
                       </tr>
                     )
                   })}
+                  {/* Fila resumen / totales */}
+                  <tr className="border-t-2 border-border/40 bg-zinc-800/70">
+                    <td className="sticky left-0 z-10 border-r border-border/20 bg-zinc-800/70 px-3 py-1.5 text-xs font-semibold text-foreground">
+                      Promedio / Total <span className="font-normal text-zinc-500">({sortedHoursRows.length})</span>
+                    </td>
+                    <td className="border-l border-border/15 px-1.5 py-1 text-right tabular-nums text-zinc-300 font-semibold whitespace-nowrap">
+                      {(controlTotals.wH / controlN).toFixed(1)} / {(controlTotals.wE / controlN).toFixed(1)}
+                    </td>
+                    <td className="px-1 py-1">
+                      <div className="flex items-center justify-end">
+                        <span className={`inline-block rounded-md px-1.5 py-[1px] text-[10px] tabular-nums font-bold ${(controlTotals.wH - controlTotals.wE) >= 0 ? 'bg-emerald-500/15 text-emerald-400' : 'bg-red-500/15 text-red-400'}`}>
+                          Σ {formatDelta(controlTotals.wH - controlTotals.wE)}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-1.5 py-1 text-center tabular-nums text-zinc-300 font-semibold">{controlTotals.wWD}</td>
+                    <td className="px-1.5 py-1 text-center tabular-nums text-zinc-500 font-semibold">{controlTotals.wFD}</td>
+                    <td className="px-1 py-1 text-center tabular-nums font-semibold text-sky-400">{controlTotals.wVD > 0 ? controlTotals.wVD : '–'}</td>
+                    <td className="px-1 py-1 text-center tabular-nums font-semibold text-amber-400">{controlTotals.wHD > 0 ? controlTotals.wHD : '–'}</td>
+                    <td className="border-l-2 border-border/25 px-1.5 py-1 text-right tabular-nums text-zinc-300 font-semibold whitespace-nowrap">
+                      {(controlTotals.mH / controlN).toFixed(1)} / {(controlTotals.mE / controlN).toFixed(1)}
+                    </td>
+                    <td className="px-1 py-1">
+                      <div className="flex items-center justify-end">
+                        <span className={`inline-block rounded-md px-1.5 py-[1px] text-[10px] tabular-nums font-bold ${(controlTotals.mH - controlTotals.mE) >= 0 ? 'bg-emerald-500/15 text-emerald-400' : 'bg-red-500/15 text-red-400'}`}>
+                          Σ {formatDelta(controlTotals.mH - controlTotals.mE)}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-1.5 py-1 text-center tabular-nums text-zinc-300 font-semibold">{controlTotals.mWD}</td>
+                    <td className="px-1.5 py-1 text-center tabular-nums text-zinc-500 font-semibold">{controlTotals.mFD}</td>
+                    <td className="px-1 py-1 text-center tabular-nums font-semibold text-sky-400">{controlTotals.mVD > 0 ? controlTotals.mVD : '–'}</td>
+                    <td className="px-1 py-1 text-center tabular-nums font-semibold text-amber-400">{controlTotals.mHD > 0 ? controlTotals.mHD : '–'}</td>
+                    <td className="border-l-2 border-border/25 px-1.5 py-1 text-center tabular-nums text-sky-300 font-bold">{controlTotals.tVD}</td>
+                  </tr>
                 </tbody>
               </table>
+              </div>
             </div>
           </div>
         )}

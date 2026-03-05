@@ -7,6 +7,17 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.70.7] - 2026-03-05
+### Mejorado — Rediseño completo del panel de Control
+- **Corrección Días Libres**: ya no cuenta vacaciones ni feriados como "libres" (antes inflaba artificialmente ej: 49h en Gallardo con 5 vac)
+- **Nuevas columnas Días Trab.**: muestra días efectivamente trabajados por semana y mes (antes no se mostraba)
+- **Visual rediseñado**: encabezados con gradientes azul (Semana) e índigo (Mes), badges de grupo A/B/C, badges coloreados para vacaciones (sky) y feriados (amber)
+- **Columnas reducidas de 16 a 13**: eliminadas Colación, Vac H y Fer H como columnas visibles (disponibles como tooltip al pasar mouse sobre Horas)
+- **Fila de totales/promedios**: muestra promedios de horas, delta acumulado (Σ) y totales de días por semana y mes
+- **Selectores mejorados**: indicador de color por sección + conteo de días visibles
+- **Títulos claros**: reemplazadas abreviaciones crípticas (Vac H S, Fer M, etc.) por nombres descriptivos con tooltips explicativos
+- **Zebra striping y hover**: filas alternadas para mejor legibilidad
+
 ## [2.70.6] - 2026-03-05
 ### Corregido — 49h en semana de vacaciones y visibilidad en Control
 - **Respeta días hábiles en vacaciones**: cuando está activa la opción de hábiles, `Vac S/M` y `Vac H S/M` no consideran sábado/domingo
