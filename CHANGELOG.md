@@ -7,6 +7,13 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.70.11] - 2026-03-05
+### Corregido — Regla de vacaciones legal forzada (sin depender de checkbox)
+- **Vacaciones legales fijas**: el conteo de vacaciones ahora SIEMPRE usa Lun-Vie (horario administrativo), sin depender de configuración guardada localmente.
+- **Evita casos de 14 en vez de 10**: aunque existan 14 días corridos marcados como VAC, el acumulado legal cuenta solo los 10 días hábiles (Lun-Vie).
+- **Horas vacación mantienen jornada legal**: se conserva cálculo `jornada legal semanal / 5` por día de vacación.
+- **UI aclarada**: el control se muestra como fijo “Vacaciones legales (fijo): solo Lun-Vie”.
+
 ## [2.70.10] - 2026-03-05
 ### Corregido — Vacaciones en horario administrativo Lun-Vie
 - **Días de vacación = solo Lun-Vie**: nueva función `isVacationBusinessDay()` siempre usa horario administrativo (Lun-Vie), independiente de jornada 6x1

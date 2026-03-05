@@ -372,7 +372,7 @@ export function CalendarioMantencionPage() {
       dayReductionHours: toNumberOr(stored.dayReductionHours, 1),
       afternoonReductionHours: toNumberOr(stored.afternoonReductionHours, 1),
       nightReductionHours: toNumberOr(stored.nightReductionHours, 1),
-      vacationBusinessDaysOnly: stored.vacationBusinessDaysOnly !== false,
+      vacationBusinessDaysOnly: true,
       holidayAsNonWorking: stored.holidayAsNonWorking !== false,
       holidayBusinessDaysOnly: stored.holidayBusinessDaysOnly !== false,
     }
@@ -1325,17 +1325,17 @@ export function CalendarioMantencionPage() {
     // Vacaciones: horario administrativo Lun-Vie (independiente de jornada 6x1)
     const weekVacationDays = weekDays.reduce((sum, d) => {
       if (!d.dateObj || !isVacationShift(t.shifts[d.c] || '')) return sum
-      if (hoursConfig.vacationBusinessDaysOnly && !isVacationBusinessDay(d.dateObj)) return sum
+      if (!isVacationBusinessDay(d.dateObj)) return sum
       return sum + 1
     }, 0)
     const monthVacationDays = monthDays.reduce((sum, d) => {
       if (!d.dateObj || !isVacationShift(t.shifts[d.c] || '')) return sum
-      if (hoursConfig.vacationBusinessDaysOnly && !isVacationBusinessDay(d.dateObj)) return sum
+      if (!isVacationBusinessDay(d.dateObj)) return sum
       return sum + 1
     }, 0)
     const totalVacationDays = dayCols.reduce((sum, d) => {
       if (!d.dateObj || !isVacationShift(t.shifts[d.c] || '')) return sum
-      if (hoursConfig.vacationBusinessDaysOnly && !isVacationBusinessDay(d.dateObj)) return sum
+      if (!isVacationBusinessDay(d.dateObj)) return sum
       return sum + 1
     }, 0)
     const weekHolidayDays = weekDays.reduce((sum, d) => {
@@ -1438,7 +1438,7 @@ export function CalendarioMantencionPage() {
       dayReductionHours: clampMin(toNumberOr(hoursConfig.dayReductionHours, 1), 0),
       afternoonReductionHours: clampMin(toNumberOr(hoursConfig.afternoonReductionHours, 1), 0),
       nightReductionHours: clampMin(toNumberOr(hoursConfig.nightReductionHours, 1), 0),
-      vacationBusinessDaysOnly: hoursConfig.vacationBusinessDaysOnly !== false,
+      vacationBusinessDaysOnly: true,
       holidayAsNonWorking: hoursConfig.holidayAsNonWorking !== false,
       holidayBusinessDaysOnly: hoursConfig.holidayBusinessDaysOnly !== false,
     }
@@ -1803,8 +1803,10 @@ export function CalendarioMantencionPage() {
               <span title="Activado: esperado por técnico según días realmente programados (no LIBRE/descanso/licencia). Desactivado: prorrateo simple por calendario.">Esperado por días programados (recomendado para 6x1)</span>
             </label>
             <label className="col-span-2 flex items-center gap-2">
-              <input type="checkbox" checked={hoursConfig.vacationBusinessDaysOnly} onChange={(e) => setHoursConfig((p) => ({ ...p, vacationBusinessDaysOnly: e.target.checked }))} />
-              <span title={`Activado: vacaciones solo cuentan días hábiles (${hoursConfig.workDaysPerWeek >= 6 ? 'Lun-Sáb en 6x1' : 'Lun-Vie en 5x2'}). Máx ${expectedWeekBase}h/sem. Desactivado: cuentan todos los días.`}>Vacaciones solo días hábiles ({hoursConfig.workDaysPerWeek >= 6 ? 'L-S' : 'L-V'})</span>
+              <input type="checkbox" checked disabled />
+              <span title={`Fijo por regla legal interna: vacaciones se contabilizan solo en horario administrativo Lun-Vie. Horas de vacación por día = jornada legal semanal/5 (actual: ${expectedWeekBase}h/sem).`}>
+                Vacaciones legales (fijo): solo Lun-Vie
+              </span>
             </label>
             <label className="col-span-2 flex items-center gap-2">
               <input type="checkbox" checked={hoursConfig.holidayAsNonWorking} onChange={(e) => setHoursConfig((p) => ({ ...p, holidayAsNonWorking: e.target.checked }))} />
