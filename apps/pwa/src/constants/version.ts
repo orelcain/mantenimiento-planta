@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.70.2' as const
+export const APP_VERSION = '2.70.3' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-03-05' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Estandarización de cierre: release con deploy hosting obligatorio' as const
+export const VERSION_NAME = 'Calendario extendible y control sincronizado por día/semana' as const
 
 /**
  * Nota:

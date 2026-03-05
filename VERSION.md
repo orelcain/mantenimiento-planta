@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.70.2**
+## Versión Actual: **v2.70.3**
 
 **Fecha de lanzamiento**: 05 de marzo de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,14 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.70.3 — Calendario extendible y control sincronizado por día (05/03/2026)
+- 🗓️ **Extensión directa del calendario**: nuevos botones `Extender +4 semanas` y `Extender +1 mes` para seguir planificando sin rehacer Excel
+- 🎯 **Selección inteligente**: al hacer click en un día/celda, se sincroniza automáticamente la semana y mes del panel de Control
+- 🌞 **Visibilidad mejorada**: resaltado más claro de día actual y de columna/celda seleccionada para operación en terreno
+- 🧮 **Vacaciones reflejadas en conteo**: días y horas de vacaciones se contabilizan en semana/mes/total de forma consistente
+- ↕️ **Orden estable de técnicos**: Control mantiene el orden original de turnos (A/B/C) sin reordenamiento automático
+- 🧷 **Grupos profesionales**: etiquetas visuales de turnos A/B/C más claras en la grilla
 
 ### v2.70.2 — Estandarización de cierre con deploy obligatorio (05/03/2026)
 - 📘 **Gobernanza de release formalizada**: se documenta en guías oficiales el cierre obligatorio con versionado + validación + commit + push + deploy

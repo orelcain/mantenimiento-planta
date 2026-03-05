@@ -1,8 +1,9 @@
 {
-  "version": "2.70.2",
+  "version": "2.70.3",
   "buildDate": "2026-03-05",
-  "buildTimestamp": 1772678890000,
+  "buildTimestamp": 1772682290000,
   "features": [
+    "Calendario mantención extendible (+4 semanas / +1 mes), selección sincronizada semana/mes y mejoras visuales de hoy/celda/grupos",
     "Proceso oficial de cierre actualizado: commit/push versionado + deploy obligatorio de Firebase Hosting",
     "Mapa Isométrico 3D: vista de planta completa con Three.js + cámara ortográfica",
     "Rotación FFT: 4 ángulos de cámara estilo Final Fantasy Tactics (Q/E o botones)",

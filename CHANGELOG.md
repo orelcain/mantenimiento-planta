@@ -7,6 +7,16 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.70.3] - 2026-03-05
+### Mejorado — Continuidad operativa de calendario y control por semana/mes
+- **Calendario extendible en UI**: nuevos botones `Extender +4 semanas` y `Extender +1 mes` para continuar planificación de semanas/meses futuros
+- **Persistencia de columnas de fecha**: los días extendidos quedan sincronizados en cache/Firebase para mantener continuidad del período
+- **Sincronización por click de día**: al seleccionar un día/celda del calendario, se actualizan automáticamente los selectores de semana y mes del panel `Control`
+- **Resaltado operativo reforzado**: mayor visibilidad para día actual y para la columna/celda seleccionada
+- **Conteo de vacaciones corregido**: días y horas de vacaciones reflejados en semana/mes/total de control
+- **Orden de técnicos estable**: se elimina ordenamiento por delta y se mantiene el orden original de turnos
+- **Visual profesional de grupos**: insignias A/B/C más legibles y consistentes en la grilla
+
 ## [2.70.2] - 2026-03-05
 ### Documentado — Cierre obligatorio con deploy de hosting
 - **Flujo oficial actualizado**: las guías de desarrollo y checklist de versión ahora exigen `versionado + validación + commit + push + deploy`

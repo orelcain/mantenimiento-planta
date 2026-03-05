@@ -77,6 +77,11 @@ type ShiftStyleSamples = {
 type PersistedCalendarState = {
   version: number
   originalFilename?: string
+  dayCols?: Array<{
+    c: number
+    dayLabel: string
+    dateRaw: string
+  }>
   techRows?: Array<{
     r: number
     turno: string
@@ -235,12 +240,7 @@ function getChileLegalWeeklyLabel(referenceDate: Date): string {
 
 function getPlanningMonthStart(): Date {
   const today = getChileToday()
-  return new Date(today.getFullYear(), 2, 1)
-}
-
-function isInPlanningMonth(date: Date): boolean {
-  const start = getPlanningMonthStart()
-  return date.getFullYear() === start.getFullYear() && date.getMonth() === start.getMonth()
+  return new Date(today.getFullYear(), today.getMonth(), 1)
 }
 
 function isoWeekKey(date: Date): string {
@@ -382,6 +382,7 @@ export function CalendarioMantencionPage() {
   const redoRef = useRef<() => void>(() => {})
   const [historyVersion, setHistoryVersion] = useState(0)
   const [calendarShortcutsActive, setCalendarShortcutsActive] = useState(false)
+  const [todayTick, setTodayTick] = useState(() => Date.now())
 
   const shortcuts = useMemo(() => {
     const dia = `${shiftConfig.diaInicio} - ${shiftConfig.diaFin}`
@@ -447,14 +448,14 @@ export function CalendarioMantencionPage() {
   }, [dayCols])
 
   const todayDayCol = useMemo(() => {
-    const today = getChileToday()
+    const today = new Date(todayTick)
     return dayCols.find((d) => {
       if (!d.dateObj) return false
       return d.dateObj.getFullYear() === today.getFullYear()
         && d.dateObj.getMonth() === today.getMonth()
         && d.dateObj.getDate() === today.getDate()
     })
-  }, [dayCols])
+  }, [dayCols, todayTick])
 
   const techGroups = useMemo(() => {
     const groups = Array.from(new Set(techRows.map((t) => t.turno).filter(Boolean)))
@@ -478,6 +479,13 @@ export function CalendarioMantencionPage() {
     return () => {
       if (syncTimerRef.current) clearTimeout(syncTimerRef.current)
     }
+  }, [])
+
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      setTodayTick(Date.now())
+    }, 60 * 1000)
+    return () => clearInterval(intervalId)
   }, [])
 
   useEffect(() => {
@@ -644,11 +652,7 @@ export function CalendarioMantencionPage() {
     const ref = XLSX.utils.decode_range(horarioSheet['!ref'] || 'A1:A1')
     const colsDetected = detectDayColumns(horarioSheet, ref)
     const colsNormalized = normalizeLegacyTemplateDates(colsDetected, horarioSheet)
-    const cols = colsNormalized.filter((col) => {
-      if (!col.dateObj) return false
-      return isInPlanningMonth(col.dateObj)
-    })
-    const finalCols = cols.length > 0 ? cols : colsNormalized
+    const finalCols = colsNormalized
     const techs = detectTechnicians(horarioSheet, ref, finalCols)
     const catalog = readTurnosCatalog(workbook)
 
@@ -666,13 +670,14 @@ export function CalendarioMantencionPage() {
     if (firstDay) setSelectedCol(firstDay.c)
 
     inferShiftConfig(catalog, techs)
-    setStatus(`Plantilla cargada: ${filename}. Técnicos: ${techs.length}. Días: ${cols.length}. Fechas alineadas a calendario actual.`)
+    setStatus(`Plantilla cargada: ${filename}. Técnicos: ${techs.length}. Días: ${finalCols.length}. Fechas alineadas a calendario actual.`)
     void hydrateCalendarFromFirebase(horarioSheet, filename)
   }
 
   async function hydrateCalendarFromFirebase(sheet: XLSX.WorkSheet, filename: string): Promise<void> {
     const applyPersistedState = (data: PersistedCalendarState): boolean => {
       const persistedRows = Array.isArray(data.techRows) ? data.techRows : []
+      const persistedColsRaw = Array.isArray(data.dayCols) ? data.dayCols : []
 
       if (data.hoursConfig) setHoursConfig({ ...defaultHoursConfig(), ...data.hoursConfig })
       if (data.shiftConfig) setShiftConfig({ ...defaultShiftConfig(), ...data.shiftConfig })
@@ -698,6 +703,30 @@ export function CalendarioMantencionPage() {
           shifts,
         }
       })
+
+      const persistedCols: DayCol[] = persistedColsRaw
+        .map((col) => {
+          const colIndex = Number(col.c)
+          if (Number.isNaN(colIndex)) return null
+          const parsedDate = parseDateFromExcelCell(col.dateRaw)
+          const dateObj = parsedDate && !Number.isNaN(parsedDate.getTime()) ? parsedDate : null
+          return {
+            c: colIndex,
+            dayLabel: String(col.dayLabel || ''),
+            dateRaw: String(col.dateRaw || ''),
+            dateObj,
+          }
+        })
+        .filter((col): col is DayCol => !!col)
+        .sort((a, b) => a.c - b.c)
+
+      if (persistedCols.length > 0) {
+        persistedCols.forEach((col) => {
+          setCellValue(1, col.c, col.dayLabel, sheet)
+          setCellValue(2, col.c, col.dateRaw, sheet)
+        })
+        setDayCols(persistedCols)
+      }
 
       restored.forEach((tech) => {
         setCellValue(tech.r, 0, tech.turno, sheet)
@@ -755,6 +784,11 @@ export function CalendarioMantencionPage() {
       const localPayload: PersistedCalendarState = {
         version: 1,
         originalFilename,
+        dayCols: dayCols.map((d) => ({
+          c: d.c,
+          dayLabel: d.dayLabel,
+          dateRaw: d.dateRaw || formatDate(d.dateObj),
+        })),
         techRows: techRows.map((t) => ({
           r: t.r,
           turno: t.turno,
@@ -787,7 +821,7 @@ export function CalendarioMantencionPage() {
       setSyncErrorText(error instanceof Error ? error.message : 'Error desconocido')
       setStatus('Cambios guardados en este navegador, pero sin permisos para sincronizar en Firebase.')
     }
-  }, [hoursConfig, originalFilename, shiftConfig, techRows])
+  }, [dayCols, hoursConfig, originalFilename, shiftConfig, techRows])
 
   useEffect(() => {
     if (!hasLoadedCalendarRef.current || isHydratingRemoteRef.current) return
@@ -1008,6 +1042,50 @@ export function CalendarioMantencionPage() {
     setStatus(`Turno actualizado (${dayLabelByCol(c)}): ${normalized}`)
   }
 
+  const selectCalendarDate = useCallback((col: DayCol): void => {
+    if (!col.dateObj) return
+    const week = isoWeekKey(col.dateObj)
+    const month = monthKey(col.dateObj)
+    if (weeks[week]) setSelectedWeek(week)
+    if (months[month]) setSelectedMonth(month)
+  }, [months, weeks])
+
+  function extendCalendarByDays(daysToAdd: number): void {
+    if (!ws || dayCols.length === 0 || daysToAdd <= 0) return
+    const lastWithDate = [...dayCols].reverse().find((d) => d.dateObj)
+    if (!lastWithDate?.dateObj) return
+
+    const lastCol = dayCols.reduce((max, d) => Math.max(max, d.c), 6)
+    const libreValue = shiftConfig.libreLabel || 'LIBRE'
+    const nextCols: DayCol[] = []
+
+    for (let offset = 1; offset <= daysToAdd; offset++) {
+      const date = new Date(lastWithDate.dateObj)
+      date.setDate(lastWithDate.dateObj.getDate() + offset)
+      const c = lastCol + offset
+      const dayLabel = normalizeWeekdayLabel(date.toLocaleDateString('es-CL', { weekday: 'long' }))
+      const dateRaw = formatDate(date)
+      nextCols.push({ c, dayLabel, dateRaw, dateObj: date })
+      setCellValue(1, c, dayLabel)
+      setCellValue(2, c, dateRaw)
+    }
+
+    if (nextCols.length === 0) return
+
+    setTechRows((prev) => prev.map((tech) => {
+      const shifts = { ...tech.shifts }
+      nextCols.forEach((col) => {
+        const nextShift = shifts[col.c] || libreValue
+        shifts[col.c] = nextShift
+        setCellValue(tech.r, col.c, nextShift)
+      })
+      return { ...tech, shifts }
+    }))
+
+    setDayCols((prev) => [...prev, ...nextCols])
+    setStatus(`Calendario extendido: +${daysToAdd} días hasta ${formatDate(nextCols[nextCols.length - 1]?.dateObj ?? null)}.`)
+  }
+
   function dayLabelByCol(c: number): string {
     const d = dayCols.find((x) => x.c === c)
     if (!d) return ''
@@ -1100,7 +1178,8 @@ export function CalendarioMantencionPage() {
   }
 
   function isVacationShift(shiftText: string): boolean {
-    return shiftText.trim().toLowerCase().includes('vacaciones')
+    const text = shiftText.trim().toLowerCase()
+    return /vacac|vacaci|vacación|vacaciones/.test(text)
   }
 
   function isHolidayShift(shiftText: string): boolean {
@@ -1206,17 +1285,14 @@ export function CalendarioMantencionPage() {
     const monthWorkedDays = monthDays.reduce((sum, d) => sum + (isWorkingShift(t.shifts[d.c] || '') ? 1 : 0), 0)
     const weekVacationDays = weekDays.reduce((sum, d) => {
       if (!d.dateObj || !isVacationShift(t.shifts[d.c] || '')) return sum
-      if (hoursConfig.vacationBusinessDaysOnly && !isBusinessDay(d.dateObj)) return sum
       return sum + 1
     }, 0)
     const monthVacationDays = monthDays.reduce((sum, d) => {
       if (!d.dateObj || !isVacationShift(t.shifts[d.c] || '')) return sum
-      if (hoursConfig.vacationBusinessDaysOnly && !isBusinessDay(d.dateObj)) return sum
       return sum + 1
     }, 0)
     const totalVacationDays = dayCols.reduce((sum, d) => {
       if (!d.dateObj || !isVacationShift(t.shifts[d.c] || '')) return sum
-      if (hoursConfig.vacationBusinessDaysOnly && !isBusinessDay(d.dateObj)) return sum
       return sum + 1
     }, 0)
     const weekHolidayDays = weekDays.reduce((sum, d) => {
@@ -1280,11 +1356,22 @@ export function CalendarioMantencionPage() {
     }
   })
 
-  const sortedHoursRows = useMemo(() => {
-    const rows = [...hoursRows]
-    rows.sort((a, b) => a.deltaWeek - b.deltaWeek)
-    return rows
-  }, [hoursRows])
+  const sortedHoursRows = hoursRows
+
+  function turnoBadgeClass(turno: string): string {
+    const key = turno.trim().toUpperCase()
+    if (key === 'A') return 'border-cyan-500/50 bg-cyan-500/15 text-cyan-200'
+    if (key === 'B') return 'border-amber-500/50 bg-amber-500/15 text-amber-200'
+    if (key === 'C') return 'border-violet-500/50 bg-violet-500/15 text-violet-200'
+    return 'border-border bg-muted/40 text-foreground'
+  }
+
+  useEffect(() => {
+    if (selectedCol === null) return
+    const selectedDay = dayCols.find((d) => d.c === selectedCol)
+    if (!selectedDay?.dateObj) return
+    selectCalendarDate(selectedDay)
+  }, [selectedCol, dayCols, selectCalendarDate])
 
   function handleHoursConfigApply() {
     const next = {
@@ -1561,6 +1648,10 @@ export function CalendarioMantencionPage() {
             <div className="grid gap-1.5">
               <label className="text-xs text-muted-foreground">Exportar calendario</label>
               <button className="h-8 rounded border text-xs" onClick={exportWorkbook}>Exportar</button>
+              <div className="grid grid-cols-2 gap-1">
+                <button className="h-8 rounded border text-xs" onClick={() => extendCalendarByDays(28)}>Extender +4 semanas</button>
+                <button className="h-8 rounded border text-xs" onClick={() => extendCalendarByDays(31)}>Extender +1 mes</button>
+              </div>
               <div className="grid grid-cols-3 gap-1 text-[11px]">
                 <select className={CONTROL_CLASS + ' h-7'} value={exportScope} onChange={(e) => setExportScope(e.target.value as ExportScope)}>
                   <option value="month">Mes actual</option>
@@ -1916,7 +2007,15 @@ export function CalendarioMantencionPage() {
                   </th>
                 ))}
                 {dayCols.map((d, idx) => (
-                  <th key={`day-${d.c}`} className={`sticky top-0 z-20 border border-primary/70 !bg-primary bg-opacity-100 px-1 py-1 backdrop-blur-none ${isSameDate(d.dateObj, todayDayCol?.dateObj ?? null) ? 'border-x-2 border-yellow-300' : ''} ${isWeekStart(idx) ? 'border-l-2 border-l-cyan-300' : ''}`} style={{ minWidth: `${DAY_COL_WIDTH}px`, maxWidth: `${DAY_COL_WIDTH}px` }}>
+                  <th
+                    key={`day-${d.c}`}
+                    className={`sticky top-0 z-20 border border-primary/70 !bg-primary bg-opacity-100 px-1 py-1 backdrop-blur-none cursor-pointer ${isSameDate(d.dateObj, todayDayCol?.dateObj ?? null) ? 'border-x-4 border-yellow-200 shadow-[inset_0_0_0_1px_rgba(253,224,71,0.8)]' : ''} ${selectedCol === d.c ? 'ring-2 ring-white/80 ring-inset' : ''} ${isWeekStart(idx) ? 'border-l-2 border-l-cyan-300' : ''}`}
+                    style={{ minWidth: `${DAY_COL_WIDTH}px`, maxWidth: `${DAY_COL_WIDTH}px` }}
+                    onClick={() => {
+                      setSelectedCol(d.c)
+                      selectCalendarDate(d)
+                    }}
+                  >
                     <div className="flex items-center justify-between gap-1">
                       <span>{d.dayLabel}</span>
                       {isWeekStart(idx) ? <span className="rounded bg-cyan-100/20 px-1 text-[9px]">{weekNumberLabel(d.dateObj)}</span> : null}
@@ -1935,7 +2034,17 @@ export function CalendarioMantencionPage() {
                   </th>
                 ))}
                 {dayCols.map((d, idx) => (
-                  <th key={`date-${d.c}`} className={`sticky top-[30px] z-20 border border-primary/70 !bg-primary bg-opacity-100 px-1 py-1 backdrop-blur-none ${isSameDate(d.dateObj, todayDayCol?.dateObj ?? null) ? 'border-x-2 border-b-2 border-yellow-300 font-semibold' : ''} ${isWeekStart(idx) ? 'border-l-2 border-l-cyan-300' : ''}`} style={{ minWidth: `${DAY_COL_WIDTH}px`, maxWidth: `${DAY_COL_WIDTH}px` }}>{formatDate(d.dateObj) || d.dateRaw}</th>
+                  <th
+                    key={`date-${d.c}`}
+                    className={`sticky top-[30px] z-20 border border-primary/70 !bg-primary bg-opacity-100 px-1 py-1 backdrop-blur-none cursor-pointer ${isSameDate(d.dateObj, todayDayCol?.dateObj ?? null) ? 'border-x-4 border-b-2 border-yellow-200 font-semibold shadow-[inset_0_0_0_1px_rgba(253,224,71,0.8)]' : ''} ${selectedCol === d.c ? 'ring-2 ring-white/80 ring-inset' : ''} ${isWeekStart(idx) ? 'border-l-2 border-l-cyan-300' : ''}`}
+                    style={{ minWidth: `${DAY_COL_WIDTH}px`, maxWidth: `${DAY_COL_WIDTH}px` }}
+                    onClick={() => {
+                      setSelectedCol(d.c)
+                      selectCalendarDate(d)
+                    }}
+                  >
+                    {formatDate(d.dateObj) || d.dateRaw}
+                  </th>
                 ))}
               </tr>
             </thead>
@@ -1952,7 +2061,11 @@ export function CalendarioMantencionPage() {
                         style={{ left: `${metaLeftFiltered(vi, visibleMetaIndices)}px`, minWidth: `${META_COL_WIDTHS[gi]}px`, maxWidth: `${META_COL_WIDTHS[gi]}px` }}
                         title={metaValues[gi]}
                       >
-                        {metaValues[gi]}
+                        {gi === 0 ? (
+                          <span className={`inline-flex min-w-6 justify-center rounded border px-1.5 py-0.5 text-[10px] font-semibold ${turnoBadgeClass(String(metaValues[gi] || ''))}`}>
+                            {metaValues[gi] || '-'}
+                          </span>
+                        ) : metaValues[gi]}
                       </td>
                     ))}
                     {dayCols.map((d, idx) => {
@@ -1962,12 +2075,13 @@ export function CalendarioMantencionPage() {
                       return (
                         <td
                           key={`shift-${tech.r}-${d.c}`}
-                          className={`border px-1 py-1 text-center cursor-pointer ${cellStyle.className} ${isSelectedCell ? 'ring-2 ring-primary ring-inset' : ''} ${isSameDate(d.dateObj, todayDayCol?.dateObj ?? null) ? 'border-x-2 border-yellow-300/80' : ''} ${isWeekStart(idx) ? 'border-l-2 border-l-cyan-300/80' : ''}`}
+                          className={`border px-1 py-1 text-center cursor-pointer ${cellStyle.className} ${isSelectedCell ? 'ring-2 ring-primary ring-inset shadow-[inset_0_0_0_1px_rgba(255,255,255,0.85)]' : ''} ${selectedCol === d.c ? 'bg-primary/10' : ''} ${isSameDate(d.dateObj, todayDayCol?.dateObj ?? null) ? 'border-x-4 border-yellow-300/90' : ''} ${isWeekStart(idx) ? 'border-l-2 border-l-cyan-300/80' : ''}`}
                           style={{ minWidth: `${DAY_COL_WIDTH}px`, maxWidth: `${DAY_COL_WIDTH}px`, ...cellStyle.style }}
                           title={value}
                           onClick={() => {
                             setSelectedRow(tech.r)
                             setSelectedCol(d.c)
+                            selectCalendarDate(d)
                           }}
                         >
                           {value}
