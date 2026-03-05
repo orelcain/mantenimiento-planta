@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.70.4**
+## Versión Actual: **v2.70.5**
 
 **Fecha de lanzamiento**: 05 de marzo de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.70.5 — Hotfix extensión vacía y vacaciones en control (05/03/2026)
+- ⬜ **Extensión limpia**: al agregar semanas/meses nuevos, las celdas quedan vacías (no prellenadas como `LIBRE`)
+- 🏖️ **Vacaciones robustas en Control**: se reconocen variantes de texto (`VAC`, `VACACIÓN`, `VACACIONES`) para contabilizar días y horas
+- 🧮 **Cálculo coherente de horas**: etiquetas de vacaciones ya no se interpretan como turno trabajado por error de texto
 
 ### v2.70.4 — Hotfix de fechas extendidas y semana por click (05/03/2026)
 - 🧭 **Parseo de fecha corregido**: se elimina interpretación ambigua de strings para evitar saltos tipo `04/03`, `04/04` al extender columnas

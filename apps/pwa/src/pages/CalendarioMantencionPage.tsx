@@ -1079,7 +1079,6 @@ export function CalendarioMantencionPage() {
     if (!lastWithDate?.dateObj) return
 
     const lastCol = dayCols.reduce((max, d) => Math.max(max, d.c), 6)
-    const libreValue = shiftConfig.libreLabel || 'LIBRE'
     const nextCols: DayCol[] = []
 
     for (let offset = 1; offset <= daysToAdd; offset++) {
@@ -1098,9 +1097,8 @@ export function CalendarioMantencionPage() {
     setTechRows((prev) => prev.map((tech) => {
       const shifts = { ...tech.shifts }
       nextCols.forEach((col) => {
-        const nextShift = shifts[col.c] || libreValue
-        shifts[col.c] = nextShift
-        setCellValue(tech.r, col.c, nextShift)
+        shifts[col.c] = ''
+        setCellValue(tech.r, col.c, '')
       })
       return { ...tech, shifts }
     }))
@@ -1120,11 +1118,25 @@ export function CalendarioMantencionPage() {
     return label.charAt(0).toUpperCase() + label.slice(1)
   }
 
+  function normalizeShiftText(shiftText: string): string {
+    return shiftText
+      .trim()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+  }
+
+  function hasVacationToken(shiftText: string): boolean {
+    const text = normalizeShiftText(shiftText)
+    if (!text) return false
+    return text.startsWith('vac') || text.includes('vacacion')
+  }
+
   function detectShiftStyleKey(value: string): keyof ShiftStyleSamples | null {
-    const text = value.trim().toLowerCase()
+    const text = normalizeShiftText(value)
     if (!text) return null
     if (text.includes('feriado')) return 'feriado'
-    if (text.includes('vacaciones')) return 'vacaciones'
+    if (hasVacationToken(value)) return 'vacaciones'
     if (text.includes('libre') || text.includes('descanso') || text.includes('licencia')) return 'libre'
     if (isReducedShift(value)) {
       if (text.includes(shiftConfig.diaInicio.toLowerCase()) || text.includes('08:00') || text.includes('07:00')) return 'diaReducido'
@@ -1167,7 +1179,7 @@ export function CalendarioMantencionPage() {
   }
 
   function shiftCellStyle(value: string): { className: string; style?: React.CSSProperties } {
-    const v = value.trim().toLowerCase()
+    const v = normalizeShiftText(value)
     if (!v) return { className: '' }
 
     // LIBRE / DESCANSO with gray background
@@ -1181,7 +1193,7 @@ export function CalendarioMantencionPage() {
     }
 
     // VACACIONES → Light blue background (Excel match)
-    if (v.includes('vacaciones')) return { className: 'font-medium', style: { backgroundColor: '#8DB4E2', color: '#000000' } }
+    if (hasVacationToken(value)) return { className: 'font-medium', style: { backgroundColor: '#8DB4E2', color: '#000000' } }
 
     // LICENCIA → Light teal background
     if (v.includes('licencia')) return { className: 'font-medium', style: { backgroundColor: '#B7DEE8', color: '#000000' } }
@@ -1195,14 +1207,13 @@ export function CalendarioMantencionPage() {
   }
 
   function isWorkingShift(shiftText: string): boolean {
-    const text = shiftText.trim().toLowerCase()
+    const text = normalizeShiftText(shiftText)
     if (!text) return false
-    return !(text.includes('libre') || text.includes('descanso') || text.includes('vacaciones') || text.includes('licencia') || text.includes('feriado'))
+    return !(text.includes('libre') || text.includes('descanso') || hasVacationToken(shiftText) || text.includes('licencia') || text.includes('feriado'))
   }
 
   function isVacationShift(shiftText: string): boolean {
-    const text = shiftText.trim().toLowerCase()
-    return /vacac|vacaci|vacación|vacaciones/.test(text)
+    return hasVacationToken(shiftText)
   }
 
   function isHolidayShift(shiftText: string): boolean {

@@ -7,6 +7,13 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.70.5] - 2026-03-05
+### Corregido — Extensión vacía y vacaciones reflejadas en Control
+- **Extensión sin autollenado**: columnas nuevas quedan vacías en vez de `LIBRE`
+- **Reconocimiento ampliado de vacaciones**: se detectan `VAC`, `VACACIÓN` y `VACACIONES`
+- **Control semanal/mensual ajustado**: los registros de vacaciones impactan correctamente en `Vac H` y `Vac` (días)
+- **Evita falso trabajo**: textos de vacaciones no se computan como turno trabajado
+
 ## [2.70.4] - 2026-03-05
 ### Corregido — Extensión de calendario y selección de semana por click
 - **Parseo de fechas robusto**: soporte explícito `dd/mm/yyyy` y `yyyy-mm-dd` para evitar interpretaciones ambiguas en columnas extendidas

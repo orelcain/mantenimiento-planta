@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.70.4' as const
+export const APP_VERSION = '2.70.5' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-03-05' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Hotfix calendario: extensión de fechas y semana por click' as const
+export const VERSION_NAME = 'Hotfix calendario: extensión vacía + vacaciones reflejadas en control' as const
 
 /**
  * Nota:
