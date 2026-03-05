@@ -67,6 +67,7 @@ Desde ahora, cada mejora aprobada se cierra con este patrón único:
 1. **Versionar** (`PATCH/MINOR/MAJOR`) en los 5 archivos PWA oficiales.
 2. **Validar** con `pnpm run release:pwa:finalize`.
 3. **Publicar** con commit de release + push a `main`.
+4. **Desplegar** Firebase Hosting y confirmar `status: success`.
 
 Formato obligatorio del commit de cierre:
 
@@ -85,6 +86,14 @@ Si `git push` falla por `non-fast-forward`, resolver con:
 git pull --rebase origin main
 git push origin main
 ```
+
+Comando obligatorio de despliegue al cierre:
+
+```bash
+firebase deploy --only hosting --non-interactive --json
+```
+
+No cerrar iteración sin deploy exitoso de hosting.
 
 ---
 

@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.70.1**
+## Versión Actual: **v2.70.2**
 
 **Fecha de lanzamiento**: 05 de marzo de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.70.2 — Estandarización de cierre con deploy obligatorio (05/03/2026)
+- 📘 **Gobernanza de release formalizada**: se documenta en guías oficiales el cierre obligatorio con versionado + validación + commit + push + deploy
+- 🚀 **Deploy de hosting obligatorio**: se incorpora `firebase deploy --only hosting --non-interactive --json` como paso mandatorio al final de cada iteración aprobada
+- ✅ **Criterio de cierre explícito**: no se considera completa una mejora sin confirmación de `status: success` en Firebase Hosting
 
 ### v2.70.1 — Cumplimiento legal 6x1 con esperado por técnico (05/03/2026)
 - ⚖️ **Modo legal por régimen**: nuevo parámetro `Días trabajo/semana` (6x1, 5x2, 7x0)

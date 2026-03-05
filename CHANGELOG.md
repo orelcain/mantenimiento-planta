@@ -7,6 +7,12 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.70.2] - 2026-03-05
+### Documentado — Cierre obligatorio con deploy de hosting
+- **Flujo oficial actualizado**: las guías de desarrollo y checklist de versión ahora exigen `versionado + validación + commit + push + deploy`
+- **Deploy mandatorio al cierre**: se incorpora `firebase deploy --only hosting --non-interactive --json` como comando estándar
+- **Criterio de éxito explícito**: cada iteración aprobada debe terminar con confirmación de despliegue exitoso en Firebase Hosting
+
 ## [2.70.1] - 2026-03-05
 ### Mejorado — Cumplimiento legal de horas para turnos 6x1
 - **Régimen semanal configurable**: nuevo selector `Días trabajo/semana` con presets `6x1`, `5x2` y `7x0`

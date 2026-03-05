@@ -6,7 +6,7 @@ Este es el estándar oficial para cerrar cada mejora del proyecto.
 
 ## ✅ Regla base
 
-- Cada mejora terminada debe cerrar con: **versionado + validación + commit + push**.
+- Cada mejora terminada debe cerrar con: **versionado + validación + commit + push + deploy hosting**.
 - No se deja trabajo “listo” sin publicar en `main`.
 
 ---
@@ -54,6 +54,9 @@ pnpm run release:pwa:finalize
 git add -A
 git commit -m "release: vX.Y.Z <resumen-corto>"
 git push origin main
+
+# 5) Deploy obligatorio
+firebase deploy --only hosting --non-interactive --json
 ```
 
 Si `push` falla por `non-fast-forward`, repetir:
@@ -105,4 +108,5 @@ Cada mejora queda trazable con:
 - versión visible en runtime,
 - historial de cambios documentado,
 - validación técnica ejecutada,
-- publicación inmediata en `main`.
+- publicación inmediata en `main`,
+- despliegue confirmado en Firebase Hosting.
