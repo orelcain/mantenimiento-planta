@@ -7,6 +7,12 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.70.8] - 2026-03-05
+### Corregido — Vacaciones en jornada 6x1 (Lun-Sáb)
+- **Días hábiles respetan jornada 6x1**: `isBusinessDay()` ahora considera Lun-Sáb como hábiles cuando `workDaysPerWeek >= 6`, solo Domingo es descanso legal
+- **Antes**: excluía Sábado como día hábil (lógica 5x2), sub-contando vacaciones en semanas con sábados
+- **Label dinámico**: checkbox muestra "L-S" o "L-V" según la jornada configurada
+
 ## [2.70.7] - 2026-03-05
 ### Mejorado — Rediseño completo del panel de Control
 - **Corrección Días Libres**: ya no cuenta vacaciones ni feriados como "libres" (antes inflaba artificialmente ej: 49h en Gallardo con 5 vac)

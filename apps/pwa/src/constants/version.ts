@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.70.7' as const
+export const APP_VERSION = '2.70.8' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-03-05' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Rediseño Control: visual, datos corregidos y totales' as const
+export const VERSION_NAME = 'Fix vacaciones 6x1: hábiles Lun-Sáb' as const
 
 /**
  * Nota:

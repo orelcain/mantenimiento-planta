@@ -1217,6 +1217,9 @@ export function CalendarioMantencionPage() {
 
   function isBusinessDay(date: Date): boolean {
     const day = date.getDay()
+    // 6x1: hábiles = lunes(1) a sábado(6), descanso = domingo(0)
+    // 5x2: hábiles = lunes(1) a viernes(5), descanso = sábado(6) y domingo(0)
+    if (hoursConfig.workDaysPerWeek >= 6) return day !== 0
     return day !== 0 && day !== 6
   }
 
@@ -1805,7 +1808,7 @@ export function CalendarioMantencionPage() {
             </label>
             <label className="col-span-2 flex items-center gap-2">
               <input type="checkbox" checked={hoursConfig.vacationBusinessDaysOnly} onChange={(e) => setHoursConfig((p) => ({ ...p, vacationBusinessDaysOnly: e.target.checked }))} />
-              <span title="Activado: vacaciones solo cuentan en días hábiles. Desactivado: cuentan todos los días del rango.">Vacaciones contabilizan solo días hábiles</span>
+              <span title={`Activado: vacaciones solo cuentan días hábiles (${hoursConfig.workDaysPerWeek >= 6 ? 'Lun-Sáb en 6x1' : 'Lun-Vie en 5x2'}). Máx ${expectedWeekBase}h/sem. Desactivado: cuentan todos los días.`}>Vacaciones solo días hábiles ({hoursConfig.workDaysPerWeek >= 6 ? 'L-S' : 'L-V'})</span>
             </label>
             <label className="col-span-2 flex items-center gap-2">
               <input type="checkbox" checked={hoursConfig.holidayAsNonWorking} onChange={(e) => setHoursConfig((p) => ({ ...p, holidayAsNonWorking: e.target.checked }))} />
