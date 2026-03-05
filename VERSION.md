@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.70.3**
+## Versión Actual: **v2.70.4**
 
 **Fecha de lanzamiento**: 05 de marzo de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,12 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.70.4 — Hotfix de fechas extendidas y semana por click (05/03/2026)
+- 🧭 **Parseo de fecha corregido**: se elimina interpretación ambigua de strings para evitar saltos tipo `04/03`, `04/04` al extender columnas
+- 🧹 **Columnas válidas solamente**: el calendario detecta día solo cuando hay encabezado semanal válido + fecha real
+- 🔄 **Sincronización robusta Control**: al hacer click en día/celda se actualizan siempre semana y mes seleccionados
+- 🧱 **Hidratación saneada**: columnas persistidas se reconstruyen desde fecha válida (día y label normalizados)
 
 ### v2.70.3 — Calendario extendible y control sincronizado por día (05/03/2026)
 - 🗓️ **Extensión directa del calendario**: nuevos botones `Extender +4 semanas` y `Extender +1 mes` para seguir planificando sin rehacer Excel

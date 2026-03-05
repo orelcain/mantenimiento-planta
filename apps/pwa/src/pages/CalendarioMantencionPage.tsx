@@ -143,9 +143,29 @@ function parseDateFromExcelCell(value: unknown): Date | null {
   if (value instanceof Date && !Number.isNaN(value.getTime())) return value
   if (typeof value === 'number') return excelSerialToDate(value)
   if (typeof value === 'string') {
-    if (/^\d+$/.test(value)) return excelSerialToDate(Number(value))
-    const d = new Date(value)
-    if (!Number.isNaN(d.getTime())) return d
+    const text = value.trim()
+    if (!text) return null
+    if (/^\d+$/.test(text)) return excelSerialToDate(Number(text))
+
+    const ddmmyyyy = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
+    if (ddmmyyyy) {
+      const day = Number(ddmmyyyy[1])
+      const month = Number(ddmmyyyy[2])
+      const year = Number(ddmmyyyy[3])
+      const d = new Date(year, month - 1, day)
+      if (d.getFullYear() === year && d.getMonth() === (month - 1) && d.getDate() === day) return d
+      return null
+    }
+
+    const yyyymmdd = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/)
+    if (yyyymmdd) {
+      const year = Number(yyyymmdd[1])
+      const month = Number(yyyymmdd[2])
+      const day = Number(yyyymmdd[3])
+      const d = new Date(year, month - 1, day)
+      if (d.getFullYear() === year && d.getMonth() === (month - 1) && d.getDate() === day) return d
+      return null
+    }
   }
   return null
 }
@@ -704,20 +724,23 @@ export function CalendarioMantencionPage() {
         }
       })
 
-      const persistedCols: DayCol[] = persistedColsRaw
+      const persistedCols = persistedColsRaw
         .map((col) => {
           const colIndex = Number(col.c)
-          if (Number.isNaN(colIndex)) return null
+          if (Number.isNaN(colIndex) || colIndex < 7) return null
           const parsedDate = parseDateFromExcelCell(col.dateRaw)
-          const dateObj = parsedDate && !Number.isNaN(parsedDate.getTime()) ? parsedDate : null
+          if (!parsedDate || Number.isNaN(parsedDate.getTime())) return null
+          const dateObj = parsedDate
+          const dayLabel = normalizeWeekdayLabel(dateObj.toLocaleDateString('es-CL', { weekday: 'long' }))
           return {
             c: colIndex,
-            dayLabel: String(col.dayLabel || ''),
-            dateRaw: String(col.dateRaw || ''),
+            dayLabel,
+            dateRaw: formatDate(dateObj),
             dateObj,
           }
         })
-        .filter((col): col is DayCol => !!col)
+        .filter((col): col is { c: number; dayLabel: string; dateRaw: string; dateObj: Date } => !!col)
+        .map((col): DayCol => ({ ...col }))
         .sort((a, b) => a.c - b.c)
 
       if (persistedCols.length > 0) {
@@ -848,10 +871,10 @@ export function CalendarioMantencionPage() {
   function detectDayColumns(sheet: XLSX.WorkSheet, ref: XLSX.Range): DayCol[] {
     const cols: DayCol[] = []
     for (let c = 7; c <= ref.e.c; c++) {
-      const dayLabel = String(getCellValue(sheet, 1, c) || '').toLowerCase()
+      const dayLabel = String(getCellValue(sheet, 1, c) || '').toLowerCase().trim()
       const dateRaw = getCellValue(sheet, 2, c)
       const dateObj = parseDateFromExcelCell(dateRaw)
-      if (WEEKDAY_HEADER.has(dayLabel) || !!dateObj) {
+      if (WEEKDAY_HEADER.has(dayLabel) && !!dateObj) {
         cols.push({ c, dayLabel: getCellValue(sheet, 1, c), dateRaw, dateObj })
       }
     }
@@ -1046,9 +1069,9 @@ export function CalendarioMantencionPage() {
     if (!col.dateObj) return
     const week = isoWeekKey(col.dateObj)
     const month = monthKey(col.dateObj)
-    if (weeks[week]) setSelectedWeek(week)
-    if (months[month]) setSelectedMonth(month)
-  }, [months, weeks])
+    setSelectedWeek(week)
+    setSelectedMonth(month)
+  }, [])
 
   function extendCalendarByDays(daysToAdd: number): void {
     if (!ws || dayCols.length === 0 || daysToAdd <= 0) return

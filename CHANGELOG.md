@@ -7,6 +7,13 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.70.4] - 2026-03-05
+### Corregido — Extensión de calendario y selección de semana por click
+- **Parseo de fechas robusto**: soporte explícito `dd/mm/yyyy` y `yyyy-mm-dd` para evitar interpretaciones ambiguas en columnas extendidas
+- **Detección de días más estricta**: solo se consideran columnas con día de semana válido y fecha real
+- **Persistencia saneada de dayCols**: se reconstruyen `dayLabel` y `dateRaw` desde la fecha válida al hidratar estado
+- **Sincronización de control confiable**: click en día/celda actualiza siempre la semana y mes seleccionados
+
 ## [2.70.3] - 2026-03-05
 ### Mejorado — Continuidad operativa de calendario y control por semana/mes
 - **Calendario extendible en UI**: nuevos botones `Extender +4 semanas` y `Extender +1 mes` para continuar planificación de semanas/meses futuros
