@@ -7,6 +7,13 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.70.1] - 2026-03-05
+### Mejorado — Cumplimiento legal de horas para turnos 6x1
+- **Régimen semanal configurable**: nuevo selector `Días trabajo/semana` con presets `6x1`, `5x2` y `7x0`
+- **Esperado por técnico**: opción para calcular horas esperadas con base en días realmente programados por persona
+- **Meta diaria legal visible**: cálculo explícito `jornada semanal / días trabajo semana` para control operativo
+- **Control semanal y mensual más preciso**: evita desviaciones por prorrateo simple cuando hay rotación real de descansos
+
 ## [2.70.0] - 2026-03-04
 ### Agregado — Módulo Calendario Mantención en PWA
 - **Módulo dedicado en app**: nueva sección `Calendario Mantención` integrada en rutas, menú lateral y permisos

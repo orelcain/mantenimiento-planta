@@ -40,6 +40,8 @@ type HoursConfig = {
   expectedWeek: number
   expectedMonth: number
   autoLegalWeek: boolean
+  workDaysPerWeek: number
+  expectedFromPlannedDays: boolean
   toleranceHours: number
   useFixedDaily: boolean
   dayReductionHours: number
@@ -107,6 +109,8 @@ function defaultHoursConfig(): HoursConfig {
     expectedWeek: 44,
     expectedMonth: 180,
     autoLegalWeek: true,
+    workDaysPerWeek: 6,
+    expectedFromPlannedDays: true,
     toleranceHours: 0.5,
     useFixedDaily: true,
     dayReductionHours: 1,
@@ -346,6 +350,8 @@ export function CalendarioMantencionPage() {
       expectedWeek: toNumberOr(stored.expectedWeek, 44),
       expectedMonth: toNumberOr(stored.expectedMonth, 180),
       autoLegalWeek: stored.autoLegalWeek !== false,
+      workDaysPerWeek: Math.max(1, Math.min(7, Math.floor(toNumberOr(stored.workDaysPerWeek, 6)))),
+      expectedFromPlannedDays: stored.expectedFromPlannedDays !== false,
       toleranceHours: toNumberOr(stored.toleranceHours, 0.5),
       useFixedDaily: stored.useFixedDaily !== false,
       dayReductionHours: toNumberOr(stored.dayReductionHours, 1),
@@ -1173,7 +1179,17 @@ export function CalendarioMantencionPage() {
   const legalWeekByLaw = getChileLegalWeeklyHours(periodReferenceDate)
   const legalWeekLabel = getChileLegalWeeklyLabel(periodReferenceDate)
   const expectedWeekBase = Math.max(0, hoursConfig.autoLegalWeek ? legalWeekByLaw : hoursConfig.expectedWeek)
+  const workDaysPerWeekBase = Math.max(1, Math.min(7, Math.floor(toNumberOr(hoursConfig.workDaysPerWeek, 6))))
+  const legalDailyTarget = expectedWeekBase / workDaysPerWeekBase
   const expectedMonthAutoBase = expectedWeekBase * (monthCalendarDays / 7)
+
+  function countsAsExpectedShift(shiftText: string): boolean {
+    const text = shiftText.trim().toLowerCase()
+    if (!text) return false
+    if (text.includes('libre') || text.includes('descanso') || text.includes('licencia')) return false
+    if (hoursConfig.holidayAsNonWorking && isHolidayShift(shiftText)) return false
+    return true
+  }
 
   function isWeekStart(index: number): boolean {
     if (index === 0) return true
@@ -1222,8 +1238,15 @@ export function CalendarioMantencionPage() {
     const weekHours = weekWorkedHours + weekVacationPaidHours + weekHolidayPaidHours
     const monthHours = monthWorkedHours + monthVacationPaidHours + monthHolidayPaidHours
 
-    const weekExpectedAdjusted = Math.max(0, expectedWeekBase * (weekDays.length / 7))
-    const monthExpectedAdjusted = Math.max(0, expectedMonthAutoBase)
+    const weekExpectedDays = weekDays.reduce((sum, d) => sum + (countsAsExpectedShift(t.shifts[d.c] || '') ? 1 : 0), 0)
+    const monthExpectedDays = monthDays.reduce((sum, d) => sum + (countsAsExpectedShift(t.shifts[d.c] || '') ? 1 : 0), 0)
+
+    const weekExpectedAdjusted = hoursConfig.expectedFromPlannedDays
+      ? Math.max(0, weekExpectedDays * legalDailyTarget)
+      : Math.max(0, expectedWeekBase * (weekDays.length / 7))
+    const monthExpectedAdjusted = hoursConfig.expectedFromPlannedDays
+      ? Math.max(0, monthExpectedDays * legalDailyTarget)
+      : Math.max(0, expectedMonthAutoBase)
 
     const weekFreeDays = Math.max(0, weekDays.length - weekWorkedDays)
     const monthFreeDays = Math.max(0, monthDays.length - monthWorkedDays)
@@ -1271,6 +1294,8 @@ export function CalendarioMantencionPage() {
       expectedWeek: clampMin(toNumberOr(hoursConfig.expectedWeek, 44), 0),
       expectedMonth: clampMin(toNumberOr(expectedMonthAutoBase, 180), 0),
       autoLegalWeek: hoursConfig.autoLegalWeek !== false,
+      workDaysPerWeek: Math.max(1, Math.min(7, Math.floor(toNumberOr(hoursConfig.workDaysPerWeek, 6)))),
+      expectedFromPlannedDays: hoursConfig.expectedFromPlannedDays !== false,
       toleranceHours: clampMin(toNumberOr(hoursConfig.toleranceHours, 0.5), 0),
       dayReductionHours: clampMin(toNumberOr(hoursConfig.dayReductionHours, 1), 0),
       afternoonReductionHours: clampMin(toNumberOr(hoursConfig.afternoonReductionHours, 1), 0),
@@ -1604,6 +1629,12 @@ export function CalendarioMantencionPage() {
               disabled={hoursConfig.autoLegalWeek}
               onChange={(e) => setHoursConfig((p) => ({ ...p, expectedWeek: toNumberOr(e.target.value, p.expectedWeek) }))}
             />
+            <label className="text-muted-foreground self-center" title="Días de trabajo por ciclo semanal del régimen. Para 6x1 usar 6; para 5x2 usar 5.">Días trabajo/semana</label>
+            <select className={CONTROL_CLASS} value={hoursConfig.workDaysPerWeek} onChange={(e) => setHoursConfig((p) => ({ ...p, workDaysPerWeek: Math.max(1, Math.min(7, Math.floor(toNumberOr(e.target.value, p.workDaysPerWeek)))) }))}>
+              <option value={6}>6x1 (6 días trabajo)</option>
+              <option value={5}>5x2 (5 días trabajo)</option>
+              <option value={7}>7x0 (sin libre fijo)</option>
+            </select>
             <label className="text-muted-foreground self-center">Esperadas mes (auto)</label>
             <div className={CONTROL_CLASS + ' flex items-center justify-between'}>
               <span className="font-medium tabular-nums">{expectedMonthAutoBase.toFixed(1)} h</span>
@@ -1626,6 +1657,10 @@ export function CalendarioMantencionPage() {
               <span title="Activado: usa tramo legal chileno según fecha del período (44h hasta 25-04-2026, 42h desde 26-04-2026, 40h desde 26-04-2028).">Usar jornada legal automática de Chile</span>
             </label>
             <label className="col-span-2 flex items-center gap-2">
+              <input type="checkbox" checked={hoursConfig.expectedFromPlannedDays} onChange={(e) => setHoursConfig((p) => ({ ...p, expectedFromPlannedDays: e.target.checked }))} />
+              <span title="Activado: esperado por técnico según días realmente programados (no LIBRE/descanso/licencia). Desactivado: prorrateo simple por calendario.">Esperado por días programados (recomendado para 6x1)</span>
+            </label>
+            <label className="col-span-2 flex items-center gap-2">
               <input type="checkbox" checked={hoursConfig.vacationBusinessDaysOnly} onChange={(e) => setHoursConfig((p) => ({ ...p, vacationBusinessDaysOnly: e.target.checked }))} />
               <span title="Activado: vacaciones solo cuentan en días hábiles. Desactivado: cuentan todos los días del rango.">Vacaciones contabilizan solo días hábiles</span>
             </label>
@@ -1641,10 +1676,17 @@ export function CalendarioMantencionPage() {
               Jornada trabajada diaria usada en cálculos = Jornada total diaria - Colación.
             </div>
             <div className="col-span-2 sm:col-span-4 rounded border border-border/80 bg-muted/20 px-2 py-1 text-[11px] text-muted-foreground">
-              Semanal esperado (auto) = Jornada semanal legal × (días de la semana visibles / 7). En esta semana: {expectedWeekBase.toFixed(1)} × ({weekDays.length}/7).
+              Jornada objetivo diaria legal = Jornada objetivo semanal / Días trabajo/semana = {expectedWeekBase.toFixed(1)} / {workDaysPerWeekBase} = {legalDailyTarget.toFixed(2)} h.
             </div>
             <div className="col-span-2 sm:col-span-4 rounded border border-border/80 bg-muted/20 px-2 py-1 text-[11px] text-muted-foreground">
-              Mensual esperado (auto) = Jornada semanal legal × (días calendario del mes / 7). En este período: {expectedWeekBase.toFixed(1)} × ({monthCalendarDays}/7) = {expectedMonthAutoBase.toFixed(1)} h.
+              {hoursConfig.expectedFromPlannedDays
+                ? 'Semanal esperado (por técnico) = Jornada diaria legal × días programados de ese técnico en la semana.'
+                : `Semanal esperado (prorrateo) = Jornada semanal legal × (días de la semana visibles / 7). En esta semana: ${expectedWeekBase.toFixed(1)} × (${weekDays.length}/7).`}
+            </div>
+            <div className="col-span-2 sm:col-span-4 rounded border border-border/80 bg-muted/20 px-2 py-1 text-[11px] text-muted-foreground">
+              {hoursConfig.expectedFromPlannedDays
+                ? 'Mensual esperado (por técnico) = Jornada diaria legal × días programados de ese técnico en el mes.'
+                : `Mensual esperado (prorrateo) = Jornada semanal legal × (días calendario del mes / 7). En este período: ${expectedWeekBase.toFixed(1)} × (${monthCalendarDays}/7) = ${expectedMonthAutoBase.toFixed(1)} h.`}
             </div>
             <div className="col-span-2 sm:col-span-4 rounded border border-border/80 bg-muted/20 px-2 py-1 text-[11px] text-muted-foreground">
               {legalWeekLabel}

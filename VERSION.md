@@ -1,14 +1,20 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.70.0**
+## Versión Actual: **v2.70.1**
 
-**Fecha de lanzamiento**: 04 de marzo de 2026  \
+**Fecha de lanzamiento**: 05 de marzo de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
 **Build**: ✅ Stable
 
 ---
 
 ## 📋 Información de la Versión
+
+### v2.70.1 — Cumplimiento legal 6x1 con esperado por técnico (05/03/2026)
+- ⚖️ **Modo legal por régimen**: nuevo parámetro `Días trabajo/semana` (6x1, 5x2, 7x0)
+- 🧠 **Esperado por días programados**: cálculo semanal y mensual por técnico según turnos realmente asignados
+- 📏 **Meta diaria legal derivada**: `jornada semanal / días trabajo semana` visible en la pestaña Horas
+- 📊 **Control más exacto**: evita sub/sobrecálculo mensual por prorrateo simple cuando hay rotación real
 
 ### v2.70.0 — Calendario Mantención integrado en PWA con turnos configurables (04/03/2026)
 - 📅 **Nuevo módulo PWA**: `Calendario Mantención` integrado con ruta, menú y permisos por rol
