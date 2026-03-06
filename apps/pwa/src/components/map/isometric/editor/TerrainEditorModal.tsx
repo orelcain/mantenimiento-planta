@@ -9,8 +9,10 @@ interface TerrainEditorModalProps {
   onToggleTerrainEdit: () => void
   tool: 'raise' | 'lower' | 'flatten' | 'smooth' | 'sample'
   onToolChange: (tool: 'raise' | 'lower' | 'flatten' | 'smooth' | 'sample') => void
-  brushSize: 1 | 3 | 5
-  onBrushSizeChange: (size: 1 | 3 | 5) => void
+  brushSize: 1 | 3 | 5 | 7 | 9
+  onBrushSizeChange: (size: 1 | 3 | 5 | 7 | 9) => void
+  brushStrength: 1 | 2 | 3 | 4 | 5
+  onBrushStrengthChange: (value: 1 | 2 | 3 | 4 | 5) => void
   flattenTarget: number
   onFlattenTargetChange: (value: number) => void
 }
@@ -24,6 +26,8 @@ export function TerrainEditorModal({
   onToolChange,
   brushSize,
   onBrushSizeChange,
+  brushStrength,
+  onBrushStrengthChange,
   flattenTarget,
   onFlattenTargetChange,
 }: TerrainEditorModalProps) {
@@ -41,7 +45,7 @@ export function TerrainEditorModal({
           <div className="flex items-center justify-between rounded-lg border p-3 bg-muted/30">
             <div>
               <p className="text-sm font-semibold">Modo edición de terreno</p>
-              <p className="text-xs text-muted-foreground">Cada cuadrante representa 1m × 1m × 1m</p>
+              <p className="text-xs text-muted-foreground">Cada cuadrante representa 1m × 1m y permite alturas entre -50m y +200m</p>
             </div>
             <Button
               variant={terrainEditEnabled ? 'default' : 'outline'}
@@ -65,10 +69,23 @@ export function TerrainEditorModal({
 
           <div className="space-y-2">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Brocha</p>
-            <div className="flex items-center gap-1.5">
+            <div className="grid grid-cols-5 gap-1.5">
               <Button variant={brushSize === 1 ? 'default' : 'outline'} size="sm" className="h-8 text-xs" onClick={() => onBrushSizeChange(1)}>1×1</Button>
               <Button variant={brushSize === 3 ? 'default' : 'outline'} size="sm" className="h-8 text-xs" onClick={() => onBrushSizeChange(3)}>3×3</Button>
               <Button variant={brushSize === 5 ? 'default' : 'outline'} size="sm" className="h-8 text-xs" onClick={() => onBrushSizeChange(5)}>5×5</Button>
+              <Button variant={brushSize === 7 ? 'default' : 'outline'} size="sm" className="h-8 text-xs" onClick={() => onBrushSizeChange(7)}>7×7</Button>
+              <Button variant={brushSize === 9 ? 'default' : 'outline'} size="sm" className="h-8 text-xs" onClick={() => onBrushSizeChange(9)}>9×9</Button>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Intensidad</p>
+            <div className="grid grid-cols-5 gap-1.5">
+              <Button variant={brushStrength === 1 ? 'default' : 'outline'} size="sm" className="h-8 text-xs" onClick={() => onBrushStrengthChange(1)}>1</Button>
+              <Button variant={brushStrength === 2 ? 'default' : 'outline'} size="sm" className="h-8 text-xs" onClick={() => onBrushStrengthChange(2)}>2</Button>
+              <Button variant={brushStrength === 3 ? 'default' : 'outline'} size="sm" className="h-8 text-xs" onClick={() => onBrushStrengthChange(3)}>3</Button>
+              <Button variant={brushStrength === 4 ? 'default' : 'outline'} size="sm" className="h-8 text-xs" onClick={() => onBrushStrengthChange(4)}>4</Button>
+              <Button variant={brushStrength === 5 ? 'default' : 'outline'} size="sm" className="h-8 text-xs" onClick={() => onBrushStrengthChange(5)}>5</Button>
             </div>
           </div>
 
@@ -106,8 +123,9 @@ export function TerrainEditorModal({
             </div>
           )}
 
-          <div className="rounded-lg border p-3 bg-primary/5 border-primary/20 text-xs text-primary">
-            Click y arrastra para pintar continuo. Mantén Shift para suavizar temporalmente.
+          <div className="rounded-lg border p-3 bg-primary/5 border-primary/20 text-xs text-primary space-y-1">
+            <p>Click y arrastra para pintar continuo. Mantén Shift para suavizar temporalmente.</p>
+            <p>Para estilo Sims: usa brocha 5x5 o 7x7 con intensidad 2-3.</p>
           </div>
         </div>
       </DialogContent>

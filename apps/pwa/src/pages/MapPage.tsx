@@ -13,6 +13,7 @@
  */
 
 import { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   MapPin,
   ZoomIn,
@@ -229,6 +230,7 @@ function getSmartSnappedPlacement(
 }
 
 export function MapPage() {
+  const navigate = useNavigate()
   const canValidate = useCanValidateIncidents()
   const isAdmin = useIsAdmin()
   const user = useAuthStore((s) => s.user)
@@ -266,7 +268,8 @@ export function MapPage() {
   const [buildMode, setBuildMode] = useState<BuildEditMode>('elements')
   const [terrainEditEnabled, setTerrainEditEnabled] = useState(false)
   const [terrainTool, setTerrainTool] = useState<'raise' | 'lower' | 'flatten' | 'smooth' | 'sample'>('raise')
-  const [terrainBrushSize, setTerrainBrushSize] = useState<1 | 3 | 5>(1)
+  const [terrainBrushSize, setTerrainBrushSize] = useState<1 | 3 | 5 | 7 | 9>(3)
+  const [terrainBrushStrength, setTerrainBrushStrength] = useState<1 | 2 | 3 | 4 | 5>(2)
   const [terrainFlattenTarget, setTerrainFlattenTarget] = useState<number>(SEA_LEVEL_ELEVATION)
   const [terrainHoverPosition, setTerrainHoverPosition] = useState<{ x: number; z: number } | null>(null)
   const [showTerrainModal, setShowTerrainModal] = useState(false)
@@ -915,47 +918,67 @@ export function MapPage() {
 
     const centerX = Math.round(position.x)
     const centerZ = Math.round(position.z)
-    const strokeKey = `${centerX},${centerZ}|${activeTerrainTool}|${terrainBrushSize}|${terrainFlattenTarget}`
+    const strokeKey = `${centerX},${centerZ}|${activeTerrainTool}|${terrainBrushSize}|${terrainBrushStrength}|${terrainFlattenTarget}`
 
     if (source === 'drag' && lastTerrainStrokeKeyRef.current === strokeKey) return
     lastTerrainStrokeKeyRef.current = strokeKey
 
     setTerrainTiles((prev) => {
-      const map = new Map<string, number>()
+      const sourceMap = new Map<string, number>()
       for (const tile of prev) {
-        map.set(`${tile.x},${tile.z}`, tile.elevation)
+        sourceMap.set(`${tile.x},${tile.z}`, tile.elevation)
       }
+
+      const map = new Map(sourceMap)
 
       const radius = Math.floor(terrainBrushSize / 2)
       let changed = false
 
       for (let dx = -radius; dx <= radius; dx++) {
         for (let dz = -radius; dz <= radius; dz++) {
+          const distance = Math.sqrt(dx * dx + dz * dz)
+          if (distance > radius + 0.001) continue
+
+          const normalizedDistance = radius === 0 ? 0 : distance / (radius + 0.35)
+          const falloff = radius === 0 ? 1 : Math.pow(Math.max(0, 1 - normalizedDistance), 1.5)
+          if (falloff <= 0) continue
+
           const x = centerX + dx
           const z = centerZ + dz
           const key = `${x},${z}`
-          const currentElevation = map.get(key) ?? SEA_LEVEL_ELEVATION
+          const currentElevation = sourceMap.get(key) ?? SEA_LEVEL_ELEVATION
 
           let targetElevation = currentElevation
           if (activeTerrainTool === 'raise') {
-            targetElevation = clampElevation(currentElevation + 1)
+            const delta = Math.max(1, Math.round(terrainBrushStrength * falloff))
+            targetElevation = clampElevation(currentElevation + delta)
           } else if (activeTerrainTool === 'lower') {
-            targetElevation = clampElevation(currentElevation - 1)
+            const delta = Math.max(1, Math.round(terrainBrushStrength * falloff))
+            targetElevation = clampElevation(currentElevation - delta)
           } else if (activeTerrainTool === 'flatten') {
-            targetElevation = clampElevation(terrainFlattenTarget)
+            const flattenBlend = Math.min(1, 0.28 * terrainBrushStrength * (0.35 + falloff))
+            targetElevation = clampElevation(
+              Math.round(currentElevation + (clampElevation(terrainFlattenTarget) - currentElevation) * flattenBlend)
+            )
           } else {
-            const neighborValues: number[] = []
-            for (let nx = -1; nx <= 1; nx++) {
-              for (let nz = -1; nz <= 1; nz++) {
-                if (nx === 0 && nz === 0) continue
+            const smoothRadius = terrainBrushSize >= 7 ? 2 : 1
+            let weightedSum = 0
+            let totalWeight = 0
+            for (let nx = -smoothRadius; nx <= smoothRadius; nx++) {
+              for (let nz = -smoothRadius; nz <= smoothRadius; nz++) {
+                const nDistance = Math.sqrt(nx * nx + nz * nz)
+                if (nDistance > smoothRadius + 0.001) continue
+                const weight = 1 / (1 + nDistance)
                 const nKey = `${x + nx},${z + nz}`
-                neighborValues.push(map.get(nKey) ?? SEA_LEVEL_ELEVATION)
+                weightedSum += (sourceMap.get(nKey) ?? SEA_LEVEL_ELEVATION) * weight
+                totalWeight += weight
               }
             }
-            const avg = neighborValues.length
-              ? neighborValues.reduce((sum, val) => sum + val, 0) / neighborValues.length
+            const avg = totalWeight > 0
+              ? weightedSum / totalWeight
               : currentElevation
-            targetElevation = clampElevation(Math.round((currentElevation + avg) / 2))
+            const smoothBlend = Math.min(1, 0.22 * terrainBrushStrength * (0.4 + falloff))
+            targetElevation = clampElevation(Math.round(currentElevation + (avg - currentElevation) * smoothBlend))
           }
 
           if (targetElevation === currentElevation) continue
@@ -982,6 +1005,7 @@ export function MapPage() {
     terrainEditEnabled,
     activeTerrainTool,
     terrainBrushSize,
+    terrainBrushStrength,
     terrainFlattenTarget,
     terrainTiles,
   ])
@@ -1273,6 +1297,15 @@ export function MapPage() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            onClick={() => navigate('/map/view')}
+          >
+            <Layers className="h-4 w-4" />
+            Vista 2D
+          </Button>
           {/* Modo editor (solo admin) */}
           {isAdmin && (
             <Button
@@ -1491,6 +1524,7 @@ export function MapPage() {
                           Editor de terreno
                         </Button>
                         <Badge variant="outline" className="text-[10px]">Brocha {terrainBrushSize}×{terrainBrushSize}</Badge>
+                        <Badge variant="outline" className="text-[10px]">Intensidad {terrainBrushStrength}</Badge>
                         <Badge variant="outline" className="text-[10px]">{activeTerrainTool}</Badge>
                       </>
                     ) : (
@@ -1887,6 +1921,8 @@ export function MapPage() {
               onToolChange={setTerrainTool}
               brushSize={terrainBrushSize}
               onBrushSizeChange={setTerrainBrushSize}
+              brushStrength={terrainBrushStrength}
+              onBrushStrengthChange={setTerrainBrushStrength}
               flattenTarget={terrainFlattenTarget}
               onFlattenTargetChange={setTerrainFlattenTarget}
             />

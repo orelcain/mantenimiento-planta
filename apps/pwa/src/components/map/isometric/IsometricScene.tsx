@@ -75,7 +75,7 @@ interface IsometricSceneProps {
   /** Preview de brocha de terreno */
   terrainBrushPreview?: {
     center: { x: number; z: number }
-    size: 1 | 3 | 5
+    size: 1 | 3 | 5 | 7 | 9
     mode: 'raise' | 'lower' | 'flatten' | 'smooth' | 'sample'
   } | null
   /** Tiles de pintura para el editor de áreas (overlay en el suelo) */
@@ -225,13 +225,19 @@ function SceneContent({
       {terrainBrushPreview && (
         <group>
           {(() => {
-            const cells: Array<{ x: number; z: number }> = []
+            const cells: Array<{ x: number; z: number; opacity: number }> = []
             const radius = Math.floor(terrainBrushPreview.size / 2)
             for (let dx = -radius; dx <= radius; dx++) {
               for (let dz = -radius; dz <= radius; dz++) {
+                const distance = Math.sqrt(dx * dx + dz * dz)
+                if (distance > radius + 0.001) continue
+                const normalizedDistance = radius === 0 ? 0 : distance / (radius + 0.35)
+                const falloff = radius === 0 ? 1 : Math.pow(Math.max(0, 1 - normalizedDistance), 1.4)
+                if (falloff <= 0) continue
                 cells.push({
                   x: terrainBrushPreview.center.x + dx,
                   z: terrainBrushPreview.center.z + dz,
+                  opacity: 0.15 + 0.35 * falloff,
                 })
               }
             }
@@ -255,7 +261,7 @@ function SceneContent({
                             : '#f59e0b'
                   }
                   transparent
-                  opacity={0.35}
+                  opacity={cell.opacity}
                   depthWrite={false}
                 />
               </mesh>
