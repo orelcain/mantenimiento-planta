@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.70.19' as const
+export const APP_VERSION = '2.70.20' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-03-07' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Importacion de terreno real: coordenadas editables + anti-429' as const
+export const VERSION_NAME = 'Terreno real: anti-429 definitivo + grilla expandida 600x500' as const
 
 /**
  * Nota:

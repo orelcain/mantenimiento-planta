@@ -45,12 +45,13 @@ export const DEFAULT_CHONCHI_RECTANGLE: GeoCoordinate[] = [
 ]
 
 const OPEN_METEO_ELEVATION_API = 'https://api.open-meteo.com/v1/elevation'
-const MAX_POINTS_PER_REQUEST = 50
-const MAX_HTTP_RETRIES = 4
-const MAX_SAMPLE_POINTS = 900
-const AUTO_EXPAND_PADDING_METERS = 24
-const MAX_AUTO_GRID_WIDTH = 320
-const MAX_AUTO_GRID_DEPTH = 240
+const MAX_POINTS_PER_REQUEST = 100
+const MAX_HTTP_RETRIES = 6
+const MAX_SAMPLE_POINTS = 800
+const AUTO_EXPAND_PADDING_METERS = 20
+const MAX_AUTO_GRID_WIDTH = 600
+const MAX_AUTO_GRID_DEPTH = 500
+const BATCH_SLEEP_MS = 1000
 
 const clamp01 = (value: number) => Math.max(0, Math.min(1, value))
 
@@ -170,7 +171,8 @@ async function fetchElevationBatch(batch: GeoCoordinate[]): Promise<number[]> {
       throw new TerrainImportHttpError(response.status, `No se pudo consultar elevaciones (${response.status})`)
     }
 
-    const waitMs = 700 * Math.pow(2, attempt)
+    // Esperar progresivamente más: 3s, 5s, 7s, 9s... hasta 15s max
+    const waitMs = Math.min(15_000, 3000 + 2000 * attempt)
     await sleep(waitMs)
   }
 
@@ -212,7 +214,7 @@ async function fetchElevations(points: GeoCoordinate[]): Promise<number[]> {
     elevations.push(...values)
 
     // Suaviza el ritmo de consulta para evitar throttling.
-    await sleep(180)
+    await sleep(BATCH_SLEEP_MS)
   }
 
   return elevations

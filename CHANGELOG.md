@@ -7,6 +7,15 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.70.20] - 2026-03-07
+### Corregido — Solucion definitiva anti-429 y expansion de grilla real
+- **Batch size duplicado**: 100 puntos por peticion (antes 50), reduce solicitudes a la mitad.
+- **Throttle robusto**: 1 segundo de espera entre batches (antes 180ms) para respetar cuota de Open-Meteo.
+- **Retry progresivo en 429**: espera 3s, 5s, 7s... hasta 15s por reintento (antes 700ms exponencial).
+- **Grilla expandida a 600×500**: soporta areas de hasta 600m × 500m a escala 1:1 (antes 320×240 comprimia el terreno).
+- **Fallback con reduccion real**: pasos de respaldo 30m y 48m que bajan radicalmente las peticiones API (antes 8m/12m igualaban el paso auto-ajustado).
+- **Mensajes informativos**: muestra dimension de grilla y paso efectivo real durante la importacion.
+
 ## [2.70.19] - 2026-03-07
 ### Mejorado — Pantalla completa del visor + escala de grilla mantenida
 - **Boton de pantalla completa**: nuevo control en HUD del visor para entrar en fullscreen del mapa 3D.

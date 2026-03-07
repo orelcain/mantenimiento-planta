@@ -1162,18 +1162,24 @@ export function MapPage() {
     try {
       const corners = parseCoordinatesText(terrainImportCoordinatesText)
       const expandedConfig = getAutoExpandedMapConfig(mapConfig, corners)
-      const gridExpanded = expandedConfig.width !== mapConfig.width || expandedConfig.depth !== mapConfig.depth
-      if (gridExpanded) {
+      const gridChanged = expandedConfig.width !== mapConfig.width || expandedConfig.depth !== mapConfig.depth
+      if (gridChanged) {
         setMapConfig(expandedConfig)
       }
-      const steps = Array.from(new Set([terrainImportSampleStep, 8, 12]))
+
+      // Fallback progresivo: cada paso reduce significativamente las peticiones API.
+      // El paso del usuario suele auto-ajustarse al mismo valor que 8/12 en grillas grandes,
+      // así que usamos saltos grandes (30, 48) para que cada reintento baje la carga real.
+      const steps = Array.from(new Set([terrainImportSampleStep, 30, 48]))
 
       let result: Awaited<ReturnType<typeof importTerrainFromRectangle>> | null = null
       let lastError: unknown = null
 
       for (const step of steps) {
         try {
-          setRealTerrainImportMessage(`Consultando elevaciones (paso ${step}m)...`)
+          setRealTerrainImportMessage(
+            `Consultando elevaciones (paso ${step}m, grilla ${expandedConfig.width}×${expandedConfig.depth})...`
+          )
           result = await importTerrainFromRectangle({
             config: expandedConfig,
             corners,
@@ -1184,6 +1190,9 @@ export function MapPage() {
         } catch (error) {
           lastError = error
           if (error instanceof TerrainImportHttpError && error.status === 429) {
+            setRealTerrainImportMessage(
+              `Cuota temporal alcanzada — reintentando con paso más grueso (${steps[steps.indexOf(step) + 1] ?? '?'}m)...`
+            )
             continue
           }
           throw error
@@ -1201,13 +1210,16 @@ export function MapPage() {
       setTerrainEditableMax((prev) => Math.min(MAX_TERRAIN_ELEVATION, Math.max(prev, Math.ceil(result.maxElevation) + 2)))
       setTerrainFlattenTarget(clampElevation(Math.round((result.minElevation + result.maxElevation) / 2)))
 
+      const scaleNote = gridChanged ? ' (grilla auto-expandida)' : ''
       setRealTerrainImportMessage(
         `Malla real aplicada: ${result.tiles.length} celdas, rango ${result.minElevation}m a ${result.maxElevation}m. ` +
-        `Grilla ${expandedConfig.width}m x ${expandedConfig.depth}m (muestra ${result.usedSampleStep}m).`
+        `Grilla ${expandedConfig.width}×${expandedConfig.depth}m, muestra efectiva ${result.usedSampleStep}m${scaleNote}.`
       )
     } catch (error) {
       if (error instanceof TerrainImportHttpError && error.status === 429) {
-        setRealTerrainImportMessage('Error importando terreno: cuota temporal de elevacion (429). Intenta con detalle 12m o espera 1-2 minutos.')
+        setRealTerrainImportMessage(
+          'Error: cuota de elevación agotada (429). Espera 2-3 minutos y vuelve a intentar.'
+        )
       } else {
         const message = error instanceof Error ? error.message : 'No fue posible importar terreno real'
         setRealTerrainImportMessage(`Error importando terreno: ${message}`)
