@@ -1,8 +1,13 @@
 {
-  "version": "2.70.11",
-  "buildDate": "2026-03-05",
-  "buildTimestamp": 1772686790000,
+  "version": "2.70.13",
+  "buildDate": "2026-03-07",
+  "buildTimestamp": 1772841667648,
   "features": [
+    "Terreno sólido volumétrico: masa completa con base inferior y paredes laterales (no solo superficie)",
+    "Esculpido coherente de volumen: subir/bajar agrega o remueve tierra dentro del rango -50m a +200m",
+    "Terreno estilo Sims: brocha radial circular con caída suave para subir/bajar sin efecto cuadriculado",
+    "Editor de terreno mejorado: brochas 1x1 a 9x9, intensidad 1-5 y suavizado/flatten progresivo",
+    "Render 3D de terreno suavizado: superficie tipo heightfield con gradiente tierra/agua para desniveles naturales",
     "Hotfix vacaciones en Control: horas/días respetan configuración de solo hábiles y se agrega badge VAC por técnico (semana/mes)",
     "Hotfix calendario: al extender días quedan vacíos (no LIBRE) y vacaciones se reconocen en variantes VAC/VACACIÓN/VACACIONES para el Control",
     "Hotfix calendario: parseo de fechas dd/mm/yyyy estable, extensión de semanas/meses consistente y semana/mes sincronizados al hacer click en día",

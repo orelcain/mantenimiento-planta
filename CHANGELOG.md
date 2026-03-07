@@ -7,6 +7,22 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.70.13] - 2026-03-06
+### Mejorado — Terreno sólido volumétrico en visor isométrico
+- **Terreno con masa real**: el terreno deja de ser solo una piel superficial y pasa a renderizarse como volumen sólido completo.
+- **Base geológica explícita**: se construye un bloque base hasta `-50m` con cara inferior y paredes laterales continuas.
+- **Esculpido consistente**: al subir o bajar terreno, la masa se deforma de forma coherente (agregar/quitar tierra), manteniendo el rango `-50m` a `+200m`.
+- **Superficie superior suave**: se conserva el modelado tipo Sims con transición orgánica para evitar apariencia pixelada.
+
+## [2.70.12] - 2026-03-06
+### Mejorado — Terreno estilo Sims en visor de mapas
+- **Esculpido radial circular**: subir/bajar terreno ahora aplica caída suave por distancia (menos efecto cuadriculado).
+- **Brochas e intensidad ampliadas**: tamaños `1x1, 3x3, 5x5, 7x7, 9x9` e intensidad `1-5` para modelado rápido de desniveles.
+- **Suavizado progresivo**: herramienta `Suavizar` con promedio ponderado de vecinos y mezcla gradual para transiciones naturales.
+- **Aplanado más orgánico**: `Flatten` pasa de salto duro a interpolación hacia nivel objetivo para evitar escalones bruscos.
+- **Render de terreno suavizado**: reemplazo de tiles voxel por superficie continua tipo `heightfield` con gradiente tierra/agua.
+- **Feedback visual mejorado**: preview de brocha circular con opacidad por caída e indicador en elevación local.
+
 ## [2.70.11] - 2026-03-05
 ### Corregido — Regla de vacaciones legal forzada (sin depender de checkbox)
 - **Vacaciones legales fijas**: el conteo de vacaciones ahora SIEMPRE usa Lun-Vie (horario administrativo), sin depender de configuración guardada localmente.
@@ -137,19 +153,9 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ## [2.69.13] - 2026-02-28
 ### Agregado — Mejoras naturales de flujo en editor de mapa
-- **Hover contextual de área**: al pasar sobre un equipo se resalta automáticamente su área asociada
-- **Botón directo en editor de área**: nueva acción `Crear y agregar equipo` para continuar el flujo sin salir del contexto
-- **Filtro rápido por área activa**: opción `Solo equipos del área activa` en el panel rápido del editor
-- **Resumen operativo por área**: contador `asociados / sin área` visible cuando hay un área activa
 
 ### Refactor — Simplificación estructural del módulo
 - **Estado unificado de overlays**: nuevo `useEditorOverlayState` para centralizar apertura/cierre de `add/area/shape/manager`
-- **Reglas de asociación centralizadas**: nuevo helper `areaAssociation.ts` (`getAreaAtPosition`, `normalizeNodeForArea`) reutilizado en click/drag/alta
-- **IsometricScene más extensible**: soporte de `highlightedAreaId` y `visibleNodeIds` para separar visualización de lógica de página
-
-## [2.69.12] - 2026-02-28
-### Modificado — Flujo de edición de mapa más directo (estilo Sims)
-- **Asociación equipo↔área**: los equipos ahora guardan `linkedAreaId`, se asocian al área al crear/arrastrar y se pueden gestionar desde propiedades
 - **Alta de equipos contextual**: si hay área activa, el modal de alta la usa como destino por defecto y muestra contexto visual
 - **Crear área → editar área**: al crear una nueva área, el flujo continúa automáticamente en modo edición de esa misma área
 - **Panel de área ampliado y reubicado**: editor de tiles más grande en el lado izquierdo para trabajar sin tapar el flujo principal

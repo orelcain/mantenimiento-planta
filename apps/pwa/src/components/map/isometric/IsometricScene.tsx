@@ -33,7 +33,7 @@ import type {
   NodeRuntimeData,
   IsometricViewerState,
 } from '@/types/isometricMap'
-import { SEA_LEVEL_ELEVATION } from '@/types/isometricMap'
+import { SEA_LEVEL_ELEVATION, MIN_TERRAIN_ELEVATION } from '@/types/isometricMap'
 
 interface IsometricSceneProps {
   /** Configuración del mapa (dimensiones, colores, grid) */
@@ -162,6 +162,228 @@ function SceneContent({
     // Notificación opcional al completar rotación
   }, [])
 
+  const terrainElevationMap = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const tile of terrain ?? []) {
+      map.set(`${tile.x},${tile.z}`, tile.elevation)
+    }
+    return map
+  }, [terrain])
+
+  const terrainSolidGeometry = useMemo(() => {
+    if (!terrain || terrain.length === 0) return null
+
+    const minX = Math.floor(-config.width / 2)
+    const maxX = Math.ceil(config.width / 2)
+    const minZ = Math.floor(-config.depth / 2)
+    const maxZ = Math.ceil(config.depth / 2)
+
+    const widthCells = maxX - minX
+    const depthCells = maxZ - minZ
+    if (widthCells <= 0 || depthCells <= 0) return null
+    const baseY = MIN_TERRAIN_ELEVATION
+
+    const getCellElevation = (x: number, z: number) => terrainElevationMap.get(`${x},${z}`) ?? SEA_LEVEL_ELEVATION
+    const getTopElevation = (vx: number, vz: number) => {
+      const e1 = getCellElevation(vx - 1, vz - 1)
+      const e2 = getCellElevation(vx, vz - 1)
+      const e3 = getCellElevation(vx - 1, vz)
+      const e4 = getCellElevation(vx, vz)
+      return (e1 + e2 + e3 + e4) / 4
+    }
+
+    const positions: number[] = []
+    const colors: number[] = []
+    const indices: number[] = []
+
+    const landLow = new THREE.Color('#4f7d4c')
+    const landHigh = new THREE.Color('#9ccf6f')
+    const waterShallow = new THREE.Color('#38bdf8')
+    const waterDeep = new THREE.Color('#1d4ed8')
+    const cliffDark = new THREE.Color('#3f4c32')
+    const cliffLight = new THREE.Color('#6b7f4c')
+    const bottomColor = new THREE.Color('#2f3a24')
+    const color = new THREE.Color()
+
+    const topHeightGrid: number[][] = []
+    for (let iz = 0; iz <= depthCells; iz++) {
+      const row: number[] = []
+      const z = minZ + iz
+      for (let ix = 0; ix <= widthCells; ix++) {
+        const x = minX + ix
+        row.push(getTopElevation(x, z))
+      }
+      topHeightGrid.push(row)
+    }
+
+    const getTopGrid = (ix: number, iz: number) => topHeightGrid[iz]?.[ix] ?? SEA_LEVEL_ELEVATION
+
+    const setTopColor = (elevation: number) => {
+      if (elevation >= SEA_LEVEL_ELEVATION) {
+        const t = Math.min(1, elevation / 200)
+        color.copy(landLow).lerp(landHigh, t)
+      } else {
+        const t = Math.min(1, Math.abs(elevation) / 50)
+        color.copy(waterShallow).lerp(waterDeep, t)
+      }
+    }
+
+    const pushVertex = (x: number, y: number, z: number, c: THREE.Color) => {
+      positions.push(x, y + 0.02, z)
+      colors.push(c.r, c.g, c.b)
+      return positions.length / 3 - 1
+    }
+
+    const pushQuad = (
+      a: [number, number, number],
+      b: [number, number, number],
+      c: [number, number, number],
+      d: [number, number, number],
+      colorA: THREE.Color,
+      colorB: THREE.Color,
+      colorC: THREE.Color,
+      colorD: THREE.Color
+    ) => {
+      const ia = pushVertex(a[0], a[1], a[2], colorA)
+      const ib = pushVertex(b[0], b[1], b[2], colorB)
+      const ic = pushVertex(c[0], c[1], c[2], colorC)
+      const id = pushVertex(d[0], d[1], d[2], colorD)
+      indices.push(ia, ib, ic)
+      indices.push(ia, ic, id)
+    }
+
+    // Top surface (suavizada)
+    for (let iz = 0; iz < depthCells; iz++) {
+      const z = minZ + iz
+      for (let ix = 0; ix < widthCells; ix++) {
+        const x = minX + ix
+
+        const y00 = getTopGrid(ix, iz)
+        const y10 = getTopGrid(ix + 1, iz)
+        const y11 = getTopGrid(ix + 1, iz + 1)
+        const y01 = getTopGrid(ix, iz + 1)
+
+        setTopColor(y00)
+        const c00 = color.clone()
+        setTopColor(y10)
+        const c10 = color.clone()
+        setTopColor(y11)
+        const c11 = color.clone()
+        setTopColor(y01)
+        const c01 = color.clone()
+
+        pushQuad(
+          [x, y00, z],
+          [x + 1, y10, z],
+          [x + 1, y11, z + 1],
+          [x, y01, z + 1],
+          c00,
+          c10,
+          c11,
+          c01
+        )
+      }
+    }
+
+    // Bottom face (base sólida)
+    pushQuad(
+      [minX, baseY, minZ],
+      [minX, baseY, maxZ],
+      [maxX, baseY, maxZ],
+      [maxX, baseY, minZ],
+      bottomColor,
+      bottomColor,
+      bottomColor,
+      bottomColor
+    )
+
+    // Boundary walls (masa lateral)
+    for (let ix = 0; ix < widthCells; ix++) {
+      const x1 = minX + ix
+      const x2 = x1 + 1
+      const y1 = getTopGrid(ix, 0)
+      const y2 = getTopGrid(ix + 1, 0)
+
+      const wallColorA = cliffDark.clone().lerp(cliffLight, Math.min(1, Math.max(y1, y2) / 200))
+      const wallColorB = wallColorA.clone()
+
+      // North
+      pushQuad(
+        [x1, y1, minZ],
+        [x1, baseY, minZ],
+        [x2, baseY, minZ],
+        [x2, y2, minZ],
+        wallColorA,
+        wallColorA,
+        wallColorB,
+        wallColorB
+      )
+
+      const ys1 = getTopGrid(ix, depthCells)
+      const ys2 = getTopGrid(ix + 1, depthCells)
+      const wallSouthA = cliffDark.clone().lerp(cliffLight, Math.min(1, Math.max(ys1, ys2) / 200))
+      const wallSouthB = wallSouthA.clone()
+
+      // South
+      pushQuad(
+        [x1, ys1, maxZ],
+        [x2, ys2, maxZ],
+        [x2, baseY, maxZ],
+        [x1, baseY, maxZ],
+        wallSouthA,
+        wallSouthB,
+        wallSouthB,
+        wallSouthA
+      )
+    }
+
+    for (let iz = 0; iz < depthCells; iz++) {
+      const z1 = minZ + iz
+      const z2 = z1 + 1
+      const yw1 = getTopGrid(0, iz)
+      const yw2 = getTopGrid(0, iz + 1)
+
+      const wallWestA = cliffDark.clone().lerp(cliffLight, Math.min(1, Math.max(yw1, yw2) / 200))
+      const wallWestB = wallWestA.clone()
+
+      // West
+      pushQuad(
+        [minX, yw1, z1],
+        [minX, yw2, z2],
+        [minX, baseY, z2],
+        [minX, baseY, z1],
+        wallWestA,
+        wallWestB,
+        wallWestB,
+        wallWestA
+      )
+
+      const ye1 = getTopGrid(widthCells, iz)
+      const ye2 = getTopGrid(widthCells, iz + 1)
+      const wallEastA = cliffDark.clone().lerp(cliffLight, Math.min(1, Math.max(ye1, ye2) / 200))
+      const wallEastB = wallEastA.clone()
+
+      // East
+      pushQuad(
+        [maxX, ye1, z1],
+        [maxX, baseY, z1],
+        [maxX, baseY, z2],
+        [maxX, ye2, z2],
+        wallEastA,
+        wallEastA,
+        wallEastB,
+        wallEastB
+      )
+    }
+
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+    geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3))
+    geometry.setIndex(indices)
+    geometry.computeVertexNormals()
+    return geometry
+  }, [terrain, terrainElevationMap, config.width, config.depth])
+
   return (
     <>
       {/* Background color */}
@@ -200,25 +422,16 @@ function SceneContent({
       {/* Grilla del suelo */}
       <PlantGrid config={config} />
 
-      {/* Terreno voxel simplificado (estilo construcción por cuadrante) */}
-      {terrain && terrain.length > 0 && (
-        <group>
-          {terrain.map((tile) => (
-            <mesh
-              key={`${tile.x},${tile.z}`}
-              position={[tile.x + 0.5, tile.elevation - 0.125, tile.z + 0.5]}
-              castShadow
-              receiveShadow
-            >
-              <boxGeometry args={[0.96, 0.25, 0.96]} />
-              <meshStandardMaterial
-                color={tile.elevation >= SEA_LEVEL_ELEVATION ? '#6b8e5a' : '#3b82f6'}
-                roughness={0.85}
-                metalness={0.05}
-              />
-            </mesh>
-          ))}
-        </group>
+      {/* Terreno suavizado tipo heightfield (menos voxel/pixelado) */}
+      {terrainSolidGeometry && (
+        <mesh geometry={terrainSolidGeometry} castShadow receiveShadow>
+          <meshStandardMaterial
+            vertexColors
+            roughness={0.94}
+            metalness={0.02}
+            side={THREE.DoubleSide}
+          />
+        </mesh>
       )}
 
       {/* Preview de brocha de terreno */}
@@ -245,7 +458,11 @@ function SceneContent({
               <mesh
                 key={`preview-${cell.x},${cell.z}`}
                 rotation-x={-Math.PI / 2}
-                position={[cell.x + 0.5, 0.06, cell.z + 0.5]}
+                position={[
+                  cell.x + 0.5,
+                  (terrainElevationMap.get(`${cell.x},${cell.z}`) ?? SEA_LEVEL_ELEVATION) + 0.08,
+                  cell.z + 0.5,
+                ]}
               >
                 <planeGeometry args={[0.94, 0.94]} />
                 <meshBasicMaterial

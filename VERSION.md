@@ -1,14 +1,27 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.70.11**
+## Versión Actual: **v2.70.13**
 
-**Fecha de lanzamiento**: 05 de marzo de 2026  \
+**Fecha de lanzamiento**: 06 de marzo de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
 **Build**: ✅ Stable
 
 ---
 
 ## 📋 Información de la Versión
+
+### v2.70.13 — Terreno sólido volumétrico (06/03/2026)
+- 🪨 **Masa real de terreno**: el mapa ya no renderiza solo una superficie; ahora existe volumen sólido del terreno
+- 🧱 **Bloque base geológico**: base inferior y paredes laterales continuas hasta `-50 m`
+- ⛏️ **Editar = agregar/quitar tierra**: subir/bajar modifica una columna de masa, no solo una piel visual
+- 🌄 **Acabado suave arriba**: se mantiene superficie orgánica tipo Sims para evitar look pixelado
+
+### v2.70.12 — Terreno estilo Sims + superficie suavizada (06/03/2026)
+- 🏔️ **Esculpido natural de terreno**: brocha circular con caída radial para subir/bajar terreno sin bordes en bloque
+- 🎚️ **Control fino y rápido**: tamaños de brocha `1×1, 3×3, 5×5, 7×7, 9×9` e intensidad configurable `1-5`
+- 🌊 **Rango operacional real**: edición de elevación entre `-50 m` y `+200 m` con feedback visual explícito
+- 🧽 **Suavizado progresivo**: herramienta `Suavizar` mejorada con mezcla ponderada de vecinos, más parecida a flujo tipo Sims
+- 🎨 **Render de terreno mejorado**: superficie continua tipo heightfield con gradiente tierra/agua para desniveles más orgánicos
 
 ### v2.70.6 — Hotfix vacaciones hábiles + badge visible en control (05/03/2026)
 - 📅 **Vacaciones según regla hábil**: `Vac S/M` y `Vac H S/M` vuelven a respetar la opción `Vacaciones contabilizan solo días hábiles`
