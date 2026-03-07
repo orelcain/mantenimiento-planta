@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.70.15**
+## Versión Actual: **v2.70.16**
 
 **Fecha de lanzamiento**: 07 de marzo de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,10 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.70.16 — Hotfix de deploy por import faltante (07/03/2026)
+- 🛠️ **Corrección de compilación**: import faltante de `MAX_TERRAIN_ELEVATION` en la escena isométrica
+- ✅ **Deploy recuperado**: se elimina el fallo de build en GitHub Actions para publicar la release
 
 ### v2.70.15 — Mapa de calor por metro + herramientas de maquinaria (07/03/2026)
 - 🌡️ **Mapa de calor real**: gradiente de color por metro desde azul (`-50 m`) a rojo (`+200 m`)

@@ -33,7 +33,7 @@ import type {
   NodeRuntimeData,
   IsometricViewerState,
 } from '@/types/isometricMap'
-import { SEA_LEVEL_ELEVATION, MIN_TERRAIN_ELEVATION } from '@/types/isometricMap'
+import { SEA_LEVEL_ELEVATION, MIN_TERRAIN_ELEVATION, MAX_TERRAIN_ELEVATION } from '@/types/isometricMap'
 
 interface IsometricSceneProps {
   /** Configuración del mapa (dimensiones, colores, grid) */

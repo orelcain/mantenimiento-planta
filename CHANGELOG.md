@@ -7,6 +7,11 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.70.16] - 2026-03-07
+### Corregido — Hotfix de build/deploy en visor de mapas
+- **Fix TypeScript en CI**: se agrega import faltante de `MAX_TERRAIN_ELEVATION` en `IsometricScene`.
+- **Deploy destrabado**: se elimina el error de compilación `Cannot find name 'MAX_TERRAIN_ELEVATION'` en GitHub Actions.
+
 ## [2.70.15] - 2026-03-07
 ### Mejorado — Visualización y control de cota de terreno
 - **Heatmap de elevación por metro**: color del terreno pasa gradualmente de azul (`-50m`) a rojo (`+200m`) con bandas por capa para lectura rápida.
