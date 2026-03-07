@@ -17,6 +17,7 @@ export interface TerrainImportResult {
   tiles: TerrainTile[]
   minElevation: number
   maxElevation: number
+  usedSampleStep: number
   bounds: {
     minLat: number
     maxLat: number
@@ -44,9 +45,12 @@ export const DEFAULT_CHONCHI_RECTANGLE: GeoCoordinate[] = [
 ]
 
 const OPEN_METEO_ELEVATION_API = 'https://api.open-meteo.com/v1/elevation'
-const OPEN_TOPO_DATA_API = 'https://api.opentopodata.org/v1/aster30m'
 const MAX_POINTS_PER_REQUEST = 50
 const MAX_HTTP_RETRIES = 4
+const MAX_SAMPLE_POINTS = 900
+const AUTO_EXPAND_PADDING_METERS = 24
+const MAX_AUTO_GRID_WIDTH = 320
+const MAX_AUTO_GRID_DEPTH = 240
 
 const clamp01 = (value: number) => Math.max(0, Math.min(1, value))
 
@@ -60,6 +64,54 @@ function chunk<T>(values: T[], size: number): T[][] {
 }
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
+
+const toRadians = (value: number) => (value * Math.PI) / 180
+
+function haversineMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const r = 6371000
+  const dLat = toRadians(lat2 - lat1)
+  const dLon = toRadians(lon2 - lon1)
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRadians(lat1)) * Math.cos(toRadians(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2)
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  return r * c
+}
+
+export function estimateRectangleMeters(corners: GeoCoordinate[]): { widthMeters: number; depthMeters: number } {
+  if (!corners || corners.length < 4) {
+    return { widthMeters: 0, depthMeters: 0 }
+  }
+
+  const latitudes = corners.map((point) => point.lat)
+  const longitudes = corners.map((point) => point.lon)
+  const minLat = Math.min(...latitudes)
+  const maxLat = Math.max(...latitudes)
+  const minLon = Math.min(...longitudes)
+  const maxLon = Math.max(...longitudes)
+  const centerLat = (minLat + maxLat) / 2
+  const centerLon = (minLon + maxLon) / 2
+
+  const widthMeters = haversineMeters(centerLat, minLon, centerLat, maxLon)
+  const depthMeters = haversineMeters(minLat, centerLon, maxLat, centerLon)
+  return { widthMeters, depthMeters }
+}
+
+export function getAutoExpandedMapConfig(
+  config: Pick<IsometricMapConfig, 'width' | 'depth' | 'cellSize' | 'floorColor' | 'gridColor' | 'gridOpacity' | 'showGrid' | 'showAxisLabels'>,
+  corners: GeoCoordinate[]
+): IsometricMapConfig {
+  const { widthMeters, depthMeters } = estimateRectangleMeters(corners)
+
+  const desiredWidth = Math.ceil((widthMeters + AUTO_EXPAND_PADDING_METERS * 2) / 10) * 10
+  const desiredDepth = Math.ceil((depthMeters + AUTO_EXPAND_PADDING_METERS * 2) / 10) * 10
+
+  return {
+    ...config,
+    width: Math.max(config.width, Math.min(MAX_AUTO_GRID_WIDTH, desiredWidth || config.width)),
+    depth: Math.max(config.depth, Math.min(MAX_AUTO_GRID_DEPTH, desiredDepth || config.depth)),
+  }
+}
 
 export function formatCoordinatesText(points: GeoCoordinate[]): string {
   return points.map((point) => `${point.lat.toFixed(6)}, ${point.lon.toFixed(6)}`).join('\n')
@@ -125,40 +177,6 @@ async function fetchElevationBatch(batch: GeoCoordinate[]): Promise<number[]> {
   throw new Error('Error inesperado en consulta de elevaciones')
 }
 
-async function fetchElevationBatchOpenTopo(batch: GeoCoordinate[]): Promise<number[]> {
-  const locations = batch.map((point) => `${point.lat.toFixed(6)},${point.lon.toFixed(6)}`).join('|')
-
-  for (let attempt = 0; attempt <= MAX_HTTP_RETRIES; attempt++) {
-    const response = await fetch(`${OPEN_TOPO_DATA_API}?locations=${encodeURIComponent(locations)}`)
-
-    if (response.ok) {
-      const payload = (await response.json()) as {
-        results?: Array<{ elevation?: number | null }>
-      }
-      const values = (payload.results ?? []).map((entry) => {
-        const elevation = entry?.elevation
-        return Number.isFinite(elevation) ? Number(elevation) : SEA_LEVEL_ELEVATION
-      })
-
-      if (values.length !== batch.length) {
-        throw new Error('Respuesta de elevacion incompleta en proveedor alternativo')
-      }
-
-      return values
-    }
-
-    const isRetryable = response.status === 429 || response.status >= 500
-    if (!isRetryable || attempt === MAX_HTTP_RETRIES) {
-      throw new TerrainImportHttpError(response.status, `No se pudo consultar elevaciones (${response.status})`)
-    }
-
-    const waitMs = 900 * Math.pow(2, attempt)
-    await sleep(waitMs)
-  }
-
-  throw new Error('Error inesperado en proveedor alternativo de elevaciones')
-}
-
 function bilinearInterpolate(grid: number[][], u: number, v: number): number {
   const rows = grid.length
   const cols = grid[0]?.length ?? 0
@@ -190,22 +208,11 @@ async function fetchElevations(points: GeoCoordinate[]): Promise<number[]> {
   const elevations: number[] = []
 
   for (const batch of batches) {
-    let values: number[]
-    try {
-      values = await fetchElevationBatch(batch)
-    } catch (error) {
-      // Si Open-Meteo limita por cuota, usar proveedor alternativo.
-      if (error instanceof TerrainImportHttpError && error.status === 429) {
-        values = await fetchElevationBatchOpenTopo(batch)
-      } else {
-        throw error
-      }
-    }
-
+    const values = await fetchElevationBatch(batch)
     elevations.push(...values)
 
     // Suaviza el ritmo de consulta para evitar throttling.
-    await sleep(120)
+    await sleep(180)
   }
 
   return elevations
@@ -213,7 +220,7 @@ async function fetchElevations(points: GeoCoordinate[]): Promise<number[]> {
 
 export async function importTerrainFromRectangle(options: TerrainImportOptions): Promise<TerrainImportResult> {
   const { config, corners, keepSeaLevelTiles = false } = options
-  const sampleStep = Math.max(2, Math.round(options.sampleStep ?? 4))
+  let sampleStep = Math.max(2, Math.round(options.sampleStep ?? 4))
 
   if (!corners || corners.length < 4) {
     throw new Error('Se requieren 4 coordenadas para definir el rectangulo')
@@ -230,8 +237,14 @@ export async function importTerrainFromRectangle(options: TerrainImportOptions):
   const widthCells = Math.max(1, Math.round(config.width))
   const depthCells = Math.max(1, Math.round(config.depth))
 
-  const sampleCols = Math.max(3, Math.floor(widthCells / sampleStep) + 1)
-  const sampleRows = Math.max(3, Math.floor(depthCells / sampleStep) + 1)
+  let sampleCols = Math.max(3, Math.floor(widthCells / sampleStep) + 1)
+  let sampleRows = Math.max(3, Math.floor(depthCells / sampleStep) + 1)
+
+  while (sampleCols * sampleRows > MAX_SAMPLE_POINTS) {
+    sampleStep += 2
+    sampleCols = Math.max(3, Math.floor(widthCells / sampleStep) + 1)
+    sampleRows = Math.max(3, Math.floor(depthCells / sampleStep) + 1)
+  }
 
   const samplePoints: GeoCoordinate[] = []
   for (let row = 0; row < sampleRows; row++) {
@@ -287,6 +300,7 @@ export async function importTerrainFromRectangle(options: TerrainImportOptions):
     tiles,
     minElevation,
     maxElevation,
+    usedSampleStep: sampleStep,
     bounds: { minLat, maxLat, minLon, maxLon },
   }
 }

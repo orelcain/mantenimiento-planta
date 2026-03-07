@@ -7,6 +7,14 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.70.18] - 2026-03-07
+### Mejorado — Auto expansion de grilla para importacion de terreno real
+- **Grilla autoajustable por coordenadas**: al importar las 4 coordenadas, el sistema expande automaticamente la base 3D (width/depth) segun el tamano real del rectangulo.
+- **Escalado con limite seguro**: la expansion agrega margen y aplica tope maximo para evitar degradacion severa de rendimiento.
+- **Muestreo adaptativo**: si la grilla crece mucho, el importador aumenta el paso de muestra de forma automatica para no exceder el presupuesto de consultas.
+- **Eliminado fallback con CORS**: se quita proveedor alternativo bloqueado por navegador y se mejora la tolerancia con reintentos/backoff contra 429.
+- **Feedback operativo**: el modal muestra el tamano de grilla aplicado y el paso de muestreo efectivo utilizado.
+
 ## [2.70.17] - 2026-03-07
 ### Mejorado — Importacion de terreno real con coordenadas editables y anti-429
 - **Coordenadas editables en UI**: el modal de Terreno Real ahora permite pegar/modificar manualmente las 4 coordenadas (`lat, lon`) antes de importar.

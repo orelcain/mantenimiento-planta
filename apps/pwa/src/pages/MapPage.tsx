@@ -48,7 +48,7 @@ import { useAppStore, useCanValidateIncidents, useIsAdmin } from '@/store'
 import { cn } from '@/lib/utils'
 import { formatRelativeTime } from '@/lib/utils'
 import { generateDemoMap, saveIsometricMap } from '@/services/isometricMap'
-import type { CameraAngle, IsometricViewerState, MapNode, MapArea, TerrainTile, BuildEditMode, MapConnector as MapConnectorType } from '@/types/isometricMap'
+import type { CameraAngle, IsometricViewerState, IsometricMapConfig, MapNode, MapArea, TerrainTile, BuildEditMode, MapConnector as MapConnectorType } from '@/types/isometricMap'
 import { 
   DEFAULT_VIEWER_STATE,
   FULL_MAP_VIEW_ZOOM,
@@ -73,6 +73,7 @@ import {
   DEFAULT_CHONCHI_RECTANGLE,
   TerrainImportHttpError,
   formatCoordinatesText,
+  getAutoExpandedMapConfig,
   importTerrainFromRectangle,
   parseCoordinatesText,
 } from '@/lib/terrainImport'
@@ -251,6 +252,7 @@ export function MapPage() {
 
   // ── Datos del mapa (mutables para editor) ──
   const demoData = useMemo(() => generateDemoMap(), [])
+  const [mapConfig, setMapConfig] = useState<IsometricMapConfig>(demoData.config)
   const [nodes, setNodes] = useState<MapNode[]>([])
   const [areas, setAreas] = useState<MapArea[]>([])
   const [connectors, setConnectors] = useState<MapConnectorType[]>([])
@@ -1130,6 +1132,11 @@ export function MapPage() {
 
     try {
       const corners = parseCoordinatesText(terrainImportCoordinatesText)
+      const expandedConfig = getAutoExpandedMapConfig(mapConfig, corners)
+      const gridExpanded = expandedConfig.width !== mapConfig.width || expandedConfig.depth !== mapConfig.depth
+      if (gridExpanded) {
+        setMapConfig(expandedConfig)
+      }
       const steps = Array.from(new Set([terrainImportSampleStep, 8, 12]))
 
       let result: Awaited<ReturnType<typeof importTerrainFromRectangle>> | null = null
@@ -1139,7 +1146,7 @@ export function MapPage() {
         try {
           setRealTerrainImportMessage(`Consultando elevaciones (paso ${step}m)...`)
           result = await importTerrainFromRectangle({
-            config: demoData.config,
+            config: expandedConfig,
             corners,
             sampleStep: step,
             keepSeaLevelTiles: false,
@@ -1166,15 +1173,20 @@ export function MapPage() {
       setTerrainFlattenTarget(clampElevation(Math.round((result.minElevation + result.maxElevation) / 2)))
 
       setRealTerrainImportMessage(
-        `Malla real aplicada: ${result.tiles.length} celdas, rango ${result.minElevation}m a ${result.maxElevation}m.`
+        `Malla real aplicada: ${result.tiles.length} celdas, rango ${result.minElevation}m a ${result.maxElevation}m. ` +
+        `Grilla ${expandedConfig.width}m x ${expandedConfig.depth}m (muestra ${result.usedSampleStep}m).`
       )
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'No fue posible importar terreno real'
-      setRealTerrainImportMessage(`Error importando terreno: ${message}`)
+      if (error instanceof TerrainImportHttpError && error.status === 429) {
+        setRealTerrainImportMessage('Error importando terreno: cuota temporal de elevacion (429). Intenta con detalle 12m o espera 1-2 minutos.')
+      } else {
+        const message = error instanceof Error ? error.message : 'No fue posible importar terreno real'
+        setRealTerrainImportMessage(`Error importando terreno: ${message}`)
+      }
     } finally {
       setIsImportingRealTerrain(false)
     }
-  }, [isImportingRealTerrain, terrainImportCoordinatesText, terrainImportSampleStep, demoData.config])
+  }, [isImportingRealTerrain, terrainImportCoordinatesText, terrainImportSampleStep, mapConfig])
 
   const handleFloorDrag = useCallback((position: { x: number; z: number }) => {
     applyTerrainBrushAt(position, 'drag')
@@ -1360,7 +1372,7 @@ export function MapPage() {
           id: 'planta-principal',
           nombre: 'Planta Principal ETT',
           version: 1,
-          config: demoData.config,
+          config: mapConfig,
           nodes,
           connectors,
           areas,
@@ -1375,7 +1387,7 @@ export function MapPage() {
     } finally {
       setIsSaving(false)
     }
-  }, [isSaving, nodes, connectors, areas, terrainTiles, demoData.config, user])
+  }, [isSaving, nodes, connectors, areas, terrainTiles, mapConfig, user])
 
   const handleCancelEdit = useCallback(() => {
     // Revertir a lienzo limpio si hay cambios sin guardar
@@ -1551,7 +1563,7 @@ export function MapPage() {
               }
             >
               <IsometricScene
-                config={demoData.config}
+                config={mapConfig}
                 nodes={nodes}
                 connectors={connectors}
                 areas={areas}
