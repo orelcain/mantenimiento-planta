@@ -69,6 +69,7 @@ import {
 } from '@/types/isometricMap'
 import type { Incident, IncidentPriority, IncidentStatus } from '@/types'
 import { useAuthStore } from '@/store'
+import { DEFAULT_CHONCHI_RECTANGLE, importTerrainFromRectangle } from '@/lib/terrainImport'
 
 // Lazy load del componente 3D pesado
 const IsometricScene = lazy(() =>
@@ -275,6 +276,8 @@ export function MapPage() {
   const [terrainFlattenTarget, setTerrainFlattenTarget] = useState<number>(SEA_LEVEL_ELEVATION)
   const [terrainHoverPosition, setTerrainHoverPosition] = useState<{ x: number; z: number } | null>(null)
   const [showTerrainModal, setShowTerrainModal] = useState(false)
+  const [isImportingRealTerrain, setIsImportingRealTerrain] = useState(false)
+  const [realTerrainImportMessage, setRealTerrainImportMessage] = useState<string | null>(null)
   const [isShiftPressed, setIsShiftPressed] = useState(false)
   const [addPlacementRotation, setAddPlacementRotation] = useState(0)
   const lastTerrainStrokeKeyRef = useRef<string | null>(null)
@@ -1108,6 +1111,38 @@ export function MapPage() {
   const handleFloorHover = useCallback((position: { x: number; z: number } | null) => {
     setTerrainHoverPosition(position)
   }, [])
+
+  const handleImportRealTerrain = useCallback(async () => {
+    if (isImportingRealTerrain) return
+
+    setIsImportingRealTerrain(true)
+    setRealTerrainImportMessage('Consultando elevaciones y generando malla...')
+
+    try {
+      const result = await importTerrainFromRectangle({
+        config: demoData.config,
+        corners: DEFAULT_CHONCHI_RECTANGLE,
+        sampleStep: 4,
+        keepSeaLevelTiles: false,
+      })
+
+      setTerrainTiles(result.tiles)
+      setHasUnsavedChanges(true)
+
+      setTerrainEditableMin((prev) => Math.max(MIN_TERRAIN_ELEVATION, Math.min(prev, Math.floor(result.minElevation) - 2)))
+      setTerrainEditableMax((prev) => Math.min(MAX_TERRAIN_ELEVATION, Math.max(prev, Math.ceil(result.maxElevation) + 2)))
+      setTerrainFlattenTarget(clampElevation(Math.round((result.minElevation + result.maxElevation) / 2)))
+
+      setRealTerrainImportMessage(
+        `Malla real aplicada: ${result.tiles.length} celdas, rango ${result.minElevation}m a ${result.maxElevation}m.`
+      )
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'No fue posible importar terreno real'
+      setRealTerrainImportMessage(`Error importando terreno: ${message}`)
+    } finally {
+      setIsImportingRealTerrain(false)
+    }
+  }, [isImportingRealTerrain, demoData.config])
 
   const handleFloorDrag = useCallback((position: { x: number; z: number }) => {
     applyTerrainBrushAt(position, 'drag')
@@ -2067,6 +2102,11 @@ export function MapPage() {
               onApplyRecommendedLimits={applyRecommendedTerrainLimits}
               flattenTarget={terrainFlattenTarget}
               onFlattenTargetChange={(value) => setTerrainFlattenTarget(clampToEditableTerrainRange(value))}
+              isImportingRealTerrain={isImportingRealTerrain}
+              onImportRealTerrain={() => {
+                void handleImportRealTerrain()
+              }}
+              realTerrainImportMessage={realTerrainImportMessage}
             />
 
             {/* Gestor de áreas — vista centralizada */}

@@ -20,6 +20,9 @@ interface TerrainEditorModalProps {
   onApplyRecommendedLimits: () => void
   flattenTarget: number
   onFlattenTargetChange: (value: number) => void
+  isImportingRealTerrain: boolean
+  onImportRealTerrain: () => void
+  realTerrainImportMessage?: string | null
 }
 
 export function TerrainEditorModal({
@@ -40,6 +43,9 @@ export function TerrainEditorModal({
   onApplyRecommendedLimits,
   flattenTarget,
   onFlattenTargetChange,
+  isImportingRealTerrain,
+  onImportRealTerrain,
+  realTerrainImportMessage,
 }: TerrainEditorModalProps) {
   const clampToEditableRange = (value: number) => {
     return Math.max(editableMin, Math.min(editableMax, clampElevation(value)))
@@ -178,6 +184,27 @@ export function TerrainEditorModal({
           <div className="rounded-lg border p-3 bg-primary/5 border-primary/20 text-xs text-primary space-y-1">
             <p>Click y arrastra para trabajar continuo. Mantén Shift para activar Rodillo temporal.</p>
             <p>Con Niveladora, el terreno se corta/rellena a la cota exacta configurada.</p>
+          </div>
+
+          <div className="space-y-2 rounded-lg border p-3 bg-muted/20">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Terreno Real (4 Coordenadas)</p>
+              <Button
+                variant="default"
+                size="sm"
+                className="h-8 text-xs"
+                onClick={onImportRealTerrain}
+                disabled={isImportingRealTerrain}
+              >
+                {isImportingRealTerrain ? 'Importando...' : 'Importar malla real'}
+              </Button>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Genera una malla de alturas gradual desde elevacion geoespacial y la adapta al canvas del visor.
+            </p>
+            {realTerrainImportMessage && (
+              <p className="text-[11px] text-primary font-medium">{realTerrainImportMessage}</p>
+            )}
           </div>
         </div>
       </DialogContent>
