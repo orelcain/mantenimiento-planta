@@ -13,6 +13,11 @@ interface TerrainEditorModalProps {
   onBrushSizeChange: (size: 1 | 3 | 5 | 7 | 9) => void
   brushStrength: 1 | 2 | 3 | 4 | 5
   onBrushStrengthChange: (value: 1 | 2 | 3 | 4 | 5) => void
+  editableMin: number
+  editableMax: number
+  onEditableMinChange: (value: number) => void
+  onEditableMaxChange: (value: number) => void
+  onApplyRecommendedLimits: () => void
   flattenTarget: number
   onFlattenTargetChange: (value: number) => void
 }
@@ -28,9 +33,18 @@ export function TerrainEditorModal({
   onBrushSizeChange,
   brushStrength,
   onBrushStrengthChange,
+  editableMin,
+  editableMax,
+  onEditableMinChange,
+  onEditableMaxChange,
+  onApplyRecommendedLimits,
   flattenTarget,
   onFlattenTargetChange,
 }: TerrainEditorModalProps) {
+  const clampToEditableRange = (value: number) => {
+    return Math.max(editableMin, Math.min(editableMax, clampElevation(value)))
+  }
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-xl">
@@ -89,6 +103,44 @@ export function TerrainEditorModal({
             </div>
           </div>
 
+          <div className="space-y-2 rounded-lg border p-3 bg-muted/20">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Topes de construcción</p>
+              <Button variant="outline" size="sm" className="h-7 text-[11px]" onClick={onApplyRecommendedLimits}>
+                Usar -30 / +60
+              </Button>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <p className="text-[11px] text-muted-foreground">Mín editable (m)</p>
+                <input
+                  type="number"
+                  min={MIN_TERRAIN_ELEVATION}
+                  max={editableMax - 1}
+                  step={1}
+                  value={editableMin}
+                  onChange={(e) => onEditableMinChange(parseFloat(e.target.value) || editableMin)}
+                  className="w-full h-8 text-xs bg-muted border rounded px-2 text-right font-mono focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+              </div>
+              <div className="space-y-1">
+                <p className="text-[11px] text-muted-foreground">Máx editable (m)</p>
+                <input
+                  type="number"
+                  min={editableMin + 1}
+                  max={MAX_TERRAIN_ELEVATION}
+                  step={1}
+                  value={editableMax}
+                  onChange={(e) => onEditableMaxChange(parseFloat(e.target.value) || editableMax)}
+                  className="w-full h-8 text-xs bg-muted border rounded px-2 text-right font-mono focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+              </div>
+            </div>
+            <div className="text-[11px] text-muted-foreground">
+              Hard limit global: {MIN_TERRAIN_ELEVATION}m a +{MAX_TERRAIN_ELEVATION}m.
+            </div>
+          </div>
+
           {(tool === 'flatten' || tool === 'sample') && (
             <div className="space-y-2 rounded-lg border p-3 bg-muted/20">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Nivel objetivo</p>
@@ -97,24 +149,24 @@ export function TerrainEditorModal({
                   variant="outline"
                   size="sm"
                   className="h-8 text-xs"
-                  onClick={() => onFlattenTargetChange(clampElevation(flattenTarget - 1))}
+                  onClick={() => onFlattenTargetChange(clampToEditableRange(flattenTarget - 1))}
                 >
                   -1m
                 </Button>
                 <input
                   type="number"
-                  min={MIN_TERRAIN_ELEVATION}
-                  max={MAX_TERRAIN_ELEVATION}
+                  min={editableMin}
+                  max={editableMax}
                   step={1}
                   value={flattenTarget}
-                  onChange={(e) => onFlattenTargetChange(clampElevation(parseFloat(e.target.value) || SEA_LEVEL_ELEVATION))}
+                  onChange={(e) => onFlattenTargetChange(clampToEditableRange(parseFloat(e.target.value) || SEA_LEVEL_ELEVATION))}
                   className="w-24 h-8 text-xs bg-muted border rounded px-2 text-right font-mono focus:outline-none focus:ring-1 focus:ring-primary"
                 />
                 <Button
                   variant="outline"
                   size="sm"
                   className="h-8 text-xs"
-                  onClick={() => onFlattenTargetChange(clampElevation(flattenTarget + 1))}
+                  onClick={() => onFlattenTargetChange(clampToEditableRange(flattenTarget + 1))}
                 >
                   +1m
                 </Button>

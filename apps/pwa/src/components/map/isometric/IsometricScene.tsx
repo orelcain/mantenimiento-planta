@@ -196,10 +196,6 @@ function SceneContent({
     const colors: number[] = []
     const indices: number[] = []
 
-    const landLow = new THREE.Color('#4f7d4c')
-    const landHigh = new THREE.Color('#9ccf6f')
-    const waterShallow = new THREE.Color('#38bdf8')
-    const waterDeep = new THREE.Color('#1d4ed8')
     const cliffDark = new THREE.Color('#3f4c32')
     const cliffLight = new THREE.Color('#6b7f4c')
     const bottomColor = new THREE.Color('#2f3a24')
@@ -219,13 +215,21 @@ function SceneContent({
     const getTopGrid = (ix: number, iz: number) => topHeightGrid[iz]?.[ix] ?? SEA_LEVEL_ELEVATION
 
     const setTopColor = (elevation: number) => {
-      if (elevation >= SEA_LEVEL_ELEVATION) {
-        const t = Math.min(1, elevation / 200)
-        color.copy(landLow).lerp(landHigh, t)
-      } else {
-        const t = Math.min(1, Math.abs(elevation) / 50)
-        color.copy(waterShallow).lerp(waterDeep, t)
-      }
+      const meter = Math.round(elevation)
+      const isPositive = meter >= SEA_LEVEL_ELEVATION
+      const t = isPositive
+        ? Math.min(1, meter / 200)
+        : Math.min(1, Math.abs(meter) / 50)
+
+      const hue = isPositive ? 118 - 56 * t : 205 + 18 * t
+      const saturation = isPositive ? 50 + 22 * t : 60 + 18 * t
+      let lightness = isPositive ? 32 + 22 * t : 30 + 18 * t
+
+      // Banda cada metro para diferenciar alturas rápidamente.
+      lightness += Math.abs(meter) % 2 === 0 ? 5 : -2
+      lightness = Math.max(18, Math.min(78, lightness))
+
+      color.setHSL(hue / 360, saturation / 100, lightness / 100)
     }
 
     const pushVertex = (x: number, y: number, z: number, c: THREE.Color) => {

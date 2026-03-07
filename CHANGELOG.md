@@ -7,6 +7,15 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.70.14] - 2026-03-07
+### Mejorado — Control preciso de altura en editor de terreno
+- **Topes editables de construcción**: nuevo rango configurable de edición (`mín`/`máx`) dentro del hard limit global (`-50m` a `+200m`).
+- **Preset operativo recomendado**: botón directo para fijar rápidamente `-30m` y `+60m`.
+- **Pincel respeta topes**: `Subir`, `Bajar`, `Suavizar` y `Aplanar` ya no pueden sobrepasar el rango editable definido.
+- **Nivel objetivo acotado**: `Flatten` y `Sample` quedan limitados al rango de trabajo activo para evitar errores por exceso de altura/profundidad.
+- **Regla vertical con gradiente**: nueva guía visual de metros negativos/positivos con marcas de topes editables y límite global.
+- **Bandas por metro en coloración**: el terreno aplica variación por capa de 1m para leer mejor diferencias de altura.
+
 ## [2.70.13] - 2026-03-06
 ### Mejorado — Terreno sólido volumétrico en visor isométrico
 - **Terreno con masa real**: el terreno deja de ser solo una piel superficial y pasa a renderizarse como volumen sólido completo.

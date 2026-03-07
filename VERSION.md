@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.70.13**
+## Versión Actual: **v2.70.14**
 
 **Fecha de lanzamiento**: 06 de marzo de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,13 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.70.14 — Topes editables y regla métrica de terreno (07/03/2026)
+- 📏 **Topes de edición configurables**: define hasta dónde construir/escavar por pincel sin salirte del rango operativo
+- 🎯 **Preset rápido de trabajo**: botón directo para usar `-30 m` y `+60 m`
+- 🧱 **Pincel acotado por rango**: subir/bajar/suavizar/aplanar respetan los límites activos
+- 🌈 **Regla visual de metros**: gradiente vertical con marcas de negativos/positivos y resaltado de ventana editable
+- 🎨 **Lectura por capas de 1m**: coloración bandada para distinguir alturas con más precisión
 
 ### v2.70.13 — Terreno sólido volumétrico (06/03/2026)
 - 🪨 **Masa real de terreno**: el mapa ya no renderiza solo una superficie; ahora existe volumen sólido del terreno

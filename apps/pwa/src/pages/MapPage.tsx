@@ -270,6 +270,8 @@ export function MapPage() {
   const [terrainTool, setTerrainTool] = useState<'raise' | 'lower' | 'flatten' | 'smooth' | 'sample'>('raise')
   const [terrainBrushSize, setTerrainBrushSize] = useState<1 | 3 | 5 | 7 | 9>(3)
   const [terrainBrushStrength, setTerrainBrushStrength] = useState<1 | 2 | 3 | 4 | 5>(2)
+  const [terrainEditableMin, setTerrainEditableMin] = useState(-30)
+  const [terrainEditableMax, setTerrainEditableMax] = useState(60)
   const [terrainFlattenTarget, setTerrainFlattenTarget] = useState<number>(SEA_LEVEL_ELEVATION)
   const [terrainHoverPosition, setTerrainHoverPosition] = useState<{ x: number; z: number } | null>(null)
   const [showTerrainModal, setShowTerrainModal] = useState(false)
@@ -288,6 +290,88 @@ export function MapPage() {
 
   const isEditMode = viewerState.mode === 'edit'
   const activeTerrainTool = terrainEditEnabled && isShiftPressed ? 'smooth' : terrainTool
+  const clampedTerrainEditableMin = useMemo(
+    () => Math.max(MIN_TERRAIN_ELEVATION, Math.min(MAX_TERRAIN_ELEVATION - 1, Math.round(terrainEditableMin))),
+    [terrainEditableMin]
+  )
+  const clampedTerrainEditableMax = useMemo(
+    () => Math.min(MAX_TERRAIN_ELEVATION, Math.max(clampedTerrainEditableMin + 1, Math.round(terrainEditableMax))),
+    [terrainEditableMax, clampedTerrainEditableMin]
+  )
+  const clampToEditableTerrainRange = useCallback((value: number) => {
+    const hard = clampElevation(value)
+    return Math.max(clampedTerrainEditableMin, Math.min(clampedTerrainEditableMax, hard))
+  }, [clampedTerrainEditableMin, clampedTerrainEditableMax])
+
+  const handleTerrainEditableMinChange = useCallback((value: number) => {
+    const nextMin = Math.max(
+      MIN_TERRAIN_ELEVATION,
+      Math.min(clampedTerrainEditableMax - 1, Math.round(value))
+    )
+    setTerrainEditableMin(nextMin)
+  }, [clampedTerrainEditableMax])
+
+  const handleTerrainEditableMaxChange = useCallback((value: number) => {
+    const nextMax = Math.min(
+      MAX_TERRAIN_ELEVATION,
+      Math.max(clampedTerrainEditableMin + 1, Math.round(value))
+    )
+    setTerrainEditableMax(nextMax)
+  }, [clampedTerrainEditableMin])
+
+  const applyRecommendedTerrainLimits = useCallback(() => {
+    setTerrainEditableMin(-30)
+    setTerrainEditableMax(60)
+  }, [])
+
+  const elevationColorForMeter = useCallback((meter: number) => {
+    const bounded = clampElevation(meter)
+    const isPositive = bounded >= 0
+    const distance = isPositive
+      ? Math.min(1, bounded / MAX_TERRAIN_ELEVATION)
+      : Math.min(1, Math.abs(bounded) / Math.abs(MIN_TERRAIN_ELEVATION))
+
+    const hue = isPositive
+      ? 120 - 55 * distance
+      : 205 + 18 * distance
+    const saturation = isPositive
+      ? 46 + 24 * distance
+      : 58 + 20 * distance
+    let lightness = isPositive
+      ? 30 + 26 * distance
+      : 28 + 20 * distance
+
+    // Banding suave por metro para distinguir capas.
+    lightness += Math.abs(bounded) % 2 === 0 ? 4 : -2
+    lightness = Math.max(20, Math.min(78, lightness))
+
+    return `hsl(${hue.toFixed(1)}, ${saturation.toFixed(1)}%, ${lightness.toFixed(1)}%)`
+  }, [])
+
+  const terrainRulerGradient = useMemo(() => {
+    const steps: string[] = []
+    const range = MAX_TERRAIN_ELEVATION - MIN_TERRAIN_ELEVATION
+    for (let meter = MIN_TERRAIN_ELEVATION; meter <= MAX_TERRAIN_ELEVATION; meter += 10) {
+      const pct = ((meter - MIN_TERRAIN_ELEVATION) / range) * 100
+      steps.push(`${elevationColorForMeter(meter)} ${pct.toFixed(2)}%`)
+    }
+    return `linear-gradient(to top, ${steps.join(', ')})`
+  }, [elevationColorForMeter])
+
+  const terrainRulerMarks = useMemo(() => {
+    const values = [
+      MIN_TERRAIN_ELEVATION,
+      clampedTerrainEditableMin,
+      SEA_LEVEL_ELEVATION,
+      clampedTerrainEditableMax,
+      MAX_TERRAIN_ELEVATION,
+    ]
+    return Array.from(new Set(values)).sort((a, b) => a - b)
+  }, [clampedTerrainEditableMin, clampedTerrainEditableMax])
+
+  useEffect(() => {
+    setTerrainFlattenTarget((prev) => clampToEditableTerrainRange(prev))
+  }, [clampToEditableTerrainRange])
   const effectiveAddType = useMemo<MapNode['type']>(() => {
     if (buildMode === 'structures') return 'building'
     if (buildMode === 'elements' && addEquipmentType === 'building') return 'pump'
@@ -911,7 +995,7 @@ export function MapPage() {
       const z = Math.round(position.z)
       const key = `${x},${z}`
       const sampled = terrainTiles.find((tile) => `${tile.x},${tile.z}` === key)?.elevation ?? SEA_LEVEL_ELEVATION
-      setTerrainFlattenTarget(clampElevation(sampled))
+      setTerrainFlattenTarget(clampToEditableTerrainRange(sampled))
       setTerrainTool('flatten')
       return
     }
@@ -951,14 +1035,14 @@ export function MapPage() {
           let targetElevation = currentElevation
           if (activeTerrainTool === 'raise') {
             const delta = Math.max(1, Math.round(terrainBrushStrength * falloff))
-            targetElevation = clampElevation(currentElevation + delta)
+            targetElevation = clampToEditableTerrainRange(currentElevation + delta)
           } else if (activeTerrainTool === 'lower') {
             const delta = Math.max(1, Math.round(terrainBrushStrength * falloff))
-            targetElevation = clampElevation(currentElevation - delta)
+            targetElevation = clampToEditableTerrainRange(currentElevation - delta)
           } else if (activeTerrainTool === 'flatten') {
             const flattenBlend = Math.min(1, 0.28 * terrainBrushStrength * (0.35 + falloff))
-            targetElevation = clampElevation(
-              Math.round(currentElevation + (clampElevation(terrainFlattenTarget) - currentElevation) * flattenBlend)
+            targetElevation = clampToEditableTerrainRange(
+              Math.round(currentElevation + (clampToEditableTerrainRange(terrainFlattenTarget) - currentElevation) * flattenBlend)
             )
           } else {
             const smoothRadius = terrainBrushSize >= 7 ? 2 : 1
@@ -978,7 +1062,7 @@ export function MapPage() {
               ? weightedSum / totalWeight
               : currentElevation
             const smoothBlend = Math.min(1, 0.22 * terrainBrushStrength * (0.4 + falloff))
-            targetElevation = clampElevation(Math.round(currentElevation + (avg - currentElevation) * smoothBlend))
+            targetElevation = clampToEditableTerrainRange(Math.round(currentElevation + (avg - currentElevation) * smoothBlend))
           }
 
           if (targetElevation === currentElevation) continue
@@ -1008,6 +1092,7 @@ export function MapPage() {
     terrainBrushStrength,
     terrainFlattenTarget,
     terrainTiles,
+    clampToEditableTerrainRange,
   ])
 
   const handleFloorHover = useCallback((position: { x: number; z: number } | null) => {
@@ -1471,6 +1556,11 @@ export function MapPage() {
                     Terreno {activeTerrainTool === 'raise' ? 'Subir' : activeTerrainTool === 'lower' ? 'Bajar' : activeTerrainTool === 'flatten' ? 'Aplanar' : activeTerrainTool === 'smooth' ? 'Suavizar' : 'Muestrear'}
                   </Badge>
                 )}
+                {terrainEditEnabled && (
+                  <Badge variant="outline" className="ml-2 text-xs bg-background/90">
+                    Tope edición: {clampedTerrainEditableMin}m a +{clampedTerrainEditableMax}m
+                  </Badge>
+                )}
                 {isEditMode && (
                   <Badge variant="secondary" className="ml-2 text-xs">
                     {buildMode === 'terrain' ? 'Modo Terreno' : buildMode === 'structures' ? 'Modo Estructuras' : 'Modo Elementos'}
@@ -1525,6 +1615,7 @@ export function MapPage() {
                         </Button>
                         <Badge variant="outline" className="text-[10px]">Brocha {terrainBrushSize}×{terrainBrushSize}</Badge>
                         <Badge variant="outline" className="text-[10px]">Intensidad {terrainBrushStrength}</Badge>
+                        <Badge variant="outline" className="text-[10px]">Topes {clampedTerrainEditableMin} / +{clampedTerrainEditableMax}m</Badge>
                         <Badge variant="outline" className="text-[10px]">{activeTerrainTool}</Badge>
                       </>
                     ) : (
@@ -1726,6 +1817,37 @@ export function MapPage() {
                   </Button>
                 </div>
               )}
+
+              {/* Regla de elevación con gradiente negativo/positivo */}
+              {isEditMode && buildMode === 'terrain' && (
+                <div className="bg-card/90 backdrop-blur rounded-lg shadow-lg border p-2 w-[260px]">
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-[10px] text-muted-foreground font-medium">REGLA DE METROS</p>
+                    <Badge variant="outline" className="text-[10px]">-50m / +200m</Badge>
+                  </div>
+                  <div className="relative h-44 rounded border overflow-hidden" style={{ background: terrainRulerGradient }}>
+                    <div
+                      className="absolute left-0 right-0 border-y border-white/60 bg-white/10"
+                      style={{
+                        bottom: `${((clampedTerrainEditableMin - MIN_TERRAIN_ELEVATION) / (MAX_TERRAIN_ELEVATION - MIN_TERRAIN_ELEVATION)) * 100}%`,
+                        height: `${((clampedTerrainEditableMax - clampedTerrainEditableMin) / (MAX_TERRAIN_ELEVATION - MIN_TERRAIN_ELEVATION)) * 100}%`,
+                      }}
+                    />
+                    {terrainRulerMarks.map((value) => {
+                      const pct = ((value - MIN_TERRAIN_ELEVATION) / (MAX_TERRAIN_ELEVATION - MIN_TERRAIN_ELEVATION)) * 100
+                      const isEditableBound = value === clampedTerrainEditableMin || value === clampedTerrainEditableMax
+                      return (
+                        <div key={value} className="absolute left-0 right-0" style={{ bottom: `${pct}%` }}>
+                          <div className={cn('border-t', isEditableBound ? 'border-white/90' : 'border-white/45')} />
+                          <span className={cn('absolute right-1 -top-2 text-[10px] font-mono px-1 rounded bg-black/45 text-white', isEditableBound && 'bg-primary/80')}>
+                            {value > 0 ? `+${value}` : value}m
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Search panel (center top) — visible siempre */}
@@ -1923,8 +2045,13 @@ export function MapPage() {
               onBrushSizeChange={setTerrainBrushSize}
               brushStrength={terrainBrushStrength}
               onBrushStrengthChange={setTerrainBrushStrength}
+              editableMin={clampedTerrainEditableMin}
+              editableMax={clampedTerrainEditableMax}
+              onEditableMinChange={handleTerrainEditableMinChange}
+              onEditableMaxChange={handleTerrainEditableMaxChange}
+              onApplyRecommendedLimits={applyRecommendedTerrainLimits}
               flattenTarget={terrainFlattenTarget}
-              onFlattenTargetChange={setTerrainFlattenTarget}
+              onFlattenTargetChange={(value) => setTerrainFlattenTarget(clampToEditableTerrainRange(value))}
             />
 
             {/* Gestor de áreas — vista centralizada */}
