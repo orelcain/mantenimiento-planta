@@ -7,6 +7,14 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.70.17] - 2026-03-07
+### Mejorado — Importacion de terreno real con coordenadas editables y anti-429
+- **Coordenadas editables en UI**: el modal de Terreno Real ahora permite pegar/modificar manualmente las 4 coordenadas (`lat, lon`) antes de importar.
+- **Control de detalle de malla**: selector de resolucion por paso (`4m`, `6m`, `8m`, `10m`, `12m`) para ajustar calidad vs velocidad.
+- **Reintentos con backoff**: el importador aplica reintentos automaticos cuando el proveedor de elevacion responde `429`.
+- **Proveedor alternativo de elevacion**: ante `429` en Open-Meteo, se activa fallback a OpenTopoData para completar la importacion.
+- **Mayor robustez operativa**: mensajes de estado mas claros durante validacion de coordenadas y descarga de elevaciones.
+
 ## [2.70.16] - 2026-03-07
 ### Corregido — Hotfix de build/deploy en visor de mapas
 - **Fix TypeScript en CI**: se agrega import faltante de `MAX_TERRAIN_ELEVATION` en `IsometricScene`.

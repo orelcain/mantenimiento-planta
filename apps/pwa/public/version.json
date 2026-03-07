@@ -1,7 +1,7 @@
 {
-  "version": "2.70.16",
+  "version": "2.70.17",
   "buildDate": "2026-03-07",
-  "buildTimestamp": 1772844934007,
+  "buildTimestamp": 1772848031331,
   "features": [
     "Heatmap de elevación por metro: azul (-50m) a rojo (+200m) para lectura instantánea de cota",
     "Indicador en vivo de cota bajo brocha durante edición de terreno",

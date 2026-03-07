@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.70.16**
+## Versión Actual: **v2.70.17**
 
 **Fecha de lanzamiento**: 07 de marzo de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,12 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.70.17 — Terreno real con coordenadas editables y fallback anti-429 (07/03/2026)
+- 🧭 **Coordenadas editables**: ahora puedes pegar/editar manualmente las 4 coordenadas (`lat, lon`) en el modal de importación.
+- 🧱 **Detalle de malla configurable**: selector de resolución (`4m`, `6m`, `8m`, `10m`, `12m`) para balancear precisión y velocidad.
+- 🔁 **Antithrottling**: reintentos automáticos con backoff cuando el proveedor responde `429`.
+- 🌐 **Proveedor alternativo**: fallback automático a OpenTopoData si Open-Meteo está limitado por cuota.
 
 ### v2.70.16 — Hotfix de deploy por import faltante (07/03/2026)
 - 🛠️ **Corrección de compilación**: import faltante de `MAX_TERRAIN_ELEVATION` en la escena isométrica

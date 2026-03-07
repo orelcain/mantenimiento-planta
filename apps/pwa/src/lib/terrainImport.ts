@@ -44,7 +44,8 @@ export const DEFAULT_CHONCHI_RECTANGLE: GeoCoordinate[] = [
 ]
 
 const OPEN_METEO_ELEVATION_API = 'https://api.open-meteo.com/v1/elevation'
-const MAX_POINTS_PER_REQUEST = 80
+const OPEN_TOPO_DATA_API = 'https://api.opentopodata.org/v1/aster30m'
+const MAX_POINTS_PER_REQUEST = 50
 const MAX_HTTP_RETRIES = 4
 
 const clamp01 = (value: number) => Math.max(0, Math.min(1, value))
@@ -124,6 +125,40 @@ async function fetchElevationBatch(batch: GeoCoordinate[]): Promise<number[]> {
   throw new Error('Error inesperado en consulta de elevaciones')
 }
 
+async function fetchElevationBatchOpenTopo(batch: GeoCoordinate[]): Promise<number[]> {
+  const locations = batch.map((point) => `${point.lat.toFixed(6)},${point.lon.toFixed(6)}`).join('|')
+
+  for (let attempt = 0; attempt <= MAX_HTTP_RETRIES; attempt++) {
+    const response = await fetch(`${OPEN_TOPO_DATA_API}?locations=${encodeURIComponent(locations)}`)
+
+    if (response.ok) {
+      const payload = (await response.json()) as {
+        results?: Array<{ elevation?: number | null }>
+      }
+      const values = (payload.results ?? []).map((entry) => {
+        const elevation = entry?.elevation
+        return Number.isFinite(elevation) ? Number(elevation) : SEA_LEVEL_ELEVATION
+      })
+
+      if (values.length !== batch.length) {
+        throw new Error('Respuesta de elevacion incompleta en proveedor alternativo')
+      }
+
+      return values
+    }
+
+    const isRetryable = response.status === 429 || response.status >= 500
+    if (!isRetryable || attempt === MAX_HTTP_RETRIES) {
+      throw new TerrainImportHttpError(response.status, `No se pudo consultar elevaciones (${response.status})`)
+    }
+
+    const waitMs = 900 * Math.pow(2, attempt)
+    await sleep(waitMs)
+  }
+
+  throw new Error('Error inesperado en proveedor alternativo de elevaciones')
+}
+
 function bilinearInterpolate(grid: number[][], u: number, v: number): number {
   const rows = grid.length
   const cols = grid[0]?.length ?? 0
@@ -155,7 +190,18 @@ async function fetchElevations(points: GeoCoordinate[]): Promise<number[]> {
   const elevations: number[] = []
 
   for (const batch of batches) {
-    const values = await fetchElevationBatch(batch)
+    let values: number[]
+    try {
+      values = await fetchElevationBatch(batch)
+    } catch (error) {
+      // Si Open-Meteo limita por cuota, usar proveedor alternativo.
+      if (error instanceof TerrainImportHttpError && error.status === 429) {
+        values = await fetchElevationBatchOpenTopo(batch)
+      } else {
+        throw error
+      }
+    }
+
     elevations.push(...values)
 
     // Suaviza el ritmo de consulta para evitar throttling.
