@@ -51,10 +51,10 @@ const EquipmentPage = lazyWithReload(() => import('@/pages/EquipmentPage').then(
 const PredictivePage = lazyWithReload(() => import('@/pages/PredictivePage').then((mod) => ({ default: mod.PredictivePage })))
 const RepuestosDashboard = lazyWithReload(() => import('@/pages/repuestos/Dashboard').then((mod) => ({ default: mod.RepuestosDashboard })))
 const MapPage = lazyWithReload(() =>
-  import('@/pages/MapPage').then((mod) => ({ default: mod?.MapPage ?? mod?.default }))
+  import('@/pages/MapPage').then((mod: any) => ({ default: mod?.MapPage ?? mod?.default }))
 )
 const MapViewPage = lazyWithReload(() =>
-  import('@/pages/MapViewPage').then((mod) => ({ default: mod?.MapViewPage ?? mod?.default }))
+  import('@/pages/MapViewPage').then((mod: any) => ({ default: mod?.MapViewPage ?? mod?.default }))
 )
 const PreventivePage = lazyWithReload(() => import('@/pages/PreventivePage').then((mod) => ({ default: mod.PreventivePage })))
 const SettingsPage = lazyWithReload(() => import('@/pages/SettingsPage').then((mod) => ({ default: mod.SettingsPage })))
