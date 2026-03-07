@@ -51,7 +51,7 @@ export function TerrainEditorModal({
         <DialogHeader>
           <DialogTitle>Editor de Terreno</DialogTitle>
           <DialogDescription>
-            Flujo simple tipo Sims: activar, elegir herramienta, tamaño de brocha y pintar en el mapa.
+            Flujo de maquinaria pesada: elegir herramienta, ancho de trabajo y cota objetivo para modelar terreno.
           </DialogDescription>
         </DialogHeader>
 
@@ -73,11 +73,11 @@ export function TerrainEditorModal({
           <div className="space-y-2">
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Herramienta</p>
             <div className="grid grid-cols-5 gap-1.5">
-              <Button variant={tool === 'raise' ? 'default' : 'outline'} size="sm" className="h-8 text-xs" onClick={() => onToolChange('raise')}>Subir</Button>
-              <Button variant={tool === 'lower' ? 'default' : 'outline'} size="sm" className="h-8 text-xs" onClick={() => onToolChange('lower')}>Bajar</Button>
-              <Button variant={tool === 'flatten' ? 'default' : 'outline'} size="sm" className="h-8 text-xs" onClick={() => onToolChange('flatten')}>Aplanar</Button>
-              <Button variant={tool === 'smooth' ? 'default' : 'outline'} size="sm" className="h-8 text-xs" onClick={() => onToolChange('smooth')}>Suavizar</Button>
-              <Button variant={tool === 'sample' ? 'default' : 'outline'} size="sm" className="h-8 text-xs" onClick={() => onToolChange('sample')}>Muestrear</Button>
+              <Button variant={tool === 'raise' ? 'default' : 'outline'} size="sm" className="h-8 text-[11px]" onClick={() => onToolChange('raise')}>Bulldozer</Button>
+              <Button variant={tool === 'lower' ? 'default' : 'outline'} size="sm" className="h-8 text-[11px]" onClick={() => onToolChange('lower')}>Excavadora</Button>
+              <Button variant={tool === 'flatten' ? 'default' : 'outline'} size="sm" className="h-8 text-[11px]" onClick={() => onToolChange('flatten')}>Niveladora</Button>
+              <Button variant={tool === 'smooth' ? 'default' : 'outline'} size="sm" className="h-8 text-[11px]" onClick={() => onToolChange('smooth')}>Rodillo</Button>
+              <Button variant={tool === 'sample' ? 'default' : 'outline'} size="sm" className="h-8 text-[11px]" onClick={() => onToolChange('sample')}>Topografo</Button>
             </div>
           </div>
 
@@ -143,7 +143,7 @@ export function TerrainEditorModal({
 
           {(tool === 'flatten' || tool === 'sample') && (
             <div className="space-y-2 rounded-lg border p-3 bg-muted/20">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Nivel objetivo</p>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Cota de nivelado</p>
               <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
@@ -176,8 +176,8 @@ export function TerrainEditorModal({
           )}
 
           <div className="rounded-lg border p-3 bg-primary/5 border-primary/20 text-xs text-primary space-y-1">
-            <p>Click y arrastra para pintar continuo. Mantén Shift para suavizar temporalmente.</p>
-            <p>Para estilo Sims: usa brocha 5x5 o 7x7 con intensidad 2-3.</p>
+            <p>Click y arrastra para trabajar continuo. Mantén Shift para activar Rodillo temporal.</p>
+            <p>Con Niveladora, el terreno se corta/rellena a la cota exacta configurada.</p>
           </div>
         </div>
       </DialogContent>

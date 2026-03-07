@@ -290,6 +290,13 @@ export function MapPage() {
 
   const isEditMode = viewerState.mode === 'edit'
   const activeTerrainTool = terrainEditEnabled && isShiftPressed ? 'smooth' : terrainTool
+  const terrainToolLabel = useCallback((tool: 'raise' | 'lower' | 'flatten' | 'smooth' | 'sample') => {
+    if (tool === 'raise') return 'Bulldozer (Relleno)'
+    if (tool === 'lower') return 'Excavadora (Corte)'
+    if (tool === 'flatten') return 'Motoniveladora (Cota)'
+    if (tool === 'smooth') return 'Rodillo Compactador'
+    return 'Topografo (Muestreo)'
+  }, [])
   const clampedTerrainEditableMin = useMemo(
     () => Math.max(MIN_TERRAIN_ELEVATION, Math.min(MAX_TERRAIN_ELEVATION - 1, Math.round(terrainEditableMin))),
     [terrainEditableMin]
@@ -324,26 +331,31 @@ export function MapPage() {
     setTerrainEditableMax(60)
   }, [])
 
+  const terrainElevationLookup = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const tile of terrainTiles) {
+      map.set(`${tile.x},${tile.z}`, tile.elevation)
+    }
+    return map
+  }, [terrainTiles])
+
+  const hoveredTerrainElevation = useMemo(() => {
+    if (!terrainHoverPosition) return null
+    const x = Math.round(terrainHoverPosition.x)
+    const z = Math.round(terrainHoverPosition.z)
+    return terrainElevationLookup.get(`${x},${z}`) ?? SEA_LEVEL_ELEVATION
+  }, [terrainHoverPosition, terrainElevationLookup])
+
   const elevationColorForMeter = useCallback((meter: number) => {
     const bounded = clampElevation(meter)
-    const isPositive = bounded >= 0
-    const distance = isPositive
-      ? Math.min(1, bounded / MAX_TERRAIN_ELEVATION)
-      : Math.min(1, Math.abs(bounded) / Math.abs(MIN_TERRAIN_ELEVATION))
-
-    const hue = isPositive
-      ? 120 - 55 * distance
-      : 205 + 18 * distance
-    const saturation = isPositive
-      ? 46 + 24 * distance
-      : 58 + 20 * distance
-    let lightness = isPositive
-      ? 30 + 26 * distance
-      : 28 + 20 * distance
+    const normalized = (bounded - MIN_TERRAIN_ELEVATION) / (MAX_TERRAIN_ELEVATION - MIN_TERRAIN_ELEVATION)
+    const hue = 220 * (1 - normalized) // Azul (-50) -> Rojo (+200)
+    const saturation = 86
+    let lightness = 49
 
     // Banding suave por metro para distinguir capas.
-    lightness += Math.abs(bounded) % 2 === 0 ? 4 : -2
-    lightness = Math.max(20, Math.min(78, lightness))
+    lightness += Math.abs(bounded) % 2 === 0 ? 4 : -3
+    lightness = Math.max(22, Math.min(72, lightness))
 
     return `hsl(${hue.toFixed(1)}, ${saturation.toFixed(1)}%, ${lightness.toFixed(1)}%)`
   }, [])
@@ -351,7 +363,7 @@ export function MapPage() {
   const terrainRulerGradient = useMemo(() => {
     const steps: string[] = []
     const range = MAX_TERRAIN_ELEVATION - MIN_TERRAIN_ELEVATION
-    for (let meter = MIN_TERRAIN_ELEVATION; meter <= MAX_TERRAIN_ELEVATION; meter += 10) {
+    for (let meter = MIN_TERRAIN_ELEVATION; meter <= MAX_TERRAIN_ELEVATION; meter += 1) {
       const pct = ((meter - MIN_TERRAIN_ELEVATION) / range) * 100
       steps.push(`${elevationColorForMeter(meter)} ${pct.toFixed(2)}%`)
     }
@@ -1040,10 +1052,8 @@ export function MapPage() {
             const delta = Math.max(1, Math.round(terrainBrushStrength * falloff))
             targetElevation = clampToEditableTerrainRange(currentElevation - delta)
           } else if (activeTerrainTool === 'flatten') {
-            const flattenBlend = Math.min(1, 0.28 * terrainBrushStrength * (0.35 + falloff))
-            targetElevation = clampToEditableTerrainRange(
-              Math.round(currentElevation + (clampToEditableTerrainRange(terrainFlattenTarget) - currentElevation) * flattenBlend)
-            )
+            // Motoniveladora: corta/rellena directo a cota objetivo.
+            targetElevation = clampToEditableTerrainRange(terrainFlattenTarget)
           } else {
             const smoothRadius = terrainBrushSize >= 7 ? 2 : 1
             let weightedSum = 0
@@ -1553,12 +1563,17 @@ export function MapPage() {
                 </Badge>
                 {terrainEditEnabled && (
                   <Badge variant="default" className="ml-2 bg-emerald-600 text-white gap-1 text-xs">
-                    Terreno {activeTerrainTool === 'raise' ? 'Subir' : activeTerrainTool === 'lower' ? 'Bajar' : activeTerrainTool === 'flatten' ? 'Aplanar' : activeTerrainTool === 'smooth' ? 'Suavizar' : 'Muestrear'}
+                    Terreno {terrainToolLabel(activeTerrainTool)}
                   </Badge>
                 )}
                 {terrainEditEnabled && (
                   <Badge variant="outline" className="ml-2 text-xs bg-background/90">
                     Tope edición: {clampedTerrainEditableMin}m a +{clampedTerrainEditableMax}m
+                  </Badge>
+                )}
+                {terrainEditEnabled && hoveredTerrainElevation !== null && (
+                  <Badge variant="outline" className="ml-2 text-xs bg-background/90">
+                    Cota brocha: {hoveredTerrainElevation > 0 ? `+${hoveredTerrainElevation}` : hoveredTerrainElevation}m
                   </Badge>
                 )}
                 {isEditMode && (
@@ -1616,7 +1631,7 @@ export function MapPage() {
                         <Badge variant="outline" className="text-[10px]">Brocha {terrainBrushSize}×{terrainBrushSize}</Badge>
                         <Badge variant="outline" className="text-[10px]">Intensidad {terrainBrushStrength}</Badge>
                         <Badge variant="outline" className="text-[10px]">Topes {clampedTerrainEditableMin} / +{clampedTerrainEditableMax}m</Badge>
-                        <Badge variant="outline" className="text-[10px]">{activeTerrainTool}</Badge>
+                        <Badge variant="outline" className="text-[10px]">{terrainToolLabel(activeTerrainTool)}</Badge>
                       </>
                     ) : (
                       <>

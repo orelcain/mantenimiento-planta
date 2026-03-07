@@ -216,14 +216,12 @@ function SceneContent({
 
     const setTopColor = (elevation: number) => {
       const meter = Math.round(elevation)
-      const isPositive = meter >= SEA_LEVEL_ELEVATION
-      const t = isPositive
-        ? Math.min(1, meter / 200)
-        : Math.min(1, Math.abs(meter) / 50)
+      const normalized = (meter - MIN_TERRAIN_ELEVATION) / (MAX_TERRAIN_ELEVATION - MIN_TERRAIN_ELEVATION)
 
-      const hue = isPositive ? 118 - 56 * t : 205 + 18 * t
-      const saturation = isPositive ? 50 + 22 * t : 60 + 18 * t
-      let lightness = isPositive ? 32 + 22 * t : 30 + 18 * t
+      // Mapa de calor: azul profundo en cotas bajas -> rojo intenso en cotas altas.
+      const hue = 220 * (1 - normalized)
+      const saturation = 86
+      let lightness = 49
 
       // Banda cada metro para diferenciar alturas rápidamente.
       lightness += Math.abs(meter) % 2 === 0 ? 5 : -2

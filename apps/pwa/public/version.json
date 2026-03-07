@@ -1,8 +1,12 @@
 {
-  "version": "2.70.14",
+  "version": "2.70.15",
   "buildDate": "2026-03-07",
-  "buildTimestamp": 1772843284646,
+  "buildTimestamp": 1772844279812,
   "features": [
+    "Heatmap de elevación por metro: azul (-50m) a rojo (+200m) para lectura instantánea de cota",
+    "Indicador en vivo de cota bajo brocha durante edición de terreno",
+    "Herramientas de maquinaria pesada (Bulldozer/Excavadora/Niveladora/Rodillo/Topógrafo)",
+    "Niveladora con corte/relleno a cota exacta",
     "Topes editables de construcción: rango mínimo/máximo configurable para pincel dentro del hard limit global",
     "Regla de metros con gradiente negativo/positivo y marcas de topes para controlar altura de forma visual",
     "Pincel y flatten acotados por rango activo (ej: -30m a +60m) para esculpido preciso",

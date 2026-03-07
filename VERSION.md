@@ -1,14 +1,20 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.70.14**
+## Versión Actual: **v2.70.15**
 
-**Fecha de lanzamiento**: 06 de marzo de 2026  \
+**Fecha de lanzamiento**: 07 de marzo de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
 **Build**: ✅ Stable
 
 ---
 
 ## 📋 Información de la Versión
+
+### v2.70.15 — Mapa de calor por metro + herramientas de maquinaria (07/03/2026)
+- 🌡️ **Mapa de calor real**: gradiente de color por metro desde azul (`-50 m`) a rojo (`+200 m`)
+- 👷 **Feedback de cota en brocha**: indicador en vivo de metros bajo la brocha para saber exactamente a qué altura estás trabajando
+- 🚜 **Herramientas con nomenclatura pesada**: `Bulldozer`, `Excavadora`, `Niveladora`, `Rodillo`, `Topógrafo`
+- 📐 **Niveladora por cota exacta**: corte/relleno directo a la altura objetivo (sin interpolación suave)
 
 ### v2.70.14 — Topes editables y regla métrica de terreno (07/03/2026)
 - 📏 **Topes de edición configurables**: define hasta dónde construir/escavar por pincel sin salirte del rango operativo

@@ -7,6 +7,13 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.70.15] - 2026-03-07
+### Mejorado — Visualización y control de cota de terreno
+- **Heatmap de elevación por metro**: color del terreno pasa gradualmente de azul (`-50m`) a rojo (`+200m`) con bandas por capa para lectura rápida.
+- **Lectura de altura en tiempo real**: nuevo indicador de cota bajo la brocha para saber exactamente a cuántos metros estás construyendo/escavando.
+- **Herramientas con lenguaje operativo**: renombradas a `Bulldozer`, `Excavadora`, `Niveladora`, `Rodillo` y `Topógrafo`.
+- **Nivelación de corte a cota**: la herramienta de niveladora aplica altura objetivo exacta en el área de trabajo.
+
 ## [2.70.14] - 2026-03-07
 ### Mejorado — Control preciso de altura en editor de terreno
 - **Topes editables de construcción**: nuevo rango configurable de edición (`mín`/`máx`) dentro del hard limit global (`-50m` a `+200m`).
