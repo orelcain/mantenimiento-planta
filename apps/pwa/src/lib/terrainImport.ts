@@ -25,6 +25,16 @@ export interface TerrainImportResult {
   }
 }
 
+export class TerrainImportHttpError extends Error {
+  status: number
+
+  constructor(status: number, message: string) {
+    super(message)
+    this.name = 'TerrainImportHttpError'
+    this.status = status
+  }
+}
+
 // Coordenadas base entregadas por usuario para el rectangulo de trabajo.
 export const DEFAULT_CHONCHI_RECTANGLE: GeoCoordinate[] = [
   { lat: -42.6325, lon: -73.7632 },
@@ -35,6 +45,7 @@ export const DEFAULT_CHONCHI_RECTANGLE: GeoCoordinate[] = [
 
 const OPEN_METEO_ELEVATION_API = 'https://api.open-meteo.com/v1/elevation'
 const MAX_POINTS_PER_REQUEST = 80
+const MAX_HTTP_RETRIES = 4
 
 const clamp01 = (value: number) => Math.max(0, Math.min(1, value))
 
@@ -45,6 +56,72 @@ function chunk<T>(values: T[], size: number): T[][] {
     chunks.push(values.slice(index, index + size))
   }
   return chunks
+}
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
+
+export function formatCoordinatesText(points: GeoCoordinate[]): string {
+  return points.map((point) => `${point.lat.toFixed(6)}, ${point.lon.toFixed(6)}`).join('\n')
+}
+
+export function parseCoordinatesText(text: string): GeoCoordinate[] {
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+
+  const points: GeoCoordinate[] = []
+  for (const line of lines) {
+    const parts = line.split(/[,;\s]+/).filter(Boolean)
+    if (parts.length < 2) {
+      throw new Error(`Linea invalida: "${line}". Usa formato: lat, lon`)
+    }
+
+    const lat = Number(parts[0])
+    const lon = Number(parts[1])
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+      throw new Error(`Coordenadas invalidas en linea: "${line}"`)
+    }
+    if (lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+      throw new Error(`Coordenadas fuera de rango en linea: "${line}"`)
+    }
+
+    points.push({ lat, lon })
+  }
+
+  if (points.length !== 4) {
+    throw new Error(`Se requieren exactamente 4 coordenadas, recibidas: ${points.length}`)
+  }
+
+  return points
+}
+
+async function fetchElevationBatch(batch: GeoCoordinate[]): Promise<number[]> {
+  const latitude = batch.map((point) => point.lat.toFixed(6)).join(',')
+  const longitude = batch.map((point) => point.lon.toFixed(6)).join(',')
+
+  for (let attempt = 0; attempt <= MAX_HTTP_RETRIES; attempt++) {
+    const response = await fetch(`${OPEN_METEO_ELEVATION_API}?latitude=${latitude}&longitude=${longitude}`)
+
+    if (response.ok) {
+      const payload = (await response.json()) as { elevation?: number[] }
+      const values = payload.elevation ?? []
+      if (values.length !== batch.length) {
+        throw new Error('Respuesta de elevacion incompleta en API externa')
+      }
+      return values
+    }
+
+    const isRetryable = response.status === 429 || response.status >= 500
+    if (!isRetryable || attempt === MAX_HTTP_RETRIES) {
+      throw new TerrainImportHttpError(response.status, `No se pudo consultar elevaciones (${response.status})`)
+    }
+
+    const waitMs = 700 * Math.pow(2, attempt)
+    await sleep(waitMs)
+  }
+
+  throw new Error('Error inesperado en consulta de elevaciones')
 }
 
 function bilinearInterpolate(grid: number[][], u: number, v: number): number {
@@ -78,21 +155,11 @@ async function fetchElevations(points: GeoCoordinate[]): Promise<number[]> {
   const elevations: number[] = []
 
   for (const batch of batches) {
-    const latitude = batch.map((point) => point.lat.toFixed(6)).join(',')
-    const longitude = batch.map((point) => point.lon.toFixed(6)).join(',')
-
-    const response = await fetch(`${OPEN_METEO_ELEVATION_API}?latitude=${latitude}&longitude=${longitude}`)
-    if (!response.ok) {
-      throw new Error(`No se pudo consultar elevaciones (${response.status})`)
-    }
-
-    const payload = (await response.json()) as { elevation?: number[] }
-    const values = payload.elevation ?? []
-    if (values.length !== batch.length) {
-      throw new Error('Respuesta de elevacion incompleta en API externa')
-    }
-
+    const values = await fetchElevationBatch(batch)
     elevations.push(...values)
+
+    // Suaviza el ritmo de consulta para evitar throttling.
+    await sleep(120)
   }
 
   return elevations

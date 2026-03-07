@@ -69,7 +69,13 @@ import {
 } from '@/types/isometricMap'
 import type { Incident, IncidentPriority, IncidentStatus } from '@/types'
 import { useAuthStore } from '@/store'
-import { DEFAULT_CHONCHI_RECTANGLE, importTerrainFromRectangle } from '@/lib/terrainImport'
+import {
+  DEFAULT_CHONCHI_RECTANGLE,
+  TerrainImportHttpError,
+  formatCoordinatesText,
+  importTerrainFromRectangle,
+  parseCoordinatesText,
+} from '@/lib/terrainImport'
 
 // Lazy load del componente 3D pesado
 const IsometricScene = lazy(() =>
@@ -278,6 +284,10 @@ export function MapPage() {
   const [showTerrainModal, setShowTerrainModal] = useState(false)
   const [isImportingRealTerrain, setIsImportingRealTerrain] = useState(false)
   const [realTerrainImportMessage, setRealTerrainImportMessage] = useState<string | null>(null)
+  const [terrainImportCoordinatesText, setTerrainImportCoordinatesText] = useState<string>(() =>
+    formatCoordinatesText(DEFAULT_CHONCHI_RECTANGLE)
+  )
+  const [terrainImportSampleStep, setTerrainImportSampleStep] = useState<number>(6)
   const [isShiftPressed, setIsShiftPressed] = useState(false)
   const [addPlacementRotation, setAddPlacementRotation] = useState(0)
   const lastTerrainStrokeKeyRef = useRef<string | null>(null)
@@ -1116,15 +1126,37 @@ export function MapPage() {
     if (isImportingRealTerrain) return
 
     setIsImportingRealTerrain(true)
-    setRealTerrainImportMessage('Consultando elevaciones y generando malla...')
+    setRealTerrainImportMessage('Validando coordenadas y consultando elevaciones...')
 
     try {
-      const result = await importTerrainFromRectangle({
-        config: demoData.config,
-        corners: DEFAULT_CHONCHI_RECTANGLE,
-        sampleStep: 4,
-        keepSeaLevelTiles: false,
-      })
+      const corners = parseCoordinatesText(terrainImportCoordinatesText)
+      const steps = Array.from(new Set([terrainImportSampleStep, 8, 12]))
+
+      let result: Awaited<ReturnType<typeof importTerrainFromRectangle>> | null = null
+      let lastError: unknown = null
+
+      for (const step of steps) {
+        try {
+          setRealTerrainImportMessage(`Consultando elevaciones (paso ${step}m)...`)
+          result = await importTerrainFromRectangle({
+            config: demoData.config,
+            corners,
+            sampleStep: step,
+            keepSeaLevelTiles: false,
+          })
+          break
+        } catch (error) {
+          lastError = error
+          if (error instanceof TerrainImportHttpError && error.status === 429) {
+            continue
+          }
+          throw error
+        }
+      }
+
+      if (!result) {
+        throw lastError instanceof Error ? lastError : new Error('No fue posible importar el terreno')
+      }
 
       setTerrainTiles(result.tiles)
       setHasUnsavedChanges(true)
@@ -1142,7 +1174,7 @@ export function MapPage() {
     } finally {
       setIsImportingRealTerrain(false)
     }
-  }, [isImportingRealTerrain, demoData.config])
+  }, [isImportingRealTerrain, terrainImportCoordinatesText, terrainImportSampleStep, demoData.config])
 
   const handleFloorDrag = useCallback((position: { x: number; z: number }) => {
     applyTerrainBrushAt(position, 'drag')
@@ -2107,6 +2139,10 @@ export function MapPage() {
                 void handleImportRealTerrain()
               }}
               realTerrainImportMessage={realTerrainImportMessage}
+              terrainImportCoordinatesText={terrainImportCoordinatesText}
+              onTerrainImportCoordinatesTextChange={setTerrainImportCoordinatesText}
+              terrainImportSampleStep={terrainImportSampleStep}
+              onTerrainImportSampleStepChange={setTerrainImportSampleStep}
             />
 
             {/* Gestor de áreas — vista centralizada */}

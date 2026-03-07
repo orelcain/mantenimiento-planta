@@ -23,6 +23,10 @@ interface TerrainEditorModalProps {
   isImportingRealTerrain: boolean
   onImportRealTerrain: () => void
   realTerrainImportMessage?: string | null
+  terrainImportCoordinatesText: string
+  onTerrainImportCoordinatesTextChange: (value: string) => void
+  terrainImportSampleStep: number
+  onTerrainImportSampleStepChange: (value: number) => void
 }
 
 export function TerrainEditorModal({
@@ -46,6 +50,10 @@ export function TerrainEditorModal({
   isImportingRealTerrain,
   onImportRealTerrain,
   realTerrainImportMessage,
+  terrainImportCoordinatesText,
+  onTerrainImportCoordinatesTextChange,
+  terrainImportSampleStep,
+  onTerrainImportSampleStepChange,
 }: TerrainEditorModalProps) {
   const clampToEditableRange = (value: number) => {
     return Math.max(editableMin, Math.min(editableMax, clampElevation(value)))
@@ -202,6 +210,32 @@ export function TerrainEditorModal({
             <p className="text-[11px] text-muted-foreground">
               Genera una malla de alturas gradual desde elevacion geoespacial y la adapta al canvas del visor.
             </p>
+            <div className="space-y-1">
+              <p className="text-[11px] text-muted-foreground">Coordenadas (4 lineas, formato: lat, lon)</p>
+              <textarea
+                value={terrainImportCoordinatesText}
+                onChange={(event) => onTerrainImportCoordinatesTextChange(event.target.value)}
+                rows={4}
+                className="w-full rounded border bg-muted px-2 py-1 text-[11px] font-mono focus:outline-none focus:ring-1 focus:ring-primary"
+                placeholder="-42.632500, -73.763200"
+              />
+            </div>
+            <div className="space-y-1">
+              <p className="text-[11px] text-muted-foreground">Detalle de malla (metros por muestra)</p>
+              <div className="flex items-center gap-1.5">
+                {[4, 6, 8, 10, 12].map((step) => (
+                  <Button
+                    key={step}
+                    size="sm"
+                    variant={terrainImportSampleStep === step ? 'default' : 'outline'}
+                    className="h-7 text-[11px] px-2"
+                    onClick={() => onTerrainImportSampleStepChange(step)}
+                  >
+                    {step}m
+                  </Button>
+                ))}
+              </div>
+            </div>
             {realTerrainImportMessage && (
               <p className="text-[11px] text-primary font-medium">{realTerrainImportMessage}</p>
             )}
