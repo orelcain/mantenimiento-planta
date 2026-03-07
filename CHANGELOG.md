@@ -7,6 +7,13 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.70.19] - 2026-03-07
+### Mejorado — Pantalla completa del visor + escala de grilla mantenida
+- **Boton de pantalla completa**: nuevo control en HUD del visor para entrar en fullscreen del mapa 3D.
+- **Boton de salida visible**: al estar en fullscreen, aparece accion dedicada `Salir fullscreen` para volver rapidamente.
+- **Toggle robusto**: soporte de entrada/salida por Fullscreen API con estado sincronizado por evento `fullscreenchange`.
+- **Escala preservada**: se mantiene la grilla en `1m x 1m x 1m` para conservar trazabilidad metrica al ampliar la base del terreno.
+
 ## [2.70.18] - 2026-03-07
 ### Mejorado — Auto expansion de grilla para importacion de terreno real
 - **Grilla autoajustable por coordenadas**: al importar las 4 coordenadas, el sistema expande automaticamente la base 3D (width/depth) segun el tamano real del rectangulo.

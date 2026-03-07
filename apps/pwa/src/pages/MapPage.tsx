@@ -21,6 +21,7 @@ import {
   RotateCcw,
   RotateCw,
   Maximize,
+  Minimize2,
   AlertTriangle,
   X,
   ChevronRight,
@@ -634,6 +635,22 @@ export function MapPage() {
 
   // ── Wheel zoom (scroll) ──
   const canvasContainerRef = useRef<HTMLDivElement>(null)
+  const [isFullscreen, setIsFullscreen] = useState(false)
+
+  const handleToggleFullscreen = useCallback(async () => {
+    const el = canvasContainerRef.current
+    if (!el) return
+
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen()
+      } else {
+        await el.requestFullscreen()
+      }
+    } catch (error) {
+      console.warn('No se pudo cambiar a pantalla completa', error)
+    }
+  }, [])
 
   const handleWheel = useCallback((e: WheelEvent) => {
     e.preventDefault()
@@ -654,6 +671,18 @@ export function MapPage() {
     el.addEventListener('wheel', handleWheel, { passive: false })
     return () => el.removeEventListener('wheel', handleWheel)
   }, [handleWheel])
+
+  useEffect(() => {
+    const syncFullscreenState = () => {
+      const current = canvasContainerRef.current
+      setIsFullscreen(document.fullscreenElement === current)
+    }
+
+    document.addEventListener('fullscreenchange', syncFullscreenState)
+    return () => {
+      document.removeEventListener('fullscreenchange', syncFullscreenState)
+    }
+  }, [])
 
   // ── Pan (left-click drag) ──
   const isPanning = useRef(false)
@@ -1787,8 +1816,31 @@ export function MapPage() {
                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={fitMapComplete} title={`Ver mapa completo (zoom ${FULL_MAP_VIEW_ZOOM})`}>
                     <Maximize className="h-4 w-4" />
                   </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => { void handleToggleFullscreen() }}
+                    title={isFullscreen ? 'Salir pantalla completa' : 'Pantalla completa'}
+                  >
+                    {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+                  </Button>
               </div>
             </div>
+
+            {isFullscreen && (
+              <div className="absolute top-4 right-4 z-30">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="gap-1.5 shadow-lg"
+                  onClick={() => { void handleToggleFullscreen() }}
+                >
+                  <Minimize2 className="h-4 w-4" />
+                  Salir fullscreen
+                </Button>
+              </div>
+            )}
 
             {/* Filter toggles (izquierda arriba) */}
             <div className="absolute top-4 left-4 flex flex-col gap-2">
