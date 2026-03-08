@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.70.26**
+## Versión Actual: **v2.70.27**
 
 **Fecha de lanzamiento**: 08 de marzo de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.70.27 — Etapa base reducida a importación mínima (08/03/2026)
+- 🧱 **Workspace base mínimo**: la etapa inicial del visor ahora muestra solo la importación de terreno y el estado de la sesión
+- 🧹 **Menos ruido en arranque**: se ocultan selector de mapa, nombre, descripción, resumen y acciones secundarias mientras definimos el nuevo flujo
+- 🎯 **Foco real en la base**: la pantalla inicial queda preparada para ir agregando funciones solo cuando tengan un lugar claro
 
 ### v2.70.26 — Feature flags: UI mínima para visor de mapas (08/03/2026)
 - 🏷️ **Feature flags**: se agregó sistema de banderas (`FEATURES`) para controlar la visibilidad de cada sección del visor de mapas

@@ -1,8 +1,11 @@
 {
-  "version": "2.70.26",
+  "version": "2.70.27",
   "buildDate": "2026-03-08",
   "buildTimestamp": 1772983200000,
   "features": [
+    "Visor de mapas: etapa base reducida a una pantalla minima con importacion de terreno y estado de sesion",
+    "Visor de mapas: se ocultan selector de mapa, nombre, descripcion, resumen y acciones secundarias en el arranque",
+    "Visor de mapas: la pantalla inicial queda lista para reintroducir funciones solo cuando tengan un lugar claro",
     "Visor de mapas: feature flags para controlar visibilidad de cada seccion del modulo",
     "Visor de mapas: UI minima al arrancar mostrando solo importacion de terreno, canvas 3D y controles de camara",
     "Visor de mapas: cada funcion se activa individualmente en FEATURES conforme se necesite",
