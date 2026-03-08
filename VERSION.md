@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.70.31**
+## Versión Actual: **v2.70.32**
 
 **Fecha de lanzamiento**: 08 de marzo de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.70.32 — Cota visible del terreno en el visor (08/03/2026)
+- 📐 **Dimensiones legibles**: el visor muestra una cota compacta con ancho, largo, subida, bajada y desnivel total del terreno cargado
+- 🧭 **Lectura directa**: se exponen además la cota mínima y la cota máxima para comparar el relieve real con la forma visual del mesh
+- 🎯 **Diagnóstico más claro**: ahora se puede distinguir si el mapa no “se parece” por proporciones reales del terreno o por la representación visual
 
 ### v2.70.31 — Fix del rebote tras importar base local (08/03/2026)
 - 🛡️ **Base local preservada**: la carga automática de mapas guardados ya no puede sobrescribir una base recién importada mientras la petición inicial sigue en curso

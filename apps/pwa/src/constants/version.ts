@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.70.31' as const
+export const APP_VERSION = '2.70.32' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-03-08' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Fix rebote de base local en visor de mapas' as const
+export const VERSION_NAME = 'Cota visible del terreno en visor de mapas' as const
 
 /**
  * Nota:

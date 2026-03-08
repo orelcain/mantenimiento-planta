@@ -572,6 +572,36 @@ export function MapPage() {
     return map
   }, [terrainTiles])
 
+  const terrainDimensionSummary = useMemo(() => {
+    if (terrainTiles.length === 0) return null
+
+    let minX = Number.POSITIVE_INFINITY
+    let maxX = Number.NEGATIVE_INFINITY
+    let minZ = Number.POSITIVE_INFINITY
+    let maxZ = Number.NEGATIVE_INFINITY
+    let minElevation = Number.POSITIVE_INFINITY
+    let maxElevation = Number.NEGATIVE_INFINITY
+
+    for (const tile of terrainTiles) {
+      minX = Math.min(minX, tile.x)
+      maxX = Math.max(maxX, tile.x)
+      minZ = Math.min(minZ, tile.z)
+      maxZ = Math.max(maxZ, tile.z)
+      minElevation = Math.min(minElevation, tile.elevation)
+      maxElevation = Math.max(maxElevation, tile.elevation)
+    }
+
+    return {
+      widthMeters: Math.max(1, maxX - minX + 1),
+      depthMeters: Math.max(1, maxZ - minZ + 1),
+      minElevation,
+      maxElevation,
+      riseMeters: Math.max(0, maxElevation),
+      dropMeters: Math.max(0, -minElevation),
+      reliefMeters: Math.max(0, maxElevation - minElevation),
+    }
+  }, [terrainTiles])
+
   const hoveredTerrainElevation = useMemo(() => {
     if (!terrainHoverPosition) return null
     const x = Math.round(terrainHoverPosition.x)
@@ -2754,6 +2784,40 @@ export function MapPage() {
             )}
 
             <div className="absolute top-4 left-4 flex flex-col gap-2">
+              {terrainDimensionSummary && (
+                <div className="bg-card/90 backdrop-blur rounded-lg shadow-lg border p-2.5 w-[260px]">
+                  <p className="text-[10px] text-muted-foreground font-medium px-1 mb-2">COTA DEL TERRENO</p>
+                  <div className="grid grid-cols-2 gap-2 text-[11px]">
+                    <div className="rounded border bg-background/70 px-2 py-1.5">
+                      <div className="text-muted-foreground">Ancho</div>
+                      <div className="font-semibold text-foreground">{terrainDimensionSummary.widthMeters} m</div>
+                    </div>
+                    <div className="rounded border bg-background/70 px-2 py-1.5">
+                      <div className="text-muted-foreground">Largo</div>
+                      <div className="font-semibold text-foreground">{terrainDimensionSummary.depthMeters} m</div>
+                    </div>
+                    <div className="rounded border bg-background/70 px-2 py-1.5">
+                      <div className="text-muted-foreground">Hacia arriba</div>
+                      <div className="font-semibold text-foreground">+{terrainDimensionSummary.riseMeters} m</div>
+                    </div>
+                    <div className="rounded border bg-background/70 px-2 py-1.5">
+                      <div className="text-muted-foreground">Hacia abajo</div>
+                      <div className="font-semibold text-foreground">-{terrainDimensionSummary.dropMeters} m</div>
+                    </div>
+                  </div>
+                  <div className="mt-2 rounded border bg-background/70 px-2 py-1.5 text-[11px]">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-muted-foreground">Desnivel total</span>
+                      <span className="font-semibold text-foreground">{terrainDimensionSummary.reliefMeters} m</span>
+                    </div>
+                    <div className="mt-1 flex items-center justify-between gap-2 text-muted-foreground">
+                      <span>Cota min {terrainDimensionSummary.minElevation} m</span>
+                      <span>Cota max {terrainDimensionSummary.maxElevation} m</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Floor selector */}
               {FEATURES.floorSelector && <div className="bg-card/90 backdrop-blur rounded-lg shadow-lg border p-1.5">
                 <p className="text-[10px] text-muted-foreground font-medium px-1 mb-1">NIVEL (m)</p>

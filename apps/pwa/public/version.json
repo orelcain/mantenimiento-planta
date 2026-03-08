@@ -1,8 +1,11 @@
 {
-  "version": "2.70.31",
+  "version": "2.70.32",
   "buildDate": "2026-03-08",
   "buildTimestamp": 1772983200000,
   "features": [
+    "Visor de mapas: cota compacta visible con ancho, largo, subida, bajada y desnivel total del terreno",
+    "Visor de mapas: se muestran tambien cota minima y cota maxima para leer mejor el relieve real",
+    "Visor de mapas: mejora de diagnostico visual para comparar dimensiones reales del terreno con el mesh renderizado",
     "Visor de mapas: la carga automatica de mapas guardados ya no sobrescribe una base local recien importada",
     "Visor de mapas: se corrige el rebote visual donde el terreno aparecia y luego se volvia a la etapa base",
     "Visor de mapas: el muestreo inicial de importacion queda realmente sincronizado en 1 m",
