@@ -45,7 +45,7 @@ export function TerrainBaseWorkspace({
   onMapDescriptionChange: _onMapDescriptionChange,
   mapWidth: _mapWidth,
   mapDepth: _mapDepth,
-  terrainTileCount: _terrainTileCount,
+  terrainTileCount,
   currentFloorLabel: _currentFloorLabel,
   mapStatusText: _mapStatusText,
   realTerrainImportMessage,
@@ -70,14 +70,17 @@ export function TerrainBaseWorkspace({
         <div>
           <h2 className="text-sm font-semibold">Importación del mapa base</h2>
           <p className="text-xs text-muted-foreground">
-            Dejamos esta etapa en modo mínimo: importar terreno desde 4 coordenadas, revisar el resultado en el canvas y seguir construyendo desde ahí.
+            {terrainTileCount > 0
+              ? 'La base ya tiene terreno cargado. Dejamos este panel compacto para reintentar importación o ajustar coordenadas sin ocupar tanto alto.'
+              : 'Dejamos esta etapa en modo mínimo: importar terreno desde 4 coordenadas, revisar el resultado en el canvas y seguir construyendo desde ahí.'}
           </p>
         </div>
 
-        <div className="mx-auto w-full max-w-[420px]">
+        <div className="w-full">
           <TerrainImportPanel
             title="Coordenadas del terreno"
             description="Usa exactamente 4 lineas en formato lat, lon. Por ahora ocultamos el resto del flujo para concentrarnos solo en importar bien la base."
+            layout="horizontal"
             importLabel="Aplicar importacion"
             importBusyLabel="Importando..."
             isImporting={isImportingRealTerrain}
@@ -90,7 +93,7 @@ export function TerrainBaseWorkspace({
             preview={terrainImportPreview}
             previewError={terrainImportPreviewError}
             progress={terrainImportProgress}
-            coordinateRows={6}
+            coordinateRows={terrainTileCount > 0 ? 4 : 5}
           />
         </div>
 

@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.70.29**
+## Versión Actual: **v2.70.30**
 
 **Fecha de lanzamiento**: 08 de marzo de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.70.30 — Panel de importación horizontal y versión sincronizada (08/03/2026)
+- ↔️ **Panel horizontal**: la sección de importación del mapa base se reorganiza en horizontal para reducir altura ocupada
+- 🔁 **Panel compacto tras carga**: cuando ya existe terreno importado, el bloque superior mantiene la misma función pero con menos peso visual
+- 🏷️ **Versión sincronizada**: se alinean `APP_VERSION`, `package.json` y el versionado público para evitar diagnósticos confusos en cliente
 
 ### v2.70.29 — Vista sin grilla base y muestreo base de 1 m (08/03/2026)
 - 🧼 **Sin grilla base**: se oculta temporalmente la grilla/plano visual del canvas para revisar el terreno importado sin interferencia
