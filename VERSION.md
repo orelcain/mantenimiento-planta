@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.70.27**
+## Versión Actual: **v2.70.28**
 
 **Fecha de lanzamiento**: 08 de marzo de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.70.28 — Terreno importado con mejor legibilidad visual (08/03/2026)
+- 🗺️ **Terreno más visible**: se aclara la paleta topográfica y se aumenta el contraste del material del terreno importado
+- 📐 **Menos interferencia**: la grilla base se atenúa automáticamente cuando existe una malla de terreno para no competir con la topografía
+- 🧭 **Lectura más clara**: las curvas de nivel quedan más visibles sobre fondos oscuros
 
 ### v2.70.27 — Etapa base reducida a importación mínima (08/03/2026)
 - 🧱 **Workspace base mínimo**: la etapa inicial del visor ahora muestra solo la importación de terreno y el estado de la sesión

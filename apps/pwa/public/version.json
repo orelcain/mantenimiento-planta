@@ -1,8 +1,11 @@
 {
-  "version": "2.70.27",
+  "version": "2.70.28",
   "buildDate": "2026-03-08",
   "buildTimestamp": 1772983200000,
   "features": [
+    "Visor de mapas: terreno importado con paleta topografica mas clara y mayor contraste visual",
+    "Visor de mapas: la grilla base se atenúa automaticamente cuando existe una malla de terreno",
+    "Visor de mapas: curvas de nivel mas visibles sobre el canvas oscuro",
     "Visor de mapas: etapa base reducida a una pantalla minima con importacion de terreno y estado de sesion",
     "Visor de mapas: se ocultan selector de mapa, nombre, descripcion, resumen y acciones secundarias en el arranque",
     "Visor de mapas: la pantalla inicial queda lista para reintroducir funciones solo cuando tengan un lugar claro",

@@ -112,13 +112,13 @@ interface IsometricSceneProps {
 }
 
 const TOPOGRAPHIC_COLOR_STOPS = [
-  { stop: 0, color: new THREE.Color('#2f6f8f') },
-  { stop: 0.16, color: new THREE.Color('#5fa7b8') },
-  { stop: 0.28, color: new THREE.Color('#d9d0a2') },
-  { stop: 0.48, color: new THREE.Color('#7ca66a') },
-  { stop: 0.7, color: new THREE.Color('#5f7e55') },
-  { stop: 0.86, color: new THREE.Color('#8a7a61') },
-  { stop: 1, color: new THREE.Color('#c8c3b5') },
+  { stop: 0, color: new THREE.Color('#4f95bf') },
+  { stop: 0.16, color: new THREE.Color('#78c1d1') },
+  { stop: 0.28, color: new THREE.Color('#e7d9a3') },
+  { stop: 0.48, color: new THREE.Color('#96bc73') },
+  { stop: 0.7, color: new THREE.Color('#739763') },
+  { stop: 0.86, color: new THREE.Color('#b18d68') },
+  { stop: 1, color: new THREE.Color('#ddd6c5') },
 ]
 
 function clamp01(value: number): number {
@@ -288,6 +288,16 @@ function SceneContent({
     }
   }, [terrain])
 
+  const sceneGridConfig = useMemo(() => {
+    if (!terrain || terrain.length === 0) return config
+    return {
+      ...config,
+      showGrid: false,
+      gridOpacity: Math.min(config.gridOpacity, 0.04),
+      floorColor: '#0d1520',
+    }
+  }, [config, terrain])
+
   const terrainSolidGeometry = useMemo(() => {
     if (!terrain || terrain.length === 0) return null
 
@@ -335,7 +345,7 @@ function SceneContent({
     const setTopColor = (elevation: number) => {
       const normalized = (elevation - terrainMetrics.minElevation) / terrainMetrics.elevationRange
       color.copy(getTopographicColor(normalized))
-      color.offsetHSL(0, -0.04, 0.02)
+      color.offsetHSL(0, 0.02, 0.08)
     }
 
     const pushVertex = (x: number, y: number, z: number, c: THREE.Color) => {
@@ -789,15 +799,17 @@ function SceneContent({
       )}
 
       {/* Grilla del suelo */}
-      <PlantGrid config={config} />
+      <PlantGrid config={sceneGridConfig} />
 
       {/* Terreno suavizado tipo heightfield (menos voxel/pixelado) */}
       {terrainSolidGeometry && (
         <mesh geometry={terrainSolidGeometry} castShadow receiveShadow renderOrder={2}>
           <meshStandardMaterial
             vertexColors
-            roughness={0.97}
+            roughness={0.9}
             metalness={0}
+            emissive="#16311c"
+            emissiveIntensity={0.16}
             side={THREE.FrontSide}
           />
         </mesh>
@@ -806,9 +818,9 @@ function SceneContent({
       {terrainContourGeometry && (
         <lineSegments geometry={terrainContourGeometry} renderOrder={3}>
           <lineBasicMaterial
-            color="#14303d"
+            color="#9fd8ff"
             transparent
-            opacity={0.32}
+            opacity={0.5}
             depthWrite={false}
           />
         </lineSegments>
