@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.70.22**
+## Versión Actual: **v2.70.23**
 
 **Fecha de lanzamiento**: 08 de marzo de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.70.23 — Hotfix deploy visor de mapas (08/03/2026)
+- 🛠️ **Typecheck remoto corregido**: se blindan accesos potencialmente indefinidos en el render de paleta topográfica y curvas de nivel
+- 🧵 **Frame del underlay corregido**: el marco del plano base pasa a renderizarse como objeto Three.js compatible con el chequeo estricto de CI
+- 🚀 **Pipeline destrabado**: el build remoto vuelve a compilar después del refactor del visor
 
 ### v2.70.22 — Base topográfica primero para el visor de mapas (08/03/2026)
 - 🧭 **Fase base prioritaria**: el módulo abre primero en modo de importación y revisión del terreno real desde 4 coordenadas

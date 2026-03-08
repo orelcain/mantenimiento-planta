@@ -131,6 +131,7 @@ function getTopographicColor(normalizedElevation: number): THREE.Color {
   for (let index = 0; index < TOPOGRAPHIC_COLOR_STOPS.length - 1; index++) {
     const current = TOPOGRAPHIC_COLOR_STOPS[index]
     const next = TOPOGRAPHIC_COLOR_STOPS[index + 1]
+    if (!current || !next) continue
 
     if (normalized <= next.stop) {
       const range = Math.max(0.0001, next.stop - current.stop)
@@ -139,7 +140,8 @@ function getTopographicColor(normalizedElevation: number): THREE.Color {
     }
   }
 
-  return TOPOGRAPHIC_COLOR_STOPS[TOPOGRAPHIC_COLOR_STOPS.length - 1].color.clone()
+  const lastStop = TOPOGRAPHIC_COLOR_STOPS[TOPOGRAPHIC_COLOR_STOPS.length - 1]
+  return (lastStop?.color ?? new THREE.Color('#c8c3b5')).clone()
 }
 
 function getContourIntersection(
@@ -553,6 +555,7 @@ function SceneContent({
           for (let index = 0; index <= intersections.length - 2; index += 2) {
             const start = intersections[index]
             const end = intersections[index + 1]
+            if (!start || !end) continue
             positions.push(start[0], start[1], start[2], end[0], end[1], end[2])
           }
         }
@@ -619,6 +622,20 @@ function SceneContent({
       new THREE.Vector3(-halfWidth, 0.03, -halfDepth),
     ])
   }, [config.depth, config.width, underlayDepth, underlayImageUrl, underlayWidth])
+
+  const underlayFrameLine = useMemo(() => {
+    if (!underlayFrameGeometry || underlayStyle.frameOpacity <= 0) return null
+
+    return new THREE.Line(
+      underlayFrameGeometry,
+      new THREE.LineBasicMaterial({
+        color: underlayStyle.frameColor,
+        transparent: true,
+        opacity: underlayStyle.frameOpacity,
+        depthWrite: false,
+      })
+    )
+  }, [underlayFrameGeometry, underlayStyle.frameColor, underlayStyle.frameOpacity])
 
   useEffect(() => {
     underlayTexture.colorSpace = THREE.SRGBColorSpace
@@ -765,15 +782,8 @@ function SceneContent({
               depthWrite={false}
             />
           </mesh>
-          {underlayFrameGeometry && underlayStyle.frameOpacity > 0 && (
-            <line geometry={underlayFrameGeometry}>
-              <lineBasicMaterial
-                color={underlayStyle.frameColor}
-                transparent
-                opacity={underlayStyle.frameOpacity}
-                depthWrite={false}
-              />
-            </line>
+          {underlayFrameLine && (
+            <primitive object={underlayFrameLine} />
           )}
         </group>
       )}

@@ -7,6 +7,12 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.70.23] - 2026-03-08
+### Corregido — Hotfix de deploy para visor de mapas
+- **TypeScript estricto en CI**: se corrigen accesos potencialmente `undefined` en la lógica de color topográfico y curvas de nivel del terreno.
+- **Marco del plano base corregido**: el frame del underlay ahora se renderiza como objeto Three.js (`primitive`) en vez de JSX ambiguo, evitando error de typecheck en GitHub Actions.
+- **Deploy destrabado**: el visor vuelve a compilar bajo el chequeo de tipos usado por el pipeline remoto.
+
 ## [2.70.22] - 2026-03-08
 ### Mejorado — Visor de mapas con base topografica primero
 - **Fase base prioritaria**: el visor ahora arranca enfocado en importar y revisar bien el terreno real desde 4 coordenadas antes de abrir herramientas de creacion.

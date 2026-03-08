@@ -1,8 +1,9 @@
 {
-  "version": "2.70.22",
+  "version": "2.70.23",
   "buildDate": "2026-03-08",
   "buildTimestamp": 1772941800000,
   "features": [
+    "Visor de mapas: hotfix de deploy corrigiendo typecheck estricto de CI en el renderer del underlay y curvas topograficas",
     "Visor de mapas: nueva etapa base enfocada en importar, revisar y guardar terreno real desde 4 coordenadas antes de crear elementos",
     "Visor de mapas: extraccion de paneles reutilizables para importacion de terreno y workspace base, reduciendo mezcla de responsabilidades en MapPage",
     "Visor de mapas: limpieza de UI en fase base ocultando incidencias, buscador, filtros y elementos no esenciales hasta pasar a creacion",
