@@ -1,8 +1,14 @@
 {
-  "version": "2.70.24",
+  "version": "2.70.26",
   "buildDate": "2026-03-08",
-  "buildTimestamp": 1772945400000,
+  "buildTimestamp": 1772983200000,
   "features": [
+    "Visor de mapas: feature flags para controlar visibilidad de cada seccion del modulo",
+    "Visor de mapas: UI minima al arrancar mostrando solo importacion de terreno, canvas 3D y controles de camara",
+    "Visor de mapas: cada funcion se activa individualmente en FEATURES conforme se necesite",
+    "Visor de mapas: mapas con base ya configurada abren directo en editor para evitar volver siempre al flujo inicial",
+    "Visor de mapas: limpieza de UI removiendo panel lateral de incidencias y bloque de filtros heredados del visor operativo",
+    "Visor de mapas: la base topografica queda como ajuste puntual de recalibracion y no como etapa dominante del modulo",
     "Visor de mapas: preview de importacion con rectangulo estimado, canvas final y puntos de muestreo antes de consultar elevaciones",
     "Visor de mapas: progreso real de importacion por porcentaje, lotes y puntos durante la consulta de topografia externa",
     "Visor de mapas: feedback de importacion unificado entre workspace base y modal del editor de terreno",

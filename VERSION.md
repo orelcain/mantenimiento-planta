@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.70.24**
+## Versión Actual: **v2.70.26**
 
 **Fecha de lanzamiento**: 08 de marzo de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,16 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.70.26 — Feature flags: UI mínima para visor de mapas (08/03/2026)
+- 🏷️ **Feature flags**: se agregó sistema de banderas (`FEATURES`) para controlar la visibilidad de cada sección del visor de mapas
+- 🧹 **Solo lo esencial**: al arrancar solo se muestra la importación de terreno, el canvas 3D y controles básicos de cámara
+- 🛠️ **Desarrollo progresivo**: cada función (editor, áreas, búsqueda, propiedades, etc.) se activa individualmente en `FEATURES` conforme se necesite
+
+### v2.70.25 — Flujo simplificado del visor de mapas (08/03/2026)
+- 🧭 **Base una vez, edición después**: los mapas con base ya configurada abren directo en modo editor en lugar de volver siempre a la etapa inicial
+- 🧹 **Menos ruido visual**: se retiran del módulo principal los paneles heredados de incidencias y filtros globales que mezclaban responsabilidades
+- 🛠️ **Base como ajuste puntual**: la configuración topográfica sigue disponible, pero ahora queda como acción de recalibración y no como flujo dominante
 
 ### v2.70.24 — Preview y progreso de importación en visor de mapas (08/03/2026)
 - 🧭 **Previsualización operativa**: el panel de terreno ahora estima rectángulo real en metros, canvas final autoexpandido y densidad efectiva antes de importar

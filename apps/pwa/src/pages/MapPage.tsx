@@ -15,7 +15,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  MapPin,
   ZoomIn,
   ZoomOut,
   RotateCcw,
@@ -24,17 +23,14 @@ import {
   Minimize2,
   AlertTriangle,
   X,
-  ChevronRight,
   Eye,
   EyeOff,
   Compass,
   Activity,
-  CircleCheck,
   Layers,
   Pencil,
   Eye as EyeIcon,
   Building2,
-  Shapes,
   Trash2,
   Settings2,
 } from 'lucide-react'
@@ -45,10 +41,8 @@ import {
   Badge,
   Input,
 } from '@/components/ui'
-import { IncidentDetail } from '@/components/incidents/IncidentDetail'
-import { useAppStore, useCanValidateIncidents, useIsAdmin } from '@/store'
+import { useAppStore, useIsAdmin } from '@/store'
 import { cn } from '@/lib/utils'
-import { formatRelativeTime } from '@/lib/utils'
 import { generateDemoMap, getIsometricMaps, saveIsometricMap } from '@/services/isometricMap'
 import { getLatestMapVersion, getMapLocations } from '@/services/maps'
 import type { CameraAngle, IsometricViewerState, MapNode, MapArea, TerrainTile, BuildEditMode, MapConnector as MapConnectorType, IsometricMap, IsometricMapConfig } from '@/types/isometricMap'
@@ -71,7 +65,6 @@ import {
   STRUCTURE_NODE_TYPES,
   ELEMENT_NODE_TYPES,
 } from '@/types/isometricMap'
-import type { Incident, IncidentPriority, IncidentStatus } from '@/types'
 import { useAuthStore } from '@/store'
 import {
   DEFAULT_CHONCHI_RECTANGLE,
@@ -111,26 +104,41 @@ import { getAreaAtPosition, normalizeNodeForArea } from '@/components/map/isomet
 import { useMapEditorActions } from '@/components/map/isometric/editor/useMapEditorActions'
 import { useAreaEditorFlow } from '@/components/map/isometric/editor/useAreaEditorFlow'
 
-const PRIORITY_CONFIG: Record<IncidentPriority, { color: string; bg: string; label: string }> = {
-  critica: { color: 'text-red-500', bg: 'bg-red-500', label: 'Crítica' },
-  alta: { color: 'text-orange-500', bg: 'bg-orange-500', label: 'Alta' },
-  media: { color: 'text-blue-500', bg: 'bg-blue-500', label: 'Media' },
-  baja: { color: 'text-gray-500', bg: 'bg-gray-500', label: 'Baja' },
-}
-
-const STATUS_CONFIG: Record<IncidentStatus, { label: string; variant: string }> = {
-  pendiente: { label: 'Pendiente', variant: 'warning' },
-  confirmada: { label: 'Confirmada', variant: 'default' },
-  rechazada: { label: 'Rechazada', variant: 'destructive' },
-  en_proceso: { label: 'En proceso', variant: 'secondary' },
-  resuelta: { label: 'Resuelta', variant: 'success' },
-  cerrada: { label: 'Cerrada', variant: 'outline' },
-}
-
 const ELEVATION_OPTIONS = ELEVATION_PRESET_LEVELS.map((level) => ({
   floor: level,
   full: formatElevationLabel(level),
 }))
+
+/**
+ * ─── Feature flags ───
+ * Controlamos qué se muestra. Empezamos con lo mínimo (solo importación del mapa).
+ * A medida que vayamos necesitando cada función, la activamos aquí.
+ * Al final quitamos todo lo que no sirve.
+ */
+const FEATURES = {
+  vista2d: false,              // Header: botón "Vista 2D"
+  workspaceToggle: false,      // Header: cambiar base↔editor, botón editar mapa
+  headerBadges: false,         // Header: badges cámara, piso, zoom
+  statusLegendCard: false,     // Card selector mapas, nombre, desc, calibración plano
+  statusSummary: false,        // Card leyenda estados equipos
+  editorToolbar: false,        // Toolbar superior editor (tools, undo/redo, save)
+  editorBadge: false,          // Badge "MODO EDITOR" + info terreno
+  buildDock: false,            // Dock inferior Sims (terrain/structures/elements)
+  equipmentToggle: false,      // Botón toggle ocultar/mostrar equipos
+  floorSelector: false,        // Selector de piso en metros
+  auxPanel: false,             // Panel auxiliar editor (gestionar áreas)
+  elevationRuler: false,       // Regla gradiente de elevación
+  searchPanel: false,          // Buscador de nodos/áreas
+  nodeInfoCard: false,         // Info nodo seleccionado en modo vista
+  propertiesPanel: false,      // Panel propiedades nodo en modo editor
+  helpHint: false,             // Atajos de teclado
+  areaEditor: false,           // Editor áreas por tiles
+  terrainEditorModal: false,   // Modal editor de terreno
+  areaManager: false,          // Gestor modal de áreas
+  addEquipmentDialog: false,   // Diálogo agregar equipo
+  linkEntityDialog: false,     // Diálogo vincular entidad
+  shapeEditorDialog: false,    // Editor de forma 3D
+} as const
 
 /** Tamaños por defecto para cada tipo de equipo */
 function getDefaultSize(type: MapNode['type']): MapNode['size'] {
@@ -314,13 +322,8 @@ function buildBackgroundMapFromVersion(
 
 export function MapPage() {
   const navigate = useNavigate()
-  const canValidate = useCanValidateIncidents()
   const isAdmin = useIsAdmin()
   const user = useAuthStore((s) => s.user)
-  const { incidents } = useAppStore()
-  const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null)
-  const [showIncidentPanel, setShowIncidentPanel] = useState(true)
-  const [showFilters, setShowFilters] = useState(false)
   const [workspaceStage, setWorkspaceStage] = useState<MapWorkspaceStage>('terrain-base')
 
   // Estado del visor isométrico
@@ -423,10 +426,29 @@ export function MapPage() {
           }
         })()
       : null
+    const hasConfiguredBase =
+      nextTerrain.length > 0 ||
+      nextNodes.length > 0 ||
+      nextAreas.length > 0 ||
+      nextConnectors.length > 0 ||
+      !!nextBackgroundMap
 
     setSelectedBaseLocationId(nextBackgroundMap?.locationId ?? '')
     setBackgroundMap(nextBackgroundMap)
     setShowBaseMap(!!nextBackgroundMap)
+    setWorkspaceStage(hasConfiguredBase ? 'editor' : 'terrain-base')
+    setViewerState((prev) => ({
+      ...prev,
+      mode: hasConfiguredBase ? 'edit' : 'view',
+      selectedNodeId: null,
+      filters: {
+        ...prev.filters,
+        showEquipment: hasConfiguredBase,
+        showLabels: hasConfiguredBase,
+        showConnectors: hasConfiguredBase,
+        showAlerts: false,
+      },
+    }))
     setHasUnsavedChanges(false)
     history.clear()
     history.pushSnapshot({ nodes: nextNodes, areas: nextAreas, connectors: nextConnectors })
@@ -679,14 +701,6 @@ export function MapPage() {
   const resolveAreaAtPosition = useCallback((x: number, z: number, floor: number) => {
     return getAreaAtPosition(areas, x, z, floor)
   }, [areas])
-
-  // Incidencias activas
-  const activeIncidents = useMemo(
-    () => incidents.filter((i) =>
-      i.status === 'pendiente' || i.status === 'confirmada' || i.status === 'en_proceso'
-    ),
-    [incidents]
-  )
 
   const visibleNodeIds = useMemo(() => {
     let filtered = nodes
@@ -1298,9 +1312,6 @@ export function MapPage() {
   useEffect(() => {
     if (!isTerrainBaseStage) return
 
-    setShowIncidentPanel(false)
-    setShowFilters(false)
-    setSelectedIncident(null)
     setTerrainEditEnabled(false)
     setShowTerrainModal(false)
     closeAreaEditor()
@@ -1331,12 +1342,12 @@ export function MapPage() {
         showLabels: true,
       },
     }))
-    setMapStatusText('Editor activado. La base del terreno ya esta lista para continuar con creacion y ajustes.')
+    setMapStatusText('Editor activado. La base ya quedo cargada y ahora el foco es editar elementos y areas.')
   }, [])
 
   const returnToTerrainWorkspace = useCallback(() => {
     setWorkspaceStage('terrain-base')
-    setMapStatusText('Volviste al modo base de terreno para revisar la importacion y la forma general del mapa.')
+    setMapStatusText('Ajuste de base abierto. Usa este espacio solo para recalibrar terreno o plano base cuando sea necesario.')
   }, [])
 
   const handleNodeDragEnd = useCallback(
@@ -1626,6 +1637,8 @@ export function MapPage() {
         `Malla real aplicada: ${result.tiles.length} celdas, rango ${result.minElevation}m a ${result.maxElevation}m. ` +
         `Grilla ${expandedConfig.width}×${expandedConfig.depth}m, muestra efectiva ${result.usedSampleStep}m${scaleNote}.`
       )
+      setMapStatusText('Base importada. Sigue con edicion de elementos; vuelve a base solo si necesitas recalibrar.')
+      enterEditorWorkspace()
     } catch (error) {
       if (error instanceof TerrainImportHttpError && error.status === 429) {
         setRealTerrainImportMessage(
@@ -1639,7 +1652,7 @@ export function MapPage() {
       setIsImportingRealTerrain(false)
       setTerrainImportProgress(null)
     }
-  }, [isImportingRealTerrain, terrainImportCoordinatesText, terrainImportSampleStep, mapConfig])
+  }, [isImportingRealTerrain, terrainImportCoordinatesText, terrainImportSampleStep, mapConfig, enterEditorWorkspace])
 
   const handleFloorDrag = useCallback((position: { x: number; z: number }) => {
     applyTerrainBrushAt(position, 'drag')
@@ -2028,37 +2041,39 @@ export function MapPage() {
           </h1>
           <p className="text-sm text-muted-foreground">
             {isTerrainBaseStage
-              ? 'Fase 1: importar y validar la base del terreno desde 4 coordenadas antes de seguir con creacion.'
-              : 'Fase 2: edicion y construccion sobre la base ya importada.'}
+              ? 'Carga y ajusta la base solo una vez. Cuando quede lista, el trabajo principal pasa a edicion de elementos.'
+              : 'Editor principal del layout: equipos, areas, conectores y ajustes sobre una base ya preparada.'}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1.5"
-            onClick={() => navigate('/map/view')}
-          >
-            <Layers className="h-4 w-4" />
-            Vista 2D
-          </Button>
-          <Badge variant={isTerrainBaseStage ? 'default' : 'secondary'} className="gap-1 font-normal">
-            {isTerrainBaseStage ? 'Base terreno' : 'Creacion'}
-          </Badge>
-          {isAdmin && isTerrainBaseStage && (
-            <Button variant="default" size="sm" className="gap-1.5" onClick={enterEditorWorkspace}>
-              <Pencil className="h-4 w-4" />
-              Seguir a creacion
+          {FEATURES.vista2d && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={() => navigate('/map/view')}
+            >
+              <Layers className="h-4 w-4" />
+              Vista 2D
             </Button>
           )}
-          {isAdmin && !isTerrainBaseStage && (
+          <Badge variant={isTerrainBaseStage ? 'outline' : 'secondary'} className="gap-1 font-normal">
+            {isTerrainBaseStage ? 'Configurando base' : 'Editor activo'}
+          </Badge>
+          {FEATURES.workspaceToggle && isAdmin && isTerrainBaseStage && (terrainTiles.length > 0 || !!backgroundMap || !!currentMapId) && (
+            <Button variant="default" size="sm" className="gap-1.5" onClick={enterEditorWorkspace}>
+              <Pencil className="h-4 w-4" />
+              Ir a edicion
+            </Button>
+          )}
+          {FEATURES.workspaceToggle && isAdmin && !isTerrainBaseStage && (
             <Button variant="outline" size="sm" className="gap-1.5" onClick={returnToTerrainWorkspace}>
               <Compass className="h-4 w-4" />
-              Volver a base
+              Ajustar base
             </Button>
           )}
           {/* Modo editor (solo admin) */}
-          {isAdmin && !isTerrainBaseStage && (
+          {FEATURES.workspaceToggle && isAdmin && !isTerrainBaseStage && (
             <Button
               variant={isEditMode ? 'default' : 'outline'}
               size="sm"
@@ -2078,20 +2093,24 @@ export function MapPage() {
               )}
             </Button>
           )}
-          {/* Ángulo actual */}
-          <Badge variant="outline" className="gap-1 font-normal">
-            <Compass className="h-3.5 w-3.5" />
-            {CAMERA_ANGLE_NAMES[viewerState.cameraAngle]}
-          </Badge>
-          {/* Piso */}
-          <Badge variant="outline" className="gap-1 font-normal">
-            <Building2 className="h-3.5 w-3.5" />
-            {formatElevationLabel(viewerState.currentFloor)}
-          </Badge>
-          {/* Zoom */}
-          <Badge variant="outline" className="gap-1 font-normal">
-            Zoom: {viewerState.zoom}
-          </Badge>
+          {FEATURES.headerBadges && (
+            <>
+              {/* Ángulo actual */}
+              <Badge variant="outline" className="gap-1 font-normal">
+                <Compass className="h-3.5 w-3.5" />
+                {CAMERA_ANGLE_NAMES[viewerState.cameraAngle]}
+              </Badge>
+              {/* Piso */}
+              <Badge variant="outline" className="gap-1 font-normal">
+                <Building2 className="h-3.5 w-3.5" />
+                {formatElevationLabel(viewerState.currentFloor)}
+              </Badge>
+              {/* Zoom */}
+              <Badge variant="outline" className="gap-1 font-normal">
+                Zoom: {viewerState.zoom}
+              </Badge>
+            </>
+          )}
         </div>
       </div>
 
@@ -2135,7 +2154,7 @@ export function MapPage() {
       )}
 
       {/* Status Legend */}
-      {isAdmin && !isTerrainBaseStage && (
+      {FEATURES.statusLegendCard && isAdmin && !isTerrainBaseStage && (
         <Card>
           <CardContent className="p-3 space-y-3">
             <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
@@ -2421,7 +2440,7 @@ export function MapPage() {
       )}
 
       {/* Status Legend */}
-      <Card>
+      {FEATURES.statusSummary && <Card>
         <CardContent className="p-3">
           <div className="flex flex-wrap items-center gap-4 text-xs">
             {(Object.keys(STATUS_LABELS) as Array<keyof typeof STATUS_LABELS>).map((status) => (
@@ -2440,7 +2459,7 @@ export function MapPage() {
             </div>
           </div>
         </CardContent>
-      </Card>
+      </Card>}
 
       {/* Main 3D Viewport + Controls */}
       <Card className="overflow-hidden">
@@ -2514,7 +2533,7 @@ export function MapPage() {
             {/* ─── HUD Overlay Controls ─── */}
 
             {/* Editor Toolbar (arriba centro, solo en modo edit) */}
-            {isEditMode && (
+            {FEATURES.editorToolbar && isEditMode && (
               <EditorToolbar
                 activeTool={editorTool}
                 hasSelection={!!viewerState.selectedNodeId}
@@ -2544,7 +2563,7 @@ export function MapPage() {
             )}
 
             {/* Edit mode indicator */}
-            {isEditMode && (
+            {FEATURES.editorBadge && isEditMode && (
               <div className="absolute top-14 left-1/2 -translate-x-1/2 z-10">
                 <Badge variant="default" className="bg-amber-500 text-white gap-1 text-xs">
                   <Pencil className="h-3 w-3" />
@@ -2575,7 +2594,7 @@ export function MapPage() {
             )}
 
             {/* Sims-like Build Dock (centro inferior) */}
-            {isEditMode && (
+            {FEATURES.buildDock && isEditMode && (
               <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20">
                 <div className="bg-card/95 backdrop-blur rounded-xl border shadow-2xl p-2 min-w-[560px]">
                   <div className="grid grid-cols-3 gap-1 mb-2">
@@ -2663,7 +2682,7 @@ export function MapPage() {
             {/* Camera rotation + zoom + pan (izquierda abajo) */}
             <div className="absolute bottom-4 left-4 flex flex-col gap-2">
               {/* Toggle equipos: botón prominente */}
-              {!isTerrainBaseStage && (
+              {FEATURES.equipmentToggle && !isTerrainBaseStage && (
                 <Button
                   variant={viewerState.filters.showEquipment ? 'outline' : 'default'}
                   size="sm"
@@ -2726,52 +2745,9 @@ export function MapPage() {
               </div>
             )}
 
-            {/* Filter toggles (izquierda arriba) */}
             <div className="absolute top-4 left-4 flex flex-col gap-2">
-              {!isTerrainBaseStage && (
-              <div className="bg-card/90 backdrop-blur rounded-lg shadow-lg border">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="gap-1.5 text-xs"
-                  onClick={() => setShowFilters(!showFilters)}
-                >
-                  <Layers className="h-3.5 w-3.5" />
-                  Filtros
-                </Button>
-                {showFilters && (
-                  <div className="p-2 border-t space-y-1">
-                    {[
-                      { key: 'showEquipment' as const, icon: Shapes, label: 'Equipos' },
-                      { key: 'showLabels' as const, icon: Eye, label: 'Etiquetas' },
-                      { key: 'showAreas' as const, icon: MapPin, label: 'Áreas' },
-                      { key: 'showConnectors' as const, icon: Activity, label: 'Conectores' },
-                      { key: 'showAlerts' as const, icon: AlertTriangle, label: 'Alertas' },
-                    ].map(({ key, icon: Icon, label }) => (
-                      <button
-                        key={key}
-                        className={cn(
-                          'flex items-center gap-2 w-full text-left text-xs px-2 py-1 rounded hover:bg-muted transition-colors',
-                          viewerState.filters[key] ? 'text-foreground' : 'text-muted-foreground'
-                        )}
-                        onClick={() => toggleFilter(key)}
-                      >
-                        {viewerState.filters[key] ? (
-                          <Eye className="h-3 w-3 text-primary" />
-                        ) : (
-                          <EyeOff className="h-3 w-3" />
-                        )}
-                        <Icon className="h-3 w-3" />
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-              )}
-
               {/* Floor selector */}
-              <div className="bg-card/90 backdrop-blur rounded-lg shadow-lg border p-1.5">
+              {FEATURES.floorSelector && <div className="bg-card/90 backdrop-blur rounded-lg shadow-lg border p-1.5">
                 <p className="text-[10px] text-muted-foreground font-medium px-1 mb-1">NIVEL (m)</p>
                 <div className="flex items-center gap-1 mb-1">
                   <Button
@@ -2820,10 +2796,10 @@ export function MapPage() {
                     </Button>
                   ))}
                 </div>
-              </div>
+              </div>}
 
               {/* Panel auxiliar compacto (modo editor) */}
-              {isEditMode && (
+              {FEATURES.auxPanel && isEditMode && (
                 <div className="bg-card/90 backdrop-blur rounded-lg shadow-lg border p-2 flex flex-col gap-2 w-[260px]">
                   <p className="text-[10px] text-muted-foreground font-medium px-1">PANELES</p>
                   <Button
@@ -2851,7 +2827,7 @@ export function MapPage() {
               )}
 
               {/* Regla de elevación con gradiente negativo/positivo */}
-              {isEditMode && buildMode === 'terrain' && (
+              {FEATURES.elevationRuler && isEditMode && buildMode === 'terrain' && (
                 <div className="bg-card/90 backdrop-blur rounded-lg shadow-lg border p-2 w-[260px]">
                   <div className="flex items-center justify-between mb-1">
                     <p className="text-[10px] text-muted-foreground font-medium">REGLA DE METROS</p>
@@ -2883,7 +2859,7 @@ export function MapPage() {
             </div>
 
             {/* Search panel (center top) — visible siempre */}
-            {!isTerrainBaseStage && (
+            {FEATURES.searchPanel && !isTerrainBaseStage && (
             <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
               <MapSearchPanel
                 nodes={nodes}
@@ -2896,7 +2872,7 @@ export function MapPage() {
             )}
 
             {/* Selected node info card (centro abajo) — solo en modo vista */}
-            {selectedNode && !isEditMode && !isTerrainBaseStage && (
+            {FEATURES.nodeInfoCard && selectedNode && !isEditMode && !isTerrainBaseStage && (
               <div className="absolute bottom-4 left-1/2 -translate-x-1/2 max-w-sm w-full px-4">
                 <Card className="bg-card/95 backdrop-blur shadow-xl border">
                   <CardContent className="p-3">
@@ -2943,9 +2919,8 @@ export function MapPage() {
               </div>
             )}
 
-            {/* Panel lateral: Propiedades (modo editor) o Incidencias (modo vista) */}
-            {isEditMode ? (
-              /* Panel de propiedades del nodo en modo editor */
+            {/* Panel lateral de propiedades del nodo */}
+            {FEATURES.propertiesPanel && isEditMode ? (
               <div className={cn(
                 'absolute top-0 right-0 h-full border-l shadow-lg transition-all duration-300 overflow-hidden z-40',
                 selectedNode ? 'w-72 md:w-80' : 'w-0'
@@ -2964,92 +2939,17 @@ export function MapPage() {
                   />
                 )}
               </div>
-            ) : (
-              /* Panel lateral de incidencias (modo vista) */
-              <div className={cn(
-                'absolute top-0 right-0 h-full bg-card/95 backdrop-blur border-l shadow-lg transition-all duration-300 overflow-hidden z-40',
-                showIncidentPanel ? 'w-72 md:w-80' : 'w-0'
-              )}>
-                <div className="h-full flex flex-col">
-                  <div className="p-3 border-b flex items-center justify-between">
-                    <h3 className="font-semibold text-sm">
-                      Incidencias ({activeIncidents.length})
-                    </h3>
-                    <Button 
-                      variant="ghost" 
-                      size="icon"
-                      className="h-7 w-7"
-                      onClick={() => setShowIncidentPanel(false)}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
-                    {activeIncidents.length === 0 ? (
-                      <div className="text-center text-muted-foreground py-8">
-                        <CircleCheck className="h-8 w-8 mx-auto mb-2 opacity-40" />
-                        <p className="text-sm">Sin incidencias activas</p>
-                      </div>
-                    ) : (
-                      activeIncidents.map((incident) => {
-                        const priorityConfig = PRIORITY_CONFIG[incident.prioridad]
-                        const statusConfig = STATUS_CONFIG[incident.status]
-                        
-                        return (
-                          <button
-                            key={incident.id}
-                            className={cn(
-                              'w-full text-left p-2.5 rounded-lg border bg-card hover:bg-muted transition-colors',
-                              selectedIncident?.id === incident.id && 'ring-2 ring-primary'
-                            )}
-                            onClick={() => setSelectedIncident(incident)}
-                          >
-                            <div className="flex items-start gap-2">
-                              <div className={cn('w-2 h-2 rounded-full mt-1.5 flex-shrink-0', priorityConfig.bg)} />
-                              <div className="flex-1 min-w-0">
-                                <p className="font-medium text-xs truncate">{incident.titulo}</p>
-                                <div className="flex items-center gap-1.5 mt-1">
-                                  <Badge variant={statusConfig.variant as any} className="text-[10px] h-4">
-                                    {statusConfig.label}
-                                  </Badge>
-                                  <span className="text-[10px] text-muted-foreground">
-                                    {formatRelativeTime(incident.createdAt)}
-                                  </span>
-                                </div>
-                              </div>
-                              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0 mt-1" />
-                            </div>
-                          </button>
-                        )
-                      })
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Botón para mostrar panel de incidencias (solo modo vista) */}
-            {!isEditMode && !showIncidentPanel && !isTerrainBaseStage && (
-              <Button
-                className="absolute top-4 right-4 shadow-lg z-40"
-                variant="secondary"
-                size="sm"
-                onClick={() => setShowIncidentPanel(true)}
-              >
-                <AlertTriangle className="h-4 w-4 mr-1" />
-                {activeIncidents.length}
-              </Button>
-            )}
+            ) : null}
 
             {/* Help hint (bottom right) */}
-            <div className="absolute bottom-4 right-4 text-[10px] text-muted-foreground/60 select-none pointer-events-none hidden md:block">
+            {FEATURES.helpHint && <div className="absolute bottom-4 right-4 text-[10px] text-muted-foreground/60 select-none pointer-events-none hidden md:block">
               {isEditMode
                 ? 'V: seleccionar · M: mover · A: agregar · B: bulldozer · R: rotar preview · Alt+drag: duplicar · Del: eliminar · Ctrl+Z: deshacer'
                 : 'Q/E: rotar · Scroll: zoom · Arrastrar clic izq/Flechas: paneo · R: reset · Click: seleccionar'}
-            </div>
+            </div>}
 
             {/* Editor de áreas — panel lateral sobre la escena 3D */}
-            {showAreaEditor && (
+            {FEATURES.areaEditor && showAreaEditor && (
               <AreaTileEditor
                 isOpen={showAreaEditor}
                 paintState={areaPaintState}
@@ -3065,7 +2965,7 @@ export function MapPage() {
               />
             )}
 
-            <TerrainEditorModal
+            {FEATURES.terrainEditorModal && <TerrainEditorModal
               isOpen={showTerrainModal}
               onOpenChange={setShowTerrainModal}
               terrainEditEnabled={terrainEditEnabled}
@@ -3098,10 +2998,10 @@ export function MapPage() {
               terrainImportPreview={terrainImportPreview}
               terrainImportPreviewError={terrainImportPreviewError}
               terrainImportProgress={terrainImportProgress}
-            />
+            />}
 
             {/* Gestor de áreas — vista centralizada */}
-            {showAreaManager && (
+            {FEATURES.areaManager && showAreaManager && (
               <div className="absolute inset-0 z-30 bg-background/70 backdrop-blur-sm flex items-center justify-center p-4">
                 <Card className="w-full max-w-2xl max-h-[80vh] overflow-hidden border shadow-2xl">
                   <CardContent className="p-0 h-full flex flex-col">
@@ -3211,17 +3111,17 @@ export function MapPage() {
       </Card>
 
       {/* Diálogo de agregar equipo (editor) */}
-      <AddEquipmentDialog
+      {FEATURES.addEquipmentDialog && <AddEquipmentDialog
         isOpen={showAddDialog}
         onClose={() => overlayState.closeOverlayIf('add-equipment')}
         onAdd={handleAddNodeFromDialog}
         allowedTypes={availableAddTypes}
         title={buildMode === 'structures' ? 'Agregar estructura' : buildMode === 'elements' ? 'Agregar elemento' : 'Agregar'}
         selectedAreaLabel={selectedAreaId ? areaById.get(selectedAreaId)?.label ?? null : null}
-      />
+      />}
 
       {/* Diálogo de vincular entidad real (editor) */}
-      {selectedNode && (
+      {FEATURES.linkEntityDialog && selectedNode && (
         <LinkEntityDialog
           isOpen={showLinkDialog}
           node={selectedNode}
@@ -3231,17 +3131,8 @@ export function MapPage() {
         />
       )}
 
-      {/* Diálogo de detalle de incidencia */}
-      {selectedIncident && !isTerrainBaseStage && (
-        <IncidentDetail 
-          incident={selectedIncident} 
-          onClose={() => setSelectedIncident(null)} 
-          canValidate={canValidate}
-        />
-      )}
-
       {/* Editor de forma 3D */}
-      {showShapeEditor && selectedNode && (
+      {FEATURES.shapeEditorDialog && showShapeEditor && selectedNode && (
         <ShapeEditorDialog
           isOpen={showShapeEditor}
           node={selectedNode}
