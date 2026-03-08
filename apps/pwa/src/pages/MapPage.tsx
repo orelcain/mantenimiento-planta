@@ -43,13 +43,16 @@ import {
   CardContent,
   Button,
   Badge,
+  Input,
 } from '@/components/ui'
 import { IncidentDetail } from '@/components/incidents/IncidentDetail'
 import { useAppStore, useCanValidateIncidents, useIsAdmin } from '@/store'
 import { cn } from '@/lib/utils'
 import { formatRelativeTime } from '@/lib/utils'
-import { generateDemoMap, saveIsometricMap } from '@/services/isometricMap'
-import type { CameraAngle, IsometricViewerState, IsometricMapConfig, MapNode, MapArea, TerrainTile, BuildEditMode, MapConnector as MapConnectorType } from '@/types/isometricMap'
+import { generateDemoMap, getIsometricMaps, saveIsometricMap } from '@/services/isometricMap'
+import { getLatestMapVersion, getMapLocations } from '@/services/maps'
+import type { CameraAngle, IsometricViewerState, MapNode, MapArea, TerrainTile, BuildEditMode, MapConnector as MapConnectorType, IsometricMap, IsometricMapConfig } from '@/types/isometricMap'
+import type { MapLocation } from '@/types/maps'
 import { 
   DEFAULT_VIEWER_STATE,
   FULL_MAP_VIEW_ZOOM,
@@ -78,6 +81,8 @@ import {
   importTerrainFromRectangle,
   parseCoordinatesText,
 } from '@/lib/terrainImport'
+
+type BackgroundCalibrationMode = 'move' | 'scale' | 'rotate'
 
 // Lazy load del componente 3D pesado
 const IsometricScene = lazy(() =>
@@ -238,6 +243,69 @@ function getSmartSnappedPlacement(
   return { position: { x: snappedX, z: snappedZ }, guides }
 }
 
+const BLANK_MAP_WIDTH_METERS = 600
+const BLANK_MAP_DEPTH_METERS = 500
+const FIT_PADDING_METERS = 20
+const FIT_ISO_FACTOR = 1.45
+
+function createBlankMapConfig(base: IsometricMapConfig): IsometricMapConfig {
+  return {
+    ...base,
+    width: Math.max(base.width, BLANK_MAP_WIDTH_METERS),
+    depth: Math.max(base.depth, BLANK_MAP_DEPTH_METERS),
+    cellSize: 1,
+  }
+}
+
+function normalizeMapConfig(config: IsometricMapConfig, fallback: IsometricMapConfig): IsometricMapConfig {
+  return {
+    ...fallback,
+    ...config,
+    width: Math.max(10, Math.round(config.width || fallback.width)),
+    depth: Math.max(10, Math.round(config.depth || fallback.depth)),
+    cellSize: 1,
+  }
+}
+
+function buildMapId(name: string): string {
+  const slug = name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 48) || 'mapa'
+  return `${slug}-${Date.now()}`
+}
+
+function buildBackgroundMapFromVersion(
+  locationId: string,
+  imageUrl: string,
+  imageWidthPx: number,
+  imageHeightPx: number,
+  fallbackConfig: IsometricMapConfig,
+  opacity: number,
+  versionId: string,
+): NonNullable<IsometricMap['backgroundMap']> {
+  const aspect = imageWidthPx > 0 && imageHeightPx > 0 ? imageWidthPx / imageHeightPx : fallbackConfig.width / fallbackConfig.depth
+  const width = fallbackConfig.width
+  const depth = Math.max(10, Math.round(width / Math.max(aspect, 0.01)))
+
+  return {
+    locationId,
+    versionId,
+    imageUrl,
+    imageWidthPx,
+    imageHeightPx,
+    opacity,
+    width,
+    depth,
+    offsetX: 0,
+    offsetZ: 0,
+    rotation: 0,
+  }
+}
+
 export function MapPage() {
   const navigate = useNavigate()
   const canValidate = useCanValidateIncidents()
@@ -253,11 +321,27 @@ export function MapPage() {
 
   // ── Datos del mapa (mutables para editor) ──
   const demoData = useMemo(() => generateDemoMap(), [])
-  const [mapConfig, setMapConfig] = useState<IsometricMapConfig>(demoData.config)
+  const blankMapConfig = useMemo(() => createBlankMapConfig(demoData.config), [demoData.config])
+  const [mapConfig, setMapConfig] = useState<IsometricMapConfig>(() => createBlankMapConfig(demoData.config))
+  const [savedMaps, setSavedMaps] = useState<IsometricMap[]>([])
+  const [currentMapId, setCurrentMapId] = useState('')
+  const [mapName, setMapName] = useState('Mapa Base Planta')
+  const [mapDescription, setMapDescription] = useState('')
+  const [isLoadingMaps, setIsLoadingMaps] = useState(true)
+  const [mapStatusText, setMapStatusText] = useState('Cargando mapas guardados...')
+  const [mapLocations, setMapLocations] = useState<MapLocation[]>([])
+  const [isLoadingBaseMaps, setIsLoadingBaseMaps] = useState(true)
+  const [baseMapStatusText, setBaseMapStatusText] = useState('Cargando fuentes de plano base...')
+  const [selectedBaseLocationId, setSelectedBaseLocationId] = useState('')
+  const [showBaseMap, setShowBaseMap] = useState(true)
+  const [backgroundMap, setBackgroundMap] = useState<IsometricMap['backgroundMap'] | null>(null)
+  const [calibrationMode, setCalibrationMode] = useState<BackgroundCalibrationMode | null>(null)
+  const [calibrationStepMeters, setCalibrationStepMeters] = useState<1 | 5>(1)
+  const [fitRequestKey, setFitRequestKey] = useState(0)
   const [nodes, setNodes] = useState<MapNode[]>([])
   const [areas, setAreas] = useState<MapArea[]>([])
   const [connectors, setConnectors] = useState<MapConnectorType[]>([])
-  const [terrainTiles, setTerrainTiles] = useState<TerrainTile[]>(() => demoData.terrain ?? [])
+  const [terrainTiles, setTerrainTiles] = useState<TerrainTile[]>([])
   // Runtime data vinculado a datos reales (Equipment, Incidents)
   const runtimeData = useMapRuntimeData(nodes)
 
@@ -298,13 +382,109 @@ export function MapPage() {
   const [isSaving, setIsSaving] = useState(false)
   const history = useEditorHistory()
 
+  const applyMapDocument = useCallback((map: IsometricMap | null) => {
+    const nextConfig = map?.config
+      ? normalizeMapConfig(map.config, blankMapConfig)
+      : blankMapConfig
+    const nextNodes = map?.nodes ?? []
+    const nextAreas = map?.areas ?? []
+    const nextConnectors = map?.connectors ?? []
+    const nextTerrain = map?.terrain ?? []
+
+    setMapConfig(nextConfig)
+    setNodes(nextNodes)
+    setAreas(nextAreas)
+    setConnectors(nextConnectors)
+    setTerrainTiles(nextTerrain)
+    setCurrentMapId(map?.id ?? '')
+    setMapName(map?.nombre ?? 'Mapa Base Planta')
+    setMapDescription(map?.descripcion ?? '')
+    const nextBackgroundMap = map?.backgroundMap
+      ? (() => {
+          const raw = map.backgroundMap
+          return {
+            ...raw,
+            imageWidthPx: raw.imageWidthPx,
+            imageHeightPx: raw.imageHeightPx,
+            width: raw.width ?? nextConfig.width,
+            depth: raw.depth ?? nextConfig.depth,
+            offsetX: raw.offsetX ?? 0,
+            offsetZ: raw.offsetZ ?? 0,
+            rotation: raw.rotation ?? 0,
+          }
+        })()
+      : null
+
+    setSelectedBaseLocationId(nextBackgroundMap?.locationId ?? '')
+    setBackgroundMap(nextBackgroundMap)
+    setShowBaseMap(!!nextBackgroundMap)
+    setHasUnsavedChanges(false)
+    history.clear()
+    history.pushSnapshot({ nodes: nextNodes, areas: nextAreas, connectors: nextConnectors })
+    setFitRequestKey((prev) => prev + 1)
+  }, [blankMapConfig, history])
+
+  const refreshBaseMapSources = useCallback(async () => {
+    setIsLoadingBaseMaps(true)
+    try {
+      const locations = await getMapLocations()
+      setMapLocations(locations)
+      setBaseMapStatusText(
+        locations.length > 0
+          ? 'Puedes usar como plano base la última versión de cualquier ubicación cargada en Mapas.'
+          : 'No hay ubicaciones de mapa activas para usar como plano base.'
+      )
+    } catch (error) {
+      console.error('Error loading base map sources:', error)
+      setMapLocations([])
+      setBaseMapStatusText('No se pudieron cargar las fuentes de plano base.')
+    } finally {
+      setIsLoadingBaseMaps(false)
+    }
+  }, [])
+
+  const refreshSavedMaps = useCallback(async (preferredMapId?: string) => {
+    setIsLoadingMaps(true)
+    try {
+      const maps = await getIsometricMaps()
+      setSavedMaps(maps)
+
+      const targetMap = preferredMapId
+        ? maps.find((map) => map.id === preferredMapId) ?? null
+        : maps[0] ?? null
+
+      if (targetMap) {
+        applyMapDocument(targetMap)
+        setMapStatusText(`Mapa cargado: ${targetMap.nombre}`)
+      } else {
+        applyMapDocument(null)
+        setMapStatusText('Sin mapas guardados. Se abrió un lienzo grande en blanco (600 m × 500 m).')
+      }
+    } catch (error) {
+      console.error('Error loading map library:', error)
+      applyMapDocument(null)
+      setMapStatusText('No se pudo cargar la biblioteca de mapas. Se abrió un lienzo en blanco.')
+    } finally {
+      setIsLoadingMaps(false)
+    }
+  }, [applyMapDocument])
+
   // Snapshot inicial para undo
   useEffect(() => {
     history.pushSnapshot({ nodes, areas, connectors })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  useEffect(() => {
+    void refreshSavedMaps()
+  }, [refreshSavedMaps])
+
+  useEffect(() => {
+    void refreshBaseMapSources()
+  }, [refreshBaseMapSources])
+
   const isEditMode = viewerState.mode === 'edit'
+  const isBaseMapCalibrationMode = isEditMode && !!backgroundMap && calibrationMode !== null
   const activeTerrainTool = terrainEditEnabled && isShiftPressed ? 'smooth' : terrainTool
   const terrainToolLabel = useCallback((tool: 'raise' | 'lower' | 'flatten' | 'smooth' | 'sample') => {
     if (tool === 'raise') return 'Bulldozer (Relleno)'
@@ -548,14 +728,12 @@ export function MapPage() {
     }))
   }, [])
 
-  const getCurrentFloorCenter = useCallback(() => {
-    let minX = Number.POSITIVE_INFINITY
-    let maxX = Number.NEGATIVE_INFINITY
-    let minZ = Number.POSITIVE_INFINITY
-    let maxZ = Number.NEGATIVE_INFINITY
+  const getCurrentFloorBounds = useCallback(() => {
+    let minX = -mapConfig.width / 2
+    let maxX = mapConfig.width / 2
+    let minZ = -mapConfig.depth / 2
+    let maxZ = mapConfig.depth / 2
 
-    // Priorizar nodos para calcular centro: reflejan mejor el contenido real visible
-    // y evitan que áreas fuera de escala arrastren el encuadre.
     const floorNodes = nodes.filter((n) => (n.floor ?? SEA_LEVEL_ELEVATION) === viewerState.currentFloor)
     for (const node of floorNodes) {
       const halfWidth = (node.size.width ?? 2) / 2
@@ -566,53 +744,66 @@ export function MapPage() {
       maxZ = Math.max(maxZ, node.position.z + halfDepth)
     }
 
-    if (floorNodes.length > 0 && Number.isFinite(minX) && Number.isFinite(maxX) && Number.isFinite(minZ) && Number.isFinite(maxZ)) {
-      return {
-        x: (minX + maxX) / 2,
-        z: (minZ + maxZ) / 2,
+    const floorAreas = areas.filter((a) => (a.floor ?? SEA_LEVEL_ELEVATION) === viewerState.currentFloor)
+    for (const area of floorAreas) {
+      if (area.tiles && area.tiles.length > 0) {
+        for (const tile of area.tiles) {
+          minX = Math.min(minX, tile.x)
+          maxX = Math.max(maxX, tile.x + 1)
+          minZ = Math.min(minZ, tile.z)
+          maxZ = Math.max(maxZ, tile.z + 1)
+        }
+      } else {
+        minX = Math.min(minX, area.position.x - area.size.width / 2)
+        maxX = Math.max(maxX, area.position.x + area.size.width / 2)
+        minZ = Math.min(minZ, area.position.z - area.size.depth / 2)
+        maxZ = Math.max(maxZ, area.position.z + area.size.depth / 2)
       }
     }
 
-    minX = Number.POSITIVE_INFINITY
-    maxX = Number.NEGATIVE_INFINITY
-    minZ = Number.POSITIVE_INFINITY
-    maxZ = Number.NEGATIVE_INFINITY
-
-    const floorAreas = areas.filter((a) => (a.floor ?? SEA_LEVEL_ELEVATION) === viewerState.currentFloor)
-    for (const area of floorAreas) {
-      minX = Math.min(minX, area.position.x - area.size.width / 2)
-      maxX = Math.max(maxX, area.position.x + area.size.width / 2)
-      minZ = Math.min(minZ, area.position.z - area.size.depth / 2)
-      maxZ = Math.max(maxZ, area.position.z + area.size.depth / 2)
-    }
-
-    if (!Number.isFinite(minX) || !Number.isFinite(maxX) || !Number.isFinite(minZ) || !Number.isFinite(maxZ)) {
-      return { x: 0, z: 0 }
-    }
-
     return {
-      x: (minX + maxX) / 2,
-      z: (minZ + maxZ) / 2,
+      minX,
+      maxX,
+      minZ,
+      maxZ,
+      center: {
+        x: (minX + maxX) / 2,
+        z: (minZ + maxZ) / 2,
+      },
+      width: Math.max(1, maxX - minX),
+      depth: Math.max(1, maxZ - minZ),
     }
-  }, [nodes, areas, viewerState.currentFloor])
+  }, [mapConfig.width, mapConfig.depth, nodes, areas, viewerState.currentFloor])
 
   const fitMapComplete = useCallback(() => {
-    const center = getCurrentFloorCenter()
+    const bounds = getCurrentFloorBounds()
+    const aspect = canvasContainerRef.current
+      ? Math.max(1, canvasContainerRef.current.clientWidth / Math.max(1, canvasContainerRef.current.clientHeight))
+      : 16 / 9
+    const requiredZoom = Math.min(
+      MAX_VIEWER_ZOOM,
+      Math.max(
+        FULL_MAP_VIEW_ZOOM,
+        Math.max(
+          bounds.depth / 2 + FIT_PADDING_METERS,
+          (bounds.width / 2 + FIT_PADDING_METERS) / aspect,
+        ) * FIT_ISO_FACTOR,
+      ),
+    )
+
     setViewerState((prev) => ({
       ...prev,
-      zoom: FULL_MAP_VIEW_ZOOM,
-      panOffset: center,
+      zoom: requiredZoom,
+      panOffset: bounds.center,
     }))
-  }, [getCurrentFloorCenter])
+  }, [getCurrentFloorBounds])
 
   const resetView = fitMapComplete
 
-  const didApplyInitialFullView = useRef(false)
   useEffect(() => {
-    if (didApplyInitialFullView.current) return
-    didApplyInitialFullView.current = true
-    fitMapComplete()
-  }, [fitMapComplete])
+    const raf = window.requestAnimationFrame(() => fitMapComplete())
+    return () => window.cancelAnimationFrame(raf)
+  }, [fitMapComplete, fitRequestKey])
 
   // Cambiar de piso
   const setFloor = useCallback((floor: number) => {
@@ -684,6 +875,12 @@ export function MapPage() {
     }
   }, [])
 
+  useEffect(() => {
+    const onResize = () => setFitRequestKey((prev) => prev + 1)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
   // ── Pan (left-click drag) ──
   const isPanning = useRef(false)
   const panStart = useRef({ x: 0, y: 0 })
@@ -712,6 +909,8 @@ export function MapPage() {
   }, [])
 
   const handlePointerDownPan = useCallback((e: React.PointerEvent) => {
+    if (isBaseMapCalibrationMode) return
+
     if (isEditMode && terrainEditEnabled) {
       lastTerrainStrokeKeyRef.current = null
       return
@@ -729,9 +928,10 @@ export function MapPage() {
     draggedDuringPan.current = false
     panStart.current = { x: e.clientX, y: e.clientY }
     targetEl?.setPointerCapture(e.pointerId)
-  }, [isEditMode, terrainEditEnabled])
+  }, [isBaseMapCalibrationMode, isEditMode, terrainEditEnabled])
 
   const handlePointerMovePan = useCallback((e: React.PointerEvent) => {
+    if (isBaseMapCalibrationMode) return
     if (isEditMode && terrainEditEnabled) return
 
     if (!isPanning.current) return
@@ -745,7 +945,7 @@ export function MapPage() {
     panStart.current = { x: e.clientX, y: e.clientY }
 
     setViewerState((prev) => applyScreenPanDelta(prev, dx, dy))
-  }, [applyScreenPanDelta, isEditMode, terrainEditEnabled])
+  }, [applyScreenPanDelta, isBaseMapCalibrationMode, isEditMode, terrainEditEnabled])
 
   const handlePointerUpPan = useCallback((e: React.PointerEvent) => {
     lastTerrainStrokeKeyRef.current = null
@@ -759,6 +959,138 @@ export function MapPage() {
       ;(e.target as HTMLElement).releasePointerCapture(e.pointerId)
     }
   }, [])
+
+  const backgroundMapMetrics = useMemo(() => {
+    if (!backgroundMap) return null
+
+    const widthPx = backgroundMap.imageWidthPx ?? 0
+    const heightPx = backgroundMap.imageHeightPx ?? 0
+    const pixelsPerMeterX = widthPx > 0 ? widthPx / Math.max(backgroundMap.width, 1) : null
+    const pixelsPerMeterZ = heightPx > 0 ? heightPx / Math.max(backgroundMap.depth, 1) : null
+    const coverageX = Math.round((backgroundMap.width / Math.max(mapConfig.width, 1)) * 100)
+    const coverageZ = Math.round((backgroundMap.depth / Math.max(mapConfig.depth, 1)) * 100)
+    const avgDensity = pixelsPerMeterX && pixelsPerMeterZ ? (pixelsPerMeterX + pixelsPerMeterZ) / 2 : null
+
+    let densityLabel = 'Sin metadatos raster'
+    if (avgDensity != null) {
+      densityLabel = avgDensity >= 8
+        ? 'Alta precisión'
+        : avgDensity >= 3
+          ? 'Precisión operativa'
+          : 'Precisión baja'
+    }
+
+    return {
+      pixelsPerMeterX,
+      pixelsPerMeterZ,
+      coverageX,
+      coverageZ,
+      densityLabel,
+    }
+  }, [backgroundMap, mapConfig.depth, mapConfig.width])
+
+  const applyBackgroundMapUpdate = useCallback((updates: Partial<NonNullable<IsometricMap['backgroundMap']>>) => {
+    setBackgroundMap((prev) => prev ? {
+      ...prev,
+      ...updates,
+      width: Math.max(1, Math.round(updates.width ?? prev.width)),
+      depth: Math.max(1, Math.round(updates.depth ?? prev.depth)),
+      offsetX: Math.round(((updates.offsetX ?? prev.offsetX) + Number.EPSILON) * 10) / 10,
+      offsetZ: Math.round(((updates.offsetZ ?? prev.offsetZ) + Number.EPSILON) * 10) / 10,
+      rotation: Math.round(((updates.rotation ?? prev.rotation) + Number.EPSILON) * 10) / 10,
+    } : prev)
+    setHasUnsavedChanges(true)
+  }, [])
+
+  const resetBackgroundCalibration = useCallback(() => {
+    if (!backgroundMap) return
+    applyBackgroundMapUpdate({
+      width: mapConfig.width,
+      depth: backgroundMap.imageWidthPx && backgroundMap.imageHeightPx
+        ? Math.max(10, Math.round(mapConfig.width / Math.max(backgroundMap.imageWidthPx / backgroundMap.imageHeightPx, 0.01)))
+        : mapConfig.depth,
+      offsetX: 0,
+      offsetZ: 0,
+      rotation: 0,
+    })
+    setMapStatusText('Calibración reiniciada usando el tamaño actual del lienzo y el aspecto de la imagen base.')
+  }, [applyBackgroundMapUpdate, backgroundMap, mapConfig.depth, mapConfig.width])
+
+  const centerBackgroundMap = useCallback(() => {
+    if (!backgroundMap) return
+    applyBackgroundMapUpdate({ offsetX: 0, offsetZ: 0 })
+    setMapStatusText('Plano base centrado en el origen del lienzo.')
+  }, [applyBackgroundMapUpdate, backgroundMap])
+
+  const fitBackgroundToCanvas = useCallback(() => {
+    if (!backgroundMap) return
+    const nextDepth = backgroundMap.imageWidthPx && backgroundMap.imageHeightPx
+      ? Math.max(10, Math.round(mapConfig.width / Math.max(backgroundMap.imageWidthPx / backgroundMap.imageHeightPx, 0.01)))
+      : mapConfig.depth
+    applyBackgroundMapUpdate({ width: mapConfig.width, depth: nextDepth, offsetX: 0, offsetZ: 0 })
+    setMapStatusText('Plano base reajustado al ancho del lienzo y recentrado.')
+  }, [applyBackgroundMapUpdate, backgroundMap, mapConfig.depth, mapConfig.width])
+
+  const nudgeBackgroundMap = useCallback((deltaX: number, deltaZ: number) => {
+    if (!backgroundMap) return
+    applyBackgroundMapUpdate({
+      offsetX: backgroundMap.offsetX + deltaX,
+      offsetZ: backgroundMap.offsetZ + deltaZ,
+    })
+  }, [applyBackgroundMapUpdate, backgroundMap])
+
+  const rotateBackgroundMap = useCallback((deltaDegrees: number) => {
+    if (!backgroundMap) return
+    applyBackgroundMapUpdate({ rotation: backgroundMap.rotation + deltaDegrees })
+  }, [applyBackgroundMapUpdate, backgroundMap])
+
+  const scaleBackgroundMap = useCallback((deltaMeters: number) => {
+    if (!backgroundMap) return
+    const ratio = backgroundMap.depth / Math.max(backgroundMap.width, 1)
+    const nextWidth = Math.max(1, backgroundMap.width + deltaMeters)
+    applyBackgroundMapUpdate({ width: nextWidth, depth: Math.max(1, Math.round(nextWidth * ratio)) })
+  }, [applyBackgroundMapUpdate, backgroundMap])
+
+  useEffect(() => {
+    if (!isBaseMapCalibrationMode || !backgroundMap) return
+
+    const handleCalibrationHotkeys = (event: KeyboardEvent) => {
+      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLSelectElement) return
+
+      const step = event.shiftKey ? 5 : calibrationStepMeters
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault()
+        nudgeBackgroundMap(-step, 0)
+      } else if (event.key === 'ArrowRight') {
+        event.preventDefault()
+        nudgeBackgroundMap(step, 0)
+      } else if (event.key === 'ArrowUp') {
+        event.preventDefault()
+        nudgeBackgroundMap(0, -step)
+      } else if (event.key === 'ArrowDown') {
+        event.preventDefault()
+        nudgeBackgroundMap(0, step)
+      } else if (event.key === '[') {
+        event.preventDefault()
+        rotateBackgroundMap(-1)
+      } else if (event.key === ']') {
+        event.preventDefault()
+        rotateBackgroundMap(1)
+      } else if (event.key === '-') {
+        event.preventDefault()
+        scaleBackgroundMap(-step)
+      } else if (event.key === '+' || event.key === '=') {
+        event.preventDefault()
+        scaleBackgroundMap(step)
+      } else if (event.key === 'Escape') {
+        event.preventDefault()
+        setCalibrationMode(null)
+      }
+    }
+
+    window.addEventListener('keydown', handleCalibrationHotkeys)
+    return () => window.removeEventListener('keydown', handleCalibrationHotkeys)
+  }, [backgroundMap, calibrationStepMeters, isBaseMapCalibrationMode, nudgeBackgroundMap, rotateBackgroundMap, scaleBackgroundMap])
 
   const isClickSuppressedAfterDrag = useCallback(() => Date.now() < suppressClickUntil.current, [])
 
@@ -1404,16 +1736,86 @@ export function MapPage() {
     resetView,
   })
 
+  const handleCreateBlankMap = useCallback(() => {
+    applyMapDocument(null)
+    setMapStatusText('Lienzo nuevo listo: base 600 m × 500 m, grilla 1 m × 1 m.')
+  }, [applyMapDocument])
+
+  const handleLoadMap = useCallback((mapId: string) => {
+    const target = savedMaps.find((map) => map.id === mapId) ?? null
+    if (!target) return
+    applyMapDocument(target)
+    setMapStatusText(`Mapa cargado: ${target.nombre}`)
+  }, [applyMapDocument, savedMaps])
+
+  const handleSelectBaseLocation = useCallback(async (locationId: string) => {
+    setSelectedBaseLocationId(locationId)
+
+    if (!locationId) {
+      setBackgroundMap(null)
+      setHasUnsavedChanges(true)
+      setBaseMapStatusText('Plano base desactivado para este layout.')
+      return
+    }
+
+    try {
+      const latestVersion = await getLatestMapVersion(locationId)
+      if (!latestVersion) {
+        setBackgroundMap(null)
+        setHasUnsavedChanges(true)
+        setBaseMapStatusText('La ubicación seleccionada no tiene versiones de mapa publicadas.')
+        return
+      }
+
+      setBackgroundMap(
+        buildBackgroundMapFromVersion(
+          locationId,
+          latestVersion.imageUrl,
+          latestVersion.width,
+          latestVersion.height,
+          mapConfig,
+          backgroundMap?.opacity ?? 0.45,
+          latestVersion.id,
+        )
+      )
+      setShowBaseMap(true)
+      setCalibrationMode('move')
+      setHasUnsavedChanges(true)
+      setBaseMapStatusText(`Plano base cargado: ${latestVersion.width}×${latestVersion.height}px · versión ${latestVersion.version}.`)
+    } catch (error) {
+      console.error('Error loading latest base map version:', error)
+      setBaseMapStatusText('No se pudo cargar la última versión del plano base.')
+    }
+  }, [backgroundMap?.opacity, mapConfig])
+
+  const expandCanvasToContent = useCallback(() => {
+    const bounds = getCurrentFloorBounds()
+    const nextWidth = Math.max(mapConfig.width, Math.ceil(bounds.width + FIT_PADDING_METERS * 2))
+    const nextDepth = Math.max(mapConfig.depth, Math.ceil(bounds.depth + FIT_PADDING_METERS * 2))
+    setMapConfig((prev) => ({ ...prev, width: nextWidth, depth: nextDepth, cellSize: 1 }))
+    setHasUnsavedChanges(true)
+    setMapStatusText(`Base ajustada al contenido: ${nextWidth} m × ${nextDepth} m.`)
+    setFitRequestKey((prev) => prev + 1)
+  }, [getCurrentFloorBounds, mapConfig.width, mapConfig.depth])
+
   const handleSave = useCallback(async () => {
     if (isSaving) return
     setIsSaving(true)
     try {
+      const normalizedName = mapName.trim() || 'Mapa Planta'
+      const mapId = currentMapId || buildMapId(normalizedName)
+      const currentVersion = currentMapId
+        ? (savedMaps.find((map) => map.id === currentMapId)?.version ?? 0) + 1
+        : 1
+
       await saveIsometricMap(
         {
-          id: 'planta-principal',
-          nombre: 'Planta Principal ETT',
-          version: 1,
-          config: mapConfig,
+          id: mapId,
+          nombre: normalizedName,
+          descripcion: mapDescription.trim(),
+          version: currentVersion,
+          config: normalizeMapConfig(mapConfig, blankMapConfig),
+          backgroundMap: backgroundMap ?? undefined,
           nodes,
           connectors,
           areas,
@@ -1422,29 +1824,66 @@ export function MapPage() {
         },
         user?.id || 'system'
       )
+      setCurrentMapId(mapId)
       setHasUnsavedChanges(false)
+      setMapStatusText(`Mapa guardado: ${normalizedName} (v${currentVersion}).`)
+      await refreshSavedMaps(mapId)
     } catch (error) {
       console.error('Error saving map:', error)
+      setMapStatusText('Error al guardar el mapa. Revisa consola/permisos de Firestore.')
     } finally {
       setIsSaving(false)
     }
-  }, [isSaving, nodes, connectors, areas, terrainTiles, mapConfig, user])
+  }, [isSaving, mapName, currentMapId, savedMaps, mapDescription, mapConfig, blankMapConfig, backgroundMap, nodes, connectors, areas, terrainTiles, user, refreshSavedMaps])
+
+  const handleSaveAsNew = useCallback(async () => {
+    if (isSaving) return
+    setIsSaving(true)
+    try {
+      const normalizedName = mapName.trim() || `Mapa ${savedMaps.length + 1}`
+      const mapId = buildMapId(normalizedName)
+      await saveIsometricMap(
+        {
+          id: mapId,
+          nombre: normalizedName,
+          descripcion: mapDescription.trim(),
+          version: 1,
+          config: normalizeMapConfig(mapConfig, blankMapConfig),
+          backgroundMap: backgroundMap ?? undefined,
+          nodes,
+          connectors,
+          areas,
+          terrain: terrainTiles,
+          createdBy: user?.id || 'system',
+        },
+        user?.id || 'system'
+      )
+      setCurrentMapId(mapId)
+      setHasUnsavedChanges(false)
+      setMapStatusText(`Mapa guardado como nuevo: ${normalizedName}.`)
+      await refreshSavedMaps(mapId)
+    } catch (error) {
+      console.error('Error saving map as new:', error)
+      setMapStatusText('No se pudo guardar como nuevo mapa.')
+    } finally {
+      setIsSaving(false)
+    }
+  }, [isSaving, mapName, savedMaps.length, mapDescription, mapConfig, blankMapConfig, backgroundMap, nodes, connectors, areas, terrainTiles, user, refreshSavedMaps])
 
   const handleCancelEdit = useCallback(() => {
-    // Revertir a lienzo limpio si hay cambios sin guardar
+    // Revertir al mapa cargado o a lienzo limpio si aún no existe uno persistido
     if (hasUnsavedChanges) {
-      setNodes([])
-      setAreas([])
-      setConnectors([])
-      setTerrainTiles([])
-      setHasUnsavedChanges(false)
+      const persisted = currentMapId ? savedMaps.find((map) => map.id === currentMapId) ?? null : null
+      applyMapDocument(persisted)
+      setMapStatusText(persisted
+        ? `Cambios descartados. Restaurado: ${persisted.nombre}.`
+        : 'Cambios descartados. Lienzo limpio restaurado.')
     }
     setViewerState((prev) => ({ ...prev, mode: 'view', selectedNodeId: null }))
     setSelectedAreaId(null)
     overlayState.closeOverlay()
     closeAreaEditor()
-    history.clear()
-  }, [hasUnsavedChanges, history, overlayState, closeAreaEditor])
+  }, [hasUnsavedChanges, currentMapId, savedMaps, applyMapDocument, overlayState, closeAreaEditor])
 
   // Nodo seleccionado data
   const selectedNode = viewerState.selectedNodeId
@@ -1560,6 +1999,272 @@ export function MapPage() {
       </div>
 
       {/* Status Legend */}
+      {isAdmin && (
+        <Card>
+          <CardContent className="p-3 space-y-3">
+            <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+              <div className="grid flex-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <div className="space-y-1">
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Mapa actual</div>
+                  <select
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    value={currentMapId}
+                    onChange={(e) => handleLoadMap(e.target.value)}
+                    disabled={isLoadingMaps || savedMaps.length === 0}
+                  >
+                    <option value="">{isLoadingMaps ? 'Cargando mapas...' : savedMaps.length === 0 ? 'Sin mapas guardados' : 'Selecciona mapa'}</option>
+                    {savedMaps.map((map) => (
+                      <option key={map.id} value={map.id}>
+                        {map.nombre} · v{map.version}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Nombre</div>
+                  <Input
+                    value={mapName}
+                    onChange={(e) => {
+                      setMapName(e.target.value)
+                      setHasUnsavedChanges(true)
+                    }}
+                    placeholder="Ej: Planta Chonchi v2"
+                  />
+                </div>
+                <div className="space-y-1 md:col-span-2 xl:col-span-1">
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Descripción</div>
+                  <Input
+                    value={mapDescription}
+                    onChange={(e) => {
+                      setMapDescription(e.target.value)
+                      setHasUnsavedChanges(true)
+                    }}
+                    placeholder="Ej: Plano calibrado para mantención marzo"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Ancho base (m)</div>
+                  <Input
+                    type="number"
+                    min={10}
+                    step={1}
+                    value={mapConfig.width}
+                    onChange={(e) => {
+                      setMapConfig((prev) => ({ ...prev, width: Math.max(10, Math.round(Number(e.target.value) || prev.width)), cellSize: 1 }))
+                      setHasUnsavedChanges(true)
+                    }}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Profundidad base (m)</div>
+                  <Input
+                    type="number"
+                    min={10}
+                    step={1}
+                    value={mapConfig.depth}
+                    onChange={(e) => {
+                      setMapConfig((prev) => ({ ...prev, depth: Math.max(10, Math.round(Number(e.target.value) || prev.depth)), cellSize: 1 }))
+                      setHasUnsavedChanges(true)
+                    }}
+                  />
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button variant="outline" size="sm" onClick={handleCreateBlankMap}>Nuevo lienzo</Button>
+                <Button variant="outline" size="sm" onClick={expandCanvasToContent}>Expandir base al contenido</Button>
+                <Button variant="outline" size="sm" onClick={fitMapComplete}>Ver mapa completo</Button>
+                <Button variant="default" size="sm" onClick={handleSave} disabled={isSaving}>{isSaving ? 'Guardando...' : 'Guardar'}</Button>
+                <Button variant="secondary" size="sm" onClick={handleSaveAsNew} disabled={isSaving}>Guardar como nuevo</Button>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <Badge variant="outline">Grilla base: 1 m × 1 m</Badge>
+              <Badge variant="outline">Brocha terreno: 1×1, 3×3, 5×5 m</Badge>
+              <Badge variant="outline">Lienzo actual: {mapConfig.width} m × {mapConfig.depth} m</Badge>
+              {currentMapId && <Badge variant="outline">ID: {currentMapId}</Badge>}
+            </div>
+            <div className="grid gap-3 md:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)_auto]">
+              <div className="space-y-1">
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Plano base raster (Firebase Mapas)</div>
+                <select
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={selectedBaseLocationId}
+                  onChange={(e) => void handleSelectBaseLocation(e.target.value)}
+                  disabled={isLoadingBaseMaps}
+                >
+                  <option value="">Sin plano base</option>
+                  {mapLocations.map((location) => (
+                    <option key={location.id} value={location.id}>{location.nombre}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  <span>Opacidad plano base</span>
+                  <span>{Math.round((backgroundMap?.opacity ?? 0.45) * 100)}%</span>
+                </div>
+                <input
+                  className="h-10 w-full"
+                  type="range"
+                  min={0.1}
+                  max={1}
+                  step={0.05}
+                  value={backgroundMap?.opacity ?? 0.45}
+                  disabled={!backgroundMap}
+                  onChange={(e) => {
+                    const nextOpacity = Number(e.target.value)
+                    setBackgroundMap((prev) => prev ? { ...prev, opacity: nextOpacity } : prev)
+                    setHasUnsavedChanges(true)
+                  }}
+                />
+              </div>
+              <div className="flex items-end gap-2">
+                <Button
+                  variant={showBaseMap ? 'default' : 'outline'}
+                  size="sm"
+                  disabled={!backgroundMap}
+                  onClick={() => setShowBaseMap((prev) => !prev)}
+                >
+                  {showBaseMap ? 'Ocultar plano' : 'Mostrar plano'}
+                </Button>
+                <select
+                  className="flex h-9 rounded-md border border-input bg-background px-2 text-xs"
+                  value={calibrationMode ?? ''}
+                  disabled={!backgroundMap}
+                  onChange={(e) => setCalibrationMode((e.target.value || null) as BackgroundCalibrationMode | null)}
+                >
+                  <option value="">Sin calibración visual</option>
+                  <option value="move">Mover sobre canvas</option>
+                  <option value="scale">Escalar sobre canvas</option>
+                  <option value="rotate">Rotar sobre canvas</option>
+                </select>
+              </div>
+            </div>
+            {backgroundMap && (
+              <>
+              <div className="grid gap-3 md:grid-cols-5">
+                <div className="space-y-1">
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Ancho plano (m)</div>
+                  <Input
+                    type="number"
+                    min={1}
+                    step={1}
+                    value={backgroundMap.width}
+                    onChange={(e) => {
+                      const value = Math.max(1, Math.round(Number(e.target.value) || backgroundMap.width))
+                      applyBackgroundMapUpdate({ width: value })
+                    }}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Profundidad plano (m)</div>
+                  <Input
+                    type="number"
+                    min={1}
+                    step={1}
+                    value={backgroundMap.depth}
+                    onChange={(e) => {
+                      const value = Math.max(1, Math.round(Number(e.target.value) || backgroundMap.depth))
+                      applyBackgroundMapUpdate({ depth: value })
+                    }}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Offset X (m)</div>
+                  <Input
+                    type="number"
+                    step={1}
+                    value={backgroundMap.offsetX}
+                    onChange={(e) => {
+                      const value = Math.round(Number(e.target.value) || 0)
+                      applyBackgroundMapUpdate({ offsetX: value })
+                    }}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Offset Z (m)</div>
+                  <Input
+                    type="number"
+                    step={1}
+                    value={backgroundMap.offsetZ}
+                    onChange={(e) => {
+                      const value = Math.round(Number(e.target.value) || 0)
+                      applyBackgroundMapUpdate({ offsetZ: value })
+                    }}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Rotación (°)</div>
+                  <Input
+                    type="number"
+                    step={1}
+                    value={backgroundMap.rotation}
+                    onChange={(e) => {
+                      const value = Math.round(Number(e.target.value) || 0)
+                      applyBackgroundMapUpdate({ rotation: value })
+                    }}
+                  />
+                </div>
+              </div>
+              <div className="grid gap-3 md:grid-cols-[1.3fr_1fr]">
+                <div className="rounded-lg border bg-muted/30 p-3 space-y-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant={calibrationMode === 'move' ? 'default' : 'outline'}>Drag: mover</Badge>
+                    <Badge variant={calibrationMode === 'scale' ? 'default' : 'outline'}>Drag: escalar</Badge>
+                    <Badge variant={calibrationMode === 'rotate' ? 'default' : 'outline'}>Drag: rotar</Badge>
+                    <Badge variant="outline">Paso teclado: {calibrationStepMeters} m</Badge>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="outline" size="sm" onClick={centerBackgroundMap}>Centrar plano</Button>
+                    <Button variant="outline" size="sm" onClick={fitBackgroundToCanvas}>Ajustar al lienzo</Button>
+                    <Button variant="outline" size="sm" onClick={resetBackgroundCalibration}>Reset calibración</Button>
+                    <Button variant="outline" size="sm" onClick={() => setCalibrationStepMeters((prev) => prev === 1 ? 5 : 1)}>{calibrationStepMeters === 1 ? 'Paso 5 m' : 'Paso 1 m'}</Button>
+                  </div>
+                  <div className="grid grid-cols-[auto_auto_auto] gap-2 w-fit">
+                    <div />
+                    <Button variant="outline" size="sm" onClick={() => nudgeBackgroundMap(0, -calibrationStepMeters)}>↑</Button>
+                    <div />
+                    <Button variant="outline" size="sm" onClick={() => nudgeBackgroundMap(-calibrationStepMeters, 0)}>←</Button>
+                    <Button variant="outline" size="sm" onClick={() => centerBackgroundMap()}>•</Button>
+                    <Button variant="outline" size="sm" onClick={() => nudgeBackgroundMap(calibrationStepMeters, 0)}>→</Button>
+                    <div />
+                    <Button variant="outline" size="sm" onClick={() => nudgeBackgroundMap(0, calibrationStepMeters)}>↓</Button>
+                    <div />
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="outline" size="sm" onClick={() => rotateBackgroundMap(-5)}>Rotar -5°</Button>
+                    <Button variant="outline" size="sm" onClick={() => rotateBackgroundMap(5)}>Rotar +5°</Button>
+                    <Button variant="outline" size="sm" onClick={() => scaleBackgroundMap(-calibrationStepMeters)}>Escala -</Button>
+                    <Button variant="outline" size="sm" onClick={() => scaleBackgroundMap(calibrationStepMeters)}>Escala +</Button>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Calibración visual: arrastra la imagen en el canvas según el modo activo. Teclado: flechas mueven, [ y ] rotan, +/- escalan, Shift acelera a 5 m.
+                  </div>
+                </div>
+                <div className="rounded-lg border bg-muted/30 p-3 space-y-2 text-xs">
+                  <div className="font-semibold text-foreground">Validación del plano base</div>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant="outline">Cobertura X: {backgroundMapMetrics?.coverageX ?? 0}%</Badge>
+                    <Badge variant="outline">Cobertura Z: {backgroundMapMetrics?.coverageZ ?? 0}%</Badge>
+                    <Badge variant="outline">Densidad: {backgroundMapMetrics?.densityLabel ?? 'N/D'}</Badge>
+                  </div>
+                  <div>Raster: {backgroundMap.imageWidthPx ?? 'N/D'} × {backgroundMap.imageHeightPx ?? 'N/D'} px</div>
+                  <div>Escala X: {backgroundMapMetrics?.pixelsPerMeterX ? `${backgroundMapMetrics.pixelsPerMeterX.toFixed(2)} px/m` : 'Sin dato'}</div>
+                  <div>Escala Z: {backgroundMapMetrics?.pixelsPerMeterZ ? `${backgroundMapMetrics.pixelsPerMeterZ.toFixed(2)} px/m` : 'Sin dato'}</div>
+                  <div className="text-muted-foreground">
+                    Referencia práctica: sobre 3 px/m ya sirve para layout operativo; sobre 8 px/m queda cómodo para alineación fina.
+                  </div>
+                </div>
+              </div>
+              </>
+            )}
+            <div className="text-xs text-muted-foreground">{baseMapStatusText}</div>
+            <div className="text-xs text-muted-foreground">{mapStatusText}</div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Status Legend */}
       <Card>
         <CardContent className="p-3">
           <div className="flex flex-wrap items-center gap-4 text-xs">
@@ -1605,6 +2310,14 @@ export function MapPage() {
             >
               <IsometricScene
                 config={mapConfig}
+                underlayImageUrl={showBaseMap ? backgroundMap?.imageUrl ?? null : null}
+                underlayOpacity={backgroundMap?.opacity ?? 0.45}
+                underlayWidth={backgroundMap?.width}
+                underlayDepth={backgroundMap?.depth}
+                underlayOffset={backgroundMap ? { x: backgroundMap.offsetX, z: backgroundMap.offsetZ } : undefined}
+                underlayRotation={backgroundMap?.rotation}
+                underlayInteractionMode={showBaseMap ? calibrationMode : null}
+                onUnderlayTransform={applyBackgroundMapUpdate}
                 nodes={nodes}
                 connectors={connectors}
                 areas={areas}

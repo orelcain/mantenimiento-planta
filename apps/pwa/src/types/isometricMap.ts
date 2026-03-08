@@ -303,6 +303,20 @@ export interface IsometricMap {
   version: number
   /** Configuración del canvas */
   config: IsometricMapConfig
+  /** Plano base opcional (imagen raster desde mapVersions) */
+  backgroundMap?: {
+    locationId: string
+    versionId: string
+    imageUrl: string
+    imageWidthPx?: number
+    imageHeightPx?: number
+    opacity: number
+    width: number
+    depth: number
+    offsetX: number
+    offsetZ: number
+    rotation: number
+  }
   /** Nodos (equipos, sensores) */
   nodes: MapNode[]
   /** Conectores (tuberías, cables) */
@@ -367,7 +381,7 @@ export interface IsometricViewerState {
 export const FULL_MAP_VIEW_ZOOM = 40
 
 /** Zoom máximo permitido al alejar manualmente */
-export const MAX_VIEWER_ZOOM = 500
+export const MAX_VIEWER_ZOOM = 1200
 
 export const DEFAULT_VIEWER_STATE: IsometricViewerState = {
   cameraAngle: 0,

@@ -1,14 +1,20 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.70.20**
+## Versión Actual: **v2.70.21**
 
-**Fecha de lanzamiento**: 07 de marzo de 2026  \
+**Fecha de lanzamiento**: 08 de marzo de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
 **Build**: ✅ Stable
 
 ---
 
 ## 📋 Información de la Versión
+
+### v2.70.21 — Calibración visual del plano base sobre terreno real (08/03/2026)
+- 🗺️ **Plano base interactivo**: el raster ahora se puede mover, escalar y rotar directamente dentro del canvas con modo visual de calibración
+- 💾 **Biblioteca real de layouts**: soporte para cargar mapas guardados, editar nombre/descripción, guardar y guardar como nuevo
+- 📏 **Validación operativa**: métricas visibles de cobertura del lienzo y densidad en px/m para revisar si el plano sirve a escala 1 m
+- 🎛️ **Alineación rápida**: acciones para centrar, ajustar al lienzo, resetear calibración y hacer nudges por botones o teclado
 
 ### v2.70.17 — Terreno real con coordenadas editables y fallback anti-429 (07/03/2026)
 - 🧭 **Coordenadas editables**: ahora puedes pegar/editar manualmente las 4 coordenadas (`lat, lon`) en el modal de importación.
@@ -45,6 +51,14 @@
 - 🌊 **Rango operacional real**: edición de elevación entre `-50 m` y `+200 m` con feedback visual explícito
 - 🧽 **Suavizado progresivo**: herramienta `Suavizar` mejorada con mezcla ponderada de vecinos, más parecida a flujo tipo Sims
 - 🎨 **Render de terreno mejorado**: superficie continua tipo heightfield con gradiente tierra/agua para desniveles más orgánicos
+=======
+### v2.70.12 — Visor de mapas con calibración visual y layouts persistentes (08/03/2026)
+- 🗺️ **Plano base interactivo**: el raster ahora se puede mover, escalar y rotar directamente dentro del canvas con modo visual de calibración
+- 💾 **Biblioteca real de mapas**: soporte para cargar layouts guardados, editar nombre/descripción, guardar y guardar como nuevo
+- 📏 **Validación operativa**: métricas visibles de cobertura del lienzo y densidad en px/m para revisar si el plano sirve a escala 1 m
+- 🎛️ **Alineación rápida**: acciones para centrar, ajustar al lienzo, resetear calibración y hacer nudges por botones o teclado
+- ⛰️ **Terreno más legible**: el relieve ya se representa con volumen vertical según elevación en vez de una marca plana
+>>>>>>> ab94e28 (feat(map): v2.70.12 calibracion visual y guardado multi-mapa)
 
 ### v2.70.6 — Hotfix vacaciones hábiles + badge visible en control (05/03/2026)
 - 📅 **Vacaciones según regla hábil**: `Vac S/M` y `Vac H S/M` vuelven a respetar la opción `Vacaciones contabilizan solo días hábiles`

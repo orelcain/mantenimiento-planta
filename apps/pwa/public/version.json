@@ -1,8 +1,12 @@
 {
-  "version": "2.70.20",
-  "buildDate": "2026-03-07",
-  "buildTimestamp": 1772850796008,
+  "version": "2.70.21",
+  "buildDate": "2026-03-08",
+  "buildTimestamp": 1772941800000,
   "features": [
+    "Visor de mapas: calibración visual del plano base dentro del canvas con drag para mover, escalar o rotar",
+    "Visor de mapas: guardado multi-mapa con nombre, descripción, carga de layouts persistidos y guardar como nuevo",
+    "Visor de mapas: validación de densidad px/m y cobertura del plano base para comprobar escala operativa",
+    "Visor de mapas: atajos rápidos para centrar, resetear, ajustar al lienzo y nudges por teclado del plano raster",
     "Heatmap de elevación por metro: azul (-50m) a rojo (+200m) para lectura instantánea de cota",
     "Indicador en vivo de cota bajo brocha durante edición de terreno",
     "Herramientas de maquinaria pesada (Bulldozer/Excavadora/Niveladora/Rodillo/Topógrafo)",

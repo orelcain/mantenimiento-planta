@@ -7,6 +7,13 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.70.21] - 2026-03-08
+### Mejorado — Calibracion visual del plano base sobre visor de terreno real
+- **Calibración visual en canvas**: el plano raster ahora se puede mover, escalar y rotar directamente dentro del visor, sin depender solo de inputs numéricos.
+- **Layouts persistentes reales**: el editor carga mapas guardados, permite editar nombre/descripción y soporta `Guardar` y `Guardar como nuevo`.
+- **Validación de escala operativa**: se agregan métricas visibles de cobertura y densidad `px/m` para revisar si el plano base sirve con grilla de 1 m.
+- **Ajustes rápidos de alineación**: nuevas acciones para centrar, ajustar al lienzo, resetear calibración y usar nudges por botones o teclado.
+
 ## [2.70.20] - 2026-03-07
 ### Corregido — Solucion definitiva anti-429 y expansion de grilla real
 - **Batch size duplicado**: 100 puntos por peticion (antes 50), reduce solicitudes a la mitad.
@@ -15,7 +22,6 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 - **Grilla expandida a 600×500**: soporta areas de hasta 600m × 500m a escala 1:1 (antes 320×240 comprimia el terreno).
 - **Fallback con reduccion real**: pasos de respaldo 30m y 48m que bajan radicalmente las peticiones API (antes 8m/12m igualaban el paso auto-ajustado).
 - **Mensajes informativos**: muestra dimension de grilla y paso efectivo real durante la importacion.
-
 ## [2.70.19] - 2026-03-07
 ### Mejorado — Pantalla completa del visor + escala de grilla mantenida
 - **Boton de pantalla completa**: nuevo control en HUD del visor para entrar en fullscreen del mapa 3D.
@@ -75,6 +81,15 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 - **Aplanado más orgánico**: `Flatten` pasa de salto duro a interpolación hacia nivel objetivo para evitar escalones bruscos.
 - **Render de terreno suavizado**: reemplazo de tiles voxel por superficie continua tipo `heightfield` con gradiente tierra/agua.
 - **Feedback visual mejorado**: preview de brocha circular con opacidad por caída e indicador en elevación local.
+=======
+## [2.70.12] - 2026-03-08
+### Mejorado — Visor de mapas con calibración visual y layouts persistentes
+- **Calibración visual del plano base**: el raster de Firebase Mapas ahora se puede mover, escalar y rotar directamente dentro del canvas con modo activo de calibración.
+- **Alineación más rápida**: nuevos atajos para centrar, ajustar al lienzo, resetear calibración, nudges por botones y hotkeys para afinar posición/rotación/escala.
+- **Validación de escala**: el editor muestra cobertura del lienzo y densidad `px/m` para estimar si la imagen base tiene precisión suficiente para trabajo operativo sobre grilla de 1 m.
+- **Guardado multi-mapa completo**: soporte para cargar mapas persistidos, editar nombre/descripción, guardar versión actual y guardar como nuevo layout.
+- **Terreno más legible**: la visualización de tiles ahora usa volumen vertical real para distinguir mejor elevaciones positivas y negativas.
+>>>>>>> ab94e28 (feat(map): v2.70.12 calibracion visual y guardado multi-mapa)
 
 ## [2.70.11] - 2026-03-05
 ### Corregido — Regla de vacaciones legal forzada (sin depender de checkbox)

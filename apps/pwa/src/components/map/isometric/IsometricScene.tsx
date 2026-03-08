@@ -13,8 +13,8 @@
  * Es el equivalente del <Canvas> + <SceneContent> patrón Viewer3D.
  */
 
-import { Suspense, useCallback, useMemo } from 'react'
-import { Canvas } from '@react-three/fiber'
+import { Suspense, useCallback, useEffect, useMemo } from 'react'
+import { Canvas, useLoader } from '@react-three/fiber'
 // drei helpers disponibles si se necesitan (Environment, etc.)
 import * as THREE from 'three'
 import { IsometricCamera } from './IsometricCamera'
@@ -38,6 +38,21 @@ import { SEA_LEVEL_ELEVATION, MIN_TERRAIN_ELEVATION, MAX_TERRAIN_ELEVATION } fro
 interface IsometricSceneProps {
   /** Configuración del mapa (dimensiones, colores, grid) */
   config: IsometricMapConfig
+  /** Plano raster opcional como base visual del mapa */
+  underlayImageUrl?: string | null
+  underlayOpacity?: number
+  underlayWidth?: number
+  underlayDepth?: number
+  underlayOffset?: { x: number; z: number }
+  underlayRotation?: number
+  underlayInteractionMode?: 'move' | 'scale' | 'rotate' | null
+  onUnderlayTransform?: (next: {
+    width?: number
+    depth?: number
+    offsetX?: number
+    offsetZ?: number
+    rotation?: number
+  }) => void
   /** Nodos (equipos/sensores) */
   nodes: MapNode[]
   /** Conectores (tuberías, cables) */
@@ -98,6 +113,14 @@ interface IsometricSceneProps {
 /** Contenido de la escena (dentro del Canvas) */
 function SceneContent({
   config,
+  underlayImageUrl,
+  underlayOpacity,
+  underlayWidth,
+  underlayDepth,
+  underlayOffset,
+  underlayRotation,
+  underlayInteractionMode,
+  onUnderlayTransform,
   nodes,
   connectors,
   areas,
@@ -121,6 +144,18 @@ function SceneContent({
   placementPreview,
   bulldozerPreview,
 }: IsometricSceneProps) {
+  const underlayDragState = useMemo(() => ({ current: null as null | {
+    mode: 'move' | 'scale' | 'rotate'
+    startPoint: { x: number; z: number }
+    startOffsetX: number
+    startOffsetZ: number
+    startWidth: number
+    startDepth: number
+    startRotation: number
+    startDistance: number
+    startAngle: number
+  } }), [])
+
   // Centro de la planta
   const centerTarget = useMemo<[number, number, number]>(
     () => [0, 0, 0],
@@ -386,6 +421,81 @@ function SceneContent({
     return geometry
   }, [terrain, terrainElevationMap, config.width, config.depth])
 
+  const underlayTexture = useLoader(
+    THREE.TextureLoader,
+    underlayImageUrl || 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=='
+  )
+
+  useEffect(() => {
+    underlayTexture.colorSpace = THREE.SRGBColorSpace
+    underlayTexture.wrapS = THREE.ClampToEdgeWrapping
+    underlayTexture.wrapT = THREE.ClampToEdgeWrapping
+    underlayTexture.needsUpdate = true
+  }, [underlayTexture])
+
+  const handleUnderlayPointerDown = useCallback((event: { stopPropagation: () => void; point: THREE.Vector3 }) => {
+    if (!underlayInteractionMode || !onUnderlayTransform) return
+    event.stopPropagation()
+
+    const centerX = underlayOffset?.x ?? 0
+    const centerZ = underlayOffset?.z ?? 0
+    const deltaX = event.point.x - centerX
+    const deltaZ = event.point.z - centerZ
+
+    underlayDragState.current = {
+      mode: underlayInteractionMode,
+      startPoint: { x: event.point.x, z: event.point.z },
+      startOffsetX: centerX,
+      startOffsetZ: centerZ,
+      startWidth: underlayWidth ?? config.width,
+      startDepth: underlayDepth ?? config.depth,
+      startRotation: underlayRotation ?? 0,
+      startDistance: Math.max(1, Math.hypot(deltaX, deltaZ)),
+      startAngle: Math.atan2(deltaZ, deltaX),
+    }
+  }, [config.depth, config.width, onUnderlayTransform, underlayDepth, underlayDragState, underlayInteractionMode, underlayOffset?.x, underlayOffset?.z, underlayRotation, underlayWidth])
+
+  const handleUnderlayPointerMove = useCallback((event: { stopPropagation: () => void; point: THREE.Vector3; buttons: number }) => {
+    const drag = underlayDragState.current
+    if (!drag || !onUnderlayTransform || event.buttons !== 1) return
+    event.stopPropagation()
+
+    if (drag.mode === 'move') {
+      onUnderlayTransform({
+        offsetX: Math.round((drag.startOffsetX + (event.point.x - drag.startPoint.x)) * 10) / 10,
+        offsetZ: Math.round((drag.startOffsetZ + (event.point.z - drag.startPoint.z)) * 10) / 10,
+      })
+      return
+    }
+
+    const centerX = drag.startOffsetX
+    const centerZ = drag.startOffsetZ
+    const currentDx = event.point.x - centerX
+    const currentDz = event.point.z - centerZ
+
+    if (drag.mode === 'scale') {
+      const currentDistance = Math.max(1, Math.hypot(currentDx, currentDz))
+      const factor = Math.max(0.1, currentDistance / drag.startDistance)
+      onUnderlayTransform({
+        width: Math.max(1, Math.round(drag.startWidth * factor)),
+        depth: Math.max(1, Math.round(drag.startDepth * factor)),
+      })
+      return
+    }
+
+    const currentAngle = Math.atan2(currentDz, currentDx)
+    const deltaAngle = (currentAngle - drag.startAngle) * (180 / Math.PI)
+    onUnderlayTransform({
+      rotation: Math.round((drag.startRotation + deltaAngle) * 10) / 10,
+    })
+  }, [onUnderlayTransform, underlayDragState])
+
+  const handleUnderlayPointerUp = useCallback((event: { stopPropagation: () => void }) => {
+    if (!underlayDragState.current) return
+    event.stopPropagation()
+    underlayDragState.current = null
+  }, [underlayDragState])
+
   return (
     <>
       {/* Background color */}
@@ -420,6 +530,28 @@ function SceneContent({
         distance={60}
         onRotationComplete={handleRotationComplete}
       />
+
+      {/* Grilla del suelo */}
+      {underlayImageUrl && (
+        <mesh
+          rotation-x={-Math.PI / 2}
+          rotation-z={((underlayRotation ?? 0) * Math.PI) / 180}
+          position={[underlayOffset?.x ?? 0, -0.02, underlayOffset?.z ?? 0]}
+          raycast={underlayInteractionMode ? undefined : () => null}
+          onPointerDown={underlayInteractionMode ? handleUnderlayPointerDown : undefined}
+          onPointerMove={underlayInteractionMode ? handleUnderlayPointerMove : undefined}
+          onPointerUp={underlayInteractionMode ? handleUnderlayPointerUp : undefined}
+          onPointerLeave={underlayInteractionMode ? handleUnderlayPointerUp : undefined}
+        >
+          <planeGeometry args={[underlayWidth ?? config.width, underlayDepth ?? config.depth]} />
+          <meshBasicMaterial
+            map={underlayTexture}
+            transparent
+            opacity={Math.max(0.05, Math.min(underlayOpacity ?? 0.5, 1))}
+            toneMapped={false}
+          />
+        </mesh>
+      )}
 
       {/* Grilla del suelo */}
       <PlantGrid config={config} />
