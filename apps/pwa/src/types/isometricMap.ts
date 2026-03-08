@@ -305,6 +305,7 @@ export interface IsometricMap {
   config: IsometricMapConfig
   /** Plano base opcional (imagen raster desde mapVersions) */
   backgroundMap?: {
+    displayMode?: 'original' | 'soft-light' | 'blueprint'
     locationId: string
     versionId: string
     imageUrl: string

@@ -83,6 +83,7 @@ import {
 } from '@/lib/terrainImport'
 
 type BackgroundCalibrationMode = 'move' | 'scale' | 'rotate'
+type BackgroundDisplayMode = NonNullable<NonNullable<IsometricMap['backgroundMap']>['displayMode']>
 
 // Lazy load del componente 3D pesado
 const IsometricScene = lazy(() =>
@@ -292,6 +293,7 @@ function buildBackgroundMapFromVersion(
   const depth = Math.max(10, Math.round(width / Math.max(aspect, 0.01)))
 
   return {
+    displayMode: 'soft-light',
     locationId,
     versionId,
     imageUrl,
@@ -404,6 +406,7 @@ export function MapPage() {
           const raw = map.backgroundMap
           return {
             ...raw,
+            displayMode: raw.displayMode ?? 'soft-light',
             imageWidthPx: raw.imageWidthPx,
             imageHeightPx: raw.imageHeightPx,
             width: raw.width ?? nextConfig.width,
@@ -2139,6 +2142,26 @@ export function MapPage() {
                   <option value="rotate">Rotar sobre canvas</option>
                 </select>
               </div>
+              <div className="space-y-1">
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Estilo visual del plano</div>
+                <select
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={(backgroundMap?.displayMode ?? 'soft-light') as BackgroundDisplayMode}
+                  disabled={!backgroundMap}
+                  onChange={(e) => {
+                    const displayMode = (e.target.value || 'soft-light') as BackgroundDisplayMode
+                    setBackgroundMap((prev) => prev ? { ...prev, displayMode } : prev)
+                    setHasUnsavedChanges(true)
+                  }}
+                >
+                  <option value="soft-light">Suave integrado</option>
+                  <option value="blueprint">Blueprint técnico</option>
+                  <option value="original">Original raster</option>
+                </select>
+                <div className="text-[11px] text-muted-foreground">
+                  Suave integrado reduce el efecto parche. Blueprint tiñe el plano para lectura técnica. Original respeta la imagen tal cual.
+                </div>
+              </div>
             </div>
             {backgroundMap && (
               <>
@@ -2311,6 +2334,7 @@ export function MapPage() {
               <IsometricScene
                 config={mapConfig}
                 underlayImageUrl={showBaseMap ? backgroundMap?.imageUrl ?? null : null}
+                underlayDisplayMode={backgroundMap?.displayMode ?? 'soft-light'}
                 underlayOpacity={backgroundMap?.opacity ?? 0.45}
                 underlayWidth={backgroundMap?.width}
                 underlayDepth={backgroundMap?.depth}

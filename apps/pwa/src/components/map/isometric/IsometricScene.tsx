@@ -14,7 +14,7 @@
  */
 
 import { Suspense, useCallback, useEffect, useMemo } from 'react'
-import { Canvas, useLoader } from '@react-three/fiber'
+import { Canvas, useLoader, useThree } from '@react-three/fiber'
 // drei helpers disponibles si se necesitan (Environment, etc.)
 import * as THREE from 'three'
 import { IsometricCamera } from './IsometricCamera'
@@ -33,13 +33,14 @@ import type {
   NodeRuntimeData,
   IsometricViewerState,
 } from '@/types/isometricMap'
-import { SEA_LEVEL_ELEVATION, MIN_TERRAIN_ELEVATION, MAX_TERRAIN_ELEVATION } from '@/types/isometricMap'
+import { SEA_LEVEL_ELEVATION, MIN_TERRAIN_ELEVATION } from '@/types/isometricMap'
 
 interface IsometricSceneProps {
   /** Configuración del mapa (dimensiones, colores, grid) */
   config: IsometricMapConfig
   /** Plano raster opcional como base visual del mapa */
   underlayImageUrl?: string | null
+  underlayDisplayMode?: 'original' | 'soft-light' | 'blueprint'
   underlayOpacity?: number
   underlayWidth?: number
   underlayDepth?: number
@@ -110,10 +111,60 @@ interface IsometricSceneProps {
   bulldozerPreview?: { x: number; z: number } | null
 }
 
+const TOPOGRAPHIC_COLOR_STOPS = [
+  { stop: 0, color: new THREE.Color('#2f6f8f') },
+  { stop: 0.16, color: new THREE.Color('#5fa7b8') },
+  { stop: 0.28, color: new THREE.Color('#d9d0a2') },
+  { stop: 0.48, color: new THREE.Color('#7ca66a') },
+  { stop: 0.7, color: new THREE.Color('#5f7e55') },
+  { stop: 0.86, color: new THREE.Color('#8a7a61') },
+  { stop: 1, color: new THREE.Color('#c8c3b5') },
+]
+
+function clamp01(value: number): number {
+  return Math.max(0, Math.min(1, value))
+}
+
+function getTopographicColor(normalizedElevation: number): THREE.Color {
+  const normalized = clamp01(normalizedElevation)
+
+  for (let index = 0; index < TOPOGRAPHIC_COLOR_STOPS.length - 1; index++) {
+    const current = TOPOGRAPHIC_COLOR_STOPS[index]
+    const next = TOPOGRAPHIC_COLOR_STOPS[index + 1]
+
+    if (normalized <= next.stop) {
+      const range = Math.max(0.0001, next.stop - current.stop)
+      const mix = clamp01((normalized - current.stop) / range)
+      return current.color.clone().lerp(next.color, mix)
+    }
+  }
+
+  return TOPOGRAPHIC_COLOR_STOPS[TOPOGRAPHIC_COLOR_STOPS.length - 1].color.clone()
+}
+
+function getContourIntersection(
+  start: [number, number, number],
+  end: [number, number, number],
+  contourLevel: number
+): [number, number, number] | null {
+  const delta = end[1] - start[1]
+  if (Math.abs(delta) < 0.0001) return null
+
+  const t = (contourLevel - start[1]) / delta
+  if (t < 0 || t > 1) return null
+
+  return [
+    start[0] + (end[0] - start[0]) * t,
+    contourLevel + 0.14,
+    start[2] + (end[2] - start[2]) * t,
+  ]
+}
+
 /** Contenido de la escena (dentro del Canvas) */
 function SceneContent({
   config,
   underlayImageUrl,
+  underlayDisplayMode,
   underlayOpacity,
   underlayWidth,
   underlayDepth,
@@ -144,6 +195,7 @@ function SceneContent({
   placementPreview,
   bulldozerPreview,
 }: IsometricSceneProps) {
+  const { gl } = useThree()
   const underlayDragState = useMemo(() => ({ current: null as null | {
     mode: 'move' | 'scale' | 'rotate'
     startPoint: { x: number; z: number }
@@ -205,6 +257,35 @@ function SceneContent({
     return map
   }, [terrain])
 
+  const terrainMetrics = useMemo(() => {
+    if (!terrain || terrain.length === 0) {
+      return {
+        minElevation: SEA_LEVEL_ELEVATION,
+        maxElevation: SEA_LEVEL_ELEVATION,
+        elevationRange: 1,
+        baseElevation: MIN_TERRAIN_ELEVATION,
+      }
+    }
+
+    let minElevation = Number.POSITIVE_INFINITY
+    let maxElevation = Number.NEGATIVE_INFINITY
+
+    for (const tile of terrain) {
+      minElevation = Math.min(minElevation, tile.elevation)
+      maxElevation = Math.max(maxElevation, tile.elevation)
+    }
+
+    const elevationRange = Math.max(1, maxElevation - minElevation)
+    const sideDepth = Math.max(8, Math.min(18, Math.round(elevationRange * 0.2)))
+
+    return {
+      minElevation,
+      maxElevation,
+      elevationRange,
+      baseElevation: Math.max(MIN_TERRAIN_ELEVATION, minElevation - sideDepth),
+    }
+  }, [terrain])
+
   const terrainSolidGeometry = useMemo(() => {
     if (!terrain || terrain.length === 0) return null
 
@@ -216,7 +297,7 @@ function SceneContent({
     const widthCells = maxX - minX
     const depthCells = maxZ - minZ
     if (widthCells <= 0 || depthCells <= 0) return null
-    const baseY = MIN_TERRAIN_ELEVATION
+    const baseY = terrainMetrics.baseElevation
 
     const getCellElevation = (x: number, z: number) => terrainElevationMap.get(`${x},${z}`) ?? SEA_LEVEL_ELEVATION
     const getTopElevation = (vx: number, vz: number) => {
@@ -231,9 +312,9 @@ function SceneContent({
     const colors: number[] = []
     const indices: number[] = []
 
-    const cliffDark = new THREE.Color('#3f4c32')
-    const cliffLight = new THREE.Color('#6b7f4c')
-    const bottomColor = new THREE.Color('#2f3a24')
+    const cliffDark = new THREE.Color('#1f2f26')
+    const cliffLight = new THREE.Color('#4f6a53')
+    const bottomColor = new THREE.Color('#122016')
     const color = new THREE.Color()
 
     const topHeightGrid: number[][] = []
@@ -250,19 +331,9 @@ function SceneContent({
     const getTopGrid = (ix: number, iz: number) => topHeightGrid[iz]?.[ix] ?? SEA_LEVEL_ELEVATION
 
     const setTopColor = (elevation: number) => {
-      const meter = Math.round(elevation)
-      const normalized = (meter - MIN_TERRAIN_ELEVATION) / (MAX_TERRAIN_ELEVATION - MIN_TERRAIN_ELEVATION)
-
-      // Mapa de calor: azul profundo en cotas bajas -> rojo intenso en cotas altas.
-      const hue = 220 * (1 - normalized)
-      const saturation = 86
-      let lightness = 49
-
-      // Banda cada metro para diferenciar alturas rápidamente.
-      lightness += Math.abs(meter) % 2 === 0 ? 5 : -2
-      lightness = Math.max(18, Math.min(78, lightness))
-
-      color.setHSL(hue / 360, saturation / 100, lightness / 100)
+      const normalized = (elevation - terrainMetrics.minElevation) / terrainMetrics.elevationRange
+      color.copy(getTopographicColor(normalized))
+      color.offsetHSL(0, -0.04, 0.02)
     }
 
     const pushVertex = (x: number, y: number, z: number, c: THREE.Color) => {
@@ -341,7 +412,10 @@ function SceneContent({
       const y1 = getTopGrid(ix, 0)
       const y2 = getTopGrid(ix + 1, 0)
 
-      const wallColorA = cliffDark.clone().lerp(cliffLight, Math.min(1, Math.max(y1, y2) / 200))
+      const wallColorA = cliffDark.clone().lerp(
+        cliffLight,
+        clamp01((Math.max(y1, y2) - terrainMetrics.minElevation) / terrainMetrics.elevationRange)
+      )
       const wallColorB = wallColorA.clone()
 
       // North
@@ -358,7 +432,10 @@ function SceneContent({
 
       const ys1 = getTopGrid(ix, depthCells)
       const ys2 = getTopGrid(ix + 1, depthCells)
-      const wallSouthA = cliffDark.clone().lerp(cliffLight, Math.min(1, Math.max(ys1, ys2) / 200))
+      const wallSouthA = cliffDark.clone().lerp(
+        cliffLight,
+        clamp01((Math.max(ys1, ys2) - terrainMetrics.minElevation) / terrainMetrics.elevationRange)
+      )
       const wallSouthB = wallSouthA.clone()
 
       // South
@@ -380,7 +457,10 @@ function SceneContent({
       const yw1 = getTopGrid(0, iz)
       const yw2 = getTopGrid(0, iz + 1)
 
-      const wallWestA = cliffDark.clone().lerp(cliffLight, Math.min(1, Math.max(yw1, yw2) / 200))
+      const wallWestA = cliffDark.clone().lerp(
+        cliffLight,
+        clamp01((Math.max(yw1, yw2) - terrainMetrics.minElevation) / terrainMetrics.elevationRange)
+      )
       const wallWestB = wallWestA.clone()
 
       // West
@@ -397,7 +477,10 @@ function SceneContent({
 
       const ye1 = getTopGrid(widthCells, iz)
       const ye2 = getTopGrid(widthCells, iz + 1)
-      const wallEastA = cliffDark.clone().lerp(cliffLight, Math.min(1, Math.max(ye1, ye2) / 200))
+      const wallEastA = cliffDark.clone().lerp(
+        cliffLight,
+        clamp01((Math.max(ye1, ye2) - terrainMetrics.minElevation) / terrainMetrics.elevationRange)
+      )
       const wallEastB = wallEastA.clone()
 
       // East
@@ -419,19 +502,133 @@ function SceneContent({
     geometry.setIndex(indices)
     geometry.computeVertexNormals()
     return geometry
-  }, [terrain, terrainElevationMap, config.width, config.depth])
+  }, [terrain, terrainElevationMap, terrainMetrics, config.width, config.depth])
+
+  const terrainContourGeometry = useMemo(() => {
+    if (!terrain || terrain.length === 0) return null
+
+    const minX = Math.floor(-config.width / 2)
+    const maxX = Math.ceil(config.width / 2)
+    const minZ = Math.floor(-config.depth / 2)
+    const maxZ = Math.ceil(config.depth / 2)
+
+    const widthCells = maxX - minX
+    const depthCells = maxZ - minZ
+    if (widthCells <= 0 || depthCells <= 0) return null
+
+    const getCellElevation = (x: number, z: number) => terrainElevationMap.get(`${x},${z}`) ?? SEA_LEVEL_ELEVATION
+    const getTopElevation = (vx: number, vz: number) => {
+      const e1 = getCellElevation(vx - 1, vz - 1)
+      const e2 = getCellElevation(vx, vz - 1)
+      const e3 = getCellElevation(vx - 1, vz)
+      const e4 = getCellElevation(vx, vz)
+      return (e1 + e2 + e3 + e4) / 4
+    }
+
+    const contourInterval = terrainMetrics.elevationRange >= 80 ? 10 : 5
+    const startLevel = Math.ceil(terrainMetrics.minElevation / contourInterval) * contourInterval
+    const endLevel = Math.floor(terrainMetrics.maxElevation / contourInterval) * contourInterval
+    const positions: number[] = []
+
+    for (let iz = 0; iz < depthCells; iz++) {
+      const z = minZ + iz
+
+      for (let ix = 0; ix < widthCells; ix++) {
+        const x = minX + ix
+        const y00 = getTopElevation(x, z)
+        const y10 = getTopElevation(x + 1, z)
+        const y11 = getTopElevation(x + 1, z + 1)
+        const y01 = getTopElevation(x, z + 1)
+
+        for (let level = startLevel; level <= endLevel; level += contourInterval) {
+          const intersections = [
+            getContourIntersection([x, y00, z], [x + 1, y10, z], level),
+            getContourIntersection([x + 1, y10, z], [x + 1, y11, z + 1], level),
+            getContourIntersection([x + 1, y11, z + 1], [x, y01, z + 1], level),
+            getContourIntersection([x, y01, z + 1], [x, y00, z], level),
+          ].filter((point): point is [number, number, number] => point !== null)
+
+          if (intersections.length < 2) continue
+
+          for (let index = 0; index <= intersections.length - 2; index += 2) {
+            const start = intersections[index]
+            const end = intersections[index + 1]
+            positions.push(start[0], start[1], start[2], end[0], end[1], end[2])
+          }
+        }
+      }
+    }
+
+    if (positions.length === 0) return null
+
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+    return geometry
+  }, [terrain, terrainElevationMap, terrainMetrics, config.width, config.depth])
 
   const underlayTexture = useLoader(
     THREE.TextureLoader,
     underlayImageUrl || 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=='
   )
 
+  const underlayStyle = useMemo(() => {
+    const baseOpacity = Math.max(0.05, Math.min(underlayOpacity ?? 0.5, 1))
+
+    if (underlayDisplayMode === 'original') {
+      return {
+        tint: '#ffffff',
+        planeOpacity: baseOpacity,
+        backdropOpacity: 0,
+        backdropColor: '#000000',
+        frameOpacity: 0,
+        frameColor: '#ffffff',
+      }
+    }
+
+    if (underlayDisplayMode === 'blueprint') {
+      return {
+        tint: '#a7e3ff',
+        planeOpacity: Math.min(0.34, baseOpacity * 0.72),
+        backdropOpacity: 0.16,
+        backdropColor: '#07273a',
+        frameOpacity: 0.32,
+        frameColor: '#6dd3ff',
+      }
+    }
+
+    return {
+      tint: '#e5eef5',
+      planeOpacity: Math.min(0.42, baseOpacity * 0.8),
+      backdropOpacity: 0.12,
+      backdropColor: '#08131d',
+      frameOpacity: 0.22,
+      frameColor: '#b8cad8',
+    }
+  }, [underlayDisplayMode, underlayOpacity])
+
+  const underlayFrameGeometry = useMemo(() => {
+    if (!underlayImageUrl) return null
+
+    const halfWidth = (underlayWidth ?? config.width) / 2
+    const halfDepth = (underlayDepth ?? config.depth) / 2
+    return new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-halfWidth, 0.03, -halfDepth),
+      new THREE.Vector3(halfWidth, 0.03, -halfDepth),
+      new THREE.Vector3(halfWidth, 0.03, halfDepth),
+      new THREE.Vector3(-halfWidth, 0.03, halfDepth),
+      new THREE.Vector3(-halfWidth, 0.03, -halfDepth),
+    ])
+  }, [config.depth, config.width, underlayDepth, underlayImageUrl, underlayWidth])
+
   useEffect(() => {
     underlayTexture.colorSpace = THREE.SRGBColorSpace
     underlayTexture.wrapS = THREE.ClampToEdgeWrapping
     underlayTexture.wrapT = THREE.ClampToEdgeWrapping
+    underlayTexture.magFilter = THREE.LinearFilter
+    underlayTexture.minFilter = THREE.LinearMipmapLinearFilter
+    underlayTexture.anisotropy = Math.min(8, gl.capabilities.getMaxAnisotropy())
     underlayTexture.needsUpdate = true
-  }, [underlayTexture])
+  }, [gl, underlayTexture])
 
   const handleUnderlayPointerDown = useCallback((event: { stopPropagation: () => void; point: THREE.Vector3 }) => {
     if (!underlayInteractionMode || !onUnderlayTransform) return
@@ -499,13 +696,14 @@ function SceneContent({
   return (
     <>
       {/* Background color */}
-      <color attach="background" args={['#0d1117']} />
+      <color attach="background" args={['#08131d']} />
 
       {/* Iluminación */}
-      <ambientLight intensity={0.5} />
+      <ambientLight intensity={0.72} />
       <directionalLight
-        position={[20, 30, 15]}
-        intensity={0.8}
+        position={[28, 38, 18]}
+        intensity={1.1}
+        color="#fff4db"
         castShadow
         shadow-mapSize-width={2048}
         shadow-mapSize-height={2048}
@@ -515,11 +713,11 @@ function SceneContent({
         shadow-camera-top={50}
         shadow-camera-bottom={-50}
       />
-      <directionalLight position={[-15, 20, -10]} intensity={0.3} />
-      <hemisphereLight args={['#1e40af', '#1e293b', 0.4]} />
+      <directionalLight position={[-22, 16, -20]} intensity={0.42} color="#7dd3fc" />
+      <hemisphereLight args={['#d7f0ff', '#0b1220', 0.58]} />
 
       {/* Ambiente */}
-      <fog attach="fog" args={['#0d1117', 80, 200]} />
+      <fog attach="fog" args={['#0b1622', 120, 260]} />
 
       {/* Cámara isométrica con rotación FFT */}
       <IsometricCamera
@@ -533,24 +731,51 @@ function SceneContent({
 
       {/* Grilla del suelo */}
       {underlayImageUrl && (
-        <mesh
+        <group
           rotation-x={-Math.PI / 2}
           rotation-z={((underlayRotation ?? 0) * Math.PI) / 180}
           position={[underlayOffset?.x ?? 0, -0.02, underlayOffset?.z ?? 0]}
-          raycast={underlayInteractionMode ? undefined : () => null}
-          onPointerDown={underlayInteractionMode ? handleUnderlayPointerDown : undefined}
-          onPointerMove={underlayInteractionMode ? handleUnderlayPointerMove : undefined}
-          onPointerUp={underlayInteractionMode ? handleUnderlayPointerUp : undefined}
-          onPointerLeave={underlayInteractionMode ? handleUnderlayPointerUp : undefined}
         >
-          <planeGeometry args={[underlayWidth ?? config.width, underlayDepth ?? config.depth]} />
-          <meshBasicMaterial
-            map={underlayTexture}
-            transparent
-            opacity={Math.max(0.05, Math.min(underlayOpacity ?? 0.5, 1))}
-            toneMapped={false}
-          />
-        </mesh>
+          {underlayStyle.backdropOpacity > 0 && (
+            <mesh position={[0, 0.003, 0]}>
+              <planeGeometry args={[(underlayWidth ?? config.width) * 1.02, (underlayDepth ?? config.depth) * 1.02]} />
+              <meshBasicMaterial
+                color={underlayStyle.backdropColor}
+                transparent
+                opacity={underlayStyle.backdropOpacity}
+                toneMapped={false}
+                depthWrite={false}
+              />
+            </mesh>
+          )}
+          <mesh
+            raycast={underlayInteractionMode ? undefined : () => null}
+            onPointerDown={underlayInteractionMode ? handleUnderlayPointerDown : undefined}
+            onPointerMove={underlayInteractionMode ? handleUnderlayPointerMove : undefined}
+            onPointerUp={underlayInteractionMode ? handleUnderlayPointerUp : undefined}
+            onPointerLeave={underlayInteractionMode ? handleUnderlayPointerUp : undefined}
+          >
+            <planeGeometry args={[underlayWidth ?? config.width, underlayDepth ?? config.depth]} />
+            <meshBasicMaterial
+              map={underlayTexture}
+              color={underlayStyle.tint}
+              transparent
+              opacity={underlayStyle.planeOpacity}
+              toneMapped={false}
+              depthWrite={false}
+            />
+          </mesh>
+          {underlayFrameGeometry && underlayStyle.frameOpacity > 0 && (
+            <line geometry={underlayFrameGeometry}>
+              <lineBasicMaterial
+                color={underlayStyle.frameColor}
+                transparent
+                opacity={underlayStyle.frameOpacity}
+                depthWrite={false}
+              />
+            </line>
+          )}
+        </group>
       )}
 
       {/* Grilla del suelo */}
@@ -558,14 +783,25 @@ function SceneContent({
 
       {/* Terreno suavizado tipo heightfield (menos voxel/pixelado) */}
       {terrainSolidGeometry && (
-        <mesh geometry={terrainSolidGeometry} castShadow receiveShadow>
+        <mesh geometry={terrainSolidGeometry} castShadow receiveShadow renderOrder={2}>
           <meshStandardMaterial
             vertexColors
-            roughness={0.94}
-            metalness={0.02}
-            side={THREE.DoubleSide}
+            roughness={0.97}
+            metalness={0}
+            side={THREE.FrontSide}
           />
         </mesh>
+      )}
+
+      {terrainContourGeometry && (
+        <lineSegments geometry={terrainContourGeometry} renderOrder={3}>
+          <lineBasicMaterial
+            color="#14303d"
+            transparent
+            opacity={0.32}
+            depthWrite={false}
+          />
+        </lineSegments>
       )}
 
       {/* Preview de brocha de terreno */}
