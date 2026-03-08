@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.70.23**
+## Versión Actual: **v2.70.24**
 
 **Fecha de lanzamiento**: 08 de marzo de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.70.24 — Preview y progreso de importación en visor de mapas (08/03/2026)
+- 🧭 **Previsualización operativa**: el panel de terreno ahora estima rectángulo real en metros, canvas final autoexpandido y densidad efectiva antes de importar
+- 📊 **Progreso visible por lotes**: la consulta de elevaciones muestra avance real por porcentaje, lotes y puntos consumidos mientras responde la API externa
+- 🧱 **Feedback unificado**: la mejora aparece tanto en la fase base del workspace como dentro del modal del editor de terreno
 
 ### v2.70.23 — Hotfix deploy visor de mapas (08/03/2026)
 - 🛠️ **Typecheck remoto corregido**: se blindan accesos potencialmente indefinidos en el render de paleta topográfica y curvas de nivel

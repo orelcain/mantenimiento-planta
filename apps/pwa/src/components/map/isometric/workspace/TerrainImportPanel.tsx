@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { Button, Textarea } from '@/components/ui'
+import type { TerrainImportPreview, TerrainImportProgress } from '@/lib/terrainImport'
 
 interface TerrainImportPanelProps {
   title?: string
@@ -13,6 +14,9 @@ interface TerrainImportPanelProps {
   sampleStep: number
   onSampleStepChange: (value: number) => void
   statusMessage?: string | null
+  preview?: TerrainImportPreview | null
+  previewError?: string | null
+  progress?: TerrainImportProgress | null
   coordinateRows?: number
   headerActions?: ReactNode
   footer?: ReactNode
@@ -32,6 +36,9 @@ export function TerrainImportPanel({
   sampleStep,
   onSampleStepChange,
   statusMessage,
+  preview,
+  previewError,
+  progress,
   coordinateRows = 4,
   headerActions,
   footer,
@@ -84,6 +91,39 @@ export function TerrainImportPanel({
           ))}
         </div>
       </div>
+
+      {previewError && (
+        <div className="rounded-md border border-destructive/30 bg-destructive/5 p-2 text-[11px] text-destructive">
+          {previewError}
+        </div>
+      )}
+
+      {preview && (
+        <div className="rounded-lg border bg-background/70 p-3 space-y-2">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Previsualizacion</p>
+          <div className="grid gap-2 sm:grid-cols-2 text-[11px] text-muted-foreground">
+            <div>Rectangulo estimado: <span className="font-medium text-foreground">{Math.round(preview.rectangleWidthMeters)} m × {Math.round(preview.rectangleDepthMeters)} m</span></div>
+            <div>Canvas final: <span className="font-medium text-foreground">{preview.gridWidth} m × {preview.gridDepth} m</span></div>
+            <div>Muestreo efectivo: <span className="font-medium text-foreground">cada {preview.sampleStep} m</span></div>
+            <div>Puntos API: <span className="font-medium text-foreground">{preview.totalSamplePoints}</span> ({preview.sampleCols} × {preview.sampleRows})</div>
+          </div>
+        </div>
+      )}
+
+      {isImporting && progress && (
+        <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 space-y-2">
+          <div className="flex items-center justify-between gap-2 text-[11px]">
+            <span className="font-medium text-primary">Progreso de importacion</span>
+            <span className="font-mono text-primary">{progress.percent}%</span>
+          </div>
+          <div className="h-2 overflow-hidden rounded-full bg-primary/15">
+            <div className="h-full rounded-full bg-primary transition-[width] duration-300" style={{ width: `${progress.percent}%` }} />
+          </div>
+          <div className="text-[11px] text-muted-foreground">
+            Lotes: {progress.completedBatches}/{progress.totalBatches} · Puntos: {progress.completedPoints}/{progress.totalPoints}
+          </div>
+        </div>
+      )}
 
       {statusMessage && (
         <p className="text-[11px] font-medium text-primary">{statusMessage}</p>

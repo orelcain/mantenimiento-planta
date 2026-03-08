@@ -11,6 +11,16 @@ export interface TerrainImportOptions {
   corners: GeoCoordinate[]
   sampleStep?: number
   keepSeaLevelTiles?: boolean
+  onProgress?: (progress: TerrainImportProgress) => void
+}
+
+export interface TerrainImportProgress {
+  completedBatches: number
+  totalBatches: number
+  completedPoints: number
+  totalPoints: number
+  currentBatchSize: number
+  percent: number
 }
 
 export interface TerrainImportResult {
@@ -53,6 +63,17 @@ const MAX_AUTO_GRID_WIDTH = 600
 const MAX_AUTO_GRID_DEPTH = 500
 const BATCH_SLEEP_MS = 1000
 
+export interface TerrainImportPreview {
+  rectangleWidthMeters: number
+  rectangleDepthMeters: number
+  gridWidth: number
+  gridDepth: number
+  sampleStep: number
+  sampleCols: number
+  sampleRows: number
+  totalSamplePoints: number
+}
+
 const clamp01 = (value: number) => Math.max(0, Math.min(1, value))
 
 function chunk<T>(values: T[], size: number): T[][] {
@@ -62,6 +83,36 @@ function chunk<T>(values: T[], size: number): T[][] {
     chunks.push(values.slice(index, index + size))
   }
   return chunks
+}
+
+function resolveSamplingPlan(
+  config: Pick<IsometricMapConfig, 'width' | 'depth'>,
+  requestedSampleStep: number
+): {
+  sampleStep: number
+  sampleCols: number
+  sampleRows: number
+  totalSamplePoints: number
+} {
+  const widthCells = Math.max(1, Math.round(config.width))
+  const depthCells = Math.max(1, Math.round(config.depth))
+
+  let sampleStep = Math.max(2, Math.round(requestedSampleStep || 4))
+  let sampleCols = Math.max(3, Math.floor(widthCells / sampleStep) + 1)
+  let sampleRows = Math.max(3, Math.floor(depthCells / sampleStep) + 1)
+
+  while (sampleCols * sampleRows > MAX_SAMPLE_POINTS) {
+    sampleStep += 2
+    sampleCols = Math.max(3, Math.floor(widthCells / sampleStep) + 1)
+    sampleRows = Math.max(3, Math.floor(depthCells / sampleStep) + 1)
+  }
+
+  return {
+    sampleStep,
+    sampleCols,
+    sampleRows,
+    totalSamplePoints: sampleCols * sampleRows,
+  }
 }
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
@@ -111,6 +162,27 @@ export function getAutoExpandedMapConfig(
     ...config,
     width: Math.max(config.width, Math.min(MAX_AUTO_GRID_WIDTH, desiredWidth || config.width)),
     depth: Math.max(config.depth, Math.min(MAX_AUTO_GRID_DEPTH, desiredDepth || config.depth)),
+  }
+}
+
+export function estimateTerrainImportPreview(
+  config: Pick<IsometricMapConfig, 'width' | 'depth' | 'cellSize' | 'floorColor' | 'gridColor' | 'gridOpacity' | 'showGrid' | 'showAxisLabels'>,
+  corners: GeoCoordinate[],
+  requestedSampleStep: number
+): TerrainImportPreview {
+  const expandedConfig = getAutoExpandedMapConfig(config, corners)
+  const { widthMeters, depthMeters } = estimateRectangleMeters(corners)
+  const sampling = resolveSamplingPlan(expandedConfig, requestedSampleStep)
+
+  return {
+    rectangleWidthMeters: widthMeters,
+    rectangleDepthMeters: depthMeters,
+    gridWidth: expandedConfig.width,
+    gridDepth: expandedConfig.depth,
+    sampleStep: sampling.sampleStep,
+    sampleCols: sampling.sampleCols,
+    sampleRows: sampling.sampleRows,
+    totalSamplePoints: sampling.totalSamplePoints,
   }
 }
 
@@ -205,13 +277,35 @@ function bilinearInterpolate(grid: number[][], u: number, v: number): number {
   return top * (1 - ty) + bottom * ty
 }
 
-async function fetchElevations(points: GeoCoordinate[]): Promise<number[]> {
+async function fetchElevations(
+  points: GeoCoordinate[],
+  onProgress?: (progress: TerrainImportProgress) => void
+): Promise<number[]> {
   const batches = chunk(points, MAX_POINTS_PER_REQUEST)
   const elevations: number[] = []
+  const totalPoints = points.length
 
-  for (const batch of batches) {
+  onProgress?.({
+    completedBatches: 0,
+    totalBatches: batches.length,
+    completedPoints: 0,
+    totalPoints,
+    currentBatchSize: 0,
+    percent: totalPoints === 0 ? 100 : 0,
+  })
+
+  for (const [index, batch] of batches.entries()) {
     const values = await fetchElevationBatch(batch)
     elevations.push(...values)
+
+    onProgress?.({
+      completedBatches: index + 1,
+      totalBatches: batches.length,
+      completedPoints: elevations.length,
+      totalPoints,
+      currentBatchSize: batch.length,
+      percent: totalPoints === 0 ? 100 : Math.round((elevations.length / totalPoints) * 100),
+    })
 
     // Suaviza el ritmo de consulta para evitar throttling.
     await sleep(BATCH_SLEEP_MS)
@@ -221,7 +315,7 @@ async function fetchElevations(points: GeoCoordinate[]): Promise<number[]> {
 }
 
 export async function importTerrainFromRectangle(options: TerrainImportOptions): Promise<TerrainImportResult> {
-  const { config, corners, keepSeaLevelTiles = false } = options
+  const { config, corners, keepSeaLevelTiles = false, onProgress } = options
   let sampleStep = Math.max(2, Math.round(options.sampleStep ?? 4))
 
   if (!corners || corners.length < 4) {
@@ -236,17 +330,10 @@ export async function importTerrainFromRectangle(options: TerrainImportOptions):
   const minLon = Math.min(...longitudes)
   const maxLon = Math.max(...longitudes)
 
-  const widthCells = Math.max(1, Math.round(config.width))
-  const depthCells = Math.max(1, Math.round(config.depth))
-
-  let sampleCols = Math.max(3, Math.floor(widthCells / sampleStep) + 1)
-  let sampleRows = Math.max(3, Math.floor(depthCells / sampleStep) + 1)
-
-  while (sampleCols * sampleRows > MAX_SAMPLE_POINTS) {
-    sampleStep += 2
-    sampleCols = Math.max(3, Math.floor(widthCells / sampleStep) + 1)
-    sampleRows = Math.max(3, Math.floor(depthCells / sampleStep) + 1)
-  }
+  const sampling = resolveSamplingPlan(config, sampleStep)
+  sampleStep = sampling.sampleStep
+  const sampleCols = sampling.sampleCols
+  const sampleRows = sampling.sampleRows
 
   const samplePoints: GeoCoordinate[] = []
   for (let row = 0; row < sampleRows; row++) {
@@ -260,7 +347,7 @@ export async function importTerrainFromRectangle(options: TerrainImportOptions):
     }
   }
 
-  const sampleElevations = await fetchElevations(samplePoints)
+  const sampleElevations = await fetchElevations(samplePoints, onProgress)
 
   const coarseGrid: number[][] = []
   for (let row = 0; row < sampleRows; row++) {

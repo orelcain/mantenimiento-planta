@@ -2,6 +2,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button, Badge } from '@/components/ui'
 import { MIN_TERRAIN_ELEVATION, MAX_TERRAIN_ELEVATION, SEA_LEVEL_ELEVATION, clampElevation } from '@/types/isometricMap'
 import { TerrainImportPanel } from '../workspace/TerrainImportPanel'
+import type { TerrainImportPreview, TerrainImportProgress } from '@/lib/terrainImport'
 
 interface TerrainEditorModalProps {
   isOpen: boolean
@@ -28,6 +29,9 @@ interface TerrainEditorModalProps {
   onTerrainImportCoordinatesTextChange: (value: string) => void
   terrainImportSampleStep: number
   onTerrainImportSampleStepChange: (value: number) => void
+  terrainImportPreview?: TerrainImportPreview | null
+  terrainImportPreviewError?: string | null
+  terrainImportProgress?: TerrainImportProgress | null
 }
 
 export function TerrainEditorModal({
@@ -55,6 +59,9 @@ export function TerrainEditorModal({
   onTerrainImportCoordinatesTextChange,
   terrainImportSampleStep,
   onTerrainImportSampleStepChange,
+  terrainImportPreview,
+  terrainImportPreviewError,
+  terrainImportProgress,
 }: TerrainEditorModalProps) {
   const clampToEditableRange = (value: number) => {
     return Math.max(editableMin, Math.min(editableMax, clampElevation(value)))
@@ -203,6 +210,9 @@ export function TerrainEditorModal({
             sampleStep={terrainImportSampleStep}
             onSampleStepChange={onTerrainImportSampleStepChange}
             statusMessage={realTerrainImportMessage}
+            preview={terrainImportPreview}
+            previewError={terrainImportPreviewError}
+            progress={terrainImportProgress}
           />
         </div>
       </DialogContent>

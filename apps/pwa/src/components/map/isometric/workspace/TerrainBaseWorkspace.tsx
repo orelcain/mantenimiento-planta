@@ -1,6 +1,7 @@
 import { Badge, Button, Card, CardContent, Input } from '@/components/ui'
 import type { IsometricMap } from '@/types/isometricMap'
 import { TerrainImportPanel } from './TerrainImportPanel'
+import type { TerrainImportPreview, TerrainImportProgress } from '@/lib/terrainImport'
 
 interface TerrainBaseWorkspaceProps {
   currentMapId: string
@@ -28,6 +29,9 @@ interface TerrainBaseWorkspaceProps {
   onTerrainImportCoordinatesTextChange: (value: string) => void
   terrainImportSampleStep: number
   onTerrainImportSampleStepChange: (value: number) => void
+  terrainImportPreview?: TerrainImportPreview | null
+  terrainImportPreviewError?: string | null
+  terrainImportProgress?: TerrainImportProgress | null
 }
 
 export function TerrainBaseWorkspace({
@@ -56,6 +60,9 @@ export function TerrainBaseWorkspace({
   onTerrainImportCoordinatesTextChange,
   terrainImportSampleStep,
   onTerrainImportSampleStepChange,
+  terrainImportPreview,
+  terrainImportPreviewError,
+  terrainImportProgress,
 }: TerrainBaseWorkspaceProps) {
   return (
     <Card>
@@ -143,6 +150,9 @@ export function TerrainBaseWorkspace({
             sampleStep={terrainImportSampleStep}
             onSampleStepChange={onTerrainImportSampleStepChange}
             statusMessage={realTerrainImportMessage}
+            preview={terrainImportPreview}
+            previewError={terrainImportPreviewError}
+            progress={terrainImportProgress}
             coordinateRows={6}
             footer={
               <div className="flex flex-wrap gap-2">

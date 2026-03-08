@@ -75,7 +75,9 @@ import type { Incident, IncidentPriority, IncidentStatus } from '@/types'
 import { useAuthStore } from '@/store'
 import {
   DEFAULT_CHONCHI_RECTANGLE,
+  estimateTerrainImportPreview,
   TerrainImportHttpError,
+  type TerrainImportProgress,
   formatCoordinatesText,
   getAutoExpandedMapConfig,
   importTerrainFromRectangle,
@@ -376,6 +378,7 @@ export function MapPage() {
   const [showTerrainModal, setShowTerrainModal] = useState(false)
   const [isImportingRealTerrain, setIsImportingRealTerrain] = useState(false)
   const [realTerrainImportMessage, setRealTerrainImportMessage] = useState<string | null>(null)
+  const [terrainImportProgress, setTerrainImportProgress] = useState<TerrainImportProgress | null>(null)
   const [terrainImportCoordinatesText, setTerrainImportCoordinatesText] = useState<string>(() =>
     formatCoordinatesText(DEFAULT_CHONCHI_RECTANGLE)
   )
@@ -548,6 +551,24 @@ export function MapPage() {
     const z = Math.round(terrainHoverPosition.z)
     return terrainElevationLookup.get(`${x},${z}`) ?? SEA_LEVEL_ELEVATION
   }, [terrainHoverPosition, terrainElevationLookup])
+
+  const terrainImportPreview = useMemo(() => {
+    try {
+      const corners = parseCoordinatesText(terrainImportCoordinatesText)
+      return estimateTerrainImportPreview(mapConfig, corners, terrainImportSampleStep)
+    } catch {
+      return null
+    }
+  }, [mapConfig, terrainImportCoordinatesText, terrainImportSampleStep])
+
+  const terrainImportPreviewError = useMemo(() => {
+    try {
+      parseCoordinatesText(terrainImportCoordinatesText)
+      return null
+    } catch (error) {
+      return error instanceof Error ? error.message : 'No se pudo interpretar el rectangulo de coordenadas'
+    }
+  }, [terrainImportCoordinatesText])
 
   const elevationColorForMeter = useCallback((meter: number) => {
     const bounded = clampElevation(meter)
@@ -1540,6 +1561,7 @@ export function MapPage() {
     if (isImportingRealTerrain) return
 
     setIsImportingRealTerrain(true)
+    setTerrainImportProgress(null)
     setRealTerrainImportMessage('Validando coordenadas y consultando elevaciones...')
 
     try {
@@ -1568,6 +1590,12 @@ export function MapPage() {
             corners,
             sampleStep: step,
             keepSeaLevelTiles: false,
+            onProgress: (progress) => {
+              setTerrainImportProgress(progress)
+              setRealTerrainImportMessage(
+                `Consultando elevaciones ${progress.percent}% · lote ${progress.completedBatches}/${progress.totalBatches} · ${progress.completedPoints}/${progress.totalPoints} puntos`
+              )
+            },
           })
           break
         } catch (error) {
@@ -1609,6 +1637,7 @@ export function MapPage() {
       }
     } finally {
       setIsImportingRealTerrain(false)
+      setTerrainImportProgress(null)
     }
   }, [isImportingRealTerrain, terrainImportCoordinatesText, terrainImportSampleStep, mapConfig])
 
@@ -2099,6 +2128,9 @@ export function MapPage() {
           onTerrainImportCoordinatesTextChange={setTerrainImportCoordinatesText}
           terrainImportSampleStep={terrainImportSampleStep}
           onTerrainImportSampleStepChange={setTerrainImportSampleStep}
+          terrainImportPreview={terrainImportPreview}
+          terrainImportPreviewError={terrainImportPreviewError}
+          terrainImportProgress={terrainImportProgress}
         />
       )}
 
@@ -3063,6 +3095,9 @@ export function MapPage() {
               onTerrainImportCoordinatesTextChange={setTerrainImportCoordinatesText}
               terrainImportSampleStep={terrainImportSampleStep}
               onTerrainImportSampleStepChange={setTerrainImportSampleStep}
+              terrainImportPreview={terrainImportPreview}
+              terrainImportPreviewError={terrainImportPreviewError}
+              terrainImportProgress={terrainImportProgress}
             />
 
             {/* Gestor de áreas — vista centralizada */}
