@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.70.32**
+## Versión Actual: **v2.70.33**
 
 **Fecha de lanzamiento**: 08 de marzo de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.70.33 — Encuadre del visor basado en límites reales del terreno (08/03/2026)
+- 🎯 **Fit real del mapa**: el cálculo de “ver mapa completo” ahora considera los límites del terreno importado en vez de depender solo del lienzo base
+- 🔄 **Reencuadre automático**: después de una importación exitosa, el visor recalcula el encuadre para mostrar mejor el terreno completo
+- 🧭 **Menos sensación de corte**: el mapa deja de verse como si tuviera límites de visualización fijos cuando el relieve ocupa un área distinta al canvas vacío
 
 ### v2.70.32 — Cota visible del terreno en el visor (08/03/2026)
 - 📐 **Dimensiones legibles**: el visor muestra una cota compacta con ancho, largo, subida, bajada y desnivel total del terreno cargado

@@ -806,10 +806,17 @@ export function MapPage() {
   }, [])
 
   const getCurrentFloorBounds = useCallback(() => {
-    let minX = -mapConfig.width / 2
-    let maxX = mapConfig.width / 2
-    let minZ = -mapConfig.depth / 2
-    let maxZ = mapConfig.depth / 2
+    let minX = Number.POSITIVE_INFINITY
+    let maxX = Number.NEGATIVE_INFINITY
+    let minZ = Number.POSITIVE_INFINITY
+    let maxZ = Number.NEGATIVE_INFINITY
+
+    for (const tile of terrainTiles) {
+      minX = Math.min(minX, tile.x)
+      maxX = Math.max(maxX, tile.x + 1)
+      minZ = Math.min(minZ, tile.z)
+      maxZ = Math.max(maxZ, tile.z + 1)
+    }
 
     const floorNodes = nodes.filter((n) => (n.floor ?? SEA_LEVEL_ELEVATION) === viewerState.currentFloor)
     for (const node of floorNodes) {
@@ -838,6 +845,13 @@ export function MapPage() {
       }
     }
 
+    if (!Number.isFinite(minX) || !Number.isFinite(maxX) || !Number.isFinite(minZ) || !Number.isFinite(maxZ)) {
+      minX = -mapConfig.width / 2
+      maxX = mapConfig.width / 2
+      minZ = -mapConfig.depth / 2
+      maxZ = mapConfig.depth / 2
+    }
+
     return {
       minX,
       maxX,
@@ -850,7 +864,7 @@ export function MapPage() {
       width: Math.max(1, maxX - minX),
       depth: Math.max(1, maxZ - minZ),
     }
-  }, [mapConfig.width, mapConfig.depth, nodes, areas, viewerState.currentFloor])
+  }, [mapConfig.width, mapConfig.depth, terrainTiles, nodes, areas, viewerState.currentFloor])
 
   const fitMapComplete = useCallback(() => {
     const bounds = getCurrentFloorBounds()
@@ -1674,6 +1688,7 @@ export function MapPage() {
         `Grilla ${expandedConfig.width}×${expandedConfig.depth}m, muestra efectiva ${result.usedSampleStep}m${scaleNote}.`
       )
       setMapStatusText('Base importada. Sigue con edicion de elementos; vuelve a base solo si necesitas recalibrar.')
+      setFitRequestKey((prev) => prev + 1)
       enterEditorWorkspace()
     } catch (error) {
       if (error instanceof TerrainImportHttpError && error.status === 429) {
