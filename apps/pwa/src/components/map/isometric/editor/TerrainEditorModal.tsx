@@ -1,6 +1,7 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button, Badge } from '@/components/ui'
 import { MIN_TERRAIN_ELEVATION, MAX_TERRAIN_ELEVATION, SEA_LEVEL_ELEVATION, clampElevation } from '@/types/isometricMap'
+import { TerrainImportPanel } from '../workspace/TerrainImportPanel'
 
 interface TerrainEditorModalProps {
   isOpen: boolean
@@ -194,52 +195,15 @@ export function TerrainEditorModal({
             <p>Con Niveladora, el terreno se corta/rellena a la cota exacta configurada.</p>
           </div>
 
-          <div className="space-y-2 rounded-lg border p-3 bg-muted/20">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Terreno Real (4 Coordenadas)</p>
-              <Button
-                variant="default"
-                size="sm"
-                className="h-8 text-xs"
-                onClick={onImportRealTerrain}
-                disabled={isImportingRealTerrain}
-              >
-                {isImportingRealTerrain ? 'Importando...' : 'Importar malla real'}
-              </Button>
-            </div>
-            <p className="text-[11px] text-muted-foreground">
-              Genera una malla de alturas gradual desde elevacion geoespacial y la adapta al canvas del visor.
-            </p>
-            <div className="space-y-1">
-              <p className="text-[11px] text-muted-foreground">Coordenadas (4 lineas, formato: lat, lon)</p>
-              <textarea
-                value={terrainImportCoordinatesText}
-                onChange={(event) => onTerrainImportCoordinatesTextChange(event.target.value)}
-                rows={4}
-                className="w-full rounded border bg-muted px-2 py-1 text-[11px] font-mono focus:outline-none focus:ring-1 focus:ring-primary"
-                placeholder="-42.632500, -73.763200"
-              />
-            </div>
-            <div className="space-y-1">
-              <p className="text-[11px] text-muted-foreground">Detalle de malla (metros por muestra)</p>
-              <div className="flex items-center gap-1.5">
-                {[4, 6, 8, 10, 12].map((step) => (
-                  <Button
-                    key={step}
-                    size="sm"
-                    variant={terrainImportSampleStep === step ? 'default' : 'outline'}
-                    className="h-7 text-[11px] px-2"
-                    onClick={() => onTerrainImportSampleStepChange(step)}
-                  >
-                    {step}m
-                  </Button>
-                ))}
-              </div>
-            </div>
-            {realTerrainImportMessage && (
-              <p className="text-[11px] text-primary font-medium">{realTerrainImportMessage}</p>
-            )}
-          </div>
+          <TerrainImportPanel
+            isImporting={isImportingRealTerrain}
+            onImport={onImportRealTerrain}
+            coordinatesText={terrainImportCoordinatesText}
+            onCoordinatesTextChange={onTerrainImportCoordinatesTextChange}
+            sampleStep={terrainImportSampleStep}
+            onSampleStepChange={onTerrainImportSampleStepChange}
+            statusMessage={realTerrainImportMessage}
+          />
         </div>
       </DialogContent>
     </Dialog>

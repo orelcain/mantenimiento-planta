@@ -84,6 +84,7 @@ import {
 
 type BackgroundCalibrationMode = 'move' | 'scale' | 'rotate'
 type BackgroundDisplayMode = NonNullable<NonNullable<IsometricMap['backgroundMap']>['displayMode']>
+type MapWorkspaceStage = 'terrain-base' | 'editor'
 
 // Lazy load del componente 3D pesado
 const IsometricScene = lazy(() =>
@@ -102,6 +103,7 @@ import { MapSearchPanel } from '@/components/map/isometric/editor/MapSearchPanel
 import { ShapeEditorDialog } from '@/components/map/isometric/editor/ShapeEditorDialog'
 import { AreaTileEditor } from '@/components/map/isometric/editor/AreaTileEditor'
 import { TerrainEditorModal } from '@/components/map/isometric/editor/TerrainEditorModal'
+import { TerrainBaseWorkspace } from '@/components/map/isometric/workspace/TerrainBaseWorkspace'
 import { useEditorOverlayState } from '@/components/map/isometric/editor/useEditorOverlayState'
 import { getAreaAtPosition, normalizeNodeForArea } from '@/components/map/isometric/editor/areaAssociation'
 import { useMapEditorActions } from '@/components/map/isometric/editor/useMapEditorActions'
@@ -317,6 +319,7 @@ export function MapPage() {
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null)
   const [showIncidentPanel, setShowIncidentPanel] = useState(true)
   const [showFilters, setShowFilters] = useState(false)
+  const [workspaceStage, setWorkspaceStage] = useState<MapWorkspaceStage>('terrain-base')
 
   // Estado del visor isométrico
   const [viewerState, setViewerState] = useState<IsometricViewerState>(DEFAULT_VIEWER_STATE)
@@ -487,6 +490,7 @@ export function MapPage() {
   }, [refreshBaseMapSources])
 
   const isEditMode = viewerState.mode === 'edit'
+  const isTerrainBaseStage = workspaceStage === 'terrain-base'
   const isBaseMapCalibrationMode = isEditMode && !!backgroundMap && calibrationMode !== null
   const activeTerrainTool = terrainEditEnabled && isShiftPressed ? 'smooth' : terrainTool
   const terrainToolLabel = useCallback((tool: 'raise' | 'lower' | 'flatten' | 'smooth' | 'sample') => {
@@ -1270,6 +1274,50 @@ export function MapPage() {
     setEditorTool('select')
   }, [])
 
+  useEffect(() => {
+    if (!isTerrainBaseStage) return
+
+    setShowIncidentPanel(false)
+    setShowFilters(false)
+    setSelectedIncident(null)
+    setTerrainEditEnabled(false)
+    setShowTerrainModal(false)
+    closeAreaEditor()
+    overlayState.closeOverlay()
+    setViewerState((prev) => ({
+      ...prev,
+      mode: 'view',
+      selectedNodeId: null,
+      filters: {
+        ...prev.filters,
+        showEquipment: false,
+        showLabels: false,
+        showConnectors: false,
+        showAlerts: false,
+      },
+    }))
+  }, [isTerrainBaseStage, closeAreaEditor, overlayState])
+
+  const enterEditorWorkspace = useCallback(() => {
+    setWorkspaceStage('editor')
+    setViewerState((prev) => ({
+      ...prev,
+      mode: 'edit',
+      selectedNodeId: null,
+      filters: {
+        ...prev.filters,
+        showEquipment: true,
+        showLabels: true,
+      },
+    }))
+    setMapStatusText('Editor activado. La base del terreno ya esta lista para continuar con creacion y ajustes.')
+  }, [])
+
+  const returnToTerrainWorkspace = useCallback(() => {
+    setWorkspaceStage('terrain-base')
+    setMapStatusText('Volviste al modo base de terreno para revisar la importacion y la forma general del mapa.')
+  }, [])
+
   const handleNodeDragEnd = useCallback(
     (nodeId: string, newPosition: { x: number; y: number; z: number }, options?: { duplicate?: boolean }) => {
       const sourceNode = nodes.find((node) => node.id === nodeId)
@@ -1950,7 +1998,9 @@ export function MapPage() {
             Mapa Isométrico
           </h1>
           <p className="text-sm text-muted-foreground">
-            Vista 3D de la planta — Rotar: Q/E · Zoom: scroll · Pan: arrastrar clic izquierdo o flechas · Reset: R
+            {isTerrainBaseStage
+              ? 'Fase 1: importar y validar la base del terreno desde 4 coordenadas antes de seguir con creacion.'
+              : 'Fase 2: edicion y construccion sobre la base ya importada.'}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -1963,8 +2013,23 @@ export function MapPage() {
             <Layers className="h-4 w-4" />
             Vista 2D
           </Button>
+          <Badge variant={isTerrainBaseStage ? 'default' : 'secondary'} className="gap-1 font-normal">
+            {isTerrainBaseStage ? 'Base terreno' : 'Creacion'}
+          </Badge>
+          {isAdmin && isTerrainBaseStage && (
+            <Button variant="default" size="sm" className="gap-1.5" onClick={enterEditorWorkspace}>
+              <Pencil className="h-4 w-4" />
+              Seguir a creacion
+            </Button>
+          )}
+          {isAdmin && !isTerrainBaseStage && (
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={returnToTerrainWorkspace}>
+              <Compass className="h-4 w-4" />
+              Volver a base
+            </Button>
+          )}
           {/* Modo editor (solo admin) */}
-          {isAdmin && (
+          {isAdmin && !isTerrainBaseStage && (
             <Button
               variant={isEditMode ? 'default' : 'outline'}
               size="sm"
@@ -2001,8 +2066,44 @@ export function MapPage() {
         </div>
       </div>
 
+      {isTerrainBaseStage && (
+        <TerrainBaseWorkspace
+          currentMapId={currentMapId}
+          savedMaps={savedMaps}
+          isLoadingMaps={isLoadingMaps}
+          onLoadMap={handleLoadMap}
+          mapName={mapName}
+          onMapNameChange={(value) => {
+            setMapName(value)
+            setHasUnsavedChanges(true)
+          }}
+          mapDescription={mapDescription}
+          onMapDescriptionChange={(value) => {
+            setMapDescription(value)
+            setHasUnsavedChanges(true)
+          }}
+          mapWidth={mapConfig.width}
+          mapDepth={mapConfig.depth}
+          terrainTileCount={terrainTiles.length}
+          currentFloorLabel={formatElevationLabel(viewerState.currentFloor)}
+          mapStatusText={mapStatusText}
+          realTerrainImportMessage={realTerrainImportMessage}
+          onCreateBlankMap={handleCreateBlankMap}
+          onFitMapComplete={fitMapComplete}
+          onImportRealTerrain={() => { void handleImportRealTerrain() }}
+          onSave={handleSave}
+          onSaveAsNew={handleSaveAsNew}
+          isImportingRealTerrain={isImportingRealTerrain}
+          isSaving={isSaving}
+          terrainImportCoordinatesText={terrainImportCoordinatesText}
+          onTerrainImportCoordinatesTextChange={setTerrainImportCoordinatesText}
+          terrainImportSampleStep={terrainImportSampleStep}
+          onTerrainImportSampleStepChange={setTerrainImportSampleStep}
+        />
+      )}
+
       {/* Status Legend */}
-      {isAdmin && (
+      {isAdmin && !isTerrainBaseStage && (
         <Card>
           <CardContent className="p-3 space-y-3">
             <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
@@ -2530,22 +2631,24 @@ export function MapPage() {
             {/* Camera rotation + zoom + pan (izquierda abajo) */}
             <div className="absolute bottom-4 left-4 flex flex-col gap-2">
               {/* Toggle equipos: botón prominente */}
-              <Button
-                variant={viewerState.filters.showEquipment ? 'outline' : 'default'}
-                size="sm"
-                className={cn(
-                  'gap-1.5 text-xs shadow-lg backdrop-blur',
-                  !viewerState.filters.showEquipment && 'bg-amber-500 hover:bg-amber-600 text-white border-amber-600'
-                )}
-                onClick={() => toggleFilter('showEquipment')}
-                title={viewerState.filters.showEquipment ? 'Ocultar equipos (ver solo planta)' : 'Mostrar equipos'}
-              >
-                {viewerState.filters.showEquipment ? (
-                  <><EyeOff className="h-3.5 w-3.5" /> Ocultar Equipos</>
-                ) : (
-                  <><Eye className="h-3.5 w-3.5" /> Solo Planta</>
-                )}
-              </Button>
+              {!isTerrainBaseStage && (
+                <Button
+                  variant={viewerState.filters.showEquipment ? 'outline' : 'default'}
+                  size="sm"
+                  className={cn(
+                    'gap-1.5 text-xs shadow-lg backdrop-blur',
+                    !viewerState.filters.showEquipment && 'bg-amber-500 hover:bg-amber-600 text-white border-amber-600'
+                  )}
+                  onClick={() => toggleFilter('showEquipment')}
+                  title={viewerState.filters.showEquipment ? 'Ocultar equipos (ver solo planta)' : 'Mostrar equipos'}
+                >
+                  {viewerState.filters.showEquipment ? (
+                    <><EyeOff className="h-3.5 w-3.5" /> Ocultar Equipos</>
+                  ) : (
+                    <><Eye className="h-3.5 w-3.5" /> Solo Planta</>
+                  )}
+                </Button>
+              )}
 
               <div className="flex items-center gap-1 bg-card/90 backdrop-blur rounded-lg p-1 shadow-lg border">
                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={rotateLeft} title="Rotar izq (Q)">
@@ -2593,6 +2696,7 @@ export function MapPage() {
 
             {/* Filter toggles (izquierda arriba) */}
             <div className="absolute top-4 left-4 flex flex-col gap-2">
+              {!isTerrainBaseStage && (
               <div className="bg-card/90 backdrop-blur rounded-lg shadow-lg border">
                 <Button
                   variant="ghost"
@@ -2632,6 +2736,7 @@ export function MapPage() {
                   </div>
                 )}
               </div>
+              )}
 
               {/* Floor selector */}
               <div className="bg-card/90 backdrop-blur rounded-lg shadow-lg border p-1.5">
@@ -2746,6 +2851,7 @@ export function MapPage() {
             </div>
 
             {/* Search panel (center top) — visible siempre */}
+            {!isTerrainBaseStage && (
             <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
               <MapSearchPanel
                 nodes={nodes}
@@ -2755,9 +2861,10 @@ export function MapPage() {
                 onFocusNode={handleFocusNode}
               />
             </div>
+            )}
 
             {/* Selected node info card (centro abajo) — solo en modo vista */}
-            {selectedNode && !isEditMode && (
+            {selectedNode && !isEditMode && !isTerrainBaseStage && (
               <div className="absolute bottom-4 left-1/2 -translate-x-1/2 max-w-sm w-full px-4">
                 <Card className="bg-card/95 backdrop-blur shadow-xl border">
                   <CardContent className="p-3">
@@ -2890,7 +2997,7 @@ export function MapPage() {
             )}
 
             {/* Botón para mostrar panel de incidencias (solo modo vista) */}
-            {!isEditMode && !showIncidentPanel && (
+            {!isEditMode && !showIncidentPanel && !isTerrainBaseStage && (
               <Button
                 className="absolute top-4 right-4 shadow-lg z-40"
                 variant="secondary"
@@ -3090,7 +3197,7 @@ export function MapPage() {
       )}
 
       {/* Diálogo de detalle de incidencia */}
-      {selectedIncident && (
+      {selectedIncident && !isTerrainBaseStage && (
         <IncidentDetail 
           incident={selectedIncident} 
           onClose={() => setSelectedIncident(null)} 

@@ -7,6 +7,13 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ---
 
+## [2.70.22] - 2026-03-08
+### Mejorado — Visor de mapas con base topografica primero
+- **Fase base prioritaria**: el visor ahora arranca enfocado en importar y revisar bien el terreno real desde 4 coordenadas antes de abrir herramientas de creacion.
+- **Limpieza de UI**: en la etapa base se ocultan incidencias, buscador, filtros y elementos secundarios para dejar la lectura del terreno mucho mas limpia.
+- **Refactor estructural**: se extraen componentes reutilizables para el panel de importacion de terreno y el workspace base, reduciendo acoplamiento dentro de `MapPage`.
+- **Preparacion para siguiente poda**: el modulo queda listo para seguir separando creacion/edicion del flujo de importacion sin rehacer el renderer ni el importador.
+
 ## [2.70.21] - 2026-03-08
 ### Mejorado — Calibracion visual del plano base sobre visor de terreno real
 - **Calibración visual en canvas**: el plano raster ahora se puede mover, escalar y rotar directamente dentro del visor, sin depender solo de inputs numéricos.

@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.70.21' as const
+export const APP_VERSION = '2.70.22' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-03-08' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Visor de mapas: calibracion visual sobre terreno real' as const
+export const VERSION_NAME = 'Visor de mapas: base topografica primero' as const
 
 /**
  * Nota:

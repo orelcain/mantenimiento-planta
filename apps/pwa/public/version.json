@@ -1,8 +1,11 @@
 {
-  "version": "2.70.21",
+  "version": "2.70.22",
   "buildDate": "2026-03-08",
   "buildTimestamp": 1772941800000,
   "features": [
+    "Visor de mapas: nueva etapa base enfocada en importar, revisar y guardar terreno real desde 4 coordenadas antes de crear elementos",
+    "Visor de mapas: extraccion de paneles reutilizables para importacion de terreno y workspace base, reduciendo mezcla de responsabilidades en MapPage",
+    "Visor de mapas: limpieza de UI en fase base ocultando incidencias, buscador, filtros y elementos no esenciales hasta pasar a creacion",
     "Visor de mapas: calibración visual del plano base dentro del canvas con drag para mover, escalar o rotar",
     "Visor de mapas: guardado multi-mapa con nombre, descripción, carga de layouts persistidos y guardar como nuevo",
     "Visor de mapas: validación de densidad px/m y cobertura del plano base para comprobar escala operativa",
