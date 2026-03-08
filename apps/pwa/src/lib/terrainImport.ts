@@ -97,7 +97,7 @@ function resolveSamplingPlan(
   const widthCells = Math.max(1, Math.round(config.width))
   const depthCells = Math.max(1, Math.round(config.depth))
 
-  let sampleStep = Math.max(2, Math.round(requestedSampleStep || 4))
+  let sampleStep = Math.max(1, Math.round(requestedSampleStep || 1))
   let sampleCols = Math.max(3, Math.floor(widthCells / sampleStep) + 1)
   let sampleRows = Math.max(3, Math.floor(depthCells / sampleStep) + 1)
 

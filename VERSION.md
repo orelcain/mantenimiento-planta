@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.70.28**
+## Versión Actual: **v2.70.29**
 
 **Fecha de lanzamiento**: 08 de marzo de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.70.29 — Vista sin grilla base y muestreo base de 1 m (08/03/2026)
+- 🧼 **Sin grilla base**: se oculta temporalmente la grilla/plano visual del canvas para revisar el terreno importado sin interferencia
+- 📏 **Una sola opción visible**: el panel de importación deja solo la opción base de 1 m para simplificar la prueba
+- ⚙️ **Ajuste automático intacto**: si el canvas supera el límite operativo, el sistema sigue pudiendo subir el muestreo efectivo internamente
 
 ### v2.70.28 — Terreno importado con mejor legibilidad visual (08/03/2026)
 - 🗺️ **Terreno más visible**: se aclara la paleta topográfica y se aumenta el contraste del material del terreno importado

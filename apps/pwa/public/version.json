@@ -1,8 +1,11 @@
 {
-  "version": "2.70.28",
+  "version": "2.70.29",
   "buildDate": "2026-03-08",
   "buildTimestamp": 1772983200000,
   "features": [
+    "Visor de mapas: se oculta temporalmente la grilla base del canvas para revisar el terreno sin interferencia visual",
+    "Visor de mapas: el panel de importacion deja una sola opcion visible de muestreo base en 1 m",
+    "Visor de mapas: el sistema conserva el aumento automatico del muestreo efectivo cuando la grilla es demasiado grande",
     "Visor de mapas: terreno importado con paleta topografica mas clara y mayor contraste visual",
     "Visor de mapas: la grilla base se atenúa automaticamente cuando existe una malla de terreno",
     "Visor de mapas: curvas de nivel mas visibles sobre el canvas oscuro",

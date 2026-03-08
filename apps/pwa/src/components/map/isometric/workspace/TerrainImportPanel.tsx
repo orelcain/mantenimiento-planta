@@ -22,7 +22,7 @@ interface TerrainImportPanelProps {
   footer?: ReactNode
 }
 
-const SAMPLE_STEPS = [4, 6, 8, 10, 12] as const
+const SAMPLE_STEPS = [1] as const
 
 export function TerrainImportPanel({
   title = 'Terreno Real (4 Coordenadas)',
@@ -76,7 +76,7 @@ export function TerrainImportPanel({
       </div>
 
       <div className="space-y-1">
-        <p className="text-[11px] text-muted-foreground">Detalle de malla (metros por muestra)</p>
+        <p className="text-[11px] text-muted-foreground">Detalle de malla base (1 m). Si la grilla es muy grande, el sistema puede aumentar el muestreo efectivo automáticamente.</p>
         <div className="flex flex-wrap items-center gap-1.5">
           {SAMPLE_STEPS.map((step) => (
             <Button

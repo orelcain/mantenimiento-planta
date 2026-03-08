@@ -18,7 +18,6 @@ import { Canvas, useLoader, useThree } from '@react-three/fiber'
 // drei helpers disponibles si se necesitan (Environment, etc.)
 import * as THREE from 'three'
 import { IsometricCamera } from './IsometricCamera'
-import { PlantGrid } from './PlantGrid'
 import { EquipmentNode } from './EquipmentNode'
 import { DraggableNode } from './editor/DraggableNode'
 import { MapAreaOverlay } from './MapAreaOverlay'
@@ -287,16 +286,6 @@ function SceneContent({
       baseElevation: Math.max(MIN_TERRAIN_ELEVATION, minElevation - sideDepth),
     }
   }, [terrain])
-
-  const sceneGridConfig = useMemo(() => {
-    if (!terrain || terrain.length === 0) return config
-    return {
-      ...config,
-      showGrid: false,
-      gridOpacity: Math.min(config.gridOpacity, 0.04),
-      floorColor: '#0d1520',
-    }
-  }, [config, terrain])
 
   const terrainSolidGeometry = useMemo(() => {
     if (!terrain || terrain.length === 0) return null
@@ -797,9 +786,6 @@ function SceneContent({
           )}
         </group>
       )}
-
-      {/* Grilla del suelo */}
-      <PlantGrid config={sceneGridConfig} />
 
       {/* Terreno suavizado tipo heightfield (menos voxel/pixelado) */}
       {terrainSolidGeometry && (
