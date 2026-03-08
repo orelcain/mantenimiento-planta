@@ -385,10 +385,11 @@ export function MapPage() {
   const [terrainImportCoordinatesText, setTerrainImportCoordinatesText] = useState<string>(() =>
     formatCoordinatesText(DEFAULT_CHONCHI_RECTANGLE)
   )
-  const [terrainImportSampleStep, setTerrainImportSampleStep] = useState<number>(6)
+  const [terrainImportSampleStep, setTerrainImportSampleStep] = useState<number>(1)
   const [isShiftPressed, setIsShiftPressed] = useState(false)
   const [addPlacementRotation, setAddPlacementRotation] = useState(0)
   const lastTerrainStrokeKeyRef = useRef<string | null>(null)
+  const preserveLocalBaseRef = useRef(false)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const history = useEditorHistory()
@@ -479,6 +480,10 @@ export function MapPage() {
     try {
       const maps = await getIsometricMaps()
       setSavedMaps(maps)
+
+      if (!preferredMapId && preserveLocalBaseRef.current) {
+        return
+      }
 
       const targetMap = preferredMapId
         ? maps.find((map) => map.id === preferredMapId) ?? null
@@ -1571,6 +1576,7 @@ export function MapPage() {
   const handleImportRealTerrain = useCallback(async () => {
     if (isImportingRealTerrain) return
 
+    preserveLocalBaseRef.current = true
     setIsImportingRealTerrain(true)
     setTerrainImportProgress(null)
     setRealTerrainImportMessage('Validando coordenadas y consultando elevaciones...')
@@ -1830,6 +1836,7 @@ export function MapPage() {
   })
 
   const handleCreateBlankMap = useCallback(() => {
+    preserveLocalBaseRef.current = true
     applyMapDocument(null)
     setMapStatusText('Lienzo nuevo listo: base 600 m × 500 m, grilla 1 m × 1 m.')
   }, [applyMapDocument])
@@ -1837,6 +1844,7 @@ export function MapPage() {
   const handleLoadMap = useCallback((mapId: string) => {
     const target = savedMaps.find((map) => map.id === mapId) ?? null
     if (!target) return
+    preserveLocalBaseRef.current = false
     applyMapDocument(target)
     setMapStatusText(`Mapa cargado: ${target.nombre}`)
   }, [applyMapDocument, savedMaps])

@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.70.30**
+## Versión Actual: **v2.70.31**
 
 **Fecha de lanzamiento**: 08 de marzo de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.70.31 — Fix del rebote tras importar base local (08/03/2026)
+- 🛡️ **Base local preservada**: la carga automática de mapas guardados ya no puede sobrescribir una base recién importada mientras la petición inicial sigue en curso
+- ✨ **Menos parpadeo**: se elimina el rebote donde el terreno aparecía un instante y luego volvía la etapa base por un `applyMapDocument(null)` tardío
+- 📏 **Muestreo inicial correcto**: el paso de importación ahora inicia realmente en 1 m, consistente con la interfaz visible
 
 ### v2.70.30 — Panel de importación horizontal y versión sincronizada (08/03/2026)
 - ↔️ **Panel horizontal**: la sección de importación del mapa base se reorganiza en horizontal para reducir altura ocupada

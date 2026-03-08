@@ -1,8 +1,11 @@
 {
-  "version": "2.70.30",
+  "version": "2.70.31",
   "buildDate": "2026-03-08",
   "buildTimestamp": 1772983200000,
   "features": [
+    "Visor de mapas: la carga automatica de mapas guardados ya no sobrescribe una base local recien importada",
+    "Visor de mapas: se corrige el rebote visual donde el terreno aparecia y luego se volvia a la etapa base",
+    "Visor de mapas: el muestreo inicial de importacion queda realmente sincronizado en 1 m",
     "Visor de mapas: panel de importacion base reorganizado en horizontal para ocupar menos altura",
     "Visor de mapas: el bloque superior se vuelve mas compacto cuando ya existe terreno cargado",
     "Visor de mapas: APP_VERSION, package.json y version publica quedan sincronizados para depuracion consistente",
