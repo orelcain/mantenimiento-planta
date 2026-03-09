@@ -523,6 +523,7 @@
             <div class="viewer-controls">
               <button class="control-chip is-active" id="toggleSatellite">Satelite</button>
               <button class="control-chip is-active" id="toggleHillshade">Relieve</button>
+              <button class="control-chip is-active" id="toggleMicroRelief">Microrelieve</button>
               <button class="control-chip is-active" id="toggleContours">Curvas</button>
               <button class="control-chip is-active" id="togglePointLabels">Puntos</button>
             </div>
@@ -755,6 +756,8 @@
 
     const SAMPLE_COLS = 9
     const SAMPLE_ROWS = 9
+    const SAMPLE_COLS_DETAIL = 21
+    const SAMPLE_ROWS_DETAIL = 21
     const metersPerDegreeLat = 111320
 
     function toRadians(value) {
@@ -835,9 +838,11 @@
       .join('')
 
     let pendingContourData = { type: 'FeatureCollection', features: [] }
+    let pendingReliefCellsData = { type: 'FeatureCollection', features: [] }
     const mapViewState = {
       satellite: true,
       hillshade: true,
+      microRelief: true,
       contours: true,
       points: true,
     }
@@ -883,6 +888,7 @@
 
       setVisibility('satellite', mapViewState.satellite)
       setVisibility('terrain-hillshade', mapViewState.hillshade)
+      setVisibility('relief-cells', mapViewState.microRelief)
       setVisibility('contour-lines', mapViewState.contours)
       setVisibility('contour-labels', mapViewState.contours)
       setVisibility('corner-points', mapViewState.points)
@@ -890,6 +896,7 @@
 
       syncControlChip('toggleSatellite', mapViewState.satellite)
       syncControlChip('toggleHillshade', mapViewState.hillshade)
+      syncControlChip('toggleMicroRelief', mapViewState.microRelief)
       syncControlChip('toggleContours', mapViewState.contours)
       syncControlChip('togglePointLabels', mapViewState.points)
     }
@@ -974,6 +981,10 @@
               type: 'geojson',
               data: pendingContourData,
             },
+            reliefCells: {
+              type: 'geojson',
+              data: pendingReliefCellsData,
+            },
           },
           layers: [
             { id: 'satellite', type: 'raster', source: 'satellite' },
@@ -1003,6 +1014,18 @@
               paint: {
                 'line-color': '#f6b86c',
                 'line-width': 3,
+              },
+            },
+            {
+              id: 'relief-cells',
+              type: 'fill-extrusion',
+              source: 'reliefCells',
+              paint: {
+                'fill-extrusion-color': ['get', 'color'],
+                'fill-extrusion-base': ['get', 'base'],
+                'fill-extrusion-height': ['get', 'height'],
+                'fill-extrusion-opacity': 0.48,
+                'fill-extrusion-vertical-gradient': true,
               },
             },
             {
@@ -1193,6 +1216,14 @@
       }
     }
 
+    function updateMapRelief(data) {
+      pendingReliefCellsData = data
+      const source = map?.getSource?.('reliefCells')
+      if (source && 'setData' in source) {
+        source.setData(data)
+      }
+    }
+
     function crossesThreshold(valueA, valueB, threshold) {
       return (valueA <= threshold && valueB > threshold) || (valueA > threshold && valueB <= threshold)
     }
@@ -1225,6 +1256,66 @@
     function contourPointToCoordinates(point) {
       const geoPoint = interpolateQuadPoint(point.u, point.v)
       return [geoPoint.lon, geoPoint.lat]
+    }
+
+    function buildReliefCells(grid, elevations, cols, rows) {
+      const minElevation = Math.min(...elevations)
+      const maxElevation = Math.max(...elevations)
+      const range = Math.max(1, maxElevation - minElevation)
+      const exaggeration = range <= 20 ? 7 : range <= 40 ? 5 : 3.4
+      const features = []
+
+      for (let row = 0; row < rows - 1; row += 1) {
+        for (let col = 0; col < cols - 1; col += 1) {
+          const topLeft = grid[row * cols + col]
+          const topRight = grid[row * cols + col + 1]
+          const bottomRight = grid[(row + 1) * cols + col + 1]
+          const bottomLeft = grid[(row + 1) * cols + col]
+
+          const cellElevations = [
+            elevations[row * cols + col] ?? minElevation,
+            elevations[row * cols + col + 1] ?? minElevation,
+            elevations[(row + 1) * cols + col + 1] ?? minElevation,
+            elevations[(row + 1) * cols + col] ?? minElevation,
+          ]
+
+          const avgElevation = cellElevations.reduce((sum, value) => sum + value, 0) / cellElevations.length
+          const cellBase = Math.max(0, (Math.min(...cellElevations) - minElevation) * exaggeration)
+          const cellHeight = Math.max(cellBase + 0.5, (avgElevation - minElevation) * exaggeration)
+          const normalized = (avgElevation - minElevation) / range
+          const color = new THREE.Color().setHSL(0.58 - normalized * 0.4, 0.46, 0.32 + normalized * 0.18).getStyle()
+
+          features.push({
+            type: 'Feature',
+            properties: {
+              elevation: Number(avgElevation.toFixed(1)),
+              base: Number(cellBase.toFixed(2)),
+              height: Number(cellHeight.toFixed(2)),
+              color,
+            },
+            geometry: {
+              type: 'Polygon',
+              coordinates: [[
+                [topLeft.lon, topLeft.lat],
+                [topRight.lon, topRight.lat],
+                [bottomRight.lon, bottomRight.lat],
+                [bottomLeft.lon, bottomLeft.lat],
+                [topLeft.lon, topLeft.lat],
+              ]],
+            },
+          })
+        }
+      }
+
+      return {
+        type: 'FeatureCollection',
+        features,
+        meta: {
+          exaggeration,
+          cols,
+          rows,
+        },
+      }
     }
 
     function buildContourData(grid, elevations) {
@@ -1441,12 +1532,12 @@
       }
     }
 
-    function buildSampleGrid(bounds) {
+    function buildSampleGrid(bounds, cols = SAMPLE_COLS, rows = SAMPLE_ROWS) {
       const result = []
-      for (let row = 0; row < SAMPLE_ROWS; row += 1) {
-        const v = row / Math.max(1, SAMPLE_ROWS - 1)
-        for (let col = 0; col < SAMPLE_COLS; col += 1) {
-          const u = col / Math.max(1, SAMPLE_COLS - 1)
+      for (let row = 0; row < rows; row += 1) {
+        const v = row / Math.max(1, rows - 1)
+        for (let col = 0; col < cols; col += 1) {
+          const u = col / Math.max(1, cols - 1)
           const point = interpolateQuadPoint(u, v)
           result.push({ lat: point.lat, lon: point.lon, row, col, u, v })
         }
@@ -1455,14 +1546,22 @@
     }
 
     async function fetchElevations(grid) {
-      const lats = grid.map((point) => point.lat.toFixed(6)).join(',')
-      const lons = grid.map((point) => point.lon.toFixed(6)).join(',')
-      const response = await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${lats}&longitude=${lons}`)
-      if (!response.ok) {
-        throw new Error(`Open-Meteo respondió ${response.status}`)
+      const elevations = []
+      const batchSize = 80
+
+      for (let index = 0; index < grid.length; index += batchSize) {
+        const batch = grid.slice(index, index + batchSize)
+        const lats = batch.map((point) => point.lat.toFixed(6)).join(',')
+        const lons = batch.map((point) => point.lon.toFixed(6)).join(',')
+        const response = await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${lats}&longitude=${lons}`)
+        if (!response.ok) {
+          throw new Error(`Open-Meteo respondió ${response.status}`)
+        }
+        const payload = await response.json()
+        elevations.push(...(payload.elevation ?? []))
       }
-      const payload = await response.json()
-      return payload.elevation ?? []
+
+      return elevations
     }
 
     async function createTerrainMesh(elevations) {
@@ -1648,19 +1747,28 @@
       document.getElementById('threeInfo').innerHTML = '<strong>Estado:</strong> consultando elevaciones reales del rectángulo...'
       try {
         const grid = buildSampleGrid(metrics)
-        const elevations = await fetchElevations(grid)
+        const detailGrid = buildSampleGrid(metrics, SAMPLE_COLS_DETAIL, SAMPLE_ROWS_DETAIL)
+        const [elevations, detailElevations] = await Promise.all([
+          fetchElevations(grid),
+          fetchElevations(detailGrid),
+        ])
         if (!Array.isArray(elevations) || elevations.length !== grid.length) {
           throw new Error('La respuesta de elevaciones vino incompleta')
         }
+        if (!Array.isArray(detailElevations) || detailElevations.length !== detailGrid.length) {
+          throw new Error('La respuesta detallada de elevaciones vino incompleta')
+        }
         const contourData = buildContourData(grid, elevations)
+        const reliefCellsData = buildReliefCells(detailGrid, detailElevations, SAMPLE_COLS_DETAIL, SAMPLE_ROWS_DETAIL)
         updateMapContours(contourData)
+        updateMapRelief(reliefCellsData)
         await createTerrainMesh(elevations)
 
         const contourValues = Array.from(new Set(contourData.features.map((feature) => feature.properties?.elevation))).filter((value) => typeof value === 'number')
         if (contourValues.length > 0) {
           document.getElementById('maplibreInfo').innerHTML = `
-            <strong>Lectura esperada:</strong> base satelital + hillshade + puntos <strong>P1-P4</strong>.<br>
-            Niveles de altura activos en <strong>${contourValues.join(', ')} m</strong>.
+            <strong>Lectura esperada:</strong> base satelital + hillshade + microrelieve local + puntos <strong>P1-P4</strong>.<br>
+            Niveles activos en <strong>${contourValues.join(', ')} m</strong>. Microrelieve <strong>${SAMPLE_COLS_DETAIL} × ${SAMPLE_ROWS_DETAIL}</strong> celdas.
           `
         }
       } catch (error) {
@@ -1709,6 +1817,10 @@
     })
     document.getElementById('toggleHillshade').addEventListener('click', () => {
       mapViewState.hillshade = !mapViewState.hillshade
+      applyMapViewState()
+    })
+    document.getElementById('toggleMicroRelief').addEventListener('click', () => {
+      mapViewState.microRelief = !mapViewState.microRelief
       applyMapViewState()
     })
     document.getElementById('toggleContours').addEventListener('click', () => {
