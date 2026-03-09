@@ -679,7 +679,6 @@
   <script type="module">
     import * as THREE from 'https://esm.sh/three@0.179.1'
     import { OrbitControls } from 'https://esm.sh/three@0.179.1/examples/jsm/controls/OrbitControls.js'
-    import * as turf from 'https://esm.sh/@turf/turf@7.2.0'
 
     const errorBanner = document.getElementById('errorBanner')
     const reportError = (message) => {
@@ -788,6 +787,8 @@
         </div>
       `)
       .join('')
+
+    let pendingContourData = { type: 'FeatureCollection', features: [] }
 
     let map = null
     try {
@@ -1001,7 +1002,6 @@
 
     const pointer = new THREE.Vector2()
     const raycaster = new THREE.Raycaster()
-    let pendingContourData = { type: 'FeatureCollection', features: [] }
     const hoverMarker = new THREE.Mesh(
       new THREE.SphereGeometry(6, 24, 24),
       new THREE.MeshStandardMaterial({ color: '#ffd37c', emissive: '#5a3b00', roughness: 0.28, metalness: 0.18 })
@@ -1056,6 +1056,40 @@
       }
     }
 
+    function crossesThreshold(valueA, valueB, threshold) {
+      return (valueA <= threshold && valueB > threshold) || (valueA > threshold && valueB <= threshold)
+    }
+
+    function interpolateThreshold(valueA, valueB, threshold) {
+      const delta = valueB - valueA
+      if (Math.abs(delta) < 0.000001) {
+        return 0.5
+      }
+      return THREE.MathUtils.clamp((threshold - valueA) / delta, 0, 1)
+    }
+
+    function contourEdgePoint(edge, row, col, threshold, topLeftValue, topRightValue, bottomRightValue, bottomLeftValue) {
+      if (edge === 'top') {
+        const t = interpolateThreshold(topLeftValue, topRightValue, threshold)
+        return { u: (col + t) / (SAMPLE_COLS - 1), v: row / (SAMPLE_ROWS - 1) }
+      }
+      if (edge === 'right') {
+        const t = interpolateThreshold(topRightValue, bottomRightValue, threshold)
+        return { u: (col + 1) / (SAMPLE_COLS - 1), v: (row + t) / (SAMPLE_ROWS - 1) }
+      }
+      if (edge === 'bottom') {
+        const t = interpolateThreshold(bottomLeftValue, bottomRightValue, threshold)
+        return { u: (col + t) / (SAMPLE_COLS - 1), v: (row + 1) / (SAMPLE_ROWS - 1) }
+      }
+      const t = interpolateThreshold(topLeftValue, bottomLeftValue, threshold)
+      return { u: col / (SAMPLE_COLS - 1), v: (row + t) / (SAMPLE_ROWS - 1) }
+    }
+
+    function contourPointToCoordinates(point) {
+      const geoPoint = interpolateQuadPoint(point.u, point.v)
+      return [geoPoint.lon, geoPoint.lat]
+    }
+
     function buildContourData(grid, elevations) {
       const minElevation = Math.min(...elevations)
       const maxElevation = Math.max(...elevations)
@@ -1064,21 +1098,56 @@
         return { type: 'FeatureCollection', features: [] }
       }
 
-      const points = turf.featureCollection(
-        grid.map((point, index) =>
-          turf.point([point.lon, point.lat], { elevation: elevations[index] ?? minElevation })
-        )
-      )
+      const features = []
 
-      const contours = turf.isolines(points, breaks, { zProperty: 'elevation' })
-      contours.features = contours.features.map((feature) => ({
-        ...feature,
-        properties: {
-          ...feature.properties,
-          elevation: feature.properties?.elevation ?? feature.properties?.contour ?? 0,
-        },
-      }))
-      return contours
+      for (const threshold of breaks) {
+        for (let row = 0; row < SAMPLE_ROWS - 1; row += 1) {
+          for (let col = 0; col < SAMPLE_COLS - 1; col += 1) {
+            const topLeftValue = elevations[row * SAMPLE_COLS + col] ?? minElevation
+            const topRightValue = elevations[row * SAMPLE_COLS + col + 1] ?? minElevation
+            const bottomLeftValue = elevations[(row + 1) * SAMPLE_COLS + col] ?? minElevation
+            const bottomRightValue = elevations[(row + 1) * SAMPLE_COLS + col + 1] ?? minElevation
+
+            const intersections = []
+
+            if (crossesThreshold(topLeftValue, topRightValue, threshold)) {
+              intersections.push(contourEdgePoint('top', row, col, threshold, topLeftValue, topRightValue, bottomRightValue, bottomLeftValue))
+            }
+            if (crossesThreshold(topRightValue, bottomRightValue, threshold)) {
+              intersections.push(contourEdgePoint('right', row, col, threshold, topLeftValue, topRightValue, bottomRightValue, bottomLeftValue))
+            }
+            if (crossesThreshold(bottomLeftValue, bottomRightValue, threshold)) {
+              intersections.push(contourEdgePoint('bottom', row, col, threshold, topLeftValue, topRightValue, bottomRightValue, bottomLeftValue))
+            }
+            if (crossesThreshold(topLeftValue, bottomLeftValue, threshold)) {
+              intersections.push(contourEdgePoint('left', row, col, threshold, topLeftValue, topRightValue, bottomRightValue, bottomLeftValue))
+            }
+
+            if (intersections.length < 2) {
+              continue
+            }
+
+            for (let index = 0; index + 1 < intersections.length; index += 2) {
+              features.push({
+                type: 'Feature',
+                properties: { elevation: threshold },
+                geometry: {
+                  type: 'LineString',
+                  coordinates: [
+                    contourPointToCoordinates(intersections[index]),
+                    contourPointToCoordinates(intersections[index + 1]),
+                  ],
+                },
+              })
+            }
+          }
+        }
+      }
+
+      return {
+        type: 'FeatureCollection',
+        features,
+      }
     }
 
     function createLabelSprite(text, fillStyle) {
