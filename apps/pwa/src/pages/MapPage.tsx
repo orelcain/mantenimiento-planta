@@ -37,10 +37,10 @@ import {
 import {
   Card,
   CardContent,
-  Button,
-  Badge,
   Input,
 } from '@/components/ui'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { useAppStore, useIsAdmin } from '@/store'
 import { cn } from '@/lib/utils'
 import { generateDemoMap, getIsometricMaps, saveIsometricMap } from '@/services/isometricMap'
