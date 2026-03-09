@@ -354,6 +354,18 @@
       border: 1px solid rgba(255,255,255,0.08);
     }
 
+    .error-banner {
+      margin-top: 12px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 140, 140, 0.25);
+      background: rgba(120, 20, 28, 0.18);
+      color: #ffd7d7;
+      font-size: 0.88rem;
+      display: none;
+      white-space: pre-wrap;
+    }
+
     @media (max-width: 1100px) {
       .hero,
       .layout,
@@ -515,12 +527,29 @@
     <div class="footer-note mono" id="footerStats">
       Esperando carga de datos topográficos para completar la comparación...
     </div>
+
+    <div class="error-banner mono" id="errorBanner"></div>
   </div>
 
   <script src="https://unpkg.com/maplibre-gl@5.19.0/dist/maplibre-gl.js"></script>
   <script type="module">
-    import * as THREE from 'https://unpkg.com/three@0.179.1/build/three.module.js'
-    import { OrbitControls } from 'https://unpkg.com/three@0.179.1/examples/jsm/controls/OrbitControls.js'
+    import * as THREE from 'https://esm.sh/three@0.179.1'
+    import { OrbitControls } from 'https://esm.sh/three@0.179.1/examples/jsm/controls/OrbitControls.js'
+
+    const errorBanner = document.getElementById('errorBanner')
+    const reportError = (message) => {
+      errorBanner.style.display = 'block'
+      errorBanner.textContent = message
+    }
+
+    window.addEventListener('error', (event) => {
+      reportError(`Error en demo: ${event.message}`)
+    })
+
+    window.addEventListener('unhandledrejection', (event) => {
+      const reason = event.reason instanceof Error ? event.reason.message : String(event.reason)
+      reportError(`Promesa rechazada: ${reason}`)
+    })
 
     const rectangle = [
       { lat: -42.632500, lon: -73.763200 },
@@ -592,84 +621,90 @@
       `)
       .join('')
 
-    const map = new maplibregl.Map({
-      container: 'maplibreMap',
-      center: metrics.center,
-      zoom: 14,
-      pitch: 68,
-      bearing: 28,
-      hash: false,
-      style: {
-        version: 8,
-        sources: {
-          osm: {
-            type: 'raster',
-            tiles: ['https://a.tile.openstreetmap.org/{z}/{x}/{y}.png'],
-            tileSize: 256,
-            attribution: '&copy; OpenStreetMap contributors',
-            maxzoom: 19,
-          },
-          terrainSource: {
-            type: 'raster-dem',
-            url: 'https://demotiles.maplibre.org/terrain-tiles/tiles.json',
-            tileSize: 256,
-          },
-          boundsRect: {
-            type: 'geojson',
-            data: {
-              type: 'Feature',
-              geometry: {
-                type: 'Polygon',
-                coordinates: [[
-                  [rectangle[0].lon, rectangle[0].lat],
-                  [rectangle[1].lon, rectangle[1].lat],
-                  [rectangle[2].lon, rectangle[2].lat],
-                  [rectangle[3].lon, rectangle[3].lat],
-                  [rectangle[0].lon, rectangle[0].lat],
-                ]],
+    let map = null
+    try {
+      map = new maplibregl.Map({
+        container: 'maplibreMap',
+        center: metrics.center,
+        zoom: 14,
+        pitch: 68,
+        bearing: 28,
+        hash: false,
+        style: {
+          version: 8,
+          sources: {
+            osm: {
+              type: 'raster',
+              tiles: ['https://a.tile.openstreetmap.org/{z}/{x}/{y}.png'],
+              tileSize: 256,
+              attribution: '&copy; OpenStreetMap contributors',
+              maxzoom: 19,
+            },
+            terrainSource: {
+              type: 'raster-dem',
+              url: 'https://demotiles.maplibre.org/terrain-tiles/tiles.json',
+              tileSize: 256,
+            },
+            boundsRect: {
+              type: 'geojson',
+              data: {
+                type: 'Feature',
+                geometry: {
+                  type: 'Polygon',
+                  coordinates: [[
+                    [rectangle[0].lon, rectangle[0].lat],
+                    [rectangle[1].lon, rectangle[1].lat],
+                    [rectangle[2].lon, rectangle[2].lat],
+                    [rectangle[3].lon, rectangle[3].lat],
+                    [rectangle[0].lon, rectangle[0].lat],
+                  ]],
+                },
               },
             },
           },
-        },
-        layers: [
-          { id: 'osm', type: 'raster', source: 'osm' },
-          {
-            id: 'rect-fill',
-            type: 'fill',
-            source: 'boundsRect',
-            paint: {
-              'fill-color': '#63d0ff',
-              'fill-opacity': 0.08,
+          layers: [
+            { id: 'osm', type: 'raster', source: 'osm' },
+            {
+              id: 'rect-fill',
+              type: 'fill',
+              source: 'boundsRect',
+              paint: {
+                'fill-color': '#63d0ff',
+                'fill-opacity': 0.08,
+              },
             },
-          },
-          {
-            id: 'rect-line',
-            type: 'line',
-            source: 'boundsRect',
-            paint: {
-              'line-color': '#f6b86c',
-              'line-width': 3,
+            {
+              id: 'rect-line',
+              type: 'line',
+              source: 'boundsRect',
+              paint: {
+                'line-color': '#f6b86c',
+                'line-width': 3,
+              },
             },
+          ],
+          terrain: {
+            source: 'terrainSource',
+            exaggeration: 1.35,
           },
-        ],
-        terrain: {
-          source: 'terrainSource',
-          exaggeration: 1.35,
         },
-      },
-      maxPitch: 85,
-    })
+        maxPitch: 85,
+      })
 
-    map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right')
-    map.once('load', () => {
-      map.fitBounds(
-        [
-          [metrics.minLon, metrics.minLat],
-          [metrics.maxLon, metrics.maxLat],
-        ],
-        { padding: 40, duration: 0 }
-      )
-    })
+      map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right')
+      map.once('load', () => {
+        map.fitBounds(
+          [
+            [metrics.minLon, metrics.minLat],
+            [metrics.maxLon, metrics.maxLat],
+          ],
+          { padding: 40, duration: 0 }
+        )
+      })
+    } catch (error) {
+      reportError(`MapLibre no pudo iniciar: ${error instanceof Error ? error.message : String(error)}`)
+      document.getElementById('maplibreInfo').innerHTML = '<strong>Error:</strong> no se pudo crear el mapa MapLibre en esta página.'
+    }
 
     const scene = new THREE.Scene()
     scene.background = new THREE.Color('#04111d')
@@ -831,6 +866,7 @@
     })
 
     document.getElementById('fitRectangle').addEventListener('click', () => {
+      if (!map) return
       map.fitBounds(
         [
           [metrics.minLon, metrics.minLat],
