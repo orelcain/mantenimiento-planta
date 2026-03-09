@@ -2,6 +2,7 @@ import { Card, CardContent } from '@/components/ui'
 import type { IsometricMap } from '@/types/isometricMap'
 import { TerrainImportPanel } from './TerrainImportPanel'
 import type { TerrainImportPreview, TerrainImportProgress } from '@/lib/terrainImport'
+import { TerrainGeoPreview } from './TerrainGeoPreview'
 
 interface TerrainBaseWorkspaceProps {
   currentMapId: string
@@ -76,24 +77,34 @@ export function TerrainBaseWorkspace({
           </p>
         </div>
 
-        <div className="w-full">
-          <TerrainImportPanel
-            title="Coordenadas del terreno"
-            description="Usa exactamente 4 lineas en formato lat, lon. Por ahora ocultamos el resto del flujo para concentrarnos solo en importar bien la base."
-            layout="horizontal"
-            importLabel="Aplicar importacion"
-            importBusyLabel="Importando..."
-            isImporting={isImportingRealTerrain}
-            onImport={onImportRealTerrain}
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
+          <div className="w-full">
+            <TerrainImportPanel
+              title="Coordenadas del terreno"
+              description="Usa exactamente 4 lineas en formato lat, lon. Ahora el mapa base ya se puede revisar en georreferencia real antes de importarlo al canvas editable."
+              layout="horizontal"
+              importLabel="Aplicar importacion"
+              importBusyLabel="Importando..."
+              isImporting={isImportingRealTerrain}
+              onImport={onImportRealTerrain}
+              coordinatesText={terrainImportCoordinatesText}
+              onCoordinatesTextChange={onTerrainImportCoordinatesTextChange}
+              sampleStep={terrainImportSampleStep}
+              onSampleStepChange={onTerrainImportSampleStepChange}
+              statusMessage={realTerrainImportMessage}
+              preview={terrainImportPreview}
+              previewError={terrainImportPreviewError}
+              progress={terrainImportProgress}
+              coordinateRows={terrainTileCount > 0 ? 4 : 5}
+            />
+          </div>
+
+          <TerrainGeoPreview
             coordinatesText={terrainImportCoordinatesText}
-            onCoordinatesTextChange={onTerrainImportCoordinatesTextChange}
-            sampleStep={terrainImportSampleStep}
-            onSampleStepChange={onTerrainImportSampleStepChange}
-            statusMessage={realTerrainImportMessage}
             preview={terrainImportPreview}
             previewError={terrainImportPreviewError}
-            progress={terrainImportProgress}
-            coordinateRows={terrainTileCount > 0 ? 4 : 5}
+            statusMessage={realTerrainImportMessage}
+            isImporting={isImportingRealTerrain}
           />
         </div>
 

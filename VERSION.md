@@ -1,6 +1,6 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.70.33**
+## Versión Actual: **v2.70.34**
 
 **Fecha de lanzamiento**: 08 de marzo de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
@@ -9,6 +9,11 @@
 ---
 
 ## 📋 Información de la Versión
+
+### v2.70.34 — Vista base georreferenciada para importación de terreno (08/03/2026)
+- 🛰️ **Vista A en la PWA**: la etapa base ahora muestra un mapa satelital georreferenciado con relieve real antes de importar el terreno al canvas editable
+- 📍 **Validación espacial directa**: se marcan los puntos P1–P4 sobre el rectángulo real para revisar orientación, cobertura y escala en el flujo operativo
+- 🏔️ **Lectura topográfica mejorada**: se superponen microrelieve continuo y curvas de nivel locales para comparar mejor la forma del terreno sin salir del módulo real
 
 ### v2.70.33 — Encuadre del visor basado en límites reales del terreno (08/03/2026)
 - 🎯 **Fit real del mapa**: el cálculo de “ver mapa completo” ahora considera los límites del terreno importado en vez de depender solo del lienzo base

@@ -1,8 +1,11 @@
 {
-  "version": "2.70.33",
+  "version": "2.70.34",
   "buildDate": "2026-03-08",
   "buildTimestamp": 1772983200000,
   "features": [
+    "Visor de mapas: la etapa base incorpora una vista georreferenciada tipo A con imagen satelital, relieve y marcadores P1-P4 antes de importar al canvas",
+    "Visor de mapas: se agrega microrelieve continuo y curvas de nivel locales sobre el rectangulo real para validar mejor orientacion y forma del terreno",
+    "Visor de mapas: la PWA incorpora maplibre-gl para seguir puliendo la alternativa georreferenciada directamente dentro del flujo real",
     "Visor de mapas: el fit del visor usa ahora los limites reales del terreno importado",
     "Visor de mapas: tras una importacion exitosa se dispara un reencuadre automatico del canvas",
     "Visor de mapas: se reduce la sensacion de recorte visual cuando el relieve no coincide con el canvas vacio",
