@@ -66,22 +66,25 @@ export function TerrainBaseWorkspace({
   terrainImportProgress,
 }: TerrainBaseWorkspaceProps) {
   return (
-    <Card>
-      <CardContent className="space-y-4 p-4">
-        <div>
-          <h2 className="text-sm font-semibold">Importación del mapa base</h2>
-          <p className="text-xs text-muted-foreground">
+    <Card className="overflow-hidden">
+      <CardContent className="space-y-4 p-4 md:p-5">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="text-base font-semibold">Base georreferenciada</h2>
+            <p className="text-xs text-muted-foreground">Enfoquemos esta etapa solo en las 4 coordenadas y la vista real que vamos a usar.</p>
+          </div>
+          <div className="text-[11px] text-muted-foreground">
             {terrainTileCount > 0
-              ? 'La base ya tiene terreno cargado. Dejamos este panel compacto para reintentar importación o ajustar coordenadas sin ocupar tanto alto.'
-              : 'Dejamos esta etapa en modo mínimo: importar terreno desde 4 coordenadas, revisar el resultado en el canvas y seguir construyendo desde ahí.'}
-          </p>
+              ? 'Ya existe una base cargada. Puedes ajustar coordenadas y volver a importar.'
+              : 'Define el rectángulo real antes de pasar al editor.'}
+          </div>
         </div>
 
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
-          <div className="w-full">
+        <div className="grid gap-5 xl:grid-cols-[360px_minmax(0,1fr)] xl:items-start">
+          <div className="w-full xl:sticky xl:top-4">
             <TerrainImportPanel
-              title="Coordenadas del terreno"
-              description="Usa exactamente 4 lineas en formato lat, lon. Ahora el mapa base ya se puede revisar en georreferencia real antes de importarlo al canvas editable."
+              title="4 coordenadas del terreno"
+              description="Usa exactamente 4 líneas en formato lat, lon. Este es el bloque principal para definir la base real antes de importarla."
               layout="horizontal"
               importLabel="Aplicar importacion"
               importBusyLabel="Importando..."
@@ -95,7 +98,7 @@ export function TerrainBaseWorkspace({
               preview={terrainImportPreview}
               previewError={terrainImportPreviewError}
               progress={terrainImportProgress}
-              coordinateRows={terrainTileCount > 0 ? 4 : 5}
+              coordinateRows={terrainTileCount > 0 ? 8 : 9}
             />
           </div>
 
@@ -105,12 +108,9 @@ export function TerrainBaseWorkspace({
             previewError={terrainImportPreviewError}
             statusMessage={realTerrainImportMessage}
             isImporting={isImportingRealTerrain}
+            mapHeightClassName="h-[520px] md:h-[620px] xl:h-[700px]"
           />
         </div>
-
-        <p className="text-[11px] text-muted-foreground">
-          {realTerrainImportMessage ?? 'Todavía no has importado terreno en esta sesión.'}
-        </p>
       </CardContent>
     </Card>
   )

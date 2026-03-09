@@ -2515,6 +2515,7 @@ export function MapPage() {
       </Card>}
 
       {/* Main 3D Viewport + Controls */}
+      {!isTerrainBaseStage && (
       <Card className="overflow-hidden">
         <CardContent className="p-0">
           <div
@@ -3196,6 +3197,7 @@ export function MapPage() {
           </div>
         </CardContent>
       </Card>
+      )}
 
       {/* Diálogo de agregar equipo (editor) */}
       {FEATURES.addEquipmentDialog && <AddEquipmentDialog

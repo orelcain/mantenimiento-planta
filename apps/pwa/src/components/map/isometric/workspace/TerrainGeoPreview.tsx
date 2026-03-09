@@ -16,6 +16,7 @@ interface TerrainGeoPreviewProps {
   previewError?: string | null
   statusMessage?: string | null
   isImporting: boolean
+  mapHeightClassName?: string
 }
 
 type QuadCorners = [GeoCoordinate, GeoCoordinate, GeoCoordinate, GeoCoordinate]
@@ -278,6 +279,7 @@ export function TerrainGeoPreview({
   previewError,
   statusMessage,
   isImporting,
+  mapHeightClassName = 'h-[460px] md:h-[560px] xl:h-[640px]',
 }: TerrainGeoPreviewProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
@@ -504,7 +506,7 @@ export function TerrainGeoPreview({
   }, [mapReady, parsed.corners, microReliefEnabled])
 
   return (
-    <div className="space-y-3 rounded-lg border bg-background/70 p-3">
+    <div className="space-y-3 rounded-xl border bg-background/80 p-3 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Vista A · Mapa real georreferenciado</p>
@@ -518,8 +520,8 @@ export function TerrainGeoPreview({
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-lg border bg-slate-950">
-        <div ref={containerRef} className="h-[360px] w-full" />
+      <div className="overflow-hidden rounded-xl border bg-slate-950">
+        <div ref={containerRef} className={`w-full ${mapHeightClassName}`} />
       </div>
 
       <div className="grid gap-2 text-[11px] text-muted-foreground md:grid-cols-2">
