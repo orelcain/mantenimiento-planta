@@ -18,6 +18,8 @@ interface TerrainGeoPreviewProps {
   isImporting: boolean
 }
 
+type QuadCorners = [GeoCoordinate, GeoCoordinate, GeoCoordinate, GeoCoordinate]
+
 const DETAIL_COLS = 31
 const DETAIL_ROWS = 31
 const OPEN_METEO_ELEVATION_API = 'https://api.open-meteo.com/v1/elevation'
@@ -34,13 +36,14 @@ function interpolatePoint(pointA: GeoCoordinate, pointB: GeoCoordinate, t: numbe
   }
 }
 
-function interpolateQuad(corners: GeoCoordinate[], u: number, v: number): GeoCoordinate {
-  const top = interpolatePoint(corners[0], corners[1], u)
-  const bottom = interpolatePoint(corners[3], corners[2], u)
+function interpolateQuad(corners: QuadCorners, u: number, v: number): GeoCoordinate {
+  const [point1, point2, point3, point4] = corners
+  const top = interpolatePoint(point1, point2, u)
+  const bottom = interpolatePoint(point4, point3, u)
   return interpolatePoint(top, bottom, v)
 }
 
-function buildSampleGrid(corners: GeoCoordinate[], cols: number, rows: number) {
+function buildSampleGrid(corners: QuadCorners, cols: number, rows: number) {
   const points: Array<GeoCoordinate & { u: number; v: number }> = []
   for (let row = 0; row < rows; row += 1) {
     const v = row / Math.max(1, rows - 1)
@@ -91,7 +94,7 @@ function sampleElevation(u: number, v: number, elevations: number[], cols: numbe
   return top * (1 - ty) + bottom * ty
 }
 
-function buildMicroReliefImage(corners: GeoCoordinate[], elevations: number[], cols: number, rows: number) {
+function buildMicroReliefImage(corners: QuadCorners, elevations: number[], cols: number, rows: number) {
   const minElevation = Math.min(...elevations)
   const maxElevation = Math.max(...elevations)
   const range = Math.max(1, maxElevation - minElevation)
@@ -138,13 +141,15 @@ function buildMicroReliefImage(corners: GeoCoordinate[], elevations: number[], c
 
   context.putImageData(image, 0, 0)
 
+  const [point1, point2, point3, point4] = corners
+
   return {
     url: canvas.toDataURL('image/png'),
     coordinates: [
-      [corners[0].lon, corners[0].lat],
-      [corners[1].lon, corners[1].lat],
-      [corners[2].lon, corners[2].lat],
-      [corners[3].lon, corners[3].lat],
+      [point1.lon, point1.lat],
+      [point2.lon, point2.lat],
+      [point3.lon, point3.lat],
+      [point4.lon, point4.lat],
     ] as [[number, number], [number, number], [number, number], [number, number]],
     minElevation,
     maxElevation,
@@ -194,7 +199,7 @@ function computeContourBreaks(minElevation: number, maxElevation: number) {
   return breaks
 }
 
-function buildContours(corners: GeoCoordinate[], elevations: number[], cols: number, rows: number): ContourFeatureCollection {
+function buildContours(corners: QuadCorners, elevations: number[], cols: number, rows: number): ContourFeatureCollection {
   const minElevation = Math.min(...elevations)
   const maxElevation = Math.max(...elevations)
   const thresholds = computeContourBreaks(minElevation, maxElevation)
@@ -232,8 +237,11 @@ function buildContours(corners: GeoCoordinate[], elevations: number[], cols: num
         if (points.length < 2) continue
 
         for (let index = 0; index + 1 < points.length; index += 2) {
-          const from = interpolateQuad(corners, points[index].u, points[index].v)
-          const to = interpolateQuad(corners, points[index + 1].u, points[index + 1].v)
+          const fromPoint = points[index]
+          const toPoint = points[index + 1]
+          if (!fromPoint || !toPoint) continue
+          const from = interpolateQuad(corners, fromPoint.u, fromPoint.v)
+          const to = interpolateQuad(corners, toPoint.u, toPoint.v)
           features.push({
             type: 'Feature',
             properties: { elevation: threshold },
@@ -251,6 +259,17 @@ function buildContours(corners: GeoCoordinate[], elevations: number[], cols: num
   }
 
   return { type: 'FeatureCollection', features }
+}
+
+function asQuadCorners(corners: GeoCoordinate[]): QuadCorners {
+  if (corners.length !== 4) {
+    throw new Error(`Se requieren exactamente 4 coordenadas, recibidas: ${corners.length}`)
+  }
+  const [point1, point2, point3, point4] = corners
+  if (!point1 || !point2 || !point3 || !point4) {
+    throw new Error('No fue posible resolver las 4 coordenadas del rectángulo')
+  }
+  return [point1, point2, point3, point4]
 }
 
 export function TerrainGeoPreview({
@@ -272,7 +291,7 @@ export function TerrainGeoPreview({
 
   const parsed = useMemo(() => {
     try {
-      return { corners: parseCoordinatesText(coordinatesText), error: null }
+      return { corners: asQuadCorners(parseCoordinatesText(coordinatesText)), error: null }
     } catch (error) {
       return {
         corners: null,
@@ -392,8 +411,10 @@ export function TerrainGeoPreview({
   useEffect(() => {
     const map = mapRef.current
     if (!map || !mapReady || !parsed.corners) return
+    const currentMap = map
+    const [point1, point2, point3, point4] = parsed.corners
 
-    const source = map.getSource('boundsRect') as maplibregl.GeoJSONSource | undefined
+    const source = currentMap.getSource('boundsRect') as maplibregl.GeoJSONSource | undefined
     source?.setData({
       type: 'FeatureCollection',
       features: [{
@@ -401,11 +422,11 @@ export function TerrainGeoPreview({
         geometry: {
           type: 'Polygon',
           coordinates: [[
-            [parsed.corners[0].lon, parsed.corners[0].lat],
-            [parsed.corners[1].lon, parsed.corners[1].lat],
-            [parsed.corners[2].lon, parsed.corners[2].lat],
-            [parsed.corners[3].lon, parsed.corners[3].lat],
-            [parsed.corners[0].lon, parsed.corners[0].lat],
+            [point1.lon, point1.lat],
+            [point2.lon, point2.lat],
+            [point3.lon, point3.lat],
+            [point4.lon, point4.lat],
+            [point1.lon, point1.lat],
           ]],
         },
         properties: {},
@@ -418,12 +439,12 @@ export function TerrainGeoPreview({
       element.className = 'flex h-7 min-w-7 items-center justify-center rounded-full border border-slate-950/70 bg-sky-400 px-2 text-[10px] font-bold text-slate-950 shadow'
       element.textContent = `P${index + 1}`
       element.style.display = pointsEnabled ? '' : 'none'
-      return new maplibregl.Marker({ element }).setLngLat([corner.lon, corner.lat]).addTo(map)
+      return new maplibregl.Marker({ element }).setLngLat([corner.lon, corner.lat]).addTo(currentMap)
     })
 
     const lons = parsed.corners.map((point) => point.lon)
     const lats = parsed.corners.map((point) => point.lat)
-    map.fitBounds([
+    currentMap.fitBounds([
       [Math.min(...lons), Math.min(...lats)],
       [Math.max(...lons), Math.max(...lats)],
     ], { padding: 36, duration: 0 })
@@ -432,36 +453,38 @@ export function TerrainGeoPreview({
   useEffect(() => {
     const map = mapRef.current
     if (!map || !mapReady || !parsed.corners) return
+    const currentMap = map
+    const corners = parsed.corners
 
     let cancelled = false
 
     async function loadGeospatialTerrain() {
       try {
         setMicroReliefSummary('Consultando elevaciones detalladas para microrelieve...')
-        const detailGrid = buildSampleGrid(parsed.corners!, DETAIL_COLS, DETAIL_ROWS)
+        const detailGrid = buildSampleGrid(corners, DETAIL_COLS, DETAIL_ROWS)
         const detailElevations = await fetchElevations(detailGrid)
         if (cancelled) return
 
-        const contours = buildContours(parsed.corners!, detailElevations, DETAIL_COLS, DETAIL_ROWS)
-        const contourSource = map.getSource('contours') as maplibregl.GeoJSONSource | undefined
+        const contours = buildContours(corners, detailElevations, DETAIL_COLS, DETAIL_ROWS)
+        const contourSource = currentMap.getSource('contours') as maplibregl.GeoJSONSource | undefined
         contourSource?.setData(contours)
 
-        const imageSpec = buildMicroReliefImage(parsed.corners!, detailElevations, DETAIL_COLS, DETAIL_ROWS)
-        if (map.getLayer('microrelief-raster')) map.removeLayer('microrelief-raster')
-        if (map.getSource('microrelief-image')) map.removeSource('microrelief-image')
+        const imageSpec = buildMicroReliefImage(corners, detailElevations, DETAIL_COLS, DETAIL_ROWS)
+        if (currentMap.getLayer('microrelief-raster')) currentMap.removeLayer('microrelief-raster')
+        if (currentMap.getSource('microrelief-image')) currentMap.removeSource('microrelief-image')
         if (imageSpec && !cancelled) {
-          map.addSource('microrelief-image', {
+          currentMap.addSource('microrelief-image', {
             type: 'image',
             url: imageSpec.url,
             coordinates: imageSpec.coordinates,
           })
-          map.addLayer({
+          currentMap.addLayer({
             id: 'microrelief-raster',
             type: 'raster',
             source: 'microrelief-image',
             paint: { 'raster-opacity': 0.72, 'raster-resampling': 'linear' },
           }, 'contour-lines')
-          map.setLayoutProperty('microrelief-raster', 'visibility', microReliefEnabled ? 'visible' : 'none')
+          currentMap.setLayoutProperty('microrelief-raster', 'visibility', microReliefEnabled ? 'visible' : 'none')
           setMicroReliefSummary(
             `Microrelieve ${DETAIL_COLS}×${DETAIL_ROWS} · cota ${imageSpec.minElevation.toFixed(1)} a ${imageSpec.maxElevation.toFixed(1)} m`
           )
