@@ -756,8 +756,8 @@
 
     const SAMPLE_COLS = 9
     const SAMPLE_ROWS = 9
-    const SAMPLE_COLS_DETAIL = 21
-    const SAMPLE_ROWS_DETAIL = 21
+    const SAMPLE_COLS_DETAIL = 31
+    const SAMPLE_ROWS_DETAIL = 31
     const metersPerDegreeLat = 111320
 
     function toRadians(value) {
@@ -838,7 +838,7 @@
       .join('')
 
     let pendingContourData = { type: 'FeatureCollection', features: [] }
-    let pendingReliefCellsData = { type: 'FeatureCollection', features: [] }
+    let pendingMicroReliefImage = null
     const mapViewState = {
       satellite: true,
       hillshade: true,
@@ -888,7 +888,7 @@
 
       setVisibility('satellite', mapViewState.satellite)
       setVisibility('terrain-hillshade', mapViewState.hillshade)
-      setVisibility('relief-cells', mapViewState.microRelief)
+      setVisibility('microrelief-raster', mapViewState.microRelief)
       setVisibility('contour-lines', mapViewState.contours)
       setVisibility('contour-labels', mapViewState.contours)
       setVisibility('corner-points', mapViewState.points)
@@ -981,10 +981,6 @@
               type: 'geojson',
               data: pendingContourData,
             },
-            reliefCells: {
-              type: 'geojson',
-              data: pendingReliefCellsData,
-            },
           },
           layers: [
             { id: 'satellite', type: 'raster', source: 'satellite' },
@@ -1014,18 +1010,6 @@
               paint: {
                 'line-color': '#f6b86c',
                 'line-width': 3,
-              },
-            },
-            {
-              id: 'relief-cells',
-              type: 'fill-extrusion',
-              source: 'reliefCells',
-              paint: {
-                'fill-extrusion-color': ['get', 'color'],
-                'fill-extrusion-base': ['get', 'base'],
-                'fill-extrusion-height': ['get', 'height'],
-                'fill-extrusion-opacity': 0.48,
-                'fill-extrusion-vertical-gradient': true,
               },
             },
             {
@@ -1093,6 +1077,7 @@
       map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right')
       map.once('load', () => {
         updateMapContours(pendingContourData)
+        updateMapMicroRelief(pendingMicroReliefImage)
         applyMapViewState()
         map.fitBounds(
           [
@@ -1216,12 +1201,40 @@
       }
     }
 
-    function updateMapRelief(data) {
-      pendingReliefCellsData = data
-      const source = map?.getSource?.('reliefCells')
-      if (source && 'setData' in source) {
-        source.setData(data)
+    function updateMapMicroRelief(imageSpec) {
+      pendingMicroReliefImage = imageSpec
+      if (!map || !map.isStyleLoaded()) {
+        return
       }
+
+      if (map.getLayer('microrelief-raster')) {
+        map.removeLayer('microrelief-raster')
+      }
+      if (map.getSource('microrelief-image')) {
+        map.removeSource('microrelief-image')
+      }
+      if (!imageSpec) {
+        return
+      }
+
+      map.addSource('microrelief-image', {
+        type: 'image',
+        url: imageSpec.url,
+        coordinates: imageSpec.coordinates,
+      })
+      map.addLayer(
+        {
+          id: 'microrelief-raster',
+          type: 'raster',
+          source: 'microrelief-image',
+          paint: {
+            'raster-opacity': 0.72,
+            'raster-resampling': 'linear',
+          },
+        },
+        'contour-lines'
+      )
+      applyMapViewState()
     }
 
     function crossesThreshold(valueA, valueB, threshold) {
@@ -1258,62 +1271,73 @@
       return [geoPoint.lon, geoPoint.lat]
     }
 
-    function buildReliefCells(grid, elevations, cols, rows) {
+    function sampleElevationFromGrid(u, v, elevations, cols, rows) {
+      const x = THREE.MathUtils.clamp(u * (cols - 1), 0, cols - 1)
+      const y = THREE.MathUtils.clamp(v * (rows - 1), 0, rows - 1)
+      const x0 = Math.floor(x)
+      const x1 = Math.min(cols - 1, x0 + 1)
+      const y0 = Math.floor(y)
+      const y1 = Math.min(rows - 1, y0 + 1)
+      const tx = x - x0
+      const ty = y - y0
+      const sample = (row, col) => elevations[row * cols + col] ?? elevations[0] ?? 0
+      const top = THREE.MathUtils.lerp(sample(y0, x0), sample(y0, x1), tx)
+      const bottom = THREE.MathUtils.lerp(sample(y1, x0), sample(y1, x1), tx)
+      return THREE.MathUtils.lerp(top, bottom, ty)
+    }
+
+    function buildMicroReliefImage(grid, elevations, cols, rows) {
       const minElevation = Math.min(...elevations)
       const maxElevation = Math.max(...elevations)
       const range = Math.max(1, maxElevation - minElevation)
-      const exaggeration = range <= 20 ? 7 : range <= 40 ? 5 : 3.4
-      const features = []
+      const size = 768
+      const canvas = document.createElement('canvas')
+      canvas.width = size
+      canvas.height = size
+      const context = canvas.getContext('2d')
+      const image = context.createImageData(size, size)
+      const light = new THREE.Vector3(-0.45, 0.55, 0.72).normalize()
 
-      for (let row = 0; row < rows - 1; row += 1) {
-        for (let col = 0; col < cols - 1; col += 1) {
-          const topLeft = grid[row * cols + col]
-          const topRight = grid[row * cols + col + 1]
-          const bottomRight = grid[(row + 1) * cols + col + 1]
-          const bottomLeft = grid[(row + 1) * cols + col]
-
-          const cellElevations = [
-            elevations[row * cols + col] ?? minElevation,
-            elevations[row * cols + col + 1] ?? minElevation,
-            elevations[(row + 1) * cols + col + 1] ?? minElevation,
-            elevations[(row + 1) * cols + col] ?? minElevation,
-          ]
-
-          const avgElevation = cellElevations.reduce((sum, value) => sum + value, 0) / cellElevations.length
-          const cellBase = Math.max(0, (Math.min(...cellElevations) - minElevation) * exaggeration)
-          const cellHeight = Math.max(cellBase + 0.5, (avgElevation - minElevation) * exaggeration)
-          const normalized = (avgElevation - minElevation) / range
-          const color = new THREE.Color().setHSL(0.58 - normalized * 0.4, 0.46, 0.32 + normalized * 0.18).getStyle()
-
-          features.push({
-            type: 'Feature',
-            properties: {
-              elevation: Number(avgElevation.toFixed(1)),
-              base: Number(cellBase.toFixed(2)),
-              height: Number(cellHeight.toFixed(2)),
-              color,
-            },
-            geometry: {
-              type: 'Polygon',
-              coordinates: [[
-                [topLeft.lon, topLeft.lat],
-                [topRight.lon, topRight.lat],
-                [bottomRight.lon, bottomRight.lat],
-                [bottomLeft.lon, bottomLeft.lat],
-                [topLeft.lon, topLeft.lat],
-              ]],
-            },
-          })
+      for (let y = 0; y < size; y += 1) {
+        const v = y / Math.max(1, size - 1)
+        for (let x = 0; x < size; x += 1) {
+          const u = x / Math.max(1, size - 1)
+          const h = sampleElevationFromGrid(u, v, elevations, cols, rows)
+          const hL = sampleElevationFromGrid(Math.max(0, u - 1 / size), v, elevations, cols, rows)
+          const hR = sampleElevationFromGrid(Math.min(1, u + 1 / size), v, elevations, cols, rows)
+          const hU = sampleElevationFromGrid(u, Math.max(0, v - 1 / size), elevations, cols, rows)
+          const hD = sampleElevationFromGrid(u, Math.min(1, v + 1 / size), elevations, cols, rows)
+          const dx = hR - hL
+          const dy = hD - hU
+          const normal = new THREE.Vector3(-dx * 0.42, -dy * 0.42, 1).normalize()
+          const shade = THREE.MathUtils.clamp(normal.dot(light), 0, 1)
+          const normalized = (h - minElevation) / range
+          const color = new THREE.Color().setHSL(0.56 - normalized * 0.34, 0.5, 0.22 + normalized * 0.18)
+          color.multiplyScalar(0.62 + shade * 0.78)
+          const alpha = Math.round(120 + shade * 70)
+          const index = (y * size + x) * 4
+          image.data[index] = Math.round(color.r * 255)
+          image.data[index + 1] = Math.round(color.g * 255)
+          image.data[index + 2] = Math.round(color.b * 255)
+          image.data[index + 3] = alpha
         }
       }
 
+      context.putImageData(image, 0, 0)
+
       return {
-        type: 'FeatureCollection',
-        features,
+        url: canvas.toDataURL('image/png'),
+        coordinates: [
+          [rectangle[0].lon, rectangle[0].lat],
+          [rectangle[1].lon, rectangle[1].lat],
+          [rectangle[2].lon, rectangle[2].lat],
+          [rectangle[3].lon, rectangle[3].lat],
+        ],
         meta: {
-          exaggeration,
           cols,
           rows,
+          minElevation,
+          maxElevation,
         },
       }
     }
@@ -1759,16 +1783,16 @@
           throw new Error('La respuesta detallada de elevaciones vino incompleta')
         }
         const contourData = buildContourData(grid, elevations)
-        const reliefCellsData = buildReliefCells(detailGrid, detailElevations, SAMPLE_COLS_DETAIL, SAMPLE_ROWS_DETAIL)
+        const microReliefImage = buildMicroReliefImage(detailGrid, detailElevations, SAMPLE_COLS_DETAIL, SAMPLE_ROWS_DETAIL)
         updateMapContours(contourData)
-        updateMapRelief(reliefCellsData)
+        updateMapMicroRelief(microReliefImage)
         await createTerrainMesh(elevations)
 
         const contourValues = Array.from(new Set(contourData.features.map((feature) => feature.properties?.elevation))).filter((value) => typeof value === 'number')
         if (contourValues.length > 0) {
           document.getElementById('maplibreInfo').innerHTML = `
-            <strong>Lectura esperada:</strong> base satelital + hillshade + microrelieve local + puntos <strong>P1-P4</strong>.<br>
-            Niveles activos en <strong>${contourValues.join(', ')} m</strong>. Microrelieve <strong>${SAMPLE_COLS_DETAIL} × ${SAMPLE_ROWS_DETAIL}</strong> celdas.
+            <strong>Lectura esperada:</strong> base satelital + hillshade + microrelieve continuo + puntos <strong>P1-P4</strong>.<br>
+            Niveles activos en <strong>${contourValues.join(', ')} m</strong>. Microrelieve <strong>${SAMPLE_COLS_DETAIL} × ${SAMPLE_ROWS_DETAIL}</strong> muestras.
           `
         }
       } catch (error) {
