@@ -222,6 +222,36 @@
       margin-bottom: 6px;
     }
 
+    .viewer-copy {
+      display: grid;
+      gap: 10px;
+    }
+
+    .viewer-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .control-chip {
+      padding: 8px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.04);
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .control-chip.is-active {
+      background: rgba(98, 199, 255, 0.16);
+      border-color: rgba(98, 199, 255, 0.34);
+      color: var(--text);
+    }
+
     .viewer-note {
       max-width: 34ch;
       font-size: 0.95rem;
@@ -487,9 +517,15 @@
     <section class="layout">
       <article class="panel viewer-panel">
         <div class="viewer-head">
-          <div>
+          <div class="viewer-copy">
             <h2 class="viewer-title">Prueba A · MapLibre Terrain</h2>
             <p class="viewer-note">Vista geoespacial con raster base, rectangulo operativo y relieve 3D si la fuente DEM pública responde para esta zona.</p>
+            <div class="viewer-controls">
+              <button class="control-chip is-active" id="toggleSatellite">Satelite</button>
+              <button class="control-chip is-active" id="toggleHillshade">Relieve</button>
+              <button class="control-chip is-active" id="toggleContours">Curvas</button>
+              <button class="control-chip is-active" id="togglePointLabels">Puntos</button>
+            </div>
           </div>
           <span class="tag">Mapa real</span>
         </div>
@@ -503,9 +539,14 @@
 
       <article class="panel viewer-panel">
         <div class="viewer-head">
-          <div>
+          <div class="viewer-copy">
             <h2 class="viewer-title">Prueba B · Mesh local con Three.js</h2>
             <p class="viewer-note">Terreno convertido a malla local editable usando Open-Meteo y renderizado propio. Esta prueba se parece más a un editor de planta.</p>
+            <div class="viewer-controls">
+              <button class="control-chip is-active" id="toggleMeshTexture">Textura</button>
+              <button class="control-chip is-active" id="toggleMeshWire">Reticula</button>
+              <button class="control-chip is-active" id="toggleMeshMarkers">Puntos</button>
+            </div>
           </div>
           <span class="tag">Editor custom</span>
         </div>
@@ -521,9 +562,14 @@
     <section class="layout layout-three">
       <article class="panel viewer-panel">
         <div class="viewer-head">
-          <div>
+          <div class="viewer-copy">
             <h2 class="viewer-title">Prueba C · Raycast sobre terrain mesh</h2>
             <p class="viewer-note">La misma malla local, pero enfocada en interacción. Sirve para medir si el terreno realmente soporta selección, brocha y edición sobre superficie.</p>
+            <div class="viewer-controls">
+              <button class="control-chip is-active" id="toggleRaycastTexture">Textura</button>
+              <button class="control-chip is-active" id="toggleRaycastWire">Reticula</button>
+              <button class="control-chip is-active" id="toggleRaycastMarkers">Puntos</button>
+            </div>
           </div>
           <span class="tag">Editor sobre relieve</span>
         </div>
@@ -789,6 +835,96 @@
       .join('')
 
     let pendingContourData = { type: 'FeatureCollection', features: [] }
+    const mapViewState = {
+      satellite: true,
+      hillshade: true,
+      contours: true,
+      points: true,
+    }
+    const meshViewState = {
+      meshTexture: true,
+      meshWire: true,
+      meshMarkers: true,
+      raycastTexture: true,
+      raycastWire: true,
+      raycastMarkers: true,
+    }
+
+    const terrainVisuals = {
+      meshMaterial: null,
+      meshWire: null,
+      meshMarkers: null,
+      meshTexture: null,
+      interactiveMaterial: null,
+      interactiveWire: null,
+      interactiveMarkers: null,
+      interactiveTexture: null,
+    }
+
+    function syncControlChip(id, active) {
+      const element = document.getElementById(id)
+      if (!element) {
+        return
+      }
+      element.classList.toggle('is-active', active)
+    }
+
+    function applyMapViewState() {
+      if (!map) {
+        return
+      }
+
+      const setVisibility = (layerId, visible) => {
+        if (!map.getLayer(layerId)) {
+          return
+        }
+        map.setLayoutProperty(layerId, 'visibility', visible ? 'visible' : 'none')
+      }
+
+      setVisibility('satellite', mapViewState.satellite)
+      setVisibility('terrain-hillshade', mapViewState.hillshade)
+      setVisibility('contour-lines', mapViewState.contours)
+      setVisibility('contour-labels', mapViewState.contours)
+      setVisibility('corner-points', mapViewState.points)
+      setVisibility('corner-labels', mapViewState.points)
+
+      syncControlChip('toggleSatellite', mapViewState.satellite)
+      syncControlChip('toggleHillshade', mapViewState.hillshade)
+      syncControlChip('toggleContours', mapViewState.contours)
+      syncControlChip('togglePointLabels', mapViewState.points)
+    }
+
+    function applyTerrainViewState() {
+      if (terrainVisuals.meshMaterial) {
+        terrainVisuals.meshMaterial.map = meshViewState.meshTexture ? terrainVisuals.meshTexture : null
+        terrainVisuals.meshMaterial.vertexColors = !meshViewState.meshTexture
+        terrainVisuals.meshMaterial.needsUpdate = true
+      }
+      if (terrainVisuals.meshWire) {
+        terrainVisuals.meshWire.visible = meshViewState.meshWire
+      }
+      if (terrainVisuals.meshMarkers) {
+        terrainVisuals.meshMarkers.visible = meshViewState.meshMarkers
+      }
+      if (terrainVisuals.interactiveMaterial) {
+        terrainVisuals.interactiveMaterial.map = meshViewState.raycastTexture ? terrainVisuals.interactiveTexture : null
+        terrainVisuals.interactiveMaterial.vertexColors = !meshViewState.raycastTexture
+        terrainVisuals.interactiveMaterial.needsUpdate = true
+      }
+      if (terrainVisuals.interactiveWire) {
+        terrainVisuals.interactiveWire.visible = meshViewState.raycastWire
+      }
+      if (terrainVisuals.interactiveMarkers) {
+        terrainVisuals.interactiveMarkers.visible = meshViewState.raycastMarkers
+      }
+
+      syncControlChip('toggleMeshTexture', meshViewState.meshTexture)
+      syncControlChip('toggleMeshWire', meshViewState.meshWire)
+      syncControlChip('toggleMeshMarkers', meshViewState.meshMarkers)
+      syncControlChip('toggleRaycastTexture', meshViewState.raycastTexture)
+      syncControlChip('toggleRaycastWire', meshViewState.raycastWire)
+      syncControlChip('toggleRaycastMarkers', meshViewState.raycastMarkers)
+    }
 
     let map = null
     try {
@@ -934,6 +1070,7 @@
       map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right')
       map.once('load', () => {
         updateMapContours(pendingContourData)
+        applyMapViewState()
         map.fitBounds(
           [
             [metrics.minLon, metrics.minLat],
@@ -1399,7 +1536,8 @@
       terrainGroup.add(floor)
       terrainGroup.add(mesh)
       terrainGroup.add(wire)
-      terrainGroup.add(buildCornerMarkers(width, depth, elevations, minElevation, exaggeration, '#62c7ff'))
+      const meshMarkers = buildCornerMarkers(width, depth, elevations, minElevation, exaggeration, '#62c7ff')
+      terrainGroup.add(meshMarkers)
 
       const interactiveGeometry = geometry.clone()
       const interactiveMesh = new THREE.Mesh(
@@ -1429,7 +1567,21 @@
       raycastTerrainGroup.add(interactiveFloor)
       raycastTerrainGroup.add(interactiveMesh)
       raycastTerrainGroup.add(interactiveWire)
-  raycastTerrainGroup.add(buildCornerMarkers(width, depth, elevations, minElevation, exaggeration, '#f6b86c'))
+      const interactiveMarkers = buildCornerMarkers(width, depth, elevations, minElevation, exaggeration, '#f6b86c')
+      raycastTerrainGroup.add(interactiveMarkers)
+
+      terrainVisuals.meshMaterial = mesh.material
+      terrainVisuals.meshWire = wire
+      terrainVisuals.meshMarkers = meshMarkers
+      terrainVisuals.meshTexture = terrainTexture?.texture ?? null
+      terrainVisuals.interactiveMaterial = interactiveMesh.material
+      terrainVisuals.interactiveWire = interactiveWire
+      terrainVisuals.interactiveMarkers = interactiveMarkers
+      terrainVisuals.interactiveTexture = terrainTexture?.texture?.clone() ?? null
+      if (terrainVisuals.interactiveMaterial && terrainVisuals.interactiveTexture) {
+        terrainVisuals.interactiveMaterial.map = terrainVisuals.interactiveTexture
+      }
+      applyTerrainViewState()
 
       controls.target.set(0, Math.max(6, range * exaggeration * 0.35), 0)
       camera.position.set(width * 0.35, Math.max(120, range * exaggeration * 3.2), depth * 0.48)
@@ -1550,6 +1702,49 @@
     document.getElementById('reloadElevation').addEventListener('click', () => {
       loadTerrain()
     })
+
+    document.getElementById('toggleSatellite').addEventListener('click', () => {
+      mapViewState.satellite = !mapViewState.satellite
+      applyMapViewState()
+    })
+    document.getElementById('toggleHillshade').addEventListener('click', () => {
+      mapViewState.hillshade = !mapViewState.hillshade
+      applyMapViewState()
+    })
+    document.getElementById('toggleContours').addEventListener('click', () => {
+      mapViewState.contours = !mapViewState.contours
+      applyMapViewState()
+    })
+    document.getElementById('togglePointLabels').addEventListener('click', () => {
+      mapViewState.points = !mapViewState.points
+      applyMapViewState()
+    })
+    document.getElementById('toggleMeshTexture').addEventListener('click', () => {
+      meshViewState.meshTexture = !meshViewState.meshTexture
+      applyTerrainViewState()
+    })
+    document.getElementById('toggleMeshWire').addEventListener('click', () => {
+      meshViewState.meshWire = !meshViewState.meshWire
+      applyTerrainViewState()
+    })
+    document.getElementById('toggleMeshMarkers').addEventListener('click', () => {
+      meshViewState.meshMarkers = !meshViewState.meshMarkers
+      applyTerrainViewState()
+    })
+    document.getElementById('toggleRaycastTexture').addEventListener('click', () => {
+      meshViewState.raycastTexture = !meshViewState.raycastTexture
+      applyTerrainViewState()
+    })
+    document.getElementById('toggleRaycastWire').addEventListener('click', () => {
+      meshViewState.raycastWire = !meshViewState.raycastWire
+      applyTerrainViewState()
+    })
+    document.getElementById('toggleRaycastMarkers').addEventListener('click', () => {
+      meshViewState.raycastMarkers = !meshViewState.raycastMarkers
+      applyTerrainViewState()
+    })
+    applyMapViewState()
+    applyTerrainViewState()
 
     document.getElementById('fitRectangle').addEventListener('click', () => {
       if (!map) return
