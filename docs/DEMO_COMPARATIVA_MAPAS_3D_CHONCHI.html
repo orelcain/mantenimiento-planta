@@ -702,6 +702,11 @@
       { lat: -42.633400, lon: -73.762600 },
     ]
 
+    const labeledRectangle = rectangle.map((point, index) => ({
+      ...point,
+      label: `P${index + 1}`,
+    }))
+
     const SAMPLE_COLS = 9
     const SAMPLE_ROWS = 9
     const metersPerDegreeLat = 111320
@@ -744,9 +749,23 @@
 
     const metrics = rectangleMetrics(rectangle)
 
-    document.getElementById('coordsList').innerHTML = rectangle
-      .map((point, index) => `<div class="coords-item">P${index + 1} · ${point.lat.toFixed(6)}, ${point.lon.toFixed(6)}</div>`)
+    document.getElementById('coordsList').innerHTML = labeledRectangle
+      .map((point) => `<div class="coords-item">${point.label} · ${point.lat.toFixed(6)}, ${point.lon.toFixed(6)}</div>`)
       .join('')
+
+    const cornerPointCollection = {
+      type: 'FeatureCollection',
+      features: labeledRectangle.map((point) => ({
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: [point.lon, point.lat],
+        },
+        properties: {
+          label: point.label,
+        },
+      })),
+    }
 
     const metricList = [
       ['Ancho estimado', `${Math.round(metrics.widthMeters)} m`],
@@ -777,11 +796,11 @@
         style: {
           version: 8,
           sources: {
-            osm: {
+            satellite: {
               type: 'raster',
-              tiles: ['https://a.tile.openstreetmap.org/{z}/{x}/{y}.png'],
+              tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
               tileSize: 256,
-              attribution: '&copy; OpenStreetMap contributors',
+              attribution: 'Esri World Imagery',
               maxzoom: 19,
             },
             terrainSource: {
@@ -805,9 +824,23 @@
                 },
               },
             },
+            cornerPoints: {
+              type: 'geojson',
+              data: cornerPointCollection,
+            },
           },
           layers: [
-            { id: 'osm', type: 'raster', source: 'osm' },
+            { id: 'satellite', type: 'raster', source: 'satellite' },
+            {
+              id: 'terrain-hillshade',
+              type: 'hillshade',
+              source: 'terrainSource',
+              paint: {
+                'hillshade-exaggeration': 0.25,
+                'hillshade-shadow-color': '#04111d',
+                'hillshade-highlight-color': '#fff0cf',
+              },
+            },
             {
               id: 'rect-fill',
               type: 'fill',
@@ -824,6 +857,33 @@
               paint: {
                 'line-color': '#f6b86c',
                 'line-width': 3,
+              },
+            },
+            {
+              id: 'corner-points',
+              type: 'circle',
+              source: 'cornerPoints',
+              paint: {
+                'circle-radius': 6,
+                'circle-color': '#62c7ff',
+                'circle-stroke-width': 2,
+                'circle-stroke-color': '#04111d',
+              },
+            },
+            {
+              id: 'corner-labels',
+              type: 'symbol',
+              source: 'cornerPoints',
+              layout: {
+                'text-field': ['get', 'label'],
+                'text-size': 13,
+                'text-offset': [0, -1.35],
+                'text-font': ['Open Sans Bold'],
+              },
+              paint: {
+                'text-color': '#ecf5ff',
+                'text-halo-color': '#04111d',
+                'text-halo-width': 1.5,
               },
             },
           ],
@@ -844,6 +904,10 @@
           ],
           { padding: 40, duration: 0 }
         )
+        document.getElementById('maplibreInfo').innerHTML = `
+          <strong>Lectura esperada:</strong> base satelital + hillshade + puntos <strong>P1-P4</strong>.<br>
+          Esta es la referencia geográfica más cercana a terreno real dentro de la demo.
+        `
       })
     } catch (error) {
       reportError(`MapLibre no pudo iniciar: ${error instanceof Error ? error.message : String(error)}`)
@@ -908,6 +972,150 @@
     hoverMarker.visible = false
     raycastScene.add(hoverMarker)
 
+    function latLonToLocalPosition(lat, lon, width, depth) {
+      const u = (lon - metrics.minLon) / Math.max(0.000001, metrics.maxLon - metrics.minLon)
+      const v = (metrics.maxLat - lat) / Math.max(0.000001, metrics.maxLat - metrics.minLat)
+      return {
+        x: (u - 0.5) * width,
+        z: (v - 0.5) * depth,
+      }
+    }
+
+    function bilinearElevationAt(lat, lon, elevations) {
+      const u = (lon - metrics.minLon) / Math.max(0.000001, metrics.maxLon - metrics.minLon)
+      const v = (metrics.maxLat - lat) / Math.max(0.000001, metrics.maxLat - metrics.minLat)
+      const x = THREE.MathUtils.clamp(u * (SAMPLE_COLS - 1), 0, SAMPLE_COLS - 1)
+      const y = THREE.MathUtils.clamp(v * (SAMPLE_ROWS - 1), 0, SAMPLE_ROWS - 1)
+      const x0 = Math.floor(x)
+      const x1 = Math.min(SAMPLE_COLS - 1, x0 + 1)
+      const y0 = Math.floor(y)
+      const y1 = Math.min(SAMPLE_ROWS - 1, y0 + 1)
+      const tx = x - x0
+      const ty = y - y0
+      const sample = (row, col) => elevations[row * SAMPLE_COLS + col] ?? elevations[0] ?? 0
+      const top = THREE.MathUtils.lerp(sample(y0, x0), sample(y0, x1), tx)
+      const bottom = THREE.MathUtils.lerp(sample(y1, x0), sample(y1, x1), tx)
+      return THREE.MathUtils.lerp(top, bottom, ty)
+    }
+
+    function createLabelSprite(text, fillStyle) {
+      const canvas = document.createElement('canvas')
+      canvas.width = 160
+      canvas.height = 72
+      const context = canvas.getContext('2d')
+      context.clearRect(0, 0, canvas.width, canvas.height)
+      context.fillStyle = 'rgba(4, 17, 29, 0.82)'
+      context.beginPath()
+      context.roundRect(8, 8, 144, 56, 18)
+      context.fill()
+      context.strokeStyle = 'rgba(255,255,255,0.14)'
+      context.lineWidth = 2
+      context.stroke()
+      context.fillStyle = fillStyle
+      context.font = '700 28px Space Grotesk, sans-serif'
+      context.textAlign = 'center'
+      context.textBaseline = 'middle'
+      context.fillText(text, 80, 39)
+      const texture = new THREE.CanvasTexture(canvas)
+      texture.colorSpace = THREE.SRGBColorSpace
+      const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false })
+      const sprite = new THREE.Sprite(material)
+      sprite.scale.set(30, 13.5, 1)
+      return sprite
+    }
+
+    function buildCornerMarkers(width, depth, elevations, minElevation, exaggeration, colorHex) {
+      const group = new THREE.Group()
+      const markerMaterial = new THREE.MeshStandardMaterial({
+        color: colorHex,
+        emissive: colorHex,
+        emissiveIntensity: 0.2,
+        roughness: 0.38,
+        metalness: 0.12,
+      })
+
+      labeledRectangle.forEach((point) => {
+        const local = latLonToLocalPosition(point.lat, point.lon, width, depth)
+        const realElevation = bilinearElevationAt(point.lat, point.lon, elevations)
+        const elevatedY = (realElevation - minElevation) * exaggeration
+
+        const pole = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 18, 12), markerMaterial)
+        pole.position.set(local.x, elevatedY + 9, local.z)
+
+        const cap = new THREE.Mesh(new THREE.SphereGeometry(3.4, 20, 20), markerMaterial)
+        cap.position.set(local.x, elevatedY + 18, local.z)
+
+        const label = createLabelSprite(point.label, '#ecf5ff')
+        label.position.set(local.x, elevatedY + 32, local.z)
+
+        group.add(pole)
+        group.add(cap)
+        group.add(label)
+      })
+
+      return group
+    }
+
+    function lonLatToTile(lon, lat, zoom) {
+      const scale = 2 ** zoom
+      const x = ((lon + 180) / 360) * scale
+      const latRad = toRadians(lat)
+      const y = ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * scale
+      return { x, y }
+    }
+
+    async function fetchImageBitmap(url) {
+      const response = await fetch(url)
+      if (!response.ok) {
+        throw new Error(`Tile respondió ${response.status}`)
+      }
+      const blob = await response.blob()
+      return createImageBitmap(blob)
+    }
+
+    async function buildTerrainTexture() {
+      const zoom = 17
+      const topLeft = lonLatToTile(metrics.minLon, metrics.maxLat, zoom)
+      const bottomRight = lonLatToTile(metrics.maxLon, metrics.minLat, zoom)
+      const minTileX = Math.floor(topLeft.x)
+      const maxTileX = Math.floor(bottomRight.x)
+      const minTileY = Math.floor(topLeft.y)
+      const maxTileY = Math.floor(bottomRight.y)
+      const tileCountX = maxTileX - minTileX + 1
+      const tileCountY = maxTileY - minTileY + 1
+
+      if (tileCountX * tileCountY > 20) {
+        throw new Error('La textura satelital excede el presupuesto de tiles para esta demo')
+      }
+
+      const canvas = document.createElement('canvas')
+      canvas.width = tileCountX * 256
+      canvas.height = tileCountY * 256
+      const context = canvas.getContext('2d')
+
+      for (let tileY = minTileY; tileY <= maxTileY; tileY += 1) {
+        for (let tileX = minTileX; tileX <= maxTileX; tileX += 1) {
+          const bitmap = await fetchImageBitmap(`https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${zoom}/${tileY}/${tileX}`)
+          context.drawImage(bitmap, (tileX - minTileX) * 256, (tileY - minTileY) * 256, 256, 256)
+        }
+      }
+
+      const texture = new THREE.CanvasTexture(canvas)
+      texture.colorSpace = THREE.SRGBColorSpace
+      texture.wrapS = THREE.ClampToEdgeWrapping
+      texture.wrapT = THREE.ClampToEdgeWrapping
+      texture.anisotropy = renderer.capabilities.getMaxAnisotropy()
+      texture.offset.set((topLeft.x - minTileX) / tileCountX, 1 - ((topLeft.y - minTileY) / tileCountY))
+      texture.repeat.set((bottomRight.x - topLeft.x) / tileCountX, -((bottomRight.y - topLeft.y) / tileCountY))
+
+      return {
+        texture,
+        zoom,
+        tileCountX,
+        tileCountY,
+      }
+    }
+
     function buildSampleGrid(bounds) {
       const result = []
       for (let row = 0; row < SAMPLE_ROWS; row += 1) {
@@ -933,7 +1141,7 @@
       return payload.elevation ?? []
     }
 
-    function createTerrainMesh(elevations) {
+    async function createTerrainMesh(elevations) {
       scene.remove(terrainGroup)
       terrainGroup = new THREE.Group()
       scene.add(terrainGroup)
@@ -969,11 +1177,21 @@
       geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3))
       geometry.computeVertexNormals()
 
+      let terrainTexture = null
+      let textureSummary = 'sin textura satelital adicional'
+      try {
+        terrainTexture = await buildTerrainTexture()
+        textureSummary = `textura satelital ${terrainTexture.tileCountX}×${terrainTexture.tileCountY} tiles (z${terrainTexture.zoom})`
+      } catch (error) {
+        textureSummary = error instanceof Error ? error.message : 'no fue posible preparar textura satelital'
+      }
+
       const mesh = new THREE.Mesh(
         geometry,
         new THREE.MeshStandardMaterial({
-          vertexColors: true,
-          roughness: 0.92,
+          vertexColors: terrainTexture ? false : true,
+          map: terrainTexture?.texture ?? null,
+          roughness: terrainTexture ? 1 : 0.92,
           metalness: 0.04,
           side: THREE.DoubleSide,
         })
@@ -994,13 +1212,15 @@
       terrainGroup.add(floor)
       terrainGroup.add(mesh)
       terrainGroup.add(wire)
+      terrainGroup.add(buildCornerMarkers(width, depth, elevations, minElevation, exaggeration, '#62c7ff'))
 
       const interactiveGeometry = geometry.clone()
       const interactiveMesh = new THREE.Mesh(
         interactiveGeometry,
         new THREE.MeshStandardMaterial({
-          vertexColors: true,
-          roughness: 0.88,
+          vertexColors: terrainTexture ? false : true,
+          map: terrainTexture?.texture?.clone() ?? null,
+          roughness: terrainTexture ? 0.98 : 0.88,
           metalness: 0.06,
           side: THREE.DoubleSide,
         })
@@ -1022,6 +1242,7 @@
       raycastTerrainGroup.add(interactiveFloor)
       raycastTerrainGroup.add(interactiveMesh)
       raycastTerrainGroup.add(interactiveWire)
+  raycastTerrainGroup.add(buildCornerMarkers(width, depth, elevations, minElevation, exaggeration, '#f6b86c'))
 
       controls.target.set(0, Math.max(6, range * exaggeration * 0.35), 0)
       camera.position.set(width * 0.35, Math.max(120, range * exaggeration * 3.2), depth * 0.48)
@@ -1035,14 +1256,15 @@
       document.getElementById('threeInfo').innerHTML = `
         <strong>Malla local:</strong> ${SAMPLE_COLS} × ${SAMPLE_ROWS} puntos.<br>
         Cota mínima <strong>${minElevation.toFixed(1)} m</strong>, cota máxima <strong>${maxElevation.toFixed(1)} m</strong>.<br>
-        Desnivel <strong>${(maxElevation - minElevation).toFixed(1)} m</strong>, exageración visual <strong>${exaggeration.toFixed(1)}x</strong>.
+        Desnivel <strong>${(maxElevation - minElevation).toFixed(1)} m</strong>, exageración visual <strong>${exaggeration.toFixed(1)}x</strong>.<br>
+        Coordenadas <strong>P1-P4</strong> marcadas sobre la malla, ${textureSummary}.
       `
 
       document.getElementById('raycastInfo').innerHTML = `
         <div class="hover-readout">
           <strong>Raycast activo:</strong>
           <span>Mueve el puntero sobre la malla para probar picking sobre relieve.</span>
-          <span>Desnivel total <strong>${(maxElevation - minElevation).toFixed(1)} m</strong>, malla <strong>${SAMPLE_COLS} × ${SAMPLE_ROWS}</strong>.</span>
+          <span>Desnivel total <strong>${(maxElevation - minElevation).toFixed(1)} m</strong>, malla <strong>${SAMPLE_COLS} × ${SAMPLE_ROWS}</strong>, puntos <strong>P1-P4</strong> visibles.</span>
         </div>
       `
 
@@ -1078,7 +1300,7 @@
         <div class="hover-readout">
           <strong>Picking sobre terreno:</strong>
           <span>X <strong>${hit.point.x.toFixed(1)} m</strong>, Y <strong>${hit.point.y.toFixed(1)} m</strong>, Z <strong>${hit.point.z.toFixed(1)} m</strong>.</span>
-          <span>Esto es la base para selección, brocha, snap o edición contextual sobre la superficie.</span>
+          <span>Esto es la base para selección, brocha, snap o edición contextual sobre la superficie. Los hitos <strong>P1-P4</strong> quedan fijos como referencia.</span>
         </div>
       `
     }
@@ -1091,9 +1313,10 @@
         if (!Array.isArray(elevations) || elevations.length !== grid.length) {
           throw new Error('La respuesta de elevaciones vino incompleta')
         }
-        createTerrainMesh(elevations)
+        await createTerrainMesh(elevations)
       } catch (error) {
         document.getElementById('threeInfo').innerHTML = `<strong>Error:</strong> ${error instanceof Error ? error.message : 'No fue posible cargar la malla local'}`
+        document.getElementById('raycastInfo').innerHTML = `<strong>Error:</strong> ${error instanceof Error ? error.message : 'No fue posible cargar la escena interactiva'}`
       }
     }
 
