@@ -198,6 +198,10 @@
       margin-bottom: 20px;
     }
 
+    .layout-three {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
     .viewer-panel {
       overflow: hidden;
       min-height: 560px;
@@ -246,12 +250,14 @@
     }
 
     #maplibreMap,
-    #threeCanvasWrap {
+    #threeCanvasWrap,
+    #raycastCanvasWrap {
       position: absolute;
       inset: 0;
     }
 
-    #threeCanvasWrap canvas {
+    #threeCanvasWrap canvas,
+    #raycastCanvasWrap canvas {
       width: 100%;
       height: 100%;
       display: block;
@@ -342,6 +348,55 @@
       margin-bottom: 6px;
     }
 
+    .options-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+
+    .option-card {
+      padding: 22px;
+      display: grid;
+      gap: 14px;
+    }
+
+    .option-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: start;
+      gap: 12px;
+    }
+
+    .option-card h3 {
+      font-size: 1.08rem;
+      margin-bottom: 6px;
+    }
+
+    .option-list {
+      display: grid;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 0.94rem;
+      line-height: 1.45;
+    }
+
+    .option-link {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 700;
+    }
+
+    .option-link:hover {
+      text-decoration: underline;
+    }
+
+    .hover-readout {
+      display: grid;
+      gap: 4px;
+      font-size: 0.84rem;
+    }
+
     .mono {
       font-family: 'IBM Plex Mono', monospace;
     }
@@ -369,7 +424,9 @@
     @media (max-width: 1100px) {
       .hero,
       .layout,
-      .side-grid {
+      .layout-three,
+      .side-grid,
+      .options-grid {
         grid-template-columns: 1fr;
       }
 
@@ -461,6 +518,75 @@
       </article>
     </section>
 
+    <section class="layout layout-three">
+      <article class="panel viewer-panel">
+        <div class="viewer-head">
+          <div>
+            <h2 class="viewer-title">Prueba C · Raycast sobre terrain mesh</h2>
+            <p class="viewer-note">La misma malla local, pero enfocada en interacción. Sirve para medir si el terreno realmente soporta selección, brocha y edición sobre superficie.</p>
+          </div>
+          <span class="tag">Editor sobre relieve</span>
+        </div>
+        <div class="viewer-surface">
+          <div id="raycastCanvasWrap"></div>
+          <div class="overlay-box" id="raycastInfo">
+            <div class="hover-readout">
+              <strong>Estado:</strong>
+              <span>preparando escena interactiva para probar picking sobre el terreno...</span>
+            </div>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <section class="options-grid">
+      <article class="panel option-card">
+        <div class="option-head">
+          <div>
+            <h3>Mapbox GL JS terrain</h3>
+            <p>Referencia visual cercana a MapLibre, pero no la usaría como base sin resolver token y costos.</p>
+          </div>
+          <span class="badge-mid">Referencia</span>
+        </div>
+        <div class="option-list">
+          <div>Lo útil aquí es el lenguaje visual: satélite + DEM + exageración vertical.</div>
+          <div>Para una demo local real faltaría un token operativo, por eso lo dejo como comparación conceptual y no como bloque ejecutable en este HTML.</div>
+          <a class="option-link" href="https://docs.mapbox.com/mapbox-gl-js/example/add-terrain/" target="_blank" rel="noreferrer">Abrir ejemplo oficial</a>
+        </div>
+      </article>
+
+      <article class="panel option-card">
+        <div class="option-head">
+          <div>
+            <h3>deck.gl terrain extension</h3>
+            <p>Buen motor para análisis y composición de capas, menos natural como editor operativo de planta.</p>
+          </div>
+          <span class="badge-mid">Analítica</span>
+        </div>
+        <div class="option-list">
+          <div>Sirve para overlays, heatmaps, rutas y lectura de datos por encima del relieve.</div>
+          <div>No gana frente a un editor de terreno con activos 3D propios; sí puede servir más adelante para una vista analítica paralela.</div>
+          <a class="option-link" href="https://deck.gl/examples/terrain-extension" target="_blank" rel="noreferrer">Abrir ejemplo oficial</a>
+        </div>
+      </article>
+
+      <article class="panel option-card">
+        <div class="option-head">
+          <div>
+            <h3>CesiumJS y kepler.gl</h3>
+            <p>Los dejo agrupados porque ambos son válidos como referencia estratégica, pero hoy no como núcleo directo del módulo.</p>
+          </div>
+          <span class="badge-bad">No núcleo</span>
+        </div>
+        <div class="option-list">
+          <div><strong>CesiumJS:</strong> enorme potencia geoespacial, pero pide un salto de complejidad que el caso actual todavía no justifica.</div>
+          <div><strong>kepler.gl:</strong> excelente para explorar capas geográficas y analítica, débil para edición operacional 3D de planta.</div>
+          <a class="option-link" href="https://cesium.com/platform/cesiumjs/" target="_blank" rel="noreferrer">Abrir CesiumJS</a>
+          <a class="option-link" href="https://kepler.gl/" target="_blank" rel="noreferrer">Abrir kepler.gl</a>
+        </div>
+      </article>
+    </section>
+
     <section class="side-grid">
       <article class="panel score-card">
         <h2>Matriz de decision</h2>
@@ -491,11 +617,25 @@
               <td><span class="badge-good">Mejor equilibrio para este proyecto</span></td>
             </tr>
             <tr>
-              <td><strong>Three.js puro</strong></td>
+              <td><strong>Three.js terrain + raycast</strong></td>
               <td>Buena malla custom, poca infraestructura GIS</td>
-              <td>Muy fuerte</td>
+              <td>Muy fuerte, con picking y control total</td>
               <td>Muy alta</td>
               <td><span class="badge-mid">Sirve si priorizas editor por sobre mapa real</span></td>
+            </tr>
+            <tr>
+              <td><strong>Mapbox GL JS</strong></td>
+              <td>Muy buena referencia visual con satélite y DEM</td>
+              <td>Media, requiere integrar editor aparte</td>
+              <td>Media</td>
+              <td><span class="badge-mid">Útil como benchmark visual, no como base primaria</span></td>
+            </tr>
+            <tr>
+              <td><strong>deck.gl</strong></td>
+              <td>Buena lectura analítica sobre terreno</td>
+              <td>Media para capas, débil para escena operativa</td>
+              <td>Media-baja</td>
+              <td><span class="badge-mid">Mejor como vista analítica complementaria</span></td>
             </tr>
             <tr>
               <td><strong>kepler.gl</strong></td>
@@ -511,7 +651,7 @@
       <article class="panel decision">
         <div class="decision-item">
           <h3>Qué mirar en la prueba</h3>
-          <p>Si la vista que más te convence es la de relieve geográfico con rectángulo operativo, la arquitectura debería empujar hacia MapLibre o Cesium. Si lo que más importa es editar activos con total libertad, el mesh local pesa más.</p>
+          <p>Si la vista que más te convence es la de relieve geográfico con rectángulo operativo, la arquitectura debería empujar hacia MapLibre o Cesium. Si lo que más importa es editar activos con total libertad, el mesh local y el raycast pesan más.</p>
         </div>
         <div class="decision-item">
           <h3>Qué limita el detalle</h3>
@@ -520,6 +660,10 @@
         <div class="decision-item">
           <h3>Veredicto recomendado</h3>
           <p><strong>Para este proyecto, hoy, lo más sensato es MapLibre + Three.js.</strong> Permite usar terreno y base geográfica reales, pero sin perder un editor propio para bombas, máquinas, sensores y telemetría.</p>
+        </div>
+        <div class="decision-item">
+          <h3>Lectura de las 6 opciones</h3>
+          <p>En esta demo quedan cubiertas las seis alternativas útiles: dos ejecutadas como terreno real/editor, una tercera enfocada en interacción, y tres más como referencias estructurales para comparar costo, dependencia y encaje operativo.</p>
         </div>
       </article>
     </section>
@@ -708,6 +852,8 @@
 
     const scene = new THREE.Scene()
     scene.background = new THREE.Color('#04111d')
+    const raycastScene = new THREE.Scene()
+    raycastScene.background = new THREE.Color('#07131d')
 
     const canvasWrap = document.getElementById('threeCanvasWrap')
     const renderer = new THREE.WebGLRenderer({ antialias: true })
@@ -715,12 +861,25 @@
     renderer.setSize(canvasWrap.clientWidth, canvasWrap.clientHeight)
     canvasWrap.appendChild(renderer.domElement)
 
+    const raycastWrap = document.getElementById('raycastCanvasWrap')
+    const raycastRenderer = new THREE.WebGLRenderer({ antialias: true })
+    raycastRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+    raycastRenderer.setSize(raycastWrap.clientWidth, raycastWrap.clientHeight)
+    raycastWrap.appendChild(raycastRenderer.domElement)
+
     const camera = new THREE.PerspectiveCamera(48, canvasWrap.clientWidth / canvasWrap.clientHeight, 0.1, 5000)
     camera.position.set(0, 220, 260)
+
+    const raycastCamera = new THREE.PerspectiveCamera(44, raycastWrap.clientWidth / raycastWrap.clientHeight, 0.1, 5000)
+    raycastCamera.position.set(0, 240, 250)
 
     const controls = new OrbitControls(camera, renderer.domElement)
     controls.enableDamping = true
     controls.target.set(0, 0, 0)
+
+    const raycastControls = new OrbitControls(raycastCamera, raycastRenderer.domElement)
+    raycastControls.enableDamping = true
+    raycastControls.target.set(0, 0, 0)
 
     scene.add(new THREE.AmbientLight('#ffffff', 0.7))
     const light = new THREE.DirectionalLight('#fff5d4', 1.2)
@@ -728,8 +887,26 @@
     scene.add(light)
     scene.add(new THREE.HemisphereLight('#9bd8ff', '#07131d', 0.65))
 
+    raycastScene.add(new THREE.AmbientLight('#ffffff', 0.72))
+    const raycastLight = new THREE.DirectionalLight('#fff0cf', 1.25)
+    raycastLight.position.set(90, 220, 140)
+    raycastScene.add(raycastLight)
+    raycastScene.add(new THREE.HemisphereLight('#8dd7ff', '#07131d', 0.7))
+
     let terrainGroup = new THREE.Group()
     scene.add(terrainGroup)
+    let raycastTerrainGroup = new THREE.Group()
+    raycastScene.add(raycastTerrainGroup)
+    let interactiveTerrainMesh = null
+
+    const pointer = new THREE.Vector2()
+    const raycaster = new THREE.Raycaster()
+    const hoverMarker = new THREE.Mesh(
+      new THREE.SphereGeometry(6, 24, 24),
+      new THREE.MeshStandardMaterial({ color: '#ffd37c', emissive: '#5a3b00', roughness: 0.28, metalness: 0.18 })
+    )
+    hoverMarker.visible = false
+    raycastScene.add(hoverMarker)
 
     function buildSampleGrid(bounds) {
       const result = []
@@ -760,6 +937,11 @@
       scene.remove(terrainGroup)
       terrainGroup = new THREE.Group()
       scene.add(terrainGroup)
+
+      raycastScene.remove(raycastTerrainGroup)
+      raycastTerrainGroup = new THREE.Group()
+      raycastScene.add(raycastTerrainGroup)
+      interactiveTerrainMesh = null
 
       const width = metrics.widthMeters
       const depth = metrics.depthMeters
@@ -813,9 +995,42 @@
       terrainGroup.add(mesh)
       terrainGroup.add(wire)
 
+      const interactiveGeometry = geometry.clone()
+      const interactiveMesh = new THREE.Mesh(
+        interactiveGeometry,
+        new THREE.MeshStandardMaterial({
+          vertexColors: true,
+          roughness: 0.88,
+          metalness: 0.06,
+          side: THREE.DoubleSide,
+        })
+      )
+      interactiveTerrainMesh = interactiveMesh
+
+      const interactiveWire = new THREE.LineSegments(
+        new THREE.WireframeGeometry(interactiveGeometry),
+        new THREE.LineBasicMaterial({ color: '#cfe9ff', transparent: true, opacity: 0.24 })
+      )
+
+      const interactiveFloor = new THREE.Mesh(
+        new THREE.PlaneGeometry(width * 1.06, depth * 1.06),
+        new THREE.MeshBasicMaterial({ color: '#051019', transparent: true, opacity: 0.96 })
+      )
+      interactiveFloor.rotation.x = -Math.PI / 2
+      interactiveFloor.position.y = -2
+
+      raycastTerrainGroup.add(interactiveFloor)
+      raycastTerrainGroup.add(interactiveMesh)
+      raycastTerrainGroup.add(interactiveWire)
+
       controls.target.set(0, Math.max(6, range * exaggeration * 0.35), 0)
       camera.position.set(width * 0.35, Math.max(120, range * exaggeration * 3.2), depth * 0.48)
       controls.update()
+
+      raycastControls.target.set(0, Math.max(8, range * exaggeration * 0.38), 0)
+      raycastCamera.position.set(-width * 0.22, Math.max(130, range * exaggeration * 3.4), depth * 0.36)
+      raycastControls.update()
+      hoverMarker.visible = false
 
       document.getElementById('threeInfo').innerHTML = `
         <strong>Malla local:</strong> ${SAMPLE_COLS} × ${SAMPLE_ROWS} puntos.<br>
@@ -823,10 +1038,49 @@
         Desnivel <strong>${(maxElevation - minElevation).toFixed(1)} m</strong>, exageración visual <strong>${exaggeration.toFixed(1)}x</strong>.
       `
 
+      document.getElementById('raycastInfo').innerHTML = `
+        <div class="hover-readout">
+          <strong>Raycast activo:</strong>
+          <span>Mueve el puntero sobre la malla para probar picking sobre relieve.</span>
+          <span>Desnivel total <strong>${(maxElevation - minElevation).toFixed(1)} m</strong>, malla <strong>${SAMPLE_COLS} × ${SAMPLE_ROWS}</strong>.</span>
+        </div>
+      `
+
       document.getElementById('footerStats').textContent =
         `Rectángulo estimado ${Math.round(width)} m × ${Math.round(depth)} m. ` +
         `Malla local ${SAMPLE_COLS}×${SAMPLE_ROWS}. ` +
-        `Rango de elevación ${minElevation.toFixed(1)} m a ${maxElevation.toFixed(1)} m.`
+        `Rango de elevación ${minElevation.toFixed(1)} m a ${maxElevation.toFixed(1)} m. ` +
+        `Comparativa activa: 6 motores revisados.`
+    }
+
+    function updateRaycastHover(event) {
+      if (!interactiveTerrainMesh) {
+        return
+      }
+
+      const bounds = raycastRenderer.domElement.getBoundingClientRect()
+      pointer.x = ((event.clientX - bounds.left) / bounds.width) * 2 - 1
+      pointer.y = -((event.clientY - bounds.top) / bounds.height) * 2 + 1
+
+      raycaster.setFromCamera(pointer, raycastCamera)
+      const intersections = raycaster.intersectObject(interactiveTerrainMesh, false)
+
+      if (intersections.length === 0) {
+        hoverMarker.visible = false
+        return
+      }
+
+      const hit = intersections[0]
+      hoverMarker.visible = true
+      hoverMarker.position.copy(hit.point)
+
+      document.getElementById('raycastInfo').innerHTML = `
+        <div class="hover-readout">
+          <strong>Picking sobre terreno:</strong>
+          <span>X <strong>${hit.point.x.toFixed(1)} m</strong>, Y <strong>${hit.point.y.toFixed(1)} m</strong>, Z <strong>${hit.point.z.toFixed(1)} m</strong>.</span>
+          <span>Esto es la base para selección, brocha, snap o edición contextual sobre la superficie.</span>
+        </div>
+      `
     }
 
     async function loadTerrain() {
@@ -846,7 +1100,9 @@
     function animate() {
       requestAnimationFrame(animate)
       controls.update()
+      raycastControls.update()
       renderer.render(scene, camera)
+      raycastRenderer.render(raycastScene, raycastCamera)
     }
 
     function onResize() {
@@ -855,9 +1111,19 @@
       renderer.setSize(width, height)
       camera.aspect = width / height
       camera.updateProjectionMatrix()
+
+      const raycastWidth = raycastWrap.clientWidth
+      const raycastHeight = raycastWrap.clientHeight
+      raycastRenderer.setSize(raycastWidth, raycastHeight)
+      raycastCamera.aspect = raycastWidth / raycastHeight
+      raycastCamera.updateProjectionMatrix()
     }
 
     window.addEventListener('resize', onResize)
+    raycastRenderer.domElement.addEventListener('pointermove', updateRaycastHover)
+    raycastRenderer.domElement.addEventListener('pointerleave', () => {
+      hoverMarker.visible = false
+    })
     animate()
     loadTerrain()
 
