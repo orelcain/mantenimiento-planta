@@ -679,6 +679,7 @@
   <script type="module">
     import * as THREE from 'https://esm.sh/three@0.179.1'
     import { OrbitControls } from 'https://esm.sh/three@0.179.1/examples/jsm/controls/OrbitControls.js'
+    import * as turf from 'https://esm.sh/@turf/turf@7.2.0'
 
     const errorBanner = document.getElementById('errorBanner')
     const reportError = (message) => {
@@ -738,10 +739,14 @@
 
     function rectangleMetrics(points) {
       const bounds = getBounds(points)
-      const centerLat = (bounds.minLat + bounds.maxLat) / 2
-      const centerLon = (bounds.minLon + bounds.maxLon) / 2
-      const widthMeters = haversineMeters(centerLat, bounds.minLon, centerLat, bounds.maxLon)
-      const depthMeters = haversineMeters(bounds.minLat, centerLon, bounds.maxLat, centerLon)
+      const centerLat = points.reduce((sum, point) => sum + point.lat, 0) / points.length
+      const centerLon = points.reduce((sum, point) => sum + point.lon, 0) / points.length
+      const topWidth = haversineMeters(points[0].lat, points[0].lon, points[1].lat, points[1].lon)
+      const bottomWidth = haversineMeters(points[3].lat, points[3].lon, points[2].lat, points[2].lon)
+      const leftDepth = haversineMeters(points[0].lat, points[0].lon, points[3].lat, points[3].lon)
+      const rightDepth = haversineMeters(points[1].lat, points[1].lon, points[2].lat, points[2].lon)
+      const widthMeters = (topWidth + bottomWidth) / 2
+      const depthMeters = (leftDepth + rightDepth) / 2
       const areaHectares = (widthMeters * depthMeters) / 10000
       const center = [centerLon, centerLat]
       return { ...bounds, center, widthMeters, depthMeters, areaHectares }
@@ -828,6 +833,10 @@
               type: 'geojson',
               data: cornerPointCollection,
             },
+            contours: {
+              type: 'geojson',
+              data: pendingContourData,
+            },
           },
           layers: [
             { id: 'satellite', type: 'raster', source: 'satellite' },
@@ -857,6 +866,32 @@
               paint: {
                 'line-color': '#f6b86c',
                 'line-width': 3,
+              },
+            },
+            {
+              id: 'contour-lines',
+              type: 'line',
+              source: 'contours',
+              paint: {
+                'line-color': '#fff0cf',
+                'line-width': 1.4,
+                'line-opacity': 0.78,
+              },
+            },
+            {
+              id: 'contour-labels',
+              type: 'symbol',
+              source: 'contours',
+              layout: {
+                'symbol-placement': 'line',
+                'text-field': ['concat', ['to-string', ['get', 'elevation']], ' m'],
+                'text-size': 11,
+                'text-font': ['Open Sans Bold'],
+              },
+              paint: {
+                'text-color': '#ecf5ff',
+                'text-halo-color': '#04111d',
+                'text-halo-width': 1.2,
               },
             },
             {
@@ -897,6 +932,7 @@
 
       map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right')
       map.once('load', () => {
+        updateMapContours(pendingContourData)
         map.fitBounds(
           [
             [metrics.minLon, metrics.minLat],
@@ -965,6 +1001,7 @@
 
     const pointer = new THREE.Vector2()
     const raycaster = new THREE.Raycaster()
+    let pendingContourData = { type: 'FeatureCollection', features: [] }
     const hoverMarker = new THREE.Mesh(
       new THREE.SphereGeometry(6, 24, 24),
       new THREE.MeshStandardMaterial({ color: '#ffd37c', emissive: '#5a3b00', roughness: 0.28, metalness: 0.18 })
@@ -972,30 +1009,76 @@
     hoverMarker.visible = false
     raycastScene.add(hoverMarker)
 
-    function latLonToLocalPosition(lat, lon, width, depth) {
-      const u = (lon - metrics.minLon) / Math.max(0.000001, metrics.maxLon - metrics.minLon)
-      const v = (metrics.maxLat - lat) / Math.max(0.000001, metrics.maxLat - metrics.minLat)
+    function interpolateGeoPoint(pointA, pointB, t) {
       return {
-        x: (u - 0.5) * width,
-        z: (v - 0.5) * depth,
+        lat: pointA.lat + (pointB.lat - pointA.lat) * t,
+        lon: pointA.lon + (pointB.lon - pointA.lon) * t,
       }
     }
 
-    function bilinearElevationAt(lat, lon, elevations) {
-      const u = (lon - metrics.minLon) / Math.max(0.000001, metrics.maxLon - metrics.minLon)
-      const v = (metrics.maxLat - lat) / Math.max(0.000001, metrics.maxLat - metrics.minLat)
-      const x = THREE.MathUtils.clamp(u * (SAMPLE_COLS - 1), 0, SAMPLE_COLS - 1)
-      const y = THREE.MathUtils.clamp(v * (SAMPLE_ROWS - 1), 0, SAMPLE_ROWS - 1)
-      const x0 = Math.floor(x)
-      const x1 = Math.min(SAMPLE_COLS - 1, x0 + 1)
-      const y0 = Math.floor(y)
-      const y1 = Math.min(SAMPLE_ROWS - 1, y0 + 1)
-      const tx = x - x0
-      const ty = y - y0
-      const sample = (row, col) => elevations[row * SAMPLE_COLS + col] ?? elevations[0] ?? 0
-      const top = THREE.MathUtils.lerp(sample(y0, x0), sample(y0, x1), tx)
-      const bottom = THREE.MathUtils.lerp(sample(y1, x0), sample(y1, x1), tx)
-      return THREE.MathUtils.lerp(top, bottom, ty)
+    function interpolateQuadPoint(u, v) {
+      const top = interpolateGeoPoint(rectangle[0], rectangle[1], u)
+      const bottom = interpolateGeoPoint(rectangle[3], rectangle[2], u)
+      return interpolateGeoPoint(top, bottom, v)
+    }
+
+    function latLonToLocalPosition(lat, lon, width, depth) {
+      const leftTop = rectangle[0]
+      const rightTop = rectangle[1]
+      const rightBottom = rectangle[2]
+      const leftBottom = rectangle[3]
+      const corners = [leftTop, rightTop, rightBottom, leftBottom]
+      const index = corners.findIndex((point) => point.lat === lat && point.lon === lon)
+      if (index === 0) return { x: -width / 2, z: -depth / 2 }
+      if (index === 1) return { x: width / 2, z: -depth / 2 }
+      if (index === 2) return { x: width / 2, z: depth / 2 }
+      if (index === 3) return { x: -width / 2, z: depth / 2 }
+      return { x: 0, z: 0 }
+    }
+
+    function computeContourBreaks(minElevation, maxElevation) {
+      const range = Math.max(1, maxElevation - minElevation)
+      const step = range <= 20 ? 2 : range <= 40 ? 5 : 10
+      const breaks = []
+      let current = Math.ceil(minElevation / step) * step
+      while (current < maxElevation) {
+        breaks.push(current)
+        current += step
+      }
+      return breaks
+    }
+
+    function updateMapContours(data) {
+      pendingContourData = data
+      const source = map?.getSource?.('contours')
+      if (source && 'setData' in source) {
+        source.setData(data)
+      }
+    }
+
+    function buildContourData(grid, elevations) {
+      const minElevation = Math.min(...elevations)
+      const maxElevation = Math.max(...elevations)
+      const breaks = computeContourBreaks(minElevation, maxElevation)
+      if (breaks.length === 0) {
+        return { type: 'FeatureCollection', features: [] }
+      }
+
+      const points = turf.featureCollection(
+        grid.map((point, index) =>
+          turf.point([point.lon, point.lat], { elevation: elevations[index] ?? minElevation })
+        )
+      )
+
+      const contours = turf.isolines(points, breaks, { zProperty: 'elevation' })
+      contours.features = contours.features.map((feature) => ({
+        ...feature,
+        properties: {
+          ...feature.properties,
+          elevation: feature.properties?.elevation ?? feature.properties?.contour ?? 0,
+        },
+      }))
+      return contours
     }
 
     function createLabelSprite(text, fillStyle) {
@@ -1034,9 +1117,14 @@
         metalness: 0.12,
       })
 
-      labeledRectangle.forEach((point) => {
+      labeledRectangle.forEach((point, index) => {
         const local = latLonToLocalPosition(point.lat, point.lon, width, depth)
-        const realElevation = bilinearElevationAt(point.lat, point.lon, elevations)
+        const cornerElevationIndex =
+          index === 0 ? 0 :
+          index === 1 ? SAMPLE_COLS - 1 :
+          index === 2 ? elevations.length - 1 :
+          (SAMPLE_ROWS - 1) * SAMPLE_COLS
+        const realElevation = elevations[cornerElevationIndex] ?? elevations[0] ?? minElevation
         const elevatedY = (realElevation - minElevation) * exaggeration
 
         const pole = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 18, 12), markerMaterial)
@@ -1100,13 +1188,44 @@
         }
       }
 
-      const texture = new THREE.CanvasTexture(canvas)
+      const sourceImage = context.getImageData(0, 0, canvas.width, canvas.height)
+      const warpedCanvas = document.createElement('canvas')
+      const warpedSize = 768
+      warpedCanvas.width = warpedSize
+      warpedCanvas.height = warpedSize
+      const warpedContext = warpedCanvas.getContext('2d')
+      const warpedImage = warpedContext.createImageData(warpedSize, warpedSize)
+
+      for (let y = 0; y < warpedSize; y += 1) {
+        const v = y / Math.max(1, warpedSize - 1)
+        for (let x = 0; x < warpedSize; x += 1) {
+          const u = x / Math.max(1, warpedSize - 1)
+          const geoPoint = interpolateQuadPoint(u, v)
+          const tilePoint = lonLatToTile(geoPoint.lon, geoPoint.lat, zoom)
+          const sourceX = Math.round((tilePoint.x - minTileX) * 256)
+          const sourceY = Math.round((tilePoint.y - minTileY) * 256)
+          if (sourceX < 0 || sourceY < 0 || sourceX >= canvas.width || sourceY >= canvas.height) {
+            continue
+          }
+
+          const sourceIndex = (sourceY * canvas.width + sourceX) * 4
+          const targetIndex = (y * warpedSize + x) * 4
+          warpedImage.data[targetIndex] = sourceImage.data[sourceIndex]
+          warpedImage.data[targetIndex + 1] = sourceImage.data[sourceIndex + 1]
+          warpedImage.data[targetIndex + 2] = sourceImage.data[sourceIndex + 2]
+          warpedImage.data[targetIndex + 3] = sourceImage.data[sourceIndex + 3]
+        }
+      }
+
+      warpedContext.putImageData(warpedImage, 0, 0)
+
+      const texture = new THREE.CanvasTexture(warpedCanvas)
       texture.colorSpace = THREE.SRGBColorSpace
       texture.wrapS = THREE.ClampToEdgeWrapping
       texture.wrapT = THREE.ClampToEdgeWrapping
       texture.anisotropy = renderer.capabilities.getMaxAnisotropy()
-      texture.offset.set((topLeft.x - minTileX) / tileCountX, 1 - ((topLeft.y - minTileY) / tileCountY))
-      texture.repeat.set((bottomRight.x - topLeft.x) / tileCountX, -((bottomRight.y - topLeft.y) / tileCountY))
+      texture.offset.set(0, 0)
+      texture.repeat.set(1, 1)
 
       return {
         texture,
@@ -1120,11 +1239,10 @@
       const result = []
       for (let row = 0; row < SAMPLE_ROWS; row += 1) {
         const v = row / Math.max(1, SAMPLE_ROWS - 1)
-        const lat = bounds.maxLat + (bounds.minLat - bounds.maxLat) * v
         for (let col = 0; col < SAMPLE_COLS; col += 1) {
           const u = col / Math.max(1, SAMPLE_COLS - 1)
-          const lon = bounds.minLon + (bounds.maxLon - bounds.minLon) * u
-          result.push({ lat, lon, row, col })
+          const point = interpolateQuadPoint(u, v)
+          result.push({ lat: point.lat, lon: point.lon, row, col, u, v })
         }
       }
       return result
@@ -1313,7 +1431,17 @@
         if (!Array.isArray(elevations) || elevations.length !== grid.length) {
           throw new Error('La respuesta de elevaciones vino incompleta')
         }
+        const contourData = buildContourData(grid, elevations)
+        updateMapContours(contourData)
         await createTerrainMesh(elevations)
+
+        const contourValues = Array.from(new Set(contourData.features.map((feature) => feature.properties?.elevation))).filter((value) => typeof value === 'number')
+        if (contourValues.length > 0) {
+          document.getElementById('maplibreInfo').innerHTML = `
+            <strong>Lectura esperada:</strong> base satelital + hillshade + puntos <strong>P1-P4</strong>.<br>
+            Niveles de altura activos en <strong>${contourValues.join(', ')} m</strong>.
+          `
+        }
       } catch (error) {
         document.getElementById('threeInfo').innerHTML = `<strong>Error:</strong> ${error instanceof Error ? error.message : 'No fue posible cargar la malla local'}`
         document.getElementById('raycastInfo').innerHTML = `<strong>Error:</strong> ${error instanceof Error ? error.message : 'No fue posible cargar la escena interactiva'}`
