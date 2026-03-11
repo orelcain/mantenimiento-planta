@@ -52,9 +52,9 @@ interface InteractiveNodeDefinition {
 
 interface ResolvedInteractiveNode extends InteractiveNodeDefinition {
   position: THREE.Vector3
-  source: 'mesh' | 'fallback'
-  meshName?: string
-  meshRef?: THREE.Mesh
+  source: 'object' | 'fallback'
+  objectName?: string
+  objectRef?: THREE.Object3D
 }
 
 interface ModelActionLink {
@@ -66,7 +66,15 @@ interface ModelActionLink {
   notes: string
 }
 
-type ResolvedNodeMeta = Partial<Record<FocusedAssetId, { source: 'mesh' | 'fallback'; meshName?: string; meshRef?: THREE.Mesh }>>
+type ResolvedNodeMeta = Partial<Record<FocusedAssetId, { source: 'object' | 'fallback'; objectName?: string; objectRef?: THREE.Object3D }>>
+
+interface SceneObjectCandidate {
+  text: string
+  center: THREE.Vector3
+  objectName: string
+  object: THREE.Object3D
+  objectType: 'group' | 'mesh'
+}
 
 const STATUS_ORDER: BlowerStatus[] = ['operativa', 'revision', 'detenida']
 
@@ -182,30 +190,52 @@ function getFallbackPosition(fallback: [number, number, number], info: { size: T
   )
 }
 
+function scoreCandidate(candidate: SceneObjectCandidate, node: InteractiveNodeDefinition): number {
+  const matches = node.keywords.reduce((count, keyword) => (
+    candidate.text.includes(normalizeSearchText(keyword)) ? count + 1 : count
+  ), 0)
+  const typeBonus = candidate.objectType === 'group' ? 4 : 1
+  return matches * 10 + typeBonus
+}
+
 function resolveInteractiveNodes(object: THREE.Object3D | null, info: { size: THREE.Vector3 } | null): ResolvedInteractiveNode[] {
-  const candidates: Array<{ text: string; center: THREE.Vector3; meshName: string; mesh: THREE.Mesh }> = []
+  const candidates: SceneObjectCandidate[] = []
 
   if (object) {
-    const allMeshNames: string[] = []
+    const allNamedObjects: string[] = []
     object.traverse((child) => {
-      if (!(child instanceof THREE.Mesh)) return
-      const name = child.name || child.userData.stableMeshId || '(sin nombre)'
-      allMeshNames.push(name)
-      const text = normalizeSearchText(`${child.name} ${child.userData.stableMeshId ?? ''}`)
+      if (child === object) return
+      const objectName = child.name || child.userData.stableMeshId || ''
+      if (!objectName) return
+
       const box = new THREE.Box3().setFromObject(child)
       if (box.isEmpty()) return
+
+      const hierarchyTrail: string[] = []
+      let currentParent = child.parent
+      let safety = 0
+      while (currentParent && currentParent !== object && safety < 6) {
+        if (currentParent.name) hierarchyTrail.push(currentParent.name)
+        currentParent = currentParent.parent
+        safety += 1
+      }
+
+      const text = normalizeSearchText(`${child.name} ${child.userData.stableMeshId ?? ''} ${hierarchyTrail.join(' ')}`)
+      const typeLabel = child instanceof THREE.Mesh ? 'mesh' : 'group'
+      allNamedObjects.push(`${typeLabel}: ${objectName}`)
 
       candidates.push({
         text,
         center: box.getCenter(new THREE.Vector3()),
-        meshName: child.name || child.userData.stableMeshId || 'mesh',
-        mesh: child,
+        objectName,
+        object: child,
+        objectType: child instanceof THREE.Mesh ? 'mesh' : 'group',
       })
     })
-    // Log all mesh names for development mapping
-    if (allMeshNames.length > 0) {
-      console.groupCollapsed(`[Sopladoras GLB] ${allMeshNames.length} mallas detectadas`)
-      allMeshNames.forEach((n, i) => console.log(`  ${i}: ${n}`))
+
+    if (allNamedObjects.length > 0) {
+      console.groupCollapsed(`[Sopladoras GLB] ${allNamedObjects.length} objetos nombrados detectados`)
+      allNamedObjects.forEach((item, index) => console.log(`  ${index}: ${item}`))
       console.groupEnd()
     }
   }
@@ -213,12 +243,21 @@ function resolveInteractiveNodes(object: THREE.Object3D | null, info: { size: TH
   const usedCandidateIndexes = new Set<number>()
 
   return INTERACTIVE_NODE_DEFINITIONS.map((node) => {
-    const candidateIndex = candidates.findIndex((candidate, index) => !usedCandidateIndexes.has(index) && node.keywords.some((keyword) => candidate.text.includes(normalizeSearchText(keyword))))
+    const candidateIndex = candidates
+      .map((candidate, index) => ({ candidate, index, score: scoreCandidate(candidate, node) }))
+      .filter(({ index, score }) => !usedCandidateIndexes.has(index) && score > 0)
+      .sort((left, right) => right.score - left.score)[0]?.index ?? -1
 
     if (candidateIndex >= 0) {
       usedCandidateIndexes.add(candidateIndex)
       const candidate = candidates[candidateIndex]!
-      return { ...node, position: candidate.center.clone(), source: 'mesh' as const, meshName: candidate.meshName, meshRef: candidate.mesh }
+      return {
+        ...node,
+        position: candidate.center.clone(),
+        source: 'object' as const,
+        objectName: candidate.objectName,
+        objectRef: candidate.object,
+      }
     }
 
     return { ...node, position: getFallbackPosition(node.fallback, info), source: 'fallback' as const }
@@ -395,19 +434,17 @@ function buildMeshToNodeMap(
 ): Map<string, FocusedAssetId> {
   const map = new Map<string, FocusedAssetId>()
   for (const node of resolvedNodes) {
-    if (!node.meshRef) continue
-    // The matched mesh and all its children belong to this node
-    node.meshRef.traverse((child) => {
+    if (!node.objectRef) continue
+    node.objectRef.traverse((child) => {
       if (child instanceof THREE.Mesh && child.userData.stableMeshId) {
         map.set(child.userData.stableMeshId, node.id)
       }
     })
-    if (node.meshRef.userData.stableMeshId) {
-      map.set(node.meshRef.userData.stableMeshId, node.id)
+    if (node.objectRef instanceof THREE.Mesh && node.objectRef.userData.stableMeshId) {
+      map.set(node.objectRef.userData.stableMeshId, node.id)
     }
-    // Also check the parent group — in many GLBs the mesh is nested inside a Group
-    if (node.meshRef.parent) {
-      node.meshRef.parent.traverse((child) => {
+    if (node.objectRef.parent) {
+      node.objectRef.parent.traverse((child) => {
         if (child instanceof THREE.Mesh && child.userData.stableMeshId) {
           map.set(child.userData.stableMeshId, node.id)
         }
@@ -507,13 +544,13 @@ function RealMeshEffects({
   // Apply blower effects
   useEffect(() => {
     for (const node of resolvedNodes) {
-      if (node.kind !== 'blower' || !node.meshRef) continue
+      if (node.kind !== 'blower' || !node.objectRef) continue
       const blower = blowers.find((b) => b.id === node.id)
       if (!blower) continue
 
       const color = getBlowerStatusColor(blower.status)
 
-      node.meshRef.traverse((child) => {
+      node.objectRef.traverse((child) => {
         if (!(child instanceof THREE.Mesh)) return
         const key = child.uuid
         if (!originalMaterials.current.has(key)) {
@@ -532,7 +569,7 @@ function RealMeshEffects({
   // Apply valve effects
   useFrame(() => {
     for (const node of resolvedNodes) {
-      if (node.kind !== 'valve' || !node.meshRef) continue
+      if (node.kind !== 'valve' || !node.objectRef) continue
       const valve = valves.find((v) => v.id === node.id)
       if (!valve) continue
       const actionLink = MODEL_ACTION_LINKS[node.id]
@@ -540,16 +577,14 @@ function RealMeshEffects({
       const isOpen = valve.status === 'abierta'
       const targetAngle = isOpen ? 0 : Math.PI / 2
 
-      // Rotate the valve mesh smoothly
       if (actionLink?.transform === 'rotate-y') {
-        node.meshRef.rotation.y = THREE.MathUtils.lerp(node.meshRef.rotation.y, targetAngle, 0.08)
+        node.objectRef.rotation.y = THREE.MathUtils.lerp(node.objectRef.rotation.y, targetAngle, 0.08)
       } else if (actionLink?.transform === 'rotate-z') {
-        node.meshRef.rotation.z = THREE.MathUtils.lerp(node.meshRef.rotation.z, targetAngle, 0.08)
+        node.objectRef.rotation.z = THREE.MathUtils.lerp(node.objectRef.rotation.z, targetAngle, 0.08)
       }
 
-      // Color feedback
       const color = getValveStatusColor(valve.status)
-      node.meshRef.traverse((child) => {
+      node.objectRef.traverse((child) => {
         if (!(child instanceof THREE.Mesh)) return
         const key = child.uuid
         if (!originalMaterials.current.has(key)) {
@@ -594,7 +629,7 @@ function SopladorasBaader142InteractiveCanvasOverlay({
   useEffect(() => {
     if (!onResolvedNodesChange) return
     const nextMeta = resolvedNodes.reduce<ResolvedNodeMeta>((acc, node) => {
-      acc[node.id] = { source: node.source, meshName: node.meshName, meshRef: node.meshRef }
+      acc[node.id] = { source: node.source, objectName: node.objectName, objectRef: node.objectRef }
       return acc
     }, {})
     onResolvedNodesChange(nextMeta)
@@ -899,12 +934,15 @@ function ModelBoundExperience({ modelName: _modelName, className, modelUrl, mode
           />
         </Viewer3D>
 
-        <div className="pointer-events-none absolute inset-x-3 top-3 z-10">
-          <div className="pointer-events-auto rounded-xl border bg-background/90 p-3 backdrop-blur">
-            <div className="grid gap-3 xl:grid-cols-[1.25fr_1.25fr_1fr]">
-              <div className="space-y-2">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Control rapido sopladoras</p>
-                <div className="flex flex-wrap gap-2">
+        <div className="pointer-events-none absolute inset-x-2 top-2 z-10">
+          <div className="pointer-events-auto rounded-xl border bg-background/88 p-2 backdrop-blur">
+            <div className="grid gap-2 xl:grid-cols-[1.2fr_1.2fr_0.9fr]">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Sopladoras</p>
+                  <span className="text-[10px] text-muted-foreground/80">ON/OFF</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
                   {blowers.map((blower) => (
                     (() => {
                       const actionLink = MODEL_ACTION_LINKS[blower.id]
@@ -913,7 +951,7 @@ function ModelBoundExperience({ modelName: _modelName, className, modelUrl, mode
                       key={blower.id}
                       size="sm"
                       variant={blower.status === 'operativa' ? 'default' : 'outline'}
-                      className="gap-2"
+                      className="h-8 gap-1.5 px-2.5 text-xs"
                       onClick={() => handleToggleBlowerPower(blower.id)}
                       title={actionLink.notes}
                     >
@@ -926,9 +964,12 @@ function ModelBoundExperience({ modelName: _modelName, className, modelUrl, mode
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Control rapido valvulas</p>
-                <div className="flex flex-wrap gap-2">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Valvulas</p>
+                  <span className="text-[10px] text-muted-foreground/80">Estado visual</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
                   {valves.map((valve) => (
                     (() => {
                       const actionLink = MODEL_ACTION_LINKS[valve.id]
@@ -937,7 +978,7 @@ function ModelBoundExperience({ modelName: _modelName, className, modelUrl, mode
                       key={valve.id}
                       size="sm"
                       variant={valve.status === 'abierta' ? 'default' : 'outline'}
-                      className="gap-2"
+                      className="h-8 gap-1.5 px-2.5 text-xs"
                       onClick={() => handleToggleValve(valve.id)}
                       title={actionLink.notes}
                     >
@@ -952,9 +993,12 @@ function ModelBoundExperience({ modelName: _modelName, className, modelUrl, mode
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Respaldo S4</p>
-                <div className="flex flex-wrap gap-2">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Respaldo S4</p>
+                  <span className="text-[10px] text-muted-foreground/80">Modo</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
                   {([
                     { id: 'auto', label: 'Auto' },
                     { id: 'manual', label: 'Manual' },
@@ -963,6 +1007,7 @@ function ModelBoundExperience({ modelName: _modelName, className, modelUrl, mode
                     <Button
                       key={option.id}
                       size="sm"
+                      className="h-8 px-2.5 text-xs"
                       variant={backupMode === option.id ? 'default' : 'outline'}
                       onClick={() => setBackupMode(option.id)}
                     >
@@ -973,13 +1018,14 @@ function ModelBoundExperience({ modelName: _modelName, className, modelUrl, mode
                     <Button
                       key={target}
                       size="sm"
+                      className="h-8 px-2.5 text-xs"
                       variant={manualBackupTarget === target ? 'default' : 'outline'}
                       onClick={() => setManualBackupTarget(target)}
                     >
                       Resp. {target}
                     </Button>
                   ))}
-                  <Button size="sm" variant="outline" onClick={handleResetSystem}>Reset sistema</Button>
+                  <Button size="sm" className="h-8 px-2.5 text-xs" variant="outline" onClick={handleResetSystem}>Reset sistema</Button>
                 </div>
               </div>
             </div>
