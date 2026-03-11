@@ -969,9 +969,12 @@ export function Visor3DViewerPage() {
           <ToboganInteractiveExperience modelName={model.name} className="h-full" />
         ) : interactiveExperience?.id === 'sopladorasBaader142' ? (
           <SopladorasBaader142InteractiveExperience
+            modelId={model.id}
             modelName={model.name}
             modelUrl={model.downloadURL}
             modelFormat={model.format}
+            canEditMappings={isAdmin}
+            currentUserId={user?.id ?? 'admin'}
             className="h-full"
           />
         ) : null}

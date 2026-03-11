@@ -7,6 +7,7 @@ import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from '@/compo
 import { Viewer3D } from '@/components/visor3d/Viewer3D'
 import { useViewer3DModelContext } from '@/components/visor3d/Viewer3DModelContext'
 import { cn } from '@/lib/utils'
+import { deleteInteractiveBinding, setInteractiveBinding, subscribeToInteractiveBindings, type InteractiveBinding } from '@/services/interactiveBindings'
 import type { Model3DFormat } from '@/types/models3d'
 
 type OperatingMode = 'produccion' | 'lavado' | 'mantencion'
@@ -16,7 +17,7 @@ type ValveStatus = 'abierta' | 'cerrada'
 type LineId = 'L1' | 'L2' | 'L3' | 'L4'
 type PrimaryLineId = 'L1' | 'L2' | 'L3'
 type BlowerId = 'S1' | 'S2' | 'S3' | 'S4'
-type ValveId = 'L1_VB1' | 'L1_VB2' | 'L1_VM1' | 'L2_VB1' | 'L2_VB2' | 'L2_VM1' | 'L3_VB1' | 'L4_VB1'
+type ValveId = 'L1_VB1' | 'L1_VB2' | 'L1_VM1' | 'L2_VB1' | 'L2_VB2' | 'L2_VM1' | 'L3_VB1' | 'L3_VM1' | 'L4_VB1'
 type FocusedAssetId = BlowerId | ValveId
 
 interface BlowerState {
@@ -48,10 +49,13 @@ interface LineVisualConfig {
 }
 
 interface SopladorasBaader142InteractiveExperienceProps {
+  modelId?: string
   modelName: string
   className?: string
   modelUrl?: string
   modelFormat?: Model3DFormat
+  canEditMappings?: boolean
+  currentUserId?: string
 }
 
 interface InteractiveNodeDefinition {
@@ -85,6 +89,7 @@ interface ModelActionLink {
 }
 
 type ResolvedNodeMeta = Partial<Record<FocusedAssetId, { source: 'object' | 'fallback'; objectName?: string; motionObjectName?: string }>>
+type InteractiveBindingMap = Partial<Record<FocusedAssetId, InteractiveBinding>>
 
 interface SceneObjectCandidate {
   text: string
@@ -150,7 +155,7 @@ const MODE_FLOW_FACTOR: Record<OperatingMode, number> = {
 const LINE_VISUALS: Record<LineId, LineVisualConfig> = {
   L1: { id: 'L1', label: 'Linea 1', color: '#eab308', blowerId: 'S1', valveIds: ['L1_VB1', 'L1_VB2', 'L1_VM1'], outletFallback: [0.14, 0.80, 0.12] },
   L2: { id: 'L2', label: 'Linea 2', color: '#ef4444', blowerId: 'S2', valveIds: ['L2_VB1', 'L2_VB2', 'L2_VM1'], outletFallback: [0.39, 0.81, 0.18] },
-  L3: { id: 'L3', label: 'Linea 3', color: '#3b82f6', blowerId: 'S3', valveIds: ['L3_VB1'], outletFallback: [0.67, 0.80, 0.29] },
+  L3: { id: 'L3', label: 'Linea 3', color: '#3b82f6', blowerId: 'S3', valveIds: ['L3_VB1', 'L3_VM1'], outletFallback: [0.67, 0.80, 0.29] },
   L4: { id: 'L4', label: 'Linea 4 respaldo', color: '#334155', blowerId: 'S4', valveIds: ['L4_VB1'], outletFallback: [0.81, 0.58, 0.35], manifoldFallback: [0.81, 0.58, 0.35] },
 }
 
@@ -169,6 +174,7 @@ const INITIAL_VALVES: ValveState[] = [
   { id: 'L2_VB2', label: 'L2 bola 2', zone: 'Linea 2 roja', lineId: 'L2', kind: 'bola', status: 'abierta' },
   { id: 'L2_VM1', label: 'L2 mariposa', zone: 'Linea 2 roja', lineId: 'L2', kind: 'mariposa', status: 'abierta' },
   { id: 'L3_VB1', label: 'L3 bola 1', zone: 'Linea 3 azul', lineId: 'L3', kind: 'bola', status: 'abierta' },
+  { id: 'L3_VM1', label: 'L3 mariposa', zone: 'Linea 3 azul', lineId: 'L3', kind: 'mariposa', status: 'abierta' },
   { id: 'L4_VB1', label: 'L4 bola respaldo', zone: 'Linea 4 respaldo', lineId: 'L4', kind: 'bola', status: 'abierta' },
 ]
 
@@ -291,6 +297,17 @@ const INTERACTIVE_NODE_DEFINITIONS: InteractiveNodeDefinition[] = [
     fallback: [0.70, 0.52, 0.45],
   },
   {
+    id: 'L3_VM1',
+    label: 'L3 mariposa',
+    kind: 'valve',
+    zone: 'Linea 3 azul',
+    lineId: 'L3',
+    keywords: ['l3 vm1', 'linea 3 mariposa', 'mariposa azul', 'valvula mariposa l3'],
+    preferredObjectNames: ['L3_VM1', 'VM1_L3', 'VALVULA_MARIPOSA_L3', 'LINEA3_MARIPOSA'],
+    handleKeywords: ['manilla', 'handle', 'palanca', 'lever', 'mariposa'],
+    fallback: [0.74, 0.49, 0.47],
+  },
+  {
     id: 'L4_VB1',
     label: 'L4 bola respaldo',
     kind: 'valve',
@@ -315,6 +332,7 @@ const MODEL_ACTION_LINKS: Record<FocusedAssetId, ModelActionLink> = {
   L2_VB2: { assetId: 'L2_VB2', action: 'toggle-valve', transform: 'rotate-z', activeLabel: 'Vertical', inactiveLabel: 'Horizontal', notes: 'Llave de bola L2. Vertical abierta, horizontal cerrada.' },
   L2_VM1: { assetId: 'L2_VM1', action: 'toggle-valve', transform: 'rotate-y', activeLabel: 'Abierta', inactiveLabel: 'Cerrada', notes: 'Mariposa L2 para direccionar el caudal.' },
   L3_VB1: { assetId: 'L3_VB1', action: 'toggle-valve', transform: 'rotate-z', activeLabel: 'Vertical', inactiveLabel: 'Horizontal', notes: 'Llave de bola L3. Vertical abierta, horizontal cerrada.' },
+  L3_VM1: { assetId: 'L3_VM1', action: 'toggle-valve', transform: 'rotate-y', activeLabel: 'Abierta', inactiveLabel: 'Cerrada', notes: 'Mariposa L3 para direccionar el caudal.' },
   L4_VB1: { assetId: 'L4_VB1', action: 'toggle-valve', transform: 'rotate-z', activeLabel: 'Vertical', inactiveLabel: 'Horizontal', notes: 'Llave de bola L4 de respaldo.' },
 }
 
@@ -389,7 +407,60 @@ function getPrimaryLineAnchor(anchors: { L1: THREE.Vector3; L2: THREE.Vector3; L
   return anchors[lineId]
 }
 
-function resolveInteractiveNodes(object: THREE.Object3D | null, info: { size: THREE.Vector3 } | null): ResolvedInteractiveNode[] {
+function findCandidateIndexByObjectName(candidates: SceneObjectCandidate[], objectName?: string): number {
+  if (!objectName) return -1
+  const normalizedTarget = normalizeSearchText(objectName)
+  return candidates.findIndex((candidate) => candidate.normalizedName === normalizedTarget || candidate.text.includes(normalizedTarget))
+}
+
+function findObjectByName(root: THREE.Object3D | null | undefined, objectName?: string): THREE.Object3D | undefined {
+  if (!root || !objectName) return undefined
+  const normalizedTarget = normalizeSearchText(objectName)
+  let found: THREE.Object3D | undefined
+  root.traverse((child) => {
+    if (found) return
+    const childName = child.name || child.userData.stableMeshId || ''
+    if (childName && normalizeSearchText(childName) === normalizedTarget) {
+      found = child
+    }
+  })
+  return found
+}
+
+function getBindingMap(bindings: InteractiveBinding[]): InteractiveBindingMap {
+  return bindings.reduce<InteractiveBindingMap>((acc, binding) => {
+    acc[binding.assetId as FocusedAssetId] = binding
+    return acc
+  }, {})
+}
+
+function getNamedSelectionFromHit(hitObject: THREE.Object3D, modelRoot: THREE.Object3D): { objectName: string; motionObjectName?: string } | null {
+  const namedPath: Array<{ name: string; object: THREE.Object3D }> = []
+  let current: THREE.Object3D | null = hitObject
+
+  while (current && current !== modelRoot) {
+    const currentName = current.name || current.userData.stableMeshId || ''
+    if (currentName) {
+      namedPath.push({ name: currentName, object: current })
+    }
+    current = current.parent
+  }
+
+  if (namedPath.length === 0) {
+    const fallbackName = hitObject.name || hitObject.userData.stableMeshId || ''
+    return fallbackName ? { objectName: fallbackName, motionObjectName: fallbackName } : null
+  }
+
+  const nearestNamed = namedPath[0]!
+  const farthestNamed = [...namedPath].reverse().find((entry) => entry.object instanceof THREE.Group) ?? namedPath[namedPath.length - 1]!
+
+  return {
+    objectName: farthestNamed.name,
+    motionObjectName: nearestNamed.name,
+  }
+}
+
+function resolveInteractiveNodes(object: THREE.Object3D | null, info: { size: THREE.Vector3 } | null, bindingMap: InteractiveBindingMap): ResolvedInteractiveNode[] {
   const candidates: SceneObjectCandidate[] = []
 
   if (object) {
@@ -436,15 +507,23 @@ function resolveInteractiveNodes(object: THREE.Object3D | null, info: { size: TH
   const usedCandidateIndexes = new Set<number>()
 
   return INTERACTIVE_NODE_DEFINITIONS.map((node) => {
-    const candidateIndex = candidates
-      .map((candidate, index) => ({ candidate, index, score: scoreCandidate(candidate, node) }))
-      .filter(({ index, score }) => !usedCandidateIndexes.has(index) && score > 0)
-      .sort((left, right) => right.score - left.score)[0]?.index ?? -1
+    const binding = bindingMap[node.id]
+    const boundCandidateIndex = findCandidateIndexByObjectName(candidates, binding?.objectName)
+    const candidateIndex = boundCandidateIndex >= 0 && !usedCandidateIndexes.has(boundCandidateIndex)
+      ? boundCandidateIndex
+      : candidates
+          .map((candidate, index) => ({ candidate, index, score: scoreCandidate(candidate, node) }))
+          .filter(({ index, score }) => !usedCandidateIndexes.has(index) && score > 0)
+          .sort((left, right) => right.score - left.score)[0]?.index ?? -1
 
     if (candidateIndex >= 0) {
       usedCandidateIndexes.add(candidateIndex)
       const candidate = candidates[candidateIndex]!
-      const motionObject = node.kind === 'valve' ? findMotionObject(candidate.object, node.handleKeywords) : candidate.object
+      const motionObject = binding?.motionObjectName
+        ? findObjectByName(candidate.object, binding.motionObjectName) ?? findObjectByName(object, binding.motionObjectName) ?? candidate.object
+        : node.kind === 'valve'
+          ? findMotionObject(candidate.object, node.handleKeywords)
+          : candidate.object
       return {
         ...node,
         position: candidate.center.clone(),
@@ -516,7 +595,7 @@ function FlowPulse({ start, end, color, speed = 0.3, delay = 0 }: { start: THREE
   return (
     <mesh ref={meshRef} position={start}>
       <sphereGeometry args={[0.04, 12, 12]} />
-      <meshStandardMaterial color={color} emissive={color} emissiveIntensity={1} />
+      <meshStandardMaterial color={color} emissive={color} emissiveIntensity={1} depthTest={false} depthWrite={false} transparent opacity={0.98} />
     </mesh>
   )
 }
@@ -690,10 +769,18 @@ function buildMeshToNodeMap(resolvedNodes: ResolvedInteractiveNode[], modelObjec
 
 function MeshClickHandler({
   meshToNodeMap,
+  modelRoot,
+  editMode,
+  assignmentTargetId,
+  onAssignBinding,
   onToggleBlower,
   onToggleValve,
 }: {
   meshToNodeMap: Map<string, FocusedAssetId>
+  modelRoot: THREE.Object3D | null
+  editMode: boolean
+  assignmentTargetId: FocusedAssetId | null
+  onAssignBinding?: (assetId: FocusedAssetId, binding: { objectName: string; motionObjectName?: string }) => void
   onToggleBlower: (blowerId: BlowerId) => void
   onToggleValve: (valveId: ValveId) => void
 }) {
@@ -712,6 +799,15 @@ function MeshClickHandler({
       const intersects = raycaster.current.intersectObjects(scene.children, true)
       for (const hit of intersects) {
         if (!(hit.object instanceof THREE.Mesh)) continue
+
+        if (editMode && assignmentTargetId && modelRoot && onAssignBinding) {
+          const selection = getNamedSelectionFromHit(hit.object, modelRoot)
+          if (selection) {
+            onAssignBinding(assignmentTargetId, selection)
+          }
+          break
+        }
+
         const stableMeshId = hit.object.userData.stableMeshId as string | undefined
         if (!stableMeshId) continue
         const nodeId = meshToNodeMap.get(stableMeshId)
@@ -726,7 +822,7 @@ function MeshClickHandler({
     }
     canvas.addEventListener('dblclick', handleClick)
     return () => canvas.removeEventListener('dblclick', handleClick)
-  }, [camera, scene, gl, meshToNodeMap, onToggleBlower, onToggleValve])
+  }, [assignmentTargetId, camera, editMode, gl, meshToNodeMap, modelRoot, onAssignBinding, onToggleBlower, onToggleValve, scene])
 
   return null
 }
@@ -866,7 +962,11 @@ function SopladorasBaader142InteractiveCanvasOverlay({
   valves,
   blowerFlow,
   backupTargets,
+  bindingMap,
+  editMode,
+  assignmentTargetId,
   focusedAssetId,
+  onAssignBinding,
   onToggleBlower,
   onToggleValve,
   onResolvedNodesChange,
@@ -875,14 +975,18 @@ function SopladorasBaader142InteractiveCanvasOverlay({
   valves: ValveState[]
   blowerFlow: Record<BlowerId, number>
   backupTargets: PrimaryLineId[]
+  bindingMap: InteractiveBindingMap
+  editMode: boolean
+  assignmentTargetId: FocusedAssetId | null
   focusedAssetId: FocusedAssetId
+  onAssignBinding?: (assetId: FocusedAssetId, binding: { objectName: string; motionObjectName?: string }) => void
   onToggleBlower: (blowerId: BlowerId) => void
   onToggleValve: (valveId: ValveId) => void
   onResolvedNodesChange?: (meta: ResolvedNodeMeta) => void
 }) {
   const { object, info } = useViewer3DModelContext()
 
-  const resolvedNodes = useMemo(() => resolveInteractiveNodes(object, info), [object, info])
+  const resolvedNodes = useMemo(() => resolveInteractiveNodes(object, info, bindingMap), [bindingMap, object, info])
 
   useEffect(() => {
     if (!onResolvedNodesChange) return
@@ -979,14 +1083,22 @@ function SopladorasBaader142InteractiveCanvasOverlay({
 
   return (
     <>
-      <MeshClickHandler meshToNodeMap={meshToNodeMap} onToggleBlower={onToggleBlower} onToggleValve={onToggleValve} />
+      <MeshClickHandler
+        meshToNodeMap={meshToNodeMap}
+        modelRoot={object}
+        editMode={editMode}
+        assignmentTargetId={assignmentTargetId}
+        onAssignBinding={onAssignBinding}
+        onToggleBlower={onToggleBlower}
+        onToggleValve={onToggleValve}
+      />
       <RealMeshEffects resolvedNodes={resolvedNodes} blowers={blowers} valves={valves} />
 
       {segments.map((segment, index) => {
         const color = segment.active ? segment.color : '#475569'
         return (
           <group key={segment.id}>
-            <Line points={[segment.start, segment.end]} color={color} lineWidth={segment.active ? 2.4 : 1.2} />
+            <Line points={[segment.start, segment.end]} color={color} lineWidth={segment.active ? 2.8 : 1.4} depthTest={false} transparent opacity={segment.active ? 0.96 : 0.48} />
             {segment.active ? <FlowPulse start={segment.start} end={segment.end} color={color} speed={0.26 + index * 0.02} delay={index * 0.12} /> : null}
           </group>
         )
@@ -1171,16 +1283,36 @@ function StandalonePanel({ modelName, className }: Pick<SopladorasBaader142Inter
   )
 }
 
-function ModelBoundExperience({ modelName: _modelName, className, modelUrl, modelFormat }: Required<Pick<SopladorasBaader142InteractiveExperienceProps, 'modelName' | 'modelUrl' | 'modelFormat'>> & Pick<SopladorasBaader142InteractiveExperienceProps, 'className'>) {
+function ModelBoundExperience({ modelId, modelName: _modelName, className, modelUrl, modelFormat, canEditMappings = false, currentUserId = 'system' }: Required<Pick<SopladorasBaader142InteractiveExperienceProps, 'modelName' | 'modelUrl' | 'modelFormat'>> & Pick<SopladorasBaader142InteractiveExperienceProps, 'className' | 'modelId' | 'canEditMappings' | 'currentUserId'>) {
   const mode: OperatingMode = 'produccion'
   const [backupMode, setBackupMode] = useState<BackupMode>('auto')
   const [manualBackupTarget, setManualBackupTarget] = useState<PrimaryLineId | null>('L1')
   const [focusedAssetId, setFocusedAssetId] = useState<FocusedAssetId>('S1')
+  const [assignmentTargetId, setAssignmentTargetId] = useState<FocusedAssetId | null>(null)
+  const [editMappingsMode, setEditMappingsMode] = useState(false)
+  const [bindings, setBindings] = useState<InteractiveBinding[]>([])
   const [resetKey, setResetKey] = useState(0)
   const viewPreset = 'front' as const
   const [resolvedNodeMeta, setResolvedNodeMeta] = useState<ResolvedNodeMeta>({})
   const [blowers, setBlowers] = useState<BlowerState[]>(INITIAL_BLOWERS)
   const [valves, setValves] = useState<ValveState[]>(INITIAL_VALVES)
+
+  useEffect(() => {
+    if (!modelId) {
+      setBindings([])
+      return
+    }
+    const unsubscribe = subscribeToInteractiveBindings(modelId, setBindings)
+    return () => unsubscribe()
+  }, [modelId])
+
+  useEffect(() => {
+    if (!editMappingsMode) {
+      setAssignmentTargetId(null)
+    }
+  }, [editMappingsMode])
+
+  const bindingMap = useMemo(() => getBindingMap(bindings), [bindings])
 
   const blowerFlow = useMemo(() => {
     return blowers.reduce<Record<BlowerId, number>>((acc, blower) => {
@@ -1227,6 +1359,40 @@ function ModelBoundExperience({ modelName: _modelName, className, modelUrl, mode
     setValves(INITIAL_VALVES)
   }, [])
 
+  const handleAssignBinding = useCallback(async (assetId: FocusedAssetId, binding: { objectName: string; motionObjectName?: string }) => {
+    setFocusedAssetId(assetId)
+    if (!modelId) return
+
+    await setInteractiveBinding(modelId, {
+      assetId,
+      objectName: binding.objectName,
+      motionObjectName: binding.motionObjectName,
+      updatedBy: currentUserId,
+    })
+  }, [currentUserId, modelId])
+
+  const handleClearBinding = useCallback(async () => {
+    if (!modelId || !assignmentTargetId) return
+    await deleteInteractiveBinding(modelId, assignmentTargetId)
+  }, [assignmentTargetId, modelId])
+
+  const handleAssetButton = useCallback((assetId: FocusedAssetId) => {
+    setFocusedAssetId(assetId)
+    if (editMappingsMode) {
+      setAssignmentTargetId(assetId)
+      return
+    }
+
+    if (assetId.startsWith('S')) {
+      handleToggleBlowerPower(assetId as BlowerId)
+      return
+    }
+    handleToggleValve(assetId as ValveId)
+  }, [editMappingsMode, handleToggleBlowerPower, handleToggleValve])
+
+  const activeBinding = assignmentTargetId ? bindingMap[assignmentTargetId] : undefined
+  const activeResolvedMeta = assignmentTargetId ? resolvedNodeMeta[assignmentTargetId] : undefined
+
   return (
     <div className={cn('grid h-full gap-3 bg-card p-3', className)}>
       <div className="relative min-h-[860px] overflow-hidden rounded-xl border bg-background">
@@ -1236,7 +1402,11 @@ function ModelBoundExperience({ modelName: _modelName, className, modelUrl, mode
             valves={valves}
             blowerFlow={blowerFlow}
             backupTargets={backupTargets}
+            bindingMap={bindingMap}
+            editMode={editMappingsMode}
+            assignmentTargetId={assignmentTargetId}
             focusedAssetId={focusedAssetId}
+            onAssignBinding={handleAssignBinding}
             onToggleBlower={handleToggleBlowerPower}
             onToggleValve={handleToggleValve}
             onResolvedNodesChange={setResolvedNodeMeta}
@@ -1245,11 +1415,36 @@ function ModelBoundExperience({ modelName: _modelName, className, modelUrl, mode
 
         <div className="pointer-events-none absolute inset-x-2 top-2 z-10">
           <div className="pointer-events-auto rounded-xl border bg-background/88 p-2 backdrop-blur">
+            {canEditMappings ? (
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-background/70 px-2 py-1.5">
+                <div className="space-y-0.5">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Modo enlaces</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {editMappingsMode
+                      ? assignmentTargetId
+                        ? `Seleccionado ${assignmentTargetId}. Haz doble clic en el grupo real del GLB para asignarlo.`
+                        : 'Editor activo. Elige un asset y luego haz doble clic sobre el modelo.'
+                      : 'Activa el editor para asignar cada boton a su grupo real del GLB.'}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  <Button size="sm" variant={editMappingsMode ? 'default' : 'outline'} className="h-8 px-2.5 text-xs" onClick={() => setEditMappingsMode((value) => !value)}>
+                    {editMappingsMode ? 'Salir editor' : 'Editar enlaces'}
+                  </Button>
+                  {editMappingsMode && assignmentTargetId ? (
+                    <Button size="sm" variant="outline" className="h-8 px-2.5 text-xs" onClick={handleClearBinding}>
+                      Quitar enlace
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+
             <div className="grid gap-2 xl:grid-cols-[1fr_1.4fr_0.9fr]">
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Sopladoras</p>
-                  <span className="text-[10px] text-muted-foreground/80">ON, REV u OFF</span>
+                  <span className="text-[10px] text-muted-foreground/80">{editMappingsMode ? 'Selecciona para enlazar' : 'ON, REV u OFF'}</span>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {blowers.map((blower) => {
@@ -1258,13 +1453,13 @@ function ModelBoundExperience({ modelName: _modelName, className, modelUrl, mode
                       <Button
                         key={blower.id}
                         size="sm"
-                        variant={blower.status === 'operativa' ? 'default' : 'outline'}
+                        variant={editMappingsMode ? (assignmentTargetId === blower.id ? 'default' : 'outline') : blower.status === 'operativa' ? 'default' : 'outline'}
                         className="h-8 gap-1.5 px-2.5 text-xs"
-                        onClick={() => handleToggleBlowerPower(blower.id)}
-                        title={actionLink.notes}
+                        onClick={() => handleAssetButton(blower.id)}
+                        title={editMappingsMode ? (bindingMap[blower.id]?.objectName ?? resolvedNodeMeta[blower.id]?.objectName ?? 'Sin grupo asignado') : actionLink.notes}
                       >
                         {blower.id}
-                        <span className="text-[10px] opacity-80">{blower.status === 'operativa' ? actionLink.activeLabel : blower.status === 'revision' ? 'REV' : actionLink.inactiveLabel}</span>
+                        <span className="text-[10px] opacity-80">{editMappingsMode ? (bindingMap[blower.id]?.objectName ? 'LINK' : 'SET') : blower.status === 'operativa' ? actionLink.activeLabel : blower.status === 'revision' ? 'REV' : actionLink.inactiveLabel}</span>
                       </Button>
                     )
                   })}
@@ -1274,7 +1469,7 @@ function ModelBoundExperience({ modelName: _modelName, className, modelUrl, mode
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Valvulas por linea</p>
-                  <span className="text-[10px] text-muted-foreground/80">Manilla real a 90 grados</span>
+                  <span className="text-[10px] text-muted-foreground/80">{editMappingsMode ? 'Selecciona para enlazar' : 'Manilla real a 90 grados'}</span>
                 </div>
                 <div className="grid gap-1.5 md:grid-cols-2 xl:grid-cols-4">
                   {(Object.keys(LINE_VISUALS) as LineId[]).map((lineId) => (
@@ -1290,13 +1485,13 @@ function ModelBoundExperience({ modelName: _modelName, className, modelUrl, mode
                             <Button
                               key={valve.id}
                               size="sm"
-                              variant={valve.status === 'abierta' ? 'default' : 'outline'}
+                              variant={editMappingsMode ? (assignmentTargetId === valve.id ? 'default' : 'outline') : valve.status === 'abierta' ? 'default' : 'outline'}
                               className="h-7 gap-1 px-2 text-[11px]"
-                              onClick={() => handleToggleValve(valve.id)}
-                              title={actionLink.notes}
+                              onClick={() => handleAssetButton(valve.id)}
+                              title={editMappingsMode ? (bindingMap[valve.id]?.objectName ?? resolvedNodeMeta[valve.id]?.objectName ?? 'Sin grupo asignado') : actionLink.notes}
                             >
                               {valve.id.replace(`${lineId}_`, '')}
-                              <span className="text-[10px] opacity-80">{valve.status === 'abierta' ? actionLink.activeLabel : actionLink.inactiveLabel}</span>
+                              <span className="text-[10px] opacity-80">{editMappingsMode ? (bindingMap[valve.id]?.objectName ? 'LINK' : 'SET') : valve.status === 'abierta' ? actionLink.activeLabel : actionLink.inactiveLabel}</span>
                             </Button>
                           )
                         })}
@@ -1342,6 +1537,21 @@ function ModelBoundExperience({ modelName: _modelName, className, modelUrl, mode
                 </div>
               </div>
             </div>
+
+            {editMappingsMode ? (
+              <div className="mt-2 rounded-lg border bg-background/65 px-2 py-1.5 text-[11px] text-muted-foreground">
+                {assignmentTargetId ? (
+                  <>
+                    <span className="font-semibold text-foreground">{assignmentTargetId}</span>
+                    {' -> '}
+                    {activeBinding?.objectName ?? activeResolvedMeta?.objectName ?? 'sin grupo asignado'}
+                    {activeBinding?.motionObjectName || activeResolvedMeta?.motionObjectName ? ` / manilla ${activeBinding?.motionObjectName ?? activeResolvedMeta?.motionObjectName}` : ''}
+                  </>
+                ) : (
+                  'Selecciona un asset en la barra superior para empezar a asignar grupos reales.'
+                )}
+              </div>
+            ) : null}
           </div>
         </div>
 
@@ -1356,17 +1566,20 @@ function ModelBoundExperience({ modelName: _modelName, className, modelUrl, mode
   )
 }
 
-export function SopladorasBaader142InteractiveExperience({ modelName, className, modelUrl, modelFormat }: SopladorasBaader142InteractiveExperienceProps) {
+export function SopladorasBaader142InteractiveExperience({ modelId, modelName, className, modelUrl, modelFormat, canEditMappings, currentUserId }: SopladorasBaader142InteractiveExperienceProps) {
   if (!modelUrl || !modelFormat) {
     return <StandalonePanel modelName={modelName} className={className} />
   }
 
   return (
     <ModelBoundExperience
+      modelId={modelId}
       modelName={modelName}
       className={className}
       modelUrl={modelUrl}
       modelFormat={modelFormat}
+      canEditMappings={canEditMappings}
+      currentUserId={currentUserId}
     />
   )
 }

@@ -586,9 +586,11 @@ export function Visor3DPublicPage() {
           <ToboganInteractiveExperience modelName={model.name} className="h-full" />
         ) : interactiveExperience?.id === 'sopladorasBaader142' ? (
           <SopladorasBaader142InteractiveExperience
+            modelId={model.id}
             modelName={model.name}
             modelUrl={model.downloadURL}
             modelFormat={model.format}
+            canEditMappings={false}
             className="h-full"
           />
         ) : null}

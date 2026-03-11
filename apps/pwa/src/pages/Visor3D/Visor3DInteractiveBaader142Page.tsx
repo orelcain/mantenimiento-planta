@@ -8,6 +8,7 @@ import { getInteractiveExperienceForModel } from '@/components/visor3d/interacti
 import type { Model3D, Model3DFormat } from '@/types/models3d'
 
 export function Visor3DInteractiveBaader142Page() {
+  const [modelId, setModelId] = useState<string | undefined>()
   const [modelUrl, setModelUrl] = useState<string | undefined>()
   const [modelFormat, setModelFormat] = useState<Model3DFormat | undefined>()
   const [loading, setLoading] = useState(true)
@@ -18,6 +19,7 @@ export function Visor3DInteractiveBaader142Page() {
         (m) => getInteractiveExperienceForModel(m)?.id === 'sopladorasBaader142',
       )
       if (match) {
+        setModelId(match.id)
         setModelUrl(match.downloadURL)
         setModelFormat(match.format)
       }
@@ -67,9 +69,11 @@ export function Visor3DInteractiveBaader142Page() {
           </div>
         ) : (
           <SopladorasBaader142InteractiveExperience
+            modelId={modelId}
             modelName="Sopladoras Baader 142"
             modelUrl={modelUrl}
             modelFormat={modelFormat}
+            canEditMappings={false}
             className="h-[calc(100vh-12rem)] min-h-[740px]"
           />
         )}
