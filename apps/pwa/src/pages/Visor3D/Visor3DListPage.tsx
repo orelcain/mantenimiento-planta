@@ -20,6 +20,7 @@ import {
   AlertCircle,
   X,
   Check,
+  Waves,
 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import {
@@ -196,6 +197,29 @@ export function Visor3DListPage() {
           </button>
         )}
       </div>
+
+      <Card className="border-primary/25 bg-gradient-to-br from-primary/10 via-background to-background">
+        <CardContent className="flex flex-col gap-4 py-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Waves className="h-5 w-5 text-primary" />
+              <h2 className="text-lg font-semibold">Interactividad destacada: Tobogan</h2>
+              <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
+                Sin modelo cargado
+              </Badge>
+            </div>
+            <p className="text-sm text-muted-foreground max-w-3xl">
+              El tobogan vive hoy en la repo externa y ya puede abrirse desde el modulo Visor 3D como experiencia independiente, sin subir un archivo al inventario de modelos.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button className="gap-2" onClick={() => navigate('/visor-3d/interactividad/tobogan')}>
+              <ExternalLink className="h-4 w-4" />
+              Abrir demo Tobogan
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Error */}
       {error && (

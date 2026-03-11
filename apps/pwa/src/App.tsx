@@ -70,6 +70,7 @@ const PermissionsPage = lazyWithReload(() => import('@/pages/admin/PermissionsPa
 const Visor3DListPage = lazyWithReload(() => import('@/pages/Visor3D/Visor3DListPage').then((mod) => ({ default: mod.Visor3DListPage })))
 const Visor3DViewerPage = lazyWithReload(() => import('@/pages/Visor3D/Visor3DViewerPage').then((mod) => ({ default: mod.Visor3DViewerPage })))
 const Visor3DPublicPage = lazyWithReload(() => import('@/pages/Visor3D/Visor3DPublicPage').then((mod) => ({ default: mod.Visor3DPublicPage })))
+const Visor3DInteractiveToboganPage = lazyWithReload(() => import('@/pages/Visor3D/Visor3DInteractiveToboganPage').then((mod) => ({ default: mod.Visor3DInteractiveToboganPage })))
 const AnalisisGraderWizardPage = lazyWithReload(() => import('@/pages/AnalisisGrader/AnalisisGraderWizardPage').then((mod) => ({ default: mod.AnalisisGraderWizardPage })))
 const AnalisisGraderSessionPage = lazyWithReload(() => import('@/pages/AnalisisGrader/AnalisisGraderSessionPage').then((mod) => ({ default: mod.AnalisisGraderSessionPage })))
 const AnalisisGraderSessionsListPage = lazyWithReload(() => import('@/pages/AnalisisGrader/AnalisisGraderSessionsListPage').then((mod) => ({ default: mod.AnalisisGraderSessionsListPage })))
@@ -199,6 +200,14 @@ export function App() {
 
           {/* Public 3D viewer (requires auth but no sidebar) */}
           <Route
+            path="/v/interactive/tobogan"
+            element={
+              <Suspense fallback={<LoadingScreen />}>
+                <Visor3DInteractiveToboganPage />
+              </Suspense>
+            }
+          />
+          <Route
             path="/v/:modelId"
             element={
               <Suspense fallback={<LoadingScreen />}>
@@ -310,6 +319,11 @@ export function App() {
             <Route path="visor-3d" element={
               <Suspense fallback={<LoadingScreen />}>
                 <Visor3DListPage />
+              </Suspense>
+            } />
+            <Route path="visor-3d/interactividad/tobogan" element={
+              <Suspense fallback={<LoadingScreen />}>
+                <Visor3DInteractiveToboganPage />
               </Suspense>
             } />
             <Route path="visor-3d/:modelId" element={
