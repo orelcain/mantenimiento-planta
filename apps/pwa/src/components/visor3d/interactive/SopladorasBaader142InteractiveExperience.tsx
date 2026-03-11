@@ -813,6 +813,8 @@ function ModelBoundExperience({ modelName: _modelName, className, modelUrl, mode
   const [mode, setMode] = useState<OperatingMode>('produccion')
   const [focusedAssetId, setFocusedAssetId] = useState<FocusedAssetId>('S1')
   const [resetKey, setResetKey] = useState(0)
+  const [viewPreset, setViewPreset] = useState<'front' | 'left' | 'right' | 'top' | 'isometric'>('front')
+  const [showSidePanel, setShowSidePanel] = useState(true)
   const [resolvedNodeMeta, setResolvedNodeMeta] = useState<ResolvedNodeMeta>({})
   const [blowers, setBlowers] = useState<BlowerState[]>(INITIAL_BLOWERS)
   const [valves, setValves] = useState<ValveState[]>(INITIAL_VALVES)
@@ -875,9 +877,9 @@ function ModelBoundExperience({ modelName: _modelName, className, modelUrl, mode
       : `Validar enclavamiento y posicion cerrada de ${focusedValve?.label.toLowerCase()} antes de intervenir el ducto.`
 
   return (
-    <div className={cn('grid h-full gap-3 bg-card p-3 xl:grid-cols-[minmax(0,2.5fr)_320px] 2xl:grid-cols-[minmax(0,2.9fr)_340px]', className)}>
+    <div className={cn(showSidePanel ? 'grid h-full gap-3 bg-card p-3 xl:grid-cols-[minmax(0,2.5fr)_320px] 2xl:grid-cols-[minmax(0,2.9fr)_340px]' : 'grid h-full gap-3 bg-card p-3', className)}>
       <div className="relative min-h-[860px] overflow-hidden rounded-xl border bg-background">
-        <Viewer3D url={modelUrl} format={modelFormat} resetKey={resetKey}>
+        <Viewer3D url={modelUrl} format={modelFormat} resetKey={resetKey} viewPreset={viewPreset}>
           <SopladorasBaader142InteractiveCanvasOverlay
             blowers={blowers}
             valves={valves}
@@ -901,6 +903,17 @@ function ModelBoundExperience({ modelName: _modelName, className, modelUrl, mode
 
           <div className="pointer-events-auto flex flex-wrap gap-2">
             {([
+              { id: 'front', label: 'Frente' },
+              { id: 'left', label: 'Izquierda' },
+              { id: 'right', label: 'Derecha' },
+              { id: 'top', label: 'Superior' },
+              { id: 'isometric', label: 'Iso' },
+            ] as const).map((option) => (
+              <Button key={option.id} variant={viewPreset === option.id ? 'default' : 'outline'} size="sm" onClick={() => setViewPreset(option.id)}>
+                {option.label}
+              </Button>
+            ))}
+            {([
               { id: 'produccion', label: 'Produccion' },
               { id: 'lavado', label: 'Lavado' },
               { id: 'mantencion', label: 'Mantencion' },
@@ -909,6 +922,9 @@ function ModelBoundExperience({ modelName: _modelName, className, modelUrl, mode
                 {option.label}
               </Button>
             ))}
+            <Button variant="outline" size="sm" onClick={() => setShowSidePanel((current) => !current)}>
+              {showSidePanel ? 'Ocultar paneles' : 'Mostrar paneles'}
+            </Button>
             <Button variant="outline" size="sm" className="gap-2" onClick={() => setResetKey((value) => value + 1)}>
               <RotateCcw className="h-4 w-4" />
               Reset vista
@@ -924,7 +940,7 @@ function ModelBoundExperience({ modelName: _modelName, className, modelUrl, mode
         </div>
       </div>
 
-      <div className="space-y-4 overflow-y-auto pr-1">
+      {showSidePanel && <div className="space-y-4 overflow-y-auto pr-1">
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base"><Workflow className="h-4 w-4 text-primary" />Estado por sopladora</CardTitle>
@@ -1063,7 +1079,7 @@ function ModelBoundExperience({ modelName: _modelName, className, modelUrl, mode
             <p className="mt-2 text-[11px] text-muted-foreground">Doble clic sobre una pieza real del modelo para interactuar. Los nombres de malla del GLB se imprimen en la consola del navegador (F12) al cargar.</p>
           </CardContent>
         </Card>
-      </div>
+      </div>}
     </div>
   )
 }

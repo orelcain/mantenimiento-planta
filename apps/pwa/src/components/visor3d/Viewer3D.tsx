@@ -36,6 +36,7 @@ interface Viewer3DProps {
   url: string
   format: Model3DFormat
   resetKey?: number
+  viewPreset?: 'front' | 'left' | 'right' | 'top' | 'isometric'
   /** Cotas: callback al hacer click en superficie */
   onPointClick?: (point: Point3D) => void
   /** Punto pendiente único (retrocompat) */
@@ -195,7 +196,35 @@ function applyMaterialOverrides(object: THREE.Object3D, overrides: MaterialOverr
 
 interface ModelInfo extends Viewer3DModelInfo {}
 
-function AutoFitCamera({ modelInfo, resetKey }: { modelInfo: ModelInfo | null; resetKey: number }) {
+function getPresetCameraPosition(
+  center: THREE.Vector3,
+  dist: number,
+  preset: NonNullable<Viewer3DProps['viewPreset']>,
+): THREE.Vector3 {
+  switch (preset) {
+    case 'front':
+      return new THREE.Vector3(center.x, center.y + dist * 0.18, center.z - dist * 0.92)
+    case 'left':
+      return new THREE.Vector3(center.x - dist * 0.95, center.y + dist * 0.18, center.z)
+    case 'right':
+      return new THREE.Vector3(center.x + dist * 0.95, center.y + dist * 0.18, center.z)
+    case 'top':
+      return new THREE.Vector3(center.x, center.y + dist * 1.2, center.z)
+    case 'isometric':
+    default:
+      return new THREE.Vector3(center.x + dist * 0.6, center.y + dist * 0.5, center.z - dist * 0.6)
+  }
+}
+
+function AutoFitCamera({
+  modelInfo,
+  resetKey,
+  viewPreset = 'front',
+}: {
+  modelInfo: ModelInfo | null
+  resetKey: number
+  viewPreset?: Viewer3DProps['viewPreset']
+}) {
   const { camera, controls } = useThree()
 
   useEffect(() => {
@@ -204,7 +233,8 @@ function AutoFitCamera({ modelInfo, resetKey }: { modelInfo: ModelInfo | null; r
     const fov = (camera as THREE.PerspectiveCamera).fov * (Math.PI / 180)
     const dist = maxDim / (2 * Math.tan(fov / 2)) * 2.0
 
-    camera.position.set(center.x + dist * 0.6, center.y + dist * 0.5, center.z - dist * 0.6)
+    const nextPosition = getPresetCameraPosition(center, dist, viewPreset ?? 'front')
+    camera.position.copy(nextPosition)
     camera.lookAt(center)
     camera.near = Math.max(maxDim * 0.001, 0.001)
     camera.far = maxDim * 200
@@ -215,7 +245,7 @@ function AutoFitCamera({ modelInfo, resetKey }: { modelInfo: ModelInfo | null; r
       ctrl.target.copy(center)
       ctrl.update()
     }
-  }, [modelInfo, camera, controls, resetKey])
+  }, [modelInfo, camera, controls, resetKey, viewPreset])
 
   return null
 }
@@ -849,7 +879,7 @@ function SceneContent(props: Viewer3DProps) {
     url, format, resetKey, onPointClick, pendingPoints, measurementType, onClosePolygon, 
     paintMode, paintColor, paintErase, materialOverrides, onMeshPainted,
     annotations, annotationMode, onAddAnnotation, onAnnotationClick, onPhotoClick,
-    focusPoint,
+    focusPoint, viewPreset,
     children 
   } = props
   const [modelInfo, setModelInfo] = useState<ModelInfo | null>(null)
@@ -903,7 +933,7 @@ function SceneContent(props: Viewer3DProps) {
         zoomToCursor
       />
 
-      <AutoFitCamera modelInfo={modelInfo} resetKey={resetKey ?? 0} />
+      <AutoFitCamera modelInfo={modelInfo} resetKey={resetKey ?? 0} viewPreset={viewPreset} />
       <FocusCamera target={focusPoint} />
 
       {/* Click handlers - Priority: Paint > Annotation > Measure */}
@@ -1027,7 +1057,7 @@ export function Viewer3D(props: Viewer3DProps) {
     <div className="w-full h-full relative">
       <CanvasErrorBoundary fallback={<WebGLUnavailableFallback />}>
         <Canvas
-          camera={{ position: [5, 3, -5], fov: 45, near: 0.01, far: 2000 }}
+          camera={{ position: [0, 3, -5], fov: 45, near: 0.01, far: 2000 }}
           shadows
           gl={{
             antialias: true,
