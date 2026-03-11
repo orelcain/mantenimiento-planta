@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Html, Line } from '@react-three/drei'
-import { useFrame } from '@react-three/fiber'
+import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { AirVent, Gauge, RotateCcw, Settings2, Workflow } from 'lucide-react'
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from '@/components/ui'
@@ -53,9 +53,10 @@ interface ResolvedInteractiveNode extends InteractiveNodeDefinition {
   position: THREE.Vector3
   source: 'mesh' | 'fallback'
   meshName?: string
+  meshRef?: THREE.Mesh
 }
 
-type ResolvedNodeMeta = Partial<Record<FocusedAssetId, { source: 'mesh' | 'fallback'; meshName?: string }>>
+type ResolvedNodeMeta = Partial<Record<FocusedAssetId, { source: 'mesh' | 'fallback'; meshName?: string; meshRef?: THREE.Mesh }>>
 
 const STATUS_ORDER: BlowerStatus[] = ['operativa', 'revision', 'detenida']
 
@@ -166,11 +167,14 @@ function getFallbackPosition(fallback: [number, number, number], info: { size: T
 }
 
 function resolveInteractiveNodes(object: THREE.Object3D | null, info: { size: THREE.Vector3 } | null): ResolvedInteractiveNode[] {
-  const candidates: Array<{ text: string; center: THREE.Vector3; meshName: string }> = []
+  const candidates: Array<{ text: string; center: THREE.Vector3; meshName: string; mesh: THREE.Mesh }> = []
 
   if (object) {
+    const allMeshNames: string[] = []
     object.traverse((child) => {
       if (!(child instanceof THREE.Mesh)) return
+      const name = child.name || child.userData.stableMeshId || '(sin nombre)'
+      allMeshNames.push(name)
       const text = normalizeSearchText(`${child.name} ${child.userData.stableMeshId ?? ''}`)
       const box = new THREE.Box3().setFromObject(child)
       if (box.isEmpty()) return
@@ -179,8 +183,15 @@ function resolveInteractiveNodes(object: THREE.Object3D | null, info: { size: TH
         text,
         center: box.getCenter(new THREE.Vector3()),
         meshName: child.name || child.userData.stableMeshId || 'mesh',
+        mesh: child,
       })
     })
+    // Log all mesh names for development mapping
+    if (allMeshNames.length > 0) {
+      console.groupCollapsed(`[Sopladoras GLB] ${allMeshNames.length} mallas detectadas`)
+      allMeshNames.forEach((n, i) => console.log(`  ${i}: ${n}`))
+      console.groupEnd()
+    }
   }
 
   const usedCandidateIndexes = new Set<number>()
@@ -191,7 +202,7 @@ function resolveInteractiveNodes(object: THREE.Object3D | null, info: { size: TH
     if (candidateIndex >= 0) {
       usedCandidateIndexes.add(candidateIndex)
       const candidate = candidates[candidateIndex]!
-      return { ...node, position: candidate.center.clone(), source: 'mesh' as const, meshName: candidate.meshName }
+      return { ...node, position: candidate.center.clone(), source: 'mesh' as const, meshName: candidate.meshName, meshRef: candidate.mesh }
     }
 
     return { ...node, position: getFallbackPosition(node.fallback, info), source: 'fallback' as const }
@@ -358,6 +369,190 @@ function InteractiveAssetProxy({
   )
 }
 
+/**
+ * Builds a lookup map from stableMeshId → nodeId by traversing
+ * each resolved node's meshRef and collecting all descendant meshes.
+ */
+function buildMeshToNodeMap(
+  resolvedNodes: ResolvedInteractiveNode[],
+  modelObject: THREE.Object3D | null,
+): Map<string, FocusedAssetId> {
+  const map = new Map<string, FocusedAssetId>()
+  for (const node of resolvedNodes) {
+    if (!node.meshRef) continue
+    // The matched mesh and all its children belong to this node
+    node.meshRef.traverse((child) => {
+      if (child instanceof THREE.Mesh && child.userData.stableMeshId) {
+        map.set(child.userData.stableMeshId, node.id)
+      }
+    })
+    if (node.meshRef.userData.stableMeshId) {
+      map.set(node.meshRef.userData.stableMeshId, node.id)
+    }
+    // Also check the parent group — in many GLBs the mesh is nested inside a Group
+    if (node.meshRef.parent) {
+      node.meshRef.parent.traverse((child) => {
+        if (child instanceof THREE.Mesh && child.userData.stableMeshId) {
+          map.set(child.userData.stableMeshId, node.id)
+        }
+      })
+    }
+  }
+  // Proximity-based fallback: for meshes not already mapped, check if they
+  // are very close to a resolved node position and assign them.
+  if (modelObject) {
+    modelObject.traverse((child) => {
+      if (!(child instanceof THREE.Mesh)) return
+      const sid = child.userData.stableMeshId as string | undefined
+      if (!sid || map.has(sid)) return
+      const box = new THREE.Box3().setFromObject(child)
+      if (box.isEmpty()) return
+      const center = box.getCenter(new THREE.Vector3())
+      let bestDist = 0.35 // max proximity threshold
+      let bestNodeId: FocusedAssetId | null = null
+      for (const node of resolvedNodes) {
+        const d = center.distanceTo(node.position)
+        if (d < bestDist) {
+          bestDist = d
+          bestNodeId = node.id
+        }
+      }
+      if (bestNodeId) map.set(sid, bestNodeId)
+    })
+  }
+  return map
+}
+
+/**
+ * Click handler that intercepts clicks on real model meshes and
+ * maps them to the corresponding interactive node.
+ */
+function MeshClickHandler({
+  meshToNodeMap,
+  onToggleBlower,
+  onToggleValve,
+}: {
+  meshToNodeMap: Map<string, FocusedAssetId>
+  onToggleBlower: (blowerId: BlowerId) => void
+  onToggleValve: (valveId: ValveId) => void
+}) {
+  const { camera, scene, gl } = useThree()
+  const raycaster = useRef(new THREE.Raycaster())
+
+  useEffect(() => {
+    const canvas = gl.domElement
+    const handleClick = (event: MouseEvent) => {
+      const rect = canvas.getBoundingClientRect()
+      const mouse = new THREE.Vector2(
+        ((event.clientX - rect.left) / rect.width) * 2 - 1,
+        -((event.clientY - rect.top) / rect.height) * 2 + 1,
+      )
+      raycaster.current.setFromCamera(mouse, camera)
+      const intersects = raycaster.current.intersectObjects(scene.children, true)
+      for (const hit of intersects) {
+        if (!(hit.object instanceof THREE.Mesh)) continue
+        const sid = hit.object.userData.stableMeshId as string | undefined
+        if (!sid) continue
+        const nodeId = meshToNodeMap.get(sid)
+        if (!nodeId) continue
+        // Dispatch action
+        if (nodeId.startsWith('S')) {
+          onToggleBlower(nodeId as BlowerId)
+        } else {
+          onToggleValve(nodeId as ValveId)
+        }
+        break
+      }
+    }
+    canvas.addEventListener('dblclick', handleClick)
+    return () => canvas.removeEventListener('dblclick', handleClick)
+  }, [camera, scene, gl, meshToNodeMap, onToggleBlower, onToggleValve])
+
+  return null
+}
+
+/**
+ * Applies real-time visual effects to the actual GLB meshes:
+ * - Blowers: color/emissive change based on on/off status
+ * - Valves: rotation change based on open/close status
+ */
+function RealMeshEffects({
+  resolvedNodes,
+  blowers,
+  valves,
+}: {
+  resolvedNodes: ResolvedInteractiveNode[]
+  blowers: BlowerState[]
+  valves: ValveState[]
+}) {
+  // Store original materials to restore when needed
+  const originalMaterials = useRef(new Map<string, THREE.Material | THREE.Material[]>())
+
+  // Apply blower effects
+  useEffect(() => {
+    for (const node of resolvedNodes) {
+      if (node.kind !== 'blower' || !node.meshRef) continue
+      const blower = blowers.find((b) => b.id === node.id)
+      if (!blower) continue
+
+      const color = getBlowerStatusColor(blower.status)
+
+      node.meshRef.traverse((child) => {
+        if (!(child instanceof THREE.Mesh)) return
+        const key = child.uuid
+        if (!originalMaterials.current.has(key)) {
+          originalMaterials.current.set(key, Array.isArray(child.material) ? child.material.map((m) => m.clone()) : child.material.clone())
+        }
+        const mat = child.material
+        if (mat instanceof THREE.MeshStandardMaterial || mat instanceof THREE.MeshPhysicalMaterial) {
+          mat.emissive.set(color)
+          mat.emissiveIntensity = blower.status === 'operativa' ? 0.35 : blower.status === 'revision' ? 0.2 : 0.15
+          mat.needsUpdate = true
+        }
+      })
+    }
+  }, [resolvedNodes, blowers])
+
+  // Apply valve effects
+  useFrame(() => {
+    for (const node of resolvedNodes) {
+      if (node.kind !== 'valve' || !node.meshRef) continue
+      const valve = valves.find((v) => v.id === node.id)
+      if (!valve) continue
+
+      const isOpen = valve.status === 'abierta'
+      const targetAngle = isOpen ? 0 : Math.PI / 2
+
+      // Rotate the valve mesh smoothly
+      if (node.id.startsWith('VM')) {
+        // Butterfly valve: rotate around Y axis
+        node.meshRef.rotation.y = THREE.MathUtils.lerp(node.meshRef.rotation.y, targetAngle, 0.08)
+      } else {
+        // Ball valve: rotate around Z axis
+        node.meshRef.rotation.z = THREE.MathUtils.lerp(node.meshRef.rotation.z, targetAngle, 0.08)
+      }
+
+      // Color feedback
+      const color = getValveStatusColor(valve.status)
+      node.meshRef.traverse((child) => {
+        if (!(child instanceof THREE.Mesh)) return
+        const key = child.uuid
+        if (!originalMaterials.current.has(key)) {
+          originalMaterials.current.set(key, Array.isArray(child.material) ? child.material.map((m) => m.clone()) : child.material.clone())
+        }
+        const mat = child.material
+        if (mat instanceof THREE.MeshStandardMaterial || mat instanceof THREE.MeshPhysicalMaterial) {
+          mat.emissive.set(color)
+          mat.emissiveIntensity = 0.2
+          mat.needsUpdate = true
+        }
+      })
+    }
+  })
+
+  return null
+}
+
 function SopladorasBaader142InteractiveCanvasOverlay({
   blowers,
   valves,
@@ -382,7 +577,7 @@ function SopladorasBaader142InteractiveCanvasOverlay({
   useEffect(() => {
     if (!onResolvedNodesChange) return
     const nextMeta = resolvedNodes.reduce<ResolvedNodeMeta>((acc, node) => {
-      acc[node.id] = { source: node.source, meshName: node.meshName }
+      acc[node.id] = { source: node.source, meshName: node.meshName, meshRef: node.meshRef }
       return acc
     }, {})
     onResolvedNodesChange(nextMeta)
@@ -439,8 +634,21 @@ function SopladorasBaader142InteractiveCanvasOverlay({
 
   if (!anchors) return null
 
+  const meshToNodeMap = buildMeshToNodeMap(resolvedNodes, object)
+
   return (
     <>
+      <MeshClickHandler
+        meshToNodeMap={meshToNodeMap}
+        onToggleBlower={onToggleBlower}
+        onToggleValve={onToggleValve}
+      />
+      <RealMeshEffects
+        resolvedNodes={resolvedNodes}
+        blowers={blowers}
+        valves={valves}
+      />
+
       {segments.map((segment, index) => {
         const color = segment.active ? segment.color : '#475569'
         return (
@@ -601,7 +809,7 @@ function StandalonePanel({ modelName, className }: Pick<SopladorasBaader142Inter
   )
 }
 
-function ModelBoundExperience({ modelName, className, modelUrl, modelFormat }: Required<Pick<SopladorasBaader142InteractiveExperienceProps, 'modelName' | 'modelUrl' | 'modelFormat'>> & Pick<SopladorasBaader142InteractiveExperienceProps, 'className'>) {
+function ModelBoundExperience({ modelName: _modelName, className, modelUrl, modelFormat }: Required<Pick<SopladorasBaader142InteractiveExperienceProps, 'modelName' | 'modelUrl' | 'modelFormat'>> & Pick<SopladorasBaader142InteractiveExperienceProps, 'className'>) {
   const [mode, setMode] = useState<OperatingMode>('produccion')
   const [focusedAssetId, setFocusedAssetId] = useState<FocusedAssetId>('S1')
   const [resetKey, setResetKey] = useState(0)
@@ -688,7 +896,7 @@ function ModelBoundExperience({ modelName, className, modelUrl, modelFormat }: R
               <h2 className="text-sm font-semibold">Interactividad Sopladoras Baader 142</h2>
               <Badge variant="outline" className="text-[10px] uppercase tracking-wide">Base 3D activa</Badge>
             </div>
-            <p className="mt-1 text-xs text-muted-foreground">Esta vista usa el mismo modelo de {modelName}. Puedes hacer clic directo sobre sopladoras, llaves de bola y valvulas mariposa para encender, apagar, abrir, cerrar y evaluar continuidad de aire por ductos.</p>
+            <p className="mt-1 text-xs text-muted-foreground">Haz doble clic sobre una pieza real del modelo (sopladora, valvula) para activarla, o usa los controles del panel. Los proxies 3D sobre el modelo tambien responden al clic.</p>
           </div>
 
           <div className="pointer-events-auto flex flex-wrap gap-2">
@@ -833,6 +1041,26 @@ function ModelBoundExperience({ modelName, className, modelUrl, modelFormat }: R
             <div className="grid gap-2">
               {activeSummary.checklist.map((item) => <div key={item} className="rounded-lg border bg-muted/20 px-3 py-2 text-sm text-muted-foreground">{item}</div>)}
             </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base"><Workflow className="h-4 w-4 text-primary" />Mallas del modelo</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="max-h-48 space-y-1 overflow-y-auto text-xs text-muted-foreground">
+              {Object.entries(resolvedNodeMeta).map(([nodeId, meta]) => (
+                <div key={nodeId} className="flex items-center justify-between gap-2 rounded border px-2 py-1">
+                  <span className="font-medium text-foreground">{nodeId}</span>
+                  <span className={meta?.source === 'mesh' ? 'text-emerald-400' : 'text-amber-400'}>
+                    {meta?.source === 'mesh' ? meta.meshName : 'fallback'}
+                  </span>
+                </div>
+              ))}
+              {Object.keys(resolvedNodeMeta).length === 0 && <p>Cargando mallas...</p>}
+            </div>
+            <p className="mt-2 text-[11px] text-muted-foreground">Doble clic sobre una pieza real del modelo para interactuar. Los nombres de malla del GLB se imprimen en la consola del navegador (F12) al cargar.</p>
           </CardContent>
         </Card>
       </div>
