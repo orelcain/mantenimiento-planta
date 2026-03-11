@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils'
 import type { Model3DFormat } from '@/types/models3d'
 
 type OperatingMode = 'produccion' | 'lavado' | 'mantencion'
+type BackupMode = 'auto' | 'manual' | 'off'
 type BlowerStatus = 'operativa' | 'revision' | 'detenida'
 type ValveStatus = 'abierta' | 'cerrada'
 type BlowerId = 'S1' | 'S2' | 'S3' | 'S4'
@@ -557,6 +558,7 @@ function SopladorasBaader142InteractiveCanvasOverlay({
   blowers,
   valves,
   flowByBlower,
+  backupTarget,
   focusedAssetId,
   onToggleBlower,
   onToggleValve,
@@ -565,6 +567,7 @@ function SopladorasBaader142InteractiveCanvasOverlay({
   blowers: BlowerState[]
   valves: ValveState[]
   flowByBlower: Record<BlowerId, number>
+  backupTarget: BlowerId | null
   focusedAssetId: FocusedAssetId
   onToggleBlower: (blowerId: BlowerId) => void
   onToggleValve: (valveId: ValveId) => void
@@ -599,8 +602,7 @@ function SopladorasBaader142InteractiveCanvasOverlay({
 
   const hasNorthFlow = flowByBlower.S1 > 0 || flowByBlower.S2 > 0
   const hasSouthFlow = flowByBlower.S3 > 0 || flowByBlower.S4 > 0
-  const supportTarget = getPrimaryBackupTarget(blowers, flowByBlower)
-  const backupActive = !!supportTarget && flowByBlower.S4 > 0
+  const backupActive = !!backupTarget && flowByBlower.S4 > 0
 
   const segments = useMemo(() => {
     if (!anchors) return []
@@ -626,11 +628,11 @@ function SopladorasBaader142InteractiveCanvasOverlay({
       vb2 && { id: 'vb2-out-c', start: vb2.position, end: anchors.outletC, active: flowByBlower.S3 > 0, color: '#38bdf8' },
       vb2 && { id: 'vb2-out-d', start: vb2.position, end: anchors.outletBackup, active: flowByBlower.S4 > 0 && !backupActive, color: '#38bdf8' },
       s4 && backupActive && { id: 's4-backup-head', start: s4.position, end: anchors.backupHeader, active: true, color: '#a78bfa' },
-      backupActive && supportTarget === 'S1' && { id: 'backup-s1', start: anchors.backupHeader, end: anchors.outletA, active: true, color: '#a78bfa' },
-      backupActive && supportTarget === 'S2' && { id: 'backup-s2', start: anchors.backupHeader, end: anchors.outletB, active: true, color: '#a78bfa' },
-      backupActive && supportTarget === 'S3' && { id: 'backup-s3', start: anchors.backupHeader, end: anchors.outletC, active: true, color: '#a78bfa' },
+      backupActive && backupTarget === 'S1' && { id: 'backup-s1', start: anchors.backupHeader, end: anchors.outletA, active: true, color: '#a78bfa' },
+      backupActive && backupTarget === 'S2' && { id: 'backup-s2', start: anchors.backupHeader, end: anchors.outletB, active: true, color: '#a78bfa' },
+      backupActive && backupTarget === 'S3' && { id: 'backup-s3', start: anchors.backupHeader, end: anchors.outletC, active: true, color: '#a78bfa' },
     ].filter(Boolean) as Array<{ id: string; start: THREE.Vector3; end: THREE.Vector3; active: boolean; color: string }>
-  }, [anchors, backupActive, flowByBlower, hasNorthFlow, hasSouthFlow, nodeMap, supportTarget])
+  }, [anchors, backupActive, backupTarget, flowByBlower, hasNorthFlow, hasSouthFlow, nodeMap])
 
   if (!anchors) return null
 
@@ -811,6 +813,8 @@ function StandalonePanel({ modelName, className }: Pick<SopladorasBaader142Inter
 
 function ModelBoundExperience({ modelName: _modelName, className, modelUrl, modelFormat }: Required<Pick<SopladorasBaader142InteractiveExperienceProps, 'modelName' | 'modelUrl' | 'modelFormat'>> & Pick<SopladorasBaader142InteractiveExperienceProps, 'className'>) {
   const [mode, setMode] = useState<OperatingMode>('produccion')
+  const [backupMode, setBackupMode] = useState<BackupMode>('auto')
+  const [manualBackupTarget, setManualBackupTarget] = useState<BlowerId | null>('S1')
   const [focusedAssetId, setFocusedAssetId] = useState<FocusedAssetId>('S1')
   const [resetKey, setResetKey] = useState(0)
   const [viewPreset, setViewPreset] = useState<'front' | 'left' | 'right' | 'top' | 'isometric'>('front')
@@ -843,7 +847,12 @@ function ModelBoundExperience({ modelName: _modelName, className, modelUrl, mode
   const openValveCount = useMemo(() => valves.filter((valve) => valve.status === 'abierta').length, [valves])
   const activeBlowerCount = useMemo(() => blowers.filter((blower) => flowByBlower[blower.id] > 0).length, [blowers, flowByBlower])
   const meshAnchoredCount = useMemo(() => Object.values(resolvedNodeMeta).filter((node) => node?.source === 'mesh').length, [resolvedNodeMeta])
-  const backupTarget = useMemo(() => getPrimaryBackupTarget(blowers, flowByBlower), [blowers, flowByBlower])
+  const autoBackupTarget = useMemo(() => getPrimaryBackupTarget(blowers, flowByBlower), [blowers, flowByBlower])
+  const backupTarget = useMemo(() => {
+    if (backupMode === 'off') return null
+    if (backupMode === 'manual') return manualBackupTarget
+    return autoBackupTarget
+  }, [autoBackupTarget, backupMode, manualBackupTarget])
   const backupOnline = useMemo(() => !!backupTarget && flowByBlower.S4 > 0, [backupTarget, flowByBlower])
 
   const focusedBlower = blowers.find((blower) => blower.id === focusedAssetId)
@@ -865,6 +874,16 @@ function ModelBoundExperience({ modelName: _modelName, className, modelUrl, mode
     setBlowers((currentBlowers) => currentBlowers.map((blower) => blower.id === blowerId ? { ...blower, status: toggleBlowerPower(blower.status) } : blower))
   }, [])
 
+  const handleResetSystem = useCallback(() => {
+    setMode('produccion')
+    setBackupMode('auto')
+    setManualBackupTarget('S1')
+    setFocusedAssetId('S1')
+    setResetKey((value) => value + 1)
+    setBlowers(INITIAL_BLOWERS)
+    setValves(INITIAL_VALVES)
+  }, [])
+
   const focusTitle = focusedBlower?.label ?? focusedValve?.label ?? 'Sin foco'
   const focusZone = focusedBlower?.zone ?? focusedValve?.zone ?? 'Sin ubicacion'
   const focusStatusLabel = focusedBlower?.status ?? focusedValve?.status ?? 'sin estado'
@@ -884,6 +903,7 @@ function ModelBoundExperience({ modelName: _modelName, className, modelUrl, mode
             blowers={blowers}
             valves={valves}
             flowByBlower={flowByBlower}
+            backupTarget={backupTarget}
             focusedAssetId={focusedAssetId}
             onToggleBlower={handleToggleBlowerPower}
             onToggleValve={handleToggleValve}
@@ -932,11 +952,88 @@ function ModelBoundExperience({ modelName: _modelName, className, modelUrl, mode
           </div>
         </div>
 
+        <div className="pointer-events-none absolute inset-x-3 top-28 z-10">
+          <div className="pointer-events-auto rounded-xl border bg-background/90 p-3 backdrop-blur">
+            <div className="grid gap-3 xl:grid-cols-[1.6fr_1.1fr_1fr]">
+              <div className="space-y-2">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Control rapido sopladoras</p>
+                <div className="flex flex-wrap gap-2">
+                  {blowers.map((blower) => (
+                    <Button
+                      key={blower.id}
+                      size="sm"
+                      variant={blower.status === 'operativa' ? 'default' : 'outline'}
+                      className="gap-2"
+                      onClick={() => handleToggleBlowerPower(blower.id)}
+                    >
+                      {blower.id}
+                      <span className="text-[10px] opacity-80">{blower.status === 'operativa' ? 'ON' : blower.status === 'revision' ? 'REV' : 'OFF'}</span>
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Control rapido valvulas</p>
+                <div className="flex flex-wrap gap-2">
+                  {valves.map((valve) => (
+                    <Button
+                      key={valve.id}
+                      size="sm"
+                      variant={valve.status === 'abierta' ? 'default' : 'outline'}
+                      className="gap-2"
+                      onClick={() => handleToggleValve(valve.id)}
+                    >
+                      {valve.id}
+                      <span className="text-[10px] opacity-80">
+                        {valve.kind === 'bola'
+                          ? valve.status === 'abierta' ? 'Vertical' : 'Horizontal'
+                          : valve.status === 'abierta' ? 'Abierta' : 'Cerrada'}
+                      </span>
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Respaldo S4</p>
+                <div className="flex flex-wrap gap-2">
+                  {([
+                    { id: 'auto', label: 'Auto' },
+                    { id: 'manual', label: 'Manual' },
+                    { id: 'off', label: 'Off' },
+                  ] as const).map((option) => (
+                    <Button
+                      key={option.id}
+                      size="sm"
+                      variant={backupMode === option.id ? 'default' : 'outline'}
+                      onClick={() => setBackupMode(option.id)}
+                    >
+                      {option.label}
+                    </Button>
+                  ))}
+                  {backupMode === 'manual' && (['S1', 'S2', 'S3'] as const).map((target) => (
+                    <Button
+                      key={target}
+                      size="sm"
+                      variant={manualBackupTarget === target ? 'default' : 'outline'}
+                      onClick={() => setManualBackupTarget(target)}
+                    >
+                      Resp. {target}
+                    </Button>
+                  ))}
+                  <Button size="sm" variant="outline" onClick={handleResetSystem}>Reset sistema</Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div className="pointer-events-none absolute bottom-3 left-3 rounded-lg border bg-background/85 px-3 py-2 text-xs text-muted-foreground backdrop-blur">
           {meshAnchoredCount}/{INTERACTIVE_NODE_DEFINITIONS.length} puntos anclados directamente a mallas del modelo.
         </div>
         <div className="pointer-events-none absolute bottom-3 right-3 rounded-lg border bg-background/85 px-3 py-2 text-xs text-muted-foreground backdrop-blur">
-          {backupOnline ? `S4 respalda a ${backupTarget}` : 'S4 en espera como respaldo'}
+          {backupOnline ? `S4 respalda a ${backupTarget}` : backupMode === 'off' ? 'S4 sin respaldo automatico' : backupMode === 'manual' ? `S4 armado para ${backupTarget}` : 'S4 en espera como respaldo'}
         </div>
       </div>
 
@@ -1044,7 +1141,7 @@ function ModelBoundExperience({ modelName: _modelName, className, modelUrl, mode
             <p>{activeBlowerCount} sopladoras entregando aire en este escenario.</p>
             <p>{openValveCount} valvulas abiertas habilitan continuidad por los ductos activos.</p>
             <p>Los tramos con flujo se iluminan en azul sobre el mismo GLB para identificar sectores habilitados y aislados.</p>
-            <p>{backupOnline ? `La sopladora 4 esta respaldando la linea de ${backupTarget}.` : 'La sopladora 4 queda disponible como respaldo cuando una primaria falla.'}</p>
+            <p>{backupOnline ? `La sopladora 4 esta respaldando la linea de ${backupTarget}.` : backupMode === 'manual' ? `La sopladora 4 esta preparada para respaldar manualmente a ${backupTarget}.` : backupMode === 'off' ? 'El respaldo automatico de S4 esta deshabilitado en este escenario.' : 'La sopladora 4 queda disponible como respaldo cuando una primaria falla.'}</p>
           </CardContent>
         </Card>
 
