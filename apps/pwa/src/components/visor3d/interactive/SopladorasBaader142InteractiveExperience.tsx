@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Html, Line } from '@react-three/drei'
+import { Line } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { AirVent, Gauge, Settings2, Workflow } from 'lucide-react'
@@ -584,153 +584,6 @@ function getAutoBackupTargets(blowers: BlowerState[], outletFlowByLine: Record<L
   })
 }
 
-function FlowPulse({ start, end, color, speed = 0.3, delay = 0 }: { start: THREE.Vector3; end: THREE.Vector3; color: string; speed?: number; delay?: number }) {
-  const meshRef = useRef<THREE.Mesh>(null)
-
-  useFrame(({ clock }) => {
-    if (!meshRef.current) return
-    const t = (clock.getElapsedTime() * speed + delay) % 1
-    meshRef.current.position.lerpVectors(start, end, t)
-  })
-
-  return (
-    <mesh ref={meshRef} position={start}>
-      <sphereGeometry args={[0.04, 12, 12]} />
-      <meshStandardMaterial color={color} emissive={color} emissiveIntensity={1} depthTest={false} depthWrite={false} transparent opacity={0.98} />
-    </mesh>
-  )
-}
-
-function InteractiveAssetProxy({
-  node,
-  color,
-  selected,
-  isActive,
-  onClick,
-}: {
-  node: ResolvedInteractiveNode
-  color: string
-  selected: boolean
-  isActive: boolean
-  onClick: () => void
-}) {
-  const coreRef = useRef<THREE.Mesh>(null)
-  const ringRef = useRef<THREE.Mesh>(null)
-  const fanGroupRef = useRef<THREE.Group>(null)
-  const leverRef = useRef<THREE.Mesh>(null)
-  const [hovered, setHovered] = useState(false)
-
-  useFrame(({ clock }) => {
-    const pulse = 1 + Math.sin(clock.getElapsedTime() * 2.4) * 0.08
-    if (coreRef.current) {
-      const scale = selected ? 1.18 : hovered ? 1.1 : 1
-      coreRef.current.scale.setScalar(scale * pulse)
-    }
-    if (ringRef.current) {
-      ringRef.current.scale.setScalar(1 + Math.sin(clock.getElapsedTime() * 2.8) * 0.18)
-    }
-    if (node.kind === 'blower' && fanGroupRef.current) {
-      fanGroupRef.current.rotation.z += isActive ? 0.08 : 0.01
-    }
-    if (node.kind === 'valve' && leverRef.current) {
-      const targetRotation = isActive ? Math.PI / 2 : 0
-      leverRef.current.rotation.z = THREE.MathUtils.lerp(leverRef.current.rotation.z, targetRotation, 0.14)
-    }
-  })
-
-  const labelClassName = selected ? 'border-primary bg-background/95 text-foreground' : 'border-white/10 bg-background/85 text-muted-foreground'
-
-  return (
-    <group
-      position={node.position}
-      onClick={(event) => {
-        event.stopPropagation()
-        onClick()
-      }}
-      onPointerOver={(event) => {
-        event.stopPropagation()
-        setHovered(true)
-      }}
-      onPointerOut={() => setHovered(false)}
-    >
-      <mesh ref={ringRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]}>
-        <ringGeometry args={[0.12, 0.18, 24]} />
-        <meshStandardMaterial color={color} transparent opacity={0.45} side={THREE.DoubleSide} />
-      </mesh>
-      <mesh ref={coreRef}>
-        <sphereGeometry args={[0.085, 20, 20]} />
-        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={selected || hovered ? 0.8 : 0.35} />
-      </mesh>
-
-      {node.kind === 'blower' ? (
-        <group ref={fanGroupRef}>
-          {[0, Math.PI / 2, Math.PI, Math.PI * 1.5].map((rotation) => (
-            <mesh key={rotation} rotation={[0, 0, rotation]} position={[0, 0, 0.01]}>
-              <boxGeometry args={[0.13, 0.025, 0.015]} />
-              <meshStandardMaterial color={color} emissive={color} emissiveIntensity={isActive ? 0.8 : 0.25} />
-            </mesh>
-          ))}
-        </group>
-      ) : (
-        <group>
-          <mesh>
-            <sphereGeometry args={[0.07, 18, 18]} />
-            <meshStandardMaterial color="#cbd5e1" metalness={0.25} roughness={0.55} />
-          </mesh>
-          <mesh ref={leverRef} position={[0, 0.13, 0]}>
-            <boxGeometry args={[0.02, 0.18, 0.02]} />
-            <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.35} />
-          </mesh>
-        </group>
-      )}
-
-      <Html position={[0, 0.18, 0]} center distanceFactor={8} zIndexRange={[20, 0]}>
-        <button
-          type="button"
-          onClick={(event) => {
-            event.stopPropagation()
-            onClick()
-          }}
-          className={cn('rounded-full border px-2 py-1 text-[10px] font-semibold shadow-lg backdrop-blur transition-colors', labelClassName)}
-        >
-          {node.kind === 'blower' ? `${node.label} ${isActive ? 'ON' : 'OFF'}` : `${node.label} ${isActive ? 'OPEN' : 'CLOSE'}`}
-        </button>
-      </Html>
-    </group>
-  )
-}
-
-function BlowerStatusBillboard({
-  node,
-  blower,
-  selected,
-  onClick,
-}: {
-  node: ResolvedInteractiveNode
-  blower: BlowerState
-  selected: boolean
-  onClick: () => void
-}) {
-  const statusColor = blower.status === 'operativa' ? 'bg-emerald-500/90' : blower.status === 'revision' ? 'bg-amber-500/90' : 'bg-rose-500/90'
-
-  return (
-    <Html position={[node.position.x, node.position.y + 0.22, node.position.z]} center distanceFactor={7} zIndexRange={[25, 0]}>
-      <button
-        type="button"
-        onClick={onClick}
-        className={cn(
-          'rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-white shadow-lg backdrop-blur transition-transform hover:scale-[1.03]',
-          statusColor,
-          selected ? 'border-white/80' : 'border-black/20',
-        )}
-        title={`${blower.label} ${blower.status === 'operativa' ? 'ON' : blower.status === 'revision' ? 'REV' : 'OFF'}`}
-      >
-        {blower.id} {blower.status === 'operativa' ? 'ON' : blower.status === 'revision' ? 'REV' : 'OFF'}
-      </button>
-    </Html>
-  )
-}
-
 function buildMeshToNodeMap(resolvedNodes: ResolvedInteractiveNode[], modelObject: THREE.Object3D | null): Map<string, FocusedAssetId> {
   const map = new Map<string, FocusedAssetId>()
   for (const node of resolvedNodes) {
@@ -1010,7 +863,6 @@ function SopladorasBaader142InteractiveCanvasOverlay({
   editMode,
   assignmentTargetId,
   onHoverBindingCandidate,
-  focusedAssetId,
   onAssignBinding,
   onToggleBlower,
   onToggleValve,
@@ -1024,7 +876,6 @@ function SopladorasBaader142InteractiveCanvasOverlay({
   editMode: boolean
   assignmentTargetId: FocusedAssetId | null
   onHoverBindingCandidate?: (binding: { objectName: string; motionObjectName?: string } | null) => void
-  focusedAssetId: FocusedAssetId
   onAssignBinding?: (assetId: FocusedAssetId, binding: { objectName: string; motionObjectName?: string }) => void
   onToggleBlower: (blowerId: BlowerId) => void
   onToggleValve: (valveId: ValveId) => void
@@ -1127,22 +978,14 @@ function SopladorasBaader142InteractiveCanvasOverlay({
 
   if (!anchors) return null
 
-  // In edit mode, render ONLY the click handler — skip all 3D overlays,
-  // Html billboards, flow lines and effects to avoid GPU overload / WebGL context loss.
-  if (editMode) {
-    return (
-      <MeshClickHandler
-        meshToNodeMap={meshToNodeMap}
-        modelRoot={object}
-        editMode={editMode}
-        assignmentTargetId={assignmentTargetId}
-        onHoverBindingCandidate={onHoverBindingCandidate}
-        onAssignBinding={onAssignBinding}
-        onToggleBlower={onToggleBlower}
-        onToggleValve={onToggleValve}
-      />
-    )
-  }
+  // -----------------------------------------------------------------------
+  // LIGHTWEIGHT CANVAS: only MeshClickHandler + RealMeshEffects + static
+  // flow Lines. All <Html> drei overlays, FlowPulse animations and
+  // InteractiveAssetProxy / BlowerStatusBillboard components have been
+  // removed to prevent GPU overload → WebGL context lost on mid-range HW.
+  // The buttons in the HTML panel above the canvas are sufficient for
+  // controlling blowers/valves; RealMeshEffects handles mesh emissive/rotation.
+  // -----------------------------------------------------------------------
 
   return (
     <>
@@ -1158,53 +1001,17 @@ function SopladorasBaader142InteractiveCanvasOverlay({
       />
       <RealMeshEffects resolvedNodes={resolvedNodes} blowers={blowers} valves={valves} />
 
-      {segments.map((segment, index) => {
+      {segments.map((segment) => {
         const color = segment.active ? segment.color : '#475569'
         return (
-          <group key={segment.id}>
-            <Line points={[segment.start, segment.end]} color={color} lineWidth={segment.active ? 2.8 : 1.4} depthTest={false} transparent opacity={segment.active ? 0.96 : 0.48} />
-            {segment.active ? <FlowPulse start={segment.start} end={segment.end} color={color} speed={0.26 + index * 0.02} delay={index * 0.12} /> : null}
-          </group>
-        )
-      })}
-
-      {resolvedNodes.map((node) => {
-        if (node.kind === 'blower') {
-          const blower = blowers.find((item) => item.id === node.id)
-          if (!blower) return null
-          if (node.source === 'fallback') {
-            return (
-              <InteractiveAssetProxy
-                key={node.id}
-                node={node}
-                color={getBlowerStatusColor(blower.status)}
-                selected={focusedAssetId === node.id}
-                isActive={blower.status === 'operativa'}
-                onClick={() => onToggleBlower(node.id as BlowerId)}
-              />
-            )
-          }
-          return (
-            <BlowerStatusBillboard
-              key={node.id}
-              node={node}
-              blower={blower}
-              selected={focusedAssetId === node.id}
-              onClick={() => onToggleBlower(node.id as BlowerId)}
-            />
-          )
-        }
-
-        const valve = valves.find((item) => item.id === node.id)
-        if (!valve || node.source === 'object') return null
-        return (
-          <InteractiveAssetProxy
-            key={node.id}
-            node={node}
-            color={getValveStatusColor(valve.status)}
-            selected={focusedAssetId === node.id}
-            isActive={valve.status === 'abierta'}
-            onClick={() => onToggleValve(node.id as ValveId)}
+          <Line
+            key={segment.id}
+            points={[segment.start, segment.end]}
+            color={color}
+            lineWidth={segment.active ? 2.8 : 1.4}
+            depthTest={false}
+            transparent
+            opacity={segment.active ? 0.96 : 0.48}
           />
         )
       })}
@@ -1352,7 +1159,7 @@ function ModelBoundExperience({ modelId, modelName: _modelName, className, model
   const mode: OperatingMode = 'produccion'
   const [backupMode, setBackupMode] = useState<BackupMode>('auto')
   const [manualBackupTarget, setManualBackupTarget] = useState<PrimaryLineId | null>('L1')
-  const [focusedAssetId, setFocusedAssetId] = useState<FocusedAssetId>('S1')
+  const [, setFocusedAssetId] = useState<FocusedAssetId>('S1')
   const [assignmentTargetId, setAssignmentTargetId] = useState<FocusedAssetId | null>(null)
   const [editMappingsMode, setEditMappingsMode] = useState(false)
   const [bindings, setBindings] = useState<InteractiveBinding[]>([])
@@ -1501,7 +1308,6 @@ function ModelBoundExperience({ modelId, modelName: _modelName, className, model
             editMode={editMappingsMode}
             assignmentTargetId={assignmentTargetId}
             onHoverBindingCandidate={setHoveredBindingCandidate}
-            focusedAssetId={focusedAssetId}
             onAssignBinding={handleAssignBinding}
             onToggleBlower={handleToggleBlowerPower}
             onToggleValve={handleToggleValve}
