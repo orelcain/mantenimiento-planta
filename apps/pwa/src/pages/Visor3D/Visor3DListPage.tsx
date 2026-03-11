@@ -88,11 +88,6 @@ export function Visor3DListPage() {
     )
   }, [models, searchQuery])
 
-  const interactiveModels = useMemo(
-    () => getModelsWithInteractiveExperience(models),
-    [models],
-  )
-
   // Eliminar modelo
   const handleDelete = useCallback(async (model: Model3D) => {
     if (!confirm(`¿Eliminar el modelo "${model.name}"? Esta acción es irreversible.`)) return
@@ -390,52 +385,27 @@ export function Visor3DListPage() {
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <p className="text-sm text-muted-foreground">{experience.description}</p>
+                    {experience.id === 'sopladorasBaader142' && (
+                      <div className="grid gap-2 text-xs text-muted-foreground">
+                        <div className="rounded-lg border bg-muted/20 px-3 py-2">
+                          Define el estado operativo de cada sopladora.
+                        </div>
+                        <div className="rounded-lg border bg-muted/20 px-3 py-2">
+                          Cambia el contexto entre produccion, lavado y mantencion.
+                        </div>
+                        <div className="rounded-lg border bg-muted/20 px-3 py-2">
+                          Prepara la logica que despues se conectara a hotspots y puntos criticos del modelo.
+                        </div>
+                      </div>
+                    )}
                     <Button className="gap-2" onClick={() => navigate(experience.route)}>
                       <ExternalLink className="h-4 w-4" />
-                        {experience.id === 'sopladorasBaader142' ? 'Abrir base interactiva' : 'Abrir interactividad'}
+                      {experience.id === 'sopladorasBaader142' ? 'Abrir base operativa' : 'Abrir interactividad'}
                     </Button>
                   </CardContent>
                 </Card>
               ))}
             </div>
-          </div>
-
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <Box className="h-4 w-4 text-primary" />
-              <h3 className="text-sm font-semibold">Modelos con interactividad asociada</h3>
-            </div>
-            {interactiveModels.length > 0 ? (
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {interactiveModels.map((model) => (
-                  <Card key={model.id} className="border-primary/15">
-                    <CardHeader className="pb-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <CardTitle className="text-base">{model.name}</CardTitle>
-                        <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
-                          {model.experience.label}
-                        </Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      <p className="text-xs text-muted-foreground">{model.originalFileName}</p>
-                      <Button variant="outline" className="gap-2" onClick={() => navigate(`/visor-3d/${model.id}`)}>
-                        <ExternalLink className="h-4 w-4" />
-                        Abrir modelo
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <Card>
-                <CardContent className="py-10 text-center">
-                  <p className="text-sm text-muted-foreground">
-                    Aun no hay modelos del inventario enlazados a una experiencia propia. Cuando exista uno, aparecera aqui y dentro de su ficha.
-                  </p>
-                </CardContent>
-              </Card>
-            )}
           </div>
         </TabsContent>
       </Tabs>

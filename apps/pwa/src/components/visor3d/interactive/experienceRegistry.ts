@@ -43,9 +43,9 @@ export const STANDALONE_INTERACTIVE_EXPERIENCES: StandaloneInteractiveExperience
     id: 'sopladorasBaader142',
     label: 'Sopladoras Baader 142',
     description:
-      'Base preparada para la interactividad del modelo Sopladoras Baader 142, enlazada al inventario 3D y lista para incorporar lógica operacional.',
+      'Base operativa para definir estados por sopladora, modos de trabajo y secuencias de inspeccion antes de conectarlo al modelo 3D.',
     route: '/visor-3d/interactividad/sopladoras-baader-142',
-    sourceLabel: 'Pendiente',
+    sourceLabel: 'Base operativa',
   },
 ]
 

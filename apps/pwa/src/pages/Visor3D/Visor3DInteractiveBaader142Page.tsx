@@ -12,11 +12,11 @@ export function Visor3DInteractiveBaader142Page() {
             <AirVent className="h-5 w-5 text-primary" />
             <h1 className="text-xl font-semibold">Interactividad Sopladoras Baader 142</h1>
             <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
-              Base activa
+              Base operativa
             </Badge>
           </div>
           <p className="text-sm text-muted-foreground">
-            Esta ruta ya trabaja sobre el modelo Sopladoras Baader 142 y sera la base para construir la lógica específica del conjunto de sopladoras.
+            Esta ruta sirve para definir estados, secuencias e inspecciones del conjunto de sopladoras antes de conectarlo a puntos interactivos del modelo 3D.
           </p>
         </div>
 

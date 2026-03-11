@@ -104,11 +104,11 @@ export function SopladorasBaader142InteractiveExperience({
               <AirVent className="h-5 w-5 text-primary" />
               <h2 className="text-sm font-semibold">Interactividad Sopladoras Baader 142</h2>
               <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
-                Base piloto
+                Base operativa
               </Badge>
             </div>
             <p className="text-xs text-muted-foreground">
-              Primera capa interactiva para {modelName}. Esta base ya separa modo operativo, estado por sopladora y foco de inspeccion.
+              Esta base sirve para definir la logica operacional de {modelName} antes de bajarla al modelo 3D: modo activo, estado por sopladora y foco de inspeccion.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -236,11 +236,21 @@ export function SopladorasBaader142InteractiveExperience({
 
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">Proximo paso de interactividad</CardTitle>
+              <CardTitle className="text-base">Utilidad actual de esta base</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 text-sm text-muted-foreground">
-              <p>Esta base ya permite empezar a definir la lógica específica del equipo sin tocar el visor 3D genérico.</p>
-              <p>Lo siguiente es conectar comportamiento real: arranque, paro, dependencias entre sopladoras y puntos críticos del modelo.</p>
+              <p>Permite validar el criterio operativo antes de meter complejidad visual en el modelo.</p>
+              <p>Sirve para acordar estados, secuencias y respuesta esperada por cada sopladora con operacion y mantencion.</p>
+              <p>Tambien deja lista la estructura para enlazar despues hotspots, alarmas y reglas reales del equipo.</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Siguiente iteracion</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm text-muted-foreground">
+              <p>Lo siguiente es conectar comportamiento real: arranque, paro, dependencias entre sopladoras y puntos criticos del modelo.</p>
             </CardContent>
           </Card>
         </div>
