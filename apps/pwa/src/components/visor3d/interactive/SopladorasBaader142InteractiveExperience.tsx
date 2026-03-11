@@ -13,14 +13,17 @@ type OperatingMode = 'produccion' | 'lavado' | 'mantencion'
 type BackupMode = 'auto' | 'manual' | 'off'
 type BlowerStatus = 'operativa' | 'revision' | 'detenida'
 type ValveStatus = 'abierta' | 'cerrada'
+type LineId = 'L1' | 'L2' | 'L3' | 'L4'
+type PrimaryLineId = 'L1' | 'L2' | 'L3'
 type BlowerId = 'S1' | 'S2' | 'S3' | 'S4'
-type ValveId = 'VM1' | 'VM2' | 'VB1' | 'VB2'
+type ValveId = 'L1_VB1' | 'L1_VB2' | 'L1_VM1' | 'L2_VB1' | 'L2_VB2' | 'L2_VM1' | 'L3_VB1' | 'L4_VB1'
 type FocusedAssetId = BlowerId | ValveId
 
 interface BlowerState {
   id: BlowerId
   label: string
   zone: string
+  lineId: LineId
   baseFlow: number
   status: BlowerStatus
 }
@@ -29,9 +32,19 @@ interface ValveState {
   id: ValveId
   label: string
   zone: string
+  lineId: LineId
   kind: 'mariposa' | 'bola'
   status: ValveStatus
-  affects: BlowerId[]
+}
+
+interface LineVisualConfig {
+  id: LineId
+  label: string
+  color: string
+  blowerId: BlowerId
+  valveIds: ValveId[]
+  outletFallback: [number, number, number]
+  manifoldFallback?: [number, number, number]
 }
 
 interface SopladorasBaader142InteractiveExperienceProps {
@@ -46,7 +59,10 @@ interface InteractiveNodeDefinition {
   label: string
   kind: 'blower' | 'valve'
   zone: string
+  lineId: LineId
   keywords: string[]
+  preferredObjectNames: string[]
+  handleKeywords?: string[]
   fallback: [number, number, number]
 }
 
@@ -55,6 +71,8 @@ interface ResolvedInteractiveNode extends InteractiveNodeDefinition {
   source: 'object' | 'fallback'
   objectName?: string
   objectRef?: THREE.Object3D
+  motionObjectName?: string
+  motionObjectRef?: THREE.Object3D
 }
 
 interface ModelActionLink {
@@ -66,18 +84,27 @@ interface ModelActionLink {
   notes: string
 }
 
-type ResolvedNodeMeta = Partial<Record<FocusedAssetId, { source: 'object' | 'fallback'; objectName?: string; objectRef?: THREE.Object3D }>>
+type ResolvedNodeMeta = Partial<Record<FocusedAssetId, { source: 'object' | 'fallback'; objectName?: string; motionObjectName?: string }>>
 
 interface SceneObjectCandidate {
   text: string
+  normalizedName: string
   center: THREE.Vector3
   objectName: string
   object: THREE.Object3D
   objectType: 'group' | 'mesh'
 }
 
-const STATUS_ORDER: BlowerStatus[] = ['operativa', 'revision', 'detenida']
+interface FlowSegment {
+  id: string
+  start: THREE.Vector3
+  end: THREE.Vector3
+  active: boolean
+  color: string
+}
 
+const STATUS_ORDER: BlowerStatus[] = ['operativa', 'revision', 'detenida']
+const PRIMARY_LINE_IDS: PrimaryLineId[] = ['L1', 'L2', 'L3']
 const STATUS_STYLES: Record<BlowerStatus, string> = {
   operativa: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
   revision: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
@@ -120,47 +147,175 @@ const MODE_FLOW_FACTOR: Record<OperatingMode, number> = {
   mantencion: 0.45,
 }
 
+const LINE_VISUALS: Record<LineId, LineVisualConfig> = {
+  L1: { id: 'L1', label: 'Linea 1', color: '#eab308', blowerId: 'S1', valveIds: ['L1_VB1', 'L1_VB2', 'L1_VM1'], outletFallback: [0.14, 0.80, 0.12] },
+  L2: { id: 'L2', label: 'Linea 2', color: '#ef4444', blowerId: 'S2', valveIds: ['L2_VB1', 'L2_VB2', 'L2_VM1'], outletFallback: [0.39, 0.81, 0.18] },
+  L3: { id: 'L3', label: 'Linea 3', color: '#3b82f6', blowerId: 'S3', valveIds: ['L3_VB1'], outletFallback: [0.67, 0.80, 0.29] },
+  L4: { id: 'L4', label: 'Linea 4 respaldo', color: '#334155', blowerId: 'S4', valveIds: ['L4_VB1'], outletFallback: [0.81, 0.58, 0.35], manifoldFallback: [0.81, 0.58, 0.35] },
+}
+
 const INITIAL_BLOWERS: BlowerState[] = [
-  { id: 'S1', label: 'Sopladora 1', zone: 'Cabecera norte', baseFlow: 92, status: 'operativa' },
-  { id: 'S2', label: 'Sopladora 2', zone: 'Cabecera centro', baseFlow: 89, status: 'operativa' },
-  { id: 'S3', label: 'Sopladora 3', zone: 'Cabecera sur', baseFlow: 76, status: 'revision' },
-  { id: 'S4', label: 'Sopladora 4', zone: 'Respaldo de linea', baseFlow: 84, status: 'detenida' },
+  { id: 'S1', label: 'Sopladora 1', zone: 'Linea 1 amarilla', lineId: 'L1', baseFlow: 92, status: 'operativa' },
+  { id: 'S2', label: 'Sopladora 2', zone: 'Linea 2 roja', lineId: 'L2', baseFlow: 89, status: 'operativa' },
+  { id: 'S3', label: 'Sopladora 3', zone: 'Linea 3 azul', lineId: 'L3', baseFlow: 76, status: 'revision' },
+  { id: 'S4', label: 'Sopladora 4', zone: 'Linea 4 respaldo', lineId: 'L4', baseFlow: 84, status: 'detenida' },
 ]
 
 const INITIAL_VALVES: ValveState[] = [
-  { id: 'VM1', label: 'Valvula mariposa norte', zone: 'Cabecera norte', kind: 'mariposa', status: 'abierta', affects: ['S1', 'S2'] },
-  { id: 'VM2', label: 'Valvula mariposa sur', zone: 'Cabecera sur', kind: 'mariposa', status: 'abierta', affects: ['S3', 'S4'] },
-  { id: 'VB1', label: 'Llave de bola linea A', zone: 'Linea A', kind: 'bola', status: 'abierta', affects: ['S1', 'S2'] },
-  { id: 'VB2', label: 'Llave de bola linea B', zone: 'Linea B', kind: 'bola', status: 'cerrada', affects: ['S3', 'S4'] },
+  { id: 'L1_VB1', label: 'L1 bola 1', zone: 'Linea 1 amarilla', lineId: 'L1', kind: 'bola', status: 'abierta' },
+  { id: 'L1_VB2', label: 'L1 bola 2', zone: 'Linea 1 amarilla', lineId: 'L1', kind: 'bola', status: 'abierta' },
+  { id: 'L1_VM1', label: 'L1 mariposa', zone: 'Linea 1 amarilla', lineId: 'L1', kind: 'mariposa', status: 'abierta' },
+  { id: 'L2_VB1', label: 'L2 bola 1', zone: 'Linea 2 roja', lineId: 'L2', kind: 'bola', status: 'abierta' },
+  { id: 'L2_VB2', label: 'L2 bola 2', zone: 'Linea 2 roja', lineId: 'L2', kind: 'bola', status: 'abierta' },
+  { id: 'L2_VM1', label: 'L2 mariposa', zone: 'Linea 2 roja', lineId: 'L2', kind: 'mariposa', status: 'abierta' },
+  { id: 'L3_VB1', label: 'L3 bola 1', zone: 'Linea 3 azul', lineId: 'L3', kind: 'bola', status: 'abierta' },
+  { id: 'L4_VB1', label: 'L4 bola respaldo', zone: 'Linea 4 respaldo', lineId: 'L4', kind: 'bola', status: 'abierta' },
 ]
 
-const BLOWER_VALVE_DEPENDENCIES: Record<BlowerId, ValveId[]> = {
-  S1: ['VM1', 'VB1'],
-  S2: ['VM1', 'VB1'],
-  S3: ['VM2', 'VB2'],
-  S4: ['VM2', 'VB2'],
-}
-
 const INTERACTIVE_NODE_DEFINITIONS: InteractiveNodeDefinition[] = [
-  { id: 'S1', label: 'Sopladora 1', kind: 'blower', zone: 'Cabecera norte', keywords: ['sopladora 1', 'blower 1', 's1'], fallback: [0.18, 0.72, 0.26] },
-  { id: 'S2', label: 'Sopladora 2', kind: 'blower', zone: 'Cabecera centro', keywords: ['sopladora 2', 'blower 2', 's2'], fallback: [0.40, 0.72, 0.34] },
-  { id: 'S3', label: 'Sopladora 3', kind: 'blower', zone: 'Cabecera sur', keywords: ['sopladora 3', 'blower 3', 's3'], fallback: [0.64, 0.70, 0.44] },
-  { id: 'S4', label: 'Sopladora 4', kind: 'blower', zone: 'Respaldo de linea', keywords: ['sopladora 4', 'blower 4', 's4'], fallback: [0.84, 0.68, 0.56] },
-  { id: 'VM1', label: 'Valvula mariposa norte', kind: 'valve', zone: 'Cabecera norte', keywords: ['mariposa norte', 'valvula mariposa 1', 'vm1'], fallback: [0.28, 0.62, 0.24] },
-  { id: 'VM2', label: 'Valvula mariposa sur', kind: 'valve', zone: 'Cabecera sur', keywords: ['mariposa sur', 'valvula mariposa 2', 'vm2'], fallback: [0.60, 0.60, 0.40] },
-  { id: 'VB1', label: 'Llave de bola linea A', kind: 'valve', zone: 'Linea A', keywords: ['bola linea a', 'llave de bola 1', 'vb1'], fallback: [0.34, 0.50, 0.29] },
-  { id: 'VB2', label: 'Llave de bola linea B', kind: 'valve', zone: 'Linea B', keywords: ['bola linea b', 'llave de bola 2', 'vb2'], fallback: [0.72, 0.48, 0.49] },
+  {
+    id: 'S1',
+    label: 'Sopladora 1',
+    kind: 'blower',
+    zone: 'Linea 1 amarilla',
+    lineId: 'L1',
+    keywords: ['sopladora 1', 'blower 1', 's1', 'linea 1', 'l1', 'amarilla'],
+    preferredObjectNames: ['S1', 'SOPLADORA_1', 'SOPLADORA1', 'BLOWER_1', 'BLOWER1', 'L1_S1'],
+    fallback: [0.16, 0.71, 0.25],
+  },
+  {
+    id: 'S2',
+    label: 'Sopladora 2',
+    kind: 'blower',
+    zone: 'Linea 2 roja',
+    lineId: 'L2',
+    keywords: ['sopladora 2', 'blower 2', 's2', 'linea 2', 'l2', 'roja'],
+    preferredObjectNames: ['S2', 'SOPLADORA_2', 'SOPLADORA2', 'BLOWER_2', 'BLOWER2', 'L2_S2'],
+    fallback: [0.38, 0.71, 0.33],
+  },
+  {
+    id: 'S3',
+    label: 'Sopladora 3',
+    kind: 'blower',
+    zone: 'Linea 3 azul',
+    lineId: 'L3',
+    keywords: ['sopladora 3', 'blower 3', 's3', 'linea 3', 'l3', 'azul'],
+    preferredObjectNames: ['S3', 'SOPLADORA_3', 'SOPLADORA3', 'BLOWER_3', 'BLOWER3', 'L3_S3'],
+    fallback: [0.62, 0.70, 0.43],
+  },
+  {
+    id: 'S4',
+    label: 'Sopladora 4',
+    kind: 'blower',
+    zone: 'Linea 4 respaldo',
+    lineId: 'L4',
+    keywords: ['sopladora 4', 'blower 4', 's4', 'linea 4', 'l4', 'respaldo', 'backup'],
+    preferredObjectNames: ['S4', 'SOPLADORA_4', 'SOPLADORA4', 'BLOWER_4', 'BLOWER4', 'L4_S4', 'RESPALDO_S4'],
+    fallback: [0.82, 0.68, 0.55],
+  },
+  {
+    id: 'L1_VB1',
+    label: 'L1 bola 1',
+    kind: 'valve',
+    zone: 'Linea 1 amarilla',
+    lineId: 'L1',
+    keywords: ['l1 vb1', 'linea 1 bola 1', 'bola 1 amarilla', 'valvula bola 1 l1'],
+    preferredObjectNames: ['L1_VB1', 'VB1_L1', 'VALVULA_BOLA_L1_1', 'LINEA1_BOLA1'],
+    handleKeywords: ['manilla', 'handle', 'palanca', 'lever', 'llave'],
+    fallback: [0.23, 0.59, 0.20],
+  },
+  {
+    id: 'L1_VB2',
+    label: 'L1 bola 2',
+    kind: 'valve',
+    zone: 'Linea 1 amarilla',
+    lineId: 'L1',
+    keywords: ['l1 vb2', 'linea 1 bola 2', 'bola 2 amarilla', 'valvula bola 2 l1'],
+    preferredObjectNames: ['L1_VB2', 'VB2_L1', 'VALVULA_BOLA_L1_2', 'LINEA1_BOLA2'],
+    handleKeywords: ['manilla', 'handle', 'palanca', 'lever', 'llave'],
+    fallback: [0.28, 0.55, 0.22],
+  },
+  {
+    id: 'L1_VM1',
+    label: 'L1 mariposa',
+    kind: 'valve',
+    zone: 'Linea 1 amarilla',
+    lineId: 'L1',
+    keywords: ['l1 vm1', 'linea 1 mariposa', 'mariposa amarilla', 'valvula mariposa l1'],
+    preferredObjectNames: ['L1_VM1', 'VM1_L1', 'VALVULA_MARIPOSA_L1', 'LINEA1_MARIPOSA'],
+    handleKeywords: ['manilla', 'handle', 'palanca', 'lever', 'mariposa'],
+    fallback: [0.34, 0.52, 0.24],
+  },
+  {
+    id: 'L2_VB1',
+    label: 'L2 bola 1',
+    kind: 'valve',
+    zone: 'Linea 2 roja',
+    lineId: 'L2',
+    keywords: ['l2 vb1', 'linea 2 bola 1', 'bola 1 roja', 'valvula bola 1 l2'],
+    preferredObjectNames: ['L2_VB1', 'VB1_L2', 'VALVULA_BOLA_L2_1', 'LINEA2_BOLA1'],
+    handleKeywords: ['manilla', 'handle', 'palanca', 'lever', 'llave'],
+    fallback: [0.44, 0.59, 0.30],
+  },
+  {
+    id: 'L2_VB2',
+    label: 'L2 bola 2',
+    kind: 'valve',
+    zone: 'Linea 2 roja',
+    lineId: 'L2',
+    keywords: ['l2 vb2', 'linea 2 bola 2', 'bola 2 roja', 'valvula bola 2 l2'],
+    preferredObjectNames: ['L2_VB2', 'VB2_L2', 'VALVULA_BOLA_L2_2', 'LINEA2_BOLA2'],
+    handleKeywords: ['manilla', 'handle', 'palanca', 'lever', 'llave'],
+    fallback: [0.51, 0.55, 0.34],
+  },
+  {
+    id: 'L2_VM1',
+    label: 'L2 mariposa',
+    kind: 'valve',
+    zone: 'Linea 2 roja',
+    lineId: 'L2',
+    keywords: ['l2 vm1', 'linea 2 mariposa', 'mariposa roja', 'valvula mariposa l2'],
+    preferredObjectNames: ['L2_VM1', 'VM1_L2', 'VALVULA_MARIPOSA_L2', 'LINEA2_MARIPOSA'],
+    handleKeywords: ['manilla', 'handle', 'palanca', 'lever', 'mariposa'],
+    fallback: [0.57, 0.52, 0.37],
+  },
+  {
+    id: 'L3_VB1',
+    label: 'L3 bola 1',
+    kind: 'valve',
+    zone: 'Linea 3 azul',
+    lineId: 'L3',
+    keywords: ['l3 vb1', 'linea 3 bola 1', 'bola azul', 'valvula bola l3'],
+    preferredObjectNames: ['L3_VB1', 'VB1_L3', 'VALVULA_BOLA_L3', 'LINEA3_BOLA1'],
+    handleKeywords: ['manilla', 'handle', 'palanca', 'lever', 'llave'],
+    fallback: [0.70, 0.52, 0.45],
+  },
+  {
+    id: 'L4_VB1',
+    label: 'L4 bola respaldo',
+    kind: 'valve',
+    zone: 'Linea 4 respaldo',
+    lineId: 'L4',
+    keywords: ['l4 vb1', 'linea 4 bola', 'bola respaldo', 'valvula bola l4', 'backup valve'],
+    preferredObjectNames: ['L4_VB1', 'VB1_L4', 'VALVULA_BOLA_L4', 'LINEA4_BOLA1', 'RESPALDO_BOLA'],
+    handleKeywords: ['manilla', 'handle', 'palanca', 'lever', 'llave'],
+    fallback: [0.78, 0.50, 0.52],
+  },
 ]
 
 const MODEL_ACTION_LINKS: Record<FocusedAssetId, ModelActionLink> = {
-  S1: { assetId: 'S1', action: 'toggle-blower', transform: 'emissive', activeLabel: 'ON', inactiveLabel: 'OFF', notes: 'Enciende o detiene la sopladora 1 y habilita su flujo si las valvulas dependientes estan abiertas.' },
-  S2: { assetId: 'S2', action: 'toggle-blower', transform: 'emissive', activeLabel: 'ON', inactiveLabel: 'OFF', notes: 'Enciende o detiene la sopladora 2 y habilita su flujo si las valvulas dependientes estan abiertas.' },
-  S3: { assetId: 'S3', action: 'toggle-blower', transform: 'emissive', activeLabel: 'ON', inactiveLabel: 'OFF', notes: 'Enciende o detiene la sopladora 3 y habilita su flujo si las valvulas dependientes estan abiertas.' },
-  S4: { assetId: 'S4', action: 'toggle-blower', transform: 'emissive', activeLabel: 'ON', inactiveLabel: 'OFF', notes: 'Enciende o detiene la sopladora 4 como unidad de respaldo o apoyo manual.' },
-  VM1: { assetId: 'VM1', action: 'toggle-valve', transform: 'rotate-y', activeLabel: 'Abierta', inactiveLabel: 'Cerrada', notes: 'La mariposa norte abre o corta el flujo del header norte.' },
-  VM2: { assetId: 'VM2', action: 'toggle-valve', transform: 'rotate-y', activeLabel: 'Abierta', inactiveLabel: 'Cerrada', notes: 'La mariposa sur abre o corta el flujo del header sur.' },
-  VB1: { assetId: 'VB1', action: 'toggle-valve', transform: 'rotate-z', activeLabel: 'Vertical', inactiveLabel: 'Horizontal', notes: 'La llave de bola A indica paso abierto en vertical y paso cerrado en horizontal.' },
-  VB2: { assetId: 'VB2', action: 'toggle-valve', transform: 'rotate-z', activeLabel: 'Vertical', inactiveLabel: 'Horizontal', notes: 'La llave de bola B indica paso abierto en vertical y paso cerrado en horizontal.' },
+  S1: { assetId: 'S1', action: 'toggle-blower', transform: 'emissive', activeLabel: 'ON', inactiveLabel: 'OFF', notes: 'Enciende o detiene la sopladora 1.' },
+  S2: { assetId: 'S2', action: 'toggle-blower', transform: 'emissive', activeLabel: 'ON', inactiveLabel: 'OFF', notes: 'Enciende o detiene la sopladora 2.' },
+  S3: { assetId: 'S3', action: 'toggle-blower', transform: 'emissive', activeLabel: 'ON', inactiveLabel: 'OFF', notes: 'Enciende o detiene la sopladora 3.' },
+  S4: { assetId: 'S4', action: 'toggle-blower', transform: 'emissive', activeLabel: 'ON', inactiveLabel: 'OFF', notes: 'Enciende o detiene la sopladora 4 de respaldo.' },
+  L1_VB1: { assetId: 'L1_VB1', action: 'toggle-valve', transform: 'rotate-z', activeLabel: 'Vertical', inactiveLabel: 'Horizontal', notes: 'Llave de bola L1. Vertical abierta, horizontal cerrada.' },
+  L1_VB2: { assetId: 'L1_VB2', action: 'toggle-valve', transform: 'rotate-z', activeLabel: 'Vertical', inactiveLabel: 'Horizontal', notes: 'Llave de bola L1. Vertical abierta, horizontal cerrada.' },
+  L1_VM1: { assetId: 'L1_VM1', action: 'toggle-valve', transform: 'rotate-y', activeLabel: 'Abierta', inactiveLabel: 'Cerrada', notes: 'Mariposa L1 para direccionar el caudal.' },
+  L2_VB1: { assetId: 'L2_VB1', action: 'toggle-valve', transform: 'rotate-z', activeLabel: 'Vertical', inactiveLabel: 'Horizontal', notes: 'Llave de bola L2. Vertical abierta, horizontal cerrada.' },
+  L2_VB2: { assetId: 'L2_VB2', action: 'toggle-valve', transform: 'rotate-z', activeLabel: 'Vertical', inactiveLabel: 'Horizontal', notes: 'Llave de bola L2. Vertical abierta, horizontal cerrada.' },
+  L2_VM1: { assetId: 'L2_VM1', action: 'toggle-valve', transform: 'rotate-y', activeLabel: 'Abierta', inactiveLabel: 'Cerrada', notes: 'Mariposa L2 para direccionar el caudal.' },
+  L3_VB1: { assetId: 'L3_VB1', action: 'toggle-valve', transform: 'rotate-z', activeLabel: 'Vertical', inactiveLabel: 'Horizontal', notes: 'Llave de bola L3. Vertical abierta, horizontal cerrada.' },
+  L4_VB1: { assetId: 'L4_VB1', action: 'toggle-valve', transform: 'rotate-z', activeLabel: 'Vertical', inactiveLabel: 'Horizontal', notes: 'Llave de bola L4 de respaldo.' },
 }
 
 function nextStatus(currentStatus: BlowerStatus): BlowerStatus {
@@ -191,11 +346,47 @@ function getFallbackPosition(fallback: [number, number, number], info: { size: T
 }
 
 function scoreCandidate(candidate: SceneObjectCandidate, node: InteractiveNodeDefinition): number {
-  const matches = node.keywords.reduce((count, keyword) => (
+  const exactMatch = node.preferredObjectNames.some((preferredName) => normalizeSearchText(preferredName) === candidate.normalizedName)
+  const partialMatch = node.preferredObjectNames.some((preferredName) => candidate.normalizedName.includes(normalizeSearchText(preferredName)))
+  const keywordMatches = node.keywords.reduce((count, keyword) => (
     candidate.text.includes(normalizeSearchText(keyword)) ? count + 1 : count
   ), 0)
-  const typeBonus = candidate.objectType === 'group' ? 4 : 1
-  return matches * 10 + typeBonus
+  const typeBonus = candidate.objectType === 'group' ? 6 : 2
+  return (exactMatch ? 120 : 0) + (partialMatch ? 40 : 0) + keywordMatches * 14 + typeBonus
+}
+
+function findMotionObject(root: THREE.Object3D, keywords: string[] = []): THREE.Object3D {
+  if (keywords.length === 0) return root
+
+  const normalizedKeywords = keywords.map((keyword) => normalizeSearchText(keyword))
+  let bestObject: THREE.Object3D | null = null
+  let bestScore = -1
+
+  root.traverse((child) => {
+    if (child === root) return
+    const childName = child.name || child.userData.stableMeshId || ''
+    if (!childName) return
+
+    const normalizedName = normalizeSearchText(childName)
+    const matchCount = normalizedKeywords.reduce((count, keyword) => count + (normalizedName.includes(keyword) ? 1 : 0), 0)
+    if (matchCount === 0) return
+
+    const score = matchCount * 10 + (child instanceof THREE.Group ? 5 : 0)
+    if (score > bestScore) {
+      bestObject = child
+      bestScore = score
+    }
+  })
+
+  if (bestObject) {
+    return bestObject
+  }
+
+  return root
+}
+
+function getPrimaryLineAnchor(anchors: { L1: THREE.Vector3; L2: THREE.Vector3; L3: THREE.Vector3 }, lineId: PrimaryLineId): THREE.Vector3 {
+  return anchors[lineId]
 }
 
 function resolveInteractiveNodes(object: THREE.Object3D | null, info: { size: THREE.Vector3 } | null): ResolvedInteractiveNode[] {
@@ -220,12 +411,14 @@ function resolveInteractiveNodes(object: THREE.Object3D | null, info: { size: TH
         safety += 1
       }
 
-      const text = normalizeSearchText(`${child.name} ${child.userData.stableMeshId ?? ''} ${hierarchyTrail.join(' ')}`)
+      const normalizedName = normalizeSearchText(objectName)
+      const text = normalizeSearchText(`${objectName} ${child.userData.stableMeshId ?? ''} ${hierarchyTrail.join(' ')}`)
       const typeLabel = child instanceof THREE.Mesh ? 'mesh' : 'group'
       allNamedObjects.push(`${typeLabel}: ${objectName}`)
 
       candidates.push({
         text,
+        normalizedName,
         center: box.getCenter(new THREE.Vector3()),
         objectName,
         object: child,
@@ -251,16 +444,23 @@ function resolveInteractiveNodes(object: THREE.Object3D | null, info: { size: TH
     if (candidateIndex >= 0) {
       usedCandidateIndexes.add(candidateIndex)
       const candidate = candidates[candidateIndex]!
+      const motionObject = node.kind === 'valve' ? findMotionObject(candidate.object, node.handleKeywords) : candidate.object
       return {
         ...node,
         position: candidate.center.clone(),
         source: 'object' as const,
         objectName: candidate.objectName,
         objectRef: candidate.object,
+        motionObjectName: motionObject.name || candidate.objectName,
+        motionObjectRef: motionObject,
       }
     }
 
-    return { ...node, position: getFallbackPosition(node.fallback, info), source: 'fallback' as const }
+    return {
+      ...node,
+      position: getFallbackPosition(node.fallback, info),
+      source: 'fallback' as const,
+    }
   })
 }
 
@@ -278,15 +478,30 @@ function getValveStatusColor(status: ValveStatus): string {
   return status === 'abierta' ? '#38bdf8' : '#ef4444'
 }
 
-function getPrimaryBackupTarget(blowers: BlowerState[], flowByBlower: Record<BlowerId, number>): BlowerId | null {
-  const primaryIds: BlowerId[] = ['S1', 'S2', 'S3']
-  const failedPrimary = primaryIds.find((blowerId) => {
+function getLineColor(lineId: LineId): string {
+  return LINE_VISUALS[lineId].color
+}
+
+function getValveMap(valves: ValveState[]): Record<ValveId, ValveStatus> {
+  return valves.reduce<Record<ValveId, ValveStatus>>((acc, valve) => {
+    acc[valve.id] = valve.status
+    return acc
+  }, {} as Record<ValveId, ValveStatus>)
+}
+
+function getLineOutletFlow(lineId: LineId, sourceFlow: number, valveMap: Record<ValveId, ValveStatus>): number {
+  if (sourceFlow <= 0) return 0
+  const valvesOpen = LINE_VISUALS[lineId].valveIds.every((valveId) => valveMap[valveId] === 'abierta')
+  return valvesOpen ? sourceFlow : 0
+}
+
+function getAutoBackupTargets(blowers: BlowerState[], outletFlowByLine: Record<LineId, number>): PrimaryLineId[] {
+  return PRIMARY_LINE_IDS.filter((lineId) => {
+    const blowerId = LINE_VISUALS[lineId].blowerId
     const blower = blowers.find((item) => item.id === blowerId)
     if (!blower) return false
-    return blower.status !== 'operativa' || flowByBlower[blowerId] <= 0
+    return blower.status === 'detenida' || outletFlowByLine[lineId] <= 0
   })
-
-  return failedPrimary ?? null
 }
 
 function FlowPulse({ start, end, color, speed = 0.3, delay = 0 }: { start: THREE.Vector3; end: THREE.Vector3; color: string; speed?: number; delay?: number }) {
@@ -323,7 +538,6 @@ function InteractiveAssetProxy({
   const ringRef = useRef<THREE.Mesh>(null)
   const fanGroupRef = useRef<THREE.Group>(null)
   const leverRef = useRef<THREE.Mesh>(null)
-  const discRef = useRef<THREE.Mesh>(null)
   const [hovered, setHovered] = useState(false)
 
   useFrame(({ clock }) => {
@@ -335,19 +549,12 @@ function InteractiveAssetProxy({
     if (ringRef.current) {
       ringRef.current.scale.setScalar(1 + Math.sin(clock.getElapsedTime() * 2.8) * 0.18)
     }
-
     if (node.kind === 'blower' && fanGroupRef.current) {
       fanGroupRef.current.rotation.z += isActive ? 0.08 : 0.01
     }
-
     if (node.kind === 'valve' && leverRef.current) {
       const targetRotation = isActive ? Math.PI / 2 : 0
       leverRef.current.rotation.z = THREE.MathUtils.lerp(leverRef.current.rotation.z, targetRotation, 0.14)
-    }
-
-    if (node.kind === 'valve' && discRef.current) {
-      const targetRotation = isActive ? Math.PI / 2 : 0
-      discRef.current.rotation.y = THREE.MathUtils.lerp(discRef.current.rotation.y, targetRotation, 0.14)
     }
   })
 
@@ -384,17 +591,6 @@ function InteractiveAssetProxy({
             </mesh>
           ))}
         </group>
-      ) : node.id.startsWith('VM') ? (
-        <group>
-          <mesh rotation={[Math.PI / 2, 0, 0]}>
-            <torusGeometry args={[0.12, 0.02, 12, 24]} />
-            <meshStandardMaterial color="#cbd5e1" metalness={0.35} roughness={0.45} />
-          </mesh>
-          <mesh ref={discRef}>
-            <cylinderGeometry args={[0.08, 0.08, 0.02, 20]} />
-            <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.35} />
-          </mesh>
-        </group>
       ) : (
         <group>
           <mesh>
@@ -424,14 +620,38 @@ function InteractiveAssetProxy({
   )
 }
 
-/**
- * Builds a lookup map from stableMeshId → nodeId by traversing
- * each resolved node's meshRef and collecting all descendant meshes.
- */
-function buildMeshToNodeMap(
-  resolvedNodes: ResolvedInteractiveNode[],
-  modelObject: THREE.Object3D | null,
-): Map<string, FocusedAssetId> {
+function BlowerStatusBillboard({
+  node,
+  blower,
+  selected,
+  onClick,
+}: {
+  node: ResolvedInteractiveNode
+  blower: BlowerState
+  selected: boolean
+  onClick: () => void
+}) {
+  const statusColor = blower.status === 'operativa' ? 'bg-emerald-500/90' : blower.status === 'revision' ? 'bg-amber-500/90' : 'bg-rose-500/90'
+
+  return (
+    <Html position={[node.position.x, node.position.y + 0.22, node.position.z]} center distanceFactor={7} zIndexRange={[25, 0]}>
+      <button
+        type="button"
+        onClick={onClick}
+        className={cn(
+          'rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-wide text-white shadow-lg backdrop-blur transition-transform hover:scale-[1.03]',
+          statusColor,
+          selected ? 'border-white/80' : 'border-black/20',
+        )}
+        title={`${blower.label} ${blower.status === 'operativa' ? 'ON' : blower.status === 'revision' ? 'REV' : 'OFF'}`}
+      >
+        {blower.id} {blower.status === 'operativa' ? 'ON' : blower.status === 'revision' ? 'REV' : 'OFF'}
+      </button>
+    </Html>
+  )
+}
+
+function buildMeshToNodeMap(resolvedNodes: ResolvedInteractiveNode[], modelObject: THREE.Object3D | null): Map<string, FocusedAssetId> {
   const map = new Map<string, FocusedAssetId>()
   for (const node of resolvedNodes) {
     if (!node.objectRef) continue
@@ -440,46 +660,34 @@ function buildMeshToNodeMap(
         map.set(child.userData.stableMeshId, node.id)
       }
     })
-    if (node.objectRef instanceof THREE.Mesh && node.objectRef.userData.stableMeshId) {
-      map.set(node.objectRef.userData.stableMeshId, node.id)
-    }
-    if (node.objectRef.parent) {
-      node.objectRef.parent.traverse((child) => {
-        if (child instanceof THREE.Mesh && child.userData.stableMeshId) {
-          map.set(child.userData.stableMeshId, node.id)
-        }
-      })
-    }
   }
-  // Proximity-based fallback: for meshes not already mapped, check if they
-  // are very close to a resolved node position and assign them.
+
   if (modelObject) {
     modelObject.traverse((child) => {
       if (!(child instanceof THREE.Mesh)) return
-      const sid = child.userData.stableMeshId as string | undefined
-      if (!sid || map.has(sid)) return
+      const stableMeshId = child.userData.stableMeshId as string | undefined
+      if (!stableMeshId || map.has(stableMeshId)) return
       const box = new THREE.Box3().setFromObject(child)
       if (box.isEmpty()) return
       const center = box.getCenter(new THREE.Vector3())
-      let bestDist = 0.35 // max proximity threshold
+      let bestDistance = 0.22
       let bestNodeId: FocusedAssetId | null = null
       for (const node of resolvedNodes) {
-        const d = center.distanceTo(node.position)
-        if (d < bestDist) {
-          bestDist = d
+        const distance = center.distanceTo(node.position)
+        if (distance < bestDistance) {
+          bestDistance = distance
           bestNodeId = node.id
         }
       }
-      if (bestNodeId) map.set(sid, bestNodeId)
+      if (bestNodeId) {
+        map.set(stableMeshId, bestNodeId)
+      }
     })
   }
+
   return map
 }
 
-/**
- * Click handler that intercepts clicks on real model meshes and
- * maps them to the corresponding interactive node.
- */
 function MeshClickHandler({
   meshToNodeMap,
   onToggleBlower,
@@ -504,11 +712,10 @@ function MeshClickHandler({
       const intersects = raycaster.current.intersectObjects(scene.children, true)
       for (const hit of intersects) {
         if (!(hit.object instanceof THREE.Mesh)) continue
-        const sid = hit.object.userData.stableMeshId as string | undefined
-        if (!sid) continue
-        const nodeId = meshToNodeMap.get(sid)
+        const stableMeshId = hit.object.userData.stableMeshId as string | undefined
+        if (!stableMeshId) continue
+        const nodeId = meshToNodeMap.get(stableMeshId)
         if (!nodeId) continue
-        // Dispatch action
         if (nodeId.startsWith('S')) {
           onToggleBlower(nodeId as BlowerId)
         } else {
@@ -524,11 +731,6 @@ function MeshClickHandler({
   return null
 }
 
-/**
- * Applies real-time visual effects to the actual GLB meshes:
- * - Blowers: color/emissive change based on on/off status
- * - Valves: rotation change based on open/close status
- */
 function RealMeshEffects({
   resolvedNodes,
   blowers,
@@ -538,63 +740,63 @@ function RealMeshEffects({
   blowers: BlowerState[]
   valves: ValveState[]
 }) {
-  // Store original materials to restore when needed
   const originalMaterials = useRef(new Map<string, THREE.Material | THREE.Material[]>())
+  const baseRotations = useRef(new Map<string, THREE.Euler>())
 
-  // Apply blower effects
   useEffect(() => {
     for (const node of resolvedNodes) {
       if (node.kind !== 'blower' || !node.objectRef) continue
-      const blower = blowers.find((b) => b.id === node.id)
+      const blower = blowers.find((item) => item.id === node.id)
       if (!blower) continue
 
       const color = getBlowerStatusColor(blower.status)
-
       node.objectRef.traverse((child) => {
         if (!(child instanceof THREE.Mesh)) return
         const key = child.uuid
         if (!originalMaterials.current.has(key)) {
-          originalMaterials.current.set(key, Array.isArray(child.material) ? child.material.map((m) => m.clone()) : child.material.clone())
+          originalMaterials.current.set(key, Array.isArray(child.material) ? child.material.map((material) => material.clone()) : child.material.clone())
         }
-        const mat = child.material
-        if (mat instanceof THREE.MeshStandardMaterial || mat instanceof THREE.MeshPhysicalMaterial) {
-          mat.emissive.set(color)
-          mat.emissiveIntensity = blower.status === 'operativa' ? 0.35 : blower.status === 'revision' ? 0.2 : 0.15
-          mat.needsUpdate = true
+        const material = child.material
+        if (material instanceof THREE.MeshStandardMaterial || material instanceof THREE.MeshPhysicalMaterial) {
+          material.emissive.set(color)
+          material.emissiveIntensity = blower.status === 'operativa' ? 0.35 : blower.status === 'revision' ? 0.2 : 0.12
+          material.needsUpdate = true
         }
       })
     }
   }, [resolvedNodes, blowers])
 
-  // Apply valve effects
   useFrame(() => {
     for (const node of resolvedNodes) {
-      if (node.kind !== 'valve' || !node.objectRef) continue
-      const valve = valves.find((v) => v.id === node.id)
+      if (node.kind !== 'valve') continue
+      const valve = valves.find((item) => item.id === node.id)
       if (!valve) continue
+
       const actionLink = MODEL_ACTION_LINKS[node.id]
-
-      const isOpen = valve.status === 'abierta'
-      const targetAngle = isOpen ? 0 : Math.PI / 2
-
-      if (actionLink?.transform === 'rotate-y') {
-        node.objectRef.rotation.y = THREE.MathUtils.lerp(node.objectRef.rotation.y, targetAngle, 0.08)
-      } else if (actionLink?.transform === 'rotate-z') {
-        node.objectRef.rotation.z = THREE.MathUtils.lerp(node.objectRef.rotation.z, targetAngle, 0.08)
+      const motionObject = node.motionObjectRef ?? node.objectRef
+      if (motionObject) {
+        if (!baseRotations.current.has(motionObject.uuid)) {
+          baseRotations.current.set(motionObject.uuid, motionObject.rotation.clone())
+        }
+        const baseRotation = baseRotations.current.get(motionObject.uuid)!
+        const axis = actionLink.transform === 'rotate-y' ? 'y' : 'z'
+        const targetAngle = baseRotation[axis] + (valve.status === 'abierta' ? 0 : Math.PI / 2)
+        motionObject.rotation[axis] = THREE.MathUtils.lerp(motionObject.rotation[axis], targetAngle, 0.12)
       }
 
+      if (!node.objectRef) continue
       const color = getValveStatusColor(valve.status)
       node.objectRef.traverse((child) => {
         if (!(child instanceof THREE.Mesh)) return
         const key = child.uuid
         if (!originalMaterials.current.has(key)) {
-          originalMaterials.current.set(key, Array.isArray(child.material) ? child.material.map((m) => m.clone()) : child.material.clone())
+          originalMaterials.current.set(key, Array.isArray(child.material) ? child.material.map((material) => material.clone()) : child.material.clone())
         }
-        const mat = child.material
-        if (mat instanceof THREE.MeshStandardMaterial || mat instanceof THREE.MeshPhysicalMaterial) {
-          mat.emissive.set(color)
-          mat.emissiveIntensity = 0.2
-          mat.needsUpdate = true
+        const material = child.material
+        if (material instanceof THREE.MeshStandardMaterial || material instanceof THREE.MeshPhysicalMaterial) {
+          material.emissive.set(color)
+          material.emissiveIntensity = 0.2
+          material.needsUpdate = true
         }
       })
     }
@@ -603,11 +805,67 @@ function RealMeshEffects({
   return null
 }
 
+function appendPathSegments({
+  collector,
+  segmentPrefix,
+  start,
+  valveNodes,
+  outlet,
+  valveMap,
+  sourceActive,
+  color,
+}: {
+  collector: FlowSegment[]
+  segmentPrefix: string
+  start: THREE.Vector3
+  valveNodes: ResolvedInteractiveNode[]
+  outlet: THREE.Vector3
+  valveMap: Record<ValveId, ValveStatus>
+  sourceActive: boolean
+  color: string
+}) {
+  let upstreamActive = sourceActive
+  let currentPoint = start
+
+  valveNodes.forEach((valveNode, index) => {
+    collector.push({
+      id: `${segmentPrefix}-to-${valveNode.id}`,
+      start: currentPoint,
+      end: valveNode.position,
+      active: upstreamActive,
+      color,
+    })
+    currentPoint = valveNode.position
+    if (valveMap[valveNode.id as ValveId] === 'cerrada') {
+      upstreamActive = false
+    }
+    if (index === valveNodes.length - 1) {
+      collector.push({
+        id: `${segmentPrefix}-to-outlet`,
+        start: currentPoint,
+        end: outlet,
+        active: upstreamActive,
+        color,
+      })
+    }
+  })
+
+  if (valveNodes.length === 0) {
+    collector.push({
+      id: `${segmentPrefix}-to-outlet`,
+      start,
+      end: outlet,
+      active: upstreamActive,
+      color,
+    })
+  }
+}
+
 function SopladorasBaader142InteractiveCanvasOverlay({
   blowers,
   valves,
-  flowByBlower,
-  backupTarget,
+  blowerFlow,
+  backupTargets,
   focusedAssetId,
   onToggleBlower,
   onToggleValve,
@@ -615,8 +873,8 @@ function SopladorasBaader142InteractiveCanvasOverlay({
 }: {
   blowers: BlowerState[]
   valves: ValveState[]
-  flowByBlower: Record<BlowerId, number>
-  backupTarget: BlowerId | null
+  blowerFlow: Record<BlowerId, number>
+  backupTargets: PrimaryLineId[]
   focusedAssetId: FocusedAssetId
   onToggleBlower: (blowerId: BlowerId) => void
   onToggleValve: (valveId: ValveId) => void
@@ -629,59 +887,91 @@ function SopladorasBaader142InteractiveCanvasOverlay({
   useEffect(() => {
     if (!onResolvedNodesChange) return
     const nextMeta = resolvedNodes.reduce<ResolvedNodeMeta>((acc, node) => {
-      acc[node.id] = { source: node.source, objectName: node.objectName, objectRef: node.objectRef }
+      acc[node.id] = { source: node.source, objectName: node.objectName, motionObjectName: node.motionObjectName }
       return acc
     }, {})
     onResolvedNodesChange(nextMeta)
   }, [onResolvedNodesChange, resolvedNodes])
 
   const nodeMap = useMemo(() => new Map(resolvedNodes.map((node) => [node.id, node])), [resolvedNodes])
+  const valveMap = useMemo(() => getValveMap(valves), [valves])
 
   const anchors = useMemo(() => {
     if (!info) return null
     return {
-      supply: getFallbackPosition([0.07, 0.42, 0.19], info),
-      outletA: getFallbackPosition([0.18, 0.82, 0.12], info),
-      outletB: getFallbackPosition([0.44, 0.82, 0.18], info),
-      outletC: getFallbackPosition([0.70, 0.82, 0.30], info),
-      outletBackup: getFallbackPosition([0.88, 0.82, 0.40], info),
-      backupHeader: getFallbackPosition([0.78, 0.58, 0.34], info),
+      L1: getFallbackPosition(LINE_VISUALS.L1.outletFallback, info),
+      L2: getFallbackPosition(LINE_VISUALS.L2.outletFallback, info),
+      L3: getFallbackPosition(LINE_VISUALS.L3.outletFallback, info),
+      manifold: getFallbackPosition(LINE_VISUALS.L4.manifoldFallback ?? LINE_VISUALS.L4.outletFallback, info),
     }
   }, [info])
-
-  const hasNorthFlow = flowByBlower.S1 > 0 || flowByBlower.S2 > 0
-  const hasSouthFlow = flowByBlower.S3 > 0 || flowByBlower.S4 > 0
-  const backupActive = !!backupTarget && flowByBlower.S4 > 0
 
   const segments = useMemo(() => {
     if (!anchors) return []
 
-    const vm1 = nodeMap.get('VM1')
-    const vm2 = nodeMap.get('VM2')
-    const vb1 = nodeMap.get('VB1')
-    const vb2 = nodeMap.get('VB2')
-    const s1 = nodeMap.get('S1')
-    const s2 = nodeMap.get('S2')
-    const s3 = nodeMap.get('S3')
-    const s4 = nodeMap.get('S4')
+    const nextSegments: FlowSegment[] = []
 
-    return [
-      s1 && vm1 && { id: 's1-vm1', start: s1.position, end: vm1.position, active: flowByBlower.S1 > 0, color: '#38bdf8' },
-      s2 && vm1 && { id: 's2-vm1', start: s2.position, end: vm1.position, active: flowByBlower.S2 > 0, color: '#38bdf8' },
-      vm1 && vb1 && { id: 'vm1-vb1', start: vm1.position, end: vb1.position, active: hasNorthFlow, color: '#38bdf8' },
-      vb1 && { id: 'vb1-out-a', start: vb1.position, end: anchors.outletA, active: flowByBlower.S1 > 0, color: '#38bdf8' },
-      vb1 && { id: 'vb1-out-b', start: vb1.position, end: anchors.outletB, active: flowByBlower.S2 > 0, color: '#38bdf8' },
-      s3 && vm2 && { id: 's3-vm2', start: s3.position, end: vm2.position, active: flowByBlower.S3 > 0, color: '#38bdf8' },
-      s4 && vm2 && { id: 's4-vm2', start: s4.position, end: vm2.position, active: flowByBlower.S4 > 0 && !backupActive, color: '#38bdf8' },
-      vm2 && vb2 && { id: 'vm2-vb2', start: vm2.position, end: vb2.position, active: hasSouthFlow && !backupActive, color: '#38bdf8' },
-      vb2 && { id: 'vb2-out-c', start: vb2.position, end: anchors.outletC, active: flowByBlower.S3 > 0, color: '#38bdf8' },
-      vb2 && { id: 'vb2-out-d', start: vb2.position, end: anchors.outletBackup, active: flowByBlower.S4 > 0 && !backupActive, color: '#38bdf8' },
-      s4 && backupActive && { id: 's4-backup-head', start: s4.position, end: anchors.backupHeader, active: true, color: '#a78bfa' },
-      backupActive && backupTarget === 'S1' && { id: 'backup-s1', start: anchors.backupHeader, end: anchors.outletA, active: true, color: '#a78bfa' },
-      backupActive && backupTarget === 'S2' && { id: 'backup-s2', start: anchors.backupHeader, end: anchors.outletB, active: true, color: '#a78bfa' },
-      backupActive && backupTarget === 'S3' && { id: 'backup-s3', start: anchors.backupHeader, end: anchors.outletC, active: true, color: '#a78bfa' },
-    ].filter(Boolean) as Array<{ id: string; start: THREE.Vector3; end: THREE.Vector3; active: boolean; color: string }>
-  }, [anchors, backupActive, backupTarget, flowByBlower, hasNorthFlow, hasSouthFlow, nodeMap])
+    PRIMARY_LINE_IDS.forEach((lineId) => {
+      const lineConfig = LINE_VISUALS[lineId]
+      const blowerNode = nodeMap.get(lineConfig.blowerId)
+      if (!blowerNode) return
+      const valveNodes = lineConfig.valveIds
+        .map((valveId) => nodeMap.get(valveId))
+        .filter((item): item is ResolvedInteractiveNode => !!item)
+      appendPathSegments({
+        collector: nextSegments,
+        segmentPrefix: `${lineId}-direct`,
+        start: blowerNode.position,
+        valveNodes,
+        outlet: getPrimaryLineAnchor(anchors, lineId),
+        valveMap,
+        sourceActive: blowerFlow[lineConfig.blowerId] > 0,
+        color: lineConfig.color,
+      })
+    })
+
+    const backupBlowerNode = nodeMap.get('S4')
+    const backupValveNode = nodeMap.get('L4_VB1')
+    if (backupBlowerNode && backupValveNode) {
+      const supplyActive = blowerFlow.S4 > 0
+      nextSegments.push({
+        id: 'L4-supply-to-valve',
+        start: backupBlowerNode.position,
+        end: backupValveNode.position,
+        active: supplyActive,
+        color: LINE_VISUALS.L4.color,
+      })
+      nextSegments.push({
+        id: 'L4-valve-to-manifold',
+        start: backupValveNode.position,
+        end: anchors.manifold,
+        active: supplyActive && valveMap.L4_VB1 === 'abierta',
+        color: LINE_VISUALS.L4.color,
+      })
+
+      const backupShare = backupTargets.length > 0 ? blowerFlow.S4 / backupTargets.length : 0
+      const backupAvailable = supplyActive && valveMap.L4_VB1 === 'abierta' && backupShare > 0
+
+      backupTargets.forEach((lineId) => {
+        const lineConfig = LINE_VISUALS[lineId]
+        const valveNodes = lineConfig.valveIds
+          .map((valveId) => nodeMap.get(valveId))
+          .filter((item): item is ResolvedInteractiveNode => !!item)
+        appendPathSegments({
+          collector: nextSegments,
+          segmentPrefix: `${lineId}-backup`,
+          start: anchors.manifold,
+          valveNodes,
+          outlet: getPrimaryLineAnchor(anchors, lineId),
+          valveMap,
+          sourceActive: backupAvailable,
+          color: lineConfig.color,
+        })
+      })
+    }
+
+    return nextSegments
+  }, [anchors, backupTargets, blowerFlow, nodeMap, valveMap])
 
   if (!anchors) return null
 
@@ -689,23 +979,15 @@ function SopladorasBaader142InteractiveCanvasOverlay({
 
   return (
     <>
-      <MeshClickHandler
-        meshToNodeMap={meshToNodeMap}
-        onToggleBlower={onToggleBlower}
-        onToggleValve={onToggleValve}
-      />
-      <RealMeshEffects
-        resolvedNodes={resolvedNodes}
-        blowers={blowers}
-        valves={valves}
-      />
+      <MeshClickHandler meshToNodeMap={meshToNodeMap} onToggleBlower={onToggleBlower} onToggleValve={onToggleValve} />
+      <RealMeshEffects resolvedNodes={resolvedNodes} blowers={blowers} valves={valves} />
 
       {segments.map((segment, index) => {
         const color = segment.active ? segment.color : '#475569'
         return (
           <group key={segment.id}>
             <Line points={[segment.start, segment.end]} color={color} lineWidth={segment.active ? 2.4 : 1.2} />
-            {segment.active && <FlowPulse start={segment.start} end={segment.end} color={color} speed={0.26 + index * 0.02} delay={index * 0.12} />}
+            {segment.active ? <FlowPulse start={segment.start} end={segment.end} color={color} speed={0.26 + index * 0.02} delay={index * 0.12} /> : null}
           </group>
         )
       })}
@@ -714,12 +996,41 @@ function SopladorasBaader142InteractiveCanvasOverlay({
         if (node.kind === 'blower') {
           const blower = blowers.find((item) => item.id === node.id)
           if (!blower) return null
-          return <InteractiveAssetProxy key={node.id} node={node} color={getBlowerStatusColor(blower.status)} selected={focusedAssetId === node.id} isActive={blower.status === 'operativa'} onClick={() => onToggleBlower(node.id as BlowerId)} />
+          if (node.source === 'fallback') {
+            return (
+              <InteractiveAssetProxy
+                key={node.id}
+                node={node}
+                color={getBlowerStatusColor(blower.status)}
+                selected={focusedAssetId === node.id}
+                isActive={blower.status === 'operativa'}
+                onClick={() => onToggleBlower(node.id as BlowerId)}
+              />
+            )
+          }
+          return (
+            <BlowerStatusBillboard
+              key={node.id}
+              node={node}
+              blower={blower}
+              selected={focusedAssetId === node.id}
+              onClick={() => onToggleBlower(node.id as BlowerId)}
+            />
+          )
         }
 
         const valve = valves.find((item) => item.id === node.id)
-        if (!valve) return null
-        return <InteractiveAssetProxy key={node.id} node={node} color={getValveStatusColor(valve.status)} selected={focusedAssetId === node.id} isActive={valve.status === 'abierta'} onClick={() => onToggleValve(node.id as ValveId)} />
+        if (!valve || node.source === 'object') return null
+        return (
+          <InteractiveAssetProxy
+            key={node.id}
+            node={node}
+            color={getValveStatusColor(valve.status)}
+            selected={focusedAssetId === node.id}
+            isActive={valve.status === 'abierta'}
+            onClick={() => onToggleValve(node.id as ValveId)}
+          />
+        )
       })}
     </>
   )
@@ -863,7 +1174,7 @@ function StandalonePanel({ modelName, className }: Pick<SopladorasBaader142Inter
 function ModelBoundExperience({ modelName: _modelName, className, modelUrl, modelFormat }: Required<Pick<SopladorasBaader142InteractiveExperienceProps, 'modelName' | 'modelUrl' | 'modelFormat'>> & Pick<SopladorasBaader142InteractiveExperienceProps, 'className'>) {
   const mode: OperatingMode = 'produccion'
   const [backupMode, setBackupMode] = useState<BackupMode>('auto')
-  const [manualBackupTarget, setManualBackupTarget] = useState<BlowerId | null>('S1')
+  const [manualBackupTarget, setManualBackupTarget] = useState<PrimaryLineId | null>('L1')
   const [focusedAssetId, setFocusedAssetId] = useState<FocusedAssetId>('S1')
   const [resetKey, setResetKey] = useState(0)
   const viewPreset = 'front' as const
@@ -871,33 +1182,31 @@ function ModelBoundExperience({ modelName: _modelName, className, modelUrl, mode
   const [blowers, setBlowers] = useState<BlowerState[]>(INITIAL_BLOWERS)
   const [valves, setValves] = useState<ValveState[]>(INITIAL_VALVES)
 
-  const flowByBlower = useMemo(() => {
-    const valveStatusMap = valves.reduce<Record<ValveId, ValveStatus>>((acc, valve) => {
-      acc[valve.id] = valve.status
-      return acc
-    }, {} as Record<ValveId, ValveStatus>)
-
+  const blowerFlow = useMemo(() => {
     return blowers.reduce<Record<BlowerId, number>>((acc, blower) => {
-      const dependenciesOpen = BLOWER_VALVE_DEPENDENCIES[blower.id].every((valveId) => valveStatusMap[valveId] === 'abierta')
-      if (!dependenciesOpen) {
-        acc[blower.id] = 0
-        return acc
-      }
-
       const statusFactor = blower.status === 'operativa' ? 1 : blower.status === 'revision' ? 0.58 : 0
       acc[blower.id] = Math.round(blower.baseFlow * MODE_FLOW_FACTOR[mode] * statusFactor)
       return acc
     }, {} as Record<BlowerId, number>)
-  }, [blowers, mode, valves])
+  }, [blowers, mode])
+
+  const valveMap = useMemo(() => getValveMap(valves), [valves])
+  const outletFlowByLine = useMemo(() => {
+    return (Object.keys(LINE_VISUALS) as LineId[]).reduce<Record<LineId, number>>((acc, lineId) => {
+      const blowerId = LINE_VISUALS[lineId].blowerId
+      acc[lineId] = getLineOutletFlow(lineId, blowerFlow[blowerId], valveMap)
+      return acc
+    }, {} as Record<LineId, number>)
+  }, [blowerFlow, valveMap])
 
   const meshAnchoredCount = useMemo(() => Object.values(resolvedNodeMeta).filter((node) => node?.source === 'object').length, [resolvedNodeMeta])
-  const autoBackupTarget = useMemo(() => getPrimaryBackupTarget(blowers, flowByBlower), [blowers, flowByBlower])
-  const backupTarget = useMemo(() => {
-    if (backupMode === 'off') return null
-    if (backupMode === 'manual') return manualBackupTarget
-    return autoBackupTarget
-  }, [autoBackupTarget, backupMode, manualBackupTarget])
-  const backupOnline = useMemo(() => !!backupTarget && flowByBlower.S4 > 0, [backupTarget, flowByBlower])
+  const autoBackupTargets = useMemo(() => getAutoBackupTargets(blowers, outletFlowByLine), [blowers, outletFlowByLine])
+  const backupTargets = useMemo<PrimaryLineId[]>(() => {
+    if (backupMode === 'off') return []
+    if (backupMode === 'manual') return manualBackupTarget ? [manualBackupTarget] : []
+    return autoBackupTargets
+  }, [autoBackupTargets, backupMode, manualBackupTarget])
+  const backupOnline = useMemo(() => backupTargets.length > 0 && blowerFlow.S4 > 0 && valveMap.L4_VB1 === 'abierta', [backupTargets, blowerFlow, valveMap])
 
   const handleToggleValve = useCallback((valveId: ValveId) => {
     setFocusedAssetId(valveId)
@@ -911,7 +1220,7 @@ function ModelBoundExperience({ modelName: _modelName, className, modelUrl, mode
 
   const handleResetSystem = useCallback(() => {
     setBackupMode('auto')
-    setManualBackupTarget('S1')
+    setManualBackupTarget('L1')
     setFocusedAssetId('S1')
     setResetKey((value) => value + 1)
     setBlowers(INITIAL_BLOWERS)
@@ -925,8 +1234,8 @@ function ModelBoundExperience({ modelName: _modelName, className, modelUrl, mode
           <SopladorasBaader142InteractiveCanvasOverlay
             blowers={blowers}
             valves={valves}
-            flowByBlower={flowByBlower}
-            backupTarget={backupTarget}
+            blowerFlow={blowerFlow}
+            backupTargets={backupTargets}
             focusedAssetId={focusedAssetId}
             onToggleBlower={handleToggleBlowerPower}
             onToggleValve={handleToggleValve}
@@ -936,59 +1245,63 @@ function ModelBoundExperience({ modelName: _modelName, className, modelUrl, mode
 
         <div className="pointer-events-none absolute inset-x-2 top-2 z-10">
           <div className="pointer-events-auto rounded-xl border bg-background/88 p-2 backdrop-blur">
-            <div className="grid gap-2 xl:grid-cols-[1.2fr_1.2fr_0.9fr]">
+            <div className="grid gap-2 xl:grid-cols-[1fr_1.4fr_0.9fr]">
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Sopladoras</p>
-                  <span className="text-[10px] text-muted-foreground/80">ON/OFF</span>
+                  <span className="text-[10px] text-muted-foreground/80">ON, REV u OFF</span>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
-                  {blowers.map((blower) => (
-                    (() => {
-                      const actionLink = MODEL_ACTION_LINKS[blower.id]
-                      return (
-                    <Button
-                      key={blower.id}
-                      size="sm"
-                      variant={blower.status === 'operativa' ? 'default' : 'outline'}
-                      className="h-8 gap-1.5 px-2.5 text-xs"
-                      onClick={() => handleToggleBlowerPower(blower.id)}
-                      title={actionLink.notes}
-                    >
-                      {blower.id}
-                      <span className="text-[10px] opacity-80">{blower.status === 'operativa' ? actionLink.activeLabel : blower.status === 'revision' ? 'REV' : actionLink.inactiveLabel}</span>
-                    </Button>
-                      )
-                    })()
-                  ))}
+                  {blowers.map((blower) => {
+                    const actionLink = MODEL_ACTION_LINKS[blower.id]
+                    return (
+                      <Button
+                        key={blower.id}
+                        size="sm"
+                        variant={blower.status === 'operativa' ? 'default' : 'outline'}
+                        className="h-8 gap-1.5 px-2.5 text-xs"
+                        onClick={() => handleToggleBlowerPower(blower.id)}
+                        title={actionLink.notes}
+                      >
+                        {blower.id}
+                        <span className="text-[10px] opacity-80">{blower.status === 'operativa' ? actionLink.activeLabel : blower.status === 'revision' ? 'REV' : actionLink.inactiveLabel}</span>
+                      </Button>
+                    )
+                  })}
                 </div>
               </div>
 
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Valvulas</p>
-                  <span className="text-[10px] text-muted-foreground/80">Estado visual</span>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Valvulas por linea</p>
+                  <span className="text-[10px] text-muted-foreground/80">Manilla real a 90 grados</span>
                 </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {valves.map((valve) => (
-                    (() => {
-                      const actionLink = MODEL_ACTION_LINKS[valve.id]
-                      return (
-                    <Button
-                      key={valve.id}
-                      size="sm"
-                      variant={valve.status === 'abierta' ? 'default' : 'outline'}
-                      className="h-8 gap-1.5 px-2.5 text-xs"
-                      onClick={() => handleToggleValve(valve.id)}
-                      title={actionLink.notes}
-                    >
-                      {valve.id}
-                      <span className="text-[10px] opacity-80">
-                        {valve.status === 'abierta' ? actionLink.activeLabel : actionLink.inactiveLabel}
-                      </span>
-                    </Button>
-                      )
-                    })()
+                <div className="grid gap-1.5 md:grid-cols-2 xl:grid-cols-4">
+                  {(Object.keys(LINE_VISUALS) as LineId[]).map((lineId) => (
+                    <div key={lineId} className="rounded-lg border bg-background/55 p-1.5">
+                      <div className="mb-1 flex items-center gap-1.5">
+                        <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: getLineColor(lineId) }} />
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{lineId}</p>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {valves.filter((valve) => valve.lineId === lineId).map((valve) => {
+                          const actionLink = MODEL_ACTION_LINKS[valve.id]
+                          return (
+                            <Button
+                              key={valve.id}
+                              size="sm"
+                              variant={valve.status === 'abierta' ? 'default' : 'outline'}
+                              className="h-7 gap-1 px-2 text-[11px]"
+                              onClick={() => handleToggleValve(valve.id)}
+                              title={actionLink.notes}
+                            >
+                              {valve.id.replace(`${lineId}_`, '')}
+                              <span className="text-[10px] opacity-80">{valve.status === 'abierta' ? actionLink.activeLabel : actionLink.inactiveLabel}</span>
+                            </Button>
+                          )
+                        })}
+                      </div>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -996,7 +1309,7 @@ function ModelBoundExperience({ modelName: _modelName, className, modelUrl, mode
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Respaldo S4</p>
-                  <span className="text-[10px] text-muted-foreground/80">Modo</span>
+                  <span className="text-[10px] text-muted-foreground/80">Reparte caudal</span>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {([
@@ -1014,15 +1327,15 @@ function ModelBoundExperience({ modelName: _modelName, className, modelUrl, mode
                       {option.label}
                     </Button>
                   ))}
-                  {backupMode === 'manual' && (['S1', 'S2', 'S3'] as const).map((target) => (
+                  {backupMode === 'manual' && PRIMARY_LINE_IDS.map((lineId) => (
                     <Button
-                      key={target}
+                      key={lineId}
                       size="sm"
                       className="h-8 px-2.5 text-xs"
-                      variant={manualBackupTarget === target ? 'default' : 'outline'}
-                      onClick={() => setManualBackupTarget(target)}
+                      variant={manualBackupTarget === lineId ? 'default' : 'outline'}
+                      onClick={() => setManualBackupTarget(lineId)}
                     >
-                      Resp. {target}
+                      {lineId}
                     </Button>
                   ))}
                   <Button size="sm" className="h-8 px-2.5 text-xs" variant="outline" onClick={handleResetSystem}>Reset sistema</Button>
@@ -1033,10 +1346,10 @@ function ModelBoundExperience({ modelName: _modelName, className, modelUrl, mode
         </div>
 
         <div className="pointer-events-none absolute bottom-3 left-3 rounded-lg border bg-background/85 px-3 py-2 text-xs text-muted-foreground backdrop-blur">
-          {meshAnchoredCount}/{INTERACTIVE_NODE_DEFINITIONS.length} puntos anclados directamente a mallas del modelo.
+          {meshAnchoredCount}/{INTERACTIVE_NODE_DEFINITIONS.length} assets amarrados a grupos reales del GLB.
         </div>
         <div className="pointer-events-none absolute bottom-3 right-3 rounded-lg border bg-background/85 px-3 py-2 text-xs text-muted-foreground backdrop-blur">
-          {backupOnline ? `S4 respalda a ${backupTarget}` : backupMode === 'off' ? 'S4 sin respaldo automatico' : backupMode === 'manual' ? `S4 armado para ${backupTarget}` : 'S4 en espera como respaldo'}
+          {backupOnline ? `S4 respalda ${backupTargets.join(', ')}` : backupMode === 'off' ? 'S4 sin respaldo automatico' : backupMode === 'manual' ? `S4 armado para ${manualBackupTarget ?? 'sin destino'}` : 'S4 en espera como respaldo' }
         </div>
       </div>
     </div>
