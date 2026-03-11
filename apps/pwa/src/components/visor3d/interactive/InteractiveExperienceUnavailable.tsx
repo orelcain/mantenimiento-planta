@@ -6,12 +6,14 @@ interface InteractiveExperienceUnavailableProps {
   modelName: string
   modelId?: string
   className?: string
+  onTryTobogan?: () => void
 }
 
 export function InteractiveExperienceUnavailable({
   modelName,
   modelId,
   className,
+  onTryTobogan,
 }: InteractiveExperienceUnavailableProps) {
   return (
     <div className={cn('flex h-full flex-col bg-card', className)}>
@@ -43,10 +45,15 @@ export function InteractiveExperienceUnavailable({
           <p className="mt-4 text-xs text-muted-foreground">
             El tobogan ya usa esta estructura. Los siguientes equipos se conectan aqui sin tocar el visor 3D base.
           </p>
-          <div className="mt-4 flex justify-center">
+          <div className="mt-4 flex justify-center gap-2">
             <Button variant="outline" size="sm" disabled>
               Registro pendiente para este modelo
             </Button>
+            {onTryTobogan ? (
+              <Button variant="default" size="sm" onClick={onTryTobogan}>
+                Probar demo Tobogan
+              </Button>
+            ) : null}
           </div>
         </div>
       </div>

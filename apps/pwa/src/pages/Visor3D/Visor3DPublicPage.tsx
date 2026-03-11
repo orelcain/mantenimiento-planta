@@ -12,7 +12,7 @@
  */
 
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import {
   Maximize,
   Minimize,
@@ -61,7 +61,7 @@ import { ColorPalette } from '@/components/visor3d/ColorPalette'
 import { AnnotationListItems } from '@/components/visor3d/AnnotationListItems'
 import { ToboganInteractiveExperience } from '@/components/visor3d/interactive/ToboganInteractiveExperience'
 import { InteractiveExperienceUnavailable } from '@/components/visor3d/interactive/InteractiveExperienceUnavailable'
-import { getInteractiveExperienceForModel } from '@/components/visor3d/interactive/experienceRegistry'
+import { getInteractiveExperienceForModel, getInteractiveExperienceFromQueryParam } from '@/components/visor3d/interactive/experienceRegistry'
 import { ImageLightbox } from '@/components/ui/ImageLightbox'
 import type { Model3D, MaterialOverride, Annotation3D, Dimension3D, DimensionUnit, Point3D, MeasurementType } from '@/types/models3d'
 import { getUnitSuffix } from '@/types/models3d'
@@ -71,6 +71,7 @@ const PUBLIC_USER_ID = 'public-viewer'
 
 export function Visor3DPublicPage() {
   const { modelId } = useParams<{ modelId: string }>()
+  const [searchParams, setSearchParams] = useSearchParams()
 
   const [model, setModel] = useState<Model3D | null>(null)
   const [loading, setLoading] = useState(true)
@@ -106,7 +107,8 @@ export function Visor3DPublicPage() {
 
   // Focus camera on point
   const [focusPoint, setFocusPoint] = useState<Point3D | null>(null)
-  const interactiveExperience = getInteractiveExperienceForModel(model)
+  const forcedInteractiveExperience = getInteractiveExperienceFromQueryParam(searchParams.get('experience'))
+  const interactiveExperience = forcedInteractiveExperience ?? getInteractiveExperienceForModel(model)
 
   // Cargar modelo (sin auth)
   useEffect(() => {
@@ -130,6 +132,18 @@ export function Visor3DPublicPage() {
     setPaintColor(null)
     setPaintErase(false)
   }, [activeView])
+
+  useEffect(() => {
+    if (!forcedInteractiveExperience) return
+    setActiveView('interactive')
+  }, [forcedInteractiveExperience])
+
+  const handleTryToboganDemo = useCallback(() => {
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.set('experience', 'tobogan')
+    setSearchParams(nextParams)
+    setActiveView('interactive')
+  }, [searchParams, setSearchParams])
 
   // Suscribirse a cotas (sin auth)
   useEffect(() => {
@@ -578,7 +592,12 @@ export function Visor3DPublicPage() {
         ) : interactiveExperience?.id === 'tobogan' ? (
           <ToboganInteractiveExperience modelName={model.name} className="h-full" />
         ) : (
-          <InteractiveExperienceUnavailable modelName={model.name} modelId={model.id} className="h-full" />
+          <InteractiveExperienceUnavailable
+            modelName={model.name}
+            modelId={model.id}
+            className="h-full"
+            onTryTobogan={handleTryToboganDemo}
+          />
         )}
       </div>
 
