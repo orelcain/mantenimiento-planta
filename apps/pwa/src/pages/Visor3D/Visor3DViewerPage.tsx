@@ -968,7 +968,12 @@ export function Visor3DViewerPage() {
         ) : interactiveExperience?.id === 'tobogan' ? (
           <ToboganInteractiveExperience modelName={model.name} className="h-full" />
         ) : interactiveExperience?.id === 'sopladorasBaader142' ? (
-          <SopladorasBaader142InteractiveExperience modelName={model.name} className="h-full" />
+          <SopladorasBaader142InteractiveExperience
+            modelName={model.name}
+            modelUrl={model.downloadURL}
+            modelFormat={model.format}
+            className="h-full"
+          />
         ) : null}
       </div>
 

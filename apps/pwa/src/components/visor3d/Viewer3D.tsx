@@ -26,6 +26,7 @@ import * as THREE from 'three'
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js'
 import type { Model3DFormat, Point3D, MaterialOverride, Annotation3D } from '@/types/models3d'
 import { AnnotationsTool } from './AnnotationsTool'
+import { Viewer3DModelContext, type Viewer3DModelContextValue, type Viewer3DModelInfo } from './Viewer3DModelContext'
 
 // ============================================================================
 // Props
@@ -192,7 +193,7 @@ function applyMaterialOverrides(object: THREE.Object3D, overrides: MaterialOverr
 // Auto-fit Camera
 // ============================================================================
 
-interface ModelInfo { center: THREE.Vector3; maxDim: number }
+interface ModelInfo extends Viewer3DModelInfo {}
 
 function AutoFitCamera({ modelInfo, resetKey }: { modelInfo: ModelInfo | null; resetKey: number }) {
   const { camera, controls } = useThree()
@@ -852,14 +853,27 @@ function SceneContent(props: Viewer3DProps) {
     children 
   } = props
   const [modelInfo, setModelInfo] = useState<ModelInfo | null>(null)
+  const [modelContextValue, setModelContextValue] = useState<Viewer3DModelContextValue>({ object: null, info: null })
   const [hasError, setHasError] = useState(false)
 
-  const handleModelLoaded = useCallback((_o: THREE.Object3D, info: LoaderResult) => {
-    setModelInfo({ center: info.center, maxDim: info.maxDim })
+  useEffect(() => {
+    setModelInfo(null)
+    setModelContextValue({ object: null, info: null })
+    setHasError(false)
+  }, [url, format])
+
+  const handleModelLoaded = useCallback((object: THREE.Object3D, info: LoaderResult) => {
+    const nextInfo = {
+      center: info.center.clone(),
+      size: info.size.clone(),
+      maxDim: info.maxDim,
+    }
+    setModelInfo(nextInfo)
+    setModelContextValue({ object, info: nextInfo })
   }, [])
 
   return (
-    <>
+    <Viewer3DModelContext.Provider value={modelContextValue}>
       <color attach="background" args={['#0a0a0f']} />
 
       {/* Lighting */}
@@ -935,7 +949,7 @@ function SceneContent(props: Viewer3DProps) {
       </Suspense>
 
       {children}
-    </>
+    </Viewer3DModelContext.Provider>
   )
 }
 
