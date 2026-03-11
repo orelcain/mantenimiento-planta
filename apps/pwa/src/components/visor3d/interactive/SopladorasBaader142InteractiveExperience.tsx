@@ -808,10 +808,12 @@ function MeshClickHandler({
 
     const handleAssignClick = (event: MouseEvent) => {
       const intersects = getSelectionFromEvent(event)
+      console.log('[Editor] click — intersects:', intersects.length, intersects.slice(0, 3).map((i) => ({ type: i.object.type, name: i.object.name, sid: i.object.userData.stableMeshId })))
       const hit = intersects.find((i) => isModelMesh(i.object))
-      if (!hit) return
+      if (!hit) { console.log('[Editor] click — no model mesh hit'); return }
       if (editMode && assignmentTargetId && modelRoot && onAssignBinding) {
         const selection = getNamedSelectionFromHit(hit.object, modelRoot)
+        console.log('[Editor] click — selection:', selection)
         if (selection) {
           onAssignBinding(assignmentTargetId, selection)
         }
@@ -1124,6 +1126,23 @@ function SopladorasBaader142InteractiveCanvasOverlay({
   const meshToNodeMap = useMemo(() => buildMeshToNodeMap(resolvedNodes, object), [resolvedNodes, object])
 
   if (!anchors) return null
+
+  // In edit mode, render ONLY the click handler — skip all 3D overlays,
+  // Html billboards, flow lines and effects to avoid GPU overload / WebGL context loss.
+  if (editMode) {
+    return (
+      <MeshClickHandler
+        meshToNodeMap={meshToNodeMap}
+        modelRoot={object}
+        editMode={editMode}
+        assignmentTargetId={assignmentTargetId}
+        onHoverBindingCandidate={onHoverBindingCandidate}
+        onAssignBinding={onAssignBinding}
+        onToggleBlower={onToggleBlower}
+        onToggleValve={onToggleValve}
+      />
+    )
+  }
 
   return (
     <>
