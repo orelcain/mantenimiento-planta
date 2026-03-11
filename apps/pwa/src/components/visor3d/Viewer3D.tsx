@@ -954,26 +954,104 @@ function SceneContent(props: Viewer3DProps) {
 }
 
 // ============================================================================
+// WebGL availability check
+// ============================================================================
+
+function isWebGLAvailable(): boolean {
+  try {
+    const canvas = document.createElement('canvas')
+    const gl = canvas.getContext('webgl2') || canvas.getContext('webgl')
+    return !!gl
+  } catch {
+    return false
+  }
+}
+
+function WebGLUnavailableFallback() {
+  return (
+    <div className="flex h-full w-full flex-col items-center justify-center gap-4 p-8 text-center">
+      <div className="rounded-full border border-amber-500/30 bg-amber-500/10 p-4">
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      </div>
+      <div>
+        <p className="text-sm font-semibold">WebGL no disponible</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          El navegador no pudo crear un contexto 3D. Intenta cerrar otras pestañas con contenido 3D,
+          reiniciar el navegador o verificar que la aceleracion por hardware este habilitada.
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// ============================================================================
+// Canvas-level Error Boundary (catches R3F Canvas creation failures)
+// ============================================================================
+
+class CanvasErrorBoundary extends Component<
+  { children: ReactNode; fallback: ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: { children: ReactNode; fallback: ReactNode }) {
+    super(props)
+    this.state = { hasError: false }
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true }
+  }
+  componentDidCatch(error: Error, _info: ErrorInfo) {
+    console.warn('[Viewer3D] Canvas creation failed:', error.message)
+  }
+  render() {
+    if (this.state.hasError) return this.props.fallback
+    return this.props.children
+  }
+}
+
+// ============================================================================
 // Main Component
 // ============================================================================
 
 export function Viewer3D(props: Viewer3DProps) {
+  const [webglOk] = useState(() => isWebGLAvailable())
+
+  if (!webglOk) {
+    return (
+      <div className="w-full h-full relative">
+        <WebGLUnavailableFallback />
+      </div>
+    )
+  }
+
   return (
     <div className="w-full h-full relative">
-      <Canvas
-        camera={{ position: [5, 3, 5], fov: 45, near: 0.01, far: 2000 }}
-        shadows
-        gl={{
-          antialias: true,
-          alpha: true,
-          toneMapping: THREE.ACESFilmicToneMapping,
-          toneMappingExposure: 1.2,
-          outputColorSpace: THREE.SRGBColorSpace,
-        }}
-        style={{ background: 'transparent' }}
-      >
-        <SceneContent {...props} />
-      </Canvas>
+      <CanvasErrorBoundary fallback={<WebGLUnavailableFallback />}>
+        <Canvas
+          camera={{ position: [5, 3, 5], fov: 45, near: 0.01, far: 2000 }}
+          shadows
+          gl={{
+            antialias: true,
+            alpha: true,
+            toneMapping: THREE.ACESFilmicToneMapping,
+            toneMappingExposure: 1.2,
+            outputColorSpace: THREE.SRGBColorSpace,
+            powerPreference: 'high-performance',
+          }}
+          onCreated={({ gl: renderer }) => {
+            const canvas = renderer.domElement
+            canvas.addEventListener('webglcontextlost', (e) => {
+              e.preventDefault()
+              console.warn('[Viewer3D] WebGL context lost — pausing render')
+            })
+            canvas.addEventListener('webglcontextrestored', () => {
+              console.info('[Viewer3D] WebGL context restored')
+            })
+          }}
+          style={{ background: 'transparent' }}
+        >
+          <SceneContent {...props} />
+        </Canvas>
+      </CanvasErrorBoundary>
       <div className="absolute bottom-2 right-2 text-[10px] text-muted-foreground/50 select-none pointer-events-none">
         Orbit: clic izq · Zoom: scroll · Pan: clic der
       </div>
