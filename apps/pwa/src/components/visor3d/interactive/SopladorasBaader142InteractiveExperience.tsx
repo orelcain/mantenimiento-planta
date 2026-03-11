@@ -773,6 +773,7 @@ function MeshClickHandler({
   modelRoot,
   editMode,
   assignmentTargetId,
+  onHoverBindingCandidate,
   onAssignBinding,
   onToggleBlower,
   onToggleValve,
@@ -781,6 +782,7 @@ function MeshClickHandler({
   modelRoot: THREE.Object3D | null
   editMode: boolean
   assignmentTargetId: FocusedAssetId | null
+  onHoverBindingCandidate?: (binding: { objectName: string; motionObjectName?: string } | null) => void
   onAssignBinding?: (assetId: FocusedAssetId, binding: { objectName: string; motionObjectName?: string }) => void
   onToggleBlower: (blowerId: BlowerId) => void
   onToggleValve: (valveId: ValveId) => void
@@ -788,16 +790,20 @@ function MeshClickHandler({
   const { camera, scene, gl } = useThree()
   const raycaster = useRef(new THREE.Raycaster())
 
+  const getSelectionFromEvent = useCallback((event: MouseEvent) => {
+    const rect = gl.domElement.getBoundingClientRect()
+    const mouse = new THREE.Vector2(
+      ((event.clientX - rect.left) / rect.width) * 2 - 1,
+      -((event.clientY - rect.top) / rect.height) * 2 + 1,
+    )
+    raycaster.current.setFromCamera(mouse, camera)
+    return raycaster.current.intersectObjects(scene.children, true)
+  }, [camera, gl, scene])
+
   useEffect(() => {
     const canvas = gl.domElement
-    const handleClick = (event: MouseEvent) => {
-      const rect = canvas.getBoundingClientRect()
-      const mouse = new THREE.Vector2(
-        ((event.clientX - rect.left) / rect.width) * 2 - 1,
-        -((event.clientY - rect.top) / rect.height) * 2 + 1,
-      )
-      raycaster.current.setFromCamera(mouse, camera)
-      const intersects = raycaster.current.intersectObjects(scene.children, true)
+    const handleAssignClick = (event: MouseEvent) => {
+      const intersects = getSelectionFromEvent(event)
       for (const hit of intersects) {
         if (!(hit.object instanceof THREE.Mesh)) continue
 
@@ -809,6 +815,28 @@ function MeshClickHandler({
           break
         }
 
+        break
+      }
+    }
+
+    const handleHover = (event: MouseEvent) => {
+      if (!editMode || !modelRoot || !onHoverBindingCandidate) return
+      const intersects = getSelectionFromEvent(event)
+      for (const hit of intersects) {
+        if (!(hit.object instanceof THREE.Mesh)) continue
+        const selection = getNamedSelectionFromHit(hit.object, modelRoot)
+        onHoverBindingCandidate(selection)
+        canvas.style.cursor = selection ? 'crosshair' : 'default'
+        return
+      }
+      onHoverBindingCandidate(null)
+      canvas.style.cursor = 'default'
+    }
+
+    const handleToggleWithDoubleClick = (event: MouseEvent) => {
+      const intersects = getSelectionFromEvent(event)
+      for (const hit of intersects) {
+        if (!(hit.object instanceof THREE.Mesh)) continue
         const stableMeshId = hit.object.userData.stableMeshId as string | undefined
         if (!stableMeshId) continue
         const nodeId = meshToNodeMap.get(stableMeshId)
@@ -821,9 +849,25 @@ function MeshClickHandler({
         break
       }
     }
-    canvas.addEventListener('dblclick', handleClick)
-    return () => canvas.removeEventListener('dblclick', handleClick)
-  }, [assignmentTargetId, camera, editMode, gl, meshToNodeMap, modelRoot, onAssignBinding, onToggleBlower, onToggleValve, scene])
+
+    if (editMode) {
+      canvas.addEventListener('click', handleAssignClick)
+      canvas.addEventListener('mousemove', handleHover)
+      canvas.style.cursor = assignmentTargetId ? 'crosshair' : 'default'
+      return () => {
+        canvas.removeEventListener('click', handleAssignClick)
+        canvas.removeEventListener('mousemove', handleHover)
+        canvas.style.cursor = 'default'
+        onHoverBindingCandidate?.(null)
+      }
+    }
+
+    canvas.addEventListener('dblclick', handleToggleWithDoubleClick)
+    return () => {
+      canvas.removeEventListener('dblclick', handleToggleWithDoubleClick)
+      canvas.style.cursor = 'default'
+    }
+  }, [assignmentTargetId, editMode, getSelectionFromEvent, gl, meshToNodeMap, modelRoot, onAssignBinding, onHoverBindingCandidate, onToggleBlower, onToggleValve])
 
   return null
 }
@@ -966,6 +1010,7 @@ function SopladorasBaader142InteractiveCanvasOverlay({
   bindingMap,
   editMode,
   assignmentTargetId,
+  onHoverBindingCandidate,
   focusedAssetId,
   onAssignBinding,
   onToggleBlower,
@@ -979,6 +1024,7 @@ function SopladorasBaader142InteractiveCanvasOverlay({
   bindingMap: InteractiveBindingMap
   editMode: boolean
   assignmentTargetId: FocusedAssetId | null
+  onHoverBindingCandidate?: (binding: { objectName: string; motionObjectName?: string } | null) => void
   focusedAssetId: FocusedAssetId
   onAssignBinding?: (assetId: FocusedAssetId, binding: { objectName: string; motionObjectName?: string }) => void
   onToggleBlower: (blowerId: BlowerId) => void
@@ -1089,6 +1135,7 @@ function SopladorasBaader142InteractiveCanvasOverlay({
         modelRoot={object}
         editMode={editMode}
         assignmentTargetId={assignmentTargetId}
+        onHoverBindingCandidate={onHoverBindingCandidate}
         onAssignBinding={onAssignBinding}
         onToggleBlower={onToggleBlower}
         onToggleValve={onToggleValve}
@@ -1294,6 +1341,7 @@ function ModelBoundExperience({ modelId, modelName: _modelName, className, model
   const [editMappingsMode, setEditMappingsMode] = useState(false)
   const [bindings, setBindings] = useState<InteractiveBinding[]>([])
   const [lastPickedBinding, setLastPickedBinding] = useState<{ assetId: FocusedAssetId; objectName: string; motionObjectName?: string } | null>(null)
+  const [hoveredBindingCandidate, setHoveredBindingCandidate] = useState<{ objectName: string; motionObjectName?: string } | null>(null)
   const [resetKey, setResetKey] = useState(0)
   const viewPreset = 'front' as const
   const [resolvedNodeMeta, setResolvedNodeMeta] = useState<ResolvedNodeMeta>({})
@@ -1430,6 +1478,7 @@ function ModelBoundExperience({ modelId, modelName: _modelName, className, model
             bindingMap={bindingMap}
             editMode={editMappingsMode}
             assignmentTargetId={assignmentTargetId}
+            onHoverBindingCandidate={setHoveredBindingCandidate}
             focusedAssetId={focusedAssetId}
             onAssignBinding={handleAssignBinding}
             onToggleBlower={handleToggleBlowerPower}
@@ -1447,8 +1496,8 @@ function ModelBoundExperience({ modelId, modelName: _modelName, className, model
                   <p className="text-[11px] text-muted-foreground">
                     {editMappingsMode
                       ? assignmentTargetId
-                        ? `Seleccionado ${assignmentTargetId}. Haz doble clic en el grupo real del GLB para asignarlo.`
-                        : 'Editor activo. Elige un asset y luego haz doble clic sobre el modelo.'
+                        ? `Seleccionado ${assignmentTargetId}. Pasa sobre la pieza y haz clic para asignarla.`
+                        : 'Editor activo. Elige un asset y luego haz clic sobre el modelo.'
                       : 'Activa el editor para asignar cada boton a su grupo real del GLB.'}
                   </p>
                 </div>
@@ -1575,6 +1624,16 @@ function ModelBoundExperience({ modelId, modelName: _modelName, className, model
                 ) : (
                   'Selecciona un asset en la barra superior para empezar a asignar grupos reales.'
                 )}
+              </div>
+            ) : null}
+
+            {editMappingsMode ? (
+              <div className="mt-2 rounded-lg border bg-background/65 px-2 py-1.5 text-[11px] text-muted-foreground">
+                Hover actual:
+                {' '}
+                {hoveredBindingCandidate
+                  ? `${hoveredBindingCandidate.objectName}${hoveredBindingCandidate.motionObjectName ? ` / manilla ${hoveredBindingCandidate.motionObjectName}` : ''}`
+                  : 'sin deteccion debajo del cursor'}
               </div>
             ) : null}
 
