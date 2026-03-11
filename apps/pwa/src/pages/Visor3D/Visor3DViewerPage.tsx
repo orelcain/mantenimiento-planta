@@ -38,6 +38,9 @@ import {
   Card,
   CardContent,
   Badge,
+  Tabs,
+  TabsList,
+  TabsTrigger,
   Dialog,
   DialogContent,
   DialogHeader,
@@ -57,6 +60,8 @@ import { Viewer3D } from '@/components/visor3d/Viewer3D'
 import { DimensionsTool } from '@/components/visor3d/DimensionsTool'
 import { ColorPalette } from '@/components/visor3d/ColorPalette'
 import { AnnotationListItems } from '@/components/visor3d/AnnotationListItems'
+import { ToboganInteractiveExperience } from '@/components/visor3d/interactive/ToboganInteractiveExperience'
+import { hasToboganInteractiveExperience } from '@/components/visor3d/interactive/experienceRegistry'
 import { ImageLightbox } from '@/components/ui/ImageLightbox'
 import type { Model3D, MaterialOverride, Annotation3D, AnnotationStatus, AnnotationPriority } from '@/types/models3d'
 import type { Dimension3D, DimensionUnit, Point3D, MeasurementType } from '@/types/models3d'
@@ -112,12 +117,14 @@ export function Visor3DViewerPage() {
   const [qrOpen, setQrOpen] = useState(false)
   const [copied, setCopied] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
+  const [activeView, setActiveView] = useState<'model' | 'interactive'>('model')
 
   // Focus camera on point
   const [focusPoint, setFocusPoint] = useState<import('@/types/models3d').Point3D | null>(null)
 
   // Viewer reset trigger
   const [resetKey, setResetKey] = useState(0)
+  const hasInteractiveExperience = hasToboganInteractiveExperience(model)
 
   // Cargar modelo
   useEffect(() => {
@@ -135,6 +142,23 @@ export function Visor3DViewerPage() {
       .catch((err) => setError(`Error cargando modelo: ${(err as Error).message}`))
       .finally(() => setLoading(false))
   }, [modelId])
+
+  useEffect(() => {
+    if (!hasInteractiveExperience && activeView !== 'model') {
+      setActiveView('model')
+    }
+  }, [activeView, hasInteractiveExperience])
+
+  useEffect(() => {
+    if (activeView !== 'interactive') return
+    setCreatingDimension(false)
+    setPendingPoints([])
+    setPaintMode(false)
+    setPaintColor(null)
+    setPaintErase(false)
+    setAnnotationMode(false)
+    setShowAnnotationDialog(false)
+  }, [activeView])
 
   // Suscribirse a cotas
   useEffect(() => {
@@ -483,83 +507,85 @@ export function Visor3DViewerPage() {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Dimension controls */}
-          <Button
-            variant={showDimensions ? 'default' : 'outline'}
-            size="sm"
-            className="gap-1.5"
-            onClick={() => setShowDimensions(!showDimensions)}
-          >
-            <Ruler className="h-4 w-4" />
-            Cotas ({dimensions.length})
-          </Button>
+          {activeView === 'model' && (
+            <>
+              {/* Dimension controls */}
+              <Button
+                variant={showDimensions ? 'default' : 'outline'}
+                size="sm"
+                className="gap-1.5"
+                onClick={() => setShowDimensions(!showDimensions)}
+              >
+                <Ruler className="h-4 w-4" />
+                Cotas ({dimensions.length})
+              </Button>
 
-          {isAdmin && !paintMode && (
-            <Button
-              variant={creatingDimension ? 'destructive' : 'outline'}
-              size="sm"
-              className="gap-1.5"
-              onClick={() => {
-                setCreatingDimension(!creatingDimension)
-                setPendingPoints([])
-              }}
-            >
-              {creatingDimension ? (
-                <>
-                  <X className="h-4 w-4" />
-                  Cancelar
-                </>
-              ) : (
-                <>
-                  <Ruler className="h-4 w-4" />
-                  Nueva cota
-                </>
+              {isAdmin && !paintMode && (
+                <Button
+                  variant={creatingDimension ? 'destructive' : 'outline'}
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={() => {
+                    setCreatingDimension(!creatingDimension)
+                    setPendingPoints([])
+                  }}
+                >
+                  {creatingDimension ? (
+                    <>
+                      <X className="h-4 w-4" />
+                      Cancelar
+                    </>
+                  ) : (
+                    <>
+                      <Ruler className="h-4 w-4" />
+                      Nueva cota
+                    </>
+                  )}
+                </Button>
               )}
-            </Button>
-          )}
 
-          {/* Annotation mode toggle */}
-          {!creatingDimension && !paintMode && (
-            <Button
-              variant={annotationMode ? 'destructive' : 'outline'}
-              size="sm"
-              className="gap-1.5"
-              onClick={() => setAnnotationMode(!annotationMode)}
-            >
-              {annotationMode ? (
-                <>
-                  <X className="h-4 w-4" />
-                  Cancelar
-                </>
-              ) : (
-                <>
-                  <MapPin className="h-4 w-4" />
-                  Anotar
-                </>
+              {!creatingDimension && !paintMode && (
+                <Button
+                  variant={annotationMode ? 'destructive' : 'outline'}
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={() => setAnnotationMode(!annotationMode)}
+                >
+                  {annotationMode ? (
+                    <>
+                      <X className="h-4 w-4" />
+                      Cancelar
+                    </>
+                  ) : (
+                    <>
+                      <MapPin className="h-4 w-4" />
+                      Anotar
+                    </>
+                  )}
+                </Button>
               )}
-            </Button>
-          )}
 
-          {/* Paint mode toggle (admin) */}
-          {isAdmin && !creatingDimension && (
-            <Button
-              variant={paintMode ? 'destructive' : 'outline'}
-              size="sm"
-              className="gap-1.5"
-              onClick={togglePaintMode}
-            >
-              {paintMode ? (
-                <>
-                  <X className="h-4 w-4" />
-                  Cerrar pintura
-                </>
-              ) : (
-                <>
-                  <Paintbrush className="h-4 w-4" />
-                  Pintar
-                </>
+              {isAdmin && !creatingDimension && (
+                <Button
+                  variant={paintMode ? 'destructive' : 'outline'}
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={togglePaintMode}
+                >
+                  {paintMode ? (
+                    <>
+                      <X className="h-4 w-4" />
+                      Cerrar pintura
+                    </>
+                  ) : (
+                    <>
+                      <Paintbrush className="h-4 w-4" />
+                      Pintar
+                    </>
+                  )}
+                </Button>
               )}
-            </Button>
+            </>
           )}
 
           <Button variant="outline" size="sm" className="gap-1.5" onClick={handleCopyLink}>
@@ -575,6 +601,7 @@ export function Visor3DViewerPage() {
             size="sm"
             className="gap-1.5"
             onClick={() => setResetKey((k) => k + 1)}
+            disabled={activeView !== 'model'}
           >
             <RotateCcw className="h-4 w-4" />
             Reset
@@ -585,8 +612,22 @@ export function Visor3DViewerPage() {
         </div>
       </div>
 
+      {hasInteractiveExperience && (
+        <Tabs value={activeView} onValueChange={(value) => setActiveView(value as 'model' | 'interactive')}>
+          <div className="flex items-center justify-between rounded-lg border bg-card px-3 py-2">
+            <TabsList className="h-auto bg-muted/70">
+              <TabsTrigger value="model">Modelo 3D</TabsTrigger>
+              <TabsTrigger value="interactive">Interactividad</TabsTrigger>
+            </TabsList>
+            <p className="hidden text-xs text-muted-foreground md:block">
+              El visor base se mantiene intacto y la simulacion del tobogan corre por separado.
+            </p>
+          </div>
+        </Tabs>
+      )}
+
       {/* Dimension creation mode indicator */}
-      {creatingDimension && (
+      {activeView === 'model' && creatingDimension && (
         <div className="flex flex-col gap-2 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
           {/* Measurement type selector */}
           <div className="flex items-center gap-1.5 flex-wrap">
@@ -655,7 +696,7 @@ export function Visor3DViewerPage() {
       )}
 
       {/* Annotation mode indicator */}
-      {annotationMode && (
+      {activeView === 'model' && annotationMode && (
         <div className="flex flex-col gap-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
           <div className="flex items-center gap-3">
             <MapPin className="h-5 w-5 text-amber-500 shrink-0" />
@@ -668,47 +709,48 @@ export function Visor3DViewerPage() {
         </div>
       )}
 
-      {/* 3D Viewer */}
       <div
         className={`relative rounded-lg overflow-hidden border bg-card ${
           isFullscreen ? 'h-screen' : 'h-[60vh] min-h-[400px]'
         }`}
       >
-        <Viewer3D
-          url={model.downloadURL}
-          format={model.format}
-          resetKey={resetKey}
-          onPointClick={handleModelClick}
-          pendingPoints={pendingPoints}
-          measurementType={measurementType}
-          onClosePolygon={handleClosePolygon}
-          paintMode={paintMode}
-          paintColor={paintColor}
-          paintErase={paintErase}
-          materialOverrides={materialOverrides}
-          onMeshPainted={handleMeshPainted}
-          annotations={annotations}
-          annotationMode={annotationMode}
-          onAnnotationClick={handleAnnotationClick}
-          onPhotoClick={(photos, idx) => {
-            setLightboxPhotos(photos)
-            setLightboxIndex(idx)
-          }}
-          focusPoint={focusPoint}
-          onAddAnnotation={handleAddAnnotationPoint}
-        >
-          {showDimensions && (
-            <DimensionsTool dimensions={dimensions} pendingPoints={pendingPoints} measurementType={measurementType} />
-          )}
-        </Viewer3D>
+        {activeView === 'model' ? (
+          <>
+            <Viewer3D
+              url={model.downloadURL}
+              format={model.format}
+              resetKey={resetKey}
+              onPointClick={handleModelClick}
+              pendingPoints={pendingPoints}
+              measurementType={measurementType}
+              onClosePolygon={handleClosePolygon}
+              paintMode={paintMode}
+              paintColor={paintColor}
+              paintErase={paintErase}
+              materialOverrides={materialOverrides}
+              onMeshPainted={handleMeshPainted}
+              annotations={annotations}
+              annotationMode={annotationMode}
+              onAnnotationClick={handleAnnotationClick}
+              onPhotoClick={(photos, idx) => {
+                setLightboxPhotos(photos)
+                setLightboxIndex(idx)
+              }}
+              focusPoint={focusPoint}
+              onAddAnnotation={handleAddAnnotationPoint}
+            >
+              {showDimensions && (
+                <DimensionsTool dimensions={dimensions} pendingPoints={pendingPoints} measurementType={measurementType} />
+              )}
+            </Viewer3D>
 
-        {/* Annotation Creation/Edit Dialog */}
-        <Dialog open={showAnnotationDialog} onOpenChange={setShowAnnotationDialog}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{selectedAnnotation ? 'Editar Anotación' : 'Nueva Anotación'}</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
+            {/* Annotation Creation/Edit Dialog */}
+            <Dialog open={showAnnotationDialog} onOpenChange={setShowAnnotationDialog}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>{selectedAnnotation ? 'Editar Anotación' : 'Nueva Anotación'}</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Título</label>
                 <input 
@@ -884,46 +926,50 @@ export function Visor3DViewerPage() {
                   Las fotos se optimizan automáticamente a WebP de alta calidad.
                 </p>
               </div>
-            </div>
-            <div className="flex justify-between items-center mt-4">
-              {selectedAnnotation ? (
-                <Button variant="destructive" size="sm" onClick={handleDeleteAnnotation}>
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Eliminar
-                </Button>
-              ) : (
-                <div />
-              )}
-              <Button onClick={handleSubmitAnnotation} disabled={!annTitle || uploadingPhotos}>
-                {uploadingPhotos ? (
-                  <>
-                    <Loader2Icon className="h-4 w-4 mr-2 animate-spin" />
-                    Subiendo fotos...
-                  </>
-                ) : (
-                  selectedAnnotation ? 'Guardar Cambios' : 'Crear Anotación'
-                )}
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+                </div>
+                <div className="flex justify-between items-center mt-4">
+                  {selectedAnnotation ? (
+                    <Button variant="destructive" size="sm" onClick={handleDeleteAnnotation}>
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Eliminar
+                    </Button>
+                  ) : (
+                    <div />
+                  )}
+                  <Button onClick={handleSubmitAnnotation} disabled={!annTitle || uploadingPhotos}>
+                    {uploadingPhotos ? (
+                      <>
+                        <Loader2Icon className="h-4 w-4 mr-2 animate-spin" />
+                        Subiendo fotos...
+                      </>
+                    ) : (
+                      selectedAnnotation ? 'Guardar Cambios' : 'Crear Anotación'
+                    )}
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
 
-        {/* Color palette overlay (inside viewer container) */}
-        {paintMode && (
-          <ColorPalette
-            selectedColor={paintColor}
-            onSelectColor={(c) => { setPaintColor(c); setPaintErase(false) }}
-            onClearMode={togglePaintMode}
-            onResetAll={handleResetAllPaint}
-            isEraseMode={paintErase}
-            onToggleErase={() => { setPaintErase(!paintErase); setPaintColor(null) }}
-            paintedCount={materialOverrides.length}
-          />
+            {/* Color palette overlay (inside viewer container) */}
+            {paintMode && (
+              <ColorPalette
+                selectedColor={paintColor}
+                onSelectColor={(c) => { setPaintColor(c); setPaintErase(false) }}
+                onClearMode={togglePaintMode}
+                onResetAll={handleResetAllPaint}
+                isEraseMode={paintErase}
+                onToggleErase={() => { setPaintErase(!paintErase); setPaintColor(null) }}
+                paintedCount={materialOverrides.length}
+              />
+            )}
+          </>
+        ) : (
+          <ToboganInteractiveExperience modelName={model.name} className="h-full" />
         )}
       </div>
 
       {/* Dimensions & Annotations panel */}
-      {(showDimensions && dimensions.length > 0) || annotations.length > 0 ? (
+      {activeView === 'model' && ((showDimensions && dimensions.length > 0) || annotations.length > 0) ? (
         <Card>
           <CardContent className="py-3 max-h-48 overflow-y-auto">
             {/* Cotas section */}

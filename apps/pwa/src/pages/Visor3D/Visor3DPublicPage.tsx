@@ -34,6 +34,9 @@ import {
   Card,
   CardContent,
   Badge,
+  Tabs,
+  TabsList,
+  TabsTrigger,
 } from '@/components/ui'
 import { getModel3DById } from '@/services/models3d'
 import {
@@ -56,6 +59,8 @@ import { Viewer3D } from '@/components/visor3d/Viewer3D'
 import { DimensionsTool } from '@/components/visor3d/DimensionsTool'
 import { ColorPalette } from '@/components/visor3d/ColorPalette'
 import { AnnotationListItems } from '@/components/visor3d/AnnotationListItems'
+import { ToboganInteractiveExperience } from '@/components/visor3d/interactive/ToboganInteractiveExperience'
+import { hasToboganInteractiveExperience } from '@/components/visor3d/interactive/experienceRegistry'
 import { ImageLightbox } from '@/components/ui/ImageLightbox'
 import type { Model3D, MaterialOverride, Annotation3D, Dimension3D, DimensionUnit, Point3D, MeasurementType } from '@/types/models3d'
 import { getUnitSuffix } from '@/types/models3d'
@@ -96,9 +101,11 @@ export function Visor3DPublicPage() {
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [resetKey, setResetKey] = useState(0)
   const containerRef = useRef<HTMLDivElement>(null)
+  const [activeView, setActiveView] = useState<'model' | 'interactive'>('model')
 
   // Focus camera on point
   const [focusPoint, setFocusPoint] = useState<Point3D | null>(null)
+  const hasInteractiveExperience = hasToboganInteractiveExperience(model)
 
   // Cargar modelo (sin auth)
   useEffect(() => {
@@ -113,6 +120,21 @@ export function Visor3DPublicPage() {
       .catch((err) => setError(`Error cargando modelo: ${(err as Error).message}`))
       .finally(() => setLoading(false))
   }, [modelId])
+
+  useEffect(() => {
+    if (!hasInteractiveExperience && activeView !== 'model') {
+      setActiveView('model')
+    }
+  }, [activeView, hasInteractiveExperience])
+
+  useEffect(() => {
+    if (activeView !== 'interactive') return
+    setCreatingDimension(false)
+    setPendingPoints([])
+    setPaintMode(false)
+    setPaintColor(null)
+    setPaintErase(false)
+  }, [activeView])
 
   // Suscribirse a cotas (sin auth)
   useEffect(() => {
@@ -352,60 +374,60 @@ export function Visor3DPublicPage() {
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0">
-          {/* Cotas toggle */}
-          <Button
-            variant={showDimensions ? 'default' : 'outline'}
-            size="sm"
-            className="gap-1 h-7 text-xs"
-            onClick={() => setShowDimensions(!showDimensions)}
-          >
-            <Ruler className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Cotas ({dimensions.length})</span>
-            <span className="sm:hidden">{dimensions.length}</span>
-          </Button>
+          {activeView === 'model' && (
+            <>
+              <Button
+                variant={showDimensions ? 'default' : 'outline'}
+                size="sm"
+                className="gap-1 h-7 text-xs"
+                onClick={() => setShowDimensions(!showDimensions)}
+              >
+                <Ruler className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Cotas ({dimensions.length})</span>
+                <span className="sm:hidden">{dimensions.length}</span>
+              </Button>
 
-          {/* Nueva cota */}
-          {!paintMode && (
-            <Button
-              variant={creatingDimension ? 'destructive' : 'outline'}
-              size="sm"
-              className="gap-1 h-7 text-xs"
-              onClick={toggleDimensionCreation}
-            >
-              {creatingDimension ? (
-                <><X className="h-3.5 w-3.5" /><span className="hidden sm:inline">Cancelar</span></>
-              ) : (
-                <><Ruler className="h-3.5 w-3.5" /><span className="hidden sm:inline">+ Cota</span></>
+              {!paintMode && (
+                <Button
+                  variant={creatingDimension ? 'destructive' : 'outline'}
+                  size="sm"
+                  className="gap-1 h-7 text-xs"
+                  onClick={toggleDimensionCreation}
+                >
+                  {creatingDimension ? (
+                    <><X className="h-3.5 w-3.5" /><span className="hidden sm:inline">Cancelar</span></>
+                  ) : (
+                    <><Ruler className="h-3.5 w-3.5" /><span className="hidden sm:inline">+ Cota</span></>
+                  )}
+                </Button>
               )}
-            </Button>
-          )}
 
-          {/* Anotaciones toggle */}
-          <Button
-            variant={showAnnotations ? 'default' : 'outline'}
-            size="sm"
-            className="gap-1 h-7 text-xs"
-            onClick={() => setShowAnnotations(!showAnnotations)}
-          >
-            <MapPin className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Notas ({annotations.length})</span>
-            <span className="sm:hidden">{annotations.length}</span>
-          </Button>
+              <Button
+                variant={showAnnotations ? 'default' : 'outline'}
+                size="sm"
+                className="gap-1 h-7 text-xs"
+                onClick={() => setShowAnnotations(!showAnnotations)}
+              >
+                <MapPin className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Notas ({annotations.length})</span>
+                <span className="sm:hidden">{annotations.length}</span>
+              </Button>
 
-          {/* Pintar */}
-          {!creatingDimension && (
-            <Button
-              variant={paintMode ? 'destructive' : 'outline'}
-              size="sm"
-              className="gap-1 h-7 text-xs"
-              onClick={togglePaintMode}
-            >
-              {paintMode ? (
-                <><X className="h-3.5 w-3.5" /><span className="hidden sm:inline">Cerrar</span></>
-              ) : (
-                <><Paintbrush className="h-3.5 w-3.5" /><span className="hidden sm:inline">Pintar</span></>
+              {!creatingDimension && (
+                <Button
+                  variant={paintMode ? 'destructive' : 'outline'}
+                  size="sm"
+                  className="gap-1 h-7 text-xs"
+                  onClick={togglePaintMode}
+                >
+                  {paintMode ? (
+                    <><X className="h-3.5 w-3.5" /><span className="hidden sm:inline">Cerrar</span></>
+                  ) : (
+                    <><Paintbrush className="h-3.5 w-3.5" /><span className="hidden sm:inline">Pintar</span></>
+                  )}
+                </Button>
               )}
-            </Button>
+            </>
           )}
 
           <Button
@@ -414,6 +436,7 @@ export function Visor3DPublicPage() {
             className="h-7 w-7 p-0"
             onClick={() => setResetKey((k) => k + 1)}
             title="Reset vista"
+            disabled={activeView !== 'model'}
           >
             <RotateCcw className="h-3.5 w-3.5" />
           </Button>
@@ -429,8 +452,22 @@ export function Visor3DPublicPage() {
         </div>
       </div>
 
+      {hasInteractiveExperience && (
+        <Tabs value={activeView} onValueChange={(value) => setActiveView(value as 'model' | 'interactive')}>
+          <div className="flex items-center justify-between border-b bg-card px-3 py-2 shrink-0">
+            <TabsList className="h-auto bg-muted/70">
+              <TabsTrigger value="model">Modelo 3D</TabsTrigger>
+              <TabsTrigger value="interactive">Interactividad</TabsTrigger>
+            </TabsList>
+            <p className="hidden text-[11px] text-muted-foreground md:block">
+              Vista publica con experiencia especifica del tobogan.
+            </p>
+          </div>
+        </Tabs>
+      )}
+
       {/* Dimension creation indicator */}
-      {creatingDimension && (
+      {activeView === 'model' && creatingDimension && (
         <div className="flex flex-col gap-1 px-3 py-1.5 bg-blue-500/10 border-b border-blue-500/30 shrink-0">
           {/* Measurement type selector */}
           <div className="flex items-center gap-1 flex-wrap">
@@ -506,45 +543,50 @@ export function Visor3DPublicPage() {
 
       {/* 3D Viewer */}
       <div className="flex-1 relative">
-        <Viewer3D
-          url={model.downloadURL}
-          format={model.format}
-          resetKey={resetKey}
-          onPointClick={creatingDimension ? handleModelClick : undefined}
-          pendingPoints={pendingPoints}
-          measurementType={measurementType}
-          onClosePolygon={handleClosePolygon}
-          paintMode={paintMode}
-          paintColor={paintColor}
-          paintErase={paintErase}
-          materialOverrides={materialOverrides}
-          onMeshPainted={handleMeshPainted}
-          annotations={showAnnotations ? annotations : undefined}
-          onPhotoClick={(photos, idx) => {
-            setLightboxPhotos(photos)
-            setLightboxIndex(idx)
-          }}
-          focusPoint={focusPoint}
-        >
-          {showDimensions && <DimensionsTool dimensions={dimensions} pendingPoints={pendingPoints} measurementType={measurementType} />}
-        </Viewer3D>
+        {activeView === 'model' ? (
+          <>
+            <Viewer3D
+              url={model.downloadURL}
+              format={model.format}
+              resetKey={resetKey}
+              onPointClick={creatingDimension ? handleModelClick : undefined}
+              pendingPoints={pendingPoints}
+              measurementType={measurementType}
+              onClosePolygon={handleClosePolygon}
+              paintMode={paintMode}
+              paintColor={paintColor}
+              paintErase={paintErase}
+              materialOverrides={materialOverrides}
+              onMeshPainted={handleMeshPainted}
+              annotations={showAnnotations ? annotations : undefined}
+              onPhotoClick={(photos, idx) => {
+                setLightboxPhotos(photos)
+                setLightboxIndex(idx)
+              }}
+              focusPoint={focusPoint}
+            >
+              {showDimensions && <DimensionsTool dimensions={dimensions} pendingPoints={pendingPoints} measurementType={measurementType} />}
+            </Viewer3D>
 
-        {/* Color palette overlay */}
-        {paintMode && (
-          <ColorPalette
-            selectedColor={paintColor}
-            onSelectColor={(c) => { setPaintColor(c); setPaintErase(false) }}
-            onClearMode={togglePaintMode}
-            onResetAll={handleResetAllPaint}
-            isEraseMode={paintErase}
-            onToggleErase={() => { setPaintErase(!paintErase); setPaintColor(null) }}
-            paintedCount={materialOverrides.length}
-          />
+            {paintMode && (
+              <ColorPalette
+                selectedColor={paintColor}
+                onSelectColor={(c) => { setPaintColor(c); setPaintErase(false) }}
+                onClearMode={togglePaintMode}
+                onResetAll={handleResetAllPaint}
+                isEraseMode={paintErase}
+                onToggleErase={() => { setPaintErase(!paintErase); setPaintColor(null) }}
+                paintedCount={materialOverrides.length}
+              />
+            )}
+          </>
+        ) : (
+          <ToboganInteractiveExperience modelName={model.name} className="h-full" />
         )}
       </div>
 
       {/* Panel de cotas + anotaciones (colapsable en la parte inferior) */}
-      {((showDimensions && dimensions.length > 0) || annotations.length > 0) && (
+      {activeView === 'model' && ((showDimensions && dimensions.length > 0) || annotations.length > 0) && (
         <div className="border-t bg-card shrink-0 max-h-40 overflow-y-auto">
           <div className="px-3 py-1.5">
             {/* Cotas */}
