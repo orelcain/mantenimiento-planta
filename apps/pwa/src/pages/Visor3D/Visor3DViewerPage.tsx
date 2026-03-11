@@ -61,7 +61,8 @@ import { DimensionsTool } from '@/components/visor3d/DimensionsTool'
 import { ColorPalette } from '@/components/visor3d/ColorPalette'
 import { AnnotationListItems } from '@/components/visor3d/AnnotationListItems'
 import { ToboganInteractiveExperience } from '@/components/visor3d/interactive/ToboganInteractiveExperience'
-import { hasToboganInteractiveExperience } from '@/components/visor3d/interactive/experienceRegistry'
+import { InteractiveExperienceUnavailable } from '@/components/visor3d/interactive/InteractiveExperienceUnavailable'
+import { getInteractiveExperienceForModel } from '@/components/visor3d/interactive/experienceRegistry'
 import { ImageLightbox } from '@/components/ui/ImageLightbox'
 import type { Model3D, MaterialOverride, Annotation3D, AnnotationStatus, AnnotationPriority } from '@/types/models3d'
 import type { Dimension3D, DimensionUnit, Point3D, MeasurementType } from '@/types/models3d'
@@ -124,7 +125,7 @@ export function Visor3DViewerPage() {
 
   // Viewer reset trigger
   const [resetKey, setResetKey] = useState(0)
-  const hasInteractiveExperience = hasToboganInteractiveExperience(model)
+  const interactiveExperience = getInteractiveExperienceForModel(model)
 
   // Cargar modelo
   useEffect(() => {
@@ -142,12 +143,6 @@ export function Visor3DViewerPage() {
       .catch((err) => setError(`Error cargando modelo: ${(err as Error).message}`))
       .finally(() => setLoading(false))
   }, [modelId])
-
-  useEffect(() => {
-    if (!hasInteractiveExperience && activeView !== 'model') {
-      setActiveView('model')
-    }
-  }, [activeView, hasInteractiveExperience])
 
   useEffect(() => {
     if (activeView !== 'interactive') return
@@ -612,19 +607,19 @@ export function Visor3DViewerPage() {
         </div>
       </div>
 
-      {hasInteractiveExperience && (
-        <Tabs value={activeView} onValueChange={(value) => setActiveView(value as 'model' | 'interactive')}>
-          <div className="flex items-center justify-between rounded-lg border bg-card px-3 py-2">
-            <TabsList className="h-auto bg-muted/70">
-              <TabsTrigger value="model">Modelo 3D</TabsTrigger>
-              <TabsTrigger value="interactive">Interactividad</TabsTrigger>
-            </TabsList>
-            <p className="hidden text-xs text-muted-foreground md:block">
-              El visor base se mantiene intacto y la simulacion del tobogan corre por separado.
-            </p>
-          </div>
-        </Tabs>
-      )}
+      <Tabs value={activeView} onValueChange={(value) => setActiveView(value as 'model' | 'interactive')}>
+        <div className="flex items-center justify-between rounded-lg border bg-card px-3 py-2">
+          <TabsList className="h-auto bg-muted/70">
+            <TabsTrigger value="model">Modelo 3D</TabsTrigger>
+            <TabsTrigger value="interactive">Interactividad</TabsTrigger>
+          </TabsList>
+          <p className="hidden text-xs text-muted-foreground md:block">
+            {interactiveExperience?.id === 'tobogan'
+              ? 'El visor base se mantiene intacto y la simulacion del tobogan corre por separado.'
+              : 'La pestana ya esta lista; falta asignar una experiencia especifica a este modelo.'}
+          </p>
+        </div>
+      </Tabs>
 
       {/* Dimension creation mode indicator */}
       {activeView === 'model' && creatingDimension && (
@@ -963,8 +958,10 @@ export function Visor3DViewerPage() {
               />
             )}
           </>
-        ) : (
+        ) : interactiveExperience?.id === 'tobogan' ? (
           <ToboganInteractiveExperience modelName={model.name} className="h-full" />
+        ) : (
+          <InteractiveExperienceUnavailable modelName={model.name} modelId={model.id} className="h-full" />
         )}
       </div>
 

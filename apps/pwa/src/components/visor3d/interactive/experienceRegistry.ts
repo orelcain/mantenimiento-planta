@@ -1,5 +1,12 @@
 import type { Model3D } from '@/types/models3d'
 
+export type InteractiveExperienceId = 'tobogan'
+
+export interface InteractiveExperienceDescriptor {
+  id: InteractiveExperienceId
+  label: string
+}
+
 function normalizeExperienceText(value: string): string {
   return value
     .normalize('NFD')
@@ -7,14 +14,33 @@ function normalizeExperienceText(value: string): string {
     .toLowerCase()
 }
 
-export function hasToboganInteractiveExperience(
-  model: Pick<Model3D, 'name' | 'originalFileName'> | null | undefined,
-): boolean {
-  if (!model) return false
-
-  const searchableText = normalizeExperienceText(
-    `${model.name} ${model.originalFileName}`,
+function buildSearchableText(
+  model: Pick<Model3D, 'id' | 'name' | 'originalFileName'>,
+): string {
+  return normalizeExperienceText(
+    `${model.id} ${model.name} ${model.originalFileName}`,
   )
+}
 
-  return searchableText.includes('tobogan')
+export function getInteractiveExperienceForModel(
+  model: Pick<Model3D, 'id' | 'name' | 'originalFileName'> | null | undefined,
+): InteractiveExperienceDescriptor | null {
+  if (!model) return null
+
+  const searchableText = buildSearchableText(model)
+
+  if (searchableText.includes('tobogan')) {
+    return {
+      id: 'tobogan',
+      label: 'Tobogan',
+    }
+  }
+
+  return null
+}
+
+export function hasToboganInteractiveExperience(
+  model: Pick<Model3D, 'id' | 'name' | 'originalFileName'> | null | undefined,
+): boolean {
+  return getInteractiveExperienceForModel(model)?.id === 'tobogan'
 }
