@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Html, Line } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
-import { AirVent, Gauge, RotateCcw, Settings2, Workflow } from 'lucide-react'
+import { AirVent, Gauge, Settings2, Workflow } from 'lucide-react'
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from '@/components/ui'
 import { Viewer3D } from '@/components/visor3d/Viewer3D'
 import { useViewer3DModelContext } from '@/components/visor3d/Viewer3DModelContext'
@@ -826,12 +826,12 @@ function StandalonePanel({ modelName, className }: Pick<SopladorasBaader142Inter
 }
 
 function ModelBoundExperience({ modelName: _modelName, className, modelUrl, modelFormat }: Required<Pick<SopladorasBaader142InteractiveExperienceProps, 'modelName' | 'modelUrl' | 'modelFormat'>> & Pick<SopladorasBaader142InteractiveExperienceProps, 'className'>) {
-  const [mode, setMode] = useState<OperatingMode>('produccion')
+  const mode: OperatingMode = 'produccion'
   const [backupMode, setBackupMode] = useState<BackupMode>('auto')
   const [manualBackupTarget, setManualBackupTarget] = useState<BlowerId | null>('S1')
   const [focusedAssetId, setFocusedAssetId] = useState<FocusedAssetId>('S1')
   const [resetKey, setResetKey] = useState(0)
-  const [viewPreset, setViewPreset] = useState<'front' | 'left' | 'right' | 'top' | 'isometric'>('front')
+  const viewPreset = 'front' as const
   const [resolvedNodeMeta, setResolvedNodeMeta] = useState<ResolvedNodeMeta>({})
   const [blowers, setBlowers] = useState<BlowerState[]>(INITIAL_BLOWERS)
   const [valves, setValves] = useState<ValveState[]>(INITIAL_VALVES)
@@ -875,7 +875,6 @@ function ModelBoundExperience({ modelName: _modelName, className, modelUrl, mode
   }, [])
 
   const handleResetSystem = useCallback(() => {
-    setMode('produccion')
     setBackupMode('auto')
     setManualBackupTarget('S1')
     setFocusedAssetId('S1')
@@ -901,46 +900,6 @@ function ModelBoundExperience({ modelName: _modelName, className, modelUrl, mode
         </Viewer3D>
 
         <div className="pointer-events-none absolute inset-x-3 top-3 z-10">
-          <div className="pointer-events-auto flex flex-col gap-2 xl:flex-row xl:items-start xl:justify-between">
-            <div className="rounded-xl border bg-background/90 p-2 backdrop-blur">
-              <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Vistas</div>
-              <div className="flex flex-wrap gap-2">
-                {([
-                  { id: 'front', label: 'Frente' },
-                  { id: 'left', label: 'Izquierda' },
-                  { id: 'right', label: 'Derecha' },
-                  { id: 'top', label: 'Superior' },
-                  { id: 'isometric', label: 'Iso' },
-                ] as const).map((option) => (
-                  <Button key={option.id} variant={viewPreset === option.id ? 'default' : 'outline'} size="sm" onClick={() => setViewPreset(option.id)}>
-                    {option.label}
-                  </Button>
-                ))}
-              </div>
-            </div>
-
-            <div className="rounded-xl border bg-background/90 p-2 backdrop-blur">
-              <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Escenario</div>
-              <div className="flex flex-wrap gap-2">
-                {([
-                  { id: 'produccion', label: 'Produccion' },
-                  { id: 'lavado', label: 'Lavado' },
-                  { id: 'mantencion', label: 'Mantencion' },
-                ] as const).map((option) => (
-                  <Button key={option.id} variant={mode === option.id ? 'default' : 'outline'} size="sm" onClick={() => setMode(option.id)}>
-                    {option.label}
-                  </Button>
-                ))}
-                <Button variant="outline" size="sm" className="gap-2" onClick={() => setResetKey((value) => value + 1)}>
-                  <RotateCcw className="h-4 w-4" />
-                  Reset vista
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="pointer-events-none absolute inset-x-3 top-28 z-10">
           <div className="pointer-events-auto rounded-xl border bg-background/90 p-3 backdrop-blur">
             <div className="grid gap-3 xl:grid-cols-[1.25fr_1.25fr_1fr]">
               <div className="space-y-2">
