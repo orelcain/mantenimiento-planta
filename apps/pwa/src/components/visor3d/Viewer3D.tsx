@@ -204,7 +204,7 @@ function AutoFitCamera({ modelInfo, resetKey }: { modelInfo: ModelInfo | null; r
     const fov = (camera as THREE.PerspectiveCamera).fov * (Math.PI / 180)
     const dist = maxDim / (2 * Math.tan(fov / 2)) * 2.0
 
-    camera.position.set(center.x + dist * 0.6, center.y + dist * 0.5, center.z + dist * 0.6)
+    camera.position.set(center.x + dist * 0.6, center.y + dist * 0.5, center.z - dist * 0.6)
     camera.lookAt(center)
     camera.near = Math.max(maxDim * 0.001, 0.001)
     camera.far = maxDim * 200
@@ -1027,7 +1027,7 @@ export function Viewer3D(props: Viewer3DProps) {
     <div className="w-full h-full relative">
       <CanvasErrorBoundary fallback={<WebGLUnavailableFallback />}>
         <Canvas
-          camera={{ position: [5, 3, 5], fov: 45, near: 0.01, far: 2000 }}
+          camera={{ position: [5, 3, -5], fov: 45, near: 0.01, far: 2000 }}
           shadows
           gl={{
             antialias: true,

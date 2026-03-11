@@ -62,7 +62,7 @@ export function Visor3DInteractiveBaader142Page() {
 
       <div className="rounded-xl border bg-card overflow-hidden">
         {loading ? (
-          <div className="flex h-[calc(100vh-15rem)] min-h-[620px] items-center justify-center">
+          <div className="flex h-[calc(100vh-12rem)] min-h-[740px] items-center justify-center">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
         ) : (
@@ -70,7 +70,7 @@ export function Visor3DInteractiveBaader142Page() {
             modelName="Sopladoras Baader 142"
             modelUrl={modelUrl}
             modelFormat={modelFormat}
-            className="h-[calc(100vh-15rem)] min-h-[620px]"
+            className="h-[calc(100vh-12rem)] min-h-[740px]"
           />
         )}
       </div>

@@ -876,7 +876,7 @@ function ModelBoundExperience({ modelName: _modelName, className, modelUrl, mode
 
   return (
     <div className={cn('grid h-full gap-3 bg-card p-3 xl:grid-cols-[minmax(0,2.5fr)_320px] 2xl:grid-cols-[minmax(0,2.9fr)_340px]', className)}>
-      <div className="relative min-h-[720px] overflow-hidden rounded-xl border bg-background">
+      <div className="relative min-h-[860px] overflow-hidden rounded-xl border bg-background">
         <Viewer3D url={modelUrl} format={modelFormat} resetKey={resetKey}>
           <SopladorasBaader142InteractiveCanvasOverlay
             blowers={blowers}

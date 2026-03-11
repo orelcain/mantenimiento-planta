@@ -713,7 +713,7 @@ export function Visor3DViewerPage() {
 
       <div
         className={`relative rounded-lg overflow-hidden border bg-card ${
-          isFullscreen ? 'h-screen' : 'h-[60vh] min-h-[400px]'
+          isFullscreen ? 'h-screen' : 'h-[72vh] min-h-[480px]'
         }`}
       >
         {activeView === 'model' ? (
