@@ -392,7 +392,7 @@ export function Visor3DListPage() {
                     <p className="text-sm text-muted-foreground">{experience.description}</p>
                     <Button className="gap-2" onClick={() => navigate(experience.route)}>
                       <ExternalLink className="h-4 w-4" />
-                      Abrir interactividad
+                        {experience.id === 'baader142' ? 'Abrir ficha base' : 'Abrir interactividad'}
                     </Button>
                   </CardContent>
                 </Card>

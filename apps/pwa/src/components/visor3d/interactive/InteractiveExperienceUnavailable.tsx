@@ -7,6 +7,10 @@ interface InteractiveExperienceUnavailableProps {
   modelId?: string
   className?: string
   onTryTobogan?: () => void
+  title?: string
+  badgeLabel?: string
+  description?: string
+  footerNote?: string
 }
 
 export function InteractiveExperienceUnavailable({
@@ -14,18 +18,22 @@ export function InteractiveExperienceUnavailable({
   modelId,
   className,
   onTryTobogan,
+  title = 'Interactividad',
+  badgeLabel = 'Proximamente',
+  description = 'Esta pestana ya esta habilitada en el visor. El siguiente paso es conectar una experiencia especifica para este modelo.',
+  footerNote = 'El tobogan ya usa esta estructura. Los siguientes equipos se conectan aqui sin tocar el visor 3D base.',
 }: InteractiveExperienceUnavailableProps) {
   return (
     <div className={cn('flex h-full flex-col bg-card', className)}>
       <div className="border-b px-4 py-3">
         <div className="flex items-center gap-2">
-          <h2 className="text-sm font-semibold">Interactividad</h2>
+          <h2 className="text-sm font-semibold">{title}</h2>
           <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
-            Proximamente
+            {badgeLabel}
           </Badge>
         </div>
         <p className="mt-1 text-xs text-muted-foreground">
-          Esta pestana ya esta habilitada en el visor. El siguiente paso es conectar una experiencia especifica para este modelo.
+          {description}
         </p>
       </div>
 
@@ -43,7 +51,7 @@ export function InteractiveExperienceUnavailable({
             {modelId ? <p className="mt-1"><span className="font-medium">ID:</span> {modelId}</p> : null}
           </div>
           <p className="mt-4 text-xs text-muted-foreground">
-            El tobogan ya usa esta estructura. Los siguientes equipos se conectan aqui sin tocar el visor 3D base.
+            {footerNote}
           </p>
           <div className="mt-4 flex justify-center gap-2">
             <Button variant="outline" size="sm" disabled>

@@ -71,6 +71,7 @@ const Visor3DListPage = lazyWithReload(() => import('@/pages/Visor3D/Visor3DList
 const Visor3DViewerPage = lazyWithReload(() => import('@/pages/Visor3D/Visor3DViewerPage').then((mod) => ({ default: mod.Visor3DViewerPage })))
 const Visor3DPublicPage = lazyWithReload(() => import('@/pages/Visor3D/Visor3DPublicPage').then((mod) => ({ default: mod.Visor3DPublicPage })))
 const Visor3DInteractiveToboganPage = lazyWithReload(() => import('@/pages/Visor3D/Visor3DInteractiveToboganPage').then((mod) => ({ default: mod.Visor3DInteractiveToboganPage })))
+const Visor3DInteractiveBaader142Page = lazyWithReload(() => import('@/pages/Visor3D/Visor3DInteractiveBaader142Page').then((mod) => ({ default: mod.Visor3DInteractiveBaader142Page })))
 const AnalisisGraderWizardPage = lazyWithReload(() => import('@/pages/AnalisisGrader/AnalisisGraderWizardPage').then((mod) => ({ default: mod.AnalisisGraderWizardPage })))
 const AnalisisGraderSessionPage = lazyWithReload(() => import('@/pages/AnalisisGrader/AnalisisGraderSessionPage').then((mod) => ({ default: mod.AnalisisGraderSessionPage })))
 const AnalisisGraderSessionsListPage = lazyWithReload(() => import('@/pages/AnalisisGrader/AnalisisGraderSessionsListPage').then((mod) => ({ default: mod.AnalisisGraderSessionsListPage })))
@@ -208,6 +209,14 @@ export function App() {
             }
           />
           <Route
+            path="/v/interactive/baader-142"
+            element={
+              <Suspense fallback={<LoadingScreen />}>
+                <Visor3DInteractiveBaader142Page />
+              </Suspense>
+            }
+          />
+          <Route
             path="/v/:modelId"
             element={
               <Suspense fallback={<LoadingScreen />}>
@@ -324,6 +333,11 @@ export function App() {
             <Route path="visor-3d/interactividad/tobogan" element={
               <Suspense fallback={<LoadingScreen />}>
                 <Visor3DInteractiveToboganPage />
+              </Suspense>
+            } />
+            <Route path="visor-3d/interactividad/baader-142" element={
+              <Suspense fallback={<LoadingScreen />}>
+                <Visor3DInteractiveBaader142Page />
               </Suspense>
             } />
             <Route path="visor-3d/:modelId" element={

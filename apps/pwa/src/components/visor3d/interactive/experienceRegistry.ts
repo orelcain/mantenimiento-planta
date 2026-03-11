@@ -1,6 +1,6 @@
 import type { Model3D } from '@/types/models3d'
 
-export type InteractiveExperienceId = 'tobogan'
+export type InteractiveExperienceId = 'tobogan' | 'baader142'
 
 export interface StandaloneInteractiveExperience {
   id: InteractiveExperienceId
@@ -17,6 +17,16 @@ const TOBOGAN_EXPERIENCE_ALIASES = [
   'tolva-tobogan',
 ]
 
+const BAADER142_EXPERIENCE_ALIASES = [
+  'baader 142',
+  'baader142',
+  'sopladoras baader 142',
+  'sopladora baader 142',
+  'nueva ubicacion de soplaroras baader 142',
+  'nueva ubicacion de sopladoras baader 142',
+  'sopladoras baader 142 nueva ubicacion',
+]
+
 export interface InteractiveExperienceDescriptor {
   id: InteractiveExperienceId
   label: string
@@ -30,6 +40,14 @@ export const STANDALONE_INTERACTIVE_EXPERIENCES: StandaloneInteractiveExperience
       'Experiencia interactiva cargada desde la repo externa del tobogan, independiente del inventario de modelos 3D.',
     route: '/visor-3d/interactividad/tobogan',
     sourceLabel: 'Repo externa',
+  },
+  {
+    id: 'baader142',
+    label: 'Baader 142 - Nueva ubicacion',
+    description:
+      'Base preparada para la futura interactividad de Nueva ubicacion de soplaroras baader 142, enlazada al modelo del inventario 3D.',
+    route: '/visor-3d/interactividad/baader-142',
+    sourceLabel: 'Pendiente',
   },
 ]
 
@@ -59,6 +77,13 @@ export function getInteractiveExperienceForModel(
     return {
       id: 'tobogan',
       label: 'Tobogan',
+    }
+  }
+
+  if (BAADER142_EXPERIENCE_ALIASES.some((alias) => searchableText.includes(alias))) {
+    return {
+      id: 'baader142',
+      label: 'Baader 142',
     }
   }
 
