@@ -736,7 +736,7 @@ function buildMeshToNodeMap(resolvedNodes: ResolvedInteractiveNode[], modelObjec
   for (const node of resolvedNodes) {
     if (!node.objectRef) continue
     node.objectRef.traverse((child) => {
-      if (child instanceof THREE.Mesh && child.userData.stableMeshId) {
+      if (child.type === 'Mesh' && child.userData.stableMeshId) {
         map.set(child.userData.stableMeshId, node.id)
       }
     })
@@ -744,7 +744,7 @@ function buildMeshToNodeMap(resolvedNodes: ResolvedInteractiveNode[], modelObjec
 
   if (modelObject) {
     modelObject.traverse((child) => {
-      if (!(child instanceof THREE.Mesh)) return
+      if (child.type !== 'Mesh') return
       const stableMeshId = child.userData.stableMeshId as string | undefined
       if (!stableMeshId || map.has(stableMeshId)) return
       const box = new THREE.Box3().setFromObject(child)
@@ -802,28 +802,27 @@ function MeshClickHandler({
 
   useEffect(() => {
     const canvas = gl.domElement
+
+    const isModelMesh = (obj: THREE.Object3D): boolean =>
+      obj.type === 'Mesh' && !obj.userData.isDimensionHelper && !obj.userData.isGrid && !obj.userData.isHighlight && !obj.userData.isSnapIndicator
+
     const handleAssignClick = (event: MouseEvent) => {
       const intersects = getSelectionFromEvent(event)
-      for (const hit of intersects) {
-        if (!(hit.object instanceof THREE.Mesh)) continue
-
-        if (editMode && assignmentTargetId && modelRoot && onAssignBinding) {
-          const selection = getNamedSelectionFromHit(hit.object, modelRoot)
-          if (selection) {
-            onAssignBinding(assignmentTargetId, selection)
-          }
-          break
+      const hit = intersects.find((i) => isModelMesh(i.object))
+      if (!hit) return
+      if (editMode && assignmentTargetId && modelRoot && onAssignBinding) {
+        const selection = getNamedSelectionFromHit(hit.object, modelRoot)
+        if (selection) {
+          onAssignBinding(assignmentTargetId, selection)
         }
-
-        break
       }
     }
 
     const handleHover = (event: MouseEvent) => {
       if (!editMode || !modelRoot || !onHoverBindingCandidate) return
       const intersects = getSelectionFromEvent(event)
-      for (const hit of intersects) {
-        if (!(hit.object instanceof THREE.Mesh)) continue
+      const hit = intersects.find((i) => isModelMesh(i.object))
+      if (hit) {
         const selection = getNamedSelectionFromHit(hit.object, modelRoot)
         onHoverBindingCandidate(selection)
         canvas.style.cursor = selection ? 'crosshair' : 'default'
@@ -835,18 +834,16 @@ function MeshClickHandler({
 
     const handleToggleWithDoubleClick = (event: MouseEvent) => {
       const intersects = getSelectionFromEvent(event)
-      for (const hit of intersects) {
-        if (!(hit.object instanceof THREE.Mesh)) continue
-        const stableMeshId = hit.object.userData.stableMeshId as string | undefined
-        if (!stableMeshId) continue
-        const nodeId = meshToNodeMap.get(stableMeshId)
-        if (!nodeId) continue
-        if (nodeId.startsWith('S')) {
-          onToggleBlower(nodeId as BlowerId)
-        } else {
-          onToggleValve(nodeId as ValveId)
-        }
-        break
+      const hit = intersects.find((i) => isModelMesh(i.object))
+      if (!hit) return
+      const stableMeshId = (hit.object as THREE.Mesh).userData.stableMeshId as string | undefined
+      if (!stableMeshId) return
+      const nodeId = meshToNodeMap.get(stableMeshId)
+      if (!nodeId) return
+      if (nodeId.startsWith('S')) {
+        onToggleBlower(nodeId as BlowerId)
+      } else {
+        onToggleValve(nodeId as ValveId)
       }
     }
 
@@ -1124,9 +1121,9 @@ function SopladorasBaader142InteractiveCanvasOverlay({
     return nextSegments
   }, [anchors, backupTargets, blowerFlow, nodeMap, valveMap])
 
-  if (!anchors) return null
+  const meshToNodeMap = useMemo(() => buildMeshToNodeMap(resolvedNodes, object), [resolvedNodes, object])
 
-  const meshToNodeMap = buildMeshToNodeMap(resolvedNodes, object)
+  if (!anchors) return null
 
   return (
     <>
@@ -1353,7 +1350,13 @@ function ModelBoundExperience({ modelId, modelName: _modelName, className, model
       setBindings([])
       return
     }
-    const unsubscribe = subscribeToInteractiveBindings(modelId, setBindings)
+    const unsubscribe = subscribeToInteractiveBindings(
+      modelId,
+      setBindings,
+      (error) => {
+        console.warn('[InteractiveBindings] Firestore subscription error (may be permissions):', error.message)
+      },
+    )
     return () => unsubscribe()
   }, [modelId])
 

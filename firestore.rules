@@ -581,6 +581,13 @@ service cloud.firestore {
         allow create, update: if request.auth != null;
         allow delete: if request.auth != null;
       }
+
+      // Subcolección de enlaces interactivos (binding asset → grupo GLB)
+      match /interactiveBindings/{bindingId} {
+        allow read: if true;
+        allow create, update: if request.auth != null;
+        allow delete: if request.auth != null;
+      }
     }
 
     // ============================================
