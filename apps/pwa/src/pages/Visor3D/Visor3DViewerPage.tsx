@@ -60,7 +60,7 @@ import { Viewer3D } from '@/components/visor3d/Viewer3D'
 import { DimensionsTool } from '@/components/visor3d/DimensionsTool'
 import { ColorPalette } from '@/components/visor3d/ColorPalette'
 import { AnnotationListItems } from '@/components/visor3d/AnnotationListItems'
-import { InteractiveExperienceUnavailable } from '@/components/visor3d/interactive/InteractiveExperienceUnavailable'
+import { SopladorasBaader142InteractiveExperience } from '@/components/visor3d/interactive/SopladorasBaader142InteractiveExperience'
 import { ToboganInteractiveExperience } from '@/components/visor3d/interactive/ToboganInteractiveExperience'
 import { getInteractiveExperienceForModel } from '@/components/visor3d/interactive/experienceRegistry'
 import { ImageLightbox } from '@/components/ui/ImageLightbox'
@@ -967,16 +967,8 @@ export function Visor3DViewerPage() {
           </>
         ) : interactiveExperience?.id === 'tobogan' ? (
           <ToboganInteractiveExperience modelName={model.name} className="h-full" />
-        ) : interactiveExperience?.id === 'baader142' ? (
-          <InteractiveExperienceUnavailable
-            modelName={model.name}
-            modelId={model.id}
-            className="h-full"
-            title="Interactividad Baader 142"
-            badgeLabel="En preparacion"
-            description="Este modelo ya esta identificado como la futura experiencia de Nueva ubicacion de soplaroras baader 142. La pestaña se mostrara aqui mientras construimos su simulacion propia."
-            footerNote="La integracion final reutilizara esta pestaña para ejecutar la experiencia especifica del equipo sin alterar el visor base."
-          />
+        ) : interactiveExperience?.id === 'sopladorasBaader142' ? (
+          <SopladorasBaader142InteractiveExperience modelName={model.name} className="h-full" />
         ) : null}
       </div>
 

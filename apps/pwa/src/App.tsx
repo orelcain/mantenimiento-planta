@@ -335,7 +335,7 @@ export function App() {
                 <Visor3DInteractiveToboganPage />
               </Suspense>
             } />
-            <Route path="visor-3d/interactividad/baader-142" element={
+            <Route path="visor-3d/interactividad/sopladoras-baader-142" element={
               <Suspense fallback={<LoadingScreen />}>
                 <Visor3DInteractiveBaader142Page />
               </Suspense>

@@ -59,7 +59,7 @@ import { Viewer3D } from '@/components/visor3d/Viewer3D'
 import { DimensionsTool } from '@/components/visor3d/DimensionsTool'
 import { ColorPalette } from '@/components/visor3d/ColorPalette'
 import { AnnotationListItems } from '@/components/visor3d/AnnotationListItems'
-import { InteractiveExperienceUnavailable } from '@/components/visor3d/interactive/InteractiveExperienceUnavailable'
+import { SopladorasBaader142InteractiveExperience } from '@/components/visor3d/interactive/SopladorasBaader142InteractiveExperience'
 import { ToboganInteractiveExperience } from '@/components/visor3d/interactive/ToboganInteractiveExperience'
 import { getInteractiveExperienceForModel } from '@/components/visor3d/interactive/experienceRegistry'
 import { ImageLightbox } from '@/components/ui/ImageLightbox'
@@ -584,16 +584,8 @@ export function Visor3DPublicPage() {
           </>
         ) : interactiveExperience?.id === 'tobogan' ? (
           <ToboganInteractiveExperience modelName={model.name} className="h-full" />
-        ) : interactiveExperience?.id === 'baader142' ? (
-          <InteractiveExperienceUnavailable
-            modelName={model.name}
-            modelId={model.id}
-            className="h-full"
-            title="Interactividad Baader 142"
-            badgeLabel="En preparacion"
-            description="La vista publica ya reconoce este modelo como parte de la futura experiencia Baader 142. La simulacion aun no esta implementada."
-            footerNote="Cuando terminemos la capa interactiva, tambien se podra abrir desde esta vista publica sin cambiar el comportamiento del visor 3D actual."
-          />
+        ) : interactiveExperience?.id === 'sopladorasBaader142' ? (
+          <SopladorasBaader142InteractiveExperience modelName={model.name} className="h-full" />
         ) : null}
       </div>
 
