@@ -67,11 +67,6 @@ const STATUS_STYLES: Record<BlowerStatus, string> = {
   detenida: 'bg-rose-500/15 text-rose-300 border-rose-500/30',
 }
 
-const VALVE_STYLES: Record<ValveStatus, string> = {
-  abierta: 'bg-sky-500/15 text-sky-300 border-sky-500/30',
-  cerrada: 'bg-rose-500/15 text-rose-300 border-rose-500/30',
-}
-
 const MODE_COPY: Record<OperatingMode, { title: string; summary: string; checklist: string[] }> = {
   produccion: {
     title: 'Produccion activa',
@@ -818,12 +813,9 @@ function ModelBoundExperience({ modelName: _modelName, className, modelUrl, mode
   const [focusedAssetId, setFocusedAssetId] = useState<FocusedAssetId>('S1')
   const [resetKey, setResetKey] = useState(0)
   const [viewPreset, setViewPreset] = useState<'front' | 'left' | 'right' | 'top' | 'isometric'>('front')
-  const [showSidePanel, setShowSidePanel] = useState(true)
   const [resolvedNodeMeta, setResolvedNodeMeta] = useState<ResolvedNodeMeta>({})
   const [blowers, setBlowers] = useState<BlowerState[]>(INITIAL_BLOWERS)
   const [valves, setValves] = useState<ValveState[]>(INITIAL_VALVES)
-
-  const activeSummary = MODE_COPY[mode]
 
   const flowByBlower = useMemo(() => {
     const valveStatusMap = valves.reduce<Record<ValveId, ValveStatus>>((acc, valve) => {
@@ -844,8 +836,6 @@ function ModelBoundExperience({ modelName: _modelName, className, modelUrl, mode
     }, {} as Record<BlowerId, number>)
   }, [blowers, mode, valves])
 
-  const openValveCount = useMemo(() => valves.filter((valve) => valve.status === 'abierta').length, [valves])
-  const activeBlowerCount = useMemo(() => blowers.filter((blower) => flowByBlower[blower.id] > 0).length, [blowers, flowByBlower])
   const meshAnchoredCount = useMemo(() => Object.values(resolvedNodeMeta).filter((node) => node?.source === 'mesh').length, [resolvedNodeMeta])
   const autoBackupTarget = useMemo(() => getPrimaryBackupTarget(blowers, flowByBlower), [blowers, flowByBlower])
   const backupTarget = useMemo(() => {
@@ -854,15 +844,6 @@ function ModelBoundExperience({ modelName: _modelName, className, modelUrl, mode
     return autoBackupTarget
   }, [autoBackupTarget, backupMode, manualBackupTarget])
   const backupOnline = useMemo(() => !!backupTarget && flowByBlower.S4 > 0, [backupTarget, flowByBlower])
-
-  const focusedBlower = blowers.find((blower) => blower.id === focusedAssetId)
-  const focusedValve = valves.find((valve) => valve.id === focusedAssetId)
-  const focusedMeta = resolvedNodeMeta[focusedAssetId]
-
-  const handleCycleStatus = useCallback((blowerId: BlowerId) => {
-    setFocusedAssetId(blowerId)
-    setBlowers((currentBlowers) => currentBlowers.map((blower) => blower.id === blowerId ? { ...blower, status: nextStatus(blower.status) } : blower))
-  }, [])
 
   const handleToggleValve = useCallback((valveId: ValveId) => {
     setFocusedAssetId(valveId)
@@ -884,19 +865,8 @@ function ModelBoundExperience({ modelName: _modelName, className, modelUrl, mode
     setValves(INITIAL_VALVES)
   }, [])
 
-  const focusTitle = focusedBlower?.label ?? focusedValve?.label ?? 'Sin foco'
-  const focusZone = focusedBlower?.zone ?? focusedValve?.zone ?? 'Sin ubicacion'
-  const focusStatusLabel = focusedBlower?.status ?? focusedValve?.status ?? 'sin estado'
-  const focusFlowLabel = focusedBlower ? formatPercent(flowByBlower[focusedBlower.id]) : focusedValve?.status === 'abierta' ? 'Paso habilitado' : 'Linea aislada'
-
-  const inspectionSuggestion = focusedBlower
-    ? `Revisar vibracion, continuidad de aire y respuesta de ${focusedBlower.label.toLowerCase()} segun el estado actual.`
-    : focusedValve?.status === 'abierta'
-      ? `Confirmar apertura efectiva, ausencia de fuga y estabilidad de ${focusedValve.label.toLowerCase()}.`
-      : `Validar enclavamiento y posicion cerrada de ${focusedValve?.label.toLowerCase()} antes de intervenir el ducto.`
-
   return (
-    <div className={cn(showSidePanel ? 'grid h-full gap-3 bg-card p-3 xl:grid-cols-[minmax(0,2.5fr)_320px] 2xl:grid-cols-[minmax(0,2.9fr)_340px]' : 'grid h-full gap-3 bg-card p-3', className)}>
+    <div className={cn('grid h-full gap-3 bg-card p-3', className)}>
       <div className="relative min-h-[860px] overflow-hidden rounded-xl border bg-background">
         <Viewer3D url={modelUrl} format={modelFormat} resetKey={resetKey} viewPreset={viewPreset}>
           <SopladorasBaader142InteractiveCanvasOverlay
@@ -911,17 +881,8 @@ function ModelBoundExperience({ modelName: _modelName, className, modelUrl, mode
           />
         </Viewer3D>
 
-        <div className="pointer-events-none absolute inset-x-3 top-3 flex flex-col gap-2 xl:flex-row xl:items-start xl:justify-between">
-          <div className="pointer-events-auto max-w-2xl rounded-xl border bg-background/90 p-3 backdrop-blur">
-            <div className="flex items-center gap-2">
-              <AirVent className="h-5 w-5 text-primary" />
-              <h2 className="text-sm font-semibold">Interactividad Sopladoras Baader 142</h2>
-              <Badge variant="outline" className="text-[10px] uppercase tracking-wide">Base 3D activa</Badge>
-            </div>
-            <p className="mt-1 text-xs text-muted-foreground">Haz doble clic sobre una pieza real del modelo (sopladora, valvula) para activarla, o usa los controles del panel. Los proxies 3D sobre el modelo tambien responden al clic.</p>
-          </div>
-
-          <div className="pointer-events-auto flex flex-wrap gap-2">
+        <div className="pointer-events-none absolute inset-x-3 top-3 flex justify-end">
+          <div className="pointer-events-auto flex flex-wrap gap-2 rounded-xl border bg-background/90 p-2 backdrop-blur">
             {([
               { id: 'front', label: 'Frente' },
               { id: 'left', label: 'Izquierda' },
@@ -942,9 +903,6 @@ function ModelBoundExperience({ modelName: _modelName, className, modelUrl, mode
                 {option.label}
               </Button>
             ))}
-            <Button variant="outline" size="sm" onClick={() => setShowSidePanel((current) => !current)}>
-              {showSidePanel ? 'Ocultar paneles' : 'Mostrar paneles'}
-            </Button>
             <Button variant="outline" size="sm" className="gap-2" onClick={() => setResetKey((value) => value + 1)}>
               <RotateCcw className="h-4 w-4" />
               Reset vista
@@ -952,7 +910,7 @@ function ModelBoundExperience({ modelName: _modelName, className, modelUrl, mode
           </div>
         </div>
 
-        <div className="pointer-events-none absolute inset-x-3 top-28 z-10">
+        <div className="pointer-events-none absolute inset-x-3 top-16 z-10">
           <div className="pointer-events-auto rounded-xl border bg-background/90 p-3 backdrop-blur">
             <div className="grid gap-3 xl:grid-cols-[1.6fr_1.1fr_1fr]">
               <div className="space-y-2">
@@ -1036,147 +994,6 @@ function ModelBoundExperience({ modelName: _modelName, className, modelUrl, mode
           {backupOnline ? `S4 respalda a ${backupTarget}` : backupMode === 'off' ? 'S4 sin respaldo automatico' : backupMode === 'manual' ? `S4 armado para ${backupTarget}` : 'S4 en espera como respaldo'}
         </div>
       </div>
-
-      {showSidePanel && <div className="space-y-4 overflow-y-auto pr-1">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base"><Workflow className="h-4 w-4 text-primary" />Estado por sopladora</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-1">
-            {blowers.map((blower) => (
-              <button
-                key={blower.id}
-                type="button"
-                onClick={() => setFocusedAssetId(blower.id)}
-                className={cn('rounded-xl border p-4 text-left transition-colors', focusedAssetId === blower.id ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/30 hover:bg-muted/30')}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold">{blower.label}</p>
-                    <p className="text-xs text-muted-foreground">{blower.zone}</p>
-                  </div>
-                  <Badge className={cn('border text-[10px] uppercase tracking-wide', STATUS_STYLES[blower.status])}>{blower.status}</Badge>
-                </div>
-                <div className="mt-4 flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Caudal actual</p>
-                    <p className="text-lg font-semibold">{formatPercent(flowByBlower[blower.id])}</p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={(event) => { event.stopPropagation(); handleToggleBlowerPower(blower.id) }}>
-                      {blower.status === 'operativa' ? 'Apagar' : 'Encender'}
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={(event) => { event.stopPropagation(); handleCycleStatus(blower.id) }}>Modo</Button>
-                  </div>
-                </div>
-              </button>
-            ))}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base"><Settings2 className="h-4 w-4 text-primary" />Valvulas y aislamiento</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-1">
-            {valves.map((valve) => (
-              <button
-                key={valve.id}
-                type="button"
-                onClick={() => setFocusedAssetId(valve.id)}
-                className={cn('rounded-xl border p-4 text-left transition-colors', focusedAssetId === valve.id ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/30 hover:bg-muted/30')}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-semibold">{valve.label}</p>
-                    <p className="text-xs text-muted-foreground">{valve.zone}</p>
-                  </div>
-                  <Badge className={cn('border text-[10px] uppercase tracking-wide', VALVE_STYLES[valve.status])}>{valve.status}</Badge>
-                </div>
-                <div className="mt-4 flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Impacta</p>
-                    <p className="text-sm font-medium">{valve.affects.join(' / ')}</p>
-                  </div>
-                  <Button variant="outline" size="sm" onClick={(event) => { event.stopPropagation(); handleToggleValve(valve.id) }}>
-                    {valve.status === 'abierta' ? 'Cerrar' : 'Abrir'}
-                  </Button>
-                </div>
-              </button>
-            ))}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base"><Gauge className="h-4 w-4 text-primary" />Punto enfocado</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div>
-              <p className="text-sm font-semibold">{focusTitle}</p>
-              <p className="text-sm text-muted-foreground">{focusZone}</p>
-            </div>
-            <div className="rounded-xl border bg-muted/20 p-4">
-              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Estado actual</p>
-              <p className="mt-1 text-lg font-semibold capitalize">{focusStatusLabel}</p>
-              <p className="mt-3 text-[11px] uppercase tracking-wide text-muted-foreground">Respuesta</p>
-              <p className="mt-1 text-lg font-semibold">{focusFlowLabel}</p>
-              <p className="mt-3 text-[11px] uppercase tracking-wide text-muted-foreground">Anclaje</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {focusedMeta?.source === 'mesh' ? `Malla detectada: ${focusedMeta.meshName}` : 'Posicion de respaldo sobre bounding box del modelo.'}
-              </p>
-            </div>
-            <div className="space-y-2 text-sm text-muted-foreground">
-              <p>Inspeccion sugerida:</p>
-              <p className="rounded-lg border bg-background px-3 py-2">{inspectionSuggestion}</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Estado de flujo del modelo</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm text-muted-foreground">
-            <p>{activeBlowerCount} sopladoras entregando aire en este escenario.</p>
-            <p>{openValveCount} valvulas abiertas habilitan continuidad por los ductos activos.</p>
-            <p>Los tramos con flujo se iluminan en azul sobre el mismo GLB para identificar sectores habilitados y aislados.</p>
-            <p>{backupOnline ? `La sopladora 4 esta respaldando la linea de ${backupTarget}.` : backupMode === 'manual' ? `La sopladora 4 esta preparada para respaldar manualmente a ${backupTarget}.` : backupMode === 'off' ? 'El respaldo automatico de S4 esta deshabilitado en este escenario.' : 'La sopladora 4 queda disponible como respaldo cuando una primaria falla.'}</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">{activeSummary.title}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <p className="text-sm text-muted-foreground">{activeSummary.summary}</p>
-            <div className="grid gap-2">
-              {activeSummary.checklist.map((item) => <div key={item} className="rounded-lg border bg-muted/20 px-3 py-2 text-sm text-muted-foreground">{item}</div>)}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base"><Workflow className="h-4 w-4 text-primary" />Mallas del modelo</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="max-h-48 space-y-1 overflow-y-auto text-xs text-muted-foreground">
-              {Object.entries(resolvedNodeMeta).map(([nodeId, meta]) => (
-                <div key={nodeId} className="flex items-center justify-between gap-2 rounded border px-2 py-1">
-                  <span className="font-medium text-foreground">{nodeId}</span>
-                  <span className={meta?.source === 'mesh' ? 'text-emerald-400' : 'text-amber-400'}>
-                    {meta?.source === 'mesh' ? meta.meshName : 'fallback'}
-                  </span>
-                </div>
-              ))}
-              {Object.keys(resolvedNodeMeta).length === 0 && <p>Cargando mallas...</p>}
-            </div>
-            <p className="mt-2 text-[11px] text-muted-foreground">Doble clic sobre una pieza real del modelo para interactuar. Los nombres de malla del GLB se imprimen en la consola del navegador (F12) al cargar.</p>
-          </CardContent>
-        </Card>
-      </div>}
     </div>
   )
 }
