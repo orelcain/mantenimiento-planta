@@ -2,6 +2,14 @@ import type { Model3D } from '@/types/models3d'
 
 export type InteractiveExperienceId = 'tobogan'
 
+export interface StandaloneInteractiveExperience {
+  id: InteractiveExperienceId
+  label: string
+  description: string
+  route: string
+  sourceLabel: string
+}
+
 const TOBOGAN_EXPERIENCE_ALIASES = [
   'tobogan',
   'tbg',
@@ -13,6 +21,17 @@ export interface InteractiveExperienceDescriptor {
   id: InteractiveExperienceId
   label: string
 }
+
+export const STANDALONE_INTERACTIVE_EXPERIENCES: StandaloneInteractiveExperience[] = [
+  {
+    id: 'tobogan',
+    label: 'Tobogan Decomiso',
+    description:
+      'Experiencia interactiva cargada desde la repo externa del tobogan, independiente del inventario de modelos 3D.',
+    route: '/visor-3d/interactividad/tobogan',
+    sourceLabel: 'Repo externa',
+  },
+]
 
 function normalizeExperienceText(value: string): string {
   return value
@@ -52,18 +71,11 @@ export function hasToboganInteractiveExperience(
   return getInteractiveExperienceForModel(model)?.id === 'tobogan'
 }
 
-export function getInteractiveExperienceFromQueryParam(
-  experienceParam: string | null | undefined,
-): InteractiveExperienceDescriptor | null {
-  if (!experienceParam) return null
-
-  const normalizedValue = normalizeExperienceText(experienceParam)
-  if (normalizedValue === 'tobogan' || normalizedValue === 'tbg') {
-    return {
-      id: 'tobogan',
-      label: 'Tobogan',
-    }
-  }
-
-  return null
+export function getModelsWithInteractiveExperience(
+  models: Pick<Model3D, 'id' | 'name' | 'originalFileName' | 'format'>[],
+): Array<Pick<Model3D, 'id' | 'name' | 'originalFileName' | 'format'> & { experience: InteractiveExperienceDescriptor }> {
+  return models.flatMap((model) => {
+    const experience = getInteractiveExperienceForModel(model)
+    return experience ? [{ ...model, experience }] : []
+  })
 }
