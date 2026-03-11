@@ -203,16 +203,16 @@ function getPresetCameraPosition(
 ): THREE.Vector3 {
   switch (preset) {
     case 'front':
-      return new THREE.Vector3(center.x, center.y + dist * 0.18, center.z - dist * 0.92)
+      return new THREE.Vector3(center.x, center.y + dist * 0.12, center.z - dist * 1.18)
     case 'left':
-      return new THREE.Vector3(center.x - dist * 0.95, center.y + dist * 0.18, center.z)
+      return new THREE.Vector3(center.x - dist * 1.12, center.y + dist * 0.14, center.z)
     case 'right':
-      return new THREE.Vector3(center.x + dist * 0.95, center.y + dist * 0.18, center.z)
+      return new THREE.Vector3(center.x + dist * 1.12, center.y + dist * 0.14, center.z)
     case 'top':
-      return new THREE.Vector3(center.x, center.y + dist * 1.2, center.z)
+      return new THREE.Vector3(center.x, center.y + dist * 1.35, center.z)
     case 'isometric':
     default:
-      return new THREE.Vector3(center.x + dist * 0.6, center.y + dist * 0.5, center.z - dist * 0.6)
+      return new THREE.Vector3(center.x + dist * 0.75, center.y + dist * 0.58, center.z - dist * 0.82)
   }
 }
 

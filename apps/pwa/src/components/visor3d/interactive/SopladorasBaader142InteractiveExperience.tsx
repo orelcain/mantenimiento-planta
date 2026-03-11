@@ -57,6 +57,15 @@ interface ResolvedInteractiveNode extends InteractiveNodeDefinition {
   meshRef?: THREE.Mesh
 }
 
+interface ModelActionLink {
+  assetId: FocusedAssetId
+  action: 'toggle-blower' | 'toggle-valve'
+  transform: 'emissive' | 'rotate-y' | 'rotate-z'
+  activeLabel: string
+  inactiveLabel: string
+  notes: string
+}
+
 type ResolvedNodeMeta = Partial<Record<FocusedAssetId, { source: 'mesh' | 'fallback'; meshName?: string; meshRef?: THREE.Mesh }>>
 
 const STATUS_ORDER: BlowerStatus[] = ['operativa', 'revision', 'detenida']
@@ -134,6 +143,17 @@ const INTERACTIVE_NODE_DEFINITIONS: InteractiveNodeDefinition[] = [
   { id: 'VB1', label: 'Llave de bola linea A', kind: 'valve', zone: 'Linea A', keywords: ['bola linea a', 'llave de bola 1', 'vb1'], fallback: [0.34, 0.50, 0.29] },
   { id: 'VB2', label: 'Llave de bola linea B', kind: 'valve', zone: 'Linea B', keywords: ['bola linea b', 'llave de bola 2', 'vb2'], fallback: [0.72, 0.48, 0.49] },
 ]
+
+const MODEL_ACTION_LINKS: Record<FocusedAssetId, ModelActionLink> = {
+  S1: { assetId: 'S1', action: 'toggle-blower', transform: 'emissive', activeLabel: 'ON', inactiveLabel: 'OFF', notes: 'Enciende o detiene la sopladora 1 y habilita su flujo si las valvulas dependientes estan abiertas.' },
+  S2: { assetId: 'S2', action: 'toggle-blower', transform: 'emissive', activeLabel: 'ON', inactiveLabel: 'OFF', notes: 'Enciende o detiene la sopladora 2 y habilita su flujo si las valvulas dependientes estan abiertas.' },
+  S3: { assetId: 'S3', action: 'toggle-blower', transform: 'emissive', activeLabel: 'ON', inactiveLabel: 'OFF', notes: 'Enciende o detiene la sopladora 3 y habilita su flujo si las valvulas dependientes estan abiertas.' },
+  S4: { assetId: 'S4', action: 'toggle-blower', transform: 'emissive', activeLabel: 'ON', inactiveLabel: 'OFF', notes: 'Enciende o detiene la sopladora 4 como unidad de respaldo o apoyo manual.' },
+  VM1: { assetId: 'VM1', action: 'toggle-valve', transform: 'rotate-y', activeLabel: 'Abierta', inactiveLabel: 'Cerrada', notes: 'La mariposa norte abre o corta el flujo del header norte.' },
+  VM2: { assetId: 'VM2', action: 'toggle-valve', transform: 'rotate-y', activeLabel: 'Abierta', inactiveLabel: 'Cerrada', notes: 'La mariposa sur abre o corta el flujo del header sur.' },
+  VB1: { assetId: 'VB1', action: 'toggle-valve', transform: 'rotate-z', activeLabel: 'Vertical', inactiveLabel: 'Horizontal', notes: 'La llave de bola A indica paso abierto en vertical y paso cerrado en horizontal.' },
+  VB2: { assetId: 'VB2', action: 'toggle-valve', transform: 'rotate-z', activeLabel: 'Vertical', inactiveLabel: 'Horizontal', notes: 'La llave de bola B indica paso abierto en vertical y paso cerrado en horizontal.' },
+}
 
 function nextStatus(currentStatus: BlowerStatus): BlowerStatus {
   const currentIndex = STATUS_ORDER.indexOf(currentStatus)
@@ -515,16 +535,15 @@ function RealMeshEffects({
       if (node.kind !== 'valve' || !node.meshRef) continue
       const valve = valves.find((v) => v.id === node.id)
       if (!valve) continue
+      const actionLink = MODEL_ACTION_LINKS[node.id]
 
       const isOpen = valve.status === 'abierta'
       const targetAngle = isOpen ? 0 : Math.PI / 2
 
       // Rotate the valve mesh smoothly
-      if (node.id.startsWith('VM')) {
-        // Butterfly valve: rotate around Y axis
+      if (actionLink?.transform === 'rotate-y') {
         node.meshRef.rotation.y = THREE.MathUtils.lerp(node.meshRef.rotation.y, targetAngle, 0.08)
-      } else {
-        // Ball valve: rotate around Z axis
+      } else if (actionLink?.transform === 'rotate-z') {
         node.meshRef.rotation.z = THREE.MathUtils.lerp(node.meshRef.rotation.z, targetAngle, 0.08)
       }
 
@@ -881,52 +900,69 @@ function ModelBoundExperience({ modelName: _modelName, className, modelUrl, mode
           />
         </Viewer3D>
 
-        <div className="pointer-events-none absolute inset-x-3 top-3 flex justify-end">
-          <div className="pointer-events-auto flex flex-wrap gap-2 rounded-xl border bg-background/90 p-2 backdrop-blur">
-            {([
-              { id: 'front', label: 'Frente' },
-              { id: 'left', label: 'Izquierda' },
-              { id: 'right', label: 'Derecha' },
-              { id: 'top', label: 'Superior' },
-              { id: 'isometric', label: 'Iso' },
-            ] as const).map((option) => (
-              <Button key={option.id} variant={viewPreset === option.id ? 'default' : 'outline'} size="sm" onClick={() => setViewPreset(option.id)}>
-                {option.label}
-              </Button>
-            ))}
-            {([
-              { id: 'produccion', label: 'Produccion' },
-              { id: 'lavado', label: 'Lavado' },
-              { id: 'mantencion', label: 'Mantencion' },
-            ] as const).map((option) => (
-              <Button key={option.id} variant={mode === option.id ? 'default' : 'outline'} size="sm" onClick={() => setMode(option.id)}>
-                {option.label}
-              </Button>
-            ))}
-            <Button variant="outline" size="sm" className="gap-2" onClick={() => setResetKey((value) => value + 1)}>
-              <RotateCcw className="h-4 w-4" />
-              Reset vista
-            </Button>
+        <div className="pointer-events-none absolute inset-x-3 top-3 z-10">
+          <div className="pointer-events-auto flex flex-col gap-2 xl:flex-row xl:items-start xl:justify-between">
+            <div className="rounded-xl border bg-background/90 p-2 backdrop-blur">
+              <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Vistas</div>
+              <div className="flex flex-wrap gap-2">
+                {([
+                  { id: 'front', label: 'Frente' },
+                  { id: 'left', label: 'Izquierda' },
+                  { id: 'right', label: 'Derecha' },
+                  { id: 'top', label: 'Superior' },
+                  { id: 'isometric', label: 'Iso' },
+                ] as const).map((option) => (
+                  <Button key={option.id} variant={viewPreset === option.id ? 'default' : 'outline'} size="sm" onClick={() => setViewPreset(option.id)}>
+                    {option.label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-xl border bg-background/90 p-2 backdrop-blur">
+              <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Escenario</div>
+              <div className="flex flex-wrap gap-2">
+                {([
+                  { id: 'produccion', label: 'Produccion' },
+                  { id: 'lavado', label: 'Lavado' },
+                  { id: 'mantencion', label: 'Mantencion' },
+                ] as const).map((option) => (
+                  <Button key={option.id} variant={mode === option.id ? 'default' : 'outline'} size="sm" onClick={() => setMode(option.id)}>
+                    {option.label}
+                  </Button>
+                ))}
+                <Button variant="outline" size="sm" className="gap-2" onClick={() => setResetKey((value) => value + 1)}>
+                  <RotateCcw className="h-4 w-4" />
+                  Reset vista
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div className="pointer-events-none absolute inset-x-3 top-16 z-10">
+        <div className="pointer-events-none absolute inset-x-3 top-28 z-10">
           <div className="pointer-events-auto rounded-xl border bg-background/90 p-3 backdrop-blur">
-            <div className="grid gap-3 xl:grid-cols-[1.6fr_1.1fr_1fr]">
+            <div className="grid gap-3 xl:grid-cols-[1.25fr_1.25fr_1fr]">
               <div className="space-y-2">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Control rapido sopladoras</p>
                 <div className="flex flex-wrap gap-2">
                   {blowers.map((blower) => (
+                    (() => {
+                      const actionLink = MODEL_ACTION_LINKS[blower.id]
+                      return (
                     <Button
                       key={blower.id}
                       size="sm"
                       variant={blower.status === 'operativa' ? 'default' : 'outline'}
                       className="gap-2"
                       onClick={() => handleToggleBlowerPower(blower.id)}
+                      title={actionLink.notes}
                     >
                       {blower.id}
-                      <span className="text-[10px] opacity-80">{blower.status === 'operativa' ? 'ON' : blower.status === 'revision' ? 'REV' : 'OFF'}</span>
+                      <span className="text-[10px] opacity-80">{blower.status === 'operativa' ? actionLink.activeLabel : blower.status === 'revision' ? 'REV' : actionLink.inactiveLabel}</span>
                     </Button>
+                      )
+                    })()
                   ))}
                 </div>
               </div>
@@ -935,20 +971,24 @@ function ModelBoundExperience({ modelName: _modelName, className, modelUrl, mode
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Control rapido valvulas</p>
                 <div className="flex flex-wrap gap-2">
                   {valves.map((valve) => (
+                    (() => {
+                      const actionLink = MODEL_ACTION_LINKS[valve.id]
+                      return (
                     <Button
                       key={valve.id}
                       size="sm"
                       variant={valve.status === 'abierta' ? 'default' : 'outline'}
                       className="gap-2"
                       onClick={() => handleToggleValve(valve.id)}
+                      title={actionLink.notes}
                     >
                       {valve.id}
                       <span className="text-[10px] opacity-80">
-                        {valve.kind === 'bola'
-                          ? valve.status === 'abierta' ? 'Vertical' : 'Horizontal'
-                          : valve.status === 'abierta' ? 'Abierta' : 'Cerrada'}
+                        {valve.status === 'abierta' ? actionLink.activeLabel : actionLink.inactiveLabel}
                       </span>
                     </Button>
+                      )
+                    })()
                   ))}
                 </div>
               </div>
