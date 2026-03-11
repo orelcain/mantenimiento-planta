@@ -147,6 +147,10 @@ function toggleValveStatus(currentStatus: ValveStatus): ValveStatus {
   return currentStatus === 'abierta' ? 'cerrada' : 'abierta'
 }
 
+function toggleBlowerPower(currentStatus: BlowerStatus): BlowerStatus {
+  return currentStatus === 'operativa' ? 'detenida' : 'operativa'
+}
+
 function normalizeSearchText(value: string): string {
   return value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim()
 }
@@ -208,6 +212,17 @@ function getValveStatusColor(status: ValveStatus): string {
   return status === 'abierta' ? '#38bdf8' : '#ef4444'
 }
 
+function getPrimaryBackupTarget(blowers: BlowerState[], flowByBlower: Record<BlowerId, number>): BlowerId | null {
+  const primaryIds: BlowerId[] = ['S1', 'S2', 'S3']
+  const failedPrimary = primaryIds.find((blowerId) => {
+    const blower = blowers.find((item) => item.id === blowerId)
+    if (!blower) return false
+    return blower.status !== 'operativa' || flowByBlower[blowerId] <= 0
+  })
+
+  return failedPrimary ?? null
+}
+
 function FlowPulse({ start, end, color, speed = 0.3, delay = 0 }: { start: THREE.Vector3; end: THREE.Vector3; color: string; speed?: number; delay?: number }) {
   const meshRef = useRef<THREE.Mesh>(null)
 
@@ -225,9 +240,24 @@ function FlowPulse({ start, end, color, speed = 0.3, delay = 0 }: { start: THREE
   )
 }
 
-function HotspotMarker({ node, color, selected, onClick }: { node: ResolvedInteractiveNode; color: string; selected: boolean; onClick: () => void }) {
+function InteractiveAssetProxy({
+  node,
+  color,
+  selected,
+  isActive,
+  onClick,
+}: {
+  node: ResolvedInteractiveNode
+  color: string
+  selected: boolean
+  isActive: boolean
+  onClick: () => void
+}) {
   const coreRef = useRef<THREE.Mesh>(null)
   const ringRef = useRef<THREE.Mesh>(null)
+  const fanGroupRef = useRef<THREE.Group>(null)
+  const leverRef = useRef<THREE.Mesh>(null)
+  const discRef = useRef<THREE.Mesh>(null)
   const [hovered, setHovered] = useState(false)
 
   useFrame(({ clock }) => {
@@ -238,6 +268,20 @@ function HotspotMarker({ node, color, selected, onClick }: { node: ResolvedInter
     }
     if (ringRef.current) {
       ringRef.current.scale.setScalar(1 + Math.sin(clock.getElapsedTime() * 2.8) * 0.18)
+    }
+
+    if (node.kind === 'blower' && fanGroupRef.current) {
+      fanGroupRef.current.rotation.z += isActive ? 0.08 : 0.01
+    }
+
+    if (node.kind === 'valve' && leverRef.current) {
+      const targetRotation = isActive ? Math.PI / 2 : 0
+      leverRef.current.rotation.z = THREE.MathUtils.lerp(leverRef.current.rotation.z, targetRotation, 0.14)
+    }
+
+    if (node.kind === 'valve' && discRef.current) {
+      const targetRotation = isActive ? Math.PI / 2 : 0
+      discRef.current.rotation.y = THREE.MathUtils.lerp(discRef.current.rotation.y, targetRotation, 0.14)
     }
   })
 
@@ -264,6 +308,40 @@ function HotspotMarker({ node, color, selected, onClick }: { node: ResolvedInter
         <sphereGeometry args={[0.085, 20, 20]} />
         <meshStandardMaterial color={color} emissive={color} emissiveIntensity={selected || hovered ? 0.8 : 0.35} />
       </mesh>
+
+      {node.kind === 'blower' ? (
+        <group ref={fanGroupRef}>
+          {[0, Math.PI / 2, Math.PI, Math.PI * 1.5].map((rotation) => (
+            <mesh key={rotation} rotation={[0, 0, rotation]} position={[0, 0, 0.01]}>
+              <boxGeometry args={[0.13, 0.025, 0.015]} />
+              <meshStandardMaterial color={color} emissive={color} emissiveIntensity={isActive ? 0.8 : 0.25} />
+            </mesh>
+          ))}
+        </group>
+      ) : node.id.startsWith('VM') ? (
+        <group>
+          <mesh rotation={[Math.PI / 2, 0, 0]}>
+            <torusGeometry args={[0.12, 0.02, 12, 24]} />
+            <meshStandardMaterial color="#cbd5e1" metalness={0.35} roughness={0.45} />
+          </mesh>
+          <mesh ref={discRef}>
+            <cylinderGeometry args={[0.08, 0.08, 0.02, 20]} />
+            <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.35} />
+          </mesh>
+        </group>
+      ) : (
+        <group>
+          <mesh>
+            <sphereGeometry args={[0.07, 18, 18]} />
+            <meshStandardMaterial color="#cbd5e1" metalness={0.25} roughness={0.55} />
+          </mesh>
+          <mesh ref={leverRef} position={[0, 0.13, 0]}>
+            <boxGeometry args={[0.02, 0.18, 0.02]} />
+            <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.35} />
+          </mesh>
+        </group>
+      )}
+
       <Html position={[0, 0.18, 0]} center distanceFactor={8} zIndexRange={[20, 0]}>
         <button
           type="button"
@@ -273,7 +351,7 @@ function HotspotMarker({ node, color, selected, onClick }: { node: ResolvedInter
           }}
           className={cn('rounded-full border px-2 py-1 text-[10px] font-semibold shadow-lg backdrop-blur transition-colors', labelClassName)}
         >
-          {node.label}
+          {node.kind === 'blower' ? `${node.label} ${isActive ? 'ON' : 'OFF'}` : `${node.label} ${isActive ? 'OPEN' : 'CLOSE'}`}
         </button>
       </Html>
     </group>
@@ -285,14 +363,16 @@ function SopladorasBaader142InteractiveCanvasOverlay({
   valves,
   flowByBlower,
   focusedAssetId,
-  onFocusAsset,
+  onToggleBlower,
+  onToggleValve,
   onResolvedNodesChange,
 }: {
   blowers: BlowerState[]
   valves: ValveState[]
   flowByBlower: Record<BlowerId, number>
   focusedAssetId: FocusedAssetId
-  onFocusAsset: (assetId: FocusedAssetId) => void
+  onToggleBlower: (blowerId: BlowerId) => void
+  onToggleValve: (valveId: ValveId) => void
   onResolvedNodesChange?: (meta: ResolvedNodeMeta) => void
 }) {
   const { object, info } = useViewer3DModelContext()
@@ -314,11 +394,18 @@ function SopladorasBaader142InteractiveCanvasOverlay({
     if (!info) return null
     return {
       supply: getFallbackPosition([0.07, 0.42, 0.19], info),
+      outletA: getFallbackPosition([0.18, 0.82, 0.12], info),
+      outletB: getFallbackPosition([0.44, 0.82, 0.18], info),
+      outletC: getFallbackPosition([0.70, 0.82, 0.30], info),
+      outletBackup: getFallbackPosition([0.88, 0.82, 0.40], info),
+      backupHeader: getFallbackPosition([0.78, 0.58, 0.34], info),
     }
   }, [info])
 
   const hasNorthFlow = flowByBlower.S1 > 0 || flowByBlower.S2 > 0
   const hasSouthFlow = flowByBlower.S3 > 0 || flowByBlower.S4 > 0
+  const supportTarget = getPrimaryBackupTarget(blowers, flowByBlower)
+  const backupActive = !!supportTarget && flowByBlower.S4 > 0
 
   const segments = useMemo(() => {
     if (!anchors) return []
@@ -333,23 +420,29 @@ function SopladorasBaader142InteractiveCanvasOverlay({
     const s4 = nodeMap.get('S4')
 
     return [
-      vm1 && { id: 'supply-vm1', start: anchors.supply, end: vm1.position, active: hasNorthFlow },
-      vm2 && { id: 'supply-vm2', start: anchors.supply, end: vm2.position, active: hasSouthFlow },
-      vm1 && vb1 && { id: 'vm1-vb1', start: vm1.position, end: vb1.position, active: hasNorthFlow },
-      vm2 && vb2 && { id: 'vm2-vb2', start: vm2.position, end: vb2.position, active: hasSouthFlow },
-      vb1 && s1 && { id: 'vb1-s1', start: vb1.position, end: s1.position, active: flowByBlower.S1 > 0 },
-      vb1 && s2 && { id: 'vb1-s2', start: vb1.position, end: s2.position, active: flowByBlower.S2 > 0 },
-      vb2 && s3 && { id: 'vb2-s3', start: vb2.position, end: s3.position, active: flowByBlower.S3 > 0 },
-      vb2 && s4 && { id: 'vb2-s4', start: vb2.position, end: s4.position, active: flowByBlower.S4 > 0 },
-    ].filter(Boolean) as Array<{ id: string; start: THREE.Vector3; end: THREE.Vector3; active: boolean }>
-  }, [anchors, hasNorthFlow, hasSouthFlow, flowByBlower, nodeMap])
+      s1 && vm1 && { id: 's1-vm1', start: s1.position, end: vm1.position, active: flowByBlower.S1 > 0, color: '#38bdf8' },
+      s2 && vm1 && { id: 's2-vm1', start: s2.position, end: vm1.position, active: flowByBlower.S2 > 0, color: '#38bdf8' },
+      vm1 && vb1 && { id: 'vm1-vb1', start: vm1.position, end: vb1.position, active: hasNorthFlow, color: '#38bdf8' },
+      vb1 && { id: 'vb1-out-a', start: vb1.position, end: anchors.outletA, active: flowByBlower.S1 > 0, color: '#38bdf8' },
+      vb1 && { id: 'vb1-out-b', start: vb1.position, end: anchors.outletB, active: flowByBlower.S2 > 0, color: '#38bdf8' },
+      s3 && vm2 && { id: 's3-vm2', start: s3.position, end: vm2.position, active: flowByBlower.S3 > 0, color: '#38bdf8' },
+      s4 && vm2 && { id: 's4-vm2', start: s4.position, end: vm2.position, active: flowByBlower.S4 > 0 && !backupActive, color: '#38bdf8' },
+      vm2 && vb2 && { id: 'vm2-vb2', start: vm2.position, end: vb2.position, active: hasSouthFlow && !backupActive, color: '#38bdf8' },
+      vb2 && { id: 'vb2-out-c', start: vb2.position, end: anchors.outletC, active: flowByBlower.S3 > 0, color: '#38bdf8' },
+      vb2 && { id: 'vb2-out-d', start: vb2.position, end: anchors.outletBackup, active: flowByBlower.S4 > 0 && !backupActive, color: '#38bdf8' },
+      s4 && backupActive && { id: 's4-backup-head', start: s4.position, end: anchors.backupHeader, active: true, color: '#a78bfa' },
+      backupActive && supportTarget === 'S1' && { id: 'backup-s1', start: anchors.backupHeader, end: anchors.outletA, active: true, color: '#a78bfa' },
+      backupActive && supportTarget === 'S2' && { id: 'backup-s2', start: anchors.backupHeader, end: anchors.outletB, active: true, color: '#a78bfa' },
+      backupActive && supportTarget === 'S3' && { id: 'backup-s3', start: anchors.backupHeader, end: anchors.outletC, active: true, color: '#a78bfa' },
+    ].filter(Boolean) as Array<{ id: string; start: THREE.Vector3; end: THREE.Vector3; active: boolean; color: string }>
+  }, [anchors, backupActive, flowByBlower, hasNorthFlow, hasSouthFlow, nodeMap, supportTarget])
 
   if (!anchors) return null
 
   return (
     <>
       {segments.map((segment, index) => {
-        const color = segment.active ? '#38bdf8' : '#475569'
+        const color = segment.active ? segment.color : '#475569'
         return (
           <group key={segment.id}>
             <Line points={[segment.start, segment.end]} color={color} lineWidth={segment.active ? 2.4 : 1.2} />
@@ -362,12 +455,12 @@ function SopladorasBaader142InteractiveCanvasOverlay({
         if (node.kind === 'blower') {
           const blower = blowers.find((item) => item.id === node.id)
           if (!blower) return null
-          return <HotspotMarker key={node.id} node={node} color={getBlowerStatusColor(blower.status)} selected={focusedAssetId === node.id} onClick={() => onFocusAsset(node.id)} />
+          return <InteractiveAssetProxy key={node.id} node={node} color={getBlowerStatusColor(blower.status)} selected={focusedAssetId === node.id} isActive={blower.status === 'operativa'} onClick={() => onToggleBlower(node.id as BlowerId)} />
         }
 
         const valve = valves.find((item) => item.id === node.id)
         if (!valve) return null
-        return <HotspotMarker key={node.id} node={node} color={getValveStatusColor(valve.status)} selected={focusedAssetId === node.id} onClick={() => onFocusAsset(node.id)} />
+        return <InteractiveAssetProxy key={node.id} node={node} color={getValveStatusColor(valve.status)} selected={focusedAssetId === node.id} isActive={valve.status === 'abierta'} onClick={() => onToggleValve(node.id as ValveId)} />
       })}
     </>
   )
@@ -540,6 +633,8 @@ function ModelBoundExperience({ modelName, className, modelUrl, modelFormat }: R
   const openValveCount = useMemo(() => valves.filter((valve) => valve.status === 'abierta').length, [valves])
   const activeBlowerCount = useMemo(() => blowers.filter((blower) => flowByBlower[blower.id] > 0).length, [blowers, flowByBlower])
   const meshAnchoredCount = useMemo(() => Object.values(resolvedNodeMeta).filter((node) => node?.source === 'mesh').length, [resolvedNodeMeta])
+  const backupTarget = useMemo(() => getPrimaryBackupTarget(blowers, flowByBlower), [blowers, flowByBlower])
+  const backupOnline = useMemo(() => !!backupTarget && flowByBlower.S4 > 0, [backupTarget, flowByBlower])
 
   const focusedBlower = blowers.find((blower) => blower.id === focusedAssetId)
   const focusedValve = valves.find((valve) => valve.id === focusedAssetId)
@@ -555,6 +650,11 @@ function ModelBoundExperience({ modelName, className, modelUrl, modelFormat }: R
     setValves((currentValves) => currentValves.map((valve) => valve.id === valveId ? { ...valve, status: toggleValveStatus(valve.status) } : valve))
   }, [])
 
+  const handleToggleBlowerPower = useCallback((blowerId: BlowerId) => {
+    setFocusedAssetId(blowerId)
+    setBlowers((currentBlowers) => currentBlowers.map((blower) => blower.id === blowerId ? { ...blower, status: toggleBlowerPower(blower.status) } : blower))
+  }, [])
+
   const focusTitle = focusedBlower?.label ?? focusedValve?.label ?? 'Sin foco'
   const focusZone = focusedBlower?.zone ?? focusedValve?.zone ?? 'Sin ubicacion'
   const focusStatusLabel = focusedBlower?.status ?? focusedValve?.status ?? 'sin estado'
@@ -567,15 +667,16 @@ function ModelBoundExperience({ modelName, className, modelUrl, modelFormat }: R
       : `Validar enclavamiento y posicion cerrada de ${focusedValve?.label.toLowerCase()} antes de intervenir el ducto.`
 
   return (
-    <div className={cn('grid h-full gap-4 bg-card p-4 xl:grid-cols-[minmax(0,1.65fr)_380px]', className)}>
-      <div className="relative min-h-[620px] overflow-hidden rounded-xl border bg-background">
+    <div className={cn('grid h-full gap-3 bg-card p-3 xl:grid-cols-[minmax(0,2.5fr)_320px] 2xl:grid-cols-[minmax(0,2.9fr)_340px]', className)}>
+      <div className="relative min-h-[720px] overflow-hidden rounded-xl border bg-background">
         <Viewer3D url={modelUrl} format={modelFormat} resetKey={resetKey}>
           <SopladorasBaader142InteractiveCanvasOverlay
             blowers={blowers}
             valves={valves}
             flowByBlower={flowByBlower}
             focusedAssetId={focusedAssetId}
-            onFocusAsset={setFocusedAssetId}
+            onToggleBlower={handleToggleBlowerPower}
+            onToggleValve={handleToggleValve}
             onResolvedNodesChange={setResolvedNodeMeta}
           />
         </Viewer3D>
@@ -587,7 +688,7 @@ function ModelBoundExperience({ modelName, className, modelUrl, modelFormat }: R
               <h2 className="text-sm font-semibold">Interactividad Sopladoras Baader 142</h2>
               <Badge variant="outline" className="text-[10px] uppercase tracking-wide">Base 3D activa</Badge>
             </div>
-            <p className="mt-1 text-xs text-muted-foreground">Esta vista usa el mismo modelo de {modelName} y superpone hotspots sobre sopladoras, llaves de bola y valvulas mariposa para probar continuidad de aire por ductos.</p>
+            <p className="mt-1 text-xs text-muted-foreground">Esta vista usa el mismo modelo de {modelName}. Puedes hacer clic directo sobre sopladoras, llaves de bola y valvulas mariposa para encender, apagar, abrir, cerrar y evaluar continuidad de aire por ductos.</p>
           </div>
 
           <div className="pointer-events-auto flex flex-wrap gap-2">
@@ -609,6 +710,9 @@ function ModelBoundExperience({ modelName, className, modelUrl, modelFormat }: R
 
         <div className="pointer-events-none absolute bottom-3 left-3 rounded-lg border bg-background/85 px-3 py-2 text-xs text-muted-foreground backdrop-blur">
           {meshAnchoredCount}/{INTERACTIVE_NODE_DEFINITIONS.length} puntos anclados directamente a mallas del modelo.
+        </div>
+        <div className="pointer-events-none absolute bottom-3 right-3 rounded-lg border bg-background/85 px-3 py-2 text-xs text-muted-foreground backdrop-blur">
+          {backupOnline ? `S4 respalda a ${backupTarget}` : 'S4 en espera como respaldo'}
         </div>
       </div>
 
@@ -637,7 +741,12 @@ function ModelBoundExperience({ modelName, className, modelUrl, modelFormat }: R
                     <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Caudal actual</p>
                     <p className="text-lg font-semibold">{formatPercent(flowByBlower[blower.id])}</p>
                   </div>
-                  <Button variant="outline" size="sm" onClick={(event) => { event.stopPropagation(); handleCycleStatus(blower.id) }}>Cambiar estado</Button>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={(event) => { event.stopPropagation(); handleToggleBlowerPower(blower.id) }}>
+                      {blower.status === 'operativa' ? 'Apagar' : 'Encender'}
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={(event) => { event.stopPropagation(); handleCycleStatus(blower.id) }}>Modo</Button>
+                  </div>
                 </div>
               </button>
             ))}
@@ -711,6 +820,7 @@ function ModelBoundExperience({ modelName, className, modelUrl, modelFormat }: R
             <p>{activeBlowerCount} sopladoras entregando aire en este escenario.</p>
             <p>{openValveCount} valvulas abiertas habilitan continuidad por los ductos activos.</p>
             <p>Los tramos con flujo se iluminan en azul sobre el mismo GLB para identificar sectores habilitados y aislados.</p>
+            <p>{backupOnline ? `La sopladora 4 esta respaldando la linea de ${backupTarget}.` : 'La sopladora 4 queda disponible como respaldo cuando una primaria falla.'}</p>
           </CardContent>
         </Card>
 
