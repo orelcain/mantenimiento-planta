@@ -890,7 +890,7 @@ function ModelBoundExperience({ modelName: _modelName, className, modelUrl, mode
     }, {} as Record<BlowerId, number>)
   }, [blowers, mode, valves])
 
-  const meshAnchoredCount = useMemo(() => Object.values(resolvedNodeMeta).filter((node) => node?.source === 'mesh').length, [resolvedNodeMeta])
+  const meshAnchoredCount = useMemo(() => Object.values(resolvedNodeMeta).filter((node) => node?.source === 'object').length, [resolvedNodeMeta])
   const autoBackupTarget = useMemo(() => getPrimaryBackupTarget(blowers, flowByBlower), [blowers, flowByBlower])
   const backupTarget = useMemo(() => {
     if (backupMode === 'off') return null
