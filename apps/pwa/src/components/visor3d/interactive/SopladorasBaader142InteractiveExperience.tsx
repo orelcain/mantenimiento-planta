@@ -7,6 +7,7 @@ import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from '@/compo
 import { Viewer3D } from '@/components/visor3d/Viewer3D'
 import { useViewer3DModelContext } from '@/components/visor3d/Viewer3DModelContext'
 import { cn } from '@/lib/utils'
+import { useToast } from '@/hooks/useToast'
 import { deleteInteractiveBinding, setInteractiveBinding, subscribeToInteractiveBindings, type InteractiveBinding } from '@/services/interactiveBindings'
 import type { Model3DFormat } from '@/types/models3d'
 
@@ -1284,6 +1285,7 @@ function StandalonePanel({ modelName, className }: Pick<SopladorasBaader142Inter
 }
 
 function ModelBoundExperience({ modelId, modelName: _modelName, className, modelUrl, modelFormat, canEditMappings = false, currentUserId = 'system' }: Required<Pick<SopladorasBaader142InteractiveExperienceProps, 'modelName' | 'modelUrl' | 'modelFormat'>> & Pick<SopladorasBaader142InteractiveExperienceProps, 'className' | 'modelId' | 'canEditMappings' | 'currentUserId'>) {
+  const { toast } = useToast()
   const mode: OperatingMode = 'produccion'
   const [backupMode, setBackupMode] = useState<BackupMode>('auto')
   const [manualBackupTarget, setManualBackupTarget] = useState<PrimaryLineId | null>('L1')
@@ -1291,6 +1293,7 @@ function ModelBoundExperience({ modelId, modelName: _modelName, className, model
   const [assignmentTargetId, setAssignmentTargetId] = useState<FocusedAssetId | null>(null)
   const [editMappingsMode, setEditMappingsMode] = useState(false)
   const [bindings, setBindings] = useState<InteractiveBinding[]>([])
+  const [lastPickedBinding, setLastPickedBinding] = useState<{ assetId: FocusedAssetId; objectName: string; motionObjectName?: string } | null>(null)
   const [resetKey, setResetKey] = useState(0)
   const viewPreset = 'front' as const
   const [resolvedNodeMeta, setResolvedNodeMeta] = useState<ResolvedNodeMeta>({})
@@ -1361,20 +1364,42 @@ function ModelBoundExperience({ modelId, modelName: _modelName, className, model
 
   const handleAssignBinding = useCallback(async (assetId: FocusedAssetId, binding: { objectName: string; motionObjectName?: string }) => {
     setFocusedAssetId(assetId)
+    setLastPickedBinding({ assetId, objectName: binding.objectName, motionObjectName: binding.motionObjectName })
     if (!modelId) return
 
-    await setInteractiveBinding(modelId, {
-      assetId,
-      objectName: binding.objectName,
-      motionObjectName: binding.motionObjectName,
-      updatedBy: currentUserId,
-    })
-  }, [currentUserId, modelId])
+    try {
+      await setInteractiveBinding(modelId, {
+        assetId,
+        objectName: binding.objectName,
+        motionObjectName: binding.motionObjectName,
+        updatedBy: currentUserId,
+      })
+      toast({
+        title: `Enlace guardado para ${assetId}`,
+        description: binding.motionObjectName ? `${binding.objectName} / manilla ${binding.motionObjectName}` : binding.objectName,
+      })
+    } catch (error) {
+      toast({
+        title: 'Error al guardar enlace',
+        description: error instanceof Error ? error.message : 'No se pudo persistir el binding del asset.',
+        variant: 'destructive',
+      })
+    }
+  }, [currentUserId, modelId, toast])
 
   const handleClearBinding = useCallback(async () => {
     if (!modelId || !assignmentTargetId) return
-    await deleteInteractiveBinding(modelId, assignmentTargetId)
-  }, [assignmentTargetId, modelId])
+    try {
+      await deleteInteractiveBinding(modelId, assignmentTargetId)
+      toast({ title: `Enlace eliminado para ${assignmentTargetId}` })
+    } catch (error) {
+      toast({
+        title: 'Error al quitar enlace',
+        description: error instanceof Error ? error.message : 'No se pudo eliminar el binding.',
+        variant: 'destructive',
+      })
+    }
+  }, [assignmentTargetId, modelId, toast])
 
   const handleAssetButton = useCallback((assetId: FocusedAssetId) => {
     setFocusedAssetId(assetId)
@@ -1550,6 +1575,15 @@ function ModelBoundExperience({ modelId, modelName: _modelName, className, model
                 ) : (
                   'Selecciona un asset en la barra superior para empezar a asignar grupos reales.'
                 )}
+              </div>
+            ) : null}
+
+            {editMappingsMode && lastPickedBinding ? (
+              <div className="mt-2 rounded-lg border bg-background/65 px-2 py-1.5 text-[11px] text-muted-foreground">
+                Ultimo pick: <span className="font-semibold text-foreground">{lastPickedBinding.assetId}</span>
+                {' -> '}
+                {lastPickedBinding.objectName}
+                {lastPickedBinding.motionObjectName ? ` / manilla ${lastPickedBinding.motionObjectName}` : ''}
               </div>
             ) : null}
           </div>
