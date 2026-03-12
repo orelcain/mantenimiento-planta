@@ -1174,8 +1174,19 @@ function StandalonePanel({ modelName, className }: Pick<SopladorasBaader142Inter
 
 function ModelBoundExperience({ modelId, modelName: _modelName, className, modelUrl, modelFormat, canEditMappings = false, currentUserId = 'system' }: Required<Pick<SopladorasBaader142InteractiveExperienceProps, 'modelName' | 'modelUrl' | 'modelFormat'>> & Pick<SopladorasBaader142InteractiveExperienceProps, 'className' | 'modelId' | 'canEditMappings' | 'currentUserId'>) {
   const { toast } = useToast()
-  console.log('[Sopladoras] ModelBoundExperience MOUNT — modelId:', modelId, 'url:', modelUrl?.slice(-40))
   const mode: OperatingMode = 'produccion'
+
+  // Delay Canvas creation to let the previous Viewer3D WebGL context fully dispose.
+  // Without this, R3F's async Canvas init causes two WebGL contexts to coexist briefly → GPU crash.
+  const [canvasReady, setCanvasReady] = useState(false)
+  useEffect(() => {
+    console.log('[Sopladoras] ModelBoundExperience MOUNTED — delaying Canvas to avoid dual WebGL context')
+    const timer = setTimeout(() => {
+      console.log('[Sopladoras] Previous Canvas disposed — creating lightweight Canvas now')
+      setCanvasReady(true)
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [])
   const [backupMode, setBackupMode] = useState<BackupMode>('auto')
   const [manualBackupTarget, setManualBackupTarget] = useState<PrimaryLineId | null>('L1')
   const [, setFocusedAssetId] = useState<FocusedAssetId>('S1')
@@ -1320,14 +1331,15 @@ function ModelBoundExperience({ modelId, modelName: _modelName, className, model
   return (
     <div className={cn('grid h-full gap-3 bg-card p-3', className)}>
       <div className="relative min-h-[860px] overflow-hidden rounded-xl border bg-background">
-        <Viewer3D url={modelUrl} format={modelFormat} resetKey={resetKey} viewPreset={viewPreset} lightweight>
-          <SopladorasBaader142InteractiveCanvasOverlay
-            blowers={blowers}
-            valves={valves}
-            blowerFlow={blowerFlow}
-            backupTargets={backupTargets}
-            bindingMap={bindingMap}
-            editMode={editMappingsMode}
+        {canvasReady ? (
+          <Viewer3D url={modelUrl} format={modelFormat} resetKey={resetKey} viewPreset={viewPreset} lightweight>
+            <SopladorasBaader142InteractiveCanvasOverlay
+              blowers={blowers}
+              valves={valves}
+              blowerFlow={blowerFlow}
+              backupTargets={backupTargets}
+              bindingMap={bindingMap}
+              editMode={editMappingsMode}
             assignmentTargetId={assignmentTargetId}
             onHoverBindingCandidate={setHoveredBindingCandidate}
             onAssignBinding={handleAssignBinding}
@@ -1335,7 +1347,12 @@ function ModelBoundExperience({ modelId, modelName: _modelName, className, model
             onToggleValve={handleToggleValve}
             onResolvedNodesChange={setResolvedNodeMeta}
           />
-        </Viewer3D>
+          </Viewer3D>
+        ) : (
+          <div className="flex h-full min-h-[400px] items-center justify-center text-sm text-muted-foreground">
+            Preparando visor interactivo...
+          </div>
+        )}
 
         <div className="pointer-events-none absolute inset-x-2 top-2 z-10">
           <div className="pointer-events-auto rounded-xl border bg-background/88 p-2 backdrop-blur">

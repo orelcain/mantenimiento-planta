@@ -1,7 +1,7 @@
 {
-  "version": "2.70.37",
+  "version": "2.70.38",
   "buildDate": "2026-03-11",
-  "buildTimestamp": 1773275509934,
+  "buildTimestamp": 1773277183127,
   "features": [
     "Visor de mapas: la etapa base incorpora una vista georreferenciada tipo A con imagen satelital, relieve y marcadores P1-P4 antes de importar al canvas",
     "Visor de mapas: se agrega microrelieve continuo y curvas de nivel locales sobre el rectangulo real para validar mejor orientacion y forma del terreno",
