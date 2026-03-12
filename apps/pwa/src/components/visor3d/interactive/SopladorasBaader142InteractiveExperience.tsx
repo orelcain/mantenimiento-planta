@@ -736,7 +736,9 @@ function RealMeshEffects({
   const originalMaterials = useRef(new Map<string, THREE.Material | THREE.Material[]>())
   const baseRotations = useRef(new Map<string, THREE.Euler>())
 
+  // Blower emissive — only runs when blower state changes
   useEffect(() => {
+    console.log('[RealMeshEffects] Applying blower emissive colors')
     for (const node of resolvedNodes) {
       if (node.kind !== 'blower' || !node.objectRef) continue
       const blower = blowers.find((item) => item.id === node.id)
@@ -759,6 +761,32 @@ function RealMeshEffects({
     }
   }, [resolvedNodes, blowers])
 
+  // Valve emissive — only runs when valve state changes (NOT every frame)
+  useEffect(() => {
+    console.log('[RealMeshEffects] Applying valve emissive colors')
+    for (const node of resolvedNodes) {
+      if (node.kind !== 'valve' || !node.objectRef) continue
+      const valve = valves.find((item) => item.id === node.id)
+      if (!valve) continue
+
+      const color = getValveStatusColor(valve.status)
+      node.objectRef.traverse((child) => {
+        if (!(child instanceof THREE.Mesh)) return
+        const key = child.uuid
+        if (!originalMaterials.current.has(key)) {
+          originalMaterials.current.set(key, Array.isArray(child.material) ? child.material.map((material) => material.clone()) : child.material.clone())
+        }
+        const material = child.material
+        if (material instanceof THREE.MeshStandardMaterial || material instanceof THREE.MeshPhysicalMaterial) {
+          material.emissive.set(color)
+          material.emissiveIntensity = 0.2
+          material.needsUpdate = true
+        }
+      })
+    }
+  }, [resolvedNodes, valves])
+
+  // Rotation lerp only — lightweight, no material updates, safe at 60fps
   useFrame(() => {
     for (const node of resolvedNodes) {
       if (node.kind !== 'valve') continue
@@ -776,22 +804,6 @@ function RealMeshEffects({
         const targetAngle = baseRotation[axis] + (valve.status === 'abierta' ? 0 : Math.PI / 2)
         motionObject.rotation[axis] = THREE.MathUtils.lerp(motionObject.rotation[axis], targetAngle, 0.12)
       }
-
-      if (!node.objectRef) continue
-      const color = getValveStatusColor(valve.status)
-      node.objectRef.traverse((child) => {
-        if (!(child instanceof THREE.Mesh)) return
-        const key = child.uuid
-        if (!originalMaterials.current.has(key)) {
-          originalMaterials.current.set(key, Array.isArray(child.material) ? child.material.map((material) => material.clone()) : child.material.clone())
-        }
-        const material = child.material
-        if (material instanceof THREE.MeshStandardMaterial || material instanceof THREE.MeshPhysicalMaterial) {
-          material.emissive.set(color)
-          material.emissiveIntensity = 0.2
-          material.needsUpdate = true
-        }
-      })
     }
   })
 
@@ -883,7 +895,13 @@ function SopladorasBaader142InteractiveCanvasOverlay({
 }) {
   const { object, info } = useViewer3DModelContext()
 
-  const resolvedNodes = useMemo(() => resolveInteractiveNodes(object, info, bindingMap), [bindingMap, object, info])
+  const resolvedNodes = useMemo(() => {
+    const nodes = resolveInteractiveNodes(object, info, bindingMap)
+    const objCount = nodes.filter((n) => n.source === 'object').length
+    const fbCount = nodes.filter((n) => n.source === 'fallback').length
+    console.log(`[Sopladoras Canvas] resolvedNodes: ${objCount} from GLB, ${fbCount} fallback — object:`, !!object, 'info:', !!info)
+    return nodes
+  }, [bindingMap, object, info])
 
   useEffect(() => {
     if (!onResolvedNodesChange) return
@@ -1156,6 +1174,7 @@ function StandalonePanel({ modelName, className }: Pick<SopladorasBaader142Inter
 
 function ModelBoundExperience({ modelId, modelName: _modelName, className, modelUrl, modelFormat, canEditMappings = false, currentUserId = 'system' }: Required<Pick<SopladorasBaader142InteractiveExperienceProps, 'modelName' | 'modelUrl' | 'modelFormat'>> & Pick<SopladorasBaader142InteractiveExperienceProps, 'className' | 'modelId' | 'canEditMappings' | 'currentUserId'>) {
   const { toast } = useToast()
+  console.log('[Sopladoras] ModelBoundExperience MOUNT — modelId:', modelId, 'url:', modelUrl?.slice(-40))
   const mode: OperatingMode = 'produccion'
   const [backupMode, setBackupMode] = useState<BackupMode>('auto')
   const [manualBackupTarget, setManualBackupTarget] = useState<PrimaryLineId | null>('L1')
@@ -1178,7 +1197,10 @@ function ModelBoundExperience({ modelId, modelName: _modelName, className, model
     }
     const unsubscribe = subscribeToInteractiveBindings(
       modelId,
-      setBindings,
+      (nextBindings) => {
+        console.log('[Sopladoras] Firestore bindings received:', nextBindings.length)
+        setBindings(nextBindings)
+      },
       (error) => {
         console.warn('[InteractiveBindings] Firestore subscription error (may be permissions):', error.message)
       },
@@ -1298,7 +1320,7 @@ function ModelBoundExperience({ modelId, modelName: _modelName, className, model
   return (
     <div className={cn('grid h-full gap-3 bg-card p-3', className)}>
       <div className="relative min-h-[860px] overflow-hidden rounded-xl border bg-background">
-        <Viewer3D url={modelUrl} format={modelFormat} resetKey={resetKey} viewPreset={viewPreset}>
+        <Viewer3D url={modelUrl} format={modelFormat} resetKey={resetKey} viewPreset={viewPreset} lightweight>
           <SopladorasBaader142InteractiveCanvasOverlay
             blowers={blowers}
             valves={valves}

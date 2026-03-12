@@ -37,6 +37,8 @@ interface Viewer3DProps {
   format: Model3DFormat
   resetKey?: number
   viewPreset?: 'front' | 'left' | 'right' | 'top' | 'isometric'
+  /** Modo ligero: sin Environment, ContactShadows ni shadow maps (para experiencias interactivas) */
+  lightweight?: boolean
   /** Cotas: callback al hacer click en superficie */
   onPointClick?: (point: Point3D) => void
   /** Punto pendiente único (retrocompat) */
@@ -879,7 +881,7 @@ function SceneContent(props: Viewer3DProps) {
     url, format, resetKey, onPointClick, pendingPoints, measurementType, onClosePolygon, 
     paintMode, paintColor, paintErase, materialOverrides, onMeshPainted,
     annotations, annotationMode, onAddAnnotation, onAnnotationClick, onPhotoClick,
-    focusPoint, viewPreset,
+    focusPoint, viewPreset, lightweight,
     children 
   } = props
   const [modelInfo, setModelInfo] = useState<ModelInfo | null>(null)
@@ -906,14 +908,24 @@ function SceneContent(props: Viewer3DProps) {
     <Viewer3DModelContext.Provider value={modelContextValue}>
       <color attach="background" args={['#0a0a0f']} />
 
-      {/* Lighting */}
-      <ambientLight intensity={0.6} />
-      <directionalLight position={[8, 10, 5]} intensity={1.0} castShadow shadow-mapSize-width={2048} shadow-mapSize-height={2048} />
-      <directionalLight position={[-5, 5, -5]} intensity={0.4} />
-      <directionalLight position={[0, -3, 5]} intensity={0.2} />
-      <hemisphereLight args={['#b1e1ff', '#b97a20', 0.5]} />
-      <Environment preset="apartment" />
-      <ContactShadows position={[0, -0.01, 0]} opacity={0.4} scale={20} blur={2} far={4} />
+      {/* Lighting — lightweight skips heavy shadow maps, Environment & ContactShadows */}
+      <ambientLight intensity={lightweight ? 0.8 : 0.6} />
+      {lightweight ? (
+        <>
+          <directionalLight position={[8, 10, 5]} intensity={1.0} />
+          <directionalLight position={[-5, 5, -5]} intensity={0.4} />
+          <hemisphereLight args={['#b1e1ff', '#b97a20', 0.5]} />
+        </>
+      ) : (
+        <>
+          <directionalLight position={[8, 10, 5]} intensity={1.0} castShadow shadow-mapSize-width={2048} shadow-mapSize-height={2048} />
+          <directionalLight position={[-5, 5, -5]} intensity={0.4} />
+          <directionalLight position={[0, -3, 5]} intensity={0.2} />
+          <hemisphereLight args={['#b1e1ff', '#b97a20', 0.5]} />
+          <Environment preset="apartment" />
+          <ContactShadows position={[0, -0.01, 0]} opacity={0.4} scale={20} blur={2} far={4} />
+        </>
+      )}
 
       {/* Grid */}
       <gridHelper args={[40, 40, '#1e293b', '#111827']} position={[0, -0.01, 0]} userData={{ isGrid: true }} />
@@ -1058,7 +1070,7 @@ export function Viewer3D(props: Viewer3DProps) {
       <CanvasErrorBoundary fallback={<WebGLUnavailableFallback />}>
         <Canvas
           camera={{ position: [0, 3, -5], fov: 45, near: 0.01, far: 2000 }}
-          shadows
+          shadows={!props.lightweight}
           gl={{
             antialias: true,
             alpha: true,
@@ -1068,6 +1080,7 @@ export function Viewer3D(props: Viewer3DProps) {
             powerPreference: 'high-performance',
           }}
           onCreated={({ gl: renderer }) => {
+            console.log('[Viewer3D] Canvas created — lightweight:', !!props.lightweight, 'renderer:', renderer.info.render)
             const canvas = renderer.domElement
             canvas.addEventListener('webglcontextlost', (e) => {
               e.preventDefault()
