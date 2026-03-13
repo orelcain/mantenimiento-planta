@@ -306,7 +306,9 @@ async function fetchOSMFeatures(corners: QuadCorners) {
     if (tags.building) {
       if (coords.length < 4) continue
       const ring = [...coords]
-      if (ring[0][0] !== ring[ring.length - 1][0] || ring[0][1] !== ring[ring.length - 1][1]) ring.push(ring[0])
+      const first = ring[0]
+      const last = ring[ring.length - 1]
+      if (first && last && (first[0] !== last[0] || first[1] !== last[1])) ring.push(first)
       const levels = parseFloat(tags['building:levels'] ?? '0')
       const h = parseFloat(tags.height ?? '0') || (levels > 0 ? levels * 3.2 : 5)
       buildings.push({
@@ -323,7 +325,9 @@ async function fetchOSMFeatures(corners: QuadCorners) {
     } else if (tags.natural === 'water' || tags.waterway || tags.landuse === 'reservoir') {
       if (coords.length >= 4) {
         const ring = [...coords]
-        if (ring[0][0] !== ring[ring.length - 1][0] || ring[0][1] !== ring[ring.length - 1][1]) ring.push(ring[0])
+        const first = ring[0]
+        const last = ring[ring.length - 1]
+        if (first && last && (first[0] !== last[0] || first[1] !== last[1])) ring.push(first)
         water.push({ type: 'Feature', geometry: { type: 'Polygon', coordinates: [ring] }, properties: {} })
       } else {
         water.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: coords }, properties: {} })
@@ -556,16 +560,18 @@ export function TerrainGeoPreview({
   useEffect(() => {
     const map = mapRef.current
     if (!map || !mapReady || !parsed.corners) return
+    const currentMap = map
+    const corners = parsed.corners
     let cancelled = false
 
     async function loadOSMData() {
       try {
         setOsmStatus('Consultando OpenStreetMap (edificios, caminos, agua)...')
-        const osm = await fetchOSMFeatures(parsed.corners!)
+        const osm = await fetchOSMFeatures(corners)
         if (cancelled) return
-        const bSrc = map!.getSource('osmBuildings') as maplibregl.GeoJSONSource | undefined
-        const rSrc = map!.getSource('osmRoads') as maplibregl.GeoJSONSource | undefined
-        const wSrc = map!.getSource('osmWater') as maplibregl.GeoJSONSource | undefined
+        const bSrc = currentMap.getSource('osmBuildings') as maplibregl.GeoJSONSource | undefined
+        const rSrc = currentMap.getSource('osmRoads') as maplibregl.GeoJSONSource | undefined
+        const wSrc = currentMap.getSource('osmWater') as maplibregl.GeoJSONSource | undefined
         bSrc?.setData(osm.buildings)
         rSrc?.setData(osm.roads)
         wSrc?.setData(osm.water)

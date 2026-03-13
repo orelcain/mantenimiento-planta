@@ -1,6 +1,6 @@
 {
   "name": "@mantenimiento/pwa",
-  "version": "2.70.42",
+  "version": "2.70.43",
   "private": true,
   "type": "module",
   "scripts": {
