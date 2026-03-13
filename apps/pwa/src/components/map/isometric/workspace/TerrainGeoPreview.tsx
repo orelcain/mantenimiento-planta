@@ -406,11 +406,13 @@ export function TerrainGeoPreview({
           },
           terrainSource: {
             type: 'raster-dem',
-            tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],
-            encoding: 'terrarium',
+            url: 'https://demotiles.maplibre.org/terrain-tiles/tiles.json',
             tileSize: 256,
-            maxzoom: 15,
-            attribution: 'AWS3D (JAXA)',
+          },
+          hillshadeSource: {
+            type: 'raster-dem',
+            url: 'https://demotiles.maplibre.org/terrain-tiles/tiles.json',
+            tileSize: 256,
           },
           boundsRect: {
             type: 'geojson',
@@ -442,7 +444,7 @@ export function TerrainGeoPreview({
           {
             id: 'terrain-hillshade',
             type: 'hillshade',
-            source: 'terrainSource',
+            source: 'hillshadeSource',
             paint: {
               'hillshade-exaggeration': 0.4,
               'hillshade-shadow-color': '#04111d',
@@ -509,7 +511,7 @@ export function TerrainGeoPreview({
             id: 'outside-mask',
             type: 'fill',
             source: 'outsideMask',
-            paint: { 'fill-color': '#06080d', 'fill-opacity': 0.92 },
+            paint: { 'fill-color': '#06080d', 'fill-opacity': 1 },
           },
         ],
         terrain: {

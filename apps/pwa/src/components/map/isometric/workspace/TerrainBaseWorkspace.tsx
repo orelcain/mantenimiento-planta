@@ -3,6 +3,7 @@ import type { IsometricMap } from '@/types/isometricMap'
 import { TerrainImportPanel } from './TerrainImportPanel'
 import type { TerrainImportPreview, TerrainImportProgress } from '@/lib/terrainImport'
 import { TerrainGeoPreview } from './TerrainGeoPreview'
+import { useState } from 'react'
 
 interface TerrainBaseWorkspaceProps {
   currentMapId: string
@@ -65,6 +66,8 @@ export function TerrainBaseWorkspace({
   terrainImportPreviewError,
   terrainImportProgress,
 }: TerrainBaseWorkspaceProps) {
+  const [panelVisible, setPanelVisible] = useState(false)
+
   return (
     <Card className="overflow-hidden">
       <CardContent className="space-y-4 p-4 md:p-5">
@@ -73,15 +76,25 @@ export function TerrainBaseWorkspace({
             <h2 className="text-base font-semibold">Base georreferenciada</h2>
             <p className="text-xs text-muted-foreground">Enfoquemos esta etapa solo en las 4 coordenadas y la vista real que vamos a usar.</p>
           </div>
-          <div className="text-[11px] text-muted-foreground">
-            {terrainTileCount > 0
-              ? 'Ya existe una base cargada. Puedes ajustar coordenadas y volver a importar.'
-              : 'Define el rectángulo real antes de pasar al editor.'}
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setPanelVisible((v) => !v)}
+              className="rounded-md border bg-muted/50 px-3 py-1.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted"
+            >
+              {panelVisible ? 'Ocultar coordenadas' : 'Editar coordenadas'}
+            </button>
+            <div className="text-[11px] text-muted-foreground">
+              {terrainTileCount > 0
+                ? 'Base cargada.'
+                : 'Define el rectángulo real antes de pasar al editor.'}
+            </div>
           </div>
         </div>
 
-        <div className="grid gap-5 xl:grid-cols-[360px_minmax(0,1fr)] xl:items-start">
-          <div className="w-full xl:sticky xl:top-4">
+        <div className={panelVisible ? 'grid gap-5 xl:grid-cols-[360px_minmax(0,1fr)] xl:items-start' : ''}>
+          {panelVisible && (
+            <div className="w-full xl:sticky xl:top-4">
             <TerrainImportPanel
               title="4 coordenadas del terreno"
               description="Usa exactamente 4 líneas en formato lat, lon. Este es el bloque principal para definir la base real antes de importarla."
@@ -101,6 +114,7 @@ export function TerrainBaseWorkspace({
               coordinateRows={terrainTileCount > 0 ? 8 : 9}
             />
           </div>
+          )}
 
           <TerrainGeoPreview
             coordinatesText={terrainImportCoordinatesText}
