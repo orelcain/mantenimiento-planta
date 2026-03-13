@@ -38,9 +38,9 @@ interface TerrainPayload {
 
 /* ── Constants ─────────────────────────────────────────────────── */
 
-const GRID = 64
+const GRID = 128
 const TILE_Z = 17
-const DEM_Z = 13
+const DEM_Z = 14
 const SCALE = 10
 
 /* ── Helpers ───────────────────────────────────────────────────── */
@@ -167,25 +167,55 @@ async function fetchElevationGrid(corners: QuadCorners, cols: number, rows: numb
   const tl = tileToLonLat(nwT.x, nwT.y, DEM_Z)
   const br = tileToLonLat(seT.x + 1, seT.y + 1, DEM_Z)
 
+  // Decode Terrarium elevation at pixel coordinate
+  const readElev = (ix: number, iy: number) => {
+    const i = (iy * big.width + ix) * 4
+    return ((px[i] ?? 0) * 256 + (px[i + 1] ?? 0) + (px[i + 2] ?? 0) / 256) - 32768
+  }
+
   const elevations: number[] = []
   for (let r = 0; r < rows; r++) {
     const lat = north - (r / (rows - 1)) * (north - south)
     for (let c = 0; c < cols; c++) {
       const lon = west + (c / (cols - 1)) * (east - west)
-      const pxX = Math.max(0, Math.min(big.width - 1, Math.round(((lon - tl.lon) / (br.lon - tl.lon)) * big.width)))
-      const pxY = Math.max(0, Math.min(big.height - 1, Math.round(((tl.lat - lat) / (tl.lat - br.lat)) * big.height)))
-      const i = (pxY * big.width + pxX) * 4
-      const red = px[i] ?? 0
-      const green = px[i + 1] ?? 0
-      const blue = px[i + 2] ?? 0
-      // Terrarium encoding: elevation = (r * 256 + g + b / 256) - 32768
-      const elev = (red * 256 + green + blue / 256) - 32768
-      // Clamp to sea level — ocean depths distort the mesh
+      // Bilinear interpolation for smoother terrain
+      const fX = ((lon - tl.lon) / (br.lon - tl.lon)) * (big.width - 1)
+      const fY = ((tl.lat - lat) / (tl.lat - br.lat)) * (big.height - 1)
+      const x0 = Math.max(0, Math.min(big.width - 2, Math.floor(fX)))
+      const y0 = Math.max(0, Math.min(big.height - 2, Math.floor(fY)))
+      const fx = fX - x0
+      const fy = fY - y0
+      const e00 = readElev(x0, y0)
+      const e10 = readElev(x0 + 1, y0)
+      const e01 = readElev(x0, y0 + 1)
+      const e11 = readElev(x0 + 1, y0 + 1)
+      const elev = e00 * (1 - fx) * (1 - fy) + e10 * fx * (1 - fy) + e01 * (1 - fx) * fy + e11 * fx * fy
       elevations.push(Math.max(0, elev))
     }
   }
 
   return elevations
+}
+
+/* ── Smooth elevation grid (Gaussian blur — reduces DEM noise) ── */
+
+function smoothElevations(elev: number[], cols: number, rows: number, passes = 1): number[] {
+  let cur = [...elev]
+  for (let p = 0; p < passes; p++) {
+    const nxt = [...cur]
+    for (let r = 1; r < rows - 1; r++) {
+      for (let c = 1; c < cols - 1; c++) {
+        const idx = r * cols + c
+        nxt[idx] = (
+          cur[(r - 1) * cols + c - 1]! + cur[(r - 1) * cols + c]! * 2 + cur[(r - 1) * cols + c + 1]! +
+          cur[r * cols + c - 1]! * 2 + cur[r * cols + c]! * 4 + cur[r * cols + c + 1]! * 2 +
+          cur[(r + 1) * cols + c - 1]! + cur[(r + 1) * cols + c]! * 2 + cur[(r + 1) * cols + c + 1]!
+        ) / 16
+      }
+    }
+    cur = nxt
+  }
+  return cur
 }
 
 /* ── R3F: Terrain island ───────────────────────────────────────── */
@@ -265,6 +295,11 @@ function TerrainIsland({ data, exaggeration }: { data: TerrainPayload; exaggerat
       <mesh geometry={botGeo}>
         <meshStandardMaterial color="#4a3f30" roughness={1} />
       </mesh>
+      {/* Water plane at sea level */}
+      <mesh position={[0, 0.005, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[meshWidth * 1.3, meshDepth * 1.3]} />
+        <meshStandardMaterial color="#1a6e8e" transparent opacity={0.6} roughness={0.15} metalness={0.3} />
+      </mesh>
     </group>
   )
 }
@@ -319,8 +354,11 @@ export function TerrainGeoPreview({
         texRef.current = tex
 
         setLoading('Decodificando elevaciones DEM…')
-        const elev = await fetchElevationGrid(corners, GRID, GRID)
+        const rawElev = await fetchElevationGrid(corners, GRID, GRID)
         if (dead) return
+
+        setLoading('Suavizando relieve…')
+        const elev = smoothElevations(rawElev, GRID, GRID, 2)
 
         const { south, north, west, east } = boundsOf(corners)
         const avgLat = ((north + south) / 2) * Math.PI / 180
@@ -394,7 +432,8 @@ export function TerrainGeoPreview({
             gl={{ antialias: true }}
             style={{ background: '#0a0e17' }}
           >
-            <ambientLight intensity={0.55} />
+            <ambientLight intensity={0.4} />
+            <hemisphereLight args={['#b1e1ff', '#b97a20', 0.55]} />
             <directionalLight position={[6, 10, 4]} intensity={1.4} />
             <directionalLight position={[-3, 6, -5]} intensity={0.35} />
             <TerrainIsland data={terrainData} exaggeration={exaggeration} />
