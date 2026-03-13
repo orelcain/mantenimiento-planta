@@ -338,6 +338,10 @@ export function TerrainGeoPreview({
             type: 'geojson',
             data: EMPTY_CONTOURS,
           },
+          outsideMask: {
+            type: 'geojson',
+            data: { type: 'FeatureCollection', features: [] },
+          },
         },
         layers: [
           { id: 'satellite', type: 'raster', source: 'satellite' },
@@ -368,6 +372,12 @@ export function TerrainGeoPreview({
             type: 'line',
             source: 'contours',
             paint: { 'line-color': '#fff0cf', 'line-width': 1.2, 'line-opacity': 0.82 },
+          },
+          {
+            id: 'outside-mask',
+            type: 'fill',
+            source: 'outsideMask',
+            paint: { 'fill-color': '#06080d', 'fill-opacity': 0.92 },
           },
         ],
         terrain: {
@@ -430,6 +440,28 @@ export function TerrainGeoPreview({
             [point4.lon, point4.lat],
             [point1.lon, point1.lat],
           ]],
+        },
+        properties: {},
+      }],
+    })
+
+    const maskSource = currentMap.getSource('outsideMask') as maplibregl.GeoJSONSource | undefined
+    maskSource?.setData({
+      type: 'FeatureCollection',
+      features: [{
+        type: 'Feature',
+        geometry: {
+          type: 'Polygon',
+          coordinates: [
+            [[-180, -90], [180, -90], [180, 90], [-180, 90], [-180, -90]],
+            [
+              [point1.lon, point1.lat],
+              [point4.lon, point4.lat],
+              [point3.lon, point3.lat],
+              [point2.lon, point2.lat],
+              [point1.lon, point1.lat],
+            ],
+          ],
         },
         properties: {},
       }],
