@@ -33,6 +33,7 @@ interface TerrainPayload {
   meshDepth: number
   minElev: number
   maxElev: number
+  realWidth: number
 }
 
 /* ── Constants ─────────────────────────────────────────────────── */
@@ -154,8 +155,14 @@ async function fetchElevationGrid(corners: QuadCorners, cols: number, rows: numb
   }
   await Promise.all(jobs)
 
-  const imgData = ctx.getImageData(0, 0, big.width, big.height)
-  const px = imgData.data
+  let px: Uint8ClampedArray
+  try {
+    const imgData = ctx.getImageData(0, 0, big.width, big.height)
+    px = imgData.data
+  } catch {
+    // CORS tainted canvas — return flat grid at 0
+    return new Array(cols * rows).fill(0)
+  }
 
   const tl = tileToLonLat(nwT.x, nwT.y, DEM_Z)
   const br = tileToLonLat(seT.x + 1, seT.y + 1, DEM_Z)
@@ -172,7 +179,9 @@ async function fetchElevationGrid(corners: QuadCorners, cols: number, rows: numb
       const green = px[i + 1] ?? 0
       const blue = px[i + 2] ?? 0
       // Terrarium encoding: elevation = (r * 256 + g + b / 256) - 32768
-      elevations.push((red * 256 + green + blue / 256) - 32768)
+      const elev = (red * 256 + green + blue / 256) - 32768
+      // Clamp to sea level — ocean depths distort the mesh
+      elevations.push(Math.max(0, elev))
     }
   }
 
@@ -182,10 +191,11 @@ async function fetchElevationGrid(corners: QuadCorners, cols: number, rows: numb
 /* ── R3F: Terrain island ───────────────────────────────────────── */
 
 function TerrainIsland({ data, exaggeration }: { data: TerrainPayload; exaggeration: number }) {
-  const { texture, elevations, cols, rows, meshWidth, meshDepth, minElev, maxElev } = data
+  const { texture, elevations, cols, rows, meshWidth, meshDepth, minElev, maxElev, realWidth } = data
   const elevRange = Math.max(0.1, maxElev - minElev)
-  const hScale = (SCALE / meshWidth) * exaggeration
-  const wallDepth = elevRange * hScale * 0.35 + 0.2
+  // Normalize height: map real meters to mesh units, then apply exaggeration
+  const hScale = (meshWidth / realWidth) * exaggeration
+  const wallDepth = Math.min(meshWidth * 0.15, elevRange * hScale * 0.5) + 0.15
 
   const { topGeo, sideGeo, botGeo } = useMemo(() => {
     const top = new THREE.PlaneGeometry(meshWidth, meshDepth, cols - 1, rows - 1)
@@ -327,6 +337,7 @@ export function TerrainGeoPreview({
           meshDepth: SCALE * aspect,
           minElev: Math.min(...elev),
           maxElev: Math.max(...elev),
+          realWidth: wm,
         })
         setLoading('')
       } catch (err) {
