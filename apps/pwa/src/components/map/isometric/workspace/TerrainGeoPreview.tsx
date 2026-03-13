@@ -360,12 +360,10 @@ export function TerrainGeoPreview({
   const [mapReady, setMapReady] = useState(false)
   const [microReliefEnabled, setMicroReliefEnabled] = useState(true)
   const [contoursEnabled, setContoursEnabled] = useState(true)
-  const [hillshadeEnabled, setHillshadeEnabled] = useState(true)
   const [pointsEnabled, setPointsEnabled] = useState(true)
   const [buildingsEnabled, setBuildingsEnabled] = useState(true)
   const [roadsEnabled, setRoadsEnabled] = useState(true)
   const [waterEnabled, setWaterEnabled] = useState(true)
-  const [terrainExaggeration, setTerrainExaggeration] = useState(2.0)
   const [buildingExaggeration, setBuildingExaggeration] = useState(4)
   const [microReliefSummary, setMicroReliefSummary] = useState<string>('Esperando coordenadas válidas...')
   const [osmStatus, setOsmStatus] = useState<string>('')
@@ -404,16 +402,6 @@ export function TerrainGeoPreview({
             attribution: 'Esri World Imagery',
             maxzoom: 19,
           },
-          terrainSource: {
-            type: 'raster-dem',
-            url: 'https://demotiles.maplibre.org/terrain-tiles/tiles.json',
-            tileSize: 256,
-          },
-          hillshadeSource: {
-            type: 'raster-dem',
-            url: 'https://demotiles.maplibre.org/terrain-tiles/tiles.json',
-            tileSize: 256,
-          },
           boundsRect: {
             type: 'geojson',
             data: { type: 'FeatureCollection', features: [] },
@@ -441,16 +429,6 @@ export function TerrainGeoPreview({
         },
         layers: [
           { id: 'satellite', type: 'raster', source: 'satellite' },
-          {
-            id: 'terrain-hillshade',
-            type: 'hillshade',
-            source: 'hillshadeSource',
-            paint: {
-              'hillshade-exaggeration': 0.4,
-              'hillshade-shadow-color': '#04111d',
-              'hillshade-highlight-color': '#fffae0',
-            },
-          },
           {
             id: 'rect-fill',
             type: 'fill',
@@ -514,10 +492,6 @@ export function TerrainGeoPreview({
             paint: { 'fill-color': '#06080d', 'fill-opacity': 1 },
           },
         ],
-        terrain: {
-          source: 'terrainSource',
-          exaggeration: 2.0,
-        },
       },
       maxPitch: 85,
     })
@@ -544,7 +518,6 @@ export function TerrainGeoPreview({
       map.setLayoutProperty(layerId, 'visibility', visible ? 'visible' : 'none')
     }
 
-    setVisibility('terrain-hillshade', hillshadeEnabled)
     setVisibility('contour-lines', contoursEnabled)
     setVisibility('microrelief-raster', microReliefEnabled)
     setVisibility('water-fill', waterEnabled)
@@ -555,13 +528,7 @@ export function TerrainGeoPreview({
       const element = marker.getElement()
       element.style.display = pointsEnabled ? '' : 'none'
     })
-  }, [mapReady, hillshadeEnabled, contoursEnabled, microReliefEnabled, pointsEnabled, buildingsEnabled, roadsEnabled, waterEnabled])
-
-  useEffect(() => {
-    const map = mapRef.current
-    if (!map || !mapReady) return
-    map.setTerrain({ source: 'terrainSource', exaggeration: terrainExaggeration })
-  }, [mapReady, terrainExaggeration])
+  }, [mapReady, contoursEnabled, microReliefEnabled, pointsEnabled, buildingsEnabled, roadsEnabled, waterEnabled])
 
   useEffect(() => {
     const map = mapRef.current
@@ -729,7 +696,6 @@ export function TerrainGeoPreview({
         </div>
         <div className="flex flex-wrap gap-1.5">
           <Badge variant={microReliefEnabled ? 'default' : 'outline'} className="cursor-pointer" onClick={() => setMicroReliefEnabled((value) => !value)}>Microrelieve</Badge>
-          <Badge variant={hillshadeEnabled ? 'default' : 'outline'} className="cursor-pointer" onClick={() => setHillshadeEnabled((value) => !value)}>Relieve</Badge>
           <Badge variant={contoursEnabled ? 'default' : 'outline'} className="cursor-pointer" onClick={() => setContoursEnabled((value) => !value)}>Curvas</Badge>
           <Badge variant={pointsEnabled ? 'default' : 'outline'} className="cursor-pointer" onClick={() => setPointsEnabled((value) => !value)}>Puntos</Badge>
           <Badge variant={buildingsEnabled ? 'default' : 'outline'} className="cursor-pointer" onClick={() => setBuildingsEnabled((value) => !value)}>Edificios</Badge>
@@ -739,12 +705,6 @@ export function TerrainGeoPreview({
       </div>
 
       <div className="flex flex-wrap items-center gap-4 text-[11px] text-muted-foreground">
-        <label className="flex items-center gap-2">
-          <span className="whitespace-nowrap">Terreno ×{terrainExaggeration.toFixed(2)}</span>
-          <input type="range" min="0.5" max="3" step="0.25" value={terrainExaggeration}
-            onChange={(e) => setTerrainExaggeration(Number(e.target.value))}
-            className="h-1.5 w-24 cursor-pointer accent-sky-500" />
-        </label>
         <label className="flex items-center gap-2">
           <span className="whitespace-nowrap">Edificios ×{buildingExaggeration}</span>
           <input type="range" min="1" max="12" step="1" value={buildingExaggeration}
