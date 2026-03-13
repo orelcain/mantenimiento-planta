@@ -289,6 +289,11 @@ export function TerrainGeoPreview({
   const [contoursEnabled, setContoursEnabled] = useState(true)
   const [hillshadeEnabled, setHillshadeEnabled] = useState(true)
   const [pointsEnabled, setPointsEnabled] = useState(true)
+  const [buildingsEnabled, setBuildingsEnabled] = useState(true)
+  const [roadsEnabled, setRoadsEnabled] = useState(true)
+  const [waterEnabled, setWaterEnabled] = useState(true)
+  const [terrainExaggeration, setTerrainExaggeration] = useState(1.25)
+  const [buildingExaggeration, setBuildingExaggeration] = useState(3)
   const [microReliefSummary, setMicroReliefSummary] = useState<string>('Esperando coordenadas válidas...')
 
   const parsed = useMemo(() => {
@@ -342,6 +347,11 @@ export function TerrainGeoPreview({
             type: 'geojson',
             data: { type: 'FeatureCollection', features: [] },
           },
+          osmVector: {
+            type: 'vector',
+            tiles: ['https://tiles.openfreemap.org/planet/{z}/{x}/{y}.pbf'],
+            maxzoom: 14,
+          },
         },
         layers: [
           { id: 'satellite', type: 'raster', source: 'satellite' },
@@ -366,6 +376,44 @@ export function TerrainGeoPreview({
             type: 'line',
             source: 'boundsRect',
             paint: { 'line-color': '#f6b86c', 'line-width': 3 },
+          },
+          {
+            id: 'water-fill',
+            type: 'fill',
+            source: 'osmVector',
+            'source-layer': 'water',
+            paint: { 'fill-color': '#1a7aaa', 'fill-opacity': 0.5 },
+          },
+          {
+            id: 'roads',
+            type: 'line',
+            source: 'osmVector',
+            'source-layer': 'transportation',
+            minzoom: 12,
+            paint: {
+              'line-color': '#d4c8a8',
+              'line-width': ['interpolate', ['linear'], ['zoom'], 12, 0.5, 16, 3],
+              'line-opacity': 0.7,
+            },
+          },
+          {
+            id: 'buildings-3d',
+            type: 'fill-extrusion',
+            source: 'osmVector',
+            'source-layer': 'building',
+            minzoom: 13,
+            paint: {
+              'fill-extrusion-color': [
+                'interpolate', ['linear'],
+                ['coalesce', ['get', 'render_height'], 6],
+                0, '#8a9bb0',
+                15, '#c4d4e4',
+                50, '#e8f0fa',
+              ],
+              'fill-extrusion-height': ['*', ['coalesce', ['get', 'render_height'], 6], 3],
+              'fill-extrusion-base': ['*', ['coalesce', ['get', 'render_min_height'], 0], 3],
+              'fill-extrusion-opacity': 0.85,
+            },
           },
           {
             id: 'contour-lines',
@@ -413,12 +461,32 @@ export function TerrainGeoPreview({
     setVisibility('terrain-hillshade', hillshadeEnabled)
     setVisibility('contour-lines', contoursEnabled)
     setVisibility('microrelief-raster', microReliefEnabled)
+    setVisibility('water-fill', waterEnabled)
+    setVisibility('roads', roadsEnabled)
+    setVisibility('buildings-3d', buildingsEnabled)
 
     markersRef.current.forEach((marker) => {
       const element = marker.getElement()
       element.style.display = pointsEnabled ? '' : 'none'
     })
-  }, [mapReady, hillshadeEnabled, contoursEnabled, microReliefEnabled, pointsEnabled])
+  }, [mapReady, hillshadeEnabled, contoursEnabled, microReliefEnabled, pointsEnabled, buildingsEnabled, roadsEnabled, waterEnabled])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !mapReady) return
+    map.setTerrain({ source: 'terrainSource', exaggeration: terrainExaggeration })
+  }, [mapReady, terrainExaggeration])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !mapReady || !map.getLayer('buildings-3d')) return
+    map.setPaintProperty('buildings-3d', 'fill-extrusion-height', [
+      '*', ['coalesce', ['get', 'render_height'], 6], buildingExaggeration,
+    ])
+    map.setPaintProperty('buildings-3d', 'fill-extrusion-base', [
+      '*', ['coalesce', ['get', 'render_min_height'], 0], buildingExaggeration,
+    ])
+  }, [mapReady, buildingExaggeration])
 
   useEffect(() => {
     const map = mapRef.current
@@ -549,7 +617,25 @@ export function TerrainGeoPreview({
           <Badge variant={hillshadeEnabled ? 'default' : 'outline'} className="cursor-pointer" onClick={() => setHillshadeEnabled((value) => !value)}>Relieve</Badge>
           <Badge variant={contoursEnabled ? 'default' : 'outline'} className="cursor-pointer" onClick={() => setContoursEnabled((value) => !value)}>Curvas</Badge>
           <Badge variant={pointsEnabled ? 'default' : 'outline'} className="cursor-pointer" onClick={() => setPointsEnabled((value) => !value)}>Puntos</Badge>
+          <Badge variant={buildingsEnabled ? 'default' : 'outline'} className="cursor-pointer" onClick={() => setBuildingsEnabled((value) => !value)}>Edificios</Badge>
+          <Badge variant={roadsEnabled ? 'default' : 'outline'} className="cursor-pointer" onClick={() => setRoadsEnabled((value) => !value)}>Caminos</Badge>
+          <Badge variant={waterEnabled ? 'default' : 'outline'} className="cursor-pointer" onClick={() => setWaterEnabled((value) => !value)}>Agua</Badge>
         </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-4 text-[11px] text-muted-foreground">
+        <label className="flex items-center gap-2">
+          <span className="whitespace-nowrap">Terreno ×{terrainExaggeration.toFixed(2)}</span>
+          <input type="range" min="0.5" max="3" step="0.25" value={terrainExaggeration}
+            onChange={(e) => setTerrainExaggeration(Number(e.target.value))}
+            className="h-1.5 w-24 cursor-pointer accent-sky-500" />
+        </label>
+        <label className="flex items-center gap-2">
+          <span className="whitespace-nowrap">Edificios ×{buildingExaggeration}</span>
+          <input type="range" min="1" max="12" step="1" value={buildingExaggeration}
+            onChange={(e) => setBuildingExaggeration(Number(e.target.value))}
+            className="h-1.5 w-24 cursor-pointer accent-orange-400" />
+        </label>
       </div>
 
       <div className="overflow-hidden rounded-xl border bg-slate-950">
