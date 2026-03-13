@@ -273,6 +273,71 @@ function asQuadCorners(corners: GeoCoordinate[]): QuadCorners {
   return [point1, point2, point3, point4]
 }
 
+const OVERPASS_API = 'https://overpass-api.de/api/interpreter'
+
+interface OverpassElement {
+  tags?: Record<string, string>
+  geometry?: Array<{ lat: number; lon: number }>
+}
+
+async function fetchOSMFeatures(corners: QuadCorners) {
+  const lats = corners.map((c) => c.lat)
+  const lons = corners.map((c) => c.lon)
+  const south = Math.min(...lats) - 0.003
+  const north = Math.max(...lats) + 0.003
+  const west = Math.min(...lons) - 0.003
+  const east = Math.max(...lons) + 0.003
+  const bbox = `${south},${west},${north},${east}`
+
+  const query = `[out:json][timeout:25];(way["building"](${bbox});way["highway"](${bbox});way["natural"="water"](${bbox});way["waterway"](${bbox});way["landuse"="reservoir"](${bbox}););out geom;`
+  const resp = await fetch(`${OVERPASS_API}?data=${encodeURIComponent(query)}`)
+  if (!resp.ok) throw new Error('Overpass API no disponible')
+  const data = (await resp.json()) as { elements: OverpassElement[] }
+
+  const buildings: GeoJSON.Feature[] = []
+  const roads: GeoJSON.Feature[] = []
+  const water: GeoJSON.Feature[] = []
+
+  for (const el of data.elements) {
+    if (!el.geometry || el.geometry.length < 2) continue
+    const coords = el.geometry.map((p) => [p.lon, p.lat] as [number, number])
+    const tags = el.tags ?? {}
+
+    if (tags.building) {
+      if (coords.length < 4) continue
+      const ring = [...coords]
+      if (ring[0][0] !== ring[ring.length - 1][0] || ring[0][1] !== ring[ring.length - 1][1]) ring.push(ring[0])
+      const levels = parseFloat(tags['building:levels'] ?? '0')
+      const h = parseFloat(tags.height ?? '0') || (levels > 0 ? levels * 3.2 : 5)
+      buildings.push({
+        type: 'Feature',
+        geometry: { type: 'Polygon', coordinates: [ring] },
+        properties: { height: h, type: tags.building },
+      })
+    } else if (tags.highway) {
+      roads.push({
+        type: 'Feature',
+        geometry: { type: 'LineString', coordinates: coords },
+        properties: { type: tags.highway, surface: tags.surface ?? '' },
+      })
+    } else if (tags.natural === 'water' || tags.waterway || tags.landuse === 'reservoir') {
+      if (coords.length >= 4) {
+        const ring = [...coords]
+        if (ring[0][0] !== ring[ring.length - 1][0] || ring[0][1] !== ring[ring.length - 1][1]) ring.push(ring[0])
+        water.push({ type: 'Feature', geometry: { type: 'Polygon', coordinates: [ring] }, properties: {} })
+      } else {
+        water.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: coords }, properties: {} })
+      }
+    }
+  }
+
+  return {
+    buildings: { type: 'FeatureCollection' as const, features: buildings },
+    roads: { type: 'FeatureCollection' as const, features: roads },
+    water: { type: 'FeatureCollection' as const, features: water },
+  }
+}
+
 export function TerrainGeoPreview({
   coordinatesText,
   preview,
@@ -295,6 +360,7 @@ export function TerrainGeoPreview({
   const [terrainExaggeration, setTerrainExaggeration] = useState(1.25)
   const [buildingExaggeration, setBuildingExaggeration] = useState(3)
   const [microReliefSummary, setMicroReliefSummary] = useState<string>('Esperando coordenadas válidas...')
+  const [osmStatus, setOsmStatus] = useState<string>('')
 
   const parsed = useMemo(() => {
     try {
@@ -347,10 +413,17 @@ export function TerrainGeoPreview({
             type: 'geojson',
             data: { type: 'FeatureCollection', features: [] },
           },
-          osmVector: {
-            type: 'vector',
-            tiles: ['https://tiles.openfreemap.org/planet/{z}/{x}/{y}.pbf'],
-            maxzoom: 14,
+          osmBuildings: {
+            type: 'geojson',
+            data: { type: 'FeatureCollection', features: [] },
+          },
+          osmRoads: {
+            type: 'geojson',
+            data: { type: 'FeatureCollection', features: [] },
+          },
+          osmWater: {
+            type: 'geojson',
+            data: { type: 'FeatureCollection', features: [] },
           },
         },
         layers: [
@@ -380,39 +453,34 @@ export function TerrainGeoPreview({
           {
             id: 'water-fill',
             type: 'fill',
-            source: 'osmVector',
-            'source-layer': 'water',
-            paint: { 'fill-color': '#1a7aaa', 'fill-opacity': 0.5 },
+            source: 'osmWater',
+            paint: { 'fill-color': '#1a7aaa', 'fill-opacity': 0.55 },
           },
           {
             id: 'roads',
             type: 'line',
-            source: 'osmVector',
-            'source-layer': 'transportation',
-            minzoom: 12,
+            source: 'osmRoads',
             paint: {
               'line-color': '#d4c8a8',
-              'line-width': ['interpolate', ['linear'], ['zoom'], 12, 0.5, 16, 3],
-              'line-opacity': 0.7,
+              'line-width': 2.5,
+              'line-opacity': 0.8,
             },
           },
           {
             id: 'buildings-3d',
             type: 'fill-extrusion',
-            source: 'osmVector',
-            'source-layer': 'building',
-            minzoom: 13,
+            source: 'osmBuildings',
             paint: {
               'fill-extrusion-color': [
-                'interpolate', ['linear'],
-                ['coalesce', ['get', 'render_height'], 6],
+                'interpolate', ['linear'], ['get', 'height'],
                 0, '#8a9bb0',
-                15, '#c4d4e4',
+                10, '#b5c8d8',
+                25, '#d4e4f0',
                 50, '#e8f0fa',
               ],
-              'fill-extrusion-height': ['*', ['coalesce', ['get', 'render_height'], 6], 3],
-              'fill-extrusion-base': ['*', ['coalesce', ['get', 'render_min_height'], 0], 3],
-              'fill-extrusion-opacity': 0.85,
+              'fill-extrusion-height': ['*', ['get', 'height'], 3],
+              'fill-extrusion-base': 0,
+              'fill-extrusion-opacity': 0.88,
             },
           },
           {
@@ -481,12 +549,39 @@ export function TerrainGeoPreview({
     const map = mapRef.current
     if (!map || !mapReady || !map.getLayer('buildings-3d')) return
     map.setPaintProperty('buildings-3d', 'fill-extrusion-height', [
-      '*', ['coalesce', ['get', 'render_height'], 6], buildingExaggeration,
-    ])
-    map.setPaintProperty('buildings-3d', 'fill-extrusion-base', [
-      '*', ['coalesce', ['get', 'render_min_height'], 0], buildingExaggeration,
+      '*', ['get', 'height'], buildingExaggeration,
     ])
   }, [mapReady, buildingExaggeration])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !mapReady || !parsed.corners) return
+    let cancelled = false
+
+    async function loadOSMData() {
+      try {
+        setOsmStatus('Consultando OpenStreetMap (edificios, caminos, agua)...')
+        const osm = await fetchOSMFeatures(parsed.corners!)
+        if (cancelled) return
+        const bSrc = map!.getSource('osmBuildings') as maplibregl.GeoJSONSource | undefined
+        const rSrc = map!.getSource('osmRoads') as maplibregl.GeoJSONSource | undefined
+        const wSrc = map!.getSource('osmWater') as maplibregl.GeoJSONSource | undefined
+        bSrc?.setData(osm.buildings)
+        rSrc?.setData(osm.roads)
+        wSrc?.setData(osm.water)
+        setOsmStatus(
+          `OSM: ${osm.buildings.features.length} edificios · ${osm.roads.features.length} caminos · ${osm.water.features.length} cuerpos de agua`
+        )
+      } catch (error) {
+        if (!cancelled) {
+          setOsmStatus(error instanceof Error ? error.message : 'Error cargando datos OSM')
+        }
+      }
+    }
+
+    void loadOSMData()
+    return () => { cancelled = true }
+  }, [mapReady, parsed.corners])
 
   useEffect(() => {
     const map = mapRef.current
@@ -642,7 +737,7 @@ export function TerrainGeoPreview({
         <div ref={containerRef} className={`w-full ${mapHeightClassName}`} />
       </div>
 
-      <div className="grid gap-2 text-[11px] text-muted-foreground md:grid-cols-2">
+      <div className="grid gap-2 text-[11px] text-muted-foreground md:grid-cols-3">
         <div className="rounded-md border bg-muted/30 p-2">
           {parsed.error ?? previewError ?? statusMessage ?? 'Mapa listo para revisar el terreno real antes de importarlo al canvas editable.'}
         </div>
@@ -654,6 +749,9 @@ export function TerrainGeoPreview({
               : 'Esperando 4 coordenadas válidas.'}
           <br />
           {isImporting ? 'Actualizando vista mientras corre la importación…' : microReliefSummary}
+        </div>
+        <div className="rounded-md border bg-muted/30 p-2">
+          {osmStatus || 'Esperando coordenadas para cargar datos OSM...'}
         </div>
       </div>
     </div>
