@@ -12,6 +12,7 @@ import { RepuestoGalleryModal } from '@/components/repuestos/RepuestoGalleryModa
 import { RepuestoDetailModal } from '@/components/repuestos/RepuestoDetailModal'
 
 import { ManualSearchModal } from '@/components/repuestos/ManualSearchModal'
+import { MachineManualPanel } from '@/components/repuestos/MachineManualPanel'
 import { useRepuestos } from '@/hooks/repuestos/useRepuestos'
 import { useRepuestosCounts } from '@/hooks/repuestos/useRepuestosCounts'
 import { useMachineCategories } from '@/hooks/repuestos/useMachineCategories'
@@ -775,6 +776,11 @@ export function RepuestosDashboard() {
             </div>
           )
         })()}
+
+        {/* Machine Manuals Panel — only admins */}
+        {isAdmin && currentMachine && (
+          <MachineManualPanel machine={currentMachine} className="mt-3" />
+        )}
 
         {/* Error Display */}
         {repuestosError && (
