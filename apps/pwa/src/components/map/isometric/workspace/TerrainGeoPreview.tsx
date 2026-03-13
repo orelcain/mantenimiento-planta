@@ -37,10 +37,9 @@ interface TerrainPayload {
 
 /* ── Constants ─────────────────────────────────────────────────── */
 
-const GRID = 48
+const GRID = 64
 const TILE_Z = 17
-const BATCH = 80
-const ELEV_API = 'https://api.open-meteo.com/v1/elevation'
+const DEM_Z = 13
 const SCALE = 10
 
 /* ── Helpers ───────────────────────────────────────────────────── */
@@ -124,40 +123,59 @@ async function fetchSatelliteCanvas(corners: QuadCorners): Promise<HTMLCanvasEle
   return out
 }
 
-/* ── Elevation grid ────────────────────────────────────────────── */
+/* ── Elevation from Terrarium DEM tiles (same source as maps3d.io) ── */
 
 async function fetchElevationGrid(corners: QuadCorners, cols: number, rows: number) {
   const { south, north, west, east } = boundsOf(corners)
-  const pts: GeoCoordinate[] = []
+  const nwT = lonLatToTile(west, north, DEM_Z)
+  const seT = lonLatToTile(east, south, DEM_Z)
+  const nx = seT.x - nwT.x + 1
+  const ny = seT.y - nwT.y + 1
+
+  const big = document.createElement('canvas')
+  big.width = nx * 256
+  big.height = ny * 256
+  const ctx = big.getContext('2d', { willReadFrequently: true })
+  if (!ctx) throw new Error('Canvas 2D no disponible')
+
+  const jobs: Promise<void>[] = []
+  for (let dy = 0; dy < ny; dy++) {
+    for (let dx = 0; dx < nx; dx++) {
+      jobs.push(
+        new Promise<void>((ok) => {
+          const img = new Image()
+          img.crossOrigin = 'anonymous'
+          img.onload = () => { ctx.drawImage(img, dx * 256, dy * 256); ok() }
+          img.onerror = () => ok()
+          img.src = `https://s3.amazonaws.com/elevation-tiles-prod/terrarium/${DEM_Z}/${nwT.x + dx}/${nwT.y + dy}.png`
+        }),
+      )
+    }
+  }
+  await Promise.all(jobs)
+
+  const imgData = ctx.getImageData(0, 0, big.width, big.height)
+  const px = imgData.data
+
+  const tl = tileToLonLat(nwT.x, nwT.y, DEM_Z)
+  const br = tileToLonLat(seT.x + 1, seT.y + 1, DEM_Z)
+
+  const elevations: number[] = []
   for (let r = 0; r < rows; r++) {
     const lat = north - (r / (rows - 1)) * (north - south)
     for (let c = 0; c < cols; c++) {
       const lon = west + (c / (cols - 1)) * (east - west)
-      pts.push({ lat, lon })
+      const pxX = Math.max(0, Math.min(big.width - 1, Math.round(((lon - tl.lon) / (br.lon - tl.lon)) * big.width)))
+      const pxY = Math.max(0, Math.min(big.height - 1, Math.round(((tl.lat - lat) / (tl.lat - br.lat)) * big.height)))
+      const i = (pxY * big.width + pxX) * 4
+      const red = px[i] ?? 0
+      const green = px[i + 1] ?? 0
+      const blue = px[i + 2] ?? 0
+      // Terrarium encoding: elevation = (r * 256 + g + b / 256) - 32768
+      elevations.push((red * 256 + green + blue / 256) - 32768)
     }
   }
 
-  const elevations: number[] = []
-  for (let i = 0; i < pts.length; i += BATCH) {
-    if (i > 0) await new Promise((resolve) => setTimeout(resolve, 150))
-    const batch = pts.slice(i, i + BATCH)
-    const latsStr = batch.map((p) => p.lat.toFixed(6)).join(',')
-    const lonsStr = batch.map((p) => p.lon.toFixed(6)).join(',')
-
-    let ok = false
-    for (let attempt = 0; attempt < 3 && !ok; attempt++) {
-      if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, 1000 * attempt))
-      const resp = await fetch(`${ELEV_API}?latitude=${latsStr}&longitude=${lonsStr}`)
-      if (resp.status === 429) continue
-      if (!resp.ok) throw new Error(`Open-Meteo respondió ${resp.status}`)
-      const data = (await resp.json()) as { elevation?: number[] }
-      const v = data.elevation ?? []
-      if (v.length !== batch.length) throw new Error('Elevación incompleta')
-      elevations.push(...v)
-      ok = true
-    }
-    if (!ok) throw new Error('Open-Meteo rate-limit excedido, intente de nuevo')
-  }
   return elevations
 }
 
@@ -290,7 +308,7 @@ export function TerrainGeoPreview({
         tex.magFilter = THREE.LinearFilter
         texRef.current = tex
 
-        setLoading('Consultando elevaciones (puede tardar unos segundos)…')
+        setLoading('Decodificando elevaciones DEM…')
         const elev = await fetchElevationGrid(corners, GRID, GRID)
         if (dead) return
 
@@ -400,7 +418,7 @@ export function TerrainGeoPreview({
         </div>
         <div className="rounded-md border bg-muted/30 p-2">
           {terrainData
-            ? `Malla ${GRID}×${GRID} · elevación ${terrainData.minElev.toFixed(1)} – ${terrainData.maxElev.toFixed(1)} m · textura satelital zoom ${TILE_Z}`
+            ? `Malla ${GRID}×${GRID} · elevación ${terrainData.minElev.toFixed(1)} – ${terrainData.maxElev.toFixed(1)} m · DEM zoom ${DEM_Z} · textura zoom ${TILE_Z}`
             : 'Esperando datos de terreno…'}
         </div>
       </div>
