@@ -289,8 +289,12 @@ async function fetchOSMFeatures(corners: QuadCorners) {
   const east = Math.max(...lons) + 0.003
   const bbox = `${south},${west},${north},${east}`
 
-  const query = `[out:json][timeout:25];(way["building"](${bbox});way["highway"](${bbox});way["natural"="water"](${bbox});way["waterway"](${bbox});way["landuse"="reservoir"](${bbox}););out geom;`
-  const resp = await fetch(`${OVERPASS_API}?data=${encodeURIComponent(query)}`)
+  const query = `[out:json][timeout:25];(way["building"](${bbox});way["highway"](${bbox});way["natural"="water"](${bbox});way["waterway"](${bbox});way["landuse"="reservoir"](${bbox});relation["natural"="water"](${bbox}););out geom;`
+  const resp = await fetch(OVERPASS_API, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `data=${encodeURIComponent(query)}`,
+  })
   if (!resp.ok) throw new Error('Overpass API no disponible')
   const data = (await resp.json()) as { elements: OverpassElement[] }
 
@@ -361,8 +365,8 @@ export function TerrainGeoPreview({
   const [buildingsEnabled, setBuildingsEnabled] = useState(true)
   const [roadsEnabled, setRoadsEnabled] = useState(true)
   const [waterEnabled, setWaterEnabled] = useState(true)
-  const [terrainExaggeration, setTerrainExaggeration] = useState(1.25)
-  const [buildingExaggeration, setBuildingExaggeration] = useState(3)
+  const [terrainExaggeration, setTerrainExaggeration] = useState(2.0)
+  const [buildingExaggeration, setBuildingExaggeration] = useState(4)
   const [microReliefSummary, setMicroReliefSummary] = useState<string>('Esperando coordenadas válidas...')
   const [osmStatus, setOsmStatus] = useState<string>('')
 
@@ -387,9 +391,9 @@ export function TerrainGeoPreview({
     const map = new maplibregl.Map({
       container: containerRef.current,
       center: [-73.7600, -42.6315],
-      zoom: 14,
-      pitch: 60,
-      bearing: 24,
+      zoom: 15.5,
+      pitch: 72,
+      bearing: -20,
       style: {
         version: 8,
         sources: {
@@ -402,8 +406,11 @@ export function TerrainGeoPreview({
           },
           terrainSource: {
             type: 'raster-dem',
-            url: 'https://demotiles.maplibre.org/terrain-tiles/tiles.json',
+            tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],
+            encoding: 'terrarium',
             tileSize: 256,
+            maxzoom: 15,
+            attribution: 'AWS3D (JAXA)',
           },
           boundsRect: {
             type: 'geojson',
@@ -437,9 +444,9 @@ export function TerrainGeoPreview({
             type: 'hillshade',
             source: 'terrainSource',
             paint: {
-              'hillshade-exaggeration': 0.28,
+              'hillshade-exaggeration': 0.4,
               'hillshade-shadow-color': '#04111d',
-              'hillshade-highlight-color': '#fff0cf',
+              'hillshade-highlight-color': '#fffae0',
             },
           },
           {
@@ -458,16 +465,21 @@ export function TerrainGeoPreview({
             id: 'water-fill',
             type: 'fill',
             source: 'osmWater',
-            paint: { 'fill-color': '#1a7aaa', 'fill-opacity': 0.55 },
+            paint: { 'fill-color': '#3399cc', 'fill-opacity': 0.6 },
           },
           {
             id: 'roads',
             type: 'line',
             source: 'osmRoads',
             paint: {
-              'line-color': '#d4c8a8',
-              'line-width': 2.5,
-              'line-opacity': 0.8,
+              'line-color': '#e8dcc8',
+              'line-width': [
+                'match', ['get', 'type'],
+                'primary', 4, 'secondary', 3.5, 'tertiary', 3,
+                'residential', 2, 'service', 1.5, 'track', 1.2,
+                2,
+              ],
+              'line-opacity': 0.85,
             },
           },
           {
@@ -477,14 +489,14 @@ export function TerrainGeoPreview({
             paint: {
               'fill-extrusion-color': [
                 'interpolate', ['linear'], ['get', 'height'],
-                0, '#8a9bb0',
-                10, '#b5c8d8',
-                25, '#d4e4f0',
-                50, '#e8f0fa',
+                0, '#9a8b7a',
+                8, '#b0a090',
+                20, '#c8baa8',
+                50, '#ddd4c6',
               ],
-              'fill-extrusion-height': ['*', ['get', 'height'], 3],
+              'fill-extrusion-height': ['*', ['get', 'height'], 4],
               'fill-extrusion-base': 0,
-              'fill-extrusion-opacity': 0.88,
+              'fill-extrusion-opacity': 0.92,
             },
           },
           {
@@ -502,7 +514,7 @@ export function TerrainGeoPreview({
         ],
         terrain: {
           source: 'terrainSource',
-          exaggeration: 1.25,
+          exaggeration: 2.0,
         },
       },
       maxPitch: 85,
@@ -650,7 +662,7 @@ export function TerrainGeoPreview({
     currentMap.fitBounds([
       [Math.min(...lons), Math.min(...lats)],
       [Math.max(...lons), Math.max(...lats)],
-    ], { padding: 36, duration: 0 })
+    ], { padding: 36, duration: 0, pitch: 72, bearing: -20 })
   }, [mapReady, parsed.corners, pointsEnabled])
 
   useEffect(() => {
