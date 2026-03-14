@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Canvas } from '@react-three/fiber'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import * as THREE from 'three'
 
@@ -24,6 +24,8 @@ interface TerrainGeoPreviewProps {
 
 type QuadCorners = [GeoCoordinate, GeoCoordinate, GeoCoordinate, GeoCoordinate]
 
+type BrushTool = 'none' | 'raise' | 'lower' | 'smooth' | 'flatten'
+
 interface TerrainPayload {
   texture: THREE.CanvasTexture
   elevations: number[]
@@ -35,6 +37,13 @@ interface TerrainPayload {
   minElev: number
   maxElev: number
   realWidth: number
+}
+
+interface TerrainEditCallbacks {
+  onHoverInfo: (info: { elevation: number; gridR: number; gridC: number } | null) => void
+  onBrushApply: (centerR: number, centerC: number) => void
+  brushTool: BrushTool
+  brushRadius: number
 }
 
 /* ── Constants ─────────────────────────────────────────────────── */
@@ -305,14 +314,94 @@ function applyWaterMaskAndThreshold(
   return result
 }
 
-/* ── R3F: Terrain island ───────────────────────────────────────── */
+/* ── R3F: Terrain island with raycasting + brush editing ────── */
 
-function TerrainIsland({ data, exaggeration }: { data: TerrainPayload; exaggeration: number }) {
+function TerrainIsland({
+  data, exaggeration, edit,
+}: {
+  data: TerrainPayload
+  exaggeration: number
+  edit: TerrainEditCallbacks
+}) {
   const { texture, elevations, cols, rows, meshWidth, meshDepth, minElev, maxElev, realWidth } = data
   const elevRange = Math.max(0.1, maxElev - minElev)
-  // Normalize height: map real meters to mesh units, then apply exaggeration
   const hScale = (meshWidth / realWidth) * exaggeration
   const wallDepth = Math.min(meshWidth * 0.15, elevRange * hScale * 0.5) + 0.15
+
+  const topRef = useRef<THREE.Mesh>(null)
+  const cursorRef = useRef<THREE.Mesh>(null)
+  const raycaster = useMemo(() => new THREE.Raycaster(), [])
+  const pointer = useRef(new THREE.Vector2(9999, 9999))
+  const isPainting = useRef(false)
+  const lastPaintTime = useRef(0)
+  const { camera, gl } = useThree()
+
+  // Track mouse position
+  useEffect(() => {
+    const el = gl.domElement
+    const onMove = (e: PointerEvent) => {
+      const rect = el.getBoundingClientRect()
+      pointer.current.x = ((e.clientX - rect.left) / rect.width) * 2 - 1
+      pointer.current.y = -((e.clientY - rect.top) / rect.height) * 2 + 1
+    }
+    const onDown = (e: PointerEvent) => {
+      if (edit.brushTool !== 'none' && e.button === 0) isPainting.current = true
+    }
+    const onUp = () => { isPainting.current = false }
+    const onLeave = () => {
+      pointer.current.set(9999, 9999)
+      isPainting.current = false
+      edit.onHoverInfo(null)
+    }
+    el.addEventListener('pointermove', onMove)
+    el.addEventListener('pointerdown', onDown)
+    el.addEventListener('pointerup', onUp)
+    el.addEventListener('pointerleave', onLeave)
+    return () => {
+      el.removeEventListener('pointermove', onMove)
+      el.removeEventListener('pointerdown', onDown)
+      el.removeEventListener('pointerup', onUp)
+      el.removeEventListener('pointerleave', onLeave)
+    }
+  }, [gl, edit])
+
+  // Raycast each frame
+  useFrame(() => {
+    if (!topRef.current) return
+    raycaster.setFromCamera(pointer.current, camera)
+    const hits = raycaster.intersectObject(topRef.current)
+    if (hits.length === 0) {
+      if (cursorRef.current) cursorRef.current.visible = false
+      return
+    }
+    const pt = hits[0]!.point
+    // Map hit point back to grid coordinates
+    const normX = (pt.x / meshWidth) + 0.5
+    const normZ = (pt.z / meshDepth) + 0.5
+    const gridC = Math.round(normX * (cols - 1))
+    const gridR = Math.round(normZ * (rows - 1))
+    if (gridR >= 0 && gridR < rows && gridC >= 0 && gridC < cols) {
+      const elev = elevations[gridR * cols + gridC] ?? 0
+      edit.onHoverInfo({ elevation: elev, gridR, gridC })
+    }
+    // Position brush cursor ring
+    if (cursorRef.current && edit.brushTool !== 'none') {
+      cursorRef.current.visible = true
+      cursorRef.current.position.set(pt.x, pt.y + 0.02, pt.z)
+      const worldRadius = (edit.brushRadius / (cols - 1)) * meshWidth
+      cursorRef.current.scale.set(worldRadius, worldRadius, worldRadius)
+    } else if (cursorRef.current) {
+      cursorRef.current.visible = false
+    }
+    // Apply brush while painting
+    if (isPainting.current && edit.brushTool !== 'none') {
+      const now = performance.now()
+      if (now - lastPaintTime.current > 50) {
+        lastPaintTime.current = now
+        edit.onBrushApply(gridR, gridC)
+      }
+    }
+  })
 
   const { topGeo, sideGeo, botGeo } = useMemo(() => {
     const top = new THREE.PlaneGeometry(meshWidth, meshDepth, cols - 1, rows - 1)
@@ -335,11 +424,9 @@ function TerrainIsland({ data, exaggeration }: { data: TerrainPayload; exaggerat
       sv.push(x2, y2, z2, x2, baseY, z2, x1, baseY, z1)
     }
 
-    // North edge
     for (let c = 0; c < cols - 1; c++) {
       addWall(pos.getX(c), pos.getY(c), pos.getZ(c), pos.getX(c + 1), pos.getY(c + 1), pos.getZ(c + 1))
     }
-    // South edge (reversed winding)
     for (let c = 0; c < cols - 1; c++) {
       const base = (rows - 1) * cols
       addWall(
@@ -347,13 +434,11 @@ function TerrainIsland({ data, exaggeration }: { data: TerrainPayload; exaggerat
         pos.getX(base + c), pos.getY(base + c), pos.getZ(base + c),
       )
     }
-    // West edge
     for (let r = 0; r < rows - 1; r++) {
       const i1 = (r + 1) * cols
       const i2 = r * cols
       addWall(pos.getX(i1), pos.getY(i1), pos.getZ(i1), pos.getX(i2), pos.getY(i2), pos.getZ(i2))
     }
-    // East edge
     for (let r = 0; r < rows - 1; r++) {
       const i1 = r * cols + cols - 1
       const i2 = (r + 1) * cols + cols - 1
@@ -371,9 +456,16 @@ function TerrainIsland({ data, exaggeration }: { data: TerrainPayload; exaggerat
     return { topGeo: top, sideGeo: side, botGeo: bot }
   }, [elevations, cols, rows, meshWidth, meshDepth, minElev, hScale, wallDepth])
 
+  // Brush cursor ring geometry
+  const cursorGeo = useMemo(() => {
+    const geo = new THREE.RingGeometry(0.9, 1, 32)
+    geo.rotateX(-Math.PI / 2)
+    return geo
+  }, [])
+
   return (
     <group>
-      <mesh geometry={topGeo}>
+      <mesh ref={topRef} geometry={topGeo}>
         <meshStandardMaterial map={texture} roughness={0.82} metalness={0.05} />
       </mesh>
       <mesh geometry={sideGeo}>
@@ -382,10 +474,13 @@ function TerrainIsland({ data, exaggeration }: { data: TerrainPayload; exaggerat
       <mesh geometry={botGeo}>
         <meshStandardMaterial color="#4a3f30" roughness={1} />
       </mesh>
-      {/* Water plane at sea level */}
       <mesh position={[0, 0.005, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[meshWidth * 1.3, meshDepth * 1.3]} />
         <meshStandardMaterial color="#1a6e8e" transparent opacity={0.6} roughness={0.15} metalness={0.3} />
+      </mesh>
+      {/* Brush cursor */}
+      <mesh ref={cursorRef} geometry={cursorGeo} visible={false}>
+        <meshBasicMaterial color="#fbbf24" transparent opacity={0.8} side={THREE.DoubleSide} />
       </mesh>
     </group>
   )
@@ -406,9 +501,80 @@ export function TerrainGeoPreview({
   const [exaggeration, setExaggeration] = useState(1.5)
   const [seaThreshold, setSeaThreshold] = useState(3)
   const [autoRotate, setAutoRotate] = useState(true)
+  const [brushTool, setBrushTool] = useState<BrushTool>('none')
+  const [brushRadius, setBrushRadius] = useState(5)
+  const [brushStrength, setBrushStrength] = useState(2)
+  const [hoverInfo, setHoverInfo] = useState<{ elevation: number; gridR: number; gridC: number } | null>(null)
+  const [editCount, setEditCount] = useState(0)
   const texRef = useRef<THREE.CanvasTexture | null>(null)
   const rawElevRef = useRef<number[]>([])
   const waterMaskRef = useRef<boolean[]>([])
+  const editedElevRef = useRef<number[]>([])
+
+  const handleBrushApply = useCallback((centerR: number, centerC: number) => {
+    if (!terrainData || brushTool === 'none') return
+    const { cols, rows } = terrainData
+    const elev = [...terrainData.elevations]
+    const r0 = Math.max(0, centerR - brushRadius)
+    const r1 = Math.min(rows - 1, centerR + brushRadius)
+    const c0 = Math.max(0, centerC - brushRadius)
+    const c1 = Math.min(cols - 1, centerC + brushRadius)
+
+    for (let r = r0; r <= r1; r++) {
+      for (let c = c0; c <= c1; c++) {
+        const dist = Math.sqrt((r - centerR) ** 2 + (c - centerC) ** 2)
+        if (dist > brushRadius) continue
+        const falloff = 1 - (dist / brushRadius)
+        const idx = r * cols + c
+        const amount = brushStrength * falloff
+
+        if (brushTool === 'raise') {
+          elev[idx] = (elev[idx] ?? 0) + amount
+        } else if (brushTool === 'lower') {
+          elev[idx] = Math.max(0, (elev[idx] ?? 0) - amount)
+        } else if (brushTool === 'smooth') {
+          let sum = 0; let cnt = 0
+          for (let dr = -1; dr <= 1; dr++) {
+            for (let dc = -1; dc <= 1; dc++) {
+              const nr = r + dr; const nc = c + dc
+              if (nr >= 0 && nr < rows && nc >= 0 && nc < cols) {
+                sum += elev[nr * cols + nc]!; cnt++
+              }
+            }
+          }
+          const avg = sum / cnt
+          elev[idx] = elev[idx]! + (avg - elev[idx]!) * falloff * 0.5
+        } else if (brushTool === 'flatten') {
+          const targetElev = elev[centerR * cols + centerC] ?? 0
+          elev[idx] = elev[idx]! + (targetElev - elev[idx]!) * falloff * 0.6
+        }
+      }
+    }
+
+    editedElevRef.current = elev
+    setTerrainData((prev) =>
+      prev ? { ...prev, elevations: elev, minElev: Math.min(...elev), maxElev: Math.max(...elev) } : null,
+    )
+    setEditCount((c) => c + 1)
+  }, [terrainData, brushTool, brushRadius, brushStrength])
+
+  const handleResetTerrain = useCallback(() => {
+    if (rawElevRef.current.length === 0) return
+    const smoothed = smoothElevations(rawElevRef.current, GRID, GRID, 2)
+    const elev = applyWaterMaskAndThreshold(smoothed, waterMaskRef.current, seaThreshold, GRID, GRID)
+    editedElevRef.current = []
+    setTerrainData((prev) =>
+      prev ? { ...prev, elevations: elev, minElev: Math.min(...elev), maxElev: Math.max(...elev) } : null,
+    )
+    setEditCount(0)
+  }, [seaThreshold])
+
+  const editCallbacks = useMemo<TerrainEditCallbacks>(() => ({
+    onHoverInfo: setHoverInfo,
+    onBrushApply: handleBrushApply,
+    brushTool,
+    brushRadius,
+  }), [handleBrushApply, brushTool, brushRadius])
 
   const parsed = useMemo(() => {
     try {
@@ -503,16 +669,24 @@ export function TerrainGeoPreview({
 
   return (
     <div className="space-y-3 rounded-xl border bg-background/80 p-3 shadow-sm">
+      {/* ── Header + tools ── */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Vista 3D · Terreno aislado
           </p>
           <p className="text-[11px] text-muted-foreground">
-            Modelo 3D del terreno delimitado por las 4 coordenadas. Arrastra para rotar, scroll para zoom.
+            {brushTool !== 'none'
+              ? 'Click y arrastra sobre el terreno para editar. Mantén presionado para pintar.'
+              : 'Arrastra para rotar, scroll para zoom.'}
           </p>
         </div>
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
+          {hoverInfo && (
+            <Badge variant="secondary" className="font-mono text-[10px]">
+              {hoverInfo.elevation.toFixed(1)} m s.n.m.
+            </Badge>
+          )}
           <Badge
             variant={autoRotate ? 'default' : 'outline'}
             className="cursor-pointer"
@@ -523,6 +697,38 @@ export function TerrainGeoPreview({
         </div>
       </div>
 
+      {/* ── Brush tools ── */}
+      <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+        {[
+          { id: 'none' as BrushTool, label: '🖐 Navegar', color: '' },
+          { id: 'raise' as BrushTool, label: '⬆ Subir', color: 'bg-green-600' },
+          { id: 'lower' as BrushTool, label: '⬇ Bajar', color: 'bg-red-600' },
+          { id: 'smooth' as BrushTool, label: '〰 Suavizar', color: 'bg-blue-600' },
+          { id: 'flatten' as BrushTool, label: '═ Aplanar', color: 'bg-amber-600' },
+        ].map((t) => (
+          <button
+            key={t.id}
+            onClick={() => { setBrushTool(t.id); if (t.id !== 'none') setAutoRotate(false) }}
+            className={`rounded-md border px-2 py-1 transition-colors ${
+              brushTool === t.id
+                ? `${t.color || 'bg-muted'} text-white border-transparent`
+                : 'bg-background/60 text-muted-foreground hover:bg-muted/50'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+        {editCount > 0 && (
+          <button
+            onClick={handleResetTerrain}
+            className="rounded-md border border-orange-500/40 bg-orange-500/10 px-2 py-1 text-orange-400 hover:bg-orange-500/20"
+          >
+            ↩ Reset ({editCount})
+          </button>
+        )}
+      </div>
+
+      {/* ── Sliders ── */}
       <div className="flex flex-wrap items-center gap-4 text-[11px] text-muted-foreground">
         <label className="flex items-center gap-2">
           <span className="whitespace-nowrap">Exageración ×{exaggeration.toFixed(1)}</span>
@@ -542,6 +748,28 @@ export function TerrainGeoPreview({
             className="h-1.5 w-24 cursor-pointer accent-cyan-400"
           />
         </label>
+        {brushTool !== 'none' && (
+          <>
+            <label className="flex items-center gap-2">
+              <span className="whitespace-nowrap">Radio {brushRadius}</span>
+              <input
+                type="range" min="1" max="20" step="1"
+                value={brushRadius}
+                onChange={(e) => setBrushRadius(Number(e.target.value))}
+                className="h-1.5 w-20 cursor-pointer accent-amber-400"
+              />
+            </label>
+            <label className="flex items-center gap-2">
+              <span className="whitespace-nowrap">Fuerza {brushStrength.toFixed(1)}</span>
+              <input
+                type="range" min="0.5" max="10" step="0.5"
+                value={brushStrength}
+                onChange={(e) => setBrushStrength(Number(e.target.value))}
+                className="h-1.5 w-20 cursor-pointer accent-amber-400"
+              />
+            </label>
+          </>
+        )}
       </div>
 
       <div className={`overflow-hidden rounded-xl border bg-[#0a0e17] ${mapHeightClassName}`}>
@@ -555,7 +783,7 @@ export function TerrainGeoPreview({
             <hemisphereLight args={['#b1e1ff', '#b97a20', 0.55]} />
             <directionalLight position={[6, 10, 4]} intensity={1.4} />
             <directionalLight position={[-3, 6, -5]} intensity={0.35} />
-            <TerrainIsland data={terrainData} exaggeration={exaggeration} />
+            <TerrainIsland data={terrainData} exaggeration={exaggeration} edit={editCallbacks} />
             <OrbitControls
               enableDamping
               dampingFactor={0.12}
@@ -563,6 +791,7 @@ export function TerrainGeoPreview({
               autoRotateSpeed={0.5}
               maxDistance={SCALE * 3}
               minDistance={SCALE * 0.3}
+              enabled={brushTool === 'none'}
             />
           </Canvas>
         ) : (
