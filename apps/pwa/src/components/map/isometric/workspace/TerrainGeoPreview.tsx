@@ -28,7 +28,7 @@ interface TerrainGeoPreviewProps {
 
 type QuadCorners = [GeoCoordinate, GeoCoordinate, GeoCoordinate, GeoCoordinate]
 
-type BrushTool = 'none' | 'raise' | 'lower' | 'smooth' | 'flatten' | 'mark-road' | 'mark-structure' | 'erase-mark'
+type BrushTool = 'none' | 'raise' | 'lower' | 'smooth' | 'flatten' | 'mark-road' | 'mark-structure' | 'erase-mark' | 'line-road' | 'box-structure'
 
 interface TerrainPayload {
   texture: THREE.CanvasTexture
@@ -60,6 +60,7 @@ interface TerrainEditCallbacks {
   onHoverInfo: (info: { elevation: number; gridR: number; gridC: number } | null) => void
   onBrushApply: (centerR: number, centerC: number) => void
   onMeasurePoint: (point: { elevation: number; gridR: number; gridC: number }) => void
+  onMarkupPoint: (point: { elevation: number; gridR: number; gridC: number }) => void
   brushTool: BrushTool
   brushRadius: number
   measureMode: boolean
@@ -305,6 +306,61 @@ function getTerrainMarkupStorageKey(corners: QuadCorners | null): string | null 
     .map((point) => `${point.lat.toFixed(5)},${point.lon.toFixed(5)}`)
     .join('|')
   return `${TERRAIN_MARKUP_STORAGE_PREFIX}${serialized}`
+}
+
+function applyLineMask(
+  mask: boolean[],
+  oppositeMask: boolean[],
+  cols: number,
+  start: { gridR: number; gridC: number },
+  end: { gridR: number; gridC: number },
+) {
+  let x0 = start.gridC
+  let y0 = start.gridR
+  const x1 = end.gridC
+  const y1 = end.gridR
+  const dx = Math.abs(x1 - x0)
+  const dy = Math.abs(y1 - y0)
+  const sx = x0 < x1 ? 1 : -1
+  const sy = y0 < y1 ? 1 : -1
+  let err = dx - dy
+
+  while (true) {
+    const idx = y0 * cols + x0
+    mask[idx] = true
+    oppositeMask[idx] = false
+    if (x0 === x1 && y0 === y1) break
+    const e2 = err * 2
+    if (e2 > -dy) {
+      err -= dy
+      x0 += sx
+    }
+    if (e2 < dx) {
+      err += dx
+      y0 += sy
+    }
+  }
+}
+
+function applyRectangleMask(
+  mask: boolean[],
+  oppositeMask: boolean[],
+  cols: number,
+  rows: number,
+  start: { gridR: number; gridC: number },
+  end: { gridR: number; gridC: number },
+) {
+  const minR = Math.max(0, Math.min(start.gridR, end.gridR))
+  const maxR = Math.min(rows - 1, Math.max(start.gridR, end.gridR))
+  const minC = Math.max(0, Math.min(start.gridC, end.gridC))
+  const maxC = Math.min(cols - 1, Math.max(start.gridC, end.gridC))
+  for (let r = minR; r <= maxR; r++) {
+    for (let c = minC; c <= maxC; c++) {
+      const idx = r * cols + c
+      mask[idx] = true
+      oppositeMask[idx] = false
+    }
+  }
 }
 
 function CameraAzimuthProbe({ onChange }: { onChange: (deg: number) => void }) {
@@ -933,6 +989,10 @@ function TerrainIsland({
         edit.onMeasurePoint(currentHoverRef.current)
         return
       }
+      if ((edit.brushTool === 'line-road' || edit.brushTool === 'box-structure') && currentHoverRef.current) {
+        edit.onMarkupPoint(currentHoverRef.current)
+        return
+      }
       if (edit.brushTool !== 'none') isPainting.current = true
     }
     const onUp = () => { isPainting.current = false }
@@ -1157,6 +1217,7 @@ export function TerrainGeoPreview({
   const [showGeoCoords, setShowGeoCoords] = useState(false)
   const [measureMode, setMeasureMode] = useState(false)
   const [measureMarkers, setMeasureMarkers] = useState<MeasureMarker[]>([])
+  const [pendingMarkupStart, setPendingMarkupStart] = useState<MeasureMarker | null>(null)
   const [cameraAzimuthDeg, setCameraAzimuthDeg] = useState(0)
   const [cornerElevations, setCornerElevations] = useState<number[] | null>(null)
   const [markupPersistenceState, setMarkupPersistenceState] = useState<'idle' | 'saved'>('idle')
@@ -1241,6 +1302,28 @@ export function TerrainGeoPreview({
     setEditCount((c) => c + 1)
   }, [terrainData, brushTool, brushRadius, brushStrength])
 
+  const handleMarkupPoint = useCallback((point: MeasureMarker) => {
+    if (!terrainData) return
+    if (brushTool !== 'line-road' && brushTool !== 'box-structure') return
+
+    if (!pendingMarkupStart) {
+      setPendingMarkupStart(point)
+      return
+    }
+
+    const roadMask = [...terrainData.roadMask]
+    const structureMask = [...terrainData.structureMask]
+    if (brushTool === 'line-road') {
+      applyLineMask(roadMask, structureMask, terrainData.cols, pendingMarkupStart, point)
+    } else {
+      applyRectangleMask(structureMask, roadMask, terrainData.cols, terrainData.rows, pendingMarkupStart, point)
+    }
+
+    setTerrainData((prev) => (prev ? { ...prev, roadMask, structureMask } : null))
+    setPendingMarkupStart(null)
+    setEditCount((count) => count + 1)
+  }, [terrainData, brushTool, pendingMarkupStart])
+
   const handleResetTerrain = useCallback(() => {
     if (baseElevRef.current.length === 0) return
     const elev = [...baseElevRef.current]
@@ -1265,10 +1348,11 @@ export function TerrainGeoPreview({
     onMeasurePoint: (point) => {
       setMeasureMarkers((prev) => (prev.length >= 2 ? [point] : [...prev, point]))
     },
+    onMarkupPoint: handleMarkupPoint,
     brushTool,
     brushRadius,
     measureMode,
-  }), [handleBrushApply, brushTool, brushRadius, measureMode])
+  }), [handleBrushApply, handleMarkupPoint, brushTool, brushRadius, measureMode])
 
   const parsed = useMemo(() => {
     try {
@@ -1450,6 +1534,12 @@ export function TerrainGeoPreview({
     if (!measureMode) setMeasureMarkers([])
   }, [measureMode])
 
+  useEffect(() => {
+    if (brushTool !== 'line-road' && brushTool !== 'box-structure') {
+      setPendingMarkupStart(null)
+    }
+  }, [brushTool])
+
   const hoverGeo = useMemo(() => {
     if (!showGeoCoords || !parsed.corners || !hoverInfo) return null
     return gridToGeo(parsed.corners, hoverInfo.gridR, hoverInfo.gridC, GRID, GRID)
@@ -1574,6 +1664,14 @@ export function TerrainGeoPreview({
                 ? 'Modo admin: pinta donde sí existe camino real sobre el satélite.'
                 : brushTool === 'mark-structure'
                   ? 'Modo admin: marca edificios, explanadas duras y estructuras.'
+                  : brushTool === 'line-road'
+                    ? pendingMarkupStart
+                      ? 'Modo admin: selecciona el punto final para trazar el camino.'
+                      : 'Modo admin: selecciona el punto inicial del camino.'
+                    : brushTool === 'box-structure'
+                      ? pendingMarkupStart
+                        ? 'Modo admin: selecciona la esquina opuesta para cerrar el rectángulo.'
+                        : 'Modo admin: selecciona la primera esquina de la estructura.'
                   : brushTool === 'erase-mark'
                     ? 'Modo admin: borra marcas manuales de caminos y estructuras.'
                     : 'Click y arrastra sobre el terreno para editar. Mantén presionado para pintar.'
@@ -1603,6 +1701,11 @@ export function TerrainGeoPreview({
               {markupPersistenceState === 'saved' ? 'Marcas guardadas' : 'Marcas locales activas'}
             </Badge>
           ) : null}
+          {pendingMarkupStart ? (
+            <Badge variant="outline" className="font-mono text-[10px]">
+              Inicio r{pendingMarkupStart.gridR} c{pendingMarkupStart.gridC}
+            </Badge>
+          ) : null}
         </div>
       </div>
 
@@ -1616,6 +1719,8 @@ export function TerrainGeoPreview({
           { id: 'flatten' as BrushTool, label: '═ Aplanar', color: 'bg-amber-600' },
           { id: 'mark-road' as BrushTool, label: '🛣 Camino', color: 'bg-orange-500' },
           { id: 'mark-structure' as BrushTool, label: '🏭 Estructura', color: 'bg-rose-600' },
+          { id: 'line-road' as BrushTool, label: '📏 Línea camino', color: 'bg-amber-500' },
+          { id: 'box-structure' as BrushTool, label: '▭ Rect estructura', color: 'bg-pink-600' },
           { id: 'erase-mark' as BrushTool, label: '🧽 Borrar marca', color: 'bg-slate-600' },
         ].map((t) => (
           <button
@@ -1636,6 +1741,14 @@ export function TerrainGeoPreview({
             className="rounded-md border border-orange-500/40 bg-orange-500/10 px-2 py-1 text-orange-400 hover:bg-orange-500/20"
           >
             ↩ Reset ({editCount})
+          </button>
+        )}
+        {pendingMarkupStart && (
+          <button
+            onClick={() => setPendingMarkupStart(null)}
+            className="rounded-md border border-sky-500/40 bg-sky-500/10 px-2 py-1 text-sky-300 hover:bg-sky-500/20"
+          >
+            Cancelar trazo
           </button>
         )}
       </div>
@@ -1660,7 +1773,7 @@ export function TerrainGeoPreview({
             className="h-1.5 w-24 cursor-pointer accent-cyan-400"
           />
         </label>
-        {brushTool !== 'none' && (
+        {brushTool !== 'none' && brushTool !== 'line-road' && brushTool !== 'box-structure' && (
           <>
             <label className="flex items-center gap-2">
               <span className="whitespace-nowrap">Radio {brushRadius.toFixed(1)}</span>
