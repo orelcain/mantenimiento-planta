@@ -1,14 +1,19 @@
 # 🚀 Sistema de Versionado - Mantenimiento PWA
 
-## Versión Actual: **v2.70.65**
+## Versión Actual: **v2.70.66**
 
-**Fecha de lanzamiento**: 08 de marzo de 2026  \
+**Fecha de lanzamiento**: 16 de marzo de 2026  \
 **Estado**: 🚀 PRODUCTION READY  \
 **Build**: ✅ Stable
 
 ---
 
 ## 📋 Información de la Versión
+
+### v2.70.66 — Persistencia real de markup admin en mapas isométricos (16/03/2026)
+- 🗂️ **Guardado en documento real**: la base georreferenciada ahora persiste coordenadas, sample step y marcas admin de caminos/estructuras dentro del mapa isométrico guardado
+- 🧭 **Recuperación al cargar**: al abrir un mapa existente se restauran las máscaras admin desde Firestore en vez de depender solo del navegador local
+- 🧱 **Puente completo base-editor**: el flujo terrain-base ya entrega estas marcas al modelo persistido para usarlo como base confiable de edición posterior
 
 ### v2.70.34 — Vista base georreferenciada para importación de terreno (08/03/2026)
 - 🛰️ **Vista A en la PWA**: la etapa base ahora muestra un mapa satelital georreferenciado con relieve real antes de importar el terreno al canvas editable

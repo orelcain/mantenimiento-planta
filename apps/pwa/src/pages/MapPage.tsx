@@ -48,7 +48,7 @@ import { useAppStore, useIsAdmin } from '@/store'
 import { cn } from '@/lib/utils'
 import { generateDemoMap, getIsometricMaps, saveIsometricMap } from '@/services/isometricMap'
 import { getLatestMapVersion, getMapLocations } from '@/services/maps'
-import type { CameraAngle, IsometricViewerState, MapNode, MapArea, TerrainTile, BuildEditMode, MapConnector as MapConnectorType, IsometricMap, IsometricMapConfig } from '@/types/isometricMap'
+import type { CameraAngle, IsometricViewerState, MapNode, MapArea, TerrainTile, BuildEditMode, MapConnector as MapConnectorType, IsometricMap, IsometricMapConfig, TerrainAdminMarkup } from '@/types/isometricMap'
 import type { MapLocation } from '@/types/maps'
 import { 
   DEFAULT_VIEWER_STATE,
@@ -394,6 +394,7 @@ export function MapPage() {
     formatCoordinatesText(DEFAULT_CHONCHI_RECTANGLE)
   )
   const [terrainImportSampleStep, setTerrainImportSampleStep] = useState<number>(1)
+  const [terrainAdminMarkup, setTerrainAdminMarkup] = useState<TerrainAdminMarkup | null | undefined>(undefined)
   const [isShiftPressed, setIsShiftPressed] = useState(false)
   const [addPlacementRotation, setAddPlacementRotation] = useState(0)
   const lastTerrainStrokeKeyRef = useRef<string | null>(null)
@@ -427,6 +428,17 @@ export function MapPage() {
     setCurrentMapId(map?.id ?? '')
     setMapName(map?.nombre ?? 'Mapa Base Planta')
     setMapDescription(map?.descripcion ?? '')
+    if (map?.terrainGeoReference) {
+      setTerrainImportCoordinatesText(map.terrainGeoReference.coordinatesText)
+      setTerrainImportSampleStep(map.terrainGeoReference.sampleStep)
+      setTerrainAdminMarkup(map.terrainGeoReference.adminMarkup ?? null)
+    } else if (!map && preserveLocalBaseRef.current) {
+      // Mantener la base local actual cuando el usuario abre un lienzo nuevo.
+    } else {
+      setTerrainImportCoordinatesText(formatCoordinatesText(DEFAULT_CHONCHI_RECTANGLE))
+      setTerrainImportSampleStep(1)
+      setTerrainAdminMarkup(map ? null : undefined)
+    }
     const nextBackgroundMap = map?.backgroundMap
       ? (() => {
           const raw = map.backgroundMap
@@ -471,6 +483,22 @@ export function MapPage() {
     history.pushSnapshot({ nodes: nextNodes, areas: nextAreas, connectors: nextConnectors })
     setFitRequestKey((prev) => prev + 1)
   }, [blankMapConfig, history])
+
+  const handleTerrainImportCoordinatesTextChange = useCallback((value: string) => {
+    setTerrainImportCoordinatesText(value)
+    setTerrainAdminMarkup(undefined)
+    setHasUnsavedChanges(true)
+  }, [])
+
+  const handleTerrainImportSampleStepChange = useCallback((value: number) => {
+    setTerrainImportSampleStep(value)
+    setHasUnsavedChanges(true)
+  }, [])
+
+  const handleTerrainAdminMarkupChange = useCallback((markup: TerrainAdminMarkup | null) => {
+    setTerrainAdminMarkup(markup)
+    setHasUnsavedChanges(true)
+  }, [])
 
   const refreshBaseMapSources = useCallback(async () => {
     setIsLoadingBaseMaps(true)
@@ -1997,6 +2025,11 @@ export function MapPage() {
           connectors,
           areas,
           terrain: terrainTiles,
+          terrainGeoReference: {
+            coordinatesText: terrainImportCoordinatesText,
+            sampleStep: terrainImportSampleStep,
+            adminMarkup: terrainAdminMarkup ?? undefined,
+          },
           createdBy: user?.id || 'system',
         },
         user?.id || 'system'
@@ -2011,7 +2044,7 @@ export function MapPage() {
     } finally {
       setIsSaving(false)
     }
-  }, [isSaving, mapName, currentMapId, savedMaps, mapDescription, mapConfig, blankMapConfig, backgroundMap, nodes, connectors, areas, terrainTiles, user, refreshSavedMaps])
+  }, [isSaving, mapName, currentMapId, savedMaps, mapDescription, mapConfig, blankMapConfig, backgroundMap, nodes, connectors, areas, terrainTiles, terrainImportCoordinatesText, terrainImportSampleStep, terrainAdminMarkup, user, refreshSavedMaps])
 
   const handleSaveAsNew = useCallback(async () => {
     if (isSaving) return
@@ -2031,6 +2064,11 @@ export function MapPage() {
           connectors,
           areas,
           terrain: terrainTiles,
+          terrainGeoReference: {
+            coordinatesText: terrainImportCoordinatesText,
+            sampleStep: terrainImportSampleStep,
+            adminMarkup: terrainAdminMarkup ?? undefined,
+          },
           createdBy: user?.id || 'system',
         },
         user?.id || 'system'
@@ -2045,7 +2083,7 @@ export function MapPage() {
     } finally {
       setIsSaving(false)
     }
-  }, [isSaving, mapName, savedMaps.length, mapDescription, mapConfig, blankMapConfig, backgroundMap, nodes, connectors, areas, terrainTiles, user, refreshSavedMaps])
+  }, [isSaving, mapName, savedMaps.length, mapDescription, mapConfig, blankMapConfig, backgroundMap, nodes, connectors, areas, terrainTiles, terrainImportCoordinatesText, terrainImportSampleStep, terrainAdminMarkup, user, refreshSavedMaps])
 
   const handleCancelEdit = useCallback(() => {
     // Revertir al mapa cargado o a lienzo limpio si aún no existe uno persistido
@@ -2228,9 +2266,11 @@ export function MapPage() {
           isImportingRealTerrain={isImportingRealTerrain}
           isSaving={isSaving}
           terrainImportCoordinatesText={terrainImportCoordinatesText}
-          onTerrainImportCoordinatesTextChange={setTerrainImportCoordinatesText}
+          onTerrainImportCoordinatesTextChange={handleTerrainImportCoordinatesTextChange}
           terrainImportSampleStep={terrainImportSampleStep}
-          onTerrainImportSampleStepChange={setTerrainImportSampleStep}
+          onTerrainImportSampleStepChange={handleTerrainImportSampleStepChange}
+          initialTerrainAdminMarkup={terrainAdminMarkup}
+          onTerrainAdminMarkupChange={handleTerrainAdminMarkupChange}
           terrainImportPreview={terrainImportPreview}
           terrainImportPreviewError={terrainImportPreviewError}
           terrainImportProgress={terrainImportProgress}
@@ -3242,9 +3282,9 @@ export function MapPage() {
               }}
               realTerrainImportMessage={realTerrainImportMessage}
               terrainImportCoordinatesText={terrainImportCoordinatesText}
-              onTerrainImportCoordinatesTextChange={setTerrainImportCoordinatesText}
+              onTerrainImportCoordinatesTextChange={handleTerrainImportCoordinatesTextChange}
               terrainImportSampleStep={terrainImportSampleStep}
-              onTerrainImportSampleStepChange={setTerrainImportSampleStep}
+              onTerrainImportSampleStepChange={handleTerrainImportSampleStepChange}
               terrainImportPreview={terrainImportPreview}
               terrainImportPreviewError={terrainImportPreviewError}
               terrainImportProgress={terrainImportProgress}

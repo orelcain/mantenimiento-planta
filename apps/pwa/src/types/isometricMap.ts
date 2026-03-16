@@ -290,6 +290,21 @@ export interface TerrainTile {
   elevation: number
 }
 
+/** Marcas admin sobre la previsualizacion georreferenciada del terreno */
+export interface TerrainAdminMarkup {
+  cols: number
+  rows: number
+  roadIndices: number[]
+  structureIndices: number[]
+}
+
+/** Configuracion fuente de la base georreferenciada previa a la importacion */
+export interface TerrainGeoReference {
+  coordinatesText: string
+  sampleStep: number
+  adminMarkup?: TerrainAdminMarkup
+}
+
 // ============================================================
 // Documento del Mapa (Firestore)
 // ============================================================
@@ -326,6 +341,8 @@ export interface IsometricMap {
   areas: MapArea[]
   /** Terreno voxel por cuadrantes de 1m */
   terrain?: TerrainTile[]
+  /** Fuente georreferenciada usada para previsualizar/importar la base real */
+  terrainGeoReference?: TerrainGeoReference
   /** Metadatos */
   createdBy: string
   createdAt: Date

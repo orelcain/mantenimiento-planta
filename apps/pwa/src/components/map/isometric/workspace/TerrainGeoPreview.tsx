@@ -14,6 +14,7 @@ import {
   type GeoCoordinate,
   type TerrainImportPreview,
 } from '@/lib/terrainImport'
+import type { TerrainAdminMarkup } from '@/types/isometricMap'
 
 /* ── Types ─────────────────────────────────────────────────────── */
 
@@ -23,6 +24,8 @@ interface TerrainGeoPreviewProps {
   previewError?: string | null
   statusMessage?: string | null
   isImporting: boolean
+  initialAdminMarkup?: TerrainAdminMarkup | null
+  onAdminMarkupChange?: (markup: TerrainAdminMarkup | null) => void
   mapHeightClassName?: string
 }
 
@@ -1199,6 +1202,8 @@ export function TerrainGeoPreview({
   previewError,
   statusMessage,
   isImporting,
+  initialAdminMarkup,
+  onAdminMarkupChange,
   mapHeightClassName = 'h-[460px] md:h-[560px] xl:h-[640px]',
 }: TerrainGeoPreviewProps) {
   const [terrainData, setTerrainData] = useState<TerrainPayload | null>(null)
@@ -1223,6 +1228,7 @@ export function TerrainGeoPreview({
   const [markupPersistenceState, setMarkupPersistenceState] = useState<'idle' | 'saved'>('idle')
   const minimapRef = useRef<HTMLCanvasElement>(null)
   const texRef = useRef<THREE.CanvasTexture | null>(null)
+  const initialAdminMarkupRef = useRef(initialAdminMarkup)
   const rawElevRef = useRef<number[]>([])
   const waterMaskRef = useRef<boolean[]>([])
   const baseElevRef = useRef<number[]>([])
@@ -1367,6 +1373,8 @@ export function TerrainGeoPreview({
     [parsed.corners],
   )
   const terrainMarkupStorageKey = useMemo(() => getTerrainMarkupStorageKey(parsed.corners), [parsed.corners])
+  const roadMask = terrainData?.roadMask
+  const structureMask = terrainData?.structureMask
 
   useEffect(() => {
     if (!parsed.corners) return
@@ -1401,7 +1409,13 @@ export function TerrainGeoPreview({
         rawElevRef.current = importedGrid
         let persistedRoadMask = new Array(GRID * GRID).fill(false)
         let persistedStructureMask = new Array(GRID * GRID).fill(false)
-        if (terrainMarkupStorageKey) {
+        const persistedMarkup = initialAdminMarkupRef.current
+        if (persistedMarkup !== undefined) {
+          if (persistedMarkup && persistedMarkup.cols === GRID && persistedMarkup.rows === GRID) {
+            persistedRoadMask = deserializeMarkupMask(GRID * GRID, persistedMarkup.roadIndices)
+            persistedStructureMask = deserializeMarkupMask(GRID * GRID, persistedMarkup.structureIndices)
+          }
+        } else if (terrainMarkupStorageKey) {
           try {
             const raw = localStorage.getItem(terrainMarkupStorageKey)
             if (raw) {
@@ -1462,14 +1476,14 @@ export function TerrainGeoPreview({
 
     void load()
     return () => { dead = true }
-  }, [parsed.corners, preview?.gridWidth, preview?.gridDepth, preview?.sampleStep, metrics?.widthMeters, metrics?.depthMeters, seaThreshold])
+  }, [parsed.corners, preview?.gridWidth, preview?.gridDepth, preview?.sampleStep, metrics?.widthMeters, metrics?.depthMeters, seaThreshold, terrainMarkupStorageKey, exaggeration])
 
   useEffect(() => {
-    if (!terrainData || !terrainMarkupStorageKey) return
+    if (!roadMask || !structureMask || !terrainMarkupStorageKey) return
     try {
       const payload: PersistedTerrainMarkup = {
-        roadIndices: serializeMarkupMask(terrainData.roadMask),
-        structureIndices: serializeMarkupMask(terrainData.structureMask),
+        roadIndices: serializeMarkupMask(roadMask),
+        structureIndices: serializeMarkupMask(structureMask),
       }
       localStorage.setItem(terrainMarkupStorageKey, JSON.stringify(payload))
       setMarkupPersistenceState('saved')
@@ -1478,7 +1492,26 @@ export function TerrainGeoPreview({
     } catch {
       return undefined
     }
-  }, [terrainData?.roadMask, terrainData?.structureMask, terrainMarkupStorageKey])
+  }, [roadMask, structureMask, terrainMarkupStorageKey])
+
+  useEffect(() => {
+    if (!terrainData || !onAdminMarkupChange) return
+
+    const roadIndices = serializeMarkupMask(terrainData.roadMask)
+    const structureIndices = serializeMarkupMask(terrainData.structureMask)
+
+    if (roadIndices.length === 0 && structureIndices.length === 0) {
+      onAdminMarkupChange(null)
+      return
+    }
+
+    onAdminMarkupChange({
+      cols: terrainData.cols,
+      rows: terrainData.rows,
+      roadIndices,
+      structureIndices,
+    })
+  }, [terrainData, onAdminMarkupChange])
 
   const handleClearAdminMarkup = useCallback(() => {
     if (!terrainData) return
@@ -1498,7 +1531,7 @@ export function TerrainGeoPreview({
 
   // Re-process elevations when sea threshold changes (no re-fetch needed)
   useEffect(() => {
-    if (!terrainData || baseElevRef.current.length === 0) return
+    if (baseElevRef.current.length === 0) return
     const elev = baseElevRef.current.map((value, index) => (waterMaskRef.current[index] && value < Math.max(0.5, seaThreshold) ? 0 : value))
     setTerrainData((prev) =>
       prev
@@ -1523,7 +1556,6 @@ export function TerrainGeoPreview({
           }
         : null,
     )
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seaThreshold, exaggeration])
 
   useEffect(() => {

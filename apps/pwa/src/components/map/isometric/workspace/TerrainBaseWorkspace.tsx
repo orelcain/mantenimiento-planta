@@ -1,5 +1,6 @@
 import { Card, CardContent } from '@/components/ui'
 import type { IsometricMap } from '@/types/isometricMap'
+import type { TerrainAdminMarkup } from '@/types/isometricMap'
 import { TerrainImportPanel } from './TerrainImportPanel'
 import type { TerrainImportPreview, TerrainImportProgress } from '@/lib/terrainImport'
 import { TerrainGeoPreview } from './TerrainGeoPreview'
@@ -31,6 +32,8 @@ interface TerrainBaseWorkspaceProps {
   onTerrainImportCoordinatesTextChange: (value: string) => void
   terrainImportSampleStep: number
   onTerrainImportSampleStepChange: (value: number) => void
+  initialTerrainAdminMarkup?: TerrainAdminMarkup | null
+  onTerrainAdminMarkupChange?: (markup: TerrainAdminMarkup | null) => void
   terrainImportPreview?: TerrainImportPreview | null
   terrainImportPreviewError?: string | null
   terrainImportProgress?: TerrainImportProgress | null
@@ -62,6 +65,8 @@ export function TerrainBaseWorkspace({
   onTerrainImportCoordinatesTextChange,
   terrainImportSampleStep,
   onTerrainImportSampleStepChange,
+  initialTerrainAdminMarkup,
+  onTerrainAdminMarkupChange,
   terrainImportPreview,
   terrainImportPreviewError,
   terrainImportProgress,
@@ -122,6 +127,8 @@ export function TerrainBaseWorkspace({
             previewError={terrainImportPreviewError}
             statusMessage={realTerrainImportMessage}
             isImporting={isImportingRealTerrain}
+            initialAdminMarkup={initialTerrainAdminMarkup}
+            onAdminMarkupChange={onTerrainAdminMarkupChange}
             mapHeightClassName="h-[520px] md:h-[620px] xl:h-[700px]"
           />
         </div>
