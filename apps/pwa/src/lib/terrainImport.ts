@@ -1,5 +1,5 @@
 import type { IsometricMapConfig, TerrainTile } from '@/types/isometricMap'
-import { SEA_LEVEL_ELEVATION, clampElevation } from '@/types/isometricMap'
+import { SEA_LEVEL_ELEVATION, MIN_TERRAIN_ELEVATION, MAX_TERRAIN_ELEVATION } from '@/types/isometricMap'
 
 export interface GeoCoordinate {
   lat: number
@@ -34,6 +34,41 @@ export interface TerrainImportResult {
     minLon: number
     maxLon: number
   }
+  geoBounds: TerrainGeoBounds
+}
+
+/** Geo bounds stored alongside terrain for coordinate display on hover */
+export interface TerrainGeoBounds {
+  minLat: number
+  maxLat: number
+  minLon: number
+  maxLon: number
+  /** Grid extents at time of import */
+  gridMinX: number
+  gridMaxX: number
+  gridMinZ: number
+  gridMaxZ: number
+}
+
+/** Convert grid position (x,z) back to geo coordinates using linear interpolation */
+export function gridToGeo(
+  x: number,
+  z: number,
+  bounds: TerrainGeoBounds
+): { lat: number; lon: number } | null {
+  if (!bounds) return null
+  const gridW = bounds.gridMaxX - bounds.gridMinX
+  const gridD = bounds.gridMaxZ - bounds.gridMinZ
+  if (gridW <= 0 || gridD <= 0) return null
+
+  const u = (x - bounds.gridMinX) / gridW
+  const v = (z - bounds.gridMinZ) / gridD
+
+  // lon increases with u (left to right), lat decreases with v (top to bottom)
+  const lon = bounds.minLon + (bounds.maxLon - bounds.minLon) * u
+  const lat = bounds.maxLat - (bounds.maxLat - bounds.minLat) * v
+
+  return { lat, lon }
 }
 
 export class TerrainImportHttpError extends Error {
@@ -251,6 +286,37 @@ async function fetchElevationBatch(batch: GeoCoordinate[]): Promise<number[]> {
   throw new Error('Error inesperado en consulta de elevaciones')
 }
 
+/** 3×3 Gaussian blur pass on a 2D grid to smooth sampling artifacts */
+function gaussianSmooth3x3(grid: number[][]): number[][] {
+  const rows = grid.length
+  if (rows === 0) return grid
+  const cols = grid[0]?.length ?? 0
+  if (cols === 0) return grid
+
+  // Kernel weights: center=4, adjacents=2, diagonals=1 — total 16
+  const result: number[][] = []
+  for (let r = 0; r < rows; r++) {
+    const row: number[] = []
+    for (let c = 0; c < cols; c++) {
+      let sum = 0
+      let weight = 0
+      for (let dr = -1; dr <= 1; dr++) {
+        for (let dc = -1; dc <= 1; dc++) {
+          const nr = r + dr
+          const nc = c + dc
+          if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) continue
+          const w = dr === 0 && dc === 0 ? 4 : (dr === 0 || dc === 0 ? 2 : 1)
+          sum += (grid[nr]?.[nc] ?? 0) * w
+          weight += w
+        }
+      }
+      row.push(weight > 0 ? sum / weight : (grid[r]?.[c] ?? 0))
+    }
+    result.push(row)
+  }
+  return result
+}
+
 function bilinearInterpolate(grid: number[][], u: number, v: number): number {
   const rows = grid.length
   const cols = grid[0]?.length ?? 0
@@ -360,6 +426,9 @@ export async function importTerrainFromRectangle(options: TerrainImportOptions):
   const minZ = Math.floor(-config.depth / 2)
   const maxZ = Math.ceil(config.depth / 2)
 
+  // --- Gaussian-smooth the coarse grid to remove sampling artifacts ---
+  const smoothedGrid = gaussianSmooth3x3(coarseGrid)
+
   const tiles: TerrainTile[] = []
   let minElevation = Number.POSITIVE_INFINITY
   let maxElevation = Number.NEGATIVE_INFINITY
@@ -369,14 +438,15 @@ export async function importTerrainFromRectangle(options: TerrainImportOptions):
 
     for (let x = minX; x < maxX; x++) {
       const u = (x - minX) / Math.max(1, maxX - minX - 1)
-      const rawElevation = bilinearInterpolate(coarseGrid, u, v)
-      const elevation = clampElevation(Math.round(rawElevation))
+      const rawElevation = bilinearInterpolate(smoothedGrid, u, v)
+      // Keep sub-meter precision for smooth mesh — only clamp to range, don't round
+      const elevation = Math.max(MIN_TERRAIN_ELEVATION, Math.min(MAX_TERRAIN_ELEVATION, rawElevation))
 
       minElevation = Math.min(minElevation, elevation)
       maxElevation = Math.max(maxElevation, elevation)
 
-      if (!keepSeaLevelTiles && elevation === SEA_LEVEL_ELEVATION) continue
-      tiles.push({ x, z, elevation })
+      if (!keepSeaLevelTiles && Math.abs(elevation - SEA_LEVEL_ELEVATION) < 0.1) continue
+      tiles.push({ x, z, elevation: Math.round(elevation * 10) / 10 })
     }
   }
 
@@ -387,9 +457,10 @@ export async function importTerrainFromRectangle(options: TerrainImportOptions):
 
   return {
     tiles,
-    minElevation,
-    maxElevation,
+    minElevation: Math.round(minElevation * 10) / 10,
+    maxElevation: Math.round(maxElevation * 10) / 10,
     usedSampleStep: sampleStep,
     bounds: { minLat, maxLat, minLon, maxLon },
+    geoBounds: { minLat, maxLat, minLon, maxLon, gridMinX: minX, gridMaxX: maxX, gridMinZ: minZ, gridMaxZ: maxZ },
   }
 }

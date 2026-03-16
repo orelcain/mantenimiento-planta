@@ -1,13 +1,8 @@
 import { useCallback, useEffect } from 'react'
 import type { Dispatch, SetStateAction } from 'react'
-import type { IsometricViewerState, MapArea, MapConnector, MapNode } from '@/types/isometricMap'
+import type { IsometricViewerState, MapArea, MapConnector, MapNode, TerrainTile } from '@/types/isometricMap'
 import type { EditorTool } from './EditorToolbar'
-
-interface EditorSnapshot {
-  nodes: MapNode[]
-  areas: MapArea[]
-  connectors: MapConnector[]
-}
+import type { EditorSnapshot } from './useEditorHistory'
 
 interface UseMapEditorActionsParams {
   isEditMode: boolean
@@ -19,6 +14,7 @@ interface UseMapEditorActionsParams {
   setNodes: Dispatch<SetStateAction<MapNode[]>>
   setAreas: Dispatch<SetStateAction<MapArea[]>>
   setConnectors: Dispatch<SetStateAction<MapConnector[]>>
+  setTerrainTiles: Dispatch<SetStateAction<TerrainTile[]>>
   setHasUnsavedChanges: Dispatch<SetStateAction<boolean>>
   setEditorTool: Dispatch<SetStateAction<EditorTool>>
   setSnapEnabled: Dispatch<SetStateAction<boolean>>
@@ -41,6 +37,7 @@ export function useMapEditorActions({
   setNodes,
   setAreas,
   setConnectors,
+  setTerrainTiles,
   setHasUnsavedChanges,
   setEditorTool,
   setSnapEnabled,
@@ -95,8 +92,9 @@ export function useMapEditorActions({
     setNodes(snapshot.nodes)
     setAreas(snapshot.areas)
     setConnectors(snapshot.connectors)
+    if (snapshot.terrain) setTerrainTiles(snapshot.terrain)
     setHasUnsavedChanges(true)
-  }, [history, setNodes, setAreas, setConnectors, setHasUnsavedChanges])
+  }, [history, setNodes, setAreas, setConnectors, setTerrainTiles, setHasUnsavedChanges])
 
   const handleRedo = useCallback(() => {
     const snapshot = history.redo()
@@ -104,8 +102,9 @@ export function useMapEditorActions({
     setNodes(snapshot.nodes)
     setAreas(snapshot.areas)
     setConnectors(snapshot.connectors)
+    if (snapshot.terrain) setTerrainTiles(snapshot.terrain)
     setHasUnsavedChanges(true)
-  }, [history, setNodes, setAreas, setConnectors, setHasUnsavedChanges])
+  }, [history, setNodes, setAreas, setConnectors, setTerrainTiles, setHasUnsavedChanges])
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {

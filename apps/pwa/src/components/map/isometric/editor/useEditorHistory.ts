@@ -6,12 +6,13 @@
  */
 
 import { useState, useCallback, useRef } from 'react'
-import type { MapNode, MapArea, MapConnector } from '@/types/isometricMap'
+import type { MapNode, MapArea, MapConnector, TerrainTile } from '@/types/isometricMap'
 
-interface EditorSnapshot {
+export interface EditorSnapshot {
   nodes: MapNode[]
   areas: MapArea[]
   connectors: MapConnector[]
+  terrain?: TerrainTile[]
 }
 
 interface UseEditorHistoryReturn {
@@ -56,6 +57,7 @@ export function useEditorHistory(): UseEditorHistoryReturn {
           size: { ...a.size },
         })),
         connectors: snapshot.connectors.map((c) => ({ ...c })),
+        terrain: snapshot.terrain ? [...snapshot.terrain] : undefined,
       }
 
       history.current.push(cloned)

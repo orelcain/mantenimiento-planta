@@ -33,6 +33,9 @@ import {
   Building2,
   Trash2,
   Settings2,
+  MapPin,
+  Ruler,
+  BarChart3,
 } from 'lucide-react'
 import {
   Card,
@@ -71,8 +74,10 @@ import {
   estimateTerrainImportPreview,
   TerrainImportHttpError,
   type TerrainImportProgress,
+  type TerrainGeoBounds,
   formatCoordinatesText,
   getAutoExpandedMapConfig,
+  gridToGeo,
   importTerrainFromRectangle,
   parseCoordinatesText,
 } from '@/lib/terrainImport'
@@ -103,6 +108,9 @@ import { useEditorOverlayState } from '@/components/map/isometric/editor/useEdit
 import { getAreaAtPosition, normalizeNodeForArea } from '@/components/map/isometric/editor/areaAssociation'
 import { useMapEditorActions } from '@/components/map/isometric/editor/useMapEditorActions'
 import { useAreaEditorFlow } from '@/components/map/isometric/editor/useAreaEditorFlow'
+import { CompassWidget } from '@/components/map/isometric/CompassWidget'
+import { Minimap } from '@/components/map/isometric/Minimap'
+import { MapStatsPanel } from '@/components/map/isometric/MapStatsPanel'
 
 const ELEVATION_OPTIONS = ELEVATION_PRESET_LEVELS.map((level) => ({
   floor: level,
@@ -390,6 +398,14 @@ export function MapPage() {
   const [addPlacementRotation, setAddPlacementRotation] = useState(0)
   const lastTerrainStrokeKeyRef = useRef<string | null>(null)
   const preserveLocalBaseRef = useRef(false)
+  // ── HUD state (compass, minimap, stats, geo coords, measurement) ──
+  const [terrainGeoBounds, setTerrainGeoBounds] = useState<TerrainGeoBounds | null>(null)
+  const [showGeoCoords, setShowGeoCoords] = useState(false)
+  const [showCompass, setShowCompass] = useState(true)
+  const [showMinimap, setShowMinimap] = useState(true)
+  const [showStatsPanel, setShowStatsPanel] = useState(false)
+  const [measurePoints, setMeasurePoints] = useState<{ x: number; z: number }[]>([])
+  const [measureMode, setMeasureMode] = useState(false)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const history = useEditorHistory()
@@ -608,6 +624,11 @@ export function MapPage() {
     const z = Math.round(terrainHoverPosition.z)
     return terrainElevationLookup.get(`${x},${z}`) ?? SEA_LEVEL_ELEVATION
   }, [terrainHoverPosition, terrainElevationLookup])
+
+  const hoveredGeoCoord = useMemo(() => {
+    if (!showGeoCoords || !terrainHoverPosition || !terrainGeoBounds) return null
+    return gridToGeo(terrainHoverPosition.x, terrainHoverPosition.z, terrainGeoBounds)
+  }, [showGeoCoords, terrainHoverPosition, terrainGeoBounds])
 
   const terrainImportPreview = useMemo(() => {
     try {
@@ -1321,9 +1342,10 @@ export function MapPage() {
         nodes: newNodes,
         areas: newAreas || areas,
         connectors: newConnectors || connectors,
+        terrain: terrainTiles,
       })
     },
-    [history, areas, connectors]
+    [history, areas, connectors, terrainTiles]
   )
 
   const {
@@ -1676,6 +1698,7 @@ export function MapPage() {
       }
 
       setTerrainTiles(result.tiles)
+      setTerrainGeoBounds(result.geoBounds)
       setHasUnsavedChanges(true)
 
       setTerrainEditableMin((prev) => Math.max(MIN_TERRAIN_ELEVATION, Math.min(prev, Math.floor(result.minElevation) - 2)))
@@ -1783,6 +1806,12 @@ export function MapPage() {
     (position: { x: number; z: number }) => {
       if (isClickSuppressedAfterDrag()) return
 
+      // Measurement ruler: collect 2 points, reset on third click
+      if (measureMode) {
+        setMeasurePoints((prev) => prev.length >= 2 ? [position] : [...prev, position])
+        return
+      }
+
       if (isEditMode && buildMode === 'terrain' && terrainEditEnabled) {
         applyTerrainBrushAt(position, 'click')
         return
@@ -1835,6 +1864,7 @@ export function MapPage() {
       setEditorTool('select')
     },
     [
+      measureMode,
       paintAreaTileAt,
       editorTool,
       effectiveAddType,
@@ -1871,6 +1901,7 @@ export function MapPage() {
     setNodes,
     setAreas,
     setConnectors,
+    setTerrainTiles,
     setHasUnsavedChanges,
     setEditorTool,
     setSnapEnabled,
@@ -2796,6 +2827,137 @@ export function MapPage() {
                   <Minimize2 className="h-4 w-4" />
                   Salir fullscreen
                 </Button>
+              </div>
+            )}
+
+            {/* Compass widget (top-right) */}
+            {showCompass && (
+              <div className="absolute top-4 right-4 z-20" style={{ marginTop: isFullscreen ? 48 : 0 }}>
+                <CompassWidget cameraAngle={viewerState.cameraAngle} />
+              </div>
+            )}
+
+            {/* Geo-coordinates + elevation hover badge (top center) */}
+            {terrainHoverPosition && (hoveredGeoCoord || hoveredTerrainElevation !== null) && (
+              <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
+                <div className="bg-card/90 backdrop-blur rounded-md border px-3 py-1 text-[11px] flex items-center gap-3 shadow">
+                  {hoveredTerrainElevation !== null && (
+                    <span className="font-mono text-foreground">
+                      Cota {hoveredTerrainElevation > 0 ? `+${hoveredTerrainElevation.toFixed(1)}` : hoveredTerrainElevation.toFixed(1)}m
+                    </span>
+                  )}
+                  {terrainHoverPosition && (
+                    <span className="text-muted-foreground font-mono">
+                      [{Math.round(terrainHoverPosition.x)}, {Math.round(terrainHoverPosition.z)}]
+                    </span>
+                  )}
+                  {hoveredGeoCoord && (
+                    <span className="text-muted-foreground font-mono">
+                      {hoveredGeoCoord.lat.toFixed(6)}° {hoveredGeoCoord.lon.toFixed(6)}°
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Minimap (bottom-right) */}
+            {showMinimap && terrainTiles.length > 0 && (
+              <div className="absolute bottom-4 right-4 z-20">
+                <Minimap
+                  config={mapConfig}
+                  terrain={terrainTiles}
+                  viewerState={viewerState}
+                  canvasAspect={mapConfig.width / mapConfig.depth}
+                />
+              </div>
+            )}
+
+            {/* Stats panel (top-left, below terrain card) */}
+            {showStatsPanel && (
+              <div className="absolute top-4 right-4 z-10" style={{ marginTop: showCompass ? 80 : 0, marginRight: 0 }}>
+                <MapStatsPanel
+                  config={mapConfig}
+                  nodes={nodes}
+                  areas={areas}
+                  connectors={connectors}
+                  terrain={terrainTiles}
+                />
+              </div>
+            )}
+
+            {/* HUD toggle buttons (top-right, below compass) */}
+            <div className="absolute z-20 flex flex-col gap-1" style={{ top: showCompass ? 80 : 12, right: showStatsPanel ? 220 : 12 }}>
+              <Button
+                variant={showGeoCoords ? 'default' : 'ghost'}
+                size="icon"
+                className="h-7 w-7 bg-card/80 backdrop-blur border shadow-sm"
+                onClick={() => setShowGeoCoords(!showGeoCoords)}
+                title={showGeoCoords ? 'Ocultar coordenadas geo' : 'Mostrar coordenadas geo'}
+                disabled={!terrainGeoBounds}
+              >
+                <MapPin className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                variant={showCompass ? 'default' : 'ghost'}
+                size="icon"
+                className="h-7 w-7 bg-card/80 backdrop-blur border shadow-sm"
+                onClick={() => setShowCompass(!showCompass)}
+                title={showCompass ? 'Ocultar brújula' : 'Mostrar brújula'}
+              >
+                <Compass className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                variant={showMinimap ? 'default' : 'ghost'}
+                size="icon"
+                className="h-7 w-7 bg-card/80 backdrop-blur border shadow-sm"
+                onClick={() => setShowMinimap(!showMinimap)}
+                title={showMinimap ? 'Ocultar minimapa' : 'Mostrar minimapa'}
+              >
+                <Layers className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                variant={showStatsPanel ? 'default' : 'ghost'}
+                size="icon"
+                className="h-7 w-7 bg-card/80 backdrop-blur border shadow-sm"
+                onClick={() => setShowStatsPanel(!showStatsPanel)}
+                title={showStatsPanel ? 'Ocultar estadísticas' : 'Mostrar estadísticas'}
+              >
+                <BarChart3 className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                variant={measureMode ? 'default' : 'ghost'}
+                size="icon"
+                className="h-7 w-7 bg-card/80 backdrop-blur border shadow-sm"
+                onClick={() => {
+                  setMeasureMode(!measureMode)
+                  setMeasurePoints([])
+                }}
+                title={measureMode ? 'Desactivar regla' : 'Medir distancia'}
+              >
+                <Ruler className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+
+            {/* Measurement result badge */}
+            {measureMode && measurePoints.length === 2 && (
+              <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-20">
+                <Badge variant="default" className="bg-blue-600 text-white text-xs gap-1 shadow-lg">
+                  <Ruler className="h-3 w-3" />
+                  {(() => {
+                    const a = measurePoints[0]!
+                    const b = measurePoints[1]!
+                    const dx = b.x - a.x
+                    const dz = b.z - a.z
+                    const dist = Math.sqrt(dx * dx + dz * dz)
+                    return `${dist.toFixed(1)} m`
+                  })()}
+                  <button
+                    className="ml-1 opacity-70 hover:opacity-100"
+                    onClick={() => setMeasurePoints([])}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </Badge>
               </div>
             )}
 
