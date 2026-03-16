@@ -71,6 +71,11 @@ interface MeasureMarker {
   gridC: number
 }
 
+interface PersistedTerrainMarkup {
+  roadIndices: number[]
+  structureIndices: number[]
+}
+
 /* ── Constants ─────────────────────────────────────────────────── */
 
 const GRID = 128
@@ -78,6 +83,7 @@ const TILE_Z = 17
 const DEM_Z = 15
 const SCALE = 10
 const OPEN_METEO_ELEVATION_API = 'https://api.open-meteo.com/v1/elevation'
+const TERRAIN_MARKUP_STORAGE_PREFIX = 'terrain-preview-markup:'
 
 /* ── Helpers ───────────────────────────────────────────────────── */
 
@@ -274,6 +280,31 @@ function createOverlayMaskGeometry({
   geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3))
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2))
   return geometry
+}
+
+function serializeMarkupMask(mask: boolean[]): number[] {
+  const out: number[] = []
+  for (let index = 0; index < mask.length; index++) {
+    if (mask[index]) out.push(index)
+  }
+  return out
+}
+
+function deserializeMarkupMask(length: number, indices: number[] | undefined): boolean[] {
+  const mask = new Array(length).fill(false)
+  if (!Array.isArray(indices)) return mask
+  for (const index of indices) {
+    if (Number.isInteger(index) && index >= 0 && index < length) mask[index] = true
+  }
+  return mask
+}
+
+function getTerrainMarkupStorageKey(corners: QuadCorners | null): string | null {
+  if (!corners) return null
+  const serialized = corners
+    .map((point) => `${point.lat.toFixed(5)},${point.lon.toFixed(5)}`)
+    .join('|')
+  return `${TERRAIN_MARKUP_STORAGE_PREFIX}${serialized}`
 }
 
 function CameraAzimuthProbe({ onChange }: { onChange: (deg: number) => void }) {
@@ -1011,8 +1042,12 @@ function TerrainIsland({
 
   return (
     <group>
-      <mesh position={[0, landBaseY - 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[meshWidth, meshDepth]} />
+      <mesh position={[0, landBaseY - 0.08, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[meshWidth * 1.14, meshDepth * 1.14]} />
+        <meshStandardMaterial color="#35291f" roughness={1} metalness={0.01} />
+      </mesh>
+      <mesh position={[0, landBaseY - 0.012, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[meshWidth * 1.02, meshDepth * 1.02]} />
         <meshStandardMaterial color="#4f4032" roughness={1} metalness={0.02} />
       </mesh>
       <mesh geometry={northWallGeo}>
@@ -1039,6 +1074,10 @@ function TerrainIsland({
       <mesh position={[0, seaBaseY, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[waterSpanWidth, waterSpanDepth]} />
         <meshStandardMaterial color="#08212d" roughness={0.22} metalness={0.08} />
+      </mesh>
+      <mesh position={[0, seaBaseY + 0.008, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[waterSpanWidth * 0.98, waterSpanDepth * 0.98]} />
+        <meshStandardMaterial color="#10394b" transparent opacity={0.16} roughness={0.18} metalness={0.04} />
       </mesh>
       <mesh position={[0, seaBaseY + seaWallHeight / 2, -waterSpanDepth / 2]}>
         <planeGeometry args={[waterSpanWidth, seaWallHeight]} />
@@ -1120,6 +1159,7 @@ export function TerrainGeoPreview({
   const [measureMarkers, setMeasureMarkers] = useState<MeasureMarker[]>([])
   const [cameraAzimuthDeg, setCameraAzimuthDeg] = useState(0)
   const [cornerElevations, setCornerElevations] = useState<number[] | null>(null)
+  const [markupPersistenceState, setMarkupPersistenceState] = useState<'idle' | 'saved'>('idle')
   const minimapRef = useRef<HTMLCanvasElement>(null)
   const texRef = useRef<THREE.CanvasTexture | null>(null)
   const rawElevRef = useRef<number[]>([])
@@ -1242,6 +1282,7 @@ export function TerrainGeoPreview({
     () => (parsed.corners ? estimateRectangleMeters(parsed.corners) : null),
     [parsed.corners],
   )
+  const terrainMarkupStorageKey = useMemo(() => getTerrainMarkupStorageKey(parsed.corners), [parsed.corners])
 
   useEffect(() => {
     if (!parsed.corners) return
@@ -1274,8 +1315,22 @@ export function TerrainGeoPreview({
         const importedGrid = terrainTilesToGrid(importedTerrain.tiles, GRID, GRID)
         baseElevRef.current = importedGrid
         rawElevRef.current = importedGrid
-        baseRoadMaskRef.current = new Array(GRID * GRID).fill(false)
-        baseStructureMaskRef.current = new Array(GRID * GRID).fill(false)
+        let persistedRoadMask = new Array(GRID * GRID).fill(false)
+        let persistedStructureMask = new Array(GRID * GRID).fill(false)
+        if (terrainMarkupStorageKey) {
+          try {
+            const raw = localStorage.getItem(terrainMarkupStorageKey)
+            if (raw) {
+              const parsedStorage = JSON.parse(raw) as PersistedTerrainMarkup
+              persistedRoadMask = deserializeMarkupMask(GRID * GRID, parsedStorage.roadIndices)
+              persistedStructureMask = deserializeMarkupMask(GRID * GRID, parsedStorage.structureIndices)
+            }
+          } catch {
+            // Ignore malformed local admin markup and continue with empty masks.
+          }
+        }
+        baseRoadMaskRef.current = persistedRoadMask
+        baseStructureMaskRef.current = persistedStructureMask
 
         setLoading('Detectando agua en imagen satelital…')
         const wMask = detectWaterMask(canvas, GRID, GRID)
@@ -1324,6 +1379,38 @@ export function TerrainGeoPreview({
     void load()
     return () => { dead = true }
   }, [parsed.corners, preview?.gridWidth, preview?.gridDepth, preview?.sampleStep, metrics?.widthMeters, metrics?.depthMeters, seaThreshold])
+
+  useEffect(() => {
+    if (!terrainData || !terrainMarkupStorageKey) return
+    try {
+      const payload: PersistedTerrainMarkup = {
+        roadIndices: serializeMarkupMask(terrainData.roadMask),
+        structureIndices: serializeMarkupMask(terrainData.structureMask),
+      }
+      localStorage.setItem(terrainMarkupStorageKey, JSON.stringify(payload))
+      setMarkupPersistenceState('saved')
+      const timeout = window.setTimeout(() => setMarkupPersistenceState('idle'), 1200)
+      return () => window.clearTimeout(timeout)
+    } catch {
+      return undefined
+    }
+  }, [terrainData?.roadMask, terrainData?.structureMask, terrainMarkupStorageKey])
+
+  const handleClearAdminMarkup = useCallback(() => {
+    if (!terrainData) return
+    const roadMask = new Array(terrainData.cols * terrainData.rows).fill(false)
+    const structureMask = new Array(terrainData.cols * terrainData.rows).fill(false)
+    baseRoadMaskRef.current = [...roadMask]
+    baseStructureMaskRef.current = [...structureMask]
+    if (terrainMarkupStorageKey) {
+      try {
+        localStorage.removeItem(terrainMarkupStorageKey)
+      } catch {
+        // noop
+      }
+    }
+    setTerrainData((prev) => (prev ? { ...prev, roadMask, structureMask } : null))
+  }, [terrainData, terrainMarkupStorageKey])
 
   // Re-process elevations when sea threshold changes (no re-fetch needed)
   useEffect(() => {
@@ -1511,6 +1598,11 @@ export function TerrainGeoPreview({
           >
             Auto-rotar
           </Badge>
+          {terrainData && (previewStats?.roadCells || previewStats?.structureCells) ? (
+            <Badge variant="outline" className="font-mono text-[10px]">
+              {markupPersistenceState === 'saved' ? 'Marcas guardadas' : 'Marcas locales activas'}
+            </Badge>
+          ) : null}
         </div>
       </div>
 
@@ -1568,17 +1660,18 @@ export function TerrainGeoPreview({
             className="h-1.5 w-24 cursor-pointer accent-cyan-400"
           />
         </label>
-        {brushTool !== 'none' && brushTool !== 'mark-road' && brushTool !== 'mark-structure' && brushTool !== 'erase-mark' && (
+        {brushTool !== 'none' && (
           <>
             <label className="flex items-center gap-2">
-              <span className="whitespace-nowrap">Radio {brushRadius}</span>
+              <span className="whitespace-nowrap">Radio {brushRadius.toFixed(1)}</span>
               <input
-                type="range" min="1" max="20" step="1"
+                type="range" min="0.5" max="20" step="0.5"
                 value={brushRadius}
                 onChange={(e) => setBrushRadius(Number(e.target.value))}
                 className="h-1.5 w-20 cursor-pointer accent-amber-400"
               />
             </label>
+            {brushTool !== 'mark-road' && brushTool !== 'mark-structure' && brushTool !== 'erase-mark' ? (
             <label className="flex items-center gap-2">
               <span className="whitespace-nowrap">Fuerza {brushStrength.toFixed(1)}</span>
               <input
@@ -1588,6 +1681,7 @@ export function TerrainGeoPreview({
                 className="h-1.5 w-20 cursor-pointer accent-amber-400"
               />
             </label>
+            ) : null}
           </>
         )}
       </div>
@@ -1720,6 +1814,9 @@ export function TerrainGeoPreview({
             <div className="flex items-center gap-3 text-muted-foreground">
               <span className="flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-orange-400" />Caminos {previewStats?.roadCells ?? 0}</span>
               <span className="flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-rose-500" />Estructuras {previewStats?.structureCells ?? 0}</span>
+              <button className="rounded border border-border/60 px-2 py-0.5 text-[10px] text-foreground hover:bg-muted/50" onClick={handleClearAdminMarkup}>
+                Limpiar marcas
+              </button>
             </div>
           </div>
         ) : null}

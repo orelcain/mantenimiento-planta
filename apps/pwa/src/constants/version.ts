@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.70.63' as const
+export const APP_VERSION = '2.70.64' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-03-16' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Herramientas admin para demarcar caminos y estructuras' as const
+export const VERSION_NAME = 'Marcas admin persistentes, brochas finas y mejor cierre lateral' as const
 
 /**
  * Nota:
