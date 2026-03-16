@@ -307,6 +307,25 @@ function createShadedTerrainCanvas(
     return brightScore * 0.42 + lowSatScore * 0.33 + flatScore * 0.25
   }
 
+  const getDockScore = (row: number, col: number) => {
+    if (sampleWater(row, col)) return 0
+    const center = sampleElevation(row, col)
+    if (center < 0.6 || center > 4.6) return 0
+    const source = sampleSourceColor(row, col)
+    const slope = sampleSlope(row, col)
+    const nearWater = [
+      sampleWater(row - 1, col),
+      sampleWater(row + 1, col),
+      sampleWater(row, col - 1),
+      sampleWater(row, col + 1),
+    ].filter(Boolean).length
+    const waterScore = clamp01(nearWater / 2.5)
+    const brightScore = clamp01((source.brightness - 122) / 30)
+    const lowSatScore = clamp01((0.14 - source.saturation) / 0.14)
+    const flatScore = clamp01((0.12 - slope) / 0.12)
+    return waterScore * 0.34 + brightScore * 0.28 + lowSatScore * 0.24 + flatScore * 0.14
+  }
+
   const light = new THREE.Vector3(-0.45, 0.85, -0.3).normalize()
 
   for (let y = 0; y < out.height; y++) {
@@ -352,43 +371,49 @@ function createShadedTerrainCanvas(
       let green = data[offset + 1]! * brightness + normalizedElevation * 8 - slopeDarken * 0.35
       let blue = data[offset + 2]! * brightness - elevationWarm * 0.4 + elevationCool - slopeDarken * 0.2
 
+      const cutShadow = clamp01((slope - 0.32) / 0.25) * clamp01((normalizedElevation - 0.08) / 0.2)
+
       if (center < 6) {
         red -= 10
         green += 8
         blue += 6
       }
 
-        red -= contourDarken
-        green -= contourDarken * 0.9
-        blue -= contourDarken * 0.8
+      red -= contourDarken
+      green -= contourDarken * 0.9
+      blue -= contourDarken * 0.8
 
-        red = lerp(red, 142, rockStrength * 0.5)
-        green = lerp(green, 134, rockStrength * 0.46)
-        blue = lerp(blue, 126, rockStrength * 0.42)
+      red = lerp(red, 142, rockStrength * 0.5)
+      green = lerp(green, 134, rockStrength * 0.46)
+      blue = lerp(blue, 126, rockStrength * 0.42)
 
-        red = lerp(red, 108, meadowStrength * 0.18)
-        green = lerp(green, 129, meadowStrength * 0.34)
-        blue = lerp(blue, 86, meadowStrength * 0.14)
+      red = lerp(red, 108, meadowStrength * 0.18)
+      green = lerp(green, 129, meadowStrength * 0.34)
+      blue = lerp(blue, 86, meadowStrength * 0.14)
 
-        red = lerp(red, 98, wetlandStrength * 0.12)
-        green = lerp(green, 126, wetlandStrength * 0.22)
-        blue = lerp(blue, 102, wetlandStrength * 0.2)
+      red = lerp(red, 98, wetlandStrength * 0.12)
+      green = lerp(green, 126, wetlandStrength * 0.22)
+      blue = lerp(blue, 102, wetlandStrength * 0.2)
 
-        red = lerp(red, 154, yardStrength * 0.52)
-        green = lerp(green, 146, yardStrength * 0.48)
-        blue = lerp(blue, 132, yardStrength * 0.42)
+      red = lerp(red, 154, yardStrength * 0.52)
+      green = lerp(green, 146, yardStrength * 0.48)
+      blue = lerp(blue, 132, yardStrength * 0.42)
 
-        red = lerp(red, 176, roadStrength * 0.36)
-        green = lerp(green, 164, roadStrength * 0.3)
-        blue = lerp(blue, 144, roadStrength * 0.24)
+      red = lerp(red, 176, roadStrength * 0.36)
+      green = lerp(green, 164, roadStrength * 0.3)
+      blue = lerp(blue, 144, roadStrength * 0.24)
 
-        red = lerp(red, 64, coastalWetness * 0.08)
-        green = lerp(green, 96, coastalWetness * 0.12)
-        blue = lerp(blue, 102, coastalWetness * 0.18)
+      red = lerp(red, 64, coastalWetness * 0.08)
+      green = lerp(green, 96, coastalWetness * 0.12)
+      blue = lerp(blue, 102, coastalWetness * 0.18)
 
-        red += ridgeLight * 10
-        green += ridgeLight * 9
-        blue += ridgeLight * 6
+      red -= cutShadow * 9
+      green -= cutShadow * 8
+      blue -= cutShadow * 6
+
+      red += ridgeLight * 10
+      green += ridgeLight * 9
+      blue += ridgeLight * 6
 
       data[offset] = Math.max(0, Math.min(255, Math.round(red)))
       data[offset + 1] = Math.max(0, Math.min(255, Math.round(green)))
@@ -401,6 +426,8 @@ function createShadedTerrainCanvas(
   const pathSegments: Array<[number, number, number, number, number]> = []
   const yardRects: Array<[number, number, number, number]> = []
   const wetCoastMarks: Array<[number, number, number, number]> = []
+  const dockRects: Array<[number, number, number, number, number]> = []
+  const shallowWaterMarks: Array<[number, number, number, number]> = []
 
   for (let r = 1; r < rows - 1; r++) {
     for (let c = 1; c < cols - 1; c++) {
@@ -419,7 +446,9 @@ function createShadedTerrainCanvas(
         sampleWater(r, c + 1),
       ].filter(Boolean).length
       const roadScore = getRoadScore(r, c)
+      const dockScore = getDockScore(r, c)
       const roadCandidate = roadScore > 0.63
+      const dockCandidate = dockScore > 0.6
       const yardCandidate = brightness > 144 && saturation < 0.1 && slope < 0.11 && center > 1.1
       const wetCandidate = nearWater > 0 && center < 4.2 && slope < 0.18
 
@@ -432,6 +461,20 @@ function createShadedTerrainCanvas(
 
       if (yardCandidate) {
         yardRects.push([px - 4, py - 4, 8, 8])
+      }
+
+      if (dockCandidate) {
+        const waterLeft = sampleWater(r, c - 1)
+        const waterRight = sampleWater(r, c + 1)
+        const waterUp = sampleWater(r - 1, c)
+        const waterDown = sampleWater(r + 1, c)
+        if ((waterLeft || waterRight) && !(waterUp || waterDown)) {
+          dockRects.push([px - 6, py - 2.4, 12, 4.8, 0.08 + dockScore * 0.08])
+        } else if ((waterUp || waterDown) && !(waterLeft || waterRight)) {
+          dockRects.push([px - 2.4, py - 6, 4.8, 12, 0.08 + dockScore * 0.08])
+        } else {
+          dockRects.push([px - 4.2, py - 4.2, 8.4, 8.4, 0.06 + dockScore * 0.06])
+        }
       }
 
       if (roadCandidate) {
@@ -449,6 +492,26 @@ function createShadedTerrainCanvas(
           }
         }
       }
+    }
+  }
+
+  for (let r = 1; r < rows - 1; r += 2) {
+    for (let c = 1; c < cols - 1; c += 2) {
+      const idx = r * cols + c
+      if (!waterMask[idx]) continue
+      const nearLand = [
+        !sampleWater(r - 1, c),
+        !sampleWater(r + 1, c),
+        !sampleWater(r, c - 1),
+        !sampleWater(r, c + 1),
+      ].filter(Boolean).length
+      if (nearLand === 0) continue
+
+      const px = (c / (cols - 1)) * out.width
+      const py = (r / (rows - 1)) * out.height
+      const seed = Math.sin((r * 87.23) + (c * 213.41)) * 5123.448
+      const random01 = seed - Math.floor(seed)
+      shallowWaterMarks.push([px, py, 5 + nearLand * 2 + random01 * 2, 0.04 + nearLand * 0.02])
     }
   }
 
@@ -470,6 +533,23 @@ function createShadedTerrainCanvas(
   ctx.fillStyle = 'rgba(220, 206, 184, 0.1)'
   for (const [x, y, width, height] of yardRects) {
     ctx.fillRect(x, y, width, height)
+  }
+  for (const [x, y, width, height, alpha] of dockRects) {
+    ctx.fillStyle = `rgba(214, 201, 182, ${alpha})`
+    ctx.fillRect(x, y, width, height)
+  }
+  ctx.restore()
+
+  ctx.save()
+  ctx.globalCompositeOperation = 'screen'
+  for (const [px, py, radius, alpha] of shallowWaterMarks) {
+    const gradient = ctx.createRadialGradient(px, py, 0, px, py, radius)
+    gradient.addColorStop(0, `rgba(92, 184, 196, ${alpha})`)
+    gradient.addColorStop(1, 'rgba(92, 184, 196, 0)')
+    ctx.fillStyle = gradient
+    ctx.beginPath()
+    ctx.arc(px, py, radius, 0, Math.PI * 2)
+    ctx.fill()
   }
   ctx.restore()
 
