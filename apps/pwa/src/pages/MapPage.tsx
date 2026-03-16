@@ -2199,7 +2199,6 @@ export function MapPage() {
       </div>
 
       {isTerrainBaseStage && (
-        <div className="relative">
         <TerrainBaseWorkspace
           currentMapId={currentMapId}
           savedMaps={savedMaps}
@@ -2236,93 +2235,6 @@ export function MapPage() {
           terrainImportPreviewError={terrainImportPreviewError}
           terrainImportProgress={terrainImportProgress}
         />
-
-        {/* ── HUD Widgets (terrain-base stage) ── */}
-        {/* Compass widget (top-right of 3D preview) */}
-        {showCompass && (
-          <div className="absolute top-16 right-6 z-20 pointer-events-auto">
-            <CompassWidget cameraAngle={viewerState.cameraAngle} />
-          </div>
-        )}
-
-        {/* Minimap (bottom-right of 3D preview) */}
-        {showMinimap && terrainTiles.length > 0 && (
-          <div className="absolute bottom-6 right-6 z-20 pointer-events-auto">
-            <Minimap
-              config={mapConfig}
-              terrain={terrainTiles}
-              viewerState={viewerState}
-              canvasAspect={mapConfig.width / mapConfig.depth}
-            />
-          </div>
-        )}
-
-        {/* Stats panel */}
-        {showStatsPanel && (
-          <div className="absolute top-16 left-6 z-20 pointer-events-auto">
-            <MapStatsPanel
-              config={mapConfig}
-              nodes={nodes}
-              areas={areas}
-              connectors={connectors}
-              terrain={terrainTiles}
-            />
-          </div>
-        )}
-
-        {/* HUD toggle buttons */}
-        <div className="absolute top-4 right-4 z-30 flex gap-1 pointer-events-auto">
-          <Button
-            variant={showCompass ? 'default' : 'ghost'}
-            size="icon"
-            className="h-7 w-7 bg-card/80 backdrop-blur border shadow-sm"
-            onClick={() => setShowCompass(!showCompass)}
-            title={showCompass ? 'Ocultar brújula' : 'Mostrar brújula'}
-          >
-            <Compass className="h-3.5 w-3.5" />
-          </Button>
-          <Button
-            variant={showMinimap ? 'default' : 'ghost'}
-            size="icon"
-            className="h-7 w-7 bg-card/80 backdrop-blur border shadow-sm"
-            onClick={() => setShowMinimap(!showMinimap)}
-            title={showMinimap ? 'Ocultar minimapa' : 'Mostrar minimapa'}
-          >
-            <Layers className="h-3.5 w-3.5" />
-          </Button>
-          <Button
-            variant={showStatsPanel ? 'default' : 'ghost'}
-            size="icon"
-            className="h-7 w-7 bg-card/80 backdrop-blur border shadow-sm"
-            onClick={() => setShowStatsPanel(!showStatsPanel)}
-            title={showStatsPanel ? 'Ocultar estadísticas' : 'Mostrar estadísticas'}
-          >
-            <BarChart3 className="h-3.5 w-3.5" />
-          </Button>
-          <Button
-            variant={showGeoCoords ? 'default' : 'ghost'}
-            size="icon"
-            className="h-7 w-7 bg-card/80 backdrop-blur border shadow-sm"
-            onClick={() => setShowGeoCoords(!showGeoCoords)}
-            title={showGeoCoords ? 'Ocultar coordenadas geo' : 'Mostrar coordenadas geo'}
-            disabled={!terrainGeoBounds}
-          >
-            <MapPin className="h-3.5 w-3.5" />
-          </Button>
-          <Button
-            variant={measureMode ? 'default' : 'ghost'}
-            size="icon"
-            className="h-7 w-7 bg-card/80 backdrop-blur border shadow-sm"
-            onClick={() => {
-              setMeasureMode(!measureMode)
-              setMeasurePoints([])
-            }}
-            title={measureMode ? 'Desactivar regla' : 'Medir distancia'}
-          >
-            <Ruler className="h-3.5 w-3.5" />
-          </Button>
-        </div>
-        </div>
       )}
 
       {/* Status Legend */}

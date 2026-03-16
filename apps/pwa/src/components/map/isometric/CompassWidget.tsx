@@ -10,23 +10,26 @@ import type { CameraAngle } from '@/types/isometricMap'
 import { CAMERA_ANGLE_AZIMUTH } from '@/types/isometricMap'
 
 interface CompassWidgetProps {
-  cameraAngle: CameraAngle
+  cameraAngle?: CameraAngle
+  rotationDeg?: number
 }
 
-export function CompassWidget({ cameraAngle }: CompassWidgetProps) {
-  const rotationDeg = useMemo(() => {
+export function CompassWidget({ cameraAngle, rotationDeg }: CompassWidgetProps) {
+  const computedRotationDeg = useMemo(() => {
+    if (typeof rotationDeg === 'number') return rotationDeg
+    if (!cameraAngle) return 0
     const azimuthRad = CAMERA_ANGLE_AZIMUTH[cameraAngle]
     // Convert azimuth to rotation: 0 = looking from SW (45°), which means N is at top-right
     // We rotate the compass so that N always points geographic north relative to the camera
     return (azimuthRad * 180) / Math.PI - 45
-  }, [cameraAngle])
+  }, [cameraAngle, rotationDeg])
 
   return (
     <div className="relative w-16 h-16" title="Brújula — norte geográfico">
       <svg
         viewBox="0 0 100 100"
         className="w-full h-full drop-shadow-lg"
-        style={{ transform: `rotate(${-rotationDeg}deg)`, transition: 'transform 0.4s ease-out' }}
+        style={{ transform: `rotate(${-computedRotationDeg}deg)`, transition: 'transform 0.4s ease-out' }}
       >
         {/* Outer ring */}
         <circle cx="50" cy="50" r="46" fill="rgba(0,0,0,0.6)" stroke="rgba(255,255,255,0.3)" strokeWidth="1.5" />

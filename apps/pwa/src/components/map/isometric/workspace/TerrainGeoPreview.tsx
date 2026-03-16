@@ -4,6 +4,9 @@ import { OrbitControls } from '@react-three/drei'
 import * as THREE from 'three'
 
 import { Badge } from '@/components/ui'
+import { Button } from '@/components/ui/button'
+import { BarChart3, Compass, Layers, MapPin, Ruler, X } from 'lucide-react'
+import { CompassWidget } from '@/components/map/isometric/CompassWidget'
 import {
   estimateRectangleMeters,
   parseCoordinatesText,
@@ -37,13 +40,22 @@ interface TerrainPayload {
   minElev: number
   maxElev: number
   realWidth: number
+  realDepth: number
 }
 
 interface TerrainEditCallbacks {
   onHoverInfo: (info: { elevation: number; gridR: number; gridC: number } | null) => void
   onBrushApply: (centerR: number, centerC: number) => void
+  onMeasurePoint: (point: { elevation: number; gridR: number; gridC: number }) => void
   brushTool: BrushTool
   brushRadius: number
+  measureMode: boolean
+}
+
+interface MeasureMarker {
+  elevation: number
+  gridR: number
+  gridC: number
 }
 
 /* ── Constants ─────────────────────────────────────────────────── */
@@ -83,6 +95,30 @@ function tileToLonLat(x: number, y: number, z: number) {
     lon: (x / n) * 360 - 180,
     lat: (Math.atan(Math.sinh(Math.PI * (1 - (2 * y) / n))) * 180) / Math.PI,
   }
+}
+
+function gridToGeo(corners: QuadCorners, gridR: number, gridC: number, rows: number, cols: number) {
+  const { south, north, west, east } = boundsOf(corners)
+  const u = cols > 1 ? gridC / (cols - 1) : 0
+  const v = rows > 1 ? gridR / (rows - 1) : 0
+  return {
+    lat: north - (north - south) * v,
+    lon: west + (east - west) * u,
+  }
+}
+
+function CameraAzimuthProbe({ onChange }: { onChange: (deg: number) => void }) {
+  const { camera } = useThree()
+  const lastSentRef = useRef<number | null>(null)
+
+  useFrame(() => {
+    const azimuthDeg = (Math.atan2(camera.position.x, camera.position.z) * 180) / Math.PI
+    if (lastSentRef.current !== null && Math.abs(lastSentRef.current - azimuthDeg) < 0.5) return
+    lastSentRef.current = azimuthDeg
+    onChange(azimuthDeg)
+  })
+
+  return null
 }
 
 /* ── Satellite imagery → Canvas ────────────────────────────────── */
@@ -314,6 +350,23 @@ function applyWaterMaskAndThreshold(
   return result
 }
 
+function applyEdgeFeathering(elev: number[], cols: number, rows: number, borderSize = 10): number[] {
+  const result = [...elev]
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const idx = r * cols + c
+      const distToEdge = Math.min(r, c, rows - 1 - r, cols - 1 - c)
+      if (distToEdge >= borderSize) continue
+      const t = Math.max(0, Math.min(1, distToEdge / borderSize))
+      const smooth = t * t * (3 - 2 * t)
+      result[idx] = result[idx]! * smooth
+    }
+  }
+
+  return result
+}
+
 /* ── R3F: Terrain island with raycasting + brush editing ────── */
 
 function TerrainIsland({
@@ -326,7 +379,7 @@ function TerrainIsland({
   const { texture, elevations, cols, rows, meshWidth, meshDepth, minElev, maxElev, realWidth } = data
   const elevRange = Math.max(0.1, maxElev - minElev)
   const hScale = (meshWidth / realWidth) * exaggeration
-  const wallDepth = Math.min(meshWidth * 0.15, elevRange * hScale * 0.5) + 0.15
+  const wallDepth = Math.min(meshWidth * 0.08, elevRange * hScale * 0.22) + 0.08
 
   const topRef = useRef<THREE.Mesh>(null)
   const cursorRef = useRef<THREE.Mesh>(null)
@@ -334,6 +387,7 @@ function TerrainIsland({
   const pointer = useRef(new THREE.Vector2(9999, 9999))
   const isPainting = useRef(false)
   const lastPaintTime = useRef(0)
+  const currentHoverRef = useRef<{ elevation: number; gridR: number; gridC: number } | null>(null)
   const { camera, gl } = useThree()
 
   // Track mouse position
@@ -345,12 +399,18 @@ function TerrainIsland({
       pointer.current.y = -((e.clientY - rect.top) / rect.height) * 2 + 1
     }
     const onDown = (e: PointerEvent) => {
-      if (edit.brushTool !== 'none' && e.button === 0) isPainting.current = true
+      if (e.button !== 0) return
+      if (edit.measureMode && currentHoverRef.current) {
+        edit.onMeasurePoint(currentHoverRef.current)
+        return
+      }
+      if (edit.brushTool !== 'none') isPainting.current = true
     }
     const onUp = () => { isPainting.current = false }
     const onLeave = () => {
       pointer.current.set(9999, 9999)
       isPainting.current = false
+      currentHoverRef.current = null
       edit.onHoverInfo(null)
     }
     el.addEventListener('pointermove', onMove)
@@ -382,7 +442,8 @@ function TerrainIsland({
     const gridR = Math.round(normZ * (rows - 1))
     if (gridR >= 0 && gridR < rows && gridC >= 0 && gridC < cols) {
       const elev = elevations[gridR * cols + gridC] ?? 0
-      edit.onHoverInfo({ elevation: elev, gridR, gridC })
+      currentHoverRef.current = { elevation: elev, gridR, gridC }
+      edit.onHoverInfo(currentHoverRef.current)
     }
     // Position brush cursor ring
     if (cursorRef.current && edit.brushTool !== 'none') {
@@ -466,17 +527,17 @@ function TerrainIsland({
   return (
     <group>
       <mesh ref={topRef} geometry={topGeo}>
-        <meshStandardMaterial map={texture} roughness={0.82} metalness={0.05} />
+        <meshStandardMaterial map={texture} color="#e7e0d2" roughness={0.96} metalness={0.02} />
       </mesh>
       <mesh geometry={sideGeo}>
-        <meshStandardMaterial color="#6B5B45" roughness={0.92} side={THREE.DoubleSide} />
+        <meshStandardMaterial color="#756650" roughness={1} side={THREE.DoubleSide} />
       </mesh>
       <mesh geometry={botGeo}>
         <meshStandardMaterial color="#4a3f30" roughness={1} />
       </mesh>
       <mesh position={[0, 0.005, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[meshWidth * 1.3, meshDepth * 1.3]} />
-        <meshStandardMaterial color="#1a6e8e" transparent opacity={0.6} roughness={0.15} metalness={0.3} />
+        <meshStandardMaterial color="#1d6f8a" transparent opacity={0.72} roughness={0.08} metalness={0.22} />
       </mesh>
       {/* Brush cursor */}
       <mesh ref={cursorRef} geometry={cursorGeo} visible={false}>
@@ -498,7 +559,7 @@ export function TerrainGeoPreview({
 }: TerrainGeoPreviewProps) {
   const [terrainData, setTerrainData] = useState<TerrainPayload | null>(null)
   const [loading, setLoading] = useState('')
-  const [exaggeration, setExaggeration] = useState(1.5)
+  const [exaggeration, setExaggeration] = useState(1.05)
   const [seaThreshold, setSeaThreshold] = useState(3)
   const [autoRotate, setAutoRotate] = useState(true)
   const [brushTool, setBrushTool] = useState<BrushTool>('none')
@@ -506,6 +567,14 @@ export function TerrainGeoPreview({
   const [brushStrength, setBrushStrength] = useState(2)
   const [hoverInfo, setHoverInfo] = useState<{ elevation: number; gridR: number; gridC: number } | null>(null)
   const [editCount, setEditCount] = useState(0)
+  const [showCompass, setShowCompass] = useState(true)
+  const [showMinimap, setShowMinimap] = useState(true)
+  const [showStats, setShowStats] = useState(false)
+  const [showGeoCoords, setShowGeoCoords] = useState(false)
+  const [measureMode, setMeasureMode] = useState(false)
+  const [measureMarkers, setMeasureMarkers] = useState<MeasureMarker[]>([])
+  const [cameraAzimuthDeg, setCameraAzimuthDeg] = useState(0)
+  const minimapRef = useRef<HTMLCanvasElement>(null)
   const texRef = useRef<THREE.CanvasTexture | null>(null)
   const rawElevRef = useRef<number[]>([])
   const waterMaskRef = useRef<boolean[]>([])
@@ -561,7 +630,8 @@ export function TerrainGeoPreview({
   const handleResetTerrain = useCallback(() => {
     if (rawElevRef.current.length === 0) return
     const smoothed = smoothElevations(rawElevRef.current, GRID, GRID, 2)
-    const elev = applyWaterMaskAndThreshold(smoothed, waterMaskRef.current, seaThreshold, GRID, GRID)
+    const masked = applyWaterMaskAndThreshold(smoothed, waterMaskRef.current, seaThreshold, GRID, GRID)
+    const elev = applyEdgeFeathering(masked, GRID, GRID)
     editedElevRef.current = []
     setTerrainData((prev) =>
       prev ? { ...prev, elevations: elev, minElev: Math.min(...elev), maxElev: Math.max(...elev) } : null,
@@ -572,9 +642,13 @@ export function TerrainGeoPreview({
   const editCallbacks = useMemo<TerrainEditCallbacks>(() => ({
     onHoverInfo: setHoverInfo,
     onBrushApply: handleBrushApply,
+    onMeasurePoint: (point) => {
+      setMeasureMarkers((prev) => (prev.length >= 2 ? [point] : [...prev, point]))
+    },
     brushTool,
     brushRadius,
-  }), [handleBrushApply, brushTool, brushRadius])
+    measureMode,
+  }), [handleBrushApply, brushTool, brushRadius, measureMode])
 
   const parsed = useMemo(() => {
     try {
@@ -619,8 +693,9 @@ export function TerrainGeoPreview({
         rawElevRef.current = rawElev
 
         setLoading('Procesando relieve…')
-        const smoothed = smoothElevations(rawElev, GRID, GRID, 2)
-        const elev = applyWaterMaskAndThreshold(smoothed, wMask, 3, GRID, GRID)
+        const smoothed = smoothElevations(rawElev, GRID, GRID, 3)
+        const masked = applyWaterMaskAndThreshold(smoothed, wMask, 3, GRID, GRID)
+        const elev = applyEdgeFeathering(masked, GRID, GRID)
 
         const { south, north, west, east } = boundsOf(corners)
         const avgLat = ((north + south) / 2) * Math.PI / 180
@@ -639,6 +714,7 @@ export function TerrainGeoPreview({
           minElev: Math.min(...elev),
           maxElev: Math.max(...elev),
           realWidth: wm,
+          realDepth: dm,
         })
         setLoading('')
       } catch (err) {
@@ -653,8 +729,9 @@ export function TerrainGeoPreview({
   // Re-process elevations when sea threshold changes (no re-fetch needed)
   useEffect(() => {
     if (!terrainData || rawElevRef.current.length === 0) return
-    const smoothed = smoothElevations(rawElevRef.current, GRID, GRID, 2)
-    const elev = applyWaterMaskAndThreshold(smoothed, waterMaskRef.current, seaThreshold, GRID, GRID)
+    const smoothed = smoothElevations(rawElevRef.current, GRID, GRID, 3)
+    const masked = applyWaterMaskAndThreshold(smoothed, waterMaskRef.current, seaThreshold, GRID, GRID)
+    const elev = applyEdgeFeathering(masked, GRID, GRID)
     setTerrainData((prev) =>
       prev
         ? { ...prev, elevations: elev, minElev: Math.min(...elev), maxElev: Math.max(...elev) }
@@ -666,6 +743,97 @@ export function TerrainGeoPreview({
   useEffect(() => {
     return () => { texRef.current?.dispose(); texRef.current = null }
   }, [])
+
+  useEffect(() => {
+    if (!measureMode) setMeasureMarkers([])
+  }, [measureMode])
+
+  const hoverGeo = useMemo(() => {
+    if (!showGeoCoords || !parsed.corners || !hoverInfo) return null
+    return gridToGeo(parsed.corners, hoverInfo.gridR, hoverInfo.gridC, GRID, GRID)
+  }, [showGeoCoords, parsed.corners, hoverInfo])
+
+  const measurement = useMemo(() => {
+    if (!terrainData || measureMarkers.length !== 2) return null
+    const [a, b] = measureMarkers
+    if (!a || !b) return null
+    const dx = ((b.gridC - a.gridC) / (GRID - 1)) * terrainData.realWidth
+    const dz = ((b.gridR - a.gridR) / (GRID - 1)) * terrainData.realDepth
+    const dy = b.elevation - a.elevation
+    const planar = Math.sqrt(dx * dx + dz * dz)
+    const spatial = Math.sqrt(dx * dx + dz * dz + dy * dy)
+    return { planar, spatial, dy }
+  }, [terrainData, measureMarkers])
+
+  const previewStats = useMemo(() => {
+    if (!terrainData) return null
+    const relief = terrainData.maxElev - terrainData.minElev
+    const coveredCells = terrainData.elevations.filter((value) => value > 0.1).length
+    return {
+      relief,
+      coveredCells,
+      totalCells: terrainData.cols * terrainData.rows,
+      waterCells: terrainData.waterMask.filter(Boolean).length,
+    }
+  }, [terrainData])
+
+  useEffect(() => {
+    const canvas = minimapRef.current
+    if (!canvas || !terrainData) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    const { cols, rows, elevations, waterMask, minElev, maxElev } = terrainData
+    const width = canvas.width
+    const height = canvas.height
+    const img = ctx.createImageData(width, height)
+    const relief = Math.max(0.1, maxElev - minElev)
+
+    for (let y = 0; y < height; y++) {
+      const r = Math.min(rows - 1, Math.round((y / (height - 1)) * (rows - 1)))
+      for (let x = 0; x < width; x++) {
+        const c = Math.min(cols - 1, Math.round((x / (width - 1)) * (cols - 1)))
+        const idx = r * cols + c
+        const offset = (y * width + x) * 4
+        if (waterMask[idx]) {
+          img.data[offset] = 24
+          img.data[offset + 1] = 99
+          img.data[offset + 2] = 140
+          img.data[offset + 3] = 255
+          continue
+        }
+        const normalized = (elevations[idx]! - minElev) / relief
+        const red = 104 + normalized * 88
+        const green = 112 + normalized * 74
+        const blue = 78 + normalized * 36
+        img.data[offset] = Math.round(red)
+        img.data[offset + 1] = Math.round(green)
+        img.data[offset + 2] = Math.round(blue)
+        img.data[offset + 3] = 255
+      }
+    }
+
+    ctx.putImageData(img, 0, 0)
+
+    if (hoverInfo) {
+      const hx = (hoverInfo.gridC / (cols - 1)) * width
+      const hy = (hoverInfo.gridR / (rows - 1)) * height
+      ctx.strokeStyle = '#f8fafc'
+      ctx.lineWidth = 1.5
+      ctx.beginPath()
+      ctx.arc(hx, hy, 4, 0, Math.PI * 2)
+      ctx.stroke()
+    }
+
+    for (const marker of measureMarkers) {
+      const mx = (marker.gridC / (cols - 1)) * width
+      const my = (marker.gridR / (rows - 1)) * height
+      ctx.fillStyle = '#f59e0b'
+      ctx.beginPath()
+      ctx.arc(mx, my, 3.5, 0, Math.PI * 2)
+      ctx.fill()
+    }
+  }, [terrainData, hoverInfo, measureMarkers])
 
   return (
     <div className="space-y-3 rounded-xl border bg-background/80 p-3 shadow-sm">
@@ -772,17 +940,19 @@ export function TerrainGeoPreview({
         )}
       </div>
 
-      <div className={`overflow-hidden rounded-xl border bg-[#0a0e17] ${mapHeightClassName}`}>
+      <div className={`relative overflow-hidden rounded-xl border bg-[#0a0e17] ${mapHeightClassName}`}>
         {terrainData ? (
           <Canvas
             camera={{ position: [SCALE * 0.75, SCALE * 0.55, SCALE * 0.75], fov: 45, near: 0.01, far: 200 }}
             gl={{ antialias: true }}
             style={{ background: '#0a0e17' }}
           >
-            <ambientLight intensity={0.4} />
-            <hemisphereLight args={['#b1e1ff', '#b97a20', 0.55]} />
-            <directionalLight position={[6, 10, 4]} intensity={1.4} />
-            <directionalLight position={[-3, 6, -5]} intensity={0.35} />
+            <fog attach="fog" args={['#0a0e17', 12, 28]} />
+            <ambientLight intensity={0.55} />
+            <hemisphereLight args={['#d9efff', '#7d5e38', 0.75]} />
+            <directionalLight position={[5, 9, 3]} intensity={1.15} />
+            <directionalLight position={[-4, 5, -4]} intensity={0.22} />
+            <CameraAzimuthProbe onChange={setCameraAzimuthDeg} />
             <TerrainIsland data={terrainData} exaggeration={exaggeration} edit={editCallbacks} />
             <OrbitControls
               enableDamping
@@ -791,12 +961,126 @@ export function TerrainGeoPreview({
               autoRotateSpeed={0.5}
               maxDistance={SCALE * 3}
               minDistance={SCALE * 0.3}
-              enabled={brushTool === 'none'}
+              enabled={brushTool === 'none' && !measureMode}
             />
           </Canvas>
         ) : (
           <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
             {loading || 'Esperando coordenadas válidas…'}
+          </div>
+        )}
+
+        <div className="absolute top-3 right-3 z-20 flex flex-wrap gap-1.5">
+          <Button
+            variant={showCompass ? 'default' : 'ghost'}
+            size="icon"
+            className="h-8 w-8 bg-card/85 backdrop-blur border shadow"
+            onClick={() => setShowCompass((value) => !value)}
+            title={showCompass ? 'Ocultar brújula' : 'Mostrar brújula'}
+          >
+            <Compass className="h-4 w-4" />
+          </Button>
+          <Button
+            variant={showMinimap ? 'default' : 'ghost'}
+            size="icon"
+            className="h-8 w-8 bg-card/85 backdrop-blur border shadow"
+            onClick={() => setShowMinimap((value) => !value)}
+            title={showMinimap ? 'Ocultar minimapa' : 'Mostrar minimapa'}
+          >
+            <Layers className="h-4 w-4" />
+          </Button>
+          <Button
+            variant={showStats ? 'default' : 'ghost'}
+            size="icon"
+            className="h-8 w-8 bg-card/85 backdrop-blur border shadow"
+            onClick={() => setShowStats((value) => !value)}
+            title={showStats ? 'Ocultar estadísticas' : 'Mostrar estadísticas'}
+          >
+            <BarChart3 className="h-4 w-4" />
+          </Button>
+          <Button
+            variant={showGeoCoords ? 'default' : 'ghost'}
+            size="icon"
+            className="h-8 w-8 bg-card/85 backdrop-blur border shadow"
+            onClick={() => setShowGeoCoords((value) => !value)}
+            title={showGeoCoords ? 'Ocultar coordenadas' : 'Mostrar coordenadas'}
+          >
+            <MapPin className="h-4 w-4" />
+          </Button>
+          <Button
+            variant={measureMode ? 'default' : 'ghost'}
+            size="icon"
+            className="h-8 w-8 bg-card/85 backdrop-blur border shadow"
+            onClick={() => {
+              setMeasureMode((value) => !value)
+              setBrushTool('none')
+              setAutoRotate(false)
+            }}
+            title={measureMode ? 'Salir de medición' : 'Medir distancia'}
+          >
+            <Ruler className="h-4 w-4" />
+          </Button>
+        </div>
+
+        {showCompass && (
+          <div className="absolute top-3 left-3 z-20">
+            <CompassWidget rotationDeg={cameraAzimuthDeg} />
+          </div>
+        )}
+
+        {showStats && terrainData && previewStats && (
+          <div className="absolute top-24 left-3 z-20 max-w-[220px] rounded-xl border bg-card/88 p-3 text-[11px] shadow-lg backdrop-blur">
+            <div className="mb-2 flex items-center gap-1.5 font-semibold text-foreground">
+              <BarChart3 className="h-3.5 w-3.5 text-primary" />
+              Estadísticas del preview
+            </div>
+            <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1 text-muted-foreground">
+              <span>Grilla</span>
+              <span className="text-foreground">{terrainData.cols}×{terrainData.rows}</span>
+              <span>Elevación</span>
+              <span className="text-foreground">{terrainData.minElev.toFixed(1)}m — {terrainData.maxElev.toFixed(1)}m</span>
+              <span>Relieve</span>
+              <span className="text-foreground">{previewStats.relief.toFixed(1)}m</span>
+              <span>Terreno útil</span>
+              <span className="text-foreground">{previewStats.coveredCells} celdas</span>
+              <span>Agua</span>
+              <span className="text-foreground">{previewStats.waterCells} celdas</span>
+            </div>
+          </div>
+        )}
+
+        {showGeoCoords && hoverInfo && hoverGeo && (
+          <div className="absolute top-3 left-1/2 z-20 -translate-x-1/2 rounded-md border bg-card/88 px-3 py-1.5 text-[11px] shadow backdrop-blur">
+            <div className="flex items-center gap-3 font-mono text-foreground">
+              <span>{hoverInfo.elevation.toFixed(1)} m</span>
+              <span className="text-muted-foreground">r{hoverInfo.gridR} c{hoverInfo.gridC}</span>
+              <span>{hoverGeo.lat.toFixed(6)}°, {hoverGeo.lon.toFixed(6)}°</span>
+            </div>
+          </div>
+        )}
+
+        {showMinimap && terrainData && (
+          <div className="absolute bottom-3 right-3 z-20 rounded-xl border bg-card/88 p-2 shadow-lg backdrop-blur">
+            <canvas ref={minimapRef} width={136} height={136} className="block rounded border" />
+          </div>
+        )}
+
+        {measureMode && (
+          <div className="absolute bottom-3 left-1/2 z-20 -translate-x-1/2 rounded-md border bg-card/88 px-3 py-2 text-[11px] shadow-lg backdrop-blur">
+            {measurement ? (
+              <div className="flex items-center gap-3">
+                <span className="font-medium text-foreground">Planta {measurement.planar.toFixed(1)} m</span>
+                <span className="text-muted-foreground">3D {measurement.spatial.toFixed(1)} m</span>
+                <span className="text-muted-foreground">Δh {measurement.dy.toFixed(1)} m</span>
+                <button className="opacity-70 hover:opacity-100" onClick={() => setMeasureMarkers([])}>
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ) : (
+              <span className="text-muted-foreground">
+                Haz click en dos puntos del terreno para medir distancia.
+              </span>
+            )}
           </div>
         )}
       </div>
