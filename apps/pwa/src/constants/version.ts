@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.70.59' as const
+export const APP_VERSION = '2.70.60' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-03-16' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Costa humeda y lectura reforzada de caminos y explanadas' as const
+export const VERSION_NAME = 'Caminos mas fieles, agua costera mas sutil y encuadre base ajustado' as const
 
 /**
  * Nota:

@@ -40,6 +40,9 @@ interface TerrainPayload {
     z: number
     scale: number
     opacity: number
+    stretch: number
+    rotation: number
+    tint: number
   }>
   cols: number
   rows: number
@@ -262,6 +265,48 @@ function createShadedTerrainCanvas(
     return waterMask[r * cols + c] ?? false
   }
 
+  const sampleSourceColor = (row: number, col: number) => {
+    const rr = Math.max(0, Math.min(rows - 1, row))
+    const cc = Math.max(0, Math.min(cols - 1, col))
+    const sx = Math.round((cc / Math.max(1, cols - 1)) * (out.width - 1))
+    const sy = Math.round((rr / Math.max(1, rows - 1)) * (out.height - 1))
+    const offset = (sy * out.width + sx) * 4
+    const red = original[offset] ?? 0
+    const green = original[offset + 1] ?? 0
+    const blue = original[offset + 2] ?? 0
+    const maxChannel = Math.max(red, green, blue)
+    const minChannel = Math.min(red, green, blue)
+    return {
+      sx,
+      sy,
+      red,
+      green,
+      blue,
+      brightness: (red + green + blue) / 3,
+      saturation: maxChannel <= 0 ? 0 : (maxChannel - minChannel) / maxChannel,
+    }
+  }
+
+  const sampleSlope = (row: number, col: number) => {
+    const left = sampleElevation(row, col - 1)
+    const right = sampleElevation(row, col + 1)
+    const up = sampleElevation(row - 1, col)
+    const down = sampleElevation(row + 1, col)
+    return Math.min(1, Math.sqrt((left - right) ** 2 + (up - down) ** 2) / 18)
+  }
+
+  const getRoadScore = (row: number, col: number) => {
+    if (sampleWater(row, col)) return 0
+    const center = sampleElevation(row, col)
+    if (center < 1.1) return 0
+    const source = sampleSourceColor(row, col)
+    const slope = sampleSlope(row, col)
+    const brightScore = clamp01((source.brightness - 126) / 34)
+    const lowSatScore = clamp01((0.17 - source.saturation) / 0.17)
+    const flatScore = clamp01((0.2 - slope) / 0.2)
+    return brightScore * 0.42 + lowSatScore * 0.33 + flatScore * 0.25
+  }
+
   const light = new THREE.Vector3(-0.45, 0.85, -0.3).normalize()
 
   for (let y = 0; y < out.height; y++) {
@@ -313,37 +358,37 @@ function createShadedTerrainCanvas(
         blue += 6
       }
 
-      red -= contourDarken
-      green -= contourDarken * 0.9
-      blue -= contourDarken * 0.8
+        red -= contourDarken
+        green -= contourDarken * 0.9
+        blue -= contourDarken * 0.8
 
-  red = lerp(red, 142, rockStrength * 0.5)
-  green = lerp(green, 134, rockStrength * 0.46)
-  blue = lerp(blue, 126, rockStrength * 0.42)
+        red = lerp(red, 142, rockStrength * 0.5)
+        green = lerp(green, 134, rockStrength * 0.46)
+        blue = lerp(blue, 126, rockStrength * 0.42)
 
-  red = lerp(red, 108, meadowStrength * 0.18)
-  green = lerp(green, 129, meadowStrength * 0.34)
-  blue = lerp(blue, 86, meadowStrength * 0.14)
+        red = lerp(red, 108, meadowStrength * 0.18)
+        green = lerp(green, 129, meadowStrength * 0.34)
+        blue = lerp(blue, 86, meadowStrength * 0.14)
 
-  red = lerp(red, 98, wetlandStrength * 0.12)
-  green = lerp(green, 126, wetlandStrength * 0.22)
-  blue = lerp(blue, 102, wetlandStrength * 0.2)
+        red = lerp(red, 98, wetlandStrength * 0.12)
+        green = lerp(green, 126, wetlandStrength * 0.22)
+        blue = lerp(blue, 102, wetlandStrength * 0.2)
 
-  red = lerp(red, 154, yardStrength * 0.52)
-  green = lerp(green, 146, yardStrength * 0.48)
-  blue = lerp(blue, 132, yardStrength * 0.42)
+        red = lerp(red, 154, yardStrength * 0.52)
+        green = lerp(green, 146, yardStrength * 0.48)
+        blue = lerp(blue, 132, yardStrength * 0.42)
 
-  red = lerp(red, 176, roadStrength * 0.36)
-  green = lerp(green, 164, roadStrength * 0.3)
-  blue = lerp(blue, 144, roadStrength * 0.24)
+        red = lerp(red, 176, roadStrength * 0.36)
+        green = lerp(green, 164, roadStrength * 0.3)
+        blue = lerp(blue, 144, roadStrength * 0.24)
 
-  red = lerp(red, 64, coastalWetness * 0.08)
-  green = lerp(green, 96, coastalWetness * 0.12)
-  blue = lerp(blue, 102, coastalWetness * 0.18)
+        red = lerp(red, 64, coastalWetness * 0.08)
+        green = lerp(green, 96, coastalWetness * 0.12)
+        blue = lerp(blue, 102, coastalWetness * 0.18)
 
-  red += ridgeLight * 10
-  green += ridgeLight * 9
-  blue += ridgeLight * 6
+        red += ridgeLight * 10
+        green += ridgeLight * 9
+        blue += ridgeLight * 6
 
       data[offset] = Math.max(0, Math.min(255, Math.round(red)))
       data[offset + 1] = Math.max(0, Math.min(255, Math.round(green)))
@@ -363,28 +408,18 @@ function createShadedTerrainCanvas(
       if (waterMask[idx]) continue
 
       const center = elevations[idx] ?? 0
-      const left = sampleElevation(r, c - 1)
-      const right = sampleElevation(r, c + 1)
-      const up = sampleElevation(r - 1, c)
-      const down = sampleElevation(r + 1, c)
-      const slope = Math.min(1, Math.sqrt((left - right) ** 2 + (up - down) ** 2) / 18)
-      const sx = Math.round((c / Math.max(1, cols - 1)) * (out.width - 1))
-      const sy = Math.round((r / Math.max(1, rows - 1)) * (out.height - 1))
-      const offset = (sy * out.width + sx) * 4
-      const baseRed = original[offset] ?? 0
-      const baseGreen = original[offset + 1] ?? 0
-      const baseBlue = original[offset + 2] ?? 0
-      const brightness = (baseRed + baseGreen + baseBlue) / 3
-      const maxChannel = Math.max(baseRed, baseGreen, baseBlue)
-      const minChannel = Math.min(baseRed, baseGreen, baseBlue)
-      const saturation = maxChannel <= 0 ? 0 : (maxChannel - minChannel) / maxChannel
+      const slope = sampleSlope(r, c)
+      const source = sampleSourceColor(r, c)
+      const brightness = source.brightness
+      const saturation = source.saturation
       const nearWater = [
         sampleWater(r - 1, c),
         sampleWater(r + 1, c),
         sampleWater(r, c - 1),
         sampleWater(r, c + 1),
       ].filter(Boolean).length
-      const roadCandidate = brightness > 132 && saturation < 0.13 && slope < 0.15 && center > 1.2
+      const roadScore = getRoadScore(r, c)
+      const roadCandidate = roadScore > 0.63
       const yardCandidate = brightness > 144 && saturation < 0.1 && slope < 0.11 && center > 1.1
       const wetCandidate = nearWater > 0 && center < 4.2 && slope < 0.18
 
@@ -400,28 +435,17 @@ function createShadedTerrainCanvas(
       }
 
       if (roadCandidate) {
-        if (c < cols - 2) {
-          const nextOffsetX = Math.round(((c + 1) / Math.max(1, cols - 1)) * (out.width - 1))
-          const nextBaseX = (sy * out.width + nextOffsetX) * 4
-          const nextBrightness = ((original[nextBaseX] ?? 0) + (original[nextBaseX + 1] ?? 0) + (original[nextBaseX + 2] ?? 0)) / 3
-          const nextMax = Math.max(original[nextBaseX] ?? 0, original[nextBaseX + 1] ?? 0, original[nextBaseX + 2] ?? 0)
-          const nextMin = Math.min(original[nextBaseX] ?? 0, original[nextBaseX + 1] ?? 0, original[nextBaseX + 2] ?? 0)
-          const nextSat = nextMax <= 0 ? 0 : (nextMax - nextMin) / nextMax
-          if (!sampleWater(r, c + 1) && nextBrightness > 128 && nextSat < 0.15) {
-            const nx = ((c + 1) / (cols - 1)) * out.width
-            pathSegments.push([px, py, nx, py, 1.4])
-          }
-        }
-        if (r < rows - 2) {
-          const nextOffsetY = Math.round(((r + 1) / Math.max(1, rows - 1)) * (out.height - 1))
-          const nextBaseY = (nextOffsetY * out.width + sx) * 4
-          const nextBrightness = ((original[nextBaseY] ?? 0) + (original[nextBaseY + 1] ?? 0) + (original[nextBaseY + 2] ?? 0)) / 3
-          const nextMax = Math.max(original[nextBaseY] ?? 0, original[nextBaseY + 1] ?? 0, original[nextBaseY + 2] ?? 0)
-          const nextMin = Math.min(original[nextBaseY] ?? 0, original[nextBaseY + 1] ?? 0, original[nextBaseY + 2] ?? 0)
-          const nextSat = nextMax <= 0 ? 0 : (nextMax - nextMin) / nextMax
-          if (!sampleWater(r + 1, c) && nextBrightness > 128 && nextSat < 0.15) {
-            const ny = ((r + 1) / (rows - 1)) * out.height
-            pathSegments.push([px, py, px, ny, 1.4])
+        const horizontalSupport = getRoadScore(r, c - 1) + getRoadScore(r, c + 1) + getRoadScore(r, c - 2) + getRoadScore(r, c + 2)
+        const verticalSupport = getRoadScore(r - 1, c) + getRoadScore(r + 1, c) + getRoadScore(r - 2, c) + getRoadScore(r + 2, c)
+        if (horizontalSupport > 1.25 || verticalSupport > 1.25) {
+          if (horizontalSupport >= verticalSupport) {
+            const startX = ((Math.max(0, c - 1.35)) / (cols - 1)) * out.width
+            const endX = ((Math.min(cols - 1, c + 1.35)) / (cols - 1)) * out.width
+            pathSegments.push([startX, py, endX, py, 1.15 + roadScore * 1.1])
+          } else {
+            const startY = ((Math.max(0, r - 1.35)) / (rows - 1)) * out.height
+            const endY = ((Math.min(rows - 1, r + 1.35)) / (rows - 1)) * out.height
+            pathSegments.push([px, startY, px, endY, 1.15 + roadScore * 1.1])
           }
         }
       }
@@ -443,7 +467,7 @@ function createShadedTerrainCanvas(
 
   ctx.save()
   ctx.globalCompositeOperation = 'screen'
-  ctx.fillStyle = 'rgba(220, 206, 184, 0.12)'
+  ctx.fillStyle = 'rgba(220, 206, 184, 0.1)'
   for (const [x, y, width, height] of yardRects) {
     ctx.fillRect(x, y, width, height)
   }
@@ -453,15 +477,15 @@ function createShadedTerrainCanvas(
   ctx.globalCompositeOperation = 'screen'
   ctx.lineCap = 'round'
   for (const [x1, y1, x2, y2, width] of pathSegments) {
-    ctx.strokeStyle = 'rgba(236, 225, 201, 0.14)'
-    ctx.lineWidth = width + 1.1
+    ctx.strokeStyle = 'rgba(236, 225, 201, 0.11)'
+    ctx.lineWidth = width + 0.9
     ctx.beginPath()
     ctx.moveTo(x1, y1)
     ctx.lineTo(x2, y2)
     ctx.stroke()
 
-    ctx.strokeStyle = 'rgba(150, 132, 112, 0.1)'
-    ctx.lineWidth = width
+    ctx.strokeStyle = 'rgba(150, 132, 112, 0.08)'
+    ctx.lineWidth = Math.max(0.8, width - 0.2)
     ctx.beginPath()
     ctx.moveTo(x1, y1)
     ctx.lineTo(x2, y2)
@@ -546,16 +570,22 @@ function generateCoastalFoamSpots(
       )
       const seed = Math.sin((r * 177.71) + (c * 913.17)) * 24631.334
       const random01 = seed - Math.floor(seed)
-      if (random01 < 0.24) continue
+      if (random01 < 0.45) continue
+
+      const detailSeed = Math.sin((r * 391.31) + (c * 117.73)) * 12874.231
+      const detail01 = detailSeed - Math.floor(detailSeed)
 
       const worldX = (c / (cols - 1) - 0.5) * meshWidth
       const worldZ = (r / (rows - 1) - 0.5) * meshDepth
-      const worldY = Math.max(0.01, (center - minElev) * hScale * 0.08)
-      const scale = 0.035 + nearWater * 0.018 + shorelineDrop * 0.004 + random01 * 0.03
-      const opacity = clamp01(0.28 + nearWater * 0.16 + shorelineDrop * 0.03)
+      const worldY = Math.max(0.008, (center - minElev) * hScale * 0.05)
+      const scale = 0.026 + nearWater * 0.014 + shorelineDrop * 0.003 + detail01 * 0.016
+      const opacity = clamp01(0.08 + nearWater * 0.07 + shorelineDrop * 0.018 + detail01 * 0.04)
+      const stretch = 0.72 + detail01 * 1.1
+      const rotation = random01 * Math.PI
+      const tint = 0.78 + detail01 * 0.22
 
-      foam.push({ x: worldX, y: worldY, z: worldZ, scale, opacity })
-      if (foam.length >= 220) return foam
+      foam.push({ x: worldX, y: worldY, z: worldZ, scale, opacity, stretch, rotation, tint })
+      if (foam.length >= 160) return foam
     }
   }
 
@@ -727,21 +757,21 @@ function TerrainIsland({
       </mesh>
       <mesh position={[0, -0.015, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[meshWidth * 1.45, meshDepth * 1.45]} />
-        <meshStandardMaterial color="#125a74" transparent opacity={0.88} roughness={0.09} metalness={0.18} />
+        <meshStandardMaterial color="#14586d" transparent opacity={0.84} roughness={0.11} metalness={0.14} />
       </mesh>
       <mesh position={[0, -0.008, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[meshWidth * 1.42, meshDepth * 1.42]} />
-        <meshStandardMaterial color="#2f8da7" transparent opacity={0.22} roughness={0.04} metalness={0.34} emissive="#76c8db" emissiveIntensity={0.08} />
+        <meshStandardMaterial color="#2d8096" transparent opacity={0.14} roughness={0.06} metalness={0.22} emissive="#76c8db" emissiveIntensity={0.04} />
       </mesh>
       {coastFoam.map((foam, index) => (
-        <group key={`${foam.x}-${foam.z}-${index}`} position={[foam.x, foam.y, foam.z]} rotation={[-Math.PI / 2, 0, 0]}>
-          <mesh>
+        <group key={`${foam.x}-${foam.z}-${index}`} position={[foam.x, foam.y, foam.z]} rotation={[-Math.PI / 2, 0, foam.rotation]}>
+          <mesh scale={[foam.stretch, 1, 1]}>
             <circleGeometry args={[foam.scale, 18]} />
-            <meshBasicMaterial color="#eafcff" transparent opacity={foam.opacity * 0.55} />
+            <meshBasicMaterial color={`hsl(191, 70%, ${88 + foam.tint * 8}%)`} transparent opacity={foam.opacity * 0.42} />
           </mesh>
-          <mesh position={[0, 0.001, 0]}>
+          <mesh position={[0, 0.001, 0]} scale={[foam.stretch * 1.08, 1, 1]}>
             <ringGeometry args={[foam.scale * 0.42, foam.scale * 0.9, 18]} />
-            <meshBasicMaterial color="#b8edf5" transparent opacity={foam.opacity * 0.38} side={THREE.DoubleSide} />
+            <meshBasicMaterial color={`hsl(189, 64%, ${76 + foam.tint * 6}%)`} transparent opacity={foam.opacity * 0.3} side={THREE.DoubleSide} />
           </mesh>
         </group>
       ))}

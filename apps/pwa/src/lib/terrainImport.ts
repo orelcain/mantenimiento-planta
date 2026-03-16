@@ -83,10 +83,10 @@ export class TerrainImportHttpError extends Error {
 
 // Coordenadas base entregadas por usuario para el rectangulo de trabajo.
 export const DEFAULT_CHONCHI_RECTANGLE: GeoCoordinate[] = [
-  { lat: -42.6325, lon: -73.7632 },
-  { lat: -42.6292, lon: -73.7579 },
-  { lat: -42.6308, lon: -73.7563 },
-  { lat: -42.6334, lon: -73.7626 },
+  { lat: -42.63228, lon: -73.76278 },
+  { lat: -42.62948, lon: -73.75818 },
+  { lat: -42.63086, lon: -73.75692 },
+  { lat: -42.63302, lon: -73.76218 },
 ]
 
 const OPEN_METEO_ELEVATION_API = 'https://api.open-meteo.com/v1/elevation'
