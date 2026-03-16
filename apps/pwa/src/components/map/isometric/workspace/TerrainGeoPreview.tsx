@@ -28,12 +28,14 @@ interface TerrainGeoPreviewProps {
 
 type QuadCorners = [GeoCoordinate, GeoCoordinate, GeoCoordinate, GeoCoordinate]
 
-type BrushTool = 'none' | 'raise' | 'lower' | 'smooth' | 'flatten'
+type BrushTool = 'none' | 'raise' | 'lower' | 'smooth' | 'flatten' | 'mark-road' | 'mark-structure' | 'erase-mark'
 
 interface TerrainPayload {
   texture: THREE.CanvasTexture
   elevations: number[]
   waterMask: boolean[]
+  roadMask: boolean[]
+  structureMask: boolean[]
   coastFoam: Array<{
     x: number
     y: number
@@ -201,6 +203,76 @@ function createEdgeWallGeometry({
   geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
   geometry.setIndex(indices)
   geometry.computeVertexNormals()
+  return geometry
+}
+
+function createOverlayMaskGeometry({
+  mask,
+  elevations,
+  cols,
+  rows,
+  meshWidth,
+  meshDepth,
+  minElev,
+  hScale,
+  lift,
+}: {
+  mask: boolean[]
+  elevations: number[]
+  cols: number
+  rows: number
+  meshWidth: number
+  meshDepth: number
+  minElev: number
+  hScale: number
+  lift: number
+}): THREE.BufferGeometry {
+  const positions: number[] = []
+  const normals: number[] = []
+  const uvs: number[] = []
+  const halfCellW = meshWidth / Math.max(1, cols - 1) / 2
+  const halfCellD = meshDepth / Math.max(1, rows - 1) / 2
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const idx = r * cols + c
+      if (!mask[idx]) continue
+      const centerX = (c / Math.max(1, cols - 1) - 0.5) * meshWidth
+      const centerZ = (r / Math.max(1, rows - 1) - 0.5) * meshDepth
+      const centerY = ((elevations[idx] ?? minElev) - minElev) * hScale + lift
+
+      positions.push(
+        centerX - halfCellW, centerY, centerZ - halfCellD,
+        centerX + halfCellW, centerY, centerZ - halfCellD,
+        centerX + halfCellW, centerY, centerZ + halfCellD,
+
+        centerX - halfCellW, centerY, centerZ - halfCellD,
+        centerX + halfCellW, centerY, centerZ + halfCellD,
+        centerX - halfCellW, centerY, centerZ + halfCellD,
+      )
+      normals.push(
+        0, 1, 0,
+        0, 1, 0,
+        0, 1, 0,
+        0, 1, 0,
+        0, 1, 0,
+        0, 1, 0,
+      )
+      uvs.push(
+        0, 0,
+        1, 0,
+        1, 1,
+        0, 0,
+        1, 1,
+        0, 1,
+      )
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+  geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3))
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2))
   return geometry
 }
 
@@ -799,7 +871,7 @@ function TerrainIsland({
   exaggeration: number
   edit: TerrainEditCallbacks
 }) {
-  const { texture, elevations, coastFoam, cols, rows, meshWidth, meshDepth, minElev, maxElev, realWidth } = data
+  const { texture, elevations, roadMask, structureMask, coastFoam, cols, rows, meshWidth, meshDepth, minElev, maxElev, realWidth } = data
   const hScale = (meshWidth / realWidth) * exaggeration
   const landBaseY = -Math.max(0.62, (maxElev - minElev) * hScale * 0.22 + 0.22)
   const seaBaseY = landBaseY - 0.12
@@ -921,6 +993,14 @@ function TerrainIsland({
     () => createEdgeWallGeometry({ side: 'east', elevations, cols, rows, meshWidth, meshDepth, minElev, hScale, baseY: landBaseY }),
     [elevations, cols, rows, meshWidth, meshDepth, minElev, hScale, landBaseY],
   )
+  const roadOverlayGeo = useMemo(
+    () => createOverlayMaskGeometry({ mask: roadMask, elevations, cols, rows, meshWidth, meshDepth, minElev, hScale, lift: 0.018 }),
+    [roadMask, elevations, cols, rows, meshWidth, meshDepth, minElev, hScale],
+  )
+  const structureOverlayGeo = useMemo(
+    () => createOverlayMaskGeometry({ mask: structureMask, elevations, cols, rows, meshWidth, meshDepth, minElev, hScale, lift: 0.028 }),
+    [structureMask, elevations, cols, rows, meshWidth, meshDepth, minElev, hScale],
+  )
 
   // Brush cursor ring geometry
   const cursorGeo = useMemo(() => {
@@ -949,6 +1029,12 @@ function TerrainIsland({
       </mesh>
       <mesh ref={topRef} geometry={topGeo}>
         <meshStandardMaterial map={texture} color="#ece2cf" roughness={0.94} metalness={0.02} />
+      </mesh>
+      <mesh geometry={roadOverlayGeo}>
+        <meshBasicMaterial color="#f59e0b" transparent opacity={0.38} side={THREE.DoubleSide} />
+      </mesh>
+      <mesh geometry={structureOverlayGeo}>
+        <meshBasicMaterial color="#ef4444" transparent opacity={0.34} side={THREE.DoubleSide} />
       </mesh>
       <mesh position={[0, seaBaseY, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[waterSpanWidth, waterSpanDepth]} />
@@ -1039,11 +1125,15 @@ export function TerrainGeoPreview({
   const rawElevRef = useRef<number[]>([])
   const waterMaskRef = useRef<boolean[]>([])
   const baseElevRef = useRef<number[]>([])
+  const baseRoadMaskRef = useRef<boolean[]>([])
+  const baseStructureMaskRef = useRef<boolean[]>([])
 
   const handleBrushApply = useCallback((centerR: number, centerC: number) => {
     if (!terrainData || brushTool === 'none') return
     const { cols, rows } = terrainData
     const elev = [...terrainData.elevations]
+    const roadMask = [...terrainData.roadMask]
+    const structureMask = [...terrainData.structureMask]
     const r0 = Math.max(0, centerR - brushRadius)
     const r1 = Math.min(rows - 1, centerR + brushRadius)
     const c0 = Math.max(0, centerC - brushRadius)
@@ -1056,6 +1146,22 @@ export function TerrainGeoPreview({
         const falloff = 1 - (dist / brushRadius)
         const idx = r * cols + c
         const amount = brushStrength * falloff
+
+        if (brushTool === 'mark-road') {
+          roadMask[idx] = true
+          structureMask[idx] = false
+          continue
+        }
+        if (brushTool === 'mark-structure') {
+          structureMask[idx] = true
+          roadMask[idx] = false
+          continue
+        }
+        if (brushTool === 'erase-mark') {
+          roadMask[idx] = false
+          structureMask[idx] = false
+          continue
+        }
 
         if (brushTool === 'raise') {
           elev[idx] = (elev[idx] ?? 0) + amount
@@ -1081,7 +1187,16 @@ export function TerrainGeoPreview({
     }
 
     setTerrainData((prev) =>
-      prev ? { ...prev, elevations: elev, minElev: Math.min(...elev), maxElev: Math.max(...elev) } : null,
+      prev
+        ? {
+            ...prev,
+            elevations: elev,
+            roadMask,
+            structureMask,
+            minElev: Math.min(...elev),
+            maxElev: Math.max(...elev),
+          }
+        : null,
     )
     setEditCount((c) => c + 1)
   }, [terrainData, brushTool, brushRadius, brushStrength])
@@ -1090,7 +1205,16 @@ export function TerrainGeoPreview({
     if (baseElevRef.current.length === 0) return
     const elev = [...baseElevRef.current]
     setTerrainData((prev) =>
-      prev ? { ...prev, elevations: elev, minElev: Math.min(...elev), maxElev: Math.max(...elev) } : null,
+      prev
+        ? {
+            ...prev,
+            elevations: elev,
+            roadMask: [...baseRoadMaskRef.current],
+            structureMask: [...baseStructureMaskRef.current],
+            minElev: Math.min(...elev),
+            maxElev: Math.max(...elev),
+          }
+        : null,
     )
     setEditCount(0)
   }, [])
@@ -1150,6 +1274,8 @@ export function TerrainGeoPreview({
         const importedGrid = terrainTilesToGrid(importedTerrain.tiles, GRID, GRID)
         baseElevRef.current = importedGrid
         rawElevRef.current = importedGrid
+        baseRoadMaskRef.current = new Array(GRID * GRID).fill(false)
+        baseStructureMaskRef.current = new Array(GRID * GRID).fill(false)
 
         setLoading('Detectando agua en imagen satelital…')
         const wMask = detectWaterMask(canvas, GRID, GRID)
@@ -1177,6 +1303,8 @@ export function TerrainGeoPreview({
           texture: tex,
           elevations: elev,
           waterMask: wMask,
+          roadMask: [...baseRoadMaskRef.current],
+          structureMask: [...baseStructureMaskRef.current],
           coastFoam,
           cols: GRID,
           rows: GRID,
@@ -1206,6 +1334,8 @@ export function TerrainGeoPreview({
         ? {
             ...prev,
             elevations: elev,
+            roadMask: [...prev.roadMask],
+            structureMask: [...prev.structureMask],
             coastFoam: generateCoastalFoamSpots(
               elev,
               waterMaskRef.current,
@@ -1256,6 +1386,8 @@ export function TerrainGeoPreview({
     const coveredCells = terrainData.elevations.filter((value) => value > 0.1).length
     const meanElevation = terrainData.elevations.reduce((sum, value) => sum + value, 0) / Math.max(1, terrainData.elevations.length)
     const coastlineCells = terrainData.elevations.filter((value) => value > 0.1 && value < 6).length
+    const roadCells = terrainData.roadMask.filter(Boolean).length
+    const structureCells = terrainData.structureMask.filter(Boolean).length
     return {
       relief,
       coveredCells,
@@ -1264,6 +1396,8 @@ export function TerrainGeoPreview({
       meanElevation,
       coastlineCells,
       foamCount: terrainData.coastFoam.length,
+      roadCells,
+      structureCells,
     }
   }, [terrainData])
 
@@ -1273,7 +1407,7 @@ export function TerrainGeoPreview({
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
-    const { cols, rows, elevations, waterMask, minElev, maxElev } = terrainData
+    const { cols, rows, elevations, waterMask, roadMask, structureMask, minElev, maxElev } = terrainData
     const width = canvas.width
     const height = canvas.height
     const img = ctx.createImageData(width, height)
@@ -1289,6 +1423,20 @@ export function TerrainGeoPreview({
           img.data[offset] = 24
           img.data[offset + 1] = 99
           img.data[offset + 2] = 140
+          img.data[offset + 3] = 255
+          continue
+        }
+        if (structureMask[idx]) {
+          img.data[offset] = 214
+          img.data[offset + 1] = 74
+          img.data[offset + 2] = 82
+          img.data[offset + 3] = 255
+          continue
+        }
+        if (roadMask[idx]) {
+          img.data[offset] = 227
+          img.data[offset + 1] = 156
+          img.data[offset + 2] = 56
           img.data[offset + 3] = 255
           continue
         }
@@ -1335,7 +1483,13 @@ export function TerrainGeoPreview({
           </p>
           <p className="text-[11px] text-muted-foreground">
             {brushTool !== 'none'
-              ? 'Click y arrastra sobre el terreno para editar. Mantén presionado para pintar.'
+              ? brushTool === 'mark-road'
+                ? 'Modo admin: pinta donde sí existe camino real sobre el satélite.'
+                : brushTool === 'mark-structure'
+                  ? 'Modo admin: marca edificios, explanadas duras y estructuras.'
+                  : brushTool === 'erase-mark'
+                    ? 'Modo admin: borra marcas manuales de caminos y estructuras.'
+                    : 'Click y arrastra sobre el terreno para editar. Mantén presionado para pintar.'
               : 'Arrastra para rotar, scroll para zoom.'}
           </p>
         </div>
@@ -1368,6 +1522,9 @@ export function TerrainGeoPreview({
           { id: 'lower' as BrushTool, label: '⬇ Bajar', color: 'bg-red-600' },
           { id: 'smooth' as BrushTool, label: '〰 Suavizar', color: 'bg-blue-600' },
           { id: 'flatten' as BrushTool, label: '═ Aplanar', color: 'bg-amber-600' },
+          { id: 'mark-road' as BrushTool, label: '🛣 Camino', color: 'bg-orange-500' },
+          { id: 'mark-structure' as BrushTool, label: '🏭 Estructura', color: 'bg-rose-600' },
+          { id: 'erase-mark' as BrushTool, label: '🧽 Borrar marca', color: 'bg-slate-600' },
         ].map((t) => (
           <button
             key={t.id}
@@ -1411,7 +1568,7 @@ export function TerrainGeoPreview({
             className="h-1.5 w-24 cursor-pointer accent-cyan-400"
           />
         </label>
-        {brushTool !== 'none' && (
+        {brushTool !== 'none' && brushTool !== 'mark-road' && brushTool !== 'mark-structure' && brushTool !== 'erase-mark' && (
           <>
             <label className="flex items-center gap-2">
               <span className="whitespace-nowrap">Radio {brushRadius}</span>
@@ -1550,9 +1707,22 @@ export function TerrainGeoPreview({
               <span className="text-foreground">{previewStats.coastlineCells} celdas</span>
               <span>Espuma costa</span>
               <span className="text-foreground">{previewStats.foamCount} marcas</span>
+              <span>Caminos admin</span>
+              <span className="text-foreground">{previewStats.roadCells} celdas</span>
+              <span>Estructuras admin</span>
+              <span className="text-foreground">{previewStats.structureCells} celdas</span>
             </div>
           </div>
         )}
+
+        {terrainData && (previewStats?.roadCells || previewStats?.structureCells) ? (
+          <div className="absolute bottom-3 left-3 z-20 rounded-xl border bg-card/88 px-3 py-2 text-[11px] shadow-lg backdrop-blur">
+            <div className="flex items-center gap-3 text-muted-foreground">
+              <span className="flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-orange-400" />Caminos {previewStats?.roadCells ?? 0}</span>
+              <span className="flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-rose-500" />Estructuras {previewStats?.structureCells ?? 0}</span>
+            </div>
+          </div>
+        ) : null}
 
         {showGeoCoords && hoverInfo && hoverGeo && (
           <div className="absolute top-3 left-1/2 z-20 -translate-x-1/2 rounded-md border bg-card/88 px-3 py-1.5 text-[11px] shadow backdrop-blur">
