@@ -62,7 +62,7 @@ interface MeasureMarker {
 
 const GRID = 128
 const TILE_Z = 17
-const DEM_Z = 14
+const DEM_Z = 15
 const SCALE = 10
 
 /* ── Helpers ───────────────────────────────────────────────────── */
@@ -367,6 +367,54 @@ function applyEdgeFeathering(elev: number[], cols: number, rows: number, borderS
   return result
 }
 
+function applyCoastalRelaxation(elev: number[], waterMask: boolean[], cols: number, rows: number, coastBand = 12): number[] {
+  const total = cols * rows
+  const distance = new Array<number>(total).fill(Number.POSITIVE_INFINITY)
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const idx = r * cols + c
+      if (waterMask[idx]) {
+        distance[idx] = 0
+      }
+    }
+  }
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const idx = r * cols + c
+      if (r > 0) distance[idx] = Math.min(distance[idx]!, distance[(r - 1) * cols + c]! + 1)
+      if (c > 0) distance[idx] = Math.min(distance[idx]!, distance[r * cols + c - 1]! + 1)
+      if (r > 0 && c > 0) distance[idx] = Math.min(distance[idx]!, distance[(r - 1) * cols + c - 1]! + 1.414)
+      if (r > 0 && c < cols - 1) distance[idx] = Math.min(distance[idx]!, distance[(r - 1) * cols + c + 1]! + 1.414)
+    }
+  }
+
+  for (let r = rows - 1; r >= 0; r--) {
+    for (let c = cols - 1; c >= 0; c--) {
+      const idx = r * cols + c
+      if (r < rows - 1) distance[idx] = Math.min(distance[idx]!, distance[(r + 1) * cols + c]! + 1)
+      if (c < cols - 1) distance[idx] = Math.min(distance[idx]!, distance[r * cols + c + 1]! + 1)
+      if (r < rows - 1 && c < cols - 1) distance[idx] = Math.min(distance[idx]!, distance[(r + 1) * cols + c + 1]! + 1.414)
+      if (r < rows - 1 && c > 0) distance[idx] = Math.min(distance[idx]!, distance[(r + 1) * cols + c - 1]! + 1.414)
+    }
+  }
+
+  const result = [...elev]
+  for (let i = 0; i < total; i++) {
+    if (waterMask[i]) {
+      result[i] = 0
+      continue
+    }
+    if (distance[i]! >= coastBand) continue
+    const t = Math.max(0, Math.min(1, distance[i]! / coastBand))
+    const smooth = t * t * (3 - 2 * t)
+    result[i] = result[i]! * (0.18 + smooth * 0.82)
+  }
+
+  return result
+}
+
 /* ── R3F: Terrain island with raycasting + brush editing ────── */
 
 function TerrainIsland({
@@ -376,10 +424,8 @@ function TerrainIsland({
   exaggeration: number
   edit: TerrainEditCallbacks
 }) {
-  const { texture, elevations, cols, rows, meshWidth, meshDepth, minElev, maxElev, realWidth } = data
-  const elevRange = Math.max(0.1, maxElev - minElev)
+  const { texture, elevations, cols, rows, meshWidth, meshDepth, minElev, realWidth } = data
   const hScale = (meshWidth / realWidth) * exaggeration
-  const wallDepth = Math.min(meshWidth * 0.08, elevRange * hScale * 0.22) + 0.08
 
   const topRef = useRef<THREE.Mesh>(null)
   const cursorRef = useRef<THREE.Mesh>(null)
@@ -464,7 +510,7 @@ function TerrainIsland({
     }
   })
 
-  const { topGeo, sideGeo, botGeo } = useMemo(() => {
+  const topGeo = useMemo(() => {
     const top = new THREE.PlaneGeometry(meshWidth, meshDepth, cols - 1, rows - 1)
     top.rotateX(-Math.PI / 2)
     const pos = top.attributes.position as THREE.BufferAttribute
@@ -476,46 +522,8 @@ function TerrainIsland({
     }
     pos.needsUpdate = true
     top.computeVertexNormals()
-
-    const baseY = -wallDepth
-    const sv: number[] = []
-
-    const addWall = (x1: number, y1: number, z1: number, x2: number, y2: number, z2: number) => {
-      sv.push(x1, y1, z1, x2, y2, z2, x1, baseY, z1)
-      sv.push(x2, y2, z2, x2, baseY, z2, x1, baseY, z1)
-    }
-
-    for (let c = 0; c < cols - 1; c++) {
-      addWall(pos.getX(c), pos.getY(c), pos.getZ(c), pos.getX(c + 1), pos.getY(c + 1), pos.getZ(c + 1))
-    }
-    for (let c = 0; c < cols - 1; c++) {
-      const base = (rows - 1) * cols
-      addWall(
-        pos.getX(base + c + 1), pos.getY(base + c + 1), pos.getZ(base + c + 1),
-        pos.getX(base + c), pos.getY(base + c), pos.getZ(base + c),
-      )
-    }
-    for (let r = 0; r < rows - 1; r++) {
-      const i1 = (r + 1) * cols
-      const i2 = r * cols
-      addWall(pos.getX(i1), pos.getY(i1), pos.getZ(i1), pos.getX(i2), pos.getY(i2), pos.getZ(i2))
-    }
-    for (let r = 0; r < rows - 1; r++) {
-      const i1 = r * cols + cols - 1
-      const i2 = (r + 1) * cols + cols - 1
-      addWall(pos.getX(i1), pos.getY(i1), pos.getZ(i1), pos.getX(i2), pos.getY(i2), pos.getZ(i2))
-    }
-
-    const side = new THREE.BufferGeometry()
-    side.setAttribute('position', new THREE.Float32BufferAttribute(sv, 3))
-    side.computeVertexNormals()
-
-    const bot = new THREE.PlaneGeometry(meshWidth, meshDepth)
-    bot.rotateX(Math.PI / 2)
-    bot.translate(0, baseY, 0)
-
-    return { topGeo: top, sideGeo: side, botGeo: bot }
-  }, [elevations, cols, rows, meshWidth, meshDepth, minElev, hScale, wallDepth])
+    return top
+  }, [elevations, cols, rows, meshWidth, meshDepth, minElev, hScale])
 
   // Brush cursor ring geometry
   const cursorGeo = useMemo(() => {
@@ -529,15 +537,13 @@ function TerrainIsland({
       <mesh ref={topRef} geometry={topGeo}>
         <meshStandardMaterial map={texture} color="#e7e0d2" roughness={0.96} metalness={0.02} />
       </mesh>
-      <mesh geometry={sideGeo}>
-        <meshStandardMaterial color="#756650" roughness={1} side={THREE.DoubleSide} />
-      </mesh>
-      <mesh geometry={botGeo}>
-        <meshStandardMaterial color="#4a3f30" roughness={1} />
-      </mesh>
       <mesh position={[0, 0.005, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[meshWidth * 1.3, meshDepth * 1.3]} />
-        <meshStandardMaterial color="#1d6f8a" transparent opacity={0.72} roughness={0.08} metalness={0.22} />
+        <planeGeometry args={[meshWidth * 1.45, meshDepth * 1.45]} />
+        <meshStandardMaterial color="#1d6f8a" transparent opacity={0.78} roughness={0.08} metalness={0.22} />
+      </mesh>
+      <mesh position={[0, -0.03, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[meshWidth * 1.6, meshDepth * 1.6]} />
+        <meshBasicMaterial color="#07111a" transparent opacity={0.45} />
       </mesh>
       {/* Brush cursor */}
       <mesh ref={cursorRef} geometry={cursorGeo} visible={false}>
@@ -629,9 +635,10 @@ export function TerrainGeoPreview({
 
   const handleResetTerrain = useCallback(() => {
     if (rawElevRef.current.length === 0) return
-    const smoothed = smoothElevations(rawElevRef.current, GRID, GRID, 2)
+    const smoothed = smoothElevations(rawElevRef.current, GRID, GRID, 3)
     const masked = applyWaterMaskAndThreshold(smoothed, waterMaskRef.current, seaThreshold, GRID, GRID)
-    const elev = applyEdgeFeathering(masked, GRID, GRID)
+    const coastal = applyCoastalRelaxation(masked, waterMaskRef.current, GRID, GRID)
+    const elev = applyEdgeFeathering(coastal, GRID, GRID, 16)
     editedElevRef.current = []
     setTerrainData((prev) =>
       prev ? { ...prev, elevations: elev, minElev: Math.min(...elev), maxElev: Math.max(...elev) } : null,
@@ -695,7 +702,8 @@ export function TerrainGeoPreview({
         setLoading('Procesando relieve…')
         const smoothed = smoothElevations(rawElev, GRID, GRID, 3)
         const masked = applyWaterMaskAndThreshold(smoothed, wMask, 3, GRID, GRID)
-        const elev = applyEdgeFeathering(masked, GRID, GRID)
+        const coastal = applyCoastalRelaxation(masked, wMask, GRID, GRID)
+        const elev = applyEdgeFeathering(coastal, GRID, GRID, 16)
 
         const { south, north, west, east } = boundsOf(corners)
         const avgLat = ((north + south) / 2) * Math.PI / 180
@@ -731,7 +739,8 @@ export function TerrainGeoPreview({
     if (!terrainData || rawElevRef.current.length === 0) return
     const smoothed = smoothElevations(rawElevRef.current, GRID, GRID, 3)
     const masked = applyWaterMaskAndThreshold(smoothed, waterMaskRef.current, seaThreshold, GRID, GRID)
-    const elev = applyEdgeFeathering(masked, GRID, GRID)
+    const coastal = applyCoastalRelaxation(masked, waterMaskRef.current, GRID, GRID)
+    const elev = applyEdgeFeathering(coastal, GRID, GRID, 16)
     setTerrainData((prev) =>
       prev
         ? { ...prev, elevations: elev, minElev: Math.min(...elev), maxElev: Math.max(...elev) }
