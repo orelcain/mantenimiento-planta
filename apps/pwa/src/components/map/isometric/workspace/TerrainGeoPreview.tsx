@@ -34,6 +34,14 @@ interface TerrainPayload {
   texture: THREE.CanvasTexture
   elevations: number[]
   waterMask: boolean[]
+  vegetation: Array<{
+    x: number
+    z: number
+    y: number
+    height: number
+    radius: number
+    hue: number
+  }>
   cols: number
   rows: number
   meshWidth: number
@@ -249,14 +257,16 @@ function createShadedTerrainCanvas(satCanvas: HTMLCanvasElement, elevations: num
       const shade = Math.max(0, normal.dot(light))
       const slope = Math.min(1, Math.sqrt((left - right) ** 2 + (up - down) ** 2) / 18)
       const normalizedElevation = (center - minElev) / elevRange
-      const contourBand = Math.abs((((center - minElev) / 5) % 1) - 0.5)
-      const contourStrength = contourBand < 0.08 ? (0.08 - contourBand) / 0.08 : 0
+      const contourBandMinor = Math.abs((((center - minElev) / 1) % 1) - 0.5)
+      const contourBandMajor = Math.abs((((center - minElev) / 5) % 1) - 0.5)
+      const contourStrengthMinor = contourBandMinor < 0.028 ? (0.028 - contourBandMinor) / 0.028 : 0
+      const contourStrengthMajor = contourBandMajor < 0.08 ? (0.08 - contourBandMajor) / 0.08 : 0
       const ambient = 0.68
       const brightness = ambient + shade * 0.44
       const elevationWarm = normalizedElevation * 18
       const elevationCool = (1 - normalizedElevation) * 10
       const slopeDarken = slope * 18
-      const contourDarken = contourStrength * 20
+      const contourDarken = contourStrengthMinor * 8 + contourStrengthMajor * 18
       const offset = (y * out.width + x) * 4
 
       let red = data[offset]! * brightness + elevationWarm
@@ -310,6 +320,59 @@ function createShadedTerrainCanvas(satCanvas: HTMLCanvasElement, elevations: num
   return out
 }
 
+function generateVegetationSpots(
+  elevations: number[],
+  waterMask: boolean[],
+  cols: number,
+  rows: number,
+  meshWidth: number,
+  meshDepth: number,
+  minElev: number,
+  realWidth: number,
+  exaggeration: number,
+): TerrainPayload['vegetation'] {
+  const spots: TerrainPayload['vegetation'] = []
+  const hScale = (meshWidth / realWidth) * exaggeration
+
+  const sampleElevation = (row: number, col: number) => {
+    const r = Math.max(0, Math.min(rows - 1, row))
+    const c = Math.max(0, Math.min(cols - 1, col))
+    return elevations[r * cols + c] ?? 0
+  }
+
+  for (let r = 2; r < rows - 2; r += 2) {
+    for (let c = 2; c < cols - 2; c += 2) {
+      const idx = r * cols + c
+      if (waterMask[idx]) continue
+
+      const center = elevations[idx] ?? 0
+      if (center < 2 || center > 42) continue
+
+      const slope = Math.sqrt(
+        (sampleElevation(r, c - 1) - sampleElevation(r, c + 1)) ** 2 +
+        (sampleElevation(r - 1, c) - sampleElevation(r + 1, c)) ** 2,
+      )
+      if (slope > 7.5) continue
+
+      const seed = Math.sin((r * 9283.23) + (c * 1237.17)) * 43758.5453
+      const random01 = seed - Math.floor(seed)
+      if (random01 < 0.82) continue
+
+      const worldX = (c / (cols - 1) - 0.5) * meshWidth
+      const worldZ = (r / (rows - 1) - 0.5) * meshDepth
+      const worldY = (center - minElev) * hScale
+      const height = 0.05 + random01 * 0.12
+      const radius = 0.02 + random01 * 0.035
+      const hue = 96 + random01 * 18
+
+      spots.push({ x: worldX, y: worldY, z: worldZ, height, radius, hue })
+      if (spots.length >= 260) return spots
+    }
+  }
+
+  return spots
+}
+
 /* ── Water detection from satellite imagery ─────────────────────── */
 
 function detectWaterMask(satCanvas: HTMLCanvasElement, cols: number, rows: number): boolean[] {
@@ -360,7 +423,7 @@ function TerrainIsland({
   exaggeration: number
   edit: TerrainEditCallbacks
 }) {
-  const { texture, elevations, cols, rows, meshWidth, meshDepth, minElev, realWidth } = data
+  const { texture, elevations, vegetation, cols, rows, meshWidth, meshDepth, minElev, realWidth } = data
   const hScale = (meshWidth / realWidth) * exaggeration
 
   const topRef = useRef<THREE.Mesh>(null)
@@ -489,6 +552,18 @@ function TerrainIsland({
         <planeGeometry args={[meshWidth * 1.08, meshDepth * 1.08]} />
         <meshBasicMaterial color="#000000" transparent opacity={0.14} />
       </mesh>
+      {vegetation.map((spot, index) => (
+        <group key={`${spot.x}-${spot.z}-${index}`} position={[spot.x, spot.y, spot.z]}>
+          <mesh position={[0, spot.height * 0.26, 0]}>
+            <cylinderGeometry args={[spot.radius * 0.18, spot.radius * 0.26, spot.height * 0.52, 5]} />
+            <meshStandardMaterial color="#5d4730" roughness={1} />
+          </mesh>
+          <mesh position={[0, spot.height * 0.72, 0]}>
+            <coneGeometry args={[spot.radius, spot.height, 6]} />
+            <meshStandardMaterial color={`hsl(${spot.hue}, 42%, 30%)`} roughness={0.96} />
+          </mesh>
+        </group>
+      ))}
       {/* Brush cursor */}
       <mesh ref={cursorRef} geometry={cursorGeo} visible={false}>
         <meshBasicMaterial color="#fbbf24" transparent opacity={0.8} side={THREE.DoubleSide} />
@@ -662,10 +737,13 @@ export function TerrainGeoPreview({
         const dm = (north - south) * 111320
         const aspect = dm / wm
 
+        const vegetation = generateVegetationSpots(importedGrid, wMask, GRID, GRID, SCALE, SCALE * aspect, Math.min(...elev), wm, exaggeration)
+
         setTerrainData({
           texture: tex,
           elevations: elev,
           waterMask: wMask,
+          vegetation,
           cols: GRID,
           rows: GRID,
           meshWidth: SCALE,
@@ -691,11 +769,27 @@ export function TerrainGeoPreview({
     const elev = baseElevRef.current.map((value, index) => (waterMaskRef.current[index] && value < Math.max(0.5, seaThreshold) ? 0 : value))
     setTerrainData((prev) =>
       prev
-        ? { ...prev, elevations: elev, minElev: Math.min(...elev), maxElev: Math.max(...elev) }
+        ? {
+            ...prev,
+            elevations: elev,
+            vegetation: generateVegetationSpots(
+              elev,
+              waterMaskRef.current,
+              prev.cols,
+              prev.rows,
+              prev.meshWidth,
+              prev.meshDepth,
+              Math.min(...elev),
+              prev.realWidth,
+              exaggeration,
+            ),
+            minElev: Math.min(...elev),
+            maxElev: Math.max(...elev),
+          }
         : null,
     )
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [seaThreshold])
+  }, [seaThreshold, exaggeration])
 
   useEffect(() => {
     return () => { texRef.current?.dispose(); texRef.current = null }
