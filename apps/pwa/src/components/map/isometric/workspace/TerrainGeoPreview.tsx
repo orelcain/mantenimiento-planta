@@ -64,6 +64,7 @@ const GRID = 128
 const TILE_Z = 17
 const DEM_Z = 15
 const SCALE = 10
+const OPEN_METEO_ELEVATION_API = 'https://api.open-meteo.com/v1/elevation'
 
 /* ── Helpers ───────────────────────────────────────────────────── */
 
@@ -168,6 +169,16 @@ async function fetchSatelliteCanvas(corners: QuadCorners): Promise<HTMLCanvasEle
   if (!outCtx) throw new Error('Canvas 2D no disponible')
   outCtx.drawImage(big, Math.round(cl), Math.round(ct), Math.round(cw), Math.round(ch), 0, 0, 1024, 1024)
   return out
+}
+
+async function fetchExactCornerElevations(points: GeoCoordinate[]): Promise<number[]> {
+  const latitudes = points.map((point) => point.lat).join(',')
+  const longitudes = points.map((point) => point.lon).join(',')
+  const response = await fetch(`${OPEN_METEO_ELEVATION_API}?latitude=${latitudes}&longitude=${longitudes}`)
+  if (!response.ok) throw new Error(`Elevacion coordenadas ${response.status}`)
+  const payload = await response.json() as { elevation?: number[] }
+  if (!Array.isArray(payload.elevation)) throw new Error('Respuesta invalida de elevacion')
+  return payload.elevation.map((value) => Math.round(value * 10) / 10)
 }
 
 /* ── Water detection from satellite imagery ─────────────────────── */
@@ -350,71 +361,6 @@ function applyWaterMaskAndThreshold(
   return result
 }
 
-function applyEdgeFeathering(elev: number[], cols: number, rows: number, borderSize = 10): number[] {
-  const result = [...elev]
-
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      const idx = r * cols + c
-      const distToEdge = Math.min(r, c, rows - 1 - r, cols - 1 - c)
-      if (distToEdge >= borderSize) continue
-      const t = Math.max(0, Math.min(1, distToEdge / borderSize))
-      const smooth = t * t * (3 - 2 * t)
-      result[idx] = result[idx]! * smooth
-    }
-  }
-
-  return result
-}
-
-function applyCoastalRelaxation(elev: number[], waterMask: boolean[], cols: number, rows: number, coastBand = 12): number[] {
-  const total = cols * rows
-  const distance = new Array<number>(total).fill(Number.POSITIVE_INFINITY)
-
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      const idx = r * cols + c
-      if (waterMask[idx]) {
-        distance[idx] = 0
-      }
-    }
-  }
-
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      const idx = r * cols + c
-      if (r > 0) distance[idx] = Math.min(distance[idx]!, distance[(r - 1) * cols + c]! + 1)
-      if (c > 0) distance[idx] = Math.min(distance[idx]!, distance[r * cols + c - 1]! + 1)
-      if (r > 0 && c > 0) distance[idx] = Math.min(distance[idx]!, distance[(r - 1) * cols + c - 1]! + 1.414)
-      if (r > 0 && c < cols - 1) distance[idx] = Math.min(distance[idx]!, distance[(r - 1) * cols + c + 1]! + 1.414)
-    }
-  }
-
-  for (let r = rows - 1; r >= 0; r--) {
-    for (let c = cols - 1; c >= 0; c--) {
-      const idx = r * cols + c
-      if (r < rows - 1) distance[idx] = Math.min(distance[idx]!, distance[(r + 1) * cols + c]! + 1)
-      if (c < cols - 1) distance[idx] = Math.min(distance[idx]!, distance[r * cols + c + 1]! + 1)
-      if (r < rows - 1 && c < cols - 1) distance[idx] = Math.min(distance[idx]!, distance[(r + 1) * cols + c + 1]! + 1.414)
-      if (r < rows - 1 && c > 0) distance[idx] = Math.min(distance[idx]!, distance[(r + 1) * cols + c - 1]! + 1.414)
-    }
-  }
-
-  const result = [...elev]
-  for (let i = 0; i < total; i++) {
-    if (waterMask[i]) {
-      result[i] = 0
-      continue
-    }
-    if (distance[i]! >= coastBand) continue
-    const t = Math.max(0, Math.min(1, distance[i]! / coastBand))
-    const smooth = t * t * (3 - 2 * t)
-    result[i] = result[i]! * (0.18 + smooth * 0.82)
-  }
-
-  return result
-}
-
 /* ── R3F: Terrain island with raycasting + brush editing ────── */
 
 function TerrainIsland({
@@ -566,7 +512,7 @@ export function TerrainGeoPreview({
   const [terrainData, setTerrainData] = useState<TerrainPayload | null>(null)
   const [loading, setLoading] = useState('')
   const [exaggeration, setExaggeration] = useState(1.05)
-  const [seaThreshold, setSeaThreshold] = useState(3)
+  const [seaThreshold, setSeaThreshold] = useState(0)
   const [autoRotate, setAutoRotate] = useState(true)
   const [brushTool, setBrushTool] = useState<BrushTool>('none')
   const [brushRadius, setBrushRadius] = useState(5)
@@ -580,6 +526,7 @@ export function TerrainGeoPreview({
   const [measureMode, setMeasureMode] = useState(false)
   const [measureMarkers, setMeasureMarkers] = useState<MeasureMarker[]>([])
   const [cameraAzimuthDeg, setCameraAzimuthDeg] = useState(0)
+  const [cornerElevations, setCornerElevations] = useState<number[] | null>(null)
   const minimapRef = useRef<HTMLCanvasElement>(null)
   const texRef = useRef<THREE.CanvasTexture | null>(null)
   const rawElevRef = useRef<number[]>([])
@@ -637,8 +584,7 @@ export function TerrainGeoPreview({
     if (rawElevRef.current.length === 0) return
     const smoothed = smoothElevations(rawElevRef.current, GRID, GRID, 3)
     const masked = applyWaterMaskAndThreshold(smoothed, waterMaskRef.current, seaThreshold, GRID, GRID)
-    const coastal = applyCoastalRelaxation(masked, waterMaskRef.current, GRID, GRID)
-    const elev = applyEdgeFeathering(coastal, GRID, GRID, 16)
+    const elev = masked
     editedElevRef.current = []
     setTerrainData((prev) =>
       prev ? { ...prev, elevations: elev, minElev: Math.min(...elev), maxElev: Math.max(...elev) } : null,
@@ -678,11 +624,16 @@ export function TerrainGeoPreview({
     async function load() {
       try {
         setTerrainData(null)
+        setCornerElevations(null)
         if (texRef.current) { texRef.current.dispose(); texRef.current = null }
 
         setLoading('Descargando imagen satelital…')
-        const canvas = await fetchSatelliteCanvas(corners)
+        const [canvas, exactCorners] = await Promise.all([
+          fetchSatelliteCanvas(corners),
+          fetchExactCornerElevations(corners),
+        ])
         if (dead) return
+        setCornerElevations(exactCorners)
 
         const tex = new THREE.CanvasTexture(canvas)
         tex.colorSpace = THREE.SRGBColorSpace
@@ -702,8 +653,7 @@ export function TerrainGeoPreview({
         setLoading('Procesando relieve…')
         const smoothed = smoothElevations(rawElev, GRID, GRID, 3)
         const masked = applyWaterMaskAndThreshold(smoothed, wMask, 3, GRID, GRID)
-        const coastal = applyCoastalRelaxation(masked, wMask, GRID, GRID)
-        const elev = applyEdgeFeathering(coastal, GRID, GRID, 16)
+        const elev = masked
 
         const { south, north, west, east } = boundsOf(corners)
         const avgLat = ((north + south) / 2) * Math.PI / 180
@@ -739,8 +689,7 @@ export function TerrainGeoPreview({
     if (!terrainData || rawElevRef.current.length === 0) return
     const smoothed = smoothElevations(rawElevRef.current, GRID, GRID, 3)
     const masked = applyWaterMaskAndThreshold(smoothed, waterMaskRef.current, seaThreshold, GRID, GRID)
-    const coastal = applyCoastalRelaxation(masked, waterMaskRef.current, GRID, GRID)
-    const elev = applyEdgeFeathering(coastal, GRID, GRID, 16)
+    const elev = masked
     setTerrainData((prev) =>
       prev
         ? { ...prev, elevations: elev, minElev: Math.min(...elev), maxElev: Math.max(...elev) }
@@ -864,6 +813,11 @@ export function TerrainGeoPreview({
               {hoverInfo.elevation.toFixed(1)} m s.n.m.
             </Badge>
           )}
+          {cornerElevations && cornerElevations.length === 4 && (
+            <Badge variant="outline" className="font-mono text-[10px]">
+              P1 {cornerElevations[0]?.toFixed(0)}m · P2 {cornerElevations[1]?.toFixed(0)}m · P3 {cornerElevations[2]?.toFixed(0)}m · P4 {cornerElevations[3]?.toFixed(0)}m
+            </Badge>
+          )}
           <Badge
             variant={autoRotate ? 'default' : 'outline'}
             className="cursor-pointer"
@@ -917,9 +871,9 @@ export function TerrainGeoPreview({
           />
         </label>
         <label className="flex items-center gap-2">
-          <span className="whitespace-nowrap">Nivel mar {seaThreshold} m</span>
+          <span className="whitespace-nowrap">Corte mar {seaThreshold} m</span>
           <input
-            type="range" min="0" max="15" step="1"
+            type="range" min="0" max="5" step="1"
             value={seaThreshold}
             onChange={(e) => setSeaThreshold(Number(e.target.value))}
             className="h-1.5 w-24 cursor-pointer accent-cyan-400"
