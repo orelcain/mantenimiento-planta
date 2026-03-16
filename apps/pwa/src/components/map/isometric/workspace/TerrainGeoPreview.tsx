@@ -34,13 +34,12 @@ interface TerrainPayload {
   texture: THREE.CanvasTexture
   elevations: number[]
   waterMask: boolean[]
-  vegetation: Array<{
+  coastFoam: Array<{
     x: number
-    z: number
     y: number
-    height: number
-    radius: number
-    hue: number
+    z: number
+    scale: number
+    opacity: number
   }>
   cols: number
   rows: number
@@ -115,6 +114,14 @@ function gridToGeo(corners: QuadCorners, gridR: number, gridC: number, rows: num
     lat: north - (north - south) * v,
     lon: west + (east - west) * u,
   }
+}
+
+function clamp01(value: number) {
+  return Math.max(0, Math.min(1, value))
+}
+
+function lerp(from: number, to: number, amount: number) {
+  return from + (to - from) * amount
 }
 
 function CameraAzimuthProbe({ onChange }: { onChange: (deg: number) => void }) {
@@ -222,7 +229,13 @@ function terrainTilesToGrid(tiles: Array<{ x: number; z: number; elevation: numb
   return grid
 }
 
-function createShadedTerrainCanvas(satCanvas: HTMLCanvasElement, elevations: number[], cols: number, rows: number): HTMLCanvasElement {
+function createShadedTerrainCanvas(
+  satCanvas: HTMLCanvasElement,
+  elevations: number[],
+  waterMask: boolean[],
+  cols: number,
+  rows: number,
+): HTMLCanvasElement {
   const out = document.createElement('canvas')
   out.width = satCanvas.width
   out.height = satCanvas.height
@@ -232,6 +245,7 @@ function createShadedTerrainCanvas(satCanvas: HTMLCanvasElement, elevations: num
   ctx.drawImage(satCanvas, 0, 0)
   const img = ctx.getImageData(0, 0, out.width, out.height)
   const data = img.data
+  const original = new Uint8ClampedArray(data)
   const minElev = Math.min(...elevations)
   const maxElev = Math.max(...elevations)
   const elevRange = Math.max(0.1, maxElev - minElev)
@@ -240,6 +254,12 @@ function createShadedTerrainCanvas(satCanvas: HTMLCanvasElement, elevations: num
     const r = Math.max(0, Math.min(rows - 1, row))
     const c = Math.max(0, Math.min(cols - 1, col))
     return elevations[r * cols + c] ?? 0
+  }
+
+  const sampleWater = (row: number, col: number) => {
+    const r = Math.max(0, Math.min(rows - 1, row))
+    const c = Math.max(0, Math.min(cols - 1, col))
+    return waterMask[r * cols + c] ?? false
   }
 
   const light = new THREE.Vector3(-0.45, 0.85, -0.3).normalize()
@@ -261,13 +281,27 @@ function createShadedTerrainCanvas(satCanvas: HTMLCanvasElement, elevations: num
       const contourBandMajor = Math.abs((((center - minElev) / 5) % 1) - 0.5)
       const contourStrengthMinor = contourBandMinor < 0.028 ? (0.028 - contourBandMinor) / 0.028 : 0
       const contourStrengthMajor = contourBandMajor < 0.08 ? (0.08 - contourBandMajor) / 0.08 : 0
+      const offset = (y * out.width + x) * 4
+      const baseRed = original[offset] ?? 0
+      const baseGreen = original[offset + 1] ?? 0
+      const baseBlue = original[offset + 2] ?? 0
+      const maxChannel = Math.max(baseRed, baseGreen, baseBlue)
+      const minChannel = Math.min(baseRed, baseGreen, baseBlue)
+      const saturation = maxChannel <= 0 ? 0 : (maxChannel - minChannel) / maxChannel
+      const brightnessSource = (baseRed + baseGreen + baseBlue) / 3
       const ambient = 0.68
       const brightness = ambient + shade * 0.44
       const elevationWarm = normalizedElevation * 18
       const elevationCool = (1 - normalizedElevation) * 10
       const slopeDarken = slope * 18
       const contourDarken = contourStrengthMinor * 8 + contourStrengthMajor * 18
-      const offset = (y * out.width + x) * 4
+      const rockStrength = clamp01((slope - 0.24) / 0.38) * (0.45 + normalizedElevation * 0.55)
+      const meadowStrength = clamp01((0.22 - slope) / 0.22) * clamp01((normalizedElevation - 0.05) / 0.24) * clamp01((0.82 - normalizedElevation) / 0.3)
+      const wetlandStrength = clamp01((8 - center) / 8) * clamp01((0.2 - slope) / 0.2)
+      const yardStrength = clamp01((brightnessSource - 122) / 42) * clamp01((0.18 - saturation) / 0.18) * clamp01((0.22 - slope) / 0.22) * clamp01((center - 1.2) / 3)
+      const roadStrength = clamp01((brightnessSource - 132) / 34) * clamp01((0.13 - saturation) / 0.13) * clamp01((0.16 - slope) / 0.16) * clamp01((center - 1.1) / 4)
+      const coastalWetness = clamp01((4.2 - center) / 4.2) * clamp01((0.18 - slope) / 0.18)
+      const ridgeLight = clamp01((normalizedElevation - 0.72) / 0.18) * clamp01((0.28 - slope) / 0.28)
 
       let red = data[offset]! * brightness + elevationWarm
       let green = data[offset + 1]! * brightness + normalizedElevation * 8 - slopeDarken * 0.35
@@ -283,6 +317,34 @@ function createShadedTerrainCanvas(satCanvas: HTMLCanvasElement, elevations: num
       green -= contourDarken * 0.9
       blue -= contourDarken * 0.8
 
+  red = lerp(red, 142, rockStrength * 0.5)
+  green = lerp(green, 134, rockStrength * 0.46)
+  blue = lerp(blue, 126, rockStrength * 0.42)
+
+  red = lerp(red, 108, meadowStrength * 0.18)
+  green = lerp(green, 129, meadowStrength * 0.34)
+  blue = lerp(blue, 86, meadowStrength * 0.14)
+
+  red = lerp(red, 98, wetlandStrength * 0.12)
+  green = lerp(green, 126, wetlandStrength * 0.22)
+  blue = lerp(blue, 102, wetlandStrength * 0.2)
+
+  red = lerp(red, 154, yardStrength * 0.52)
+  green = lerp(green, 146, yardStrength * 0.48)
+  blue = lerp(blue, 132, yardStrength * 0.42)
+
+  red = lerp(red, 176, roadStrength * 0.36)
+  green = lerp(green, 164, roadStrength * 0.3)
+  blue = lerp(blue, 144, roadStrength * 0.24)
+
+  red = lerp(red, 64, coastalWetness * 0.08)
+  green = lerp(green, 96, coastalWetness * 0.12)
+  blue = lerp(blue, 102, coastalWetness * 0.18)
+
+  red += ridgeLight * 10
+  green += ridgeLight * 9
+  blue += ridgeLight * 6
+
       data[offset] = Math.max(0, Math.min(255, Math.round(red)))
       data[offset + 1] = Math.max(0, Math.min(255, Math.round(green)))
       data[offset + 2] = Math.max(0, Math.min(255, Math.round(blue)))
@@ -290,6 +352,122 @@ function createShadedTerrainCanvas(satCanvas: HTMLCanvasElement, elevations: num
   }
 
   ctx.putImageData(img, 0, 0)
+
+  const pathSegments: Array<[number, number, number, number, number]> = []
+  const yardRects: Array<[number, number, number, number]> = []
+  const wetCoastMarks: Array<[number, number, number, number]> = []
+
+  for (let r = 1; r < rows - 1; r++) {
+    for (let c = 1; c < cols - 1; c++) {
+      const idx = r * cols + c
+      if (waterMask[idx]) continue
+
+      const center = elevations[idx] ?? 0
+      const left = sampleElevation(r, c - 1)
+      const right = sampleElevation(r, c + 1)
+      const up = sampleElevation(r - 1, c)
+      const down = sampleElevation(r + 1, c)
+      const slope = Math.min(1, Math.sqrt((left - right) ** 2 + (up - down) ** 2) / 18)
+      const sx = Math.round((c / Math.max(1, cols - 1)) * (out.width - 1))
+      const sy = Math.round((r / Math.max(1, rows - 1)) * (out.height - 1))
+      const offset = (sy * out.width + sx) * 4
+      const baseRed = original[offset] ?? 0
+      const baseGreen = original[offset + 1] ?? 0
+      const baseBlue = original[offset + 2] ?? 0
+      const brightness = (baseRed + baseGreen + baseBlue) / 3
+      const maxChannel = Math.max(baseRed, baseGreen, baseBlue)
+      const minChannel = Math.min(baseRed, baseGreen, baseBlue)
+      const saturation = maxChannel <= 0 ? 0 : (maxChannel - minChannel) / maxChannel
+      const nearWater = [
+        sampleWater(r - 1, c),
+        sampleWater(r + 1, c),
+        sampleWater(r, c - 1),
+        sampleWater(r, c + 1),
+      ].filter(Boolean).length
+      const roadCandidate = brightness > 132 && saturation < 0.13 && slope < 0.15 && center > 1.2
+      const yardCandidate = brightness > 144 && saturation < 0.1 && slope < 0.11 && center > 1.1
+      const wetCandidate = nearWater > 0 && center < 4.2 && slope < 0.18
+
+      const px = (c / (cols - 1)) * out.width
+      const py = (r / (rows - 1)) * out.height
+
+      if (wetCandidate) {
+        wetCoastMarks.push([px, py, 5 + nearWater * 2, 0.05 + nearWater * 0.02])
+      }
+
+      if (yardCandidate) {
+        yardRects.push([px - 4, py - 4, 8, 8])
+      }
+
+      if (roadCandidate) {
+        if (c < cols - 2) {
+          const nextOffsetX = Math.round(((c + 1) / Math.max(1, cols - 1)) * (out.width - 1))
+          const nextBaseX = (sy * out.width + nextOffsetX) * 4
+          const nextBrightness = ((original[nextBaseX] ?? 0) + (original[nextBaseX + 1] ?? 0) + (original[nextBaseX + 2] ?? 0)) / 3
+          const nextMax = Math.max(original[nextBaseX] ?? 0, original[nextBaseX + 1] ?? 0, original[nextBaseX + 2] ?? 0)
+          const nextMin = Math.min(original[nextBaseX] ?? 0, original[nextBaseX + 1] ?? 0, original[nextBaseX + 2] ?? 0)
+          const nextSat = nextMax <= 0 ? 0 : (nextMax - nextMin) / nextMax
+          if (!sampleWater(r, c + 1) && nextBrightness > 128 && nextSat < 0.15) {
+            const nx = ((c + 1) / (cols - 1)) * out.width
+            pathSegments.push([px, py, nx, py, 1.4])
+          }
+        }
+        if (r < rows - 2) {
+          const nextOffsetY = Math.round(((r + 1) / Math.max(1, rows - 1)) * (out.height - 1))
+          const nextBaseY = (nextOffsetY * out.width + sx) * 4
+          const nextBrightness = ((original[nextBaseY] ?? 0) + (original[nextBaseY + 1] ?? 0) + (original[nextBaseY + 2] ?? 0)) / 3
+          const nextMax = Math.max(original[nextBaseY] ?? 0, original[nextBaseY + 1] ?? 0, original[nextBaseY + 2] ?? 0)
+          const nextMin = Math.min(original[nextBaseY] ?? 0, original[nextBaseY + 1] ?? 0, original[nextBaseY + 2] ?? 0)
+          const nextSat = nextMax <= 0 ? 0 : (nextMax - nextMin) / nextMax
+          if (!sampleWater(r + 1, c) && nextBrightness > 128 && nextSat < 0.15) {
+            const ny = ((r + 1) / (rows - 1)) * out.height
+            pathSegments.push([px, py, px, ny, 1.4])
+          }
+        }
+      }
+    }
+  }
+
+  ctx.save()
+  ctx.globalCompositeOperation = 'multiply'
+  for (const [px, py, radius, alpha] of wetCoastMarks) {
+    const gradient = ctx.createRadialGradient(px, py, 0, px, py, radius)
+    gradient.addColorStop(0, `rgba(24, 61, 68, ${alpha})`)
+    gradient.addColorStop(1, 'rgba(24, 61, 68, 0)')
+    ctx.fillStyle = gradient
+    ctx.beginPath()
+    ctx.arc(px, py, radius, 0, Math.PI * 2)
+    ctx.fill()
+  }
+  ctx.restore()
+
+  ctx.save()
+  ctx.globalCompositeOperation = 'screen'
+  ctx.fillStyle = 'rgba(220, 206, 184, 0.12)'
+  for (const [x, y, width, height] of yardRects) {
+    ctx.fillRect(x, y, width, height)
+  }
+  ctx.restore()
+
+  ctx.save()
+  ctx.globalCompositeOperation = 'screen'
+  ctx.lineCap = 'round'
+  for (const [x1, y1, x2, y2, width] of pathSegments) {
+    ctx.strokeStyle = 'rgba(236, 225, 201, 0.14)'
+    ctx.lineWidth = width + 1.1
+    ctx.beginPath()
+    ctx.moveTo(x1, y1)
+    ctx.lineTo(x2, y2)
+    ctx.stroke()
+
+    ctx.strokeStyle = 'rgba(150, 132, 112, 0.1)'
+    ctx.lineWidth = width
+    ctx.beginPath()
+    ctx.moveTo(x1, y1)
+    ctx.lineTo(x2, y2)
+    ctx.stroke()
+  }
+  ctx.restore()
 
   // Shoreline emphasis for better coast readability.
   ctx.save()
@@ -320,7 +498,7 @@ function createShadedTerrainCanvas(satCanvas: HTMLCanvasElement, elevations: num
   return out
 }
 
-function generateVegetationSpots(
+function generateCoastalFoamSpots(
   elevations: number[],
   waterMask: boolean[],
   cols: number,
@@ -330,8 +508,8 @@ function generateVegetationSpots(
   minElev: number,
   realWidth: number,
   exaggeration: number,
-): TerrainPayload['vegetation'] {
-  const spots: TerrainPayload['vegetation'] = []
+): TerrainPayload['coastFoam'] {
+  const foam: TerrainPayload['coastFoam'] = []
   const hScale = (meshWidth / realWidth) * exaggeration
 
   const sampleElevation = (row: number, col: number) => {
@@ -340,37 +518,48 @@ function generateVegetationSpots(
     return elevations[r * cols + c] ?? 0
   }
 
+  const sampleWater = (row: number, col: number) => {
+    const r = Math.max(0, Math.min(rows - 1, row))
+    const c = Math.max(0, Math.min(cols - 1, col))
+    return waterMask[r * cols + c] ?? false
+  }
+
   for (let r = 2; r < rows - 2; r += 2) {
     for (let c = 2; c < cols - 2; c += 2) {
       const idx = r * cols + c
-      if (waterMask[idx]) continue
-
       const center = elevations[idx] ?? 0
-      if (center < 2 || center > 42) continue
+      if (waterMask[idx] || center < 0.4 || center > 3.2) continue
 
-      const slope = Math.sqrt(
-        (sampleElevation(r, c - 1) - sampleElevation(r, c + 1)) ** 2 +
-        (sampleElevation(r - 1, c) - sampleElevation(r + 1, c)) ** 2,
+      const nearWater = [
+        sampleWater(r - 1, c),
+        sampleWater(r + 1, c),
+        sampleWater(r, c - 1),
+        sampleWater(r, c + 1),
+      ].filter(Boolean).length
+      if (nearWater === 0) continue
+
+      const shorelineDrop = Math.max(
+        Math.abs(center - sampleElevation(r - 1, c)),
+        Math.abs(center - sampleElevation(r + 1, c)),
+        Math.abs(center - sampleElevation(r, c - 1)),
+        Math.abs(center - sampleElevation(r, c + 1)),
       )
-      if (slope > 7.5) continue
-
-      const seed = Math.sin((r * 9283.23) + (c * 1237.17)) * 43758.5453
+      const seed = Math.sin((r * 177.71) + (c * 913.17)) * 24631.334
       const random01 = seed - Math.floor(seed)
-      if (random01 < 0.82) continue
+      if (random01 < 0.24) continue
 
       const worldX = (c / (cols - 1) - 0.5) * meshWidth
       const worldZ = (r / (rows - 1) - 0.5) * meshDepth
-      const worldY = (center - minElev) * hScale
-      const height = 0.05 + random01 * 0.12
-      const radius = 0.02 + random01 * 0.035
-      const hue = 96 + random01 * 18
+      const worldY = Math.max(0.01, (center - minElev) * hScale * 0.08)
+      const scale = 0.035 + nearWater * 0.018 + shorelineDrop * 0.004 + random01 * 0.03
+      const opacity = clamp01(0.28 + nearWater * 0.16 + shorelineDrop * 0.03)
 
-      spots.push({ x: worldX, y: worldY, z: worldZ, height, radius, hue })
-      if (spots.length >= 260) return spots
+      foam.push({ x: worldX, y: worldY, z: worldZ, scale, opacity })
+      if (foam.length >= 220) return foam
     }
   }
 
-  return spots
+  return foam
 }
 
 /* ── Water detection from satellite imagery ─────────────────────── */
@@ -423,7 +612,7 @@ function TerrainIsland({
   exaggeration: number
   edit: TerrainEditCallbacks
 }) {
-  const { texture, elevations, vegetation, cols, rows, meshWidth, meshDepth, minElev, realWidth } = data
+  const { texture, elevations, coastFoam, cols, rows, meshWidth, meshDepth, minElev, realWidth } = data
   const hScale = (meshWidth / realWidth) * exaggeration
 
   const topRef = useRef<THREE.Mesh>(null)
@@ -544,6 +733,18 @@ function TerrainIsland({
         <planeGeometry args={[meshWidth * 1.42, meshDepth * 1.42]} />
         <meshStandardMaterial color="#2f8da7" transparent opacity={0.22} roughness={0.04} metalness={0.34} emissive="#76c8db" emissiveIntensity={0.08} />
       </mesh>
+      {coastFoam.map((foam, index) => (
+        <group key={`${foam.x}-${foam.z}-${index}`} position={[foam.x, foam.y, foam.z]} rotation={[-Math.PI / 2, 0, 0]}>
+          <mesh>
+            <circleGeometry args={[foam.scale, 18]} />
+            <meshBasicMaterial color="#eafcff" transparent opacity={foam.opacity * 0.55} />
+          </mesh>
+          <mesh position={[0, 0.001, 0]}>
+            <ringGeometry args={[foam.scale * 0.42, foam.scale * 0.9, 18]} />
+            <meshBasicMaterial color="#b8edf5" transparent opacity={foam.opacity * 0.38} side={THREE.DoubleSide} />
+          </mesh>
+        </group>
+      ))}
       <mesh position={[0, -0.05, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[meshWidth * 1.85, meshDepth * 1.85]} />
         <meshBasicMaterial color="#07111a" transparent opacity={0.58} />
@@ -552,18 +753,6 @@ function TerrainIsland({
         <planeGeometry args={[meshWidth * 1.08, meshDepth * 1.08]} />
         <meshBasicMaterial color="#000000" transparent opacity={0.14} />
       </mesh>
-      {vegetation.map((spot, index) => (
-        <group key={`${spot.x}-${spot.z}-${index}`} position={[spot.x, spot.y, spot.z]}>
-          <mesh position={[0, spot.height * 0.26, 0]}>
-            <cylinderGeometry args={[spot.radius * 0.18, spot.radius * 0.26, spot.height * 0.52, 5]} />
-            <meshStandardMaterial color="#5d4730" roughness={1} />
-          </mesh>
-          <mesh position={[0, spot.height * 0.72, 0]}>
-            <coneGeometry args={[spot.radius, spot.height, 6]} />
-            <meshStandardMaterial color={`hsl(${spot.hue}, 42%, 30%)`} roughness={0.96} />
-          </mesh>
-        </group>
-      ))}
       {/* Brush cursor */}
       <mesh ref={cursorRef} geometry={cursorGeo} visible={false}>
         <meshBasicMaterial color="#fbbf24" transparent opacity={0.8} side={THREE.DoubleSide} />
@@ -717,18 +906,18 @@ export function TerrainGeoPreview({
         baseElevRef.current = importedGrid
         rawElevRef.current = importedGrid
 
+        setLoading('Detectando agua en imagen satelital…')
+        const wMask = detectWaterMask(canvas, GRID, GRID)
+        waterMaskRef.current = wMask
+
         setLoading('Aplicando sombreado natural…')
-        const shadedCanvas = createShadedTerrainCanvas(canvas, importedGrid, GRID, GRID)
+        const shadedCanvas = createShadedTerrainCanvas(canvas, importedGrid, wMask, GRID, GRID)
 
         const tex = new THREE.CanvasTexture(shadedCanvas)
         tex.colorSpace = THREE.SRGBColorSpace
         tex.minFilter = THREE.LinearFilter
         tex.magFilter = THREE.LinearFilter
         texRef.current = tex
-
-        setLoading('Detectando agua en imagen satelital…')
-        const wMask = detectWaterMask(canvas, GRID, GRID)
-        waterMaskRef.current = wMask
         const elev = importedGrid.map((value, index) => (wMask[index] && value < Math.max(0.5, seaThreshold) ? 0 : value))
 
         const { south, north, west, east } = boundsOf(corners)
@@ -737,13 +926,13 @@ export function TerrainGeoPreview({
         const dm = (north - south) * 111320
         const aspect = dm / wm
 
-        const vegetation = generateVegetationSpots(importedGrid, wMask, GRID, GRID, SCALE, SCALE * aspect, Math.min(...elev), wm, exaggeration)
+        const coastFoam = generateCoastalFoamSpots(elev, wMask, GRID, GRID, SCALE, SCALE * aspect, Math.min(...elev), wm, exaggeration)
 
         setTerrainData({
           texture: tex,
           elevations: elev,
           waterMask: wMask,
-          vegetation,
+          coastFoam,
           cols: GRID,
           rows: GRID,
           meshWidth: SCALE,
@@ -772,7 +961,7 @@ export function TerrainGeoPreview({
         ? {
             ...prev,
             elevations: elev,
-            vegetation: generateVegetationSpots(
+            coastFoam: generateCoastalFoamSpots(
               elev,
               waterMaskRef.current,
               prev.cols,
@@ -829,6 +1018,7 @@ export function TerrainGeoPreview({
       waterCells: terrainData.waterMask.filter(Boolean).length,
       meanElevation,
       coastlineCells,
+      foamCount: terrainData.coastFoam.length,
     }
   }, [terrainData])
 
@@ -1113,6 +1303,8 @@ export function TerrainGeoPreview({
               <span className="text-foreground">{previewStats.waterCells} celdas</span>
               <span>Costa baja</span>
               <span className="text-foreground">{previewStats.coastlineCells} celdas</span>
+              <span>Espuma costa</span>
+              <span className="text-foreground">{previewStats.foamCount} marcas</span>
             </div>
           </div>
         )}
