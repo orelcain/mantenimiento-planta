@@ -224,6 +224,9 @@ function createShadedTerrainCanvas(satCanvas: HTMLCanvasElement, elevations: num
   ctx.drawImage(satCanvas, 0, 0)
   const img = ctx.getImageData(0, 0, out.width, out.height)
   const data = img.data
+  const minElev = Math.min(...elevations)
+  const maxElev = Math.max(...elevations)
+  const elevRange = Math.max(0.1, maxElev - minElev)
 
   const sampleElevation = (row: number, col: number) => {
     const r = Math.max(0, Math.min(rows - 1, row))
@@ -241,18 +244,69 @@ function createShadedTerrainCanvas(satCanvas: HTMLCanvasElement, elevations: num
       const right = sampleElevation(row, col + 1)
       const up = sampleElevation(row - 1, col)
       const down = sampleElevation(row + 1, col)
+      const center = sampleElevation(row, col)
       const normal = new THREE.Vector3(left - right, 2.2, up - down).normalize()
       const shade = Math.max(0, normal.dot(light))
-      const ambient = 0.72
-      const brightness = ambient + shade * 0.48
+      const slope = Math.min(1, Math.sqrt((left - right) ** 2 + (up - down) ** 2) / 18)
+      const normalizedElevation = (center - minElev) / elevRange
+      const contourBand = Math.abs((((center - minElev) / 5) % 1) - 0.5)
+      const contourStrength = contourBand < 0.08 ? (0.08 - contourBand) / 0.08 : 0
+      const ambient = 0.68
+      const brightness = ambient + shade * 0.44
+      const elevationWarm = normalizedElevation * 18
+      const elevationCool = (1 - normalizedElevation) * 10
+      const slopeDarken = slope * 18
+      const contourDarken = contourStrength * 20
       const offset = (y * out.width + x) * 4
-      data[offset] = Math.min(255, Math.round(data[offset]! * brightness))
-      data[offset + 1] = Math.min(255, Math.round(data[offset + 1]! * brightness))
-      data[offset + 2] = Math.min(255, Math.round(data[offset + 2]! * brightness))
+
+      let red = data[offset]! * brightness + elevationWarm
+      let green = data[offset + 1]! * brightness + normalizedElevation * 8 - slopeDarken * 0.35
+      let blue = data[offset + 2]! * brightness - elevationWarm * 0.4 + elevationCool - slopeDarken * 0.2
+
+      if (center < 6) {
+        red -= 10
+        green += 8
+        blue += 6
+      }
+
+      red -= contourDarken
+      green -= contourDarken * 0.9
+      blue -= contourDarken * 0.8
+
+      data[offset] = Math.max(0, Math.min(255, Math.round(red)))
+      data[offset + 1] = Math.max(0, Math.min(255, Math.round(green)))
+      data[offset + 2] = Math.max(0, Math.min(255, Math.round(blue)))
     }
   }
 
   ctx.putImageData(img, 0, 0)
+
+  // Shoreline emphasis for better coast readability.
+  ctx.save()
+  ctx.globalCompositeOperation = 'screen'
+  ctx.strokeStyle = 'rgba(216, 234, 228, 0.16)'
+  ctx.lineWidth = 2
+  ctx.beginPath()
+  for (let r = 1; r < rows - 1; r++) {
+    for (let c = 1; c < cols - 1; c++) {
+      const center = sampleElevation(r, c)
+      if (center > 1.8) continue
+      const neighbors = [
+        sampleElevation(r - 1, c),
+        sampleElevation(r + 1, c),
+        sampleElevation(r, c - 1),
+        sampleElevation(r, c + 1),
+      ]
+      if (!neighbors.some((value) => value > 3)) continue
+      const px = (c / (cols - 1)) * out.width
+      const py = (r / (rows - 1)) * out.height
+      ctx.moveTo(px - 1, py)
+      ctx.lineTo(px + 1, py)
+    }
+  }
+  ctx.stroke()
+  ctx.restore()
+
   return out
 }
 
@@ -417,15 +471,23 @@ function TerrainIsland({
   return (
     <group>
       <mesh ref={topRef} geometry={topGeo}>
-        <meshStandardMaterial map={texture} color="#e7e0d2" roughness={0.96} metalness={0.02} />
+        <meshStandardMaterial map={texture} color="#ece2cf" roughness={0.94} metalness={0.02} />
       </mesh>
-      <mesh position={[0, 0.005, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+      <mesh position={[0, -0.015, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[meshWidth * 1.45, meshDepth * 1.45]} />
-        <meshStandardMaterial color="#1d6f8a" transparent opacity={0.78} roughness={0.08} metalness={0.22} />
+        <meshStandardMaterial color="#125a74" transparent opacity={0.88} roughness={0.09} metalness={0.18} />
       </mesh>
-      <mesh position={[0, -0.03, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[meshWidth * 1.6, meshDepth * 1.6]} />
-        <meshBasicMaterial color="#07111a" transparent opacity={0.45} />
+      <mesh position={[0, -0.008, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[meshWidth * 1.42, meshDepth * 1.42]} />
+        <meshStandardMaterial color="#2f8da7" transparent opacity={0.22} roughness={0.04} metalness={0.34} emissive="#76c8db" emissiveIntensity={0.08} />
+      </mesh>
+      <mesh position={[0, -0.05, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[meshWidth * 1.85, meshDepth * 1.85]} />
+        <meshBasicMaterial color="#07111a" transparent opacity={0.58} />
+      </mesh>
+      <mesh position={[0, -0.02, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[meshWidth * 1.08, meshDepth * 1.08]} />
+        <meshBasicMaterial color="#000000" transparent opacity={0.14} />
       </mesh>
       {/* Brush cursor */}
       <mesh ref={cursorRef} geometry={cursorGeo} visible={false}>
@@ -664,11 +726,15 @@ export function TerrainGeoPreview({
     if (!terrainData) return null
     const relief = terrainData.maxElev - terrainData.minElev
     const coveredCells = terrainData.elevations.filter((value) => value > 0.1).length
+    const meanElevation = terrainData.elevations.reduce((sum, value) => sum + value, 0) / Math.max(1, terrainData.elevations.length)
+    const coastlineCells = terrainData.elevations.filter((value) => value > 0.1 && value < 6).length
     return {
       relief,
       coveredCells,
       totalCells: terrainData.cols * terrainData.rows,
       waterCells: terrainData.waterMask.filter(Boolean).length,
+      meanElevation,
+      coastlineCells,
     }
   }, [terrainData])
 
@@ -841,17 +907,19 @@ export function TerrainGeoPreview({
       </div>
 
       <div className={`relative overflow-hidden rounded-xl border bg-[#0a0e17] ${mapHeightClassName}`}>
+        <div className="pointer-events-none absolute inset-0 z-[1] bg-[radial-gradient(circle_at_50%_0%,rgba(98,181,214,0.18),transparent_38%),linear-gradient(180deg,rgba(18,40,66,0.34)_0%,rgba(6,15,26,0)_32%,rgba(4,9,17,0.22)_100%)]" />
         {terrainData ? (
           <Canvas
             camera={{ position: [SCALE * 0.75, SCALE * 0.55, SCALE * 0.75], fov: 45, near: 0.01, far: 200 }}
             gl={{ antialias: true }}
             style={{ background: '#0a0e17' }}
           >
-            <fog attach="fog" args={['#0a0e17', 12, 28]} />
-            <ambientLight intensity={0.55} />
-            <hemisphereLight args={['#d9efff', '#7d5e38', 0.75]} />
-            <directionalLight position={[5, 9, 3]} intensity={1.15} />
-            <directionalLight position={[-4, 5, -4]} intensity={0.22} />
+            <fog attach="fog" args={['#09131d', 10, 24]} />
+            <ambientLight intensity={0.62} />
+            <hemisphereLight args={['#e4f6ff', '#866342', 0.9]} />
+            <directionalLight position={[5, 9, 3]} intensity={1.25} color="#fff7dd" />
+            <directionalLight position={[-4, 5, -4]} intensity={0.3} color="#9cc8ff" />
+            <directionalLight position={[0, 2, 8]} intensity={0.16} color="#6dd0ff" />
             <CameraAzimuthProbe onChange={setCameraAzimuthDeg} />
             <TerrainIsland data={terrainData} exaggeration={exaggeration} edit={editCallbacks} />
             <OrbitControls
@@ -869,6 +937,8 @@ export function TerrainGeoPreview({
             {loading || 'Esperando coordenadas válidas…'}
           </div>
         )}
+        <div className="pointer-events-none absolute inset-0 z-[2] bg-[radial-gradient(circle_at_center,transparent_58%,rgba(2,6,12,0.22)_100%)]" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-[2] h-24 bg-gradient-to-b from-white/5 via-sky-200/5 to-transparent" />
 
         <div className="absolute top-3 right-3 z-20 flex flex-wrap gap-1.5">
           <Button
@@ -941,10 +1011,14 @@ export function TerrainGeoPreview({
               <span className="text-foreground">{terrainData.minElev.toFixed(1)}m — {terrainData.maxElev.toFixed(1)}m</span>
               <span>Relieve</span>
               <span className="text-foreground">{previewStats.relief.toFixed(1)}m</span>
+              <span>Media</span>
+              <span className="text-foreground">{previewStats.meanElevation.toFixed(1)}m</span>
               <span>Terreno útil</span>
               <span className="text-foreground">{previewStats.coveredCells} celdas</span>
               <span>Agua</span>
               <span className="text-foreground">{previewStats.waterCells} celdas</span>
+              <span>Costa baja</span>
+              <span className="text-foreground">{previewStats.coastlineCells} celdas</span>
             </div>
           </div>
         )}
@@ -962,6 +1036,10 @@ export function TerrainGeoPreview({
         {showMinimap && terrainData && (
           <div className="absolute bottom-3 right-3 z-20 rounded-xl border bg-card/88 p-2 shadow-lg backdrop-blur">
             <canvas ref={minimapRef} width={136} height={136} className="block rounded border" />
+            <div className="mt-1 flex items-center justify-between text-[10px] text-muted-foreground">
+              <span>Cenital</span>
+              <span>{terrainData.minElev.toFixed(0)}–{terrainData.maxElev.toFixed(0)}m</span>
+            </div>
           </div>
         )}
 
