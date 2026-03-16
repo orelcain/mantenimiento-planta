@@ -9,6 +9,7 @@ import { BarChart3, Compass, Layers, MapPin, Ruler, X } from 'lucide-react'
 import { CompassWidget } from '@/components/map/isometric/CompassWidget'
 import {
   estimateRectangleMeters,
+  importTerrainFromRectangle,
   parseCoordinatesText,
   type GeoCoordinate,
   type TerrainImportPreview,
@@ -181,6 +182,80 @@ async function fetchExactCornerElevations(points: GeoCoordinate[]): Promise<numb
   return payload.elevation.map((value) => Math.round(value * 10) / 10)
 }
 
+function terrainTilesToGrid(tiles: Array<{ x: number; z: number; elevation: number }>, cols: number, rows: number): number[] {
+  if (tiles.length === 0) return new Array(cols * rows).fill(0)
+
+  let minX = Number.POSITIVE_INFINITY
+  let maxX = Number.NEGATIVE_INFINITY
+  let minZ = Number.POSITIVE_INFINITY
+  let maxZ = Number.NEGATIVE_INFINITY
+  const tileMap = new Map<string, number>()
+
+  for (const tile of tiles) {
+    minX = Math.min(minX, tile.x)
+    maxX = Math.max(maxX, tile.x)
+    minZ = Math.min(minZ, tile.z)
+    maxZ = Math.max(maxZ, tile.z)
+    tileMap.set(`${tile.x},${tile.z}`, tile.elevation)
+  }
+
+  const width = Math.max(1, maxX - minX)
+  const depth = Math.max(1, maxZ - minZ)
+  const grid = new Array<number>(cols * rows).fill(0)
+
+  for (let r = 0; r < rows; r++) {
+    const sourceZ = Math.round(minZ + (r / Math.max(1, rows - 1)) * depth)
+    for (let c = 0; c < cols; c++) {
+      const sourceX = Math.round(minX + (c / Math.max(1, cols - 1)) * width)
+      grid[r * cols + c] = tileMap.get(`${sourceX},${sourceZ}`) ?? 0
+    }
+  }
+
+  return grid
+}
+
+function createShadedTerrainCanvas(satCanvas: HTMLCanvasElement, elevations: number[], cols: number, rows: number): HTMLCanvasElement {
+  const out = document.createElement('canvas')
+  out.width = satCanvas.width
+  out.height = satCanvas.height
+  const ctx = out.getContext('2d')
+  if (!ctx) return satCanvas
+
+  ctx.drawImage(satCanvas, 0, 0)
+  const img = ctx.getImageData(0, 0, out.width, out.height)
+  const data = img.data
+
+  const sampleElevation = (row: number, col: number) => {
+    const r = Math.max(0, Math.min(rows - 1, row))
+    const c = Math.max(0, Math.min(cols - 1, col))
+    return elevations[r * cols + c] ?? 0
+  }
+
+  const light = new THREE.Vector3(-0.45, 0.85, -0.3).normalize()
+
+  for (let y = 0; y < out.height; y++) {
+    const row = Math.round((y / Math.max(1, out.height - 1)) * (rows - 1))
+    for (let x = 0; x < out.width; x++) {
+      const col = Math.round((x / Math.max(1, out.width - 1)) * (cols - 1))
+      const left = sampleElevation(row, col - 1)
+      const right = sampleElevation(row, col + 1)
+      const up = sampleElevation(row - 1, col)
+      const down = sampleElevation(row + 1, col)
+      const normal = new THREE.Vector3(left - right, 2.2, up - down).normalize()
+      const shade = Math.max(0, normal.dot(light))
+      const ambient = 0.72
+      const brightness = ambient + shade * 0.48
+      const offset = (y * out.width + x) * 4
+      data[offset] = Math.min(255, Math.round(data[offset]! * brightness))
+      data[offset + 1] = Math.min(255, Math.round(data[offset + 1]! * brightness))
+      data[offset + 2] = Math.min(255, Math.round(data[offset + 2]! * brightness))
+    }
+  }
+
+  ctx.putImageData(img, 0, 0)
+  return out
+}
+
 /* ── Water detection from satellite imagery ─────────────────────── */
 
 function detectWaterMask(satCanvas: HTMLCanvasElement, cols: number, rows: number): boolean[] {
@@ -220,145 +295,6 @@ function detectWaterMask(satCanvas: HTMLCanvasElement, cols: number, rows: numbe
     }
   }
   return mask
-}
-
-/* ── Elevation from Terrarium DEM tiles (same source as maps3d.io) ── */
-
-async function fetchElevationGrid(corners: QuadCorners, cols: number, rows: number) {
-  const { south, north, west, east } = boundsOf(corners)
-  const nwT = lonLatToTile(west, north, DEM_Z)
-  const seT = lonLatToTile(east, south, DEM_Z)
-  const nx = seT.x - nwT.x + 1
-  const ny = seT.y - nwT.y + 1
-
-  const big = document.createElement('canvas')
-  big.width = nx * 256
-  big.height = ny * 256
-  const ctx = big.getContext('2d', { willReadFrequently: true })
-  if (!ctx) throw new Error('Canvas 2D no disponible')
-
-  const jobs: Promise<void>[] = []
-  for (let dy = 0; dy < ny; dy++) {
-    for (let dx = 0; dx < nx; dx++) {
-      jobs.push(
-        new Promise<void>((ok) => {
-          const img = new Image()
-          img.crossOrigin = 'anonymous'
-          img.onload = () => { ctx.drawImage(img, dx * 256, dy * 256); ok() }
-          img.onerror = () => ok()
-          img.src = `https://s3.amazonaws.com/elevation-tiles-prod/terrarium/${DEM_Z}/${nwT.x + dx}/${nwT.y + dy}.png`
-        }),
-      )
-    }
-  }
-  await Promise.all(jobs)
-
-  let px: Uint8ClampedArray
-  try {
-    const imgData = ctx.getImageData(0, 0, big.width, big.height)
-    px = imgData.data
-  } catch {
-    // CORS tainted canvas — return flat grid at 0
-    return new Array(cols * rows).fill(0)
-  }
-
-  const tl = tileToLonLat(nwT.x, nwT.y, DEM_Z)
-  const br = tileToLonLat(seT.x + 1, seT.y + 1, DEM_Z)
-
-  // Decode Terrarium elevation at pixel coordinate
-  const readElev = (ix: number, iy: number) => {
-    const i = (iy * big.width + ix) * 4
-    return ((px[i] ?? 0) * 256 + (px[i + 1] ?? 0) + (px[i + 2] ?? 0) / 256) - 32768
-  }
-
-  const elevations: number[] = []
-  for (let r = 0; r < rows; r++) {
-    const lat = north - (r / (rows - 1)) * (north - south)
-    for (let c = 0; c < cols; c++) {
-      const lon = west + (c / (cols - 1)) * (east - west)
-      // Bilinear interpolation for smoother terrain
-      const fX = ((lon - tl.lon) / (br.lon - tl.lon)) * (big.width - 1)
-      const fY = ((tl.lat - lat) / (tl.lat - br.lat)) * (big.height - 1)
-      const x0 = Math.max(0, Math.min(big.width - 2, Math.floor(fX)))
-      const y0 = Math.max(0, Math.min(big.height - 2, Math.floor(fY)))
-      const fx = fX - x0
-      const fy = fY - y0
-      const e00 = readElev(x0, y0)
-      const e10 = readElev(x0 + 1, y0)
-      const e01 = readElev(x0, y0 + 1)
-      const e11 = readElev(x0 + 1, y0 + 1)
-      const elev = e00 * (1 - fx) * (1 - fy) + e10 * fx * (1 - fy) + e01 * (1 - fx) * fy + e11 * fx * fy
-      elevations.push(Math.max(0, elev))
-    }
-  }
-
-  return elevations
-}
-
-/* ── Smooth elevation grid (Gaussian blur — reduces DEM noise) ── */
-
-function smoothElevations(elev: number[], cols: number, rows: number, passes = 1): number[] {
-  let cur = [...elev]
-  for (let p = 0; p < passes; p++) {
-    const nxt = [...cur]
-    for (let r = 1; r < rows - 1; r++) {
-      for (let c = 1; c < cols - 1; c++) {
-        const idx = r * cols + c
-        nxt[idx] = (
-          cur[(r - 1) * cols + c - 1]! + cur[(r - 1) * cols + c]! * 2 + cur[(r - 1) * cols + c + 1]! +
-          cur[r * cols + c - 1]! * 2 + cur[r * cols + c]! * 4 + cur[r * cols + c + 1]! * 2 +
-          cur[(r + 1) * cols + c - 1]! + cur[(r + 1) * cols + c]! * 2 + cur[(r + 1) * cols + c + 1]!
-        ) / 16
-      }
-    }
-    cur = nxt
-  }
-  return cur
-}
-
-function applyWaterMaskAndThreshold(
-  elev: number[],
-  waterMask: boolean[],
-  seaThreshold: number,
-  cols: number,
-  rows: number,
-): number[] {
-  const result = [...elev]
-
-  // 1. Force water pixels to 0
-  for (let i = 0; i < result.length; i++) {
-    if (waterMask[i]) result[i] = 0
-  }
-
-  // 2. Clamp elevations below threshold to 0 (DEM noise near coast)
-  for (let i = 0; i < result.length; i++) {
-    if (result[i]! < seaThreshold) result[i] = 0
-  }
-
-  // 3. Extra smooth only coastal transition (land pixels adjacent to water)
-  for (let pass = 0; pass < 3; pass++) {
-    const nxt = [...result]
-    for (let r = 1; r < rows - 1; r++) {
-      for (let c = 1; c < cols - 1; c++) {
-        const idx = r * cols + c
-        if (result[idx] === 0) continue // skip water
-        // Check if any neighbor is water
-        const hasWaterNeighbor =
-          result[(r - 1) * cols + c] === 0 || result[(r + 1) * cols + c] === 0 ||
-          result[r * cols + c - 1] === 0 || result[r * cols + c + 1] === 0
-        if (!hasWaterNeighbor) continue
-        // Smooth toward water — blend with neighbors
-        nxt[idx] = (
-          result[(r - 1) * cols + c]! + result[(r + 1) * cols + c]! +
-          result[r * cols + c - 1]! + result[r * cols + c + 1]! +
-          result[idx]! * 2
-        ) / 6
-      }
-    }
-    for (let i = 0; i < result.length; i++) result[i] = nxt[i]!
-  }
-
-  return result
 }
 
 /* ── R3F: Terrain island with raycasting + brush editing ────── */
@@ -531,7 +467,7 @@ export function TerrainGeoPreview({
   const texRef = useRef<THREE.CanvasTexture | null>(null)
   const rawElevRef = useRef<number[]>([])
   const waterMaskRef = useRef<boolean[]>([])
-  const editedElevRef = useRef<number[]>([])
+  const baseElevRef = useRef<number[]>([])
 
   const handleBrushApply = useCallback((centerR: number, centerC: number) => {
     if (!terrainData || brushTool === 'none') return
@@ -573,7 +509,6 @@ export function TerrainGeoPreview({
       }
     }
 
-    editedElevRef.current = elev
     setTerrainData((prev) =>
       prev ? { ...prev, elevations: elev, minElev: Math.min(...elev), maxElev: Math.max(...elev) } : null,
     )
@@ -581,16 +516,13 @@ export function TerrainGeoPreview({
   }, [terrainData, brushTool, brushRadius, brushStrength])
 
   const handleResetTerrain = useCallback(() => {
-    if (rawElevRef.current.length === 0) return
-    const smoothed = smoothElevations(rawElevRef.current, GRID, GRID, 3)
-    const masked = applyWaterMaskAndThreshold(smoothed, waterMaskRef.current, seaThreshold, GRID, GRID)
-    const elev = masked
-    editedElevRef.current = []
+    if (baseElevRef.current.length === 0) return
+    const elev = [...baseElevRef.current]
     setTerrainData((prev) =>
       prev ? { ...prev, elevations: elev, minElev: Math.min(...elev), maxElev: Math.max(...elev) } : null,
     )
     setEditCount(0)
-  }, [seaThreshold])
+  }, [])
 
   const editCallbacks = useMemo<TerrainEditCallbacks>(() => ({
     onHoverInfo: setHoverInfo,
@@ -628,14 +560,30 @@ export function TerrainGeoPreview({
         if (texRef.current) { texRef.current.dispose(); texRef.current = null }
 
         setLoading('Descargando imagen satelital…')
-        const [canvas, exactCorners] = await Promise.all([
+        const previewWidth = Math.max(10, Math.round(preview?.gridWidth ?? metrics?.widthMeters ?? GRID))
+        const previewDepth = Math.max(10, Math.round(preview?.gridDepth ?? metrics?.depthMeters ?? GRID))
+
+        const [canvas, exactCorners, importedTerrain] = await Promise.all([
           fetchSatelliteCanvas(corners),
           fetchExactCornerElevations(corners),
+          importTerrainFromRectangle({
+            config: { width: previewWidth, depth: previewDepth },
+            corners,
+            sampleStep: Math.max(1, Math.round(preview?.sampleStep ?? 1)),
+            keepSeaLevelTiles: true,
+          }),
         ])
         if (dead) return
         setCornerElevations(exactCorners)
 
-        const tex = new THREE.CanvasTexture(canvas)
+        const importedGrid = terrainTilesToGrid(importedTerrain.tiles, GRID, GRID)
+        baseElevRef.current = importedGrid
+        rawElevRef.current = importedGrid
+
+        setLoading('Aplicando sombreado natural…')
+        const shadedCanvas = createShadedTerrainCanvas(canvas, importedGrid, GRID, GRID)
+
+        const tex = new THREE.CanvasTexture(shadedCanvas)
         tex.colorSpace = THREE.SRGBColorSpace
         tex.minFilter = THREE.LinearFilter
         tex.magFilter = THREE.LinearFilter
@@ -644,16 +592,7 @@ export function TerrainGeoPreview({
         setLoading('Detectando agua en imagen satelital…')
         const wMask = detectWaterMask(canvas, GRID, GRID)
         waterMaskRef.current = wMask
-
-        setLoading('Decodificando elevaciones DEM…')
-        const rawElev = await fetchElevationGrid(corners, GRID, GRID)
-        if (dead) return
-        rawElevRef.current = rawElev
-
-        setLoading('Procesando relieve…')
-        const smoothed = smoothElevations(rawElev, GRID, GRID, 3)
-        const masked = applyWaterMaskAndThreshold(smoothed, wMask, 3, GRID, GRID)
-        const elev = masked
+        const elev = importedGrid.map((value, index) => (wMask[index] && value < Math.max(0.5, seaThreshold) ? 0 : value))
 
         const { south, north, west, east } = boundsOf(corners)
         const avgLat = ((north + south) / 2) * Math.PI / 180
@@ -682,14 +621,12 @@ export function TerrainGeoPreview({
 
     void load()
     return () => { dead = true }
-  }, [parsed.corners])
+  }, [parsed.corners, preview?.gridWidth, preview?.gridDepth, preview?.sampleStep, metrics?.widthMeters, metrics?.depthMeters, seaThreshold])
 
   // Re-process elevations when sea threshold changes (no re-fetch needed)
   useEffect(() => {
-    if (!terrainData || rawElevRef.current.length === 0) return
-    const smoothed = smoothElevations(rawElevRef.current, GRID, GRID, 3)
-    const masked = applyWaterMaskAndThreshold(smoothed, waterMaskRef.current, seaThreshold, GRID, GRID)
-    const elev = masked
+    if (!terrainData || baseElevRef.current.length === 0) return
+    const elev = baseElevRef.current.map((value, index) => (waterMaskRef.current[index] && value < Math.max(0.5, seaThreshold) ? 0 : value))
     setTerrainData((prev) =>
       prev
         ? { ...prev, elevations: elev, minElev: Math.min(...elev), maxElev: Math.max(...elev) }
