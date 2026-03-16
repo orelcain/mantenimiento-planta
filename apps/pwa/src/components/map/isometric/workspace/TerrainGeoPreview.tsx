@@ -127,6 +127,83 @@ function lerp(from: number, to: number, amount: number) {
   return from + (to - from) * amount
 }
 
+function createEdgeWallGeometry({
+  side,
+  elevations,
+  cols,
+  rows,
+  meshWidth,
+  meshDepth,
+  minElev,
+  hScale,
+  baseY,
+}: {
+  side: 'north' | 'south' | 'west' | 'east'
+  elevations: number[]
+  cols: number
+  rows: number
+  meshWidth: number
+  meshDepth: number
+  minElev: number
+  hScale: number
+  baseY: number
+}): THREE.BufferGeometry {
+  const useRows = side === 'west' || side === 'east'
+  const segments = useRows ? rows : cols
+  const positions = new Float32Array(segments * 2 * 3)
+  const indices: number[] = []
+
+  for (let index = 0; index < segments; index++) {
+    let x = 0
+    let z = 0
+    let elevation = minElev
+
+    if (side === 'north') {
+      x = (index / Math.max(1, cols - 1) - 0.5) * meshWidth
+      z = -meshDepth / 2
+      elevation = elevations[index] ?? minElev
+    } else if (side === 'south') {
+      x = (index / Math.max(1, cols - 1) - 0.5) * meshWidth
+      z = meshDepth / 2
+      elevation = elevations[(rows - 1) * cols + index] ?? minElev
+    } else if (side === 'west') {
+      x = -meshWidth / 2
+      z = (index / Math.max(1, rows - 1) - 0.5) * meshDepth
+      elevation = elevations[index * cols] ?? minElev
+    } else {
+      x = meshWidth / 2
+      z = (index / Math.max(1, rows - 1) - 0.5) * meshDepth
+      elevation = elevations[index * cols + (cols - 1)] ?? minElev
+    }
+
+    const topY = (elevation - minElev) * hScale
+    const topOffset = index * 6
+    positions[topOffset] = x
+    positions[topOffset + 1] = topY
+    positions[topOffset + 2] = z
+    positions[topOffset + 3] = x
+    positions[topOffset + 4] = baseY
+    positions[topOffset + 5] = z
+
+    if (index < segments - 1) {
+      const vertex = index * 2
+      if (side === 'north' || side === 'east') {
+        indices.push(vertex, vertex + 1, vertex + 2)
+        indices.push(vertex + 1, vertex + 3, vertex + 2)
+      } else {
+        indices.push(vertex, vertex + 2, vertex + 1)
+        indices.push(vertex + 1, vertex + 2, vertex + 3)
+      }
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+  geometry.setIndex(indices)
+  geometry.computeVertexNormals()
+  return geometry
+}
+
 function CameraAzimuthProbe({ onChange }: { onChange: (deg: number) => void }) {
   const { camera } = useThree()
   const lastSentRef = useRef<number | null>(null)
@@ -722,8 +799,13 @@ function TerrainIsland({
   exaggeration: number
   edit: TerrainEditCallbacks
 }) {
-  const { texture, elevations, coastFoam, cols, rows, meshWidth, meshDepth, minElev, realWidth } = data
+  const { texture, elevations, coastFoam, cols, rows, meshWidth, meshDepth, minElev, maxElev, realWidth } = data
   const hScale = (meshWidth / realWidth) * exaggeration
+  const landBaseY = -Math.max(0.62, (maxElev - minElev) * hScale * 0.22 + 0.22)
+  const seaBaseY = landBaseY - 0.12
+  const waterSpanWidth = meshWidth * 1.45
+  const waterSpanDepth = meshDepth * 1.45
+  const seaWallHeight = Math.abs(seaBaseY) + 0.02
 
   const topRef = useRef<THREE.Mesh>(null)
   const cursorRef = useRef<THREE.Mesh>(null)
@@ -823,6 +905,23 @@ function TerrainIsland({
     return top
   }, [elevations, cols, rows, meshWidth, meshDepth, minElev, hScale])
 
+  const northWallGeo = useMemo(
+    () => createEdgeWallGeometry({ side: 'north', elevations, cols, rows, meshWidth, meshDepth, minElev, hScale, baseY: landBaseY }),
+    [elevations, cols, rows, meshWidth, meshDepth, minElev, hScale, landBaseY],
+  )
+  const southWallGeo = useMemo(
+    () => createEdgeWallGeometry({ side: 'south', elevations, cols, rows, meshWidth, meshDepth, minElev, hScale, baseY: landBaseY }),
+    [elevations, cols, rows, meshWidth, meshDepth, minElev, hScale, landBaseY],
+  )
+  const westWallGeo = useMemo(
+    () => createEdgeWallGeometry({ side: 'west', elevations, cols, rows, meshWidth, meshDepth, minElev, hScale, baseY: landBaseY }),
+    [elevations, cols, rows, meshWidth, meshDepth, minElev, hScale, landBaseY],
+  )
+  const eastWallGeo = useMemo(
+    () => createEdgeWallGeometry({ side: 'east', elevations, cols, rows, meshWidth, meshDepth, minElev, hScale, baseY: landBaseY }),
+    [elevations, cols, rows, meshWidth, meshDepth, minElev, hScale, landBaseY],
+  )
+
   // Brush cursor ring geometry
   const cursorGeo = useMemo(() => {
     const geo = new THREE.RingGeometry(0.9, 1, 32)
@@ -832,8 +931,44 @@ function TerrainIsland({
 
   return (
     <group>
+      <mesh position={[0, landBaseY - 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[meshWidth, meshDepth]} />
+        <meshStandardMaterial color="#4f4032" roughness={1} metalness={0.02} />
+      </mesh>
+      <mesh geometry={northWallGeo}>
+        <meshStandardMaterial color="#705641" roughness={0.98} metalness={0.01} />
+      </mesh>
+      <mesh geometry={southWallGeo}>
+        <meshStandardMaterial color="#654d3b" roughness={0.98} metalness={0.01} />
+      </mesh>
+      <mesh geometry={westWallGeo}>
+        <meshStandardMaterial color="#5f4938" roughness={0.98} metalness={0.01} />
+      </mesh>
+      <mesh geometry={eastWallGeo}>
+        <meshStandardMaterial color="#68513d" roughness={0.98} metalness={0.01} />
+      </mesh>
       <mesh ref={topRef} geometry={topGeo}>
         <meshStandardMaterial map={texture} color="#ece2cf" roughness={0.94} metalness={0.02} />
+      </mesh>
+      <mesh position={[0, seaBaseY, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[waterSpanWidth, waterSpanDepth]} />
+        <meshStandardMaterial color="#08212d" roughness={0.22} metalness={0.08} />
+      </mesh>
+      <mesh position={[0, seaBaseY + seaWallHeight / 2, -waterSpanDepth / 2]}>
+        <planeGeometry args={[waterSpanWidth, seaWallHeight]} />
+        <meshStandardMaterial color="#0b3040" roughness={0.32} metalness={0.04} side={THREE.DoubleSide} />
+      </mesh>
+      <mesh position={[0, seaBaseY + seaWallHeight / 2, waterSpanDepth / 2]} rotation={[0, Math.PI, 0]}>
+        <planeGeometry args={[waterSpanWidth, seaWallHeight]} />
+        <meshStandardMaterial color="#0a2a38" roughness={0.32} metalness={0.04} side={THREE.DoubleSide} />
+      </mesh>
+      <mesh position={[-waterSpanWidth / 2, seaBaseY + seaWallHeight / 2, 0]} rotation={[0, Math.PI / 2, 0]}>
+        <planeGeometry args={[waterSpanDepth, seaWallHeight]} />
+        <meshStandardMaterial color="#0a2b39" roughness={0.32} metalness={0.04} side={THREE.DoubleSide} />
+      </mesh>
+      <mesh position={[waterSpanWidth / 2, seaBaseY + seaWallHeight / 2, 0]} rotation={[0, -Math.PI / 2, 0]}>
+        <planeGeometry args={[waterSpanDepth, seaWallHeight]} />
+        <meshStandardMaterial color="#0b3142" roughness={0.32} metalness={0.04} side={THREE.DoubleSide} />
       </mesh>
       <mesh position={[0, -0.015, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[meshWidth * 1.45, meshDepth * 1.45]} />
