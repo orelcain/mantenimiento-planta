@@ -889,10 +889,109 @@
     }
     .ptl-dm-status strong { color: var(--text-bright); }
     @media (max-width: 640px) {
-      .ptl-chart-wrap { height: 200px; overflow-x: auto; }
+      .ptl-chart-wrap { height: 200px; }
       .ptl-legend { gap: 6px; font-size: 0.62rem; }
       .ptl-legend-item { font-size: 0.62rem; }
       .ptl-header { padding: 10px 12px 0; }
+    }
+    @media (max-width: 640px) and (orientation: landscape) {
+      .ptl-chart-wrap { height: calc(100vh - 120px); }
+    }
+
+    /* Botón ampliar */
+    .ptl-expand-btn {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 6px;
+      padding: 4px 9px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: var(--text-bright);
+      cursor: pointer;
+      transition: background 0.15s;
+      letter-spacing: 0.3px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .ptl-expand-btn:hover { background: rgba(255,255,255,0.13); }
+    .ptl-expand-btn svg { width: 13px; height: 13px; }
+
+    /* Overlay fullscreen */
+    .ptl-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      background: var(--bg);
+      flex-direction: column;
+    }
+    .ptl-overlay.active { display: flex; }
+    .ptl-overlay-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+      flex-shrink: 0;
+    }
+    .ptl-overlay-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.85rem;
+      font-weight: 800;
+      color: var(--text-bright);
+      letter-spacing: 0.3px;
+    }
+    .ptl-overlay-legend {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+      font-size: 0.65rem;
+      color: var(--muted);
+      font-weight: 600;
+    }
+    .ptl-overlay-legend-item {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+    }
+    .ptl-close-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 6px;
+      padding: 5px 10px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: var(--text-bright);
+      cursor: pointer;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+    .ptl-close-btn svg { width: 14px; height: 14px; }
+    .ptl-overlay-body {
+      flex: 1;
+      padding: 12px 16px;
+      position: relative;
+      min-height: 0;
+    }
+    .ptl-overlay-body canvas {
+      width: 100% !important;
+      height: 100% !important;
+    }
+    .ptl-overlay-status {
+      padding: 6px 16px;
+      font-size: 0.72rem;
+      color: var(--muted);
+      border-top: 1px solid rgba(255,255,255,0.05);
+      flex-shrink: 0;
     }
 
     /* ─── ZONAS DIRECTEMAR ─── */
@@ -1646,12 +1745,21 @@
             <span style="font-size:1.1rem">📊</span>
             <span style="font-weight:800;font-size:0.88rem;color:var(--text-bright);letter-spacing:0.3px">LÍNEA TEMPORAL · ESTADO DEL PUERTO</span>
           </div>
-          <div class="ptl-legend">
-            <div class="ptl-legend-item"><div style="width:24px;height:0;border-top:2.5px solid #ff6b6b"></div>Historial real</div>
-            <div class="ptl-legend-item"><div style="width:24px;height:0;border-top:2px dashed #ff6b6b"></div>Pronóstico</div>
-            <div class="ptl-legend-item"><div class="ptl-legend-dot" style="background:var(--good)"></div>Abierto (&lt;40)</div>
-            <div class="ptl-legend-item"><div class="ptl-legend-dot" style="background:var(--mid)"></div>Restricción (40-65)</div>
-            <div class="ptl-legend-item"><div class="ptl-legend-dot" style="background:var(--bad)"></div>Cierre (&gt;65)</div>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <div class="ptl-legend">
+              <div class="ptl-legend-item"><div style="width:24px;height:0;border-top:2.5px solid #ff6b6b"></div>Historial real</div>
+              <div class="ptl-legend-item"><div style="width:24px;height:0;border-top:2px dashed #ff6b6b"></div>Pronóstico</div>
+              <div class="ptl-legend-item"><div class="ptl-legend-dot" style="background:var(--good)"></div>Abierto (&lt;40)</div>
+              <div class="ptl-legend-item"><div class="ptl-legend-dot" style="background:var(--mid)"></div>Restricción (40-65)</div>
+              <div class="ptl-legend-item"><div class="ptl-legend-dot" style="background:var(--bad)"></div>Cierre (&gt;65)</div>
+            </div>
+            <button class="ptl-expand-btn" id="ptlExpandBtn" onclick="ptlOpenOverlay()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/>
+                <line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/>
+              </svg>
+              Ampliar
+            </button>
           </div>
         </div>
         <div class="ptl-body">
@@ -1660,6 +1768,36 @@
           </div>
         </div>
         <div class="ptl-dm-status" id="ptlDmStatus">Estado DIRECTEMAR: consultando...</div>
+      </div>
+
+      <!-- Overlay fullscreen del gráfico -->
+      <div class="ptl-overlay" id="ptlOverlay">
+        <div class="ptl-overlay-header">
+          <div>
+            <div class="ptl-overlay-title">
+              <span>📊</span>
+              <span>LÍNEA TEMPORAL · ESTADO DEL PUERTO</span>
+            </div>
+            <div class="ptl-overlay-legend" style="margin-top:6px">
+              <div class="ptl-overlay-legend-item"><div style="width:20px;height:0;border-top:2px solid #ff6b6b"></div>Historial real</div>
+              <div class="ptl-overlay-legend-item"><div style="width:20px;height:0;border-top:2px dashed #ff6b6b"></div>Pronóstico</div>
+              <div class="ptl-overlay-legend-item"><div style="width:8px;height:8px;border-radius:50%;background:var(--good)"></div>Abierto (&lt;40)</div>
+              <div class="ptl-overlay-legend-item"><div style="width:8px;height:8px;border-radius:50%;background:var(--mid)"></div>Restricción (40-65)</div>
+              <div class="ptl-overlay-legend-item"><div style="width:8px;height:8px;border-radius:50%;background:var(--bad)"></div>Cierre (&gt;65)</div>
+            </div>
+          </div>
+          <button class="ptl-close-btn" onclick="ptlCloseOverlay()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/>
+              <line x1="10" y1="14" x2="3" y2="21"/><line x1="21" y1="3" x2="14" y2="10"/>
+            </svg>
+            Cerrar
+          </button>
+        </div>
+        <div class="ptl-overlay-body" id="ptlOverlayBody">
+          <canvas id="portTimelineChartOverlay"></canvas>
+        </div>
+        <div class="ptl-overlay-status" id="ptlOverlayStatus">Estado DIRECTEMAR: consultando...</div>
       </div>
 
       <!-- Elementos ocultos requeridos por funciones JS (no visibles en UI) -->
@@ -1757,11 +1895,36 @@
     let closureTimelineChart;
 
     let portTimelineChart;
+    let portTimelineChartOverlay = null;
 
     /* Estado DIRECTEMAR oficial — fuente de verdad para AHORA */
     let _dmGlobalStatus = null; // { restricciones, estado, restriccionBahia, navesMenores }
     let _lastWeather = null;   // guardado para reconstruir timeline en auto-refresh
     let _lastMarine = null;
+
+    /* ─── OVERLAY AMPLIAR GRÁFICO ─── */
+    function ptlOpenOverlay() {
+      const overlay = document.getElementById('ptlOverlay');
+      // Sincronizar estado DIRECTEMAR
+      const dmStatus = document.getElementById('ptlDmStatus');
+      document.getElementById('ptlOverlayStatus').innerHTML = dmStatus ? dmStatus.innerHTML : '';
+      overlay.classList.add('active');
+      document.body.style.overflow = 'hidden';
+      // Construir gráfico en overlay si hay datos
+      if (_lastWeather && _lastMarine) {
+        setTimeout(() => buildPortTimelineOnCanvas('portTimelineChartOverlay', _lastWeather, _lastMarine, _dmGlobalStatus), 50);
+      }
+    }
+    function ptlCloseOverlay() {
+      document.getElementById('ptlOverlay').classList.remove('active');
+      document.body.style.overflow = '';
+      if (portTimelineChartOverlay) {
+        portTimelineChartOverlay.destroy();
+        portTimelineChartOverlay = null;
+      }
+    }
+    // Cerrar con tecla Escape
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') ptlCloseOverlay(); });
 
     /* ─── NAVBAR SCROLL EFFECT ─── */
     const navbar = document.getElementById('navbar');
@@ -3509,9 +3672,10 @@
     };
     Chart.register(nowLinePlugin);
 
-    function buildPortTimeline(weather, marine, dm) {
-      const canvas = document.getElementById('portTimelineChart');
-      const dmStatusEl = document.getElementById('ptlDmStatus');
+    function buildPortTimelineOnCanvas(canvasId, weather, marine, dm) {
+      const canvas = document.getElementById(canvasId);
+      const isOverlay = canvasId === 'portTimelineChartOverlay';
+      const dmStatusEl = isOverlay ? document.getElementById('ptlOverlayStatus') : document.getElementById('ptlDmStatus');
       if (!canvas || !weather?.hourly?.time) return;
 
       const weatherTimes = weather.hourly.time ?? [];
@@ -3640,9 +3804,13 @@
       }
 
       // Destroy previous
-      if (portTimelineChart) portTimelineChart.destroy();
+      if (isOverlay) {
+        if (portTimelineChartOverlay) portTimelineChartOverlay.destroy();
+      } else {
+        if (portTimelineChart) portTimelineChart.destroy();
+      }
 
-      portTimelineChart = new Chart(canvas, {
+      const chartInstance = new Chart(canvas, {
         type: 'line',
         data: {
           labels,
@@ -3781,6 +3949,12 @@
           }
         }
       });
+      if (isOverlay) portTimelineChartOverlay = chartInstance;
+      else portTimelineChart = chartInstance;
+    }
+
+    function buildPortTimeline(weather, marine, dm) {
+      buildPortTimelineOnCanvas('portTimelineChart', weather, marine, dm);
     }
 
     function renderDirectemarPanel(dm) {

@@ -111,3 +111,23 @@ jobs:
         run: |
           echo "Deploy a GitHub Pages falló en ambos intentos."
           exit 1
+
+      - name: Notificar deploy exitoso (ntfy)
+        if: success()
+        run: |
+          curl -s -X POST \
+            -H "Title: ✅ Deploy completado" \
+            -H "Tags: rocket" \
+            -H "Priority: default" \
+            -d "GitHub Pages actualizado correctamente 🚀" \
+            https://ntfy.sh/mis-notificaciones-claude || true
+
+      - name: Notificar deploy fallido (ntfy)
+        if: failure()
+        run: |
+          curl -s -X POST \
+            -H "Title: ❌ Deploy falló" \
+            -H "Tags: warning" \
+            -H "Priority: high" \
+            -d "El deploy a GitHub Pages falló. Revisa los logs." \
+            https://ntfy.sh/mis-notificaciones-claude || true
