@@ -36,14 +36,6 @@
       -webkit-font-smoothing: antialiased;
     }
 
-    #fxCanvas {
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      z-index: 0;
-      opacity: 0.5;
-    }
-
     /* ─── NAVBAR ─── */
     .navbar {
       position: sticky;
@@ -1370,7 +1362,7 @@
   </style>
 </head>
 <body>
-  <canvas id="fxCanvas"></canvas>
+
 
   <!-- NAVBAR -->
   <nav class="navbar" id="navbar">
@@ -1461,8 +1453,8 @@
                   <div class="dmv">Capitanía de Puerto de <strong>Castro</strong> · QUINZONA</div>
                 </div>
                 <div class="dm-detail-item">
-                  <div class="dml">Puertos cercanos</div>
-                  <div class="dmv" id="dmNearby">Consultando...</div>
+                  <div class="dml">Zona Chonchi · Queilen · Puqueldon</div>
+                  <div class="dmv" id="dmSubPuertos">Consultando...</div>
                 </div>
               </div>
               <div id="dmConflict"></div>
@@ -1611,70 +1603,6 @@
       </div>
     </section>
 
-    <!-- ═══════════════ CARTA NAVEGACIÓN & MULTAS ═══════════════ -->
-    <section class="row">
-      <div class="row-title"><span class="accent-bar"></span>Normativa Marítima · Multas y Autorizaciones</div>
-      <div class="info-grid">
-        <div class="info-panel">
-          <h3>📜 Navegación con Carta (Zarpe Restringido)</h3>
-          <p style="margin-bottom:10px;color:#999">Cuando el puerto tiene restricciones parciales, el Capitán de Puerto puede autorizar zarpe bajo condiciones:</p>
-          <ul>
-            <li><strong>Carta de zarpe con restricción:</strong> autorización especial emitida por la Capitanía de Puerto para navegar bajo condiciones meteorológicas adversas parciales</li>
-            <li><strong>Requisitos:</strong> embarcación en buen estado, tripulación con licencias vigentes, radio VHF operativa, elementos de seguridad al día</li>
-            <li><strong>Restricción horaria:</strong> puede limitar navegación a horarios diurnos (06:00–18:00)</li>
-            <li><strong>Zona limitada:</strong> navegación solo en aguas interiores protegidas, prohibido mar abierto</li>
-            <li><strong>Puerto cerrado =</strong> <span style="color:#ff6b6b;font-weight:800">NO se puede zarpar bajo ninguna circunstancia</span>, ni con carta</li>
-          </ul>
-          <div class="legal-ref">
-            <strong>Base legal:</strong> D.L. N° 2.222 (Ley de Navegación), Art. 6° y 64°. Reglamento de Orden, Seguridad y Disciplina en Naves y Litoral de la República (D.S. N° 1.340 bis). La Capitanía de Puerto tiene potestad exclusiva para autorizar/denegar zarpes.
-          </div>
-        </div>
-        <div class="info-panel">
-          <h3>⚠️ Multas por Infracción Marítima</h3>
-          <p style="margin-bottom:10px;color:#999">Sanciones aplicables por DIRECTEMAR según la Ley de Navegación (DL 2.222) y Código Penal. <strong>Valor UTM marzo 2026 ≈ $67.000 CLP</strong></p>
-          <table class="fines-table">
-            <thead>
-              <tr>
-                <th>Infracción</th>
-                <th>Sanción</th>
-                <th>Monto aprox.</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>Zarpar sin autorización (puerto cerrado)</td>
-                <td>5 – 100 UTM</td>
-                <td class="fine-amount">$335.000 – $6.700.000</td>
-              </tr>
-              <tr>
-                <td>Zarpar sin carta/zarpe vigente</td>
-                <td>3 – 50 UTM</td>
-                <td class="fine-amount">$201.000 – $3.350.000</td>
-              </tr>
-              <tr>
-                <td>No respetar restricciones de la carta</td>
-                <td>5 – 50 UTM</td>
-                <td class="fine-amount">$335.000 – $3.350.000</td>
-              </tr>
-              <tr>
-                <td>Poner en riesgo la vida humana en el mar</td>
-                <td>Hasta 1.000 UTM + penal</td>
-                <td class="fine-amount">Hasta $67.000.000</td>
-              </tr>
-              <tr>
-                <td>Reincidencia (cualquier infracción)</td>
-                <td>Doble de multa + suspensión licencia</td>
-                <td class="fine-amount">Según caso</td>
-              </tr>
-            </tbody>
-          </table>
-          <div class="legal-ref">
-            <strong>Además:</strong> Retención de la embarcación, suspensión/cancelación de matrícula y licencias de tripulación, responsabilidad penal en caso de lesiones o muerte (Art. 313 y ss. del Código Penal). El Capitán de Puerto puede ordenar <strong>comiso de la nave</strong> en casos graves. Consulta: <a href="https://www.directemar.cl" target="_blank">directemar.cl</a>
-          </div>
-        </div>
-      </div>
-    </section>
-
     <!-- KPI ROW -->
     <section class="row">
       <div class="row-title"><span class="accent-bar"></span>Resumen de la Semana</div>
@@ -1687,14 +1615,7 @@
           <div class="kpi-label" title="Cantidad de días dentro de los próximos 7 con riesgo ALTO por pronóstico diario.">Días Riesgo Alto</div>
           <div class="kpi-value" id="highDays">-</div>
         </article>
-        <article class="kpi-card">
-          <div class="kpi-label">Lluvia Ahora</div>
-          <div class="kpi-value" id="nowRain">-</div>
-        </article>
-        <article class="kpi-card">
-          <div class="kpi-label">Viento Ahora</div>
-          <div class="kpi-value" id="nowWind">-</div>
-        </article>
+
         <article class="kpi-card">
           <div class="kpi-label" title="Máxima racha pronosticada en 7 días. Puede no ocurrir en las próximas 24h.">Racha Máx Semanal</div>
           <div class="kpi-value" id="maxGust">-</div>
@@ -1726,11 +1647,6 @@
           <h3>Semáforo Horario · Cierre Próx. 24h</h3>
           <div class="chart-range-hint">Índice cierre: <strong>0–44 bajo</strong> · <strong>45–64 atención</strong> · <strong>65+ cierre probable</strong> · <span class="help-tip" title="Este es el gráfico principal para decidir cierre probable: datos horarios de próximas 24h.">ⓘ principal para decisión</span></div>
           <div class="chart-wrap"><canvas id="closureTimelineChart"></canvas></div>
-        </div>
-        <div class="chart-card">
-          <h3>Impacto por Variable · Próx. 24h</h3>
-          <div class="chart-range-hint">Mayor barra = mayor aporte al riesgo de cierre (normalizado 0–100) · <span class="help-tip" title="No es valor físico directo; es contribución relativa al riesgo para comparar variables entre sí.">ⓘ escala normalizada</span></div>
-          <div class="chart-wrap"><canvas id="closureDriversChart"></canvas></div>
         </div>
       </div>
     </section>
@@ -1787,7 +1703,7 @@
     let weekChart;
     let marineChart;
     let closureTimelineChart;
-    let closureDriversChart;
+
     let portTimelineChart;
 
     /* Estado DIRECTEMAR oficial — fuente de verdad para AHORA */
@@ -1818,18 +1734,6 @@
         setMapFocus(false);
       }
     });
-
-    /* ─── RAIN / PARTICLE FX ─── */
-    const fx = {
-      mode: 'clear',
-      canvas: null,
-      ctx: null,
-      w: 0,
-      h: 0,
-      drops: [],
-      particles: [],
-      rafId: 0,
-    };
 
     function toCLDate(isoDate) {
       return new Date(isoDate + 'T12:00:00').toLocaleDateString('es-CL', {
@@ -1932,75 +1836,9 @@
       return { level: 'BAJO', cls: 'risk-low', pct, reason: `Probabilidad baja de cierre (${pct}%).` };
     }
 
-    function initFxCanvas() {
-      fx.canvas = document.getElementById('fxCanvas');
-      fx.ctx = fx.canvas.getContext('2d');
-      resizeFxCanvas();
-      window.addEventListener('resize', resizeFxCanvas);
-    }
-
-    function resizeFxCanvas() {
-      fx.w = window.innerWidth;
-      fx.h = window.innerHeight;
-      fx.canvas.width = Math.floor(fx.w * devicePixelRatio);
-      fx.canvas.height = Math.floor(fx.h * devicePixelRatio);
-      fx.ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-      seedFx();
-    }
-
-    function seedFx() {
-      fx.drops = Array.from({ length: 140 }, () => ({
-        x: Math.random() * fx.w,
-        y: Math.random() * fx.h,
-        len: 8 + Math.random() * 14,
-        speed: 9 + Math.random() * 10,
-      }));
-      fx.particles = Array.from({ length: 50 }, () => ({
-        x: Math.random() * fx.w,
-        y: Math.random() * fx.h,
-        r: 0.5 + Math.random() * 1.5,
-        vx: -0.15 + Math.random() * 0.3,
-        vy: -0.1 + Math.random() * 0.25,
-      }));
-    }
-
     function setFxMode(mode) {
-      fx.mode = mode;
-      document.getElementById('bgMode').textContent = mode === 'rain' ? '🌧 Lluvia activa' : '☀ Cielo operativo';
-      if (!fx.rafId) animateFx();
-    }
-
-    function animateFx() {
-      fx.rafId = requestAnimationFrame(animateFx);
-      const ctx = fx.ctx;
-      ctx.clearRect(0, 0, fx.w, fx.h);
-      if (fx.mode === 'rain') {
-        ctx.strokeStyle = 'rgba(180, 200, 230, 0.25)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        for (const d of fx.drops) {
-          ctx.moveTo(d.x, d.y);
-          ctx.lineTo(d.x - d.len * 0.22, d.y + d.len);
-          d.x -= 1.2;
-          d.y += d.speed;
-          if (d.y > fx.h + 30) { d.y = -10; d.x = Math.random() * fx.w; }
-          if (d.x < -30) d.x = fx.w + 20;
-        }
-        ctx.stroke();
-      } else {
-        for (const p of fx.particles) {
-          ctx.beginPath();
-          ctx.fillStyle = 'rgba(0, 166, 178, 0.09)';
-          ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-          ctx.fill();
-          p.x += p.vx;
-          p.y += p.vy;
-          if (p.x < -6) p.x = fx.w + 6;
-          if (p.x > fx.w + 6) p.x = -6;
-          if (p.y < -6) p.y = fx.h + 6;
-          if (p.y > fx.h + 6) p.y = -6;
-        }
-      }
+      const bgModeEl = document.getElementById('bgMode');
+      if (bgModeEl) bgModeEl.textContent = mode === 'rain' ? '🌧 Lluvia activa' : '☀ Cielo operativo';
     }
 
     /* ─── CHARTS (Marine palette) ─── */
@@ -2418,72 +2256,6 @@
       });
     }
 
-    function buildClosureDriversChart(samples) {
-      const keys = [
-        ['gust', 'Racha'],
-        ['wind', 'Viento'],
-        ['wave', 'Oleaje'],
-        ['rain', 'Lluvia'],
-        ['pressure', 'Baja presión'],
-        ['visibility', 'Baja visib.'],
-        ['cloud', 'Nubosidad'],
-        ['humidity', 'Humedad'],
-        ['wavePeriod', 'Período ola'],
-        ['storm', 'Tormenta'],
-        ['fog', 'Niebla'],
-      ];
-
-      const averageByKey = keys.map(([key]) => {
-        if (!samples.length) return 0;
-        const total = samples.reduce((acc, sample) => acc + Number(sample.components?.[key] ?? 0), 0);
-        return total / samples.length;
-      });
-
-      if (closureDriversChart) closureDriversChart.destroy();
-      closureDriversChart = new Chart(document.getElementById('closureDriversChart'), {
-        type: 'bar',
-        data: {
-          labels: keys.map(([, label]) => label),
-          datasets: [
-            {
-              label: 'Impacto promedio (0-100)',
-              data: averageByKey,
-              borderWidth: 1,
-              borderRadius: 4,
-              backgroundColor: averageByKey.map((v) => (v >= 65 ? 'rgba(255,107,107,0.55)' : v >= 45 ? 'rgba(244,201,93,0.55)' : 'rgba(76,215,160,0.55)')),
-              borderColor: averageByKey.map((v) => (v >= 65 ? '#ff6b6b' : v >= 45 ? '#f4c95d' : '#4cd7a0')),
-            }
-          ]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: { labels: { color: '#e5e5e5', font: { weight: 600 } } },
-            tooltip: {
-              backgroundColor: NF.tooltipBg,
-              borderColor: NF.tooltipBorder,
-              borderWidth: 1,
-              titleColor: '#fff',
-              bodyColor: '#ccc',
-              callbacks: {
-                afterLabel(context) {
-                  const value = Number(context.parsed.y ?? 0);
-                  if (value >= 65) return 'Impacto crítico';
-                  if (value >= 45) return 'Impacto medio';
-                  return 'Impacto bajo';
-                }
-              }
-            }
-          },
-          scales: {
-            x: { ticks: { color: NF.ticks }, grid: { display: false } },
-            y: { min: 0, max: 100, ticks: { color: NF.ticks }, grid: { color: NF.grid }, title: { display: true, text: 'Contribución al cierre', color: NF.ticks } }
-          }
-        }
-      });
-    }
-
     function renderTable(days) {
       const tbody = document.getElementById('tbody');
       tbody.innerHTML = '';
@@ -2894,8 +2666,7 @@
           : '✅ Semana favorable';
       document.getElementById('weeklyStatus').textContent = weeklyStatus;
       document.getElementById('highDays').textContent = `${highDays} / ${days.length}`;
-      document.getElementById('nowRain').textContent = `${num(current.precipitation, 1)} mm/h`;
-      document.getElementById('nowWind').textContent = `${num(current.wind_speed_10m, 1)} km/h`;
+
       document.getElementById('maxGust').textContent = `${num(maxGust, 1)} km/h`;
       document.getElementById('maxWave').textContent = `${num(maxWave, 2)} m`;
       document.getElementById('maxGustScope').textContent = `7d: ${num(maxGust, 0)} km/h · 24h: ${num(maxGust24h, 0)} km/h`;
@@ -2913,6 +2684,8 @@
     const CF_PROXY = 'https://us-central1-mantenimiento-planta-771a3.cloudfunctions.net/sitportProxy';
     /* Puertos cercanos a monitorear */
     const NEARBY_PORTS = ['CASTRO', 'QUELLÓN', 'QUELLON', 'ANCUD', 'PUERTO MONTT', 'CALBUCO'];
+    /* Sub-puertos bajo la Capitanía de Castro que queremos trackear individualmente */
+    const SUB_PUERTOS_CHONCHI = ['QUEILEN', 'PUQUELDON'];
     let _dmCache = null;
     let _dmTimer = null;
 
@@ -2970,14 +2743,15 @@
         navesMenores: false,
         restriccionBahia: false,
         medicion: null,
+        subPuertos: [],   // Queilen, Puqueldon — informativo solamente
         nearby: [],
         timestamp: new Date().toISOString(),
       };
 
       if (!Array.isArray(ports)) return result;
 
-      // Buscar Chonchi
-      const chonchi = ports.find(p => p.reparticion?.nombre?.includes('CHONCHI'));
+      // ── Buscar Chonchi (fuente de verdad del estado principal) ──
+      const chonchi = ports.find(p => p.reparticion?.nombre?.toUpperCase().includes('CHONCHI'));
       if (!chonchi) return result;
 
       result.found = true;
@@ -2988,7 +2762,7 @@
       result.restriccionBahia = r.restriccionBahia ?? false;
       result.estado = result.restricciones > 0 ? 'CON RESTRICCIÓN' : 'SIN RESTRICCIÓN';
 
-      // Medición meteorológica
+      // Medición meteorológica de Chonchi
       const m = chonchi.medicionMeteo;
       if (m) {
         result.medicion = {
@@ -3005,7 +2779,25 @@
         };
       }
 
-      // Puertos cercanos
+      // ── Sub-puertos de la zona: Queilen y Puqueldon (solo informativos) ──
+      for (const port of ports) {
+        const name = (port.reparticion?.nombre ?? '').toUpperCase();
+        if (SUB_PUERTOS_CHONCHI.some(n => name.includes(n))) {
+          const nr = port.restricciones ?? {};
+          const pm = port.medicionMeteo;
+          result.subPuertos.push({
+            nombre: port.reparticion.nombre.replace(/CAPITAN[ÍI]A DE PUERTO /i, '').trim(),
+            restricciones: nr.numeroRestricciones ?? 0,
+            navesMenores: nr.navesMenores ?? false,
+            navesMayores: nr.navesMayores ?? false,
+            restriccionBahia: nr.restriccionBahia ?? false,
+            viento: pm?.velocidadViento ?? null,
+            dirViento: pm?.textoDireccionViento ?? null,
+          });
+        }
+      }
+
+      // ── Puertos cercanos regionales ──
       for (const port of ports) {
         const name = port.reparticion?.nombre ?? '';
         if (NEARBY_PORTS.some(n => name.toUpperCase().includes(n))) {
@@ -3664,16 +3456,23 @@
         restrTags.innerHTML = '<span class="dm-restriccion-tag" style="color:var(--good);background:rgba(70,211,105,0.1)">Sin restricciones</span>';
       }
 
-      // Puertos cercanos con viento
-      if (dm.nearby.length > 0) {
-        nearby.innerHTML = dm.nearby.map(p => {
-          const color = p.restricciones > 0 ? '#ff6b6b' : '#4cd7a0';
-          const ico = p.restricciones > 0 ? '🔴' : '🟢';
-          const windInfo = p.viento !== null ? ` 💨${p.viento}nds ${p.dirViento ?? ''}` : '';
-          return `${ico} <strong style="color:${color}">${p.nombre}</strong> (${p.restricciones})${windInfo}`;
-        }).join(' · ');
-      } else {
-        nearby.textContent = 'Sin datos de puertos cercanos';
+      // Sub-puertos zona: Queilen y Puqueldon (solo informativos, no afectan estado principal)
+      const subPuertosEl = document.getElementById('dmSubPuertos');
+      if (subPuertosEl) {
+        if (dm.subPuertos && dm.subPuertos.length > 0) {
+          subPuertosEl.innerHTML = dm.subPuertos.map(p => {
+            const hasR = p.restricciones > 0;
+            const color = hasR ? '#ff6b6b' : '#4cd7a0';
+            const ico = hasR ? '🔴' : '🟢';
+            let detail = hasR ? `${p.restricciones} restr.` : 'abierto';
+            if (p.navesMenores) detail += ' · ⛵menores';
+            if (p.navesMayores) detail += ' · 🚢mayores';
+            const windInfo = p.viento !== null ? ` 💨${p.viento}nds` : '';
+            return `${ico} <strong style="color:${color}">${p.nombre}</strong> <span style="color:var(--muted);font-size:0.8em">(${detail}${windInfo})</span>`;
+          }).join('<br>');
+        } else {
+          subPuertosEl.innerHTML = '<span style="color:var(--muted);font-size:0.82em">Sin datos individuales en SITPORT</span>';
+        }
       }
 
       ts.textContent = 'Consulta API SITPORT: ' + new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }) + ' hrs';
@@ -3710,6 +3509,9 @@
       if (!dm || !dm.found) return portNow;
       _dmGlobalStatus = dm;
 
+      // Solo se usa el estado de CHONCHI (dm.restricciones proviene únicamente de Chonchi).
+      // Queilen y Puqueldon se muestran en el panel DIRECTEMAR como referencia informativa
+      // pero NO afectan el estado principal del puerto ni las alertas de cierre.
       const dmRestr = dm.restricciones > 0;
       // Determinar estado real según DIRECTEMAR:
       // restriccionBahia O (navesMayores Y navesMenores) → CERRADO
@@ -3830,7 +3632,6 @@
         buildWeekChart(days);
         buildMarineChart(days);
         buildClosureTimelineChart(closureOutlook.samples ?? []);
-        buildClosureDriversChart(closureOutlook.samples ?? []);
 
         // Renderizar estado DIRECTEMAR (puede llegar después)
         const dm = await dmPromise;
@@ -3892,7 +3693,6 @@
       const dm = await fetchDirectemarStatus(true);
       renderDirectemarPanel(dm);
     });
-    initFxCanvas();
     loadData();
     startDirectemarAutoRefresh();
   </script>
