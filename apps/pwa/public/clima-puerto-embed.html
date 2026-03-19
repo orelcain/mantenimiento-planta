@@ -2821,23 +2821,16 @@
       result.restricciones  = (result.navesMenores || result.navesMayores || result.restriccionBahia) ? 1 : 0;
       result.estado = result.restricciones > 0 ? 'CON RESTRICCIÓN' : 'SIN RESTRICCIÓN';
 
-      // Debug: permite verificar en consola del navegador
-      console.log('🔍 SITPORT QUINZONA:', {
-        capitania: {
-          nombre: capitania.reparticion?.nombre,
+      // Debug: muestra la estructura COMPLETA del objeto Capitanía para analizar campos anidados
+      console.log('🔍 SITPORT - Capitanía keys:', Object.keys(capitania));
+      console.log('🔍 SITPORT - Capitanía completo:', JSON.stringify(capitania, null, 2));
+      console.log('🔍 SITPORT QUINZONA summary:', {
+        capitaniaFlags: {
           navesMenores: capNavesMenores, navesMayores: capNavesMayores, restriccionBahia: capBahia,
           totalAPI: capR.numeroRestricciones
         },
-        queilen: queilenEntry ? {
-          nombre: queilenEntry.reparticion?.nombre,
-          navesMenores: queilenEntry.restricciones?.navesMenores,
-          navesMayores: queilenEntry.restricciones?.navesMayores,
-          restriccionBahia: queilenEntry.restricciones?.restriccionBahia,
-        } : 'NO ENCONTRADO',
-        puqueldon: puqueldonEntry ? {
-          nombre: puqueldonEntry.reparticion?.nombre,
-          navesMenores: puqueldonEntry.restricciones?.navesMenores,
-        } : 'NO ENCONTRADO',
+        queilen: queilenEntry ? 'ENCONTRADO' : 'NO ENCONTRADO',
+        puqueldon: puqueldonEntry ? 'ENCONTRADO' : 'NO ENCONTRADO',
         chonchiResultante: {
           navesMenores: result.navesMenores,
           navesMayores: result.navesMayores,
