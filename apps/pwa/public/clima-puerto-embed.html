@@ -3497,8 +3497,8 @@
           zoneName = 'Quinzona';
         }
       }
-      // Mostrar sección siempre que haya datos de dm
-      if (sectionEl) sectionEl.style.display = (dm && dm.found) ? '' : 'none';
+      // Mostrar sección solo cuando hay restricción activa
+      if (sectionEl) sectionEl.style.display = (dm && dm.found && dmRestricted) ? '' : 'none';
       if (zoneLabelEl) {
         const action = dmRestricted ? 'Pronóstico de reapertura' : 'Probabilidad de apertura';
         zoneLabelEl.textContent = `${action} · ${zoneName}`;
