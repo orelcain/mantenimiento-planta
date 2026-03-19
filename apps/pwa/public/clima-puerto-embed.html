@@ -985,6 +985,7 @@
     }
     .ptl-overlay-scroll {
       flex: 1;
+      min-height: 0;
       overflow-x: auto;
       overflow-y: hidden;
       -webkit-overflow-scrolling: touch;
@@ -992,7 +993,8 @@
     }
     .ptl-overlay-chart-inner {
       min-width: 1440px;
-      height: 340px;
+      height: 100%;
+      min-height: 260px;
       position: relative;
     }
     .ptl-overlay-body canvas {
@@ -4042,7 +4044,7 @@
           ]
         },
         options: {
-          responsive: !isOverlay,
+          responsive: true,
           maintainAspectRatio: false,
           interaction: { mode: 'index', intersect: false },
           plugins: {
