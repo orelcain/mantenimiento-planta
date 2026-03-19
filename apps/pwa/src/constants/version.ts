@@ -2,7 +2,7 @@
  * Versión de la aplicación
  * Mantener sincronizada con package.json y VERSION.md
  */
-export const APP_VERSION = '2.70.66' as const
+export const APP_VERSION = '2.70.67' as const
 // Mantener sincronizada con apps/pwa/package.json y apps/pwa/public/version.json
 
 
@@ -16,7 +16,7 @@ export const VERSION_DATE = '2026-03-19' as const
 /**
  * Nombre de la versión (opcional)
  */
-export const VERSION_NAME = 'Persistencia real de marcacion admin en mapas isometricos' as const
+export const VERSION_NAME = 'Prueba de deploy desde Claude Code' as const
 
 /**
  * Nota:
