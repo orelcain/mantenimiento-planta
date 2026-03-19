@@ -992,8 +992,7 @@
     }
     .ptl-overlay-chart-inner {
       min-width: 1440px;
-      height: calc(100vh - 210px);
-      min-height: 280px;
+      height: 340px;
       position: relative;
     }
     .ptl-overlay-body canvas {
@@ -3776,11 +3775,16 @@
       },
 
       // Day label pills — drawn AFTER chart content so they're always on top
+      // In overlay mode (xAxis top) pills go at chartArea.top + 8 (inside chart, below axis)
+      // In normal mode pills go at chartArea.top + 6
       afterDraw(chart, _args, options) {
         if (!options.enabled || !options.bands || !options.bands.length) return;
         const { ctx, chartArea, scales } = chart;
         const xScale = scales.x;
         if (!xScale || !chartArea) return;
+
+        // Skip pills in overlay — the x-axis at top already labels each day
+        if (options.overlayMode) return;
 
         const nTicks = xScale.ticks.length;
         ctx.save();
@@ -3805,23 +3809,16 @@
           const textW = ctx.measureText(band.dayLabel).width;
           const pillW = Math.min(textW + pillPad * 2, bandVisW - 4);
 
-          // Pill background
-          const pillBg = i % 2 === 0
-            ? 'rgba(10,30,55,0.82)'
-            : 'rgba(30,65,110,0.82)';
+          const pillBg = i % 2 === 0 ? 'rgba(10,30,55,0.82)' : 'rgba(30,65,110,0.82)';
           ctx.fillStyle = pillBg;
           _ptlRoundRect(ctx, midX - pillW / 2, pillY, pillW, pillH, 5);
           ctx.fill();
 
-          // Pill border
-          ctx.strokeStyle = i % 2 === 0
-            ? 'rgba(255,255,255,0.18)'
-            : 'rgba(100,160,220,0.45)';
+          ctx.strokeStyle = i % 2 === 0 ? 'rgba(255,255,255,0.18)' : 'rgba(100,160,220,0.45)';
           ctx.lineWidth = 1;
           _ptlRoundRect(ctx, midX - pillW / 2, pillY, pillW, pillH, 5);
           ctx.stroke();
 
-          // Day text
           ctx.fillStyle = i % 2 === 0 ? 'rgba(200,220,255,0.80)' : 'rgba(140,195,255,0.95)';
           ctx.save();
           ctx.rect(midX - pillW / 2 + 1, pillY, pillW - 2, pillH);
@@ -4097,31 +4094,33 @@
             dayStripePlugin: {
               enabled: true,
               bands: dayBands,
+              overlayMode: isOverlay,
             }
           },
           scales: {
             x: {
+              position: isOverlay ? 'top' : 'bottom',
               ticks: {
                 color: (ctx) => {
                   const lbl = ctx.tick?.label;
                   const isDay = Array.isArray(lbl) || (typeof lbl === 'string' && lbl.includes('/'));
-                  return isDay ? '#c8dcf8' : '#7090a8';
+                  return isDay ? '#c8dcf8' : '#8aa8c8';
                 },
                 font: (ctx) => {
                   const lbl = ctx.tick?.label;
                   const isDay = Array.isArray(lbl) || (typeof lbl === 'string' && lbl.includes('/'));
                   return { size: isDay ? 10 : 9, weight: isDay ? '700' : '400' };
                 },
-                maxRotation: isOverlay ? 0 : 45,
+                maxRotation: 0,
                 minRotation: 0,
                 autoSkip: true,
-                maxTicksLimit: isOverlay ? 30 : 16,
+                maxTicksLimit: isOverlay ? 28 : 16,
               },
               grid: {
                 color: (ctx) => {
                   const lbl = ctx.chart.data.labels?.[ctx.index];
                   const isDay = Array.isArray(lbl) || (typeof lbl === 'string' && lbl.includes('/'));
-                  return isDay ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.05)';
+                  return isDay ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.05)';
                 }
               }
             },
