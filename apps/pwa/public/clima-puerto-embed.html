@@ -3745,13 +3745,14 @@
         const xScale = scales.x;
         if (!xScale || !chartArea) return;
 
-        const nTicks = xScale.ticks.length;
+        const nLabels = chart.data.labels?.length || 0;
         ctx.save();
 
         options.bands.forEach((band, i) => {
-          const x1 = xScale.getPixelForTick(Math.min(band.startIdx, nTicks - 1));
-          const x2 = band.endIdx < nTicks
-            ? xScale.getPixelForTick(band.endIdx)
+          // getPixelForValue usa el índice del dato directamente (no el índice del tick filtrado)
+          const x1 = xScale.getPixelForValue(Math.min(band.startIdx, nLabels - 1));
+          const x2 = band.endIdx < nLabels
+            ? xScale.getPixelForValue(band.endIdx)
             : chartArea.right;
           const bandW = Math.max(0, Math.min(x2, chartArea.right) - x1);
 
@@ -3791,10 +3792,11 @@
         ctx.textBaseline = 'middle';
         ctx.textAlign = 'center';
 
+        const nLabels = chart.data.labels?.length || 0;
         options.bands.forEach((band, i) => {
-          const x1 = xScale.getPixelForTick(Math.min(band.startIdx, nTicks - 1));
-          const x2 = band.endIdx < nTicks
-            ? xScale.getPixelForTick(band.endIdx)
+          const x1 = xScale.getPixelForValue(Math.min(band.startIdx, nLabels - 1));
+          const x2 = band.endIdx < nLabels
+            ? xScale.getPixelForValue(band.endIdx)
             : chartArea.right;
           const visibleX2 = Math.min(x2, chartArea.right);
           const visibleX1 = Math.max(x1, chartArea.left);
