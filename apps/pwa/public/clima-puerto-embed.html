@@ -698,7 +698,7 @@
     .msc-body { padding: 14px 20px 18px; }
     .msc-grid {
       display: grid;
-      grid-template-columns: 200px 1fr 220px;
+      grid-template-columns: 200px 1fr;
       gap: 20px;
       align-items: start;
     }
@@ -1546,7 +1546,26 @@
                   </div>
                 </div>
               </div>
-              <div id="dmConflict"></div>
+              <!-- Pronóstico de reapertura: aparece debajo de la zona cerrada -->
+              <div id="zonaProbSection" style="display:none;margin-top:12px;padding:12px 14px;background:rgba(255,255,255,0.03);border-radius:8px;border:1px solid rgba(255,255,255,0.08)">
+                <div style="font-size:0.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px" id="openingZoneLabel">Pronóstico de reapertura</div>
+                <div style="display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap">
+                  <div class="msc-opening-gauge" style="margin-bottom:0;flex-shrink:0">
+                    <div class="msc-opening-ring" id="openingRing" style="width:88px;height:88px">
+                      <svg viewBox="0 0 120 120" class="msc-ring-svg">
+                        <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="10"/>
+                        <circle cx="60" cy="60" r="52" fill="none" stroke="var(--good)" stroke-width="10" stroke-linecap="round" stroke-dasharray="326.7" stroke-dashoffset="326.7" id="openingArc" transform="rotate(-90 60 60)"/>
+                      </svg>
+                      <div class="msc-opening-pct" id="openingPct" style="font-size:1.1rem">--%</div>
+                    </div>
+                  </div>
+                  <div style="flex:1;min-width:120px">
+                    <div class="msc-opening-label" id="openingLabel">Evaluando...</div>
+                    <div class="msc-opening-detail" id="openingDetail"></div>
+                    <div class="msc-opening-windows" id="openingWindows"></div>
+                  </div>
+                </div>
+              </div>
               <div class="dm-source">
                 <span id="dmTimestamp">Consultando SITPORT...</span>
                 <span>·</span>
@@ -1588,22 +1607,6 @@
               </div>
               <div class="msc-note">Estación automática actualiza ~cada 30-60 min. Boletines oficiales en horarios sinópticos.</div>
               <div class="msc-last-update" id="meteoLastUpdate">Última medición: consultando...</div>
-            </div>
-            <!-- Probabilidad de apertura -->
-            <div class="msc-opening-side" id="openingForecastSide">
-              <div class="msc-label">Probabilidad de apertura del puerto</div>
-              <div class="msc-opening-gauge">
-                <div class="msc-opening-ring" id="openingRing">
-                  <svg viewBox="0 0 120 120" class="msc-ring-svg">
-                    <circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="10"/>
-                    <circle cx="60" cy="60" r="52" fill="none" stroke="var(--good)" stroke-width="10" stroke-linecap="round" stroke-dasharray="326.7" stroke-dashoffset="326.7" id="openingArc" transform="rotate(-90 60 60)"/>
-                  </svg>
-                  <div class="msc-opening-pct" id="openingPct">--%</div>
-                </div>
-              </div>
-              <div class="msc-opening-label" id="openingLabel">Evaluando condiciones...</div>
-              <div class="msc-opening-detail" id="openingDetail"></div>
-              <div class="msc-opening-windows" id="openingWindows"></div>
             </div>
           </div>
         </div>
@@ -3281,10 +3284,32 @@
       const labelEl = document.getElementById('openingLabel');
       const detailEl = document.getElementById('openingDetail');
       const windowsEl = document.getElementById('openingWindows');
+      const sectionEl = document.getElementById('zonaProbSection');
+      const zoneLabelEl = document.getElementById('openingZoneLabel');
       const circumference = 2 * Math.PI * 52; // ~326.7
 
       const dmRestricted = dm && dm.found && dm.restricciones > 0;
       const dmOpen = dm && dm.found && dm.restricciones === 0;
+
+      // Determinar nombre de la zona relevante
+      let zoneName = 'Bahía de Yal (Chonchi)';
+      if (dm && dm.found) {
+        const closedSub = dm.subPuertos?.find(p => p.navesMenores || p.navesMayores || p.restriccionBahia);
+        if (closedSub) {
+          // Capitalizar primer letra de cada palabra
+          zoneName = closedSub.nombre.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+        } else if (dm.estado === 'DESCONOCIDO') {
+          zoneName = 'Quinzona';
+        } else if (dmRestricted) {
+          zoneName = 'Bahía de Yal (Chonchi)';
+        }
+      }
+      // Mostrar sección siempre que haya datos de dm
+      if (sectionEl) sectionEl.style.display = (dm && dm.found) ? '' : 'none';
+      if (zoneLabelEl) {
+        const action = dmRestricted ? 'Pronóstico de reapertura' : 'Probabilidad de apertura';
+        zoneLabelEl.textContent = `${action} · ${zoneName}`;
+      }
 
       let openProb;
       let statusClass;
