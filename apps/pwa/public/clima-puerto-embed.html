@@ -4059,6 +4059,12 @@
               titleColor: '#fff',
               bodyColor: '#ccc',
               callbacks: {
+                label(ctx) {
+                  const val = ctx.parsed.y;
+                  if (val == null) return null;
+                  const rounded = Number.isInteger(val) ? val : Math.round(val * 10) / 10;
+                  return `${ctx.dataset.label}: ${rounded}`;
+                },
                 afterBody(contexts) {
                   const idx = contexts[0]?.dataIndex;
                   if (idx == null) return '';
@@ -4106,10 +4112,10 @@
                   const isDay = Array.isArray(lbl) || (typeof lbl === 'string' && lbl.includes('/'));
                   return { size: isDay ? 10 : 9, weight: isDay ? '700' : '400' };
                 },
-                maxRotation: 45,
+                maxRotation: isOverlay ? 0 : 45,
                 minRotation: 0,
-                autoSkip: !isOverlay,
-                maxTicksLimit: isOverlay ? 80 : 16,
+                autoSkip: true,
+                maxTicksLimit: isOverlay ? 30 : 16,
               },
               grid: {
                 color: (ctx) => {
