@@ -3785,9 +3785,6 @@
         const xScale = scales.x;
         if (!xScale || !chartArea) return;
 
-        // Skip pills in overlay — the x-axis at top already labels each day
-        if (options.overlayMode) return;
-
         const nTicks = xScale.ticks.length;
         ctx.save();
         ctx.font = 'bold 9px system-ui, -apple-system, sans-serif';
@@ -3806,7 +3803,9 @@
 
           const midX = visibleX1 + bandVisW / 2;
           const pillH = 17;
-          const pillY = chartArea.top + 6;
+          // En overlay el eje X está arriba → pills dentro del gráfico, pegadas al borde superior
+          // En normal → pills también dentro del área del gráfico
+          const pillY = chartArea.top + (options.overlayMode ? 4 : 6);
           const pillPad = 6;
           const textW = ctx.measureText(band.dayLabel).width;
           const pillW = Math.min(textW + pillPad * 2, bandVisW - 4);
@@ -3919,7 +3918,11 @@
           _dayBandStart = labels.length;
           _dayBandLabel = `${diaAbr} ${dayNum}/${mesStr}`;
           lastDayShown = dayNum;
-          label = `${diaAbr} ${dayNum}/${mesStr}\n${String(h).padStart(2,'0')}:00`;
+          // En overlay: solo hora (el día se muestra por las pills del plugin)
+          // En normal: día + hora en el tick de medianoche/primer punto del día
+          label = isOverlay
+            ? String(h).padStart(2, '0') + ':00'
+            : `${diaAbr} ${dayNum}/${mesStr}\n${String(h).padStart(2,'0')}:00`;
         } else {
           label = String(h).padStart(2, '0') + ':00';
         }
@@ -4117,20 +4120,23 @@
                 minRotation: 0,
                 autoSkip: !isOverlay,
                 maxTicksLimit: isOverlay ? undefined : 16,
+                // En overlay: todos los labels son horas → mostrar solo 00:00, 06:00, 12:00, 18:00
                 callback: isOverlay ? function(val) {
                   const lbl = this.getLabelForValue(val);
                   if (!lbl) return null;
-                  const str = Array.isArray(lbl) ? lbl.join('\n') : lbl;
-                  // Siempre mostrar labels de día (contienen '/')
-                  if (str.includes('/')) return lbl;
-                  // Solo mostrar horas clave intermedias
+                  const str = Array.isArray(lbl) ? lbl[lbl.length - 1] : lbl;
                   const h = parseInt(str);
-                  return (h === 6 || h === 12 || h === 18) ? str : null;
+                  return (h === 0 || h === 6 || h === 12 || h === 18) ? str : null;
                 } : undefined,
               },
               grid: {
                 color: (ctx) => {
                   const lbl = ctx.chart.data.labels?.[ctx.index];
+                  // En overlay: medianoche (00:00) → línea más visible; resto → sutil
+                  if (isOverlay) {
+                    const str = Array.isArray(lbl) ? lbl[lbl.length - 1] : lbl;
+                    return (str && parseInt(str) === 0) ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.05)';
+                  }
                   const isDay = Array.isArray(lbl) || (typeof lbl === 'string' && lbl.includes('/'));
                   return isDay ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.05)';
                 }
