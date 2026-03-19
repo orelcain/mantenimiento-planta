@@ -2899,7 +2899,8 @@
           result.navesMayores    = false;
           result.restriccionBahia = false;
           result.estado = 'DESCONOCIDO';
-          result.estadoDetalle = 'La Capitanía tiene restricciones pero no se puede determinar si son propias de Chonchi';
+          result.restricciones = 1; // hay restricciones en la jurisdicción, origen desconocido
+          result.estadoDetalle = 'La Capitanía tiene restricciones activas · No se puede determinar si afectan a Bahía de Yal';
         } else {
           result.navesMenores    = capNavesMenores  && !subNavesMenores;
           result.navesMayores    = capNavesMayores  && !subNavesMayores;
@@ -3403,13 +3404,15 @@
       if (dm && dm.found) {
         _dmGlobalStatus = dm;
         const chonchiRestr = dm.restriccionBahia || dm.navesMenores || dm.navesMayores;
-        const icon = chonchiRestr ? '🔴' : '🟢';
-        const estado = chonchiRestr ? 'CON RESTRICCIÓN' : 'ABIERTO';
+        const isUnknownDm  = dm.estado === 'DESCONOCIDO';
+        const icon  = isUnknownDm ? '⚠️' : chonchiRestr ? '🔴' : '🟢';
+        const estado = isUnknownDm ? 'ZONA CON RESTRICCIÓN' : chonchiRestr ? 'CON RESTRICCIÓN' : 'ABIERTO';
         let detail = '';
-        if (dm.restriccionBahia) detail += ' · Bahía cerrada';
-        if (dm.navesMenores) detail += ' · Naves menores restringidas';
-        if (dm.navesMayores) detail += ' · Naves mayores restringidas';
-        if (!chonchiRestr) detail = ' · Sin restricciones en Bahía de Yal';
+        if (isUnknownDm) detail = ' · Restricción en Capitanía · origen sin confirmar · Ver zonas';
+        else if (dm.restriccionBahia) detail += ' · Bahía cerrada';
+        else if (dm.navesMenores) detail += ' · Naves menores restringidas';
+        else if (dm.navesMayores) detail += ' · Naves mayores restringidas';
+        else detail = ' · Sin restricciones en Bahía de Yal';
         dmStatusEl.innerHTML = `${icon} <strong>DIRECTEMAR AHORA: ${estado}</strong>${detail} · Chonchi / Bahía de Yal`;
       } else {
         dmStatusEl.innerHTML = '⏳ Sin datos DIRECTEMAR en este momento';
@@ -3604,20 +3607,26 @@
 
       // Estado basado en flags booleanos de Chonchi (no en numeroRestricciones que puede
       // reflejar el total de la Capitanía incluyendo Queilen/Puqueldon)
-      const hasRestr = dm.restriccionBahia || dm.navesMenores || dm.navesMayores;
-      panel.className = 'directemar-panel ' + (hasRestr ? 'dm-restricted' : 'dm-open');
-      badge.className = 'dm-badge live' + (hasRestr ? '' : ' ok');
-      badge.textContent = hasRestr ? '🔴 EN VIVO' : '🟢 EN VIVO';
-      icon.textContent = hasRestr ? '⛔' : '⚓';
-      status.className = 'dm-big-status ' + (hasRestr ? 'restricted' : 'open');
-      status.innerHTML = (hasRestr ? '🚫 CON RESTRICCIÓN' : '✅ ABIERTO') + locationHtml;
-      restr.className = 'dm-restricciones ' + (hasRestr ? 'has' : 'none');
+      const isUnknown = dm.estado === 'DESCONOCIDO';
+      const hasRestr  = dm.restriccionBahia || dm.navesMenores || dm.navesMayores;
+      panel.className = 'directemar-panel ' + (isUnknown ? 'dm-restricted' : hasRestr ? 'dm-restricted' : 'dm-open');
+      badge.className = 'dm-badge live' + (isUnknown || hasRestr ? '' : ' ok');
+      badge.textContent = isUnknown || hasRestr ? '🔴 EN VIVO' : '🟢 EN VIVO';
+      icon.textContent = isUnknown ? '⚠️' : hasRestr ? '⛔' : '⚓';
+      status.className = 'dm-big-status ' + (isUnknown ? 'restricted' : hasRestr ? 'restricted' : 'open');
+      if (isUnknown) {
+        status.innerHTML = '⚠️ RESTRICCIÓN EN ZONA' + locationHtml;
+      } else {
+        status.innerHTML = (hasRestr ? '🚫 CON RESTRICCIÓN' : '✅ ABIERTO') + locationHtml;
+      }
+      restr.className = 'dm-restricciones ' + (isUnknown || hasRestr ? 'has' : 'none');
       let restrSummary = '';
-      if (dm.restriccionBahia) restrSummary = 'Bahía cerrada';
+      if (isUnknown) restrSummary = 'Restricción en la Capitanía · origen sin confirmar · Ver zonas abajo';
+      else if (dm.restriccionBahia) restrSummary = 'Bahía cerrada';
       else if (dm.navesMenores && dm.navesMayores) restrSummary = 'Naves mayores y menores restringidas';
       else if (dm.navesMenores) restrSummary = 'Naves menores restringidas';
       else if (dm.navesMayores) restrSummary = 'Naves mayores restringidas';
-      restr.textContent = hasRestr ? restrSummary : 'Sin restricciones en Bahía de Yal';
+      restr.textContent = (isUnknown || hasRestr) ? restrSummary : 'Sin restricciones en Bahía de Yal';
 
       // Medición meteorológica
       if (dm.medicion && dm.medicion.temp !== null) {
