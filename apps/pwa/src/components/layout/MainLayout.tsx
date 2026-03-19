@@ -263,6 +263,21 @@ export function MainLayout() {
       })]
     : filteredNavigation
 
+  // Bottom nav: rutas principales para móvil (máx 4 + "Más")
+  const bottomNavDef: Array<{ name: string; href: string; icon: React.ElementType; module?: AppModule }> = [
+    { name: 'Inicio', href: '/', icon: LayoutDashboard, module: 'dashboard' },
+    { name: 'Alertas', href: '/incidents', icon: AlertTriangle, module: 'incidencias' },
+    { name: 'Equipos', href: '/equipment', icon: Wrench, module: 'equipos' },
+    { name: 'Preventivo', href: '/preventive', icon: CalendarClock, module: 'preventivo' },
+  ]
+  const bottomNavItems = bottomNavDef.filter(item => !item.module || canSee(item.module))
+
+  const currentPageName = allNavigation.find(item =>
+    item.href === '/'
+      ? location.pathname === '/'
+      : location.pathname.startsWith(item.href)
+  )?.name ?? ''
+
   const readOnlyPrefixes = ['/settings', '/admin', '/hierarchy']
   const isReadOnly = !isOnline && readOnlyPrefixes.some((p) => location.pathname.startsWith(p))
 
@@ -553,17 +568,23 @@ export function MainLayout() {
       {/* ══════ MAIN CONTENT AREA ══════ */}
       <div className="flex-1 min-w-0 flex flex-col min-h-screen">
         {/* Top bar */}
-        <header className="sticky top-0 z-30 flex items-center h-16 px-4 bg-background/80 backdrop-blur border-b">
+        <header className="sticky top-0 z-30 flex items-center h-14 px-4 bg-background/80 backdrop-blur border-b">
+          {/* Mobile: title centrado + hamburgesa para rutas secundarias */}
+          <div className="flex-1 flex items-center lg:hidden">
+            {currentPageName && (
+              <span className="text-sm font-semibold truncate">{currentPageName}</span>
+            )}
+          </div>
           <button
             onClick={() => setSidebarOpen(true)}
-            className="lg:hidden p-2 -ml-2 hover:bg-muted rounded-lg"
-            aria-label="Abrir menú"
+            className="lg:hidden p-2 -mr-2 hover:bg-muted rounded-lg text-muted-foreground"
+            aria-label="Abrir menú completo"
             aria-expanded={sidebarOpen}
           >
             <Menu className="h-5 w-5" />
           </button>
 
-          <div className="flex-1" />
+          <div className="hidden lg:flex flex-1" />
 
           {isGanttRoute && (
             <Button
@@ -850,8 +871,8 @@ export function MainLayout() {
           id="main-content"
           className={`${
             isClimaRoute
-              ? 'h-[calc(100vh-4rem)] p-0 overflow-hidden'
-              : 'p-3 lg:p-6 w-full max-w-[100vw] overflow-x-hidden'
+              ? 'h-[calc(100vh-3.5rem)] p-0 overflow-hidden'
+              : 'p-3 lg:p-6 w-full max-w-[100vw] overflow-x-hidden pb-20 lg:pb-6'
           } ${
             isReadOnly ? 'pointer-events-none opacity-70' : ''
           }`}
@@ -896,13 +917,51 @@ export function MainLayout() {
       {!canSee('aria') && isAdmin && (
         <button
           onClick={handleEnableAria}
-          className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 px-4 py-3 text-white shadow-lg hover:from-blue-700 hover:to-purple-700 transition-all hover:scale-105"
+          className="fixed right-6 z-50 flex items-center gap-2 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 px-4 py-3 text-white shadow-lg hover:from-blue-700 hover:to-purple-700 transition-all hover:scale-105 bottom-24 lg:bottom-6"
           title="Activar ARIA Asistente"
         >
           <Bot className="h-5 w-5" />
           <span className="text-sm font-medium">Activar ARIA</span>
         </button>
       )}
+
+      {/* ══════ MOBILE BOTTOM NAV BAR ══════ */}
+      <nav
+        className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-card/95 backdrop-blur-md border-t border-border"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+        aria-label="Navegación principal"
+      >
+        <div className="flex items-stretch h-16">
+          {bottomNavItems.map(item => {
+            const isActive = item.href === '/'
+              ? location.pathname === '/'
+              : location.pathname.startsWith(item.href)
+            return (
+              <NavLink
+                key={item.href}
+                to={item.href}
+                onClick={() => setSidebarOpen(false)}
+                className={cn(
+                  'flex-1 flex flex-col items-center justify-center gap-0.5 text-[0.65rem] font-medium transition-colors active:scale-95',
+                  isActive ? 'text-primary' : 'text-muted-foreground'
+                )}
+                aria-label={item.name}
+              >
+                <item.icon className={cn('h-5 w-5', isActive && 'stroke-[2.5px]')} />
+                <span>{item.name}</span>
+              </NavLink>
+            )
+          })}
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="flex-1 flex flex-col items-center justify-center gap-0.5 text-[0.65rem] font-medium text-muted-foreground transition-colors active:scale-95"
+            aria-label="Más opciones"
+          >
+            <Menu className="h-5 w-5" />
+            <span>Más</span>
+          </button>
+        </div>
+      </nav>
     </div>
   )
 }
