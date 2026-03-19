@@ -2732,9 +2732,17 @@
     }
 
     /**
-     * Extrae datos de Chonchi y puertos cercanos del array de puertos.
+     * Extrae datos de Chonchi/Bahía de Yal y sub-puertos de la QUINZONA.
+     *
+     * IMPORTANTE: La API SITPORT devuelve "CAPITANÍA DE PUERTO CHONCHI" como entrada
+     * principal que AGRUPA las restricciones de todos sus sub-puertos (Queilen, Puqueldon).
+     * No existe una entrada separada para "CHONCHI" como puerto individual.
+     *
+     * Estrategia: restamos de la Capitanía lo que pertenece a sub-puertos para obtener
+     * el estado real de Chonchi/Bahía de Yal.
+     *
      * Retorna: { found, restricciones, estado, navesMayores, navesMenores,
-     *            restriccionBahia, medicion, nearby[], timestamp }
+     *            restriccionBahia, medicion, subPuertos[], nearby[], timestamp }
      */
     function extractChonchiData(ports) {
       const result = {
@@ -2745,32 +2753,24 @@
         navesMenores: false,
         restriccionBahia: false,
         medicion: null,
-        subPuertos: [],   // Queilen, Puqueldon — informativo solamente
+        subPuertos: [],
         nearby: [],
         timestamp: new Date().toISOString(),
       };
 
       if (!Array.isArray(ports)) return result;
 
-      // ── Buscar Chonchi: primero intentar entrada específica (sin "CAPITAN"),
-      // luego cualquier entrada que contenga "CHONCHI" como fallback ──
-      const isCapitania = n => n.includes('CAPITAN') || n.includes('GOBERNACION') || n.includes('GOBERNACIÓN');
-      const chonchi = ports.find(p => {
-        const name = (p.reparticion?.nombre ?? '').toUpperCase();
-        return name.includes('CHONCHI') && !isCapitania(name);
-      }) ?? ports.find(p => (p.reparticion?.nombre ?? '').toUpperCase().includes('CHONCHI'));
-      if (!chonchi) return result;
+      const nameOf = p => (p.reparticion?.nombre ?? '').toUpperCase();
+      const isCapitania = n => n.includes('CAPITAN') || n.includes('GOBERN');
+
+      // ── 1. Capitanía Chonchi → fuente de datos meteorológicos + restricciones brutas
+      const capitania = ports.find(p => nameOf(p).includes('CHONCHI'));
+      if (!capitania) return result;
 
       result.found = true;
-      const r = chonchi.restricciones ?? {};
-      result.restricciones = r.numeroRestricciones ?? 0;
-      result.navesMayores = r.navesMayores ?? false;
-      result.navesMenores = r.navesMenores ?? false;
-      result.restriccionBahia = r.restriccionBahia ?? false;
-      result.estado = result.restricciones > 0 ? 'CON RESTRICCIÓN' : 'SIN RESTRICCIÓN';
 
-      // Medición meteorológica de Chonchi
-      const m = chonchi.medicionMeteo;
+      // Datos meteorológicos de la estación Chonchi (siempre del entry de Capitanía)
+      const m = capitania.medicionMeteo;
       if (m) {
         result.medicion = {
           temp: m.temperatura,
@@ -2779,43 +2779,113 @@
           windDeg: m.direccionViento ?? null,
           pressure: m.presion,
           rain: m.lluviaUltimaHora ?? 0,
-          date: m.fecha ? new Date(m.fecha).toLocaleString('es-CL', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }) : null,
+          date: m.fecha ? new Date(m.fecha).toLocaleString('es-CL', {
+            day: '2-digit', month: '2-digit', year: 'numeric',
+            hour: '2-digit', minute: '2-digit'
+          }) : null,
           rawFecha: m.fecha ?? null,
           unidadViento: m.unidadViento ?? 'nds',
           unidadPresion: m.unidadPresion ?? 'hPa',
         };
       }
 
-      // ── Sub-puertos de la zona: Queilen y Puqueldon (solo informativos) ──
-      for (const port of ports) {
-        const name = (port.reparticion?.nombre ?? '').toUpperCase();
-        if (SUB_PUERTOS_CHONCHI.some(n => name.includes(n)) && !isCapitania(name)) {
-          const nr = port.restricciones ?? {};
-          const pm = port.medicionMeteo;
-          result.subPuertos.push({
-            nombre: port.reparticion.nombre.replace(/CAPITAN[ÍI]A DE PUERTO /i, '').trim(),
-            restricciones: nr.numeroRestricciones ?? 0,
-            navesMenores: nr.navesMenores ?? false,
-            navesMayores: nr.navesMayores ?? false,
-            restriccionBahia: nr.restriccionBahia ?? false,
-            viento: pm?.velocidadViento ?? null,
-            dirViento: pm?.textoDireccionViento ?? null,
-          });
+      // Restricciones brutas de la Capitanía (puede incluir sub-puertos)
+      const capR = capitania.restricciones ?? {};
+      const capNavesMenores  = capR.navesMenores   ?? false;
+      const capNavesMayores  = capR.navesMayores   ?? false;
+      const capBahia         = capR.restriccionBahia ?? false;
+
+      // ── 2. Sub-puertos: Queilen y Puqueldon
+      const queilenEntry = ports.find(p => {
+        const n = nameOf(p);
+        return n.includes('QUEILEN') && !isCapitania(n);
+      });
+      const puqueldonEntry = ports.find(p => {
+        const n = nameOf(p);
+        return (n.includes('PUQUELDON') || n.includes('PUQUELDÓN')) && !isCapitania(n);
+      });
+
+      // Flags de restricciones que YA están explicadas por sub-puertos
+      const subNavesMenores = (queilenEntry?.restricciones?.navesMenores   ?? false)
+                            || (puqueldonEntry?.restricciones?.navesMenores   ?? false);
+      const subNavesMayores = (queilenEntry?.restricciones?.navesMayores   ?? false)
+                            || (puqueldonEntry?.restricciones?.navesMayores   ?? false);
+      const subBahia        = (queilenEntry?.restricciones?.restriccionBahia ?? false)
+                            || (puqueldonEntry?.restricciones?.restriccionBahia ?? false);
+
+      // ── 3. Restricciones PROPIAS de Chonchi/Bahía de Yal
+      //    = lo que tiene la Capitanía Y que NO está explicado por sub-puertos
+      result.navesMenores   = capNavesMenores  && !subNavesMenores;
+      result.navesMayores   = capNavesMayores  && !subNavesMayores;
+      result.restriccionBahia = capBahia       && !subBahia;
+      result.restricciones  = (result.navesMenores || result.navesMayores || result.restriccionBahia) ? 1 : 0;
+      result.estado = result.restricciones > 0 ? 'CON RESTRICCIÓN' : 'SIN RESTRICCIÓN';
+
+      // Debug: permite verificar en consola del navegador
+      console.log('🔍 SITPORT QUINZONA:', {
+        capitania: {
+          nombre: capitania.reparticion?.nombre,
+          navesMenores: capNavesMenores, navesMayores: capNavesMayores, restriccionBahia: capBahia,
+          totalAPI: capR.numeroRestricciones
+        },
+        queilen: queilenEntry ? {
+          nombre: queilenEntry.reparticion?.nombre,
+          navesMenores: queilenEntry.restricciones?.navesMenores,
+          navesMayores: queilenEntry.restricciones?.navesMayores,
+          restriccionBahia: queilenEntry.restricciones?.restriccionBahia,
+        } : 'NO ENCONTRADO',
+        puqueldon: puqueldonEntry ? {
+          nombre: puqueldonEntry.reparticion?.nombre,
+          navesMenores: puqueldonEntry.restricciones?.navesMenores,
+        } : 'NO ENCONTRADO',
+        chonchiResultante: {
+          navesMenores: result.navesMenores,
+          navesMayores: result.navesMayores,
+          restriccionBahia: result.restriccionBahia,
+          estado: result.estado
         }
+      });
+
+      // ── 4. Poblar sub-puertos para el panel de zonas
+      if (queilenEntry) {
+        const qr = queilenEntry.restricciones ?? {};
+        const qm = queilenEntry.medicionMeteo;
+        result.subPuertos.push({
+          nombre: queilenEntry.reparticion.nombre.replace(/CAPITAN[ÍI]A DE PUERTO /i, '').trim(),
+          restricciones: qr.numeroRestricciones ?? 0,
+          navesMenores: qr.navesMenores ?? false,
+          navesMayores: qr.navesMayores ?? false,
+          restriccionBahia: qr.restriccionBahia ?? false,
+          viento: qm?.velocidadViento ?? null,
+          dirViento: qm?.textoDireccionViento ?? null,
+        });
+      }
+      if (puqueldonEntry) {
+        const pr = puqueldonEntry.restricciones ?? {};
+        const pm2 = puqueldonEntry.medicionMeteo;
+        result.subPuertos.push({
+          nombre: puqueldonEntry.reparticion.nombre.replace(/CAPITAN[ÍI]A DE PUERTO /i, '').trim(),
+          restricciones: pr.numeroRestricciones ?? 0,
+          navesMenores: pr.navesMenores ?? false,
+          navesMayores: pr.navesMayores ?? false,
+          restriccionBahia: pr.restriccionBahia ?? false,
+          viento: pm2?.velocidadViento ?? null,
+          dirViento: pm2?.textoDireccionViento ?? null,
+        });
       }
 
-      // ── Puertos cercanos regionales ──
+      // ── 5. Puertos cercanos regionales
       for (const port of ports) {
         const name = port.reparticion?.nombre ?? '';
         if (NEARBY_PORTS.some(n => name.toUpperCase().includes(n))) {
           const nr = port.restricciones ?? {};
-          const pm = port.medicionMeteo;
+          const pm3 = port.medicionMeteo;
           result.nearby.push({
             nombre: name.replace(/CAPITAN[ÍI]A DE PUERTO /i, '').trim(),
             restricciones: nr.numeroRestricciones ?? 0,
             estado: (nr.numeroRestricciones ?? 0) > 0 ? 'RESTRICCIÓN' : 'ABIERTO',
-            viento: pm?.velocidadViento ?? null,
-            dirViento: pm?.textoDireccionViento ?? null,
+            viento: pm3?.velocidadViento ?? null,
+            dirViento: pm3?.textoDireccionViento ?? null,
           });
         }
       }
@@ -3538,21 +3608,22 @@
         detailEl.textContent = detail;
       }
 
-      // Bahía de Yal: usa datos principales del DM (siempre disponibles)
+      // Bahía de Yal: usa flags derivados de Chonchi (estado propio, sin sub-puertos)
       renderZoneCard('dmZonaBahia', 'dmZonaBahiaStatus', 'dmZonaBahiaDetail',
-        dm.restricciones > 0, dm.navesMenores, dm.navesMayores, dm.restriccionBahia,
+        dm.navesMenores || dm.navesMayores || dm.restriccionBahia,
+        dm.navesMenores, dm.navesMayores, dm.restriccionBahia,
         dm.restricciones, dm.medicion?.windSpeed ?? null, false);
 
-      // Queilen y Puqueldon: desde subPuertos si disponibles
+      // Queilen y Puqueldon: desde subPuertos
       const subQ = dm.subPuertos?.find(p => p.nombre?.toUpperCase().includes('QUEILEN'));
       const subP = dm.subPuertos?.find(p => p.nombre?.toUpperCase().includes('PUQUELDON') || p.nombre?.toUpperCase().includes('PUQUELDÓN'));
       renderZoneCard('dmZonaQueilen', 'dmZonaQuilenStatus', 'dmZonaQuilenDetail',
-        subQ ? subQ.restricciones > 0 : false,
+        !!(subQ?.navesMenores || subQ?.navesMayores || subQ?.restriccionBahia),
         subQ?.navesMenores ?? false, subQ?.navesMayores ?? false,
         subQ?.restriccionBahia ?? false, subQ?.restricciones ?? 0,
         subQ?.viento ?? null, !subQ);
       renderZoneCard('dmZonaPuqueldon', 'dmZonaPuqueldonStatus', 'dmZonaPuqueldonDetail',
-        subP ? subP.restricciones > 0 : false,
+        !!(subP?.navesMenores || subP?.navesMayores || subP?.restriccionBahia),
         subP?.navesMenores ?? false, subP?.navesMayores ?? false,
         subP?.restriccionBahia ?? false, subP?.restricciones ?? 0,
         subP?.viento ?? null, !subP);
