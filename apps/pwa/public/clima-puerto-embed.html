@@ -917,6 +917,25 @@
     .dm-zone-status-badge.restricted { color: var(--mid); }
     .dm-zone-status-badge.closed { color: var(--bad); }
     .dm-zone-status-badge.unknown { color: var(--muted); }
+    .dm-zone-restr-text {
+      margin-top: 7px;
+      font-size: 0.67rem;
+      color: var(--muted);
+      line-height: 1.5;
+      border-top: 1px solid rgba(255,255,255,0.07);
+      padding-top: 6px;
+      white-space: pre-line;
+      word-break: break-word;
+    }
+    .dm-zone-restr-text .restr-label {
+      font-weight: 600;
+      color: var(--bad);
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 3px;
+      display: block;
+    }
     .dm-zone-detail {
       font-size: 0.68rem;
       color: var(--muted);
@@ -1507,19 +1526,22 @@
                   <div class="dml">Estado por Zona · QUINZONA</div>
                   <div class="dm-zones-row" id="dmZonasRow">
                     <div class="dm-zone-card zone-unknown" id="dmZonaBahia">
-                      <div class="dm-zone-name">📍 Bahía de Yal</div>
+                      <div class="dm-zone-name">📍 Bahía de Yal <span style="opacity:0.5;font-size:0.72em;font-weight:400">(Chonchi)</span></div>
                       <div class="dm-zone-status-badge unknown" id="dmZonaBahiaStatus">—</div>
                       <div class="dm-zone-detail" id="dmZonaBahiaDetail">Consultando...</div>
+                      <div class="dm-zone-restr-text" id="dmZonaBahiaRestr" style="display:none"></div>
                     </div>
                     <div class="dm-zone-card zone-unknown" id="dmZonaQueilen">
                       <div class="dm-zone-name">🗺️ Queilen</div>
                       <div class="dm-zone-status-badge unknown" id="dmZonaQuilenStatus">—</div>
                       <div class="dm-zone-detail" id="dmZonaQuilenDetail">Consultando...</div>
+                      <div class="dm-zone-restr-text" id="dmZonaQuilenRestr" style="display:none"></div>
                     </div>
                     <div class="dm-zone-card zone-unknown" id="dmZonaPuqueldon">
                       <div class="dm-zone-name">🗺️ Puqueldon</div>
                       <div class="dm-zone-status-badge unknown" id="dmZonaPuqueldonStatus">—</div>
                       <div class="dm-zone-detail" id="dmZonaPuqueldonDetail">Consultando...</div>
+                      <div class="dm-zone-restr-text" id="dmZonaPuqueldonRestr" style="display:none"></div>
                     </div>
                   </div>
                 </div>
@@ -2683,6 +2705,8 @@
     /* API REST oficial de SITPORT (CORS: Access-Control-Allow-Origin: *) */
     const SITPORT_API = 'https://orion.directemar.cl/sitport/back/users/Totalgeneral';
     /* Endpoint consultaBahias — POST, devuelve todas las bahías con color/valor de restricción */
+    /* Endpoint consultaCapuertoRestriccion — POST, devuelve texto detallado de restricciones por bahía */
+    const SITPORT_CONSULTA_CAP_RESTR = 'https://orion.directemar.cl/sitport/back/users/consultaCapuertoRestriccion';
     const SITPORT_CONSULTA_BAHIAS = 'https://orion.directemar.cl/sitport/back/users/consultaBahias';
     /* Cloud Function como fallback si la API directa falla */
     const CF_PROXY = 'https://us-central1-mantenimiento-planta-771a3.cloudfunctions.net/sitportProxy';
@@ -2794,11 +2818,11 @@
      * Retorna: { found, restricciones, estado, navesMayores, navesMenores,
      *            restriccionBahia, medicion, subPuertos[], nearby[], timestamp }
      */
-    function extractChonchiData(ports, bahias = null) {
+    function extractChonchiData(ports, bahias = null, capRestrData = null) {
       const result = {
         found: false,
         restricciones: 0,
-        estado: 'DESCONOCIDO',
+        estado: null,
         navesMayores: false,
         navesMenores: false,
         restriccionBahia: false,
@@ -2911,11 +2935,44 @@
       }
 
       if (result.estado !== 'DESCONOCIDO') {
+        // estado===null: path normal (chonchiEntry encontrado, o path de substracción sin restricciones desconocidas)
         result.restricciones = (result.navesMenores || result.navesMayores || result.restriccionBahia) ? 1 : 0;
         result.estado = result.restricciones > 0 ? 'CON RESTRICCIÓN' : 'SIN RESTRICCIÓN';
       }
 
       // ── 4. Poblar sub-puertos para el panel de zonas
+      // Helper: extrae texto legible de restricción desde capRestrData para un nombre de bahía
+      const getRestrText = (bahiaKeyword) => {
+        if (!Array.isArray(capRestrData) || capRestrData.length === 0) return null;
+        const matches = capRestrData.filter(r => {
+          const n = (r.NMBahia ?? r.nmBahia ?? r.nombre ?? r.Nombre ?? '').toUpperCase();
+          return n.includes(bahiaKeyword.toUpperCase());
+        });
+        if (matches.length === 0) return null;
+        return matches.map(r => {
+          const parts = [];
+          const fi = r.fechaInicio ?? r.FechaInicio ?? r.fecha_inicio;
+          if (fi) {
+            const d = new Date(fi);
+            parts.push(`⚠️ Inicio: ${d.toLocaleString('es-CL', {day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}`);
+          }
+          const tipo = r.tipo ?? r.Tipo ?? r.TipoRestriccion;
+          if (tipo) parts.push(`Tipo: ${tipo}`);
+          const inst = r.NMInstalacion ?? r.nmInstalacion ?? r.instalacion ?? r.Instalacion;
+          if (inst) parts.push(`Instalación: ${inst}`);
+          const naves = r.navesConRestriccion ?? r.naves ?? r.Naves ?? r.NavesConRestriccion;
+          if (naves) parts.push(`Naves: ${naves}`);
+          const areas = r.areasRestriccion ?? r.areas ?? r.Areas ?? r.AreasRestriccion;
+          if (areas) parts.push(`Áreas: ${areas}`);
+          const obs = (r.observacion ?? r.Observacion ?? r.obs ?? r.Obs ?? '').trim();
+          if (obs) parts.push(`Obs.: ${obs.length > 250 ? obs.substring(0, 250) + '...' : obs}`);
+          return parts.join('\n');
+        }).filter(Boolean).join('\n—\n');
+      };
+
+      // También intentar extraer texto de Chonchi principal
+      result.chonchiRestrText = getRestrText('CHONCHI') || null;
+
       if (queilenEntry) {
         const f = extractFlags(queilenEntry);
         result.subPuertos.push({
@@ -2926,6 +2983,7 @@
           restriccionBahia: f.restriccionBahia,
           viento: f.viento,
           dirViento: f.dirViento,
+          restrText: getRestrText('QUEILEN'),
         });
       }
       if (puqueldonEntry) {
@@ -2938,6 +2996,7 @@
           restriccionBahia: f.restriccionBahia,
           viento: f.viento,
           dirViento: f.dirViento,
+          restrText: getRestrText('PUQUELDON') ?? getRestrText('PUQUELDÓN'),
         });
       }
 
@@ -3021,19 +3080,58 @@
       }
     }
 
+    /**
+     * Obtiene detalles ricos de restricciones desde consultaCapuertoRestriccion (POST).
+     * Devuelve el array completo o null si el endpoint no está disponible.
+     */
+    async function fetchConsultaCapuertoRestriccion() {
+      try {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 10000);
+        const resp = await fetch(SITPORT_CONSULTA_CAP_RESTR, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json, text/plain, */*' },
+          body: JSON.stringify({}),
+          signal: ctrl.signal,
+        });
+        clearTimeout(timer);
+        if (!resp.ok) return null;
+        const data = await resp.json();
+        const all = Array.isArray(data.recordset) ? data.recordset
+                  : Array.isArray(data.recordsets?.[0]) ? data.recordsets[0]
+                  : Array.isArray(data) ? data : null;
+        if (!all || all.length === 0) return null;
+        // Filtrar solo registros de Chonchi (CdReparticion=225 o IDBahia conocidas)
+        const CHONCHI_BAHIAS = [116, 119, 155, 205]; // Castro(116), Chonchi(119), Queilen(155), Puqueldón(205)
+        const chonchi = all.filter(r =>
+          r.CdReparticion === CHONCHI_REPARTICION_ID ||
+          CHONCHI_BAHIAS.includes(r.IDBahia)
+        );
+        const used = chonchi.length > 0 ? chonchi : all.filter(r => {
+          const n = (r.NMBahia ?? r.nombre ?? '').toUpperCase();
+          return n.includes('CHONCHI') || n.includes('QUEILEN') || n.includes('PUQUELDON') || n.includes('PUQUELDÓN');
+        });
+        console.log('✅ consultaCapuertoRestriccion OK —', used.length, 'registros Chonchi');
+        return used.length > 0 ? used : null;
+      } catch (e) {
+        console.log('⚠️ consultaCapuertoRestriccion no disponible:', e.message);
+        return null;
+      }
+    }
+
     async function fetchDirectemarStatus(force = false) {
       if (!force && _dmCache && (Date.now() - _dmCache._ts < 120000)) return _dmCache;
-      // Lanzar consultaBahias (primario) y Totalgeneral en paralelo
-      // Si consultaBahias falla, intentar discovery de endpoint GET como fallback
-      const [ports, bahiasFromConsulta] = await Promise.all([
+      // Lanzar las tres fuentes en paralelo
+      const [ports, bahiasFromConsulta, capRestrData] = await Promise.all([
         fetchSitportData(),
         fetchConsultaBahias(),
+        fetchConsultaCapuertoRestriccion(),
       ]);
       // Si consultaBahias no devolvió datos, intentar discovery GET como fallback
       const bahias = bahiasFromConsulta
         ?? (_sitportBahiasData ? _sitportBahiasData : await discoverSitportBahiasEndpoint());
       if (!ports) return null;
-      const parsed = extractChonchiData(ports, bahias);
+      const parsed = extractChonchiData(ports, bahias, capRestrData);
       parsed._ts = Date.now();
       _dmCache = parsed;
       return parsed;
@@ -3718,10 +3816,11 @@
       }
 
       // ─── ZONAS: Bahía de Yal (main), Queilen, Puqueldon ───
-      function renderZoneCard(cardId, statusId, detailId, hasRestr, navesMenores, navesMayores, restriccionBahia, restricciones, viento, noData) {
+      function renderZoneCard(cardId, statusId, detailId, hasRestr, navesMenores, navesMayores, restriccionBahia, restricciones, viento, noData, restrTextId, restrText) {
         const card = document.getElementById(cardId);
         const statusEl = document.getElementById(statusId);
         const detailEl = document.getElementById(detailId);
+        const restrTextEl = restrTextId ? document.getElementById(restrTextId) : null;
         if (!card || !statusEl || !detailEl) return;
 
         if (noData) {
@@ -3729,6 +3828,7 @@
           statusEl.className = 'dm-zone-status-badge unknown';
           statusEl.textContent = '— Sin datos';
           detailEl.textContent = 'SITPORT no reporta esta zona individualmente';
+          if (restrTextEl) restrTextEl.style.display = 'none';
           return;
         }
         if (restriccionBahia || (navesMayores && navesMenores) || (restricciones > 1 && navesMayores)) {
@@ -3750,25 +3850,39 @@
         if (restriccionBahia) detail += ' · 🌊 Bahía';
         if (viento !== null && viento !== undefined) detail += ` · 💨 ${viento} nds`;
         detailEl.textContent = detail;
+        // Mostrar detalle textual de restricción (datos de la Capitanía)
+        if (restrTextEl) {
+          if (hasRestr && restrText) {
+            restrTextEl.style.display = '';
+            restrTextEl.innerHTML = '<span class="restr-label">Detalle Capitanía</span>' +
+              restrText.split('\n').map(l => l.startsWith('—') ? '<hr style="border-color:rgba(255,255,255,0.07);margin:4px 0">' : `<span>${l}</span>`).join('<br>');
+          } else {
+            restrTextEl.style.display = 'none';
+            restrTextEl.innerHTML = '';
+          }
+        }
       }
 
-      // Bahía de Yal: usa flags individuales de Chonchi cuando están disponibles
+      // Bahía de Yal (Chonchi): usa flags individuales de Chonchi cuando están disponibles
       if (dm.estado === 'DESCONOCIDO') {
         // La Capitanía tiene restricciones pero no podemos distinguir si son de Chonchi o sub-puertos
         const card = document.getElementById('dmZonaBahia');
         const statusEl = document.getElementById('dmZonaBahiaStatus');
         const detailEl = document.getElementById('dmZonaBahiaDetail');
+        const restrEl = document.getElementById('dmZonaBahiaRestr');
         if (card && statusEl && detailEl) {
           card.className = 'dm-zone-card zone-unknown';
           statusEl.className = 'dm-zone-status-badge unknown';
           statusEl.textContent = '⚠️ SIN DATO';
           detailEl.textContent = 'La Capitanía tiene restricciones en otra zona · Ver Queilen';
+          if (restrEl) restrEl.style.display = 'none';
         }
       } else {
         renderZoneCard('dmZonaBahia', 'dmZonaBahiaStatus', 'dmZonaBahiaDetail',
           dm.navesMenores || dm.navesMayores || dm.restriccionBahia,
           dm.navesMenores, dm.navesMayores, dm.restriccionBahia,
-          dm.restricciones, dm.medicion?.windSpeed ?? null, false);
+          dm.restricciones, dm.medicion?.windSpeed ?? null, false,
+          'dmZonaBahiaRestr', dm.chonchiRestrText ?? null);
       }
 
       // Queilen y Puqueldon: desde subPuertos
@@ -3778,12 +3892,14 @@
         !!(subQ?.navesMenores || subQ?.navesMayores || subQ?.restriccionBahia),
         subQ?.navesMenores ?? false, subQ?.navesMayores ?? false,
         subQ?.restriccionBahia ?? false, subQ?.restricciones ?? 0,
-        subQ?.viento ?? null, !subQ);
+        subQ?.viento ?? null, !subQ,
+        'dmZonaQuilenRestr', subQ?.restrText ?? null);
       renderZoneCard('dmZonaPuqueldon', 'dmZonaPuqueldonStatus', 'dmZonaPuqueldonDetail',
         !!(subP?.navesMenores || subP?.navesMayores || subP?.restriccionBahia),
         subP?.navesMenores ?? false, subP?.navesMayores ?? false,
         subP?.restriccionBahia ?? false, subP?.restricciones ?? 0,
-        subP?.viento ?? null, !subP);
+        subP?.viento ?? null, !subP,
+        'dmZonaPuqueldonRestr', subP?.restrText ?? null);
 
       ts.textContent = 'Consulta API SITPORT: ' + new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }) + ' hrs';
     }
