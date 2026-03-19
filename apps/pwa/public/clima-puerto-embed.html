@@ -1566,6 +1566,7 @@
                   </div>
                 </div>
               </div>
+              <div id="dmConflict"></div>
               <div class="dm-source">
                 <span id="dmTimestamp">Consultando SITPORT...</span>
                 <span>·</span>
@@ -3288,20 +3289,19 @@
       const zoneLabelEl = document.getElementById('openingZoneLabel');
       const circumference = 2 * Math.PI * 52; // ~326.7
 
-      const dmRestricted = dm && dm.found && dm.restricciones > 0;
-      const dmOpen = dm && dm.found && dm.restricciones === 0;
+      // Determinar zona "destacada": primero sub-puerto cerrado, luego Bahía de Yal
+      const closedSub = (dm && dm.found) ? dm.subPuertos?.find(p => p.navesMenores || p.navesMayores || p.restriccionBahia) : null;
+      // dmRestricted refleja la zona DESTACADA (no solo Bahía de Yal)
+      const dmRestricted = !!closedSub || (dm && dm.found && dm.restricciones > 0);
+      const dmOpen = dm && dm.found && !dmRestricted;
 
-      // Determinar nombre de la zona relevante
+      // Nombre de la zona relevante
       let zoneName = 'Bahía de Yal (Chonchi)';
       if (dm && dm.found) {
-        const closedSub = dm.subPuertos?.find(p => p.navesMenores || p.navesMayores || p.restriccionBahia);
         if (closedSub) {
-          // Capitalizar primer letra de cada palabra
           zoneName = closedSub.nombre.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
         } else if (dm.estado === 'DESCONOCIDO') {
           zoneName = 'Quinzona';
-        } else if (dmRestricted) {
-          zoneName = 'Bahía de Yal (Chonchi)';
         }
       }
       // Mostrar sección siempre que haya datos de dm
@@ -3935,6 +3935,7 @@
      */
     function checkDirectemarConflict(dm, portModel) {
       const conflict = document.getElementById('dmConflict');
+      if (!conflict) return;
       if (!dm || !dm.found) { conflict.innerHTML = ''; return; }
 
       const dmRestr = dm.restricciones > 0;
