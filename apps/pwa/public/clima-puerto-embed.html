@@ -2682,6 +2682,8 @@
        ═══════════════════════════════════════════════════════════════ */
     /* API REST oficial de SITPORT (CORS: Access-Control-Allow-Origin: *) */
     const SITPORT_API = 'https://orion.directemar.cl/sitport/back/users/Totalgeneral';
+    /* Endpoint consultaBahias — POST, devuelve todas las bahías con color/valor de restricción */
+    const SITPORT_CONSULTA_BAHIAS = 'https://orion.directemar.cl/sitport/back/users/consultaBahias';
     /* Cloud Function como fallback si la API directa falla */
     const CF_PROXY = 'https://us-central1-mantenimiento-planta-771a3.cloudfunctions.net/sitportProxy';
     /* Capitanía Chonchi: reparticion.id = 225, codigo = 2239 */
@@ -2958,13 +2960,78 @@
       return result;
     }
 
+    /**
+     * Obtiene datos individuales de bahías desde el endpoint consultaBahias (POST).
+     * Devuelve array normalizado con campos {nombre, restricciones} compatibles con
+     * extractChonchiData, filtrado a las bahías de la jurisdicción Chonchi (CdReparticion=225).
+     * Retorna null si el endpoint no está disponible.
+     */
+    async function fetchConsultaBahias() {
+      try {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), 10000);
+        const resp = await fetch(SITPORT_CONSULTA_BAHIAS, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json, text/plain, */*' },
+          body: JSON.stringify({}),
+          signal: ctrl.signal,
+        });
+        clearTimeout(timer);
+        if (!resp.ok) {
+          console.warn('⚠️ consultaBahias HTTP', resp.status);
+          return null;
+        }
+        const data = await resp.json();
+        // La respuesta tiene estructura { recordset: [...], recordsets: [[...]], ... }
+        const all = Array.isArray(data.recordset) ? data.recordset
+                  : Array.isArray(data.recordsets?.[0]) ? data.recordsets[0]
+                  : Array.isArray(data) ? data : null;
+        if (!all || all.length === 0) {
+          console.warn('⚠️ consultaBahias: respuesta vacía');
+          return null;
+        }
+        // Filtrar bahías de la jurisdicción Chonchi y normalizar al formato de extractChonchiData
+        const chonchibahias = all
+          .filter(b => b.CdReparticion === CHONCHI_REPARTICION_ID)
+          .map(b => {
+            const tieneRestriccion = b.valor === 1 || b.color === 'danger';
+            return {
+              nombre: (b.NMBahia ?? '').toUpperCase(),
+              IDBahia: b.IDBahia,
+              CdReparticion: b.CdReparticion,
+              color: b.color,
+              valor: b.valor,
+              // Campos de compatibilidad con extractFlags/nameOfB
+              restricciones: {
+                navesMenores:    tieneRestriccion,
+                navesMayores:    tieneRestriccion,
+                restriccionBahia: tieneRestriccion,
+              },
+            };
+          });
+        if (chonchibahias.length === 0) {
+          console.warn('⚠️ consultaBahias: sin bahías CdReparticion=225');
+          return null;
+        }
+        console.log('✅ consultaBahias OK —', chonchibahias.length, 'bahías Chonchi:', chonchibahias.map(b => `${b.nombre}(${b.valor})`).join(', '));
+        return chonchibahias;
+      } catch (e) {
+        console.warn('⚠️ consultaBahias falló:', e.message);
+        return null;
+      }
+    }
+
     async function fetchDirectemarStatus(force = false) {
       if (!force && _dmCache && (Date.now() - _dmCache._ts < 120000)) return _dmCache;
-      // Lanzar búsqueda de bahías individuales en paralelo con datos generales
-      const [ports, bahias] = await Promise.all([
+      // Lanzar consultaBahias (primario) y Totalgeneral en paralelo
+      // Si consultaBahias falla, intentar discovery de endpoint GET como fallback
+      const [ports, bahiasFromConsulta] = await Promise.all([
         fetchSitportData(),
-        _sitportBahiasData ? Promise.resolve(_sitportBahiasData) : discoverSitportBahiasEndpoint(),
+        fetchConsultaBahias(),
       ]);
+      // Si consultaBahias no devolvió datos, intentar discovery GET como fallback
+      const bahias = bahiasFromConsulta
+        ?? (_sitportBahiasData ? _sitportBahiasData : await discoverSitportBahiasEndpoint());
       if (!ports) return null;
       const parsed = extractChonchiData(ports, bahias);
       parsed._ts = Date.now();
