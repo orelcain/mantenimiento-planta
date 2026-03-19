@@ -875,7 +875,56 @@
     }
     .ptl-dm-status strong { color: var(--text-bright); }
     @media (max-width: 640px) {
-      .ptl-chart-wrap { height: 220px; }
+      .ptl-chart-wrap { height: 200px; overflow-x: auto; }
+      .ptl-legend { gap: 6px; font-size: 0.62rem; }
+      .ptl-legend-item { font-size: 0.62rem; }
+      .ptl-header { padding: 10px 12px 0; }
+    }
+
+    /* ─── ZONAS DIRECTEMAR ─── */
+    .dm-zones-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+      flex-wrap: wrap;
+    }
+    .dm-zone-card {
+      flex: 1;
+      min-width: 100px;
+      background: rgba(255,255,255,0.04);
+      border-radius: 8px;
+      padding: 8px 10px;
+      border: 1px solid rgba(255,255,255,0.08);
+      transition: border-color 0.3s;
+    }
+    .dm-zone-card.zone-open { border-color: rgba(70,211,105,0.35); background: rgba(70,211,105,0.05); }
+    .dm-zone-card.zone-restricted { border-color: rgba(244,201,93,0.35); background: rgba(244,201,93,0.05); }
+    .dm-zone-card.zone-closed { border-color: rgba(255,107,107,0.35); background: rgba(255,107,107,0.05); }
+    .dm-zone-card.zone-unknown { border-color: rgba(255,255,255,0.1); }
+    .dm-zone-name {
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      margin-bottom: 4px;
+    }
+    .dm-zone-status-badge {
+      font-size: 0.8rem;
+      font-weight: 800;
+    }
+    .dm-zone-status-badge.open { color: var(--good); }
+    .dm-zone-status-badge.restricted { color: var(--mid); }
+    .dm-zone-status-badge.closed { color: var(--bad); }
+    .dm-zone-status-badge.unknown { color: var(--muted); }
+    .dm-zone-detail {
+      font-size: 0.68rem;
+      color: var(--muted);
+      margin-top: 3px;
+      line-height: 1.3;
+    }
+    @media (max-width: 480px) {
+      .dm-zone-card { min-width: calc(50% - 4px); flex: 0 0 calc(50% - 4px); }
     }
 
     /* ─── PORT STATUS PANEL ─── */
@@ -1452,9 +1501,27 @@
                   <div class="dml">Capitanía jurisdiccional</div>
                   <div class="dmv">Capitanía de Puerto de <strong>Castro</strong> · QUINZONA</div>
                 </div>
-                <div class="dm-detail-item">
-                  <div class="dml">Zona Chonchi · Queilen · Puqueldon</div>
-                  <div class="dmv" id="dmSubPuertos">Consultando...</div>
+              </div>
+              <div class="dm-detail-row" style="margin-top:6px">
+                <div class="dm-detail-item" style="width:100%">
+                  <div class="dml">Estado por Zona · QUINZONA</div>
+                  <div class="dm-zones-row" id="dmZonasRow">
+                    <div class="dm-zone-card zone-unknown" id="dmZonaBahia">
+                      <div class="dm-zone-name">📍 Bahía de Yal</div>
+                      <div class="dm-zone-status-badge unknown" id="dmZonaBahiaStatus">—</div>
+                      <div class="dm-zone-detail" id="dmZonaBahiaDetail">Consultando...</div>
+                    </div>
+                    <div class="dm-zone-card zone-unknown" id="dmZonaQueilen">
+                      <div class="dm-zone-name">🗺️ Queilen</div>
+                      <div class="dm-zone-status-badge unknown" id="dmZonaQuilenStatus">—</div>
+                      <div class="dm-zone-detail" id="dmZonaQuilenDetail">Consultando...</div>
+                    </div>
+                    <div class="dm-zone-card zone-unknown" id="dmZonaPuqueldon">
+                      <div class="dm-zone-name">🗺️ Puqueldon</div>
+                      <div class="dm-zone-status-badge unknown" id="dmZonaPuqueldonStatus">—</div>
+                      <div class="dm-zone-detail" id="dmZonaPuqueldonDetail">Consultando...</div>
+                    </div>
+                  </div>
                 </div>
               </div>
               <div id="dmConflict"></div>
@@ -1545,16 +1612,18 @@
 
       <!-- Proyección por modelo meteorológico -->
       <div style="margin-bottom:6px;display:flex;align-items:center;gap:8px">
-        <span style="font-size:0.78rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px">📊 Proyección por modelo meteorológico (Open-Meteo / ECMWF)</span>
+        <span style="font-size:0.78rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px">📊 Análisis Operativo · Modelo Meteo (Open-Meteo / ECMWF)</span>
       </div>
       <div class="port-status-card status-open" id="portCard">
+        <!-- Elementos ocultos que mantiene applyDirectemarOverride (no visibles) -->
+        <div style="display:none">
+          <div id="portIcon"></div>
+          <div id="portStatus"></div>
+          <div id="portDot"></div>
+          <div id="portTime"></div>
+        </div>
         <div class="port-grid">
-          <div class="port-hero-side">
-            <div class="port-icon" id="portIcon">⚓</div>
-            <div class="port-big-status open" id="portStatus">CONSULTANDO...</div>
-            <div class="port-updated"><span class="port-live-dot open" id="portDot"></span> <span id="portTime">Calculando...</span></div>
-          </div>
-          <div class="port-detail-side">
+          <div class="port-detail-side" style="padding:16px 20px">
             <div class="port-detail-row">
               <div class="port-detail-item">
                 <div class="pdl">Condiciones actuales</div>
@@ -1708,6 +1777,8 @@
 
     /* Estado DIRECTEMAR oficial — fuente de verdad para AHORA */
     let _dmGlobalStatus = null; // { restricciones, estado, restriccionBahia, navesMenores }
+    let _lastWeather = null;   // guardado para reconstruir timeline en auto-refresh
+    let _lastMarine = null;
 
     /* ─── NAVBAR SCROLL EFFECT ─── */
     const navbar = document.getElementById('navbar');
@@ -3401,7 +3472,6 @@
       // Bahía de Yal subtitle under status
       const locationHtml = '<div style="font-size:0.72rem;color:var(--muted);margin-top:2px">📍 Bahía de Yal · Centro de Acopio Antarfood</div>';
       const restrTags = document.getElementById('dmRestrTags');
-      const nearby = document.getElementById('dmNearby');
       const ts = document.getElementById('dmTimestamp');
       const conflict = document.getElementById('dmConflict');
 
@@ -3416,9 +3486,21 @@
         restr.textContent = 'Sin conexión a API SITPORT';
         medicion.innerHTML = 'No se pudo consultar la API de DIRECTEMAR. <span style="color:var(--muted)">Verifique conectividad o intente más tarde.</span>';
         restrTags.innerHTML = '<span class="dm-restriccion-tag warn">Sin datos</span>';
-        nearby.textContent = 'No disponible';
         ts.textContent = 'Última consulta: ' + new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }) + ' — sin respuesta';
         conflict.innerHTML = '';
+        // Zonas en estado error
+        ['dmZonaBahia','dmZonaQueilen','dmZonaPuqueldon'].forEach(id => {
+          const c = document.getElementById(id);
+          if (c) c.className = 'dm-zone-card zone-unknown';
+        });
+        ['dmZonaBahiaStatus','dmZonaQuilenStatus','dmZonaPuqueldonStatus'].forEach(id => {
+          const e = document.getElementById(id);
+          if (e) { e.className = 'dm-zone-status-badge unknown'; e.textContent = '— Sin datos'; }
+        });
+        ['dmZonaBahiaDetail','dmZonaQuilenDetail','dmZonaPuqueldonDetail'].forEach(id => {
+          const e = document.getElementById(id);
+          if (e) e.textContent = 'Sin conexión';
+        });
         return;
       }
 
@@ -3456,24 +3538,59 @@
         restrTags.innerHTML = '<span class="dm-restriccion-tag" style="color:var(--good);background:rgba(70,211,105,0.1)">Sin restricciones</span>';
       }
 
-      // Sub-puertos zona: Queilen y Puqueldon (solo informativos, no afectan estado principal)
-      const subPuertosEl = document.getElementById('dmSubPuertos');
-      if (subPuertosEl) {
-        if (dm.subPuertos && dm.subPuertos.length > 0) {
-          subPuertosEl.innerHTML = dm.subPuertos.map(p => {
-            const hasR = p.restricciones > 0;
-            const color = hasR ? '#ff6b6b' : '#4cd7a0';
-            const ico = hasR ? '🔴' : '🟢';
-            let detail = hasR ? `${p.restricciones} restr.` : 'abierto';
-            if (p.navesMenores) detail += ' · ⛵menores';
-            if (p.navesMayores) detail += ' · 🚢mayores';
-            const windInfo = p.viento !== null ? ` 💨${p.viento}nds` : '';
-            return `${ico} <strong style="color:${color}">${p.nombre}</strong> <span style="color:var(--muted);font-size:0.8em">(${detail}${windInfo})</span>`;
-          }).join('<br>');
-        } else {
-          subPuertosEl.innerHTML = '<span style="color:var(--muted);font-size:0.82em">Sin datos individuales en SITPORT</span>';
+      // ─── ZONAS: Bahía de Yal (main), Queilen, Puqueldon ───
+      function renderZoneCard(cardId, statusId, detailId, hasRestr, navesMenores, navesMayores, restriccionBahia, restricciones, viento, noData) {
+        const card = document.getElementById(cardId);
+        const statusEl = document.getElementById(statusId);
+        const detailEl = document.getElementById(detailId);
+        if (!card || !statusEl || !detailEl) return;
+
+        if (noData) {
+          card.className = 'dm-zone-card zone-unknown';
+          statusEl.className = 'dm-zone-status-badge unknown';
+          statusEl.textContent = '— Sin datos';
+          detailEl.textContent = 'SITPORT no reporta esta zona individualmente';
+          return;
         }
+        if (restriccionBahia || (navesMayores && navesMenores) || (restricciones > 1 && navesMayores)) {
+          card.className = 'dm-zone-card zone-closed';
+          statusEl.className = 'dm-zone-status-badge closed';
+          statusEl.textContent = '🔴 CERRADO';
+        } else if (hasRestr) {
+          card.className = 'dm-zone-card zone-restricted';
+          statusEl.className = 'dm-zone-status-badge restricted';
+          statusEl.textContent = '🟡 RESTRINGIDO';
+        } else {
+          card.className = 'dm-zone-card zone-open';
+          statusEl.className = 'dm-zone-status-badge open';
+          statusEl.textContent = '🟢 ABIERTO';
+        }
+        let detail = hasRestr ? `${restricciones} restricción${restricciones > 1 ? 'es' : ''}` : 'Sin restricciones';
+        if (navesMenores) detail += ' · ⛵ Menores';
+        if (navesMayores) detail += ' · 🚢 Mayores';
+        if (restriccionBahia) detail += ' · 🌊 Bahía';
+        if (viento !== null && viento !== undefined) detail += ` · 💨 ${viento} nds`;
+        detailEl.textContent = detail;
       }
+
+      // Bahía de Yal: usa datos principales del DM (siempre disponibles)
+      renderZoneCard('dmZonaBahia', 'dmZonaBahiaStatus', 'dmZonaBahiaDetail',
+        dm.restricciones > 0, dm.navesMenores, dm.navesMayores, dm.restriccionBahia,
+        dm.restricciones, dm.medicion?.windSpeed ?? null, false);
+
+      // Queilen y Puqueldon: desde subPuertos si disponibles
+      const subQ = dm.subPuertos?.find(p => p.nombre?.toUpperCase().includes('QUEILEN'));
+      const subP = dm.subPuertos?.find(p => p.nombre?.toUpperCase().includes('PUQUELDON') || p.nombre?.toUpperCase().includes('PUQUELDÓN'));
+      renderZoneCard('dmZonaQueilen', 'dmZonaQuilenStatus', 'dmZonaQuilenDetail',
+        subQ ? subQ.restricciones > 0 : false,
+        subQ?.navesMenores ?? false, subQ?.navesMayores ?? false,
+        subQ?.restriccionBahia ?? false, subQ?.restricciones ?? 0,
+        subQ?.viento ?? null, !subQ);
+      renderZoneCard('dmZonaPuqueldon', 'dmZonaPuqueldonStatus', 'dmZonaPuqueldonDetail',
+        subP ? subP.restricciones > 0 : false,
+        subP?.navesMenores ?? false, subP?.navesMayores ?? false,
+        subP?.restriccionBahia ?? false, subP?.restricciones ?? 0,
+        subP?.viento ?? null, !subP);
 
       ts.textContent = 'Consulta API SITPORT: ' + new Date().toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' }) + ' hrs';
     }
@@ -3590,6 +3707,10 @@
           _dmGlobalStatus = dm;
           renderDirectemarPanel(dm);
           renderMeteoScheduleBlock(dm, null);
+          // Reconstruir línea temporal con datos meteorológicos ya cargados
+          if (_lastWeather && _lastMarine) {
+            buildPortTimeline(_lastWeather, _lastMarine, dm);
+          }
         } catch (_) {}
       }, 5 * 60 * 1000);
     }
@@ -3609,6 +3730,8 @@
         if (!weatherRes.ok || !marineRes.ok) throw new Error('No se pudo consultar una de las APIs de pronóstico.');
         const weather = await weatherRes.json();
         const marine = await marineRes.json();
+        _lastWeather = weather;
+        _lastMarine = marine;
         const current = weather.current ?? {};
         const isRainingNow = (current.precipitation ?? 0) > 0.15 || rainyCodes.has(current.weather_code);
         setFxMode(isRainingNow ? 'rain' : 'clear');
