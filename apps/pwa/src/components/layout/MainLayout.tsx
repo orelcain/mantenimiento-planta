@@ -871,7 +871,7 @@ export function MainLayout() {
           id="main-content"
           className={`${
             isClimaRoute
-              ? 'h-[calc(100vh-3.5rem)] p-0 overflow-hidden'
+              ? 'h-[calc(100vh-3.5rem-4rem)] lg:h-[calc(100vh-3.5rem)] p-0 overflow-hidden'
               : 'p-3 lg:p-6 w-full max-w-[100vw] overflow-x-hidden pb-20 lg:pb-6'
           } ${
             isReadOnly ? 'pointer-events-none opacity-70' : ''

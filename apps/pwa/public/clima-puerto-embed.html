@@ -1417,18 +1417,30 @@
       .map-frame { height: 420px; }
       .kpi-card { flex: 0 0 160px; padding: 14px 12px; }
       .kpi-value { font-size: 1.2rem; }
-      .navbar { padding: 0 3%; height: 56px; }
-      .nav-logo { font-size: 1.2rem; }
-      .layer-pill { padding: 6px 14px; font-size: 0.76rem; }
+
+      /* Navbar móvil: ocultar subtítulo y badge, solo logo + botones */
+      .navbar { padding: 0 3%; height: auto; min-height: 56px; flex-wrap: wrap; gap: 6px; }
+      .nav-logo { font-size: 0.95rem; }
+      .nav-divider { display: none; }
+      .nav-title { display: none; }
+      .nav-badge { display: none; }
+      .nav-right { gap: 6px; }
+      .btn-map-focus { padding: 6px 10px; font-size: 0.73rem; }
+      .btn-reload { padding: 6px 10px; font-size: 0.73rem; }
+
+      /* Layer pills con scroll táctil suave */
+      .layer-bar { -webkit-overflow-scrolling: touch; padding: 10px 3%; gap: 6px; }
+      .layer-pill { padding: 6px 12px; font-size: 0.73rem; }
+
       .port-big-status { font-size: 1.4rem; }
       .port-icon { font-size: 2.5rem; }
       .fines-table { font-size: 0.74rem; }
       .fines-table th, .fines-table td { padding: 6px 6px; }
 
-      .btn-map-focus {
-        padding: 6px 10px;
-        font-size: 0.75rem;
-      }
+      /* Tabla pronóstico: scroll horizontal */
+      .table-card { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+      table { min-width: 520px; }
+      th, td { padding: 9px 8px; font-size: 0.78rem; }
 
       .windy-focus .hero-map-wrap {
         top: 60px;
