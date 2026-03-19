@@ -991,7 +991,7 @@
       padding: 0 16px;
     }
     .ptl-overlay-chart-inner {
-      min-width: 1100px;
+      min-width: 1440px;
       height: calc(100vh - 210px);
       min-height: 280px;
       position: relative;
@@ -3725,8 +3725,19 @@
     Chart.register(nowLinePlugin);
 
     /* ─── PLUGIN: BANDAS ALTERNADAS POR DÍA ─── */
+    function _ptlRoundRect(ctx, x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y, x + w, y + h, r);
+      ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r);
+      ctx.arcTo(x, y, x + w, y, r);
+      ctx.closePath();
+    }
+
     const dayStripePlugin = {
       id: 'dayStripePlugin',
+      // Bands and separator lines — before chart content
       beforeDraw(chart, _args, options) {
         if (!options.enabled || !options.bands || !options.bands.length) return;
         const { ctx, chartArea, scales } = chart;
@@ -3741,40 +3752,82 @@
           const x2 = band.endIdx < nTicks
             ? xScale.getPixelForTick(band.endIdx)
             : chartArea.right;
+          const bandW = Math.max(0, Math.min(x2, chartArea.right) - x1);
 
-          // Fondo alternado
-          const fillColors = [
-            'rgba(255,255,255,0)',
-            'rgba(100,160,220,0.055)',
-            'rgba(255,255,255,0)',
-            'rgba(100,160,220,0.055)',
-            'rgba(255,255,255,0)',
-            'rgba(100,160,220,0.055)',
-            'rgba(255,255,255,0)',
-            'rgba(100,160,220,0.055)',
-          ];
-          ctx.fillStyle = fillColors[i % fillColors.length];
-          ctx.fillRect(x1, chartArea.top, x2 - x1, chartArea.bottom - chartArea.top);
+          // Alternating fills: even=subtle blue, odd=transparent
+          if (i % 2 === 1) {
+            ctx.fillStyle = 'rgba(80,140,210,0.09)';
+            ctx.fillRect(x1, chartArea.top, bandW, chartArea.bottom - chartArea.top);
+          }
 
-          // Línea divisoria al comienzo de cada día (no el primero)
+          // Separator line at start of each day (not the very first band)
           if (band.startIdx > 0) {
-            ctx.strokeStyle = 'rgba(255,255,255,0.18)';
-            ctx.lineWidth = 1;
-            ctx.setLineDash([4, 4]);
+            ctx.strokeStyle = 'rgba(255,255,255,0.30)';
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([]);
             ctx.beginPath();
             ctx.moveTo(x1, chartArea.top);
             ctx.lineTo(x1, chartArea.bottom);
             ctx.stroke();
-            ctx.setLineDash([]);
           }
+        });
 
-          // Etiqueta del día centrada en la parte superior de la banda
-          const midX = x1 + (Math.min(x2, chartArea.right) - x1) / 2;
-          ctx.fillStyle = 'rgba(255,255,255,0.40)';
-          ctx.font = 'bold 9px system-ui, -apple-system, sans-serif';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'top';
-          ctx.fillText(band.dayLabel, midX, chartArea.top + 4);
+        ctx.restore();
+      },
+
+      // Day label pills — drawn AFTER chart content so they're always on top
+      afterDraw(chart, _args, options) {
+        if (!options.enabled || !options.bands || !options.bands.length) return;
+        const { ctx, chartArea, scales } = chart;
+        const xScale = scales.x;
+        if (!xScale || !chartArea) return;
+
+        const nTicks = xScale.ticks.length;
+        ctx.save();
+        ctx.font = 'bold 9px system-ui, -apple-system, sans-serif';
+        ctx.textBaseline = 'middle';
+        ctx.textAlign = 'center';
+
+        options.bands.forEach((band, i) => {
+          const x1 = xScale.getPixelForTick(Math.min(band.startIdx, nTicks - 1));
+          const x2 = band.endIdx < nTicks
+            ? xScale.getPixelForTick(band.endIdx)
+            : chartArea.right;
+          const visibleX2 = Math.min(x2, chartArea.right);
+          const visibleX1 = Math.max(x1, chartArea.left);
+          const bandVisW = visibleX2 - visibleX1;
+          if (bandVisW < 10) return;
+
+          const midX = visibleX1 + bandVisW / 2;
+          const pillH = 17;
+          const pillY = chartArea.top + 6;
+          const pillPad = 6;
+          const textW = ctx.measureText(band.dayLabel).width;
+          const pillW = Math.min(textW + pillPad * 2, bandVisW - 4);
+
+          // Pill background
+          const pillBg = i % 2 === 0
+            ? 'rgba(10,30,55,0.82)'
+            : 'rgba(30,65,110,0.82)';
+          ctx.fillStyle = pillBg;
+          _ptlRoundRect(ctx, midX - pillW / 2, pillY, pillW, pillH, 5);
+          ctx.fill();
+
+          // Pill border
+          ctx.strokeStyle = i % 2 === 0
+            ? 'rgba(255,255,255,0.18)'
+            : 'rgba(100,160,220,0.45)';
+          ctx.lineWidth = 1;
+          _ptlRoundRect(ctx, midX - pillW / 2, pillY, pillW, pillH, 5);
+          ctx.stroke();
+
+          // Day text
+          ctx.fillStyle = i % 2 === 0 ? 'rgba(200,220,255,0.80)' : 'rgba(140,195,255,0.95)';
+          ctx.save();
+          ctx.rect(midX - pillW / 2 + 1, pillY, pillW - 2, pillH);
+          ctx.clip();
+          ctx.fillText(band.dayLabel, midX, pillY + pillH / 2);
+          ctx.restore();
         });
 
         ctx.restore();
@@ -4043,14 +4096,28 @@
           scales: {
             x: {
               ticks: {
-                color: '#90a4b8',
-                font: { size: 9 },
+                color: (ctx) => {
+                  const lbl = ctx.tick?.label;
+                  const isDay = Array.isArray(lbl) || (typeof lbl === 'string' && lbl.includes('/'));
+                  return isDay ? '#c8dcf8' : '#7090a8';
+                },
+                font: (ctx) => {
+                  const lbl = ctx.tick?.label;
+                  const isDay = Array.isArray(lbl) || (typeof lbl === 'string' && lbl.includes('/'));
+                  return { size: isDay ? 10 : 9, weight: isDay ? '700' : '400' };
+                },
                 maxRotation: 45,
                 minRotation: 0,
-                autoSkip: true,
-                maxTicksLimit: 16,
+                autoSkip: !isOverlay,
+                maxTicksLimit: isOverlay ? 80 : 16,
               },
-              grid: { color: 'rgba(255,255,255,0.06)' }
+              grid: {
+                color: (ctx) => {
+                  const lbl = ctx.chart.data.labels?.[ctx.index];
+                  const isDay = Array.isArray(lbl) || (typeof lbl === 'string' && lbl.includes('/'));
+                  return isDay ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.05)';
+                }
+              }
             },
             yRisk: {
               position: 'left',
