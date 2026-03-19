@@ -1610,65 +1610,18 @@
         <div class="ptl-dm-status" id="ptlDmStatus">Estado DIRECTEMAR: consultando...</div>
       </div>
 
-      <!-- Proyección por modelo meteorológico -->
-      <div style="margin-bottom:6px;display:flex;align-items:center;gap:8px">
-        <span style="font-size:0.78rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px">📊 Análisis Operativo · Modelo Meteo (Open-Meteo / ECMWF)</span>
-      </div>
-      <div class="port-status-card status-open" id="portCard">
-        <!-- Elementos ocultos que mantiene applyDirectemarOverride (no visibles) -->
-        <div style="display:none">
-          <div id="portIcon"></div>
-          <div id="portStatus"></div>
-          <div id="portDot"></div>
-          <div id="portTime"></div>
-        </div>
-        <div class="port-grid">
-          <div class="port-detail-side" style="padding:16px 20px">
-            <div class="port-detail-row">
-              <div class="port-detail-item">
-                <div class="pdl">Condiciones actuales</div>
-                <div class="pdv" id="portConditions">Evaluando datos meteorológicos...</div>
-              </div>
-              <div class="port-detail-item">
-                <div class="pdl">Navegación con carta</div>
-                <div class="pdv" id="portCarta">—</div>
-              </div>
-            </div>
-            <div class="port-detail-row">
-              <div class="port-detail-item">
-                <div class="pdl">Restricciones vigentes</div>
-                <div class="port-reasons" id="portReasons"><span class="port-reason-tag">Cargando...</span></div>
-              </div>
-              <div class="port-detail-item">
-                <div class="pdl">Decisión rápida (próx. 24h)</div>
-                <div class="port-closure-box">
-                  <div class="decision-now" id="decisionNow">DECISIÓN RECOMENDADA AHORA: evaluando...</div>
-                  <div class="decision-review" id="decisionReview">Próxima revisión recomendada: calculando...</div>
-                  <div class="port-closure-headline" id="closureHeadline">Calculando cierre probable...</div>
-                  <div class="port-closure-secondary" id="restrictionHeadline">Calculando restricción probable...</div>
-                  <div class="port-closure-sub" id="closureSub">Analizando viento, rachas, lluvia y oleaje.</div>
-                  <div class="port-closure-uncertainty" id="closureUncertainty">Incertidumbre del modelo: ±--%</div>
-                  <div class="port-closure-why" id="closureWhy" title="El porcentaje se calcula SOLO con las próximas 24h, usando datos horarios y umbrales marítimos.">¿Por qué este porcentaje?</div>
-                  <div class="port-closure-drivers" id="closureDrivers"><span class="port-reason-tag">Cargando...</span></div>
-                  <div class="preventive-alert" id="preventiveAlert">
-                    <div class="preventive-alert-title" id="preventiveAlertTitle">Prevención operativa</div>
-                    <div class="preventive-alert-text" id="preventiveAlertText">Calculando ventana preventiva...</div>
-                  </div>
-                  <div class="preventive-actions" id="preventiveActions"><div class="preventive-action">Cargando acciones...</div></div>
-                </div>
-              </div>
-              <div class="port-detail-item">
-                <div class="pdl">Jurisdicción</div>
-                <div class="pdv">Capitanía de Puerto de <strong>Castro</strong> · Gobernación Marítima de <strong>Puerto Montt</strong></div>
-              </div>
-            </div>
-            <div class="port-link-row">
-              <a class="port-link port-link-primary" href="https://www.directemar.cl/directemar/site/edic/base/port/condiciones-de-barra.html" target="_blank" rel="noopener">📡 Ver estado oficial DIRECTEMAR</a>
-              <a class="port-link port-link-secondary" href="https://meteoarmada.directemar.cl/" target="_blank" rel="noopener">🌊 MeteoArmada</a>
-              <a class="port-link port-link-secondary" href="https://www.shoa.cl/" target="_blank" rel="noopener">📊 SHOA</a>
-            </div>
-          </div>
-        </div>
+      <!-- Elementos ocultos requeridos por funciones JS (no visibles en UI) -->
+      <div style="display:none" id="portCard">
+        <div id="portIcon"></div><div id="portStatus"></div>
+        <div id="portDot"></div><div id="portTime"></div>
+        <div id="portConditions"></div><div id="portCarta"></div>
+        <div id="portReasons"></div><div id="decisionNow"></div>
+        <div id="decisionReview"></div><div id="closureHeadline"></div>
+        <div id="restrictionHeadline"></div><div id="closureSub"></div>
+        <div id="closureUncertainty"></div><div id="closureWhy"></div>
+        <div id="closureDrivers"></div><div id="preventiveAlert"></div>
+        <div id="preventiveAlertTitle"></div><div id="preventiveAlertText"></div>
+        <div id="preventiveActions"></div>
       </div>
     </section>
 
@@ -1695,28 +1648,6 @@
           <div class="kpi-value" id="maxWave">-</div>
           <div class="kpi-sub" id="maxWaveScope">Ventana: próximos 7 días</div>
         </article>
-      </div>
-    </section>
-
-    <!-- CHARTS ROW -->
-    <section class="row">
-      <div class="row-title"><span class="accent-bar"></span>Gráficos del Pronóstico</div>
-      <div class="charts-grid">
-        <div class="chart-card">
-          <h3>Meteograma 7 Días · Viento / Racha / Lluvia</h3>
-          <div class="chart-range-hint">Rangos viento/racha: <strong>0–34 normal</strong> · <strong>35–54 atención</strong> · <strong>55+ alerta alta diaria</strong> · <span class="help-tip" title="Este gráfico es diario (7 días). La decisión de cierre usa principalmente el semáforo horario de próximas 24h.">ⓘ cómo leer</span></div>
-          <div class="chart-wrap"><canvas id="weekChart"></canvas></div>
-        </div>
-        <div class="chart-card">
-          <h3>Mar + Temperatura · 7 Días</h3>
-          <div class="chart-range-hint">Rangos oleaje: <strong>0–1.79 m normal</strong> · <strong>1.8–2.49 m atención</strong> · <strong>2.5+ alerta alta diaria</strong> · <span class="help-tip" title="El oleaje alto aumenta riesgo, pero el cierre real depende de combinación con viento/racha, visibilidad y condición actual.">ⓘ combinación de factores</span></div>
-          <div class="chart-wrap"><canvas id="marineChart"></canvas></div>
-        </div>
-        <div class="chart-card">
-          <h3>Semáforo Horario · Cierre Próx. 24h</h3>
-          <div class="chart-range-hint">Índice cierre: <strong>0–44 bajo</strong> · <strong>45–64 atención</strong> · <strong>65+ cierre probable</strong> · <span class="help-tip" title="Este es el gráfico principal para decidir cierre probable: datos horarios de próximas 24h.">ⓘ principal para decisión</span></div>
-          <div class="chart-wrap"><canvas id="closureTimelineChart"></canvas></div>
-        </div>
       </div>
     </section>
 
@@ -2821,8 +2752,13 @@
 
       if (!Array.isArray(ports)) return result;
 
-      // ── Buscar Chonchi (fuente de verdad del estado principal) ──
-      const chonchi = ports.find(p => p.reparticion?.nombre?.toUpperCase().includes('CHONCHI'));
+      // ── Buscar Chonchi: primero intentar entrada específica (sin "CAPITAN"),
+      // luego cualquier entrada que contenga "CHONCHI" como fallback ──
+      const isCapitania = n => n.includes('CAPITAN') || n.includes('GOBERNACION') || n.includes('GOBERNACIÓN');
+      const chonchi = ports.find(p => {
+        const name = (p.reparticion?.nombre ?? '').toUpperCase();
+        return name.includes('CHONCHI') && !isCapitania(name);
+      }) ?? ports.find(p => (p.reparticion?.nombre ?? '').toUpperCase().includes('CHONCHI'));
       if (!chonchi) return result;
 
       result.found = true;
@@ -2853,7 +2789,7 @@
       // ── Sub-puertos de la zona: Queilen y Puqueldon (solo informativos) ──
       for (const port of ports) {
         const name = (port.reparticion?.nombre ?? '').toUpperCase();
-        if (SUB_PUERTOS_CHONCHI.some(n => name.includes(n))) {
+        if (SUB_PUERTOS_CHONCHI.some(n => name.includes(n)) && !isCapitania(name)) {
           const nr = port.restricciones ?? {};
           const pm = port.medicionMeteo;
           result.subPuertos.push({
@@ -3236,10 +3172,18 @@
       const marineMap = {};
       marineTimes.forEach((t, i) => { marineMap[t] = { wave: waves[i] ?? 0, wavePeriod: wavePeriods[i] ?? 8 }; });
 
-      // Compute risk index for every hour
+      // Ventana de visualización: 36h pasado + 84h futuro = ~5 días
+      const windowStart = new Date(now.getTime() - 36 * 3600000);
+      const windowEnd   = new Date(now.getTime() + 84 * 3600000);
+
+      // Días de la semana abreviados en español
+      const DIAS = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+      let lastDayShown = -1;
+
+      // Compute risk index — filtrado a ventana, cada 3 horas
       const labels = [];
-      const riskData = [];           // Índice de riesgo 0-100 (historial real)
-      const riskForecast = [];       // Índice de riesgo 0-100 (pronóstico)
+      const riskData = [];
+      const riskForecast = [];
       const gustData = [];
       const waveData = [];
       let nowIdx = -1;
@@ -3247,9 +3191,13 @@
       for (let i = 0; i < weatherTimes.length; i++) {
         const t = weatherTimes[i];
         const d = new Date(t);
+
+        // Solo cada 3 horas dentro de la ventana
+        if (d.getHours() % 3 !== 0) continue;
+        if (d < windowStart || d > windowEnd) continue;
+
         const isPast = d <= now;
-        const isClose = Math.abs(d - now) < 1800000;
-        if (isClose && nowIdx === -1) nowIdx = i;
+        if (Math.abs(d - now) < 5400000 && nowIdx === -1) nowIdx = labels.length;
 
         const sample = {
           gust: Number(gusts[i] ?? 0),
@@ -3266,16 +3214,24 @@
         const comp = riskComponentScores(sample);
         const ri = aggregateRiskIndex(comp);
 
-        // Label: show date for first hour of day, else just hour
+        // Etiqueta: al cambiar de día o primero → "Mié 19\n00:00", resto → "03:00"
         const h = d.getHours();
-        const dayLabel = d.toLocaleDateString('es-CL', { day: 'numeric', month: 'short' });
-        labels.push(h === 0 || i === 0 ? dayLabel + ' ' + String(h).padStart(2, '0') + ':00' : String(h).padStart(2, '0') + ':00');
+        const dayNum = d.getDate();
+        let label;
+        if (dayNum !== lastDayShown || labels.length === 0) {
+          lastDayShown = dayNum;
+          const diaAbr = DIAS[d.getDay()];
+          const mesStr = (d.getMonth() + 1).toString().padStart(2, '0');
+          label = `${diaAbr} ${dayNum}/${mesStr}\n${String(h).padStart(2,'0')}:00`;
+        } else {
+          label = String(h).padStart(2, '0') + ':00';
+        }
+        labels.push(label);
 
         if (isPast) {
           riskData.push(ri);
           riskForecast.push(null);
         } else {
-          // Connect: first forecast point = last history value
           if (riskForecast.length > 0 && riskForecast[riskForecast.length - 1] === null && riskData.length > 0) {
             riskForecast[riskForecast.length - 1] = riskData[riskData.length - 1];
           }
@@ -3289,14 +3245,14 @@
 
       if (nowIdx === -1) nowIdx = Math.max(0, riskData.findIndex(v => v === null) - 1);
 
-      // If DM has real status, override NOW index in the data
+      // Si DM tiene datos reales de Chonchi, ajusta el índice NOW con el estado real
       if (dm && dm.found && nowIdx >= 0) {
-        const dmRestr = dm.restricciones > 0;
         let dmRisk;
-        if (dm.restriccionBahia) dmRisk = 75;       // Bahía cerrada → riesgo alto
-        else if (dm.navesMenores) dmRisk = 55;      // Naves menores restringidas
-        else if (dmRestr) dmRisk = 50;              // Alguna restricción
-        else dmRisk = 15;                            // Abierto
+        if (dm.restriccionBahia) dmRisk = 80;        // Bahía cerrada
+        else if (dm.navesMayores && dm.navesMenores) dmRisk = 75;
+        else if (dm.navesMenores) dmRisk = 55;       // Naves menores restringidas
+        else if (dm.navesMayores) dmRisk = 60;       // Naves mayores restringidas
+        else dmRisk = 12;                            // Abierto sin restricciones
 
         // Override the NOW point and a few around it
         for (let j = Math.max(0, nowIdx - 1); j <= Math.min(nowIdx + 1, riskData.length - 1); j++) {
@@ -3305,15 +3261,18 @@
         }
       }
 
-      // Update DM status text
+      // Update DM status text — basado en Chonchi/Bahía de Yal específicamente
       if (dm && dm.found) {
         _dmGlobalStatus = dm;
-        const icon = dm.restricciones > 0 ? '🔴' : '🟢';
-        const estado = dm.restricciones > 0 ? 'CON RESTRICCIÓN' : 'ABIERTO';
-        const detail = dm.restricciones > 0
-          ? `${dm.restricciones} restricciones activas` + (dm.restriccionBahia ? ' · Bahía cerrada' : '') + (dm.navesMenores ? ' · Naves menores restringidas' : '')
-          : 'Sin restricciones';
-        dmStatusEl.innerHTML = `${icon} <strong>DIRECTEMAR AHORA: ${estado}</strong> — ${detail} · Bahía de Yal, Chonchi`;
+        const chonchiRestr = dm.restriccionBahia || dm.navesMenores || dm.navesMayores;
+        const icon = chonchiRestr ? '🔴' : '🟢';
+        const estado = chonchiRestr ? 'CON RESTRICCIÓN' : 'ABIERTO';
+        let detail = '';
+        if (dm.restriccionBahia) detail += ' · Bahía cerrada';
+        if (dm.navesMenores) detail += ' · Naves menores restringidas';
+        if (dm.navesMayores) detail += ' · Naves mayores restringidas';
+        if (!chonchiRestr) detail = ' · Sin restricciones en Bahía de Yal';
+        dmStatusEl.innerHTML = `${icon} <strong>DIRECTEMAR AHORA: ${estado}</strong>${detail} · Chonchi / Bahía de Yal`;
       } else {
         dmStatusEl.innerHTML = '⏳ Sin datos DIRECTEMAR en este momento';
       }
@@ -3426,11 +3385,12 @@
               ticks: {
                 color: '#90a4b8',
                 font: { size: 9 },
-                maxRotation: 60,
+                maxRotation: 45,
+                minRotation: 0,
                 autoSkip: true,
-                maxTicksLimit: 20,
+                maxTicksLimit: 16,
               },
-              grid: { color: 'rgba(255,255,255,0.04)' }
+              grid: { color: 'rgba(255,255,255,0.06)' }
             },
             yRisk: {
               position: 'left',
@@ -3504,7 +3464,9 @@
         return;
       }
 
-      const hasRestr = dm.restricciones > 0;
+      // Estado basado en flags booleanos de Chonchi (no en numeroRestricciones que puede
+      // reflejar el total de la Capitanía incluyendo Queilen/Puqueldon)
+      const hasRestr = dm.restriccionBahia || dm.navesMenores || dm.navesMayores;
       panel.className = 'directemar-panel ' + (hasRestr ? 'dm-restricted' : 'dm-open');
       badge.className = 'dm-badge live' + (hasRestr ? '' : ' ok');
       badge.textContent = hasRestr ? '🔴 EN VIVO' : '🟢 EN VIVO';
@@ -3512,9 +3474,12 @@
       status.className = 'dm-big-status ' + (hasRestr ? 'restricted' : 'open');
       status.innerHTML = (hasRestr ? '🚫 CON RESTRICCIÓN' : '✅ ABIERTO') + locationHtml;
       restr.className = 'dm-restricciones ' + (hasRestr ? 'has' : 'none');
-      restr.textContent = hasRestr
-        ? `${dm.restricciones} restriccion${dm.restricciones > 1 ? 'es' : ''} activa${dm.restricciones > 1 ? 's' : ''}`
-        : 'Sin restricciones';
+      let restrSummary = '';
+      if (dm.restriccionBahia) restrSummary = 'Bahía cerrada';
+      else if (dm.navesMenores && dm.navesMayores) restrSummary = 'Naves mayores y menores restringidas';
+      else if (dm.navesMenores) restrSummary = 'Naves menores restringidas';
+      else if (dm.navesMayores) restrSummary = 'Naves mayores restringidas';
+      restr.textContent = hasRestr ? restrSummary : 'Sin restricciones en Bahía de Yal';
 
       // Medición meteorológica
       if (dm.medicion && dm.medicion.temp !== null) {
@@ -3527,15 +3492,15 @@
         medicion.innerHTML = '<span style="color:var(--muted)">Sin medición automática reportada</span>';
       }
 
-      // Restricciones tags detallados
+      // Restricciones tags — basados en Chonchi/Bahía de Yal solamente
       if (hasRestr) {
-        let tags = `<span class="dm-restriccion-tag">${dm.restricciones} restriccion${dm.restricciones > 1 ? 'es' : ''}</span>`;
+        let tags = '';
+        if (dm.restriccionBahia) tags += '<span class="dm-restriccion-tag" style="background:rgba(244,201,93,0.2);color:#f4c95d">🌊 Bahía</span>';
         if (dm.navesMayores) tags += '<span class="dm-restriccion-tag" style="background:rgba(255,107,107,0.15);color:#ff6b6b">🚢 Naves Mayores</span>';
         if (dm.navesMenores) tags += '<span class="dm-restriccion-tag" style="background:rgba(255,107,107,0.15);color:#ff6b6b">⛵ Naves Menores</span>';
-        if (dm.restriccionBahia) tags += '<span class="dm-restriccion-tag" style="background:rgba(244,201,93,0.2);color:#f4c95d">🌊 Bahía</span>';
-        restrTags.innerHTML = tags;
+        restrTags.innerHTML = tags || '<span class="dm-restriccion-tag">Restricción activa</span>';
       } else {
-        restrTags.innerHTML = '<span class="dm-restriccion-tag" style="color:var(--good);background:rgba(70,211,105,0.1)">Sin restricciones</span>';
+        restrTags.innerHTML = '<span class="dm-restriccion-tag" style="color:var(--good);background:rgba(70,211,105,0.1)">Sin restricciones · Bahía de Yal</span>';
       }
 
       // ─── ZONAS: Bahía de Yal (main), Queilen, Puqueldon ───
@@ -3626,23 +3591,18 @@
       if (!dm || !dm.found) return portNow;
       _dmGlobalStatus = dm;
 
-      // Solo se usa el estado de CHONCHI (dm.restricciones proviene únicamente de Chonchi).
-      // Queilen y Puqueldon se muestran en el panel DIRECTEMAR como referencia informativa
-      // pero NO afectan el estado principal del puerto ni las alertas de cierre.
-      const dmRestr = dm.restricciones > 0;
-      // Determinar estado real según DIRECTEMAR:
-      // restriccionBahia O (navesMayores Y navesMenores) → CERRADO
-      // solo navesMenores → RESTRINGIDO
-      // algunas restricciones → RESTRINGIDO
-      // sin restricciones → ABIERTO
+      // Estado de CHONCHI/Bahía de Yal basado en flags booleanos (no en numeroRestricciones
+      // que puede reflejar el total de la Capitanía, no del puerto individual).
+      const chonchiRestr = dm.restriccionBahia || dm.navesMenores || dm.navesMayores;
       let dmStatus;
       if (dm.restriccionBahia || (dm.navesMayores && dm.navesMenores)) {
         dmStatus = 'CERRADO';
-      } else if (dmRestr) {
+      } else if (chonchiRestr) {
         dmStatus = 'RESTRINGIDO';
       } else {
         dmStatus = 'ABIERTO';
       }
+      const dmRestr = chonchiRestr;
 
       const card = document.getElementById('portCard');
       const statusEl = document.getElementById('portStatus');
@@ -3752,9 +3712,7 @@
         renderPreventiveSupport(closureOutlook);
         renderKPIs(days, current, closureOutlook);
         renderTable(days);
-        buildWeekChart(days);
-        buildMarineChart(days);
-        buildClosureTimelineChart(closureOutlook.samples ?? []);
+        // buildWeekChart, buildMarineChart, buildClosureTimelineChart removidos — reemplazados por buildPortTimeline
 
         // Renderizar estado DIRECTEMAR (puede llegar después)
         const dm = await dmPromise;
