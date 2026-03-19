@@ -992,34 +992,43 @@
     }
     .ptl-overlay-chart-inner {
       min-width: 1100px;
-      height: 100%;
-      min-height: 260px;
+      height: calc(100vh - 210px);
+      min-height: 280px;
       position: relative;
     }
     .ptl-overlay-body canvas {
       width: 100% !important;
       height: 100% !important;
     }
-    /* Botón X flotante siempre visible */
-    .ptl-float-close {
-      position: fixed;
-      top: 14px;
-      right: 14px;
-      z-index: 10001;
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      background: rgba(30,50,70,0.92);
-      border: 1.5px solid rgba(255,255,255,0.2);
+    /* Botón X flotante → movido a barra inferior */
+    .ptl-float-close { display: none; }
+    .ptl-overlay-footer {
       display: none;
+      flex-shrink: 0;
+      padding: 10px 16px;
+      padding-bottom: max(10px, env(safe-area-inset-bottom, 10px));
+      border-top: 1px solid rgba(255,255,255,0.08);
+      background: rgba(5,20,35,0.96);
+    }
+    .ptl-overlay.active .ptl-overlay-footer { display: flex; align-items: center; justify-content: center; }
+    .ptl-overlay-close-bar {
+      display: flex;
       align-items: center;
       justify-content: center;
+      gap: 8px;
+      background: rgba(255,255,255,0.08);
+      border: 1.5px solid rgba(255,255,255,0.18);
+      border-radius: 10px;
+      padding: 10px 32px;
+      font-size: 0.82rem;
+      font-weight: 800;
+      color: var(--text-bright);
       cursor: pointer;
-      backdrop-filter: blur(6px);
-      -webkit-backdrop-filter: blur(6px);
+      letter-spacing: 0.4px;
+      width: 100%;
+      max-width: 320px;
     }
-    .ptl-overlay.active .ptl-float-close { display: flex; }
-    .ptl-float-close svg { width: 16px; height: 16px; color: #fff; }
+    .ptl-overlay-close-bar svg { width: 16px; height: 16px; }
     .ptl-overlay-status {
       padding: 6px 16px;
       font-size: 0.72rem;
@@ -1806,12 +1815,6 @@
 
       <!-- Overlay fullscreen del gráfico -->
       <div class="ptl-overlay" id="ptlOverlay">
-        <!-- Botón X flotante siempre visible -->
-        <button class="ptl-float-close" onclick="ptlCloseOverlay()" title="Cerrar">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
-        </button>
         <div class="ptl-overlay-header">
           <div>
             <div class="ptl-overlay-title">
@@ -1826,8 +1829,9 @@
               <div class="ptl-overlay-legend-item"><div style="width:8px;height:8px;border-radius:50%;background:var(--bad)"></div>Cierre (&gt;65)</div>
             </div>
           </div>
-          <div style="font-size:0.65rem;color:var(--muted);text-align:right;flex-shrink:0;margin-left:8px">
-            ← desliza →
+          <div style="font-size:0.65rem;color:var(--muted);text-align:right;flex-shrink:0;margin-left:8px;line-height:1.5">
+            ← desliza →<br>
+            <span style="font-size:0.58rem;opacity:0.6">7 días</span>
           </div>
         </div>
         <div class="ptl-overlay-body" id="ptlOverlayBody">
@@ -1838,6 +1842,14 @@
           </div>
         </div>
         <div class="ptl-overlay-status" id="ptlOverlayStatus">Estado DIRECTEMAR: consultando...</div>
+        <div class="ptl-overlay-footer">
+          <button class="ptl-overlay-close-bar" onclick="ptlCloseOverlay()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+            Cerrar vista ampliada
+          </button>
+        </div>
       </div>
 
       <!-- Elementos ocultos requeridos por funciones JS (no visibles en UI) -->
@@ -3712,6 +3724,64 @@
     };
     Chart.register(nowLinePlugin);
 
+    /* ─── PLUGIN: BANDAS ALTERNADAS POR DÍA ─── */
+    const dayStripePlugin = {
+      id: 'dayStripePlugin',
+      beforeDraw(chart, _args, options) {
+        if (!options.enabled || !options.bands || !options.bands.length) return;
+        const { ctx, chartArea, scales } = chart;
+        const xScale = scales.x;
+        if (!xScale || !chartArea) return;
+
+        const nTicks = xScale.ticks.length;
+        ctx.save();
+
+        options.bands.forEach((band, i) => {
+          const x1 = xScale.getPixelForTick(Math.min(band.startIdx, nTicks - 1));
+          const x2 = band.endIdx < nTicks
+            ? xScale.getPixelForTick(band.endIdx)
+            : chartArea.right;
+
+          // Fondo alternado
+          const fillColors = [
+            'rgba(255,255,255,0)',
+            'rgba(100,160,220,0.055)',
+            'rgba(255,255,255,0)',
+            'rgba(100,160,220,0.055)',
+            'rgba(255,255,255,0)',
+            'rgba(100,160,220,0.055)',
+            'rgba(255,255,255,0)',
+            'rgba(100,160,220,0.055)',
+          ];
+          ctx.fillStyle = fillColors[i % fillColors.length];
+          ctx.fillRect(x1, chartArea.top, x2 - x1, chartArea.bottom - chartArea.top);
+
+          // Línea divisoria al comienzo de cada día (no el primero)
+          if (band.startIdx > 0) {
+            ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([4, 4]);
+            ctx.beginPath();
+            ctx.moveTo(x1, chartArea.top);
+            ctx.lineTo(x1, chartArea.bottom);
+            ctx.stroke();
+            ctx.setLineDash([]);
+          }
+
+          // Etiqueta del día centrada en la parte superior de la banda
+          const midX = x1 + (Math.min(x2, chartArea.right) - x1) / 2;
+          ctx.fillStyle = 'rgba(255,255,255,0.40)';
+          ctx.font = 'bold 9px system-ui, -apple-system, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'top';
+          ctx.fillText(band.dayLabel, midX, chartArea.top + 4);
+        });
+
+        ctx.restore();
+      }
+    };
+    Chart.register(dayStripePlugin);
+
     function buildPortTimelineOnCanvas(canvasId, weather, marine, dm) {
       const canvas = document.getElementById(canvasId);
       const isOverlay = canvasId === 'portTimelineChartOverlay';
@@ -3752,6 +3822,11 @@
       const waveData = [];
       let nowIdx = -1;
 
+      // Bandas de días para el plugin de franjas
+      const dayBands = [];
+      let _dayBandStart = 0;
+      let _dayBandLabel = '';
+
       for (let i = 0; i < weatherTimes.length; i++) {
         const t = weatherTimes[i];
         const d = new Date(t);
@@ -3781,11 +3856,17 @@
         // Etiqueta: al cambiar de día o primero → "Mié 19\n00:00", resto → "03:00"
         const h = d.getHours();
         const dayNum = d.getDate();
+        const diaAbr = DIAS[d.getDay()];
+        const mesStr = (d.getMonth() + 1).toString().padStart(2, '0');
         let label;
         if (dayNum !== lastDayShown || labels.length === 0) {
+          // Cerrar banda del día anterior
+          if (labels.length > 0) {
+            dayBands.push({ startIdx: _dayBandStart, endIdx: labels.length, dayLabel: _dayBandLabel });
+          }
+          _dayBandStart = labels.length;
+          _dayBandLabel = `${diaAbr} ${dayNum}/${mesStr}`;
           lastDayShown = dayNum;
-          const diaAbr = DIAS[d.getDay()];
-          const mesStr = (d.getMonth() + 1).toString().padStart(2, '0');
           label = `${diaAbr} ${dayNum}/${mesStr}\n${String(h).padStart(2,'0')}:00`;
         } else {
           label = String(h).padStart(2, '0') + ':00';
@@ -3805,6 +3886,11 @@
 
         gustData.push(sample.gust);
         waveData.push(sample.wave);
+      }
+
+      // Cerrar la última banda de día
+      if (labels.length > _dayBandStart) {
+        dayBands.push({ startIdx: _dayBandStart, endIdx: labels.length, dayLabel: _dayBandLabel });
       }
 
       if (nowIdx === -1) nowIdx = Math.max(0, riskData.findIndex(v => v === null) - 1);
@@ -3948,6 +4034,10 @@
                 { value: 40, color: '#f4c95d', label: '⚠ Restricción 40' },
                 { value: 65, color: '#ff6b6b', label: '⛔ Cierre 65' },
               ]
+            },
+            dayStripePlugin: {
+              enabled: true,
+              bands: dayBands,
             }
           },
           scales: {
