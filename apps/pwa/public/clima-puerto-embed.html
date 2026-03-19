@@ -4115,8 +4115,18 @@
                 },
                 maxRotation: 0,
                 minRotation: 0,
-                autoSkip: true,
-                maxTicksLimit: isOverlay ? 28 : 16,
+                autoSkip: !isOverlay,
+                maxTicksLimit: isOverlay ? undefined : 16,
+                callback: isOverlay ? function(val) {
+                  const lbl = this.getLabelForValue(val);
+                  if (!lbl) return null;
+                  const str = Array.isArray(lbl) ? lbl.join('\n') : lbl;
+                  // Siempre mostrar labels de día (contienen '/')
+                  if (str.includes('/')) return lbl;
+                  // Solo mostrar horas clave intermedias
+                  const h = parseInt(str);
+                  return (h === 6 || h === 12 || h === 18) ? str : null;
+                } : undefined,
               },
               grid: {
                 color: (ctx) => {
