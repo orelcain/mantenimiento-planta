@@ -498,6 +498,20 @@
     .risk-mid { color: #f5c518; background: rgba(245, 197, 24, 0.15); }
     .risk-high { color: var(--bad); background: rgba(255, 107, 107, 0.2); }
 
+    .today-row td { background: rgba(0, 166, 178, 0.07); }
+    .today-badge {
+      display: inline-block;
+      background: var(--brand-primary);
+      color: #051a2d;
+      font-size: 0.6em;
+      font-weight: 800;
+      padding: 1px 5px;
+      border-radius: 3px;
+      letter-spacing: 0.5px;
+      vertical-align: middle;
+      margin-right: 4px;
+    }
+
     /* ─── DIRECTEMAR OFFICIAL PANEL ─── */
     .directemar-panel {
       background: var(--card);
@@ -2287,10 +2301,14 @@
     function renderTable(days) {
       const tbody = document.getElementById('tbody');
       tbody.innerHTML = '';
-      for (const d of days) {
+      const todayStr = new Date().toISOString().slice(0, 10);
+      const futureDays = days.filter(d => d.date >= todayStr);
+      for (const d of futureDays) {
+        const isToday = d.date === todayStr;
         const tr = document.createElement('tr');
+        if (isToday) tr.classList.add('today-row');
         tr.innerHTML = `
-          <td>${toCLDate(d.date)}</td>
+          <td>${isToday ? '<span class="today-badge">HOY</span>' : ''}${toCLDate(d.date)}</td>
           <td>${weatherCodeMap[d.weatherCode] ?? '—'}</td>
           <td>${num(d.tMin)}° / ${num(d.tMax)}°</td>
           <td>${num(d.rain)} mm</td>
@@ -3501,9 +3519,10 @@
       const marineMap = {};
       marineTimes.forEach((t, i) => { marineMap[t] = { wave: waves[i] ?? 0, wavePeriod: wavePeriods[i] ?? 8 }; });
 
-      // Ventana de visualización: 36h pasado + 84h futuro = ~5 días
-      const windowStart = new Date(now.getTime() - 36 * 3600000);
-      const windowEnd   = new Date(now.getTime() + 84 * 3600000);
+      // Ventana de visualización: 6h pasado + 7 días completos desde medianoche de hoy
+      const todayMidnight = new Date(now); todayMidnight.setHours(0, 0, 0, 0);
+      const windowStart = new Date(now.getTime() - 6 * 3600000);
+      const windowEnd   = new Date(todayMidnight.getTime() + 7 * 24 * 3600000);
 
       // Días de la semana abreviados en español
       const DIAS = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
