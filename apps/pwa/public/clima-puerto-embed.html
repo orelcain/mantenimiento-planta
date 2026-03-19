@@ -2684,12 +2684,60 @@
     const SITPORT_API = 'https://orion.directemar.cl/sitport/back/users/Totalgeneral';
     /* Cloud Function como fallback si la API directa falla */
     const CF_PROXY = 'https://us-central1-mantenimiento-planta-771a3.cloudfunctions.net/sitportProxy';
+    /* Capitanía Chonchi: reparticion.id = 225, codigo = 2239 */
+    const CHONCHI_REPARTICION_ID = 225;
+    /* Candidatos de endpoints SITPORT para datos individuales de bahías/recintos */
+    const SITPORT_BASE = 'https://orion.directemar.cl/sitport/back';
+    const SITPORT_BAHIA_CANDIDATES = [
+      `${SITPORT_BASE}/users/BahiasGeneral`,
+      `${SITPORT_BASE}/users/RecintoGeneral`,
+      `${SITPORT_BASE}/users/Bahias`,
+      `${SITPORT_BASE}/users/Recintos`,
+      `${SITPORT_BASE}/restricciones/BahiasActivas`,
+      `${SITPORT_BASE}/usuarios/restriccionesBahias`,
+      `${SITPORT_BASE}/users/BahiasByCapitania/${CHONCHI_REPARTICION_ID}`,
+    ];
     /* Puertos cercanos a monitorear */
     const NEARBY_PORTS = ['CASTRO', 'QUELLÓN', 'QUELLON', 'ANCUD', 'PUERTO MONTT', 'CALBUCO'];
-    /* Sub-puertos bajo la Capitanía de Castro que queremos trackear individualmente */
     const SUB_PUERTOS_CHONCHI = ['QUEILEN', 'PUQUELDON'];
     let _dmCache = null;
     let _dmTimer = null;
+    let _sitportBahiasData = null; // Cache de datos individuales de bahías
+
+    /**
+     * Intenta encontrar el endpoint correcto de SITPORT para datos individuales de bahías.
+     * Prueba varios candidatos y devuelve el primero que retorna datos útiles (CHONCHI individual).
+     */
+    async function discoverSitportBahiasEndpoint() {
+      for (const url of SITPORT_BAHIA_CANDIDATES) {
+        try {
+          const ctrl = new AbortController();
+          const timer = setTimeout(() => ctrl.abort(), 8000);
+          const resp = await fetch(url, { signal: ctrl.signal });
+          clearTimeout(timer);
+          if (!resp.ok) continue;
+          const data = await resp.json();
+          const arr = Array.isArray(data) ? data : (Array.isArray(data?.data) ? data.data : null);
+          if (!arr || arr.length === 0) continue;
+          // Verificar si tiene entradas con nombre CHONCHI (no solo Capitanía)
+          const hasChonchi = arr.some(p => {
+            const n = (p.reparticion?.nombre ?? p.nombre ?? '').toUpperCase();
+            return n.includes('CHONCHI') && !n.includes('CAPITAN');
+          });
+          if (hasChonchi) {
+            console.log('✅ SITPORT bahías individuales encontradas en:', url, '—', arr.length, 'entradas');
+            _sitportBahiasData = arr;
+            return arr;
+          }
+          console.log('🔍 SITPORT endpoint probado (sin CHONCHI individual):', url,
+            '— muestra:', arr[0]?.reparticion?.nombre ?? arr[0]?.nombre ?? JSON.stringify(arr[0]).substring(0, 80));
+        } catch (e) {
+          console.log('🔍 SITPORT endpoint no disponible:', url, '—', e.message);
+        }
+      }
+      console.warn('⚠️ No se encontró endpoint SITPORT con datos individuales de Chonchi');
+      return null;
+    }
 
     /**
      * Obtiene datos de TODOS los puertos desde la API SITPORT.
@@ -2744,7 +2792,7 @@
      * Retorna: { found, restricciones, estado, navesMayores, navesMenores,
      *            restriccionBahia, medicion, subPuertos[], nearby[], timestamp }
      */
-    function extractChonchiData(ports) {
+    function extractChonchiData(ports, bahias = null) {
       const result = {
         found: false,
         restricciones: 0,
@@ -2789,81 +2837,104 @@
         };
       }
 
-      // Restricciones brutas de la Capitanía (puede incluir sub-puertos)
-      const capR = capitania.restricciones ?? {};
-      const capNavesMenores  = capR.navesMenores   ?? false;
-      const capNavesMayores  = capR.navesMayores   ?? false;
-      const capBahia         = capR.restriccionBahia ?? false;
+      // ── 2. Buscar datos INDIVIDUALES por bahía/sub-puerto
+      //    Fuente preferida: endpoint bahías (si discoverSitportBahiasEndpoint lo encontró)
+      //    Fuente fallback:  búsqueda en el array general (Totalgeneral solo tiene la Capitanía agregada)
 
-      // ── 2. Sub-puertos: Queilen y Puqueldon
-      const queilenEntry = ports.find(p => {
-        const n = nameOf(p);
-        return n.includes('QUEILEN') && !isCapitania(n);
-      });
-      const puqueldonEntry = ports.find(p => {
-        const n = nameOf(p);
-        return (n.includes('PUQUELDON') || n.includes('PUQUELDÓN')) && !isCapitania(n);
-      });
+      const nameOfB = p => (p.reparticion?.nombre ?? p.nombre ?? '').toUpperCase();
 
-      // Flags de restricciones que YA están explicadas por sub-puertos
-      const subNavesMenores = (queilenEntry?.restricciones?.navesMenores   ?? false)
-                            || (puqueldonEntry?.restricciones?.navesMenores   ?? false);
-      const subNavesMayores = (queilenEntry?.restricciones?.navesMayores   ?? false)
-                            || (puqueldonEntry?.restricciones?.navesMayores   ?? false);
-      const subBahia        = (queilenEntry?.restricciones?.restriccionBahia ?? false)
-                            || (puqueldonEntry?.restricciones?.restriccionBahia ?? false);
+      // Función auxiliar para extraer flags de restricción de cualquier objeto
+      const extractFlags = entry => {
+        const r = entry?.restricciones ?? {};
+        return {
+          navesMenores:    r.navesMenores    ?? false,
+          navesMayores:    r.navesMayores    ?? false,
+          restriccionBahia: r.restriccionBahia ?? false,
+          viento: entry?.medicionMeteo?.velocidadViento ?? null,
+          dirViento: entry?.medicionMeteo?.textoDireccionViento ?? null,
+        };
+      };
 
-      // ── 3. Restricciones PROPIAS de Chonchi/Bahía de Yal
-      //    = lo que tiene la Capitanía Y que NO está explicado por sub-puertos
-      result.navesMenores   = capNavesMenores  && !subNavesMenores;
-      result.navesMayores   = capNavesMayores  && !subNavesMayores;
-      result.restriccionBahia = capBahia       && !subBahia;
-      result.restricciones  = (result.navesMenores || result.navesMayores || result.restriccionBahia) ? 1 : 0;
-      result.estado = result.restricciones > 0 ? 'CON RESTRICCIÓN' : 'SIN RESTRICCIÓN';
+      let chonchiEntry   = null;
+      let queilenEntry   = null;
+      let puqueldonEntry = null;
 
-      // Debug: muestra la estructura COMPLETA del objeto Capitanía para analizar campos anidados
-      console.log('🔍 SITPORT - Capitanía keys:', Object.keys(capitania));
-      console.log('🔍 SITPORT - Capitanía completo:', JSON.stringify(capitania, null, 2));
-      console.log('🔍 SITPORT QUINZONA summary:', {
-        capitaniaFlags: {
-          navesMenores: capNavesMenores, navesMayores: capNavesMayores, restriccionBahia: capBahia,
-          totalAPI: capR.numeroRestricciones
-        },
-        queilen: queilenEntry ? 'ENCONTRADO' : 'NO ENCONTRADO',
-        puqueldon: puqueldonEntry ? 'ENCONTRADO' : 'NO ENCONTRADO',
-        chonchiResultante: {
-          navesMenores: result.navesMenores,
-          navesMayores: result.navesMayores,
-          restriccionBahia: result.restriccionBahia,
-          estado: result.estado
+      if (Array.isArray(bahias) && bahias.length > 0) {
+        // Endpoint de bahías individuales disponible → usar datos directos
+        chonchiEntry   = bahias.find(p => { const n = nameOfB(p); return n.includes('CHONCHI')   && !isCapitania(n); });
+        queilenEntry   = bahias.find(p => { const n = nameOfB(p); return n.includes('QUEILEN')   && !isCapitania(n); });
+        puqueldonEntry = bahias.find(p => { const n = nameOfB(p); return (n.includes('PUQUELDON') || n.includes('PUQUELDÓN')) && !isCapitania(n); });
+        console.log('✅ SITPORT usando endpoint bahías individuales:', {
+          chonchi: chonchiEntry ? nameOfB(chonchiEntry) : 'NO ENCONTRADO',
+          queilen: queilenEntry ? nameOfB(queilenEntry) : 'NO ENCONTRADO',
+          puqueldon: puqueldonEntry ? nameOfB(puqueldonEntry) : 'NO ENCONTRADO',
+        });
+      } else {
+        // Fallback: solo tenemos el array Totalgeneral (sin datos individuales de sub-puertos)
+        queilenEntry   = ports.find(p => { const n = nameOf(p); return n.includes('QUEILEN')   && !isCapitania(n); });
+        puqueldonEntry = ports.find(p => { const n = nameOf(p); return (n.includes('PUQUELDON') || n.includes('PUQUELDÓN')) && !isCapitania(n); });
+        console.log('⚠️ SITPORT solo con datos de Capitanía (sin bahías individuales)');
+      }
+
+      // ── 3. Restricciones de Chonchi/Bahía de Yal
+      if (chonchiEntry) {
+        // Datos individuales directos de Chonchi
+        const f = extractFlags(chonchiEntry);
+        result.navesMenores    = f.navesMenores;
+        result.navesMayores    = f.navesMayores;
+        result.restriccionBahia = f.restriccionBahia;
+      } else {
+        // Sin datos individuales → enfoque de substracción sobre la Capitanía
+        const capR = capitania.restricciones ?? {};
+        const capNavesMenores   = capR.navesMenores    ?? false;
+        const capNavesMayores   = capR.navesMayores    ?? false;
+        const capBahia          = capR.restriccionBahia ?? false;
+        const subNavesMenores   = (queilenEntry?.restricciones?.navesMenores    ?? false) || (puqueldonEntry?.restricciones?.navesMenores    ?? false);
+        const subNavesMayores   = (queilenEntry?.restricciones?.navesMayores    ?? false) || (puqueldonEntry?.restricciones?.navesMayores    ?? false);
+        const subBahia          = (queilenEntry?.restricciones?.restriccionBahia ?? false) || (puqueldonEntry?.restricciones?.restriccionBahia ?? false);
+        // Cuando no hay datos individuales de sub-puertos (que es el caso normal con Totalgeneral)
+        // y la Capitanía tiene restricciones → no podemos distinguir de quién son → mostramos DESCONOCIDO
+        if (!queilenEntry && !puqueldonEntry && (capNavesMenores || capNavesMayores || capBahia)) {
+          result.navesMenores    = false;
+          result.navesMayores    = false;
+          result.restriccionBahia = false;
+          result.estado = 'DESCONOCIDO';
+          result.estadoDetalle = 'La Capitanía tiene restricciones pero no se puede determinar si son propias de Chonchi';
+        } else {
+          result.navesMenores    = capNavesMenores  && !subNavesMenores;
+          result.navesMayores    = capNavesMayores  && !subNavesMayores;
+          result.restriccionBahia = capBahia        && !subBahia;
         }
-      });
+      }
+
+      if (result.estado !== 'DESCONOCIDO') {
+        result.restricciones = (result.navesMenores || result.navesMayores || result.restriccionBahia) ? 1 : 0;
+        result.estado = result.restricciones > 0 ? 'CON RESTRICCIÓN' : 'SIN RESTRICCIÓN';
+      }
 
       // ── 4. Poblar sub-puertos para el panel de zonas
       if (queilenEntry) {
-        const qr = queilenEntry.restricciones ?? {};
-        const qm = queilenEntry.medicionMeteo;
+        const f = extractFlags(queilenEntry);
         result.subPuertos.push({
-          nombre: queilenEntry.reparticion.nombre.replace(/CAPITAN[ÍI]A DE PUERTO /i, '').trim(),
-          restricciones: qr.numeroRestricciones ?? 0,
-          navesMenores: qr.navesMenores ?? false,
-          navesMayores: qr.navesMayores ?? false,
-          restriccionBahia: qr.restriccionBahia ?? false,
-          viento: qm?.velocidadViento ?? null,
-          dirViento: qm?.textoDireccionViento ?? null,
+          nombre: (queilenEntry.reparticion?.nombre ?? queilenEntry.nombre ?? 'QUEILEN').replace(/CAPITAN[ÍI]A DE PUERTO /i, '').trim(),
+          restricciones: (f.navesMenores || f.navesMayores || f.restriccionBahia) ? 1 : 0,
+          navesMenores: f.navesMenores,
+          navesMayores: f.navesMayores,
+          restriccionBahia: f.restriccionBahia,
+          viento: f.viento,
+          dirViento: f.dirViento,
         });
       }
       if (puqueldonEntry) {
-        const pr = puqueldonEntry.restricciones ?? {};
-        const pm2 = puqueldonEntry.medicionMeteo;
+        const f = extractFlags(puqueldonEntry);
         result.subPuertos.push({
-          nombre: puqueldonEntry.reparticion.nombre.replace(/CAPITAN[ÍI]A DE PUERTO /i, '').trim(),
-          restricciones: pr.numeroRestricciones ?? 0,
-          navesMenores: pr.navesMenores ?? false,
-          navesMayores: pr.navesMayores ?? false,
-          restriccionBahia: pr.restriccionBahia ?? false,
-          viento: pm2?.velocidadViento ?? null,
-          dirViento: pm2?.textoDireccionViento ?? null,
+          nombre: (puqueldonEntry.reparticion?.nombre ?? puqueldonEntry.nombre ?? 'PUQUELDON').replace(/CAPITAN[ÍI]A DE PUERTO /i, '').trim(),
+          restricciones: (f.navesMenores || f.navesMayores || f.restriccionBahia) ? 1 : 0,
+          navesMenores: f.navesMenores,
+          navesMayores: f.navesMayores,
+          restriccionBahia: f.restriccionBahia,
+          viento: f.viento,
+          dirViento: f.dirViento,
         });
       }
 
@@ -2888,9 +2959,13 @@
 
     async function fetchDirectemarStatus(force = false) {
       if (!force && _dmCache && (Date.now() - _dmCache._ts < 120000)) return _dmCache;
-      const ports = await fetchSitportData();
+      // Lanzar búsqueda de bahías individuales en paralelo con datos generales
+      const [ports, bahias] = await Promise.all([
+        fetchSitportData(),
+        _sitportBahiasData ? Promise.resolve(_sitportBahiasData) : discoverSitportBahiasEndpoint(),
+      ]);
       if (!ports) return null;
-      const parsed = extractChonchiData(ports);
+      const parsed = extractChonchiData(ports, bahias);
       parsed._ts = Date.now();
       _dmCache = parsed;
       return parsed;
@@ -3601,11 +3676,24 @@
         detailEl.textContent = detail;
       }
 
-      // Bahía de Yal: usa flags derivados de Chonchi (estado propio, sin sub-puertos)
-      renderZoneCard('dmZonaBahia', 'dmZonaBahiaStatus', 'dmZonaBahiaDetail',
-        dm.navesMenores || dm.navesMayores || dm.restriccionBahia,
-        dm.navesMenores, dm.navesMayores, dm.restriccionBahia,
-        dm.restricciones, dm.medicion?.windSpeed ?? null, false);
+      // Bahía de Yal: usa flags individuales de Chonchi cuando están disponibles
+      if (dm.estado === 'DESCONOCIDO') {
+        // La Capitanía tiene restricciones pero no podemos distinguir si son de Chonchi o sub-puertos
+        const card = document.getElementById('dmZonaBahia');
+        const statusEl = document.getElementById('dmZonaBahiaStatus');
+        const detailEl = document.getElementById('dmZonaBahiaDetail');
+        if (card && statusEl && detailEl) {
+          card.className = 'dm-zone-card zone-unknown';
+          statusEl.className = 'dm-zone-status-badge unknown';
+          statusEl.textContent = '⚠️ SIN DATO';
+          detailEl.textContent = 'La Capitanía tiene restricciones en otra zona · Ver Queilen';
+        }
+      } else {
+        renderZoneCard('dmZonaBahia', 'dmZonaBahiaStatus', 'dmZonaBahiaDetail',
+          dm.navesMenores || dm.navesMayores || dm.restriccionBahia,
+          dm.navesMenores, dm.navesMayores, dm.restriccionBahia,
+          dm.restricciones, dm.medicion?.windSpeed ?? null, false);
+      }
 
       // Queilen y Puqueldon: desde subPuertos
       const subQ = dm.subPuertos?.find(p => p.nombre?.toUpperCase().includes('QUEILEN'));
