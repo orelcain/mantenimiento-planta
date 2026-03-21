@@ -2028,81 +2028,47 @@
     }
 
     function calcRisk({ gust, wind, wave, rain, weatherCode }) {
-      /* Riesgo operativo diario: cada factor DIRECTEMAR mapea independiente-
-         mente a una probabilidad; el factor dominante define el piso y los
-         demás componen hasta un 20 % adicional.  */
-      let gustR = 0;
-      if (gust >= 70) gustR = 95;
-      else if (gust >= 60) gustR = 82;
-      else if (gust >= 55) gustR = 72;   // umbral cierre DIRECTEMAR
-      else if (gust >= 50) gustR = 55;
-      else if (gust >= 45) gustR = 42;   // umbral restricción
-      else if (gust >= 35) gustR = 22;
+      /* Riesgo operativo diario — modelo "% del cierre".
+         Cada factor se mide como porcentaje de su umbral histórico
+         de cierre para Puerto Chonchi (canal protegido, Chiloé).
+         Factor dominante define el piso + composición secundaria. */
+      const gustPct  = Math.min(100, (gust  / 40) * 100);
+      const windPct  = Math.min(100, (wind  / 30) * 100);
+      const wavePct  = Math.min(100, (wave  / 1.5) * 100);
+      let   otherPct = 0;
+      if ([95, 96, 99].includes(weatherCode)) otherPct = 80;
+      if (rain >= 8)  otherPct = Math.max(otherPct, 100);
+      else if (rain > 0) otherPct = Math.max(otherPct, Math.min(100, (rain / 8) * 100));
 
-      let windR = 0;
-      if (wind >= 55) windR = 88;
-      else if (wind >= 45) windR = 72;   // cierre viento sostenido
-      else if (wind >= 40) windR = 50;
-      else if (wind >= 35) windR = 35;   // restricción
-      else if (wind >= 25) windR = 14;
+      const sorted = [gustPct, windPct, wavePct, otherPct].sort((a, b) => b - a);
+      const pct = Math.max(2, Math.min(98, Math.round(
+        sorted[0] * 0.55 + (sorted[1] || 0) * 0.25 + (sorted[2] || 0) * 0.12 + (sorted[3] || 0) * 0.08
+      )));
 
-      let waveR = 0;
-      if (wave >= 3.5) waveR = 90;
-      else if (wave >= 2.8) waveR = 70;
-      else if (wave >= 2.5) waveR = 55;  // cierre oleaje
-      else if (wave >= 2.0) waveR = 38;
-      else if (wave >= 1.8) waveR = 25;  // restricción
-      else if (wave >= 1.2) waveR = 10;
-
-      let otherR = 0;
-      if ([95, 96, 99].includes(weatherCode)) otherR = 60;
-      if (rain >= 30) otherR = Math.max(otherR, 30);
-      else if (rain >= 15) otherR = Math.max(otherR, 15);
-
-      const sorted = [gustR, windR, waveR, otherR].sort((a, b) => b - a);
-      const pct = Math.max(4, Math.min(96, Math.round(sorted[0] + (sorted[1] || 0) * 0.20 + (sorted[2] || 0) * 0.08)));
-
-      if (pct >= 55) return { level: 'ALTO', cls: 'risk-high', pct, reason: `Riesgo operativo ALTO (${pct}%). Se recomienda restricción o cierre.` };
-      if (pct >= 30) return { level: 'MEDIO', cls: 'risk-mid', pct, reason: `Riesgo operativo medio (${pct}%). Monitoreo activo y validación táctica.` };
+      if (pct >= 65) return { level: 'ALTO', cls: 'risk-high', pct, reason: `Riesgo operativo ALTO (${pct}%). Se recomienda restricción o cierre.` };
+      if (pct >= 35) return { level: 'MEDIO', cls: 'risk-mid', pct, reason: `Riesgo operativo medio (${pct}%). Monitoreo activo y validación táctica.` };
       return { level: 'BAJO', cls: 'risk-low', pct, reason: `Riesgo bajo (${pct}%). Condiciones generalmente operables.` };
     }
 
     function calcDailyCloseRisk({ gust, wind, wave, rain, weatherCode }) {
-      /* Probabilidad de CIERRE de puerto: un solo factor sobre el umbral
-         DIRECTEMAR ya genera alta probabilidad; factores secundarios
-         componen/aumentan el valor final.  */
-      let gustP = 0;
-      if (gust >= 70) gustP = 94;
-      else if (gust >= 65) gustP = 86;
-      else if (gust >= 60) gustP = 78;
-      else if (gust >= 55) gustP = 68;   // ← UMBRAL CIERRE DIRECTEMAR
-      else if (gust >= 50) gustP = 48;   // muy cerca del umbral
-      else if (gust >= 45) gustP = 32;   // umbral restricción
+      /* Probabilidad de CIERRE de puerto — modelo "% del cierre".
+         Cada factor como porcentaje del umbral histórico de cierre
+         DIRECTEMAR para Puerto Chonchi (canal protegido, Chiloé).
+         Un solo factor al 100% ya genera alta probabilidad. */
+      const gustPct  = Math.min(100, (gust  / 40) * 100);
+      const windPct  = Math.min(100, (wind  / 30) * 100);
+      const wavePct  = Math.min(100, (wave  / 1.5) * 100);
+      let   otherPct = 0;
+      if ([95, 96, 99].includes(weatherCode)) otherPct = 80;
+      if (rain >= 8)  otherPct = Math.max(otherPct, 100);
+      else if (rain > 0) otherPct = Math.max(otherPct, Math.min(100, (rain / 8) * 100));
 
-      let windP = 0;
-      if (wind >= 55) windP = 90;
-      else if (wind >= 45) windP = 70;   // cierre viento sostenido
-      else if (wind >= 40) windP = 48;
-      else if (wind >= 35) windP = 28;   // restricción
-
-      let waveP = 0;
-      if (wave >= 3.5) waveP = 92;
-      else if (wave >= 3.0) waveP = 76;
-      else if (wave >= 2.5) waveP = 58;  // cierre oleaje
-      else if (wave >= 2.0) waveP = 36;
-      else if (wave >= 1.8) waveP = 22;  // restricción
-
-      let otherP = 0;
-      if ([95, 96, 99].includes(weatherCode)) otherP = 55;
-      if (rain >= 30) otherP = Math.max(otherP, 28);
-      else if (rain >= 15) otherP = Math.max(otherP, 14);
-
-      const sorted = [gustP, windP, waveP, otherP].sort((a, b) => b - a);
+      const sorted = [gustPct, windPct, wavePct, otherPct].sort((a, b) => b - a);
       const pct = Math.max(2, Math.min(98,
-        Math.round(sorted[0] + (sorted[1] || 0) * 0.22 + (sorted[2] || 0) * 0.08)));
+        Math.round(sorted[0] * 0.60 + (sorted[1] || 0) * 0.22 + (sorted[2] || 0) * 0.10 + (sorted[3] || 0) * 0.08)));
 
-      if (pct >= 55) return { level: 'ALTO', cls: 'risk-high', pct, reason: `Probabilidad ALTA de cierre (${pct}%). Condiciones sobre umbrales DIRECTEMAR.` };
-      if (pct >= 30) return { level: 'MEDIO', cls: 'risk-mid', pct, reason: `Probabilidad media de cierre (${pct}%). Condiciones cercanas a umbrales.` };
+      if (pct >= 65) return { level: 'ALTO', cls: 'risk-high', pct, reason: `Probabilidad ALTA de cierre (${pct}%). Condiciones sobre umbrales DIRECTEMAR.` };
+      if (pct >= 35) return { level: 'MEDIO', cls: 'risk-mid', pct, reason: `Probabilidad media de cierre (${pct}%). Condiciones cercanas a umbrales.` };
       return { level: 'BAJO', cls: 'risk-low', pct, reason: `Probabilidad baja de cierre (${pct}%).` };
     }
 
@@ -2128,13 +2094,13 @@
     };
 
     const PORT_LIMITS = {
-      windAttention: 35,
-      windCloseLikely: 55,
-      gustClose: 55,
-      windCloseHard: 45,
-      waveAttention: 1.8,
-      waveCloseLikely: 2.5,
-      waveHard: 3.5,
+      windAttention: 22,       // restricción canal protegido
+      windCloseLikely: 30,     // cierre viento sostenido Chonchi
+      gustClose: 40,           // cierre rachas
+      windCloseHard: 30,
+      waveAttention: 1.0,      // restricción oleaje canal
+      waveCloseLikely: 1.5,    // cierre oleaje
+      waveHard: 2.0,
     };
 
     const rangeBandPlugin = {
@@ -2201,54 +2167,50 @@
       return `faltan ${num(threshold - numeric, decimals)}${unit} para ${threshold}${unit}`;
     }
 
-    function clamp01(value) {
-      return Math.max(0, Math.min(1, value));
+    // Helper: % del umbral de cierre (0 = calma, 100 = umbral alcanzado)
+    function closurePct(value, closureThreshold) {
+      return Math.max(0, Math.min(100, (value / closureThreshold) * 100));
     }
 
-    function normalizeRange(value, start, end) {
-      if (!Number.isFinite(value) || end <= start) return 0;
-      return clamp01((value - start) / (end - start));
-    }
-
+    /* ── Índice de riesgo — modelo "% del cierre" ──
+       Cada parámetro se mide como porcentaje de su umbral histórico de
+       cierre para Puerto Chonchi (canal protegido, Chiloé).
+       100/100 = TODAS las condiciones en nivel de cierre de puerto.
+       Umbrales: rachas 40 km/h, viento 30, olas 1.5 m, lluvia 8 mm,
+       caída presión 15 hPa, pérdida visib 9 km, pérdida período 7 s */
     function riskComponentScores(sample) {
       const isStorm       = [95, 96, 99].includes(sample.code);
       const isFog         = [45, 48].includes(sample.code);
       const isHeavyPrecip = [65, 67, 75, 82, 86].includes(sample.code);
       const isModPrecip   = [63, 66, 73, 81, 85].includes(sample.code);
 
-      /* Rangos calibrados para Puerto Chonchi (canal protegido, Chiloé).
-         DIRECTEMAR cierra con rachas ~25 km/h y olas <1m en canales. */
       return {
-        gust: normalizeRange(sample.gust, 10, 25) * 100,
-        wind: normalizeRange(sample.wind, 6, 18) * 100,
-        wave: normalizeRange(sample.wave, 0.2, 1.2) * 100,
-        rain: normalizeRange(sample.rain, 0.3, 4) * 100,
-        pressure: normalizeRange(1013 - sample.pressure, 1, 12) * 100,
-        visibility: normalizeRange(8000 - sample.visibility, 0, 7500) * 100,
-        cloud: normalizeRange(sample.cloud, 70, 100) * 100,
-        humidity: normalizeRange(sample.humidity, 80, 100) * 100,
-        wavePeriod: normalizeRange(8 - sample.wavePeriod, 0.5, 5) * 100,
-        storm: isStorm ? 100 : 0,
-        fog: isFog ? 80 : 0,
-        precip: isHeavyPrecip ? 100 : (isModPrecip ? 60 : 0),
+        gust:       closurePct(sample.gust, 40),
+        wind:       closurePct(sample.wind, 30),
+        wave:       closurePct(sample.wave, 1.5),
+        rain:       closurePct(sample.rain, 8),
+        pressure:   closurePct(Math.max(0, 1013 - sample.pressure), 15),
+        visibility: closurePct(Math.max(0, 10000 - sample.visibility), 9000),
+        wavePeriod: closurePct(Math.max(0, 10 - sample.wavePeriod), 7),
+        storm:      isStorm ? 100 : 0,
+        fog:        isFog   ? 100 : 0,
+        precip:     isHeavyPrecip ? 100 : (isModPrecip ? 60 : 0),
       };
     }
 
     function aggregateRiskIndex(components) {
-      /* Pesos calibrados para canal protegido Chiloé.  Suma = 1.0 */
+      /* Pesos: importancia en decisión DIRECTEMAR de cierre. Suma = 1.0 */
       const weighted =
-        components.gust       * 0.20 +
+        components.gust       * 0.22 +
         components.wind       * 0.14 +
-        components.wave       * 0.12 +
-        components.rain       * 0.08 +
+        components.wave       * 0.16 +
+        components.rain       * 0.06 +
         components.pressure   * 0.08 +
-        components.visibility * 0.07 +
-        components.cloud      * 0.02 +
-        components.humidity   * 0.02 +
+        components.visibility * 0.10 +
         components.wavePeriod * 0.04 +
         components.storm      * 0.08 +
-        components.fog        * 0.03 +
-        (components.precip ?? 0) * 0.12;
+        components.fog        * 0.06 +
+        (components.precip ?? 0) * 0.06;
       return Math.max(0, Math.min(100, weighted));
     }
 
@@ -2357,8 +2319,8 @@
                 { from: PORT_LIMITS.windCloseLikely, to: 90, color: 'rgba(255,107,107,0.10)' },
               ],
               markers: [
-                { value: PORT_LIMITS.windAttention, color: '#f4c95d', label: 'Atención 35' },
-                { value: PORT_LIMITS.windCloseLikely, color: '#ff6b6b', label: 'Alerta 55' },
+                { value: PORT_LIMITS.windAttention, color: '#f4c95d', label: 'Atención 22' },
+                { value: PORT_LIMITS.windCloseLikely, color: '#ff6b6b', label: 'Cierre 30' },
               ]
             }
           },
@@ -2420,8 +2382,8 @@
                 { from: PORT_LIMITS.waveCloseLikely, to: 5, color: 'rgba(255,107,107,0.10)' },
               ],
               markers: [
-                { value: PORT_LIMITS.waveAttention, color: '#f4c95d', label: 'Atención 1.8m' },
-                { value: PORT_LIMITS.waveCloseLikely, color: '#ff6b6b', label: 'Alerta 2.5m' },
+                { value: PORT_LIMITS.waveAttention, color: '#f4c95d', label: 'Atención 1.0m' },
+                { value: PORT_LIMITS.waveCloseLikely, color: '#ff6b6b', label: 'Cierre 1.5m' },
               ]
             }
           },
@@ -2495,8 +2457,8 @@
                 afterLabel(context) {
                   if ((context.dataset.label ?? '').includes('Índice cierre')) {
                     const value = context.parsed.y;
-                    if (value >= 45) return 'Estado horario: cierre probable';
-                    if (value >= 20) return 'Estado horario: atención';
+                    if (value >= 65) return 'Estado horario: cierre probable';
+                    if (value >= 35) return 'Estado horario: atención';
                     return 'Estado horario: operativo';
                   }
                   return '';
@@ -2507,12 +2469,12 @@
               enabled: true,
               axisId: 'yIndex',
               bands: [
-                { from: 0, to: 45, color: 'rgba(76,215,160,0.07)' },
-                { from: 45, to: 65, color: 'rgba(244,201,93,0.08)' },
+                { from: 0, to: 35, color: 'rgba(76,215,160,0.07)' },
+                { from: 35, to: 65, color: 'rgba(244,201,93,0.08)' },
                 { from: 65, to: 100, color: 'rgba(255,107,107,0.10)' },
               ],
               markers: [
-                { value: 45, color: '#f4c95d', label: 'Atención 45' },
+                { value: 35, color: '#f4c95d', label: 'Atención 35' },
                 { value: 65, color: '#ff6b6b', label: 'Cierre 65' },
               ]
             }
@@ -2576,24 +2538,24 @@
       let status = 'ABIERTO';
       let carta = true;
 
-      // Evaluate current conditions against DIRECTEMAR criteria
-      if (gust >= 70 || isStorm) {
+      // Evaluar condiciones actuales vs umbrales cierre Puerto Chonchi (canal protegido)
+      if (gust >= 50 || isStorm) {
         status = 'CERRADO';
         carta = false;
-        if (gust >= 70) reasons.push({ text: `Rachas ${num(gust,0)} km/h (≥70)`, cls: 'danger' });
+        if (gust >= 50) reasons.push({ text: `Rachas ${num(gust,0)} km/h (≥50)`, cls: 'danger' });
         if (isStorm) reasons.push({ text: 'Tormenta activa', cls: 'danger' });
-      } else if (gust >= 55 || wind >= 45) {
+      } else if (gust >= 40 || wind >= 30) {
         status = 'CERRADO';
         carta = false;
-        if (gust >= 55) reasons.push({ text: `Rachas ${num(gust,0)} km/h (≥55)`, cls: 'danger' });
-        if (wind >= 45) reasons.push({ text: `Viento ${num(wind,0)} km/h (≥45)`, cls: 'danger' });
-      } else if (gust >= 45 || wind >= 35) {
+        if (gust >= 40) reasons.push({ text: `Rachas ${num(gust,0)} km/h (≥40)`, cls: 'danger' });
+        if (wind >= 30) reasons.push({ text: `Viento ${num(wind,0)} km/h (≥30)`, cls: 'danger' });
+      } else if (gust >= 30 || wind >= 22) {
         status = 'RESTRINGIDO';
-        if (gust >= 45) reasons.push({ text: `Rachas ${num(gust,0)} km/h (≥45)`, cls: 'warn' });
-        if (wind >= 35) reasons.push({ text: `Viento ${num(wind,0)} km/h (≥35)`, cls: 'warn' });
+        if (gust >= 30) reasons.push({ text: `Rachas ${num(gust,0)} km/h (≥30)`, cls: 'warn' });
+        if (wind >= 22) reasons.push({ text: `Viento ${num(wind,0)} km/h (≥22)`, cls: 'warn' });
       }
 
-      if (rain >= 10) {
+      if (rain >= 8) {
         if (status === 'ABIERTO') status = 'RESTRINGIDO';
         reasons.push({ text: `Lluvia intensa ${num(rain,1)} mm/h`, cls: 'warn' });
       }
@@ -2694,8 +2656,8 @@
       }
 
       const maxIndex = Math.max(...samples.map((s) => s.riskIndex), 0);
-      const highHours = samples.filter((s) => s.riskIndex >= 45).length;
-      const mediumHours = samples.filter((s) => s.riskIndex >= 20 && s.riskIndex < 45).length;
+      const highHours = samples.filter((s) => s.riskIndex >= 65).length;
+      const mediumHours = samples.filter((s) => s.riskIndex >= 35 && s.riskIndex < 65).length;
       const avgIndex = samples.reduce((acc, s) => acc + s.riskIndex, 0) / samples.length;
 
       const maxGust = Math.max(...samples.map((s) => s.gust), 0);
@@ -2712,9 +2674,9 @@
         maxIndex >= 68 ||
         highHours >= 3 ||
         stormHours >= 2 ||
-        maxGust >= 55 ||      // ← umbral cierre DIRECTEMAR
-        maxWind >= 45 ||      // ← cierre viento sostenido
-        maxWave >= 2.5;       // ← cierre oleaje
+        maxGust >= 40 ||      // ← umbral cierre Puerto Chonchi
+        maxWind >= 30 ||      // ← cierre viento sostenido
+        maxWave >= 1.5;       // ← cierre oleaje canal protegido
 
       /* --- closeProbability con pisos por umbrales DIRECTEMAR directos --- */
       let closeProbability =
@@ -2724,17 +2686,17 @@
         mediumHours * 2.2;
 
       // Pisos impuestos por umbrales físicos (rachas, viento, oleaje)
-      if (maxGust >= 70) closeProbability = Math.max(closeProbability, 90);
-      else if (maxGust >= 60) closeProbability = Math.max(closeProbability, 78);
-      else if (maxGust >= 55) closeProbability = Math.max(closeProbability, 65);
-      else if (maxGust >= 50) closeProbability = Math.max(closeProbability, 45);
-      else if (maxGust >= 45) closeProbability = Math.max(closeProbability, 30);
+      // Pisos por umbrales de cierre Puerto Chonchi (canal protegido)
+      if (maxGust >= 50) closeProbability = Math.max(closeProbability, 92);
+      else if (maxGust >= 40) closeProbability = Math.max(closeProbability, 78);
+      else if (maxGust >= 35) closeProbability = Math.max(closeProbability, 58);
+      else if (maxGust >= 30) closeProbability = Math.max(closeProbability, 40);
 
-      if (maxWind >= 45) closeProbability = Math.max(closeProbability, 68);
-      else if (maxWind >= 40) closeProbability = Math.max(closeProbability, 42);
+      if (maxWind >= 30) closeProbability = Math.max(closeProbability, 72);
+      else if (maxWind >= 25) closeProbability = Math.max(closeProbability, 45);
 
-      if (maxWave >= 3.5) closeProbability = Math.max(closeProbability, 85);
-      else if (maxWave >= 2.5) closeProbability = Math.max(closeProbability, 55);
+      if (maxWave >= 2.0) closeProbability = Math.max(closeProbability, 85);
+      else if (maxWave >= 1.5) closeProbability = Math.max(closeProbability, 60);
 
       if (portNow?.status === 'CERRADO') closeProbability = Math.max(closeProbability, 85);
       closeProbability = Math.max(3, Math.min(97, Math.round(closeProbability)));
@@ -2745,15 +2707,15 @@
         maxIndex * 0.18 +
         mediumHours * 3.5 +
         highHours * 2.4 +
-        (maxWind >= 35 ? 12 : 0) +
-        (maxWave >= 1.8 ? 12 : 0) +
-        (maxGust >= 45 ? 15 : 0) +
+        (maxWind >= 22 ? 12 : 0) +
+        (maxWave >= 1.0 ? 12 : 0) +
+        (maxGust >= 30 ? 15 : 0) +
         (minVisibility <= 5000 ? 6 : 0);
 
-      // Pisos restricción por umbrales DIRECTEMAR
-      if (maxGust >= 45) restrictProbability = Math.max(restrictProbability, 65);
-      if (maxWind >= 35) restrictProbability = Math.max(restrictProbability, 60);
-      if (maxWave >= 1.8) restrictProbability = Math.max(restrictProbability, 55);
+      // Pisos restricción — umbrales Puerto Chonchi (canal protegido)
+      if (maxGust >= 30) restrictProbability = Math.max(restrictProbability, 65);
+      if (maxWind >= 22) restrictProbability = Math.max(restrictProbability, 60);
+      if (maxWave >= 1.0) restrictProbability = Math.max(restrictProbability, 55);
 
       if (portNow?.status === 'RESTRINGIDO') restrictProbability = Math.max(restrictProbability, 75);
       if (portNow?.status === 'CERRADO') restrictProbability = Math.max(restrictProbability, 92);
@@ -2768,10 +2730,10 @@
       uncertainty = Math.max(6, Math.min(18, uncertainty));
 
       const drivers = [];
-      if (maxGust >= 55) drivers.push(`Rachas máx ${num(maxGust, 0)} km/h`);
-      if (maxWind >= 40) drivers.push(`Viento máx ${num(maxWind, 0)} km/h`);
-      if (maxWave >= 2.5) drivers.push(`Oleaje máx ${num(maxWave, 1)} m`);
-      if (maxRain >= 8) drivers.push(`Lluvia horaria máx ${num(maxRain, 1)} mm/h`);
+      if (maxGust >= 30) drivers.push(`Rachas máx ${num(maxGust, 0)} km/h`);
+      if (maxWind >= 22) drivers.push(`Viento máx ${num(maxWind, 0)} km/h`);
+      if (maxWave >= 1.0) drivers.push(`Oleaje máx ${num(maxWave, 1)} m`);
+      if (maxRain >= 6) drivers.push(`Lluvia horaria máx ${num(maxRain, 1)} mm/h`);
       if (minPressure <= 1000) drivers.push(`Presión mínima ${num(minPressure, 0)} hPa`);
       if (minVisibility <= 4000) drivers.push(`Visibilidad mínima ${num(minVisibility / 1000, 1)} km`);
       if (stormHours > 0) drivers.push(`Tormenta prevista (${stormHours} h)`);
@@ -4090,12 +4052,12 @@
               enabled: true,
               axisId: 'yRisk',
               bands: [
-                { from: 0, to: 40, color: 'rgba(76,215,160,0.06)' },
-                { from: 40, to: 65, color: 'rgba(244,201,93,0.07)' },
+                { from: 0, to: 35, color: 'rgba(76,215,160,0.06)' },
+                { from: 35, to: 65, color: 'rgba(244,201,93,0.07)' },
                 { from: 65, to: 100, color: 'rgba(255,107,107,0.08)' },
               ],
               markers: [
-                { value: 40, color: '#f4c95d', label: '⚠ Restricción 40' },
+                { value: 35, color: '#f4c95d', label: '⚠ Atención 35' },
                 { value: 65, color: '#ff6b6b', label: '⛔ Cierre 65' },
               ]
             },

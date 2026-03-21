@@ -873,54 +873,62 @@ exports.purgeSensorReadingsManual = onCall(
 const CHONCHI_LAT = -42.62
 const CHONCHI_LON = -73.77
 
-function _normalizeRange(value, min, max) {
-  if (max === min) return 0
-  return Math.max(0, Math.min(1, (value - min) / (max - min)))
+// Helper: % del umbral de cierre (0 = calma, 100 = umbral alcanzado)
+function _pct(value, closureThreshold) {
+  return Math.max(0, Math.min(100, (value / closureThreshold) * 100))
 }
 
+/* ── Índice de riesgo — modelo "% del cierre" ──
+   Cada parámetro se mide como porcentaje de su umbral histórico de
+   cierre para Puerto Chonchi (canal protegido, Chiloé · Caleta menor).
+   100/100 = TODAS las condiciones en nivel de cierre de puerto.
+
+   Umbrales de cierre DIRECTEMAR (referencia histórica Chonchi):
+   Rachas:      40 km/h  (~22 kt, Beaufort 5-6 en canal)
+   Viento:      30 km/h  (~16 kt sostenido)
+   Oleaje:       1.5 m   (significativo para canal protegido)
+   Lluvia:       8 mm/h  (precipitación intensa)
+   Presión:     15 hPa   (caída desde 1013 → 998 hPa)
+   Visibilidad:  9 km    (pérdida desde 10 km → 1 km)
+   Período ola:  7 s     (pérdida desde 10 s → 3 s, oleaje picado) */
 function _calcRiskIndex(sample) {
   const isStorm       = [95, 96, 99].includes(sample.code)
   const isFog         = [45, 48].includes(sample.code)
-  // WMO: 63=lluvia moderada, 65=lluvia fuerte, 67=freezing rain fuerte,
-  //      75=nevada fuerte, 82=chubascos violentos, 86=chubascos nieve fuertes
   const isHeavyPrecip = [65, 67, 75, 82, 86].includes(sample.code)
   const isModPrecip   = [63, 66, 73, 81, 85].includes(sample.code)
 
-  // Rangos calibrados para Puerto Chonchi (canal protegido, Chiloé).
-  // DIRECTEMAR cierra con rachas ~25 km/h y olas <1m en canales.
+  // Cada componente: % del umbral de cierre (0 = calma, 100 = cierre)
   const c = {
-    gust:       _normalizeRange(sample.gust,            10,   25)  * 100,
-    wind:       _normalizeRange(sample.wind,             6,   18)  * 100,
-    wave:       _normalizeRange(sample.wave,            0.2,  1.2) * 100,
-    rain:       _normalizeRange(sample.rain,            0.3,   4)  * 100,
-    pressure:   _normalizeRange(1013 - sample.pressure, 1,    12)  * 100,
-    visibility: _normalizeRange(8000 - sample.visibility, 0, 7500) * 100,
-    cloud:      _normalizeRange(sample.cloud,           70,  100)  * 100,
-    humidity:   _normalizeRange(sample.humidity,        80,  100)  * 100,
-    wavePeriod: _normalizeRange(8 - sample.wavePeriod,  0.5,   5)  * 100,
+    gust:       _pct(sample.gust, 40),
+    wind:       _pct(sample.wind, 30),
+    wave:       _pct(sample.wave, 1.5),
+    rain:       _pct(sample.rain, 8),
+    pressure:   _pct(Math.max(0, 1013 - sample.pressure), 15),
+    visibility: _pct(Math.max(0, 10000 - sample.visibility), 9000),
+    wavePeriod: _pct(Math.max(0, 10 - sample.wavePeriod), 7),
     storm:      isStorm ? 100 : 0,
-    fog:        isFog   ?  80 : 0,
+    fog:        isFog   ? 100 : 0,
     precip:     isHeavyPrecip ? 100 : (isModPrecip ? 60 : 0),
   }
+
+  // Pesos: importancia relativa en decisión DIRECTEMAR de cierre. Suma = 1.0
   return Math.max(0, Math.min(100,
-    c.gust       * 0.20 +
-    c.wind       * 0.14 +
-    c.wave       * 0.12 +
-    c.rain       * 0.08 +
-    c.pressure   * 0.08 +
-    c.visibility * 0.07 +
-    c.cloud      * 0.02 +
-    c.humidity   * 0.02 +
-    c.wavePeriod * 0.04 +
-    c.storm      * 0.08 +
-    c.fog        * 0.03 +
-    c.precip     * 0.12
+    c.gust       * 0.22 +   // Rachas: factor más determinante
+    c.wind       * 0.14 +   // Viento sostenido
+    c.wave       * 0.16 +   // Oleaje
+    c.rain       * 0.06 +   // Precipitación medida
+    c.pressure   * 0.08 +   // Presión atmosférica
+    c.visibility * 0.10 +   // Visibilidad
+    c.wavePeriod * 0.04 +   // Período de ola
+    c.storm      * 0.08 +   // Evento de tormenta
+    c.fog        * 0.06 +   // Niebla
+    c.precip     * 0.06     // Precipitación WMO
   ))
 }
 
 function _riskLevel(ri) {
-  if (ri >= 45) return 'ALTO'
-  if (ri >= 20) return 'MEDIO'
+  if (ri >= 65) return 'ALTO'
+  if (ri >= 35) return 'MEDIO'
   return 'BAJO'
 }
 
