@@ -963,6 +963,87 @@ function _riskLevel(ri) {
   return 'BAJO'
 }
 
+/**
+ * Calcula la tendencia de riesgo para las próximas 12h.
+ * Retorna string listo para incluir en notificación push.
+ */
+function _calcTrendLine(weather, marine, nowIdx) {
+  const times = weather.hourly?.time ?? []
+  const marineMap = {}
+  ;(marine.hourly?.time ?? []).forEach((t, i) => {
+    marineMap[t] = {
+      wave:       marine.hourly.wave_height?.[i]  ?? 0,
+      wavePeriod: marine.hourly.wave_period?.[i]  ?? 8,
+    }
+  })
+
+  // Calcular riesgo hora a hora (0h = ahora, hasta +12h)
+  const risks = []
+  for (let h = 0; h <= 12; h++) {
+    const idx = nowIdx + h
+    if (idx >= times.length) break
+    const t = times[idx]
+    const s = {
+      gust:       weather.hourly.wind_gusts_10m?.[idx]       ?? 0,
+      wind:       weather.hourly.wind_speed_10m?.[idx]       ?? 0,
+      rain:       weather.hourly.precipitation?.[idx]        ?? 0,
+      code:       weather.hourly.weather_code?.[idx]         ?? 0,
+      pressure:   weather.hourly.pressure_msl?.[idx]         ?? 1015,
+      cloud:      weather.hourly.cloud_cover?.[idx]          ?? 0,
+      humidity:   weather.hourly.relative_humidity_2m?.[idx] ?? 0,
+      visibility: weather.hourly.visibility?.[idx]           ?? 10000,
+      wave:       marineMap[t]?.wave       ?? 0,
+      wavePeriod: marineMap[t]?.wavePeriod ?? 8,
+    }
+    risks.push({ h, ri: _calcRiskIndex(s) })
+  }
+  if (risks.length < 3) return null
+
+  const now    = risks[0].ri
+  const nowLvl = _riskLevel(now)
+
+  // Dirección: promedio últimas 4h vs ahora
+  const tail = risks.slice(-4)
+  const avg  = tail.reduce((s, r) => s + r.ri, 0) / tail.length
+  const delta = avg - now
+
+  // Buscar primera hora donde el nivel cambia (cruce de umbral)
+  let crossHour = null
+  let crossDir  = null  // 'mejora' | 'empeora'
+  for (const r of risks) {
+    if (r.h === 0) continue
+    const lvl = _riskLevel(r.ri)
+    if (nowLvl === 'ALTO' && lvl !== 'ALTO')  { crossHour = r.h; crossDir = 'mejora';   break }
+    if (nowLvl === 'MEDIO' && lvl === 'BAJO')  { crossHour = r.h; crossDir = 'mejora';   break }
+    if (nowLvl === 'MEDIO' && lvl === 'ALTO')  { crossHour = r.h; crossDir = 'empeora';  break }
+    if (nowLvl === 'BAJO'  && lvl !== 'BAJO')  { crossHour = r.h; crossDir = 'empeora';  break }
+  }
+
+  // Pico máximo en ventana
+  const peak = risks.reduce((mx, r) => r.ri > mx.ri ? r : mx, risks[0])
+
+  // Armar texto
+  let arrow, label
+  if (delta < -8) {
+    arrow = '📉'; label = 'Mejorando'
+  } else if (delta > 8) {
+    arrow = '📈'; label = 'Empeorando'
+  } else {
+    arrow = '➡️'; label = 'Estable'
+  }
+
+  let detail = ''
+  if (crossDir === 'mejora' && crossHour) {
+    detail = ` · Apertura probable ~${crossHour}h`
+  } else if (crossDir === 'empeora' && crossHour) {
+    detail = ` · Cierre probable ~${crossHour}h`
+  } else if (peak.h > 0 && peak.ri > now + 10) {
+    detail = ` · Pico ${Math.round(peak.ri)}/100 en ~${peak.h}h`
+  }
+
+  return `${arrow} ${label}${detail}`
+}
+
 async function _getAllFcmTokens() {
   const snap = await db.collection('fcmTokens').get()
   // Deduplicar: un token por usuario+plataforma (evita notificaciones duplicadas)
@@ -1094,6 +1175,9 @@ exports.checkClimaPortoAlert = onSchedule(
     const currentLevel  = _riskLevel(currentRi)
     const forecastLevel = _riskLevel(maxRiNext6h)
 
+    // Tendencia próximas 12h
+    const trendLine = _calcTrendLine(weather, marine, nowIdx)
+
     // 3. Estado DIRECTEMAR
     const dm    = await _fetchDmStatus()
     const dmKey = _dmKey(dm)
@@ -1113,23 +1197,25 @@ exports.checkClimaPortoAlert = onSchedule(
     // 5. Armar notificaciones según cambios detectados
     const notifications = []
 
+    const trendSuffix = trendLine ? `\n${trendLine}` : ''
+
     if (forecastLevel !== prevLevel) {
       if (forecastLevel === 'ALTO') {
         notifications.push({
           title: '⛔ Puerto Chonchi: Cierre probable',
-          body:  `Índice de riesgo ${Math.round(maxRiNext6h)}/100 en las próximas 6h. Condiciones severas previstas en Bahía de Yal.`,
+          body:  `Riesgo ${Math.round(maxRiNext6h)}/100 próx. 6h. Condiciones severas en Bahía de Yal.${trendSuffix}`,
           data:  { type: 'clima_cierre', ri: String(Math.round(maxRiNext6h)), url: '/clima-puerto' },
         })
       } else if (forecastLevel === 'MEDIO') {
         notifications.push({
           title: '⚠️ Puerto Chonchi: Posible restricción',
-          body:  `Índice de riesgo ${Math.round(maxRiNext6h)}/100. Verificar condiciones antes de zarpar en Bahía de Yal.`,
+          body:  `Riesgo ${Math.round(maxRiNext6h)}/100. Verificar condiciones en Bahía de Yal.${trendSuffix}`,
           data:  { type: 'clima_restriccion', ri: String(Math.round(maxRiNext6h)), url: '/clima-puerto' },
         })
       } else {
         notifications.push({
           title: '🟢 Puerto Chonchi: Condiciones mejoran',
-          body:  `Riesgo actual ${Math.round(currentRi)}/100. Bahía de Yal con condiciones favorables.`,
+          body:  `Riesgo ${Math.round(currentRi)}/100. Bahía de Yal con condiciones favorables.${trendSuffix}`,
           data:  { type: 'clima_abierto', ri: String(Math.round(currentRi)), url: '/clima-puerto' },
         })
       }
@@ -1285,12 +1371,14 @@ exports.scheduleClimaPortoTestNotification = onCall(
     const dmMeteo = dm?.meteo ?? null
     const dmWind = dmMeteo ? `${Math.round(dmMeteo.velocidadViento * 1.852)} km/h ${dmMeteo.textoDireccionViento || ''}`.trim() : null
     const dmTemp = dmMeteo ? `${dmMeteo.temperatura}°C` : null
-    const numR = dm?.numRestricciones ?? 0
+
+    // Tendencia próximas 12h
+    const trendLine = _calcTrendLine(weather, marine, nowIdx)
 
     const title = `🧪 Test · Puerto Chonchi · ${dmLabels[dmK] || dmK}`
     const lines = [
       `${lvlEmoji[lvl] || ''} Riesgo ${Math.round(ri)}/100 (${lvl})`,
-      numR > 0 ? `📋 ${numR} restricciones activas` : null,
+      trendLine,
       `🌬 Rachas ${Math.round(sample.gust)} km/h · Viento ${Math.round(sample.wind)} km/h`,
       sample.rain > 0 ? `🌧 Lluvia ${sample.rain.toFixed(1)} mm` : null,
       `🌊 Olas ${sample.wave.toFixed(1)}m · Presión ${Math.round(sample.pressure)} hPa`,
