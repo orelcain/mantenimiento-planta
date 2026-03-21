@@ -924,11 +924,17 @@ async function _getAllFcmTokens() {
   return Array.from(new Set([...best.values()].map(v => v.token)))
 }
 
-async function _fetchJson(url, timeoutMs = 15000) {
+async function _fetchJson(url, timeoutMs = 20000) {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
   try {
-    const res = await fetch(url, { signal: controller.signal })
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; MantenimientoApp/1.0)',
+        'Accept': 'application/json',
+      },
+    })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     return await res.json()
   } finally {
@@ -1227,8 +1233,9 @@ exports.scheduleClimaPortoTestNotification = onCall(
     const lvl = _riskLevel(ri)
 
     let dmK = 'UNKNOWN'
+    let dm = null
     try {
-      const dm = await _fetchDmStatus()
+      dm = await _fetchDmStatus()
       dmK = _dmKey(dm)
     } catch (e) {
       logger.warn('scheduleClimaPortoTestNotification: error obteniendo DM, usando UNKNOWN', e)
