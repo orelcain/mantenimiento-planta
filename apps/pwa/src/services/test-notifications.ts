@@ -16,10 +16,8 @@ export async function scheduleClimaPortoTestNotification(delaySeconds: number): 
   reason?: string
   message?: string
 }> {
-  // Pasar el token FCM desde localStorage directamente, para no depender de query Firestore
-  const fcmToken = localStorage.getItem('fcm_token') ?? undefined
   const fn = httpsCallable(functions, 'scheduleClimaPortoTestNotification')
-  const result = await fn({ delaySeconds, fcmToken })
+  const result = await fn({ delaySeconds })
   return result.data as any
 }
 

@@ -861,39 +861,48 @@ function _normalizeRange(value, min, max) {
 }
 
 function _calcRiskIndex(sample) {
-  const isStorm = [95, 96, 99].includes(sample.code)
-  const isFog   = [45, 48].includes(sample.code)
+  const isStorm       = [95, 96, 99].includes(sample.code)
+  const isFog         = [45, 48].includes(sample.code)
+  // WMO: 63=lluvia moderada, 65=lluvia fuerte, 67=freezing rain fuerte,
+  //      75=nevada fuerte, 82=chubascos violentos, 86=chubascos nieve fuertes
+  const isHeavyPrecip = [65, 67, 75, 82, 86].includes(sample.code)
+  const isModPrecip   = [63, 66, 73, 81, 85].includes(sample.code)
+
+  // Rangos calibrados para Puerto Chonchi (canal protegido, Chiloé).
+  // DIRECTEMAR cierra con rachas ~25 km/h y olas <1m en canales.
   const c = {
-    gust:       _normalizeRange(sample.gust,            30,   60)  * 100,
-    wind:       _normalizeRange(sample.wind,            20,   45)  * 100,
-    wave:       _normalizeRange(sample.wave,            1.0,  3.0) * 100,
-    rain:       _normalizeRange(sample.rain,            1,    10)  * 100,
-    pressure:   _normalizeRange(1015 - sample.pressure, 3,    25)  * 100,
-    visibility: _normalizeRange(5000 - sample.visibility, 500, 4500) * 100,
-    cloud:      _normalizeRange(sample.cloud,           65,  100)  * 100,
-    humidity:   _normalizeRange(sample.humidity,        78,  100)  * 100,
-    wavePeriod: _normalizeRange(8 - sample.wavePeriod,  0.5,   6)  * 100,
+    gust:       _normalizeRange(sample.gust,            10,   25)  * 100,
+    wind:       _normalizeRange(sample.wind,             6,   18)  * 100,
+    wave:       _normalizeRange(sample.wave,            0.2,  1.2) * 100,
+    rain:       _normalizeRange(sample.rain,            0.3,   4)  * 100,
+    pressure:   _normalizeRange(1013 - sample.pressure, 1,    12)  * 100,
+    visibility: _normalizeRange(8000 - sample.visibility, 0, 7500) * 100,
+    cloud:      _normalizeRange(sample.cloud,           70,  100)  * 100,
+    humidity:   _normalizeRange(sample.humidity,        80,  100)  * 100,
+    wavePeriod: _normalizeRange(8 - sample.wavePeriod,  0.5,   5)  * 100,
     storm:      isStorm ? 100 : 0,
-    fog:        isFog   ?  90 : 0,
+    fog:        isFog   ?  80 : 0,
+    precip:     isHeavyPrecip ? 100 : (isModPrecip ? 60 : 0),
   }
   return Math.max(0, Math.min(100,
-    c.gust       * 0.26 +
-    c.wind       * 0.16 +
-    c.wave       * 0.20 +
-    c.rain       * 0.06 +
-    c.pressure   * 0.05 +
+    c.gust       * 0.20 +
+    c.wind       * 0.14 +
+    c.wave       * 0.12 +
+    c.rain       * 0.08 +
+    c.pressure   * 0.08 +
     c.visibility * 0.07 +
-    c.cloud      * 0.04 +
-    c.humidity   * 0.03 +
-    c.wavePeriod * 0.05 +
-    c.storm      * 0.06 +
-    c.fog        * 0.02
+    c.cloud      * 0.02 +
+    c.humidity   * 0.02 +
+    c.wavePeriod * 0.04 +
+    c.storm      * 0.08 +
+    c.fog        * 0.03 +
+    c.precip     * 0.12
   ))
 }
 
 function _riskLevel(ri) {
-  if (ri >= 65) return 'ALTO'
-  if (ri >= 40) return 'MEDIO'
+  if (ri >= 45) return 'ALTO'
+  if (ri >= 20) return 'MEDIO'
   return 'BAJO'
 }
 
@@ -1145,33 +1154,20 @@ exports.scheduleClimaPortoTestNotification = onCall(
     }
 
     const delaySeconds = Math.min(300, Math.max(10, Number(request.data?.delaySeconds) || 30))
-    const clientToken  = typeof request.data?.fcmToken === 'string' && request.data.fcmToken.length > 10
-      ? request.data.fcmToken
-      : null
 
-    logger.info('scheduleClimaPortoTestNotification: inicio', { userId, delaySeconds, hasClientToken: !!clientToken })
+    logger.info('scheduleClimaPortoTestNotification: inicio', { userId, delaySeconds })
 
-    // Tokens FCM del propio admin.
-    // Si el cliente pasó su token directamente lo usamos de inmediato (más confiable).
-    // Como fallback consultamos Firestore.
+    // Enviar a TODOS los usuarios (el test simula una alerta real)
     let tokens = []
-    if (clientToken) {
-      tokens = [clientToken]
-    } else {
-      try {
-        const tokensSnap = await db.collection('fcmTokens').where('userId', '==', userId).get()
-        tokensSnap.forEach(doc => {
-          const t = doc.data()?.token
-          if (t && typeof t === 'string') tokens.push(t)
-        })
-      } catch (e) {
-        logger.error('scheduleClimaPortoTestNotification: error leyendo tokens FCM', e)
-        return { success: false, reason: 'token_error', message: 'Error al obtener tokens de notificación. Intenta recargar la app.' }
-      }
+    try {
+      tokens = await _getAllFcmTokens()
+    } catch (e) {
+      logger.error('scheduleClimaPortoTestNotification: error leyendo tokens FCM', e)
+      return { success: false, reason: 'token_error', message: 'Error al obtener tokens de notificación.' }
     }
 
     if (tokens.length === 0) {
-      return { success: false, reason: 'no_tokens', message: 'No tienes notificaciones activadas en este dispositivo. Activa los permisos de notificación primero.' }
+      return { success: false, reason: 'no_tokens', message: 'No hay usuarios con notificaciones activadas.' }
     }
 
     // Esperar el delay (la función sigue corriendo en el servidor aunque el cliente cierre la app)

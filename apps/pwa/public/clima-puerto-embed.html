@@ -2211,43 +2211,44 @@
     }
 
     function riskComponentScores(sample) {
-      const isStorm = [95, 96, 99].includes(sample.code);
-      const isFog = [45, 48].includes(sample.code);
+      const isStorm       = [95, 96, 99].includes(sample.code);
+      const isFog         = [45, 48].includes(sample.code);
+      const isHeavyPrecip = [65, 67, 75, 82, 86].includes(sample.code);
+      const isModPrecip   = [63, 66, 73, 81, 85].includes(sample.code);
 
-      /* Rangos de normalización ajustados a umbrales DIRECTEMAR:
-         - Racha: 30-60 (antes 35-75). Así 45 km/h = 50 %, 55 km/h = 83 %.
-         - Viento: 20-45 (antes 25-50). Así 35 km/h = 60 %, 45 km/h = 100 %.
-         - Oleaje: 1.0-3.0 (antes 1.2-3.5). Así 1.8 = 40 %, 2.5 = 75 %.  */
+      /* Rangos calibrados para Puerto Chonchi (canal protegido, Chiloé).
+         DIRECTEMAR cierra con rachas ~25 km/h y olas <1m en canales. */
       return {
-        gust: normalizeRange(sample.gust, 30, 60) * 100,
-        wind: normalizeRange(sample.wind, 20, 45) * 100,
-        wave: normalizeRange(sample.wave, 1.0, 3.0) * 100,
-        rain: normalizeRange(sample.rain, 1, 10) * 100,
-        pressure: normalizeRange(1015 - sample.pressure, 3, 25) * 100,
-        visibility: normalizeRange(5000 - sample.visibility, 500, 4500) * 100,
-        cloud: normalizeRange(sample.cloud, 65, 100) * 100,
-        humidity: normalizeRange(sample.humidity, 78, 100) * 100,
-        wavePeriod: normalizeRange(8 - sample.wavePeriod, 0.5, 6) * 100,
+        gust: normalizeRange(sample.gust, 10, 25) * 100,
+        wind: normalizeRange(sample.wind, 6, 18) * 100,
+        wave: normalizeRange(sample.wave, 0.2, 1.2) * 100,
+        rain: normalizeRange(sample.rain, 0.3, 4) * 100,
+        pressure: normalizeRange(1013 - sample.pressure, 1, 12) * 100,
+        visibility: normalizeRange(8000 - sample.visibility, 0, 7500) * 100,
+        cloud: normalizeRange(sample.cloud, 70, 100) * 100,
+        humidity: normalizeRange(sample.humidity, 80, 100) * 100,
+        wavePeriod: normalizeRange(8 - sample.wavePeriod, 0.5, 5) * 100,
         storm: isStorm ? 100 : 0,
-        fog: isFog ? 90 : 0,
+        fog: isFog ? 80 : 0,
+        precip: isHeavyPrecip ? 100 : (isModPrecip ? 60 : 0),
       };
     }
 
     function aggregateRiskIndex(components) {
-      /* Pesos recalibrados: rachas y oleaje pesan más porque son los
-         gatillos principales de cierre DIRECTEMAR.  Suma pesos = 1.0 */
+      /* Pesos calibrados para canal protegido Chiloé.  Suma = 1.0 */
       const weighted =
-        components.gust * 0.26 +
-        components.wind * 0.16 +
-        components.wave * 0.20 +
-        components.rain * 0.06 +
-        components.pressure * 0.05 +
+        components.gust       * 0.20 +
+        components.wind       * 0.14 +
+        components.wave       * 0.12 +
+        components.rain       * 0.08 +
+        components.pressure   * 0.08 +
         components.visibility * 0.07 +
-        components.cloud * 0.04 +
-        components.humidity * 0.03 +
-        components.wavePeriod * 0.05 +
-        components.storm * 0.06 +
-        components.fog * 0.02;
+        components.cloud      * 0.02 +
+        components.humidity   * 0.02 +
+        components.wavePeriod * 0.04 +
+        components.storm      * 0.08 +
+        components.fog        * 0.03 +
+        (components.precip ?? 0) * 0.12;
       return Math.max(0, Math.min(100, weighted));
     }
 
@@ -2494,8 +2495,8 @@
                 afterLabel(context) {
                   if ((context.dataset.label ?? '').includes('Índice cierre')) {
                     const value = context.parsed.y;
-                    if (value >= 65) return 'Estado horario: cierre probable';
-                    if (value >= 45) return 'Estado horario: atención';
+                    if (value >= 45) return 'Estado horario: cierre probable';
+                    if (value >= 20) return 'Estado horario: atención';
                     return 'Estado horario: operativo';
                   }
                   return '';
@@ -2693,8 +2694,8 @@
       }
 
       const maxIndex = Math.max(...samples.map((s) => s.riskIndex), 0);
-      const highHours = samples.filter((s) => s.riskIndex >= 65).length;
-      const mediumHours = samples.filter((s) => s.riskIndex >= 45 && s.riskIndex < 65).length;
+      const highHours = samples.filter((s) => s.riskIndex >= 45).length;
+      const mediumHours = samples.filter((s) => s.riskIndex >= 20 && s.riskIndex < 45).length;
       const avgIndex = samples.reduce((acc, s) => acc + s.riskIndex, 0) / samples.length;
 
       const maxGust = Math.max(...samples.map((s) => s.gust), 0);
@@ -2777,7 +2778,7 @@
       if (fogHours >= 2) drivers.push(`Niebla prevista (${fogHours} h)`);
       if (drivers.length === 0) drivers.push('Sin señales críticas en 24h');
 
-      const topRisk = maxIndex >= 65 ? 'ALTO' : maxIndex >= 45 ? 'MEDIO' : 'BAJO';
+      const topRisk = maxIndex >= 45 ? 'ALTO' : maxIndex >= 20 ? 'MEDIO' : 'BAJO';
       const summary = closeLikely
         ? `Cierre probable en próximas 24h (riesgo ${topRisk.toLowerCase()}, índice máx ${num(maxIndex, 0)}).`
         : restrictLikely
