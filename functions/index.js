@@ -1125,14 +1125,10 @@ exports.checkClimaPortoAlert = onSchedule(
 // Envía una notificación push de prueba con datos reales del clima, después de un delay.
 // Solo para admins. El delay le da tiempo al usuario de cerrar la app.
 exports.scheduleClimaPortoTestNotification = onCall(
-  { region: 'us-central1', timeoutSeconds: 320 },
+  { region: 'us-central1', timeoutSeconds: 340 },
   async (request) => {
     const userId = request.auth?.uid
-    if (!userId) {
-      const err = new Error('Debes iniciar sesión')
-      err.code = 'unauthenticated'
-      throw err
-    }
+    if (!userId) throw new HttpsError('unauthenticated', 'Debes iniciar sesión')
 
     let user
     try {
@@ -1140,29 +1136,37 @@ exports.scheduleClimaPortoTestNotification = onCall(
       user = userSnap.data()
     } catch (e) {
       logger.error('scheduleClimaPortoTestNotification: error leyendo usuario', e)
-      throw new Error('Error al verificar usuario')
+      throw new HttpsError('internal', 'Error al verificar usuario')
     }
 
     if (!user || user.rol !== 'admin') {
-      const err = new Error('Solo los administradores pueden usar esta función')
-      err.code = 'permission-denied'
-      throw err
+      throw new HttpsError('permission-denied', 'Solo los administradores pueden usar esta función')
     }
 
     const delaySeconds = Math.min(300, Math.max(10, Number(request.data?.delaySeconds) || 30))
-    logger.info('scheduleClimaPortoTestNotification: inicio', { userId, delaySeconds })
+    const clientToken  = typeof request.data?.fcmToken === 'string' && request.data.fcmToken.length > 10
+      ? request.data.fcmToken
+      : null
 
-    // Tokens FCM del propio admin (solo sus dispositivos)
+    logger.info('scheduleClimaPortoTestNotification: inicio', { userId, delaySeconds, hasClientToken: !!clientToken })
+
+    // Tokens FCM del propio admin.
+    // Si el cliente pasó su token directamente lo usamos de inmediato (más confiable).
+    // Como fallback consultamos Firestore.
     let tokens = []
-    try {
-      const tokensSnap = await db.collection('fcmTokens').where('userId', '==', userId).get()
-      tokensSnap.forEach(doc => {
-        const t = doc.data()?.token
-        if (t && typeof t === 'string') tokens.push(t)
-      })
-    } catch (e) {
-      logger.error('scheduleClimaPortoTestNotification: error leyendo tokens FCM', e)
-      throw new Error('Error al obtener tokens de notificación')
+    if (clientToken) {
+      tokens = [clientToken]
+    } else {
+      try {
+        const tokensSnap = await db.collection('fcmTokens').where('userId', '==', userId).get()
+        tokensSnap.forEach(doc => {
+          const t = doc.data()?.token
+          if (t && typeof t === 'string') tokens.push(t)
+        })
+      } catch (e) {
+        logger.error('scheduleClimaPortoTestNotification: error leyendo tokens FCM', e)
+        return { success: false, reason: 'token_error', message: 'Error al obtener tokens de notificación. Intenta recargar la app.' }
+      }
     }
 
     if (tokens.length === 0) {
