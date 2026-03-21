@@ -1,6 +1,4 @@
-import { useMemo, useEffect } from 'react'
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore'
-import { db } from '@/services/firebase'
+import { useMemo } from 'react'
 
 /**
  * Módulo Clima Puerto — Dashboard meteorológico del Puerto de Chonchi.
@@ -17,22 +15,6 @@ export function ClimaPortPage() {
   const iframeSrc = useMemo(() => {
     const basePath = import.meta.env.BASE_URL || '/'
     return `${basePath}clima-puerto-embed.html`
-  }, [])
-
-  // Escuchar datos DIRECTEMAR del embed y cachear en Firestore
-  // para que Cloud Functions pueda leer el estado del puerto
-  useEffect(() => {
-    function handleMessage(event: MessageEvent) {
-      if (event.data?.type !== 'DM_STATUS_UPDATE') return
-      const payload = event.data.payload
-      if (!payload?.found) return
-      setDoc(doc(db, 'cache', 'dmStatus'), {
-        ...payload,
-        updatedAt: serverTimestamp(),
-      }, { merge: true }).catch(() => {})
-    }
-    window.addEventListener('message', handleMessage)
-    return () => window.removeEventListener('message', handleMessage)
   }, [])
 
   return (

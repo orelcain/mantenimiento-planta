@@ -4,7 +4,7 @@ const { onCall, onRequest, HttpsError } = require('firebase-functions/v2/https')
 const { onSchedule } = require('firebase-functions/v2/scheduler')
 const { logger } = require('firebase-functions')
 const { initializeApp } = require('firebase-admin/app')
-const { getFirestore } = require('firebase-admin/firestore')
+const { getFirestore, FieldValue } = require('firebase-admin/firestore')
 const { getDatabase } = require('firebase-admin/database')
 const { getMessaging } = require('firebase-admin/messaging')
 
@@ -868,6 +868,37 @@ exports.purgeSensorReadingsManual = onCall(
  *
  * Cache: 2 min CDN / 1 min browser.
  */
+// ==================== CACHE DM STATUS (desde navegador) ====================
+/**
+ * El navegador del usuario puede acceder a SITPORT pero GCP no.
+ * El embed llama esta función HTTP con los datos DM para cachearlos
+ * en Firestore, y así checkClimaPortoAlert los puede leer.
+ */
+exports.cacheDmStatus = onRequest(
+  { region: 'us-central1', cors: true, maxInstances: 5 },
+  async (req, res) => {
+    if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' })
+    const d = req.body
+    if (!d || typeof d.found !== 'boolean') return res.status(400).json({ error: 'invalid payload' })
+    try {
+      await db.collection('cache').doc('dmStatus').set({
+        found:            d.found,
+        restriccionBahia: d.restriccionBahia ?? false,
+        navesMenores:     d.navesMenores     ?? false,
+        navesMayores:     d.navesMayores     ?? false,
+        numRestricciones: d.numRestricciones ?? 0,
+        estado:           d.estado ?? null,
+        meteo:            d.meteo ?? null,
+        updatedAt:        FieldValue.serverTimestamp(),
+      })
+      res.json({ ok: true })
+    } catch (e) {
+      logger.error('cacheDmStatus error', e.message)
+      res.status(500).json({ error: e.message })
+    }
+  }
+)
+
 // ==================== CLIMA PUERTO — ALERTAS AUTOMÁTICAS ====================
 
 const CHONCHI_LAT = -42.62
