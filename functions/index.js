@@ -82,7 +82,8 @@ function dedupeTokens(list) {
 }
 
 /**
- * Enviar notificación a tokens específicos
+ * Enviar notificación a tokens específicos.
+ * Limpia automáticamente tokens inválidos/expirados de Firestore.
  */
 async function sendNotification(tokens, title, body, data = {}) {
   if (tokens.length === 0) {
@@ -109,6 +110,23 @@ async function sendNotification(tokens, title, body, data = {}) {
       successCount: response.successCount,
       failureCount: response.failureCount,
     })
+
+    // Limpiar tokens inválidos de Firestore
+    if (response.failureCount > 0) {
+      const invalidCodes = ['messaging/invalid-registration-token', 'messaging/registration-token-not-registered']
+      const batch = db.batch()
+      let cleaned = 0
+      response.responses.forEach((r, i) => {
+        if (r.error && invalidCodes.includes(r.error.code)) {
+          batch.delete(db.collection('fcmTokens').doc(tokens[i]))
+          cleaned++
+        }
+      })
+      if (cleaned > 0) {
+        await batch.commit()
+        logger.info('Cleaned invalid FCM tokens', { cleaned })
+      }
+    }
 
     return response
   } catch (error) {
@@ -943,49 +961,45 @@ async function _fetchJson(url, timeoutMs = 20000) {
 }
 
 async function _fetchDmStatus() {
-  const SITPORT_BASE = 'https://orion.directemar.cl/sitport/back/users'
   const nameOf = p => (p.reparticion?.nombre || p.NombreZona || p.Nombre || p.NombrePuerto || p.nombre || '').toUpperCase()
 
-  // Primero intentar endpoint de bahías individuales (devuelve Chonchi por separado)
-  try {
-    const bahias = await _fetchJson(`${SITPORT_BASE}/BahiasByCapitania/225`)
-    if (Array.isArray(bahias) && bahias.length > 0) {
-      const chonchi = bahias.find(p => {
-        const n = nameOf(p)
-        return n.includes('CHONCHI') && !n.includes('CAPITAN')
-      })
-      if (chonchi) {
-        const r = chonchi.restricciones ?? {}
-        return {
-          found:            true,
-          restriccionBahia: r.restriccionBahia ?? false,
-          navesMenores:     r.navesMenores     ?? false,
-          navesMayores:     r.navesMayores     ?? false,
-          numRestricciones: r.numeroRestricciones ?? 0,
-          meteo:            chonchi.medicionMeteo ?? null,
-        }
-      }
-    }
-  } catch (_) { /* seguir con fallback */ }
+  // SITPORT bloquea peticiones desde GCP, usar nuestro proxy desplegado
+  const PROXY_URL = 'https://us-central1-mantenimiento-planta-771a3.cloudfunctions.net/sitportProxy'
+  const SITPORT_DIRECT = 'https://orion.directemar.cl/sitport/back/users/Totalgeneral'
 
-  // Fallback: Totalgeneral (tiene la Capitanía agregada)
+  let ports = null
+
+  // Intentar primero el proxy propio (funciona desde GCP)
   try {
-    const ports = await _fetchJson(`${SITPORT_BASE}/Totalgeneral`)
-    if (!Array.isArray(ports)) return null
-    const capitania = ports.find(p => nameOf(p).includes('CHONCHI'))
-    if (!capitania) return null
-    const capR = capitania.restricciones ?? {}
-    return {
-      found:            true,
-      restriccionBahia: capR.restriccionBahia ?? false,
-      navesMenores:     capR.navesMenores     ?? false,
-      navesMayores:     capR.navesMayores     ?? false,
-      numRestricciones: capR.numeroRestricciones ?? 0,
-      meteo:            capitania.medicionMeteo ?? null,
+    const proxyResp = await _fetchJson(PROXY_URL)
+    if (proxyResp?.ok && Array.isArray(proxyResp.data)) {
+      ports = proxyResp.data
     }
-  } catch (e) {
-    logger.warn('_fetchDmStatus error', e.message)
-    return null
+  } catch (_) { /* seguir con fallback directo */ }
+
+  // Fallback: acceso directo (funciona fuera de GCP)
+  if (!ports) {
+    try {
+      const data = await _fetchJson(SITPORT_DIRECT)
+      if (Array.isArray(data)) ports = data
+    } catch (e) {
+      logger.warn('_fetchDmStatus: ambos endpoints fallaron', e.message)
+      return null
+    }
+  }
+
+  if (!ports) return null
+
+  const capitania = ports.find(p => nameOf(p).includes('CHONCHI'))
+  if (!capitania) return null
+  const r = capitania.restricciones ?? {}
+  return {
+    found:            true,
+    restriccionBahia: r.restriccionBahia ?? false,
+    navesMenores:     r.navesMenores     ?? false,
+    navesMayores:     r.navesMayores     ?? false,
+    numRestricciones: r.numeroRestricciones ?? 0,
+    meteo:            capitania.medicionMeteo ?? null,
   }
 }
 
