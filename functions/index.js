@@ -908,12 +908,20 @@ function _riskLevel(ri) {
 
 async function _getAllFcmTokens() {
   const snap = await db.collection('fcmTokens').get()
-  const tokens = []
+  // Deduplicar: un token por usuario+plataforma (evita notificaciones duplicadas)
+  const best = new Map() // key: "userId:platform" → { token, updatedAt }
   snap.forEach(doc => {
-    const t = doc.data()?.token
-    if (t && typeof t === 'string') tokens.push(t)
+    const d = doc.data()
+    const t = d?.token
+    if (!t || typeof t !== 'string') return
+    const key = `${d.userId || 'anon'}:${d.platform || 'unknown'}`
+    const prev = best.get(key)
+    const ts = d.updatedAt?.toDate?.() ?? new Date(0)
+    if (!prev || ts > prev.updatedAt) {
+      best.set(key, { token: t, updatedAt: ts })
+    }
   })
-  return Array.from(new Set(tokens))
+  return Array.from(new Set([...best.values()].map(v => v.token)))
 }
 
 async function _fetchJson(url, timeoutMs = 15000) {
@@ -930,7 +938,7 @@ async function _fetchJson(url, timeoutMs = 15000) {
 
 async function _fetchDmStatus() {
   const SITPORT_BASE = 'https://orion.directemar.cl/sitport/back/users'
-  const nameOf = p => (p.NombreZona || p.Nombre || p.NombrePuerto || p.nombre || '').toUpperCase()
+  const nameOf = p => (p.reparticion?.nombre || p.NombreZona || p.Nombre || p.NombrePuerto || p.nombre || '').toUpperCase()
 
   // Primero intentar endpoint de bahías individuales (devuelve Chonchi por separado)
   try {
@@ -947,24 +955,28 @@ async function _fetchDmStatus() {
           restriccionBahia: r.restriccionBahia ?? false,
           navesMenores:     r.navesMenores     ?? false,
           navesMayores:     r.navesMayores     ?? false,
+          numRestricciones: r.numeroRestricciones ?? 0,
+          meteo:            chonchi.medicionMeteo ?? null,
         }
       }
     }
   } catch (_) { /* seguir con fallback */ }
 
-  // Fallback: Totalgeneral (solo tiene la Capitanía agregada, no bahías individuales)
+  // Fallback: Totalgeneral (tiene la Capitanía agregada)
   try {
     const ports = await _fetchJson(`${SITPORT_BASE}/Totalgeneral`)
     if (!Array.isArray(ports)) return null
     const capitania = ports.find(p => nameOf(p).includes('CHONCHI'))
     if (!capitania) return null
     const capR = capitania.restricciones ?? {}
-    // Si la Capitanía muestra restricción pero no tenemos datos individuales,
-    // no podemos saber si afecta a Chonchi o a otro puerto (ej. Queilen)
-    if (capR.navesMenores || capR.navesMayores || capR.restriccionBahia) {
-      return { found: true, restriccionBahia: false, navesMenores: false, navesMayores: false, desconocido: true }
+    return {
+      found:            true,
+      restriccionBahia: capR.restriccionBahia ?? false,
+      navesMenores:     capR.navesMenores     ?? false,
+      navesMayores:     capR.navesMayores     ?? false,
+      numRestricciones: capR.numeroRestricciones ?? 0,
+      meteo:            capitania.medicionMeteo ?? null,
     }
-    return { found: true, restriccionBahia: false, navesMenores: false, navesMayores: false }
   } catch (e) {
     logger.warn('_fetchDmStatus error', e.message)
     return null
@@ -972,10 +984,9 @@ async function _fetchDmStatus() {
 }
 
 function _dmKey(dm) {
-  if (!dm || !dm.found)               return 'UNKNOWN'
-  if (dm.desconocido)                 return 'DESCONOCIDO'
-  if (dm.restriccionBahia)            return 'BAHIA_CERRADA'
-  if (dm.navesMenores || dm.navesMayores) return 'RESTRINGIDO'
+  if (!dm || !dm.found)                           return 'UNKNOWN'
+  if (dm.restriccionBahia)                        return 'BAHIA_CERRADA'
+  if (dm.navesMenores || dm.navesMayores)         return 'RESTRINGIDO'
   return 'ABIERTO'
 }
 
@@ -1223,11 +1234,25 @@ exports.scheduleClimaPortoTestNotification = onCall(
       logger.warn('scheduleClimaPortoTestNotification: error obteniendo DM, usando UNKNOWN', e)
     }
 
-    const dmLabels = { ABIERTO: 'Abierto', RESTRINGIDO: 'Con restricciones', BAHIA_CERRADA: 'Cerrado', DESCONOCIDO: 'Estado desconocido', UNKNOWN: 'Sin datos DM' }
+    const dmLabels = { ABIERTO: '🟢 Abierto', RESTRINGIDO: '🟡 Restringido', BAHIA_CERRADA: '🔴 Cerrado', UNKNOWN: '❓ Sin datos' }
     const lvlEmoji = { ALTO: '⛔', MEDIO: '⚠️', BAJO: '🟢' }
 
-    const title = '🧪 Test · Puerto Chonchi'
-    const body  = `${lvlEmoji[lvl] || ''} Riesgo ${Math.round(ri)}/100 (${lvl}) · DM: ${dmLabels[dmK] || dmK} · Viento ${Math.round(sample.wind)} km/h · Olas ${sample.wave.toFixed(1)}m`
+    // Datos reales del sensor DIRECTEMAR (si existen)
+    const dmMeteo = dm?.meteo ?? null
+    const dmWind = dmMeteo ? `${Math.round(dmMeteo.velocidadViento * 1.852)} km/h ${dmMeteo.textoDireccionViento || ''}`.trim() : null
+    const dmTemp = dmMeteo ? `${dmMeteo.temperatura}°C` : null
+    const numR = dm?.numRestricciones ?? 0
+
+    const title = `🧪 Test · Puerto Chonchi · ${dmLabels[dmK] || dmK}`
+    const lines = [
+      `${lvlEmoji[lvl] || ''} Riesgo ${Math.round(ri)}/100 (${lvl})`,
+      numR > 0 ? `📋 ${numR} restricciones activas` : null,
+      `🌬 Rachas ${Math.round(sample.gust)} km/h · Viento ${Math.round(sample.wind)} km/h`,
+      sample.rain > 0 ? `🌧 Lluvia ${sample.rain.toFixed(1)} mm` : null,
+      `🌊 Olas ${sample.wave.toFixed(1)}m · Presión ${Math.round(sample.pressure)} hPa`,
+      dmWind ? `📡 Sensor DM: ${dmWind} · ${dmTemp}` : null,
+    ].filter(Boolean)
+    const body = lines.join('\n')
 
     try {
       await sendNotification(tokens, title, body, { type: 'clima_test', url: '/clima-puerto' })
