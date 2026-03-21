@@ -919,18 +919,42 @@ async function _fetchJson(url, timeoutMs = 15000) {
 }
 
 async function _fetchDmStatus() {
+  const SITPORT_BASE = 'https://orion.directemar.cl/sitport/back/users'
+  const nameOf = p => (p.NombreZona || p.Nombre || p.NombrePuerto || p.nombre || '').toUpperCase()
+
+  // Primero intentar endpoint de bahías individuales (devuelve Chonchi por separado)
   try {
-    const data = await _fetchJson('https://orion.directemar.cl/sitport/back/users/Totalgeneral')
-    if (!Array.isArray(data)) return null
-    const nameOf = p => (p.NombreZona || p.Nombre || p.NombrePuerto || p.nombre || '').toUpperCase()
-    const chonchi = data.find(p => nameOf(p).includes('CHONCHI'))
-    if (!chonchi) return null
-    return {
-      found:           true,
-      restriccionBahia: Boolean(chonchi.RestriccionBahia || chonchi.restriccionBahia),
-      navesMenores:     Boolean(chonchi.NavesMenores     || chonchi.navesMenores     || chonchi.RestriccionNavesMenores),
-      navesMayores:     Boolean(chonchi.NavesMayores     || chonchi.navesMayores     || chonchi.RestriccionNavesMayores),
+    const bahias = await _fetchJson(`${SITPORT_BASE}/BahiasByCapitania/225`)
+    if (Array.isArray(bahias) && bahias.length > 0) {
+      const chonchi = bahias.find(p => {
+        const n = nameOf(p)
+        return n.includes('CHONCHI') && !n.includes('CAPITAN')
+      })
+      if (chonchi) {
+        const r = chonchi.restricciones ?? {}
+        return {
+          found:            true,
+          restriccionBahia: r.restriccionBahia ?? false,
+          navesMenores:     r.navesMenores     ?? false,
+          navesMayores:     r.navesMayores     ?? false,
+        }
+      }
     }
+  } catch (_) { /* seguir con fallback */ }
+
+  // Fallback: Totalgeneral (solo tiene la Capitanía agregada, no bahías individuales)
+  try {
+    const ports = await _fetchJson(`${SITPORT_BASE}/Totalgeneral`)
+    if (!Array.isArray(ports)) return null
+    const capitania = ports.find(p => nameOf(p).includes('CHONCHI'))
+    if (!capitania) return null
+    const capR = capitania.restricciones ?? {}
+    // Si la Capitanía muestra restricción pero no tenemos datos individuales,
+    // no podemos saber si afecta a Chonchi o a otro puerto (ej. Queilen)
+    if (capR.navesMenores || capR.navesMayores || capR.restriccionBahia) {
+      return { found: true, restriccionBahia: false, navesMenores: false, navesMayores: false, desconocido: true }
+    }
+    return { found: true, restriccionBahia: false, navesMenores: false, navesMayores: false }
   } catch (e) {
     logger.warn('_fetchDmStatus error', e.message)
     return null
@@ -938,8 +962,9 @@ async function _fetchDmStatus() {
 }
 
 function _dmKey(dm) {
-  if (!dm || !dm.found)     return 'UNKNOWN'
-  if (dm.restriccionBahia)  return 'BAHIA_CERRADA'
+  if (!dm || !dm.found)               return 'UNKNOWN'
+  if (dm.desconocido)                 return 'DESCONOCIDO'
+  if (dm.restriccionBahia)            return 'BAHIA_CERRADA'
   if (dm.navesMenores || dm.navesMayores) return 'RESTRINGIDO'
   return 'ABIERTO'
 }
@@ -963,10 +988,12 @@ exports.checkClimaPortoAlert = onSchedule(
 
     // 2. Calcular riesgo actual + máximo próximas 6h
     const times = weather.hourly?.time ?? []
-    const now = new Date()
+    // Open-Meteo devuelve timestamps sin offset en hora Santiago ("2026-03-21T15:00").
+    // Para comparar correctamente, construimos "now" con la misma ingenuidad de zona:
+    const nowSantiago = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Santiago' }))
     let nowIdx = 0, minDiff = Infinity
     times.forEach((t, i) => {
-      const diff = Math.abs(new Date(t) - now)
+      const diff = Math.abs(new Date(t) - nowSantiago)
       if (diff < minDiff) { minDiff = diff; nowIdx = i }
     })
 
@@ -1044,7 +1071,7 @@ exports.checkClimaPortoAlert = onSchedule(
       }
     }
 
-    if (dmKey !== prevDmKey && dmKey !== 'UNKNOWN') {
+    if (dmKey !== prevDmKey && dmKey !== 'UNKNOWN' && dmKey !== 'DESCONOCIDO') {
       if (dmKey === 'BAHIA_CERRADA') {
         notifications.push({
           title: '🔴 DIRECTEMAR: Bahía de Yal cerrada',
