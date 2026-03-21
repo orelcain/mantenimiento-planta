@@ -1,3 +1,4 @@
+// Cloud Functions – mantenimiento-planta  (secret GROQ_API_KEY v3)
 const { onDocumentCreated, onDocumentUpdated } = require('firebase-functions/v2/firestore')
 const { onCall, onRequest, HttpsError } = require('firebase-functions/v2/https')
 const { onSchedule } = require('firebase-functions/v2/scheduler')
