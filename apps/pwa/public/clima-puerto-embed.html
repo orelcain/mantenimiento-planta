@@ -1909,7 +1909,6 @@
               <th>Racha máx.</th>
               <th>Ola máx.</th>
               <th>Riesgo Puerto</th>
-              <th>Riesgo Cierre (día)</th>
             </tr>
           </thead>
           <tbody id="tbody"></tbody>
@@ -2031,52 +2030,30 @@
     }
 
     function calcRisk({ gust, wind, wave, rain, weatherCode }) {
-      /* Riesgo operativo diario — mismo modelo que Cloud Functions (_calcRiskIndex).
-         Cada factor como % de su umbral de cierre DIRECTEMAR Puerto Chonchi.
-         10 componentes, pesos suman 1.0. */
+      /* Riesgo diario — modelo "% del cierre" DIRECTEMAR Puerto Chonchi.
+         Mismo modelo que Cloud Functions pero redistribuido para datos diarios
+         (sin presión, visibilidad ni período ola). Pesos normalizados a 1.0. */
       const pctOf = (v, th) => Math.min(100, (v / th) * 100);
       const isStorm       = [95, 96, 99].includes(weatherCode);
       const isFog         = [45, 48].includes(weatherCode);
       const isHeavyPrecip = [65, 67, 75, 82, 86].includes(weatherCode);
       const isModPrecip   = [63, 66, 73, 81, 85].includes(weatherCode);
 
+      // Pesos redistribuidos para datos diarios (originales × 1.282, suma = 1.0)
+      // Rachas: factor más determinante en decisión cierre
       const pct = Math.max(2, Math.min(98, Math.round(
-        pctOf(gust, 40)  * 0.22 +
-        pctOf(wind, 30)  * 0.14 +
-        pctOf(wave, 1.5) * 0.16 +
-        pctOf(rain, 8)   * 0.06 +
-        (isStorm ? 100 : 0)      * 0.08 +
-        (isFog   ? 100 : 0)      * 0.06 +
-        (isHeavyPrecip ? 100 : (isModPrecip ? 60 : 0)) * 0.06 +
-        0 * 0.08 +   // presión: no disponible en daily
-        0 * 0.10 +   // visibilidad: no disponible en daily
-        0 * 0.04     // período ola: no disponible en daily
+        pctOf(gust, 40)  * 0.30 +
+        pctOf(wind, 30)  * 0.18 +
+        pctOf(wave, 1.5) * 0.20 +
+        pctOf(rain, 8)   * 0.08 +
+        (isStorm ? 100 : 0)      * 0.10 +
+        (isFog   ? 100 : 0)      * 0.07 +
+        (isHeavyPrecip ? 100 : (isModPrecip ? 60 : 0)) * 0.07
       )));
 
-      if (pct >= 65) return { level: 'ALTO', cls: 'risk-high', pct, reason: `Riesgo ALTO (${pct}%). Se recomienda restricción o cierre.` };
+      if (pct >= 60) return { level: 'ALTO', cls: 'risk-high', pct, reason: `Riesgo ALTO (${pct}%). Cierre probable.` };
       if (pct >= 35) return { level: 'MEDIO', cls: 'risk-mid', pct, reason: `Riesgo medio (${pct}%). Monitoreo activo.` };
       return { level: 'BAJO', cls: 'risk-low', pct, reason: `Riesgo bajo (${pct}%). Condiciones operables.` };
-    }
-
-    function calcDailyCloseRisk({ gust, wind, wave, rain, weatherCode }) {
-      /* Probabilidad de CIERRE — factor dominante pesa más.
-         Si un solo factor excede su umbral, la probabilidad sube rápido. */
-      const pctOf = (v, th) => Math.min(100, (v / th) * 100);
-      const gustPct  = pctOf(gust, 40);
-      const windPct  = pctOf(wind, 30);
-      const wavePct  = pctOf(wave, 1.5);
-      let   otherPct = 0;
-      if ([95, 96, 99].includes(weatherCode)) otherPct = 90;
-      if (rain >= 8) otherPct = Math.max(otherPct, 100);
-      else if (rain > 0) otherPct = Math.max(otherPct, pctOf(rain, 8));
-
-      const sorted = [gustPct, windPct, wavePct, otherPct].sort((a, b) => b - a);
-      const pct = Math.max(2, Math.min(98,
-        Math.round(sorted[0] * 0.55 + (sorted[1] || 0) * 0.25 + (sorted[2] || 0) * 0.12 + (sorted[3] || 0) * 0.08)));
-
-      if (pct >= 65) return { level: 'ALTO', cls: 'risk-high', pct, reason: `Probabilidad ALTA de cierre (${pct}%).` };
-      if (pct >= 35) return { level: 'MEDIO', cls: 'risk-mid', pct, reason: `Probabilidad media de cierre (${pct}%).` };
-      return { level: 'BAJO', cls: 'risk-low', pct, reason: `Probabilidad baja de cierre (${pct}%).` };
     }
 
     function setFxMode(mode) {
@@ -2514,7 +2491,6 @@
           <td>${num(d.gust)} km/h</td>
           <td>${num(d.wave)} m</td>
           <td><span class="chip ${d.risk.cls}" title="${d.risk.reason}">${d.risk.level} · ${d.risk.pct}%</span></td>
-          <td><span class="chip ${d.closeRisk.cls}" title="${d.closeRisk.reason}">${d.closeRisk.level} · ${d.closeRisk.pct}%</span></td>
         `;
         tbody.appendChild(tr);
       }
@@ -4511,8 +4487,7 @@
           const wave = waveByDay[date] ?? 0;
           const weatherCode = weather.daily.weather_code?.[i];
           const risk = calcRisk({ gust, wind, wave, rain, weatherCode });
-          const closeRisk = calcDailyCloseRisk({ gust, wind, wave, rain, weatherCode });
-          return { date, weatherCode, tMin: weather.daily.temperature_2m_min?.[i], tMax: weather.daily.temperature_2m_max?.[i], rain, wind, gust, wave, risk, closeRisk };
+          return { date, weatherCode, tMin: weather.daily.temperature_2m_min?.[i], tMax: weather.daily.temperature_2m_max?.[i], rain, wind, gust, wave, risk };
         });
         const portNow = renderPortStatus(current, days[0]?.risk?.level ?? 'BAJO');
         const closureOutlook = calcClosureOutlook24h(current, weather, marine, portNow);
