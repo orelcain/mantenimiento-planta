@@ -10,9 +10,11 @@ const functions = getFunctions()
 
 export async function scheduleClimaPortoTestNotification(delaySeconds: number): Promise<{
   success: boolean
-  ri: number
-  level: string
-  dmKey: string
+  ri?: number
+  level?: string
+  dmKey?: string
+  reason?: string
+  message?: string
 }> {
   const fn = httpsCallable(functions, 'scheduleClimaPortoTestNotification')
   const result = await fn({ delaySeconds })
