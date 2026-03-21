@@ -42,11 +42,10 @@ jobs:
 
       - name: Deploy Cloud Functions
         working-directory: .
-        run: firebase deploy --only functions --non-interactive
-        env:
-          # Secret configurado en: GitHub → Settings → Secrets → Actions
-          # Obtener con: firebase login:ci  (en tu computador)
-          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+        run: |
+          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > /tmp/sa.json
+          GOOGLE_APPLICATION_CREDENTIALS=/tmp/sa.json firebase deploy --only functions --non-interactive
+          rm -f /tmp/sa.json
 
       - name: Notificar deploy exitoso
         if: success()
