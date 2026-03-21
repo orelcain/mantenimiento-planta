@@ -904,6 +904,11 @@ exports.cacheDmStatus = onRequest(
 const CHONCHI_LAT = -42.62
 const CHONCHI_LON = -73.77
 
+// Factor de corrección por terreno protegido: Bahía de Yal es un canal
+// abrigado donde las rachas reales son ~80% del valor calculado para
+// terreno abierto. Alinea con Apple Weather / ECMWF.
+const SHELTER_FACTOR = 0.80
+
 // Helper: % del umbral de cierre (0 = calma, 100 = umbral alcanzado)
 function _pct(value, closureThreshold) {
   return Math.max(0, Math.min(100, (value / closureThreshold) * 100))
@@ -984,8 +989,8 @@ function _calcTrendLine(weather, marine, nowIdx) {
     if (idx >= times.length) break
     const t = times[idx]
     const s = {
-      gust:       weather.hourly.wind_gusts_10m?.[idx]       ?? 0,
-      wind:       weather.hourly.wind_speed_10m?.[idx]       ?? 0,
+      gust:       (weather.hourly.wind_gusts_10m?.[idx]       ?? 0) * SHELTER_FACTOR,
+      wind:       (weather.hourly.wind_speed_10m?.[idx]       ?? 0) * SHELTER_FACTOR,
       rain:       weather.hourly.precipitation?.[idx]        ?? 0,
       code:       weather.hourly.weather_code?.[idx]         ?? 0,
       pressure:   weather.hourly.pressure_msl?.[idx]         ?? 1015,
@@ -1156,8 +1161,8 @@ exports.checkClimaPortoAlert = onSchedule(
       if (idx >= times.length) break
       const t = times[idx]
       const sample = {
-        gust:       weather.hourly.wind_gusts_10m?.[idx]         ?? 0,
-        wind:       weather.hourly.wind_speed_10m?.[idx]         ?? 0,
+        gust:       (weather.hourly.wind_gusts_10m?.[idx]         ?? 0) * SHELTER_FACTOR,
+        wind:       (weather.hourly.wind_speed_10m?.[idx]         ?? 0) * SHELTER_FACTOR,
         rain:       weather.hourly.precipitation?.[idx]          ?? 0,
         code:       weather.hourly.weather_code?.[idx]           ?? 0,
         pressure:   weather.hourly.pressure_msl?.[idx]           ?? 1015,
@@ -1340,8 +1345,8 @@ exports.scheduleClimaPortoTestNotification = onCall(
 
     const t = times[nowIdx]
     const sample = {
-      gust:       weather.hourly.wind_gusts_10m?.[nowIdx]       ?? 0,
-      wind:       weather.hourly.wind_speed_10m?.[nowIdx]       ?? 0,
+      gust:       (weather.hourly.wind_gusts_10m?.[nowIdx]       ?? 0) * SHELTER_FACTOR,
+      wind:       (weather.hourly.wind_speed_10m?.[nowIdx]       ?? 0) * SHELTER_FACTOR,
       rain:       weather.hourly.precipitation?.[nowIdx]        ?? 0,
       code:       weather.hourly.weather_code?.[nowIdx]         ?? 0,
       pressure:   weather.hourly.pressure_msl?.[nowIdx]         ?? 1015,

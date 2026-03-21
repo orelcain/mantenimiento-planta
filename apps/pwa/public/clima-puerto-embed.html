@@ -1930,6 +1930,9 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
   <script>
     const CHONCHI = { lat: -42.62, lon: -73.77 };
+    // Factor corrección terreno protegido: Bahía de Yal es canal abrigado,
+    // rachas/viento reales ≈80% del valor Open-Meteo (calculado para terreno abierto).
+    const SHELTER_FACTOR = 0.80;
 
     const weatherCodeMap = {
       0: 'Despejado', 1: 'Mayormente despejado', 2: 'Parcial nublado', 3: 'Nublado',
@@ -4477,6 +4480,21 @@
         if (!weatherRes.ok || !marineRes.ok) throw new Error('No se pudo consultar una de las APIs de pronóstico.');
         const weather = await weatherRes.json();
         const marine = await marineRes.json();
+
+        // Corregir viento por factor terreno protegido (canal Bahía de Yal)
+        if (weather.hourly) {
+          weather.hourly.wind_gusts_10m = (weather.hourly.wind_gusts_10m ?? []).map(v => v * SHELTER_FACTOR);
+          weather.hourly.wind_speed_10m = (weather.hourly.wind_speed_10m ?? []).map(v => v * SHELTER_FACTOR);
+        }
+        if (weather.current) {
+          weather.current.wind_gusts_10m = (weather.current.wind_gusts_10m ?? 0) * SHELTER_FACTOR;
+          weather.current.wind_speed_10m = (weather.current.wind_speed_10m ?? 0) * SHELTER_FACTOR;
+        }
+        if (weather.daily) {
+          weather.daily.wind_gusts_10m_max = (weather.daily.wind_gusts_10m_max ?? []).map(v => v * SHELTER_FACTOR);
+          weather.daily.wind_speed_10m_max = (weather.daily.wind_speed_10m_max ?? []).map(v => v * SHELTER_FACTOR);
+        }
+
         _lastWeather = weather;
         _lastMarine = marine;
         const current = weather.current ?? {};
