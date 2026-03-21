@@ -688,5 +688,14 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow create, update, delete: if isAuthenticated();
     }
+
+    // ============================================
+    // CACHE - Datos temporales (estado DM puerto, etc.)
+    // ============================================
+    match /cache/{docId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAdmin();
+      allow delete: if isAdmin();
+    }
   }
 }

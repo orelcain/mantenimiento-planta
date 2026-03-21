@@ -969,46 +969,30 @@ async function _fetchJson(url, timeoutMs = 20000) {
 }
 
 async function _fetchDmStatus() {
-  const nameOf = p => (p.reparticion?.nombre || p.NombreZona || p.Nombre || p.NombrePuerto || p.nombre || '').toUpperCase()
-
-  // SITPORT bloquea peticiones desde GCP, usar nuestro proxy desplegado
-  const PROXY_URL = 'https://us-central1-mantenimiento-planta-771a3.cloudfunctions.net/sitportProxy'
-  const SITPORT_DIRECT = 'https://orion.directemar.cl/sitport/back/users/Totalgeneral'
-
-  let ports = null
-
-  // Intentar primero el proxy propio (funciona desde GCP)
+  // Leer desde cache en Firestore (actualizado por el navegador del usuario)
+  // SITPORT bloquea peticiones desde GCP, por eso usamos cache del navegador
   try {
-    const proxyResp = await _fetchJson(PROXY_URL)
-    if (proxyResp?.ok && Array.isArray(proxyResp.data)) {
-      ports = proxyResp.data
+    const cacheDoc = await db.collection('cache').doc('dmStatus').get()
+    if (cacheDoc.exists) {
+      const cached = cacheDoc.data()
+      const age = Date.now() - (cached.updatedAt?.toDate?.()?.getTime?.() ?? 0)
+      // Cache válido si tiene < 3 horas de antigüedad
+      if (age < 3 * 60 * 60 * 1000 && cached.found) {
+        return {
+          found:            true,
+          restriccionBahia: cached.restriccionBahia ?? false,
+          navesMenores:     cached.navesMenores     ?? false,
+          navesMayores:     cached.navesMayores     ?? false,
+          numRestricciones: cached.numRestricciones ?? 0,
+          meteo:            cached.meteo ?? null,
+        }
+      }
     }
-  } catch (_) { /* seguir con fallback directo */ }
-
-  // Fallback: acceso directo (funciona fuera de GCP)
-  if (!ports) {
-    try {
-      const data = await _fetchJson(SITPORT_DIRECT)
-      if (Array.isArray(data)) ports = data
-    } catch (e) {
-      logger.warn('_fetchDmStatus: ambos endpoints fallaron', e.message)
-      return null
-    }
+  } catch (e) {
+    logger.warn('_fetchDmStatus: cache read error', e.message)
   }
 
-  if (!ports) return null
-
-  const capitania = ports.find(p => nameOf(p).includes('CHONCHI'))
-  if (!capitania) return null
-  const r = capitania.restricciones ?? {}
-  return {
-    found:            true,
-    restriccionBahia: r.restriccionBahia ?? false,
-    navesMenores:     r.navesMenores     ?? false,
-    navesMayores:     r.navesMayores     ?? false,
-    numRestricciones: r.numeroRestricciones ?? 0,
-    meteo:            capitania.medicionMeteo ?? null,
-  }
+  return null
 }
 
 function _dmKey(dm) {

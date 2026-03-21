@@ -3347,6 +3347,33 @@
       const parsed = extractChonchiData(ports, bahias, capRestrData);
       parsed._ts = Date.now();
       _dmCache = parsed;
+
+      // Enviar datos DM al PWA padre para cache en Firestore
+      // (Cloud Functions no puede acceder SITPORT desde GCP)
+      if (parsed.found && window.parent !== window) {
+        try {
+          window.parent.postMessage({
+            type: 'DM_STATUS_UPDATE',
+            payload: {
+              found:            parsed.found,
+              restriccionBahia: parsed.restriccionBahia,
+              navesMenores:     parsed.navesMenores,
+              navesMayores:     parsed.navesMayores,
+              numRestricciones: parsed.restricciones ?? 0,
+              estado:           parsed.estado,
+              meteo:            parsed.medicion ? {
+                velocidadViento:      parsed.medicion.windSpeed,
+                textoDireccionViento: parsed.medicion.windDir,
+                temperatura:          parsed.medicion.temp,
+                presion:              parsed.medicion.pressure,
+                lluviaUltimaHora:     parsed.medicion.rain,
+              } : null,
+              timestamp:        new Date().toISOString(),
+            },
+          }, '*');
+        } catch (_) {}
+      }
+
       return parsed;
     }
 
