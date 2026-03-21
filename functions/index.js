@@ -1,5 +1,5 @@
 const { onDocumentCreated, onDocumentUpdated } = require('firebase-functions/v2/firestore')
-const { onCall, onRequest } = require('firebase-functions/v2/https')
+const { onCall, onRequest, HttpsError } = require('firebase-functions/v2/https')
 const { onSchedule } = require('firebase-functions/v2/scheduler')
 const { logger } = require('firebase-functions')
 const { initializeApp } = require('firebase-admin/app')
@@ -1119,6 +1119,92 @@ exports.checkClimaPortoAlert = onSchedule(
     })
 
     logger.info('checkClimaPortoAlert: fin', { notificacionesEnviadas: notifications.length })
+  }
+)
+
+// Envía una notificación push de prueba con datos reales del clima, después de un delay.
+// Solo para admins. El delay le da tiempo al usuario de cerrar la app.
+exports.scheduleClimaPortoTestNotification = onCall(
+  { region: 'us-central1', timeoutSeconds: 320 },
+  async (request) => {
+    const userId = request.auth?.uid
+    if (!userId) throw new HttpsError('unauthenticated', 'Debes iniciar sesión')
+
+    const userSnap = await db.collection('users').doc(userId).get()
+    const user = userSnap.data()
+    if (!user || user.rol !== 'admin') {
+      throw new HttpsError('permission-denied', 'Solo los administradores pueden usar esta función')
+    }
+
+    const delaySeconds = Math.min(300, Math.max(10, Number(request.data?.delaySeconds) || 30))
+    logger.info('scheduleClimaPortoTestNotification: inicio', { userId, delaySeconds })
+
+    // Tokens FCM del propio admin (solo sus dispositivos)
+    const tokensSnap = await db.collection('fcmTokens').where('userId', '==', userId).get()
+    const tokens = []
+    tokensSnap.forEach(doc => {
+      const t = doc.data()?.token
+      if (t && typeof t === 'string') tokens.push(t)
+    })
+    if (tokens.length === 0) {
+      throw new HttpsError('failed-precondition', 'No tienes notificaciones activadas en este dispositivo')
+    }
+
+    // Esperar el delay (la función sigue corriendo en el servidor aunque el cliente cierre la app)
+    await new Promise(resolve => setTimeout(resolve, delaySeconds * 1000))
+
+    // Fetch datos meteorológicos actuales
+    const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${CHONCHI_LAT}&longitude=${CHONCHI_LON}&timezone=America/Santiago&hourly=precipitation,weather_code,wind_speed_10m,wind_gusts_10m,pressure_msl,cloud_cover,relative_humidity_2m,visibility&forecast_days=2`
+    const marineUrl  = `https://marine-api.open-meteo.com/v1/marine?latitude=${CHONCHI_LAT}&longitude=${CHONCHI_LON}&timezone=America/Santiago&hourly=wave_height,wave_period&forecast_days=2`
+    let weather, marine
+    try {
+      ;[weather, marine] = await Promise.all([_fetchJson(weatherUrl), _fetchJson(marineUrl)])
+    } catch (e) {
+      throw new HttpsError('unavailable', 'No se pudo obtener datos meteorológicos')
+    }
+
+    // Calcular índice de riesgo para la hora actual
+    const times = weather.hourly?.time ?? []
+    const nowSantiago = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Santiago' }))
+    let nowIdx = 0, minDiff = Infinity
+    times.forEach((t, i) => {
+      const diff = Math.abs(new Date(t) - nowSantiago)
+      if (diff < minDiff) { minDiff = diff; nowIdx = i }
+    })
+
+    const marineMap = {}
+    ;(marine.hourly?.time ?? []).forEach((t, i) => {
+      marineMap[t] = { wave: marine.hourly.wave_height?.[i] ?? 0, wavePeriod: marine.hourly.wave_period?.[i] ?? 8 }
+    })
+
+    const t = times[nowIdx]
+    const sample = {
+      gust:       weather.hourly.wind_gusts_10m?.[nowIdx]       ?? 0,
+      wind:       weather.hourly.wind_speed_10m?.[nowIdx]       ?? 0,
+      rain:       weather.hourly.precipitation?.[nowIdx]        ?? 0,
+      code:       weather.hourly.weather_code?.[nowIdx]         ?? 0,
+      pressure:   weather.hourly.pressure_msl?.[nowIdx]         ?? 1015,
+      cloud:      weather.hourly.cloud_cover?.[nowIdx]          ?? 0,
+      humidity:   weather.hourly.relative_humidity_2m?.[nowIdx] ?? 0,
+      visibility: weather.hourly.visibility?.[nowIdx]           ?? 10000,
+      wave:       marineMap[t]?.wave       ?? 0,
+      wavePeriod: marineMap[t]?.wavePeriod ?? 8,
+    }
+
+    const ri  = _calcRiskIndex(sample)
+    const lvl = _riskLevel(ri)
+    const dm  = await _fetchDmStatus()
+    const dmK = _dmKey(dm)
+
+    const dmLabels = { ABIERTO: 'Abierto', RESTRINGIDO: 'Con restricciones', BAHIA_CERRADA: 'Cerrado', DESCONOCIDO: 'Estado desconocido', UNKNOWN: 'Sin datos DM' }
+    const lvlEmoji = { ALTO: '⛔', MEDIO: '⚠️', BAJO: '🟢' }
+
+    const title = '🧪 Test · Puerto Chonchi'
+    const body  = `${lvlEmoji[lvl]} Riesgo ${Math.round(ri)}/100 (${lvl}) · DM: ${dmLabels[dmK] || dmK} · Viento ${Math.round(sample.wind)} km/h · Olas ${sample.wave.toFixed(1)}m`
+
+    await sendNotification(tokens, title, body, { type: 'clima_test', url: '/clima-puerto' })
+    logger.info('scheduleClimaPortoTestNotification: enviado', { userId, ri: Math.round(ri), dmK })
+    return { success: true, ri: Math.round(ri), level: lvl, dmKey: dmK }
   }
 )
 
