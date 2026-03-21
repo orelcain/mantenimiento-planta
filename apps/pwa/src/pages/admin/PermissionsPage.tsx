@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { ClimaPortoTestCard } from './ClimaPortoTestCard'
 import {
   Button,
   Card,
@@ -381,6 +382,8 @@ export function PermissionsPage({ isEmbedded = false }: { isEmbedded?: boolean }
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ClimaPortoTestCard />
     </div>
   )
 }

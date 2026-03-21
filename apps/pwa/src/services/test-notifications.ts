@@ -8,6 +8,17 @@ import { logger } from '@/lib/logger'
 
 const functions = getFunctions()
 
+export async function scheduleClimaPortoTestNotification(delaySeconds: number): Promise<{
+  success: boolean
+  ri: number
+  level: string
+  dmKey: string
+}> {
+  const fn = httpsCallable(functions, 'scheduleClimaPortoTestNotification')
+  const result = await fn({ delaySeconds })
+  return result.data as any
+}
+
 export async function sendTestNotification(): Promise<{
   success: boolean
   message: string
