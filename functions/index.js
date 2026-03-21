@@ -1128,26 +1128,45 @@ exports.scheduleClimaPortoTestNotification = onCall(
   { region: 'us-central1', timeoutSeconds: 320 },
   async (request) => {
     const userId = request.auth?.uid
-    if (!userId) throw new HttpsError('unauthenticated', 'Debes iniciar sesión')
+    if (!userId) {
+      const err = new Error('Debes iniciar sesión')
+      err.code = 'unauthenticated'
+      throw err
+    }
 
-    const userSnap = await db.collection('users').doc(userId).get()
-    const user = userSnap.data()
+    let user
+    try {
+      const userSnap = await db.collection('users').doc(userId).get()
+      user = userSnap.data()
+    } catch (e) {
+      logger.error('scheduleClimaPortoTestNotification: error leyendo usuario', e)
+      throw new Error('Error al verificar usuario')
+    }
+
     if (!user || user.rol !== 'admin') {
-      throw new HttpsError('permission-denied', 'Solo los administradores pueden usar esta función')
+      const err = new Error('Solo los administradores pueden usar esta función')
+      err.code = 'permission-denied'
+      throw err
     }
 
     const delaySeconds = Math.min(300, Math.max(10, Number(request.data?.delaySeconds) || 30))
     logger.info('scheduleClimaPortoTestNotification: inicio', { userId, delaySeconds })
 
     // Tokens FCM del propio admin (solo sus dispositivos)
-    const tokensSnap = await db.collection('fcmTokens').where('userId', '==', userId).get()
-    const tokens = []
-    tokensSnap.forEach(doc => {
-      const t = doc.data()?.token
-      if (t && typeof t === 'string') tokens.push(t)
-    })
+    let tokens = []
+    try {
+      const tokensSnap = await db.collection('fcmTokens').where('userId', '==', userId).get()
+      tokensSnap.forEach(doc => {
+        const t = doc.data()?.token
+        if (t && typeof t === 'string') tokens.push(t)
+      })
+    } catch (e) {
+      logger.error('scheduleClimaPortoTestNotification: error leyendo tokens FCM', e)
+      throw new Error('Error al obtener tokens de notificación')
+    }
+
     if (tokens.length === 0) {
-      throw new HttpsError('failed-precondition', 'No tienes notificaciones activadas en este dispositivo')
+      return { success: false, reason: 'no_tokens', message: 'No tienes notificaciones activadas en este dispositivo. Activa los permisos de notificación primero.' }
     }
 
     // Esperar el delay (la función sigue corriendo en el servidor aunque el cliente cierre la app)
@@ -1160,7 +1179,8 @@ exports.scheduleClimaPortoTestNotification = onCall(
     try {
       ;[weather, marine] = await Promise.all([_fetchJson(weatherUrl), _fetchJson(marineUrl)])
     } catch (e) {
-      throw new HttpsError('unavailable', 'No se pudo obtener datos meteorológicos')
+      logger.error('scheduleClimaPortoTestNotification: error fetchando datos clima', e)
+      return { success: false, reason: 'fetch_error', message: 'No se pudo obtener datos meteorológicos' }
     }
 
     // Calcular índice de riesgo para la hora actual
@@ -1193,16 +1213,28 @@ exports.scheduleClimaPortoTestNotification = onCall(
 
     const ri  = _calcRiskIndex(sample)
     const lvl = _riskLevel(ri)
-    const dm  = await _fetchDmStatus()
-    const dmK = _dmKey(dm)
+
+    let dmK = 'UNKNOWN'
+    try {
+      const dm = await _fetchDmStatus()
+      dmK = _dmKey(dm)
+    } catch (e) {
+      logger.warn('scheduleClimaPortoTestNotification: error obteniendo DM, usando UNKNOWN', e)
+    }
 
     const dmLabels = { ABIERTO: 'Abierto', RESTRINGIDO: 'Con restricciones', BAHIA_CERRADA: 'Cerrado', DESCONOCIDO: 'Estado desconocido', UNKNOWN: 'Sin datos DM' }
     const lvlEmoji = { ALTO: '⛔', MEDIO: '⚠️', BAJO: '🟢' }
 
     const title = '🧪 Test · Puerto Chonchi'
-    const body  = `${lvlEmoji[lvl]} Riesgo ${Math.round(ri)}/100 (${lvl}) · DM: ${dmLabels[dmK] || dmK} · Viento ${Math.round(sample.wind)} km/h · Olas ${sample.wave.toFixed(1)}m`
+    const body  = `${lvlEmoji[lvl] || ''} Riesgo ${Math.round(ri)}/100 (${lvl}) · DM: ${dmLabels[dmK] || dmK} · Viento ${Math.round(sample.wind)} km/h · Olas ${sample.wave.toFixed(1)}m`
 
-    await sendNotification(tokens, title, body, { type: 'clima_test', url: '/clima-puerto' })
+    try {
+      await sendNotification(tokens, title, body, { type: 'clima_test', url: '/clima-puerto' })
+    } catch (e) {
+      logger.error('scheduleClimaPortoTestNotification: error enviando notificación FCM', e)
+      return { success: false, reason: 'send_error', message: 'Error al enviar la notificación push' }
+    }
+
     logger.info('scheduleClimaPortoTestNotification: enviado', { userId, ri: Math.round(ri), dmK })
     return { success: true, ri: Math.round(ri), level: lvl, dmKey: dmK }
   }

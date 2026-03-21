@@ -17,6 +17,7 @@ export function ClimaPortoTestCard() {
   const [selectedDelay, setSelectedDelay] = useState(30)
   const [state, setState] = useState<State>('idle')
   const [countdown, setCountdown] = useState(0)
+  const [errorMsg, setErrorMsg] = useState('')
   const { toast } = useToast()
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -38,18 +39,24 @@ export function ClimaPortoTestCard() {
     }, 1000)
 
     try {
-      await scheduleClimaPortoTestNotification(selectedDelay)
+      const result = await scheduleClimaPortoTestNotification(selectedDelay)
       clearCountdown()
-      setState('done')
-      toast({ description: 'Notificación de prueba enviada correctamente.' })
+      if (result.success) {
+        setState('done')
+        toast({ description: 'Notificación de prueba enviada correctamente.' })
+      } else {
+        setState('error')
+        setErrorMsg(result.message || 'No se pudo enviar la notificación')
+        toast({ variant: 'destructive', title: 'Error', description: result.message })
+      }
     } catch (e: any) {
       clearCountdown()
       setState('error')
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: e.message || 'No se pudo enviar la notificación',
-      })
+      const msg = e.message && e.message !== 'internal'
+        ? e.message
+        : 'Error al llamar la función. Revisa que las notificaciones estén activadas.'
+      setErrorMsg(msg)
+      toast({ variant: 'destructive', title: 'Error', description: msg })
     }
   }
 
@@ -109,9 +116,9 @@ export function ClimaPortoTestCard() {
         )}
 
         {state === 'error' && (
-          <div className="flex items-center justify-between rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3">
-            <p className="text-sm text-destructive">Error al enviar</p>
-            <Button size="sm" variant="ghost" onClick={() => setState('idle')}>Reintentar</Button>
+          <div className="flex items-start justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3">
+            <p className="text-sm text-destructive">{errorMsg || 'Error al enviar'}</p>
+            <Button size="sm" variant="ghost" className="shrink-0" onClick={() => setState('idle')}>Reintentar</Button>
           </div>
         )}
       </CardContent>
