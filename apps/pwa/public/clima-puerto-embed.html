@@ -795,7 +795,7 @@
     /* Schedule grid */
     .msc-schedule-grid {
       display: grid;
-      grid-template-columns: repeat(6, 1fr);
+      grid-template-columns: repeat(4, 1fr);
       gap: 6px;
       margin-bottom: 8px;
     }
@@ -1819,6 +1819,8 @@
             <div class="msc-schedule-side">
               <div class="msc-label">Horarios de observación — Estación Chonchi</div>
               <div class="msc-schedule-grid" id="meteoScheduleGrid">
+                <div class="msc-time-slot" data-hour="0"><span class="msc-time">00:00</span><span class="msc-slot-label">Medianoche</span></div>
+                <div class="msc-time-slot" data-hour="3"><span class="msc-time">03:00</span><span class="msc-slot-label">Madrugada</span></div>
                 <div class="msc-time-slot" data-hour="6"><span class="msc-time">06:00</span><span class="msc-slot-label">Matutino</span></div>
                 <div class="msc-time-slot" data-hour="9"><span class="msc-time">09:00</span><span class="msc-slot-label">Media mañana</span></div>
                 <div class="msc-time-slot" data-hour="12"><span class="msc-time">12:00</span><span class="msc-slot-label">Mediodía</span></div>
@@ -1826,7 +1828,7 @@
                 <div class="msc-time-slot" data-hour="18"><span class="msc-time">18:00</span><span class="msc-slot-label">Vespertino</span></div>
                 <div class="msc-time-slot" data-hour="21"><span class="msc-time">21:00</span><span class="msc-slot-label">Nocturno</span></div>
               </div>
-              <div class="msc-note">Estación automática actualiza ~cada 30-60 min. Boletines oficiales en horarios sinópticos.</div>
+              <div class="msc-note">Estación automática actualiza ~cada 10 min. Boletines sinópticos OMM cada 3h (ciclo completo 24h).</div>
               <div class="msc-last-update" id="meteoLastUpdate">Última medición: consultando...</div>
             </div>
           </div>
@@ -3524,7 +3526,7 @@
     /* ═══════════════════════════════════════════════════════════════
        METEO SCHEDULE, COUNTDOWN & OPENING PROBABILITY
        ═══════════════════════════════════════════════════════════════ */
-    const METEO_HOURS = [6, 9, 12, 15, 18, 21]; // Horas sinópticas locales Chile estándar Capitanía
+    const METEO_HOURS = [0, 3, 6, 9, 12, 15, 18, 21]; // Ciclo sinóptico OMM completo (8 obs/día cada 3h UTC) en hora Chile
     let _countdownInterval = null;
     let _lastMeteoDate = null;
 
