@@ -84,6 +84,7 @@ import {
 import { fetchSatelliteTexture } from '@/lib/satelliteTexture'
 import { tilesToGrid, generateHillshade, compositeTerrain } from '@/lib/terrainComposite'
 import { fetchOSMFeatures } from '@/lib/osmBuildings'
+import type { OSMFeatures } from '@/lib/osmBuildings'
 
 type BackgroundCalibrationMode = 'move' | 'scale' | 'rotate'
 type BackgroundDisplayMode = NonNullable<NonNullable<IsometricMap['backgroundMap']>['displayMode']>
@@ -405,6 +406,7 @@ export function MapPage() {
   const preserveLocalBaseRef = useRef(false)
   // ── HUD state (compass, minimap, stats, geo coords, measurement) ──
   const [terrainGeoBounds, setTerrainGeoBounds] = useState<TerrainGeoBounds | null>(null)
+  const [osmFeaturesData, setOsmFeaturesData] = useState<OSMFeatures | null>(null)
   const [showGeoCoords, setShowGeoCoords] = useState(false)
   const [showCompass, setShowCompass] = useState(true)
   const [showMinimap, setShowMinimap] = useState(true)
@@ -1756,6 +1758,7 @@ export function MapPage() {
           )
 
           setSatelliteTextureCanvas(composited)
+          setOsmFeaturesData(osmResult)
         } catch {
           // Satellite/composite is optional — terrain still renders with vertex colors
         }
@@ -2680,6 +2683,8 @@ export function MapPage() {
                   ? { x: terrainHoverPosition.x, z: terrainHoverPosition.z }
                   : null}
                 satelliteTextureCanvas={satelliteTextureCanvas}
+                osmFeatures={osmFeaturesData}
+                terrainGeoBounds={terrainGeoBounds}
                 paintTiles={showAreaEditor ? {
                   tiles: areaPaintState.tiles,
                   color: areaPaintState.color,

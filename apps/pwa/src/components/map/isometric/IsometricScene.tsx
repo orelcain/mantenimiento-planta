@@ -22,6 +22,7 @@ import { EquipmentNode } from './EquipmentNode'
 import { DraggableNode } from './editor/DraggableNode'
 import { MapAreaOverlay } from './MapAreaOverlay'
 import { MapConnector } from './MapConnector'
+import { OSMOverlay3D } from './OSMOverlay3D'
 import type {
   CameraAngle,
   IsometricMapConfig,
@@ -33,6 +34,8 @@ import type {
   IsometricViewerState,
 } from '@/types/isometricMap'
 import { SEA_LEVEL_ELEVATION, MIN_TERRAIN_ELEVATION } from '@/types/isometricMap'
+import type { OSMFeatures } from '@/lib/osmBuildings'
+import type { TerrainGeoBounds } from '@/lib/terrainImport'
 
 interface IsometricSceneProps {
   /** Configuración del mapa (dimensiones, colores, grid) */
@@ -110,6 +113,10 @@ interface IsometricSceneProps {
   bulldozerPreview?: { x: number; z: number } | null
   /** Canvas con textura satelital para draping sobre el terreno */
   satelliteTextureCanvas?: HTMLCanvasElement | null
+  /** Features OSM 3D (edificios, caminos, agua, landcover) */
+  osmFeatures?: OSMFeatures | null
+  /** Bounds georreferenciados del terreno para mapeo geo→grid */
+  terrainGeoBounds?: TerrainGeoBounds | null
 }
 
 const TOPOGRAPHIC_COLOR_STOPS = [
@@ -198,6 +205,8 @@ function SceneContent({
   placementPreview,
   bulldozerPreview,
   satelliteTextureCanvas,
+  osmFeatures,
+  terrainGeoBounds,
 }: IsometricSceneProps) {
   const { gl } = useThree()
   const underlayDragState = useMemo(() => ({ current: null as null | {
@@ -845,6 +854,16 @@ function SceneContent({
             depthWrite={false}
           />
         </lineSegments>
+      )}
+
+      {/* OSM 3D overlay: edificios, caminos, agua, árboles */}
+      {osmFeatures && terrainGeoBounds && (
+        <OSMOverlay3D
+          features={osmFeatures}
+          geoBounds={terrainGeoBounds}
+          terrainElevationMap={terrainElevationMap}
+          minElevation={terrainMetrics.minElevation}
+        />
       )}
 
       {/* Preview de brocha de terreno */}
