@@ -119,13 +119,13 @@ interface IsometricSceneProps {
 }
 
 const TOPOGRAPHIC_COLOR_STOPS = [
-  { stop: 0, color: new THREE.Color('#4f95bf') },
-  { stop: 0.16, color: new THREE.Color('#78c1d1') },
-  { stop: 0.28, color: new THREE.Color('#e7d9a3') },
-  { stop: 0.48, color: new THREE.Color('#96bc73') },
-  { stop: 0.7, color: new THREE.Color('#739763') },
-  { stop: 0.86, color: new THREE.Color('#b18d68') },
-  { stop: 1, color: new THREE.Color('#ddd6c5') },
+  { stop: 0, color: new THREE.Color('#a8c090') },    // lowland green
+  { stop: 0.15, color: new THREE.Color('#96bc73') },  // light green
+  { stop: 0.35, color: new THREE.Color('#739763') },  // forest green
+  { stop: 0.55, color: new THREE.Color('#8a9e6a') },  // olive
+  { stop: 0.75, color: new THREE.Color('#b18d68') },  // tan/rock
+  { stop: 0.9, color: new THREE.Color('#c4b08a') },   // light rock
+  { stop: 1, color: new THREE.Color('#ddd6c5') },     // summit gray
 ]
 
 function clamp01(value: number): number {
@@ -298,13 +298,25 @@ function SceneContent({
     }
   }, [terrain])
 
-  const terrainSolidGeometry = useMemo(() => {
+  // Bounding box real de los terrain tiles (en vez de config.width/depth)
+  // para evitar renderizar celdas vacías fuera del área de datos
+  const terrainDataBounds = useMemo(() => {
     if (!terrain || terrain.length === 0) return null
+    let tMinX = Infinity, tMaxX = -Infinity, tMinZ = Infinity, tMaxZ = -Infinity
+    for (const tile of terrain) {
+      if (tile.x < tMinX) tMinX = tile.x
+      if (tile.x > tMaxX) tMaxX = tile.x
+      if (tile.z < tMinZ) tMinZ = tile.z
+      if (tile.z > tMaxZ) tMaxZ = tile.z
+    }
+    // +1 porque tile (x,z) ocupa from x to x+1
+    return { minX: tMinX, maxX: tMaxX + 1, minZ: tMinZ, maxZ: tMaxZ + 1 }
+  }, [terrain])
 
-    const minX = Math.floor(-config.width / 2)
-    const maxX = Math.ceil(config.width / 2)
-    const minZ = Math.floor(-config.depth / 2)
-    const maxZ = Math.ceil(config.depth / 2)
+  const terrainSolidGeometry = useMemo(() => {
+    if (!terrain || terrain.length === 0 || !terrainDataBounds) return null
+
+    const { minX, maxX, minZ, maxZ } = terrainDataBounds
 
     const widthCells = maxX - minX
     const depthCells = maxZ - minZ
@@ -379,6 +391,14 @@ function SceneContent({
       indices.push(ia, ic, id)
     }
 
+    // UV mapping: satellite texture covers the full config grid, not just the data bounds
+    const configMinX = Math.floor(-config.width / 2)
+    const configMaxX = Math.ceil(config.width / 2)
+    const configMinZ = Math.floor(-config.depth / 2)
+    const configMaxZ = Math.ceil(config.depth / 2)
+    const fullW = configMaxX - configMinX
+    const fullD = configMaxZ - configMinZ
+
     // Top surface (suavizada)
     for (let iz = 0; iz < depthCells; iz++) {
       const z = minZ + iz
@@ -399,11 +419,11 @@ function SceneContent({
         setTopColor(y01)
         const c01 = color.clone()
 
-        // UV coordinates mapping each cell to its normalized position across the full grid
-        const u0 = ix / widthCells
-        const u1 = (ix + 1) / widthCells
-        const v0 = 1 - iz / depthCells        // flip V (texture top = north = iz=0)
-        const v1 = 1 - (iz + 1) / depthCells
+        // UV coordinates relative to full config grid (satellite texture covers entire geo bounds)
+        const u0 = (x - configMinX) / fullW
+        const u1 = (x + 1 - configMinX) / fullW
+        const v0 = 1 - (z - configMinZ) / fullD
+        const v1 = 1 - (z + 1 - configMinZ) / fullD
 
         pushQuad(
           [x, y00, z],
@@ -524,15 +544,12 @@ function SceneContent({
     geometry.setIndex(indices)
     geometry.computeVertexNormals()
     return geometry
-  }, [terrain, terrainElevationMap, terrainMetrics, config.width, config.depth])
+  }, [terrain, terrainElevationMap, terrainMetrics, terrainDataBounds, config.width, config.depth])
 
   const terrainContourGeometry = useMemo(() => {
-    if (!terrain || terrain.length === 0) return null
+    if (!terrain || terrain.length === 0 || !terrainDataBounds) return null
 
-    const minX = Math.floor(-config.width / 2)
-    const maxX = Math.ceil(config.width / 2)
-    const minZ = Math.floor(-config.depth / 2)
-    const maxZ = Math.ceil(config.depth / 2)
+    const { minX, maxX, minZ, maxZ } = terrainDataBounds
 
     const widthCells = maxX - minX
     const depthCells = maxZ - minZ
@@ -587,7 +604,7 @@ function SceneContent({
     const geometry = new THREE.BufferGeometry()
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
     return geometry
-  }, [terrain, terrainElevationMap, terrainMetrics, config.width, config.depth])
+  }, [terrain, terrainElevationMap, terrainMetrics, terrainDataBounds])
 
   const underlayTexture = useLoader(
     THREE.TextureLoader,
@@ -733,7 +750,7 @@ function SceneContent({
   return (
     <>
       {/* Background color */}
-      <color attach="background" args={['#0c1a24']} />
+      <color attach="background" args={['#1a2530']} />
 
       {/* Iluminación natural */}
       <ambientLight intensity={satelliteTextureCanvas ? 0.9 : 0.72} />
@@ -754,7 +771,7 @@ function SceneContent({
       <hemisphereLight args={[satelliteTextureCanvas ? '#e8f4ff' : '#d7f0ff', '#1a1510', satelliteTextureCanvas ? 0.7 : 0.58]} />
 
       {/* Ambiente — niebla lejana para no oscurecer el terreno */}
-      <fog attach="fog" args={['#0c1a24', 180, 400]} />
+      <fog attach="fog" args={['#1a2530', 200, 500]} />
 
       {/* Cámara isométrica con rotación FFT */}
       <IsometricCamera
@@ -1164,7 +1181,7 @@ export function IsometricScene(props: IsometricSceneProps) {
           toneMappingExposure: 1.0,
           outputColorSpace: THREE.SRGBColorSpace,
         }}
-        style={{ background: '#0d1117' }}
+        style={{ background: '#1a2530' }}
         onPointerMissed={() => props.onBackgroundClick?.()}
       >
         <Suspense fallback={<InCanvasLoader />}>
