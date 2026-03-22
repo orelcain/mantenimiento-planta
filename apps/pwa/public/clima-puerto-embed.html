@@ -512,6 +512,37 @@
       margin-right: 4px;
     }
 
+    /* ─── HOURLY DETAIL ROWS ─── */
+    .day-row { cursor: pointer; user-select: none; }
+    .day-row:hover td { background: rgba(0,166,178,0.06); }
+    .expand-arrow { display: inline-block; transition: transform 0.2s; margin-right: 4px; font-size: 0.7em; color: var(--muted); }
+    .day-row.expanded .expand-arrow { transform: rotate(90deg); }
+    .hourly-detail-row td { padding: 0; border-bottom: none; }
+    .hourly-detail-row .hourly-wrap { max-height: 0; overflow: hidden; transition: max-height 0.35s ease; }
+    .hourly-detail-row.open .hourly-wrap { max-height: 1200px; }
+    .hourly-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(105px, 1fr));
+      gap: 6px;
+      padding: 10px 14px 14px;
+      background: rgba(0,0,0,0.25);
+      border-left: 3px solid var(--brand-primary);
+    }
+    .hour-cell {
+      background: rgba(255,255,255,0.04);
+      border-radius: 6px;
+      padding: 8px 7px;
+      text-align: center;
+      font-size: 0.72rem;
+      line-height: 1.35;
+    }
+    .hour-cell .h-time { font-weight: 800; color: var(--brand-primary); font-size: 0.8rem; margin-bottom: 2px; }
+    .hour-cell .h-risk { font-weight: 800; font-size: 0.72rem; border-radius: 3px; padding: 1px 5px; display: inline-block; margin-top: 3px; }
+    .hour-cell .h-risk.risk-low  { color: #46d369; background: rgba(70,211,105,0.15); }
+    .hour-cell .h-risk.risk-mid  { color: #f5c518; background: rgba(245,197,24,0.15); }
+    .hour-cell .h-risk.risk-high { color: var(--bad); background: rgba(255,107,107,0.2); }
+    .hour-cell .h-detail { color: var(--muted); font-size: 0.65rem; }
+
     /* ─── DIRECTEMAR OFFICIAL PANEL ─── */
     .directemar-panel {
       background: var(--card);
@@ -1896,7 +1927,7 @@
 
     <!-- TABLE ROW -->
     <section class="row">
-      <div class="row-title"><span class="accent-bar"></span>Pronóstico Detallado</div>
+      <div class="row-title"><span class="accent-bar"></span>Pronóstico Detallado <span style="font-size:0.65em;color:var(--muted);font-weight:400;">— toca un día para ver detalle horario</span></div>
       <div class="table-card">
         <table>
           <thead>
@@ -2054,6 +2085,59 @@
       if (pct >= 60) return { level: 'ALTO', cls: 'risk-high', pct, reason: `Riesgo ALTO (${pct}%). Cierre probable.` };
       if (pct >= 35) return { level: 'MEDIO', cls: 'risk-mid', pct, reason: `Riesgo medio (${pct}%). Monitoreo activo.` };
       return { level: 'BAJO', cls: 'risk-low', pct, reason: `Riesgo bajo (${pct}%). Condiciones operables.` };
+    }
+
+    /* Riesgo horario — modelo completo 10 componentes (mismo que Cloud Functions) */
+    function calcRiskHourly(s) {
+      const pctOf = (v, th) => Math.min(100, (v / th) * 100);
+      const isStorm       = [95, 96, 99].includes(s.code);
+      const isFog         = [45, 48].includes(s.code);
+      const isHeavyPrecip = [65, 67, 75, 82, 86].includes(s.code);
+      const isModPrecip   = [63, 66, 73, 81, 85].includes(s.code);
+      const pct = Math.max(0, Math.min(100, Math.round(
+        pctOf(s.gust, 40)  * 0.22 +
+        pctOf(s.wind, 30)  * 0.14 +
+        pctOf(s.wave, 1.5) * 0.16 +
+        pctOf(s.rain, 8)   * 0.06 +
+        pctOf(Math.max(0, 1013 - s.pressure), 15) * 0.08 +
+        pctOf(Math.max(0, 10000 - s.visibility), 9000) * 0.10 +
+        pctOf(Math.max(0, 10 - s.wavePeriod), 7)  * 0.04 +
+        (isStorm ? 100 : 0) * 0.08 +
+        (isFog   ? 100 : 0) * 0.06 +
+        (isHeavyPrecip ? 100 : (isModPrecip ? 60 : 0)) * 0.06
+      )));
+      const level = pct >= 65 ? 'ALTO' : pct >= 35 ? 'MEDIO' : 'BAJO';
+      const cls   = pct >= 65 ? 'risk-high' : pct >= 35 ? 'risk-mid' : 'risk-low';
+      return { level, cls, pct };
+    }
+
+    /* Extraer datos horarios de un día específico desde _lastWeather / _lastMarine */
+    function getHourlyForDay(dateStr) {
+      if (!_lastWeather || !_lastMarine) return [];
+      const wh = _lastWeather.hourly;
+      const mh = _lastMarine.hourly;
+      const marineMap = {};
+      (mh?.time ?? []).forEach((t, i) => {
+        marineMap[t] = { wave: mh.wave_height?.[i] ?? 0, wavePeriod: mh.wave_period?.[i] ?? 8 };
+      });
+      const hours = [];
+      (wh?.time ?? []).forEach((t, i) => {
+        if (t.slice(0, 10) !== dateStr) return;
+        const hour = t.slice(11, 16); // "HH:MM"
+        const s = {
+          gust:       wh.wind_gusts_10m?.[i]       ?? 0,
+          wind:       wh.wind_speed_10m?.[i]        ?? 0,
+          rain:       wh.precipitation?.[i]         ?? 0,
+          code:       wh.weather_code?.[i]          ?? 0,
+          pressure:   wh.pressure_msl?.[i]          ?? 1015,
+          visibility: wh.visibility?.[i]            ?? 10000,
+          wave:       marineMap[t]?.wave             ?? 0,
+          wavePeriod: marineMap[t]?.wavePeriod       ?? 8,
+        };
+        const risk = calcRiskHourly(s);
+        hours.push({ hour, ...s, risk });
+      });
+      return hours;
     }
 
     function setFxMode(mode) {
@@ -2479,10 +2563,12 @@
       const todayStr = new Date().toISOString().slice(0, 10);
       for (const d of days) {
         const isToday = d.date === todayStr;
+
+        // Fila del día (clickeable)
         const tr = document.createElement('tr');
-        if (isToday) tr.classList.add('today-row');
+        tr.className = 'day-row' + (isToday ? ' today-row' : '');
         tr.innerHTML = `
-          <td>${isToday ? '<span class="today-badge">HOY</span>' : ''}${toCLDate(d.date)}</td>
+          <td><span class="expand-arrow">▶</span>${isToday ? '<span class="today-badge">HOY</span>' : ''}${toCLDate(d.date)}</td>
           <td>${weatherCodeMap[d.weatherCode] ?? '—'}</td>
           <td>${num(d.tMin)}° / ${num(d.tMax)}°</td>
           <td>${num(d.rain)} mm</td>
@@ -2492,6 +2578,46 @@
           <td><span class="chip ${d.risk.cls}" title="${d.risk.reason}">${d.risk.level} · ${d.risk.pct}%</span></td>
         `;
         tbody.appendChild(tr);
+
+        // Fila de detalle horario (oculta)
+        const detailTr = document.createElement('tr');
+        detailTr.className = 'hourly-detail-row';
+        const detailTd = document.createElement('td');
+        detailTd.colSpan = 8;
+        detailTd.innerHTML = '<div class="hourly-wrap"></div>';
+        detailTr.appendChild(detailTd);
+        tbody.appendChild(detailTr);
+
+        // Toggle expand/collapse
+        tr.addEventListener('click', () => {
+          const isOpen = detailTr.classList.contains('open');
+          // Cerrar todas las demás
+          tbody.querySelectorAll('.hourly-detail-row.open').forEach(r => r.classList.remove('open'));
+          tbody.querySelectorAll('.day-row.expanded').forEach(r => r.classList.remove('expanded'));
+          if (!isOpen) {
+            tr.classList.add('expanded');
+            detailTr.classList.add('open');
+            const wrap = detailTr.querySelector('.hourly-wrap');
+            if (!wrap.dataset.loaded) {
+              wrap.dataset.loaded = '1';
+              const hours = getHourlyForDay(d.date);
+              if (hours.length === 0) {
+                wrap.innerHTML = '<div style="padding:12px 14px;color:var(--muted);font-size:0.8rem;">Sin datos horarios para este día</div>';
+              } else {
+                wrap.innerHTML = '<div class="hourly-grid">' + hours.map(h => `
+                  <div class="hour-cell">
+                    <div class="h-time">${h.hour}</div>
+                    <div class="h-detail">${weatherCodeMap[h.code] ?? '—'}</div>
+                    <div class="h-detail">🌬 ${num(h.gust)} km/h</div>
+                    <div class="h-detail">🌊 ${h.wave.toFixed(1)}m</div>
+                    ${h.rain > 0 ? `<div class="h-detail">🌧 ${h.rain.toFixed(1)}mm</div>` : ''}
+                    <div class="h-risk ${h.risk.cls}">${h.risk.pct}%</div>
+                  </div>
+                `).join('') + '</div>';
+              }
+            }
+          }
+        });
       }
     }
 
