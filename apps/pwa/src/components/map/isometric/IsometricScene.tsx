@@ -23,6 +23,8 @@ import { DraggableNode } from './editor/DraggableNode'
 import { MapAreaOverlay } from './MapAreaOverlay'
 import { MapConnector } from './MapConnector'
 import { OSMOverlay3D } from './OSMOverlay3D'
+import { TerrainMesh, useTerrainData } from './TerrainMesh'
+import { SceneEnvironment } from './SceneEnvironment'
 import type {
   IsometricMapConfig,
   MapNode,
@@ -32,7 +34,7 @@ import type {
   NodeRuntimeData,
   IsometricViewerState,
 } from '@/types/isometricMap'
-import { SEA_LEVEL_ELEVATION, MIN_TERRAIN_ELEVATION } from '@/types/isometricMap'
+import { SEA_LEVEL_ELEVATION } from '@/types/isometricMap'
 import type { OSMFeatures } from '@/lib/osmBuildings'
 import type { TerrainGeoBounds } from '@/lib/terrainImport'
 
@@ -116,57 +118,6 @@ interface IsometricSceneProps {
   osmFeatures?: OSMFeatures | null
   /** Bounds georreferenciados del terreno para mapeo geo→grid */
   terrainGeoBounds?: TerrainGeoBounds | null
-}
-
-const TOPOGRAPHIC_COLOR_STOPS = [
-  { stop: 0, color: new THREE.Color('#a8c090') },    // lowland green
-  { stop: 0.15, color: new THREE.Color('#96bc73') },  // light green
-  { stop: 0.35, color: new THREE.Color('#739763') },  // forest green
-  { stop: 0.55, color: new THREE.Color('#8a9e6a') },  // olive
-  { stop: 0.75, color: new THREE.Color('#b18d68') },  // tan/rock
-  { stop: 0.9, color: new THREE.Color('#c4b08a') },   // light rock
-  { stop: 1, color: new THREE.Color('#ddd6c5') },     // summit gray
-]
-
-function clamp01(value: number): number {
-  return Math.max(0, Math.min(1, value))
-}
-
-function getTopographicColor(normalizedElevation: number): THREE.Color {
-  const normalized = clamp01(normalizedElevation)
-
-  for (let index = 0; index < TOPOGRAPHIC_COLOR_STOPS.length - 1; index++) {
-    const current = TOPOGRAPHIC_COLOR_STOPS[index]
-    const next = TOPOGRAPHIC_COLOR_STOPS[index + 1]
-    if (!current || !next) continue
-
-    if (normalized <= next.stop) {
-      const range = Math.max(0.0001, next.stop - current.stop)
-      const mix = clamp01((normalized - current.stop) / range)
-      return current.color.clone().lerp(next.color, mix)
-    }
-  }
-
-  const lastStop = TOPOGRAPHIC_COLOR_STOPS[TOPOGRAPHIC_COLOR_STOPS.length - 1]
-  return (lastStop?.color ?? new THREE.Color('#c8c3b5')).clone()
-}
-
-function getContourIntersection(
-  start: [number, number, number],
-  end: [number, number, number],
-  contourLevel: number
-): [number, number, number] | null {
-  const delta = end[1] - start[1]
-  if (Math.abs(delta) < 0.0001) return null
-
-  const t = (contourLevel - start[1]) / delta
-  if (t < 0 || t > 1) return null
-
-  return [
-    start[0] + (end[0] - start[0]) * t,
-    contourLevel + 0.14,
-    start[2] + (end[2] - start[2]) * t,
-  ]
 }
 
 /** Contenido de la escena (dentro del Canvas) */
@@ -260,351 +211,8 @@ function SceneContent({
     // Notificación opcional al completar rotación
   }, [])
 
-  const terrainElevationMap = useMemo(() => {
-    const map = new Map<string, number>()
-    for (const tile of terrain ?? []) {
-      map.set(`${tile.x},${tile.z}`, tile.elevation)
-    }
-    return map
-  }, [terrain])
-
-  const terrainMetrics = useMemo(() => {
-    if (!terrain || terrain.length === 0) {
-      return {
-        minElevation: SEA_LEVEL_ELEVATION,
-        maxElevation: SEA_LEVEL_ELEVATION,
-        elevationRange: 1,
-        baseElevation: MIN_TERRAIN_ELEVATION,
-      }
-    }
-
-    let minElevation = Number.POSITIVE_INFINITY
-    let maxElevation = Number.NEGATIVE_INFINITY
-
-    for (const tile of terrain) {
-      minElevation = Math.min(minElevation, tile.elevation)
-      maxElevation = Math.max(maxElevation, tile.elevation)
-    }
-
-    const elevationRange = Math.max(1, maxElevation - minElevation)
-    // Thinner cross-section for natural look (3-6m deep)
-    const sideDepth = Math.max(3, Math.min(6, Math.round(elevationRange * 0.08)))
-
-    return {
-      minElevation,
-      maxElevation,
-      elevationRange,
-      baseElevation: Math.max(MIN_TERRAIN_ELEVATION, minElevation - sideDepth),
-    }
-  }, [terrain])
-
-  // Bounding box real de los terrain tiles (en vez de config.width/depth)
-  // para evitar renderizar celdas vacías fuera del área de datos
-  const terrainDataBounds = useMemo(() => {
-    if (!terrain || terrain.length === 0) return null
-    let tMinX = Infinity, tMaxX = -Infinity, tMinZ = Infinity, tMaxZ = -Infinity
-    for (const tile of terrain) {
-      if (tile.x < tMinX) tMinX = tile.x
-      if (tile.x > tMaxX) tMaxX = tile.x
-      if (tile.z < tMinZ) tMinZ = tile.z
-      if (tile.z > tMaxZ) tMaxZ = tile.z
-    }
-    // +1 porque tile (x,z) ocupa from x to x+1
-    return { minX: tMinX, maxX: tMaxX + 1, minZ: tMinZ, maxZ: tMaxZ + 1 }
-  }, [terrain])
-
-  const terrainSolidGeometry = useMemo(() => {
-    if (!terrain || terrain.length === 0 || !terrainDataBounds) return null
-
-    const { minX, maxX, minZ, maxZ } = terrainDataBounds
-
-    const widthCells = maxX - minX
-    const depthCells = maxZ - minZ
-    if (widthCells <= 0 || depthCells <= 0) return null
-    const baseY = terrainMetrics.baseElevation
-
-    const getCellElevation = (x: number, z: number) => terrainElevationMap.get(`${x},${z}`) ?? SEA_LEVEL_ELEVATION
-    const getTopElevation = (vx: number, vz: number) => {
-      const e1 = getCellElevation(vx - 1, vz - 1)
-      const e2 = getCellElevation(vx, vz - 1)
-      const e3 = getCellElevation(vx - 1, vz)
-      const e4 = getCellElevation(vx, vz)
-      return (e1 + e2 + e3 + e4) / 4
-    }
-
-    const positions: number[] = []
-    const colors: number[] = []
-    const uvs: number[] = []
-    const indices: number[] = []
-
-    // Warm earth/rock tones for geological cross-section
-    const cliffDark = new THREE.Color('#3a2a1a')
-    const cliffLight = new THREE.Color('#8b7355')
-    const bottomColor = new THREE.Color('#2a1f14')
-    const color = new THREE.Color()
-
-    const topHeightGrid: number[][] = []
-    for (let iz = 0; iz <= depthCells; iz++) {
-      const row: number[] = []
-      const z = minZ + iz
-      for (let ix = 0; ix <= widthCells; ix++) {
-        const x = minX + ix
-        row.push(getTopElevation(x, z))
-      }
-      topHeightGrid.push(row)
-    }
-
-    const getTopGrid = (ix: number, iz: number) => topHeightGrid[iz]?.[ix] ?? SEA_LEVEL_ELEVATION
-
-    const setTopColor = (elevation: number) => {
-      const normalized = (elevation - terrainMetrics.minElevation) / terrainMetrics.elevationRange
-      color.copy(getTopographicColor(normalized))
-      color.offsetHSL(0, 0.02, 0.08)
-    }
-
-    const pushVertex = (x: number, y: number, z: number, c: THREE.Color, u = 0, v = 0) => {
-      positions.push(x, y + 0.02, z)
-      colors.push(c.r, c.g, c.b)
-      uvs.push(u, v)
-      return positions.length / 3 - 1
-    }
-
-    const pushQuad = (
-      a: [number, number, number],
-      b: [number, number, number],
-      c: [number, number, number],
-      d: [number, number, number],
-      colorA: THREE.Color,
-      colorB: THREE.Color,
-      colorC: THREE.Color,
-      colorD: THREE.Color,
-      uvA?: [number, number],
-      uvB?: [number, number],
-      uvC?: [number, number],
-      uvD?: [number, number],
-    ) => {
-      const ia = pushVertex(a[0], a[1], a[2], colorA, uvA?.[0] ?? 0, uvA?.[1] ?? 0)
-      const ib = pushVertex(b[0], b[1], b[2], colorB, uvB?.[0] ?? 0, uvB?.[1] ?? 0)
-      const ic = pushVertex(c[0], c[1], c[2], colorC, uvC?.[0] ?? 0, uvC?.[1] ?? 0)
-      const id = pushVertex(d[0], d[1], d[2], colorD, uvD?.[0] ?? 0, uvD?.[1] ?? 0)
-      indices.push(ia, ib, ic)
-      indices.push(ia, ic, id)
-    }
-
-    // UV mapping: satellite texture covers the full config grid, not just the data bounds
-    const configMinX = Math.floor(-config.width / 2)
-    const configMaxX = Math.ceil(config.width / 2)
-    const configMinZ = Math.floor(-config.depth / 2)
-    const configMaxZ = Math.ceil(config.depth / 2)
-    const fullW = configMaxX - configMinX
-    const fullD = configMaxZ - configMinZ
-
-    // Top surface (suavizada)
-    for (let iz = 0; iz < depthCells; iz++) {
-      const z = minZ + iz
-      for (let ix = 0; ix < widthCells; ix++) {
-        const x = minX + ix
-
-        const y00 = getTopGrid(ix, iz)
-        const y10 = getTopGrid(ix + 1, iz)
-        const y11 = getTopGrid(ix + 1, iz + 1)
-        const y01 = getTopGrid(ix, iz + 1)
-
-        setTopColor(y00)
-        const c00 = color.clone()
-        setTopColor(y10)
-        const c10 = color.clone()
-        setTopColor(y11)
-        const c11 = color.clone()
-        setTopColor(y01)
-        const c01 = color.clone()
-
-        // UV coordinates relative to full config grid (satellite texture covers entire geo bounds)
-        const u0 = (x - configMinX) / fullW
-        const u1 = (x + 1 - configMinX) / fullW
-        const v0 = 1 - (z - configMinZ) / fullD
-        const v1 = 1 - (z + 1 - configMinZ) / fullD
-
-        pushQuad(
-          [x, y00, z],
-          [x + 1, y10, z],
-          [x + 1, y11, z + 1],
-          [x, y01, z + 1],
-          c00,
-          c10,
-          c11,
-          c01,
-          [u0, v0],
-          [u1, v0],
-          [u1, v1],
-          [u0, v1],
-        )
-      }
-    }
-
-    // Bottom face (base sólida)
-    pushQuad(
-      [minX, baseY, minZ],
-      [minX, baseY, maxZ],
-      [maxX, baseY, maxZ],
-      [maxX, baseY, minZ],
-      bottomColor,
-      bottomColor,
-      bottomColor,
-      bottomColor
-    )
-
-    // Boundary walls (masa lateral) — gradient top→bottom for geological strata
-    for (let ix = 0; ix < widthCells; ix++) {
-      const x1 = minX + ix
-      const x2 = x1 + 1
-      const y1 = getTopGrid(ix, 0)
-      const y2 = getTopGrid(ix + 1, 0)
-
-      const topMix = clamp01((Math.max(y1, y2) - terrainMetrics.minElevation) / terrainMetrics.elevationRange)
-      const wallTop = cliffDark.clone().lerp(cliffLight, topMix * 0.8 + 0.2)
-      const wallBottom = cliffDark.clone()
-
-      // North
-      pushQuad(
-        [x1, y1, minZ],
-        [x1, baseY, minZ],
-        [x2, baseY, minZ],
-        [x2, y2, minZ],
-        wallTop,
-        wallBottom,
-        wallBottom,
-        wallTop
-      )
-
-      const ys1 = getTopGrid(ix, depthCells)
-      const ys2 = getTopGrid(ix + 1, depthCells)
-      const topMixS = clamp01((Math.max(ys1, ys2) - terrainMetrics.minElevation) / terrainMetrics.elevationRange)
-      const wallTopS = cliffDark.clone().lerp(cliffLight, topMixS * 0.8 + 0.2)
-      const wallBottomS = cliffDark.clone()
-
-      // South
-      pushQuad(
-        [x1, ys1, maxZ],
-        [x2, ys2, maxZ],
-        [x2, baseY, maxZ],
-        [x1, baseY, maxZ],
-        wallTopS,
-        wallTopS,
-        wallBottomS,
-        wallBottomS
-      )
-    }
-
-    for (let iz = 0; iz < depthCells; iz++) {
-      const z1 = minZ + iz
-      const z2 = z1 + 1
-      const yw1 = getTopGrid(0, iz)
-      const yw2 = getTopGrid(0, iz + 1)
-
-      const topMixW = clamp01((Math.max(yw1, yw2) - terrainMetrics.minElevation) / terrainMetrics.elevationRange)
-      const wallTopW = cliffDark.clone().lerp(cliffLight, topMixW * 0.8 + 0.2)
-      const wallBottomW = cliffDark.clone()
-
-      // West
-      pushQuad(
-        [minX, yw1, z1],
-        [minX, yw2, z2],
-        [minX, baseY, z2],
-        [minX, baseY, z1],
-        wallTopW,
-        wallTopW,
-        wallBottomW,
-        wallBottomW
-      )
-
-      const ye1 = getTopGrid(widthCells, iz)
-      const ye2 = getTopGrid(widthCells, iz + 1)
-      const topMixE = clamp01((Math.max(ye1, ye2) - terrainMetrics.minElevation) / terrainMetrics.elevationRange)
-      const wallTopE = cliffDark.clone().lerp(cliffLight, topMixE * 0.8 + 0.2)
-      const wallBottomE = cliffDark.clone()
-
-      // East
-      pushQuad(
-        [maxX, ye1, z1],
-        [maxX, baseY, z1],
-        [maxX, baseY, z2],
-        [maxX, ye2, z2],
-        wallTopE,
-        wallBottomE,
-        wallBottomE,
-        wallTopE
-      )
-    }
-
-    const geometry = new THREE.BufferGeometry()
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
-    geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3))
-    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2))
-    geometry.setIndex(indices)
-    geometry.computeVertexNormals()
-    return geometry
-  }, [terrain, terrainElevationMap, terrainMetrics, terrainDataBounds, config.width, config.depth])
-
-  const terrainContourGeometry = useMemo(() => {
-    if (!terrain || terrain.length === 0 || !terrainDataBounds) return null
-
-    const { minX, maxX, minZ, maxZ } = terrainDataBounds
-
-    const widthCells = maxX - minX
-    const depthCells = maxZ - minZ
-    if (widthCells <= 0 || depthCells <= 0) return null
-
-    const getCellElevation = (x: number, z: number) => terrainElevationMap.get(`${x},${z}`) ?? SEA_LEVEL_ELEVATION
-    const getTopElevation = (vx: number, vz: number) => {
-      const e1 = getCellElevation(vx - 1, vz - 1)
-      const e2 = getCellElevation(vx, vz - 1)
-      const e3 = getCellElevation(vx - 1, vz)
-      const e4 = getCellElevation(vx, vz)
-      return (e1 + e2 + e3 + e4) / 4
-    }
-
-    const contourInterval = terrainMetrics.elevationRange >= 80 ? 10 : 5
-    const startLevel = Math.ceil(terrainMetrics.minElevation / contourInterval) * contourInterval
-    const endLevel = Math.floor(terrainMetrics.maxElevation / contourInterval) * contourInterval
-    const positions: number[] = []
-
-    for (let iz = 0; iz < depthCells; iz++) {
-      const z = minZ + iz
-
-      for (let ix = 0; ix < widthCells; ix++) {
-        const x = minX + ix
-        const y00 = getTopElevation(x, z)
-        const y10 = getTopElevation(x + 1, z)
-        const y11 = getTopElevation(x + 1, z + 1)
-        const y01 = getTopElevation(x, z + 1)
-
-        for (let level = startLevel; level <= endLevel; level += contourInterval) {
-          const intersections = [
-            getContourIntersection([x, y00, z], [x + 1, y10, z], level),
-            getContourIntersection([x + 1, y10, z], [x + 1, y11, z + 1], level),
-            getContourIntersection([x + 1, y11, z + 1], [x, y01, z + 1], level),
-            getContourIntersection([x, y01, z + 1], [x, y00, z], level),
-          ].filter((point): point is [number, number, number] => point !== null)
-
-          if (intersections.length < 2) continue
-
-          for (let index = 0; index <= intersections.length - 2; index += 2) {
-            const start = intersections[index]
-            const end = intersections[index + 1]
-            if (!start || !end) continue
-            positions.push(start[0], start[1], start[2], end[0], end[1], end[2])
-          }
-        }
-      }
-    }
-
-    if (positions.length === 0) return null
-
-    const geometry = new THREE.BufferGeometry()
-    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
-    return geometry
-  }, [terrain, terrainElevationMap, terrainMetrics, terrainDataBounds])
+  // Terrain data (elevation map, metrics, bounds) via extracted hook
+  const { elevationMap: terrainElevationMap, metrics: terrainMetrics } = useTerrainData(terrain)
 
   const underlayTexture = useLoader(
     THREE.TextureLoader,
@@ -749,29 +357,7 @@ function SceneContent({
 
   return (
     <>
-      {/* Background color */}
-      <color attach="background" args={['#1a2530']} />
-
-      {/* Iluminación natural */}
-      <ambientLight intensity={satelliteTextureCanvas ? 0.9 : 0.72} />
-      <directionalLight
-        position={[30, 45, 20]}
-        intensity={satelliteTextureCanvas ? 1.4 : 1.1}
-        color={satelliteTextureCanvas ? '#fffaf0' : '#fff4db'}
-        castShadow
-        shadow-mapSize-width={2048}
-        shadow-mapSize-height={2048}
-        shadow-camera-far={120}
-        shadow-camera-left={-60}
-        shadow-camera-right={60}
-        shadow-camera-top={60}
-        shadow-camera-bottom={-60}
-      />
-      <directionalLight position={[-18, 12, -22]} intensity={0.25} color="#96c8e8" />
-      <hemisphereLight args={[satelliteTextureCanvas ? '#e8f4ff' : '#d7f0ff', '#1a1510', satelliteTextureCanvas ? 0.7 : 0.58]} />
-
-      {/* Ambiente — niebla lejana para no oscurecer el terreno */}
-      <fog attach="fog" args={['#1a2530', 200, 500]} />
+      <SceneEnvironment hasSatelliteTexture={!!satelliteTextureCanvas} />
 
       {/* Cámara isométrica con rotación FFT */}
       <IsometricCamera
@@ -825,50 +411,13 @@ function SceneContent({
         </group>
       )}
 
-      {/* Terreno suavizado tipo heightfield (menos voxel/pixelado) */}
-      {terrainSolidGeometry && !satelliteTextureCanvas && (
-        <mesh geometry={terrainSolidGeometry} castShadow receiveShadow renderOrder={2}>
-          <meshStandardMaterial
-            vertexColors
-            roughness={0.85}
-            metalness={0}
-            side={THREE.FrontSide}
-          />
-        </mesh>
-      )}
-
-      {/* Terreno con textura satelital + hillshade compuesto */}
-      {terrainSolidGeometry && satelliteTextureCanvas && (
-        <mesh geometry={terrainSolidGeometry} castShadow receiveShadow renderOrder={2}>
-          <meshStandardMaterial
-            roughness={0.88}
-            metalness={0.02}
-            side={THREE.FrontSide}
-            envMapIntensity={0.3}
-          >
-            <canvasTexture
-              attach="map"
-              image={satelliteTextureCanvas}
-              colorSpace={THREE.SRGBColorSpace}
-              wrapS={THREE.ClampToEdgeWrapping}
-              wrapT={THREE.ClampToEdgeWrapping}
-              magFilter={THREE.LinearFilter}
-              minFilter={THREE.LinearMipmapLinearFilter}
-            />
-          </meshStandardMaterial>
-        </mesh>
-      )}
-
-      {/* Contornos solo sin textura satelital (con satélite el hillshade basta) */}
-      {terrainContourGeometry && !satelliteTextureCanvas && (
-        <lineSegments geometry={terrainContourGeometry} renderOrder={3}>
-          <lineBasicMaterial
-            color="#9fd8ff"
-            transparent
-            opacity={0.4}
-            depthWrite={false}
-          />
-        </lineSegments>
+      {/* Terrain heightfield mesh (vertex-color or satellite drape + contours) */}
+      {terrain && terrain.length > 0 && (
+        <TerrainMesh
+          terrain={terrain}
+          config={config}
+          satelliteTextureCanvas={satelliteTextureCanvas}
+        />
       )}
 
       {/* OSM 3D overlay: edificios, caminos, agua, árboles */}
