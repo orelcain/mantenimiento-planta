@@ -82,6 +82,8 @@ import {
   parseCoordinatesText,
 } from '@/lib/terrainImport'
 import { fetchSatelliteTexture } from '@/lib/satelliteTexture'
+import { tilesToGrid, generateHillshade, compositeTerrain } from '@/lib/terrainComposite'
+import { fetchOSMFeatures } from '@/lib/osmBuildings'
 
 type BackgroundCalibrationMode = 'move' | 'scale' | 'rotate'
 type BackgroundDisplayMode = NonNullable<NonNullable<IsometricMap['backgroundMap']>['displayMode']>
@@ -1731,12 +1733,33 @@ export function MapPage() {
       setTerrainGeoBounds(result.geoBounds)
       setHasUnsavedChanges(true)
 
-      // Fetch satellite texture in background (non-blocking)
+      // Fetch satellite texture + hillshade + landcover in background (non-blocking)
       const { minLat, maxLat, minLon, maxLon } = result.bounds
-      fetchSatelliteTexture(minLat, maxLat, minLon, maxLon).then(
-        (satResult) => setSatelliteTextureCanvas(satResult.canvas),
-        () => { /* satellite texture is optional */ }
-      )
+      const terrainTilesSnapshot = result.tiles
+      ;(async () => {
+        try {
+          // Parallel fetch: satellite imagery + OSM landcover
+          const [satResult, osmResult] = await Promise.all([
+            fetchSatelliteTexture(minLat, maxLat, minLon, maxLon),
+            fetchOSMFeatures(minLat, maxLat, minLon, maxLon).catch(() => ({ buildings: [], roads: [], water: [], landcover: [] })),
+          ])
+
+          // Generate hillshade from elevation data
+          const eg = tilesToGrid(terrainTilesSnapshot)
+          const hillshade = generateHillshade(eg, satResult.width, satResult.height)
+
+          // Composite: satellite + landcover overlay + hillshade blending
+          const composited = compositeTerrain(
+            satResult.canvas,
+            hillshade,
+            osmResult.landcover.length > 0 ? { features: osmResult.landcover, bounds: { minLat, maxLat, minLon, maxLon } } : undefined,
+          )
+
+          setSatelliteTextureCanvas(composited)
+        } catch {
+          // Satellite/composite is optional — terrain still renders with vertex colors
+        }
+      })()
 
       setTerrainEditableMin((prev) => Math.max(MIN_TERRAIN_ELEVATION, Math.min(prev, Math.floor(result.minElevation) - 2)))
       setTerrainEditableMax((prev) => Math.min(MAX_TERRAIN_ELEVATION, Math.max(prev, Math.ceil(result.maxElevation) + 2)))

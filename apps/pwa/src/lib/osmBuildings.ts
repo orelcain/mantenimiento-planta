@@ -1,8 +1,10 @@
 /**
- * osmBuildings — Fetch buildings, roads, and water features from
- * OpenStreetMap via the Overpass API and return structured data
- * that can be extruded as 3D objects on top of the terrain.
+ * osmBuildings — Fetch buildings, roads, water features and natural
+ * landcover from OpenStreetMap via the Overpass API and return
+ * structured data for 3D rendering and terrain compositing.
  */
+
+import type { LandcoverFeature } from './terrainComposite'
 
 export interface OSMBuilding {
   coords: { lat: number; lon: number }[]
@@ -27,6 +29,7 @@ export interface OSMFeatures {
   buildings: OSMBuilding[]
   roads: OSMRoad[]
   water: OSMWater[]
+  landcover: LandcoverFeature[]
 }
 
 const OVERPASS_API = 'https://overpass-api.de/api/interpreter'
@@ -50,6 +53,19 @@ export async function fetchOSMFeatures(
       way["highway"](${bbox});
       way["waterway"](${bbox});
       way["natural"="water"](${bbox});
+      way["natural"="wood"](${bbox});
+      way["natural"="scrub"](${bbox});
+      way["natural"="wetland"](${bbox});
+      way["natural"="sand"](${bbox});
+      way["natural"="bare_rock"](${bbox});
+      way["natural"="grassland"](${bbox});
+      way["natural"="coastline"](${bbox});
+      way["landuse"="forest"](${bbox});
+      way["landuse"="farmland"](${bbox});
+      way["landuse"="grass"](${bbox});
+      way["landuse"="meadow"](${bbox});
+      way["landuse"="orchard"](${bbox});
+      relation["natural"="water"](${bbox});
     );
     out body;
     >;
@@ -66,7 +82,7 @@ export async function fetchOSMFeatures(
     const data = await resp.json()
     return processElements(data.elements ?? [])
   } catch {
-    return { buildings: [], roads: [], water: [] }
+    return { buildings: [], roads: [], water: [], landcover: [] }
   }
 }
 
@@ -77,6 +93,7 @@ interface OverpassElement {
   lon?: number
   nodes?: number[]
   tags?: Record<string, string>
+  members?: { type: string; ref: number; role: string }[]
 }
 
 function processElements(elements: OverpassElement[]): OSMFeatures {
@@ -84,6 +101,7 @@ function processElements(elements: OverpassElement[]): OSMFeatures {
   const buildings: OSMBuilding[] = []
   const roads: OSMRoad[] = []
   const water: OSMWater[] = []
+  const landcover: LandcoverFeature[] = []
 
   for (const el of elements) {
     if (el.type === 'node' && el.lat != null && el.lon != null) {
@@ -91,11 +109,34 @@ function processElements(elements: OverpassElement[]): OSMFeatures {
     }
   }
 
-  for (const el of elements) {
-    if (el.type !== 'way' || !el.nodes) continue
-    const coords = el.nodes
+  const resolveCoords = (nodeIds: number[]) =>
+    nodeIds
       .map((nid) => nodes.get(nid))
       .filter((c): c is { lat: number; lon: number } => c != null)
+
+  for (const el of elements) {
+    if (el.type === 'relation') {
+      // Relations for large water bodies / multipolygons
+      const tags = el.tags ?? {}
+      if (tags.natural === 'water' && el.members) {
+        for (const m of el.members) {
+          if (m.type === 'way' && m.role === 'outer' && m.ref) {
+            const wayEl = elements.find((e) => e.type === 'way' && e.id === m.ref)
+            if (wayEl?.nodes) {
+              const coords = resolveCoords(wayEl.nodes)
+              if (coords.length >= 3) {
+                water.push({ coords, tags })
+                landcover.push({ coords, type: 'water' })
+              }
+            }
+          }
+        }
+      }
+      continue
+    }
+
+    if (el.type !== 'way' || !el.nodes) continue
+    const coords = resolveCoords(el.nodes)
     if (coords.length < 3) continue
 
     const tags = el.tags ?? {}
@@ -113,8 +154,32 @@ function processElements(elements: OverpassElement[]): OSMFeatures {
       roads.push({ coords, width, type: tags.highway })
     } else if (tags.waterway || tags.natural === 'water') {
       water.push({ coords, tags })
+      landcover.push({ coords, type: 'water' })
+    } else {
+      // Landcover classification
+      const lcType = classifyLandcover(tags)
+      if (lcType) {
+        landcover.push({ coords, type: lcType })
+      }
     }
   }
 
-  return { buildings, roads, water }
+  return { buildings, roads, water, landcover }
+}
+
+function classifyLandcover(
+  tags: Record<string, string>,
+): LandcoverFeature['type'] | null {
+  const nat = tags.natural
+  const lu = tags.landuse
+
+  if (nat === 'wood' || lu === 'forest' || lu === 'orchard') return 'forest'
+  if (nat === 'scrub') return 'scrub'
+  if (nat === 'wetland') return 'wetland'
+  if (nat === 'sand' || nat === 'beach') return 'sand'
+  if (nat === 'bare_rock' || nat === 'scree') return 'rock'
+  if (nat === 'grassland' || lu === 'grass' || lu === 'meadow') return 'grass'
+  if (lu === 'farmland') return 'farmland'
+
+  return null
 }

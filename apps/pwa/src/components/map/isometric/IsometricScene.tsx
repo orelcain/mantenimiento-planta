@@ -13,8 +13,8 @@
  * Es el equivalente del <Canvas> + <SceneContent> patrón Viewer3D.
  */
 
-import { Suspense, useCallback, useEffect, useMemo } from 'react'
-import { Canvas, useLoader, useThree } from '@react-three/fiber'
+import { Suspense, useCallback, useEffect, useMemo, useRef } from 'react'
+import { Canvas, useLoader, useThree, useFrame } from '@react-three/fiber'
 // drei helpers disponibles si se necesitan (Environment, etc.)
 import * as THREE from 'three'
 import { IsometricCamera } from './IsometricCamera'
@@ -161,6 +161,31 @@ function getContourIntersection(
     contourLevel + 0.14,
     start[2] + (end[2] - start[2]) * t,
   ]
+}
+
+/** Plano de agua animado para representar la costa / nivel del mar */
+function WaterPlane({ width, depth, seaLevel }: { width: number; depth: number; seaLevel: number }) {
+  const meshRef = useRef<THREE.Mesh>(null)
+  useFrame(({ clock }) => {
+    if (meshRef.current) {
+      // Gentle wave motion
+      meshRef.current.position.y = seaLevel + Math.sin(clock.elapsedTime * 0.6) * 0.08
+    }
+  })
+  return (
+    <mesh ref={meshRef} rotation-x={-Math.PI / 2} position={[0, seaLevel, 0]} renderOrder={4}>
+      <planeGeometry args={[width * 1.5, depth * 1.5]} />
+      <meshStandardMaterial
+        color="#1a5e8a"
+        transparent
+        opacity={0.55}
+        roughness={0.15}
+        metalness={0.3}
+        depthWrite={false}
+        side={THREE.DoubleSide}
+      />
+    </mesh>
+  )
 }
 
 /** Contenido de la escena (dentro del Canvas) */
@@ -732,14 +757,14 @@ function SceneContent({
   return (
     <>
       {/* Background color */}
-      <color attach="background" args={['#08131d']} />
+      <color attach="background" args={[satelliteTextureCanvas ? '#0a1520' : '#08131d']} />
 
-      {/* Iluminación */}
-      <ambientLight intensity={0.72} />
+      {/* Iluminación — más cálida y natural con satélite */}
+      <ambientLight intensity={satelliteTextureCanvas ? 0.85 : 0.72} />
       <directionalLight
         position={[28, 38, 18]}
-        intensity={1.1}
-        color="#fff4db"
+        intensity={satelliteTextureCanvas ? 1.3 : 1.1}
+        color={satelliteTextureCanvas ? '#fff8e8' : '#fff4db'}
         castShadow
         shadow-mapSize-width={2048}
         shadow-mapSize-height={2048}
@@ -749,8 +774,8 @@ function SceneContent({
         shadow-camera-top={50}
         shadow-camera-bottom={-50}
       />
-      <directionalLight position={[-22, 16, -20]} intensity={0.42} color="#7dd3fc" />
-      <hemisphereLight args={['#d7f0ff', '#0b1220', 0.58]} />
+      <directionalLight position={[-22, 16, -20]} intensity={0.35} color="#7dd3fc" />
+      <hemisphereLight args={[satelliteTextureCanvas ? '#e3f0ff' : '#d7f0ff', '#0b1220', satelliteTextureCanvas ? 0.65 : 0.58]} />
 
       {/* Ambiente */}
       <fog attach="fog" args={['#0b1622', 120, 260]} />
@@ -812,22 +837,21 @@ function SceneContent({
         <mesh geometry={terrainSolidGeometry} castShadow receiveShadow renderOrder={2}>
           <meshStandardMaterial
             vertexColors
-            roughness={0.9}
+            roughness={0.85}
             metalness={0}
-            emissive="#16311c"
-            emissiveIntensity={0.16}
             side={THREE.FrontSide}
           />
         </mesh>
       )}
 
-      {/* Terreno con textura satelital */}
+      {/* Terreno con textura satelital + hillshade compuesto */}
       {terrainSolidGeometry && satelliteTextureCanvas && (
         <mesh geometry={terrainSolidGeometry} castShadow receiveShadow renderOrder={2}>
           <meshStandardMaterial
-            roughness={0.92}
-            metalness={0}
+            roughness={0.88}
+            metalness={0.02}
             side={THREE.FrontSide}
+            envMapIntensity={0.3}
           >
             <canvasTexture
               attach="map"
@@ -842,12 +866,22 @@ function SceneContent({
         </mesh>
       )}
 
-      {terrainContourGeometry && (
+      {/* Plano de agua en nivel del mar (solo si hay terreno costero) */}
+      {terrainSolidGeometry && terrainMetrics.minElevation < 8 && (
+        <WaterPlane
+          width={config.width}
+          depth={config.depth}
+          seaLevel={Math.max(SEA_LEVEL_ELEVATION, terrainMetrics.minElevation + 0.5)}
+        />
+      )}
+
+      {/* Contornos solo sin textura satelital (con satélite el hillshade basta) */}
+      {terrainContourGeometry && !satelliteTextureCanvas && (
         <lineSegments geometry={terrainContourGeometry} renderOrder={3}>
           <lineBasicMaterial
             color="#9fd8ff"
             transparent
-            opacity={0.5}
+            opacity={0.4}
             depthWrite={false}
           />
         </lineSegments>
