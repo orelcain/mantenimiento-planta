@@ -7,7 +7,7 @@
  * - Trees: Instanced cone+cylinder shapes in forest/scrub areas
  */
 
-import { useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { TerrainGeoBounds } from '@/lib/terrainImport'
@@ -435,7 +435,7 @@ function TreeField({ trees }: { trees: { x: number; y: number; z: number; scale:
   const trunkRef = useRef<THREE.InstancedMesh>(null)
   const canopyRef = useRef<THREE.InstancedMesh>(null)
 
-  useMemo(() => {
+  useEffect(() => {
     if (!trunkRef.current || !canopyRef.current) return
 
     const mat = new THREE.Matrix4()
@@ -460,8 +460,7 @@ function TreeField({ trees }: { trees: { x: number; y: number; z: number; scale:
     }
     trunkRef.current.instanceMatrix.needsUpdate = true
     canopyRef.current.instanceMatrix.needsUpdate = true
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [trees, trunkRef.current, canopyRef.current])
+  }, [trees])
 
   const count = trees.length
 

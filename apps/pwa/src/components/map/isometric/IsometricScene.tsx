@@ -24,7 +24,6 @@ import { MapAreaOverlay } from './MapAreaOverlay'
 import { MapConnector } from './MapConnector'
 import { OSMOverlay3D } from './OSMOverlay3D'
 import type {
-  CameraAngle,
   IsometricMapConfig,
   MapNode,
   MapConnector as MapConnectorType,
@@ -76,7 +75,7 @@ interface IsometricSceneProps {
   onNodeClick?: (nodeId: string) => void
   onNodeHover?: (nodeId: string | null) => void
   onAreaClick?: (areaId: string) => void
-  onCameraAngleChange?: (angle: CameraAngle) => void
+
   onBackgroundClick?: () => void
   /** Editor callbacks */
   onNodeDragEnd?: (
@@ -193,7 +192,6 @@ function SceneContent({
   onNodeClick,
   onNodeHover,
   onAreaClick,
-  onCameraAngleChange: _onCameraAngleChange,
   onBackgroundClick,
   onNodeDragEnd,
   onFloorClick,

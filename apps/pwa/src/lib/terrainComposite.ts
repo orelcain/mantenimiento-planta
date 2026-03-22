@@ -68,7 +68,8 @@ export function generateHillshade(
   const canvas = document.createElement('canvas')
   canvas.width = outWidth
   canvas.height = outHeight
-  const ctx = canvas.getContext('2d')!
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return canvas
   const imgData = ctx.createImageData(outWidth, outHeight)
   const data = imgData.data
 
@@ -205,7 +206,8 @@ export function compositeTerrain(
   const canvas = document.createElement('canvas')
   canvas.width = w
   canvas.height = h
-  const ctx = canvas.getContext('2d')!
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return canvas
 
   // 1) Draw satellite imagery as base
   ctx.drawImage(satellite, 0, 0, w, h)

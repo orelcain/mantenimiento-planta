@@ -381,7 +381,7 @@ export function MapPage() {
   const [areaManagerFloor, setAreaManagerFloor] = useState<'all' | number>('all')
   const [selectedAreaId, setSelectedAreaId] = useState<string | null>(null)
   const [hoveredAreaId, setHoveredAreaId] = useState<string | null>(null)
-  const showOnlyActiveAreaEquipment = false
+
   const [buildMode, setBuildMode] = useState<BuildEditMode>('elements')
   const [terrainEditEnabled, setTerrainEditEnabled] = useState(false)
   const [terrainTool, setTerrainTool] = useState<'raise' | 'lower' | 'flatten' | 'smooth' | 'sample'>('raise')
@@ -803,13 +803,9 @@ export function MapPage() {
       filtered = filtered.filter((node) => ELEMENT_NODE_TYPES.includes(node.type))
     }
 
-    if (showOnlyActiveAreaEquipment && selectedAreaId) {
-      filtered = filtered.filter((node) => node.linkedAreaId === selectedAreaId)
-    }
-
     if (filtered.length === nodes.length) return undefined
     return new Set(filtered.map((node) => node.id))
-  }, [nodes, isEditMode, buildMode, showOnlyActiveAreaEquipment, selectedAreaId])
+  }, [nodes, isEditMode, buildMode, selectedAreaId])
 
   const managedAreas = useMemo(() => {
     const base = areaManagerFloor === 'all'
