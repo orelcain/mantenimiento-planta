@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Demo Terreno HD — Planta Chonchi</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0a0e14; color: #e0e8f0; font-family: 'Segoe UI', system-ui, sans-serif; overflow: hidden; }
+
+  #loading {
+    position: fixed; inset: 0; z-index: 1000;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: #0a0e14;
+  }
+  #loading h1 { font-size: 1.4rem; margin-bottom: 16px; color: #6ecbf5; }
+  #loading .bar-wrap { width: 320px; height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden; }
+  #loading .bar-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #00a6b2, #6ecbf5); transition: width 0.3s; }
+  #loading .status { margin-top: 12px; font-size: 0.82rem; color: #8aa8c8; text-align: center; max-width: 400px; }
+
+  #canvas3d { width: 100vw; height: 100vh; display: block; }
+
+  .hud {
+    position: fixed; top: 16px; left: 16px; z-index: 100;
+    background: rgba(10,14,20,0.88); backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.08); border-radius: 12px;
+    padding: 16px 20px; max-width: 340px;
+  }
+  .hud h2 { font-size: 0.9rem; color: #6ecbf5; margin-bottom: 8px; letter-spacing: 0.5px; }
+  .hud .stat { font-size: 0.78rem; color: #8aa8c8; margin: 3px 0; }
+  .hud .stat b { color: #e0e8f0; }
+
+  .controls {
+    position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 100;
+    display: flex; gap: 8px; background: rgba(10,14,20,0.88); backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 10px 16px;
+  }
+  .controls button {
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+    color: #e0e8f0; padding: 6px 14px; border-radius: 6px; cursor: pointer;
+    font-size: 0.78rem; transition: all 0.2s;
+  }
+  .controls button:hover { background: rgba(110,203,245,0.15); border-color: #6ecbf5; }
+  .controls button.active { background: rgba(110,203,245,0.2); border-color: #6ecbf5; color: #6ecbf5; }
+
+  .legend {
+    position: fixed; top: 16px; right: 16px; z-index: 100;
+    background: rgba(10,14,20,0.88); backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.08); border-radius: 12px;
+    padding: 12px 16px; font-size: 0.75rem;
+  }
+  .legend h3 { color: #6ecbf5; font-size: 0.8rem; margin-bottom: 6px; }
+  .legend .item { display: flex; align-items: center; gap: 8px; margin: 3px 0; color: #8aa8c8; }
+  .legend .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(255,255,255,0.15); }
+</style>
+</head>
+<body>
+
+<!-- Loading screen -->
+<div id="loading">
+  <h1>Generando Terreno HD — Planta Chonchi</h1>
+  <div class="bar-wrap"><div class="bar-fill" id="progressBar"></div></div>
+  <div class="status" id="statusText">Iniciando...</div>
+</div>
+
+<!-- 3D Canvas -->
+<canvas id="canvas3d"></canvas>
+
+<!-- HUD -->
+<div class="hud" id="hud" style="display:none">
+  <h2>TERRENO HD · PLANTA CHONCHI</h2>
+  <div class="stat">Elevación: <b id="hudElev">—</b></div>
+  <div class="stat">Resolución DEM: <b id="hudRes">—</b></div>
+  <div class="stat">Puntos terreno: <b id="hudPts">—</b></div>
+  <div class="stat">Edificios OSM: <b id="hudBldg">—</b></div>
+  <div class="stat">Textura: <b id="hudTex">—</b></div>
+</div>
+
+<!-- Legend -->
+<div class="legend" id="legendPanel" style="display:none">
+  <h3>Capas</h3>
+  <div class="item"><div class="swatch" style="background:#4a90d9"></div>Edificios OSM</div>
+  <div class="item"><div class="swatch" style="background:#7ec87e"></div>Vegetación</div>
+  <div class="item"><div class="swatch" style="background:#d4a76a"></div>Caminos</div>
+  <div class="item"><div class="swatch" style="background:#6ecbf5"></div>Agua</div>
+  <div class="item"><div class="swatch" style="background:rgba(255,255,255,0.3)"></div>Curvas de nivel</div>
+</div>
+
+<!-- Controls -->
+<div class="controls" id="controlsBar" style="display:none">
+  <button onclick="toggleWireframe()" id="btnWire">Wireframe</button>
+  <button onclick="toggleContours()" id="btnContour">Curvas nivel</button>
+  <button onclick="toggleBuildings()" id="btnBldg" class="active">Edificios</button>
+  <button onclick="toggleSatellite()" id="btnSat" class="active">Satélite</button>
+  <button onclick="cycleExaggeration()" id="btnExag">Exag: 2.5x</button>
+  <button onclick="resetCamera()">Reset cámara</button>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.179.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.179.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+/* ═══════════════════════════════════════════════════════════════
+   CONFIGURACIÓN
+   ═══════════════════════════════════════════════════════════════ */
+const PLANT_RECT = [
+  { lat: -42.632500, lon: -73.763200 },
+  { lat: -42.629200, lon: -73.757900 },
+  { lat: -42.630800, lon: -73.756300 },
+  { lat: -42.633400, lon: -73.762600 },
+];
+
+// Expandir bbox un 30% para contexto
+const EXPAND = 0.3;
+const lats = PLANT_RECT.map(p => p.lat);
+const lons = PLANT_RECT.map(p => p.lon);
+const latMin = Math.min(...lats), latMax = Math.max(...lats);
+const lonMin = Math.min(...lons), lonMax = Math.max(...lons);
+const dLat = (latMax - latMin) * EXPAND;
+const dLon = (lonMax - lonMin) * EXPAND;
+const BBOX = {
+  south: latMin - dLat, north: latMax + dLat,
+  west: lonMin - dLon, east: lonMax + dLon,
+};
+
+const TERRAIN_ZOOM = 14;      // AWS terrain tiles zoom (~5-10m/px)
+const SAT_ZOOM = 17;          // Satellite tiles zoom (~1.2m/px)
+const MESH_RESOLUTION = 128;  // Grid points per side for terrain mesh
+let EXAGGERATION = 2.5;
+const EXAG_OPTIONS = [1.0, 1.5, 2.5, 4.0, 6.0];
+let exagIdx = 2;
+
+/* ═══════════════════════════════════════════════════════════════
+   UTILIDADES GEO
+   ═══════════════════════════════════════════════════════════════ */
+function latLonToMercator(lat, lon) {
+  const x = (lon + 180) / 360;
+  const sinLat = Math.sin(lat * Math.PI / 180);
+  const y = 0.5 - Math.log((1 + sinLat) / (1 - sinLat)) / (4 * Math.PI);
+  return { x, y };
+}
+
+function lonLatToTile(lon, lat, zoom) {
+  const n = Math.pow(2, zoom);
+  const x = Math.floor((lon + 180) / 360 * n);
+  const latRad = lat * Math.PI / 180;
+  const y = Math.floor((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n);
+  return { x, y };
+}
+
+function tileBounds(tx, ty, zoom) {
+  const n = Math.pow(2, zoom);
+  const lonW = tx / n * 360 - 180;
+  const lonE = (tx + 1) / n * 360 - 180;
+  const latN = Math.atan(Math.sinh(Math.PI * (1 - 2 * ty / n))) * 180 / Math.PI;
+  const latS = Math.atan(Math.sinh(Math.PI * (1 - 2 * (ty + 1) / n))) * 180 / Math.PI;
+  return { north: latN, south: latS, east: lonE, west: lonW };
+}
+
+// Haversine distance
+function geoDistMeters(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+const SCENE_WIDTH = geoDistMeters(BBOX.south, BBOX.west, BBOX.south, BBOX.east);
+const SCENE_DEPTH = geoDistMeters(BBOX.south, BBOX.west, BBOX.north, BBOX.west);
+
+function progress(pct, text) {
+  document.getElementById('progressBar').style.width = pct + '%';
+  document.getElementById('statusText').textContent = text;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   1. AWS TERRAIN TILES (Terrarium encoding)
+   ═══════════════════════════════════════════════════════════════ */
+async function fetchTerrainTiles() {
+  progress(5, 'Descargando tiles de elevación (AWS Terrain Tiles)...');
+
+  const minTile = lonLatToTile(BBOX.west, BBOX.north, TERRAIN_ZOOM);
+  const maxTile = lonLatToTile(BBOX.east, BBOX.south, TERRAIN_ZOOM);
+
+  const tiles = [];
+  const tileCountX = maxTile.x - minTile.x + 1;
+  const tileCountY = maxTile.y - minTile.y + 1;
+
+  // Canvas para componer todos los tiles
+  const compositeCanvas = document.createElement('canvas');
+  compositeCanvas.width = tileCountX * 256;
+  compositeCanvas.height = tileCountY * 256;
+  const ctx = compositeCanvas.getContext('2d');
+
+  let fetched = 0;
+  const total = tileCountX * tileCountY;
+
+  for (let ty = minTile.y; ty <= maxTile.y; ty++) {
+    for (let tx = minTile.x; tx <= maxTile.x; tx++) {
+      const url = `https://s3.amazonaws.com/elevation-tiles-prod/terrarium/${TERRAIN_ZOOM}/${tx}/${ty}.png`;
+      try {
+        const resp = await fetch(url);
+        if (resp.ok) {
+          const blob = await resp.blob();
+          const bmp = await createImageBitmap(blob);
+          const px = (tx - minTile.x) * 256;
+          const py = (ty - minTile.y) * 256;
+          ctx.drawImage(bmp, px, py, 256, 256);
+        }
+      } catch (e) { console.warn('Terrain tile fail:', tx, ty, e); }
+      fetched++;
+      progress(5 + (fetched / total) * 20, `Tiles elevación: ${fetched}/${total}`);
+    }
+  }
+
+  // Decodificar elevaciones del canvas compuesto
+  const imgData = ctx.getImageData(0, 0, compositeCanvas.width, compositeCanvas.height);
+  const pixels = imgData.data;
+
+  // Mapear bbox completo al canvas
+  const tileBoundsMin = tileBounds(minTile.x, minTile.y, TERRAIN_ZOOM);
+  const tileBoundsMax = tileBounds(maxTile.x + 1, maxTile.y + 1, TERRAIN_ZOOM);
+  const fullBounds = {
+    north: tileBoundsMin.north, south: tileBoundsMax.south || tileBoundsMax.north,
+    west: tileBoundsMin.west, east: tileBoundsMax.east,
+  };
+  // Fix south: tileBounds of ty+1
+  const tb2 = tileBounds(minTile.x, maxTile.y + 1, TERRAIN_ZOOM);
+  fullBounds.south = tb2.north;
+
+  // Sample elevation grid at MESH_RESOLUTION
+  const elevGrid = [];
+  for (let row = 0; row < MESH_RESOLUTION; row++) {
+    const lat = BBOX.north - (row / (MESH_RESOLUTION - 1)) * (BBOX.north - BBOX.south);
+    for (let col = 0; col < MESH_RESOLUTION; col++) {
+      const lon = BBOX.west + (col / (MESH_RESOLUTION - 1)) * (BBOX.east - BBOX.west);
+
+      // Map lat/lon to pixel in composite canvas
+      const u = (lon - fullBounds.west) / (fullBounds.east - fullBounds.west);
+      const v = (fullBounds.north - lat) / (fullBounds.north - fullBounds.south);
+      const px = Math.floor(u * (compositeCanvas.width - 1));
+      const py = Math.floor(v * (compositeCanvas.height - 1));
+      const idx = (py * compositeCanvas.width + px) * 4;
+
+      // Terrarium encoding: elevation = (R * 256 + G + B / 256) - 32768
+      const R = pixels[idx], G = pixels[idx + 1], B = pixels[idx + 2];
+      const elev = (R * 256 + G + B / 256) - 32768;
+      elevGrid.push(elev);
+    }
+  }
+
+  return { elevGrid, width: SCENE_WIDTH, depth: SCENE_DEPTH, cols: MESH_RESOLUTION, rows: MESH_RESOLUTION };
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   2. TEXTURA SATELITAL (Esri World Imagery)
+   ═══════════════════════════════════════════════════════════════ */
+async function fetchSatelliteTexture() {
+  progress(30, 'Descargando textura satelital (Esri World Imagery zoom 17)...');
+
+  const minTile = lonLatToTile(BBOX.west, BBOX.north, SAT_ZOOM);
+  const maxTile = lonLatToTile(BBOX.east, BBOX.south, SAT_ZOOM);
+  const tileCountX = maxTile.x - minTile.x + 1;
+  const tileCountY = maxTile.y - minTile.y + 1;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = tileCountX * 256;
+  canvas.height = tileCountY * 256;
+  const ctx = canvas.getContext('2d');
+
+  let fetched = 0;
+  const total = tileCountX * tileCountY;
+
+  for (let ty = minTile.y; ty <= maxTile.y; ty++) {
+    for (let tx = minTile.x; tx <= maxTile.x; tx++) {
+      const url = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${SAT_ZOOM}/${ty}/${tx}`;
+      try {
+        const resp = await fetch(url);
+        if (resp.ok) {
+          const blob = await resp.blob();
+          const bmp = await createImageBitmap(blob);
+          ctx.drawImage(bmp, (tx - minTile.x) * 256, (ty - minTile.y) * 256, 256, 256);
+        }
+      } catch (e) { console.warn('Sat tile fail:', tx, ty, e); }
+      fetched++;
+      progress(30 + (fetched / total) * 20, `Tiles satélite: ${fetched}/${total}`);
+    }
+  }
+
+  // Crop to exact bbox
+  const tileBoundsNW = tileBounds(minTile.x, minTile.y, SAT_ZOOM);
+  const tileBoundsSE_tile = tileBounds(maxTile.x, maxTile.y + 1, SAT_ZOOM);
+  const fullW = tileBoundsNW.west;
+  const fullN = tileBoundsNW.north;
+  const fullE = tileBounds(maxTile.x + 1, minTile.y, SAT_ZOOM).west;
+  const fullS = tileBoundsSE_tile.north;
+
+  // UV crop to BBOX portion of the tile canvas
+  const uMin = (BBOX.west - fullW) / (fullE - fullW);
+  const uMax = (BBOX.east - fullW) / (fullE - fullW);
+  const vMin = (fullN - BBOX.north) / (fullN - fullS);
+  const vMax = (fullN - BBOX.south) / (fullN - fullS);
+
+  const cropX = Math.floor(uMin * canvas.width);
+  const cropY = Math.floor(vMin * canvas.height);
+  const cropW = Math.floor((uMax - uMin) * canvas.width);
+  const cropH = Math.floor((vMax - vMin) * canvas.height);
+
+  const croppedCanvas = document.createElement('canvas');
+  croppedCanvas.width = cropW;
+  croppedCanvas.height = cropH;
+  croppedCanvas.getContext('2d').drawImage(canvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+
+  return croppedCanvas;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   3. OPENSTREETMAP DATA (Overpass API)
+   ═══════════════════════════════════════════════════════════════ */
+async function fetchOSMData() {
+  progress(55, 'Consultando edificios y caminos (OpenStreetMap Overpass)...');
+
+  const bbox = `${BBOX.south},${BBOX.west},${BBOX.north},${BBOX.east}`;
+  const query = `
+    [out:json][timeout:30];
+    (
+      way["building"](${bbox});
+      way["highway"](${bbox});
+      way["waterway"](${bbox});
+      way["natural"="water"](${bbox});
+      way["landuse"](${bbox});
+    );
+    out body;
+    >;
+    out skel qt;
+  `;
+
+  try {
+    const resp = await fetch('https://overpass-api.de/api/interpreter', {
+      method: 'POST',
+      body: 'data=' + encodeURIComponent(query),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+    if (!resp.ok) throw new Error(`Overpass ${resp.status}`);
+    const data = await resp.json();
+    progress(65, `OSM: ${data.elements.length} elementos recibidos`);
+    return data;
+  } catch (e) {
+    console.warn('OSM fetch failed:', e);
+    progress(65, 'OSM no disponible, continuando sin edificios...');
+    return { elements: [] };
+  }
+}
+
+function processOSMData(osmData) {
+  const nodes = {};
+  const buildings = [];
+  const roads = [];
+  const water = [];
+
+  for (const el of osmData.elements) {
+    if (el.type === 'node') {
+      nodes[el.id] = { lat: el.lat, lon: el.lon };
+    }
+  }
+
+  for (const el of osmData.elements) {
+    if (el.type !== 'way' || !el.nodes) continue;
+    const coords = el.nodes.map(nid => nodes[nid]).filter(Boolean);
+    if (coords.length < 3) continue;
+
+    const tags = el.tags || {};
+    if (tags.building) {
+      const height = parseFloat(tags['building:height'] || tags.height || '0') || (parseFloat(tags['building:levels'] || '1') * 3.2);
+      buildings.push({ coords, height: Math.max(3, height), tags });
+    } else if (tags.highway) {
+      const width = tags.highway === 'primary' ? 6 : tags.highway === 'secondary' ? 5 : tags.highway === 'residential' ? 4 : 3;
+      roads.push({ coords, width, type: tags.highway });
+    } else if (tags.waterway || tags.natural === 'water') {
+      water.push({ coords, tags });
+    }
+  }
+
+  return { buildings, roads, water };
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   4. HILLSHADE GENERATION
+   ═══════════════════════════════════════════════════════════════ */
+function generateHillshade(elevGrid, cols, rows) {
+  const size = 512;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const imgData = ctx.createImageData(size, size);
+  const light = new THREE.Vector3(-0.5, 0.6, 0.7).normalize();
+
+  for (let y = 0; y < size; y++) {
+    const row = (y / (size - 1)) * (rows - 1);
+    for (let x = 0; x < size; x++) {
+      const col = (x / (size - 1)) * (cols - 1);
+
+      const r = Math.floor(row), c = Math.floor(col);
+      const fr = row - r, fc = col - c;
+      const r1 = Math.min(r + 1, rows - 1), c1 = Math.min(c + 1, cols - 1);
+
+      // Bilinear sample
+      const h00 = elevGrid[r * cols + c];
+      const h10 = elevGrid[r * cols + c1];
+      const h01 = elevGrid[r1 * cols + c];
+      const h11 = elevGrid[r1 * cols + c1];
+      const h = h00*(1-fc)*(1-fr) + h10*fc*(1-fr) + h01*(1-fc)*fr + h11*fc*fr;
+
+      // Neighbors for normal
+      const hL = c > 0 ? elevGrid[r * cols + (c-1)] : h;
+      const hR = c < cols-1 ? elevGrid[r * cols + (c+1)] : h;
+      const hU = r > 0 ? elevGrid[(r-1) * cols + c] : h;
+      const hD = r < rows-1 ? elevGrid[(r+1) * cols + c] : h;
+
+      const dx = (hR - hL) * 0.5;
+      const dy = (hD - hU) * 0.5;
+      const normal = new THREE.Vector3(-dx, -dy, 1).normalize();
+      const shade = Math.max(0, Math.min(1, normal.dot(light)));
+
+      const idx = (y * size + x) * 4;
+      const v = Math.floor(128 + shade * 127);
+      imgData.data[idx] = v;
+      imgData.data[idx+1] = v;
+      imgData.data[idx+2] = v;
+      imgData.data[idx+3] = 80; // Semi-transparent overlay
+    }
+  }
+  ctx.putImageData(imgData, 0, 0);
+  return canvas;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   5. BUILD THREE.JS SCENE
+   ═══════════════════════════════════════════════════════════════ */
+let scene, camera, renderer, controls;
+let terrainMesh, wireframeMesh, contourLines, buildingGroup;
+let terrainData, satTexture, osmFeatures;
+let showWireframe = false, showContours = false, showBuildings = true, showSatellite = true;
+
+function geoToLocal(lat, lon) {
+  const x = ((lon - BBOX.west) / (BBOX.east - BBOX.west) - 0.5) * SCENE_WIDTH;
+  const z = ((BBOX.north - lat) / (BBOX.north - BBOX.south) - 0.5) * SCENE_DEPTH;
+  return { x, z };
+}
+
+function getElevationAt(lat, lon, elevGrid, cols, rows) {
+  const u = (lon - BBOX.west) / (BBOX.east - BBOX.west);
+  const v = (BBOX.north - lat) / (BBOX.north - BBOX.south);
+  const col = u * (cols - 1);
+  const row = v * (rows - 1);
+  const c = Math.floor(col), r = Math.floor(row);
+  const fc = col - c, fr = row - r;
+  const c1 = Math.min(c + 1, cols - 1), r1 = Math.min(r + 1, rows - 1);
+  const h00 = elevGrid[r * cols + c];
+  const h10 = elevGrid[r * cols + c1];
+  const h01 = elevGrid[r1 * cols + c];
+  const h11 = elevGrid[r1 * cols + c1];
+  return h00*(1-fc)*(1-fr) + h10*fc*(1-fr) + h01*(1-fc)*fr + h11*fc*fr;
+}
+
+function buildTerrainMesh(data, satCanvas) {
+  const { elevGrid, width, depth, cols, rows } = data;
+  const minElev = Math.min(...elevGrid);
+  const maxElev = Math.max(...elevGrid);
+  const range = Math.max(1, maxElev - minElev);
+
+  const geo = new THREE.PlaneGeometry(width, depth, cols - 1, rows - 1);
+  geo.rotateX(-Math.PI / 2);
+  const pos = geo.getAttribute('position');
+  const colors = [];
+  const uvs = geo.getAttribute('uv');
+
+  for (let i = 0; i < pos.count; i++) {
+    const elev = elevGrid[i] ?? minElev;
+    const y = (elev - minElev) * EXAGGERATION;
+    pos.setY(i, y);
+
+    // Topographic colors as fallback
+    const norm = (elev - minElev) / range;
+    const color = new THREE.Color();
+    if (norm < 0.1) color.setHex(0x4f95bf);        // Agua
+    else if (norm < 0.25) color.setHex(0x78c1a8);  // Costa
+    else if (norm < 0.45) color.setHex(0x8cbc6e);  // Verde bajo
+    else if (norm < 0.7) color.setHex(0x6d9a58);   // Verde alto
+    else if (norm < 0.88) color.setHex(0xa68860);   // Roca
+    else color.setHex(0xd4cbb8);                    // Cima
+    colors.push(color.r, color.g, color.b);
+  }
+
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  geo.computeVertexNormals();
+
+  // Material: satellite texture if available, else vertex colors
+  let material;
+  if (satCanvas && showSatellite) {
+    const tex = new THREE.CanvasTexture(satCanvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 8;
+
+    // Blend satellite with hillshade
+    const hillshadeCanvas = generateHillshade(elevGrid, cols, rows);
+
+    material = new THREE.MeshStandardMaterial({
+      map: tex,
+      roughness: 0.95,
+      metalness: 0,
+      envMapIntensity: 0.3,
+    });
+  } else {
+    material = new THREE.MeshStandardMaterial({
+      vertexColors: true,
+      roughness: 0.92,
+      metalness: 0,
+    });
+  }
+
+  const mesh = new THREE.Mesh(geo, material);
+  mesh.receiveShadow = true;
+  return mesh;
+}
+
+function buildContourLines(data) {
+  const { elevGrid, width, depth, cols, rows } = data;
+  const minElev = Math.min(...elevGrid);
+  const maxElev = Math.max(...elevGrid);
+  const interval = (maxElev - minElev) > 30 ? 5 : 2; // Adaptive interval
+
+  const group = new THREE.Group();
+  const contourLevels = [];
+  for (let h = Math.ceil(minElev / interval) * interval; h <= maxElev; h += interval) {
+    contourLevels.push(h);
+  }
+
+  for (const level of contourLevels) {
+    const points = [];
+    for (let r = 0; r < rows - 1; r++) {
+      for (let c = 0; c < cols - 1; c++) {
+        const h00 = elevGrid[r * cols + c];
+        const h10 = elevGrid[r * cols + (c+1)];
+        const h01 = elevGrid[(r+1) * cols + c];
+        const h11 = elevGrid[(r+1) * cols + (c+1)];
+
+        const edges = [
+          [h00, h10, c, r, c+1, r],
+          [h10, h11, c+1, r, c+1, r+1],
+          [h11, h01, c+1, r+1, c, r+1],
+          [h01, h00, c, r+1, c, r],
+        ];
+
+        const crossings = [];
+        for (const [ha, hb, ca, ra, cb, rb] of edges) {
+          if ((ha <= level && hb > level) || (ha > level && hb <= level)) {
+            const t = (level - ha) / (hb - ha);
+            const x = ((ca + t * (cb - ca)) / (cols - 1) - 0.5) * width;
+            const z = ((ra + t * (rb - ra)) / (rows - 1) - 0.5) * depth;
+            const y = (level - Math.min(...elevGrid)) * EXAGGERATION + 0.3;
+            crossings.push(new THREE.Vector3(x, y, z));
+          }
+        }
+
+        if (crossings.length === 2) {
+          points.push(crossings[0], crossings[1]);
+        }
+      }
+    }
+
+    if (points.length > 0) {
+      const geo = new THREE.BufferGeometry().setFromPoints(points);
+      const isMajor = (level % (interval * 5)) === 0;
+      const mat = new THREE.LineBasicMaterial({
+        color: isMajor ? 0xffffff : 0xcccccc,
+        transparent: true,
+        opacity: isMajor ? 0.4 : 0.15,
+      });
+      group.add(new THREE.LineSegments(geo, mat));
+    }
+  }
+
+  return group;
+}
+
+function buildOSMBuildings(features, elevData) {
+  const group = new THREE.Group();
+  const { elevGrid, cols, rows } = elevData;
+
+  for (const bldg of features.buildings) {
+    const shape = new THREE.Shape();
+    let first = true;
+    let baseElev = Infinity;
+
+    // Get base elevation for this building
+    for (const c of bldg.coords) {
+      const e = getElevationAt(c.lat, c.lon, elevGrid, cols, rows);
+      baseElev = Math.min(baseElev, e);
+    }
+    const minElev = Math.min(...elevGrid);
+
+    for (const c of bldg.coords) {
+      const local = geoToLocal(c.lat, c.lon);
+      if (first) { shape.moveTo(local.x, local.z); first = false; }
+      else shape.lineTo(local.x, local.z);
+    }
+    shape.closePath();
+
+    const height = bldg.height * EXAGGERATION * 0.4; // Scale building height
+    const extrudeSettings = { depth: height, bevelEnabled: false };
+    const geo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+    geo.rotateX(-Math.PI / 2);
+
+    const mat = new THREE.MeshStandardMaterial({
+      color: 0x5588bb,
+      roughness: 0.7,
+      metalness: 0.1,
+      transparent: true,
+      opacity: 0.85,
+    });
+
+    const mesh = new THREE.Mesh(geo, mat);
+    const baseY = (baseElev - minElev) * EXAGGERATION;
+    mesh.position.y = baseY;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    group.add(mesh);
+  }
+
+  // Roads as flat ribbons
+  for (const road of features.roads) {
+    if (road.coords.length < 2) continue;
+    const points = [];
+    const minElev = Math.min(...elevGrid);
+    for (const c of road.coords) {
+      const local = geoToLocal(c.lat, c.lon);
+      const elev = getElevationAt(c.lat, c.lon, elevGrid, cols, rows);
+      const y = (elev - minElev) * EXAGGERATION + 0.5;
+      points.push(new THREE.Vector3(local.x, y, local.z));
+    }
+
+    const geo = new THREE.BufferGeometry().setFromPoints(points);
+    const mat = new THREE.LineBasicMaterial({
+      color: road.type === 'primary' ? 0xd4a76a : road.type === 'secondary' ? 0xc09858 : 0x998866,
+      linewidth: 1,
+    });
+    group.add(new THREE.Line(geo, mat));
+  }
+
+  // Water bodies
+  for (const w of features.water) {
+    if (w.coords.length < 3) continue;
+    const shape = new THREE.Shape();
+    let first = true;
+    for (const c of w.coords) {
+      const local = geoToLocal(c.lat, c.lon);
+      if (first) { shape.moveTo(local.x, local.z); first = false; }
+      else shape.lineTo(local.x, local.z);
+    }
+    shape.closePath();
+
+    const geo = new THREE.ShapeGeometry(shape);
+    geo.rotateX(-Math.PI / 2);
+    const mat = new THREE.MeshStandardMaterial({
+      color: 0x3a7ec8,
+      roughness: 0.3,
+      metalness: 0.2,
+      transparent: true,
+      opacity: 0.7,
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.y = 0.2;
+    group.add(mesh);
+  }
+
+  return group;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   6. PLANT BOUNDARY MARKER
+   ═══════════════════════════════════════════════════════════════ */
+function buildPlantBoundary(elevData) {
+  const { elevGrid, cols, rows } = elevData;
+  const minElev = Math.min(...elevGrid);
+  const points = [];
+
+  for (const p of [...PLANT_RECT, PLANT_RECT[0]]) {
+    const local = geoToLocal(p.lat, p.lon);
+    const elev = getElevationAt(p.lat, p.lon, elevGrid, cols, rows);
+    const y = (elev - minElev) * EXAGGERATION + 1.5;
+    points.push(new THREE.Vector3(local.x, y, local.z));
+  }
+
+  const geo = new THREE.BufferGeometry().setFromPoints(points);
+  const mat = new THREE.LineDashedMaterial({
+    color: 0xff6b6b, dashSize: 4, gapSize: 2, linewidth: 2,
+  });
+  const line = new THREE.Line(geo, mat);
+  line.computeLineDistances();
+  return line;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   7. SCENE SETUP & MAIN
+   ═══════════════════════════════════════════════════════════════ */
+function setupScene() {
+  const canvas = document.getElementById('canvas3d');
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.1;
+
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0d1520);
+  scene.fog = new THREE.FogExp2(0x0d1520, 0.0004);
+
+  camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 1, 5000);
+  camera.position.set(SCENE_WIDTH * 0.5, SCENE_DEPTH * 0.5, SCENE_DEPTH * 0.5);
+
+  controls = new OrbitControls(camera, canvas);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  controls.maxPolarAngle = Math.PI * 0.48;
+  controls.minDistance = 20;
+  controls.maxDistance = 2000;
+  controls.target.set(0, 0, 0);
+
+  // Lighting
+  const ambient = new THREE.AmbientLight(0x8899bb, 0.5);
+  scene.add(ambient);
+
+  const hemi = new THREE.HemisphereLight(0x87ceeb, 0x444422, 0.6);
+  scene.add(hemi);
+
+  const sun = new THREE.DirectionalLight(0xfff4e0, 1.2);
+  sun.position.set(SCENE_WIDTH * 0.6, SCENE_DEPTH * 0.8, -SCENE_DEPTH * 0.3);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.camera.near = 1;
+  sun.shadow.camera.far = 3000;
+  const shadowExtent = Math.max(SCENE_WIDTH, SCENE_DEPTH) * 0.6;
+  sun.shadow.camera.left = -shadowExtent;
+  sun.shadow.camera.right = shadowExtent;
+  sun.shadow.camera.top = shadowExtent;
+  sun.shadow.camera.bottom = -shadowExtent;
+  scene.add(sun);
+
+  // Sky gradient
+  const skyGeo = new THREE.SphereGeometry(2500, 32, 16);
+  const skyMat = new THREE.ShaderMaterial({
+    side: THREE.BackSide,
+    uniforms: {
+      topColor: { value: new THREE.Color(0x0044aa) },
+      bottomColor: { value: new THREE.Color(0x0d1520) },
+    },
+    vertexShader: `varying vec3 vWorldPosition;
+      void main() {
+        vec4 wp = modelMatrix * vec4(position, 1.0);
+        vWorldPosition = wp.xyz;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }`,
+    fragmentShader: `uniform vec3 topColor; uniform vec3 bottomColor;
+      varying vec3 vWorldPosition;
+      void main() {
+        float h = normalize(vWorldPosition).y;
+        gl_FragColor = vec4(mix(bottomColor, topColor, max(h, 0.0)), 1.0);
+      }`,
+  });
+  scene.add(new THREE.Mesh(skyGeo, skyMat));
+
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+function rebuildScene() {
+  if (terrainMesh) scene.remove(terrainMesh);
+  if (wireframeMesh) scene.remove(wireframeMesh);
+  if (contourLines) scene.remove(contourLines);
+  if (buildingGroup) scene.remove(buildingGroup);
+
+  terrainMesh = buildTerrainMesh(terrainData, showSatellite ? satTexture : null);
+  scene.add(terrainMesh);
+
+  // Wireframe
+  wireframeMesh = new THREE.LineSegments(
+    new THREE.WireframeGeometry(terrainMesh.geometry),
+    new THREE.LineBasicMaterial({ color: 0xddffff, transparent: true, opacity: 0.12 })
+  );
+  wireframeMesh.visible = showWireframe;
+  scene.add(wireframeMesh);
+
+  // Contours
+  contourLines = buildContourLines(terrainData);
+  contourLines.visible = showContours;
+  scene.add(contourLines);
+
+  // OSM Buildings
+  if (osmFeatures && (osmFeatures.buildings.length + osmFeatures.roads.length + osmFeatures.water.length) > 0) {
+    buildingGroup = buildOSMBuildings(osmFeatures, terrainData);
+    buildingGroup.visible = showBuildings;
+    scene.add(buildingGroup);
+  }
+
+  // Plant boundary
+  scene.add(buildPlantBoundary(terrainData));
+}
+
+function updateHUD() {
+  const elevs = terrainData.elevGrid;
+  document.getElementById('hudElev').textContent =
+    `${Math.min(...elevs).toFixed(1)}m — ${Math.max(...elevs).toFixed(1)}m`;
+  document.getElementById('hudRes').textContent = `~${(SCENE_WIDTH / MESH_RESOLUTION).toFixed(1)}m/px (AWS Terrain z${TERRAIN_ZOOM})`;
+  document.getElementById('hudPts').textContent = `${MESH_RESOLUTION}×${MESH_RESOLUTION} = ${MESH_RESOLUTION**2}`;
+  document.getElementById('hudBldg').textContent = osmFeatures ? `${osmFeatures.buildings.length} edificios, ${osmFeatures.roads.length} caminos` : '—';
+  document.getElementById('hudTex').textContent = satTexture ? `Esri World Imagery z${SAT_ZOOM}` : 'Colores topográficos';
+}
+
+/* UI Controls */
+window.toggleWireframe = () => {
+  showWireframe = !showWireframe;
+  if (wireframeMesh) wireframeMesh.visible = showWireframe;
+  document.getElementById('btnWire').classList.toggle('active', showWireframe);
+};
+window.toggleContours = () => {
+  showContours = !showContours;
+  if (contourLines) contourLines.visible = showContours;
+  document.getElementById('btnContour').classList.toggle('active', showContours);
+};
+window.toggleBuildings = () => {
+  showBuildings = !showBuildings;
+  if (buildingGroup) buildingGroup.visible = showBuildings;
+  document.getElementById('btnBldg').classList.toggle('active', showBuildings);
+};
+window.toggleSatellite = () => {
+  showSatellite = !showSatellite;
+  document.getElementById('btnSat').classList.toggle('active', showSatellite);
+  rebuildScene();
+};
+window.cycleExaggeration = () => {
+  exagIdx = (exagIdx + 1) % EXAG_OPTIONS.length;
+  EXAGGERATION = EXAG_OPTIONS[exagIdx];
+  document.getElementById('btnExag').textContent = `Exag: ${EXAGGERATION}x`;
+  rebuildScene();
+};
+window.resetCamera = () => {
+  camera.position.set(SCENE_WIDTH * 0.5, SCENE_DEPTH * 0.5, SCENE_DEPTH * 0.5);
+  controls.target.set(0, 0, 0);
+  controls.update();
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   MAIN
+   ═══════════════════════════════════════════════════════════════ */
+async function main() {
+  try {
+    setupScene();
+
+    // Fetch all data sources in parallel where possible
+    const [terrainResult, satResult] = await Promise.all([
+      fetchTerrainTiles(),
+      fetchSatelliteTexture(),
+    ]);
+    terrainData = terrainResult;
+    satTexture = satResult;
+
+    // OSM after terrain (needs elevation for placement)
+    const osmRaw = await fetchOSMData();
+    osmFeatures = processOSMData(osmRaw);
+
+    progress(80, 'Construyendo escena 3D...');
+    rebuildScene();
+
+    progress(95, 'Finalizando...');
+    updateHUD();
+
+    // Hide loading, show UI
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('hud').style.display = '';
+    document.getElementById('legendPanel').style.display = '';
+    document.getElementById('controlsBar').style.display = '';
+
+    animate();
+  } catch (err) {
+    console.error('Error fatal:', err);
+    progress(0, `Error: ${err.message}`);
+  }
+}
+
+main();
+</script>
+</body>
+</html>

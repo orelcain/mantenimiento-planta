@@ -108,6 +108,8 @@ interface IsometricSceneProps {
   } | null
   /** Preview de bulldozer sobre celda de piso */
   bulldozerPreview?: { x: number; z: number } | null
+  /** Canvas con textura satelital para draping sobre el terreno */
+  satelliteTextureCanvas?: HTMLCanvasElement | null
 }
 
 const TOPOGRAPHIC_COLOR_STOPS = [
@@ -195,6 +197,7 @@ function SceneContent({
   visibleNodeIds,
   placementPreview,
   bulldozerPreview,
+  satelliteTextureCanvas,
 }: IsometricSceneProps) {
   const { gl } = useThree()
   const underlayDragState = useMemo(() => ({ current: null as null | {
@@ -311,6 +314,7 @@ function SceneContent({
 
     const positions: number[] = []
     const colors: number[] = []
+    const uvs: number[] = []
     const indices: number[] = []
 
     const cliffDark = new THREE.Color('#1f2f26')
@@ -337,9 +341,10 @@ function SceneContent({
       color.offsetHSL(0, 0.02, 0.08)
     }
 
-    const pushVertex = (x: number, y: number, z: number, c: THREE.Color) => {
+    const pushVertex = (x: number, y: number, z: number, c: THREE.Color, u = 0, v = 0) => {
       positions.push(x, y + 0.02, z)
       colors.push(c.r, c.g, c.b)
+      uvs.push(u, v)
       return positions.length / 3 - 1
     }
 
@@ -351,12 +356,16 @@ function SceneContent({
       colorA: THREE.Color,
       colorB: THREE.Color,
       colorC: THREE.Color,
-      colorD: THREE.Color
+      colorD: THREE.Color,
+      uvA?: [number, number],
+      uvB?: [number, number],
+      uvC?: [number, number],
+      uvD?: [number, number],
     ) => {
-      const ia = pushVertex(a[0], a[1], a[2], colorA)
-      const ib = pushVertex(b[0], b[1], b[2], colorB)
-      const ic = pushVertex(c[0], c[1], c[2], colorC)
-      const id = pushVertex(d[0], d[1], d[2], colorD)
+      const ia = pushVertex(a[0], a[1], a[2], colorA, uvA?.[0] ?? 0, uvA?.[1] ?? 0)
+      const ib = pushVertex(b[0], b[1], b[2], colorB, uvB?.[0] ?? 0, uvB?.[1] ?? 0)
+      const ic = pushVertex(c[0], c[1], c[2], colorC, uvC?.[0] ?? 0, uvC?.[1] ?? 0)
+      const id = pushVertex(d[0], d[1], d[2], colorD, uvD?.[0] ?? 0, uvD?.[1] ?? 0)
       indices.push(ia, ib, ic)
       indices.push(ia, ic, id)
     }
@@ -381,6 +390,12 @@ function SceneContent({
         setTopColor(y01)
         const c01 = color.clone()
 
+        // UV coordinates mapping each cell to its normalized position across the full grid
+        const u0 = ix / widthCells
+        const u1 = (ix + 1) / widthCells
+        const v0 = 1 - iz / depthCells        // flip V (texture top = north = iz=0)
+        const v1 = 1 - (iz + 1) / depthCells
+
         pushQuad(
           [x, y00, z],
           [x + 1, y10, z],
@@ -389,7 +404,11 @@ function SceneContent({
           c00,
           c10,
           c11,
-          c01
+          c01,
+          [u0, v0],
+          [u1, v0],
+          [u1, v1],
+          [u0, v1],
         )
       }
     }
@@ -500,6 +519,7 @@ function SceneContent({
     const geometry = new THREE.BufferGeometry()
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
     geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3))
+    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2))
     geometry.setIndex(indices)
     geometry.computeVertexNormals()
     return geometry
@@ -788,7 +808,7 @@ function SceneContent({
       )}
 
       {/* Terreno suavizado tipo heightfield (menos voxel/pixelado) */}
-      {terrainSolidGeometry && (
+      {terrainSolidGeometry && !satelliteTextureCanvas && (
         <mesh geometry={terrainSolidGeometry} castShadow receiveShadow renderOrder={2}>
           <meshStandardMaterial
             vertexColors
@@ -798,6 +818,27 @@ function SceneContent({
             emissiveIntensity={0.16}
             side={THREE.FrontSide}
           />
+        </mesh>
+      )}
+
+      {/* Terreno con textura satelital */}
+      {terrainSolidGeometry && satelliteTextureCanvas && (
+        <mesh geometry={terrainSolidGeometry} castShadow receiveShadow renderOrder={2}>
+          <meshStandardMaterial
+            roughness={0.92}
+            metalness={0}
+            side={THREE.FrontSide}
+          >
+            <canvasTexture
+              attach="map"
+              image={satelliteTextureCanvas}
+              colorSpace={THREE.SRGBColorSpace}
+              wrapS={THREE.ClampToEdgeWrapping}
+              wrapT={THREE.ClampToEdgeWrapping}
+              magFilter={THREE.LinearFilter}
+              minFilter={THREE.LinearMipmapLinearFilter}
+            />
+          </meshStandardMaterial>
         </mesh>
       )}
 

@@ -81,6 +81,7 @@ import {
   importTerrainFromRectangle,
   parseCoordinatesText,
 } from '@/lib/terrainImport'
+import { fetchSatelliteTexture } from '@/lib/satelliteTexture'
 
 type BackgroundCalibrationMode = 'move' | 'scale' | 'rotate'
 type BackgroundDisplayMode = NonNullable<NonNullable<IsometricMap['backgroundMap']>['displayMode']>
@@ -360,6 +361,7 @@ export function MapPage() {
   const [areas, setAreas] = useState<MapArea[]>([])
   const [connectors, setConnectors] = useState<MapConnectorType[]>([])
   const [terrainTiles, setTerrainTiles] = useState<TerrainTile[]>([])
+  const [satelliteTextureCanvas, setSatelliteTextureCanvas] = useState<HTMLCanvasElement | null>(null)
   // Runtime data vinculado a datos reales (Equipment, Incidents)
   const runtimeData = useMapRuntimeData(nodes)
 
@@ -1729,6 +1731,13 @@ export function MapPage() {
       setTerrainGeoBounds(result.geoBounds)
       setHasUnsavedChanges(true)
 
+      // Fetch satellite texture in background (non-blocking)
+      const { minLat, maxLat, minLon, maxLon } = result.bounds
+      fetchSatelliteTexture(minLat, maxLat, minLon, maxLon).then(
+        (satResult) => setSatelliteTextureCanvas(satResult.canvas),
+        () => { /* satellite texture is optional */ }
+      )
+
       setTerrainEditableMin((prev) => Math.max(MIN_TERRAIN_ELEVATION, Math.min(prev, Math.floor(result.minElevation) - 2)))
       setTerrainEditableMax((prev) => Math.min(MAX_TERRAIN_ELEVATION, Math.max(prev, Math.ceil(result.maxElevation) + 2)))
       setTerrainFlattenTarget(clampElevation(Math.round((result.minElevation + result.maxElevation) / 2)))
@@ -2647,6 +2656,7 @@ export function MapPage() {
                 bulldozerPreview={isEditMode && editorTool === 'bulldozer' && terrainHoverPosition
                   ? { x: terrainHoverPosition.x, z: terrainHoverPosition.z }
                   : null}
+                satelliteTextureCanvas={satelliteTextureCanvas}
                 paintTiles={showAreaEditor ? {
                   tiles: areaPaintState.tiles,
                   color: areaPaintState.color,

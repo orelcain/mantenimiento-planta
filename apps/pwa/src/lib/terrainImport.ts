@@ -98,6 +98,103 @@ const MAX_AUTO_GRID_WIDTH = 600
 const MAX_AUTO_GRID_DEPTH = 500
 const BATCH_SLEEP_MS = 1000
 
+/* ─── AWS Terrain Tiles (Terrarium encoding) ─── */
+const AWS_TERRAIN_TILE_URL = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium'
+const TERRAIN_TILE_ZOOM = 14 // ~10 m/px at equator, ~7 m/px at lat -42°
+
+export type ElevationSource = 'aws-terrain-tiles' | 'open-meteo'
+
+function lonLatToTile(lon: number, lat: number, zoom: number): { x: number; y: number } {
+  const n = Math.pow(2, zoom)
+  const x = Math.floor((lon + 180) / 360 * n)
+  const latRad = lat * Math.PI / 180
+  const y = Math.floor((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n)
+  return { x, y }
+}
+
+function tileBoundsForZoom(tx: number, ty: number, zoom: number) {
+  const n = Math.pow(2, zoom)
+  const west = tx / n * 360 - 180
+  const east = (tx + 1) / n * 360 - 180
+  const north = Math.atan(Math.sinh(Math.PI * (1 - 2 * ty / n))) * 180 / Math.PI
+  const south = Math.atan(Math.sinh(Math.PI * (1 - 2 * (ty + 1) / n))) * 180 / Math.PI
+  return { north, south, east, west }
+}
+
+/**
+ * Fetch elevation from AWS Terrain Tiles (Terrarium RGB encoding).
+ * Returns a Float32Array grid of `cols × rows` elevations sampled from
+ * the tile imagery, covering the given bounding box.
+ */
+async function fetchElevationFromTerrainTiles(
+  minLat: number, maxLat: number,
+  minLon: number, maxLon: number,
+  cols: number, rows: number,
+  onProgress?: (msg: string, pct: number) => void,
+): Promise<Float32Array> {
+  const zoom = TERRAIN_TILE_ZOOM
+  const minTile = lonLatToTile(minLon, maxLat, zoom) // NW corner -> min tile
+  const maxTile = lonLatToTile(maxLon, minLat, zoom) // SE corner -> max tile
+
+  const tilesX = maxTile.x - minTile.x + 1
+  const tilesY = maxTile.y - minTile.y + 1
+
+  // Compose all tiles into an offscreen canvas
+  const canvas = new OffscreenCanvas(tilesX * 256, tilesY * 256)
+  const ctx = canvas.getContext('2d')!
+  let fetched = 0
+  const total = tilesX * tilesY
+
+  for (let ty = minTile.y; ty <= maxTile.y; ty++) {
+    for (let tx = minTile.x; tx <= maxTile.x; tx++) {
+      const url = `${AWS_TERRAIN_TILE_URL}/${zoom}/${tx}/${ty}.png`
+      try {
+        const resp = await fetch(url)
+        if (resp.ok) {
+          const blob = await resp.blob()
+          const bmp = await createImageBitmap(blob)
+          const px = (tx - minTile.x) * 256
+          const py = (ty - minTile.y) * 256
+          ctx.drawImage(bmp, px, py, 256, 256)
+          bmp.close()
+        }
+      } catch { /* skip tile errors */ }
+      fetched++
+      onProgress?.(`Tiles elevación HD: ${fetched}/${total}`, Math.round(fetched / total * 60))
+    }
+  }
+
+  // Full tile bounds for UV mapping
+  const nwBounds = tileBoundsForZoom(minTile.x, minTile.y, zoom)
+  const seBounds = tileBoundsForZoom(maxTile.x, maxTile.y, zoom)
+  const fullWest = nwBounds.west
+  const fullNorth = nwBounds.north
+  const fullEast = tileBoundsForZoom(maxTile.x + 1, minTile.y, zoom).west
+  const fullSouth = seBounds.south
+
+  const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+  const pixels = imgData.data
+  const cw = canvas.width
+  const result = new Float32Array(cols * rows)
+
+  for (let r = 0; r < rows; r++) {
+    const lat = maxLat - (r / (rows - 1)) * (maxLat - minLat)
+    for (let c = 0; c < cols; c++) {
+      const lon = minLon + (c / (cols - 1)) * (maxLon - minLon)
+      const u = (lon - fullWest) / (fullEast - fullWest)
+      const v = (fullNorth - lat) / (fullNorth - fullSouth)
+      const px = Math.min(Math.floor(u * cw), cw - 1)
+      const py = Math.min(Math.floor(v * canvas.height), canvas.height - 1)
+      const idx = (py * cw + px) * 4
+      // Terrarium encoding: elevation = (R * 256 + G + B / 256) - 32768
+      result[r * cols + c] = (pixels[idx] * 256 + pixels[idx + 1] + pixels[idx + 2] / 256) - 32768
+    }
+  }
+
+  onProgress?.('Elevación HD lista', 60)
+  return result
+}
+
 export interface TerrainImportPreview {
   rectangleWidthMeters: number
   rectangleDepthMeters: number
@@ -396,6 +493,99 @@ export async function importTerrainFromRectangle(options: TerrainImportOptions):
   const minLon = Math.min(...longitudes)
   const maxLon = Math.max(...longitudes)
 
+  const minX = Math.floor(-config.width / 2)
+  const maxX = Math.ceil(config.width / 2)
+  const minZ = Math.floor(-config.depth / 2)
+  const maxZ = Math.ceil(config.depth / 2)
+  const widthCells = maxX - minX
+  const depthCells = maxZ - minZ
+
+  // ── Try AWS Terrain Tiles first (HD resolution) ────────────────
+  let elevationSource: ElevationSource = 'open-meteo'
+  let hdGrid: Float32Array | null = null
+  const hdCols = Math.min(widthCells, 256)
+  const hdRows = Math.min(depthCells, 256)
+
+  try {
+    const progressAdapter = onProgress
+      ? (_msg: string, _pct: number) => {
+          onProgress({
+            completedBatches: 0, totalBatches: 1,
+            completedPoints: Math.round(_pct / 100 * hdCols * hdRows),
+            totalPoints: hdCols * hdRows,
+            currentBatchSize: hdCols * hdRows,
+            percent: _pct,
+          })
+        }
+      : undefined
+
+    hdGrid = await fetchElevationFromTerrainTiles(
+      minLat, maxLat, minLon, maxLon,
+      hdCols, hdRows,
+      progressAdapter,
+    )
+    elevationSource = 'aws-terrain-tiles'
+  } catch {
+    // Fallback silencioso a Open-Meteo
+    hdGrid = null
+  }
+
+  if (hdGrid) {
+    // ── HD path: interpolate from high-res grid ──
+    const tiles: TerrainTile[] = []
+    let minElevation = Number.POSITIVE_INFINITY
+    let maxElevation = Number.NEGATIVE_INFINITY
+
+    for (let z = minZ; z < maxZ; z++) {
+      const v = (z - minZ) / Math.max(1, maxZ - minZ - 1)
+      const srcRow = v * (hdRows - 1)
+      const r0 = Math.floor(srcRow)
+      const r1 = Math.min(r0 + 1, hdRows - 1)
+      const tr = srcRow - r0
+
+      for (let x = minX; x < maxX; x++) {
+        const u = (x - minX) / Math.max(1, maxX - minX - 1)
+        const srcCol = u * (hdCols - 1)
+        const c0 = Math.floor(srcCol)
+        const c1 = Math.min(c0 + 1, hdCols - 1)
+        const tc = srcCol - c0
+
+        const v00 = hdGrid[r0 * hdCols + c0]
+        const v10 = hdGrid[r0 * hdCols + c1]
+        const v01 = hdGrid[r1 * hdCols + c0]
+        const v11 = hdGrid[r1 * hdCols + c1]
+        const rawElevation = v00 * (1 - tc) * (1 - tr) + v10 * tc * (1 - tr) + v01 * (1 - tc) * tr + v11 * tc * tr
+
+        const elevation = Math.max(MIN_TERRAIN_ELEVATION, Math.min(MAX_TERRAIN_ELEVATION, rawElevation))
+        minElevation = Math.min(minElevation, elevation)
+        maxElevation = Math.max(maxElevation, elevation)
+        if (!keepSeaLevelTiles && Math.abs(elevation - SEA_LEVEL_ELEVATION) < 0.1) continue
+        tiles.push({ x, z, elevation: Math.round(elevation * 10) / 10 })
+      }
+    }
+
+    if (!Number.isFinite(minElevation) || !Number.isFinite(maxElevation)) {
+      minElevation = SEA_LEVEL_ELEVATION
+      maxElevation = SEA_LEVEL_ELEVATION
+    }
+
+    onProgress?.({
+      completedBatches: 1, totalBatches: 1,
+      completedPoints: hdCols * hdRows, totalPoints: hdCols * hdRows,
+      currentBatchSize: 0, percent: 100,
+    })
+
+    return {
+      tiles,
+      minElevation: Math.round(minElevation * 10) / 10,
+      maxElevation: Math.round(maxElevation * 10) / 10,
+      usedSampleStep: 1,
+      bounds: { minLat, maxLat, minLon, maxLon },
+      geoBounds: { minLat, maxLat, minLon, maxLon, gridMinX: minX, gridMaxX: maxX, gridMinZ: minZ, gridMaxZ: maxZ },
+    }
+  }
+
+  // ── Fallback: Open-Meteo (legacy path) ──────────────────────────
   const sampling = resolveSamplingPlan(config, sampleStep)
   sampleStep = sampling.sampleStep
   const sampleCols = sampling.sampleCols
@@ -420,11 +610,6 @@ export async function importTerrainFromRectangle(options: TerrainImportOptions):
     const offset = row * sampleCols
     coarseGrid.push(sampleElevations.slice(offset, offset + sampleCols))
   }
-
-  const minX = Math.floor(-config.width / 2)
-  const maxX = Math.ceil(config.width / 2)
-  const minZ = Math.floor(-config.depth / 2)
-  const maxZ = Math.ceil(config.depth / 2)
 
   // --- Gaussian-smooth the coarse grid to remove sampling artifacts ---
   const smoothedGrid = gaussianSmooth3x3(coarseGrid)
