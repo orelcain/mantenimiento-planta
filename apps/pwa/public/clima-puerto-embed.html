@@ -4001,7 +4001,7 @@
       const DIAS = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
       let lastDayShown = -1;
 
-      // Compute risk index — filtrado a ventana, cada 3 horas
+      // Compute risk index — filtrado a ventana, cada 1 hora
       const labels = [];
       const riskData = [];
       const riskForecast = [];
@@ -4018,12 +4018,11 @@
         const t = weatherTimes[i];
         const d = new Date(t);
 
-        // Solo cada 3 horas dentro de la ventana
-        if (d.getHours() % 3 !== 0) continue;
+        // Cada hora dentro de la ventana
         if (d < windowStart || d > windowEnd) continue;
 
         const isPast = d <= now;
-        if (Math.abs(d - now) < 5400000 && nowIdx === -1) nowIdx = labels.length;
+        if (Math.abs(d - now) < 1800000 && nowIdx === -1) nowIdx = labels.length;
 
         const sample = {
           gust: Number(gusts[i] ?? 0),
@@ -4040,7 +4039,7 @@
         const comp = riskComponentScores(sample);
         const ri = aggregateRiskIndex(comp);
 
-        // Etiqueta: al cambiar de día o primero → "Mié 19\n00:00", resto → "03:00"
+        // Etiqueta: al cambiar de día → "Mié 19/03\n00:00"; cada 3h → "03:00"; resto → ''
         const h = d.getHours();
         const dayNum = d.getDate();
         const diaAbr = DIAS[d.getDay()];
@@ -4054,13 +4053,13 @@
           _dayBandStart = labels.length;
           _dayBandLabel = `${diaAbr} ${dayNum}/${mesStr}`;
           lastDayShown = dayNum;
-          // En overlay: solo hora (el día se muestra por las pills del plugin)
-          // En normal: día + hora en el tick de medianoche/primer punto del día
           label = isOverlay
             ? String(h).padStart(2, '0') + ':00'
             : `${diaAbr} ${dayNum}/${mesStr}\n${String(h).padStart(2,'0')}:00`;
-        } else {
+        } else if (h % 3 === 0) {
           label = String(h).padStart(2, '0') + ':00';
+        } else {
+          label = '';
         }
         labels.push(label);
 
@@ -4254,16 +4253,18 @@
                 },
                 maxRotation: 0,
                 minRotation: 0,
-                autoSkip: !isOverlay,
-                maxTicksLimit: isOverlay ? undefined : 16,
-                // En overlay: todos los labels son horas → mostrar solo 00:00, 06:00, 12:00, 18:00
-                callback: isOverlay ? function(val) {
+                autoSkip: false,
+                maxTicksLimit: isOverlay ? undefined : 56,
+                callback: function(val) {
                   const lbl = this.getLabelForValue(val);
-                  if (!lbl) return null;
-                  const str = Array.isArray(lbl) ? lbl[lbl.length - 1] : lbl;
-                  const h = parseInt(str);
-                  return (h === 0 || h === 6 || h === 12 || h === 18) ? str : null;
-                } : undefined,
+                  if (!lbl || lbl === '') return null;
+                  if (isOverlay) {
+                    const str = Array.isArray(lbl) ? lbl[lbl.length - 1] : lbl;
+                    const h = parseInt(str);
+                    return (h % 3 === 0) ? str : null;
+                  }
+                  return lbl;
+                },
               },
               grid: {
                 color: (ctx) => {
