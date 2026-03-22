@@ -1119,161 +1119,197 @@ function _dmKey(dm) {
   return 'ABIERTO'
 }
 
+/* ─── Lógica core de chequeo clima puerto (reutilizable) ─── */
+async function _runClimaCheck(source = 'scheduler') {
+  logger.info('_runClimaCheck: inicio', { source })
+
+  // 1. Fetch datos meteorológicos y marinos
+  const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${CHONCHI_LAT}&longitude=${CHONCHI_LON}&timezone=America/Santiago&hourly=precipitation,weather_code,wind_speed_10m,wind_gusts_10m,pressure_msl,cloud_cover,relative_humidity_2m,visibility&forecast_days=2`
+  const marineUrl  = `https://marine-api.open-meteo.com/v1/marine?latitude=${CHONCHI_LAT}&longitude=${CHONCHI_LON}&timezone=America/Santiago&hourly=wave_height,wave_period&forecast_days=2`
+
+  let weather, marine
+  try {
+    ;[weather, marine] = await Promise.all([_fetchJson(weatherUrl), _fetchJson(marineUrl)])
+  } catch (e) {
+    logger.error('_runClimaCheck: error fetch meteorológico', e)
+    return { error: 'fetch_failed' }
+  }
+
+  // 2. Calcular riesgo actual + máximo próximas 6h
+  const times = weather.hourly?.time ?? []
+  const nowSantiago = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Santiago' }))
+  let nowIdx = 0, minDiff = Infinity
+  times.forEach((t, i) => {
+    const diff = Math.abs(new Date(t) - nowSantiago)
+    if (diff < minDiff) { minDiff = diff; nowIdx = i }
+  })
+
+  const marineMap = {}
+  ;(marine.hourly?.time ?? []).forEach((t, i) => {
+    marineMap[t] = {
+      wave:       marine.hourly.wave_height?.[i]  ?? 0,
+      wavePeriod: marine.hourly.wave_period?.[i]  ?? 8,
+    }
+  })
+
+  let currentRi = 0, maxRiNext6h = 0
+  for (let offset = 0; offset <= 6; offset++) {
+    const idx = nowIdx + offset
+    if (idx >= times.length) break
+    const t = times[idx]
+    const sample = {
+      gust:       (weather.hourly.wind_gusts_10m?.[idx]         ?? 0) * SHELTER_FACTOR,
+      wind:       (weather.hourly.wind_speed_10m?.[idx]         ?? 0) * SHELTER_FACTOR,
+      rain:       weather.hourly.precipitation?.[idx]          ?? 0,
+      code:       weather.hourly.weather_code?.[idx]           ?? 0,
+      pressure:   weather.hourly.pressure_msl?.[idx]           ?? 1015,
+      cloud:      weather.hourly.cloud_cover?.[idx]            ?? 0,
+      humidity:   weather.hourly.relative_humidity_2m?.[idx]   ?? 0,
+      visibility: weather.hourly.visibility?.[idx]             ?? 10000,
+      wave:       marineMap[t]?.wave       ?? 0,
+      wavePeriod: marineMap[t]?.wavePeriod ?? 8,
+    }
+    const ri = _calcRiskIndex(sample)
+    if (offset === 0) currentRi = ri
+    if (ri > maxRiNext6h) maxRiNext6h = ri
+  }
+
+  const currentLevel  = _riskLevel(currentRi)
+  const forecastLevel = _riskLevel(maxRiNext6h)
+
+  // Tendencia próximas 12h
+  const trendLine = _calcTrendLine(weather, marine, nowIdx)
+
+  // 3. Estado DIRECTEMAR
+  const dm    = await _fetchDmStatus()
+  const dmKey = _dmKey(dm)
+
+  // 4. Leer estado anterior de Firestore
+  const stateRef  = db.collection('climaPuertoAlertState').doc('chonchi')
+  const stateSnap = await stateRef.get()
+  const prev      = stateSnap.exists ? stateSnap.data() : {}
+  const prevLevel = prev.forecastLevel || 'BAJO'
+  const prevDmKey = prev.dmKey         || 'UNKNOWN'
+  const prevUpdated = prev.updatedAt?.toDate?.() ?? null
+
+  logger.info('_runClimaCheck: estado', {
+    currentRi: Math.round(currentRi), maxRiNext6h: Math.round(maxRiNext6h),
+    currentLevel, forecastLevel, dmKey, prevLevel, prevDmKey,
+  })
+
+  // 5. Armar notificaciones
+  const notifications = []
+  const trendSuffix = trendLine ? `\n${trendLine}` : ''
+
+  // Horas desde la última actualización
+  const hoursSinceUpdate = prevUpdated
+    ? (Date.now() - prevUpdated.getTime()) / 3600000
+    : Infinity
+
+  const levelChanged = forecastLevel !== prevLevel
+  const dmChanged    = dmKey !== prevDmKey && dmKey !== 'UNKNOWN' && dmKey !== 'DESCONOCIDO'
+
+  // Enviar notificación de clima si:
+  // a) El nivel cambió (transición), O
+  // b) El nivel es ALTO/MEDIO y han pasado >= 3h (recordatorio periódico)
+  const shouldNotifyClima = levelChanged ||
+    ((forecastLevel === 'ALTO' || forecastLevel === 'MEDIO') && hoursSinceUpdate >= 3)
+
+  if (shouldNotifyClima) {
+    if (forecastLevel === 'ALTO') {
+      notifications.push({
+        title: '⛔ Puerto Chonchi: Cierre probable',
+        body:  `Riesgo ${Math.round(maxRiNext6h)}/100 próx. 6h. Condiciones severas en Bahía de Yal.${trendSuffix}`,
+        data:  { type: 'clima_cierre', ri: String(Math.round(maxRiNext6h)), url: '/clima-puerto' },
+      })
+    } else if (forecastLevel === 'MEDIO') {
+      notifications.push({
+        title: '⚠️ Puerto Chonchi: Posible restricción',
+        body:  `Riesgo ${Math.round(maxRiNext6h)}/100. Verificar condiciones en Bahía de Yal.${trendSuffix}`,
+        data:  { type: 'clima_restriccion', ri: String(Math.round(maxRiNext6h)), url: '/clima-puerto' },
+      })
+    } else {
+      notifications.push({
+        title: '🟢 Puerto Chonchi: Condiciones mejoran',
+        body:  `Riesgo ${Math.round(currentRi)}/100. Bahía de Yal con condiciones favorables.${trendSuffix}`,
+        data:  { type: 'clima_abierto', ri: String(Math.round(currentRi)), url: '/clima-puerto' },
+      })
+    }
+  }
+
+  if (dmChanged) {
+    if (dmKey === 'BAHIA_CERRADA') {
+      notifications.push({
+        title: '🔴 DIRECTEMAR: Bahía de Yal cerrada',
+        body:  'Restricción total oficial. Puerto Chonchi / Bahía de Yal sin operación.',
+        data:  { type: 'dm_cierre', url: '/clima-puerto' },
+      })
+    } else if (dmKey === 'RESTRINGIDO') {
+      const detail = (dm?.navesMenores && dm?.navesMayores)
+        ? 'naves mayores y menores'
+        : dm?.navesMenores ? 'naves menores' : 'naves mayores'
+      notifications.push({
+        title: '🟡 DIRECTEMAR: Puerto con restricciones',
+        body:  `Restricciones para ${detail} en Chonchi / Bahía de Yal.`,
+        data:  { type: 'dm_restriccion', url: '/clima-puerto' },
+      })
+    } else if (dmKey === 'ABIERTO') {
+      notifications.push({
+        title: '🟢 DIRECTEMAR: Puerto abierto',
+        body:  'Sin restricciones en Bahía de Yal. Puerto Chonchi operativo.',
+        data:  { type: 'dm_abierto', url: '/clima-puerto' },
+      })
+    }
+  }
+
+  // 6. Enviar push a todos los usuarios con token registrado
+  let sent = 0
+  if (notifications.length > 0) {
+    const tokens = await _getAllFcmTokens()
+    if (tokens.length === 0) {
+      logger.warn('_runClimaCheck: sin tokens FCM registrados')
+    } else {
+      for (const notif of notifications) {
+        await sendNotification(tokens, notif.title, notif.body, notif.data)
+        sent++
+      }
+    }
+  }
+
+  // 7. Guardar nuevo estado
+  await stateRef.set({
+    currentRi:    Math.round(currentRi),
+    maxRiNext6h:  Math.round(maxRiNext6h),
+    currentLevel,
+    forecastLevel,
+    dmKey,
+    updatedAt:    new Date(),
+  })
+
+  const result = {
+    currentRi: Math.round(currentRi),
+    maxRiNext6h: Math.round(maxRiNext6h),
+    currentLevel, forecastLevel, dmKey,
+    prevLevel, prevDmKey,
+    levelChanged, dmChanged, shouldNotifyClima,
+    notificacionesEnviadas: sent,
+    hoursSinceUpdate: Math.round(hoursSinceUpdate * 10) / 10,
+  }
+  logger.info('_runClimaCheck: fin', result)
+  return result
+}
+
 exports.checkClimaPortoAlert = onSchedule(
   { schedule: 'every 60 minutes', timeZone: 'America/Santiago', region: 'us-central1' },
-  async () => {
-    logger.info('checkClimaPortoAlert: inicio')
+  async () => { await _runClimaCheck('scheduler') }
+)
 
-    // 1. Fetch datos meteorológicos y marinos
-    const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${CHONCHI_LAT}&longitude=${CHONCHI_LON}&timezone=America/Santiago&hourly=precipitation,weather_code,wind_speed_10m,wind_gusts_10m,pressure_msl,cloud_cover,relative_humidity_2m,visibility&forecast_days=2`
-    const marineUrl  = `https://marine-api.open-meteo.com/v1/marine?latitude=${CHONCHI_LAT}&longitude=${CHONCHI_LON}&timezone=America/Santiago&hourly=wave_height,wave_period&forecast_days=2`
-
-    let weather, marine
-    try {
-      ;[weather, marine] = await Promise.all([_fetchJson(weatherUrl), _fetchJson(marineUrl)])
-    } catch (e) {
-      logger.error('checkClimaPortoAlert: error fetch meteorológico', e)
-      return
-    }
-
-    // 2. Calcular riesgo actual + máximo próximas 6h
-    const times = weather.hourly?.time ?? []
-    // Open-Meteo devuelve timestamps sin offset en hora Santiago ("2026-03-21T15:00").
-    // Para comparar correctamente, construimos "now" con la misma ingenuidad de zona:
-    const nowSantiago = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Santiago' }))
-    let nowIdx = 0, minDiff = Infinity
-    times.forEach((t, i) => {
-      const diff = Math.abs(new Date(t) - nowSantiago)
-      if (diff < minDiff) { minDiff = diff; nowIdx = i }
-    })
-
-    const marineMap = {}
-    ;(marine.hourly?.time ?? []).forEach((t, i) => {
-      marineMap[t] = {
-        wave:       marine.hourly.wave_height?.[i]  ?? 0,
-        wavePeriod: marine.hourly.wave_period?.[i]  ?? 8,
-      }
-    })
-
-    let currentRi = 0, maxRiNext6h = 0
-    for (let offset = 0; offset <= 6; offset++) {
-      const idx = nowIdx + offset
-      if (idx >= times.length) break
-      const t = times[idx]
-      const sample = {
-        gust:       (weather.hourly.wind_gusts_10m?.[idx]         ?? 0) * SHELTER_FACTOR,
-        wind:       (weather.hourly.wind_speed_10m?.[idx]         ?? 0) * SHELTER_FACTOR,
-        rain:       weather.hourly.precipitation?.[idx]          ?? 0,
-        code:       weather.hourly.weather_code?.[idx]           ?? 0,
-        pressure:   weather.hourly.pressure_msl?.[idx]           ?? 1015,
-        cloud:      weather.hourly.cloud_cover?.[idx]            ?? 0,
-        humidity:   weather.hourly.relative_humidity_2m?.[idx]   ?? 0,
-        visibility: weather.hourly.visibility?.[idx]             ?? 10000,
-        wave:       marineMap[t]?.wave       ?? 0,
-        wavePeriod: marineMap[t]?.wavePeriod ?? 8,
-      }
-      const ri = _calcRiskIndex(sample)
-      if (offset === 0) currentRi = ri
-      if (ri > maxRiNext6h) maxRiNext6h = ri
-    }
-
-    const currentLevel  = _riskLevel(currentRi)
-    const forecastLevel = _riskLevel(maxRiNext6h)
-
-    // Tendencia próximas 12h
-    const trendLine = _calcTrendLine(weather, marine, nowIdx)
-
-    // 3. Estado DIRECTEMAR
-    const dm    = await _fetchDmStatus()
-    const dmKey = _dmKey(dm)
-
-    // 4. Leer estado anterior de Firestore
-    const stateRef  = db.collection('climaPuertoAlertState').doc('chonchi')
-    const stateSnap = await stateRef.get()
-    const prev      = stateSnap.exists ? stateSnap.data() : {}
-    const prevLevel = prev.forecastLevel || 'BAJO'
-    const prevDmKey = prev.dmKey        || 'UNKNOWN'
-
-    logger.info('checkClimaPortoAlert: estado', {
-      currentRi: Math.round(currentRi), maxRiNext6h: Math.round(maxRiNext6h),
-      currentLevel, forecastLevel, dmKey, prevLevel, prevDmKey,
-    })
-
-    // 5. Armar notificaciones según cambios detectados
-    const notifications = []
-
-    const trendSuffix = trendLine ? `\n${trendLine}` : ''
-
-    if (forecastLevel !== prevLevel) {
-      if (forecastLevel === 'ALTO') {
-        notifications.push({
-          title: '⛔ Puerto Chonchi: Cierre probable',
-          body:  `Riesgo ${Math.round(maxRiNext6h)}/100 próx. 6h. Condiciones severas en Bahía de Yal.${trendSuffix}`,
-          data:  { type: 'clima_cierre', ri: String(Math.round(maxRiNext6h)), url: '/clima-puerto' },
-        })
-      } else if (forecastLevel === 'MEDIO') {
-        notifications.push({
-          title: '⚠️ Puerto Chonchi: Posible restricción',
-          body:  `Riesgo ${Math.round(maxRiNext6h)}/100. Verificar condiciones en Bahía de Yal.${trendSuffix}`,
-          data:  { type: 'clima_restriccion', ri: String(Math.round(maxRiNext6h)), url: '/clima-puerto' },
-        })
-      } else {
-        notifications.push({
-          title: '🟢 Puerto Chonchi: Condiciones mejoran',
-          body:  `Riesgo ${Math.round(currentRi)}/100. Bahía de Yal con condiciones favorables.${trendSuffix}`,
-          data:  { type: 'clima_abierto', ri: String(Math.round(currentRi)), url: '/clima-puerto' },
-        })
-      }
-    }
-
-    if (dmKey !== prevDmKey && dmKey !== 'UNKNOWN' && dmKey !== 'DESCONOCIDO') {
-      if (dmKey === 'BAHIA_CERRADA') {
-        notifications.push({
-          title: '🔴 DIRECTEMAR: Bahía de Yal cerrada',
-          body:  'Restricción total oficial. Puerto Chonchi / Bahía de Yal sin operación.',
-          data:  { type: 'dm_cierre', url: '/clima-puerto' },
-        })
-      } else if (dmKey === 'RESTRINGIDO') {
-        const detail = (dm?.navesMenores && dm?.navesMayores)
-          ? 'naves mayores y menores'
-          : dm?.navesMenores ? 'naves menores' : 'naves mayores'
-        notifications.push({
-          title: '🟡 DIRECTEMAR: Puerto con restricciones',
-          body:  `Restricciones para ${detail} en Chonchi / Bahía de Yal.`,
-          data:  { type: 'dm_restriccion', url: '/clima-puerto' },
-        })
-      } else if (dmKey === 'ABIERTO') {
-        notifications.push({
-          title: '🟢 DIRECTEMAR: Puerto abierto',
-          body:  'Sin restricciones en Bahía de Yal. Puerto Chonchi operativo.',
-          data:  { type: 'dm_abierto', url: '/clima-puerto' },
-        })
-      }
-    }
-
-    // 6. Enviar push a todos los usuarios con token registrado
-    if (notifications.length > 0) {
-      const tokens = await _getAllFcmTokens()
-      if (tokens.length === 0) {
-        logger.warn('checkClimaPortoAlert: sin tokens FCM registrados')
-      } else {
-        for (const notif of notifications) {
-          await sendNotification(tokens, notif.title, notif.body, notif.data)
-        }
-      }
-    }
-
-    // 7. Guardar nuevo estado
-    await stateRef.set({
-      currentRi:    Math.round(currentRi),
-      maxRiNext6h:  Math.round(maxRiNext6h),
-      currentLevel,
-      forecastLevel,
-      dmKey,
-      updatedAt:    new Date(),
-    })
-
-    logger.info('checkClimaPortoAlert: fin', { notificacionesEnviadas: notifications.length })
+// Endpoint HTTP para ejecutar manualmente el chequeo (testing / backup del scheduler)
+exports.runClimaPortoCheck = onRequest(
+  { region: 'us-central1', cors: true, timeoutSeconds: 30, memory: '256MiB' },
+  async (req, res) => {
+    const result = await _runClimaCheck('http')
+    res.json({ ok: !result?.error, ...result })
   }
 )
 

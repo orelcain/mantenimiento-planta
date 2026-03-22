@@ -2477,8 +2477,7 @@
       const tbody = document.getElementById('tbody');
       tbody.innerHTML = '';
       const todayStr = new Date().toISOString().slice(0, 10);
-      const futureDays = days.filter(d => d.date >= todayStr);
-      for (const d of futureDays) {
+      for (const d of days) {
         const isToday = d.date === todayStr;
         const tr = document.createElement('tr');
         if (isToday) tr.classList.add('today-row');
@@ -4480,6 +4479,7 @@
         const isRainingNow = (current.precipitation ?? 0) > 0.15 || rainyCodes.has(current.weather_code);
         setFxMode(isRainingNow ? 'rain' : 'clear');
         const waveByDay = aggregateHourlyMaxByDay(marine.hourly?.time ?? [], marine.hourly?.wave_height ?? []);
+        const todayStr = new Date().toISOString().slice(0, 10);
         const days = weather.daily.time.map((date, i) => {
           const gust = weather.daily.wind_gusts_10m_max?.[i] ?? 0;
           const wind = weather.daily.wind_speed_10m_max?.[i] ?? 0;
@@ -4488,7 +4488,7 @@
           const weatherCode = weather.daily.weather_code?.[i];
           const risk = calcRisk({ gust, wind, wave, rain, weatherCode });
           return { date, weatherCode, tMin: weather.daily.temperature_2m_min?.[i], tMax: weather.daily.temperature_2m_max?.[i], rain, wind, gust, wave, risk };
-        });
+        }).filter(d => d.date >= todayStr);
         const portNow = renderPortStatus(current, days[0]?.risk?.level ?? 'BAJO');
         const closureOutlook = calcClosureOutlook24h(current, weather, marine, portNow);
         renderClosureOutlook(closureOutlook);
