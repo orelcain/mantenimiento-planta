@@ -102,8 +102,6 @@ const BATCH_SLEEP_MS = 1000
 const AWS_TERRAIN_TILE_URL = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium'
 const TERRAIN_TILE_ZOOM = 14 // ~10 m/px at equator, ~7 m/px at lat -42°
 
-export type ElevationSource = 'aws-terrain-tiles' | 'open-meteo'
-
 function lonLatToTile(lon: number, lat: number, zoom: number): { x: number; y: number } {
   const n = Math.pow(2, zoom)
   const x = Math.floor((lon + 180) / 360 * n)
@@ -141,7 +139,8 @@ async function fetchElevationFromTerrainTiles(
 
   // Compose all tiles into an offscreen canvas
   const canvas = new OffscreenCanvas(tilesX * 256, tilesY * 256)
-  const ctx = canvas.getContext('2d')!
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('OffscreenCanvas 2d context not available')
   let fetched = 0
   const total = tilesX * tilesY
 
@@ -187,7 +186,10 @@ async function fetchElevationFromTerrainTiles(
       const py = Math.min(Math.floor(v * canvas.height), canvas.height - 1)
       const idx = (py * cw + px) * 4
       // Terrarium encoding: elevation = (R * 256 + G + B / 256) - 32768
-      result[r * cols + c] = (pixels[idx] * 256 + pixels[idx + 1] + pixels[idx + 2] / 256) - 32768
+      const R = pixels[idx] ?? 0
+      const G = pixels[idx + 1] ?? 0
+      const B = pixels[idx + 2] ?? 0
+      result[r * cols + c] = (R * 256 + G + B / 256) - 32768
     }
   }
 
@@ -501,7 +503,6 @@ export async function importTerrainFromRectangle(options: TerrainImportOptions):
   const depthCells = maxZ - minZ
 
   // ── Try AWS Terrain Tiles first (HD resolution) ────────────────
-  let elevationSource: ElevationSource = 'open-meteo'
   let hdGrid: Float32Array | null = null
   const hdCols = Math.min(widthCells, 256)
   const hdRows = Math.min(depthCells, 256)
@@ -524,7 +525,6 @@ export async function importTerrainFromRectangle(options: TerrainImportOptions):
       hdCols, hdRows,
       progressAdapter,
     )
-    elevationSource = 'aws-terrain-tiles'
   } catch {
     // Fallback silencioso a Open-Meteo
     hdGrid = null
@@ -550,10 +550,10 @@ export async function importTerrainFromRectangle(options: TerrainImportOptions):
         const c1 = Math.min(c0 + 1, hdCols - 1)
         const tc = srcCol - c0
 
-        const v00 = hdGrid[r0 * hdCols + c0]
-        const v10 = hdGrid[r0 * hdCols + c1]
-        const v01 = hdGrid[r1 * hdCols + c0]
-        const v11 = hdGrid[r1 * hdCols + c1]
+        const v00 = hdGrid[r0 * hdCols + c0] ?? 0
+        const v10 = hdGrid[r0 * hdCols + c1] ?? 0
+        const v01 = hdGrid[r1 * hdCols + c0] ?? 0
+        const v11 = hdGrid[r1 * hdCols + c1] ?? 0
         const rawElevation = v00 * (1 - tc) * (1 - tr) + v10 * tc * (1 - tr) + v01 * (1 - tc) * tr + v11 * tc * tr
 
         const elevation = Math.max(MIN_TERRAIN_ELEVATION, Math.min(MAX_TERRAIN_ELEVATION, rawElevation))

@@ -57,7 +57,8 @@ export async function fetchSatelliteTexture(
   const canvas = document.createElement('canvas')
   canvas.width = tilesX * 256
   canvas.height = tilesY * 256
-  const ctx = canvas.getContext('2d')!
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('Canvas 2d context not available')
 
   let fetched = 0
   const total = tilesX * tilesY
@@ -101,7 +102,8 @@ export async function fetchSatelliteTexture(
   const cropped = document.createElement('canvas')
   cropped.width = cropW
   cropped.height = cropH
-  cropped.getContext('2d')!.drawImage(canvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH)
+  const croppedCtx = cropped.getContext('2d')
+  if (croppedCtx) croppedCtx.drawImage(canvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH)
 
   return { canvas: cropped, width: cropW, height: cropH }
 }
