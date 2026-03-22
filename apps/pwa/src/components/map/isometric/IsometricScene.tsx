@@ -13,8 +13,8 @@
  * Es el equivalente del <Canvas> + <SceneContent> patrón Viewer3D.
  */
 
-import { Suspense, useCallback, useEffect, useMemo, useRef } from 'react'
-import { Canvas, useLoader, useThree, useFrame } from '@react-three/fiber'
+import { Suspense, useCallback, useEffect, useMemo } from 'react'
+import { Canvas, useLoader, useThree } from '@react-three/fiber'
 // drei helpers disponibles si se necesitan (Environment, etc.)
 import * as THREE from 'three'
 import { IsometricCamera } from './IsometricCamera'
@@ -163,31 +163,6 @@ function getContourIntersection(
   ]
 }
 
-/** Plano de agua animado para representar la costa / nivel del mar */
-function WaterPlane({ width, depth, seaLevel }: { width: number; depth: number; seaLevel: number }) {
-  const meshRef = useRef<THREE.Mesh>(null)
-  useFrame(({ clock }) => {
-    if (meshRef.current) {
-      // Gentle wave motion
-      meshRef.current.position.y = seaLevel + Math.sin(clock.elapsedTime * 0.6) * 0.08
-    }
-  })
-  return (
-    <mesh ref={meshRef} rotation-x={-Math.PI / 2} position={[0, seaLevel, 0]} renderOrder={4}>
-      <planeGeometry args={[width * 1.5, depth * 1.5]} />
-      <meshStandardMaterial
-        color="#1a5e8a"
-        transparent
-        opacity={0.55}
-        roughness={0.15}
-        metalness={0.3}
-        depthWrite={false}
-        side={THREE.DoubleSide}
-      />
-    </mesh>
-  )
-}
-
 /** Contenido de la escena (dentro del Canvas) */
 function SceneContent({
   config,
@@ -305,7 +280,8 @@ function SceneContent({
     }
 
     const elevationRange = Math.max(1, maxElevation - minElevation)
-    const sideDepth = Math.max(8, Math.min(18, Math.round(elevationRange * 0.2)))
+    // Thinner cross-section for natural look (3-6m deep)
+    const sideDepth = Math.max(3, Math.min(6, Math.round(elevationRange * 0.08)))
 
     return {
       minElevation,
@@ -342,9 +318,10 @@ function SceneContent({
     const uvs: number[] = []
     const indices: number[] = []
 
-    const cliffDark = new THREE.Color('#1f2f26')
-    const cliffLight = new THREE.Color('#4f6a53')
-    const bottomColor = new THREE.Color('#122016')
+    // Warm earth/rock tones for geological cross-section
+    const cliffDark = new THREE.Color('#3a2a1a')
+    const cliffLight = new THREE.Color('#8b7355')
+    const bottomColor = new THREE.Color('#2a1f14')
     const color = new THREE.Color()
 
     const topHeightGrid: number[][] = []
@@ -450,18 +427,16 @@ function SceneContent({
       bottomColor
     )
 
-    // Boundary walls (masa lateral)
+    // Boundary walls (masa lateral) — gradient top→bottom for geological strata
     for (let ix = 0; ix < widthCells; ix++) {
       const x1 = minX + ix
       const x2 = x1 + 1
       const y1 = getTopGrid(ix, 0)
       const y2 = getTopGrid(ix + 1, 0)
 
-      const wallColorA = cliffDark.clone().lerp(
-        cliffLight,
-        clamp01((Math.max(y1, y2) - terrainMetrics.minElevation) / terrainMetrics.elevationRange)
-      )
-      const wallColorB = wallColorA.clone()
+      const topMix = clamp01((Math.max(y1, y2) - terrainMetrics.minElevation) / terrainMetrics.elevationRange)
+      const wallTop = cliffDark.clone().lerp(cliffLight, topMix * 0.8 + 0.2)
+      const wallBottom = cliffDark.clone()
 
       // North
       pushQuad(
@@ -469,19 +444,17 @@ function SceneContent({
         [x1, baseY, minZ],
         [x2, baseY, minZ],
         [x2, y2, minZ],
-        wallColorA,
-        wallColorA,
-        wallColorB,
-        wallColorB
+        wallTop,
+        wallBottom,
+        wallBottom,
+        wallTop
       )
 
       const ys1 = getTopGrid(ix, depthCells)
       const ys2 = getTopGrid(ix + 1, depthCells)
-      const wallSouthA = cliffDark.clone().lerp(
-        cliffLight,
-        clamp01((Math.max(ys1, ys2) - terrainMetrics.minElevation) / terrainMetrics.elevationRange)
-      )
-      const wallSouthB = wallSouthA.clone()
+      const topMixS = clamp01((Math.max(ys1, ys2) - terrainMetrics.minElevation) / terrainMetrics.elevationRange)
+      const wallTopS = cliffDark.clone().lerp(cliffLight, topMixS * 0.8 + 0.2)
+      const wallBottomS = cliffDark.clone()
 
       // South
       pushQuad(
@@ -489,10 +462,10 @@ function SceneContent({
         [x2, ys2, maxZ],
         [x2, baseY, maxZ],
         [x1, baseY, maxZ],
-        wallSouthA,
-        wallSouthB,
-        wallSouthB,
-        wallSouthA
+        wallTopS,
+        wallTopS,
+        wallBottomS,
+        wallBottomS
       )
     }
 
@@ -502,11 +475,9 @@ function SceneContent({
       const yw1 = getTopGrid(0, iz)
       const yw2 = getTopGrid(0, iz + 1)
 
-      const wallWestA = cliffDark.clone().lerp(
-        cliffLight,
-        clamp01((Math.max(yw1, yw2) - terrainMetrics.minElevation) / terrainMetrics.elevationRange)
-      )
-      const wallWestB = wallWestA.clone()
+      const topMixW = clamp01((Math.max(yw1, yw2) - terrainMetrics.minElevation) / terrainMetrics.elevationRange)
+      const wallTopW = cliffDark.clone().lerp(cliffLight, topMixW * 0.8 + 0.2)
+      const wallBottomW = cliffDark.clone()
 
       // West
       pushQuad(
@@ -514,19 +485,17 @@ function SceneContent({
         [minX, yw2, z2],
         [minX, baseY, z2],
         [minX, baseY, z1],
-        wallWestA,
-        wallWestB,
-        wallWestB,
-        wallWestA
+        wallTopW,
+        wallTopW,
+        wallBottomW,
+        wallBottomW
       )
 
       const ye1 = getTopGrid(widthCells, iz)
       const ye2 = getTopGrid(widthCells, iz + 1)
-      const wallEastA = cliffDark.clone().lerp(
-        cliffLight,
-        clamp01((Math.max(ye1, ye2) - terrainMetrics.minElevation) / terrainMetrics.elevationRange)
-      )
-      const wallEastB = wallEastA.clone()
+      const topMixE = clamp01((Math.max(ye1, ye2) - terrainMetrics.minElevation) / terrainMetrics.elevationRange)
+      const wallTopE = cliffDark.clone().lerp(cliffLight, topMixE * 0.8 + 0.2)
+      const wallBottomE = cliffDark.clone()
 
       // East
       pushQuad(
@@ -534,10 +503,10 @@ function SceneContent({
         [maxX, baseY, z1],
         [maxX, baseY, z2],
         [maxX, ye2, z2],
-        wallEastA,
-        wallEastA,
-        wallEastB,
-        wallEastB
+        wallTopE,
+        wallBottomE,
+        wallBottomE,
+        wallTopE
       )
     }
 
@@ -757,28 +726,28 @@ function SceneContent({
   return (
     <>
       {/* Background color */}
-      <color attach="background" args={[satelliteTextureCanvas ? '#0a1520' : '#08131d']} />
+      <color attach="background" args={['#0c1a24']} />
 
-      {/* Iluminación — más cálida y natural con satélite */}
-      <ambientLight intensity={satelliteTextureCanvas ? 0.85 : 0.72} />
+      {/* Iluminación natural */}
+      <ambientLight intensity={satelliteTextureCanvas ? 0.9 : 0.72} />
       <directionalLight
-        position={[28, 38, 18]}
-        intensity={satelliteTextureCanvas ? 1.3 : 1.1}
-        color={satelliteTextureCanvas ? '#fff8e8' : '#fff4db'}
+        position={[30, 45, 20]}
+        intensity={satelliteTextureCanvas ? 1.4 : 1.1}
+        color={satelliteTextureCanvas ? '#fffaf0' : '#fff4db'}
         castShadow
         shadow-mapSize-width={2048}
         shadow-mapSize-height={2048}
-        shadow-camera-far={100}
-        shadow-camera-left={-50}
-        shadow-camera-right={50}
-        shadow-camera-top={50}
-        shadow-camera-bottom={-50}
+        shadow-camera-far={120}
+        shadow-camera-left={-60}
+        shadow-camera-right={60}
+        shadow-camera-top={60}
+        shadow-camera-bottom={-60}
       />
-      <directionalLight position={[-22, 16, -20]} intensity={0.35} color="#7dd3fc" />
-      <hemisphereLight args={[satelliteTextureCanvas ? '#e3f0ff' : '#d7f0ff', '#0b1220', satelliteTextureCanvas ? 0.65 : 0.58]} />
+      <directionalLight position={[-18, 12, -22]} intensity={0.25} color="#96c8e8" />
+      <hemisphereLight args={[satelliteTextureCanvas ? '#e8f4ff' : '#d7f0ff', '#1a1510', satelliteTextureCanvas ? 0.7 : 0.58]} />
 
-      {/* Ambiente */}
-      <fog attach="fog" args={['#0b1622', 120, 260]} />
+      {/* Ambiente — niebla lejana para no oscurecer el terreno */}
+      <fog attach="fog" args={['#0c1a24', 180, 400]} />
 
       {/* Cámara isométrica con rotación FFT */}
       <IsometricCamera
@@ -864,15 +833,6 @@ function SceneContent({
             />
           </meshStandardMaterial>
         </mesh>
-      )}
-
-      {/* Plano de agua en nivel del mar (solo si hay terreno costero) */}
-      {terrainSolidGeometry && terrainMetrics.minElevation < 8 && (
-        <WaterPlane
-          width={config.width}
-          depth={config.depth}
-          seaLevel={Math.max(SEA_LEVEL_ELEVATION, terrainMetrics.minElevation + 0.5)}
-        />
       )}
 
       {/* Contornos solo sin textura satelital (con satélite el hillshade basta) */}
