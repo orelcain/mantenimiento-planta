@@ -13,9 +13,8 @@
  * Es el equivalente del <Canvas> + <SceneContent> patrón Viewer3D.
  */
 
-import { Suspense, useCallback, useEffect, useMemo } from 'react'
-import { Canvas, useLoader, useThree } from '@react-three/fiber'
-// drei helpers disponibles si se necesitan (Environment, etc.)
+import { Suspense, useCallback, useMemo } from 'react'
+import { Canvas } from '@react-three/fiber'
 import * as THREE from 'three'
 import { IsometricCamera } from './IsometricCamera'
 import { EquipmentNode } from './EquipmentNode'
@@ -25,6 +24,8 @@ import { MapConnector } from './MapConnector'
 import { OSMOverlay3D } from './OSMOverlay3D'
 import { TerrainMesh, useTerrainData } from './TerrainMesh'
 import { SceneEnvironment } from './SceneEnvironment'
+import { UnderlayImage } from './UnderlayImage'
+import { EditorPreviews } from './EditorPreviews'
 import type {
   IsometricMapConfig,
   MapNode,
@@ -157,19 +158,6 @@ function SceneContent({
   osmFeatures,
   terrainGeoBounds,
 }: IsometricSceneProps) {
-  const { gl } = useThree()
-  const underlayDragState = useMemo(() => ({ current: null as null | {
-    mode: 'move' | 'scale' | 'rotate'
-    startPoint: { x: number; z: number }
-    startOffsetX: number
-    startOffsetZ: number
-    startWidth: number
-    startDepth: number
-    startRotation: number
-    startDistance: number
-    startAngle: number
-  } }), [])
-
   // Centro de la planta
   const centerTarget = useMemo<[number, number, number]>(
     () => [0, 0, 0],
@@ -214,147 +202,6 @@ function SceneContent({
   // Terrain data (elevation map, metrics, bounds) via extracted hook
   const { elevationMap: terrainElevationMap, metrics: terrainMetrics } = useTerrainData(terrain)
 
-  const underlayTexture = useLoader(
-    THREE.TextureLoader,
-    underlayImageUrl || 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=='
-  )
-
-  const underlayStyle = useMemo(() => {
-    const baseOpacity = Math.max(0.05, Math.min(underlayOpacity ?? 0.5, 1))
-
-    if (underlayDisplayMode === 'original') {
-      return {
-        tint: '#ffffff',
-        planeOpacity: baseOpacity,
-        backdropOpacity: 0,
-        backdropColor: '#000000',
-        frameOpacity: 0,
-        frameColor: '#ffffff',
-      }
-    }
-
-    if (underlayDisplayMode === 'blueprint') {
-      return {
-        tint: '#a7e3ff',
-        planeOpacity: Math.min(0.34, baseOpacity * 0.72),
-        backdropOpacity: 0.16,
-        backdropColor: '#07273a',
-        frameOpacity: 0.32,
-        frameColor: '#6dd3ff',
-      }
-    }
-
-    return {
-      tint: '#e5eef5',
-      planeOpacity: Math.min(0.42, baseOpacity * 0.8),
-      backdropOpacity: 0.12,
-      backdropColor: '#08131d',
-      frameOpacity: 0.22,
-      frameColor: '#b8cad8',
-    }
-  }, [underlayDisplayMode, underlayOpacity])
-
-  const underlayFrameGeometry = useMemo(() => {
-    if (!underlayImageUrl) return null
-
-    const halfWidth = (underlayWidth ?? config.width) / 2
-    const halfDepth = (underlayDepth ?? config.depth) / 2
-    return new THREE.BufferGeometry().setFromPoints([
-      new THREE.Vector3(-halfWidth, 0.03, -halfDepth),
-      new THREE.Vector3(halfWidth, 0.03, -halfDepth),
-      new THREE.Vector3(halfWidth, 0.03, halfDepth),
-      new THREE.Vector3(-halfWidth, 0.03, halfDepth),
-      new THREE.Vector3(-halfWidth, 0.03, -halfDepth),
-    ])
-  }, [config.depth, config.width, underlayDepth, underlayImageUrl, underlayWidth])
-
-  const underlayFrameLine = useMemo(() => {
-    if (!underlayFrameGeometry || underlayStyle.frameOpacity <= 0) return null
-
-    return new THREE.Line(
-      underlayFrameGeometry,
-      new THREE.LineBasicMaterial({
-        color: underlayStyle.frameColor,
-        transparent: true,
-        opacity: underlayStyle.frameOpacity,
-        depthWrite: false,
-      })
-    )
-  }, [underlayFrameGeometry, underlayStyle.frameColor, underlayStyle.frameOpacity])
-
-  useEffect(() => {
-    underlayTexture.colorSpace = THREE.SRGBColorSpace
-    underlayTexture.wrapS = THREE.ClampToEdgeWrapping
-    underlayTexture.wrapT = THREE.ClampToEdgeWrapping
-    underlayTexture.magFilter = THREE.LinearFilter
-    underlayTexture.minFilter = THREE.LinearMipmapLinearFilter
-    underlayTexture.anisotropy = Math.min(8, gl.capabilities.getMaxAnisotropy())
-    underlayTexture.needsUpdate = true
-  }, [gl, underlayTexture])
-
-  const handleUnderlayPointerDown = useCallback((event: { stopPropagation: () => void; point: THREE.Vector3 }) => {
-    if (!underlayInteractionMode || !onUnderlayTransform) return
-    event.stopPropagation()
-
-    const centerX = underlayOffset?.x ?? 0
-    const centerZ = underlayOffset?.z ?? 0
-    const deltaX = event.point.x - centerX
-    const deltaZ = event.point.z - centerZ
-
-    underlayDragState.current = {
-      mode: underlayInteractionMode,
-      startPoint: { x: event.point.x, z: event.point.z },
-      startOffsetX: centerX,
-      startOffsetZ: centerZ,
-      startWidth: underlayWidth ?? config.width,
-      startDepth: underlayDepth ?? config.depth,
-      startRotation: underlayRotation ?? 0,
-      startDistance: Math.max(1, Math.hypot(deltaX, deltaZ)),
-      startAngle: Math.atan2(deltaZ, deltaX),
-    }
-  }, [config.depth, config.width, onUnderlayTransform, underlayDepth, underlayDragState, underlayInteractionMode, underlayOffset?.x, underlayOffset?.z, underlayRotation, underlayWidth])
-
-  const handleUnderlayPointerMove = useCallback((event: { stopPropagation: () => void; point: THREE.Vector3; buttons: number }) => {
-    const drag = underlayDragState.current
-    if (!drag || !onUnderlayTransform || event.buttons !== 1) return
-    event.stopPropagation()
-
-    if (drag.mode === 'move') {
-      onUnderlayTransform({
-        offsetX: Math.round((drag.startOffsetX + (event.point.x - drag.startPoint.x)) * 10) / 10,
-        offsetZ: Math.round((drag.startOffsetZ + (event.point.z - drag.startPoint.z)) * 10) / 10,
-      })
-      return
-    }
-
-    const centerX = drag.startOffsetX
-    const centerZ = drag.startOffsetZ
-    const currentDx = event.point.x - centerX
-    const currentDz = event.point.z - centerZ
-
-    if (drag.mode === 'scale') {
-      const currentDistance = Math.max(1, Math.hypot(currentDx, currentDz))
-      const factor = Math.max(0.1, currentDistance / drag.startDistance)
-      onUnderlayTransform({
-        width: Math.max(1, Math.round(drag.startWidth * factor)),
-        depth: Math.max(1, Math.round(drag.startDepth * factor)),
-      })
-      return
-    }
-
-    const currentAngle = Math.atan2(currentDz, currentDx)
-    const deltaAngle = (currentAngle - drag.startAngle) * (180 / Math.PI)
-    onUnderlayTransform({
-      rotation: Math.round((drag.startRotation + deltaAngle) * 10) / 10,
-    })
-  }, [onUnderlayTransform, underlayDragState])
-
-  const handleUnderlayPointerUp = useCallback((event: { stopPropagation: () => void }) => {
-    if (!underlayDragState.current) return
-    event.stopPropagation()
-    underlayDragState.current = null
-  }, [underlayDragState])
-
   return (
     <>
       <SceneEnvironment hasSatelliteTexture={!!satelliteTextureCanvas} />
@@ -369,46 +216,20 @@ function SceneContent({
         onRotationComplete={handleRotationComplete}
       />
 
-      {/* Grilla del suelo */}
+      {/* Underlay (plano base raster) */}
       {underlayImageUrl && (
-        <group
-          rotation-x={-Math.PI / 2}
-          rotation-z={((underlayRotation ?? 0) * Math.PI) / 180}
-          position={[underlayOffset?.x ?? 0, -0.02, underlayOffset?.z ?? 0]}
-        >
-          {underlayStyle.backdropOpacity > 0 && (
-            <mesh position={[0, 0.003, 0]}>
-              <planeGeometry args={[(underlayWidth ?? config.width) * 1.02, (underlayDepth ?? config.depth) * 1.02]} />
-              <meshBasicMaterial
-                color={underlayStyle.backdropColor}
-                transparent
-                opacity={underlayStyle.backdropOpacity}
-                toneMapped={false}
-                depthWrite={false}
-              />
-            </mesh>
-          )}
-          <mesh
-            raycast={underlayInteractionMode ? undefined : () => null}
-            onPointerDown={underlayInteractionMode ? handleUnderlayPointerDown : undefined}
-            onPointerMove={underlayInteractionMode ? handleUnderlayPointerMove : undefined}
-            onPointerUp={underlayInteractionMode ? handleUnderlayPointerUp : undefined}
-            onPointerLeave={underlayInteractionMode ? handleUnderlayPointerUp : undefined}
-          >
-            <planeGeometry args={[underlayWidth ?? config.width, underlayDepth ?? config.depth]} />
-            <meshBasicMaterial
-              map={underlayTexture}
-              color={underlayStyle.tint}
-              transparent
-              opacity={underlayStyle.planeOpacity}
-              toneMapped={false}
-              depthWrite={false}
-            />
-          </mesh>
-          {underlayFrameLine && (
-            <primitive object={underlayFrameLine} />
-          )}
-        </group>
+        <UnderlayImage
+          imageUrl={underlayImageUrl}
+          displayMode={underlayDisplayMode}
+          opacity={underlayOpacity}
+          width={underlayWidth}
+          depth={underlayDepth}
+          offset={underlayOffset}
+          rotation={underlayRotation}
+          interactionMode={underlayInteractionMode}
+          onTransform={onUnderlayTransform}
+          config={config}
+        />
       )}
 
       {/* Terrain heightfield mesh (vertex-color or satellite drape + contours) */}
@@ -430,133 +251,15 @@ function SceneContent({
         />
       )}
 
-      {/* Preview de brocha de terreno */}
-      {terrainBrushPreview && (
-        <group>
-          {(() => {
-            const cells: Array<{ x: number; z: number; opacity: number }> = []
-            const radius = Math.floor(terrainBrushPreview.size / 2)
-            for (let dx = -radius; dx <= radius; dx++) {
-              for (let dz = -radius; dz <= radius; dz++) {
-                const distance = Math.sqrt(dx * dx + dz * dz)
-                if (distance > radius + 0.001) continue
-                const normalizedDistance = radius === 0 ? 0 : distance / (radius + 0.35)
-                const falloff = radius === 0 ? 1 : Math.pow(Math.max(0, 1 - normalizedDistance), 1.4)
-                if (falloff <= 0) continue
-                cells.push({
-                  x: terrainBrushPreview.center.x + dx,
-                  z: terrainBrushPreview.center.z + dz,
-                  opacity: 0.15 + 0.35 * falloff,
-                })
-              }
-            }
-            return cells.map((cell) => (
-              <mesh
-                key={`preview-${cell.x},${cell.z}`}
-                rotation-x={-Math.PI / 2}
-                position={[
-                  cell.x + 0.5,
-                  (terrainElevationMap.get(`${cell.x},${cell.z}`) ?? SEA_LEVEL_ELEVATION) + 0.08,
-                  cell.z + 0.5,
-                ]}
-              >
-                <planeGeometry args={[0.94, 0.94]} />
-                <meshBasicMaterial
-                  color={
-                    terrainBrushPreview.mode === 'raise'
-                      ? '#22c55e'
-                      : terrainBrushPreview.mode === 'lower'
-                        ? '#ef4444'
-                        : terrainBrushPreview.mode === 'flatten'
-                          ? '#3b82f6'
-                          : terrainBrushPreview.mode === 'smooth'
-                            ? '#a855f7'
-                            : '#f59e0b'
-                  }
-                  transparent
-                  opacity={cell.opacity}
-                  depthWrite={false}
-                />
-              </mesh>
-            ))
-          })()}
-        </group>
-      )}
-
-      {/* Preview fantasma de colocación (verde válido / rojo inválido) */}
-      {placementPreview && (
-        <group>
-          <mesh
-            position={[
-              placementPreview.position.x,
-              placementPreview.floor + placementPreview.size.height / 2,
-              placementPreview.position.z,
-            ]}
-            rotation-y={(placementPreview.rotation * Math.PI) / 180}
-          >
-            <boxGeometry args={[
-              placementPreview.size.width,
-              placementPreview.size.height,
-              placementPreview.size.depth,
-            ]} />
-            <meshStandardMaterial
-              color={placementPreview.valid ? '#22c55e' : '#ef4444'}
-              transparent
-              opacity={0.35}
-              depthWrite={false}
-            />
-          </mesh>
-          <mesh
-            rotation-x={-Math.PI / 2}
-            position={[placementPreview.position.x, placementPreview.floor + 0.05, placementPreview.position.z]}
-          >
-            <planeGeometry args={[placementPreview.size.width, placementPreview.size.depth]} />
-            <meshBasicMaterial
-              color={placementPreview.valid ? '#22c55e' : '#ef4444'}
-              transparent
-              opacity={0.25}
-              depthWrite={false}
-            />
-          </mesh>
-
-          {placementPreview.snapGuides?.map((guide, index) => {
-            const centerX = (guide.from.x + guide.to.x) / 2
-            const centerZ = (guide.from.z + guide.to.z) / 2
-            const width = Math.abs(guide.to.x - guide.from.x)
-            const depth = Math.abs(guide.to.z - guide.from.z)
-
-            return (
-              <mesh
-                key={`snap-guide-${index}`}
-                rotation-x={-Math.PI / 2}
-                position={[centerX, placementPreview.floor + 0.08, centerZ]}
-              >
-                <planeGeometry args={[
-                  guide.axis === 'z' ? Math.max(width, 0.08) : 0.08,
-                  guide.axis === 'x' ? Math.max(depth, 0.08) : 0.08,
-                ]} />
-                <meshBasicMaterial
-                  color={placementPreview.valid ? '#22c55e' : '#ef4444'}
-                  transparent
-                  opacity={0.6}
-                  depthWrite={false}
-                />
-              </mesh>
-            )
-          })}
-        </group>
-      )}
-
-      {/* Preview de bulldozer */}
-      {bulldozerPreview && (
-        <mesh
-          rotation-x={-Math.PI / 2}
-          position={[bulldozerPreview.x, viewerState.currentFloor + 0.06, bulldozerPreview.z]}
-        >
-          <planeGeometry args={[1, 1]} />
-          <meshBasicMaterial color="#ef4444" transparent opacity={0.3} depthWrite={false} />
-        </mesh>
-      )}
+      {/* Editor previews (brush, placement, bulldozer, paint tiles) */}
+      <EditorPreviews
+        terrainBrushPreview={terrainBrushPreview}
+        placementPreview={placementPreview}
+        bulldozerPreview={bulldozerPreview}
+        paintTiles={paintTiles}
+        currentFloor={viewerState.currentFloor}
+        terrainElevationMap={terrainElevationMap}
+      />
 
       {/* Áreas/zonas (filtradas por piso) */}
       {viewerState.filters.showAreas && areas
@@ -570,32 +273,6 @@ function SceneContent({
           onClick={onAreaClick}
         />
       ))}
-
-      {/* Paint tiles overlay (editor de áreas) */}
-      {paintTiles && paintTiles.tiles.size > 0 && (
-        <group>
-          {Array.from(paintTiles.tiles).map((key) => {
-            const parts = key.split(',')
-            const px = Number(parts[0])
-            const pz = Number(parts[1])
-            return (
-              <mesh
-                key={key}
-                rotation-x={-Math.PI / 2}
-                position={[px + 0.5, 0.02, pz + 0.5]}
-              >
-                <planeGeometry args={[0.95, 0.95]} />
-                <meshBasicMaterial
-                  color={paintTiles.color}
-                  transparent
-                  opacity={Math.min(paintTiles.opacity + 0.2, 0.8)}
-                  depthWrite={false}
-                />
-              </mesh>
-            )
-          })}
-        </group>
-      )}
 
       {/* Conectores */}
       {viewerState.filters.showConnectors && connectors.map((connector) => {
