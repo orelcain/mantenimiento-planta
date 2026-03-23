@@ -15,5 +15,15 @@
     "*.css": "tailwindcss"
   },
   "typescript.tsdk": "apps/pwa/node_modules/typescript/lib",
-  "typescript.enablePromptUseWorkspaceTsdk": true
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.fixAll.ruff": "explicit",
+      "source.organizeImports.ruff": "explicit"
+    }
+  },
+  "ruff.lint.enable": true,
+  "ruff.path": ["C:/Users/pc hp/.local/bin/ruff.exe"]
 }

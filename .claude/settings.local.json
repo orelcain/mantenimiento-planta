@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(claude mcp:*)",
+      "Bash(ruff --version)",
+      "Bash(pip show:*)",
+      "Bash(pip3 show:*)",
+      "Bash(pip install:*)",
+      "Bash(python -m ensurepip --upgrade)",
+      "Bash(python -m pip install ruff)",
+      "Bash(python -c \"import sys; print\\(sys.executable\\)\")",
+      "Bash(curl -LsSf https://astral.sh/ruff/install.sh)",
+      "Bash(sh)",
+      "Bash(powershell -c \"Invoke-WebRequest -Uri ''''https://github.com/astral-sh/ruff/releases/latest/download/ruff-x86_64-pc-windows-msvc.zip'''' -OutFile ruff.zip; Expand-Archive ruff.zip -DestinationPath .venv/Scripts/ -Force; Remove-Item ruff.zip\")",
+      "Bash(\"/c/Users/pc hp/.local/bin/ruff\" --version)",
+      "Bash(gh repo:*)",
+      "Bash(npm --version)",
+      "Bash(npm install:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(claude-flow --version)",
+      "Bash(ruflo mcp:*)",
+      "Bash(ruflo --help)",
+      "Bash(claude-flow init:*)"
+    ]
+  }
+}
