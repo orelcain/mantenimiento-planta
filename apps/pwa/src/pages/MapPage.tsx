@@ -496,23 +496,23 @@ export function MapPage() {
     history.clear()
     history.pushSnapshot({ nodes: nextNodes, areas: nextAreas, connectors: nextConnectors })
     setFitRequestKey((prev) => prev + 1)
-  }, [blankMapConfig, history])
+  }, [blankMapConfig, history, setTerrainImportCoordinatesText, setTerrainImportSampleStep, setTerrainAdminMarkup, setSelectedBaseLocationId, setBackgroundMap, setShowBaseMap])
 
   const handleTerrainImportCoordinatesTextChange = useCallback((value: string) => {
     setTerrainImportCoordinatesText(value)
     setTerrainAdminMarkup(undefined)
     setHasUnsavedChanges(true)
-  }, [])
+  }, [setTerrainImportCoordinatesText, setTerrainAdminMarkup])
 
   const handleTerrainImportSampleStepChange = useCallback((value: number) => {
     setTerrainImportSampleStep(value)
     setHasUnsavedChanges(true)
-  }, [])
+  }, [setTerrainImportSampleStep])
 
   const handleTerrainAdminMarkupChange = useCallback((markup: TerrainAdminMarkup | null) => {
     setTerrainAdminMarkup(markup)
     setHasUnsavedChanges(true)
-  }, [])
+  }, [setTerrainAdminMarkup])
 
   const refreshBaseMapSources = useCallback(async () => {
     setIsLoadingBaseMaps(true)
@@ -531,7 +531,7 @@ export function MapPage() {
     } finally {
       setIsLoadingBaseMaps(false)
     }
-  }, [])
+  }, [setIsLoadingBaseMaps, setMapLocations, setBaseMapStatusText])
 
   const refreshSavedMaps = useCallback(async (preferredMapId?: string) => {
     setIsLoadingMaps(true)
@@ -607,7 +607,7 @@ export function MapPage() {
       Math.min(clampedTerrainEditableMax - 1, Math.round(value))
     )
     setTerrainEditableMin(nextMin)
-  }, [clampedTerrainEditableMax])
+  }, [clampedTerrainEditableMax, setTerrainEditableMin])
 
   const handleTerrainEditableMaxChange = useCallback((value: number) => {
     const nextMax = Math.min(
@@ -615,12 +615,12 @@ export function MapPage() {
       Math.max(clampedTerrainEditableMin + 1, Math.round(value))
     )
     setTerrainEditableMax(nextMax)
-  }, [clampedTerrainEditableMin])
+  }, [clampedTerrainEditableMin, setTerrainEditableMax])
 
   const applyRecommendedTerrainLimits = useCallback(() => {
     setTerrainEditableMin(-30)
     setTerrainEditableMax(60)
-  }, [])
+  }, [setTerrainEditableMin, setTerrainEditableMax])
 
   const terrainElevationLookup = useMemo(() => {
     const map = new Map<string, number>()
@@ -727,7 +727,7 @@ export function MapPage() {
 
   useEffect(() => {
     setTerrainFlattenTarget((prev) => clampToEditableTerrainRange(prev))
-  }, [clampToEditableTerrainRange])
+  }, [clampToEditableTerrainRange, setTerrainFlattenTarget])
   const effectiveAddType = useMemo<MapNode['type']>(() => {
     if (buildMode === 'structures') return 'building'
     if (buildMode === 'elements' && addEquipmentType === 'building') return 'pump'
@@ -753,7 +753,7 @@ export function MapPage() {
     if (buildMode === 'elements' && addEquipmentType === 'building') {
       setAddEquipmentType('pump')
     }
-  }, [buildMode, addEquipmentType])
+  }, [buildMode, addEquipmentType, setTerrainEditEnabled])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -813,7 +813,7 @@ export function MapPage() {
 
     if (filtered.length === nodes.length) return undefined
     return new Set(filtered.map((node) => node.id))
-  }, [nodes, isEditMode, buildMode, selectedAreaId])
+  }, [nodes, isEditMode, buildMode])
 
   const managedAreas = useMemo(() => {
     const base = areaManagerFloor === 'all'
@@ -1150,7 +1150,7 @@ export function MapPage() {
       rotation: Math.round(((updates.rotation ?? prev.rotation) + Number.EPSILON) * 10) / 10,
     } : prev)
     setHasUnsavedChanges(true)
-  }, [])
+  }, [setBackgroundMap])
 
   const resetBackgroundCalibration = useCallback(() => {
     if (!backgroundMap) return
@@ -1240,7 +1240,7 @@ export function MapPage() {
 
     window.addEventListener('keydown', handleCalibrationHotkeys)
     return () => window.removeEventListener('keydown', handleCalibrationHotkeys)
-  }, [backgroundMap, calibrationStepMeters, isBaseMapCalibrationMode, nudgeBackgroundMap, rotateBackgroundMap, scaleBackgroundMap])
+  }, [backgroundMap, calibrationStepMeters, isBaseMapCalibrationMode, nudgeBackgroundMap, rotateBackgroundMap, scaleBackgroundMap, setCalibrationMode])
 
   const isClickSuppressedAfterDrag = useCallback(() => Date.now() < suppressClickUntil.current, [])
 
@@ -1437,7 +1437,7 @@ export function MapPage() {
         showAlerts: false,
       },
     }))
-  }, [isTerrainBaseStage, closeAreaEditor, overlayState])
+  }, [isTerrainBaseStage, closeAreaEditor, overlayState, setTerrainEditEnabled, setShowTerrainModal])
 
   const enterEditorWorkspace = useCallback(() => {
     setWorkspaceStage('editor')
@@ -1671,11 +1671,13 @@ export function MapPage() {
     terrainFlattenTarget,
     terrainTiles,
     clampToEditableTerrainRange,
+    setTerrainFlattenTarget,
+    setTerrainTool,
   ])
 
   const handleFloorHover = useCallback((position: { x: number; z: number } | null) => {
     setTerrainHoverPosition(position)
-  }, [])
+  }, [setTerrainHoverPosition])
 
   const handleImportRealTerrain = useCallback(async () => {
     if (isImportingRealTerrain) return
@@ -1793,7 +1795,7 @@ export function MapPage() {
       setIsImportingRealTerrain(false)
       setTerrainImportProgress(null)
     }
-  }, [isImportingRealTerrain, terrainImportCoordinatesText, terrainImportSampleStep, mapConfig, enterEditorWorkspace])
+  }, [isImportingRealTerrain, terrainImportCoordinatesText, terrainImportSampleStep, mapConfig, enterEditorWorkspace, setIsImportingRealTerrain, setRealTerrainImportMessage, setTerrainImportProgress, setTerrainEditableMin, setTerrainEditableMax, setTerrainFlattenTarget, setTerrainGeoBounds, setOsmFeaturesData])
 
   const handleFloorDrag = useCallback((position: { x: number; z: number }) => {
     applyTerrainBrushAt(position, 'drag')
@@ -1949,6 +1951,7 @@ export function MapPage() {
       terrainEditEnabled,
       applyTerrainBrushAt,
       setEditorTool,
+      setMeasurePoints,
     ]
   )
 
@@ -2030,7 +2033,7 @@ export function MapPage() {
       console.error('Error loading latest base map version:', error)
       setBaseMapStatusText('No se pudo cargar la última versión del plano base.')
     }
-  }, [backgroundMap?.opacity, mapConfig])
+  }, [backgroundMap?.opacity, mapConfig, setBackgroundMap, setBaseMapStatusText, setCalibrationMode, setSelectedBaseLocationId, setShowBaseMap])
 
   const expandCanvasToContent = useCallback(() => {
     const bounds = getCurrentFloorBounds()
