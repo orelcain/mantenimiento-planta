@@ -18,6 +18,10 @@ apps/pwa/public/maps/*.png
 # Excepción: imagen aérea de referencia del recinto (asset del proyecto)
 !apps/pwa/public/maps/recinto-2023.png
 
+# Ruflo / claude-flow agent artifacts
+.swarm/
+setter_analysis.txt
+
 # Local env files - IMPORTANTE: Nunca commitear credenciales
 .env
 .env.local
