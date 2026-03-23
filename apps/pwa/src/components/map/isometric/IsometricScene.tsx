@@ -39,70 +39,44 @@ import { SEA_LEVEL_ELEVATION } from '@/types/isometricMap'
 import type { OSMFeatures } from '@/lib/osmBuildings'
 import type { TerrainGeoBounds } from '@/lib/terrainImport'
 
-interface IsometricSceneProps {
-  /** Configuración del mapa (dimensiones, colores, grid) */
-  config: IsometricMapConfig
-  /** Plano raster opcional como base visual del mapa */
-  underlayImageUrl?: string | null
-  underlayDisplayMode?: 'original' | 'soft-light' | 'blueprint'
-  underlayOpacity?: number
-  underlayWidth?: number
-  underlayDepth?: number
-  underlayOffset?: { x: number; z: number }
-  underlayRotation?: number
-  underlayInteractionMode?: 'move' | 'scale' | 'rotate' | null
-  onUnderlayTransform?: (next: {
-    width?: number
-    depth?: number
-    offsetX?: number
-    offsetZ?: number
-    rotation?: number
-  }) => void
-  /** Nodos (equipos/sensores) */
-  nodes: MapNode[]
-  /** Conectores (tuberías, cables) */
-  connectors: MapConnectorType[]
-  /** Áreas/zonas */
-  areas: MapArea[]
-  /** Área seleccionada */
-  selectedAreaId?: string | null
-  /** Área resaltada por contexto (hover/preview) */
-  highlightedAreaId?: string | null
-  /** Data runtime (estados, incidencias, sensores) */
-  runtimeData: Map<string, NodeRuntimeData>
-  /** Terreno editable (celdas 1m x 1m con elevación) */
-  terrain?: TerrainTile[]
-  /** Estado del visor */
-  viewerState: IsometricViewerState
-  /** Callbacks */
-  onNodeClick?: (nodeId: string) => void
-  onNodeHover?: (nodeId: string | null) => void
-  onAreaClick?: (areaId: string) => void
+// ── Grouped prop interfaces ──
 
-  onBackgroundClick?: () => void
-  /** Editor callbacks */
-  onNodeDragEnd?: (
-    nodeId: string,
-    newPosition: { x: number; y: number; z: number },
-    options?: { duplicate?: boolean }
-  ) => void
-  /** Callback para agregar nodo al hacer click en suelo en modo 'add' */
-  onFloorClick?: (position: { x: number; z: number }) => void
-  /** Callback para pintar/editar en arrastre sobre suelo */
-  onFloorDrag?: (position: { x: number; z: number }) => void
-  /** Callback de hover sobre suelo para preview de brocha */
-  onFloorHover?: (position: { x: number; z: number } | null) => void
-  /** Preview de brocha de terreno */
+export interface UnderlayProps {
+  imageUrl?: string | null
+  displayMode?: 'original' | 'soft-light' | 'blueprint'
+  opacity?: number
+  width?: number
+  depth?: number
+  offset?: { x: number; z: number }
+  rotation?: number
+  interactionMode?: 'move' | 'scale' | 'rotate' | null
+  onTransform?: (next: {
+    width?: number; depth?: number; offsetX?: number; offsetZ?: number; rotation?: number
+  }) => void
+}
+
+export interface EntityProps {
+  nodes: MapNode[]
+  connectors: MapConnectorType[]
+  areas: MapArea[]
+  selectedAreaId?: string | null
+  highlightedAreaId?: string | null
+  runtimeData: Map<string, NodeRuntimeData>
+  visibleNodeIds?: Set<string>
+}
+
+export interface TerrainDataProps {
+  terrain?: TerrainTile[]
+  satelliteTextureCanvas?: HTMLCanvasElement | null
+  terrainGeoBounds?: TerrainGeoBounds | null
+}
+
+export interface EditorPreviewsProps {
   terrainBrushPreview?: {
     center: { x: number; z: number }
     size: 1 | 3 | 5 | 7 | 9
     mode: 'raise' | 'lower' | 'flatten' | 'smooth' | 'sample'
   } | null
-  /** Tiles de pintura para el editor de áreas (overlay en el suelo) */
-  paintTiles?: { tiles: Set<string>; color: string; opacity: number }
-  /** Filtro adicional de nodos visibles */
-  visibleNodeIds?: Set<string>
-  /** Preview fantasma para colocación de nodos */
   placementPreview?: {
     position: { x: number; z: number }
     floor: number
@@ -111,53 +85,56 @@ interface IsometricSceneProps {
     valid: boolean
     snapGuides?: Array<{ axis: 'x' | 'z'; from: { x: number; z: number }; to: { x: number; z: number } }>
   } | null
-  /** Preview de bulldozer sobre celda de piso */
   bulldozerPreview?: { x: number; z: number } | null
-  /** Canvas con textura satelital para draping sobre el terreno */
-  satelliteTextureCanvas?: HTMLCanvasElement | null
-  /** Features OSM 3D (edificios, caminos, agua, landcover) */
+  paintTiles?: { tiles: Set<string>; color: string; opacity: number }
+}
+
+export interface SceneCallbacks {
+  onNodeClick?: (nodeId: string) => void
+  onNodeHover?: (nodeId: string | null) => void
+  onAreaClick?: (areaId: string) => void
+  onBackgroundClick?: () => void
+  onNodeDragEnd?: (
+    nodeId: string,
+    newPosition: { x: number; y: number; z: number },
+    options?: { duplicate?: boolean }
+  ) => void
+  onFloorClick?: (position: { x: number; z: number }) => void
+  onFloorDrag?: (position: { x: number; z: number }) => void
+  onFloorHover?: (position: { x: number; z: number } | null) => void
+}
+
+interface IsometricSceneProps {
+  config: IsometricMapConfig
+  viewerState: IsometricViewerState
+  underlay?: UnderlayProps
+  entities: EntityProps
+  terrainData?: TerrainDataProps
+  previews?: EditorPreviewsProps
+  callbacks?: SceneCallbacks
   osmFeatures?: OSMFeatures | null
-  /** Bounds georreferenciados del terreno para mapeo geo→grid */
-  terrainGeoBounds?: TerrainGeoBounds | null
 }
 
 /** Contenido de la escena (dentro del Canvas) */
 function SceneContent({
   config,
-  underlayImageUrl,
-  underlayDisplayMode,
-  underlayOpacity,
-  underlayWidth,
-  underlayDepth,
-  underlayOffset,
-  underlayRotation,
-  underlayInteractionMode,
-  onUnderlayTransform,
-  nodes,
-  connectors,
-  areas,
-  selectedAreaId,
-  highlightedAreaId,
-  runtimeData,
-  terrain,
   viewerState,
-  onNodeClick,
-  onNodeHover,
-  onAreaClick,
-  onBackgroundClick,
-  onNodeDragEnd,
-  onFloorClick,
-  onFloorDrag,
-  onFloorHover,
-  terrainBrushPreview,
-  paintTiles,
-  visibleNodeIds,
-  placementPreview,
-  bulldozerPreview,
-  satelliteTextureCanvas,
+  underlay,
+  entities,
+  terrainData,
+  previews,
+  callbacks,
   osmFeatures,
-  terrainGeoBounds,
 }: IsometricSceneProps) {
+  // Destructure grouped props for convenience
+  const { imageUrl: underlayImageUrl, displayMode: underlayDisplayMode, opacity: underlayOpacity,
+    width: underlayWidth, depth: underlayDepth, offset: underlayOffset, rotation: underlayRotation,
+    interactionMode: underlayInteractionMode, onTransform: onUnderlayTransform } = underlay ?? {}
+  const { nodes, connectors, areas, selectedAreaId, highlightedAreaId, runtimeData, visibleNodeIds } = entities
+  const { terrain, satelliteTextureCanvas, terrainGeoBounds } = terrainData ?? {}
+  const { terrainBrushPreview, placementPreview, bulldozerPreview, paintTiles } = previews ?? {}
+  const { onNodeClick, onNodeHover, onAreaClick, onBackgroundClick, onNodeDragEnd,
+    onFloorClick, onFloorDrag, onFloorHover } = callbacks ?? {}
   // Centro de la planta
   const centerTarget = useMemo<[number, number, number]>(
     () => [0, 0, 0],
@@ -408,7 +385,7 @@ export function IsometricScene(props: IsometricSceneProps) {
           outputColorSpace: THREE.SRGBColorSpace,
         }}
         style={{ background: '#1a2530' }}
-        onPointerMissed={() => props.onBackgroundClick?.()}
+        onPointerMissed={() => props.callbacks?.onBackgroundClick?.()}
       >
         <Suspense fallback={<InCanvasLoader />}>
           <SceneContent {...props} />

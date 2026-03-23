@@ -2649,51 +2649,61 @@ export function MapPage() {
             >
               <IsometricScene
                 config={mapConfig}
-                underlayImageUrl={showBaseMap ? backgroundMap?.imageUrl ?? null : null}
-                underlayDisplayMode={backgroundMap?.displayMode ?? 'soft-light'}
-                underlayOpacity={backgroundMap?.opacity ?? 0.45}
-                underlayWidth={backgroundMap?.width}
-                underlayDepth={backgroundMap?.depth}
-                underlayOffset={backgroundMap ? { x: backgroundMap.offsetX, z: backgroundMap.offsetZ } : undefined}
-                underlayRotation={backgroundMap?.rotation}
-                underlayInteractionMode={showBaseMap ? calibrationMode : null}
-                onUnderlayTransform={applyBackgroundMapUpdate}
-                nodes={nodes}
-                connectors={connectors}
-                areas={areas}
-                terrain={terrainTiles}
-                selectedAreaId={selectedAreaId}
-                highlightedAreaId={hoveredAreaId}
-                runtimeData={runtimeData}
                 viewerState={viewerState}
-                visibleNodeIds={visibleNodeIds}
-                onNodeClick={handleNodeClick}
-                onNodeHover={handleNodeHover}
-                onAreaClick={handleAreaClick}
-                onBackgroundClick={handleBackgroundClick}
-                onNodeDragEnd={handleNodeDragEnd}
-                onFloorClick={handleFloorClick}
-                onFloorDrag={handleFloorDrag}
-                onFloorHover={handleFloorHover}
-                terrainBrushPreview={terrainEditEnabled && terrainHoverPosition
-                  ? {
-                      center: terrainHoverPosition,
-                      size: terrainBrushSize,
-                      mode: activeTerrainTool,
-                    }
-                  : null}
-                placementPreview={placementPreview}
-                bulldozerPreview={isEditMode && editorTool === 'bulldozer' && terrainHoverPosition
-                  ? { x: terrainHoverPosition.x, z: terrainHoverPosition.z }
-                  : null}
-                satelliteTextureCanvas={satelliteTextureCanvas}
+                underlay={{
+                  imageUrl: showBaseMap ? backgroundMap?.imageUrl ?? null : null,
+                  displayMode: backgroundMap?.displayMode ?? 'soft-light',
+                  opacity: backgroundMap?.opacity ?? 0.45,
+                  width: backgroundMap?.width,
+                  depth: backgroundMap?.depth,
+                  offset: backgroundMap ? { x: backgroundMap.offsetX, z: backgroundMap.offsetZ } : undefined,
+                  rotation: backgroundMap?.rotation,
+                  interactionMode: showBaseMap ? calibrationMode : null,
+                  onTransform: applyBackgroundMapUpdate,
+                }}
+                entities={{
+                  nodes,
+                  connectors,
+                  areas,
+                  selectedAreaId,
+                  highlightedAreaId: hoveredAreaId,
+                  runtimeData,
+                  visibleNodeIds,
+                }}
+                terrainData={{
+                  terrain: terrainTiles,
+                  satelliteTextureCanvas,
+                  terrainGeoBounds,
+                }}
+                previews={{
+                  terrainBrushPreview: terrainEditEnabled && terrainHoverPosition
+                    ? {
+                        center: terrainHoverPosition,
+                        size: terrainBrushSize,
+                        mode: activeTerrainTool,
+                      }
+                    : null,
+                  placementPreview,
+                  bulldozerPreview: isEditMode && editorTool === 'bulldozer' && terrainHoverPosition
+                    ? { x: terrainHoverPosition.x, z: terrainHoverPosition.z }
+                    : null,
+                  paintTiles: showAreaEditor ? {
+                    tiles: areaPaintState.tiles,
+                    color: areaPaintState.color,
+                    opacity: areaPaintState.opacity,
+                  } : undefined,
+                }}
+                callbacks={{
+                  onNodeClick: handleNodeClick,
+                  onNodeHover: handleNodeHover,
+                  onAreaClick: handleAreaClick,
+                  onBackgroundClick: handleBackgroundClick,
+                  onNodeDragEnd: handleNodeDragEnd,
+                  onFloorClick: handleFloorClick,
+                  onFloorDrag: handleFloorDrag,
+                  onFloorHover: handleFloorHover,
+                }}
                 osmFeatures={osmFeaturesData}
-                terrainGeoBounds={terrainGeoBounds}
-                paintTiles={showAreaEditor ? {
-                  tiles: areaPaintState.tiles,
-                  color: areaPaintState.color,
-                  opacity: areaPaintState.opacity,
-                } : undefined}
               />
             </Suspense>
 
