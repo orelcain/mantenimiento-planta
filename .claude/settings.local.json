@@ -20,7 +20,13 @@
       "Bash(claude-flow --version)",
       "Bash(ruflo mcp:*)",
       "Bash(ruflo --help)",
-      "Bash(claude-flow init:*)"
+      "Bash(claude-flow init:*)",
+      "Read(//c/Users/pc hp/AppData/Roaming/Code/User/**)",
+      "Read(//c/Users/pc hp/AppData/Roaming/npm/node_modules/claude-flow/**)",
+      "Bash(xargs grep:*)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\pc hp\\AppData\\Roaming\\npm\\node_modules\\claude-flow\\v3\\@claude-flow\\cli\\dist\\src\\mcp-tools"
     ]
   }
 }
