@@ -53,6 +53,9 @@ const RepuestosDashboard = lazyWithReload(() => import('@/pages/repuestos/Dashbo
 const MapPage = lazyWithReload(() =>
   import('@/pages/MapPage').then((mod: any) => ({ default: mod?.MapPage ?? mod?.default }))
 )
+const MapaPlantaPage = lazyWithReload(() =>
+  import('@/pages/MapaPlantaPage').then((mod) => ({ default: mod.MapaPlantaPage }))
+)
 const MapViewPage = lazyWithReload(() =>
   import('@/pages/MapViewPage').then((mod: any) => ({ default: mod?.MapViewPage ?? mod?.default }))
 )
@@ -262,6 +265,11 @@ export function App() {
             <Route path="map/view" element={
               <Suspense fallback={<LoadingScreen />}>
                 <MapViewPage />
+              </Suspense>
+            } />
+            <Route path="map/planta" element={
+              <Suspense fallback={<LoadingScreen />}>
+                <MapaPlantaPage />
               </Suspense>
             } />
             <Route path="inspections" element={
