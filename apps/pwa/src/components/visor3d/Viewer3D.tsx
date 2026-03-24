@@ -331,7 +331,7 @@ function GLBModel({ url, overrides, onLoaded }: { url: string; overrides: Materi
     applyMaterialOverrides(clone, overrides)
     cloned.current = clone
     onLoaded(clone, { ...info, meshIds })
-  }, [scene]) // eslint-disable-line
+  }, [scene]) // eslint-disable-line react-hooks/exhaustive-deps
   if (!cloned.current) return null
   return <primitive object={cloned.current} />
 }
@@ -347,7 +347,7 @@ function FBXModel({ url, overrides, onLoaded }: { url: string; overrides: Materi
     applyMaterialOverrides(clone, overrides)
     cloned.current = clone
     onLoaded(clone, { ...info, meshIds })
-  }, [fbx]) // eslint-disable-line
+  }, [fbx]) // eslint-disable-line react-hooks/exhaustive-deps
   if (!cloned.current) return null
   return <primitive object={cloned.current} />
 }
@@ -364,7 +364,7 @@ function OBJModel({ url, overrides, onLoaded }: { url: string; overrides: Materi
       setObj(object)
       onLoaded(object, { ...info, meshIds })
     }, undefined, (err) => console.error('Error loading OBJ:', err))
-  }, [url]) // eslint-disable-line
+  }, [url]) // eslint-disable-line react-hooks/exhaustive-deps
   if (!obj) return null
   return <primitive object={obj} />
 }

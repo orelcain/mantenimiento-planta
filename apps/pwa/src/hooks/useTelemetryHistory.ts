@@ -11,7 +11,10 @@ export type TimeRange = '1h' | '6h' | '12h' | '24h' | '48h' | '7d'
 /**
  * Hook para obtener historial de telemetría con buffer circular (osciloscopio)
  * Los datos se agregan sin recargar todo el gráfico
- * TODO: Implementar query a Firestore collection 'telemetryHistory'
+ * 
+ * NOTA: Actualmente genera datos sintéticos a partir de la lectura actual.
+ * Pendiente: Implementar query a Firestore collection 'telemetryHistory'
+ * cuando se habilite almacenamiento histórico desde ESP32 o Cloud Function.
  */
 export function useTelemetryHistory(
   equipmentId: string | null,

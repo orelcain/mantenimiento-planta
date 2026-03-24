@@ -684,9 +684,32 @@ service cloud.firestore {
       allow create, update, delete: if isAuthenticated();
     }
 
+    match /ganttProjects/{projectId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isSupervisor();
+    }
+
     match /ganttTaskComments/{commentId} {
       allow read: if isAuthenticated();
       allow create, update, delete: if isAuthenticated();
+    }
+
+    // ============================================
+    // CÓDIGOS DE INVITACIÓN
+    // ============================================
+    match /inviteCodes/{codeId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin();
+      allow update: if isAuthenticated(); // mark as used on registration
+      allow delete: if isAdmin();
+    }
+
+    // ============================================
+    // ROLES PERSONALIZADOS
+    // ============================================
+    match /roles/{roleId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
     }
 
     // ============================================

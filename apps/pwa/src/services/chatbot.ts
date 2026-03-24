@@ -1062,12 +1062,12 @@ async function fetchGraderSummary(): Promise<string> {
   if (cached) return cached
 
   try {
-    // Las sesiones de análisis se guardan en 'graderSessions' o similar
+    // Las sesiones de análisis se guardan en 'graderAnalysisSessions'
     let sessionsCount = 0
     let sessionsInfo = 'No hay sesiones de análisis registradas.'
     
     try {
-      const snap = await getDocs(query(collection(db, 'graderSessions'), orderBy('createdAt', 'desc'), limit(20)))
+      const snap = await getDocs(query(collection(db, 'graderAnalysisSessions'), orderBy('createdAt', 'desc'), limit(20)))
       const sessions = snap.docs.map(d => ({ id: d.id, ...d.data() })) as any[]
       sessionsCount = sessions.length
       

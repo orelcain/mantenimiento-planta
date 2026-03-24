@@ -718,9 +718,7 @@ export function HierarchyPage() {
           className="mb-1"
           ref={el => {
             if (assignRef && firstMatchRef) {
-              // Mantener scroll al primer match
-              // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-              assignRef && (firstMatchRef.current = el)
+              firstMatchRef.current = el
             }
             if (el) {
               nodeRefs.current.set(node.id, el)
