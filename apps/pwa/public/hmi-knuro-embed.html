@@ -1168,7 +1168,12 @@ setInterval(tick,1000);tick();
 /* ── Scale ── */
 function scaleHMI(){
   const p=document.getElementById('hp'),s=document.getElementById('hs');
-  let sc=Math.min((p.clientWidth-72)/800,(p.clientHeight-60)/480,1);
+  if(!p||!s) return;
+  const availW=p.clientWidth||window.innerWidth;
+  const availH=p.clientHeight||window.innerHeight;
+  if(availW<10||availH<10) return; // dimensiones aún no disponibles
+  const rpW=IN_IFRAME?0:300; // en iframe sin panel derecho propio
+  let sc=Math.min((availW-rpW-40)/800,(availH-40)/480,1);
   sc=Math.max(sc,.28);
   s.style.transform=`scale(${sc})`;s.style.width='800px';s.style.height='480px';
   s.parentElement.style.width=Math.round(800*sc)+'px';
@@ -1176,6 +1181,13 @@ function scaleHMI(){
   s.parentElement.style.overflow='hidden';
 }
 window.addEventListener('resize',scaleHMI);
+// ResizeObserver: re-escala cuando el contenedor cambia de tamaño (crítico en iframe)
+if(window.ResizeObserver){
+  document.addEventListener('DOMContentLoaded',()=>{
+    const hp=document.getElementById('hp');
+    if(hp) new ResizeObserver(()=>scaleHMI()).observe(hp);
+  });
+}
 
 /* ── Navigation ── */
 const NAMES={
@@ -2358,6 +2370,9 @@ window.addEventListener('load',async()=>{
   initRefIds();          // asignar data-frid a cada .fr span
 
   if(IN_IFRAME){
+    // En iframe: ocultar panel derecho para maximizar área HMI
+    const rp=document.getElementById('rp');
+    if(rp) rp.style.display='none';
     // Notificar al padre (HmiKnuroPage) que estamos listos para recibir datos
     window.parent.postMessage({type:'hmi:ready'},'*');
     // Los presets/refs llegarán via hmi:init → ver listener arriba
